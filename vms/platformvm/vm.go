@@ -389,8 +389,8 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	server.RegisterInterceptFunc(vm.metrics.InterceptRequestFunc())
-	server.RegisterAfterFunc(vm.metrics.AfterRequestFunc())
+	server.RegisterInterceptFunc(vm.metrics.InterceptRequest)
+	server.RegisterAfterFunc(vm.metrics.AfterRequest)
 	if err := server.RegisterService(&Service{
 		vm:          vm,
 		addrManager: avax.NewAddressManager(vm.ctx),
@@ -514,7 +514,7 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.NodeID]ui
 	endTime := vm.Clock().Time()
 	vm.metrics.IncValidatorSetsCreated()
 	vm.metrics.AddValidatorSetsDuration(endTime.Sub(startTime))
-	vm.metrics.AddValidatorSetsHeightDiff(float64(lastAcceptedHeight - height))
+	vm.metrics.AddValidatorSetsHeightDiff(lastAcceptedHeight - height)
 	return vdrSet, nil
 }
 
@@ -564,8 +564,8 @@ func (vm *VM) updateValidators() error {
 	}
 
 	weight, _ := primaryValidators.GetWeight(vm.ctx.NodeID)
-	vm.metrics.SetLocalStake(float64(weight))
-	vm.metrics.SetTotalStake(float64(primaryValidators.Weight()))
+	vm.metrics.SetLocalStake(weight)
+	vm.metrics.SetTotalStake(primaryValidators.Weight())
 
 	for subnetID := range vm.WhitelistedSubnets {
 		subnetValidators, err := vm.state.ValidatorSet(subnetID)

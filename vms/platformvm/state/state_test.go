@@ -328,7 +328,7 @@ func newStateFromDB(assert *assert.Assertions, db database.Database) State {
 
 	state, err := new(
 		db,
-		metrics.NewNoopMetrics(),
+		metrics.Noop,
 		&config.Config{
 			Validators: vdrs,
 		},

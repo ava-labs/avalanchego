@@ -260,7 +260,7 @@ func defaultState(
 		prometheus.NewRegistry(),
 		cfg,
 		ctx,
-		metrics.NewNoopMetrics(),
+		metrics.Noop,
 		rewards,
 	)
 	if err != nil {

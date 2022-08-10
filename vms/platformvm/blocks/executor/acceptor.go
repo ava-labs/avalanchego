@@ -188,9 +188,9 @@ func (a *acceptor) AbortBlock(b *blocks.AbortBlock) error {
 	// Update metrics
 	if a.bootstrapped.GetValue() {
 		if parentState.initiallyPreferCommit {
-			a.metrics.MarkOptionVoteWon()
-		} else {
 			a.metrics.MarkOptionVoteLost()
+		} else {
+			a.metrics.MarkOptionVoteWon()
 		}
 	}
 

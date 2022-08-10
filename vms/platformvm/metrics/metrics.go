@@ -4,10 +4,8 @@
 package metrics
 
 import (
-	"net/http"
 	"time"
 
-	"github.com/gorilla/rpc/v2"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -19,18 +17,14 @@ import (
 var _ Metrics = &metrics{}
 
 type Metrics interface {
+	metric.APIInterceptor
+
 	// Mark that an option vote that we initially preferred was accepted.
 	MarkOptionVoteWon()
 	// Mark that an option vote that we initially preferred was rejected.
 	MarkOptionVoteLost()
 	// Mark that the given block was accepted.
 	MarkAccepted(blocks.Block) error
-	// Returns an interceptor function to use for API requests
-	// to track API metrics.
-	InterceptRequestFunc() func(*rpc.RequestInfo) *http.Request
-	// Returns an AfterRequest function to use for API requests
-	// to track API metrics.
-	AfterRequestFunc() func(*rpc.RequestInfo)
 	// Mark that a validator set was created.
 	IncValidatorSetsCreated()
 	// Mark that a validator set was cached.
@@ -39,16 +33,15 @@ type Metrics interface {
 	AddValidatorSetsDuration(time.Duration)
 	// Mark that we computed a validator diff at a height with the given
 	// difference from the top.
-	AddValidatorSetsHeightDiff(float64)
+	AddValidatorSetsHeightDiff(uint64)
 	// Mark that this much stake is staked on the node.
-	SetLocalStake(float64)
+	SetLocalStake(uint64)
 	// Mark that this much stake is staked in the network.
-	SetTotalStake(float64)
-	// Mark that this node is connected to this
-	// percent of the subnet's stake.
-	SetSubnetPercentConnected(subnetIDStr string, percent float64)
-	// Mark that this node is connected to this percent
-	// of the Primary network's stake.
+	SetTotalStake(uint64)
+	// Mark that this node is connected to this percent of a subnet's stake.
+	SetSubnetPercentConnected(subnetID ids.ID, percent float64)
+	// Mark that this node is connected to this percent of the Primary Network's
+	// stake.
 	SetPercentConnected(percent float64)
 }
 
@@ -57,96 +50,98 @@ func New(
 	registerer prometheus.Registerer,
 	whitelistedSubnets ids.Set,
 ) (Metrics, error) {
-	res := &metrics{}
-
 	blockMetrics, err := newBlockMetrics(namespace, registerer)
-	res.blockMetrics = blockMetrics
+	m := &metrics{
+		blockMetrics: blockMetrics,
 
-	res.percentConnected = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "percent_connected",
-		Help:      "Percent of connected stake",
-	})
-	res.subnetPercentConnected = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
+		percentConnected: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
-			Name:      "percent_connected_subnet",
-			Help:      "Percent of connected subnet weight",
-		},
-		[]string{"subnetID"},
-	)
-	res.localStake = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "local_staked",
-		Help:      "Total amount of AVAX on this node staked",
-	})
-	res.totalStake = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "total_staked",
-		Help:      "Total amount of AVAX staked",
-	})
+			Name:      "percent_connected",
+			Help:      "Percent of connected stake",
+		}),
+		subnetPercentConnected: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "percent_connected_subnet",
+				Help:      "Percent of connected subnet weight",
+			},
+			[]string{"subnetID"},
+		),
+		localStake: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "local_staked",
+			Help:      "Total amount of AVAX on this node staked",
+		}),
+		totalStake: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "total_staked",
+			Help:      "Total amount of AVAX staked",
+		}),
 
-	res.numVotesWon = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "votes_won",
-		Help:      "Total number of votes this node has won",
-	})
-	res.numVotesLost = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "votes_lost",
-		Help:      "Total number of votes this node has lost",
-	})
+		numVotesWon: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "votes_won",
+			Help:      "Total number of votes this node has won",
+		}),
+		numVotesLost: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "votes_lost",
+			Help:      "Total number of votes this node has lost",
+		}),
 
-	res.validatorSetsCached = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "validator_sets_cached",
-		Help:      "Total number of validator sets cached",
-	})
-	res.validatorSetsCreated = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "validator_sets_created",
-		Help:      "Total number of validator sets created from applying difflayers",
-	})
-	res.validatorSetsHeightDiff = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "validator_sets_height_diff_sum",
-		Help:      "Total number of validator sets diffs applied for generating validator sets",
-	})
-	res.validatorSetsDuration = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "validator_sets_duration_sum",
-		Help:      "Total amount of time generating validator sets in nanoseconds",
-	})
+		validatorSetsCached: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "validator_sets_cached",
+			Help:      "Total number of validator sets cached",
+		}),
+		validatorSetsCreated: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "validator_sets_created",
+			Help:      "Total number of validator sets created from applying difflayers",
+		}),
+		validatorSetsHeightDiff: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "validator_sets_height_diff_sum",
+			Help:      "Total number of validator sets diffs applied for generating validator sets",
+		}),
+		validatorSetsDuration: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "validator_sets_duration_sum",
+			Help:      "Total amount of time generating validator sets in nanoseconds",
+		}),
+	}
 
 	errs := wrappers.Errs{Err: err}
 	apiRequestMetrics, err := metric.NewAPIInterceptor(namespace, registerer)
-	res.apiRequestMetrics = apiRequestMetrics
+	m.APIInterceptor = apiRequestMetrics
 	errs.Add(
 		err,
 
-		registerer.Register(res.percentConnected),
-		registerer.Register(res.subnetPercentConnected),
-		registerer.Register(res.localStake),
-		registerer.Register(res.totalStake),
+		registerer.Register(m.percentConnected),
+		registerer.Register(m.subnetPercentConnected),
+		registerer.Register(m.localStake),
+		registerer.Register(m.totalStake),
 
-		registerer.Register(res.numVotesWon),
-		registerer.Register(res.numVotesLost),
+		registerer.Register(m.numVotesWon),
+		registerer.Register(m.numVotesLost),
 
-		registerer.Register(res.validatorSetsCreated),
-		registerer.Register(res.validatorSetsCached),
-		registerer.Register(res.validatorSetsHeightDiff),
-		registerer.Register(res.validatorSetsDuration),
+		registerer.Register(m.validatorSetsCreated),
+		registerer.Register(m.validatorSetsCached),
+		registerer.Register(m.validatorSetsHeightDiff),
+		registerer.Register(m.validatorSetsDuration),
 	)
 
 	// init subnet tracker metrics with whitelisted subnets
 	for subnetID := range whitelistedSubnets {
 		// initialize to 0
-		res.subnetPercentConnected.WithLabelValues(subnetID.String()).Set(0)
+		m.subnetPercentConnected.WithLabelValues(subnetID.String()).Set(0)
 	}
-	return res, errs.Err
+	return m, errs.Err
 }
 
 type metrics struct {
+	metric.APIInterceptor
+
 	blockMetrics *blockMetrics
 
 	percentConnected       prometheus.Gauge
@@ -160,8 +155,6 @@ type metrics struct {
 	validatorSetsCreated    prometheus.Counter
 	validatorSetsHeightDiff prometheus.Gauge
 	validatorSetsDuration   prometheus.Gauge
-
-	apiRequestMetrics metric.APIInterceptor
 }
 
 func (m *metrics) MarkOptionVoteWon() {
@@ -176,14 +169,6 @@ func (m *metrics) MarkAccepted(b blocks.Block) error {
 	return b.Visit(m.blockMetrics)
 }
 
-func (m *metrics) InterceptRequestFunc() func(*rpc.RequestInfo) *http.Request {
-	return m.apiRequestMetrics.InterceptRequest
-}
-
-func (m *metrics) AfterRequestFunc() func(*rpc.RequestInfo) {
-	return m.apiRequestMetrics.AfterRequest
-}
-
 func (m *metrics) IncValidatorSetsCreated() {
 	m.validatorSetsCreated.Inc()
 }
@@ -196,20 +181,20 @@ func (m *metrics) AddValidatorSetsDuration(d time.Duration) {
 	m.validatorSetsDuration.Add(float64(d))
 }
 
-func (m *metrics) AddValidatorSetsHeightDiff(d float64) {
-	m.validatorSetsHeightDiff.Add(d)
+func (m *metrics) AddValidatorSetsHeightDiff(d uint64) {
+	m.validatorSetsHeightDiff.Add(float64(d))
 }
 
-func (m *metrics) SetLocalStake(s float64) {
-	m.localStake.Set(s)
+func (m *metrics) SetLocalStake(s uint64) {
+	m.localStake.Set(float64(s))
 }
 
-func (m *metrics) SetTotalStake(s float64) {
-	m.totalStake.Set(s)
+func (m *metrics) SetTotalStake(s uint64) {
+	m.totalStake.Set(float64(s))
 }
 
-func (m *metrics) SetSubnetPercentConnected(label string, percent float64) {
-	m.subnetPercentConnected.WithLabelValues(label).Set(percent)
+func (m *metrics) SetSubnetPercentConnected(subnetID ids.ID, percent float64) {
+	m.subnetPercentConnected.WithLabelValues(subnetID.String()).Set(percent)
 }
 
 func (m *metrics) SetPercentConnected(percent float64) {
