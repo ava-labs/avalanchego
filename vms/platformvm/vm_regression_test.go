@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -689,8 +690,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		prometheus.NewRegistry(),
 		&vm.Config,
 		vm.ctx,
-		vm.LocalStake,
-		vm.TotalStake,
+		metrics.Noop,
 		vm.rewards,
 	)
 	assert.NoError(err)
@@ -1063,8 +1063,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		prometheus.NewRegistry(),
 		&vm.Config,
 		vm.ctx,
-		vm.LocalStake,
-		vm.TotalStake,
+		metrics.Noop,
 		vm.rewards,
 	)
 	assert.NoError(err)
@@ -1215,6 +1214,99 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	validators, err = vm.GetValidatorSet(5, constants.PrimaryNetworkID)
 	assert.NoError(err)
 	assert.Equal(expectedValidators2, validators)
+}
+
+func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
+	assert := assert.New(t)
+
+	validatorStartTime := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
+	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
+	validatorStake := defaultMaxValidatorStake / 5
+
+	delegator1StartTime := validatorStartTime
+	delegator1EndTime := delegator1StartTime.Add(3 * defaultMinStakingDuration)
+	delegator1Stake := defaultMaxValidatorStake - validatorStake
+
+	delegator2StartTime := delegator1EndTime
+	delegator2EndTime := delegator2StartTime.Add(3 * defaultMinStakingDuration)
+	delegator2Stake := defaultMaxValidatorStake - validatorStake
+
+	vm, _, _, _ := defaultVM()
+
+	vm.ctx.Lock.Lock()
+	defer func() {
+		err := vm.Shutdown()
+		assert.NoError(err)
+
+		vm.ctx.Lock.Unlock()
+	}()
+
+	key, err := testKeyfactory.NewPrivateKey()
+	assert.NoError(err)
+
+	id := key.PublicKey().Address()
+	changeAddr := keys[0].PublicKey().Address()
+
+	// create valid tx
+	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
+		validatorStake,
+		uint64(validatorStartTime.Unix()),
+		uint64(validatorEndTime.Unix()),
+		ids.NodeID(id),
+		id,
+		reward.PercentDenominator,
+		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
+		changeAddr,
+	)
+	assert.NoError(err)
+
+	// issue the add validator tx
+	err = vm.blockBuilder.AddUnverifiedTx(addValidatorTx)
+	assert.NoError(err)
+
+	// trigger block creation for the validator tx
+	addValidatorBlock, err := vm.BuildBlock()
+	assert.NoError(err)
+
+	verifyAndAcceptProposalCommitment(assert, vm, addValidatorBlock)
+
+	// create valid tx
+	addFirstDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
+		delegator1Stake,
+		uint64(delegator1StartTime.Unix()),
+		uint64(delegator1EndTime.Unix()),
+		ids.NodeID(id),
+		keys[0].PublicKey().Address(),
+		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
+		changeAddr,
+	)
+	assert.NoError(err)
+
+	// issue the first add delegator tx
+	err = vm.blockBuilder.AddUnverifiedTx(addFirstDelegatorTx)
+	assert.NoError(err)
+
+	// trigger block creation for the first add delegator tx
+	addFirstDelegatorBlock, err := vm.BuildBlock()
+	assert.NoError(err)
+
+	verifyAndAcceptProposalCommitment(assert, vm, addFirstDelegatorBlock)
+
+	// create valid tx
+	addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
+		delegator2Stake,
+		uint64(delegator2StartTime.Unix()),
+		uint64(delegator2EndTime.Unix()),
+		ids.NodeID(id),
+		keys[0].PublicKey().Address(),
+		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
+		changeAddr,
+	)
+	assert.NoError(err)
+
+	// attempting to issue the second add delegator tx should fail because the
+	// total stake weight would go over the limit.
+	assert.Error(vm.blockBuilder.AddUnverifiedTx(addSecondDelegatorTx))
 }
 
 func verifyAndAcceptProposalCommitment(assert *assert.Assertions, vm *VM, blk snowman.Block) {

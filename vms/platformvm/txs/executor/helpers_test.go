@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -230,17 +231,6 @@ func defaultState(
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
-	dummyLocalStake := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "uts",
-		Name:      "local_staked",
-		Help:      "Total amount of AVAX on this node staked",
-	})
-	dummyTotalStake := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "uts",
-		Name:      "total_staked",
-		Help:      "Total amount of AVAX staked",
-	})
-
 	genesisBytes := buildGenesisTest(ctx)
 	state, err := state.New(
 		db,
@@ -248,8 +238,7 @@ func defaultState(
 		prometheus.NewRegistry(),
 		cfg,
 		ctx,
-		dummyLocalStake,
-		dummyTotalStake,
+		metrics.Noop,
 		rewards,
 	)
 	if err != nil {
