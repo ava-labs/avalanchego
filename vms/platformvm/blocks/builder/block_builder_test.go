@@ -7,9 +7,10 @@ import (
 	"math"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/stretchr/testify/assert"
 )
 
 // shows that a locally generated CreateChainTx can be added to mempool and then
