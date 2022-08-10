@@ -42,9 +42,6 @@ type BlockBuilder interface {
 	mempool.BlockTimer
 	Network
 
-	// StartTimer starts a timer to periodically check whether a block can be built
-	StartTimer()
-
 	// set preferred block on top of which we'll build next
 	SetPreference(blockID ids.ID) error
 
@@ -117,8 +114,6 @@ func NewBlockBuilder(
 	go txExecutorBackend.Ctx.Log.RecoverAndPanic(builder.timer.Dispatch)
 	return builder
 }
-
-func (b *blockBuilder) StartTimer() { b.timer.Dispatch() }
 
 func (b *blockBuilder) SetPreference(blockID ids.ID) error {
 	if blockID == b.preferredBlockID {
