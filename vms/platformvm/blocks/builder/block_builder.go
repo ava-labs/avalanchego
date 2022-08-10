@@ -43,7 +43,7 @@ type BlockBuilder interface {
 	Network
 
 	// set preferred block on top of which we'll build next
-	SetPreference(blockID ids.ID) error
+	SetPreference(blockID ids.ID)
 
 	// get preferred block on top of which we'll build next
 	Preferred() (snowman.Block, error)
@@ -115,14 +115,14 @@ func NewBlockBuilder(
 	return builder
 }
 
-func (b *blockBuilder) SetPreference(blockID ids.ID) error {
+func (b *blockBuilder) SetPreference(blockID ids.ID) {
 	if blockID == b.preferredBlockID {
 		// If the preference didn't change, then this is a noop
-		return nil
+		return
 	}
 	b.preferredBlockID = blockID
 	b.ResetBlockTimer()
-	return nil
+	return
 }
 
 func (b *blockBuilder) Preferred() (snowman.Block, error) {

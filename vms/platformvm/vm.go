@@ -375,7 +375,8 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 
 // SetPreference sets the preferred block to be the one with ID [blkID]
 func (vm *VM) SetPreference(blkID ids.ID) error {
-	return vm.BlockBuilder.SetPreference(blkID)
+	vm.BlockBuilder.SetPreference(blkID)
+	return nil
 }
 
 func (vm *VM) Version() (string, error) {
