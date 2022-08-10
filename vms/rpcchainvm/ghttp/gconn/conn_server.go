@@ -19,7 +19,7 @@ var _ connpb.ConnServer = &Server{}
 
 // Server is an http.Conn that is managed over RPC.
 type Server struct {
-	connpb.UnimplementedConnServer
+	connpb.UnsafeConnServer
 	conn   net.Conn
 	closer *grpcutils.ServerCloser
 }

@@ -11,19 +11,22 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/database/rocksdb"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestNewSingleRocksDB(t *testing.T) {
 	dir := t.TempDir()
 
-	v1 := version.DefaultVersion1_0_0
+	v1 := version.Semantic1_0_0
 
 	dbPath := filepath.Join(dir, v1.String())
-	db, err := rocksdb.New(dbPath, nil, logging.NoLog{})
+	db, err := rocksdb.New(dbPath, nil, logging.NoLog{}, "", prometheus.NewRegistry())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +36,7 @@ func TestNewSingleRocksDB(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager, err := NewRocksDB(dir, nil, logging.NoLog{}, v1)
+	manager, err := NewRocksDB(dir, nil, logging.NoLog{}, v1, "", prometheus.NewRegistry())
 	if err != nil {
 		t.Fatal(err)
 	}

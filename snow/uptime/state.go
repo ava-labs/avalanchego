@@ -10,7 +10,10 @@ import (
 )
 
 type State interface {
-	GetUptime(nodeID ids.ShortID) (upDuration time.Duration, lastUpdated time.Time, err error)
-	SetUptime(nodeID ids.ShortID, upDuration time.Duration, lastUpdated time.Time) error
-	GetStartTime(nodeID ids.ShortID) (startTime time.Time, err error)
+	// GetUptime returns [upDuration] and [lastUpdated] to be truncated (floored) to the nearest second
+	GetUptime(nodeID ids.NodeID) (upDuration time.Duration, lastUpdated time.Time, err error)
+	// SetUptime expects [upDuration] and [lastUpdated] to be truncated (floored) to the nearest second
+	SetUptime(nodeID ids.NodeID, upDuration time.Duration, lastUpdated time.Time) error
+	// GetStartTime returns [startTime] truncated (floored) to the nearest second
+	GetStartTime(nodeID ids.NodeID) (startTime time.Time, err error)
 }

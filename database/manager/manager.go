@@ -82,7 +82,9 @@ func NewRocksDB(
 	dbDirPath string,
 	dbConfig []byte,
 	log logging.Logger,
-	currentVersion version.Version,
+	currentVersion *version.Semantic,
+	namespace string,
+	reg prometheus.Registerer,
 ) (Manager, error) {
 	return new(
 		rocksdb.New,
@@ -90,6 +92,8 @@ func NewRocksDB(
 		dbConfig,
 		log,
 		currentVersion,
+		namespace,
+		reg,
 	)
 }
 
@@ -101,7 +105,9 @@ func NewLevelDB(
 	dbDirPath string,
 	dbConfig []byte,
 	log logging.Logger,
-	currentVersion version.Version,
+	currentVersion *version.Semantic,
+	namespace string,
+	reg prometheus.Registerer,
 ) (Manager, error) {
 	return new(
 		leveldb.New,
@@ -109,6 +115,8 @@ func NewLevelDB(
 		dbConfig,
 		log,
 		currentVersion,
+		namespace,
+		reg,
 	)
 }
 
@@ -117,16 +125,17 @@ func NewLevelDB(
 // [includePreviousVersions], opens previous database versions and includes them
 // in the returned Manager.
 func new(
-	newDB func(string, []byte, logging.Logger) (database.Database, error),
+	newDB func(string, []byte, logging.Logger, string, prometheus.Registerer) (database.Database, error),
 	dbDirPath string,
 	dbConfig []byte,
 	log logging.Logger,
-	currentVersion version.Version,
+	currentVersion *version.Semantic,
+	namespace string,
+	reg prometheus.Registerer,
 ) (Manager, error) {
-	parser := version.NewDefaultParser()
 	currentDBPath := filepath.Join(dbDirPath, currentVersion.String())
 
-	currentDB, err := newDB(currentDBPath, dbConfig, log)
+	currentDB, err := newDB(currentDBPath, dbConfig, log, namespace, reg)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create db at %s: %w", currentDBPath, err)
 	}
@@ -161,30 +170,36 @@ func new(
 			return nil
 		}
 		_, dbName := filepath.Split(path)
-		version, err := parser.Parse(dbName)
+		dbVersion, err := version.Parse(dbName)
 		if err != nil {
 			// If the database directory contains any directories that don't
 			// match the expected version format, ignore them.
 			return filepath.SkipDir
 		}
 
-		// If [version] is greater than or equal to the specified version
+		// If [dbVersion] is greater than or equal to the specified version
 		// skip over creating the new database to avoid creating the same db
 		// twice or creating a database with a version ahead of the desired one.
-		if cmp := version.Compare(currentVersion); cmp >= 0 {
+		if cmp := dbVersion.Compare(currentVersion); cmp >= 0 {
 			return filepath.SkipDir
 		}
 
-		db, err := newDB(path, dbConfig, log)
+		versionStr := strings.ReplaceAll(dbName, ".", "_")
+		var dbNamespace string
+		if len(namespace) > 0 {
+			dbNamespace = fmt.Sprintf("%s_%s", namespace, versionStr)
+		} else {
+			dbNamespace = versionStr
+		}
+
+		db, err := newDB(path, dbConfig, log, dbNamespace, reg)
 		if err != nil {
 			return fmt.Errorf("couldn't create db at %s: %w", path, err)
 		}
 
-		wrappedDB := corruptabledb.New(db)
-
 		manager.databases = append(manager.databases, &VersionedDatabase{
-			Database: wrappedDB,
-			Version:  version,
+			Database: corruptabledb.New(db),
+			Version:  dbVersion,
 		})
 
 		return filepath.SkipDir
@@ -203,7 +218,7 @@ func new(
 
 // NewMemDB returns a database manager with a single memdb instance with
 // [currentVersion].
-func NewMemDB(currentVersion version.Version) Manager {
+func NewMemDB(currentVersion *version.Semantic) Manager {
 	return &manager{
 		databases: []*VersionedDatabase{
 			{

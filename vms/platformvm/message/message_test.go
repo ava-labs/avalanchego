@@ -6,10 +6,10 @@ package message
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestTx(t *testing.T) {

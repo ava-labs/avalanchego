@@ -6,7 +6,8 @@ package p
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -51,13 +52,13 @@ func (b *builderWithOptions) GetImportableBalance(
 }
 
 func (b *builderWithOptions) NewAddValidatorTx(
-	validator *platformvm.Validator,
+	vdr *validator.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
 	options ...common.Option,
-) (*platformvm.UnsignedAddValidatorTx, error) {
+) (*txs.AddValidatorTx, error) {
 	return b.Builder.NewAddValidatorTx(
-		validator,
+		vdr,
 		rewardsOwner,
 		shares,
 		common.UnionOptions(b.options, options)...,
@@ -65,22 +66,22 @@ func (b *builderWithOptions) NewAddValidatorTx(
 }
 
 func (b *builderWithOptions) NewAddSubnetValidatorTx(
-	validator *platformvm.SubnetValidator,
+	vdr *validator.SubnetValidator,
 	options ...common.Option,
-) (*platformvm.UnsignedAddSubnetValidatorTx, error) {
+) (*txs.AddSubnetValidatorTx, error) {
 	return b.Builder.NewAddSubnetValidatorTx(
-		validator,
+		vdr,
 		common.UnionOptions(b.options, options)...,
 	)
 }
 
 func (b *builderWithOptions) NewAddDelegatorTx(
-	validator *platformvm.Validator,
+	vdr *validator.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,
-) (*platformvm.UnsignedAddDelegatorTx, error) {
+) (*txs.AddDelegatorTx, error) {
 	return b.Builder.NewAddDelegatorTx(
-		validator,
+		vdr,
 		rewardsOwner,
 		common.UnionOptions(b.options, options)...,
 	)
@@ -93,7 +94,7 @@ func (b *builderWithOptions) NewCreateChainTx(
 	fxIDs []ids.ID,
 	chainName string,
 	options ...common.Option,
-) (*platformvm.UnsignedCreateChainTx, error) {
+) (*txs.CreateChainTx, error) {
 	return b.Builder.NewCreateChainTx(
 		subnetID,
 		genesis,
@@ -107,7 +108,7 @@ func (b *builderWithOptions) NewCreateChainTx(
 func (b *builderWithOptions) NewCreateSubnetTx(
 	owner *secp256k1fx.OutputOwners,
 	options ...common.Option,
-) (*platformvm.UnsignedCreateSubnetTx, error) {
+) (*txs.CreateSubnetTx, error) {
 	return b.Builder.NewCreateSubnetTx(
 		owner,
 		common.UnionOptions(b.options, options)...,
@@ -118,7 +119,7 @@ func (b *builderWithOptions) NewImportTx(
 	sourceChainID ids.ID,
 	to *secp256k1fx.OutputOwners,
 	options ...common.Option,
-) (*platformvm.UnsignedImportTx, error) {
+) (*txs.ImportTx, error) {
 	return b.Builder.NewImportTx(
 		sourceChainID,
 		to,
@@ -130,7 +131,7 @@ func (b *builderWithOptions) NewExportTx(
 	chainID ids.ID,
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
-) (*platformvm.UnsignedExportTx, error) {
+) (*txs.ExportTx, error) {
 	return b.Builder.NewExportTx(
 		chainID,
 		outputs,

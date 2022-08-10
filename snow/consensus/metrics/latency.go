@@ -7,12 +7,16 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 var _ Latency = &latency{}
@@ -125,7 +129,10 @@ func (l *latency) Issued(id ids.ID, pollNumber uint64) {
 func (l *latency) Accepted(id ids.ID, pollNumber uint64) {
 	startIntf, ok := l.processingEntries.Get(id)
 	if !ok {
-		l.log.Debug("unable to measure Accepted transaction %v", id.String())
+		l.log.Debug("unable to measure tx latency",
+			zap.Stringer("status", choices.Accepted),
+			zap.Stringer("txID", id),
+		)
 		return
 	}
 	l.processingEntries.Delete(id)
@@ -142,7 +149,10 @@ func (l *latency) Accepted(id ids.ID, pollNumber uint64) {
 func (l *latency) Rejected(id ids.ID, pollNumber uint64) {
 	startIntf, ok := l.processingEntries.Get(id)
 	if !ok {
-		l.log.Debug("unable to measure Rejected transaction %v", id.String())
+		l.log.Debug("unable to measure tx latency",
+			zap.Stringer("status", choices.Rejected),
+			zap.Stringer("txID", id),
+		)
 		return
 	}
 	l.processingEntries.Delete(id)

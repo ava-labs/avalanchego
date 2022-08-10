@@ -17,7 +17,7 @@ var (
 
 type Message interface {
 	// Handle this message with the correct message handler
-	Handle(handler Handler, nodeID ids.ShortID, requestID uint32) error
+	Handle(handler Handler, nodeID ids.NodeID, requestID uint32) error
 
 	// initialize should be called whenever a message is built or parsed
 	initialize([]byte)
@@ -39,7 +39,7 @@ type Tx struct {
 	Tx []byte `serialize:"true"`
 }
 
-func (msg *Tx) Handle(handler Handler, nodeID ids.ShortID, requestID uint32) error {
+func (msg *Tx) Handle(handler Handler, nodeID ids.NodeID, requestID uint32) error {
 	return handler.HandleTx(nodeID, requestID, msg)
 }
 

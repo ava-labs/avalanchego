@@ -8,6 +8,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
@@ -83,9 +85,10 @@ func NewMessageMetrics(
 }
 
 type Metrics struct {
-	Log            logging.Logger
-	FailedToParse  prometheus.Counter
-	MessageMetrics map[message.Op]*MessageMetrics
+	Log                     logging.Logger
+	FailedToParse           prometheus.Counter
+	NumUselessPeerListBytes prometheus.Counter
+	MessageMetrics          map[message.Op]*MessageMetrics
 }
 
 func NewMetrics(
@@ -100,11 +103,19 @@ func NewMetrics(
 			Name:      "msgs_failed_to_parse",
 			Help:      "Number of messages that could not be parsed or were invalidly formed",
 		}),
+		NumUselessPeerListBytes: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "num_useless_peerlist_bytes",
+			Help:      "Amount of useless bytes (i.e. information about nodes we already knew/don't want to connect to) received in PeerList messages",
+		}),
 		MessageMetrics: make(map[message.Op]*MessageMetrics, len(message.ExternalOps)),
 	}
 
 	errs := wrappers.Errs{}
-	errs.Add(registerer.Register(m.FailedToParse))
+	errs.Add(
+		registerer.Register(m.FailedToParse),
+		registerer.Register(m.NumUselessPeerListBytes),
+	)
 	for _, op := range message.ExternalOps {
 		m.MessageMetrics[op] = NewMessageMetrics(op, namespace, registerer, &errs)
 	}
@@ -118,8 +129,8 @@ func (m *Metrics) Sent(msg message.OutboundMessage) {
 	msgMetrics := m.MessageMetrics[op]
 	if msgMetrics == nil {
 		m.Log.Error(
-			"unknown message being sent with op %s",
-			op,
+			"unknown message being sent",
+			zap.Stringer("messageOp", op),
 		)
 		msg.DecRef()
 		return
@@ -137,9 +148,9 @@ func (m *Metrics) MultipleSendsFailed(op message.Op, count int) {
 	msgMetrics := m.MessageMetrics[op]
 	if msgMetrics == nil {
 		m.Log.Error(
-			"%d unknown messages failed to be sent with op %s",
-			count,
-			op,
+			"unknown messages failed to be sent",
+			zap.Stringer("messageOp", op),
+			zap.Int("messageCount", count),
 		)
 		return
 	}
@@ -153,8 +164,8 @@ func (m *Metrics) SendFailed(msg message.OutboundMessage) {
 	msgMetrics := m.MessageMetrics[op]
 	if msgMetrics == nil {
 		m.Log.Error(
-			"unknown message failed to be sent with op %s",
-			op,
+			"unknown message failed to be sent",
+			zap.Stringer("messageOp", op),
 		)
 		msg.DecRef()
 		return
@@ -168,8 +179,8 @@ func (m *Metrics) Received(msg message.InboundMessage, msgLen uint32) {
 	msgMetrics := m.MessageMetrics[op]
 	if msgMetrics == nil {
 		m.Log.Error(
-			"unknown message received with op %s",
-			op,
+			"unknown message received",
+			zap.Stringer("messageOp", op),
 		)
 		return
 	}

@@ -23,10 +23,10 @@ import (
 func TestNewSingleLevelDB(t *testing.T) {
 	dir := t.TempDir()
 
-	v1 := version.DefaultVersion1_0_0
+	v1 := version.Semantic1_0_0
 
 	dbPath := filepath.Join(dir, v1.String())
-	db, err := leveldb.New(dbPath, nil, logging.NoLog{})
+	db, err := leveldb.New(dbPath, nil, logging.NoLog{}, "", prometheus.NewRegistry())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +36,7 @@ func TestNewSingleLevelDB(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager, err := NewLevelDB(dir, nil, logging.NoLog{}, v1)
+	manager, err := NewLevelDB(dir, nil, logging.NoLog{}, v1, "", prometheus.NewRegistry())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,9 +58,9 @@ func TestNewSingleLevelDB(t *testing.T) {
 func TestNewCreatesSingleDB(t *testing.T) {
 	dir := t.TempDir()
 
-	v1 := version.DefaultVersion1_0_0
+	v1 := version.Semantic1_0_0
 
-	manager, err := NewLevelDB(dir, nil, logging.NoLog{}, v1)
+	manager, err := NewLevelDB(dir, nil, logging.NoLog{}, v1, "", prometheus.NewRegistry())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,17 +82,25 @@ func TestNewCreatesSingleDB(t *testing.T) {
 func TestNewInvalidMemberPresent(t *testing.T) {
 	dir := t.TempDir()
 
-	v1 := version.NewDefaultVersion(1, 1, 0)
-	v2 := version.NewDefaultVersion(1, 2, 0)
+	v1 := &version.Semantic{
+		Major: 1,
+		Minor: 1,
+		Patch: 0,
+	}
+	v2 := &version.Semantic{
+		Major: 1,
+		Minor: 2,
+		Patch: 0,
+	}
 
 	dbPath1 := filepath.Join(dir, v1.String())
-	db1, err := leveldb.New(dbPath1, nil, logging.NoLog{})
+	db1, err := leveldb.New(dbPath1, nil, logging.NoLog{}, "", prometheus.NewRegistry())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	dbPath2 := filepath.Join(dir, v2.String())
-	db2, err := leveldb.New(dbPath2, nil, logging.NoLog{})
+	db2, err := leveldb.New(dbPath2, nil, logging.NoLog{}, "", prometheus.NewRegistry())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +110,7 @@ func TestNewInvalidMemberPresent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = NewLevelDB(dir, nil, logging.NoLog{}, v2)
+	_, err = NewLevelDB(dir, nil, logging.NoLog{}, v2, "", prometheus.NewRegistry())
 	assert.Error(t, err, "expected to error creating the manager due to an open db")
 
 	err = db1.Close()
@@ -114,7 +122,7 @@ func TestNewInvalidMemberPresent(t *testing.T) {
 	err = f.Close()
 	assert.NoError(t, err)
 
-	db, err := NewLevelDB(dir, nil, logging.NoLog{}, v1)
+	db, err := NewLevelDB(dir, nil, logging.NoLog{}, v1, "", prometheus.NewRegistry())
 	assert.NoError(t, err, "expected not to error with a non-directory file being present")
 
 	err = db.Close()
@@ -124,17 +132,37 @@ func TestNewInvalidMemberPresent(t *testing.T) {
 func TestNewSortsDatabases(t *testing.T) {
 	dir := t.TempDir()
 
-	vers := []version.Version{
-		version.NewDefaultVersion(2, 1, 2),
-		version.NewDefaultVersion(2, 0, 2),
-		version.NewDefaultVersion(1, 3, 2),
-		version.NewDefaultVersion(1, 0, 2),
-		version.NewDefaultVersion(1, 0, 1),
+	vers := []*version.Semantic{
+		{
+			Major: 2,
+			Minor: 1,
+			Patch: 2,
+		},
+		{
+			Major: 2,
+			Minor: 0,
+			Patch: 2,
+		},
+		{
+			Major: 1,
+			Minor: 3,
+			Patch: 2,
+		},
+		{
+			Major: 1,
+			Minor: 0,
+			Patch: 2,
+		},
+		{
+			Major: 1,
+			Minor: 0,
+			Patch: 1,
+		},
 	}
 
 	for _, version := range vers {
 		dbPath := filepath.Join(dir, version.String())
-		db, err := leveldb.New(dbPath, nil, logging.NoLog{})
+		db, err := leveldb.New(dbPath, nil, logging.NoLog{}, "", prometheus.NewRegistry())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -145,7 +173,7 @@ func TestNewSortsDatabases(t *testing.T) {
 		}
 	}
 
-	manager, err := NewLevelDB(dir, nil, logging.NoLog{}, vers[0])
+	manager, err := NewLevelDB(dir, nil, logging.NoLog{}, vers[0], "", prometheus.NewRegistry())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,7 +227,7 @@ func TestPrefixDBManager(t *testing.T) {
 	m := &manager{databases: []*VersionedDatabase{
 		{
 			Database: db,
-			Version:  version.DefaultVersion1_0_0,
+			Version:  version.Semantic1_0_0,
 		},
 	}}
 
@@ -237,7 +265,7 @@ func TestNestedPrefixDBManager(t *testing.T) {
 	m := &manager{databases: []*VersionedDatabase{
 		{
 			Database: db,
-			Version:  version.DefaultVersion1_0_0,
+			Version:  version.Semantic1_0_0,
 		},
 	}}
 
@@ -259,15 +287,23 @@ func TestMeterDBManager(t *testing.T) {
 	m := &manager{databases: []*VersionedDatabase{
 		{
 			Database: memdb.New(),
-			Version:  version.NewDefaultVersion(2, 0, 0),
+			Version: &version.Semantic{
+				Major: 2,
+				Minor: 0,
+				Patch: 0,
+			},
 		},
 		{
 			Database: memdb.New(),
-			Version:  version.NewDefaultVersion(1, 5, 0),
+			Version: &version.Semantic{
+				Major: 1,
+				Minor: 5,
+				Patch: 0,
+			},
 		},
 		{
 			Database: memdb.New(),
-			Version:  version.DefaultVersion1_0_0,
+			Version:  version.Semantic1_0_0,
 		},
 	}}
 
@@ -298,15 +334,23 @@ func TestCompleteMeterDBManager(t *testing.T) {
 	m := &manager{databases: []*VersionedDatabase{
 		{
 			Database: memdb.New(),
-			Version:  version.NewDefaultVersion(2, 0, 0),
+			Version: &version.Semantic{
+				Major: 2,
+				Minor: 0,
+				Patch: 0,
+			},
 		},
 		{
 			Database: memdb.New(),
-			Version:  version.NewDefaultVersion(1, 5, 0),
+			Version: &version.Semantic{
+				Major: 1,
+				Minor: 5,
+				Patch: 0,
+			},
 		},
 		{
 			Database: memdb.New(),
-			Version:  version.DefaultVersion1_0_0,
+			Version:  version.Semantic1_0_0,
 		},
 	}}
 
@@ -332,10 +376,22 @@ func TestCompleteMeterDBManager(t *testing.T) {
 }
 
 func TestNewManagerFromDBs(t *testing.T) {
-	versions := []version.Version{
-		version.NewDefaultVersion(3, 2, 0),
-		version.NewDefaultVersion(1, 2, 0),
-		version.NewDefaultVersion(1, 1, 1),
+	versions := []*version.Semantic{
+		{
+			Major: 3,
+			Minor: 2,
+			Patch: 0,
+		},
+		{
+			Major: 1,
+			Minor: 2,
+			Patch: 0,
+		},
+		{
+			Major: 1,
+			Minor: 1,
+			Patch: 1,
+		},
 	}
 	m, err := NewManagerFromDBs(
 		[]*VersionedDatabase{
@@ -372,15 +428,27 @@ func TestNewManagerFromNonUniqueDBs(t *testing.T) {
 		[]*VersionedDatabase{
 			{
 				Database: memdb.New(),
-				Version:  version.NewDefaultVersion(1, 1, 0),
+				Version: &version.Semantic{
+					Major: 1,
+					Minor: 1,
+					Patch: 0,
+				},
 			},
 			{
 				Database: memdb.New(),
-				Version:  version.NewDefaultVersion(1, 1, 0), // Duplicate
+				Version: &version.Semantic{
+					Major: 1,
+					Minor: 1,
+					Patch: 0,
+				}, // Duplicate
 			},
 			{
 				Database: memdb.New(),
-				Version:  version.NewDefaultVersion(1, 2, 0),
+				Version: &version.Semantic{
+					Major: 1,
+					Minor: 2,
+					Patch: 0,
+				},
 			},
 		})
 	assert.Error(t, err)

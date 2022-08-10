@@ -10,11 +10,16 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
+	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
 )
 
-var _ VMGetter = &vmGetter{}
+var (
+	_ VMGetter = &vmGetter{}
+
+	errInvalidVMID = errors.New("invalid vmID")
+)
 
 // VMGetter defines functionality to get the plugins on the node.
 type VMGetter interface {
@@ -32,6 +37,7 @@ type VMGetterConfig struct {
 	FileReader      filesystem.Reader
 	Manager         vms.Manager
 	PluginDirectory string
+	CPUTracker      resource.ProcessTracker
 }
 
 type vmGetter struct {
@@ -73,7 +79,7 @@ func (getter *vmGetter) Get() (map[ids.ID]vms.Factory, map[ids.ID]vms.Factory, e
 			// there is no alias with plugin name, try to use full vmID.
 			vmID, err = ids.FromString(name)
 			if err != nil {
-				return nil, nil, fmt.Errorf("invalid vmID %s", name)
+				return nil, nil, fmt.Errorf("%w: %q", errInvalidVMID, name)
 			}
 		}
 
@@ -93,6 +99,7 @@ func (getter *vmGetter) Get() (map[ids.ID]vms.Factory, map[ids.ID]vms.Factory, e
 
 		unregisteredVMs[vmID] = rpcchainvm.NewFactory(
 			filepath.Join(getter.config.PluginDirectory, file.Name()),
+			getter.config.CPUTracker,
 		)
 	}
 	return registeredVMs, unregisteredVMs, nil

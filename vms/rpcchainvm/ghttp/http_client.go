@@ -217,7 +217,7 @@ func getHTTPSimpleRequest(r *http.Request) (*httppb.HandleSimpleHTTPRequest, err
 // convertWriteResponse converts a gRPC HandleSimpleHTTPResponse to an HTTP response.
 func convertWriteResponse(w http.ResponseWriter, resp *httppb.HandleSimpleHTTPResponse) error {
 	grpcutils.MergeHTTPHeader(resp.Headers, w.Header())
-	w.WriteHeader(int(resp.Code))
+	w.WriteHeader(grpcutils.EnsureValidResponseCode(int(resp.Code)))
 	_, err := w.Write(resp.Body)
 	return err
 }

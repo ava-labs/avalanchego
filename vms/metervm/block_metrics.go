@@ -23,12 +23,26 @@ type blockMetrics struct {
 	verifyErr,
 	accept,
 	reject,
+	// Batched metrics
 	getAncestors,
-	batchedParseBlock metric.Averager
+	batchedParseBlock,
+	// Height metrics
+	verifyHeightIndex,
+	getBlockIDAtHeight,
+	// State sync metrics
+	stateSyncEnabled,
+	getOngoingSyncStateSummary,
+	getLastStateSummary,
+	parseStateSummary,
+	parseStateSummaryErr,
+	getStateSummary,
+	getStateSummaryErr metric.Averager
 }
 
 func (m *blockMetrics) Initialize(
 	supportsBatchedFetching bool,
+	supportsHeightIndexing bool,
+	supportsStateSync bool,
 	namespace string,
 	reg prometheus.Registerer,
 ) error {
@@ -49,6 +63,19 @@ func (m *blockMetrics) Initialize(
 	if supportsBatchedFetching {
 		m.getAncestors = newAverager(namespace, "get_ancestors", reg, &errs)
 		m.batchedParseBlock = newAverager(namespace, "batched_parse_block", reg, &errs)
+	}
+	if supportsHeightIndexing {
+		m.verifyHeightIndex = newAverager(namespace, "verify_height_index", reg, &errs)
+		m.getBlockIDAtHeight = newAverager(namespace, "get_block_id_at_height", reg, &errs)
+	}
+	if supportsStateSync {
+		m.stateSyncEnabled = newAverager(namespace, "state_sync_enabled", reg, &errs)
+		m.getOngoingSyncStateSummary = newAverager(namespace, "get_ongoing_state_sync_summary", reg, &errs)
+		m.getLastStateSummary = newAverager(namespace, "get_last_state_summary", reg, &errs)
+		m.parseStateSummary = newAverager(namespace, "parse_state_summary", reg, &errs)
+		m.parseStateSummaryErr = newAverager(namespace, "parse_state_summary_err", reg, &errs)
+		m.getStateSummary = newAverager(namespace, "get_state_summary", reg, &errs)
+		m.getStateSummaryErr = newAverager(namespace, "get_state_summary_err", reg, &errs)
 	}
 	return errs.Err
 }

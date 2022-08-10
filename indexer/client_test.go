@@ -7,10 +7,12 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/rpc"
-	"github.com/stretchr/testify/assert"
 )
 
 type mockClient struct {
@@ -37,40 +39,54 @@ func TestIndexClient(t *testing.T) {
 				return nil
 			},
 		}
-		index, err := client.GetIndex(context.Background(), &GetIndexArgs{ContainerID: ids.Empty, Encoding: formatting.Hex})
+		index, err := client.GetIndex(context.Background(), ids.Empty)
 		assert.NoError(err)
 		assert.EqualValues(5, index)
 	}
 	{
 		// Test GetLastAccepted
 		id := ids.GenerateTestID()
+		bytes := utils.RandomBytes(10)
+		bytesStr, err := formatting.Encode(formatting.Hex, bytes)
+		assert.NoError(err)
 		client.requester = &mockClient{
 			assert:         assert,
 			expectedMethod: "getLastAccepted",
 			onSendRequestF: func(reply interface{}) error {
-				*(reply.(*FormattedContainer)) = FormattedContainer{ID: id}
+				*(reply.(*FormattedContainer)) = FormattedContainer{
+					ID:    id,
+					Bytes: bytesStr,
+				}
 				return nil
 			},
 		}
-		container, err := client.GetLastAccepted(context.Background(), &GetLastAcceptedArgs{Encoding: formatting.Hex})
+		container, err := client.GetLastAccepted(context.Background())
 		assert.NoError(err)
 		assert.EqualValues(id, container.ID)
+		assert.EqualValues(bytes, container.Bytes)
 	}
 	{
 		// Test GetContainerRange
 		id := ids.GenerateTestID()
+		bytes := utils.RandomBytes(10)
+		bytesStr, err := formatting.Encode(formatting.Hex, bytes)
+		assert.NoError(err)
 		client.requester = &mockClient{
 			assert:         assert,
 			expectedMethod: "getContainerRange",
 			onSendRequestF: func(reply interface{}) error {
-				*(reply.(*GetContainerRangeResponse)) = GetContainerRangeResponse{Containers: []FormattedContainer{{ID: id}}}
+				*(reply.(*GetContainerRangeResponse)) = GetContainerRangeResponse{Containers: []FormattedContainer{{
+					ID:    id,
+					Bytes: bytesStr,
+				}}}
 				return nil
 			},
 		}
-		containers, err := client.GetContainerRange(context.Background(), &GetContainerRangeArgs{StartIndex: 1, NumToFetch: 10, Encoding: formatting.Hex})
+		containers, err := client.GetContainerRange(context.Background(), 1, 10)
 		assert.NoError(err)
 		assert.Len(containers, 1)
 		assert.EqualValues(id, containers[0].ID)
+		assert.EqualValues(bytes, containers[0].Bytes)
 	}
 	{
 		// Test IsAccepted
@@ -78,27 +94,34 @@ func TestIndexClient(t *testing.T) {
 			assert:         assert,
 			expectedMethod: "isAccepted",
 			onSendRequestF: func(reply interface{}) error {
-				*(reply.(*bool)) = true
+				*(reply.(*IsAcceptedResponse)) = IsAcceptedResponse{IsAccepted: true}
 				return nil
 			},
 		}
-		isAccepted, err := client.IsAccepted(context.Background(), &GetIndexArgs{ContainerID: ids.Empty, Encoding: formatting.Hex})
+		isAccepted, err := client.IsAccepted(context.Background(), ids.Empty)
 		assert.NoError(err)
 		assert.True(isAccepted)
 	}
 	{
 		// Test GetContainerByID
 		id := ids.GenerateTestID()
+		bytes := utils.RandomBytes(10)
+		bytesStr, err := formatting.Encode(formatting.Hex, bytes)
+		assert.NoError(err)
 		client.requester = &mockClient{
 			assert:         assert,
 			expectedMethod: "getContainerByID",
 			onSendRequestF: func(reply interface{}) error {
-				*(reply.(*FormattedContainer)) = FormattedContainer{ID: id}
+				*(reply.(*FormattedContainer)) = FormattedContainer{
+					ID:    id,
+					Bytes: bytesStr,
+				}
 				return nil
 			},
 		}
-		container, err := client.GetContainerByID(context.Background(), &GetIndexArgs{ContainerID: id, Encoding: formatting.Hex})
+		container, err := client.GetContainerByID(context.Background(), id)
 		assert.NoError(err)
 		assert.EqualValues(id, container.ID)
+		assert.EqualValues(bytes, container.Bytes)
 	}
 }

@@ -6,6 +6,7 @@ package common
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
@@ -17,10 +18,17 @@ func DefaultConfigTest() Config {
 		BootstrappedF:   func(ids.ID) { isBootstrapped = true },
 	}
 
+	beacons := validators.NewSet()
+
+	connectedPeers := tracker.NewPeers()
+	startupTracker := tracker.NewStartup(connectedPeers, 0)
+	beacons.RegisterCallbackListener(startupTracker)
+
 	return Config{
 		Ctx:                            snow.DefaultConsensusContextTest(),
 		Validators:                     validators.NewSet(),
-		Beacons:                        validators.NewSet(),
+		Beacons:                        beacons,
+		StartupTracker:                 startupTracker,
 		Sender:                         &SenderTest{},
 		Bootstrapable:                  &BootstrapableTest{},
 		Subnet:                         subnet,

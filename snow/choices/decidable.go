@@ -36,5 +36,7 @@ type Decidable interface {
 	// ID, Rejected should be returned. If the contents of this element are
 	// unknown, then Unknown should be returned. Otherwise, Processing should be
 	// returned.
+	//
+	// TODO: Consider allowing Status to return an error.
 	Status() Status
 }

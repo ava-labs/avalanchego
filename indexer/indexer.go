@@ -9,25 +9,27 @@ import (
 	"math"
 	"sync"
 
+	"github.com/gorilla/rpc/v2"
+
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/json"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
-
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman"
-	"github.com/ava-labs/avalanchego/snow/triggers"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/gorilla/rpc/v2"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
@@ -55,13 +57,14 @@ var (
 
 // Config for an indexer
 type Config struct {
-	DB                                      database.Database
-	Log                                     logging.Logger
-	IndexingEnabled                         bool
-	AllowIncompleteIndex                    bool
-	DecisionDispatcher, ConsensusDispatcher *triggers.EventDispatcher
-	APIServer                               server.PathAdder
-	ShutdownF                               func()
+	DB                     database.Database
+	Log                    logging.Logger
+	IndexingEnabled        bool
+	AllowIncompleteIndex   bool
+	DecisionAcceptorGroup  snow.AcceptorGroup
+	ConsensusAcceptorGroup snow.AcceptorGroup
+	APIServer              server.PathAdder
+	ShutdownF              func()
 }
 
 // Indexer causes accepted containers for a given chain
@@ -77,18 +80,18 @@ type Indexer interface {
 // NewIndexer returns a new Indexer and registers a new endpoint on the given API server.
 func NewIndexer(config Config) (Indexer, error) {
 	indexer := &indexer{
-		codec:                codec.NewManager(codecMaxSize),
-		log:                  config.Log,
-		db:                   config.DB,
-		allowIncompleteIndex: config.AllowIncompleteIndex,
-		indexingEnabled:      config.IndexingEnabled,
-		consensusDispatcher:  config.ConsensusDispatcher,
-		decisionDispatcher:   config.DecisionDispatcher,
-		txIndices:            map[ids.ID]Index{},
-		vtxIndices:           map[ids.ID]Index{},
-		blockIndices:         map[ids.ID]Index{},
-		pathAdder:            config.APIServer,
-		shutdownF:            config.ShutdownF,
+		codec:                  codec.NewManager(codecMaxSize),
+		log:                    config.Log,
+		db:                     config.DB,
+		allowIncompleteIndex:   config.AllowIncompleteIndex,
+		indexingEnabled:        config.IndexingEnabled,
+		decisionAcceptorGroup:  config.DecisionAcceptorGroup,
+		consensusAcceptorGroup: config.ConsensusAcceptorGroup,
+		txIndices:              map[ids.ID]Index{},
+		vtxIndices:             map[ids.ID]Index{},
+		blockIndices:           map[ids.ID]Index{},
+		pathAdder:              config.APIServer,
+		shutdownF:              config.ShutdownF,
 	}
 
 	if err := indexer.codec.RegisterCodec(
@@ -136,10 +139,10 @@ type indexer struct {
 	// Chain ID --> index of txs of that chain (if applicable)
 	txIndices map[ids.ID]Index
 
-	// Notifies of newly accepted blocks and vertices
-	consensusDispatcher *triggers.EventDispatcher
 	// Notifies of newly accepted transactions
-	decisionDispatcher *triggers.EventDispatcher
+	decisionAcceptorGroup snow.AcceptorGroup
+	// Notifies of newly accepted blocks and vertices
+	consensusAcceptorGroup snow.AcceptorGroup
 }
 
 // Assumes [engine]'s context lock is not held
@@ -149,25 +152,38 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 
 	ctx := engine.Context()
 	if i.closed {
-		i.log.Debug("not registering chain %s because indexer is closed", name)
+		i.log.Debug("not registering chain to indexer",
+			zap.String("reason", "indexer is closed"),
+			zap.String("chainName", name),
+		)
 		return
 	} else if ctx.SubnetID != constants.PrimaryNetworkID {
-		i.log.Debug("not registering chain %s because it's not in primary network", name)
+		i.log.Debug("not registering chain to indexer",
+			zap.String("reason", "not in the primary network"),
+			zap.String("chainName", name),
+		)
 		return
 	}
 
 	chainID := ctx.ChainID
 	if i.blockIndices[chainID] != nil || i.txIndices[chainID] != nil || i.vtxIndices[chainID] != nil {
-		i.log.Warn("chain %s is already being indexed", chainID)
+		i.log.Warn("chain is already being indexed",
+			zap.Stringer("chainID", chainID),
+		)
 		return
 	}
 
 	// If the index is incomplete, make sure that's OK. Otherwise, cause node to die.
 	isIncomplete, err := i.isIncomplete(chainID)
 	if err != nil {
-		i.log.Error("couldn't get whether chain %s is incomplete: %s", name, err)
+		i.log.Error("couldn't get whether chain is incomplete",
+			zap.String("chainName", name),
+			zap.Error(err),
+		)
 		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
+			i.log.Error("failed to close indexer",
+				zap.Error(err),
+			)
 		}
 		return
 	}
@@ -175,9 +191,14 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 	// See if this chain was indexed in a previous run
 	previouslyIndexed, err := i.previouslyIndexed(chainID)
 	if err != nil {
-		i.log.Error("couldn't get whether chain %s was previously indexed: %s", name, err)
+		i.log.Error("couldn't get whether chain was previously indexed",
+			zap.String("chainName", name),
+			zap.Error(err),
+		)
 		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
+			i.log.Error("failed to close indexer",
+				zap.Error(err),
+			)
 		}
 		return
 	}
@@ -186,9 +207,13 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 		if previouslyIndexed && !i.allowIncompleteIndex {
 			// We indexed this chain in a previous run but not in this run.
 			// This would create an incomplete index, which is not allowed, so exit.
-			i.log.Fatal("running would cause index %s would become incomplete but incomplete indices are disabled", name)
+			i.log.Fatal("running would cause index to become incomplete but incomplete indices are disabled",
+				zap.String("chainName", name),
+			)
 			if err := i.close(); err != nil {
-				i.log.Error("error while closing indexer: %s", err)
+				i.log.Error("failed to close indexer",
+					zap.Error(err),
+				)
 			}
 			return
 		}
@@ -198,65 +223,99 @@ func (i *indexer) RegisterChain(name string, engine common.Engine) {
 		if err == nil {
 			return
 		}
-		i.log.Fatal("couldn't mark chain %s as incomplete: %s", name, err)
+		i.log.Fatal("couldn't mark chain as incomplete",
+			zap.String("chainName", name),
+			zap.Error(err),
+		)
 		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
+			i.log.Error("failed to close indexer",
+				zap.Error(err),
+			)
 		}
 		return
 	}
 
 	if !i.allowIncompleteIndex && isIncomplete && (previouslyIndexed || i.hasRunBefore) {
-		i.log.Fatal("index %s is incomplete but incomplete indices are disabled. Shutting down", name)
+		i.log.Fatal("index is incomplete but incomplete indices are disabled. Shutting down",
+			zap.String("chainName", name),
+		)
 		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
+			i.log.Error("failed to close indexer",
+				zap.Error(err),
+			)
 		}
 		return
 	}
 
 	// Mark that in this run, this chain was indexed
 	if err := i.markPreviouslyIndexed(chainID); err != nil {
-		i.log.Error("couldn't mark chain %s as indexed: %s", name, err)
+		i.log.Error("couldn't mark chain as indexed",
+			zap.String("chainName", name),
+			zap.Error(err),
+		)
 		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
+			i.log.Error("failed to close indexer",
+				zap.Error(err),
+			)
 		}
 		return
 	}
 
 	switch engine.(type) {
 	case snowman.Engine:
-		index, err := i.registerChainHelper(chainID, blockPrefix, name, "block", i.consensusDispatcher)
+		index, err := i.registerChainHelper(chainID, blockPrefix, name, "block", i.consensusAcceptorGroup)
 		if err != nil {
-			i.log.Fatal("couldn't create block index for %s: %s", name, err)
+			i.log.Fatal("failed to create block index",
+				zap.String("chainName", name),
+				zap.Error(err),
+			)
 			if err := i.close(); err != nil {
-				i.log.Error("error while closing indexer: %s", err)
+				i.log.Error("failed to close indexer",
+					zap.Error(err),
+				)
 			}
 			return
 		}
 		i.blockIndices[chainID] = index
 	case avalanche.Engine:
-		vtxIndex, err := i.registerChainHelper(chainID, vtxPrefix, name, "vtx", i.consensusDispatcher)
+		vtxIndex, err := i.registerChainHelper(chainID, vtxPrefix, name, "vtx", i.consensusAcceptorGroup)
 		if err != nil {
-			i.log.Fatal("couldn't create vertex index for %s: %s", name, err)
+			i.log.Fatal("couldn't create vertex index",
+				zap.String("chainName", name),
+				zap.Error(err),
+			)
 			if err := i.close(); err != nil {
-				i.log.Error("error while closing indexer: %s", err)
+				i.log.Error("failed to close indexer",
+					zap.Error(err),
+				)
 			}
 			return
 		}
 		i.vtxIndices[chainID] = vtxIndex
 
-		txIndex, err := i.registerChainHelper(chainID, txPrefix, name, "tx", i.decisionDispatcher)
+		txIndex, err := i.registerChainHelper(chainID, txPrefix, name, "tx", i.decisionAcceptorGroup)
 		if err != nil {
-			i.log.Fatal("couldn't create tx index for %s: %s", name, err)
+			i.log.Fatal("couldn't create tx index for",
+				zap.String("chainName", name),
+				zap.Error(err),
+			)
 			if err := i.close(); err != nil {
-				i.log.Error("error while closing indexer: %s", err)
+				i.log.Error("failed to close indexer:",
+					zap.Error(err),
+				)
 			}
 			return
 		}
 		i.txIndices[chainID] = txIndex
 	default:
-		i.log.Error("got unexpected engine type %T", engine)
+		engineType := fmt.Sprintf("%T", engine)
+		i.log.Error("got unexpected engine type",
+			zap.String("engineType", engineType),
+		)
 		if err := i.close(); err != nil {
-			i.log.Error("error while closing indexer: %s", err)
+			i.log.Error("failed to close indexer",
+				zap.Error(err),
+			)
 		}
 		return
 	}
@@ -266,7 +325,7 @@ func (i *indexer) registerChainHelper(
 	chainID ids.ID,
 	prefixEnd byte,
 	name, endpoint string,
-	dispatcher *triggers.EventDispatcher,
+	acceptorGroup snow.AcceptorGroup,
 ) (Index, error) {
 	prefix := make([]byte, hashing.HashLen+wrappers.ByteLen)
 	copy(prefix, chainID[:])
@@ -279,7 +338,7 @@ func (i *indexer) registerChainHelper(
 	}
 
 	// Register index to learn about new accepted vertices
-	if err := dispatcher.RegisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID), index, true); err != nil {
+	if err := acceptorGroup.RegisterAcceptor(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID), index, true); err != nil {
 		_ = index.Close()
 		return nil, err
 	}
@@ -322,19 +381,19 @@ func (i *indexer) close() error {
 	for chainID, txIndex := range i.txIndices {
 		errs.Add(
 			txIndex.Close(),
-			i.decisionDispatcher.DeregisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)),
+			i.decisionAcceptorGroup.DeregisterAcceptor(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)),
 		)
 	}
 	for chainID, vtxIndex := range i.vtxIndices {
 		errs.Add(
 			vtxIndex.Close(),
-			i.consensusDispatcher.DeregisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)),
+			i.consensusAcceptorGroup.DeregisterAcceptor(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)),
 		)
 	}
 	for chainID, blockIndex := range i.blockIndices {
 		errs.Add(
 			blockIndex.Close(),
-			i.consensusDispatcher.DeregisterChain(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)),
+			i.consensusAcceptorGroup.DeregisterAcceptor(chainID, fmt.Sprintf("%s%s", indexNamePrefix, chainID)),
 		)
 	}
 	errs.Add(i.db.Close())

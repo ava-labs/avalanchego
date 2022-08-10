@@ -32,7 +32,7 @@ func newFormattedContainer(c Container, index uint64, enc formatting.Encoding) (
 		ID:       c.ID,
 		Index:    json.Uint64(index),
 	}
-	bytesStr, err := formatting.EncodeWithChecksum(enc, c.Bytes)
+	bytesStr, err := formatting.Encode(enc, c.Bytes)
 	if err != nil {
 		return fc, err
 	}
@@ -58,12 +58,12 @@ func (s *service) GetLastAccepted(_ *http.Request, args *GetLastAcceptedArgs, re
 	return err
 }
 
-type GetContainer struct {
+type GetContainerByIndexArgs struct {
 	Index    json.Uint64         `json:"index"`
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
-func (s *service) GetContainerByIndex(_ *http.Request, args *GetContainer, reply *FormattedContainer) error {
+func (s *service) GetContainerByIndex(_ *http.Request, args *GetContainerByIndexArgs, reply *FormattedContainer) error {
 	container, err := s.Index.GetContainerByIndex(uint64(args.Index))
 	if err != nil {
 		return err
@@ -112,8 +112,7 @@ func (s *service) GetContainerRange(r *http.Request, args *GetContainerRangeArgs
 }
 
 type GetIndexArgs struct {
-	ContainerID ids.ID              `json:"containerID"`
-	Encoding    formatting.Encoding `json:"encoding"`
+	ID ids.ID `json:"id"`
 }
 
 type GetIndexResponse struct {
@@ -121,17 +120,21 @@ type GetIndexResponse struct {
 }
 
 func (s *service) GetIndex(r *http.Request, args *GetIndexArgs, reply *GetIndexResponse) error {
-	index, err := s.Index.GetIndex(args.ContainerID)
+	index, err := s.Index.GetIndex(args.ID)
 	reply.Index = json.Uint64(index)
 	return err
+}
+
+type IsAcceptedArgs struct {
+	ID ids.ID `json:"id"`
 }
 
 type IsAcceptedResponse struct {
 	IsAccepted bool `json:"isAccepted"`
 }
 
-func (s *service) IsAccepted(r *http.Request, args *GetIndexArgs, reply *IsAcceptedResponse) error {
-	_, err := s.Index.GetIndex(args.ContainerID)
+func (s *service) IsAccepted(r *http.Request, args *IsAcceptedArgs, reply *IsAcceptedResponse) error {
+	_, err := s.Index.GetIndex(args.ID)
 	if err == nil {
 		reply.IsAccepted = true
 		return nil
@@ -143,8 +146,13 @@ func (s *service) IsAccepted(r *http.Request, args *GetIndexArgs, reply *IsAccep
 	return err
 }
 
-func (s *service) GetContainerByID(r *http.Request, args *GetIndexArgs, reply *FormattedContainer) error {
-	container, err := s.Index.GetContainerByID(args.ContainerID)
+type GetContainerByIDArgs struct {
+	ID       ids.ID              `json:"id"`
+	Encoding formatting.Encoding `json:"encoding"`
+}
+
+func (s *service) GetContainerByID(r *http.Request, args *GetContainerByIDArgs, reply *FormattedContainer) error {
+	container, err := s.Index.GetContainerByID(args.ID)
 	if err != nil {
 		return err
 	}

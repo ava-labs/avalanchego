@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -121,9 +120,9 @@ func TestUTXOSerialize(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(utxoBytes, expected) {
-		t.Fatalf("Expected:\n%s\nResult:\n%s",
-			formatting.DumpBytes(expected),
-			formatting.DumpBytes(utxoBytes),
+		t.Fatalf("Expected:\n0x%x\nResult:\n0x%x",
+			expected,
+			utxoBytes,
 		)
 	}
 }

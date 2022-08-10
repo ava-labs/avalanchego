@@ -14,7 +14,7 @@ var _ readerpb.ReaderServer = &Server{}
 
 // Server is an io.Reader that is managed over RPC.
 type Server struct {
-	readerpb.UnimplementedReaderServer
+	readerpb.UnsafeReaderServer
 	reader io.Reader
 }
 

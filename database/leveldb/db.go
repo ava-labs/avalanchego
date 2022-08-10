@@ -7,6 +7,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
+	"sync"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
@@ -14,6 +19,8 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"
@@ -24,18 +31,31 @@ const (
 	// Name is the name of this database for database switches
 	Name = "leveldb"
 
-	// BlockCacheSize is the number of bytes to use for block caching in
+	// DefaultBlockCacheSize is the number of bytes to use for block caching in
 	// leveldb.
-	BlockCacheSize = 12 * opt.MiB
+	DefaultBlockCacheSize = 12 * opt.MiB
 
-	// WriteBufferSize is the number of bytes to use for buffers in leveldb.
-	WriteBufferSize = 12 * opt.MiB
+	// DefaultWriteBufferSize is the number of bytes to use for buffers in
+	// leveldb.
+	DefaultWriteBufferSize = 12 * opt.MiB
 
-	// HandleCap is the number of files descriptors to cap levelDB to use.
-	HandleCap = 1024
+	// DefaultHandleCap is the number of files descriptors to cap levelDB to
+	// use.
+	DefaultHandleCap = 1024
 
-	// BitsPerKey is the number of bits to add to the bloom filter per key.
-	BitsPerKey = 10
+	// DefaultBitsPerKey is the number of bits to add to the bloom filter per
+	// key.
+	DefaultBitsPerKey = 10
+
+	// DefaultMaxManifestFileSize is the default maximum size of a manifest
+	// file.
+	//
+	// This avoids https://github.com/syndtr/goleveldb/issues/413.
+	DefaultMaxManifestFileSize = math.MaxInt64
+
+	// DefaultMetricUpdateFrequency is the frequency to poll the LevelDB
+	// metrics.
+	DefaultMetricUpdateFrequency = 10 * time.Second
 
 	// levelDBByteOverhead is the number of bytes of constant overhead that
 	// should be added to a batch size per operation.
@@ -53,7 +73,17 @@ var (
 // in binary-alphabetical order.
 type Database struct {
 	*leveldb.DB
-	closed utils.AtomicBool
+	// metrics is only initialized and used when [MetricUpdateFrequency] is >= 0
+	// in the config
+	metrics   metrics
+	closed    utils.AtomicBool
+	closeOnce sync.Once
+	// closeCh is closed when Close() is called.
+	closeCh chan struct{}
+	// closeWg is used to wait for all goroutines created by New() to exit.
+	// This avoids racy behavior when Close() is called at the same time as
+	// Stats(). See: https://github.com/syndtr/goleveldb/issues/418
+	closeWg sync.WaitGroup
 }
 
 type config struct {
@@ -139,27 +169,39 @@ type config struct {
 	// The default value is 6MiB.
 	WriteBuffer      int `json:"writeBuffer"`
 	FilterBitsPerKey int `json:"filterBitsPerKey"`
+
+	// MaxManifestFileSize is the maximum size limit of the MANIFEST-****** file.
+	// When the MANIFEST-****** file grows beyond this size, LevelDB will create
+	// a new MANIFEST file.
+	//
+	// The default value is infinity.
+	MaxManifestFileSize int64 `json:"maxManifestFileSize"`
+
+	// MetricUpdateFrequency is the frequency to poll LevelDB metrics.
+	// If <= 0, LevelDB metrics aren't polled.
+	MetricUpdateFrequency time.Duration `json:"metricUpdateFrequency"`
 }
 
 // New returns a wrapped LevelDB object.
-func New(file string, configBytes []byte, log logging.Logger) (database.Database, error) {
+func New(file string, configBytes []byte, log logging.Logger, namespace string, reg prometheus.Registerer) (database.Database, error) {
 	parsedConfig := config{
-		BlockCacheCapacity:     BlockCacheSize,
+		BlockCacheCapacity:     DefaultBlockCacheSize,
 		DisableSeeksCompaction: true,
-		OpenFilesCacheCapacity: HandleCap,
-		WriteBuffer:            WriteBufferSize / 2,
-		FilterBitsPerKey:       BitsPerKey,
+		OpenFilesCacheCapacity: DefaultHandleCap,
+		WriteBuffer:            DefaultWriteBufferSize / 2,
+		FilterBitsPerKey:       DefaultBitsPerKey,
+		MaxManifestFileSize:    DefaultMaxManifestFileSize,
+		MetricUpdateFrequency:  DefaultMetricUpdateFrequency,
 	}
 	if len(configBytes) > 0 {
 		if err := json.Unmarshal(configBytes, &parsedConfig); err != nil {
 			return nil, fmt.Errorf("failed to parse db config: %w", err)
 		}
 	}
-	configJSON, err := json.Marshal(&parsedConfig)
-	if err != nil {
-		return nil, err
-	}
-	log.Info("leveldb config: %s", string(configJSON))
+
+	log.Info("creating new leveldb",
+		zap.Reflect("config", parsedConfig),
+	)
 
 	// Open the db and recover any potential corruptions
 	db, err := leveldb.OpenFile(file, &opt.Options{
@@ -177,13 +219,51 @@ func New(file string, configBytes []byte, log logging.Logger) (database.Database
 		OpenFilesCacheCapacity:        parsedConfig.OpenFilesCacheCapacity,
 		WriteBuffer:                   parsedConfig.WriteBuffer,
 		Filter:                        filter.NewBloomFilter(parsedConfig.FilterBitsPerKey),
+		MaxManifestFileSize:           parsedConfig.MaxManifestFileSize,
 	})
 	if _, corrupted := err.(*errors.ErrCorrupted); corrupted {
 		db, err = leveldb.RecoverFile(file, nil)
 	}
-	return &Database{
-		DB: db,
-	}, err
+	if err != nil {
+		return nil, err
+	}
+
+	wrappedDB := &Database{
+		DB:      db,
+		closeCh: make(chan struct{}),
+	}
+	if parsedConfig.MetricUpdateFrequency > 0 {
+		metrics, err := newMetrics(namespace, reg)
+		if err != nil {
+			// Drop any close error to report the original error
+			_ = db.Close()
+			return nil, err
+		}
+		wrappedDB.metrics = metrics
+		wrappedDB.closeWg.Add(1)
+		go func() {
+			t := time.NewTicker(parsedConfig.MetricUpdateFrequency)
+			defer func() {
+				t.Stop()
+				wrappedDB.closeWg.Done()
+			}()
+
+			for {
+				if err := wrappedDB.updateMetrics(); err != nil {
+					log.Warn("failed to update leveldb metrics",
+						zap.Error(err),
+					)
+				}
+
+				select {
+				case <-t.C:
+				case <-wrappedDB.closeCh:
+					return
+				}
+			}
+		}()
+	}
+	return wrappedDB, nil
 }
 
 // Has returns if the key is set in the database
@@ -252,12 +332,6 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	}
 }
 
-// Stat returns a particular internal stat of the database.
-func (db *Database) Stat(property string) (string, error) {
-	stat, err := db.DB.GetProperty(property)
-	return stat, updateError(err)
-}
-
 // This comment is basically copy pasted from the underlying levelDB library:
 
 // Compact the underlying DB for the given key range.
@@ -275,7 +349,18 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 
 func (db *Database) Close() error {
 	db.closed.SetValue(true)
+	db.closeOnce.Do(func() {
+		close(db.closeCh)
+	})
+	db.closeWg.Wait()
 	return updateError(db.DB.Close())
+}
+
+func (db *Database) HealthCheck() (interface{}, error) {
+	if db.closed.GetValue() {
+		return nil, database.ErrClosed
+	}
+	return nil, nil
 }
 
 // batch is a wrapper around a levelDB batch to contain sizes.

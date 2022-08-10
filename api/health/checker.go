@@ -7,6 +7,8 @@ package health
 type Checker interface {
 	// HealthCheck returns health check results and, if not healthy, a non-nil
 	// error
+	//
+	// It is expected that the results are json marshallable.
 	HealthCheck() (interface{}, error)
 }
 

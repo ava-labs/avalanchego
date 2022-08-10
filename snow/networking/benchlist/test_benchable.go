@@ -13,7 +13,7 @@ type TestBenchable struct {
 	T *testing.T
 
 	CantBenched, CantUnbenched bool
-	BenchedF, UnbenchedF       func(chainID ids.ID, validatorID ids.ShortID)
+	BenchedF, UnbenchedF       func(chainID ids.ID, validatorID ids.NodeID)
 }
 
 // Default set the default callable value to [cant]
@@ -22,7 +22,7 @@ func (b *TestBenchable) Default(cant bool) {
 	b.CantUnbenched = cant
 }
 
-func (b *TestBenchable) Benched(chainID ids.ID, validatorID ids.ShortID) {
+func (b *TestBenchable) Benched(chainID ids.ID, validatorID ids.NodeID) {
 	if b.BenchedF != nil {
 		b.BenchedF(chainID, validatorID)
 	} else if b.CantBenched && b.T != nil {
@@ -30,7 +30,7 @@ func (b *TestBenchable) Benched(chainID ids.ID, validatorID ids.ShortID) {
 	}
 }
 
-func (b *TestBenchable) Unbenched(chainID ids.ID, validatorID ids.ShortID) {
+func (b *TestBenchable) Unbenched(chainID ids.ID, validatorID ids.NodeID) {
 	if b.UnbenchedF != nil {
 		b.UnbenchedF(chainID, validatorID)
 	} else if b.CantUnbenched && b.T != nil {

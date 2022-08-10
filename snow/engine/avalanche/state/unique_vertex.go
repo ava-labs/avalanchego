@@ -260,20 +260,14 @@ func (vtx *uniqueVertex) Verify() error {
 		}
 	}
 
-	// edge is updated in "vtx.Accept"
-	// and "vtx.serializer.Edge()" is global
-	acceptedEdges := ids.NewSet(0)
-	acceptedEdges.Add(vtx.serializer.Edge()...)
-	for id := range acceptedEdges {
-		edgeVtx, err := vtx.serializer.getUniqueVertex(id)
-		if err != nil {
-			return err
-		}
-		// MUST error if stop vertex has already been accepted (can't be accepted twice)
-		// regardless of whether the underlying vertex is stop vertex or not
-		if edgeVtx.v.vtx.StopVertex() {
-			return errStopVertexAlreadyAccepted
-		}
+	// MUST error if stop vertex has already been accepted (can't be accepted twice)
+	// regardless of whether the underlying vertex is stop vertex or not
+	stopVtxAccepted, err := vtx.serializer.StopVertexAccepted()
+	if err != nil {
+		return err
+	}
+	if stopVtxAccepted {
+		return errStopVertexAlreadyAccepted
 	}
 	if !whitelistVtx {
 		// below are stop vertex specific verifications
@@ -349,6 +343,9 @@ func (vtx *uniqueVertex) Verify() error {
 		}
 		queue = append(queue, parents...)
 	}
+
+	acceptedEdges := ids.NewSet(0)
+	acceptedEdges.Add(vtx.serializer.Edge()...)
 
 	// stop vertex should be able to reach all IDs
 	// that are returned by the "Edge"

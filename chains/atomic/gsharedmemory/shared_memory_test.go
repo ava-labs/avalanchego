@@ -19,8 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
 	sharedmemorypb "github.com/ava-labs/avalanchego/proto/pb/sharedmemory"
 )
@@ -36,20 +36,18 @@ func TestInterface(t *testing.T) {
 	chainID1 := ids.GenerateTestID()
 
 	for _, test := range atomic.SharedMemoryTests {
-		m := atomic.Memory{}
 		baseDB := memdb.New()
 		memoryDB := prefixdb.New([]byte{0}, baseDB)
 		testDB := prefixdb.New([]byte{1}, baseDB)
 
-		err := m.Initialize(logging.NoLog{}, memoryDB)
-		assert.NoError(err)
+		m := atomic.NewMemory(memoryDB)
 
 		sm0, conn0 := wrapSharedMemory(t, m.NewSharedMemory(chainID0), baseDB)
 		sm1, conn1 := wrapSharedMemory(t, m.NewSharedMemory(chainID1), baseDB)
 
 		test(t, chainID0, chainID1, sm0, sm1, testDB)
 
-		err = conn0.Close()
+		err := conn0.Close()
 		assert.NoError(err)
 
 		err = conn1.Close()
@@ -59,13 +57,16 @@ func TestInterface(t *testing.T) {
 
 func wrapSharedMemory(t *testing.T, sm atomic.SharedMemory, db database.Database) (atomic.SharedMemory, io.Closer) {
 	listener := bufconn.Listen(bufSize)
-	server := grpc.NewServer()
-	sharedmemorypb.RegisterSharedMemoryServer(server, NewServer(sm, db))
-	go func() {
-		if err := server.Serve(listener); err != nil {
-			t.Logf("Server exited with error: %v", err)
-		}
-	}()
+	serverCloser := grpcutils.ServerCloser{}
+
+	serverFunc := func(opts []grpc.ServerOption) *grpc.Server {
+		server := grpcutils.NewDefaultServer(opts)
+		sharedmemorypb.RegisterSharedMemoryServer(server, NewServer(sm, db))
+		serverCloser.Add(server)
+		return server
+	}
+
+	go grpcutils.Serve(listener, serverFunc)
 
 	dialer := grpc.WithContextDialer(
 		func(context.Context, string) (net.Conn, error) {
@@ -73,8 +74,9 @@ func wrapSharedMemory(t *testing.T, sm atomic.SharedMemory, db database.Database
 		},
 	)
 
-	ctx := context.Background()
-	conn, err := grpc.DialContext(ctx, "", dialer, grpc.WithInsecure())
+	dopts := grpcutils.DefaultDialOptions
+	dopts = append(dopts, dialer)
+	conn, err := grpcutils.Dial("", dopts...)
 	if err != nil {
 		t.Fatalf("Failed to dial: %s", err)
 	}

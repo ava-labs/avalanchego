@@ -6,6 +6,7 @@ package proposervm
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"testing"
 	"time"
 
@@ -516,7 +517,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		},
 	}
 
-	if err := outerOption.Verify(); err != errUnexpectedBlockType {
+	if err := outerOption.Verify(); !errors.Is(err, errUnexpectedBlockType) {
 		t.Fatal(err)
 	}
 
@@ -624,8 +625,8 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 
 	// Make sure that we will be sampled to perform the proposals.
-	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		res := make(map[ids.ShortID]uint64)
+	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+		res := make(map[ids.NodeID]uint64)
 		res[proVM.ctx.NodeID] = uint64(10)
 		return res, nil
 	}

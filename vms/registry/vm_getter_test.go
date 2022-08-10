@@ -7,13 +7,15 @@ import (
 	"errors"
 	"io/fs"
 	"testing"
-
-	"gotest.tools/assert"
+	"time"
 
 	"github.com/golang/mock/gomock"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
+	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/vms"
 )
 
@@ -80,7 +82,7 @@ func TestGet_InvalidVMName(t *testing.T) {
 	resources.mockManager.EXPECT().Lookup("invalid-vm").Times(1).Return(ids.Empty, errOops)
 
 	_, _, err := resources.getter.Get()
-	assert.ErrorContains(t, err, "invalid vmID invalid-vm")
+	assert.ErrorIs(t, err, errInvalidVMID)
 }
 
 // Get should fail if we can't get the VM factory
@@ -101,6 +103,8 @@ func TestGet_GetFactoryFails(t *testing.T) {
 
 // Get should return the correct registered and unregistered VMs.
 func TestGet_Success(t *testing.T) {
+	assert := assert.New(t)
+
 	resources := initVMGetterTest(t)
 	defer resources.ctrl.Finish()
 
@@ -118,13 +122,13 @@ func TestGet_Success(t *testing.T) {
 	registeredVMs, unregisteredVMs, err := resources.getter.Get()
 
 	// we should have one registered vm, and one unregistered vm.
-	assert.Equal(t, len(registeredVMs), 1)
-	assert.Check(t, registeredVMs[registeredVMId] != nil)
+	assert.Len(registeredVMs, 1)
+	assert.NotNil(registeredVMs[registeredVMId])
 
-	assert.Equal(t, len(unregisteredVMs), 1)
-	assert.Check(t, unregisteredVMs[unregisteredVMId] != nil)
+	assert.Len(unregisteredVMs, 1)
+	assert.NotNil(unregisteredVMs[unregisteredVMId])
 
-	assert.NilError(t, err)
+	assert.NoError(err)
 }
 
 type vmGetterTestResources struct {
@@ -145,6 +149,7 @@ func initVMGetterTest(t *testing.T) *vmGetterTestResources {
 			FileReader:      mockReader,
 			Manager:         mockManager,
 			PluginDirectory: pluginDir,
+			CPUTracker:      resource.NewManager("", time.Hour, time.Hour, time.Hour),
 		},
 	)
 

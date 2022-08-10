@@ -18,7 +18,6 @@ var (
 )
 
 var (
-	// Interface compliance
 	_ Factory    = &FactoryED25519{}
 	_ PublicKey  = &PublicKeyED25519{}
 	_ PrivateKey = &PrivateKeyED25519{}

@@ -108,7 +108,7 @@ func TestBenchlistAdd(t *testing.T) {
 	b.clock.Set(now)
 
 	benched := false
-	benchable.BenchedF = func(ids.ID, ids.ShortID) {
+	benchable.BenchedF = func(ids.ID, ids.NodeID) {
 		benched = true
 	}
 	b.lock.Unlock()
@@ -123,7 +123,7 @@ func TestBenchlistAdd(t *testing.T) {
 	assert.Equal(t, b.benchlistSet.Len(), 1)
 
 	next := b.benchedQueue[0]
-	assert.Equal(t, vdr0.ID(), next.validatorID)
+	assert.Equal(t, vdr0.ID(), next.nodeID)
 	assert.True(t, !next.benchedUntil.After(now.Add(duration)))
 	assert.True(t, !next.benchedUntil.Before(now.Add(duration/2)))
 	assert.Len(t, b.failureStreaks, 0)
@@ -135,11 +135,6 @@ func TestBenchlistAdd(t *testing.T) {
 	for i := 0; i < threshold-1; i++ {
 		b.RegisterFailure(vdr1.ID())
 	}
-
-	// Advance the time
-	b.lock.Lock()
-	now = now.Add(minimumFailingDuration)
-	b.lock.Unlock()
 
 	// Register another failure
 	b.RegisterResponse(vdr1.ID())
@@ -286,9 +281,9 @@ func TestBenchlistMaxStake(t *testing.T) {
 
 	// Ensure the benched queue root has the min end time
 	minEndTime := b.benchedQueue[0].benchedUntil
-	benchedIDs := []ids.ShortID{vdr0.ID(), vdr1.ID(), vdr4.ID()}
+	benchedIDs := []ids.NodeID{vdr0.ID(), vdr1.ID(), vdr4.ID()}
 	for _, benchedVdr := range b.benchedQueue {
-		assert.Contains(t, benchedIDs, benchedVdr.validatorID)
+		assert.Contains(t, benchedIDs, benchedVdr.nodeID)
 		assert.True(t, !benchedVdr.benchedUntil.Before(minEndTime))
 	}
 
@@ -321,7 +316,7 @@ func TestBenchlistRemove(t *testing.T) {
 	benchable := &TestBenchable{
 		T:             t,
 		CantUnbenched: true,
-		UnbenchedF: func(ids.ID, ids.ShortID) {
+		UnbenchedF: func(ids.ID, ids.NodeID) {
 			count++
 		},
 	}
@@ -378,9 +373,9 @@ func TestBenchlistRemove(t *testing.T) {
 
 	// Ensure the benched queue root has the min end time
 	minEndTime := b.benchedQueue[0].benchedUntil
-	benchedIDs := []ids.ShortID{vdr0.ID(), vdr1.ID(), vdr2.ID()}
+	benchedIDs := []ids.NodeID{vdr0.ID(), vdr1.ID(), vdr2.ID()}
 	for _, benchedVdr := range b.benchedQueue {
-		assert.Contains(t, benchedIDs, benchedVdr.validatorID)
+		assert.Contains(t, benchedIDs, benchedVdr.nodeID)
 		assert.True(t, !benchedVdr.benchedUntil.Before(minEndTime))
 	}
 

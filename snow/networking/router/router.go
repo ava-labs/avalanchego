@@ -24,12 +24,13 @@ type Router interface {
 	InternalHandler
 
 	Initialize(
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 		log logging.Logger,
 		msgCreator message.Creator,
 		timeouts timeout.Manager,
 		shutdownTimeout time.Duration,
 		criticalChains ids.Set,
+		whiteListedSubnets ids.Set,
 		onFatal func(exitCode int),
 		healthConfig HealthConfig,
 		metricsNamespace string,
@@ -45,7 +46,7 @@ type InternalHandler interface {
 	benchlist.Benchable
 
 	RegisterRequest(
-		nodeID ids.ShortID,
+		nodeID ids.NodeID,
 		chainID ids.ID,
 		requestID uint32,
 		op message.Op,

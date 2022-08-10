@@ -6,7 +6,7 @@ package proposervm
 import (
 	"bytes"
 	"crypto"
-	"fmt"
+	"errors"
 	"testing"
 	"time"
 
@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
@@ -115,9 +114,12 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 	// ...Call GetAncestors on them ...
 	// Note: we assumed that if blkID is not known, that's NOT an error.
 	// Simply return an empty result
-	coreVM.GetAncestorsF = func(blkID ids.ID,
-		maxBlocksNum, maxBlocksSize int,
-		maxBlocksRetrivalTime time.Duration) ([][]byte, error) {
+	coreVM.GetAncestorsF = func(
+		blkID ids.ID,
+		maxBlocksNum,
+		maxBlocksSize int,
+		maxBlocksRetrivalTime time.Duration,
+	) ([][]byte, error) {
 		res := make([][]byte, 0, 3)
 		switch blkID {
 		case coreBlk3.ID():
@@ -227,9 +229,12 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 	// ...Call GetAncestors on them ...
 	// Note: we assumed that if blkID is not known, that's NOT an error.
 	// Simply return an empty result
-	coreVM.GetAncestorsF = func(blkID ids.ID,
-		maxBlocksNum, maxBlocksSize int,
-		maxBlocksRetrivalTime time.Duration) ([][]byte, error) {
+	coreVM.GetAncestorsF = func(
+		blkID ids.ID,
+		maxBlocksNum,
+		maxBlocksSize int,
+		maxBlocksRetrivalTime time.Duration,
+	) ([][]byte, error) {
 		res := make([][]byte, 0, 3)
 		switch blkID {
 		case coreBlk3.ID():
@@ -272,7 +277,7 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 
 	// ... and check returned values are as expected
 	assert.NoError(err, "Error calling GetAncestors: %v", err)
-	assert.Len(res, 3, "GetAncestor returned %v entries instead of %v", len(res), 3)
+	assert.Len(res, 3)
 	assert.EqualValues(res[0], builtBlk3.Bytes())
 	assert.EqualValues(res[1], builtBlk2.Bytes())
 	assert.EqualValues(res[2], builtBlk1.Bytes())
@@ -399,9 +404,12 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 	// ...Call GetAncestors on them ...
 	// Note: we assumed that if blkID is not known, that's NOT an error.
 	// Simply return an empty result
-	coreVM.GetAncestorsF = func(blkID ids.ID,
-		maxBlocksNum, maxBlocksSize int,
-		maxBlocksRetrivalTime time.Duration) ([][]byte, error) {
+	coreVM.GetAncestorsF = func(
+		blkID ids.ID,
+		maxBlocksNum,
+		maxBlocksSize int,
+		maxBlocksRetrivalTime time.Duration,
+	) ([][]byte, error) {
 		res := make([][]byte, 0, 3)
 		switch blkID {
 		case coreBlk4.ID():
@@ -548,7 +556,7 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 			case bytes.Equal(blkBytes, coreBlk3.Bytes()):
 				res = append(res, coreBlk3)
 			default:
-				return nil, fmt.Errorf("Unexpected call to parse unknown block")
+				return nil, errors.New("Unexpected call to parse unknown block")
 			}
 		}
 		return res, nil
@@ -648,7 +656,7 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 			case bytes.Equal(blkBytes, coreBlk3.Bytes()):
 				res = append(res, coreBlk3)
 			default:
-				return nil, fmt.Errorf("Unexpected call to parse unknown block")
+				return nil, errors.New("Unexpected call to parse unknown block")
 			}
 		}
 		return res, nil
@@ -800,7 +808,7 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 			case bytes.Equal(blkBytes, coreBlk4.Bytes()):
 				res = append(res, coreBlk4)
 			default:
-				return nil, fmt.Errorf("Unexpected call to parse unknown block")
+				return nil, errors.New("Unexpected call to parse unknown block")
 			}
 		}
 		return res, nil
@@ -853,9 +861,16 @@ func initTestRemoteProposerVM(
 	coreVM.TestVM.T = t
 	coreVM.TestBatchedVM.T = t
 
-	coreVM.InitializeF = func(*snow.Context, manager.Manager,
-		[]byte, []byte, []byte, chan<- common.Message,
-		[]*common.Fx, common.AppSender) error {
+	coreVM.InitializeF = func(
+		*snow.Context,
+		manager.Manager,
+		[]byte,
+		[]byte,
+		[]byte,
+		chan<- common.Message,
+		[]*common.Fx,
+		common.AppSender,
+	) error {
 		return nil
 	}
 	coreVM.LastAcceptedF = func() (ids.ID, error) { return coreGenBlk.ID(), nil }
@@ -876,29 +891,29 @@ func initTestRemoteProposerVM(
 		}
 	}
 
-	proVM := New(coreVM, proBlkStartTime, 0, false)
+	proVM := New(coreVM, proBlkStartTime, 0)
 
 	valState := &validators.TestState{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func() (uint64, error) { return coreGenBlk.Height(), nil }
 	valState.GetCurrentHeightF = func() (uint64, error) { return defaultPChainHeight, nil }
-	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		res := make(map[ids.ShortID]uint64)
+	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+		res := make(map[ids.NodeID]uint64)
 		res[proVM.ctx.NodeID] = uint64(10)
-		res[ids.ShortID{1}] = uint64(5)
-		res[ids.ShortID{2}] = uint64(6)
-		res[ids.ShortID{3}] = uint64(7)
+		res[ids.NodeID{1}] = uint64(5)
+		res[ids.NodeID{2}] = uint64(6)
+		res[ids.NodeID{3}] = uint64(7)
 		return res, nil
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw))
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	ctx.StakingCertLeaf = pTestCert.Leaf
 	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
 
-	dummyDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	// make sure that DBs are compressed correctly
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
 	if err := proVM.Initialize(ctx, dummyDBManager, initialState, nil, nil, nil, nil, nil); err != nil {

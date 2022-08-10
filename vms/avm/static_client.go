@@ -24,9 +24,10 @@ type staticClient struct {
 
 // NewClient returns an AVM client for interacting with the avm static api
 func NewStaticClient(uri string) StaticClient {
-	return &staticClient{
-		requester: rpc.NewEndpointRequester(uri, "/ext/vm/avm", "avm"),
-	}
+	return &staticClient{requester: rpc.NewEndpointRequester(
+		uri+"/ext/vm/avm",
+		"avm",
+	)}
 }
 
 func (c *staticClient) BuildGenesis(ctx context.Context, args *BuildGenesisArgs, options ...rpc.Option) (resp *BuildGenesisReply, err error) {

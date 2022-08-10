@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"strings"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -143,15 +145,13 @@ func (ta *Topological) IsVirtuous(tx snowstorm.Tx) bool { return ta.cg.IsVirtuou
 func (ta *Topological) Add(vtx Vertex) error {
 	ta.ctx.Log.AssertTrue(vtx != nil, "Attempting to insert nil vertex")
 
-	vtxID := vtx.ID()
 	if vtx.Status().Decided() {
 		return nil // Already decided this vertex
-	} else if _, exists := ta.nodes[vtxID]; exists {
-		return nil // Already inserted this vertex
 	}
 
-	if err := ta.ctx.ConsensusDispatcher.Issue(ta.ctx, vtxID, vtx.Bytes()); err != nil {
-		return err
+	vtxID := vtx.ID()
+	if _, exists := ta.nodes[vtxID]; exists {
+		return nil // Already inserted this vertex
 	}
 
 	txs, err := vtx.Txs()
@@ -561,7 +561,11 @@ func (ta *Topological) update(vtx Vertex) error {
 		switch status := dep.Status(); status {
 		case choices.Rejected:
 			// My parent is rejected, so I should be rejected
-			ta.ctx.Log.Trace("rejecting vertex %s due to rejected parent %s", vtxID, dep.ID())
+			ta.ctx.Log.Trace("rejecting vertex",
+				zap.String("reason", "rejected parent"),
+				zap.Stringer("vtxID", vtxID),
+				zap.Stringer("parentID", dep.ID()),
+			)
 			if !txv.Status().Decided() {
 				if err := ta.cg.Remove(vtxID); err != nil {
 					return fmt.Errorf("failed to remove transaction vertex %s from snowstorm before rejecting vertex itself", vtxID)
@@ -569,9 +573,6 @@ func (ta *Topological) update(vtx Vertex) error {
 				ta.virtuousVoting.Remove(vtxID)
 			}
 			if err := vtx.Reject(); err != nil {
-				return err
-			}
-			if err := ta.ctx.ConsensusDispatcher.Reject(ta.ctx, vtxID, vtx.Bytes()); err != nil {
 				return err
 			}
 			delete(ta.nodes, vtxID)
@@ -640,9 +641,9 @@ func (ta *Topological) update(vtx Vertex) error {
 	switch {
 	case acceptable:
 		// I'm acceptable, why not accept?
-		// Note that ConsensusDispatcher.Accept must be called before vtx.Accept to honor
-		// EventDispatcher.Accept's invariant.
-		if err := ta.ctx.ConsensusDispatcher.Accept(ta.ctx, vtxID, vtx.Bytes()); err != nil {
+		// Note that ConsensusAcceptor.Accept must be called before vtx.Accept
+		// to honor Acceptor.Accept's invariant.
+		if err := ta.ctx.ConsensusAcceptor.Accept(ta.ctx, vtxID, vtx.Bytes()); err != nil {
 			return err
 		}
 
@@ -653,11 +654,10 @@ func (ta *Topological) update(vtx Vertex) error {
 		ta.Latency.Accepted(vtxID, ta.pollNumber)
 	case rejectable:
 		// I'm rejectable, why not reject?
-		if err := ta.ctx.ConsensusDispatcher.Reject(ta.ctx, vtxID, vtx.Bytes()); err != nil {
-			return err
-		}
-
-		ta.ctx.Log.Trace("rejecting vertex %s due to a conflicting acceptance", vtxID)
+		ta.ctx.Log.Trace("rejecting vertex",
+			zap.String("reason", "conflicting acceptance"),
+			zap.Stringer("vtxID", vtxID),
+		)
 		if !txv.Status().Decided() {
 			if err := ta.cg.Remove(vtxID); err != nil {
 				return fmt.Errorf("failed to remove transaction vertex %s from snowstorm before rejecting vertex itself", vtxID)

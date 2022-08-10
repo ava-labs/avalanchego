@@ -8,6 +8,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	zap "go.uber.org/zap"
 )
 
 // MockLogger is a mock of Logger interface.
@@ -46,7 +47,7 @@ func (mr *MockLoggerMockRecorder) AssertDeferredNoError(f interface{}) *gomock.C
 }
 
 // AssertDeferredTrue mocks base method.
-func (m *MockLogger) AssertDeferredTrue(f func() bool, format string, args ...interface{}) {
+func (m *MockLogger) AssertDeferredTrue(f func() bool, format string, args ...zap.Field) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{f, format}
 	for _, a := range args {
@@ -75,7 +76,7 @@ func (mr *MockLoggerMockRecorder) AssertNoError(err interface{}) *gomock.Call {
 }
 
 // AssertTrue mocks base method.
-func (m *MockLogger) AssertTrue(b bool, format string, args ...interface{}) {
+func (m *MockLogger) AssertTrue(b bool, format string, args ...zap.Field) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{b, format}
 	for _, a := range args {
@@ -92,7 +93,7 @@ func (mr *MockLoggerMockRecorder) AssertTrue(b, format interface{}, args ...inte
 }
 
 // Debug mocks base method.
-func (m *MockLogger) Debug(format string, args ...interface{}) {
+func (m *MockLogger) Debug(format string, args ...zap.Field) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{format}
 	for _, a := range args {
@@ -109,7 +110,7 @@ func (mr *MockLoggerMockRecorder) Debug(format interface{}, args ...interface{})
 }
 
 // Error mocks base method.
-func (m *MockLogger) Error(format string, args ...interface{}) {
+func (m *MockLogger) Error(format string, args ...zap.Field) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{format}
 	for _, a := range args {
@@ -126,7 +127,7 @@ func (mr *MockLoggerMockRecorder) Error(format interface{}, args ...interface{})
 }
 
 // Fatal mocks base method.
-func (m *MockLogger) Fatal(format string, args ...interface{}) {
+func (m *MockLogger) Fatal(format string, args ...zap.Field) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{format}
 	for _, a := range args {
@@ -142,36 +143,8 @@ func (mr *MockLoggerMockRecorder) Fatal(format interface{}, args ...interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Fatal", reflect.TypeOf((*MockLogger)(nil).Fatal), varargs...)
 }
 
-// GetDisplayLevel mocks base method.
-func (m *MockLogger) GetDisplayLevel() Level {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetDisplayLevel")
-	ret0, _ := ret[0].(Level)
-	return ret0
-}
-
-// GetDisplayLevel indicates an expected call of GetDisplayLevel.
-func (mr *MockLoggerMockRecorder) GetDisplayLevel() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDisplayLevel", reflect.TypeOf((*MockLogger)(nil).GetDisplayLevel))
-}
-
-// GetLogLevel mocks base method.
-func (m *MockLogger) GetLogLevel() Level {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetLogLevel")
-	ret0, _ := ret[0].(Level)
-	return ret0
-}
-
-// GetLogLevel indicates an expected call of GetLogLevel.
-func (mr *MockLoggerMockRecorder) GetLogLevel() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogLevel", reflect.TypeOf((*MockLogger)(nil).GetLogLevel))
-}
-
 // Info mocks base method.
-func (m *MockLogger) Info(format string, args ...interface{}) {
+func (m *MockLogger) Info(format string, args ...zap.Field) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{format}
 	for _, a := range args {
@@ -211,54 +184,6 @@ func (mr *MockLoggerMockRecorder) RecoverAndPanic(f interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecoverAndPanic", reflect.TypeOf((*MockLogger)(nil).RecoverAndPanic), f)
 }
 
-// SetContextualDisplayingEnabled mocks base method.
-func (m *MockLogger) SetContextualDisplayingEnabled(arg0 bool) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetContextualDisplayingEnabled", arg0)
-}
-
-// SetContextualDisplayingEnabled indicates an expected call of SetContextualDisplayingEnabled.
-func (mr *MockLoggerMockRecorder) SetContextualDisplayingEnabled(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetContextualDisplayingEnabled", reflect.TypeOf((*MockLogger)(nil).SetContextualDisplayingEnabled), arg0)
-}
-
-// SetDisplayLevel mocks base method.
-func (m *MockLogger) SetDisplayLevel(arg0 Level) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetDisplayLevel", arg0)
-}
-
-// SetDisplayLevel indicates an expected call of SetDisplayLevel.
-func (mr *MockLoggerMockRecorder) SetDisplayLevel(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDisplayLevel", reflect.TypeOf((*MockLogger)(nil).SetDisplayLevel), arg0)
-}
-
-// SetLogLevel mocks base method.
-func (m *MockLogger) SetLogLevel(arg0 Level) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetLogLevel", arg0)
-}
-
-// SetLogLevel indicates an expected call of SetLogLevel.
-func (mr *MockLoggerMockRecorder) SetLogLevel(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLogLevel", reflect.TypeOf((*MockLogger)(nil).SetLogLevel), arg0)
-}
-
-// SetPrefix mocks base method.
-func (m *MockLogger) SetPrefix(arg0 string) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetPrefix", arg0)
-}
-
-// SetPrefix indicates an expected call of SetPrefix.
-func (mr *MockLoggerMockRecorder) SetPrefix(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPrefix", reflect.TypeOf((*MockLogger)(nil).SetPrefix), arg0)
-}
-
 // Stop mocks base method.
 func (m *MockLogger) Stop() {
 	m.ctrl.T.Helper()
@@ -284,7 +209,7 @@ func (mr *MockLoggerMockRecorder) StopOnPanic() *gomock.Call {
 }
 
 // Trace mocks base method.
-func (m *MockLogger) Trace(format string, args ...interface{}) {
+func (m *MockLogger) Trace(format string, args ...zap.Field) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{format}
 	for _, a := range args {
@@ -301,7 +226,7 @@ func (mr *MockLoggerMockRecorder) Trace(format interface{}, args ...interface{})
 }
 
 // Verbo mocks base method.
-func (m *MockLogger) Verbo(format string, args ...interface{}) {
+func (m *MockLogger) Verbo(format string, args ...zap.Field) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{format}
 	for _, a := range args {
@@ -318,7 +243,7 @@ func (mr *MockLoggerMockRecorder) Verbo(format interface{}, args ...interface{})
 }
 
 // Warn mocks base method.
-func (m *MockLogger) Warn(format string, args ...interface{}) {
+func (m *MockLogger) Warn(format string, args ...zap.Field) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{format}
 	for _, a := range args {
@@ -347,114 +272,4 @@ func (m *MockLogger) Write(p []byte) (int, error) {
 func (mr *MockLoggerMockRecorder) Write(p interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Write", reflect.TypeOf((*MockLogger)(nil).Write), p)
-}
-
-// MockRotatingWriter is a mock of RotatingWriter interface.
-type MockRotatingWriter struct {
-	ctrl     *gomock.Controller
-	recorder *MockRotatingWriterMockRecorder
-}
-
-// MockRotatingWriterMockRecorder is the mock recorder for MockRotatingWriter.
-type MockRotatingWriterMockRecorder struct {
-	mock *MockRotatingWriter
-}
-
-// NewMockRotatingWriter creates a new mock instance.
-func NewMockRotatingWriter(ctrl *gomock.Controller) *MockRotatingWriter {
-	mock := &MockRotatingWriter{ctrl: ctrl}
-	mock.recorder = &MockRotatingWriterMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockRotatingWriter) EXPECT() *MockRotatingWriterMockRecorder {
-	return m.recorder
-}
-
-// Close mocks base method.
-func (m *MockRotatingWriter) Close() error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Close")
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Close indicates an expected call of Close.
-func (mr *MockRotatingWriterMockRecorder) Close() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockRotatingWriter)(nil).Close))
-}
-
-// Flush mocks base method.
-func (m *MockRotatingWriter) Flush() error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Flush")
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Flush indicates an expected call of Flush.
-func (mr *MockRotatingWriterMockRecorder) Flush() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Flush", reflect.TypeOf((*MockRotatingWriter)(nil).Flush))
-}
-
-// Initialize mocks base method.
-func (m *MockRotatingWriter) Initialize(arg0 Config) (int, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Initialize", arg0)
-	ret0, _ := ret[0].(int)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Initialize indicates an expected call of Initialize.
-func (mr *MockRotatingWriterMockRecorder) Initialize(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*MockRotatingWriter)(nil).Initialize), arg0)
-}
-
-// Rotate mocks base method.
-func (m *MockRotatingWriter) Rotate() error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Rotate")
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Rotate indicates an expected call of Rotate.
-func (mr *MockRotatingWriterMockRecorder) Rotate() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Rotate", reflect.TypeOf((*MockRotatingWriter)(nil).Rotate))
-}
-
-// Write mocks base method.
-func (m *MockRotatingWriter) Write(b []byte) (int, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Write", b)
-	ret0, _ := ret[0].(int)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Write indicates an expected call of Write.
-func (mr *MockRotatingWriterMockRecorder) Write(b interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Write", reflect.TypeOf((*MockRotatingWriter)(nil).Write), b)
-}
-
-// WriteString mocks base method.
-func (m *MockRotatingWriter) WriteString(s string) (int, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WriteString", s)
-	ret0, _ := ret[0].(int)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// WriteString indicates an expected call of WriteString.
-func (mr *MockRotatingWriterMockRecorder) WriteString(s interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteString", reflect.TypeOf((*MockRotatingWriter)(nil).WriteString), s)
 }

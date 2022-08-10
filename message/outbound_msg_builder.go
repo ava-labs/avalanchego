@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 var _ OutboundMsgBuilder = &outMsgBuilder{}
@@ -19,7 +19,7 @@ type OutboundMsgBuilder interface {
 	Version(
 		networkID uint32,
 		myTime uint64,
-		ip utils.IPDesc,
+		ip ips.IPPort,
 		myVersion string,
 		myVersionTime uint64,
 		sig []byte,
@@ -27,13 +27,38 @@ type OutboundMsgBuilder interface {
 	) (OutboundMessage, error)
 
 	PeerList(
-		peers []utils.IPCertDesc,
+		peers []ips.ClaimedIPPort,
 		bypassThrottling bool,
 	) (OutboundMessage, error)
 
 	Ping() (OutboundMessage, error)
 
 	Pong(uptimePercentage uint8) (OutboundMessage, error)
+
+	GetStateSummaryFrontier(
+		chainID ids.ID,
+		requestID uint32,
+		deadline time.Duration,
+	) (OutboundMessage, error)
+
+	StateSummaryFrontier(
+		chainID ids.ID,
+		requestID uint32,
+		summary []byte,
+	) (OutboundMessage, error)
+
+	GetAcceptedStateSummary(
+		chainID ids.ID,
+		requestID uint32,
+		deadline time.Duration,
+		heights []uint64,
+	) (OutboundMessage, error)
+
+	AcceptedStateSummary(
+		chainID ids.ID,
+		requestID uint32,
+		summaryIDs []ids.ID,
+	) (OutboundMessage, error)
 
 	GetAcceptedFrontier(
 		chainID ids.ID,
@@ -108,6 +133,13 @@ type OutboundMsgBuilder interface {
 		containerIDs []ids.ID,
 	) (OutboundMessage, error)
 
+	ChitsV2(
+		chainID ids.ID,
+		requestID uint32,
+		containerIDs []ids.ID,
+		containerID ids.ID,
+	) (OutboundMessage, error)
+
 	AppRequest(
 		chainID ids.ID,
 		requestID uint32,
@@ -142,7 +174,7 @@ func NewOutboundBuilder(c Codec, enableCompression bool) OutboundMsgBuilder {
 func (b *outMsgBuilder) Version(
 	networkID uint32,
 	myTime uint64,
-	ip utils.IPDesc,
+	ip ips.IPPort,
 	myVersion string,
 	myVersionTime uint64,
 	sig []byte,
@@ -170,7 +202,7 @@ func (b *outMsgBuilder) Version(
 	)
 }
 
-func (b *outMsgBuilder) PeerList(peers []utils.IPCertDesc, bypassThrottling bool) (OutboundMessage, error) {
+func (b *outMsgBuilder) PeerList(peers []ips.ClaimedIPPort, bypassThrottling bool) (OutboundMessage, error) {
 	return b.c.Pack(
 		PeerList,
 		map[Field]interface{}{
@@ -201,6 +233,78 @@ func (b *outMsgBuilder) Pong(uptimePercentage uint8) (OutboundMessage, error) {
 	)
 }
 
+func (b *outMsgBuilder) GetStateSummaryFrontier(
+	chainID ids.ID,
+	requestID uint32,
+	deadline time.Duration,
+) (OutboundMessage, error) {
+	return b.c.Pack(
+		GetStateSummaryFrontier,
+		map[Field]interface{}{
+			ChainID:   chainID[:],
+			RequestID: requestID,
+			Deadline:  uint64(deadline),
+		},
+		GetStateSummaryFrontier.Compressible(), // GetStateSummaryFrontier messages can't be compressed
+		false,
+	)
+}
+
+func (b *outMsgBuilder) StateSummaryFrontier(
+	chainID ids.ID,
+	requestID uint32,
+	summary []byte,
+) (OutboundMessage, error) {
+	return b.c.Pack(
+		StateSummaryFrontier,
+		map[Field]interface{}{
+			ChainID:      chainID[:],
+			RequestID:    requestID,
+			SummaryBytes: summary,
+		},
+		b.compress && StateSummaryFrontier.Compressible(), // StateSummaryFrontier messages may be compressed
+		false,
+	)
+}
+
+func (b *outMsgBuilder) GetAcceptedStateSummary(
+	chainID ids.ID,
+	requestID uint32,
+	deadline time.Duration,
+	heights []uint64,
+) (OutboundMessage, error) {
+	return b.c.Pack(
+		GetAcceptedStateSummary,
+		map[Field]interface{}{
+			ChainID:        chainID[:],
+			RequestID:      requestID,
+			Deadline:       uint64(deadline),
+			SummaryHeights: heights,
+		},
+		b.compress && GetAcceptedStateSummary.Compressible(), // GetAcceptedStateSummary messages may be compressed
+		false,
+	)
+}
+
+func (b *outMsgBuilder) AcceptedStateSummary(
+	chainID ids.ID,
+	requestID uint32,
+	summaryIDs []ids.ID,
+) (OutboundMessage, error) {
+	summaryIDBytes := make([][]byte, len(summaryIDs))
+	encodeIDs(summaryIDs, summaryIDBytes)
+	return b.c.Pack(
+		AcceptedStateSummary,
+		map[Field]interface{}{
+			ChainID:    chainID[:],
+			RequestID:  requestID,
+			SummaryIDs: summaryIDBytes,
+		},
+		b.compress && AcceptedStateSummary.Compressible(), // AcceptedStateSummary messages may be compressed
+		false,
+	)
+}
+
 func (b *outMsgBuilder) GetAcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
@@ -224,10 +328,7 @@ func (b *outMsgBuilder) AcceptedFrontier(
 	containerIDs []ids.ID,
 ) (OutboundMessage, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
-	for i, containerID := range containerIDs {
-		copy := containerID
-		containerIDBytes[i] = copy[:]
-	}
+	encodeIDs(containerIDs, containerIDBytes)
 	return b.c.Pack(
 		AcceptedFrontier,
 		map[Field]interface{}{
@@ -247,10 +348,7 @@ func (b *outMsgBuilder) GetAccepted(
 	containerIDs []ids.ID,
 ) (OutboundMessage, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
-	for i, containerID := range containerIDs {
-		copy := containerID
-		containerIDBytes[i] = copy[:]
-	}
+	encodeIDs(containerIDs, containerIDBytes)
 	return b.c.Pack(
 		GetAccepted,
 		map[Field]interface{}{
@@ -270,10 +368,7 @@ func (b *outMsgBuilder) Accepted(
 	containerIDs []ids.ID,
 ) (OutboundMessage, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
-	for i, containerID := range containerIDs {
-		copy := containerID
-		containerIDBytes[i] = copy[:]
-	}
+	encodeIDs(containerIDs, containerIDBytes)
 	return b.c.Pack(
 		Accepted,
 		map[Field]interface{}{
@@ -406,10 +501,7 @@ func (b *outMsgBuilder) Chits(
 	containerIDs []ids.ID,
 ) (OutboundMessage, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
-	for i, containerID := range containerIDs {
-		copy := containerID
-		containerIDBytes[i] = copy[:]
-	}
+	encodeIDs(containerIDs, containerIDBytes)
 	return b.c.Pack(
 		Chits,
 		map[Field]interface{}{
@@ -418,6 +510,28 @@ func (b *outMsgBuilder) Chits(
 			ContainerIDs: containerIDBytes,
 		},
 		Chits.Compressible(), // Chits messages can't be compressed
+		false,
+	)
+}
+
+func (b *outMsgBuilder) ChitsV2(
+	chainID ids.ID,
+	requestID uint32,
+	containerIDs []ids.ID,
+	containerID ids.ID,
+) (OutboundMessage, error) {
+	containerIDBytes := make([][]byte, len(containerIDs))
+	encodeIDs(containerIDs, containerIDBytes)
+
+	return b.c.Pack(
+		ChitsV2,
+		map[Field]interface{}{
+			ChainID:      chainID[:],
+			RequestID:    requestID,
+			ContainerIDs: containerIDBytes,
+			ContainerID:  containerID[:],
+		},
+		ChitsV2.Compressible(), // ChitsV2 messages can't be compressed
 		false,
 	)
 }

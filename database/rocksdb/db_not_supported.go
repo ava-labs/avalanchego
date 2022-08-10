@@ -9,6 +9,8 @@ package rocksdb
 import (
 	"errors"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -16,6 +18,6 @@ import (
 var errUnsupportedDatabase = errors.New("database isn't suppported")
 
 // New returns an error.
-func New(file string, dbConfig []byte, log logging.Logger) (database.Database, error) {
+func New(string, []byte, logging.Logger, string, prometheus.Registerer) (database.Database, error) {
 	return nil, errUnsupportedDatabase
 }
