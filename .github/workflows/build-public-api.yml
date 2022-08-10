@@ -37,7 +37,7 @@ jobs:
           if [[ ${{ github.event_name != 'push' ]];
           then
             echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
-           else
+          else
             echo ::set-output name=VERSION::${{ inputs.tag }}
           fi
         shell: bash
