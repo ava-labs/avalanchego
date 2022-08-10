@@ -44,7 +44,7 @@
     {
       "type": "ansible",
       "playbook_file": ".github/packer/create_public_ami.yml",
-      "roles_path": "scripts/ansible/roles/",
+      "roles_path": ".github/packer/roles/",
       "extra_arguments": ["-e", "component=public-ami build=packer os_release=focal tag={{user `tag`}}"]
     },
     {
