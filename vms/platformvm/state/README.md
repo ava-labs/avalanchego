@@ -1,6 +1,6 @@
-# Platform VM database layout
-
-In platform VM, database layout is as follows:
+#  PlatformVM database layout
+	
+The PlatformVM's database layout is as follows:
 
 ```
   VMDB  

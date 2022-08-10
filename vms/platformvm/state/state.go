@@ -132,6 +132,62 @@ type State interface {
 	Close() error
 }
 
+type stateBlk struct {
+	Blk    blocks.Block
+	Bytes  []byte         `serialize:"true"`
+	Status choices.Status `serialize:"true"`
+}
+
+/*
+ * VMDB
+ * |-. validators
+ * | |-. current
+ * | | |-. validator
+ * | | | '-. list
+ * | | |   '-- txID -> uptime + potential reward
+ * | | |-. delegator
+ * | | | '-. list
+ * | | |   '-- txID -> potential reward
+ * | | '-. subnetValidator
+ * | |   '-. list
+ * | |     '-- txID -> nil
+ * | |-. pending
+ * | | |-. validator
+ * | | | '-. list
+ * | | |   '-- txID -> nil
+ * | | |-. delegator
+ * | | | '-. list
+ * | | |   '-- txID -> nil
+ * | | '-. subnetValidator
+ * | |   '-. list
+ * | |     '-- txID -> nil
+ * | '-. diffs
+ * |   '-. height+subnet
+ * |     '-. list
+ * |       '-- nodeID -> weightChange
+ * |-. blocks
+ * | '-- blockID -> block bytes
+ * |-. txs
+ * | '-- txID -> tx bytes + tx status
+ * |- rewardUTXOs
+ * | '-. txID
+ * |   '-. list
+ * |     '-- utxoID -> utxo bytes
+ * |- utxos
+ * | '-- utxoDB
+ * |-. subnets
+ * | '-. list
+ * |   '-- txID -> nil
+ * |-. chains
+ * | '-. subnetID
+ * |   '-. list
+ * |     '-- txID -> nil
+ * '-. singletons
+ *   |-- initializedKey -> nil
+ *   |-- timestampKey -> timestamp
+ *   |-- currentSupplyKey -> currentSupply
+ *   '-- lastAcceptedKey -> lastAccepted
+ */
 type state struct {
 	cfg     *config.Config
 	ctx     *snow.Context
@@ -230,12 +286,6 @@ type heightWithSubnet struct {
 type txBytesAndStatus struct {
 	Tx     []byte        `serialize:"true"`
 	Status status.Status `serialize:"true"`
-}
-
-type stateBlk struct {
-	Blk    blocks.Block
-	Bytes  []byte         `serialize:"true"`
-	Status choices.Status `serialize:"true"`
 }
 
 type txAndStatus struct {
@@ -716,52 +766,6 @@ func (s *state) SetCurrentSupply(cs uint64)          { s.currentSupply = cs }
 func (s *state) GetLastAccepted() ids.ID             { return s.lastAccepted }
 func (s *state) SetLastAccepted(lastAccepted ids.ID) { s.lastAccepted = lastAccepted }
 
-func (s *state) SetHeight(height uint64) { s.currentHeight = height }
-
-func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error) {
-	if blk, exists := s.addedBlocks[blockID]; exists {
-		return blk.Blk, blk.Status, nil
-	}
-	if blkIntf, cached := s.blockCache.Get(blockID); cached {
-		if blkIntf == nil {
-			return nil, choices.Processing, database.ErrNotFound // status does not matter here
-		}
-
-		blkState := blkIntf.(stateBlk)
-		return blkState.Blk, blkState.Status, nil
-	}
-
-	blkBytes, err := s.blockDB.Get(blockID[:])
-	if err == database.ErrNotFound {
-		s.blockCache.Put(blockID, nil)
-		return nil, choices.Processing, database.ErrNotFound // status does not matter here
-	} else if err != nil {
-		return nil, choices.Processing, err // status does not matter here
-	}
-
-	// Note: stored blocks are verified, so it's safe to unmarshal them with GenesisCodec
-	blkState := stateBlk{}
-	if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
-		return nil, choices.Processing, err // status does not matter here
-	}
-
-	blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
-	if err != nil {
-		return nil, choices.Processing, err
-	}
-
-	s.blockCache.Put(blockID, blkState)
-	return blkState.Blk, blkState.Status, nil
-}
-
-func (s *state) AddStatelessBlock(block blocks.Block, status choices.Status) {
-	s.addedBlocks[block.ID()] = stateBlk{
-		Blk:    block,
-		Bytes:  block.Bytes(),
-		Status: status,
-	}
-}
-
 func (s *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error) {
 	prefixStruct := heightWithSubnet{
 		Height:   height,
@@ -1156,6 +1160,29 @@ func (s *state) write(height uint64) error {
 	return errs.Err
 }
 
+func (s *state) Close() error {
+	errs := wrappers.Errs{}
+	errs.Add(
+		s.pendingSubnetValidatorBaseDB.Close(),
+		s.pendingDelegatorBaseDB.Close(),
+		s.pendingValidatorBaseDB.Close(),
+		s.pendingValidatorsDB.Close(),
+		s.currentSubnetValidatorBaseDB.Close(),
+		s.currentDelegatorBaseDB.Close(),
+		s.currentValidatorBaseDB.Close(),
+		s.currentValidatorsDB.Close(),
+		s.validatorsDB.Close(),
+		s.txDB.Close(),
+		s.rewardUTXODB.Close(),
+		s.utxoDB.Close(),
+		s.subnetBaseDB.Close(),
+		s.chainDB.Close(),
+		s.singletonDB.Close(),
+		s.blockDB.Close(),
+	)
+	return errs.Err
+}
+
 func (s *state) sync(genesis []byte) error {
 	shouldInit, err := s.shouldInit()
 	if err != nil {
@@ -1213,6 +1240,18 @@ func (s *state) init(genesisBytes []byte) error {
 	return s.Commit()
 }
 
+func (s *state) AddStatelessBlock(block blocks.Block, status choices.Status) {
+	s.addedBlocks[block.ID()] = stateBlk{
+		Blk:    block,
+		Bytes:  block.Bytes(),
+		Status: status,
+	}
+}
+
+func (s *state) SetHeight(height uint64) {
+	s.currentHeight = height
+}
+
 func (s *state) Commit() error {
 	defer s.Abort()
 	batch, err := s.CommitBatch()
@@ -1237,11 +1276,11 @@ func (s *state) writeBlocks() error {
 	for blkID, stateBlk := range s.addedBlocks {
 		var (
 			blkID = blkID
-			sblk  = stateBlk
+			stBlk = stateBlk
 		)
 
 		// Note: blocks to be stored are verified, so it's safe to marshal them with GenesisCodec
-		blockBytes, err := blocks.GenesisCodec.Marshal(txs.Version, &sblk)
+		blockBytes, err := blocks.GenesisCodec.Marshal(txs.Version, &stBlk)
 		if err != nil {
 			return fmt.Errorf("failed to marshal block %s to store with: %w", blkID, err)
 		}
@@ -1253,6 +1292,42 @@ func (s *state) writeBlocks() error {
 		}
 	}
 	return nil
+}
+
+func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error) {
+	if blk, exists := s.addedBlocks[blockID]; exists {
+		return blk.Blk, blk.Status, nil
+	}
+	if blkIntf, cached := s.blockCache.Get(blockID); cached {
+		if blkIntf == nil {
+			return nil, choices.Processing, database.ErrNotFound // status does not matter here
+		}
+
+		blkState := blkIntf.(stateBlk)
+		return blkState.Blk, blkState.Status, nil
+	}
+
+	blkBytes, err := s.blockDB.Get(blockID[:])
+	if err == database.ErrNotFound {
+		s.blockCache.Put(blockID, nil)
+		return nil, choices.Processing, database.ErrNotFound // status does not matter here
+	} else if err != nil {
+		return nil, choices.Processing, err // status does not matter here
+	}
+
+	// Note: stored blocks are verified, so it's safe to unmarshal them with GenesisCodec
+	blkState := stateBlk{}
+	if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
+		return nil, choices.Processing, err // status does not matter here
+	}
+
+	blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
+	if err != nil {
+		return nil, choices.Processing, err
+	}
+
+	s.blockCache.Put(blockID, blkState)
+	return blkState.Blk, blkState.Status, nil
 }
 
 func (s *state) writeCurrentPrimaryNetworkStakers(height uint64) error {
@@ -1650,27 +1725,4 @@ func (s *state) writeMetadata() error {
 		s.persistedLastAccepted = s.lastAccepted
 	}
 	return nil
-}
-
-func (s *state) Close() error {
-	errs := wrappers.Errs{}
-	errs.Add(
-		s.pendingSubnetValidatorBaseDB.Close(),
-		s.pendingDelegatorBaseDB.Close(),
-		s.pendingValidatorBaseDB.Close(),
-		s.pendingValidatorsDB.Close(),
-		s.currentSubnetValidatorBaseDB.Close(),
-		s.currentDelegatorBaseDB.Close(),
-		s.currentValidatorBaseDB.Close(),
-		s.currentValidatorsDB.Close(),
-		s.validatorsDB.Close(),
-		s.txDB.Close(),
-		s.rewardUTXODB.Close(),
-		s.utxoDB.Close(),
-		s.subnetBaseDB.Close(),
-		s.chainDB.Close(),
-		s.singletonDB.Close(),
-		s.blockDB.Close(),
-	)
-	return errs.Err
 }

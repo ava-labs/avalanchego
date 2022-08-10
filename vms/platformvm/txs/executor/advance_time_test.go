@@ -433,7 +433,6 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	}()
 	env.config.WhitelistedSubnets.Add(testSubnet1.ID())
 	dummyHeight := uint64(1)
-
 	// Add a subnet validator to the staker set
 	subnetValidatorNodeID := ids.NodeID(preFundedKeys[0].PublicKey().Address())
 	// Starts after the corre
@@ -523,7 +522,6 @@ func TestWhitelistedSubnet(t *testing.T) {
 			if whitelist {
 				env.config.WhitelistedSubnets.Add(testSubnet1.ID())
 			}
-
 			// Add a subnet validator to the staker set
 			subnetValidatorNodeID := preFundedKeys[0].PublicKey().Address()
 
