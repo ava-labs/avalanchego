@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -689,8 +690,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		prometheus.NewRegistry(),
 		&vm.Config,
 		vm.ctx,
-		vm.LocalStake,
-		vm.TotalStake,
+		metrics.Noop,
 		vm.rewards,
 	)
 	assert.NoError(err)
@@ -1063,8 +1063,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		prometheus.NewRegistry(),
 		&vm.Config,
 		vm.ctx,
-		vm.LocalStake,
-		vm.TotalStake,
+		metrics.Noop,
 		vm.rewards,
 	)
 	assert.NoError(err)

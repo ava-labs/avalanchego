@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -188,11 +189,10 @@ type stateBlk struct {
  *   '-- lastAcceptedKey -> lastAccepted
  */
 type state struct {
-	cfg        *config.Config
-	ctx        *snow.Context
-	localStake prometheus.Gauge
-	totalStake prometheus.Gauge
-	rewards    reward.Calculator
+	cfg     *config.Config
+	ctx     *snow.Context
+	metrics metrics.Metrics
+	rewards reward.Calculator
 
 	baseDB *versiondb.Database
 
@@ -305,11 +305,10 @@ type uptimeAndReward struct {
 func New(
 	db database.Database,
 	genesisBytes []byte,
-	metrics prometheus.Registerer,
+	metricsReg prometheus.Registerer,
 	cfg *config.Config,
 	ctx *snow.Context,
-	localStake prometheus.Gauge,
-	totalStake prometheus.Gauge,
+	metrics metrics.Metrics,
 	rewards reward.Calculator,
 ) (State, error) {
 	s, err := new(
@@ -317,8 +316,7 @@ func New(
 		metrics,
 		cfg,
 		ctx,
-		localStake,
-		totalStake,
+		metricsReg,
 		rewards,
 	)
 	if err != nil {
@@ -337,16 +335,15 @@ func New(
 
 func new(
 	db database.Database,
-	metrics prometheus.Registerer,
+	metrics metrics.Metrics,
 	cfg *config.Config,
 	ctx *snow.Context,
-	localStake prometheus.Gauge,
-	totalStake prometheus.Gauge,
+	metricsReg prometheus.Registerer,
 	rewards reward.Calculator,
 ) (*state, error) {
 	blockCache, err := metercacher.New(
 		"block_cache",
-		metrics,
+		metricsReg,
 		&cache.LRU{Size: blockCacheSize},
 	)
 	if err != nil {
@@ -371,7 +368,7 @@ func new(
 
 	validatorDiffsCache, err := metercacher.New(
 		"validator_diffs_cache",
-		metrics,
+		metricsReg,
 		&cache.LRU{Size: validatorDiffsCacheSize},
 	)
 	if err != nil {
@@ -380,7 +377,7 @@ func new(
 
 	txCache, err := metercacher.New(
 		"tx_cache",
-		metrics,
+		metricsReg,
 		&cache.LRU{Size: txCacheSize},
 	)
 	if err != nil {
@@ -390,7 +387,7 @@ func new(
 	rewardUTXODB := prefixdb.New(rewardUTXOsPrefix, baseDB)
 	rewardUTXOsCache, err := metercacher.New(
 		"reward_utxos_cache",
-		metrics,
+		metricsReg,
 		&cache.LRU{Size: rewardUTXOsCacheSize},
 	)
 	if err != nil {
@@ -398,7 +395,7 @@ func new(
 	}
 
 	utxoDB := prefixdb.New(utxoPrefix, baseDB)
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, genesis.Codec, metrics)
+	utxoState, err := avax.NewMeteredUTXOState(utxoDB, genesis.Codec, metricsReg)
 	if err != nil {
 		return nil, err
 	}
@@ -407,7 +404,7 @@ func new(
 
 	chainCache, err := metercacher.New(
 		"chain_cache",
-		metrics,
+		metricsReg,
 		&cache.LRU{Size: chainCacheSize},
 	)
 	if err != nil {
@@ -416,7 +413,7 @@ func new(
 
 	chainDBCache, err := metercacher.New(
 		"chain_db_cache",
-		metrics,
+		metricsReg,
 		&cache.LRU{Size: chainDBCacheSize},
 	)
 	if err != nil {
@@ -424,12 +421,11 @@ func new(
 	}
 
 	return &state{
-		cfg:        cfg,
-		ctx:        ctx,
-		localStake: localStake,
-		totalStake: totalStake,
-		rewards:    rewards,
-		baseDB:     baseDB,
+		cfg:     cfg,
+		ctx:     ctx,
+		metrics: metrics,
+		rewards: rewards,
+		baseDB:  baseDB,
 
 		addedBlocks: make(map[ids.ID]stateBlk),
 		blockCache:  blockCache,
@@ -1182,6 +1178,7 @@ func (s *state) Close() error {
 		s.subnetBaseDB.Close(),
 		s.chainDB.Close(),
 		s.singletonDB.Close(),
+		s.blockDB.Close(),
 	)
 	return errs.Err
 }
@@ -1285,7 +1282,7 @@ func (s *state) writeBlocks() error {
 		// Note: blocks to be stored are verified, so it's safe to marshal them with GenesisCodec
 		blockBytes, err := blocks.GenesisCodec.Marshal(txs.Version, &stBlk)
 		if err != nil {
-			return fmt.Errorf("failed to marshal block %s: %w", blkID, err)
+			return fmt.Errorf("failed to marshal block %s to store: %w", blkID, err)
 		}
 
 		delete(s.addedBlocks, blkID)
@@ -1453,8 +1450,8 @@ func (s *state) writeCurrentPrimaryNetworkStakers(height uint64) error {
 		return nil
 	}
 	weight, _ := primaryValidators.GetWeight(s.ctx.NodeID)
-	s.localStake.Set(float64(weight))
-	s.totalStake.Set(float64(primaryValidators.Weight()))
+	s.metrics.SetLocalStake(weight)
+	s.metrics.SetTotalStake(primaryValidators.Weight())
 	return nil
 }
 

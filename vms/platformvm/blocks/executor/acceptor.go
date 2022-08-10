@@ -160,9 +160,9 @@ func (a *acceptor) CommitBlock(b *blocks.CommitBlock) error {
 	// Update metrics
 	if a.bootstrapped.GetValue() {
 		if parentState.initiallyPreferCommit {
-			a.metrics.MarkVoteWon()
+			a.metrics.MarkOptionVoteWon()
 		} else {
-			a.metrics.MarkVoteLost()
+			a.metrics.MarkOptionVoteLost()
 		}
 	}
 
@@ -188,9 +188,9 @@ func (a *acceptor) AbortBlock(b *blocks.AbortBlock) error {
 	// Update metrics
 	if a.bootstrapped.GetValue() {
 		if parentState.initiallyPreferCommit {
-			a.metrics.MarkVoteLost()
+			a.metrics.MarkOptionVoteLost()
 		} else {
-			a.metrics.MarkVoteWon()
+			a.metrics.MarkOptionVoteWon()
 		}
 	}
 

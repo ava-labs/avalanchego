@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
@@ -327,13 +328,12 @@ func newStateFromDB(assert *assert.Assertions, db database.Database) State {
 
 	state, err := new(
 		db,
-		prometheus.NewRegistry(),
+		metrics.Noop,
 		&config.Config{
 			Validators: vdrs,
 		},
 		&snow.Context{},
-		prometheus.NewGauge(prometheus.GaugeOpts{}),
-		prometheus.NewGauge(prometheus.GaugeOpts{}),
+		prometheus.NewRegistry(),
 		reward.NewCalculator(reward.Config{
 			MaxConsumptionRate: .12 * reward.PercentDenominator,
 			MinConsumptionRate: .1 * reward.PercentDenominator,

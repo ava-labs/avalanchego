@@ -221,7 +221,6 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 			rewardAddress: rewardAddress,                                    // Reward Address
 			feeKeys:       []*crypto.PrivateKeySECP256K1R{preFundedKeys[1]}, // tx fee payer
 			setup: func(target *environment) { // Remove all UTXOs owned by keys[1]
-				dummyHeight := uint64(1)
 				utxoIDs, err := target.state.UTXOIDs(
 					preFundedKeys[1].PublicKey().Address().Bytes(),
 					ids.Empty,
