@@ -7,44 +7,40 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/gorilla/rpc/v2"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 )
 
-var _ Metrics = &noopMetrics{}
+var Noop Metrics = noopMetrics{}
 
 type noopMetrics struct{}
 
-func NewNoopMetrics() *noopMetrics {
-	return &noopMetrics{}
+func (noopMetrics) MarkOptionVoteWon() {}
+
+func (noopMetrics) MarkOptionVoteLost() {}
+
+func (noopMetrics) MarkAccepted(blocks.Block) error { return nil }
+
+func (noopMetrics) InterceptRequest(i *rpc.RequestInfo) *http.Request {
+	return i.Request
 }
 
-func (m *noopMetrics) MarkOptionVoteWon() {}
+func (noopMetrics) AfterRequest(*rpc.RequestInfo) {}
 
-func (m *noopMetrics) MarkOptionVoteLost() {}
+func (noopMetrics) IncValidatorSetsCreated() {}
 
-func (m *noopMetrics) MarkAccepted(blocks.Block) error { return nil }
+func (noopMetrics) IncValidatorSetsCached() {}
 
-func (m *noopMetrics) InterceptRequestFunc() func(*rpc.RequestInfo) *http.Request {
-	return func(*rpc.RequestInfo) *http.Request { return nil }
-}
+func (noopMetrics) AddValidatorSetsDuration(time.Duration) {}
 
-func (m *noopMetrics) AfterRequestFunc() func(*rpc.RequestInfo) {
-	return func(ri *rpc.RequestInfo) {}
-}
+func (noopMetrics) AddValidatorSetsHeightDiff(uint64) {}
 
-func (m *noopMetrics) IncValidatorSetsCreated() {}
+func (noopMetrics) SetLocalStake(uint64) {}
 
-func (m *noopMetrics) IncValidatorSetsCached() {}
+func (noopMetrics) SetTotalStake(uint64) {}
 
-func (m *noopMetrics) AddValidatorSetsDuration(time.Duration) {}
+func (noopMetrics) SetSubnetPercentConnected(ids.ID, float64) {}
 
-func (m *noopMetrics) AddValidatorSetsHeightDiff(float64) {}
-
-func (m *noopMetrics) SetLocalStake(float64) {}
-
-func (m *noopMetrics) SetTotalStake(float64) {}
-
-func (m *noopMetrics) SetSubnetPercentConnected(label string, percent float64) {}
-
-func (m *noopMetrics) SetPercentConnected(percent float64) {}
+func (noopMetrics) SetPercentConnected(float64) {}

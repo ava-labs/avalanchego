@@ -1,5 +1,41 @@
 # Release Notes
 
+## [v1.7.17](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.17)
+
+This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged. The supported plugin version is `15`.
+
+### VMs
+
+- Refactored P-chain block state management
+  - Supporting easier parsing and usage of blocks
+  - Improving separation of block execution with block definition
+  - Unifying state definitions
+- Introduced support to send custom X-chain assets to the P-chain to be activated in a future upgrade
+- Introduced support to use custom assets on the P-chain to be activated in a future upgrade
+- Added VMs README to begin fully documenting plugin invariants
+- Added various comments around expected usages of VM tools
+
+### Coreth
+
+- Added optional JSON logging
+- Added interface for supporting stateful precompiles
+- Removed legacy code format from the database
+
+### Fixes
+
+- Fixed ungraceful gRPC connection closure during very long running requests
+- Fixed LevelDB panic during shutdown
+- Fixed verification of `--stake-max-consumption-rate` to include the upper-bound
+- Fixed various CI failures
+- Fixed flaky unit tests
+
+### Miscellaneous
+
+- Added bootstrapping ETA metrics
+- Converted all logs to support structured fields
+- Improved Snowman++ oracle block verification error messages
+- Removed deprecated or unused scripts
+
 ## [v1.7.16](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.16)
 
 This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged. The supported plugin version is `15`.

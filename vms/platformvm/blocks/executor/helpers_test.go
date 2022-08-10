@@ -191,7 +191,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	)
 	res.sender = &common.SenderTest{T: t}
 
-	metrics := metrics.NewNoopMetrics()
+	metrics := metrics.Noop
 	res.mempool, err = mempool.NewMempool("mempool", registerer, res)
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
@@ -272,7 +272,7 @@ func defaultState(
 		prometheus.NewRegistry(),
 		cfg,
 		ctx,
-		metrics.NewNoopMetrics(),
+		metrics.Noop,
 		rewards,
 	)
 	if err != nil {
