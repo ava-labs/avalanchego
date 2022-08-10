@@ -6,6 +6,9 @@
 - Bump minimum go version to v1.18.1
 - Add interface for suppporting stateful precompiles
 - Remove legacy code format from the database
+- Enable expensive metrics by default
+- Fix atomic trie sync bug that could result in storing incorrect metadata
+- Update state sync metrics to use counter for number of items received
 
 ## [v0.8.14](https://github.com/ava-labs/coreth/releases/tag/v0.8.14)
 
