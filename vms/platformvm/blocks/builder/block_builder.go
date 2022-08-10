@@ -267,10 +267,6 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 }
 
 func (b *blockBuilder) Shutdown() {
-	if b.timer == nil {
-		return
-	}
-
 	// There is a potential deadlock if the timer is about to execute a timeout.
 	// So, the lock must be released before stopping the timer.
 	ctx := b.txExecutorBackend.Ctx
