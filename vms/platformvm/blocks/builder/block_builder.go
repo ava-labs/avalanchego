@@ -275,8 +275,6 @@ func (b *blockBuilder) Shutdown() {
 	ctx.Lock.Lock()
 }
 
-// resetTimer Check if there is a block ready to be added to consensus. If so, notify the
-// consensus engine.
 func (b *blockBuilder) ResetBlockTimer() {
 	// If there is a pending transaction trigger building of a block with that transaction
 	if b.Mempool.HasDecisionTxs() {
