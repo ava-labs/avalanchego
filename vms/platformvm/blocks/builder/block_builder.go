@@ -19,10 +19,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
-	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -67,7 +67,7 @@ type blockBuilder struct {
 	mempool.Mempool
 	Network
 
-	txBuilder         p_tx_builder.Builder
+	txBuilder         builder.Builder
 	txExecutorBackend *txexecutor.Backend
 	blkManager        blockexecutor.Manager
 
@@ -86,7 +86,7 @@ type blockBuilder struct {
 // Initialize this builder.
 func NewBlockBuilder(
 	mempool mempool.Mempool,
-	txBuilder p_tx_builder.Builder,
+	txBuilder builder.Builder,
 	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
 	toEngine chan<- common.Message,
