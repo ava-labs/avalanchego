@@ -30,7 +30,7 @@ var _ Network = &network{}
 type Network interface {
 	common.AppHandler
 
-	// GossipTx gossips just added to mempool
+	// GossipTx gossips the transaction to some of the connected peers
 	GossipTx(tx *txs.Tx) error
 }
 
