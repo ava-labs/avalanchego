@@ -38,10 +38,10 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	assert := assert.New(t)
 
 	env := newEnvironment(t)
+	env.ctx.Lock.Lock()
 	defer func() {
 		assert.NoError(shutdownEnvironment(env))
 	}()
-	env.ctx.Lock.Lock()
 
 	var gossipedBytes []byte
 	env.sender.SendAppGossipF = func(b []byte) error {
@@ -88,10 +88,10 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 	assert := assert.New(t)
 
 	env := newEnvironment(t)
+	env.ctx.Lock.Lock()
 	defer func() {
 		assert.NoError(shutdownEnvironment(env))
 	}()
-	env.ctx.Lock.Lock()
 
 	// create a tx and mark as invalid
 	tx := getValidTx(env.txBuilder, t)
@@ -115,10 +115,10 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	assert := assert.New(t)
 
 	env := newEnvironment(t)
+	env.ctx.Lock.Lock()
 	defer func() {
 		assert.NoError(shutdownEnvironment(env))
 	}()
-	env.ctx.Lock.Lock()
 
 	var gossipedBytes []byte
 	env.sender.SendAppGossipF = func(b []byte) error {
