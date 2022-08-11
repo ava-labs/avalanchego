@@ -199,10 +199,7 @@ func newEnvironment(t *testing.T) *environment {
 		res.sender,
 	)
 
-	if err := res.BlockBuilder.SetPreference(genesisID); err != nil {
-		panic(fmt.Errorf("failed setting last accepted block: %w", err))
-	}
-
+	res.BlockBuilder.SetPreference(genesisID)
 	addSubnet(res)
 
 	return res

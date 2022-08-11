@@ -122,7 +122,6 @@ func (b *blockBuilder) SetPreference(blockID ids.ID) {
 	}
 	b.preferredBlockID = blockID
 	b.ResetBlockTimer()
-	return
 }
 
 func (b *blockBuilder) Preferred() (snowman.Block, error) {
