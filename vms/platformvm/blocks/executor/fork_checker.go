@@ -6,6 +6,7 @@ package executor
 import (
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/forks"
 )
@@ -18,109 +19,48 @@ type forkChecker struct {
 }
 
 func (f *forkChecker) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
-	currentFork, err := f.GetFork(b.Parent())
-	if err != nil {
-		return fmt.Errorf("could not check block type %T against fork, %w", b, err)
-	}
-
-	if currentFork != forks.Blueberry {
-		return fmt.Errorf("block type %T not accepted on fork %s", b, currentFork)
-	}
-	return nil
+	return f.assertFork(b.Parent(), forks.Blueberry)
 }
 
 func (f *forkChecker) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
-	currentFork, err := f.GetFork(b.Parent())
-	if err != nil {
-		return fmt.Errorf("could not check block type %T against fork, %w", b, err)
-	}
-
-	if currentFork != forks.Blueberry {
-		return fmt.Errorf("block type %T not accepted on fork %s", b, currentFork)
-	}
-	return nil
+	return f.assertFork(b.Parent(), forks.Blueberry)
 }
 
 func (f *forkChecker) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) error {
-	currentFork, err := f.GetFork(b.Parent())
-	if err != nil {
-		return fmt.Errorf("could not check block type %T against fork, %w", b, err)
-	}
-
-	if currentFork != forks.Blueberry {
-		return fmt.Errorf("block type %T not accepted on fork %s", b, currentFork)
-	}
-	return nil
+	return f.assertFork(b.Parent(), forks.Blueberry)
 }
 
 func (f *forkChecker) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) error {
-	currentFork, err := f.GetFork(b.Parent())
-	if err != nil {
-		return fmt.Errorf("could not check block type %T against fork, %w", b, err)
-	}
-
-	if currentFork != forks.Blueberry {
-		return fmt.Errorf("block type %T not accepted on fork %s", b, currentFork)
-	}
-	return nil
+	return f.assertFork(b.Parent(), forks.Blueberry)
 }
 
 func (f *forkChecker) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
-	currentFork, err := f.GetFork(b.Parent())
-	if err != nil {
-		return fmt.Errorf("could not check block type %T against fork, %w", b, err)
-	}
-
-	if currentFork != forks.Apricot {
-		return fmt.Errorf("block type %T not accepted on fork %s", b, currentFork)
-	}
-	return nil
+	return f.assertFork(b.Parent(), forks.Apricot)
 }
 
 func (f *forkChecker) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
-	currentFork, err := f.GetFork(b.Parent())
-	if err != nil {
-		return fmt.Errorf("could not check block type %T against fork, %w", b, err)
-	}
-
-	if currentFork != forks.Apricot {
-		return fmt.Errorf("block type %T not accepted on fork %s", b, currentFork)
-	}
-	return nil
+	return f.assertFork(b.Parent(), forks.Apricot)
 }
 
 func (f *forkChecker) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
-	currentFork, err := f.GetFork(b.Parent())
-	if err != nil {
-		return fmt.Errorf("could not check block type %T against fork, %w", b, err)
-	}
-
-	if currentFork != forks.Apricot {
-		return fmt.Errorf("block type %T not accepted on fork %s", b, currentFork)
-	}
-	return nil
+	return f.assertFork(b.Parent(), forks.Apricot)
 }
 
 func (f *forkChecker) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
-	currentFork, err := f.GetFork(b.Parent())
-	if err != nil {
-		return fmt.Errorf("could not check block type %T against fork, %w", b, err)
-	}
-
-	if currentFork != forks.Apricot {
-		return fmt.Errorf("block type %T not accepted on fork %s", b, currentFork)
-	}
-	return nil
+	return f.assertFork(b.Parent(), forks.Apricot)
 }
 
 func (f *forkChecker) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
-	currentFork, err := f.GetFork(b.Parent())
-	if err != nil {
-		return fmt.Errorf("could not check block type %T against fork, %w", b, err)
-	}
+	return f.assertFork(b.Parent(), forks.Apricot)
+}
 
-	if currentFork != forks.Apricot {
-		return fmt.Errorf("block type %T not accepted on fork %s", b, currentFork)
+func (f *forkChecker) assertFork(parent ids.ID, expectedFork forks.Fork) error {
+	currentFork, err := f.GetFork(parent)
+	if err != nil {
+		return fmt.Errorf("couldn't get fork from parent %s: %w", parent, err)
+	}
+	if currentFork != expectedFork {
+		return fmt.Errorf("expected fork %d but got %d", expectedFork, currentFork)
 	}
 	return nil
 }
