@@ -123,44 +123,40 @@ func (a *apricotStrategy) buildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 
-	tx := a.txes[0]
+	var (
+		tx           = a.txes[0]
+		statelessBlk blocks.Block
+		err          error
+	)
 	switch tx.Unsigned.(type) {
 	case txs.StakerTx,
 		*txs.RewardValidatorTx,
 		*txs.AdvanceTimeTx:
-		statelessBlk, err := blocks.NewApricotProposalBlock(
+		statelessBlk, err = blocks.NewApricotProposalBlock(
 			a.parentBlkID,
 			a.nextHeight,
 			tx,
 		)
-		if err != nil {
-			return nil, err
-		}
-
-		// remove selected txs from mempool only when we are sure
-		// a valid block containing it has been generated
-		a.Mempool.Remove(a.txes)
-		return a.blkManager.NewBlock(statelessBlk), nil
 
 	case *txs.CreateChainTx,
 		*txs.CreateSubnetTx,
 		*txs.ImportTx,
 		*txs.ExportTx:
-		statelessBlk, err := blocks.NewApricotStandardBlock(
+		statelessBlk, err = blocks.NewApricotStandardBlock(
 			a.parentBlkID,
 			a.nextHeight,
 			a.txes,
 		)
-		if err != nil {
-			return nil, err
-		}
-
-		// remove selected txs from mempool only when we are sure
-		// a valid block containing it has been generated
-		a.Mempool.Remove(a.txes)
-		return a.blkManager.NewBlock(statelessBlk), nil
 
 	default:
 		return nil, fmt.Errorf("unhandled tx type %T, could not include into a block", tx.Unsigned)
 	}
+
+	if err != nil {
+		return nil, err
+	}
+	// remove selected txs from mempool only when we are sure
+	// a valid block containing it has been generated
+	a.Mempool.Remove(a.txes)
+	return a.blkManager.NewBlock(statelessBlk), nil
 }
