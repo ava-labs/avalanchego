@@ -1,6 +1,8 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+// TODO: consider moving the network implementation to a separate package
+
 package builder
 
 import (
