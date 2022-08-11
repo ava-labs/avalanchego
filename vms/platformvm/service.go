@@ -1629,7 +1629,7 @@ func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchain
 		return nil
 	}
 
-	preferredBlk, err := service.vm.Preferred()
+	preferredBlk, err := service.vm.Builder.Preferred()
 	if err != nil {
 		return fmt.Errorf("could not retrieve preferred block, err %w", err)
 	}
@@ -1922,7 +1922,7 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 
 	// The status of this transaction is not in the database - check if the tx
 	// is in the preferred block's db. If so, return that it's processing.
-	prefBlk, err := service.vm.Preferred()
+	prefBlk, err := service.vm.Builder.Preferred()
 	if err != nil {
 		return err
 	}

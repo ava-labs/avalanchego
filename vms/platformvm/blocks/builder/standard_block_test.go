@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -52,7 +53,7 @@ func TestAtomicTxImports(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
+	utxoBytes, err := blocks.Codec.Marshal(txs.Version, utxo)
 	assert.NoError(err)
 
 	inputID := utxo.InputID()
@@ -78,7 +79,9 @@ func TestAtomicTxImports(t *testing.T) {
 	env.state.SetTimestamp(env.config.ApricotPhase5Time.Add(100 * time.Second))
 
 	assert.NoError(env.Builder.Add(tx))
-	b, err := env.BuildBlock()
+	// TODO remove
+	// env.Builder.AddDecisionTx(tx)
+	b, err := env.Builder.BuildBlock()
 	assert.NoError(err)
 	// Test multiple verify calls work
 	assert.NoError(b.Verify())

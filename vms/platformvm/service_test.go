@@ -264,7 +264,7 @@ func TestGetTxStatus(t *testing.T) {
 
 	if err := service.vm.Builder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
-	} else if block, err := service.vm.BuildBlock(); err != nil {
+	} else if block, err := service.vm.Builder.BuildBlock(); err != nil {
 		t.Fatal(err)
 	} else if blk, ok := block.(*blockexecutor.Block); !ok {
 		t.Fatalf("should be *blockexecutor.Block but is %T", block)
@@ -359,7 +359,7 @@ func TestGetTx(t *testing.T) {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 			}
 
-			block, err := service.vm.BuildBlock()
+			block, err := service.vm.Builder.BuildBlock()
 			if err != nil {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 			}

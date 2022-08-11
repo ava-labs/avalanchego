@@ -71,14 +71,14 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	// trigger block creation
 	assert.NoError(vm.Builder.AddUnverifiedTx(addValidatorTx))
 
-	addValidatorBlock, err := vm.BuildBlock()
+	addValidatorBlock, err := vm.Builder.BuildBlock()
 	assert.NoError(err)
 
 	verifyAndAcceptProposalCommitment(assert, vm, addValidatorBlock)
 
 	vm.clock.Set(validatorStartTime)
 
-	firstAdvanceTimeBlock, err := vm.BuildBlock()
+	firstAdvanceTimeBlock, err := vm.Builder.BuildBlock()
 	assert.NoError(err)
 
 	verifyAndAcceptProposalCommitment(assert, vm, firstAdvanceTimeBlock)
@@ -101,14 +101,14 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	// trigger block creation
 	assert.NoError(vm.Builder.AddUnverifiedTx(addFirstDelegatorTx))
 
-	addFirstDelegatorBlock, err := vm.BuildBlock()
+	addFirstDelegatorBlock, err := vm.Builder.BuildBlock()
 	assert.NoError(err)
 
 	verifyAndAcceptProposalCommitment(assert, vm, addFirstDelegatorBlock)
 
 	vm.clock.Set(firstDelegatorStartTime)
 
-	secondAdvanceTimeBlock, err := vm.BuildBlock()
+	secondAdvanceTimeBlock, err := vm.Builder.BuildBlock()
 	assert.NoError(err)
 
 	verifyAndAcceptProposalCommitment(assert, vm, secondAdvanceTimeBlock)
@@ -133,7 +133,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	// trigger block creation
 	assert.NoError(vm.Builder.AddUnverifiedTx(addSecondDelegatorTx))
 
-	addSecondDelegatorBlock, err := vm.BuildBlock()
+	addSecondDelegatorBlock, err := vm.Builder.BuildBlock()
 	assert.NoError(err)
 
 	verifyAndAcceptProposalCommitment(assert, vm, addSecondDelegatorBlock)
@@ -235,7 +235,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// trigger block creation for the validator tx
-			addValidatorBlock, err := vm.BuildBlock()
+			addValidatorBlock, err := vm.Builder.BuildBlock()
 			assert.NoError(err)
 
 			verifyAndAcceptProposalCommitment(assert, vm, addValidatorBlock)
@@ -257,7 +257,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// trigger block creation for the first add delegator tx
-			addFirstDelegatorBlock, err := vm.BuildBlock()
+			addFirstDelegatorBlock, err := vm.Builder.BuildBlock()
 			assert.NoError(err)
 
 			verifyAndAcceptProposalCommitment(assert, vm, addFirstDelegatorBlock)
@@ -279,7 +279,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// trigger block creation for the second add delegator tx
-			addSecondDelegatorBlock, err := vm.BuildBlock()
+			addSecondDelegatorBlock, err := vm.Builder.BuildBlock()
 			assert.NoError(err)
 
 			verifyAndAcceptProposalCommitment(assert, vm, addSecondDelegatorBlock)
@@ -301,7 +301,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// trigger block creation for the third add delegator tx
-			addThirdDelegatorBlock, err := vm.BuildBlock()
+			addThirdDelegatorBlock, err := vm.Builder.BuildBlock()
 			assert.NoError(err)
 
 			verifyAndAcceptProposalCommitment(assert, vm, addThirdDelegatorBlock)
@@ -323,7 +323,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// trigger block creation for the fourth add delegator tx
-			addFourthDelegatorBlock, err := vm.BuildBlock()
+			addFourthDelegatorBlock, err := vm.Builder.BuildBlock()
 
 			if test.shouldFail {
 				assert.Error(err, "should have failed to allow new delegator")
@@ -410,7 +410,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	preferred, err := vm.Preferred()
+	preferred, err := vm.Builder.Preferred()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -501,7 +501,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	assert.NoError(err)
 
 	// Create the proposal block to add the new validator
-	preferred, err := vm.Preferred()
+	preferred, err := vm.Builder.Preferred()
 	assert.NoError(err)
 
 	preferredID := preferred.ID()
@@ -745,7 +745,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert.NoError(err)
 
 	// Create the proposal block to add the first new validator
-	preferred, err := vm.Preferred()
+	preferred, err := vm.Builder.Preferred()
 	assert.NoError(err)
 
 	preferredID := preferred.ID()
@@ -1146,7 +1146,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	assert.NoError(err)
 
 	// Create the proposal block to add the first new validator
-	preferred, err := vm.Preferred()
+	preferred, err := vm.Builder.Preferred()
 	assert.NoError(err)
 
 	preferredID := preferred.ID()
@@ -1180,7 +1180,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 
 	// Create the proposal block that moves the first new validator from the
 	// pending validator set into the current validator set.
-	preferred, err = vm.Preferred()
+	preferred, err = vm.Builder.Preferred()
 	assert.NoError(err)
 
 	preferredID = preferred.ID()
@@ -1268,7 +1268,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation for the validator tx
-	addValidatorBlock, err := vm.BuildBlock()
+	addValidatorBlock, err := vm.Builder.BuildBlock()
 	assert.NoError(err)
 
 	verifyAndAcceptProposalCommitment(assert, vm, addValidatorBlock)
@@ -1290,7 +1290,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation for the first add delegator tx
-	addFirstDelegatorBlock, err := vm.BuildBlock()
+	addFirstDelegatorBlock, err := vm.Builder.BuildBlock()
 	assert.NoError(err)
 
 	verifyAndAcceptProposalCommitment(assert, vm, addFirstDelegatorBlock)

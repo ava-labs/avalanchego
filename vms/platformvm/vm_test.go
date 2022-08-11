@@ -374,7 +374,7 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 		panic(err)
 	} else if err := vm.Builder.AddUnverifiedTx(testSubnet1); err != nil {
 		panic(err)
-	} else if blk, err := vm.BuildBlock(); err != nil {
+	} else if blk, err := vm.Builder.BuildBlock(); err != nil {
 		panic(err)
 	} else if err := blk.Verify(); err != nil {
 		panic(err)
@@ -449,7 +449,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 		panic(err)
 	} else if err := vm.Builder.AddUnverifiedTx(testSubnet1); err != nil {
 		panic(err)
-	} else if blk, err := vm.BuildBlock(); err != nil {
+	} else if blk, err := vm.Builder.BuildBlock(); err != nil {
 		panic(err)
 	} else if err := blk.Verify(); err != nil {
 		panic(err)
@@ -576,7 +576,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	// trigger block creation
 	assert.NoError(vm.Builder.AddUnverifiedTx(tx))
 
-	blk, err := vm.BuildBlock()
+	blk, err := vm.Builder.BuildBlock()
 	assert.NoError(err)
 
 	assert.NoError(blk.Verify())
@@ -634,7 +634,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	preferred, err := vm.Preferred()
+	preferred, err := vm.Builder.Preferred()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -699,7 +699,7 @@ func TestAddValidatorReject(t *testing.T) {
 	// trigger block creation
 	assert.NoError(vm.Builder.AddUnverifiedTx(tx))
 
-	blk, err := vm.BuildBlock()
+	blk, err := vm.Builder.BuildBlock()
 	assert.NoError(err)
 
 	assert.NoError(blk.Verify())
@@ -799,7 +799,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	// trigger block creation
 	assert.NoError(vm.Builder.AddUnverifiedTx(tx))
 
-	blk, err := vm.BuildBlock()
+	blk, err := vm.Builder.BuildBlock()
 	assert.NoError(err)
 
 	assert.NoError(blk.Verify())
@@ -872,7 +872,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	// trigger block creation
 	assert.NoError(vm.Builder.AddUnverifiedTx(tx))
 
-	blk, err := vm.BuildBlock()
+	blk, err := vm.Builder.BuildBlock()
 	assert.NoError(err)
 
 	assert.NoError(blk.Verify())
@@ -927,7 +927,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	// Fast forward clock to time for genesis validators to leave
 	vm.clock.Set(defaultValidateEndTime)
 
-	blk, err := vm.BuildBlock() // should contain proposal to advance time
+	blk, err := vm.Builder.BuildBlock() // should contain proposal to advance time
 	assert.NoError(err)
 
 	assert.NoError(blk.Verify())
@@ -971,7 +971,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	timestamp := vm.state.GetTimestamp()
 	assert.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
 
-	blk, err = vm.BuildBlock() // should contain proposal to reward genesis validator
+	blk, err = vm.Builder.BuildBlock() // should contain proposal to reward genesis validator
 	assert.NoError(err)
 
 	assert.NoError(blk.Verify())
@@ -1026,7 +1026,7 @@ func TestRewardValidatorReject(t *testing.T) {
 	// Fast forward clock to time for genesis validators to leave
 	vm.clock.Set(defaultValidateEndTime)
 
-	blk, err := vm.BuildBlock() // should contain proposal to advance time
+	blk, err := vm.Builder.BuildBlock() // should contain proposal to advance time
 	assert.NoError(err)
 	assert.NoError(blk.Verify())
 
@@ -1067,7 +1067,7 @@ func TestRewardValidatorReject(t *testing.T) {
 	timestamp := vm.state.GetTimestamp()
 	assert.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
 
-	blk, err = vm.BuildBlock() // should contain proposal to reward genesis validator
+	blk, err = vm.Builder.BuildBlock() // should contain proposal to reward genesis validator
 	assert.NoError(err)
 
 	assert.NoError(blk.Verify())
@@ -1121,7 +1121,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	// Fast forward clock to time for genesis validators to leave
 	vm.clock.Set(defaultValidateEndTime)
 
-	blk, err := vm.BuildBlock() // should contain proposal to advance time
+	blk, err := vm.Builder.BuildBlock() // should contain proposal to advance time
 	assert.NoError(err)
 	assert.NoError(blk.Verify())
 
@@ -1163,7 +1163,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	assert.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
 
 	// should contain proposal to reward genesis validator
-	blk, err = vm.BuildBlock()
+	blk, err = vm.Builder.BuildBlock()
 	assert.NoError(err)
 
 	assert.NoError(blk.Verify())
@@ -1214,7 +1214,7 @@ func TestUnneededBuildBlock(t *testing.T) {
 		}
 		vm.ctx.Lock.Unlock()
 	}()
-	if _, err := vm.BuildBlock(); err == nil {
+	if _, err := vm.Builder.BuildBlock(); err == nil {
 		t.Fatalf("Should have errored on BuildBlock")
 	}
 }
@@ -1243,7 +1243,7 @@ func TestCreateChain(t *testing.T) {
 		t.Fatal(err)
 	} else if err := vm.Builder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
-	} else if blk, err := vm.BuildBlock(); err != nil { // should contain proposal to create chain
+	} else if blk, err := vm.Builder.BuildBlock(); err != nil { // should contain proposal to create chain
 		t.Fatal(err)
 	} else if err := blk.Verify(); err != nil {
 		t.Fatal(err)
@@ -1301,7 +1301,7 @@ func TestCreateSubnet(t *testing.T) {
 	assert.NoError(vm.Builder.AddUnverifiedTx(createSubnetTx))
 
 	// should contain proposal to create subnet
-	blk, err := vm.BuildBlock()
+	blk, err := vm.Builder.BuildBlock()
 	assert.NoError(err)
 
 	assert.NoError(blk.Verify())
@@ -1341,7 +1341,7 @@ func TestCreateSubnet(t *testing.T) {
 
 	assert.NoError(vm.Builder.AddUnverifiedTx(addValidatorTx))
 
-	blk, err = vm.BuildBlock() // should add validator to the new subnet
+	blk, err = vm.Builder.BuildBlock() // should add validator to the new subnet
 	assert.NoError(err)
 
 	assert.NoError(blk.Verify())
@@ -1387,7 +1387,7 @@ func TestCreateSubnet(t *testing.T) {
 	// Create a block with an advance time tx that moves validator
 	// from pending to current validator set
 	vm.clock.Set(startTime)
-	blk, err = vm.BuildBlock() // should be advance time tx
+	blk, err = vm.Builder.BuildBlock() // should be advance time tx
 	assert.NoError(err)
 
 	assert.NoError(blk.Verify())
@@ -1434,7 +1434,7 @@ func TestCreateSubnet(t *testing.T) {
 
 	// fast forward clock to time validator should stop validating
 	vm.clock.Set(endTime)
-	blk, err = vm.BuildBlock() // should be advance time tx
+	blk, err = vm.Builder.BuildBlock() // should be advance time tx
 	assert.NoError(err)
 
 	assert.NoError(blk.Verify())
@@ -1552,7 +1552,7 @@ func TestAtomicImport(t *testing.T) {
 
 	if err := vm.Builder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
-	} else if blk, err := vm.BuildBlock(); err != nil {
+	} else if blk, err := vm.Builder.BuildBlock(); err != nil {
 		t.Fatal(err)
 	} else if err := blk.Verify(); err != nil {
 		t.Fatal(err)
@@ -1601,7 +1601,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	preferred, err := vm.Preferred()
+	preferred, err := vm.Builder.Preferred()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1684,7 +1684,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	preferred, err := firstVM.Preferred()
+	preferred, err := firstVM.Builder.Preferred()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1814,7 +1814,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	preferred, err := firstVM.Preferred()
+	preferred, err := firstVM.Builder.Preferred()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1946,7 +1946,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	preferred, err := vm.Preferred()
+	preferred, err := vm.Builder.Preferred()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2180,7 +2180,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	preferred, err = vm.Preferred()
+	preferred, err = vm.Builder.Preferred()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2241,7 +2241,7 @@ func TestUnverifiedParent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	preferred, err := vm.Preferred()
+	preferred, err := vm.Builder.Preferred()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2413,7 +2413,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	secondVM.clock.Set(defaultValidateEndTime)
 	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
 
-	blk, err := secondVM.BuildBlock() // should contain proposal to advance time
+	blk, err := secondVM.Builder.BuildBlock() // should contain proposal to advance time
 	assert.NoError(err)
 
 	assert.NoError(blk.Verify())
@@ -2457,7 +2457,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	timestamp := secondVM.state.GetTimestamp()
 	assert.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
 
-	blk, err = secondVM.BuildBlock() // should contain proposal to reward genesis validator
+	blk, err = secondVM.Builder.BuildBlock() // should contain proposal to reward genesis validator
 	assert.NoError(err)
 
 	assert.NoError(blk.Verify())
@@ -2540,7 +2540,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	vm.clock.Set(defaultValidateEndTime)
 	vm.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
 
-	blk, err := vm.BuildBlock() // should contain proposal to advance time
+	blk, err := vm.Builder.BuildBlock() // should contain proposal to advance time
 	assert.NoError(err)
 
 	assert.NoError(blk.Verify())
@@ -2569,7 +2569,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	assert.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
 
 	// should contain proposal to reward genesis validator
-	blk, err = vm.BuildBlock()
+	blk, err = vm.Builder.BuildBlock()
 	assert.NoError(err)
 
 	assert.NoError(blk.Verify())

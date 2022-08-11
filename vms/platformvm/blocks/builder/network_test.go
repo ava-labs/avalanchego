@@ -17,6 +17,22 @@ import (
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
 
+func getValidTx(txBuilder txbuilder.Builder, t *testing.T) *txs.Tx {
+	tx, err := txBuilder.NewCreateChainTx(
+		testSubnet1.ID(),
+		nil,
+		constants.AVMID,
+		nil,
+		"chain name",
+		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tx
+}
+
 // show that a tx learned from gossip is validated and added to mempool
 func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	assert := assert.New(t)
@@ -137,20 +153,4 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	assert.NoError(err, "could not reintroduce tx to mempool")
 
 	assert.True(gossipedBytes == nil)
-}
-
-func getValidTx(txBuilder txbuilder.Builder, t *testing.T) *txs.Tx {
-	tx, err := txBuilder.NewCreateChainTx(
-		testSubnet1.ID(),
-		nil,
-		constants.AVMID,
-		nil,
-		"chain name",
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return tx
 }
