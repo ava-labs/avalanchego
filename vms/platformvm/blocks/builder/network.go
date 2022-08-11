@@ -19,13 +19,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ Network = &network{}
-
 const (
 	// We allow [recentCacheSize] to be fairly large because we only store hashes
 	// in the cache, not entire transactions.
 	recentCacheSize = 512
 )
+
+var _ Network = &network{}
 
 type Network interface {
 	common.AppHandler
