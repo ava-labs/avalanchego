@@ -304,7 +304,13 @@ func (vm *VM) onNormalOperationsStarted() error {
 	if err := vm.uptimeManager.StartTracking(validatorIDs); err != nil {
 		return err
 	}
-	return vm.state.Commit()
+	if err := vm.state.Commit(); err != nil {
+		return err
+	}
+
+	// Start the block builder
+	vm.Builder.ResetBlockTimer()
+	return nil
 }
 
 func (vm *VM) SetState(state snow.State) error {

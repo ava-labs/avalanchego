@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -95,4 +97,18 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	assert.True(env.mempool.Has(txID))
 	_, isDropped = env.mempool.GetDropReason(txID)
 	assert.False(isDropped)
+}
+
+func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
+	env := newEnvironment(t)
+	env.ctx.Lock.Lock()
+	env.isBootstrapped.SetValue(false)
+	env.ctx.Log = logging.NoWarn{}
+	defer func() {
+		if err := shutdownEnvironment(env); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	env.Builder.SetPreference(ids.GenerateTestID()) // should not panic
 }

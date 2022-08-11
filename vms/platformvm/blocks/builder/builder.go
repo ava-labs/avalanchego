@@ -96,13 +96,12 @@ func New(
 		toEngine:          toEngine,
 	}
 
-	builder.timer = timer.NewTimer(
-		func() {
-			txExecutorBackend.Ctx.Lock.Lock()
-			defer txExecutorBackend.Ctx.Lock.Unlock()
+	builder.timer = timer.NewTimer(func() {
+		txExecutorBackend.Ctx.Lock.Lock()
+		defer txExecutorBackend.Ctx.Lock.Unlock()
 
-			builder.ResetBlockTimer()
-		})
+		builder.ResetBlockTimer()
+	})
 
 	builder.Network = NewNetwork(
 		txExecutorBackend.Ctx,
@@ -274,13 +273,20 @@ func (b *builder) Shutdown() {
 }
 
 func (b *builder) ResetBlockTimer() {
+	ctx := b.txExecutorBackend.Ctx
+	if !b.txExecutorBackend.Bootstrapped.GetValue() {
+		ctx.Log.Verbo("skipping block timer reset",
+			zap.String("reason", "not bootstrapped"),
+		)
+		return
+	}
+
 	// If there is a pending transaction trigger building of a block with that transaction
 	if b.Mempool.HasDecisionTxs() {
 		b.notifyBlockReady()
 		return
 	}
 
-	ctx := b.txExecutorBackend.Ctx
 	preferredState, ok := b.blkManager.GetState(b.preferredBlockID)
 	if !ok {
 		// The preferred block should always be a decision block
