@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanche-network-runner/client"
+	"github.com/ava-labs/avalanche-network-runner/rpcpb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/subnet-evm/tests/e2e/utils"
 	"github.com/onsi/ginkgo/v2/formatter"
@@ -62,9 +63,13 @@ func startRunner(vmName string, genesisPath string, pluginDir string) error {
 		ctx,
 		execPath,
 		client.WithPluginDir(pluginDir),
-		client.WithCustomVMs(map[string]string{
-			vmName: genesisPath,
-		}))
+		client.WithBlockchainSpecs([]*rpcpb.BlockchainSpec{
+			{
+				VmName:  vmName,
+				Genesis: genesisPath,
+			},
+		}),
+	)
 	cancel()
 	if err != nil {
 		return err
@@ -99,17 +104,17 @@ done:
 			continue
 		}
 
-		if !resp.ClusterInfo.CustomVmsHealthy {
+		if !resp.ClusterInfo.CustomChainsHealthy {
 			continue
 		}
 
 		// all logs are stored under root data dir
 		logsDir = resp.GetClusterInfo().GetRootDataDir()
 
-		for chainID, vmInfo := range resp.ClusterInfo.CustomVms {
-			if vmInfo.VmId == vmId.String() {
+		for chainID, chainInfo := range resp.ClusterInfo.CustomChains {
+			if chainInfo.VmId == vmId.String() {
 				blockchainID = chainID
-				outf("{{blue}}subnet-evm is ready:{{/}} %+v\n", vmInfo)
+				outf("{{blue}}subnet-evm is ready:{{/}} %+v\n", chainInfo)
 				break done
 			}
 		}
