@@ -34,7 +34,7 @@ jobs:
       - name: Get the tag
         id: get_tag
         run: |
-          if [[ ${{ github.event_name }} != 'push' ]];
+          if [[ ${{ github.event_name }} == 'push' ]];
           then
             echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
           else
