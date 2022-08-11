@@ -40,10 +40,7 @@ func (v *verifier) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
 		return nil
 	}
 
-	if err := v.verifyCommonBlock(b); err != nil {
-		return err
-	}
-	if err := v.validateBlockTimestamp(b); err != nil {
+	if err := v.blueberryCommonBlock(b); err != nil {
 		return err
 	}
 
@@ -52,12 +49,11 @@ func (v *verifier) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
 	if !ok {
 		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
 	}
-	onAcceptState := parentState.onAbortState
 
 	blkState := &blockState{
 		statelessBlock: b,
 		timestamp:      b.BlockTimestamp(),
-		onAcceptState:  onAcceptState,
+		onAcceptState:  parentState.onAbortState,
 	}
 	v.blkIDToState[blkID] = blkState
 	return nil
@@ -71,10 +67,7 @@ func (v *verifier) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
 		return nil
 	}
 
-	if err := v.verifyCommonBlock(b); err != nil {
-		return fmt.Errorf("couldn't verify common block of %s: %s", blkID, err)
-	}
-	if err := v.validateBlockTimestamp(b); err != nil {
+	if err := v.blueberryCommonBlock(b); err != nil {
 		return err
 	}
 
@@ -83,11 +76,10 @@ func (v *verifier) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
 	if !ok {
 		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
 	}
-	onAcceptState := parentState.onCommitState
 
 	blkState := &blockState{
 		statelessBlock: b,
-		onAcceptState:  onAcceptState,
+		onAcceptState:  parentState.onCommitState,
 		timestamp:      b.BlockTimestamp(),
 	}
 	v.blkIDToState[blkID] = blkState
@@ -102,10 +94,7 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 		return nil
 	}
 
-	if err := v.verifyCommonBlock(b); err != nil {
-		return err
-	}
-	if err := v.validateBlockTimestamp(b); err != nil {
+	if err := v.blueberryCommonBlock(b); err != nil {
 		return err
 	}
 
@@ -203,10 +192,7 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 		return nil
 	}
 
-	if err := v.verifyCommonBlock(b); err != nil {
-		return err
-	}
-	if err := v.validateBlockTimestamp(b); err != nil {
+	if err := v.blueberryCommonBlock(b); err != nil {
 		return err
 	}
 
@@ -351,7 +337,7 @@ func (v *verifier) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 		return nil
 	}
 
-	if err := v.verifyCommonBlock(b); err != nil {
+	if err := v.apricotCommonBlock(b); err != nil {
 		return err
 	}
 
@@ -379,7 +365,7 @@ func (v *verifier) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 		return nil
 	}
 
-	if err := v.verifyCommonBlock(b); err != nil {
+	if err := v.apricotCommonBlock(b); err != nil {
 		return fmt.Errorf("couldn't verify common block of %s: %s", blkID, err)
 	}
 
@@ -407,7 +393,7 @@ func (v *verifier) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 		return nil
 	}
 
-	if err := v.verifyCommonBlock(b); err != nil {
+	if err := v.apricotCommonBlock(b); err != nil {
 		return err
 	}
 
@@ -458,7 +444,7 @@ func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 		atomicRequests: make(map[ids.ID]*atomic.Requests),
 	}
 
-	if err := v.verifyCommonBlock(b); err != nil {
+	if err := v.apricotCommonBlock(b); err != nil {
 		return err
 	}
 
@@ -525,7 +511,14 @@ func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 	return nil
 }
 
-func (v *verifier) verifyCommonBlock(b blocks.Block) error {
+func (v *verifier) blueberryCommonBlock(b blocks.Block) error {
+	if err := v.apricotCommonBlock(b); err != nil {
+		return err
+	}
+	return v.validateBlockTimestamp(b)
+}
+
+func (v *verifier) apricotCommonBlock(b blocks.Block) error {
 	parentID := b.Parent()
 	parent, err := v.GetBlock(parentID)
 	if err != nil {
@@ -600,7 +593,7 @@ func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 		return nil
 	}
 
-	if err := v.verifyCommonBlock(b); err != nil {
+	if err := v.apricotCommonBlock(b); err != nil {
 		return err
 	}
 
