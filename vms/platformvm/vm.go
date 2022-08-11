@@ -392,10 +392,13 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
 	server.RegisterInterceptFunc(vm.metrics.InterceptRequest)
 	server.RegisterAfterFunc(vm.metrics.AfterRequest)
-	if err := server.RegisterService(&Service{
-		vm:          vm,
-		addrManager: avax.NewAddressManager(vm.ctx),
-	}, "platform"); err != nil {
+	if err := server.RegisterService(
+		&Service{
+			vm:          vm,
+			addrManager: avax.NewAddressManager(vm.ctx),
+		},
+		"platform",
+	); err != nil {
 		return nil, err
 	}
 
