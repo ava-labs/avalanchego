@@ -132,6 +132,8 @@ func (a *apricotStrategy) buildBlock() (snowman.Block, error) {
 	case txs.StakerTx,
 		*txs.RewardValidatorTx,
 		*txs.AdvanceTimeTx:
+		// Note that if [tx] is one of the above types, it's the only
+		// tx in this block because Apricot proposal blocks have 1 tx.
 		statelessBlk, err = blocks.NewApricotProposalBlock(
 			a.parentBlkID,
 			a.nextHeight,
@@ -142,6 +144,8 @@ func (a *apricotStrategy) buildBlock() (snowman.Block, error) {
 		*txs.CreateSubnetTx,
 		*txs.ImportTx,
 		*txs.ExportTx:
+		// Note that if [tx] is one of the above types, all of
+		// the txs in [a.txes] must be "standard" txs.
 		statelessBlk, err = blocks.NewApricotStandardBlock(
 			a.parentBlkID,
 			a.nextHeight,
