@@ -1285,7 +1285,7 @@ func (s *state) writeBlocks() error {
 		delete(s.addedBlocks, blkID)
 		s.blockCache.Put(blkID, stateBlk)
 		if err = s.blockDB.Put(blkID[:], blockBytes); err != nil {
-			return fmt.Errorf("failed to write block %s with: %w", blkID, err)
+			return fmt.Errorf("failed to write block %s: %w", blkID, err)
 		}
 	}
 	return nil

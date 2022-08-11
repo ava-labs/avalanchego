@@ -1,6 +1,8 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+// TODO: consider moving the network implementation to a separate package
+
 package builder
 
 import (
@@ -17,18 +19,18 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ Network = &network{}
-
 const (
 	// We allow [recentCacheSize] to be fairly large because we only store hashes
 	// in the cache, not entire transactions.
 	recentCacheSize = 512
 )
 
+var _ Network = &network{}
+
 type Network interface {
 	common.AppHandler
 
-	// GossipTx gossips just added to mempool
+	// GossipTx gossips the transaction to some of the connected peers
 	GossipTx(tx *txs.Tx) error
 }
 

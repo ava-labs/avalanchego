@@ -54,6 +54,13 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
+const (
+	testNetworkID                 = 10 // To be used in tests
+	defaultWeight                 = 10000
+	maxRecentlyAcceptedWindowSize = 256
+	recentlyAcceptedWindowTTL     = 5 * time.Minute
+)
+
 var (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
@@ -70,13 +77,6 @@ var (
 
 	testSubnet1            *txs.Tx
 	testSubnet1ControlKeys = preFundedKeys[0:3]
-)
-
-const (
-	testNetworkID                 = 10 // To be used in tests
-	defaultWeight                 = 10000
-	maxRecentlyAcceptedWindowSize = 256
-	recentlyAcceptedWindowTTL     = 5 * time.Minute
 )
 
 type mutableSharedMemory struct {
@@ -202,7 +202,7 @@ func newEnvironment(t *testing.T, mockResetBlockTimer bool) *environment {
 		window,
 	)
 
-	res.Builder = NewBlockBuilder(
+	res.Builder = New(
 		res.mempool,
 		res.txBuilder,
 		&res.backend,

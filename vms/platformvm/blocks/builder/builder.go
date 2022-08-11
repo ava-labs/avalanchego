@@ -79,8 +79,7 @@ type builder struct {
 	timer *timer.Timer
 }
 
-// Initialize this builder.
-func NewBlockBuilder(
+func New(
 	mempool mempool.Mempool,
 	txBuilder txbuilder.Builder,
 	txExecutorBackend *txexecutor.Backend,
