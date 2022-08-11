@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package builder
 
 import (
 	"testing"
@@ -13,37 +13,38 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+
+	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
 
-func getValidTx(vm *VM, t *testing.T) *txs.Tx {
-	res, err := vm.txBuilder.NewCreateChainTx(
+func getValidTx(txBuilder txbuilder.Builder, t *testing.T) *txs.Tx {
+	tx, err := txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
 		nil,
 		"chain name",
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty, // change addr
+		ids.ShortEmpty,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	return res
+	return tx
 }
 
 // show that a tx learned from gossip is validated and added to mempool
 func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	assert := assert.New(t)
-	vm, _, sender, _ := defaultVM()
-	vm.ctx.Lock.Lock()
+
+	env := newEnvironment(t)
+	env.ctx.Lock.Lock()
 	defer func() {
-		assert.NoError(vm.Shutdown())
-		vm.ctx.Lock.Unlock()
+		assert.NoError(shutdownEnvironment(env))
 	}()
 
 	var gossipedBytes []byte
-	sender.SendAppGossipF = func(b []byte) error {
+	env.sender.SendAppGossipF = func(b []byte) error {
 		gossipedBytes = b
 		return nil
 	}
@@ -51,20 +52,20 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 
 	// create a tx
-	tx := getValidTx(vm, t)
+	tx := getValidTx(env.txBuilder, t)
 	txID := tx.ID()
 
 	msg := message.Tx{Tx: tx.Bytes()}
 	msgBytes, err := message.Build(&msg)
 	assert.NoError(err)
 	// Free lock because [AppGossip] waits for the context lock
-	vm.ctx.Lock.Unlock()
+	env.ctx.Lock.Unlock()
 	// show that unknown tx is added to mempool
-	err = vm.AppGossip(nodeID, msgBytes)
+	err = env.AppGossip(nodeID, msgBytes)
 	assert.NoError(err, "error in reception of gossiped tx")
-	assert.True(vm.mempool.Has(txID))
+	assert.True(env.Builder.Has(txID))
 	// Grab lock back
-	vm.ctx.Lock.Lock()
+	env.ctx.Lock.Lock()
 
 	// and gossiped if it has just been discovered
 	assert.True(gossipedBytes != nil)
@@ -85,53 +86,51 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 // show that txs already marked as invalid are not re-requested on gossiping
 func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 	assert := assert.New(t)
-	vm, _, _, _ := defaultVM()
-	vm.ctx.Lock.Lock()
+
+	env := newEnvironment(t)
+	env.ctx.Lock.Lock()
 	defer func() {
-		assert.NoError(vm.Shutdown())
-		vm.ctx.Lock.Unlock()
+		assert.NoError(shutdownEnvironment(env))
 	}()
 
 	// create a tx and mark as invalid
-	tx := getValidTx(vm, t)
+	tx := getValidTx(env.txBuilder, t)
 	txID := tx.ID()
-	vm.mempool.MarkDropped(txID, "dropped for testing")
+	env.Builder.MarkDropped(txID, "dropped for testing")
 
 	// show that the invalid tx is not requested
 	nodeID := ids.GenerateTestNodeID()
 	msg := message.Tx{Tx: tx.Bytes()}
 	msgBytes, err := message.Build(&msg)
 	assert.NoError(err)
-	vm.ctx.Lock.Unlock()
-	err = vm.AppGossip(nodeID, msgBytes)
-	vm.ctx.Lock.Lock()
+	env.ctx.Lock.Unlock()
+	err = env.AppGossip(nodeID, msgBytes)
+	env.ctx.Lock.Lock()
 	assert.NoError(err, "error in reception of gossiped tx")
-	assert.False(vm.mempool.Has(txID))
+	assert.False(env.Builder.Has(txID))
 }
 
 // show that locally generated txs are gossiped
 func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	assert := assert.New(t)
-	vm, _, sender, _ := defaultVM()
-	vm.ctx.Lock.Lock()
+
+	env := newEnvironment(t)
+	env.ctx.Lock.Lock()
 	defer func() {
-		assert.NoError(vm.Shutdown())
-		vm.ctx.Lock.Unlock()
+		assert.NoError(shutdownEnvironment(env))
 	}()
 
-	mempool := &vm.blockBuilder
-
 	var gossipedBytes []byte
-	sender.SendAppGossipF = func(b []byte) error {
+	env.sender.SendAppGossipF = func(b []byte) error {
 		gossipedBytes = b
 		return nil
 	}
 
 	// add a tx to the mempool and show it gets gossiped
-	tx := getValidTx(vm, t)
+	tx := getValidTx(env.txBuilder, t)
 	txID := tx.ID()
 
-	err := mempool.AddUnverifiedTx(tx)
+	err := env.Builder.AddUnverifiedTx(tx)
 	assert.NoError(err, "couldn't add tx to mempool")
 	assert.True(gossipedBytes != nil)
 
@@ -149,8 +148,8 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 
 	// show that transaction is not re-gossiped is recently added to mempool
 	gossipedBytes = nil
-	vm.mempool.RemoveDecisionTxs([]*txs.Tx{tx})
-	err = vm.mempool.Add(tx)
+	env.Builder.RemoveDecisionTxs([]*txs.Tx{tx})
+	err = env.Builder.Add(tx)
 	assert.NoError(err, "could not reintroduce tx to mempool")
 
 	assert.True(gossipedBytes == nil)

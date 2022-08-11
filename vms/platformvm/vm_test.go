@@ -114,7 +114,7 @@ var (
 	cChainID = ids.Empty.Prefix(1)
 
 	// Used to create and use keys.
-	testKeyfactory crypto.FactorySECP256K1R
+	testKeyFactory crypto.FactorySECP256K1R
 )
 
 type snLookup struct {
@@ -311,7 +311,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 	return &buildGenesisArgs, genesisBytes
 }
 
-func defaultVM() (*VM, database.Database, *common.SenderTest, *mutableSharedMemory) {
+func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
 			Chains:                 chains.MockManager{},
@@ -370,7 +370,7 @@ func defaultVM() (*VM, database.Database, *common.SenderTest, *mutableSharedMemo
 	)
 	if err != nil {
 		panic(err)
-	} else if err := vm.blockBuilder.AddUnverifiedTx(testSubnet1); err != nil {
+	} else if err := vm.Builder.AddUnverifiedTx(testSubnet1); err != nil {
 		panic(err)
 	} else if blk, err := vm.BuildBlock(); err != nil {
 		panic(err)
@@ -382,7 +382,7 @@ func defaultVM() (*VM, database.Database, *common.SenderTest, *mutableSharedMemo
 		panic(err)
 	}
 
-	return vm, baseDBManager.Current().Database, appSender, msm
+	return vm, baseDBManager.Current().Database, msm
 }
 
 func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
@@ -444,7 +444,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 	)
 	if err != nil {
 		panic(err)
-	} else if err := vm.blockBuilder.AddUnverifiedTx(testSubnet1); err != nil {
+	} else if err := vm.Builder.AddUnverifiedTx(testSubnet1); err != nil {
 		panic(err)
 	} else if blk, err := vm.BuildBlock(); err != nil {
 		panic(err)
@@ -459,7 +459,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 
 // Ensure genesis state is parsed from bytes and stored correctly
 func TestGenesis(t *testing.T) {
-	vm, _, _, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -473,7 +473,7 @@ func TestGenesis(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if genesisBlock, err := vm.GetBlock(genesisBlockID); err != nil {
+	if genesisBlock, err := vm.manager.GetBlock(genesisBlockID); err != nil {
 		t.Fatalf("couldn't get genesis block: %v", err)
 	} else if genesisBlock.Status() != choices.Accepted {
 		t.Fatal("genesis block should be accepted")
@@ -545,7 +545,7 @@ func TestGenesis(t *testing.T) {
 // accept proposal to add validator to primary network
 func TestAddValidatorCommit(t *testing.T) {
 	assert := assert.New(t)
-	vm, _, _, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		assert.NoError(vm.Shutdown())
@@ -571,7 +571,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	assert.NoError(vm.blockBuilder.AddUnverifiedTx(tx))
+	assert.NoError(vm.Builder.AddUnverifiedTx(tx))
 
 	blk, err := vm.BuildBlock()
 	assert.NoError(err)
@@ -602,7 +602,7 @@ func TestAddValidatorCommit(t *testing.T) {
 
 // verify invalid proposal to add validator to primary network
 func TestInvalidAddValidatorCommit(t *testing.T) {
-	vm, _, _, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -613,7 +613,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 
 	startTime := defaultGenesisTime.Add(-txexecutor.SyncBound).Add(-1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
-	key, _ := testKeyfactory.NewPrivateKey()
+	key, _ := testKeyFactory.NewPrivateKey()
 	nodeID := ids.NodeID(key.PublicKey().Address())
 
 	// create invalid tx
@@ -655,7 +655,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	if err := parsedBlock.Verify(); err == nil {
 		t.Fatalf("Should have errored during verification")
 	}
-	if _, dropped := vm.blockBuilder.GetDropReason(statelessBlk.Tx.ID()); !dropped {
+	if _, dropped := vm.Builder.GetDropReason(statelessBlk.Tx.ID()); !dropped {
 		t.Fatal("tx should be in dropped tx cache")
 	}
 }
@@ -663,7 +663,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 // Reject proposal to add validator to primary network
 func TestAddValidatorReject(t *testing.T) {
 	assert := assert.New(t)
-	vm, _, _, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		assert.NoError(vm.Shutdown())
@@ -689,7 +689,7 @@ func TestAddValidatorReject(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	assert.NoError(vm.blockBuilder.AddUnverifiedTx(tx))
+	assert.NoError(vm.Builder.AddUnverifiedTx(tx))
 
 	blk, err := vm.BuildBlock()
 	assert.NoError(err)
@@ -724,7 +724,7 @@ func TestAddValidatorReject(t *testing.T) {
 
 // Reject proposal to add validator to primary network
 func TestAddValidatorInvalidNotReissued(t *testing.T) {
-	vm, _, _, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -755,7 +755,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	}
 
 	// trigger block creation
-	if err := vm.blockBuilder.AddUnverifiedTx(tx); err == nil {
+	if err := vm.Builder.AddUnverifiedTx(tx); err == nil {
 		t.Fatal("Expected BuildBlock to error due to adding a validator with a nodeID that is already in the validator set.")
 	}
 }
@@ -763,7 +763,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 // Accept proposal to add validator to subnet
 func TestAddSubnetValidatorAccept(t *testing.T) {
 	assert := assert.New(t)
-	vm, _, _, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		assert.NoError(vm.Shutdown())
@@ -789,7 +789,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	assert.NoError(vm.blockBuilder.AddUnverifiedTx(tx))
+	assert.NoError(vm.Builder.AddUnverifiedTx(tx))
 
 	blk, err := vm.BuildBlock()
 	assert.NoError(err)
@@ -836,7 +836,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 // Reject proposal to add validator to subnet
 func TestAddSubnetValidatorReject(t *testing.T) {
 	assert := assert.New(t)
-	vm, _, _, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		assert.NoError(vm.Shutdown())
@@ -862,7 +862,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	assert.NoError(vm.blockBuilder.AddUnverifiedTx(tx))
+	assert.NoError(vm.Builder.AddUnverifiedTx(tx))
 
 	blk, err := vm.BuildBlock()
 	assert.NoError(err)
@@ -909,7 +909,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 // Test case where primary network validator rewarded
 func TestRewardValidatorAccept(t *testing.T) {
 	assert := assert.New(t)
-	vm, _, _, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		assert.NoError(vm.Shutdown())
@@ -1008,7 +1008,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 // Test case where primary network validator not rewarded
 func TestRewardValidatorReject(t *testing.T) {
 	assert := assert.New(t)
-	vm, _, _, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		assert.NoError(vm.Shutdown())
@@ -1103,7 +1103,7 @@ func TestRewardValidatorReject(t *testing.T) {
 // Test case where primary network validator is preferred to be rewarded
 func TestRewardValidatorPreferred(t *testing.T) {
 	assert := assert.New(t)
-	vm, _, _, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		assert.NoError(vm.Shutdown())
@@ -1198,7 +1198,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 
 // Ensure BuildBlock errors when there is no block to build
 func TestUnneededBuildBlock(t *testing.T) {
-	vm, _, _, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1213,7 +1213,7 @@ func TestUnneededBuildBlock(t *testing.T) {
 
 // test acceptance of proposal to create a new chain
 func TestCreateChain(t *testing.T) {
-	vm, _, _, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1233,7 +1233,7 @@ func TestCreateChain(t *testing.T) {
 	)
 	if err != nil {
 		t.Fatal(err)
-	} else if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
+	} else if err := vm.Builder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	} else if blk, err := vm.BuildBlock(); err != nil { // should contain proposal to create chain
 		t.Fatal(err)
@@ -1270,7 +1270,7 @@ func TestCreateChain(t *testing.T) {
 // 4) Advance timestamp to validator's end time (removing validator from current)
 func TestCreateSubnet(t *testing.T) {
 	assert := assert.New(t)
-	vm, _, _, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		assert.NoError(vm.Shutdown())
@@ -1290,7 +1290,7 @@ func TestCreateSubnet(t *testing.T) {
 	)
 	assert.NoError(err)
 
-	assert.NoError(vm.blockBuilder.AddUnverifiedTx(createSubnetTx))
+	assert.NoError(vm.Builder.AddUnverifiedTx(createSubnetTx))
 
 	// should contain proposal to create subnet
 	blk, err := vm.BuildBlock()
@@ -1331,7 +1331,7 @@ func TestCreateSubnet(t *testing.T) {
 	)
 	assert.NoError(err)
 
-	assert.NoError(vm.blockBuilder.AddUnverifiedTx(addValidatorTx))
+	assert.NoError(vm.Builder.AddUnverifiedTx(addValidatorTx))
 
 	blk, err = vm.BuildBlock() // should add validator to the new subnet
 	assert.NoError(err)
@@ -1474,7 +1474,7 @@ func TestCreateSubnet(t *testing.T) {
 
 // test asset import
 func TestAtomicImport(t *testing.T) {
-	vm, baseDB, _, mutableSharedMemory := defaultVM()
+	vm, baseDB, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1542,7 +1542,7 @@ func TestAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
+	if err := vm.Builder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	} else if blk, err := vm.BuildBlock(); err != nil {
 		t.Fatal(err)
@@ -1563,7 +1563,7 @@ func TestAtomicImport(t *testing.T) {
 
 // test optimistic asset import
 func TestOptimisticAtomicImport(t *testing.T) {
-	vm, _, _, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -2284,7 +2284,7 @@ func TestUnverifiedParent(t *testing.T) {
 }
 
 func TestMaxStakeAmount(t *testing.T) {
-	vm, _, _, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {

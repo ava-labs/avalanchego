@@ -1,7 +1,9 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+// TODO: consider moving the network implementation to a separate package
+
+package builder
 
 import (
 	"fmt"
@@ -11,8 +13,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -23,25 +25,35 @@ const (
 	recentCacheSize = 512
 )
 
+var _ Network = &network{}
+
+type Network interface {
+	common.AppHandler
+
+	// GossipTx gossips the transaction to some of the connected peers
+	GossipTx(tx *txs.Tx) error
+}
+
 type network struct {
-	log logging.Logger
+	ctx        *snow.Context
+	blkBuilder Builder
+
 	// gossip related attributes
 	appSender common.AppSender
-	mempool   *blockBuilder
-	vm        *VM
 	recentTxs *cache.LRU
 }
 
-func newNetwork(appSender common.AppSender, vm *VM) *network {
-	n := &network{
-		log:       vm.ctx.Log,
-		appSender: appSender,
-		mempool:   &vm.blockBuilder,
-		vm:        vm,
-		recentTxs: &cache.LRU{Size: recentCacheSize},
+func NewNetwork(
+	ctx *snow.Context,
+	blkBuilder *builder,
+	appSender common.AppSender,
+) Network {
+	return &network{
+		ctx:        ctx,
+		blkBuilder: blkBuilder,
+		appSender:  appSender,
+		recentTxs:  &cache.LRU{Size: recentCacheSize},
 	}
-
-	return n
 }
 
 func (n *network) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
@@ -63,14 +75,14 @@ func (n *network) AppResponse(nodeID ids.NodeID, requestID uint32, msgBytes []by
 }
 
 func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
-	n.log.Debug("called AppGossip message handler",
+	n.ctx.Log.Debug("called AppGossip message handler",
 		zap.Stringer("nodeID", nodeID),
 		zap.Int("messageLen", len(msgBytes)),
 	)
 
 	msgIntf, err := message.Parse(msgBytes)
 	if err != nil {
-		n.log.Debug("dropping AppGossip message",
+		n.ctx.Log.Debug("dropping AppGossip message",
 			zap.String("reason", "failed to parse message"),
 		)
 		return nil
@@ -78,7 +90,7 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 
 	msg, ok := msgIntf.(*message.Tx)
 	if !ok {
-		n.log.Debug("dropping unexpected message",
+		n.ctx.Log.Debug("dropping unexpected message",
 			zap.Stringer("nodeID", nodeID),
 		)
 		return nil
@@ -86,7 +98,7 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 
 	tx, err := txs.Parse(txs.Codec, msg.Tx)
 	if err != nil {
-		n.log.Verbo("received invalid tx",
+		n.ctx.Log.Verbo("received invalid tx",
 			zap.Stringer("nodeID", nodeID),
 			zap.Binary("tx", msg.Tx),
 			zap.Error(err),
@@ -98,17 +110,17 @@ func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
 
 	// We need to grab the context lock here to avoid racy behavior with
 	// transaction verification + mempool modifications.
-	n.vm.ctx.Lock.Lock()
-	defer n.vm.ctx.Lock.Unlock()
+	n.ctx.Lock.Lock()
+	defer n.ctx.Lock.Unlock()
 
-	if _, dropped := n.mempool.GetDropReason(txID); dropped {
+	if _, dropped := n.blkBuilder.GetDropReason(txID); dropped {
 		// If the tx is being dropped - just ignore it
 		return nil
 	}
 
 	// add to mempool
-	if err = n.mempool.AddUnverifiedTx(tx); err != nil {
-		n.log.Debug("tx failed verification",
+	if err = n.blkBuilder.AddUnverifiedTx(tx); err != nil {
+		n.ctx.Log.Debug("tx failed verification",
 			zap.Stringer("nodeID", nodeID),
 			zap.Error(err),
 		)
@@ -124,7 +136,7 @@ func (n *network) GossipTx(tx *txs.Tx) error {
 	}
 	n.recentTxs.Put(txID, nil)
 
-	n.log.Debug("gossiping tx",
+	n.ctx.Log.Debug("gossiping tx",
 		zap.Stringer("txID", txID),
 	)
 

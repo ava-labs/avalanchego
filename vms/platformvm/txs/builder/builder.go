@@ -27,13 +27,12 @@ import (
 const MaxPageSize = 1024
 
 var (
-	_ TxBuilder = &builder{}
+	_ Builder = &builder{}
 
 	errNoFunds = errors.New("no spendable funds were found")
 )
 
-// TODO: TxBuilder should be replaced by the P-chain wallet
-type TxBuilder interface {
+type Builder interface {
 	AtomicTxBuilder
 	DecisionTxBuilder
 	ProposalTxBuilder
@@ -158,7 +157,7 @@ type ProposalTxBuilder interface {
 	NewRewardValidatorTx(txID ids.ID) (*txs.Tx, error)
 }
 
-func NewTxBuilder(
+func New(
 	ctx *snow.Context,
 	cfg config.Config,
 	clk *mockable.Clock,
@@ -166,7 +165,7 @@ func NewTxBuilder(
 	state state.Chain,
 	atomicUTXOManager avax.AtomicUTXOManager,
 	utxoSpender utxo.Spender,
-) TxBuilder {
+) Builder {
 	return &builder{
 		AtomicUTXOManager: atomicUTXOManager,
 		Spender:           utxoSpender,

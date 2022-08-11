@@ -40,7 +40,7 @@ import (
 
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	assert := assert.New(t)
-	vm, _, _, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		assert.NoError(vm.Shutdown())
@@ -67,7 +67,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	assert.NoError(vm.blockBuilder.AddUnverifiedTx(addValidatorTx))
+	assert.NoError(vm.Builder.AddUnverifiedTx(addValidatorTx))
 
 	addValidatorBlock, err := vm.BuildBlock()
 	assert.NoError(err)
@@ -97,7 +97,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	assert.NoError(vm.blockBuilder.AddUnverifiedTx(addFirstDelegatorTx))
+	assert.NoError(vm.Builder.AddUnverifiedTx(addFirstDelegatorTx))
 
 	addFirstDelegatorBlock, err := vm.BuildBlock()
 	assert.NoError(err)
@@ -129,7 +129,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	assert.NoError(vm.blockBuilder.AddUnverifiedTx(addSecondDelegatorTx))
+	assert.NoError(vm.Builder.AddUnverifiedTx(addSecondDelegatorTx))
 
 	addSecondDelegatorBlock, err := vm.BuildBlock()
 	assert.NoError(err)
@@ -152,7 +152,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	err = vm.blockBuilder.AddUnverifiedTx(addThirdDelegatorTx)
+	err = vm.Builder.AddUnverifiedTx(addThirdDelegatorTx)
 	assert.Error(err, "should have marked the delegator as being over delegated")
 }
 
@@ -198,7 +198,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			vm, _, _, _ := defaultVM()
+			vm, _, _ := defaultVM()
 			vm.ApricotPhase3Time = test.ap3Time
 
 			vm.ctx.Lock.Lock()
@@ -209,7 +209,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				vm.ctx.Lock.Unlock()
 			}()
 
-			key, err := testKeyfactory.NewPrivateKey()
+			key, err := testKeyFactory.NewPrivateKey()
 			assert.NoError(err)
 
 			id := key.PublicKey().Address()
@@ -229,7 +229,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// issue the add validator tx
-			err = vm.blockBuilder.AddUnverifiedTx(addValidatorTx)
+			err = vm.Builder.AddUnverifiedTx(addValidatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the validator tx
@@ -251,7 +251,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// issue the first add delegator tx
-			err = vm.blockBuilder.AddUnverifiedTx(addFirstDelegatorTx)
+			err = vm.Builder.AddUnverifiedTx(addFirstDelegatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the first add delegator tx
@@ -273,7 +273,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// issue the second add delegator tx
-			err = vm.blockBuilder.AddUnverifiedTx(addSecondDelegatorTx)
+			err = vm.Builder.AddUnverifiedTx(addSecondDelegatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the second add delegator tx
@@ -295,7 +295,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// issue the third add delegator tx
-			err = vm.blockBuilder.AddUnverifiedTx(addThirdDelegatorTx)
+			err = vm.Builder.AddUnverifiedTx(addThirdDelegatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the third add delegator tx
@@ -317,7 +317,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// issue the fourth add delegator tx
-			err = vm.blockBuilder.AddUnverifiedTx(addFourthDelegatorTx)
+			err = vm.Builder.AddUnverifiedTx(addFourthDelegatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the fourth add delegator tx
@@ -467,7 +467,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	assert := assert.New(t)
 
-	vm, baseDB, _, mutableSharedMemory := defaultVM()
+	vm, baseDB, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown()
@@ -479,7 +479,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	newValidatorStartTime := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime := newValidatorStartTime.Add(defaultMinStakingDuration)
 
-	key, err := testKeyfactory.NewPrivateKey()
+	key, err := testKeyFactory.NewPrivateKey()
 	assert.NoError(err)
 
 	nodeID := ids.NodeID(key.PublicKey().Address())
@@ -691,7 +691,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		&vm.Config,
 		vm.ctx,
 		metrics.Noop,
-		vm.rewards,
+		reward.NewCalculator(vm.Config.RewardConfig),
 	)
 	assert.NoError(err)
 	vm.state = is
@@ -712,7 +712,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	assert := assert.New(t)
 
-	vm, baseDB, _, mutableSharedMemory := defaultVM()
+	vm, baseDB, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown()
@@ -1064,7 +1064,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		&vm.Config,
 		vm.ctx,
 		metrics.Noop,
-		vm.rewards,
+		reward.NewCalculator(vm.Config.RewardConfig),
 	)
 	assert.NoError(err)
 	vm.state = is
@@ -1094,7 +1094,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	assert := assert.New(t)
 
-	vm, _, _, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown()
@@ -1231,7 +1231,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	delegator2EndTime := delegator2StartTime.Add(3 * defaultMinStakingDuration)
 	delegator2Stake := defaultMaxValidatorStake - validatorStake
 
-	vm, _, _, _ := defaultVM()
+	vm, _, _ := defaultVM()
 
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -1241,7 +1241,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	key, err := testKeyfactory.NewPrivateKey()
+	key, err := testKeyFactory.NewPrivateKey()
 	assert.NoError(err)
 
 	id := key.PublicKey().Address()
@@ -1261,7 +1261,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	assert.NoError(err)
 
 	// issue the add validator tx
-	err = vm.blockBuilder.AddUnverifiedTx(addValidatorTx)
+	err = vm.Builder.AddUnverifiedTx(addValidatorTx)
 	assert.NoError(err)
 
 	// trigger block creation for the validator tx
@@ -1283,7 +1283,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	assert.NoError(err)
 
 	// issue the first add delegator tx
-	err = vm.blockBuilder.AddUnverifiedTx(addFirstDelegatorTx)
+	err = vm.Builder.AddUnverifiedTx(addFirstDelegatorTx)
 	assert.NoError(err)
 
 	// trigger block creation for the first add delegator tx
@@ -1306,7 +1306,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 
 	// attempting to issue the second add delegator tx should fail because the
 	// total stake weight would go over the limit.
-	assert.Error(vm.blockBuilder.AddUnverifiedTx(addSecondDelegatorTx))
+	assert.Error(vm.Builder.AddUnverifiedTx(addSecondDelegatorTx))
 }
 
 func verifyAndAcceptProposalCommitment(assert *assert.Assertions, vm *VM, blk snowman.Block) {

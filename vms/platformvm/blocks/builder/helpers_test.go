@@ -1,12 +1,12 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package executor
+package builder
 
 import (
 	"errors"
 	"fmt"
-	"math"
+	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -32,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -43,14 +45,20 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
+	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 const (
-	testNetworkID = 10 // To be used in tests
-	defaultWeight = 10000
+	testNetworkID                 = 10 // To be used in tests
+	defaultWeight                 = 10000
+	maxRecentlyAcceptedWindowSize = 256
+	recentlyAcceptedWindowTTL     = 5 * time.Minute
 )
 
 var (
@@ -66,13 +74,9 @@ var (
 	defaultTxFee              = uint64(100)
 	xChainID                  = ids.Empty.Prefix(0)
 	cChainID                  = ids.Empty.Prefix(1)
-	lastAcceptedID            = ids.GenerateTestID()
 
 	testSubnet1            *txs.Tx
 	testSubnet1ControlKeys = preFundedKeys[0:3]
-
-	// Used to create and use keys.
-	testKeyfactory crypto.FactorySECP256K1R
 )
 
 type mutableSharedMemory struct {
@@ -80,6 +84,11 @@ type mutableSharedMemory struct {
 }
 
 type environment struct {
+	Builder
+	blkManager blockexecutor.Manager
+	mempool    mempool.Mempool
+	sender     *common.SenderTest
+
 	isBootstrapped *utils.AtomicBool
 	config         *config.Config
 	clk            *mockable.Clock
@@ -88,27 +97,14 @@ type environment struct {
 	msm            *mutableSharedMemory
 	fx             fx.Fx
 	state          state.State
-	states         map[ids.ID]state.Chain
 	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
 	utxosHandler   utxo.Handler
-	txBuilder      builder.Builder
-	backend        Backend
+	txBuilder      txbuilder.Builder
+	backend        txexecutor.Backend
 }
 
-func (e *environment) GetState(blkID ids.ID) (state.Chain, bool) {
-	if blkID == lastAcceptedID {
-		return e.state, true
-	}
-	chainState, ok := e.states[blkID]
-	return chainState, ok
-}
-
-func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
-	e.states[blkID] = chainState
-}
-
-// TODO: snLookup currently duplicated in vm_test.go. Remove duplication
+// TODO snLookup currently duplicated in vm_test.go. Consider removing duplication
 type snLookup struct {
 	chainsToSubnet map[ids.ID]ids.ID
 }
@@ -121,76 +117,100 @@ func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
 	return subnetID, nil
 }
 
-func newEnvironment() *environment {
-	var isBootstrapped utils.AtomicBool
-	isBootstrapped.SetValue(true)
-
-	config := defaultConfig()
-	clk := defaultClock()
-
-	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
-	baseDB := versiondb.New(baseDBManager.Current().Database)
-	ctx, msm := defaultCtx(baseDB)
-
-	fx := defaultFx(&clk, ctx.Log, isBootstrapped.GetValue())
-
-	rewards := reward.NewCalculator(config.RewardConfig)
-	baseState := defaultState(&config, ctx, baseDB, rewards)
-
-	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
-	uptimes := uptime.NewManager(baseState)
-	utxoHandler := utxo.NewHandler(ctx, &clk, baseState, fx)
-
-	txBuilder := builder.New(
-		ctx,
-		config,
-		&clk,
-		fx,
-		baseState,
-		atomicUTXOs,
-		utxoHandler,
+func newEnvironment(t *testing.T) *environment {
+	var (
+		res = &environment{}
+		err error
 	)
 
-	backend := Backend{
-		Config:       &config,
-		Ctx:          ctx,
-		Clk:          &clk,
-		Bootstrapped: &isBootstrapped,
-		Fx:           fx,
-		FlowChecker:  utxoHandler,
-		Uptimes:      uptimes,
-		Rewards:      rewards,
+	res.isBootstrapped = &utils.AtomicBool{}
+	res.isBootstrapped.SetValue(true)
+
+	res.config = defaultConfig()
+	res.clk = defaultClock()
+
+	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
+	res.baseDB = versiondb.New(baseDBManager.Current().Database)
+	res.ctx, res.msm = defaultCtx(res.baseDB)
+	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.GetValue())
+
+	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
+	res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
+
+	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
+	res.uptimes = uptime.NewManager(res.state)
+	res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.state, res.fx)
+
+	res.txBuilder = txbuilder.New(
+		res.ctx,
+		*res.config,
+		res.clk,
+		res.fx,
+		res.state,
+		res.atomicUTXOs,
+		res.utxosHandler,
+	)
+
+	genesisID := res.state.GetLastAccepted()
+	res.backend = txexecutor.Backend{
+		Config:       res.config,
+		Ctx:          res.ctx,
+		Clk:          res.clk,
+		Bootstrapped: res.isBootstrapped,
+		Fx:           res.fx,
+		FlowChecker:  res.utxosHandler,
+		Uptimes:      res.uptimes,
+		Rewards:      rewardsCalc,
 	}
 
-	env := &environment{
-		isBootstrapped: &isBootstrapped,
-		config:         &config,
-		clk:            &clk,
-		baseDB:         baseDB,
-		ctx:            ctx,
-		msm:            msm,
-		fx:             fx,
-		state:          baseState,
-		states:         make(map[ids.ID]state.Chain),
-		atomicUTXOs:    atomicUTXOs,
-		uptimes:        uptimes,
-		utxosHandler:   utxoHandler,
-		txBuilder:      txBuilder,
-		backend:        backend,
+	registerer := prometheus.NewRegistry()
+	window := window.New(
+		window.Config{
+			Clock:   res.clk,
+			MaxSize: maxRecentlyAcceptedWindowSize,
+			TTL:     recentlyAcceptedWindowTTL,
+		},
+	)
+	res.sender = &common.SenderTest{T: t}
+
+	metrics, err := metrics.New("", registerer, res.config.WhitelistedSubnets)
+	if err != nil {
+		panic(fmt.Errorf("failed to create metrics: %w", err))
 	}
 
-	addSubnet(env, txBuilder)
+	res.mempool, err = mempool.NewMempool("mempool", registerer, res)
+	if err != nil {
+		panic(fmt.Errorf("failed to create mempool: %w", err))
+	}
+	res.blkManager = blockexecutor.NewManager(
+		res.mempool,
+		metrics,
+		res.state,
+		&res.backend,
+		window,
+	)
 
-	return env
+	res.Builder = New(
+		res.mempool,
+		res.txBuilder,
+		&res.backend,
+		res.blkManager,
+		nil, // toEngine,
+		res.sender,
+	)
+
+	res.Builder.SetPreference(genesisID)
+	addSubnet(res)
+
+	return res
 }
 
 func addSubnet(
 	env *environment,
-	txBuilder builder.Builder,
 ) {
 	// Create a subnet
 	var err error
-	testSubnet1, err = txBuilder.NewCreateSubnetTx(
+	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		[]ids.ShortID{ // control keys
 			preFundedKeys[0].PublicKey().Address(),
@@ -205,12 +225,13 @@ func addSubnet(
 	}
 
 	// store it
-	stateDiff, err := state.NewDiff(lastAcceptedID, env)
+	genesisID := env.state.GetLastAccepted()
+	stateDiff, err := state.NewDiff(genesisID, env.blkManager)
 	if err != nil {
 		panic(err)
 	}
 
-	executor := StandardTxExecutor{
+	executor := txexecutor.StandardTxExecutor{
 		Backend: &env.backend,
 		State:   stateDiff,
 		Tx:      testSubnet1,
@@ -282,8 +303,8 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	return ctx, msm
 }
 
-func defaultConfig() config.Config {
-	return config.Config{
+func defaultConfig() *config.Config {
+	return &config.Config{
 		Chains:                 chains.MockManager{},
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             validators.NewManager(),
@@ -306,10 +327,10 @@ func defaultConfig() config.Config {
 	}
 }
 
-func defaultClock() mockable.Clock {
+func defaultClock() *mockable.Clock {
 	clk := mockable.Clock{}
 	clk.Set(defaultGenesisTime)
-	return clk
+	return &clk
 }
 
 type fxVMInt struct {
@@ -421,7 +442,6 @@ func shutdownEnvironment(env *environment) error {
 		if err := env.uptimes.Shutdown(validatorIDs); err != nil {
 			return err
 		}
-		env.state.SetHeight( /*height*/ math.MaxUint64)
 		if err := env.state.Commit(); err != nil {
 			return err
 		}

@@ -66,7 +66,7 @@ var (
 )
 
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
-	vm, _, _, mutableSharedMemory := defaultVM()
+	vm, _, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 	ks := keystore.New(logging.NoLog{}, manager.NewMemDB(version.Semantic1_0_0))
@@ -74,7 +74,10 @@ func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
 		t.Fatal(err)
 	}
 	vm.ctx.Keystore = ks.NewBlockchainKeyStore(vm.ctx.ChainID)
-	return &Service{vm: vm}, mutableSharedMemory
+	return &Service{
+		vm:          vm,
+		addrManager: avax.NewAddressManager(vm.ctx),
+	}, mutableSharedMemory
 }
 
 // Give user [testUsername] control of [testPrivateKey] and keys[0] (which is funded)
@@ -85,7 +88,7 @@ func defaultAddress(t *testing.T, service *Service) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pk, err := testKeyfactory.ToPrivateKey(testPrivateKey)
+	pk, err := testKeyFactory.ToPrivateKey(testPrivateKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,13 +256,13 @@ func TestGetTxStatus(t *testing.T) {
 	}
 
 	// put the chain in existing chain list
-	if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err == nil {
+	if err := service.vm.Builder.AddUnverifiedTx(tx); err == nil {
 		t.Fatal("should have erred because of missing funds")
 	}
 
 	mutableSharedMemory.SharedMemory = sm
 
-	if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
+	if err := service.vm.Builder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	} else if block, err := service.vm.BuildBlock(); err != nil {
 		t.Fatal(err)
@@ -352,7 +355,7 @@ func TestGetTx(t *testing.T) {
 			if err := service.GetTx(nil, arg, &response); err == nil {
 				t.Fatalf("failed test '%s - %s': haven't issued tx yet so shouldn't be able to get it", test.description, encoding.String())
 			}
-			if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
+			if err := service.vm.Builder.AddUnverifiedTx(tx); err != nil {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 			}
 
@@ -549,7 +552,7 @@ func TestGetStake(t *testing.T) {
 	assert.NoError(service.vm.state.Commit())
 
 	// Make sure the delegator addr has the right stake (old stake + stakeAmount)
-	addr, _ := service.vm.FormatLocalAddress(keys[0].PublicKey().Address())
+	addr, _ := service.addrManager.FormatLocalAddress(keys[0].PublicKey().Address())
 	args.Addresses = []string{addr}
 	assert.NoError(service.GetStake(nil, &args, &response))
 	assert.EqualValues(oldStake+stakeAmount, uint64(response.Staked))
@@ -794,12 +797,12 @@ func TestGetBlock(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			preferred, err := service.vm.GetBlock(service.vm.preferred)
+			preferred, err := service.vm.Builder.Preferred()
 			if err != nil {
 				t.Fatal(err)
 			}
 			statelessBlock, err := blocks.NewStandardBlock(
-				service.vm.preferred,
+				preferred.ID(),
 				preferred.Height()+1,
 				[]*txs.Tx{tx},
 			)
