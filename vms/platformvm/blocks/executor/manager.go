@@ -25,7 +25,7 @@ type Manager interface {
 	GetBlock(blkID ids.ID) (snowman.Block, error)
 	NewBlock(blocks.Block) snowman.Block
 
-	// GetFork returns fork active on blkID
+	// GetFork returns the fork of [blkID]'s child.
 	GetFork(blkID ids.ID) (forks.Fork, error)
 }
 
@@ -46,16 +46,15 @@ func NewManager(
 		blkIDToState: map[ids.ID]*blockState{},
 	}
 
-	verifier := &verifier{
-		backend:           backend,
-		txExecutorBackend: txExecutorBackend,
-		forkChecker: &forkChecker{
-			backend: backend,
-		},
-	}
 	manager := &manager{
-		backend:  backend,
-		verifier: verifier,
+		backend: backend,
+		verifier: &verifier{
+			backend:           backend,
+			txExecutorBackend: txExecutorBackend,
+			forkChecker: &forkChecker{
+				backend: backend,
+			},
+		},
 		acceptor: &acceptor{
 			backend:          backend,
 			metrics:          metrics,
@@ -63,9 +62,6 @@ func NewManager(
 		},
 		rejector: &rejector{backend: backend},
 	}
-
-	// // TODO ABENEGIA: solve this loop
-	// verifier.man = manager
 	return manager
 }
 
