@@ -134,46 +134,42 @@ func (b *blueberryStrategy) buildBlock() (snowman.Block, error) {
 		return b.blkManager.NewBlock(statelessBlk), nil
 	}
 
-	tx := b.txes[0]
+	var (
+		tx           = b.txes[0]
+		statelessBlk blocks.Block
+		err          error
+	)
 	switch tx.Unsigned.(type) {
 	case txs.StakerTx,
 		*txs.RewardValidatorTx,
 		*txs.AdvanceTimeTx:
-		statelessBlk, err := blocks.NewBlueberryProposalBlock(
+		statelessBlk, err = blocks.NewBlueberryProposalBlock(
 			b.blkTime,
 			b.parentBlkID,
 			b.height,
 			tx,
 		)
-		if err != nil {
-			return nil, err
-		}
-
-		// remove selected txs from mempool only when we are sure
-		// a valid block containing it has been generated
-		b.Mempool.Remove(b.txes)
-		return b.blkManager.NewBlock(statelessBlk), nil
 
 	case *txs.CreateChainTx,
 		*txs.CreateSubnetTx,
 		*txs.ImportTx,
 		*txs.ExportTx:
-		statelessBlk, err := blocks.NewBlueberryStandardBlock(
+		statelessBlk, err = blocks.NewBlueberryStandardBlock(
 			b.blkTime,
 			b.parentBlkID,
 			b.height,
 			b.txes,
 		)
-		if err != nil {
-			return nil, err
-		}
-
-		// remove selected txs from mempool only when we are sure
-		// a valid block containing it has been generated
-		b.Mempool.Remove(b.txes)
-		return b.blkManager.NewBlock(statelessBlk), nil
 
 	default:
 		return nil, fmt.Errorf("unhandled tx type %T, could not include into a block", tx.Unsigned)
 	}
+
+	if err != nil {
+		return nil, err
+	}
+	// remove selected txs from mempool only when we are sure
+	// a valid block containing it has been generated
+	b.Mempool.Remove(b.txes)
+	return b.blkManager.NewBlock(statelessBlk), nil
 }
