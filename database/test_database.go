@@ -43,6 +43,9 @@ var Tests = []func(t *testing.T, db Database){
 	TestMemorySafetyBatch,
 	TestClear,
 	TestClearPrefix,
+	TestModifyValueAfterPut,
+	TestModifyValueAfterBatchPut,
+	TestModifyValueAfterBatchPutReplay,
 	TestConcurrentBatches,
 	TestManySmallConcurrentKVPairBatches,
 }
@@ -1172,6 +1175,77 @@ func TestClearPrefix(t *testing.T, db Database) {
 
 	err = db.Close()
 	assert.NoError(err)
+}
+
+func TestModifyValueAfterPut(t *testing.T, db Database) {
+	assert := assert.New(t)
+
+	key := []byte{1}
+	value := []byte{1, 2}
+	originalValue := utils.CopyBytes(value)
+
+	err := db.Put(key, value)
+	assert.NoError(err)
+
+	// Modify the value that was Put into the database
+	// to see if the database copied the value correctly.
+	value[0] = 2
+	retrievedValue, err := db.Get(key)
+	assert.NoError(err)
+	assert.Equal(originalValue, retrievedValue)
+}
+
+func TestModifyValueAfterBatchPut(t *testing.T, db Database) {
+	assert := assert.New(t)
+
+	key := []byte{1}
+	value := []byte{1, 2}
+	originalValue := utils.CopyBytes(value)
+
+	batch := db.NewBatch()
+	err := batch.Put(key, value)
+	assert.NoError(err)
+
+	// Modify the value that was Put into the Batch and then Write the
+	// batch to the database.
+	value[0] = 2
+	err = batch.Write()
+	assert.NoError(err)
+
+	// Verify that the value written to the database contains matches the original
+	// value of the byte slice when Put was called.
+	retrievedValue, err := db.Get(key)
+	assert.NoError(err)
+	assert.Equal(originalValue, retrievedValue)
+}
+
+func TestModifyValueAfterBatchPutReplay(t *testing.T, db Database) {
+	assert := assert.New(t)
+
+	key := []byte{1}
+	value := []byte{1, 2}
+	originalValue := utils.CopyBytes(value)
+
+	batch := db.NewBatch()
+	err := batch.Put(key, value)
+	assert.NoError(err)
+
+	// Modify the value that was Put into the Batch and then Write the
+	// batch to the database.
+	value[0] = 2
+
+	// Create a new batch and replay the batch onto this one before writing it to the DB.
+	replayBatch := db.NewBatch()
+	err = batch.Replay(replayBatch)
+	assert.NoError(err)
+	err = replayBatch.Write()
+	assert.NoError(err)
+
+	// Verify that the value written to the database contains matches the original
+	// value of the byte slice when Put was called.
+	retrievedValue, err := db.Get(key)
+	assert.NoError(err)
+	assert.Equal(originalValue, retrievedValue)
 }
 
 func TestConcurrentBatches(t *testing.T, db Database) {

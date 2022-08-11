@@ -92,7 +92,7 @@ func (db *Database) Put(key, value []byte) error {
 	if db.mem == nil {
 		return database.ErrClosed
 	}
-	db.mem[string(key)] = valueDelete{value: value}
+	db.mem[string(key)] = valueDelete{value: utils.CopyBytes(value)}
 	return nil
 }
 
