@@ -42,17 +42,17 @@ However upon Blueberry activation some transactions and blocks type will be forb
   * `blocks.ApricotAbortBlock`
   * `blocks.ApricotCommitBlock`
   * `blocks.ApricotProposalBlock`
-  * `blocks.ApricotStandardtBlock`
+  * `blocks.ApricotStandardBlock`
 * The following tx types will be forbidden:
   * `AdvanceTimeTx`
 * The following block types will be allowed:
   * `blocks.BlueberryAbortBlock`
   * `blocks.BlueberryCommitBlock`
   * `blocks.BlueberryProposalBlock`
-  * `blocks.BlueberryStandardtBlock`
+  * `blocks.BlueberryStandardBlock`
 
 Note that unlike `blocks.Apricot*` blocks, `blocks.Blueberry*` blocks will serialize block timestamp.
 
-Note Bluberry fork won't change any transactions format, so transactions byte representation is fully backward compatible. Also Blueberry won't change any codec version
+Note Blueberry fork won't change any transactions format, so transactions byte representation is fully backward compatible. Also Blueberry won't change any codec version
 
-[^1]: note that avalanchego codebase includes `blocks.ApricotAtomicBlock`, which has been forbidden on Apricot Phase 5 fork. This type is kept just to allow boostrapping from genesis and it is forbidden on Blueberry as well as subsequent Apricot forks.
+[^1]: note that avalanchego codebase includes `blocks.ApricotAtomicBlock`, which has been forbidden on Apricot Phase 5 fork. This type is kept just to allow bootstrapping from genesis and it is forbidden on Blueberry as well as subsequent Apricot forks.
