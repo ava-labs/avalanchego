@@ -370,7 +370,7 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 	)
 	if err != nil {
 		panic(err)
-	} else if err := vm.BlockBuilder.AddUnverifiedTx(testSubnet1); err != nil {
+	} else if err := vm.Builder.AddUnverifiedTx(testSubnet1); err != nil {
 		panic(err)
 	} else if blk, err := vm.BuildBlock(); err != nil {
 		panic(err)
@@ -444,7 +444,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 	)
 	if err != nil {
 		panic(err)
-	} else if err := vm.BlockBuilder.AddUnverifiedTx(testSubnet1); err != nil {
+	} else if err := vm.Builder.AddUnverifiedTx(testSubnet1); err != nil {
 		panic(err)
 	} else if blk, err := vm.BuildBlock(); err != nil {
 		panic(err)
@@ -571,7 +571,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	assert.NoError(vm.BlockBuilder.AddUnverifiedTx(tx))
+	assert.NoError(vm.Builder.AddUnverifiedTx(tx))
 
 	blk, err := vm.BuildBlock()
 	assert.NoError(err)
@@ -655,7 +655,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	if err := parsedBlock.Verify(); err == nil {
 		t.Fatalf("Should have errored during verification")
 	}
-	if _, dropped := vm.BlockBuilder.GetDropReason(statelessBlk.Tx.ID()); !dropped {
+	if _, dropped := vm.Builder.GetDropReason(statelessBlk.Tx.ID()); !dropped {
 		t.Fatal("tx should be in dropped tx cache")
 	}
 }
@@ -689,7 +689,7 @@ func TestAddValidatorReject(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	assert.NoError(vm.BlockBuilder.AddUnverifiedTx(tx))
+	assert.NoError(vm.Builder.AddUnverifiedTx(tx))
 
 	blk, err := vm.BuildBlock()
 	assert.NoError(err)
@@ -755,7 +755,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	}
 
 	// trigger block creation
-	if err := vm.BlockBuilder.AddUnverifiedTx(tx); err == nil {
+	if err := vm.Builder.AddUnverifiedTx(tx); err == nil {
 		t.Fatal("Expected BuildBlock to error due to adding a validator with a nodeID that is already in the validator set.")
 	}
 }
@@ -789,7 +789,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	assert.NoError(vm.BlockBuilder.AddUnverifiedTx(tx))
+	assert.NoError(vm.Builder.AddUnverifiedTx(tx))
 
 	blk, err := vm.BuildBlock()
 	assert.NoError(err)
@@ -862,7 +862,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	assert.NoError(vm.BlockBuilder.AddUnverifiedTx(tx))
+	assert.NoError(vm.Builder.AddUnverifiedTx(tx))
 
 	blk, err := vm.BuildBlock()
 	assert.NoError(err)
@@ -1233,7 +1233,7 @@ func TestCreateChain(t *testing.T) {
 	)
 	if err != nil {
 		t.Fatal(err)
-	} else if err := vm.BlockBuilder.AddUnverifiedTx(tx); err != nil {
+	} else if err := vm.Builder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	} else if blk, err := vm.BuildBlock(); err != nil { // should contain proposal to create chain
 		t.Fatal(err)
@@ -1290,7 +1290,7 @@ func TestCreateSubnet(t *testing.T) {
 	)
 	assert.NoError(err)
 
-	assert.NoError(vm.BlockBuilder.AddUnverifiedTx(createSubnetTx))
+	assert.NoError(vm.Builder.AddUnverifiedTx(createSubnetTx))
 
 	// should contain proposal to create subnet
 	blk, err := vm.BuildBlock()
@@ -1331,7 +1331,7 @@ func TestCreateSubnet(t *testing.T) {
 	)
 	assert.NoError(err)
 
-	assert.NoError(vm.BlockBuilder.AddUnverifiedTx(addValidatorTx))
+	assert.NoError(vm.Builder.AddUnverifiedTx(addValidatorTx))
 
 	blk, err = vm.BuildBlock() // should add validator to the new subnet
 	assert.NoError(err)
@@ -1542,7 +1542,7 @@ func TestAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.BlockBuilder.AddUnverifiedTx(tx); err != nil {
+	if err := vm.Builder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	} else if blk, err := vm.BuildBlock(); err != nil {
 		t.Fatal(err)

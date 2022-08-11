@@ -45,12 +45,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
+	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -84,7 +84,7 @@ type mutableSharedMemory struct {
 }
 
 type environment struct {
-	BlockBuilder
+	Builder
 	blkManager blockexecutor.Manager
 	mempool    mempool.Mempool
 	sender     *common.SenderTest
@@ -100,7 +100,7 @@ type environment struct {
 	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
 	utxosHandler   utxo.Handler
-	txBuilder      builder.Builder
+	txBuilder      txbuilder.Builder
 	backend        txexecutor.Backend
 }
 
@@ -141,7 +141,7 @@ func newEnvironment(t *testing.T) *environment {
 	res.uptimes = uptime.NewManager(res.state)
 	res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.state, res.fx)
 
-	res.txBuilder = builder.New(
+	res.txBuilder = txbuilder.New(
 		res.ctx,
 		*res.config,
 		res.clk,
@@ -190,7 +190,7 @@ func newEnvironment(t *testing.T) *environment {
 		window,
 	)
 
-	res.BlockBuilder = NewBlockBuilder(
+	res.Builder = NewBlockBuilder(
 		res.mempool,
 		res.txBuilder,
 		&res.backend,
@@ -199,7 +199,7 @@ func newEnvironment(t *testing.T) *environment {
 		res.sender,
 	)
 
-	res.BlockBuilder.SetPreference(genesisID)
+	res.Builder.SetPreference(genesisID)
 	addSubnet(res)
 
 	return res

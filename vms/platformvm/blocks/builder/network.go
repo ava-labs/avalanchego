@@ -34,7 +34,7 @@ type Network interface {
 
 type network struct {
 	ctx        *snow.Context
-	blkBuilder BlockBuilder
+	blkBuilder Builder
 
 	// gossip related attributes
 	appSender common.AppSender
@@ -43,7 +43,7 @@ type network struct {
 
 func NewNetwork(
 	ctx *snow.Context,
-	blkBuilder *blockBuilder,
+	blkBuilder *builder,
 	appSender common.AppSender,
 ) Network {
 	return &network{

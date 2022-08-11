@@ -78,7 +78,7 @@ func TestAtomicTxImports(t *testing.T) {
 
 	env.state.SetTimestamp(env.config.ApricotPhase5Time.Add(100 * time.Second))
 
-	env.BlockBuilder.AddDecisionTx(tx)
+	env.Builder.AddDecisionTx(tx)
 	b, err := env.BuildBlock()
 	assert.NoError(err)
 	// Test multiple verify calls work

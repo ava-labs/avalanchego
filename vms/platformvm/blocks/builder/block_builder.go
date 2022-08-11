@@ -19,10 +19,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
+	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -31,13 +31,13 @@ import (
 const targetBlockSize = 128 * units.KiB
 
 var (
-	_ BlockBuilder = &blockBuilder{}
+	_ Builder = &builder{}
 
 	errEndOfTime       = errors.New("program time is suspiciously far in the future")
 	errNoPendingBlocks = errors.New("no pending blocks")
 )
 
-type BlockBuilder interface {
+type Builder interface {
 	mempool.Mempool
 	mempool.BlockTimer
 	Network
@@ -59,12 +59,12 @@ type BlockBuilder interface {
 	Shutdown()
 }
 
-// blockBuilder implements a simple blockBuilder to convert txs into valid blocks
-type blockBuilder struct {
+// builder implements a simple builder to convert txs into valid blocks
+type builder struct {
 	mempool.Mempool
 	Network
 
-	txBuilder         builder.Builder
+	txBuilder         txbuilder.Builder
 	txExecutorBackend *txexecutor.Backend
 	blkManager        blockexecutor.Manager
 
@@ -83,13 +83,13 @@ type blockBuilder struct {
 // Initialize this builder.
 func NewBlockBuilder(
 	mempool mempool.Mempool,
-	txBuilder builder.Builder,
+	txBuilder txbuilder.Builder,
 	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
 	toEngine chan<- common.Message,
 	appSender common.AppSender,
-) BlockBuilder {
-	builder := &blockBuilder{
+) Builder {
+	builder := &builder{
 		Mempool:           mempool,
 		txBuilder:         txBuilder,
 		txExecutorBackend: txExecutorBackend,
@@ -115,7 +115,7 @@ func NewBlockBuilder(
 	return builder
 }
 
-func (b *blockBuilder) SetPreference(blockID ids.ID) {
+func (b *builder) SetPreference(blockID ids.ID) {
 	if blockID == b.preferredBlockID {
 		// If the preference didn't change, then this is a noop
 		return
@@ -124,12 +124,12 @@ func (b *blockBuilder) SetPreference(blockID ids.ID) {
 	b.ResetBlockTimer()
 }
 
-func (b *blockBuilder) Preferred() (snowman.Block, error) {
+func (b *builder) Preferred() (snowman.Block, error) {
 	return b.blkManager.GetBlock(b.preferredBlockID)
 }
 
 // AddUnverifiedTx verifies a transaction and attempts to add it to the mempool
-func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
+func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 	txID := tx.ID()
 	if b.Mempool.Has(txID) {
 		// If the transaction is already in the mempool - then it looks the same
@@ -155,7 +155,7 @@ func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 }
 
 // BuildBlock builds a block to be added to consensus
-func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
+func (b *builder) BuildBlock() (snowman.Block, error) {
 	b.Mempool.DisableAdding()
 	defer func() {
 		b.Mempool.EnableAdding()
@@ -265,7 +265,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
-func (b *blockBuilder) Shutdown() {
+func (b *builder) Shutdown() {
 	// There is a potential deadlock if the timer is about to execute a timeout.
 	// So, the lock must be released before stopping the timer.
 	ctx := b.txExecutorBackend.Ctx
@@ -274,7 +274,7 @@ func (b *blockBuilder) Shutdown() {
 	ctx.Lock.Lock()
 }
 
-func (b *blockBuilder) ResetBlockTimer() {
+func (b *builder) ResetBlockTimer() {
 	// If there is a pending transaction trigger building of a block with that transaction
 	if b.Mempool.HasDecisionTxs() {
 		b.notifyBlockReady()
@@ -345,7 +345,7 @@ func (b *blockBuilder) ResetBlockTimer() {
 // - [txID] of the next staker to reward
 // - [shouldReward] if the txID exists and is ready to be rewarded
 // - [err] if something bad happened
-func (b *blockBuilder) getNextStakerToReward(preferredState state.Chain) (ids.ID, bool, error) {
+func (b *builder) getNextStakerToReward(preferredState state.Chain) (ids.ID, bool, error) {
 	currentChainTimestamp := preferredState.GetTimestamp()
 	if !currentChainTimestamp.Before(mockable.MaxTime) {
 		return ids.Empty, false, errEndOfTime
@@ -373,7 +373,7 @@ func (b *blockBuilder) getNextStakerToReward(preferredState state.Chain) (ids.ID
 
 // getNextChainTime returns the timestamp for the next chain time and if the
 // local time is >= time of the next staker set change.
-func (b *blockBuilder) getNextChainTime(preferredState state.Chain) (time.Time, bool, error) {
+func (b *builder) getNextChainTime(preferredState state.Chain) (time.Time, bool, error) {
 	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
 	if err != nil {
 		return time.Time{}, false, err
@@ -389,7 +389,7 @@ func (b *blockBuilder) getNextChainTime(preferredState state.Chain) (time.Time, 
 // a valid starting time but does not necessarily remove all txs since
 // popped txs are not necessarily ordered by start time.
 // Returns true/false if mempool is non-empty/empty following cleanup.
-func (b *blockBuilder) dropTooEarlyMempoolProposalTxs() bool {
+func (b *builder) dropTooEarlyMempoolProposalTxs() bool {
 	ctx := b.txExecutorBackend.Ctx
 	now := b.txExecutorBackend.Clk.Time()
 	syncTime := now.Add(txexecutor.SyncBound)
@@ -419,7 +419,7 @@ func (b *blockBuilder) dropTooEarlyMempoolProposalTxs() bool {
 
 // notifyBlockReady tells the consensus engine that a new block is ready to be
 // created
-func (b *blockBuilder) notifyBlockReady() {
+func (b *builder) notifyBlockReady() {
 	select {
 	case b.toEngine <- common.PendingTxs:
 	default:

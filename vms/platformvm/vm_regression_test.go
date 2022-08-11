@@ -67,7 +67,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	assert.NoError(vm.BlockBuilder.AddUnverifiedTx(addValidatorTx))
+	assert.NoError(vm.Builder.AddUnverifiedTx(addValidatorTx))
 
 	addValidatorBlock, err := vm.BuildBlock()
 	assert.NoError(err)
@@ -97,7 +97,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	assert.NoError(vm.BlockBuilder.AddUnverifiedTx(addFirstDelegatorTx))
+	assert.NoError(vm.Builder.AddUnverifiedTx(addFirstDelegatorTx))
 
 	addFirstDelegatorBlock, err := vm.BuildBlock()
 	assert.NoError(err)
@@ -129,7 +129,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	assert.NoError(vm.BlockBuilder.AddUnverifiedTx(addSecondDelegatorTx))
+	assert.NoError(vm.Builder.AddUnverifiedTx(addSecondDelegatorTx))
 
 	addSecondDelegatorBlock, err := vm.BuildBlock()
 	assert.NoError(err)
@@ -152,7 +152,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	err = vm.BlockBuilder.AddUnverifiedTx(addThirdDelegatorTx)
+	err = vm.Builder.AddUnverifiedTx(addThirdDelegatorTx)
 	assert.Error(err, "should have marked the delegator as being over delegated")
 }
 
@@ -229,7 +229,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// issue the add validator tx
-			err = vm.BlockBuilder.AddUnverifiedTx(addValidatorTx)
+			err = vm.Builder.AddUnverifiedTx(addValidatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the validator tx
@@ -251,7 +251,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// issue the first add delegator tx
-			err = vm.BlockBuilder.AddUnverifiedTx(addFirstDelegatorTx)
+			err = vm.Builder.AddUnverifiedTx(addFirstDelegatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the first add delegator tx
@@ -273,7 +273,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// issue the second add delegator tx
-			err = vm.BlockBuilder.AddUnverifiedTx(addSecondDelegatorTx)
+			err = vm.Builder.AddUnverifiedTx(addSecondDelegatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the second add delegator tx
@@ -295,7 +295,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// issue the third add delegator tx
-			err = vm.BlockBuilder.AddUnverifiedTx(addThirdDelegatorTx)
+			err = vm.Builder.AddUnverifiedTx(addThirdDelegatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the third add delegator tx
@@ -317,7 +317,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// issue the fourth add delegator tx
-			err = vm.BlockBuilder.AddUnverifiedTx(addFourthDelegatorTx)
+			err = vm.Builder.AddUnverifiedTx(addFourthDelegatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the fourth add delegator tx
@@ -1261,7 +1261,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	assert.NoError(err)
 
 	// issue the add validator tx
-	err = vm.BlockBuilder.AddUnverifiedTx(addValidatorTx)
+	err = vm.Builder.AddUnverifiedTx(addValidatorTx)
 	assert.NoError(err)
 
 	// trigger block creation for the validator tx
@@ -1283,7 +1283,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	assert.NoError(err)
 
 	// issue the first add delegator tx
-	err = vm.BlockBuilder.AddUnverifiedTx(addFirstDelegatorTx)
+	err = vm.Builder.AddUnverifiedTx(addFirstDelegatorTx)
 	assert.NoError(err)
 
 	// trigger block creation for the first add delegator tx
@@ -1306,7 +1306,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 
 	// attempting to issue the second add delegator tx should fail because the
 	// total stake weight would go over the limit.
-	assert.Error(vm.BlockBuilder.AddUnverifiedTx(addSecondDelegatorTx))
+	assert.Error(vm.Builder.AddUnverifiedTx(addSecondDelegatorTx))
 }
 
 func verifyAndAcceptProposalCommitment(assert *assert.Assertions, vm *VM, blk snowman.Block) {

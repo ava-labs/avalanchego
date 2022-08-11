@@ -70,7 +70,7 @@ var (
 
 type VM struct {
 	Factory
-	blockbuilder.BlockBuilder
+	blockbuilder.Builder
 
 	metrics            metrics.Metrics
 	atomicUtxosManager avax.AtomicUTXOManager
@@ -203,7 +203,7 @@ func (vm *VM) Initialize(
 		vm.txExecutorBackend,
 		vm.recentlyAccepted,
 	)
-	vm.BlockBuilder = blockbuilder.NewBlockBuilder(
+	vm.Builder = blockbuilder.NewBlockBuilder(
 		mempool,
 		vm.txBuilder,
 		vm.txExecutorBackend,
@@ -324,7 +324,7 @@ func (vm *VM) Shutdown() error {
 		return nil
 	}
 
-	vm.BlockBuilder.Shutdown()
+	vm.Builder.Shutdown()
 
 	if vm.bootstrapped.GetValue() {
 		primaryValidatorSet, exist := vm.Validators.GetValidators(constants.PrimaryNetworkID)
@@ -375,7 +375,7 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 
 // SetPreference sets the preferred block to be the one with ID [blkID]
 func (vm *VM) SetPreference(blkID ids.ID) error {
-	vm.BlockBuilder.SetPreference(blkID)
+	vm.Builder.SetPreference(blkID)
 	return nil
 }
 

@@ -30,14 +30,14 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	txID := tx.ID()
 
 	env.sender.SendAppGossipF = func(b []byte) error { return nil }
-	err := env.BlockBuilder.AddUnverifiedTx(tx)
+	err := env.Builder.AddUnverifiedTx(tx)
 	assert.NoError(err, "couldn't add tx to mempool")
 
 	has := env.mempool.Has(txID)
 	assert.True(has, "valid tx not recorded into mempool")
 
 	// show that build block include that tx and removes it from mempool
-	blkIntf, err := env.BlockBuilder.BuildBlock()
+	blkIntf, err := env.Builder.BuildBlock()
 	assert.NoError(err, "couldn't build block out of mempool")
 
 	blk, ok := blkIntf.(*executor.Block)
