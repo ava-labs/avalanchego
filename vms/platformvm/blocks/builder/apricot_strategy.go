@@ -39,9 +39,9 @@ func (a *apricotStrategy) hasContent() (bool, error) {
 	return len(a.txes) != 0, nil
 }
 
-// Note: selectBlockContent will only peek into mempool and must not
-// remove any transactions. It's up to the caller to cleanup the mempool
-// if it must
+// Note: selectBlockContent will only peek into mempool and must not remove
+// any transactions. It's up to the caller to cleanup the mempool if necessary.
+// If this method returns nil, [a.txes] won't be empty.
 func (a *apricotStrategy) selectBlockContent() error {
 	// try including as many standard txs as possible. No need to advance chain time
 	if a.Mempool.HasDecisionTxs() {
