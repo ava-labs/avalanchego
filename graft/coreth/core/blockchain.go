@@ -55,7 +55,9 @@ import (
 )
 
 var (
-	acceptorQueueGauge = metrics.NewRegisteredGauge("blockchain/acceptor/queue/size", nil)
+	acceptorQueueGauge           = metrics.NewRegisteredGauge("blockchain/acceptor/queue/size", nil)
+	processedBlockGasUsedCounter = metrics.NewRegisteredCounter("blockchain/blocks/gas/used/processed", nil)
+	acceptedBlockGasUsedCounter  = metrics.NewRegisteredCounter("blockchain/blocks/gas/used/accepted", nil)
 
 	ErrRefuseToCorruptArchiver = errors.New("node has operated with pruning disabled, shutting down to prevent missing tries")
 
@@ -809,6 +811,8 @@ func (bc *BlockChain) Accept(block *types.Block) error {
 
 	bc.lastAccepted = block
 	bc.addAcceptorQueue(block)
+	acceptedBlockGasUsedCounter.Inc(int64(block.GasUsed()))
+
 	return nil
 }
 
@@ -1103,6 +1107,7 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 		"root", block.Root(), "baseFeePerGas", block.BaseFee(), "blockGasCost", block.BlockGasCost(),
 	)
 
+	processedBlockGasUsedCounter.Inc(int64(block.GasUsed()))
 	return nil
 }
 
