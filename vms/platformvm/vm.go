@@ -203,7 +203,7 @@ func (vm *VM) Initialize(
 		vm.txExecutorBackend,
 		vm.recentlyAccepted,
 	)
-	vm.Builder = blockbuilder.NewBlockBuilder(
+	vm.Builder = blockbuilder.New(
 		mempool,
 		vm.txBuilder,
 		vm.txExecutorBackend,

@@ -190,7 +190,7 @@ func newEnvironment(t *testing.T) *environment {
 		window,
 	)
 
-	res.Builder = NewBlockBuilder(
+	res.Builder = New(
 		res.mempool,
 		res.txBuilder,
 		&res.backend,
