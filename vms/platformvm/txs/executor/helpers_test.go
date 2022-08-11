@@ -43,10 +43,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
 
 const (
@@ -93,7 +92,7 @@ type environment struct {
 	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
 	utxosHandler   utxo.Handler
-	txBuilder      p_tx_builder.Builder
+	txBuilder      builder.Builder
 	backend        Backend
 }
 
@@ -142,7 +141,7 @@ func newEnvironment() *environment {
 	uptimes := uptime.NewManager(baseState)
 	utxoHandler := utxo.NewHandler(ctx, &clk, baseState, fx)
 
-	txBuilder := p_tx_builder.New(
+	txBuilder := builder.New(
 		ctx,
 		config,
 		&clk,
@@ -187,7 +186,7 @@ func newEnvironment() *environment {
 
 func addSubnet(
 	env *environment,
-	txBuilder p_tx_builder.Builder,
+	txBuilder builder.Builder,
 ) {
 	// Create a subnet
 	var err error

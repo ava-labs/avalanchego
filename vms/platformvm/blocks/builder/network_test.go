@@ -13,7 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+
+	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
 
 // show that a tx learned from gossip is validated and added to mempool
@@ -46,7 +47,7 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	// show that unknown tx is added to mempool
 	err = env.AppGossip(nodeID, msgBytes)
 	assert.NoError(err, "error in reception of gossiped tx")
-	assert.True(env.BlockBuilder.Has(txID))
+	assert.True(env.Builder.Has(txID))
 	// Grab lock back
 	env.ctx.Lock.Lock()
 
@@ -79,7 +80,7 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 	// create a tx and mark as invalid
 	tx := getValidTx(env.txBuilder, t)
 	txID := tx.ID()
-	env.BlockBuilder.MarkDropped(txID, "dropped for testing")
+	env.Builder.MarkDropped(txID, "dropped for testing")
 
 	// show that the invalid tx is not requested
 	nodeID := ids.GenerateTestNodeID()
@@ -90,7 +91,7 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 	err = env.AppGossip(nodeID, msgBytes)
 	env.ctx.Lock.Lock()
 	assert.NoError(err, "error in reception of gossiped tx")
-	assert.False(env.BlockBuilder.Has(txID))
+	assert.False(env.Builder.Has(txID))
 }
 
 // show that locally generated txs are gossiped
@@ -113,7 +114,7 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	tx := getValidTx(env.txBuilder, t)
 	txID := tx.ID()
 
-	err := env.BlockBuilder.AddUnverifiedTx(tx)
+	err := env.Builder.AddUnverifiedTx(tx)
 	assert.NoError(err, "couldn't add tx to mempool")
 	assert.True(gossipedBytes != nil)
 
@@ -131,14 +132,14 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 
 	// show that transaction is not re-gossiped is recently added to mempool
 	gossipedBytes = nil
-	env.BlockBuilder.RemoveDecisionTxs([]*txs.Tx{tx})
-	err = env.BlockBuilder.Add(tx)
+	env.Builder.RemoveDecisionTxs([]*txs.Tx{tx})
+	err = env.Builder.Add(tx)
 	assert.NoError(err, "could not reintroduce tx to mempool")
 
 	assert.True(gossipedBytes == nil)
 }
 
-func getValidTx(txBuilder builder.Builder, t *testing.T) *txs.Tx {
+func getValidTx(txBuilder txbuilder.Builder, t *testing.T) *txs.Tx {
 	tx, err := txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,

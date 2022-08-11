@@ -10,6 +10,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"golang.org/x/sync/errgroup"
+
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
@@ -40,6 +43,8 @@ var Tests = []func(t *testing.T, db Database){
 	TestMemorySafetyBatch,
 	TestClear,
 	TestClearPrefix,
+	TestConcurrentBatches,
+	TestManySmallConcurrentKVPairBatches,
 }
 
 // TestSimpleKeyValue tests to make sure that simple Put + Get + Delete + Has
@@ -575,7 +580,6 @@ func TestBatchInner(t *testing.T, db Database) {
 
 // TestBatchLargeSize tests to make sure that the batch can support a large
 // amount of entries.
-//nolint:interfacer // This function must match the test function definition
 func TestBatchLargeSize(t *testing.T, db Database) {
 	totalSize := 8 * units.MiB   // 8 MiB
 	elementSize := 4 * units.KiB // 4 KiB
@@ -1168,4 +1172,63 @@ func TestClearPrefix(t *testing.T, db Database) {
 
 	err = db.Close()
 	assert.NoError(err)
+}
+
+func TestConcurrentBatches(t *testing.T, db Database) {
+	numBatches := 10
+	keysPerBatch := 50
+	keySize := 32
+	valueSize := units.KiB
+
+	assert.NoError(t, runConcurrentBatches(
+		db,
+		numBatches,
+		keysPerBatch,
+		keySize,
+		valueSize,
+	))
+}
+
+func TestManySmallConcurrentKVPairBatches(t *testing.T, db Database) {
+	numBatches := 100
+	keysPerBatch := 10
+	keySize := 10
+	valueSize := 10
+
+	assert.NoError(t, runConcurrentBatches(
+		db,
+		numBatches,
+		keysPerBatch,
+		keySize,
+		valueSize,
+	))
+}
+
+func runConcurrentBatches(
+	db Database,
+	numBatches,
+	keysPerBatch,
+	keySize,
+	valueSize int,
+) error {
+	batches := make([]Batch, 0, numBatches)
+	for i := 0; i < numBatches; i++ {
+		batches = append(batches, db.NewBatch())
+	}
+
+	for _, batch := range batches {
+		for i := 0; i < keysPerBatch; i++ {
+			key := utils.RandomBytes(keySize)
+			value := utils.RandomBytes(valueSize)
+			if err := batch.Put(key, value); err != nil {
+				return err
+			}
+		}
+	}
+
+	var eg errgroup.Group
+	for _, batch := range batches {
+		eg.Go(batch.Write)
+	}
+	return eg.Wait()
 }

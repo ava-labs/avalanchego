@@ -7,9 +7,10 @@ import (
 	"math"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/stretchr/testify/assert"
 )
 
 // shows that a locally generated CreateChainTx can be added to mempool and then
@@ -29,14 +30,14 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	txID := tx.ID()
 
 	env.sender.SendAppGossipF = func(b []byte) error { return nil }
-	err := env.BlockBuilder.AddUnverifiedTx(tx)
+	err := env.Builder.AddUnverifiedTx(tx)
 	assert.NoError(err, "couldn't add tx to mempool")
 
 	has := env.mempool.Has(txID)
 	assert.True(has, "valid tx not recorded into mempool")
 
 	// show that build block include that tx and removes it from mempool
-	blkIntf, err := env.BlockBuilder.BuildBlock()
+	blkIntf, err := env.Builder.BuildBlock()
 	assert.NoError(err, "couldn't build block out of mempool")
 
 	blk, ok := blkIntf.(*executor.Block)

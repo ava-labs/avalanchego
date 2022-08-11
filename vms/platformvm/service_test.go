@@ -256,13 +256,13 @@ func TestGetTxStatus(t *testing.T) {
 	}
 
 	// put the chain in existing chain list
-	if err := service.vm.BlockBuilder.AddUnverifiedTx(tx); err == nil {
+	if err := service.vm.Builder.AddUnverifiedTx(tx); err == nil {
 		t.Fatal("should have erred because of missing funds")
 	}
 
 	mutableSharedMemory.SharedMemory = sm
 
-	if err := service.vm.BlockBuilder.AddUnverifiedTx(tx); err != nil {
+	if err := service.vm.Builder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	} else if block, err := service.vm.BuildBlock(); err != nil {
 		t.Fatal(err)
@@ -355,7 +355,7 @@ func TestGetTx(t *testing.T) {
 			if err := service.GetTx(nil, arg, &response); err == nil {
 				t.Fatalf("failed test '%s - %s': haven't issued tx yet so shouldn't be able to get it", test.description, encoding.String())
 			}
-			if err := service.vm.BlockBuilder.AddUnverifiedTx(tx); err != nil {
+			if err := service.vm.Builder.AddUnverifiedTx(tx); err != nil {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 			}
 
@@ -797,7 +797,7 @@ func TestGetBlock(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			preferred, err := service.vm.BlockBuilder.Preferred()
+			preferred, err := service.vm.Builder.Preferred()
 			if err != nil {
 				t.Fatal(err)
 			}

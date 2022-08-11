@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -46,10 +47,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	p_blk_builder "github.com/ava-labs/avalanchego/vms/platformvm/blocks/builder"
+	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/blocks/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
-	p_metrics "github.com/ava-labs/avalanchego/vms/platformvm/metrics"
-	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -70,9 +70,9 @@ var (
 
 type VM struct {
 	Factory
-	p_blk_builder.BlockBuilder
+	blockbuilder.Builder
 
-	metrics            p_metrics.Metrics
+	metrics            metrics.Metrics
 	atomicUtxosManager avax.AtomicUTXOManager
 
 	// Used to get time. Useful for faking time during tests.
@@ -100,7 +100,7 @@ type VM struct {
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted *window.Window
 
-	txBuilder         p_tx_builder.Builder
+	txBuilder         txbuilder.Builder
 	txExecutorBackend *txexecutor.Backend
 	manager           blockexecutor.Manager
 }
@@ -126,7 +126,7 @@ func (vm *VM) Initialize(
 
 	// Initialize metrics as soon as possible
 	var err error
-	vm.metrics, err = p_metrics.New("", registerer, vm.WhitelistedSubnets)
+	vm.metrics, err = metrics.New("", registerer, vm.WhitelistedSubnets)
 	if err != nil {
 		return fmt.Errorf("failed to initialize metrics: %w", err)
 	}
@@ -168,7 +168,7 @@ func (vm *VM) Initialize(
 	vm.uptimeManager = uptime.NewManager(vm.state)
 	vm.UptimeLockedCalculator.SetCalculator(&vm.bootstrapped, &ctx.Lock, vm.uptimeManager)
 
-	vm.txBuilder = p_tx_builder.New(
+	vm.txBuilder = txbuilder.New(
 		vm.ctx,
 		vm.Config,
 		&vm.clock,
@@ -203,7 +203,7 @@ func (vm *VM) Initialize(
 		vm.txExecutorBackend,
 		vm.recentlyAccepted,
 	)
-	vm.BlockBuilder = p_blk_builder.NewBlockBuilder(
+	vm.Builder = blockbuilder.NewBlockBuilder(
 		mempool,
 		vm.txBuilder,
 		vm.txExecutorBackend,
@@ -324,7 +324,7 @@ func (vm *VM) Shutdown() error {
 		return nil
 	}
 
-	vm.BlockBuilder.Shutdown()
+	vm.Builder.Shutdown()
 
 	if vm.bootstrapped.GetValue() {
 		primaryValidatorSet, exist := vm.Validators.GetValidators(constants.PrimaryNetworkID)
@@ -375,7 +375,8 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 
 // SetPreference sets the preferred block to be the one with ID [blkID]
 func (vm *VM) SetPreference(blkID ids.ID) error {
-	return vm.BlockBuilder.SetPreference(blkID)
+	vm.Builder.SetPreference(blkID)
+	return nil
 }
 
 func (vm *VM) Version() (string, error) {
@@ -391,10 +392,13 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
 	server.RegisterInterceptFunc(vm.metrics.InterceptRequest)
 	server.RegisterAfterFunc(vm.metrics.AfterRequest)
-	if err := server.RegisterService(&Service{
-		vm:          vm,
-		addrManager: avax.NewAddressManager(vm.ctx),
-	}, "platform"); err != nil {
+	if err := server.RegisterService(
+		&Service{
+			vm:          vm,
+			addrManager: avax.NewAddressManager(vm.ctx),
+		},
+		"platform",
+	); err != nil {
 		return nil, err
 	}
 

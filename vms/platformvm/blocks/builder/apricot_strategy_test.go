@@ -82,7 +82,7 @@ func TestApricotPickingOrder(t *testing.T) {
 	assert.NoError(env.mempool.Add(stakerTx))
 
 	// test: decisionTxs must be picked first
-	blk, err := env.BlockBuilder.BuildBlock()
+	blk, err := env.Builder.BuildBlock()
 	assert.NoError(err)
 	stdBlk, ok := blk.(*blockexecutor.Block)
 	assert.True(ok)
@@ -92,7 +92,7 @@ func TestApricotPickingOrder(t *testing.T) {
 	assert.False(env.mempool.HasDecisionTxs())
 
 	// test: reward validator blocks must follow, one per endingValidator
-	blk, err = env.BlockBuilder.BuildBlock()
+	blk, err = env.Builder.BuildBlock()
 	assert.NoError(err)
 	rewardBlk, ok := blk.(*blockexecutor.Block)
 	assert.True(ok)
@@ -110,13 +110,13 @@ func TestApricotPickingOrder(t *testing.T) {
 	commitBlk := options[0]
 	assert.NoError(commitBlk.Verify())
 	assert.NoError(commitBlk.Accept())
-	assert.NoError(env.BlockBuilder.SetPreference(commitBlk.ID()))
+	env.Builder.SetPreference(commitBlk.ID())
 
 	// mempool proposal tx is too far in the future. An advance time tx
 	// will be issued first
 	now = nextChainTime.Add(txexecutor.MaxFutureStartTime / 2)
 	env.clk.Set(now)
-	blk, err = env.BlockBuilder.BuildBlock()
+	blk, err = env.Builder.BuildBlock()
 	assert.NoError(err)
 	advanceTimeBlk, ok := blk.(*blockexecutor.Block)
 	assert.True(ok)
@@ -134,10 +134,10 @@ func TestApricotPickingOrder(t *testing.T) {
 	commitBlk = options[0]
 	assert.NoError(commitBlk.Verify())
 	assert.NoError(commitBlk.Accept())
-	assert.NoError(env.BlockBuilder.SetPreference(commitBlk.ID()))
+	env.Builder.SetPreference(commitBlk.ID())
 
 	// finally mempool addValidatorTx must be picked
-	blk, err = env.BlockBuilder.BuildBlock()
+	blk, err = env.Builder.BuildBlock()
 	assert.NoError(err)
 	proposalBlk, ok := blk.(*blockexecutor.Block)
 	assert.True(ok)

@@ -56,7 +56,7 @@ func TestBlueberryFork(t *testing.T) {
 		assert.NoError(err)
 		assert.NoError(env.mempool.Add(addPendingValidatorTx))
 
-		proposalBlk, err := env.BlockBuilder.BuildBlock()
+		proposalBlk, err := env.Builder.BuildBlock()
 		assert.NoError(err)
 		assert.NoError(proposalBlk.Verify())
 		assert.NoError(proposalBlk.Accept())
@@ -68,11 +68,11 @@ func TestBlueberryFork(t *testing.T) {
 		assert.NoError(commitBlk.Verify())
 		assert.NoError(commitBlk.Accept())
 		assert.NoError(env.state.Commit())
-		assert.NoError(env.BlockBuilder.SetPreference(commitBlk.ID()))
+		env.Builder.SetPreference(commitBlk.ID())
 
 		// advance chain time
 		env.clk.Set(nextValidatorStartTime)
-		advanceTimeBlk, err := env.BlockBuilder.BuildBlock()
+		advanceTimeBlk, err := env.Builder.BuildBlock()
 		assert.NoError(err)
 		assert.NoError(advanceTimeBlk.Verify())
 		assert.NoError(advanceTimeBlk.Accept())
@@ -84,7 +84,7 @@ func TestBlueberryFork(t *testing.T) {
 		assert.NoError(commitBlk.Verify())
 		assert.NoError(commitBlk.Accept())
 		assert.NoError(env.state.Commit())
-		assert.NoError(env.BlockBuilder.SetPreference(commitBlk.ID()))
+		env.Builder.SetPreference(commitBlk.ID())
 	}
 
 	// check Blueberry fork is activated
@@ -102,7 +102,7 @@ func TestBlueberryFork(t *testing.T) {
 	assert.NoError(err)
 	assert.NoError(env.mempool.Add(createChainTx))
 
-	proposalBlk, err := env.BlockBuilder.BuildBlock()
+	proposalBlk, err := env.Builder.BuildBlock()
 	assert.NoError(err)
 	assert.NoError(proposalBlk.Verify())
 	assert.NoError(proposalBlk.Accept())

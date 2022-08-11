@@ -1009,7 +1009,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.BlockBuilder.AddUnverifiedTx(tx),
+		service.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
 	return errs.Err
@@ -1110,7 +1110,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.BlockBuilder.AddUnverifiedTx(tx),
+		service.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
 	return errs.Err
@@ -1207,7 +1207,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.BlockBuilder.AddUnverifiedTx(tx),
+		service.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
 	return errs.Err
@@ -1279,7 +1279,7 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.BlockBuilder.AddUnverifiedTx(tx),
+		service.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
 	return errs.Err
@@ -1371,7 +1371,7 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.BlockBuilder.AddUnverifiedTx(tx),
+		service.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
 	return errs.Err
@@ -1452,7 +1452,7 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.BlockBuilder.AddUnverifiedTx(tx),
+		service.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
 	return errs.Err
@@ -1573,7 +1573,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.BlockBuilder.AddUnverifiedTx(tx),
+		service.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
 	return errs.Err
@@ -1852,7 +1852,7 @@ func (service *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response
 	if err != nil {
 		return fmt.Errorf("couldn't parse tx: %w", err)
 	}
-	if err := service.vm.BlockBuilder.AddUnverifiedTx(tx); err != nil {
+	if err := service.vm.Builder.AddUnverifiedTx(tx); err != nil {
 		return fmt.Errorf("couldn't issue tx: %w", err)
 	}
 
@@ -1943,7 +1943,7 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 		return err
 	}
 
-	if service.vm.BlockBuilder.Has(args.TxID) {
+	if service.vm.Builder.Has(args.TxID) {
 		// Found the tx in the mempool. Report tx is processing.
 		response.Status = status.Processing
 		return nil
@@ -1951,7 +1951,7 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 
 	// Note: we check if tx is dropped only after having looked for it
 	// in the database and the mempool, because dropped txs may be re-issued.
-	reason, dropped := service.vm.BlockBuilder.GetDropReason(args.TxID)
+	reason, dropped := service.vm.Builder.GetDropReason(args.TxID)
 	if !dropped {
 		// The tx isn't being tracked by the node.
 		response.Status = status.Unknown

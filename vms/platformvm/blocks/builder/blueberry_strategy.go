@@ -18,7 +18,7 @@ import (
 var _ buildingStrategy = &blueberryStrategy{}
 
 type blueberryStrategy struct {
-	*blockBuilder
+	*builder
 
 	// inputs
 	// All must be set before [build] is called.
@@ -62,7 +62,7 @@ func (b *blueberryStrategy) selectBlockContent() error {
 	}
 
 	// try rewarding stakers whose staking period ends at current chain time.
-	stakerTxID, shouldReward, err := b.blockBuilder.getNextStakerToReward(b.parentState)
+	stakerTxID, shouldReward, err := b.builder.getNextStakerToReward(b.parentState)
 	if err != nil {
 		return fmt.Errorf("could not find next staker to reward %s", err)
 	}

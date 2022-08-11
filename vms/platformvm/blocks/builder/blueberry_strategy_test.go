@@ -80,7 +80,7 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	assert.NoError(env.mempool.Add(stakerTx))
 
 	// test: decisionTxs must be picked first
-	blk, err := env.BlockBuilder.BuildBlock()
+	blk, err := env.Builder.BuildBlock()
 	assert.NoError(err)
 	assert.True(blk.Timestamp().Equal(nextChainTime))
 	stdBlk, ok := blk.(*blockexecutor.Block)
@@ -95,7 +95,7 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	assert.False(env.mempool.HasDecisionTxs())
 
 	// test: reward validator blocks must follow, one per endingValidator
-	blk, err = env.BlockBuilder.BuildBlock()
+	blk, err = env.Builder.BuildBlock()
 	assert.NoError(err)
 	assert.True(blk.Timestamp().Equal(nextChainTime))
 	rewardBlk, ok := blk.(*blockexecutor.Block)
@@ -114,14 +114,14 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	commitBlk := options[0]
 	assert.NoError(commitBlk.Verify())
 	assert.NoError(commitBlk.Accept())
-	assert.NoError(env.BlockBuilder.SetPreference(commitBlk.ID()))
+	env.Builder.SetPreference(commitBlk.ID())
 
 	// mempool proposal tx is too far in the future. A
 	// proposal block including mempool proposalTx
 	// will be issued to advance time and
 	now = nextChainTime.Add(txexecutor.MaxFutureStartTime / 2)
 	env.clk.Set(now)
-	blk, err = env.BlockBuilder.BuildBlock()
+	blk, err = env.Builder.BuildBlock()
 	assert.NoError(err)
 	assert.True(blk.Timestamp().Equal(now))
 	proposalBlk, ok := blk.(*blockexecutor.Block)
@@ -137,7 +137,7 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	env.clk.Set(now)
 
 	// finally mempool addValidatorTx must be picked
-	blk, err = env.BlockBuilder.BuildBlock()
+	blk, err = env.Builder.BuildBlock()
 	assert.NoError(err)
 	assert.True(blk.Timestamp().Equal(now))
 	emptyStdBlk, ok := blk.(*blockexecutor.Block)

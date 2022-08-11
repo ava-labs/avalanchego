@@ -25,7 +25,7 @@ type buildingStrategy interface {
 
 // Factory method that returns the correct building strategy for the
 // current fork.
-func (b *blockBuilder) getBuildingStrategy() (buildingStrategy, error) {
+func (b *builder) getBuildingStrategy() (buildingStrategy, error) {
 	// Get the block to build on top of and retrieve the new block's context.
 	preferred, err := b.Preferred()
 	if err != nil {
@@ -47,17 +47,17 @@ func (b *blockBuilder) getBuildingStrategy() (buildingStrategy, error) {
 	switch currentFork {
 	case forks.Apricot:
 		return &apricotStrategy{
-			blockBuilder: b,
-			parentBlkID:  prefBlkID,
-			parentState:  preferredState,
-			nextHeight:   nextHeight,
+			builder:     b,
+			parentBlkID: prefBlkID,
+			parentState: preferredState,
+			nextHeight:  nextHeight,
 		}, nil
 	case forks.Blueberry:
 		return &blueberryStrategy{
-			blockBuilder: b,
-			parentBlkID:  prefBlkID,
-			parentState:  preferredState,
-			height:       nextHeight,
+			builder:     b,
+			parentBlkID: prefBlkID,
+			parentState: preferredState,
+			height:      nextHeight,
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported fork %s", currentFork)

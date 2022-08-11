@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
@@ -46,10 +48,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/prometheus/client_golang/prometheus"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
-	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -89,7 +90,7 @@ type noopBlkTimer struct{}
 func (*noopBlkTimer) ResetBlockTimer() {}
 
 type environment struct {
-	BlockBuilder
+	Builder
 	blkManager blockexecutor.Manager
 	mempool    mempool.Mempool
 	sender     *common.SenderTest
@@ -105,7 +106,7 @@ type environment struct {
 	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
 	utxosHandler   utxo.Handler
-	txBuilder      p_tx_builder.Builder
+	txBuilder      txbuilder.Builder
 	backend        txexecutor.Backend
 }
 
@@ -146,7 +147,7 @@ func newEnvironment(t *testing.T, mockResetBlockTimer bool) *environment {
 	res.uptimes = uptime.NewManager(res.state)
 	res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.state, res.fx)
 
-	res.txBuilder = p_tx_builder.New(
+	res.txBuilder = txbuilder.New(
 		res.ctx,
 		*res.config,
 		res.clk,
@@ -201,7 +202,7 @@ func newEnvironment(t *testing.T, mockResetBlockTimer bool) *environment {
 		window,
 	)
 
-	res.BlockBuilder = NewBlockBuilder(
+	res.Builder = NewBlockBuilder(
 		res.mempool,
 		res.txBuilder,
 		&res.backend,
@@ -210,10 +211,7 @@ func newEnvironment(t *testing.T, mockResetBlockTimer bool) *environment {
 		res.sender,
 	)
 
-	if err := res.BlockBuilder.SetPreference(genesisID); err != nil {
-		panic(fmt.Errorf("failed setting last accepted block: %w", err))
-	}
-
+	res.Builder.SetPreference(genesisID)
 	addSubnet(res)
 
 	return res

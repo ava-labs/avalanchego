@@ -21,7 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
-	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -30,22 +30,19 @@ import (
 const targetBlockSize = 128 * units.KiB
 
 var (
-	_ BlockBuilder = &blockBuilder{}
+	_ Builder = &builder{}
 
 	errEndOfTime       = errors.New("program time is suspiciously far in the future")
 	errNoPendingBlocks = errors.New("no pending blocks")
 )
 
-type BlockBuilder interface {
+type Builder interface {
 	mempool.Mempool
 	mempool.BlockTimer
 	Network
 
-	// StartTimer starts a timer to periodically check whether a block can be built
-	StartTimer()
-
 	// set preferred block on top of which we'll build next
-	SetPreference(blockID ids.ID) error
+	SetPreference(blockID ids.ID)
 
 	// get preferred block on top of which we'll build next
 	Preferred() (snowman.Block, error)
@@ -57,16 +54,16 @@ type BlockBuilder interface {
 	// next block
 	BuildBlock() (snowman.Block, error)
 
-	// Shutdown cleanly shuts BlockBuilder down
+	// Shutdown cleanly shuts Builder down
 	Shutdown()
 }
 
-// blockBuilder implements a simple blockBuilder to convert txs into valid blocks
-type blockBuilder struct {
+// builder implements a simple builder to convert txs into valid blocks
+type builder struct {
 	mempool.Mempool
 	Network
 
-	txBuilder         p_tx_builder.Builder
+	txBuilder         txbuilder.Builder
 	txExecutorBackend *txexecutor.Backend
 	blkManager        blockexecutor.Manager
 
@@ -85,13 +82,13 @@ type blockBuilder struct {
 // Initialize this builder.
 func NewBlockBuilder(
 	mempool mempool.Mempool,
-	txBuilder p_tx_builder.Builder,
+	txBuilder txbuilder.Builder,
 	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
 	toEngine chan<- common.Message,
 	appSender common.AppSender,
-) BlockBuilder {
-	builder := &blockBuilder{
+) Builder {
+	builder := &builder{
 		Mempool:           mempool,
 		txBuilder:         txBuilder,
 		txExecutorBackend: txExecutorBackend,
@@ -117,24 +114,21 @@ func NewBlockBuilder(
 	return builder
 }
 
-func (b *blockBuilder) StartTimer() { b.timer.Dispatch() }
-
-func (b *blockBuilder) SetPreference(blockID ids.ID) error {
+func (b *builder) SetPreference(blockID ids.ID) {
 	if blockID == b.preferredBlockID {
 		// If the preference didn't change, then this is a noop
-		return nil
+		return
 	}
 	b.preferredBlockID = blockID
 	b.ResetBlockTimer()
-	return nil
 }
 
-func (b *blockBuilder) Preferred() (snowman.Block, error) {
+func (b *builder) Preferred() (snowman.Block, error) {
 	return b.blkManager.GetBlock(b.preferredBlockID)
 }
 
 // AddUnverifiedTx verifies a transaction and attempts to add it to the mempool
-func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
+func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 	txID := tx.ID()
 	if b.Mempool.Has(txID) {
 		// If the transaction is already in the mempool - then it looks the same
@@ -160,7 +154,7 @@ func (b *blockBuilder) AddUnverifiedTx(tx *txs.Tx) error {
 }
 
 // BuildBlock builds a block to be added to consensus
-func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
+func (b *builder) BuildBlock() (snowman.Block, error) {
 	b.Mempool.DisableAdding()
 	defer func() {
 		b.Mempool.EnableAdding()
@@ -177,11 +171,7 @@ func (b *blockBuilder) BuildBlock() (snowman.Block, error) {
 	return blkBuildingStrategy.buildBlock()
 }
 
-func (b *blockBuilder) Shutdown() {
-	if b.timer == nil {
-		return
-	}
-
+func (b *builder) Shutdown() {
 	// There is a potential deadlock if the timer is about to execute a timeout.
 	// So, the lock must be released before stopping the timer.
 	ctx := b.txExecutorBackend.Ctx
@@ -190,9 +180,7 @@ func (b *blockBuilder) Shutdown() {
 	ctx.Lock.Lock()
 }
 
-// resetTimer Check if there is a block ready to be added to consensus. If so, notify the
-// consensus engine.
-func (b *blockBuilder) ResetBlockTimer() {
+func (b *builder) ResetBlockTimer() {
 	blkBuildStrategy, err := b.getBuildingStrategy()
 	if err != nil {
 		return
@@ -246,7 +234,7 @@ func (b *blockBuilder) ResetBlockTimer() {
 // - [txID] of the next staker to reward
 // - [shouldReward] if the txID exists and is ready to be rewarded
 // - [err] if something bad happened
-func (b *blockBuilder) getNextStakerToReward(preferredState state.Chain) (ids.ID, bool, error) {
+func (b *builder) getNextStakerToReward(preferredState state.Chain) (ids.ID, bool, error) {
 	currentChainTimestamp := preferredState.GetTimestamp()
 	if !currentChainTimestamp.Before(mockable.MaxTime) {
 		return ids.Empty, false, errEndOfTime
@@ -274,7 +262,7 @@ func (b *blockBuilder) getNextStakerToReward(preferredState state.Chain) (ids.ID
 
 // getNextChainTime returns the timestamp for the next chain time and if the
 // local time is >= time of the next staker set change.
-func (b *blockBuilder) getNextChainTime(preferredState state.Chain) (time.Time, bool, error) {
+func (b *builder) getNextChainTime(preferredState state.Chain) (time.Time, bool, error) {
 	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
 	if err != nil {
 		return time.Time{}, false, err
@@ -290,7 +278,7 @@ func (b *blockBuilder) getNextChainTime(preferredState state.Chain) (time.Time, 
 // Guarantees that [PeekProposalTx] will return a valid tx after calling.
 // May not remove all expired txs since txs aren't necessarily popped
 // ordered by start time.
-func (b *blockBuilder) dropExpiredProposalTxs() {
+func (b *builder) dropExpiredProposalTxs() {
 	var (
 		ctx      = b.txExecutorBackend.Ctx
 		now      = b.txExecutorBackend.Clk.Time()
@@ -322,7 +310,7 @@ func (b *blockBuilder) dropExpiredProposalTxs() {
 
 // notifyBlockReady tells the consensus engine that a new block is ready to be
 // created
-func (b *blockBuilder) notifyBlockReady() {
+func (b *builder) notifyBlockReady() {
 	select {
 	case b.toEngine <- common.PendingTxs:
 	default:

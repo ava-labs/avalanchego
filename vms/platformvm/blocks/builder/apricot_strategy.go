@@ -17,7 +17,7 @@ import (
 var _ buildingStrategy = &apricotStrategy{}
 
 type apricotStrategy struct {
-	*blockBuilder
+	*builder
 
 	// inputs
 	// All must be set before [build] is called.
@@ -50,7 +50,7 @@ func (a *apricotStrategy) selectBlockContent() error {
 	}
 
 	// try rewarding stakers whose staking period ends at current chain time.
-	stakerTxID, shouldReward, err := a.blockBuilder.getNextStakerToReward(a.parentState)
+	stakerTxID, shouldReward, err := a.builder.getNextStakerToReward(a.parentState)
 	if err != nil {
 		return fmt.Errorf("could not find next staker to reward %s", err)
 	}
@@ -65,7 +65,7 @@ func (a *apricotStrategy) selectBlockContent() error {
 	}
 
 	// try advancing chain time
-	nextChainTime, shouldAdvanceTime, err := a.blockBuilder.getNextChainTime(a.parentState)
+	nextChainTime, shouldAdvanceTime, err := a.builder.getNextChainTime(a.parentState)
 	if err != nil {
 		return fmt.Errorf("could not retrieve next chain time %s", err)
 	}
