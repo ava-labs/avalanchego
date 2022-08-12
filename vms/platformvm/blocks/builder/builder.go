@@ -384,6 +384,7 @@ func (b *builder) setNextBuildBlockTime() {
 	_, shouldReward, err := b.getNextStakerToReward(preferredState)
 	if err != nil {
 		ctx.Log.Error("failed to fetch next staker to reward",
+			zap.Stringer("blkID", b.preferredBlockID),
 			zap.Error(err),
 		)
 		return
@@ -396,6 +397,7 @@ func (b *builder) setNextBuildBlockTime() {
 	_, shouldAdvanceTime, err := b.getNextChainTime(preferredState)
 	if err != nil {
 		ctx.Log.Error("failed to fetch next chain time",
+			zap.Stringer("blkID", b.preferredBlockID),
 			zap.Error(err),
 		)
 		return
@@ -415,6 +417,7 @@ func (b *builder) setNextBuildBlockTime() {
 	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
 	if err != nil {
 		ctx.Log.Error("couldn't get next staker change time",
+			zap.Stringer("blkID", b.preferredBlockID),
 			zap.Error(err),
 		)
 		return
