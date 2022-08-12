@@ -4,7 +4,6 @@
 package evm
 
 import (
-	"math/big"
 	"sync"
 	"time"
 
@@ -21,17 +20,11 @@ import (
 type buildingBlkStatus uint8
 
 var (
-	// AP3 Params
-	minBlockTime = 2 * time.Second
-	maxBlockTime = 3 * time.Second
-
 	// AP4 Params
 	minBlockTimeAP4 = 500 * time.Millisecond
 )
 
 const (
-	batchSize = 250
-
 	// waitBlockTime is the amount of time to wait for BuildBlock to be
 	// called by the engine before deciding whether or not to gossip the
 	// transaction that triggered the PendingTxs message to the engine.
@@ -42,8 +35,7 @@ const (
 	// whatever the peer makes.
 	waitBlockTime = 100 * time.Millisecond
 
-	dontBuild        buildingBlkStatus = iota
-	conditionalBuild                   // Only used prior to AP4
+	dontBuild buildingBlkStatus = iota
 	mayBuild
 	building
 )
@@ -66,22 +58,14 @@ type blockBuilder struct {
 	// [buildBlockLock] must be held when accessing [buildStatus]
 	buildBlockLock sync.Mutex
 
-	// [buildBlockTimer] is a two stage timer handling block production.
-	// Stage1 build a block if the batch size has been reached.
-	// Stage2 build a block regardless of the size.
+	// [buildBlockTimer] is a timer handling block production.
 	buildBlockTimer *timer.Timer
 
 	// buildStatus signals the phase of block building the VM is currently in.
 	// [dontBuild] indicates there's no need to build a block.
-	// [conditionalBuild] indicates build a block if the batch size has been reached.
 	// [mayBuild] indicates the VM should proceed to build a block.
 	// [building] indicates the VM has sent a request to the engine to build a block.
 	buildStatus buildingBlkStatus
-
-	// isAP4 is a boolean indicating if AP4 is activated. This prevents us from
-	// getting the current time and comparing it to the *params.chainConfig more
-	// than once.
-	isAP4 bool
 }
 
 func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *blockBuilder {
@@ -102,44 +86,8 @@ func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *bl
 }
 
 func (b *blockBuilder) handleBlockBuilding() {
-	b.buildBlockTimer = timer.NewStagedTimer(b.buildBlockTwoStageTimer)
+	b.buildBlockTimer = timer.NewTimer(b.buildBlockTimerCallback)
 	go b.ctx.Log.RecoverAndPanic(b.buildBlockTimer.Dispatch)
-
-	if !b.chainConfig.IsApricotPhase4(big.NewInt(time.Now().Unix())) {
-		b.shutdownWg.Add(1)
-		go b.ctx.Log.RecoverAndPanic(b.migrateAP4)
-	} else {
-		b.isAP4 = true
-	}
-}
-
-func (b *blockBuilder) migrateAP4() {
-	defer b.shutdownWg.Done()
-
-	// In some tests, the AP4 timestamp is not populated. If this is the case, we
-	// should only stop [buildBlockTwoStageTimer] on shutdown.
-	if b.chainConfig.ApricotPhase4BlockTimestamp == nil {
-		<-b.shutdownChan
-		b.buildBlockTimer.Stop()
-		return
-	}
-
-	timestamp := time.Unix(b.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0)
-	duration := time.Until(timestamp)
-	select {
-	case <-time.After(duration):
-		b.isAP4 = true
-		b.buildBlockLock.Lock()
-		// Flush any invalid statuses leftover from legacy block timer builder
-		if b.buildStatus == conditionalBuild {
-			b.buildStatus = mayBuild
-		}
-		b.buildBlockLock.Unlock()
-	case <-b.shutdownChan:
-		// buildBlockTimer will never be nil because we exit as soon as it is ever
-		// set to nil.
-		b.buildBlockTimer.Stop()
-	}
 }
 
 // handleGenerateBlock should be called immediately after [BuildBlock].
@@ -149,31 +97,16 @@ func (b *blockBuilder) handleGenerateBlock() {
 	b.buildBlockLock.Lock()
 	defer b.buildBlockLock.Unlock()
 
-	if !b.isAP4 {
-		// Set the buildStatus before calling Cancel or Issue on
-		// the mempool and after generating the block.
-		// This prevents [needToBuild] from returning true when the
-		// produced block will change whether or not we need to produce
-		// another block and also ensures that when the mempool adds a
-		// new item to Pending it will be handled appropriately by [signalTxsReady]
-		if b.needToBuild() {
-			b.buildStatus = conditionalBuild
-			b.buildBlockTimer.SetTimeoutIn(minBlockTime)
-		} else {
-			b.buildStatus = dontBuild
-		}
+	// If we still need to build a block immediately after building, we let the
+	// engine know it [mayBuild] in [minBlockTimeAP4].
+	//
+	// It is often the case in AP4 that a block (with the same txs) could be built
+	// after a few seconds of delay as the [baseFee] and/or [blockGasCost] decrease.
+	if b.needToBuild() {
+		b.buildStatus = mayBuild
+		b.buildBlockTimer.SetTimeoutIn(minBlockTimeAP4)
 	} else {
-		// If we still need to build a block immediately after building, we let the
-		// engine know it [mayBuild] in [minBlockTimeAP4].
-		//
-		// It is often the case in AP4 that a block (with the same txs) could be built
-		// after a few seconds of delay as the [baseFee] and/or [blockGasCost] decrease.
-		if b.needToBuild() {
-			b.buildStatus = mayBuild
-			b.buildBlockTimer.SetTimeoutIn(minBlockTimeAP4)
-		} else {
-			b.buildStatus = dontBuild
-		}
+		b.buildStatus = dontBuild
 	}
 }
 
@@ -184,31 +117,14 @@ func (b *blockBuilder) needToBuild() bool {
 	return size > 0 || b.mempool.Len() > 0
 }
 
-// buildEarly returns true if there are sufficient outstanding transactions to
-// be issued into a block to build a block early.
-//
-// NOTE: Only used prior to AP4.
-func (b *blockBuilder) buildEarly() bool {
-	size := b.txPool.PendingSize()
-	return size > batchSize || b.mempool.Len() > 1
-}
-
-// buildBlockTwoStageTimer is a two stage timer that sends a notification
+// buildBlockTimerCallback is the timer callback that sends a notification
 // to the engine when the VM is ready to build a block.
-// If it should be called back again, it returns the timeout duration at
-// which it should be called again.
-func (b *blockBuilder) buildBlockTwoStageTimer() (time.Duration, bool) {
+func (b *blockBuilder) buildBlockTimerCallback() {
 	b.buildBlockLock.Lock()
 	defer b.buildBlockLock.Unlock()
 
 	switch b.buildStatus {
 	case dontBuild:
-	case conditionalBuild:
-		if !b.buildEarly() {
-			b.buildStatus = mayBuild
-			return (maxBlockTime - minBlockTime), true
-		}
-		b.markBuilding()
 	case mayBuild:
 		b.markBuilding()
 	case building:
@@ -219,9 +135,6 @@ func (b *blockBuilder) buildBlockTwoStageTimer() (time.Duration, bool) {
 		// Log an error if an invalid status is found.
 		log.Error("Found invalid build status in build block timer", "buildStatus", b.buildStatus)
 	}
-
-	// No need for the timeout to fire again until BuildBlock is called.
-	return 0, false
 }
 
 // markBuilding assumes the [buildBlockLock] is held.
@@ -234,21 +147,14 @@ func (b *blockBuilder) markBuilding() {
 	}
 }
 
-// signalTxsReady sets the initial timeout on the two stage timer if the process
-// has not already begun from an earlier notification. If [buildStatus] is anything
-// other than [dontBuild], then the attempt has already begun and this notification
+// signalTxsReady notifies the engine and sets the status to [building] if the
+// status is [dontBuild]. Otherwise, the attempt has already begun and this notification
 // can be safely skipped.
 func (b *blockBuilder) signalTxsReady() {
 	b.buildBlockLock.Lock()
 	defer b.buildBlockLock.Unlock()
 
 	if b.buildStatus != dontBuild {
-		return
-	}
-
-	if !b.isAP4 {
-		b.buildStatus = conditionalBuild
-		b.buildBlockTimer.SetTimeoutIn(minBlockTime)
 		return
 	}
 
@@ -279,8 +185,7 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 				log.Trace("New tx detected, trying to generate a block")
 				b.signalTxsReady()
 
-				// We only attempt to invoke [GossipEthTxs] once AP4 is activated
-				if b.isAP4 && b.gossiper != nil && len(ethTxsEvent.Txs) > 0 {
+				if b.gossiper != nil && len(ethTxsEvent.Txs) > 0 {
 					// Give time for this node to build a block before attempting to
 					// gossip
 					time.Sleep(waitBlockTime)
@@ -297,9 +202,8 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 				log.Trace("New atomic Tx detected, trying to generate a block")
 				b.signalTxsReady()
 
-				// We only attempt to invoke [GossipAtomicTxs] once AP4 is activated
 				newTxs := b.mempool.GetNewTxs()
-				if b.isAP4 && b.gossiper != nil && len(newTxs) > 0 {
+				if b.gossiper != nil && len(newTxs) > 0 {
 					// Give time for this node to build a block before attempting to
 					// gossip
 					time.Sleep(waitBlockTime)

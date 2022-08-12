@@ -104,8 +104,6 @@ func init() {
 		testShortIDAddrs = append(testShortIDAddrs, pk.PublicKey().Address())
 	}
 
-	minBlockTime = time.Millisecond
-	maxBlockTime = time.Millisecond
 	minBlockTimeAP4 = time.Millisecond
 }
 

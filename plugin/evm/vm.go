@@ -663,11 +663,9 @@ func (vm *VM) initChainState(lastAcceptedBlock *types.Block) error {
 	return vm.multiGatherer.Register(chainStateMetricsPrefix, chainStateRegisterer)
 }
 
-// initGossipHandling sets the gossip handler to use the push gossiper if ApricotPhase4 (activation of Snowman++) is enabled
+// initGossipHandling sets the gossip handler to use the push gossiper
 func (vm *VM) initGossipHandling() {
-	if vm.chainConfig.ApricotPhase4BlockTimestamp != nil {
-		vm.Network.SetGossipHandler(NewGossipHandler(vm))
-	}
+	vm.Network.SetGossipHandler(NewGossipHandler(vm))
 }
 
 func (vm *VM) createConsensusCallbacks() *dummy.ConsensusCallbacks {
