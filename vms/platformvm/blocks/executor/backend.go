@@ -44,7 +44,7 @@ func (b *backend) GetState(blkID ids.ID) (state.Chain, bool) {
 
 	// Note: If the last accepted block is a proposal block, we will have
 	//       returned in the above if statement.
-	return b.state, blkID == b.lastAccepted
+	return b.state, blkID == b.state.GetLastAccepted()
 }
 
 func (b *backend) GetBlock(blkID ids.ID) (blocks.Block, error) {
