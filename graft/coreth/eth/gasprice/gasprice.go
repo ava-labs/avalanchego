@@ -59,19 +59,28 @@ const (
 	// [DefaultMaxBlockHistory] to ensure all block lookups can be cached when
 	// serving a fee history query.
 	DefaultFeeHistoryCacheSize int = 30_000
+	// concurrentLookbackThreads sets the number of concurrent workers to fetch
+	// blocks to be included in fee estimations.
+	concurrentLookbackThreads int = 10
 )
 
 var (
-	DefaultMaxPrice   = big.NewInt(150 * params.GWei)
-	DefaultMinPrice   = big.NewInt(0 * params.GWei)
-	DefaultMinBaseFee = big.NewInt(params.ApricotPhase3InitialBaseFee)
-	DefaultMinGasUsed = big.NewInt(6_000_000) // block gas limit is 8,000,000
+	DefaultMaxPrice           = big.NewInt(150 * params.GWei)
+	DefaultMinPrice           = big.NewInt(0 * params.GWei)
+	DefaultMinBaseFee         = big.NewInt(params.ApricotPhase3InitialBaseFee)
+	DefaultMinGasUsed         = big.NewInt(6_000_000) // block gas limit is 8,000,000
+	DefaultMaxLookbackSeconds = uint64(80)
 )
 
 type Config struct {
 	// Blocks specifies the number of blocks to fetch during gas price estimation.
-	Blocks     int
+	Blocks int
+	// Percentile is a value between 0 and 100 that we use during gas price estimation to choose
+	// the gas price estimate in which Percentile% of the gas estimate values in the array fall below it
 	Percentile int
+	// MaxLookbackSeconds specifies the maximum number of seconds that current timestamp
+	// can differ from block timestamp in order to be included in gas price estimation
+	MaxLookbackSeconds uint64
 	// MaxCallBlockHistory specifies the maximum number of blocks that can be
 	// fetched in a single eth_feeHistory call.
 	MaxCallBlockHistory int
@@ -117,6 +126,7 @@ type Oracle struct {
 	clock mockable.Clock
 
 	checkBlocks, percentile int
+	maxLookbackSeconds      uint64
 	maxCallBlockHistory     int
 	maxBlockHistory         int
 	historyCache            *lru.Cache
@@ -137,6 +147,11 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 	} else if percent > 100 {
 		percent = 100
 		log.Warn("Sanitizing invalid gasprice oracle sample percentile", "provided", config.Percentile, "updated", percent)
+	}
+	maxLookbackSeconds := config.MaxLookbackSeconds
+	if maxLookbackSeconds <= 0 {
+		maxLookbackSeconds = DefaultMaxLookbackSeconds
+		log.Warn("Sanitizing invalid gasprice oracle max block seconds", "provided", config.MaxLookbackSeconds, "updated", maxLookbackSeconds)
 	}
 	maxPrice := config.MaxPrice
 	if maxPrice == nil || maxPrice.Int64() <= 0 {
@@ -186,13 +201,14 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 		minGasUsed:          minGasUsed,
 		checkBlocks:         blocks,
 		percentile:          percent,
+		maxLookbackSeconds:  maxLookbackSeconds,
 		maxCallBlockHistory: maxCallBlockHistory,
 		maxBlockHistory:     maxBlockHistory,
 		historyCache:        cache,
 	}
 }
 
-// EstiamteBaseFee returns an estimate of what the base fee will be on a block
+// EstimateBaseFee returns an estimate of what the base fee will be on a block
 // produced at the current time. If ApricotPhase3 has not been activated, it may
 // return a nil value and a nil error.
 func (oracle *Oracle) EstimateBaseFee(ctx context.Context) (*big.Int, error) {
@@ -303,26 +319,69 @@ func (oracle *Oracle) suggestDynamicFees(ctx context.Context) (*big.Int, *big.In
 		return new(big.Int).Set(lastPrice), new(big.Int).Set(lastBaseFee), nil
 	}
 	var (
-		sent, exp      int
-		number         = head.Number.Uint64()
-		result         = make(chan results, oracle.checkBlocks)
-		quit           = make(chan struct{})
-		tipResults     []*big.Int
-		baseFeeResults []*big.Int
+		latestBlockNumber               = head.Number.Uint64()
+		lowerBlockNumberLimit           = uint64(0)
+		result                          = make(chan results, oracle.checkBlocks)
+		tipResults                      []*big.Int
+		baseFeeResults                  []*big.Int
+		workerChannel                   = make(chan uint64, concurrentLookbackThreads)
+		wg                              sync.WaitGroup
+		lookBackContext, lookbackCancel = context.WithCancel(ctx)
 	)
-	for sent < oracle.checkBlocks && number > 0 {
-		go oracle.getBlockTips(ctx, number, result, quit)
-		sent++
-		exp++
-		number--
+
+	defer lookbackCancel()
+
+	if uint64(oracle.checkBlocks) <= latestBlockNumber {
+		lowerBlockNumberLimit = latestBlockNumber - uint64(oracle.checkBlocks)
 	}
-	for exp > 0 {
-		res := <-result
+
+	// Producer adds block requests from [latestBlockNumber] to [lowerBlockLimit] inclusive.
+	go func() {
+		defer close(workerChannel)
+		for i := latestBlockNumber; i > lowerBlockNumberLimit; i-- {
+			select {
+			case <-lookBackContext.Done():
+				// If a worker signals that it encountered a block past the max lookback time, stop
+				// adding more block numbers to [workerChannel] since they will not be included.
+				return
+
+			case workerChannel <- i:
+			}
+		}
+	}()
+
+	// Create [concurrentLookbackThreads] consumer threads to fetch blocks for the requested heights
+	for i := 0; i <= concurrentLookbackThreads; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for blockNumber := range workerChannel {
+				blockNumber := blockNumber
+				currentTime := oracle.clock.Unix()
+				// Pass in [lookbackCancel] here, so that if the worker finds a block past the oldest timestamp
+				// the worker can signal to the producer that there's no need to add work past that point.
+				// Since the producer adds numbers in order, we guarantee that the producer has already
+				// added work for any block with a timestamp greater than the point at which the producer
+				// will stop adding work requests.
+				oracle.getBlockTips(ctx, blockNumber, result, currentTime, lookbackCancel)
+			}
+		}()
+	}
+
+	// Wait for all workers to complete. Only the workers add to the result channel, so once they have terminated
+	// we can safely close the result channel.
+	// This ensures that the results channel will be closed once there are no more results to add.
+	go func() {
+		defer close(result)
+		wg.Wait()
+	}()
+
+	// Process all of the results sequentially. This will terminate when the [result] channel has been closed.
+	for res := range result {
 		if res.err != nil {
-			close(quit)
 			return new(big.Int).Set(lastPrice), new(big.Int).Set(lastBaseFee), res.err
 		}
-		exp--
+
 		if res.tip != nil {
 			tipResults = append(tipResults, res.tip)
 		} else {
@@ -335,6 +394,7 @@ func (oracle *Oracle) suggestDynamicFees(ctx context.Context) (*big.Int, *big.In
 			baseFeeResults = append(baseFeeResults, new(big.Int).Set(common.Big0))
 		}
 	}
+
 	price := lastPrice
 	baseFee := lastBaseFee
 	if len(tipResults) > 0 {
@@ -369,23 +429,24 @@ type results struct {
 
 // getBlockTips calculates the minimum required tip to be included in a given
 // block and sends the value to the result channel.
-func (oracle *Oracle) getBlockTips(ctx context.Context, blockNum uint64, result chan results, quit chan struct{}) {
-	header, err := oracle.backend.HeaderByNumber(ctx, rpc.BlockNumber(blockNum))
+func (oracle *Oracle) getBlockTips(ctx context.Context, blockNumber uint64, result chan results, currentTime uint64, cancel context.CancelFunc) {
+	header, err := oracle.backend.HeaderByNumber(ctx, rpc.BlockNumber(blockNumber))
 	if header == nil {
-		select {
-		case result <- results{nil, nil, err}:
-		case <-quit:
-		}
+		result <- results{nil, nil, err}
+		return
+	}
+
+	// If we see a block thats older than maxLookbackSeconds, we should cancel all contexts and
+	// stop looking back blocks
+	if currentTime-header.Time > oracle.maxLookbackSeconds {
+		cancel()
 		return
 	}
 
 	// Don't bias the estimate with blocks containing a limited number of transactions paying to
 	// expedite block production.
 	if header.GasUsed < oracle.minGasUsed.Uint64() {
-		select {
-		case result <- results{nil, header.BaseFee, nil}:
-		case <-quit:
-		}
+		result <- results{nil, header.BaseFee, nil}
 		return
 	}
 
@@ -398,10 +459,7 @@ func (oracle *Oracle) getBlockTips(ctx context.Context, blockNum uint64, result 
 	// tip when most blocks are full otherwise callers may observe an unexpected
 	// delay in transaction inclusion.
 	minTip, err := oracle.backend.MinRequiredTip(ctx, header)
-	select {
-	case result <- results{minTip, header.BaseFee, err}:
-	case <-quit:
-	}
+	result <- results{minTip, header.BaseFee, err}
 }
 
 type bigIntArray []*big.Int
