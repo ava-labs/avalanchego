@@ -128,7 +128,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	if err := syncDisabledVM.Initialize(
 		vmSetup.syncerVM.ctx,
 		vmSetup.syncerDBManager,
-		[]byte(genesisJSONApricotPhase5),
+		[]byte(genesisJSONLatest),
 		nil,
 		[]byte(configJSON),
 		vmSetup.syncerVM.toEngine,
@@ -190,7 +190,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	if err := syncReEnabledVM.Initialize(
 		vmSetup.syncerVM.ctx,
 		vmSetup.syncerDBManager,
-		[]byte(genesisJSONApricotPhase5),
+		[]byte(genesisJSONLatest),
 		nil,
 		[]byte(configJSON),
 		vmSetup.syncerVM.toEngine,
@@ -254,7 +254,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest) *syncVMSetup {
 	_, serverVM, _, serverAtomicMemory, serverAppSender := GenesisVMWithUTXOs(
 		t,
 		true,
-		genesisJSONApricotPhase5,
+		"",
 		"",
 		"",
 		map[ids.ShortID]uint64{
@@ -343,7 +343,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest) *syncVMSetup {
 	syncerEngineChan, syncerVM, syncerDBManager, syncerAtomicMemory, syncerAppSender := GenesisVMWithUTXOs(
 		t,
 		false,
-		genesisJSONApricotPhase5,
+		"",
 		stateSyncEnabledJSON,
 		"",
 		map[ids.ShortID]uint64{
