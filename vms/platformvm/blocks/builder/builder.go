@@ -95,13 +95,12 @@ func New(
 		toEngine:          toEngine,
 	}
 
-	builder.timer = timer.NewTimer(
-		func() {
-			txExecutorBackend.Ctx.Lock.Lock()
-			defer txExecutorBackend.Ctx.Lock.Unlock()
+	builder.timer = timer.NewTimer(func() {
+		txExecutorBackend.Ctx.Lock.Lock()
+		defer txExecutorBackend.Ctx.Lock.Unlock()
 
-			builder.ResetBlockTimer()
-		})
+		builder.ResetBlockTimer()
+	})
 
 	builder.Network = NewNetwork(
 		txExecutorBackend.Ctx,
@@ -180,6 +179,18 @@ func (b *builder) Shutdown() {
 }
 
 func (b *builder) ResetBlockTimer() {
+	var (
+		ctx = b.txExecutorBackend.Ctx
+		now = b.txExecutorBackend.Clk.Time()
+	)
+
+	if !b.txExecutorBackend.Bootstrapped.GetValue() {
+		ctx.Log.Verbo("skipping block timer reset",
+			zap.String("reason", "not bootstrapped"),
+		)
+		return
+	}
+
 	blkBuildStrategy, err := b.getBuildingStrategy()
 	if err != nil {
 		return
@@ -197,11 +208,6 @@ func (b *builder) ResetBlockTimer() {
 	}
 
 	// Wake up when it's time to add/remove the next validator
-	var (
-		ctx = b.txExecutorBackend.Ctx
-		now = b.txExecutorBackend.Clk.Time()
-	)
-
 	preferredState, ok := b.blkManager.GetState(b.preferredBlockID)
 	if !ok {
 		// The preferred block should always be a decision block

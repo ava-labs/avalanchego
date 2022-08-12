@@ -24,7 +24,8 @@ jobs:
       # fail. See: https://github.com/actions/virtual-environments/issues/5841
       - name: Install mingw 10.2.0
         if: matrix.os == 'windows-latest'
-        run: choco install mingw --version 10.2.0 --allow-downgrade
+        shell: powershell
+        run: Choco-Install -PackageName mingw -ArgumentList "--version", "10.2.0", "--allow-downgrade"
       - name: build_test
         shell: bash
         run: .github/workflows/build_and_test.sh
