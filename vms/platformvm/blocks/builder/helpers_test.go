@@ -132,6 +132,10 @@ func newEnvironment(t *testing.T) *environment {
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	res.baseDB = versiondb.New(baseDBManager.Current().Database)
 	res.ctx, res.msm = defaultCtx(res.baseDB)
+
+	res.ctx.Lock.Lock()
+	defer res.ctx.Lock.Unlock()
+
 	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.GetValue())
 
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
