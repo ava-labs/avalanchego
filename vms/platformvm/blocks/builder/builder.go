@@ -96,12 +96,7 @@ func New(
 		toEngine:          toEngine,
 	}
 
-	builder.timer = timer.NewTimer(func() {
-		txExecutorBackend.Ctx.Lock.Lock()
-		defer txExecutorBackend.Ctx.Lock.Unlock()
-
-		builder.ResetBlockTimer()
-	})
+	builder.timer = timer.NewTimer(builder.setNextBuildBlockTime)
 
 	builder.Network = NewNetwork(
 		txExecutorBackend.Ctx,
@@ -273,75 +268,9 @@ func (b *builder) Shutdown() {
 }
 
 func (b *builder) ResetBlockTimer() {
-	ctx := b.txExecutorBackend.Ctx
-	if !b.txExecutorBackend.Bootstrapped.GetValue() {
-		ctx.Log.Verbo("skipping block timer reset",
-			zap.String("reason", "not bootstrapped"),
-		)
-		return
-	}
-
-	// If there is a pending transaction trigger building of a block with that transaction
-	if b.Mempool.HasDecisionTxs() {
-		b.notifyBlockReady()
-		return
-	}
-
-	preferredState, ok := b.blkManager.GetState(b.preferredBlockID)
-	if !ok {
-		// The preferred block should always be a decision block
-		ctx.Log.Error("couldn't get preferred block state",
-			zap.Stringer("blkID", b.preferredBlockID),
-		)
-		return
-	}
-
-	_, shouldReward, err := b.getNextStakerToReward(preferredState)
-	if err != nil {
-		ctx.Log.Error("failed to fetch next staker to reward",
-			zap.Error(err),
-		)
-		return
-	}
-	if shouldReward {
-		b.notifyBlockReady()
-		return
-	}
-
-	_, shouldAdvanceTime, err := b.getNextChainTime(preferredState)
-	if err != nil {
-		ctx.Log.Error("failed to fetch next chain time",
-			zap.Error(err),
-		)
-		return
-	}
-	if shouldAdvanceTime {
-		// time is at or after the time for the next validator to join/leave
-		b.notifyBlockReady() // Should issue a proposal to advance timestamp
-		return
-	}
-
-	if hasProposalTxs := b.dropTooEarlyMempoolProposalTxs(); hasProposalTxs {
-		b.notifyBlockReady() // Should issue a ProposeAddValidator
-		return
-	}
-
-	now := b.txExecutorBackend.Clk.Time()
-	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
-	if err != nil {
-		ctx.Log.Error("couldn't get next staker change time",
-			zap.Error(err),
-		)
-		return
-	}
-	waitTime := nextStakerChangeTime.Sub(now)
-	ctx.Log.Debug("setting next scheduled event",
-		zap.Time("nextEventTime", nextStakerChangeTime),
-		zap.Duration("timeUntil", waitTime),
-	)
-
-	// Wake up when it's time to add/remove the next validator
-	b.timer.SetTimeoutIn(waitTime)
+	// Next time the context lock is released, we can attempt to reset the block
+	// timer.
+	b.timer.SetTimeoutIn(0)
 }
 
 // getNextStakerToReward returns the next staker txID to remove from the staking
@@ -420,6 +349,91 @@ func (b *builder) dropTooEarlyMempoolProposalTxs() bool {
 		)
 	}
 	return false
+}
+
+func (b *builder) setNextBuildBlockTime() {
+	ctx := b.txExecutorBackend.Ctx
+
+	// Grabbing the lock here enforces that this function is not called mid-way
+	// through modifying of the state.
+	ctx.Lock.Lock()
+	defer ctx.Lock.Unlock()
+
+	if !b.txExecutorBackend.Bootstrapped.GetValue() {
+		ctx.Log.Verbo("skipping block timer reset",
+			zap.String("reason", "not bootstrapped"),
+		)
+		return
+	}
+
+	// If there is a pending transaction trigger building of a block with that transaction
+	if b.Mempool.HasDecisionTxs() {
+		b.notifyBlockReady()
+		return
+	}
+
+	preferredState, ok := b.blkManager.GetState(b.preferredBlockID)
+	if !ok {
+		// The preferred block should always be a decision block
+		ctx.Log.Error("couldn't get preferred block state",
+			zap.Stringer("preferredID", b.preferredBlockID),
+			zap.Stringer("lastAcceptedID", b.blkManager.LastAccepted()),
+		)
+		return
+	}
+
+	_, shouldReward, err := b.getNextStakerToReward(preferredState)
+	if err != nil {
+		ctx.Log.Error("failed to fetch next staker to reward",
+			zap.Stringer("preferredID", b.preferredBlockID),
+			zap.Stringer("lastAcceptedID", b.blkManager.LastAccepted()),
+			zap.Error(err),
+		)
+		return
+	}
+	if shouldReward {
+		b.notifyBlockReady()
+		return
+	}
+
+	_, shouldAdvanceTime, err := b.getNextChainTime(preferredState)
+	if err != nil {
+		ctx.Log.Error("failed to fetch next chain time",
+			zap.Stringer("preferredID", b.preferredBlockID),
+			zap.Stringer("lastAcceptedID", b.blkManager.LastAccepted()),
+			zap.Error(err),
+		)
+		return
+	}
+	if shouldAdvanceTime {
+		// time is at or after the time for the next validator to join/leave
+		b.notifyBlockReady() // Should issue a proposal to advance timestamp
+		return
+	}
+
+	if hasProposalTxs := b.dropTooEarlyMempoolProposalTxs(); hasProposalTxs {
+		b.notifyBlockReady() // Should issue a ProposeAddValidator
+		return
+	}
+
+	now := b.txExecutorBackend.Clk.Time()
+	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
+	if err != nil {
+		ctx.Log.Error("couldn't get next staker change time",
+			zap.Stringer("preferredID", b.preferredBlockID),
+			zap.Stringer("lastAcceptedID", b.blkManager.LastAccepted()),
+			zap.Error(err),
+		)
+		return
+	}
+	waitTime := nextStakerChangeTime.Sub(now)
+	ctx.Log.Debug("setting next scheduled event",
+		zap.Time("nextEventTime", nextStakerChangeTime),
+		zap.Duration("timeUntil", waitTime),
+	)
+
+	// Wake up when it's time to add/remove the next validator
+	b.timer.SetTimeoutIn(waitTime)
 }
 
 // notifyBlockReady tells the consensus engine that a new block is ready to be

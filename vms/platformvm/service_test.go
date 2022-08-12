@@ -783,6 +783,8 @@ func TestGetBlock(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			service, _ := defaultService(t)
+			service.vm.ctx.Lock.Lock()
+			defer service.vm.ctx.Lock.Unlock()
 
 			// Make a block an accept it, then check we can get it.
 			tx, err := service.vm.txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks

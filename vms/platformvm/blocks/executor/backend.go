@@ -15,9 +15,7 @@ import (
 // Shared fields used by visitors.
 type backend struct {
 	mempool.Mempool
-	// Keep the last accepted block in memory because when we check a
-	// proposal block's status, it may be accepted but not have an accepted
-	// child, in which case it's in [blkIDToState].
+	// lastAccepted is the ID of the last block that had Accept() called on it.
 	lastAccepted ids.ID
 
 	// blkIDToState is a map from a block's ID to the state of the block.
@@ -46,7 +44,7 @@ func (b *backend) GetState(blkID ids.ID) (state.Chain, bool) {
 
 	// Note: If the last accepted block is a proposal block, we will have
 	//       returned in the above if statement.
-	return b.state, blkID == b.lastAccepted
+	return b.state, blkID == b.state.GetLastAccepted()
 }
 
 func (b *backend) GetBlock(blkID ids.ID) (blocks.Block, error) {
