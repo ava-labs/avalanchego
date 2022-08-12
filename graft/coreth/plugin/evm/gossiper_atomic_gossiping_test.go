@@ -19,7 +19,7 @@ import (
 func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 	assert := assert.New(t)
 
-	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase4, "", "")
+	_, vm, _, sharedMemory, sender := GenesisVM(t, true, "", "", "")
 	defer func() {
 		assert.NoError(vm.Shutdown())
 	}()
@@ -78,7 +78,7 @@ func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 	assert := assert.New(t)
 
-	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase4, "", "")
+	_, vm, _, sharedMemory, sender := GenesisVM(t, true, "", "", "")
 	defer func() {
 		assert.NoError(vm.Shutdown())
 	}()
@@ -149,7 +149,7 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 	t.Skip("FLAKY")
 	assert := assert.New(t)
 
-	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase4, "", "")
+	_, vm, _, sharedMemory, sender := GenesisVM(t, true, "", "", "")
 	defer func() {
 		assert.NoError(vm.Shutdown())
 	}()

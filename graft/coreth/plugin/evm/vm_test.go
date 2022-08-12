@@ -74,7 +74,9 @@ var (
 	genesisJSONApricotPhase2 = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"daoForkBlock\":0,\"daoForkSupport\":true,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0,\"apricotPhase1BlockTimestamp\":0,\"apricotPhase2BlockTimestamp\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x5f5e100\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0100000000000000000000000000000000000000\":{\"code\":\"0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033\",\"balance\":\"0x0\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
 	genesisJSONApricotPhase3 = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"daoForkBlock\":0,\"daoForkSupport\":true,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0,\"apricotPhase1BlockTimestamp\":0,\"apricotPhase2BlockTimestamp\":0,\"apricotPhase3BlockTimestamp\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x5f5e100\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0100000000000000000000000000000000000000\":{\"code\":\"0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033\",\"balance\":\"0x0\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
 	genesisJSONApricotPhase4 = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"daoForkBlock\":0,\"daoForkSupport\":true,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0,\"apricotPhase1BlockTimestamp\":0,\"apricotPhase2BlockTimestamp\":0,\"apricotPhase3BlockTimestamp\":0,\"apricotPhase4BlockTimestamp\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x5f5e100\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0100000000000000000000000000000000000000\":{\"code\":\"0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033\",\"balance\":\"0x0\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
-	genesisJSONApricotPhase5 = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"daoForkBlock\":0,\"daoForkSupport\":true,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0,\"apricotPhase1BlockTimestamp\":0,\"apricotPhase2BlockTimestamp\":0,\"apricotPhase3BlockTimestamp\":0,\"apricotPhase4BlockTimestamp\":0, \"apricotPhase5BlockTimestamp\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x5f5e100\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0100000000000000000000000000000000000000\":{\"code\":\"0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033\",\"balance\":\"0x0\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
+	genesisJSONApricotPhase5 = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"daoForkBlock\":0,\"daoForkSupport\":true,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0,\"apricotPhase1BlockTimestamp\":0,\"apricotPhase2BlockTimestamp\":0,\"apricotPhase3BlockTimestamp\":0,\"apricotPhase4BlockTimestamp\":0,\"apricotPhase5BlockTimestamp\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x5f5e100\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0100000000000000000000000000000000000000\":{\"code\":\"0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033\",\"balance\":\"0x0\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
+	genesisJSONBlueberry     = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"daoForkBlock\":0,\"daoForkSupport\":true,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0,\"apricotPhase1BlockTimestamp\":0,\"apricotPhase2BlockTimestamp\":0,\"apricotPhase3BlockTimestamp\":0,\"apricotPhase4BlockTimestamp\":0,\"apricotPhase5BlockTimestamp\":0,\"blueberryBlockTimestamp\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x5f5e100\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0100000000000000000000000000000000000000\":{\"code\":\"0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033\",\"balance\":\"0x0\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
+	genesisJSONLatest        = genesisJSONBlueberry
 
 	apricotRulesPhase0 = params.Rules{}
 	apricotRulesPhase1 = params.Rules{IsApricotPhase1: true}
@@ -82,6 +84,7 @@ var (
 	apricotRulesPhase3 = params.Rules{IsApricotPhase1: true, IsApricotPhase2: true, IsApricotPhase3: true}
 	apricotRulesPhase4 = params.Rules{IsApricotPhase1: true, IsApricotPhase2: true, IsApricotPhase3: true, IsApricotPhase4: true}
 	apricotRulesPhase5 = params.Rules{IsApricotPhase1: true, IsApricotPhase2: true, IsApricotPhase3: true, IsApricotPhase4: true, IsApricotPhase5: true}
+	// blueberryRules     = params.Rules{IsApricotPhase1: true, IsApricotPhase2: true, IsApricotPhase3: true, IsApricotPhase4: true, IsApricotPhase5: true, IsBlueberry: true}
 )
 
 func init() {
@@ -160,6 +163,8 @@ func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
 	return subnetID, nil
 }
 
+// setupGenesis sets up the genesis
+// If [genesisJSON] is empty, defaults to using [genesisJSONLatest]
 func setupGenesis(t *testing.T,
 	genesisJSON string,
 ) (*snow.Context,
@@ -167,6 +172,9 @@ func setupGenesis(t *testing.T,
 	[]byte,
 	chan engCommon.Message,
 	*atomic.Memory) {
+	if len(genesisJSON) == 0 {
+		genesisJSON = genesisJSONLatest
+	}
 	genesisBytes := BuildGenesisTest(t, genesisJSON)
 	ctx := NewContext()
 
@@ -203,6 +211,7 @@ func setupGenesis(t *testing.T,
 
 // GenesisVM creates a VM instance with the genesis test bytes and returns
 // the channel use to send messages to the engine, the vm, and atomic memory
+// If [genesisJSON] is empty, defaults to using [genesisJSONLatest]
 func GenesisVM(t *testing.T,
 	finishBootstrapping bool,
 	genesisJSON string,
@@ -275,6 +284,7 @@ func addUTXO(sharedMemory *atomic.Memory, ctx *snow.Context, txID ids.ID, index 
 
 // GenesisVMWithUTXOs creates a GenesisVM and generates UTXOs in the X-Chain Shared Memory containing AVAX based on the [utxos] map
 // Generates UTXOIDs by using a hash of the address in the [utxos] map such that the UTXOs will be generated deterministically.
+// If [genesisJSON] is empty, defaults to using [genesisJSONLatest]
 func GenesisVMWithUTXOs(t *testing.T, finishBootstrapping bool, genesisJSON string, configJSON string, upgradeJSON string, utxos map[ids.ShortID]uint64) (chan engCommon.Message, *VM, manager.Manager, *atomic.Memory, *engCommon.SenderTest) {
 	issuer, vm, dbManager, sharedMemory, sender := GenesisVM(t, finishBootstrapping, genesisJSON, configJSON, upgradeJSON)
 	for addr, avaxAmount := range utxos {
@@ -294,7 +304,7 @@ func TestVMConfig(t *testing.T) {
 	txFeeCap := float64(11)
 	enabledEthAPIs := []string{"debug"}
 	configJSON := fmt.Sprintf("{\"rpc-tx-fee-cap\": %g,\"eth-apis\": %s}", txFeeCap, fmt.Sprintf("[%q]", enabledEthAPIs[0]))
-	_, vm, _, _, _ := GenesisVM(t, false, genesisJSONApricotPhase0, configJSON, "")
+	_, vm, _, _, _ := GenesisVM(t, false, "", configJSON, "")
 	assert.Equal(t, vm.config.RPCTxFeeCap, txFeeCap, "Tx Fee Cap should be set")
 	assert.Equal(t, vm.config.EthAPIs(), enabledEthAPIs, "EnabledEthAPIs should be set")
 	assert.NoError(t, vm.Shutdown())
@@ -304,7 +314,7 @@ func TestVMConfigDefaults(t *testing.T) {
 	txFeeCap := float64(11)
 	enabledEthAPIs := []string{"debug"}
 	configJSON := fmt.Sprintf("{\"rpc-tx-fee-cap\": %g,\"eth-apis\": %s}", txFeeCap, fmt.Sprintf("[%q]", enabledEthAPIs[0]))
-	_, vm, _, _, _ := GenesisVM(t, false, genesisJSONApricotPhase0, configJSON, "")
+	_, vm, _, _, _ := GenesisVM(t, false, "", configJSON, "")
 
 	var vmConfig Config
 	vmConfig.SetDefaults()
@@ -315,7 +325,7 @@ func TestVMConfigDefaults(t *testing.T) {
 }
 
 func TestVMNilConfig(t *testing.T) {
-	_, vm, _, _, _ := GenesisVM(t, false, genesisJSONApricotPhase0, "", "")
+	_, vm, _, _, _ := GenesisVM(t, false, "", "", "")
 
 	// VM Config should match defaults if no config is passed in
 	var vmConfig Config
@@ -328,7 +338,7 @@ func TestVMContinuosProfiler(t *testing.T) {
 	profilerDir := t.TempDir()
 	profilerFrequency := 500 * time.Millisecond
 	configJSON := fmt.Sprintf("{\"continuous-profiler-dir\": %q,\"continuous-profiler-frequency\": \"500ms\"}", profilerDir)
-	_, vm, _, _, _ := GenesisVM(t, false, genesisJSONApricotPhase0, configJSON, "")
+	_, vm, _, _, _ := GenesisVM(t, false, "", configJSON, "")
 	assert.Equal(t, vm.config.ContinuousProfilerDir, profilerDir, "profiler dir should be set")
 	assert.Equal(t, vm.config.ContinuousProfilerFrequency.Duration, profilerFrequency, "profiler frequency should be set")
 
@@ -377,6 +387,11 @@ func TestVMUpgrades(t *testing.T) {
 		{
 			name:             "Apricot Phase 5",
 			genesis:          genesisJSONApricotPhase5,
+			expectedGasPrice: big.NewInt(0),
+		},
+		{
+			name:             "Blueberry",
+			genesis:          genesisJSONBlueberry,
 			expectedGasPrice: big.NewInt(0),
 		},
 	}

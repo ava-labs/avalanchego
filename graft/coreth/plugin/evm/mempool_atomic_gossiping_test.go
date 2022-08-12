@@ -93,7 +93,7 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 func TestMempoolMaxMempoolSizeHandling(t *testing.T) {
 	assert := assert.New(t)
 
-	_, vm, _, sharedMemory, _ := GenesisVM(t, true, genesisJSONApricotPhase4, "", "")
+	_, vm, _, sharedMemory, _ := GenesisVM(t, true, "", "", "")
 	defer func() {
 		err := vm.Shutdown()
 		assert.NoError(err)
