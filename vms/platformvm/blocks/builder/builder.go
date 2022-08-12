@@ -351,6 +351,9 @@ func (b *builder) dropTooEarlyMempoolProposalTxs() bool {
 
 func (b *builder) setNextBuildBlockTime() {
 	ctx := b.txExecutorBackend.Ctx
+
+	// Grabbing the lock here enforces that this function is not called mid-way
+	// through modifying of the state.
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
