@@ -207,7 +207,7 @@ func (b *builder) ResetBlockTimer() {
 		return
 	}
 
-	// Wake up when it's time to add/remove the next validator
+	// Wake up when it's time to add/remove the next validator/delegator
 	preferredState, ok := b.blkManager.GetState(b.preferredBlockID)
 	if !ok {
 		// The preferred block should always be a decision block

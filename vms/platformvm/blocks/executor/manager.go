@@ -53,6 +53,7 @@ func NewManager(
 			txExecutorBackend: txExecutorBackend,
 			forkChecker: &forkChecker{
 				backend: backend,
+				clk:     txExecutorBackend.Clk,
 			},
 		},
 		acceptor: &acceptor{

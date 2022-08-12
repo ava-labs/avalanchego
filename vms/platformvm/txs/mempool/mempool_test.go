@@ -9,15 +9,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/assert"
+
+	transactions "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var _ BlockTimer = &noopBlkTimer{}
@@ -37,9 +39,9 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	mpool, err := NewMempool("mempool", registerer, &noopBlkTimer{})
 	assert.NoError(err)
 
-	txes, err := createTestDecisionTxes(1)
+	txs, err := createTestDecisiontxs(1)
 	assert.NoError(err)
-	tx := txes[0]
+	tx := txs[0]
 
 	// shortcut to simulated almost filled mempool
 	mpool.(*mempool).bytesAvailable = len(tx.Bytes()) - 1
@@ -61,13 +63,13 @@ func TestDecisionTxsInMempool(t *testing.T) {
 	mpool, err := NewMempool("mempool", registerer, &noopBlkTimer{})
 	assert.NoError(err)
 
-	txes, err := createTestDecisionTxes(2)
+	txs, err := createTestDecisiontxs(2)
 	assert.NoError(err)
 
-	// txes must not already there before we start
+	// txs must not already there before we start
 	assert.False(mpool.HasDecisionTxs())
 
-	for _, tx := range txes {
+	for _, tx := range txs {
 		// tx not already there
 		assert.False(mpool.Has(tx.ID()))
 
@@ -96,10 +98,10 @@ func TestDecisionTxsInMempool(t *testing.T) {
 		assert.True(found)
 
 		// once removed it cannot be there
-		mpool.Remove([]*txs.Tx{tx})
+		mpool.Remove([]*transactions.Tx{tx})
 
 		assert.False(mpool.Has(tx.ID()))
-		assert.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
+		assert.Equal((*transactions.Tx)(nil), mpool.Get(tx.ID()))
 
 		// we can reinsert it
 		assert.NoError(mpool.Add(tx))
@@ -125,8 +127,8 @@ func TestDecisionTxsInMempool(t *testing.T) {
 
 		// once popped it cannot be there
 		assert.False(mpool.Has(tx.ID()))
-		assert.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
-		assert.Equal([]*txs.Tx{}, mpool.PeekDecisionTxs(txSize))
+		assert.Equal((*transactions.Tx)(nil), mpool.Get(tx.ID()))
+		assert.Equal([]*transactions.Tx{}, mpool.PeekDecisionTxs(txSize))
 
 		// we can reinsert it again to grow the mempool
 		assert.NoError(mpool.Add(tx))
@@ -142,13 +144,13 @@ func TestProposalTxsInMempool(t *testing.T) {
 
 	// it's key to this test that proposal txs
 	// are ordered by decreasing start time
-	txes, err := createTestProposalTxes(2)
+	txs, err := createTestProposaltxs(2)
 	assert.NoError(err)
 
-	// txes should not be already there
+	// txs should not be already there
 	assert.False(mpool.HasProposalTx())
 
-	for _, tx := range txes {
+	for _, tx := range txs {
 		assert.False(mpool.Has(tx.ID()))
 
 		// we can insert
@@ -168,10 +170,10 @@ func TestProposalTxsInMempool(t *testing.T) {
 		assert.Equal(tx, peeked)
 
 		// once removed it cannot be there
-		mpool.Remove([]*txs.Tx{tx})
+		mpool.Remove([]*transactions.Tx{tx})
 
 		assert.False(mpool.Has(tx.ID()))
-		assert.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
+		assert.Equal((*transactions.Tx)(nil), mpool.Get(tx.ID()))
 
 		// we can reinsert it
 		assert.NoError(mpool.Add(tx))
@@ -182,18 +184,18 @@ func TestProposalTxsInMempool(t *testing.T) {
 
 		// once popped it cannot be there
 		assert.False(mpool.Has(tx.ID()))
-		assert.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
+		assert.Equal((*transactions.Tx)(nil), mpool.Get(tx.ID()))
 
 		// we can reinsert it again to grow the mempool
 		assert.NoError(mpool.Add(tx))
 	}
 }
 
-func createTestDecisionTxes(count int) ([]*txs.Tx, error) {
-	res := make([]*txs.Tx, 0, count)
+func createTestDecisiontxs(count int) ([]*transactions.Tx, error) {
+	res := make([]*transactions.Tx, 0, count)
 	for i := uint32(0); i < uint32(count); i++ {
-		utx := &txs.CreateChainTx{
-			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+		utx := &transactions.CreateChainTx{
+			BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
 				NetworkID:    10,
 				BlockchainID: ids.Empty.Prefix(uint64(i)),
 				Ins: []*avax.TransferableInput{{
@@ -226,7 +228,7 @@ func createTestDecisionTxes(count int) ([]*txs.Tx, error) {
 			SubnetAuth:  &secp256k1fx.Input{SigIndices: []uint32{1}},
 		}
 
-		tx, err := txs.NewSigned(utx, txs.Codec, nil)
+		tx, err := transactions.NewSigned(utx, transactions.Codec, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -235,13 +237,13 @@ func createTestDecisionTxes(count int) ([]*txs.Tx, error) {
 	return res, nil
 }
 
-// Proposal Txes are sorted by decreasing start time
-func createTestProposalTxes(count int) ([]*txs.Tx, error) {
+// Proposal txs are sorted by decreasing start time
+func createTestProposaltxs(count int) ([]*transactions.Tx, error) {
 	var clk mockable.Clock
-	res := make([]*txs.Tx, 0, count)
+	res := make([]*transactions.Tx, 0, count)
 	for i := 0; i < count; i++ {
-		utx := &txs.AddValidatorTx{
-			BaseTx: txs.BaseTx{},
+		utx := &transactions.AddValidatorTx{
+			BaseTx: transactions.BaseTx{},
 			Validator: validator.Validator{
 				Start: uint64(clk.Time().Add(time.Duration(count-i) * time.Second).Unix()),
 			},
@@ -250,7 +252,7 @@ func createTestProposalTxes(count int) ([]*txs.Tx, error) {
 			Shares:       100,
 		}
 
-		tx, err := txs.NewSigned(utx, txs.Codec, nil)
+		tx, err := transactions.NewSigned(utx, transactions.Codec, nil)
 		if err != nil {
 			return nil, err
 		}

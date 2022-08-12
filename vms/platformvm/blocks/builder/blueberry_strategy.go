@@ -11,8 +11,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+
+	transactions "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var _ buildingStrategy = &blueberryStrategy{}
@@ -28,7 +29,7 @@ type blueberryStrategy struct {
 
 	// outputs
 	// All set in [selectBlockContent].
-	txes    []*txs.Tx
+	txs     []*transactions.Tx
 	blkTime time.Time
 }
 
@@ -37,7 +38,7 @@ func (b *blueberryStrategy) hasContent() (bool, error) {
 		return false, err
 	}
 
-	if len(b.txes) == 0 {
+	if len(b.txs) == 0 {
 		// blueberry allows empty blocks with non-zero timestamp
 		// to move ahead chain time
 		return !b.blkTime.IsZero(), nil
@@ -56,7 +57,7 @@ func (b *blueberryStrategy) selectBlockContent() error {
 
 	// try including as many standard txs as possible. No need to advance chain time
 	if b.Mempool.HasDecisionTxs() {
-		b.txes = b.Mempool.PeekDecisionTxs(targetBlockSize)
+		b.txs = b.Mempool.PeekDecisionTxs(targetBlockSize)
 		b.blkTime = blkTime
 		return nil
 	}
@@ -72,7 +73,7 @@ func (b *blueberryStrategy) selectBlockContent() error {
 			return fmt.Errorf("could not build tx to reward staker %s", err)
 		}
 
-		b.txes = []*txs.Tx{rewardValidatorTx}
+		b.txs = []*transactions.Tx{rewardValidatorTx}
 		b.blkTime = blkTime
 		return nil
 	}
@@ -83,7 +84,7 @@ func (b *blueberryStrategy) selectBlockContent() error {
 		return fmt.Errorf("could not retrieve next chain time %s", err)
 	}
 	if shouldAdvanceTime {
-		b.txes = nil
+		b.txs = nil
 		b.blkTime = nextChainTime
 		return nil
 	}
@@ -101,10 +102,10 @@ func (b *blueberryStrategy) selectBlockContent() error {
 	// if the chain timestamp is too far in the past to issue this transaction
 	// but according to local time, it's ready to be issued, then attempt to
 	// advance the timestamp, so it can be issued.
-	startTime := tx.Unsigned.(txs.StakerTx).StartTime()
+	startTime := tx.Unsigned.(transactions.StakerTx).StartTime()
 	maxChainStartTime := b.parentState.GetTimestamp().Add(executor.MaxFutureStartTime)
 
-	b.txes = []*txs.Tx{tx}
+	b.txs = []*transactions.Tx{tx}
 	if startTime.After(maxChainStartTime) {
 		// setting blkTime to now to propose moving chain time ahead
 		now := b.txExecutorBackend.Clk.Time()
@@ -120,7 +121,7 @@ func (b *blueberryStrategy) buildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 
-	if len(b.txes) == 0 {
+	if len(b.txs) == 0 {
 		// empty standard block are allowed to move chain time head
 		statelessBlk, err := blocks.NewBlueberryStandardBlock(
 			b.blkTime,
@@ -135,14 +136,14 @@ func (b *blueberryStrategy) buildBlock() (snowman.Block, error) {
 	}
 
 	var (
-		tx           = b.txes[0]
+		tx           = b.txs[0]
 		statelessBlk blocks.Block
 		err          error
 	)
 	switch tx.Unsigned.(type) {
-	case txs.StakerTx,
-		*txs.RewardValidatorTx,
-		*txs.AdvanceTimeTx:
+	case transactions.StakerTx,
+		*transactions.RewardValidatorTx,
+		*transactions.AdvanceTimeTx:
 		statelessBlk, err = blocks.NewBlueberryProposalBlock(
 			b.blkTime,
 			b.parentBlkID,
@@ -150,15 +151,15 @@ func (b *blueberryStrategy) buildBlock() (snowman.Block, error) {
 			tx,
 		)
 
-	case *txs.CreateChainTx,
-		*txs.CreateSubnetTx,
-		*txs.ImportTx,
-		*txs.ExportTx:
+	case *transactions.CreateChainTx,
+		*transactions.CreateSubnetTx,
+		*transactions.ImportTx,
+		*transactions.ExportTx:
 		statelessBlk, err = blocks.NewBlueberryStandardBlock(
 			b.blkTime,
 			b.parentBlkID,
 			b.height,
-			b.txes,
+			b.txs,
 		)
 
 	default:
@@ -170,6 +171,6 @@ func (b *blueberryStrategy) buildBlock() (snowman.Block, error) {
 	}
 	// remove selected txs from mempool only when we are sure
 	// a valid block containing it has been generated
-	b.Mempool.Remove(b.txes)
+	b.Mempool.Remove(b.txs)
 	return b.blkManager.NewBlock(statelessBlk), nil
 }

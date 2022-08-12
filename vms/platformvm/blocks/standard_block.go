@@ -8,7 +8,8 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+
+	transactions "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var (
@@ -16,8 +17,7 @@ var (
 	_ Block = &ApricotStandardBlock{}
 )
 
-// NewBlueberryStandardBlock assumes [txes] are initialized
-func NewBlueberryStandardBlock(timestamp time.Time, parentID ids.ID, height uint64, txes []*txs.Tx) (Block, error) {
+func NewBlueberryStandardBlock(timestamp time.Time, parentID ids.ID, height uint64, txs []*transactions.Tx) (Block, error) {
 	res := &BlueberryStandardBlock{
 		BlueberryCommonBlock: BlueberryCommonBlock{
 			ApricotCommonBlock: ApricotCommonBlock{
@@ -26,7 +26,7 @@ func NewBlueberryStandardBlock(timestamp time.Time, parentID ids.ID, height uint
 			},
 			BlkTimestamp: uint64(timestamp.Unix()),
 		},
-		Transactions: txes,
+		Transactions: txs,
 	}
 
 	return res, initialize(Block(res))
@@ -35,33 +35,32 @@ func NewBlueberryStandardBlock(timestamp time.Time, parentID ids.ID, height uint
 type BlueberryStandardBlock struct {
 	BlueberryCommonBlock `serialize:"true"`
 
-	Transactions []*txs.Tx `serialize:"true" json:"txs"`
+	Transactions []*transactions.Tx `serialize:"true" json:"txs"`
 }
 
 func (b *BlueberryStandardBlock) initialize(bytes []byte) error {
 	b.BlueberryCommonBlock.initialize(bytes)
 	for _, tx := range b.Transactions {
-		if err := tx.Sign(txs.Codec, nil); err != nil {
+		if err := tx.Sign(transactions.Codec, nil); err != nil {
 			return fmt.Errorf("failed to initialize tx: %w", err)
 		}
 	}
 	return nil
 }
 
-func (b *BlueberryStandardBlock) Txs() []*txs.Tx { return b.Transactions }
+func (b *BlueberryStandardBlock) Txs() []*transactions.Tx { return b.Transactions }
 
 func (b *BlueberryStandardBlock) Visit(v Visitor) error {
 	return v.BlueberryStandardBlock(b)
 }
 
-// NewApricotStandardBlock assumes [txes] are initialized
-func NewApricotStandardBlock(parentID ids.ID, height uint64, txes []*txs.Tx) (Block, error) {
+func NewApricotStandardBlock(parentID ids.ID, height uint64, txs []*transactions.Tx) (Block, error) {
 	res := &ApricotStandardBlock{
 		ApricotCommonBlock: ApricotCommonBlock{
 			PrntID: parentID,
 			Hght:   height,
 		},
-		Transactions: txes,
+		Transactions: txs,
 	}
 
 	return res, initialize(Block(res))
@@ -70,20 +69,20 @@ func NewApricotStandardBlock(parentID ids.ID, height uint64, txes []*txs.Tx) (Bl
 type ApricotStandardBlock struct {
 	ApricotCommonBlock `serialize:"true"`
 
-	Transactions []*txs.Tx `serialize:"true" json:"txs"`
+	Transactions []*transactions.Tx `serialize:"true" json:"txs"`
 }
 
 func (b *ApricotStandardBlock) initialize(bytes []byte) error {
 	b.ApricotCommonBlock.initialize(bytes)
 	for _, tx := range b.Transactions {
-		if err := tx.Sign(txs.Codec, nil); err != nil {
+		if err := tx.Sign(transactions.Codec, nil); err != nil {
 			return fmt.Errorf("failed to sign block: %w", err)
 		}
 	}
 	return nil
 }
 
-func (b *ApricotStandardBlock) Txs() []*txs.Tx { return b.Transactions }
+func (b *ApricotStandardBlock) Txs() []*transactions.Tx { return b.Transactions }
 
 func (b *ApricotStandardBlock) Visit(v Visitor) error {
 	return v.ApricotStandardBlock(b)

@@ -20,7 +20,6 @@ type ApricotAtomicBlock struct {
 	Tx *txs.Tx `serialize:"true" json:"tx"`
 }
 
-// NewApricotAtomicBlock assumes [tx] is initialized
 func NewApricotAtomicBlock(
 	parentID ids.ID,
 	height uint64,

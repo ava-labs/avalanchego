@@ -12,6 +12,5 @@ func Parse(c codec.Manager, b []byte) (Block, error) {
 	if _, err := c.Unmarshal(b, &blk); err != nil {
 		return nil, err
 	}
-
 	return blk, blk.initialize(b)
 }

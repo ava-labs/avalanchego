@@ -16,7 +16,6 @@ var (
 	_ Block = &ApricotProposalBlock{}
 )
 
-// NewBlueberryProposalBlock assumes [tx] is initialized
 func NewBlueberryProposalBlock(
 	timestamp time.Time,
 	parentID ids.ID,
@@ -57,7 +56,6 @@ func (b *BlueberryProposalBlock) Visit(v Visitor) error {
 	return v.BlueberryProposalBlock(b)
 }
 
-// NewApricotProposalBlock assumes [tx] is initialized
 func NewApricotProposalBlock(
 	parentID ids.ID,
 	height uint64,

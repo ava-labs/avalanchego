@@ -10,8 +10,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+
+	transactions "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var _ buildingStrategy = &apricotStrategy{}
@@ -28,7 +29,7 @@ type apricotStrategy struct {
 
 	// outputs
 	// Set in [selectBlockContent].
-	txes []*txs.Tx
+	txs []*transactions.Tx
 }
 
 func (a *apricotStrategy) hasContent() (bool, error) {
@@ -36,16 +37,16 @@ func (a *apricotStrategy) hasContent() (bool, error) {
 		return false, err
 	}
 
-	return len(a.txes) != 0, nil
+	return len(a.txs) != 0, nil
 }
 
 // Note: selectBlockContent will only peek into mempool and must not remove
 // any transactions. It's up to the caller to cleanup the mempool if necessary.
-// If this method returns nil, [a.txes] won't be empty.
+// If this method returns nil, [a.txs] won't be empty.
 func (a *apricotStrategy) selectBlockContent() error {
 	// try including as many standard txs as possible. No need to advance chain time
 	if a.Mempool.HasDecisionTxs() {
-		a.txes = a.Mempool.PeekDecisionTxs(targetBlockSize)
+		a.txs = a.Mempool.PeekDecisionTxs(targetBlockSize)
 		return nil
 	}
 
@@ -60,7 +61,7 @@ func (a *apricotStrategy) selectBlockContent() error {
 			return fmt.Errorf("could not build tx to reward staker %s", err)
 		}
 
-		a.txes = []*txs.Tx{rewardValidatorTx}
+		a.txs = []*transactions.Tx{rewardValidatorTx}
 		return nil
 	}
 
@@ -74,7 +75,7 @@ func (a *apricotStrategy) selectBlockContent() error {
 		if err != nil {
 			return fmt.Errorf("could not build tx to reward staker %s", err)
 		}
-		a.txes = []*txs.Tx{advanceTimeTx}
+		a.txs = []*transactions.Tx{advanceTimeTx}
 		return nil
 	}
 
@@ -82,14 +83,14 @@ func (a *apricotStrategy) selectBlockContent() error {
 	if err != nil {
 		return err
 	}
-	a.txes = []*txs.Tx{tx}
+	a.txs = []*transactions.Tx{tx}
 	return nil
 }
 
 // Try to get/make a proposal tx to put into a block.
 // Returns an error if there's no suitable proposal tx.
 // Doesn't modify [a.Mempool].
-func (a *apricotStrategy) nextProposalTx() (*txs.Tx, error) {
+func (a *apricotStrategy) nextProposalTx() (*transactions.Tx, error) {
 	// clean out transactions with an invalid timestamp.
 	a.dropExpiredProposalTxs()
 
@@ -99,7 +100,7 @@ func (a *apricotStrategy) nextProposalTx() (*txs.Tx, error) {
 		return nil, errNoPendingBlocks
 	}
 	tx := a.Mempool.PeekProposalTx()
-	startTime := tx.Unsigned.(txs.StakerTx).StartTime()
+	startTime := tx.Unsigned.(transactions.StakerTx).StartTime()
 
 	// Check whether this staker starts within at most [MaxFutureStartTime].
 	// If it does, issue the staking tx.
@@ -124,14 +125,14 @@ func (a *apricotStrategy) buildBlock() (snowman.Block, error) {
 	}
 
 	var (
-		tx           = a.txes[0]
+		tx           = a.txs[0]
 		statelessBlk blocks.Block
 		err          error
 	)
 	switch tx.Unsigned.(type) {
-	case txs.StakerTx,
-		*txs.RewardValidatorTx,
-		*txs.AdvanceTimeTx:
+	case transactions.StakerTx,
+		*transactions.RewardValidatorTx,
+		*transactions.AdvanceTimeTx:
 		// Note that if [tx] is one of the above types, it's the only
 		// tx in this block because Apricot proposal blocks have 1 tx.
 		statelessBlk, err = blocks.NewApricotProposalBlock(
@@ -140,16 +141,16 @@ func (a *apricotStrategy) buildBlock() (snowman.Block, error) {
 			tx,
 		)
 
-	case *txs.CreateChainTx,
-		*txs.CreateSubnetTx,
-		*txs.ImportTx,
-		*txs.ExportTx:
+	case *transactions.CreateChainTx,
+		*transactions.CreateSubnetTx,
+		*transactions.ImportTx,
+		*transactions.ExportTx:
 		// Note that if [tx] is one of the above types, all of
-		// the txs in [a.txes] must be "standard" txs.
+		// the txs in [a.txs] must be "standard" transactions.
 		statelessBlk, err = blocks.NewApricotStandardBlock(
 			a.parentBlkID,
 			a.nextHeight,
-			a.txes,
+			a.txs,
 		)
 
 	default:
@@ -161,6 +162,6 @@ func (a *apricotStrategy) buildBlock() (snowman.Block, error) {
 	}
 	// remove selected txs from mempool only when we are sure
 	// a valid block containing it has been generated
-	a.Mempool.Remove(a.txes)
+	a.Mempool.Remove(a.txs)
 	return a.blkManager.NewBlock(statelessBlk), nil
 }

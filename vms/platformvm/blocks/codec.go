@@ -13,7 +13,7 @@ import (
 )
 
 // Version is the current default codec version
-const Version = 0
+const Version = txs.Version
 
 // GenesisCode allows blocks of larger than usual size to be parsed.
 // While this gives flexibility in accommodating large genesis blocks

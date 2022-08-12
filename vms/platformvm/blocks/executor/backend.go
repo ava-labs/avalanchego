@@ -68,13 +68,13 @@ func (b *backend) LastAccepted() ids.ID {
 	return b.lastAccepted
 }
 
+// GetFork needs the parent's timestamp to carry out its calculations.
+// Verify was already called on the parent (guaranteed by consensus engine).
+// The parent hasn't been rejected (guaranteed by consensus engine).
+// If the parent is accepted, the parent is the most recently
+// accepted block.
+// If the parent hasn't been accepted, the parent is in memory.
 func (b *backend) GetFork(blkID ids.ID) (forks.Fork, error) {
-	// We need the parent's timestamp.
-	// Verify was already called on the parent (guaranteed by consensus engine).
-	// The parent hasn't been rejected (guaranteed by consensus engine).
-	// If the parent is accepted, the parent is the most recently
-	// accepted block.
-	// If the parent hasn't been accepted, the parent is in memory.
 	var parentTimestamp time.Time
 	if parentState, ok := b.blkIDToState[blkID]; ok {
 		parentTimestamp = parentState.timestamp

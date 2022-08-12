@@ -13,8 +13,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	transactions "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var preFundedKeys = crypto.BuildTestKeys()
@@ -108,7 +109,7 @@ func TestProposalBlocks(t *testing.T) {
 
 		parsedApricotProposalBlk, ok := parsed.(*ApricotProposalBlock)
 		assert.True(ok)
-		assert.Equal([]*txs.Tx{tx}, parsedApricotProposalBlk.Txs())
+		assert.Equal([]*transactions.Tx{tx}, parsedApricotProposalBlk.Txs())
 
 		// check that blueberry proposal block can be built and parsed
 		blueberryProposalBlk, err := NewBlueberryProposalBlock(
@@ -131,7 +132,7 @@ func TestProposalBlocks(t *testing.T) {
 		assert.Equal(blueberryProposalBlk.BlockTimestamp(), parsed.BlockTimestamp())
 		parsedBlueberryProposalBlk, ok := parsed.(*BlueberryProposalBlock)
 		assert.True(ok)
-		assert.Equal([]*txs.Tx{tx}, parsedBlueberryProposalBlk.Txs())
+		assert.Equal([]*transactions.Tx{tx}, parsedBlueberryProposalBlk.Txs())
 
 		// backward compatibility check
 		assert.Equal(parsedApricotProposalBlk.Txs(), parsedBlueberryProposalBlk.Txs())
@@ -254,13 +255,13 @@ func TestAtomicBlock(t *testing.T) {
 
 		parsedAtomicBlk, ok := parsed.(*ApricotAtomicBlock)
 		assert.True(ok)
-		assert.Equal([]*txs.Tx{tx}, parsedAtomicBlk.Txs())
+		assert.Equal([]*transactions.Tx{tx}, parsedAtomicBlk.Txs())
 	}
 }
 
-func testAtomicTx() (*txs.Tx, error) {
-	utx := &txs.ImportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+func testAtomicTx() (*transactions.Tx, error) {
+	utx := &transactions.ImportTx{
+		BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    10,
 			BlockchainID: ids.ID{'c', 'h', 'a', 'i', 'n', 'I', 'D'},
 			Outs: []*avax.TransferableOutput{{
@@ -300,16 +301,16 @@ func testAtomicTx() (*txs.Tx, error) {
 		}},
 	}
 	signers := [][]*crypto.PrivateKeySECP256K1R{{preFundedKeys[0]}}
-	return txs.NewSigned(utx, txs.Codec, signers)
+	return transactions.NewSigned(utx, transactions.Codec, signers)
 }
 
-func testDecisionTxs() ([]*txs.Tx, error) {
+func testDecisionTxs() ([]*transactions.Tx, error) {
 	countTxs := 2
-	txes := make([]*txs.Tx, 0, countTxs)
+	txs := make([]*transactions.Tx, 0, countTxs)
 	for i := 0; i < countTxs; i++ {
 		// Create the tx
-		utx := &txs.CreateChainTx{
-			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+		utx := &transactions.CreateChainTx{
+			BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
 				NetworkID:    10,
 				BlockchainID: ids.ID{'c', 'h', 'a', 'i', 'n', 'I', 'D'},
 				Outs: []*avax.TransferableOutput{{
@@ -344,20 +345,20 @@ func testDecisionTxs() ([]*txs.Tx, error) {
 		}
 
 		signers := [][]*crypto.PrivateKeySECP256K1R{{preFundedKeys[0]}}
-		tx, err := txs.NewSigned(utx, txs.Codec, signers)
+		tx, err := transactions.NewSigned(utx, transactions.Codec, signers)
 		if err != nil {
 			return nil, err
 		}
-		txes = append(txes, tx)
+		txs = append(txs, tx)
 	}
-	return txes, nil
+	return txs, nil
 }
 
-func testProposalTx() (*txs.Tx, error) {
-	utx := &txs.RewardValidatorTx{
+func testProposalTx() (*transactions.Tx, error) {
+	utx := &transactions.RewardValidatorTx{
 		TxID: ids.ID{'r', 'e', 'w', 'a', 'r', 'd', 'I', 'D'},
 	}
 
 	signers := [][]*crypto.PrivateKeySECP256K1R{{preFundedKeys[0]}}
-	return txs.NewSigned(utx, txs.Codec, signers)
+	return transactions.NewSigned(utx, transactions.Codec, signers)
 }

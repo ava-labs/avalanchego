@@ -512,10 +512,7 @@ func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 }
 
 func (v *verifier) blueberryCommonBlock(b blocks.Block) error {
-	if err := v.apricotCommonBlock(b); err != nil {
-		return err
-	}
-	return v.validateBlockTimestamp(b)
+	return v.apricotCommonBlock(b)
 }
 
 func (v *verifier) apricotCommonBlock(b blocks.Block) error {
@@ -535,54 +532,6 @@ func (v *verifier) apricotCommonBlock(b blocks.Block) error {
 
 	// check whether block type is allowed in current fork
 	return b.Visit(v.forkChecker)
-}
-
-func (v *verifier) validateBlockTimestamp(b blocks.Block) error {
-	parentID := b.Parent()
-	parentBlk, err := v.getStatelessBlock(parentID)
-	if err != nil {
-		return err
-	}
-	parentBlkTime := parentBlk.BlockTimestamp()
-	blkTime := b.BlockTimestamp()
-
-	switch b.(type) {
-	case *blocks.BlueberryAbortBlock,
-		*blocks.BlueberryCommitBlock:
-		if !blkTime.Equal(parentBlkTime) {
-			return fmt.Errorf(
-				"%w parent block timestamp (%s) option block timestamp (%s)",
-				errOptionBlockTimestampNotMatchingParent,
-				parentBlkTime,
-				blkTime,
-			)
-		}
-		return nil
-
-	case *blocks.BlueberryStandardBlock,
-		*blocks.BlueberryProposalBlock:
-		parentID := b.Parent()
-		parentState, ok := v.GetState(parentID)
-		if !ok {
-			return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, b.ID())
-		}
-		nextStakerChangeTime, err := executor.GetNextStakerChangeTime(parentState)
-		if err != nil {
-			return fmt.Errorf("could not verify block timestamp: %w", err)
-		}
-		localTime := v.txExecutorBackend.Clk.Time()
-
-		return executor.ValidateProposedChainTime(
-			blkTime,
-			parentBlkTime,
-			nextStakerChangeTime,
-			localTime,
-			false, /*enforceStrictness*/
-		)
-
-	default:
-		return fmt.Errorf("cannot not validate block timestamp for block type %T", b)
-	}
 }
 
 func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {

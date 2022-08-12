@@ -527,12 +527,9 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 				// Blueberry is activated
 				cfg: &config.Config{BlueberryTime: time.Time{}},
 			}
-			verifier := &verifier{
-				txExecutorBackend: &executor.Backend{},
-				backend:           backend,
-				forkChecker: &forkChecker{
-					backend: backend,
-				},
+			fc := &forkChecker{
+				backend: backend,
+				clk:     &mockable.Clock{},
 			}
 
 			// build and verify child block
@@ -542,7 +539,8 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 			// Set expectations for dependencies.
 			parentStatelessBlk.EXPECT().BlockTimestamp().Return(test.parentTime).Times(1)
 			assert.NoError(err)
-			err = verifier.validateBlockTimestamp(statelessAbortBlk)
+
+			err = statelessAbortBlk.Visit(fc)
 			assert.ErrorIs(err, test.result)
 		})
 	}
@@ -607,12 +605,9 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 				// Blueberry is activated
 				cfg: &config.Config{BlueberryTime: time.Time{}},
 			}
-			verifier := &verifier{
-				txExecutorBackend: &executor.Backend{},
-				backend:           backend,
-				forkChecker: &forkChecker{
-					backend: backend,
-				},
+			fc := &forkChecker{
+				backend: backend,
+				clk:     &mockable.Clock{},
 			}
 
 			// build and verify child block
@@ -622,7 +617,7 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 			// Set expectations for dependencies.
 			parentStatelessBlk.EXPECT().BlockTimestamp().Return(test.parentTime).Times(1)
 			assert.NoError(err)
-			err = verifier.validateBlockTimestamp(statelessCommitBlk)
+			err = statelessCommitBlk.Visit(fc)
 			assert.ErrorIs(err, test.result)
 		})
 	}
