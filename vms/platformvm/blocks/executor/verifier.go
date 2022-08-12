@@ -115,13 +115,7 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 
 	// Having verifier block timestamp, we update staker set
 	// before processing block transaction
-	currentValidatorsToAdd,
-		currentValidatorsToRemove,
-		pendingValidatorsToRemove,
-		currentDelegatorsToAdd,
-		pendingDelegatorsToRemove,
-		updatedSupply,
-		err := executor.UpdateStakerSet(parentState, nextChainTime, v.txExecutorBackend.Rewards)
+	updated, err := executor.UpdateStakerSet(parentState, nextChainTime, v.txExecutorBackend.Rewards)
 	if err != nil {
 		return err
 	}
@@ -131,21 +125,21 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 		return err
 	}
 	onAcceptState.SetTimestamp(nextChainTime)
-	onAcceptState.SetCurrentSupply(updatedSupply)
+	onAcceptState.SetCurrentSupply(updated.Supply)
 
-	for _, currentValidatorToAdd := range currentValidatorsToAdd {
+	for _, currentValidatorToAdd := range updated.CurrentValidatorsToAdd {
 		onAcceptState.PutCurrentValidator(currentValidatorToAdd)
 	}
-	for _, pendingValidatorToRemove := range pendingValidatorsToRemove {
+	for _, pendingValidatorToRemove := range updated.PendingValidatorsToRemove {
 		onAcceptState.DeletePendingValidator(pendingValidatorToRemove)
 	}
-	for _, currentDelegatorToAdd := range currentDelegatorsToAdd {
+	for _, currentDelegatorToAdd := range updated.CurrentDelegatorsToAdd {
 		onAcceptState.PutCurrentDelegator(currentDelegatorToAdd)
 	}
-	for _, pendingDelegatorToRemove := range pendingDelegatorsToRemove {
+	for _, pendingDelegatorToRemove := range updated.PendingDelegatorsToRemove {
 		onAcceptState.DeletePendingDelegator(pendingDelegatorToRemove)
 	}
-	for _, currentValidatorToRemove := range currentValidatorsToRemove {
+	for _, currentValidatorToRemove := range updated.CurrentValidatorsToRemove {
 		onAcceptState.DeleteCurrentValidator(currentValidatorToRemove)
 	}
 	blkState.onAcceptState = onAcceptState
@@ -210,13 +204,7 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 
 	// Having verifier block timestamp, we update staker set
 	// before processing block transaction
-	currentValidatorsToAdd,
-		currentValidatorsToRemove,
-		pendingValidatorsToRemove,
-		currentDelegatorsToAdd,
-		pendingDelegatorsToRemove,
-		updatedSupply,
-		err := executor.UpdateStakerSet(parentState, nextChainTime, v.txExecutorBackend.Rewards)
+	updated, err := executor.UpdateStakerSet(parentState, nextChainTime, v.txExecutorBackend.Rewards)
 	if err != nil {
 		return err
 	}
@@ -226,21 +214,21 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 		return err
 	}
 	onAcceptState.SetTimestamp(nextChainTime)
-	onAcceptState.SetCurrentSupply(updatedSupply)
+	onAcceptState.SetCurrentSupply(updated.Supply)
 
-	for _, currentValidatorToAdd := range currentValidatorsToAdd {
+	for _, currentValidatorToAdd := range updated.CurrentValidatorsToAdd {
 		onAcceptState.PutCurrentValidator(currentValidatorToAdd)
 	}
-	for _, pendingValidatorToRemove := range pendingValidatorsToRemove {
+	for _, pendingValidatorToRemove := range updated.PendingValidatorsToRemove {
 		onAcceptState.DeletePendingValidator(pendingValidatorToRemove)
 	}
-	for _, currentDelegatorToAdd := range currentDelegatorsToAdd {
+	for _, currentDelegatorToAdd := range updated.CurrentDelegatorsToAdd {
 		onAcceptState.PutCurrentDelegator(currentDelegatorToAdd)
 	}
-	for _, pendingDelegatorToRemove := range pendingDelegatorsToRemove {
+	for _, pendingDelegatorToRemove := range updated.PendingDelegatorsToRemove {
 		onAcceptState.DeletePendingDelegator(pendingDelegatorToRemove)
 	}
-	for _, currentValidatorToRemove := range currentValidatorsToRemove {
+	for _, currentValidatorToRemove := range updated.CurrentValidatorsToRemove {
 		onAcceptState.DeleteCurrentValidator(currentValidatorToRemove)
 	}
 

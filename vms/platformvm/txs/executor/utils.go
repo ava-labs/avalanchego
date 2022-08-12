@@ -7,6 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
 var (
@@ -83,4 +87,111 @@ func ValidateProposedChainTime(
 		)
 	}
 	return nil
+}
+
+type UpdatedStateData struct {
+	CurrentValidatorsToAdd    []*state.Staker
+	CurrentValidatorsToRemove []*state.Staker
+	PendingValidatorsToRemove []*state.Staker
+	CurrentDelegatorsToAdd    []*state.Staker
+	PendingDelegatorsToRemove []*state.Staker
+	Supply                    uint64
+}
+
+// UpdateStakerSet does not modifies parentState. Instead it returns
+// an UpdatedStateData struct with all quantities modified by the advancing of chain time
+func UpdateStakerSet(parentState state.Chain, proposedChainTime time.Time, rewards reward.Calculator) (*UpdatedStateData, error) {
+	var (
+		updated = &UpdatedStateData{}
+		err     error
+	)
+	updated.Supply = parentState.GetCurrentSupply()
+	pendingStakerIterator, err := parentState.GetPendingStakerIterator()
+	if err != nil {
+		return nil, err
+	}
+
+	// Add to the staker set any pending stakers whose start time is at or
+	// before the new timestamp
+	for pendingStakerIterator.Next() {
+		stakerToRemove := pendingStakerIterator.Value()
+		if stakerToRemove.StartTime.After(proposedChainTime) {
+			break
+		}
+
+		stakerToAdd := *stakerToRemove
+		stakerToAdd.NextTime = stakerToRemove.EndTime
+		stakerToAdd.Priority = state.PendingToCurrentPriorities[stakerToRemove.Priority]
+
+		switch stakerToRemove.Priority {
+		case state.PrimaryNetworkDelegatorPendingPriority:
+			potentialReward := rewards.Calculate(
+				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
+				stakerToRemove.Weight,
+				updated.Supply,
+			)
+			updated.Supply, err = math.Add64(updated.Supply, potentialReward)
+			if err != nil {
+				pendingStakerIterator.Release()
+				return nil, err
+			}
+
+			stakerToAdd.PotentialReward = potentialReward
+
+			updated.CurrentDelegatorsToAdd = append(updated.CurrentDelegatorsToAdd, &stakerToAdd)
+			updated.PendingDelegatorsToRemove = append(updated.PendingDelegatorsToRemove, stakerToRemove)
+		case state.PrimaryNetworkValidatorPendingPriority:
+			potentialReward := rewards.Calculate(
+				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
+				stakerToRemove.Weight,
+				updated.Supply,
+			)
+			updated.Supply, err = math.Add64(updated.Supply, potentialReward)
+			if err != nil {
+				pendingStakerIterator.Release()
+				return nil, err
+			}
+
+			stakerToAdd.PotentialReward = potentialReward
+
+			updated.CurrentValidatorsToAdd = append(updated.CurrentValidatorsToAdd, &stakerToAdd)
+			updated.PendingValidatorsToRemove = append(updated.PendingValidatorsToRemove, stakerToRemove)
+		case state.SubnetValidatorPendingPriority:
+			// We require that the [txTimestamp] <= [nextStakerChangeTime].
+			// Additionally, the minimum stake duration is > 0. This means we
+			// know that the staker we are adding here should never be attempted
+			// to be removed in the following loop.
+
+			updated.CurrentValidatorsToAdd = append(updated.CurrentValidatorsToAdd, &stakerToAdd)
+			updated.PendingValidatorsToRemove = append(updated.PendingValidatorsToRemove, stakerToRemove)
+		default:
+			pendingStakerIterator.Release()
+			return nil, fmt.Errorf("expected staker priority got %d", stakerToRemove.Priority)
+		}
+	}
+	pendingStakerIterator.Release()
+
+	currentStakerIterator, err := parentState.GetCurrentStakerIterator()
+	if err != nil {
+		return nil, err
+	}
+
+	for currentStakerIterator.Next() {
+		stakerToRemove := currentStakerIterator.Value()
+		if stakerToRemove.EndTime.After(proposedChainTime) {
+			break
+		}
+
+		priority := stakerToRemove.Priority
+		if priority == state.PrimaryNetworkDelegatorCurrentPriority ||
+			priority == state.PrimaryNetworkValidatorCurrentPriority {
+			// Primary network stakers are removed by the RewardValidatorTx, not
+			// an AdvanceTimeTx.
+			break
+		}
+
+		updated.CurrentValidatorsToRemove = append(updated.CurrentValidatorsToRemove, stakerToRemove)
+	}
+	currentStakerIterator.Release()
+	return updated, err
 }

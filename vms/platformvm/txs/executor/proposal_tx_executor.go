@@ -513,13 +513,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		return err
 	}
 
-	currentValidatorsToAdd,
-		currentValidatorsToRemove,
-		pendingValidatorsToRemove,
-		currentDelegatorsToAdd,
-		pendingDelegatorsToRemove,
-		updatedSupply,
-		err := UpdateStakerSet(parentState, proposedChainTime, e.Backend.Rewards)
+	updated, err := UpdateStakerSet(parentState, proposedChainTime, e.Backend.Rewards)
 	if err != nil {
 		return err
 	}
@@ -530,21 +524,21 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 	}
 
 	e.OnCommit.SetTimestamp(proposedChainTime)
-	e.OnCommit.SetCurrentSupply(updatedSupply)
+	e.OnCommit.SetCurrentSupply(updated.Supply)
 
-	for _, currentValidatorToAdd := range currentValidatorsToAdd {
+	for _, currentValidatorToAdd := range updated.CurrentValidatorsToAdd {
 		e.OnCommit.PutCurrentValidator(currentValidatorToAdd)
 	}
-	for _, pendingValidatorToRemove := range pendingValidatorsToRemove {
+	for _, pendingValidatorToRemove := range updated.PendingValidatorsToRemove {
 		e.OnCommit.DeletePendingValidator(pendingValidatorToRemove)
 	}
-	for _, currentDelegatorToAdd := range currentDelegatorsToAdd {
+	for _, currentDelegatorToAdd := range updated.CurrentDelegatorsToAdd {
 		e.OnCommit.PutCurrentDelegator(currentDelegatorToAdd)
 	}
-	for _, pendingDelegatorToRemove := range pendingDelegatorsToRemove {
+	for _, pendingDelegatorToRemove := range updated.PendingDelegatorsToRemove {
 		e.OnCommit.DeletePendingDelegator(pendingDelegatorToRemove)
 	}
-	for _, currentValidatorToRemove := range currentValidatorsToRemove {
+	for _, currentValidatorToRemove := range updated.CurrentValidatorsToRemove {
 		e.OnCommit.DeleteCurrentValidator(currentValidatorToRemove)
 	}
 
@@ -556,117 +550,6 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 
 	e.PrefersCommit = !proposedChainTime.After(now.Add(SyncBound))
 	return nil
-}
-
-// TODO return a struct
-func UpdateStakerSet(
-	parentState state.Chain,
-	proposedChainTime time.Time,
-	rewards reward.Calculator,
-) (
-	currentValidatorsToAdd []*state.Staker,
-	currentValidatorsToRemove []*state.Staker,
-	pendingValidatorsToRemove []*state.Staker,
-	currentDelegatorsToAdd []*state.Staker,
-	pendingDelegatorsToRemove []*state.Staker,
-	updatedSupply uint64,
-	err error,
-) {
-	updatedSupply = parentState.GetCurrentSupply()
-	pendingStakerIterator, err := parentState.GetPendingStakerIterator()
-	if err != nil {
-		return nil, nil, nil, nil, nil, 0, err
-	}
-
-	// Add to the staker set any pending stakers whose start time is at or
-	// before the new timestamp
-	for pendingStakerIterator.Next() {
-		stakerToRemove := pendingStakerIterator.Value()
-		if stakerToRemove.StartTime.After(proposedChainTime) {
-			break
-		}
-
-		stakerToAdd := *stakerToRemove
-		stakerToAdd.NextTime = stakerToRemove.EndTime
-		stakerToAdd.Priority = state.PendingToCurrentPriorities[stakerToRemove.Priority]
-
-		switch stakerToRemove.Priority {
-		case state.PrimaryNetworkDelegatorPendingPriority:
-			potentialReward := rewards.Calculate(
-				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
-				stakerToRemove.Weight,
-				updatedSupply,
-			)
-			updatedSupply, err = math.Add64(updatedSupply, potentialReward)
-			if err != nil {
-				pendingStakerIterator.Release()
-				return nil, nil, nil, nil, nil, 0, err
-			}
-
-			stakerToAdd.PotentialReward = potentialReward
-
-			currentDelegatorsToAdd = append(currentDelegatorsToAdd, &stakerToAdd)
-			pendingDelegatorsToRemove = append(pendingDelegatorsToRemove, stakerToRemove)
-		case state.PrimaryNetworkValidatorPendingPriority:
-			potentialReward := rewards.Calculate(
-				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
-				stakerToRemove.Weight,
-				updatedSupply,
-			)
-			updatedSupply, err = math.Add64(updatedSupply, potentialReward)
-			if err != nil {
-				pendingStakerIterator.Release()
-				return nil, nil, nil, nil, nil, 0, err
-			}
-
-			stakerToAdd.PotentialReward = potentialReward
-
-			currentValidatorsToAdd = append(currentValidatorsToAdd, &stakerToAdd)
-			pendingValidatorsToRemove = append(pendingValidatorsToRemove, stakerToRemove)
-		case state.SubnetValidatorPendingPriority:
-			// We require that the [txTimestamp] <= [nextStakerChangeTime].
-			// Additionally, the minimum stake duration is > 0. This means we
-			// know that the staker we are adding here should never be attempted
-			// to be removed in the following loop.
-
-			currentValidatorsToAdd = append(currentValidatorsToAdd, &stakerToAdd)
-			pendingValidatorsToRemove = append(pendingValidatorsToRemove, stakerToRemove)
-		default:
-			pendingStakerIterator.Release()
-			return nil, nil, nil, nil, nil, 0, fmt.Errorf("expected staker priority got %d", stakerToRemove.Priority)
-		}
-	}
-	pendingStakerIterator.Release()
-
-	currentStakerIterator, err := parentState.GetCurrentStakerIterator()
-	if err != nil {
-		return nil, nil, nil, nil, nil, 0, err
-	}
-
-	for currentStakerIterator.Next() {
-		stakerToRemove := currentStakerIterator.Value()
-		if stakerToRemove.EndTime.After(proposedChainTime) {
-			break
-		}
-
-		priority := stakerToRemove.Priority
-		if priority == state.PrimaryNetworkDelegatorCurrentPriority ||
-			priority == state.PrimaryNetworkValidatorCurrentPriority {
-			// Primary network stakers are removed by the RewardValidatorTx, not
-			// an AdvanceTimeTx.
-			break
-		}
-
-		currentValidatorsToRemove = append(currentValidatorsToRemove, stakerToRemove)
-	}
-	currentStakerIterator.Release()
-	return currentValidatorsToAdd,
-		currentValidatorsToRemove,
-		pendingValidatorsToRemove,
-		currentDelegatorsToAdd,
-		pendingDelegatorsToRemove,
-		updatedSupply,
-		err
 }
 
 func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
