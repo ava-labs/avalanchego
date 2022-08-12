@@ -23,34 +23,28 @@ func NewBlueberryProposalBlock(
 	tx *txs.Tx,
 ) (Block, error) {
 	res := &BlueberryProposalBlock{
-		BlueberryCommonBlock: BlueberryCommonBlock{
+		BlkTimestamp: uint64(timestamp.Unix()),
+		ApricotProposalBlock: &ApricotProposalBlock{
 			ApricotCommonBlock: ApricotCommonBlock{
 				PrntID: parentID,
 				Hght:   height,
 			},
-			BlkTimestamp: uint64(timestamp.Unix()),
+			Tx: tx,
 		},
-		Tx: tx,
 	}
 
 	return res, initialize(Block(res))
 }
 
 type BlueberryProposalBlock struct {
-	BlueberryCommonBlock `serialize:"true"`
+	BlkTimestamp uint64 `serialize:"true" json:"time"`
 
-	Tx *txs.Tx `serialize:"true" json:"tx"`
+	*ApricotProposalBlock `serialize:"true"`
 }
 
-func (b *BlueberryProposalBlock) initialize(bytes []byte) error {
-	b.BlueberryCommonBlock.initialize(bytes)
-	if err := b.Tx.Sign(txs.Codec, nil); err != nil {
-		return fmt.Errorf("failed to initialize tx: %w", err)
-	}
-	return nil
+func (b *BlueberryProposalBlock) BlockTimestamp() time.Time {
+	return time.Unix(int64(b.BlkTimestamp), 0)
 }
-
-func (b *BlueberryProposalBlock) Txs() []*txs.Tx { return []*txs.Tx{b.Tx} }
 
 func (b *BlueberryProposalBlock) Visit(v Visitor) error {
 	return v.BlueberryProposalBlock(b)

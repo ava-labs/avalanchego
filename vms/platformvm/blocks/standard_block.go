@@ -19,36 +19,28 @@ var (
 
 func NewBlueberryStandardBlock(timestamp time.Time, parentID ids.ID, height uint64, txs []*transactions.Tx) (Block, error) {
 	res := &BlueberryStandardBlock{
-		BlueberryCommonBlock: BlueberryCommonBlock{
+		BlkTimestamp: uint64(timestamp.Unix()),
+		ApricotStandardBlock: &ApricotStandardBlock{
 			ApricotCommonBlock: ApricotCommonBlock{
 				PrntID: parentID,
 				Hght:   height,
 			},
-			BlkTimestamp: uint64(timestamp.Unix()),
+			Transactions: txs,
 		},
-		Transactions: txs,
 	}
 
 	return res, initialize(Block(res))
 }
 
 type BlueberryStandardBlock struct {
-	BlueberryCommonBlock `serialize:"true"`
+	BlkTimestamp uint64 `serialize:"true" json:"time"`
 
-	Transactions []*transactions.Tx `serialize:"true" json:"txs"`
+	*ApricotStandardBlock `serialize:"true"`
 }
 
-func (b *BlueberryStandardBlock) initialize(bytes []byte) error {
-	b.BlueberryCommonBlock.initialize(bytes)
-	for _, tx := range b.Transactions {
-		if err := tx.Sign(transactions.Codec, nil); err != nil {
-			return fmt.Errorf("failed to initialize tx: %w", err)
-		}
-	}
-	return nil
+func (b *BlueberryStandardBlock) BlockTimestamp() time.Time {
+	return time.Unix(int64(b.BlkTimestamp), 0)
 }
-
-func (b *BlueberryStandardBlock) Txs() []*transactions.Tx { return b.Transactions }
 
 func (b *BlueberryStandardBlock) Visit(v Visitor) error {
 	return v.BlueberryStandardBlock(b)

@@ -10,18 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-type BlueberryCommonBlock struct {
-	ApricotCommonBlock `serialize:"true"`
-
-	// Time this block was proposed at. Note that this
-	// is serialized for blueberry blocks only
-	BlkTimestamp uint64 `serialize:"true" json:"time"`
-}
-
-func (b *BlueberryCommonBlock) BlockTimestamp() time.Time {
-	return time.Unix(int64(b.BlkTimestamp), 0)
-}
-
 // ApricotCommonBlock contains fields and methods common to all blocks in this VM.
 type ApricotCommonBlock struct {
 	// parent's ID
