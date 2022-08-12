@@ -30,6 +30,7 @@ import (
 	"context"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
@@ -137,7 +138,8 @@ func newTestBackend(t *testing.T, config *params.ChainConfig, numBlocks int, ext
 	genesis := gspec.MustCommit(db)
 
 	// Generate testing blocks
-	blocks, _, err := core.GenerateChain(gspec.Config, genesis, engine, db, numBlocks, 0, genBlocks)
+
+	blocks, _, err := core.GenerateChain(gspec.Config, genesis, engine, db, numBlocks, 1, genBlocks)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,17 +180,34 @@ type suggestTipCapTest struct {
 	expectedTip     *big.Int
 }
 
-func applyGasPriceTest(t *testing.T, test suggestTipCapTest) {
-	config := Config{
-		Blocks:     20,
-		Percentile: 60,
+func defaultOracleConfig() Config {
+	return Config{
+		Blocks:             20,
+		Percentile:         60,
+		MaxLookbackSeconds: 80,
 	}
+}
 
+//  timeCrunchOracleConfig returns a config with [MaxLookbackSeconds] set to 5
+// to ensure that during gas price estimation, we will hit the time based look back limit
+func timeCrunchOracleConfig() Config {
+	return Config{
+		Blocks:             20,
+		Percentile:         60,
+		MaxLookbackSeconds: 5,
+	}
+}
+
+func applyGasPriceTest(t *testing.T, test suggestTipCapTest, config Config) {
 	if test.genBlock == nil {
 		test.genBlock = func(i int, b *core.BlockGen) {}
 	}
 	backend := newTestBackend(t, test.chainConfig, test.numBlocks, test.extDataGasUsage, test.genBlock)
 	oracle := NewOracle(backend, config)
+
+	// mock time to be consistent across different CI runs
+	// sets currentTime to be 20 seconds
+	oracle.clock.Set(time.Unix(20, 0))
 
 	got, err := oracle.SuggestTipCap(context.Background())
 	if err != nil {
@@ -228,8 +247,8 @@ func TestSuggestTipCapEmptyExtDataGasUsage(t *testing.T) {
 				b.AddTx(tx)
 			}
 		},
-		expectedTip: big.NewInt(11_427_927_927),
-	})
+		expectedTip: big.NewInt(5_713_963_963),
+	}, defaultOracleConfig())
 }
 
 func TestSuggestTipCapSimple(t *testing.T) {
@@ -261,8 +280,8 @@ func TestSuggestTipCapSimple(t *testing.T) {
 				b.AddTx(tx)
 			}
 		},
-		expectedTip: big.NewInt(11_427_927_927),
-	})
+		expectedTip: big.NewInt(5_713_963_963),
+	}, defaultOracleConfig())
 }
 
 func TestSuggestTipCapSimpleFloor(t *testing.T) {
@@ -295,7 +314,7 @@ func TestSuggestTipCapSimpleFloor(t *testing.T) {
 			}
 		},
 		expectedTip: common.Big0,
-	})
+	}, defaultOracleConfig())
 }
 
 func TestSuggestTipCapSmallTips(t *testing.T) {
@@ -342,8 +361,8 @@ func TestSuggestTipCapSmallTips(t *testing.T) {
 			}
 		},
 		// NOTE: small tips do not bias estimate
-		expectedTip: big.NewInt(11_427_927_927),
-	})
+		expectedTip: big.NewInt(5_713_963_963),
+	}, defaultOracleConfig())
 }
 
 func TestSuggestTipCapExtDataUsage(t *testing.T) {
@@ -375,8 +394,8 @@ func TestSuggestTipCapExtDataUsage(t *testing.T) {
 				b.AddTx(tx)
 			}
 		},
-		expectedTip: big.NewInt(11_413_453_299),
-	})
+		expectedTip: big.NewInt(5_706_726_649),
+	}, defaultOracleConfig())
 }
 
 func TestSuggestTipCapMinGas(t *testing.T) {
@@ -409,7 +428,7 @@ func TestSuggestTipCapMinGas(t *testing.T) {
 			}
 		},
 		expectedTip: big.NewInt(0),
-	})
+	}, defaultOracleConfig())
 }
 
 // Regression test to ensure that SuggestPrice does not panic prior to activation of ApricotPhase3
@@ -447,4 +466,71 @@ func TestSuggestGasPricePreAP3(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestSuggestTipCapMaxBlocksLookback(t *testing.T) {
+	txTip := big.NewInt(550 * params.GWei)
+
+	applyGasPriceTest(t, suggestTipCapTest{
+		chainConfig:     params.TestChainConfig,
+		numBlocks:       20,
+		extDataGasUsage: common.Big0,
+		genBlock: func(i int, b *core.BlockGen) {
+			b.SetCoinbase(common.Address{1})
+
+			signer := types.LatestSigner(params.TestChainConfig)
+			baseFee := b.BaseFee()
+			feeCap := new(big.Int).Add(baseFee, txTip)
+			for j := 0; j < 370; j++ {
+				tx := types.NewTx(&types.DynamicFeeTx{
+					ChainID:   params.TestChainConfig.ChainID,
+					Nonce:     b.TxNonce(addr),
+					To:        &common.Address{},
+					Gas:       params.TxGas,
+					GasFeeCap: feeCap,
+					GasTipCap: txTip,
+					Data:      []byte{},
+				})
+				tx, err := types.SignTx(tx, signer, key)
+				if err != nil {
+					t.Fatalf("failed to create tx: %s", err)
+				}
+				b.AddTx(tx)
+			}
+		},
+		expectedTip: big.NewInt(51_565_264_256),
+	}, defaultOracleConfig())
+}
+
+func TestSuggestTipCapMaxBlocksSecondsLookback(t *testing.T) {
+	txTip := big.NewInt(550 * params.GWei)
+	applyGasPriceTest(t, suggestTipCapTest{
+		chainConfig:     params.TestChainConfig,
+		numBlocks:       20,
+		extDataGasUsage: big.NewInt(1),
+		genBlock: func(i int, b *core.BlockGen) {
+			b.SetCoinbase(common.Address{1})
+
+			signer := types.LatestSigner(params.TestChainConfig)
+			baseFee := b.BaseFee()
+			feeCap := new(big.Int).Add(baseFee, txTip)
+			for j := 0; j < 370; j++ {
+				tx := types.NewTx(&types.DynamicFeeTx{
+					ChainID:   params.TestChainConfig.ChainID,
+					Nonce:     b.TxNonce(addr),
+					To:        &common.Address{},
+					Gas:       params.TxGas,
+					GasFeeCap: feeCap,
+					GasTipCap: txTip,
+					Data:      []byte{},
+				})
+				tx, err := types.SignTx(tx, signer, key)
+				if err != nil {
+					t.Fatalf("failed to create tx: %s", err)
+				}
+				b.AddTx(tx)
+			}
+		},
+		expectedTip: big.NewInt(92_212_529_423),
+	}, timeCrunchOracleConfig())
 }
