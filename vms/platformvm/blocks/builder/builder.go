@@ -376,7 +376,8 @@ func (b *builder) setNextBuildBlockTime() {
 	if !ok {
 		// The preferred block should always be a decision block
 		ctx.Log.Error("couldn't get preferred block state",
-			zap.Stringer("blkID", b.preferredBlockID),
+			zap.Stringer("preferredID", b.preferredBlockID),
+			zap.Stringer("lastAcceptedID", b.blkManager.LastAccepted()),
 		)
 		return
 	}
@@ -384,7 +385,8 @@ func (b *builder) setNextBuildBlockTime() {
 	_, shouldReward, err := b.getNextStakerToReward(preferredState)
 	if err != nil {
 		ctx.Log.Error("failed to fetch next staker to reward",
-			zap.Stringer("blkID", b.preferredBlockID),
+			zap.Stringer("preferredID", b.preferredBlockID),
+			zap.Stringer("lastAcceptedID", b.blkManager.LastAccepted()),
 			zap.Error(err),
 		)
 		return
@@ -397,7 +399,8 @@ func (b *builder) setNextBuildBlockTime() {
 	_, shouldAdvanceTime, err := b.getNextChainTime(preferredState)
 	if err != nil {
 		ctx.Log.Error("failed to fetch next chain time",
-			zap.Stringer("blkID", b.preferredBlockID),
+			zap.Stringer("preferredID", b.preferredBlockID),
+			zap.Stringer("lastAcceptedID", b.blkManager.LastAccepted()),
 			zap.Error(err),
 		)
 		return
@@ -417,7 +420,8 @@ func (b *builder) setNextBuildBlockTime() {
 	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
 	if err != nil {
 		ctx.Log.Error("couldn't get next staker change time",
-			zap.Stringer("blkID", b.preferredBlockID),
+			zap.Stringer("preferredID", b.preferredBlockID),
+			zap.Stringer("lastAcceptedID", b.blkManager.LastAccepted()),
 			zap.Error(err),
 		)
 		return
