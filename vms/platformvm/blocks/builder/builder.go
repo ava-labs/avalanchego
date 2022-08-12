@@ -268,6 +268,8 @@ func (b *builder) Shutdown() {
 }
 
 func (b *builder) ResetBlockTimer() {
+	// Next time the context lock is released, we can attempt to reset the block
+	// timer.
 	b.timer.SetTimeoutIn(0)
 }
 
