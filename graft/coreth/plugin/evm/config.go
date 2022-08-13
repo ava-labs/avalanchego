@@ -181,6 +181,16 @@ func (d *Duration) UnmarshalJSON(data []byte) (err error) {
 	return err
 }
 
+// String implements the stringer interface.
+func (d Duration) String() string {
+	return d.Duration.String()
+}
+
+// String implements the stringer interface.
+func (d Duration) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.Duration.String())
+}
+
 // Validate returns an error if this is an invalid config.
 func (c *Config) Validate() error {
 	if c.PopulateMissingTries != nil && (c.OfflinePruning || c.Pruning) {
