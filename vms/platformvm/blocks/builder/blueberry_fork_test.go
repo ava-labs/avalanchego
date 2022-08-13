@@ -21,6 +21,7 @@ func TestBlueberryFork(t *testing.T) {
 
 	// mock ResetBlockTimer to control timing of block formation
 	env := newEnvironment(t, true /*mockResetBlockTimer*/)
+	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)

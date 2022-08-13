@@ -30,9 +30,13 @@ import (
 
 func TestAcceptorVisitProposalBlock(t *testing.T) {
 	assert := assert.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	lastAcceptedID := ids.GenerateTestID()
 
 	blk, err := blocks.NewApricotProposalBlock(
-		ids.GenerateTestID(),
+		lastAcceptedID,
 		1,
 		&txs.Tx{
 			Unsigned: &txs.AddDelegatorTx{
@@ -47,6 +51,8 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 	assert.True(ok)
 
 	blkID := blk.ID()
+
+	s := state.NewMockState(ctrl)
 	acceptor := &acceptor{
 		backend: &backend{
 			ctx: &snow.Context{
@@ -55,6 +61,7 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 			blkIDToState: map[ids.ID]*blockState{
 				blkID: {},
 			},
+			state: s,
 		},
 		metrics:          metrics.Noop,
 		recentlyAccepted: nil,
@@ -67,6 +74,11 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 
 	_, exists := acceptor.GetState(blkID)
 	assert.False(exists)
+
+	s.EXPECT().GetLastAccepted().Return(lastAcceptedID).Times(1)
+
+	_, exists = acceptor.GetState(lastAcceptedID)
+	assert.True(exists)
 }
 
 func TestAcceptorVisitAtomicBlock(t *testing.T) {

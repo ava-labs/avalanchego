@@ -95,12 +95,7 @@ func New(
 		toEngine:          toEngine,
 	}
 
-	builder.timer = timer.NewTimer(func() {
-		txExecutorBackend.Ctx.Lock.Lock()
-		defer txExecutorBackend.Ctx.Lock.Unlock()
-
-		builder.ResetBlockTimer()
-	})
+	builder.timer = timer.NewTimer(builder.setNextBuildBlockTime)
 
 	builder.Network = NewNetwork(
 		txExecutorBackend.Ctx,
@@ -179,58 +174,9 @@ func (b *builder) Shutdown() {
 }
 
 func (b *builder) ResetBlockTimer() {
-	var (
-		ctx = b.txExecutorBackend.Ctx
-		now = b.txExecutorBackend.Clk.Time()
-	)
-
-	if !b.txExecutorBackend.Bootstrapped.GetValue() {
-		ctx.Log.Verbo("skipping block timer reset",
-			zap.String("reason", "not bootstrapped"),
-		)
-		return
-	}
-
-	blkBuildStrategy, err := b.getBuildingStrategy()
-	if err != nil {
-		return
-	}
-
-	// check if there are txs to be included in the block
-	// or if chain time can be moved ahead via block timestamp
-	hasContent, err := blkBuildStrategy.hasContent()
-	if err != nil {
-		return
-	}
-	if hasContent {
-		b.notifyBlockReady()
-		return
-	}
-
-	// Wake up when it's time to add/remove the next validator/delegator
-	preferredState, ok := b.blkManager.GetState(b.preferredBlockID)
-	if !ok {
-		// The preferred block should always be a decision block
-		ctx.Log.Error("couldn't get preferred block state",
-			zap.Stringer("blkID", b.preferredBlockID),
-		)
-		return
-	}
-	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
-	if err != nil {
-		ctx.Log.Error("couldn't get next staker change time",
-			zap.Error(err),
-		)
-		return
-	}
-	waitTime := nextStakerChangeTime.Sub(now)
-	ctx.Log.Debug("setting next scheduled event",
-		zap.Time("nextEventTime", nextStakerChangeTime),
-		zap.Duration("timeUntil", waitTime),
-	)
-
-	// Wake up when it's time to add/remove the next validator
-	b.timer.SetTimeoutIn(waitTime)
+	// Next time the context lock is released, we can attempt to reset the block
+	// timer.
+	b.timer.SetTimeoutIn(0)
 }
 
 // getNextStakerToReward returns the next staker txID to remove from the staking
@@ -311,6 +257,65 @@ func (b *builder) dropExpiredProposalTxs() {
 			zap.Stringer("txID", txID),
 		)
 	}
+}
+
+func (b *builder) setNextBuildBlockTime() {
+	ctx := b.txExecutorBackend.Ctx
+
+	// Grabbing the lock here enforces that this function is not called mid-way
+	// through modifying of the state.
+	ctx.Lock.Lock()
+	defer ctx.Lock.Unlock()
+
+	if !b.txExecutorBackend.Bootstrapped.GetValue() {
+		ctx.Log.Verbo("skipping block timer reset",
+			zap.String("reason", "not bootstrapped"),
+		)
+		return
+	}
+	blkBuildStrategy, err := b.getBuildingStrategy()
+	if err != nil {
+		return
+	}
+
+	// check if there are txs to be included in the block
+	// or if chain time can be moved ahead via block timestamp
+	hasContent, err := blkBuildStrategy.hasContent()
+	if err != nil {
+		return
+	}
+	if hasContent {
+		b.notifyBlockReady()
+		return
+	}
+
+	// Wake up when it's time to add/remove the next validator/delegator
+	preferredState, ok := b.blkManager.GetState(b.preferredBlockID)
+	if !ok {
+		// The preferred block should always be a decision block
+		ctx.Log.Error("couldn't get preferred block state",
+			zap.Stringer("blkID", b.preferredBlockID),
+		)
+		return
+	}
+	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
+	if err != nil {
+		ctx.Log.Error("couldn't get next staker change time",
+			zap.Error(err),
+		)
+		return
+	}
+	var (
+		now      = b.txExecutorBackend.Clk.Time()
+		waitTime = nextStakerChangeTime.Sub(now)
+	)
+	ctx.Log.Debug("setting next scheduled event",
+		zap.Time("nextEventTime", nextStakerChangeTime),
+		zap.Duration("timeUntil", waitTime),
+	)
+
+	// Wake up when it's time to add/remove the next validator
+	b.timer.SetTimeoutIn(waitTime)
 }
 
 // notifyBlockReady tells the consensus engine that a new block is ready to be
