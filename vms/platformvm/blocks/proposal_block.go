@@ -40,7 +40,7 @@ type BlueberryProposalBlock struct {
 	ApricotProposalBlock `serialize:"true"`
 }
 
-func (b *BlueberryProposalBlock) BlockTimestamp() time.Time {
+func (b *BlueberryProposalBlock) Timestamp() time.Time {
 	return time.Unix(int64(b.Time), 0)
 }
 

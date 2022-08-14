@@ -33,7 +33,7 @@ type BlueberryCommitBlock struct {
 	ApricotCommitBlock `serialize:"true"`
 }
 
-func (b *BlueberryCommitBlock) BlockTimestamp() time.Time {
+func (b *BlueberryCommitBlock) Timestamp() time.Time {
 	return time.Unix(int64(b.Time), 0)
 }
 

@@ -33,7 +33,7 @@ type BlueberryAbortBlock struct {
 	ApricotAbortBlock `serialize:"true"`
 }
 
-func (b *BlueberryAbortBlock) BlockTimestamp() time.Time {
+func (b *BlueberryAbortBlock) Timestamp() time.Time {
 	return time.Unix(int64(b.Time), 0)
 }
 

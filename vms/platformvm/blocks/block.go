@@ -17,7 +17,7 @@ type Block interface {
 	Parent() ids.ID
 	Bytes() []byte
 	Height() uint64
-	BlockTimestamp() time.Time
+	Timestamp() time.Time
 
 	// Txs returns list of transactions contained in the block
 	Txs() []*txs.Tx

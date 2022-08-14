@@ -36,7 +36,7 @@ type BlueberryStandardBlock struct {
 	ApricotStandardBlock `serialize:"true"`
 }
 
-func (b *BlueberryStandardBlock) BlockTimestamp() time.Time {
+func (b *BlueberryStandardBlock) Timestamp() time.Time {
 	return time.Unix(int64(b.Time), 0)
 }
 

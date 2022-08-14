@@ -79,7 +79,7 @@ func (b *Block) Timestamp() time.Time {
 
 	default:
 		// from blueberry on, timestamps are serialized in blocks
-		return b.Block.BlockTimestamp()
+		return b.Block.Timestamp()
 	}
 }
 
@@ -112,7 +112,7 @@ func (b *Block) Options() ([2]snowman.Block, error) {
 		}
 
 	case *blocks.BlueberryProposalBlock:
-		timestamp := b.Block.BlockTimestamp()
+		timestamp := b.Block.Timestamp()
 		statelessCommitBlk, err = blocks.NewBlueberryCommitBlock(timestamp, blkID, nextHeight)
 		if err != nil {
 			return [2]snowman.Block{}, fmt.Errorf(

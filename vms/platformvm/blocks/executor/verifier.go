@@ -52,7 +52,7 @@ func (v *verifier) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
 
 	blkState := &blockState{
 		statelessBlock: b,
-		timestamp:      b.BlockTimestamp(),
+		timestamp:      b.Timestamp(),
 		onAcceptState:  parentState.onAbortState,
 	}
 	v.blkIDToState[blkID] = blkState
@@ -80,7 +80,7 @@ func (v *verifier) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
 	blkState := &blockState{
 		statelessBlock: b,
 		onAcceptState:  parentState.onCommitState,
-		timestamp:      b.BlockTimestamp(),
+		timestamp:      b.Timestamp(),
 	}
 	v.blkIDToState[blkID] = blkState
 	return nil
@@ -111,7 +111,7 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 	if !ok {
 		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
 	}
-	nextChainTime := b.BlockTimestamp()
+	nextChainTime := b.Timestamp()
 
 	// Having verifier block timestamp, we update staker set
 	// before processing block transaction
@@ -170,7 +170,7 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 	onAbortState.AddTx(b.Tx, status.Aborted)
 	blkState.onAbortState = onAbortState
 
-	blkState.timestamp = b.BlockTimestamp()
+	blkState.timestamp = b.Timestamp()
 	blkState.initiallyPreferCommit = txExecutor.PrefersCommit
 
 	v.blkIDToState[blkID] = blkState
@@ -200,7 +200,7 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 	if !ok {
 		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
 	}
-	nextChainTime := b.BlockTimestamp()
+	nextChainTime := b.Timestamp()
 
 	// Having verifier block timestamp, we update staker set
 	// before processing block transaction

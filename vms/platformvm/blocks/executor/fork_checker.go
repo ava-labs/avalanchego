@@ -92,8 +92,8 @@ func (f *forkChecker) validateBlueberryOptionsTimestamp(b blocks.Block) error {
 	if err != nil {
 		return err
 	}
-	parentBlkTime := parentBlk.BlockTimestamp()
-	blkTime := b.BlockTimestamp()
+	parentBlkTime := parentBlk.Timestamp()
+	blkTime := b.Timestamp()
 
 	if !blkTime.Equal(parentBlkTime) {
 		return fmt.Errorf(
@@ -112,8 +112,8 @@ func (f *forkChecker) validateBlueberryBlocksTimestamp(b blocks.Block) error {
 	if err != nil {
 		return err
 	}
-	parentBlkTime := parentBlk.BlockTimestamp()
-	blkTime := b.BlockTimestamp()
+	parentBlkTime := parentBlk.Timestamp()
+	blkTime := b.Timestamp()
 
 	parentState, ok := f.GetState(parentID)
 	if !ok {

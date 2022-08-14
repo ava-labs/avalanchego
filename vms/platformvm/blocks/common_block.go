@@ -32,6 +32,6 @@ func (b *ApricotCommonBlock) Parent() ids.ID { return b.PrntID }
 func (b *ApricotCommonBlock) Bytes() []byte  { return b.bytes }
 func (b *ApricotCommonBlock) Height() uint64 { return b.Hght }
 
-func (b *ApricotCommonBlock) BlockTimestamp() time.Time {
+func (b *ApricotCommonBlock) Timestamp() time.Time {
 	return time.Unix(0, 0)
 }
