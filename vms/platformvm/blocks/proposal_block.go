@@ -22,7 +22,7 @@ func NewBlueberryProposalBlock(
 	height uint64,
 	tx *txs.Tx,
 ) (Block, error) {
-	res := &BlueberryProposalBlock{
+	blk := &BlueberryProposalBlock{
 		BlkTimestamp: uint64(timestamp.Unix()),
 		ApricotProposalBlock: &ApricotProposalBlock{
 			ApricotCommonBlock: ApricotCommonBlock{
@@ -32,8 +32,7 @@ func NewBlueberryProposalBlock(
 			Tx: tx,
 		},
 	}
-
-	return res, initialize(Block(res))
+	return blk, initialize(blk)
 }
 
 type BlueberryProposalBlock struct {
@@ -55,15 +54,14 @@ func NewApricotProposalBlock(
 	height uint64,
 	tx *txs.Tx,
 ) (Block, error) {
-	res := &ApricotProposalBlock{
+	blk := &ApricotProposalBlock{
 		ApricotCommonBlock: ApricotCommonBlock{
 			PrntID: parentID,
 			Hght:   height,
 		},
 		Tx: tx,
 	}
-
-	return res, initialize(Block(res))
+	return blk, initialize(blk)
 }
 
 // As is, this is duplication of atomic block. But let's tolerate some code duplication for now

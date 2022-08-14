@@ -18,7 +18,7 @@ var (
 )
 
 func NewBlueberryStandardBlock(timestamp time.Time, parentID ids.ID, height uint64, txs []*transactions.Tx) (Block, error) {
-	res := &BlueberryStandardBlock{
+	blk := &BlueberryStandardBlock{
 		BlkTimestamp: uint64(timestamp.Unix()),
 		ApricotStandardBlock: &ApricotStandardBlock{
 			ApricotCommonBlock: ApricotCommonBlock{
@@ -28,8 +28,7 @@ func NewBlueberryStandardBlock(timestamp time.Time, parentID ids.ID, height uint
 			Transactions: txs,
 		},
 	}
-
-	return res, initialize(Block(res))
+	return blk, initialize(blk)
 }
 
 type BlueberryStandardBlock struct {
@@ -47,15 +46,14 @@ func (b *BlueberryStandardBlock) Visit(v Visitor) error {
 }
 
 func NewApricotStandardBlock(parentID ids.ID, height uint64, txs []*transactions.Tx) (Block, error) {
-	res := &ApricotStandardBlock{
+	blk := &ApricotStandardBlock{
 		ApricotCommonBlock: ApricotCommonBlock{
 			PrntID: parentID,
 			Hght:   height,
 		},
 		Transactions: txs,
 	}
-
-	return res, initialize(Block(res))
+	return blk, initialize(blk)
 }
 
 type ApricotStandardBlock struct {

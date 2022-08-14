@@ -25,15 +25,14 @@ func NewApricotAtomicBlock(
 	height uint64,
 	tx *txs.Tx,
 ) (*ApricotAtomicBlock, error) {
-	res := &ApricotAtomicBlock{
+	blk := &ApricotAtomicBlock{
 		ApricotCommonBlock: ApricotCommonBlock{
 			PrntID: parentID,
 			Hght:   height,
 		},
 		Tx: tx,
 	}
-
-	return res, initialize(Block(res))
+	return blk, initialize(blk)
 }
 
 func (b *ApricotAtomicBlock) initialize(bytes []byte) error {
