@@ -17,8 +17,8 @@ var (
 
 func NewBlueberryCommitBlock(timestamp time.Time, parentID ids.ID, height uint64) (Block, error) {
 	blk := &BlueberryCommitBlock{
-		BlkTimestamp: uint64(timestamp.Unix()),
-		ApricotCommitBlock: &ApricotCommitBlock{
+		Time: uint64(timestamp.Unix()),
+		ApricotCommitBlock: ApricotCommitBlock{
 			ApricotCommonBlock: ApricotCommonBlock{
 				PrntID: parentID,
 				Hght:   height,
@@ -29,13 +29,12 @@ func NewBlueberryCommitBlock(timestamp time.Time, parentID ids.ID, height uint64
 }
 
 type BlueberryCommitBlock struct {
-	BlkTimestamp uint64 `serialize:"true" json:"time"`
-
-	*ApricotCommitBlock `serialize:"true"`
+	Time               uint64 `serialize:"true" json:"time"`
+	ApricotCommitBlock `serialize:"true"`
 }
 
 func (b *BlueberryCommitBlock) BlockTimestamp() time.Time {
-	return time.Unix(int64(b.BlkTimestamp), 0)
+	return time.Unix(int64(b.Time), 0)
 }
 
 func (b *BlueberryCommitBlock) Visit(v Visitor) error {

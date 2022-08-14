@@ -23,8 +23,8 @@ func NewBlueberryProposalBlock(
 	tx *txs.Tx,
 ) (Block, error) {
 	blk := &BlueberryProposalBlock{
-		BlkTimestamp: uint64(timestamp.Unix()),
-		ApricotProposalBlock: &ApricotProposalBlock{
+		Time: uint64(timestamp.Unix()),
+		ApricotProposalBlock: ApricotProposalBlock{
 			ApricotCommonBlock: ApricotCommonBlock{
 				PrntID: parentID,
 				Hght:   height,
@@ -36,13 +36,12 @@ func NewBlueberryProposalBlock(
 }
 
 type BlueberryProposalBlock struct {
-	BlkTimestamp uint64 `serialize:"true" json:"time"`
-
-	*ApricotProposalBlock `serialize:"true"`
+	Time                 uint64 `serialize:"true" json:"time"`
+	ApricotProposalBlock `serialize:"true"`
 }
 
 func (b *BlueberryProposalBlock) BlockTimestamp() time.Time {
-	return time.Unix(int64(b.BlkTimestamp), 0)
+	return time.Unix(int64(b.Time), 0)
 }
 
 func (b *BlueberryProposalBlock) Visit(v Visitor) error {
