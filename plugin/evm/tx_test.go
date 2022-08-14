@@ -145,6 +145,13 @@ func executeTxTest(t *testing.T, test atomicTxTest) {
 		return
 	}
 
+	if test.bootstrapping {
+		// If this test simulates processing txs during bootstrapping (where some verification is skipped),
+		// initialize the block building goroutines normally initialized in SetState(snow.NormalOps).
+		// This ensures that the VM can build a block correctly during the test.
+		vm.initBlockBuilding()
+	}
+
 	if err := vm.issueTx(tx, true /*=local*/); err != nil {
 		t.Fatal(err)
 	}

@@ -257,8 +257,7 @@ type VM struct {
 
 	builder *blockBuilder
 
-	gossiper    Gossiper
-	gossipStats GossipStats
+	gossiper Gossiper
 
 	baseCodec codec.Registry
 	codec     codec.Manager
@@ -559,15 +558,6 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash) error {
 	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
 	vm.handleGasPriceUpdates()
 
-	// start goroutines to manage block building
-	//
-	// NOTE: gossip network must be initialized first otherwise ETH tx gossip will
-	// not work.
-	vm.gossipStats = NewGossipStats()
-	vm.gossiper = vm.createGossiper()
-	vm.builder = vm.NewBlockBuilder(vm.toEngine)
-	vm.builder.awaitSubmittedTxs()
-
 	vm.eth.Start()
 	return vm.initChainState(vm.blockChain.LastAcceptedBlock())
 }
@@ -661,11 +651,6 @@ func (vm *VM) initChainState(lastAcceptedBlock *types.Block) error {
 	vm.State = state
 
 	return vm.multiGatherer.Register(chainStateMetricsPrefix, chainStateRegisterer)
-}
-
-// initGossipHandling sets the gossip handler to use the push gossiper
-func (vm *VM) initGossipHandling() {
-	vm.Network.SetGossipHandler(NewGossipHandler(vm))
 }
 
 func (vm *VM) createConsensusCallbacks() *dummy.ConsensusCallbacks {
@@ -906,13 +891,23 @@ func (vm *VM) SetState(state snow.State) error {
 		}
 		return vm.fx.Bootstrapping()
 	case snow.NormalOp:
-		// Initialize gossip handling once we enter normal operation as there is no need to handle mempool gossip before this point.
-		vm.initGossipHandling()
+		// Initialize goroutines related to block building once we enter normal operation as there is no need to handle mempool gossip before this point.
+		vm.initBlockBuilding()
 		vm.bootstrapped = true
 		return vm.fx.Bootstrapped()
 	default:
 		return snow.ErrUnknownState
 	}
+}
+
+// initBlockBuilding starts goroutines to manage block building
+func (vm *VM) initBlockBuilding() {
+	// NOTE: gossip network must be initialized first otherwise ETH tx gossip will not work.
+	gossipStats := NewGossipStats()
+	vm.gossiper = vm.createGossiper(gossipStats)
+	vm.builder = vm.NewBlockBuilder(vm.toEngine)
+	vm.builder.awaitSubmittedTxs()
+	vm.Network.SetGossipHandler(NewGossipHandler(vm, gossipStats))
 }
 
 // setAppRequestHandlers sets the request handlers for the VM to serve state sync
