@@ -76,7 +76,7 @@ type pushGossiper struct {
 
 // createGossiper constructs and returns a pushGossiper or noopGossiper
 // based on whether vm.chainConfig.ApricotPhase4BlockTimestamp is set
-func (vm *VM) createGossiper() Gossiper {
+func (vm *VM) createGossiper(stats GossipStats) Gossiper {
 	if vm.chainConfig.ApricotPhase4BlockTimestamp == nil {
 		return &noopGossiper{}
 	}
@@ -96,7 +96,7 @@ func (vm *VM) createGossiper() Gossiper {
 		recentAtomicTxs:      &cache.LRU{Size: recentCacheSize},
 		recentEthTxs:         &cache.LRU{Size: recentCacheSize},
 		codec:                vm.networkCodec,
-		stats:                vm.gossipStats,
+		stats:                stats,
 	}
 	net.awaitEthTxGossip()
 	return net
@@ -425,12 +425,12 @@ type GossipHandler struct {
 	stats         GossipReceivedStats
 }
 
-func NewGossipHandler(vm *VM) *GossipHandler {
+func NewGossipHandler(vm *VM, stats GossipReceivedStats) *GossipHandler {
 	return &GossipHandler{
 		vm:            vm,
 		atomicMempool: vm.mempool,
 		txPool:        vm.txPool,
-		stats:         vm.gossipStats,
+		stats:         stats,
 	}
 }
 
