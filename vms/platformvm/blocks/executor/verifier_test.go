@@ -85,7 +85,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 		},
 	)
 	assert.NoError(err)
-	blk.(*blocks.ApricotProposalBlock).Tx.Unsigned = blkTx
+	blk.Tx.Unsigned = blkTx
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
@@ -97,7 +97,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	onAbortState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 
 	// Visit the block
-	err = verifier.ApricotProposalBlock(blk.(*blocks.ApricotProposalBlock))
+	err = verifier.ApricotProposalBlock(blk)
 	assert.NoError(err)
 	assert.Contains(verifier.backend.blkIDToState, blk.ID())
 	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
@@ -107,7 +107,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	assert.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.ApricotProposalBlock(blk.(*blocks.ApricotProposalBlock))
+	err = verifier.ApricotProposalBlock(blk)
 	assert.NoError(err)
 }
 
@@ -278,7 +278,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 		},
 	)
 	assert.NoError(err)
-	blk.(*blocks.ApricotStandardBlock).Transactions[0].Unsigned = blkTx
+	blk.Transactions[0].Unsigned = blkTx
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
@@ -287,7 +287,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	mempool.EXPECT().RemoveDecisionTxs(blk.Txs()).Times(1)
 
-	err = verifier.ApricotStandardBlock(blk.(*blocks.ApricotStandardBlock))
+	err = verifier.ApricotStandardBlock(blk)
 	assert.NoError(err)
 
 	// Assert expected state.
@@ -298,7 +298,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	assert.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.ApricotStandardBlock(blk.(*blocks.ApricotStandardBlock))
+	err = verifier.ApricotStandardBlock(blk)
 	assert.NoError(err)
 }
 
@@ -352,7 +352,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	)
 
 	// Verify the block.
-	err = verifier.ApricotCommitBlock(blk.(*blocks.ApricotCommitBlock))
+	err = verifier.ApricotCommitBlock(blk)
 	assert.NoError(err)
 
 	// Assert expected state.
@@ -362,7 +362,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	assert.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.ApricotCommitBlock(blk.(*blocks.ApricotCommitBlock))
+	err = verifier.ApricotCommitBlock(blk)
 	assert.NoError(err)
 }
 
@@ -416,7 +416,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	)
 
 	// Verify the block.
-	err = verifier.ApricotAbortBlock(blk.(*blocks.ApricotAbortBlock))
+	err = verifier.ApricotAbortBlock(blk)
 	assert.NoError(err)
 
 	// Assert expected state.
@@ -426,7 +426,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	assert.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.ApricotAbortBlock(blk.(*blocks.ApricotAbortBlock))
+	err = verifier.ApricotAbortBlock(blk)
 	assert.NoError(err)
 }
 
@@ -701,11 +701,11 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	).Times(1)
 
 	// We can't serialize [blkTx] because it isn't
-	// regiestered with the blocks.Codec.
+	// registered with the blocks.Codec.
 	// Serialize this block with a dummy tx
 	// and replace it after creation with the mock tx.
 	// TODO allow serialization of mock txs.
-	blkIntf, err := blocks.NewApricotStandardBlock(
+	blk, err := blocks.NewApricotStandardBlock(
 		parentID,
 		2,
 		[]*txs.Tx{
@@ -716,7 +716,6 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 		},
 	)
 	assert.NoError(err)
-	blk := blkIntf.(*blocks.ApricotStandardBlock)
 	blk.Transactions[0].Unsigned = blkTx
 
 	// Set expectations for dependencies.

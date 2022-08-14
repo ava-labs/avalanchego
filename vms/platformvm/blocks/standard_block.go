@@ -8,8 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-
-	transactions "github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var (
@@ -17,7 +16,12 @@ var (
 	_ Block = &ApricotStandardBlock{}
 )
 
-func NewBlueberryStandardBlock(timestamp time.Time, parentID ids.ID, height uint64, txs []*transactions.Tx) (Block, error) {
+func NewBlueberryStandardBlock(
+	timestamp time.Time,
+	parentID ids.ID,
+	height uint64,
+	txes []*txs.Tx,
+) (*BlueberryStandardBlock, error) {
 	blk := &BlueberryStandardBlock{
 		Time: uint64(timestamp.Unix()),
 		ApricotStandardBlock: ApricotStandardBlock{
@@ -25,7 +29,7 @@ func NewBlueberryStandardBlock(timestamp time.Time, parentID ids.ID, height uint
 				PrntID: parentID,
 				Hght:   height,
 			},
-			Transactions: txs,
+			Transactions: txes,
 		},
 	}
 	return blk, initialize(blk)
@@ -44,13 +48,17 @@ func (b *BlueberryStandardBlock) Visit(v Visitor) error {
 	return v.BlueberryStandardBlock(b)
 }
 
-func NewApricotStandardBlock(parentID ids.ID, height uint64, txs []*transactions.Tx) (Block, error) {
+func NewApricotStandardBlock(
+	parentID ids.ID,
+	height uint64,
+	txes []*txs.Tx,
+) (*ApricotStandardBlock, error) {
 	blk := &ApricotStandardBlock{
 		ApricotCommonBlock: ApricotCommonBlock{
 			PrntID: parentID,
 			Hght:   height,
 		},
-		Transactions: txs,
+		Transactions: txes,
 	}
 	return blk, initialize(blk)
 }
@@ -58,20 +66,20 @@ func NewApricotStandardBlock(parentID ids.ID, height uint64, txs []*transactions
 type ApricotStandardBlock struct {
 	ApricotCommonBlock `serialize:"true"`
 
-	Transactions []*transactions.Tx `serialize:"true" json:"txs"`
+	Transactions []*txs.Tx `serialize:"true" json:"txs"`
 }
 
 func (b *ApricotStandardBlock) initialize(bytes []byte) error {
 	b.ApricotCommonBlock.initialize(bytes)
 	for _, tx := range b.Transactions {
-		if err := tx.Sign(transactions.Codec, nil); err != nil {
+		if err := tx.Sign(txs.Codec, nil); err != nil {
 			return fmt.Errorf("failed to sign block: %w", err)
 		}
 	}
 	return nil
 }
 
-func (b *ApricotStandardBlock) Txs() []*transactions.Tx { return b.Transactions }
+func (b *ApricotStandardBlock) Txs() []*txs.Tx { return b.Transactions }
 
 func (b *ApricotStandardBlock) Visit(v Visitor) error {
 	return v.ApricotStandardBlock(b)

@@ -21,7 +21,7 @@ func NewBlueberryProposalBlock(
 	parentID ids.ID,
 	height uint64,
 	tx *txs.Tx,
-) (Block, error) {
+) (*BlueberryProposalBlock, error) {
 	blk := &BlueberryProposalBlock{
 		Time: uint64(timestamp.Unix()),
 		ApricotProposalBlock: ApricotProposalBlock{
@@ -52,7 +52,7 @@ func NewApricotProposalBlock(
 	parentID ids.ID,
 	height uint64,
 	tx *txs.Tx,
-) (Block, error) {
+) (*ApricotProposalBlock, error) {
 	blk := &ApricotProposalBlock{
 		ApricotCommonBlock: ApricotCommonBlock{
 			PrntID: parentID,

@@ -145,87 +145,101 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetCurrentSupply().Return(uint64(1000)).AnyTimes()
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 
-	// wrong version
-	childTimestamp := parentTime.Add(time.Second)
-	blueberryChildBlk, err := blocks.NewApricotStandardBlock(
-		blueberryParentBlk.ID(),
-		blueberryParentBlk.Height()+1,
-		nil, // txs nulled to simplify test
-	)
-	assert.NoError(err)
-	block := env.blkManager.NewBlock(blueberryChildBlk)
-	assert.Error(block.Verify())
+	{
+		// wrong version
+		blueberryChildBlk, err := blocks.NewApricotStandardBlock(
+			blueberryParentBlk.ID(),
+			blueberryParentBlk.Height()+1,
+			nil, // txs nulled to simplify test
+		)
+		assert.NoError(err)
+		block := env.blkManager.NewBlock(blueberryChildBlk)
+		assert.Error(block.Verify())
+	}
 
-	// wrong height
-	blueberryChildBlk, err = blocks.NewBlueberryStandardBlock(
-		childTimestamp,
-		blueberryParentBlk.ID(),
-		blueberryParentBlk.Height(),
-		nil, // txs nulled to simplify test
-	)
-	assert.NoError(err)
-	block = env.blkManager.NewBlock(blueberryChildBlk)
-	assert.Error(block.Verify())
+	{
+		// wrong height
+		childTimestamp := parentTime.Add(time.Second)
+		blueberryChildBlk, err := blocks.NewBlueberryStandardBlock(
+			childTimestamp,
+			blueberryParentBlk.ID(),
+			blueberryParentBlk.Height(),
+			nil, // txs nulled to simplify test
+		)
+		assert.NoError(err)
+		block := env.blkManager.NewBlock(blueberryChildBlk)
+		assert.Error(block.Verify())
+	}
 
-	// wrong timestamp, earlier than parent
-	childTimestamp = parentTime.Add(-1 * time.Second)
-	blueberryChildBlk, err = blocks.NewBlueberryStandardBlock(
-		childTimestamp,
-		blueberryParentBlk.ID(),
-		blueberryParentBlk.Height()+1,
-		nil, // txs nulled to simplify test
-	)
-	assert.NoError(err)
-	block = env.blkManager.NewBlock(blueberryChildBlk)
-	assert.Error(block.Verify())
+	{
+		// wrong timestamp, earlier than parent
+		childTimestamp := parentTime.Add(-1 * time.Second)
+		blueberryChildBlk, err := blocks.NewBlueberryStandardBlock(
+			childTimestamp,
+			blueberryParentBlk.ID(),
+			blueberryParentBlk.Height()+1,
+			nil, // txs nulled to simplify test
+		)
+		assert.NoError(err)
+		block := env.blkManager.NewBlock(blueberryChildBlk)
+		assert.Error(block.Verify())
+	}
 
-	// wrong timestamp, violated synchrony bound
-	childTimestamp = parentTime.Add(txexecutor.SyncBound).Add(time.Second)
-	blueberryChildBlk, err = blocks.NewBlueberryStandardBlock(
-		childTimestamp,
-		blueberryParentBlk.ID(),
-		blueberryParentBlk.Height()+1,
-		nil, // txs nulled to simplify test
-	)
-	assert.NoError(err)
-	block = env.blkManager.NewBlock(blueberryChildBlk)
-	assert.Error(block.Verify())
+	{
+		// wrong timestamp, violated synchrony bound
+		childTimestamp := parentTime.Add(txexecutor.SyncBound).Add(time.Second)
+		blueberryChildBlk, err := blocks.NewBlueberryStandardBlock(
+			childTimestamp,
+			blueberryParentBlk.ID(),
+			blueberryParentBlk.Height()+1,
+			nil, // txs nulled to simplify test
+		)
+		assert.NoError(err)
+		block := env.blkManager.NewBlock(blueberryChildBlk)
+		assert.Error(block.Verify())
+	}
 
-	// wrong timestamp, skipped staker set change event
-	childTimestamp = nextStakerTime.Add(time.Second)
-	blueberryChildBlk, err = blocks.NewBlueberryStandardBlock(
-		childTimestamp,
-		blueberryParentBlk.ID(),
-		blueberryParentBlk.Height()+1,
-		nil, // txs nulled to simplify test
-	)
-	assert.NoError(err)
-	block = env.blkManager.NewBlock(blueberryChildBlk)
-	assert.Error(block.Verify())
+	{
+		// wrong timestamp, skipped staker set change event
+		childTimestamp := nextStakerTime.Add(time.Second)
+		blueberryChildBlk, err := blocks.NewBlueberryStandardBlock(
+			childTimestamp,
+			blueberryParentBlk.ID(),
+			blueberryParentBlk.Height()+1,
+			nil, // txs nulled to simplify test
+		)
+		assert.NoError(err)
+		block := env.blkManager.NewBlock(blueberryChildBlk)
+		assert.Error(block.Verify())
+	}
 
-	// valid block, same timestamp as parent block
-	childTimestamp = parentTime
-	blueberryChildBlk, err = blocks.NewBlueberryStandardBlock(
-		childTimestamp,
-		blueberryParentBlk.ID(),
-		blueberryParentBlk.Height()+1,
-		nil, // txs nulled to simplify test
-	)
-	assert.NoError(err)
-	block = env.blkManager.NewBlock(blueberryChildBlk)
-	assert.NoError(block.Verify())
+	{
+		// valid block, same timestamp as parent block
+		childTimestamp := parentTime
+		blueberryChildBlk, err := blocks.NewBlueberryStandardBlock(
+			childTimestamp,
+			blueberryParentBlk.ID(),
+			blueberryParentBlk.Height()+1,
+			nil, // txs nulled to simplify test
+		)
+		assert.NoError(err)
+		block := env.blkManager.NewBlock(blueberryChildBlk)
+		assert.NoError(block.Verify())
+	}
 
-	// valid
-	childTimestamp = nextStakerTime
-	blueberryChildBlk, err = blocks.NewBlueberryStandardBlock(
-		childTimestamp,
-		blueberryParentBlk.ID(),
-		blueberryParentBlk.Height()+1,
-		nil, // txs nulled to simplify test
-	)
-	assert.NoError(err)
-	block = env.blkManager.NewBlock(blueberryChildBlk)
-	assert.NoError(block.Verify())
+	{
+		// valid
+		childTimestamp := nextStakerTime
+		blueberryChildBlk, err := blocks.NewBlueberryStandardBlock(
+			childTimestamp,
+			blueberryParentBlk.ID(),
+			blueberryParentBlk.Height()+1,
+			nil, // txs nulled to simplify test
+		)
+		assert.NoError(err)
+		block := env.blkManager.NewBlock(blueberryChildBlk)
+		assert.NoError(block.Verify())
+	}
 }
 
 func TestBlueberryStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {

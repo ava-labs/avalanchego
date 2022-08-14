@@ -210,89 +210,103 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	}
 	assert.NoError(blkTx.Sign(txs.Codec, nil))
 
-	// wrong height
-	statelessProposalBlock, err := blocks.NewBlueberryProposalBlock(
-		parentTime.Add(time.Second),
-		parentID,
-		blueberryParentBlk.Height(),
-		blkTx,
-	)
-	block := env.blkManager.NewBlock(statelessProposalBlock)
-	assert.NoError(err)
-	assert.Error(block.Verify())
-
-	// wrong version
-	statelessProposalBlock, err = blocks.NewApricotProposalBlock(
-		parentID,
-		blueberryParentBlk.Height()+1,
-		blkTx,
-	)
-	block = env.blkManager.NewBlock(statelessProposalBlock)
-	assert.NoError(err)
-	assert.Error(block.Verify())
-
-	// wrong timestamp, earlier than parent
-	statelessProposalBlock, err = blocks.NewBlueberryProposalBlock(
-		parentTime.Add(-1*time.Second),
-		parentID,
-		blueberryParentBlk.Height()+1,
-		blkTx,
-	)
-	block = env.blkManager.NewBlock(statelessProposalBlock)
-	assert.NoError(err)
-	assert.Error(block.Verify())
-
-	// wrong timestamp, violated synchrony bound
-	beyondSyncBoundTimeStamp := env.clk.Time().Add(executor.SyncBound).Add(time.Second)
-	statelessProposalBlock, err = blocks.NewBlueberryProposalBlock(
-		beyondSyncBoundTimeStamp,
-		parentID,
-		blueberryParentBlk.Height()+1,
-		blkTx,
-	)
-	block = env.blkManager.NewBlock(statelessProposalBlock)
-	assert.NoError(err)
-	assert.Error(block.Verify())
-
-	// wrong timestamp, skipped staker set change event
-	skippedStakerEventTimeStamp := nextStakerTime.Add(time.Second)
-	statelessProposalBlock, err = blocks.NewBlueberryProposalBlock(
-		skippedStakerEventTimeStamp,
-		parentID,
-		blueberryParentBlk.Height()+1,
-		blkTx,
-	)
-	block = env.blkManager.NewBlock(statelessProposalBlock)
-	assert.NoError(err)
-	assert.Error(block.Verify())
-
-	// wrong tx content (no advance time txs)
-	invalidTx := &txs.Tx{
-		Unsigned: &txs.AdvanceTimeTx{
-			Time: uint64(nextStakerTime.Unix()),
-		},
+	{
+		// wrong height
+		statelessProposalBlock, err := blocks.NewBlueberryProposalBlock(
+			parentTime.Add(time.Second),
+			parentID,
+			blueberryParentBlk.Height(),
+			blkTx,
+		)
+		block := env.blkManager.NewBlock(statelessProposalBlock)
+		assert.NoError(err)
+		assert.Error(block.Verify())
 	}
-	assert.NoError(invalidTx.Sign(txs.Codec, nil))
-	statelessProposalBlock, err = blocks.NewBlueberryProposalBlock(
-		parentTime.Add(time.Second),
-		parentID,
-		blueberryParentBlk.Height()+1,
-		invalidTx,
-	)
-	block = env.blkManager.NewBlock(statelessProposalBlock)
-	assert.NoError(err)
-	assert.Error(block.Verify())
 
-	// valid
-	statelessProposalBlock, err = blocks.NewBlueberryProposalBlock(
-		nextStakerTime,
-		parentID,
-		blueberryParentBlk.Height()+1,
-		blkTx,
-	)
-	block = env.blkManager.NewBlock(statelessProposalBlock)
-	assert.NoError(err)
-	assert.NoError(block.Verify())
+	{
+		// wrong version
+		statelessProposalBlock, err := blocks.NewApricotProposalBlock(
+			parentID,
+			blueberryParentBlk.Height()+1,
+			blkTx,
+		)
+		block := env.blkManager.NewBlock(statelessProposalBlock)
+		assert.NoError(err)
+		assert.Error(block.Verify())
+	}
+
+	{
+		// wrong timestamp, earlier than parent
+		statelessProposalBlock, err := blocks.NewBlueberryProposalBlock(
+			parentTime.Add(-1*time.Second),
+			parentID,
+			blueberryParentBlk.Height()+1,
+			blkTx,
+		)
+		block := env.blkManager.NewBlock(statelessProposalBlock)
+		assert.NoError(err)
+		assert.Error(block.Verify())
+	}
+
+	{
+		// wrong timestamp, violated synchrony bound
+		beyondSyncBoundTimeStamp := env.clk.Time().Add(executor.SyncBound).Add(time.Second)
+		statelessProposalBlock, err := blocks.NewBlueberryProposalBlock(
+			beyondSyncBoundTimeStamp,
+			parentID,
+			blueberryParentBlk.Height()+1,
+			blkTx,
+		)
+		block := env.blkManager.NewBlock(statelessProposalBlock)
+		assert.NoError(err)
+		assert.Error(block.Verify())
+	}
+
+	{
+		// wrong timestamp, skipped staker set change event
+		skippedStakerEventTimeStamp := nextStakerTime.Add(time.Second)
+		statelessProposalBlock, err := blocks.NewBlueberryProposalBlock(
+			skippedStakerEventTimeStamp,
+			parentID,
+			blueberryParentBlk.Height()+1,
+			blkTx,
+		)
+		block := env.blkManager.NewBlock(statelessProposalBlock)
+		assert.NoError(err)
+		assert.Error(block.Verify())
+	}
+
+	{
+		// wrong tx content (no advance time txs)
+		invalidTx := &txs.Tx{
+			Unsigned: &txs.AdvanceTimeTx{
+				Time: uint64(nextStakerTime.Unix()),
+			},
+		}
+		assert.NoError(invalidTx.Sign(txs.Codec, nil))
+		statelessProposalBlock, err := blocks.NewBlueberryProposalBlock(
+			parentTime.Add(time.Second),
+			parentID,
+			blueberryParentBlk.Height()+1,
+			invalidTx,
+		)
+		block := env.blkManager.NewBlock(statelessProposalBlock)
+		assert.NoError(err)
+		assert.Error(block.Verify())
+	}
+
+	{
+		// valid
+		statelessProposalBlock, err := blocks.NewBlueberryProposalBlock(
+			nextStakerTime,
+			parentID,
+			blueberryParentBlk.Height()+1,
+			blkTx,
+		)
+		block := env.blkManager.NewBlock(statelessProposalBlock)
+		assert.NoError(err)
+		assert.NoError(block.Verify())
+	}
 }
 
 func TestBlueberryProposalBlockUpdateStakers(t *testing.T) {
