@@ -98,8 +98,9 @@ type UpdatedStateData struct {
 	Supply                    uint64
 }
 
-// UpdateStakerSet does not modifies parentState. Instead it returns
-// an UpdatedStateData struct with all quantities modified by the advancing of chain time
+// UpdateStakerSet does not modify [parentState].
+// Instead it returns an UpdatedStateData struct with all values modified by
+// the advancing of chain time.
 func UpdateStakerSet(parentState state.Chain, proposedChainTime time.Time, rewards reward.Calculator) (*UpdatedStateData, error) {
 	var (
 		updated = &UpdatedStateData{}
