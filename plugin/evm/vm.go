@@ -166,14 +166,7 @@ var (
 	errInvalidNonce                   = errors.New("invalid nonce")
 	errConflictingAtomicInputs        = errors.New("invalid block due to conflicting atomic inputs")
 	errUnclesUnsupported              = errors.New("uncles unsupported")
-	errTxHashMismatch                 = errors.New("txs hash does not match header")
-	errUncleHashMismatch              = errors.New("uncle hash mismatch")
 	errRejectedParent                 = errors.New("rejected parent")
-	errInvalidDifficulty              = errors.New("invalid difficulty")
-	errInvalidBlockVersion            = errors.New("invalid block version")
-	errInvalidMixDigest               = errors.New("invalid mix digest")
-	errInvalidExtDataHash             = errors.New("invalid extra data hash")
-	errHeaderExtraDataTooBig          = errors.New("header extra data too big")
 	errInsufficientFundsForFee        = errors.New("insufficient AVAX funds to pay transaction fee")
 	errNoEVMOutputs                   = errors.New("tx has no EVM outputs")
 	errNilBaseFeeApricotPhase3        = errors.New("nil base fee is invalid after apricotPhase3")
@@ -247,6 +240,8 @@ type VM struct {
 	acceptedBlockDB database.Database
 
 	toEngine chan<- commonEng.Message
+
+	syntacticBlockValidator BlockValidator
 
 	// [atomicTxRepository] maintains two indexes on accepted atomic txs.
 	// - txID to accepted atomic tx
@@ -380,17 +375,19 @@ func (vm *VM) Initialize(
 		return err
 	}
 
+	var extDataHashes map[common.Hash]common.Hash
 	// Set the chain config for mainnet/fuji chain IDs
 	switch {
 	case g.Config.ChainID.Cmp(params.AvalancheMainnetChainID) == 0:
 		g.Config = params.AvalancheMainnetChainConfig
-		phase0BlockValidator.extDataHashes = mainnetExtDataHashes
+		extDataHashes = mainnetExtDataHashes
 	case g.Config.ChainID.Cmp(params.AvalancheFujiChainID) == 0:
 		g.Config = params.AvalancheFujiChainConfig
-		phase0BlockValidator.extDataHashes = fujiExtDataHashes
+		extDataHashes = fujiExtDataHashes
 	case g.Config.ChainID.Cmp(params.AvalancheLocalChainID) == 0:
 		g.Config = params.AvalancheLocalChainConfig
 	}
+	vm.syntacticBlockValidator = NewBlockValidator(extDataHashes)
 
 	// Ensure that non-standard commit interval is only allowed for the local network
 	if g.Config.ChainID.Cmp(params.AvalancheLocalChainID) != 0 {
@@ -1551,24 +1548,6 @@ func (vm *VM) GetCurrentNonce(address common.Address) (uint64, error) {
 func (vm *VM) currentRules() params.Rules {
 	header := vm.eth.APIBackend.CurrentHeader()
 	return vm.chainConfig.AvalancheRules(header.Number, big.NewInt(int64(header.Time)))
-}
-
-// getBlockValidator returns the block validator that should be used for a block that
-// follows the ruleset defined by [rules]
-func (vm *VM) getBlockValidator(rules params.Rules) BlockValidator {
-	switch {
-	case rules.IsApricotPhase5:
-		return phase5BlockValidator
-	case rules.IsApricotPhase4:
-		return phase4BlockValidator
-	case rules.IsApricotPhase3:
-		return phase3BlockValidator
-	case rules.IsApricotPhase2, rules.IsApricotPhase1:
-		// Note: the phase1BlockValidator is used in both apricot phase1 and phase2
-		return phase1BlockValidator
-	default:
-		return phase0BlockValidator
-	}
 }
 
 func (vm *VM) startContinuousProfiler() {
