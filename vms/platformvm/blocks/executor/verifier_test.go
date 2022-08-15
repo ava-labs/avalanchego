@@ -37,12 +37,18 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
+	parentOnAcceptState := state.NewMockDiff(ctrl)
+	timestamp := time.Now()
+	// One call for each of onCommitState and onAbortState.
+	parentOnAcceptState.EXPECT().GetTimestamp().Return(timestamp).Times(2)
+	parentOnAcceptState.EXPECT().GetCurrentSupply().Return(uint64(10000)).Times(2)
 
 	backend := &backend{
 		lastAccepted: parentID,
 		blkIDToState: map[ids.ID]*blockState{
 			parentID: {
 				statelessBlock: parentStatelessBlk,
+				onAcceptState:  parentOnAcceptState,
 			},
 		},
 		Mempool: mempool,
@@ -60,16 +66,8 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 		},
 	}
 
-	onCommitState := state.NewMockDiff(ctrl)
-	onAbortState := state.NewMockDiff(ctrl)
 	blkTx := txs.NewMockUnsignedTx(ctrl)
-	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.ProposalTxExecutor{})).DoAndReturn(
-		func(e *executor.ProposalTxExecutor) error {
-			e.OnCommitState = onCommitState
-			e.OnAbortState = onAbortState
-			return nil
-		},
-	).Times(1)
+	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.ProposalTxExecutor{})).Return(nil).Times(1)
 
 	// We can't serialize [blkTx] because it isn't
 	// regiestered with the blocks.Codec.
@@ -88,13 +86,9 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	blk.Tx.Unsigned = blkTx
 
 	// Set expectations for dependencies.
-	timestamp := time.Now()
 	tx := blk.Txs()[0]
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	mempool.EXPECT().RemoveProposalTx(tx).Times(1)
-	onCommitState.EXPECT().AddTx(tx, status.Committed).Times(1)
-	onAbortState.EXPECT().AddTx(tx, status.Aborted).Times(1)
-	onAbortState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 
 	// Visit the block
 	err = verifier.ApricotProposalBlock(blk)
@@ -102,9 +96,16 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	assert.Contains(verifier.backend.blkIDToState, blk.ID())
 	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
 	assert.Equal(blk, gotBlkState.statelessBlock)
-	assert.Equal(onCommitState, gotBlkState.onCommitState)
-	assert.Equal(onAbortState, gotBlkState.onAbortState)
 	assert.Equal(timestamp, gotBlkState.timestamp)
+
+	// Assert that the expected tx statuses are set.
+	_, gotStatus, err := gotBlkState.onCommitState.GetTx(tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Committed, gotStatus)
+
+	_, gotStatus, err = gotBlkState.onAbortState.GetTx(tx.ID())
+	assert.NoError(err)
+	assert.Equal(status.Aborted, gotStatus)
 
 	// Visiting again should return nil without using dependencies.
 	err = verifier.ApricotProposalBlock(blk)
