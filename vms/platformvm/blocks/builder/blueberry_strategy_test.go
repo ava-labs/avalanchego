@@ -42,9 +42,6 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	validatorTx, err := createTestValidatorTx(env, validatorStartTime, nextChainTime)
 	assert.NoError(err)
 
-	parentState, ok := env.blkManager.GetState(env.state.GetLastAccepted())
-	assert.True(ok)
-
 	onCommitState, err := state.NewDiff(env.state.GetLastAccepted(), env.blkManager)
 	assert.NoError(err)
 
@@ -53,7 +50,6 @@ func TestBlueberryPickingOrder(t *testing.T) {
 
 	// accept validator as pending
 	txExecutor := txexecutor.ProposalTxExecutor{
-		ParentState:   parentState,
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
 		Backend:       &env.backend,

@@ -158,7 +158,6 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 
 	// Check the transaction's validity.
 	txExecutor := executor.ProposalTxExecutor{
-		ParentState:   parentState,
 		OnCommitState: blkState.onCommitState,
 		OnAbortState:  blkState.onAbortState,
 		Backend:       v.txExecutorBackend,
@@ -389,21 +388,17 @@ func (v *verifier) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 		return err
 	}
 
-	parentState, ok := v.GetState(b.Parent())
-	if !ok {
-		return fmt.Errorf("missing parent state %s", b.Parent())
-	}
-	onCommitState, err := state.NewDiff(b.Parent(), v.backend)
+	parentID := b.Parent()
+	onCommitState, err := state.NewDiff(parentID, v.backend)
 	if err != nil {
 		return err
 	}
-	onAbortState, err := state.NewDiff(b.Parent(), v.backend)
+	onAbortState, err := state.NewDiff(parentID, v.backend)
 	if err != nil {
 		return err
 	}
 
 	txExecutor := &executor.ProposalTxExecutor{
-		ParentState:   parentState,
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
 		Backend:       v.txExecutorBackend,

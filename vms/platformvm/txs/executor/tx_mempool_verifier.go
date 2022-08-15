@@ -5,7 +5,6 @@ package executor
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -68,12 +67,7 @@ func (v *MempoolTxVerifier) proposalTx(tx txs.StakerTx) error {
 		return err
 	}
 
-	parentState, ok := v.StateVersions.GetState(v.ParentID)
-	if !ok {
-		return fmt.Errorf("missing parent state %s", v.ParentID)
-	}
 	executor := ProposalTxExecutor{
-		ParentState:   parentState,
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
 		Backend:       v.Backend,

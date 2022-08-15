@@ -292,14 +292,21 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 				tt.setup(freshTH)
 			}
 
-			parentState, ok := freshTH.GetState(lastAcceptedID)
-			if !ok {
-				t.Fatal("parent state not found")
+			onCommitState, err := state.NewDiff(lastAcceptedID, freshTH)
+			if err != nil {
+				t.Fatal(err)
 			}
+
+			onAbortState, err := state.NewDiff(lastAcceptedID, freshTH)
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			executor := ProposalTxExecutor{
-				ParentState: parentState,
-				Backend:     &freshTH.backend,
-				Tx:          tx,
+				OnCommitState: onCommitState,
+				OnAbortState:  onAbortState,
+				Backend:       &freshTH.backend,
+				Tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			if err != nil && !tt.shouldErr {
@@ -339,14 +346,21 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		parentState, ok := env.GetState(lastAcceptedID)
-		if !ok {
-			t.Fatal("parent state not found")
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
 		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			ParentState: parentState,
-			Backend:     &env.backend,
-			Tx:          tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -372,14 +386,21 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		parentState, ok := env.GetState(lastAcceptedID)
-		if !ok {
-			t.Fatal("parent state not found")
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
 		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			ParentState: parentState,
-			Backend:     &env.backend,
-			Tx:          tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err != nil {
@@ -427,14 +448,21 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		parentState, ok := env.GetState(lastAcceptedID)
-		if !ok {
-			t.Fatal("parent state not found")
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
 		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			ParentState: parentState,
-			Backend:     &env.backend,
-			Tx:          tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -476,14 +504,21 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		parentState, ok := env.GetState(lastAcceptedID)
-		if !ok {
-			t.Fatal("parent state not found")
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
 		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			ParentState: parentState,
-			Backend:     &env.backend,
-			Tx:          tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -507,14 +542,21 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		parentState, ok := env.GetState(lastAcceptedID)
-		if !ok {
-			t.Fatal("parent state not found")
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
 		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			ParentState: parentState,
-			Backend:     &env.backend,
-			Tx:          tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -538,14 +580,21 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		parentState, ok := env.GetState(lastAcceptedID)
-		if !ok {
-			t.Fatal("parent state not found")
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
 		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			ParentState: parentState,
-			Backend:     &env.backend,
-			Tx:          tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err != nil {
@@ -572,14 +621,21 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		parentState, ok := env.GetState(lastAcceptedID)
-		if !ok {
-			t.Fatal("parent state not found")
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
 		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			ParentState: parentState,
-			Backend:     &env.backend,
-			Tx:          tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -634,14 +690,21 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		parentState, ok := env.GetState(lastAcceptedID)
-		if !ok {
-			t.Fatal("parent state not found")
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
 		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			ParentState: parentState,
-			Backend:     &env.backend,
-			Tx:          duplicateSubnetTx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            duplicateSubnetTx,
 		}
 		err = duplicateSubnetTx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -670,14 +733,21 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		parentState, ok := env.GetState(lastAcceptedID)
-		if !ok {
-			t.Fatal("parent state not found")
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
 		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			ParentState: parentState,
-			Backend:     &env.backend,
-			Tx:          tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -707,14 +777,21 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 		addSubnetValidatorTx.SyntacticallyVerified = false
 
-		parentState, ok := env.GetState(lastAcceptedID)
-		if !ok {
-			t.Fatal("parent state not found")
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
 		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			ParentState: parentState,
-			Backend:     &env.backend,
-			Tx:          tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -743,14 +820,21 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 		copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
-		parentState, ok := env.GetState(lastAcceptedID)
-		if !ok {
-			t.Fatal("parent state not found")
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
 		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			ParentState: parentState,
-			Backend:     &env.backend,
-			Tx:          tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -787,14 +871,22 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		if err := env.state.Commit(); err != nil {
 			t.Fatal(err)
 		}
-		parentState, ok := env.GetState(lastAcceptedID)
-		if !ok {
-			t.Fatal("parent state not found")
+
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
 		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			ParentState: parentState,
-			Backend:     &env.backend,
-			Tx:          tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -835,14 +927,21 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		parentState, ok := env.GetState(lastAcceptedID)
-		if !ok {
-			t.Fatal("parent state not found")
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
 		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			ParentState: parentState,
-			Backend:     &env.backend,
-			Tx:          tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -866,14 +965,21 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		parentState, ok := env.GetState(lastAcceptedID)
-		if !ok {
-			t.Fatal("parent state not found")
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
 		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			ParentState: parentState,
-			Backend:     &env.backend,
-			Tx:          tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -897,14 +1003,21 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		parentState, ok := env.GetState(lastAcceptedID)
-		if !ok {
-			t.Fatal("parent state not found")
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
 		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			ParentState: parentState,
-			Backend:     &env.backend,
-			Tx:          tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -949,14 +1062,21 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		parentState, ok := env.GetState(lastAcceptedID)
-		if !ok {
-			t.Fatal("parent state not found")
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
 		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			ParentState: parentState,
-			Backend:     &env.backend,
-			Tx:          tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -989,14 +1109,21 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			env.state.DeleteUTXO(utxoID)
 		}
 
-		parentState, ok := env.GetState(lastAcceptedID)
-		if !ok {
-			t.Fatal("parent state not found")
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
 		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			ParentState: parentState,
-			Backend:     &env.backend,
-			Tx:          tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {

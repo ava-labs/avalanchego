@@ -44,12 +44,21 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	tx, err := env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
 	assert.NoError(err)
 
-	parentState, ok := env.GetState(lastAcceptedID)
-	assert.True(ok)
+	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	txExecutor := ProposalTxExecutor{
-		ParentState: parentState,
-		Backend:     &env.backend,
-		Tx:          tx,
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       &env.backend,
+		Tx:            tx,
 	}
 	assert.Error(tx.Unsigned.Visit(&txExecutor))
 
@@ -60,12 +69,21 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	tx, err = env.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
 	assert.NoError(err)
 
-	parentState, ok = env.GetState(lastAcceptedID)
-	assert.True(ok)
+	onCommitState, err = state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onAbortState, err = state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	txExecutor = ProposalTxExecutor{
-		ParentState: parentState,
-		Backend:     &env.backend,
-		Tx:          tx,
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       &env.backend,
+		Tx:            tx,
 	}
 	assert.Error(tx.Unsigned.Visit(&txExecutor))
 
@@ -73,12 +91,21 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	tx, err = env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
 	assert.NoError(err)
 
-	parentState, ok = env.GetState(lastAcceptedID)
-	assert.True(ok)
+	onCommitState, err = state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onAbortState, err = state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	txExecutor = ProposalTxExecutor{
-		ParentState: parentState,
-		Backend:     &env.backend,
-		Tx:          tx,
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       &env.backend,
+		Tx:            tx,
 	}
 	assert.NoError(tx.Unsigned.Visit(&txExecutor))
 
@@ -129,12 +156,21 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	tx, err := env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
 	assert.NoError(err)
 
-	parentState, ok := env.GetState(lastAcceptedID)
-	assert.True(ok)
+	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	txExecutor := ProposalTxExecutor{
-		ParentState: parentState,
-		Backend:     &env.backend,
-		Tx:          tx,
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       &env.backend,
+		Tx:            tx,
 	}
 	assert.Error(tx.Unsigned.Visit(&txExecutor))
 
@@ -146,9 +182,10 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	assert.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
-		ParentState: parentState,
-		Backend:     &env.backend,
-		Tx:          tx,
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       &env.backend,
+		Tx:            tx,
 	}
 	assert.Error(tx.Unsigned.Visit(&txExecutor))
 
@@ -156,12 +193,21 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	tx, err = env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
 	assert.NoError(err)
 
-	parentState, ok = env.GetState(lastAcceptedID)
-	assert.True(ok)
+	onCommitState, err = state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onAbortState, err = state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	txExecutor = ProposalTxExecutor{
-		ParentState: parentState,
-		Backend:     &env.backend,
-		Tx:          tx,
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       &env.backend,
+		Tx:            tx,
 	}
 	assert.NoError(tx.Unsigned.Visit(&txExecutor))
 
@@ -266,12 +312,21 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 
-	parentState, ok := env.GetState(lastAcceptedID)
-	assert.True(ok)
+	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	txExecutor := ProposalTxExecutor{
-		ParentState: parentState,
-		Backend:     &env.backend,
-		Tx:          tx,
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       &env.backend,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
 	assert.NoError(err)
@@ -385,12 +440,21 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 
-	parentState, ok := env.GetState(lastAcceptedID)
-	assert.True(ok)
+	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	txExecutor := ProposalTxExecutor{
-		ParentState: parentState,
-		Backend:     &env.backend,
-		Tx:          tx,
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       &env.backend,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
 	assert.NoError(err)

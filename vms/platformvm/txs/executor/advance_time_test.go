@@ -42,12 +42,17 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	tx, err := env.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
 	assert.NoError(err)
 
-	parentState, ok := env.GetState(lastAcceptedID)
-	assert.True(ok)
+	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	assert.NoError(err)
+
+	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	assert.NoError(err)
+
 	executor := ProposalTxExecutor{
-		ParentState: parentState,
-		Backend:     &env.backend,
-		Tx:          tx,
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       &env.backend,
+		Tx:            tx,
 	}
 	assert.NoError(tx.Unsigned.Visit(&executor))
 
@@ -87,14 +92,21 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parentState, ok := env.GetState(lastAcceptedID)
-	if !ok {
-		t.Fatal("parent state not found")
+	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	executor := ProposalTxExecutor{
-		ParentState: parentState,
-		Backend:     &env.backend,
-		Tx:          tx,
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       &env.backend,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	if err == nil {
@@ -121,12 +133,21 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		parentState, ok := env.GetState(lastAcceptedID)
-		assert.True(t, ok)
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			ParentState: parentState,
-			Backend:     &env.backend,
-			Tx:          tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -157,14 +178,21 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		parentState, ok := env.GetState(lastAcceptedID)
-		if !ok {
-			t.Fatal("parent state not found")
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
 		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			ParentState: parentState,
-			Backend:     &env.backend,
-			Tx:          tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -391,12 +419,17 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 				tx, err := env.txBuilder.NewAdvanceTimeTx(newTime)
 				assert.NoError(err)
 
-				parentState, ok := env.GetState(lastAcceptedID)
-				assert.True(ok)
+				onCommitState, err := state.NewDiff(lastAcceptedID, env)
+				assert.NoError(err)
+
+				onAbortState, err := state.NewDiff(lastAcceptedID, env)
+				assert.NoError(err)
+
 				executor := ProposalTxExecutor{
-					ParentState: parentState,
-					Backend:     &env.backend,
-					Tx:          tx,
+					OnCommitState: onCommitState,
+					OnAbortState:  onAbortState,
+					Backend:       &env.backend,
+					Tx:            tx,
 				}
 				assert.NoError(tx.Unsigned.Visit(&executor))
 
@@ -499,12 +532,17 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	tx, err = env.txBuilder.NewAdvanceTimeTx(subnetVdr1EndTime)
 	assert.NoError(err)
 
-	parentState, ok := env.GetState(lastAcceptedID)
-	assert.True(ok)
+	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	assert.NoError(err)
+
+	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	assert.NoError(err)
+
 	executor := ProposalTxExecutor{
-		ParentState: parentState,
-		Backend:     &env.backend,
-		Tx:          tx,
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       &env.backend,
+		Tx:            tx,
 	}
 	assert.NoError(tx.Unsigned.Visit(&executor))
 
@@ -569,14 +607,21 @@ func TestWhitelistedSubnet(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			parentState, ok := env.GetState(lastAcceptedID)
-			if !ok {
-				t.Fatal("parent state not found")
+			onCommitState, err := state.NewDiff(lastAcceptedID, env)
+			if err != nil {
+				t.Fatal(err)
 			}
+
+			onAbortState, err := state.NewDiff(lastAcceptedID, env)
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			executor := ProposalTxExecutor{
-				ParentState: parentState,
-				Backend:     &env.backend,
-				Tx:          tx,
+				OnCommitState: onCommitState,
+				OnAbortState:  onAbortState,
+				Backend:       &env.backend,
+				Tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			if err != nil {
@@ -618,14 +663,21 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	tx, err := env.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
 	assert.NoError(t, err)
 
-	parentState, ok := env.GetState(lastAcceptedID)
-	if !ok {
-		t.Fatal("parent state not found")
+	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	executor := ProposalTxExecutor{
-		ParentState: parentState,
-		Backend:     &env.backend,
-		Tx:          tx,
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       &env.backend,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)
@@ -672,14 +724,21 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	tx, err = env.txBuilder.NewAdvanceTimeTx(pendingDelegatorStartTime)
 	assert.NoError(t, err)
 
-	parentState, ok = env.GetState(lastAcceptedID)
-	if !ok {
-		t.Fatal("parent state not found")
+	onCommitState, err = state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	onAbortState, err = state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	executor = ProposalTxExecutor{
-		ParentState: parentState,
-		Backend:     &env.backend,
-		Tx:          tx,
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       &env.backend,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)
@@ -714,14 +773,21 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	tx, err := env.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
 	assert.NoError(t, err)
 
-	parentState, ok := env.GetState(lastAcceptedID)
-	if !ok {
-		t.Fatal("parent state not found")
+	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	executor := ProposalTxExecutor{
-		ParentState: parentState,
-		Backend:     &env.backend,
-		Tx:          tx,
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       &env.backend,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)
@@ -763,14 +829,21 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	tx, err = env.txBuilder.NewAdvanceTimeTx(pendingDelegatorStartTime)
 	assert.NoError(t, err)
 
-	parentState, ok = env.GetState(lastAcceptedID)
-	if !ok {
-		t.Fatal("parent state not found")
+	onCommitState, err = state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	onAbortState, err = state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	executor = ProposalTxExecutor{
-		ParentState: parentState,
-		Backend:     &env.backend,
-		Tx:          tx,
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       &env.backend,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)
@@ -801,14 +874,21 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parentState, ok := env.GetState(lastAcceptedID)
-	if !ok {
-		t.Fatal("parent state not found")
+	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	executor := ProposalTxExecutor{
-		ParentState: parentState,
-		Backend:     &env.backend,
-		Tx:          tx,
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       &env.backend,
+		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
 	assert.NoError(t, err)
