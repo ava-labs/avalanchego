@@ -80,7 +80,11 @@ func (a *acceptor) acceptOptionBlock(b blocks.Block) error {
 			a.metrics.MarkOptionVoteLost()
 		}
 	}
-
+	blkState, ok := a.blkIDToState[blkID]
+	if !ok {
+		return fmt.Errorf("couldn't find state of block %s", blkID)
+	}
+	blkState.onAcceptState.Apply(a.state)
 	return a.state.Commit()
 }
 
