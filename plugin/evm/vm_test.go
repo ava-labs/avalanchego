@@ -278,7 +278,7 @@ func TestVMUpgrades(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			_, vm, _, _ := GenesisVM(t, true, test.genesis, "", "")
 
-			if gasPrice := vm.chain.GetTxPool().GasPrice(); gasPrice.Cmp(test.expectedGasPrice) != 0 {
+			if gasPrice := vm.txPool.GasPrice(); gasPrice.Cmp(test.expectedGasPrice) != 0 {
 				t.Fatalf("Expected pool gas price to be %d but found %d", test.expectedGasPrice, gasPrice)
 			}
 			defer func() {
@@ -370,7 +370,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 	}()
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
-	vm.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
+	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
@@ -382,7 +382,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	errs := vm.chain.AddRemoteTxsSync([]*types.Transaction{signedTx})
+	errs := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
@@ -404,7 +404,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 		}
 		txs[i] = signedTx
 	}
-	errs = vm.chain.AddRemoteTxsSync(txs)
+	errs = vm.txPool.AddRemotesSync(txs)
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
@@ -431,7 +431,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 	}
 
 	ethBlk1 := blk1.(*chain.BlockWrapper).Block.(*Block).ethBlock
-	if ethBlk1Root := ethBlk1.Root(); !vm.chain.BlockChain().HasState(ethBlk1Root) {
+	if ethBlk1Root := ethBlk1.Root(); !vm.blockChain.HasState(ethBlk1Root) {
 		t.Fatalf("Expected blk1 state root to not yet be pruned after blk2 was accepted because of tip buffer")
 	}
 
@@ -475,13 +475,13 @@ func TestBuildEthTxBlock(t *testing.T) {
 	}
 
 	// State root should not have been committed and discarded on restart
-	if ethBlk1Root := ethBlk1.Root(); restartedVM.chain.BlockChain().HasState(ethBlk1Root) {
+	if ethBlk1Root := ethBlk1.Root(); restartedVM.blockChain.HasState(ethBlk1Root) {
 		t.Fatalf("Expected blk1 state root to be pruned after blk2 was accepted on top of it in pruning mode")
 	}
 
 	// State root should be committed when accepted tip on shutdown
 	ethBlk2 := blk2.(*chain.BlockWrapper).Block.(*Block).ethBlock
-	if ethBlk2Root := ethBlk2.Root(); !restartedVM.chain.BlockChain().HasState(ethBlk2Root) {
+	if ethBlk2Root := ethBlk2.Root(); !restartedVM.blockChain.HasState(ethBlk2Root) {
 		t.Fatalf("Expected blk2 state root to not be pruned after shutdown (last accepted tip should be committed)")
 	}
 }
@@ -512,9 +512,9 @@ func TestSetPreferenceRace(t *testing.T) {
 	}()
 
 	newTxPoolHeadChan1 := make(chan core.NewTxPoolReorgEvent, 1)
-	vm1.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan1)
+	vm1.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan1)
 	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
-	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
+	vm2.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan2)
 
 	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0])
@@ -522,7 +522,7 @@ func TestSetPreferenceRace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	txErrors := vm1.chain.AddRemoteTxsSync([]*types.Transaction{signedTx})
+	txErrors := vm1.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	for i, err := range txErrors {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
@@ -593,7 +593,7 @@ func TestSetPreferenceRace(t *testing.T) {
 	var errs []error
 
 	// Add the remote transactions, build the block, and set VM1's preference for block A
-	errs = vm1.chain.AddRemoteTxsSync(txs)
+	errs = vm1.txPool.AddRemotesSync(txs)
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM1 at index %d: %s", i, err)
@@ -622,7 +622,7 @@ func TestSetPreferenceRace(t *testing.T) {
 	// Split the transactions over two blocks, and set VM2's preference to them in sequence
 	// after building each block
 	// Block C
-	errs = vm2.chain.AddRemoteTxsSync(txs[0:5])
+	errs = vm2.txPool.AddRemotesSync(txs[0:5])
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
@@ -653,7 +653,7 @@ func TestSetPreferenceRace(t *testing.T) {
 	}
 
 	// Block D
-	errs = vm2.chain.AddRemoteTxsSync(txs[5:10])
+	errs = vm2.txPool.AddRemotesSync(txs[5:10])
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
@@ -726,11 +726,11 @@ func TestSetPreferenceRace(t *testing.T) {
 
 	log.Info("Validating canonical chain")
 	// Verify the Canonical Chain for Both VMs
-	if err := vm2.chain.ValidateCanonicalChain(); err != nil {
+	if err := vm2.blockChain.ValidateCanonicalChain(); err != nil {
 		t.Fatalf("VM2 failed canonical chain verification due to: %s", err)
 	}
 
-	if err := vm1.chain.ValidateCanonicalChain(); err != nil {
+	if err := vm1.blockChain.ValidateCanonicalChain(); err != nil {
 		t.Fatalf("VM1 failed canonical chain verification due to: %s", err)
 	}
 }
@@ -762,9 +762,9 @@ func TestReorgProtection(t *testing.T) {
 	}()
 
 	newTxPoolHeadChan1 := make(chan core.NewTxPoolReorgEvent, 1)
-	vm1.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan1)
+	vm1.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan1)
 	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
-	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
+	vm2.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan2)
 
 	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0])
@@ -772,7 +772,7 @@ func TestReorgProtection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	txErrors := vm1.chain.AddRemoteTxsSync([]*types.Transaction{signedTx})
+	txErrors := vm1.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	for i, err := range txErrors {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
@@ -843,7 +843,7 @@ func TestReorgProtection(t *testing.T) {
 	var errs []error
 
 	// Add the remote transactions, build the block, and set VM1's preference for block A
-	errs = vm1.chain.AddRemoteTxsSync(txs)
+	errs = vm1.txPool.AddRemotesSync(txs)
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM1 at index %d: %s", i, err)
@@ -872,7 +872,7 @@ func TestReorgProtection(t *testing.T) {
 	// Split the transactions over two blocks, and set VM2's preference to them in sequence
 	// after building each block
 	// Block C
-	errs = vm2.chain.AddRemoteTxsSync(txs[0:5])
+	errs = vm2.txPool.AddRemotesSync(txs[0:5])
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
@@ -939,9 +939,9 @@ func TestNonCanonicalAccept(t *testing.T) {
 	}()
 
 	newTxPoolHeadChan1 := make(chan core.NewTxPoolReorgEvent, 1)
-	vm1.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan1)
+	vm1.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan1)
 	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
-	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
+	vm2.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan2)
 
 	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0])
@@ -949,7 +949,7 @@ func TestNonCanonicalAccept(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	txErrors := vm1.chain.AddRemoteTxsSync([]*types.Transaction{signedTx})
+	txErrors := vm1.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	for i, err := range txErrors {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
@@ -1020,7 +1020,7 @@ func TestNonCanonicalAccept(t *testing.T) {
 	var errs []error
 
 	// Add the remote transactions, build the block, and set VM1's preference for block A
-	errs = vm1.chain.AddRemoteTxsSync(txs)
+	errs = vm1.txPool.AddRemotesSync(txs)
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM1 at index %d: %s", i, err)
@@ -1046,15 +1046,15 @@ func TestNonCanonicalAccept(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm1.chain.BlockChain().GetVMConfig().AllowUnfinalizedQueries = true
+	vm1.blockChain.GetVMConfig().AllowUnfinalizedQueries = true
 
 	blkBHeight := vm1BlkB.Height()
 	blkBHash := vm1BlkB.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
-	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
+	if b := vm1.blockChain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
 	}
 
-	errs = vm2.chain.AddRemoteTxsSync(txs[0:5])
+	errs = vm2.txPool.AddRemotesSync(txs[0:5])
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
@@ -1081,7 +1081,7 @@ func TestNonCanonicalAccept(t *testing.T) {
 	}
 
 	blkCHash := vm1BlkC.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
-	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkCHash {
+	if b := vm1.blockChain.GetBlockByNumber(blkBHeight); b.Hash() != blkCHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkCHash.Hex(), b.Hash().Hex())
 	}
 }
@@ -1109,9 +1109,9 @@ func TestStickyPreference(t *testing.T) {
 	}()
 
 	newTxPoolHeadChan1 := make(chan core.NewTxPoolReorgEvent, 1)
-	vm1.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan1)
+	vm1.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan1)
 	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
-	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
+	vm2.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan2)
 
 	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0])
@@ -1119,7 +1119,7 @@ func TestStickyPreference(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	txErrors := vm1.chain.AddRemoteTxsSync([]*types.Transaction{signedTx})
+	txErrors := vm1.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	for i, err := range txErrors {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
@@ -1190,7 +1190,7 @@ func TestStickyPreference(t *testing.T) {
 	var errs []error
 
 	// Add the remote transactions, build the block, and set VM1's preference for block A
-	errs = vm1.chain.AddRemoteTxsSync(txs)
+	errs = vm1.txPool.AddRemotesSync(txs)
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM1 at index %d: %s", i, err)
@@ -1216,15 +1216,15 @@ func TestStickyPreference(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm1.chain.BlockChain().GetVMConfig().AllowUnfinalizedQueries = true
+	vm1.blockChain.GetVMConfig().AllowUnfinalizedQueries = true
 
 	blkBHeight := vm1BlkB.Height()
 	blkBHash := vm1BlkB.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
-	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
+	if b := vm1.blockChain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
 	}
 
-	errs = vm2.chain.AddRemoteTxsSync(txs[0:5])
+	errs = vm2.txPool.AddRemotesSync(txs[0:5])
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
@@ -1254,7 +1254,7 @@ func TestStickyPreference(t *testing.T) {
 		t.Fatalf("Expected new block to match")
 	}
 
-	errs = vm2.chain.AddRemoteTxsSync(txs[5:])
+	errs = vm2.txPool.AddRemotesSync(txs[5:])
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
@@ -1288,13 +1288,13 @@ func TestStickyPreference(t *testing.T) {
 	if err := vm1BlkD.Verify(); err != nil {
 		t.Fatalf("Block failed verification on VM1: %s", err)
 	}
-	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
+	if b := vm1.blockChain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
 	}
-	if b := vm1.chain.GetBlockByNumber(blkDHeight); b != nil {
+	if b := vm1.blockChain.GetBlockByNumber(blkDHeight); b != nil {
 		t.Fatalf("expected block at %d to be nil but got %s", blkDHeight, b.Hash().Hex())
 	}
-	if b := vm1.chain.BlockChain().CurrentBlock(); b.Hash() != blkBHash {
+	if b := vm1.blockChain.CurrentBlock(); b.Hash() != blkBHash {
 		t.Fatalf("expected current block to have hash %s but got %s", blkBHash.Hex(), b.Hash().Hex())
 	}
 
@@ -1305,13 +1305,13 @@ func TestStickyPreference(t *testing.T) {
 	if err := vm1BlkD.Verify(); err != nil {
 		t.Fatalf("Block failed verification on VM1: %s", err)
 	}
-	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
+	if b := vm1.blockChain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
 	}
-	if b := vm1.chain.GetBlockByNumber(blkDHeight); b != nil {
+	if b := vm1.blockChain.GetBlockByNumber(blkDHeight); b != nil {
 		t.Fatalf("expected block at %d to be nil but got %s", blkDHeight, b.Hash().Hex())
 	}
-	if b := vm1.chain.BlockChain().CurrentBlock(); b.Hash() != blkBHash {
+	if b := vm1.blockChain.CurrentBlock(); b.Hash() != blkBHash {
 		t.Fatalf("expected current block to have hash %s but got %s", blkBHash.Hex(), b.Hash().Hex())
 	}
 
@@ -1320,13 +1320,13 @@ func TestStickyPreference(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkCHash {
+	if b := vm1.blockChain.GetBlockByNumber(blkBHeight); b.Hash() != blkCHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkCHash.Hex(), b.Hash().Hex())
 	}
-	if b := vm1.chain.GetBlockByNumber(blkDHeight); b.Hash() != blkDHash {
+	if b := vm1.blockChain.GetBlockByNumber(blkDHeight); b.Hash() != blkDHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkDHeight, blkDHash.Hex(), b.Hash().Hex())
 	}
-	if b := vm1.chain.BlockChain().CurrentBlock(); b.Hash() != blkDHash {
+	if b := vm1.blockChain.CurrentBlock(); b.Hash() != blkDHash {
 		t.Fatalf("expected current block to have hash %s but got %s", blkDHash.Hex(), b.Hash().Hex())
 	}
 
@@ -1344,13 +1344,13 @@ func TestStickyPreference(t *testing.T) {
 	}
 
 	// Ensure queryable after accepting
-	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkCHash {
+	if b := vm1.blockChain.GetBlockByNumber(blkBHeight); b.Hash() != blkCHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkCHash.Hex(), b.Hash().Hex())
 	}
-	if b := vm1.chain.GetBlockByNumber(blkDHeight); b.Hash() != blkDHash {
+	if b := vm1.blockChain.GetBlockByNumber(blkDHeight); b.Hash() != blkDHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkDHeight, blkDHash.Hex(), b.Hash().Hex())
 	}
-	if b := vm1.chain.BlockChain().CurrentBlock(); b.Hash() != blkDHash {
+	if b := vm1.blockChain.CurrentBlock(); b.Hash() != blkDHash {
 		t.Fatalf("expected current block to have hash %s but got %s", blkDHash.Hex(), b.Hash().Hex())
 	}
 }
@@ -1377,9 +1377,9 @@ func TestUncleBlock(t *testing.T) {
 	}()
 
 	newTxPoolHeadChan1 := make(chan core.NewTxPoolReorgEvent, 1)
-	vm1.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan1)
+	vm1.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan1)
 	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
-	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
+	vm2.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan2)
 
 	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0])
@@ -1387,7 +1387,7 @@ func TestUncleBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	txErrors := vm1.chain.AddRemoteTxsSync([]*types.Transaction{signedTx})
+	txErrors := vm1.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	for i, err := range txErrors {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
@@ -1455,7 +1455,7 @@ func TestUncleBlock(t *testing.T) {
 
 	var errs []error
 
-	errs = vm1.chain.AddRemoteTxsSync(txs)
+	errs = vm1.txPool.AddRemotesSync(txs)
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM1 at index %d: %s", i, err)
@@ -1481,7 +1481,7 @@ func TestUncleBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	errs = vm2.chain.AddRemoteTxsSync(txs[0:5])
+	errs = vm2.txPool.AddRemotesSync(txs[0:5])
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
@@ -1511,7 +1511,7 @@ func TestUncleBlock(t *testing.T) {
 		t.Fatalf("Expected new block to match")
 	}
 
-	errs = vm2.chain.AddRemoteTxsSync(txs[5:10])
+	errs = vm2.txPool.AddRemotesSync(txs[5:10])
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
@@ -1570,7 +1570,7 @@ func TestEmptyBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	txErrors := vm.chain.AddRemoteTxsSync([]*types.Transaction{signedTx})
+	txErrors := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	for i, err := range txErrors {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
@@ -1631,9 +1631,9 @@ func TestAcceptReorg(t *testing.T) {
 	}()
 
 	newTxPoolHeadChan1 := make(chan core.NewTxPoolReorgEvent, 1)
-	vm1.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan1)
+	vm1.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan1)
 	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
-	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
+	vm2.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan2)
 
 	tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainConfig.ChainID), testKeys[0])
@@ -1641,7 +1641,7 @@ func TestAcceptReorg(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	txErrors := vm1.chain.AddRemoteTxsSync([]*types.Transaction{signedTx})
+	txErrors := vm1.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	for i, err := range txErrors {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
@@ -1711,7 +1711,7 @@ func TestAcceptReorg(t *testing.T) {
 
 	// Add the remote transactions, build the block, and set VM1's preference
 	// for block B
-	errs := vm1.chain.AddRemoteTxsSync(txs)
+	errs := vm1.txPool.AddRemotesSync(txs)
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM1 at index %d: %s", i, err)
@@ -1737,7 +1737,7 @@ func TestAcceptReorg(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	errs = vm2.chain.AddRemoteTxsSync(txs[0:5])
+	errs = vm2.txPool.AddRemotesSync(txs[0:5])
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
@@ -1764,7 +1764,7 @@ func TestAcceptReorg(t *testing.T) {
 		t.Fatalf("Expected new block to match")
 	}
 
-	errs = vm2.chain.AddRemoteTxsSync(txs[5:])
+	errs = vm2.txPool.AddRemotesSync(txs[5:])
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
@@ -1797,7 +1797,7 @@ func TestAcceptReorg(t *testing.T) {
 	}
 
 	blkBHash := vm1BlkB.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
-	if b := vm1.chain.BlockChain().CurrentBlock(); b.Hash() != blkBHash {
+	if b := vm1.blockChain.CurrentBlock(); b.Hash() != blkBHash {
 		t.Fatalf("expected current block to have hash %s but got %s", blkBHash.Hex(), b.Hash().Hex())
 	}
 
@@ -1806,7 +1806,7 @@ func TestAcceptReorg(t *testing.T) {
 	}
 
 	blkCHash := vm1BlkC.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
-	if b := vm1.chain.BlockChain().CurrentBlock(); b.Hash() != blkCHash {
+	if b := vm1.blockChain.CurrentBlock(); b.Hash() != blkCHash {
 		t.Fatalf("expected current block to have hash %s but got %s", blkCHash.Hex(), b.Hash().Hex())
 	}
 	if err := vm1BlkB.Reject(); err != nil {
@@ -1817,7 +1817,7 @@ func TestAcceptReorg(t *testing.T) {
 		t.Fatal(err)
 	}
 	blkDHash := vm1BlkD.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
-	if b := vm1.chain.BlockChain().CurrentBlock(); b.Hash() != blkDHash {
+	if b := vm1.blockChain.CurrentBlock(); b.Hash() != blkDHash {
 		t.Fatalf("expected current block to have hash %s but got %s", blkDHash.Hex(), b.Hash().Hex())
 	}
 }
@@ -1837,7 +1837,7 @@ func TestFutureBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	txErrors := vm.chain.AddRemoteTxsSync([]*types.Transaction{signedTx})
+	txErrors := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	for i, err := range txErrors {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
@@ -1895,7 +1895,7 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	txErrors := vm.chain.AddRemoteTxsSync([]*types.Transaction{signedTx})
+	txErrors := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	for i, err := range txErrors {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
@@ -1924,10 +1924,10 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 	blkHeight := blk.Height()
 	blkHash := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
 
-	vm.chain.BlockChain().GetVMConfig().AllowUnfinalizedQueries = true
+	vm.blockChain.GetVMConfig().AllowUnfinalizedQueries = true
 
 	ctx := context.Background()
-	b, err := vm.chain.APIBackend().BlockByNumber(ctx, rpc.BlockNumber(blkHeight))
+	b, err := vm.eth.APIBackend.BlockByNumber(ctx, rpc.BlockNumber(blkHeight))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1935,9 +1935,9 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkHeight, blkHash.Hex(), b.Hash().Hex())
 	}
 
-	vm.chain.BlockChain().GetVMConfig().AllowUnfinalizedQueries = false
+	vm.blockChain.GetVMConfig().AllowUnfinalizedQueries = false
 
-	_, err = vm.chain.APIBackend().BlockByNumber(ctx, rpc.BlockNumber(blkHeight))
+	_, err = vm.eth.APIBackend.BlockByNumber(ctx, rpc.BlockNumber(blkHeight))
 	if !errors.Is(err, eth.ErrUnfinalizedData) {
 		t.Fatalf("expected ErrUnfinalizedData but got %s", err.Error())
 	}
@@ -1946,7 +1946,7 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 		t.Fatalf("VM failed to accept block: %s", err)
 	}
 
-	if b := vm.chain.GetBlockByNumber(blkHeight); b.Hash() != blkHash {
+	if b := vm.blockChain.GetBlockByNumber(blkHeight); b.Hash() != blkHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkHeight, blkHash.Hex(), b.Hash().Hex())
 	}
 }
@@ -2029,7 +2029,7 @@ func TestBuildSubnetEVMBlock(t *testing.T) {
 	}()
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
-	vm.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
+	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
 	tx := types.NewTransaction(uint64(0), testEthAddrs[1], new(big.Int).Mul(firstTxAmount, big.NewInt(4)), 21000, big.NewInt(testMinGasPrice*3), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
@@ -2037,7 +2037,7 @@ func TestBuildSubnetEVMBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	txErrors := vm.chain.AddRemoteTxsSync([]*types.Transaction{signedTx})
+	txErrors := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	for i, err := range txErrors {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
@@ -2059,7 +2059,7 @@ func TestBuildSubnetEVMBlock(t *testing.T) {
 		}
 		txs[i] = signedTx
 	}
-	errs := vm.chain.AddRemoteTxs(txs)
+	errs := vm.txPool.AddRemotes(txs)
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
@@ -2092,7 +2092,7 @@ func TestBuildSubnetEVMBlock(t *testing.T) {
 	}
 
 	// Confirm all txs are present
-	ethBlkTxs := vm.chain.GetBlockByNumber(2).Transactions()
+	ethBlkTxs := vm.blockChain.GetBlockByNumber(2).Transactions()
 	for i, tx := range txs {
 		if len(ethBlkTxs) <= i {
 			t.Fatalf("missing transactions expected: %d but found: %d", len(txs), len(ethBlkTxs))
@@ -2123,9 +2123,9 @@ func TestBuildAllowListActivationBlock(t *testing.T) {
 	}()
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
-	vm.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
+	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
-	genesisState, err := vm.chain.BlockChain().StateAt(vm.chain.GetGenesisBlock().Root())
+	genesisState, err := vm.blockChain.StateAt(vm.blockChain.Genesis().Root())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2141,7 +2141,7 @@ func TestBuildAllowListActivationBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	txErrors := vm.chain.AddRemoteTxsSync([]*types.Transaction{signedTx})
+	txErrors := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	for i, err := range txErrors {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
@@ -2155,7 +2155,7 @@ func TestBuildAllowListActivationBlock(t *testing.T) {
 	}
 
 	// Verify that the allow list config activation was handled correctly in the first block.
-	blkState, err := vm.chain.BlockState(blk.(*chain.BlockWrapper).Block.(*Block).ethBlock)
+	blkState, err := vm.blockChain.StateAt(blk.(*chain.BlockWrapper).Block.(*Block).ethBlock.Root())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2186,9 +2186,9 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	}()
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
-	vm.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
+	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
-	genesisState, err := vm.chain.BlockChain().StateAt(vm.chain.GetGenesisBlock().Root())
+	genesisState, err := vm.blockChain.StateAt(vm.blockChain.Genesis().Root())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2208,7 +2208,7 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	signedTx0, err := types.SignTx(tx0, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
 	assert.NoError(t, err)
 
-	errs := vm.chain.GetTxPool().AddRemotesSync([]*types.Transaction{signedTx0})
+	errs := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx0})
 	if err := errs[0]; err != nil {
 		t.Fatalf("Failed to add tx at index: %s", err)
 	}
@@ -2220,7 +2220,7 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	errs = vm.chain.GetTxPool().AddRemotesSync([]*types.Transaction{signedTx1})
+	errs = vm.txPool.AddRemotesSync([]*types.Transaction{signedTx1})
 	if err := errs[0]; !errors.Is(err, precompile.ErrSenderAddressNotAllowListed) {
 		t.Fatalf("expected ErrSenderAddressNotAllowListed, got: %s", err)
 	}
@@ -2259,7 +2259,7 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 	disableAllowListTimestamp := enableAllowListTimestamp.Add(10 * time.Hour)
 
 	// configure a network upgrade to remove the allowlist
-	precompileConfigs := &vm.chain.BlockChain().Config().UpgradeConfig
+	precompileConfigs := &vm.blockChain.Config().UpgradeConfig
 	precompileConfigs.PrecompileUpgrades = append(
 		precompileConfigs.PrecompileUpgrades,
 		params.PrecompileUpgrade{
@@ -2276,9 +2276,9 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 	}()
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
-	vm.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
+	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
-	genesisState, err := vm.chain.BlockChain().StateAt(vm.chain.GetGenesisBlock().Root())
+	genesisState, err := vm.blockChain.StateAt(vm.blockChain.Genesis().Root())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2298,7 +2298,7 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 	signedTx0, err := types.SignTx(tx0, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
 	assert.NoError(t, err)
 
-	errs := vm.chain.GetTxPool().AddRemotesSync([]*types.Transaction{signedTx0})
+	errs := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx0})
 	if err := errs[0]; err != nil {
 		t.Fatalf("Failed to add tx at index: %s", err)
 	}
@@ -2310,7 +2310,7 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	errs = vm.chain.GetTxPool().AddRemotesSync([]*types.Transaction{signedTx1})
+	errs = vm.txPool.AddRemotesSync([]*types.Transaction{signedTx1})
 	if err := errs[0]; !errors.Is(err, precompile.ErrSenderAddressNotAllowListed) {
 		t.Fatalf("expected ErrSenderAddressNotAllowListed, got: %s", err)
 	}
@@ -2331,7 +2331,7 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 	<-newTxPoolHeadChan // wait for new head in tx pool
 
 	// retry the rejected Tx, which should now succeed
-	errs = vm.chain.GetTxPool().AddRemotesSync([]*types.Transaction{signedTx1})
+	errs = vm.txPool.AddRemotesSync([]*types.Transaction{signedTx1})
 	if err := errs[0]; err != nil {
 		t.Fatalf("Failed to add tx at index: %s", err)
 	}
@@ -2385,9 +2385,9 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	}()
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
-	vm.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
+	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
-	genesisState, err := vm.chain.BlockChain().StateAt(vm.chain.GetGenesisBlock().Root())
+	genesisState, err := vm.blockChain.StateAt(vm.blockChain.Genesis().Root())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2402,10 +2402,10 @@ func TestFeeManagerChangeFee(t *testing.T) {
 		t.Fatalf("Expected fee manager list status to be set to no role: %s, but found: %s", precompile.FeeConfigManagerAddress, role)
 	}
 	// Contract is initialized but no preconfig is given, reader should return genesis fee config
-	feeConfig, lastChangedAt, err := vm.chain.BlockChain().GetFeeConfigAt(vm.chain.GetGenesisBlock().Header())
+	feeConfig, lastChangedAt, err := vm.blockChain.GetFeeConfigAt(vm.blockChain.Genesis().Header())
 	assert.NoError(t, err)
 	assert.EqualValues(t, feeConfig, testLowFeeConfig)
-	assert.Zero(t, vm.chain.CurrentBlock().Number().Cmp(lastChangedAt))
+	assert.Zero(t, vm.blockChain.CurrentBlock().Number().Cmp(lastChangedAt))
 
 	// set a different fee config now
 	testHighFeeConfig := testLowFeeConfig
@@ -2430,7 +2430,7 @@ func TestFeeManagerChangeFee(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	errs := vm.chain.GetTxPool().AddRemotesSync([]*types.Transaction{signedTx})
+	errs := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
 	if err := errs[0]; err != nil {
 		t.Fatalf("Failed to add tx at index: %s", err)
 	}
@@ -2444,10 +2444,10 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	block := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
 
 	// Contract is initialized but no state is given, reader should return genesis fee config
-	feeConfig, lastChangedAt, err = vm.chain.BlockChain().GetFeeConfigAt(block.Header())
+	feeConfig, lastChangedAt, err = vm.blockChain.GetFeeConfigAt(block.Header())
 	assert.NoError(t, err)
 	assert.EqualValues(t, testHighFeeConfig, feeConfig)
-	assert.EqualValues(t, vm.chain.CurrentBlock().Number(), lastChangedAt)
+	assert.EqualValues(t, vm.blockChain.CurrentBlock().Number(), lastChangedAt)
 
 	// should fail, with same params since fee is higher now
 	tx2 := types.NewTx(&types.DynamicFeeTx{
@@ -2466,6 +2466,6 @@ func TestFeeManagerChangeFee(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = vm.chain.GetTxPool().AddRemote(signedTx2)
+	err = vm.txPool.AddRemote(signedTx2)
 	assert.ErrorIs(t, err, core.ErrUnderpriced)
 }

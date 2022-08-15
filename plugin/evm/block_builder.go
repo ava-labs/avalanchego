@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	subnetEVM "github.com/ava-labs/subnet-evm/chain"
+	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/params"
 
 	"github.com/ava-labs/avalanchego/snow"
@@ -51,7 +51,7 @@ type blockBuilder struct {
 	ctx         *snow.Context
 	chainConfig *params.ChainConfig
 
-	chain    *subnetEVM.ETHChain
+	txPool   *core.TxPool
 	gossiper Gossiper
 
 	shutdownChan <-chan struct{}
@@ -86,7 +86,7 @@ func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *bl
 	b := &blockBuilder{
 		ctx:                  vm.ctx,
 		chainConfig:          vm.chainConfig,
-		chain:                vm.chain,
+		txPool:               vm.txPool,
 		gossiper:             vm.gossiper,
 		shutdownChan:         vm.shutdownChan,
 		shutdownWg:           &vm.shutdownWg,
@@ -177,7 +177,7 @@ func (b *blockBuilder) handleGenerateBlock() {
 // needToBuild returns true if there are outstanding transactions to be issued
 // into a block.
 func (b *blockBuilder) needToBuild() bool {
-	size := b.chain.PendingSize()
+	size := b.txPool.PendingSize()
 	return size > 0
 }
 
@@ -186,7 +186,7 @@ func (b *blockBuilder) needToBuild() bool {
 //
 // NOTE: Only used prior to SubnetEVM.
 func (b *blockBuilder) buildEarly() bool {
-	size := b.chain.PendingSize()
+	size := b.txPool.PendingSize()
 	return size > batchSize
 }
 
@@ -268,7 +268,8 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 
 		// txSubmitChan is invoked when new transactions are issued as well as on re-orgs which
 		// may orphan transactions that were previously in a preferred block.
-		txSubmitChan := b.chain.GetTxSubmitCh()
+		txSubmitChan := make(chan core.NewTxsEvent)
+		b.txPool.SubscribeNewTxsEvent(txSubmitChan)
 		for {
 			select {
 			case txsEvent := <-txSubmitChan:

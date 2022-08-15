@@ -611,6 +611,17 @@ func (pool *TxPool) Pending(enforceTips bool) map[common.Address]types.Transacti
 	return pending
 }
 
+// PendingSize returns the number of pending txs in the tx pool.
+func (pool *TxPool) PendingSize() int {
+	pending := pool.Pending(true)
+	count := 0
+	for _, txs := range pending {
+		count += len(txs)
+	}
+	return count
+
+}
+
 // PendingFrom returns the same set of transactions that would be returned from Pending restricted to only
 // transactions from [addrs].
 func (pool *TxPool) PendingFrom(addrs []common.Address, enforceTips bool) map[common.Address]types.Transactions {

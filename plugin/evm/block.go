@@ -38,7 +38,7 @@ func (b *Block) Accept() error {
 
 	b.status = choices.Accepted
 	log.Debug(fmt.Sprintf("Accepting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
-	if err := vm.chain.Accept(b.ethBlock); err != nil {
+	if err := vm.blockChain.Accept(b.ethBlock); err != nil {
 		return fmt.Errorf("chain could not accept %s: %w", b.ID(), err)
 	}
 	if err := vm.acceptedBlockDB.Put(lastAcceptedKey, b.id[:]); err != nil {
@@ -52,7 +52,7 @@ func (b *Block) Accept() error {
 func (b *Block) Reject() error {
 	b.status = choices.Rejected
 	log.Debug(fmt.Sprintf("Rejecting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
-	return b.vm.chain.Reject(b.ethBlock)
+	return b.vm.blockChain.Reject(b.ethBlock)
 }
 
 // SetStatus implements the InternalBlock interface allowing ChainState
@@ -100,7 +100,7 @@ func (b *Block) verify(writes bool) error {
 		return fmt.Errorf("syntactic block verification failed: %w", err)
 	}
 
-	return b.vm.chain.BlockChain().InsertBlockManual(b.ethBlock, writes)
+	return b.vm.blockChain.InsertBlockManual(b.ethBlock, writes)
 }
 
 // Bytes implements the snowman.Block interface

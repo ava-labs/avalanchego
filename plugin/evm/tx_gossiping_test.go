@@ -89,8 +89,8 @@ func TestMempoolTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.chain.GetTxPool().SetGasPrice(common.Big1)
-	vm.chain.GetTxPool().SetMinFee(common.Big0)
+	vm.txPool.SetGasPrice(common.Big1)
+	vm.txPool.SetMinFee(common.Big0)
 
 	// create eth txes
 	ethTxs := getValidTxs(key, 3, common.Big1)
@@ -141,7 +141,7 @@ func TestMempoolTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 	}
 
 	// Notify VM about eth txs
-	errs := vm.chain.GetTxPool().AddRemotesSync(ethTxs[:2])
+	errs := vm.txPool.AddRemotesSync(ethTxs[:2])
 	for _, err := range errs {
 		assert.NoError(err, "failed adding subnet-evm tx to mempool")
 	}
@@ -150,7 +150,7 @@ func TestMempoolTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 	attemptAwait(t, &wg2, 5*time.Second) // wait until reorg processed
 	assert.NoError(vm.gossiper.GossipTxs(ethTxs[:2]))
 
-	errs = vm.chain.GetTxPool().AddRemotesSync(ethTxs)
+	errs = vm.txPool.AddRemotesSync(ethTxs)
 	assert.Contains(errs[0].Error(), "already known")
 	assert.Contains(errs[1].Error(), "already known")
 	assert.NoError(errs[2], "failed adding subnet-evm tx to mempool")
@@ -176,8 +176,8 @@ func TestMempoolTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.chain.GetTxPool().SetGasPrice(common.Big1)
-	vm.chain.GetTxPool().SetMinFee(common.Big0)
+	vm.txPool.SetGasPrice(common.Big1)
+	vm.txPool.SetMinFee(common.Big0)
 
 	// create eth txes
 	txs := getValidTxs(key, 100, common.Big1)
@@ -204,7 +204,7 @@ func TestMempoolTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 	}
 
 	// Notify VM about eth txs
-	errs := vm.chain.GetTxPool().AddRemotesSync(txs)
+	errs := vm.txPool.AddRemotesSync(txs)
 	for _, err := range errs {
 		assert.NoError(err, "failed adding subnet-evm tx to mempool")
 	}
@@ -236,8 +236,8 @@ func TestMempoolTxsAppGossipHandling(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.chain.GetTxPool().SetGasPrice(common.Big1)
-	vm.chain.GetTxPool().SetMinFee(common.Big0)
+	vm.txPool.SetGasPrice(common.Big1)
+	vm.txPool.SetMinFee(common.Big0)
 
 	var (
 		wg          sync.WaitGroup
@@ -291,14 +291,14 @@ func TestMempoolTxsRegossipSingleAccount(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.chain.GetTxPool().SetGasPrice(common.Big1)
-	vm.chain.GetTxPool().SetMinFee(common.Big0)
+	vm.txPool.SetGasPrice(common.Big1)
+	vm.txPool.SetMinFee(common.Big0)
 
 	// create eth txes
 	txs := getValidTxs(key, 10, big.NewInt(226*params.GWei))
 
 	// Notify VM about eth txs
-	errs := vm.chain.GetTxPool().AddRemotesSync(txs)
+	errs := vm.txPool.AddRemotesSync(txs)
 	for _, err := range errs {
 		assert.NoError(err, "failed adding subnet-evm tx to remote mempool")
 	}
@@ -331,8 +331,8 @@ func TestMempoolTxsRegossip(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.chain.GetTxPool().SetGasPrice(common.Big1)
-	vm.chain.GetTxPool().SetMinFee(common.Big0)
+	vm.txPool.SetGasPrice(common.Big1)
+	vm.txPool.SetMinFee(common.Big0)
 
 	// create eth txes
 	ethTxs := make([]*types.Transaction, 20)
@@ -345,11 +345,11 @@ func TestMempoolTxsRegossip(t *testing.T) {
 	}
 
 	// Notify VM about eth txs
-	errs := vm.chain.GetTxPool().AddRemotesSync(ethTxs[:10])
+	errs := vm.txPool.AddRemotesSync(ethTxs[:10])
 	for _, err := range errs {
 		assert.NoError(err, "failed adding subnet-evm tx to remote mempool")
 	}
-	errs = vm.chain.GetTxPool().AddLocals(ethTxs[10:])
+	errs = vm.txPool.AddLocals(ethTxs[10:])
 	for _, err := range errs {
 		assert.NoError(err, "failed adding subnet-evm tx to local mempool")
 	}
@@ -394,18 +394,18 @@ func TestMempoolTxsPriorityRegossip(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.chain.GetTxPool().SetGasPrice(common.Big1)
-	vm.chain.GetTxPool().SetMinFee(common.Big0)
+	vm.txPool.SetGasPrice(common.Big1)
+	vm.txPool.SetMinFee(common.Big0)
 
 	// create eth txes
 	txs := getValidTxs(key, 10, big.NewInt(226*params.GWei))
 	txs2 := getValidTxs(key2, 10, big.NewInt(226*params.GWei))
 
 	// Notify VM about eth txs
-	for _, err := range vm.chain.GetTxPool().AddRemotesSync(txs) {
+	for _, err := range vm.txPool.AddRemotesSync(txs) {
 		assert.NoError(err, "failed adding subnet-evm tx to remote mempool")
 	}
-	for _, err := range vm.chain.GetTxPool().AddRemotesSync(txs2) {
+	for _, err := range vm.txPool.AddRemotesSync(txs2) {
 		assert.NoError(err, "failed adding subnet-evm tx 2 to remote mempool")
 	}
 

@@ -79,15 +79,15 @@ func (vm *VM) createGossipper() Gossiper {
 		gossipActivationTime: time.Unix(vm.chainConfig.SubnetEVMTimestamp.Int64(), 0),
 		config:               vm.config,
 		client:               vm.client,
-		blockchain:           vm.chain.BlockChain(),
-		txPool:               vm.chain.GetTxPool(),
+		blockchain:           vm.blockChain,
+		txPool:               vm.txPool,
 		txsToGossipChan:      make(chan []*types.Transaction),
 		txsToGossip:          make(map[common.Hash]*types.Transaction),
 		shutdownChan:         vm.shutdownChan,
 		shutdownWg:           &vm.shutdownWg,
 		recentTxs:            &cache.LRU{Size: recentCacheSize},
 		codec:                vm.networkCodec,
-		signer:               types.LatestSigner(vm.chain.BlockChain().Config()),
+		signer:               types.LatestSigner(vm.blockChain.Config()),
 	}
 	net.awaitEthTxGossip()
 	return net
@@ -398,7 +398,7 @@ type GossipHandler struct {
 func NewGossipHandler(vm *VM) *GossipHandler {
 	return &GossipHandler{
 		vm:     vm,
-		txPool: vm.chain.GetTxPool(),
+		txPool: vm.txPool,
 	}
 }
 
