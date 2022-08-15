@@ -18,7 +18,7 @@ import (
 var (
 	_ Diff = &diff{}
 
-	errMissingParentState = errors.New("missing parent state")
+	ErrMissingParentState = errors.New("missing parent state")
 )
 
 type Diff interface {
@@ -65,7 +65,7 @@ func NewDiff(
 ) (Diff, error) {
 	parentState, ok := stateVersions.GetState(parentID)
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", errMissingParentState, parentID)
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, parentID)
 	}
 	return &diff{
 		parentID:      parentID,
@@ -105,7 +105,7 @@ func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 	// If the validator wasn't modified in this diff, ask the parent state.
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", errMissingParentState, d.parentID)
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 	return parentState.GetCurrentValidator(subnetID, nodeID)
 }
@@ -121,7 +121,7 @@ func (d *diff) DeleteCurrentValidator(staker *Staker) {
 func (d *diff) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", errMissingParentState, d.parentID)
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 
 	parentIterator, err := parentState.GetCurrentDelegatorIterator(subnetID, nodeID)
@@ -143,7 +143,7 @@ func (d *diff) DeleteCurrentDelegator(staker *Staker) {
 func (d *diff) GetCurrentStakerIterator() (StakerIterator, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", errMissingParentState, d.parentID)
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 
 	parentIterator, err := parentState.GetCurrentStakerIterator()
@@ -168,7 +168,7 @@ func (d *diff) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 	// If the validator wasn't modified in this diff, ask the parent state.
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", errMissingParentState, d.parentID)
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 	return parentState.GetPendingValidator(subnetID, nodeID)
 }
@@ -184,7 +184,7 @@ func (d *diff) DeletePendingValidator(staker *Staker) {
 func (d *diff) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", errMissingParentState, d.parentID)
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 
 	parentIterator, err := parentState.GetPendingDelegatorIterator(subnetID, nodeID)
@@ -206,7 +206,7 @@ func (d *diff) DeletePendingDelegator(staker *Staker) {
 func (d *diff) GetPendingStakerIterator() (StakerIterator, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", errMissingParentState, d.parentID)
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 
 	parentIterator, err := parentState.GetPendingStakerIterator()
@@ -221,7 +221,7 @@ func (d *diff) GetSubnets() ([]*txs.Tx, error) {
 	if len(d.addedSubnets) == 0 {
 		parentState, ok := d.stateVersions.GetState(d.parentID)
 		if !ok {
-			return nil, fmt.Errorf("%w: %s", errMissingParentState, d.parentID)
+			return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 		}
 		return parentState.GetSubnets()
 	}
@@ -232,7 +232,7 @@ func (d *diff) GetSubnets() ([]*txs.Tx, error) {
 
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", errMissingParentState, d.parentID)
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 	subnets, err := parentState.GetSubnets()
 	if err != nil {
@@ -260,7 +260,7 @@ func (d *diff) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
 		// No chains have been added to this subnet
 		parentState, ok := d.stateVersions.GetState(d.parentID)
 		if !ok {
-			return nil, fmt.Errorf("%w: %s", errMissingParentState, d.parentID)
+			return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 		}
 		return parentState.GetChains(subnetID)
 	}
@@ -280,7 +280,7 @@ func (d *diff) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
 	// This chain wasn't cached yet
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", errMissingParentState, d.parentID)
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 	chains, err := parentState.GetChains(subnetID)
 	if err != nil {
@@ -320,7 +320,7 @@ func (d *diff) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return nil, status.Unknown, fmt.Errorf("%w: %s", errMissingParentState, d.parentID)
+		return nil, status.Unknown, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 	return parentState.GetTx(txID)
 }
@@ -347,7 +347,7 @@ func (d *diff) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", errMissingParentState, d.parentID)
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 	return parentState.GetRewardUTXOs(txID)
 }
@@ -364,7 +364,7 @@ func (d *diff) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 	if !modified {
 		parentState, ok := d.stateVersions.GetState(d.parentID)
 		if !ok {
-			return nil, fmt.Errorf("%w: %s", errMissingParentState, d.parentID)
+			return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 		}
 		return parentState.GetUTXO(utxoID)
 	}

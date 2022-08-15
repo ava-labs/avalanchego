@@ -63,7 +63,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	).Times(1)
 
 	// We can't serialize [blkTx] because it isn't
-	// regiestered with the blocks.Codec.
+	// registered with the blocks.Codec.
 	// Serialize this block with a dummy tx
 	// and replace it after creation with the mock tx.
 	// TODO allow serialization of mock txs.
@@ -239,7 +239,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	).Times(1)
 
 	// We can't serialize [blkTx] because it isn't
-	// regiestered with the blocks.Codec.
+	// registered with the blocks.Codec.
 	// Serialize this block with a dummy tx
 	// and replace it after creation with the mock tx.
 	// TODO allow serialization of mock txs.
@@ -494,4 +494,55 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 
 	err = verifier.StandardBlock(blk)
 	assert.ErrorIs(err, errConflictingParentTxs)
+}
+
+func TestVerifierVisitStandardBlockWithProposalBlockParent(t *testing.T) {
+	assert := assert.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Create mocked dependencies.
+	s := state.NewMockState(ctrl)
+	mempool := mempool.NewMockMempool(ctrl)
+	parentID := ids.GenerateTestID()
+	parentStatelessBlk := blocks.NewMockBlock(ctrl)
+	parentOnCommitState := state.NewMockDiff(ctrl)
+	parentOnAbortState := state.NewMockDiff(ctrl)
+	verifier := &verifier{
+		txExecutorBackend: &executor.Backend{},
+		backend: &backend{
+			blkIDToState: map[ids.ID]*blockState{
+				parentID: {
+					statelessBlock: parentStatelessBlk,
+					proposalBlockState: proposalBlockState{
+						onCommitState: parentOnCommitState,
+						onAbortState:  parentOnAbortState,
+					},
+					standardBlockState: standardBlockState{},
+				},
+			},
+			Mempool: mempool,
+			state:   s,
+			ctx: &snow.Context{
+				Log: logging.NoLog{},
+			},
+		},
+	}
+
+	blk, err := blocks.NewStandardBlock(
+		parentID,
+		2,
+		[]*txs.Tx{
+			{
+				Unsigned: &txs.AdvanceTimeTx{},
+				Creds:    []verify.Verifiable{},
+			},
+		},
+	)
+	assert.NoError(err)
+
+	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
+
+	err = verifier.StandardBlock(blk)
+	assert.ErrorIs(err, state.ErrMissingParentState)
 }

@@ -33,7 +33,6 @@ const (
 var (
 	_ txs.Visitor = &ProposalTxExecutor{}
 
-	errMissingParentState        = errors.New("missing parent state")
 	errWeightTooSmall            = errors.New("weight of this validator is too low")
 	errWeightTooLarge            = errors.New("weight of this validator is too large")
 	errStakeTooShort             = errors.New("staking period is too short")
@@ -101,7 +100,7 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 
 	parentState, ok := e.StateVersions.GetState(e.ParentID)
 	if !ok {
-		return errMissingParentState
+		return state.ErrMissingParentState
 	}
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.Stake))
@@ -216,7 +215,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 
 	parentState, ok := e.StateVersions.GetState(e.ParentID)
 	if !ok {
-		return errMissingParentState
+		return state.ErrMissingParentState
 	}
 
 	if e.Bootstrapped.GetValue() {
@@ -371,7 +370,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 
 	parentState, ok := e.StateVersions.GetState(e.ParentID)
 	if !ok {
-		return errMissingParentState
+		return state.ErrMissingParentState
 	}
 
 	txID := e.Tx.ID()
@@ -492,7 +491,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 
 	parentState, ok := e.StateVersions.GetState(e.ParentID)
 	if !ok {
-		return errMissingParentState
+		return state.ErrMissingParentState
 	}
 
 	if chainTimestamp := parentState.GetTimestamp(); !txTimestamp.After(chainTimestamp) {
@@ -661,7 +660,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 
 	parentState, ok := e.StateVersions.GetState(e.ParentID)
 	if !ok {
-		return errMissingParentState
+		return state.ErrMissingParentState
 	}
 
 	currentStakerIterator, err := parentState.GetCurrentStakerIterator()
