@@ -553,7 +553,7 @@ func (n *Node) initChains(genesisBytes []byte) {
 		ID:            constants.PlatformChainID,
 		SubnetID:      constants.PrimaryNetworkID,
 		GenesisData:   genesisBytes, // Specifies other chains to create
-		VMAlias:       constants.PlatformVMID.String(),
+		VMID:          constants.PlatformVMID,
 		CustomBeacons: n.beacons,
 	})
 }

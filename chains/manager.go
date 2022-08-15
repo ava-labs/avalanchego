@@ -116,9 +116,9 @@ type ChainParameters struct {
 	// The genesis data of this chain's ledger.
 	GenesisData []byte
 	// The ID of the vm this chain is running.
-	VMAlias string
+	VMID ids.ID
 	// The IDs of the feature extensions this chain is running.
-	FxAliases []string
+	FxIDs []ids.ID
 	// Should only be set if the default beacons can't be used.
 	CustomBeacons validators.Set
 }
@@ -247,7 +247,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	if m.StakingEnabled && chainParams.SubnetID != constants.PrimaryNetworkID && !m.WhitelistedSubnets.Contains(chainParams.SubnetID) {
 		m.Log.Debug("skipped creating non-whitelisted chain",
 			zap.Stringer("chainID", chainParams.ID),
-			zap.String("vmID", chainParams.VMAlias),
+			zap.Stringer("vmID", chainParams.VMID),
 		)
 		return
 	}
@@ -263,7 +263,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	}
 	m.Log.Info("creating chain",
 		zap.Stringer("chainID", chainParams.ID),
-		zap.String("vmID", chainParams.VMAlias),
+		zap.Stringer("vmID", chainParams.VMID),
 	)
 
 	sb, exists := m.subnets[chainParams.SubnetID]
@@ -348,12 +348,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 
 // Create a chain
 func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, error) {
-	vmID, err := m.VMManager.Lookup(chainParams.VMAlias)
-	if err != nil {
-		return nil, fmt.Errorf("error while looking up VM: %w", err)
-	}
-
-	if chainParams.ID != constants.PlatformChainID && vmID == constants.PlatformVMID {
+	if chainParams.ID != constants.PlatformChainID && chainParams.VMID == constants.PlatformVMID {
 		return nil, errCreatePlatformVM
 	}
 	primaryAlias := m.PrimaryAliasOrDefault(chainParams.ID)
@@ -412,7 +407,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 
 	// Get a factory for the vm we want to use on our chain
-	vmFactory, err := m.VMManager.GetFactory(vmID)
+	vmFactory, err := m.VMManager.GetFactory(chainParams.VMID)
 	if err != nil {
 		return nil, fmt.Errorf("error while getting vmFactory: %w", err)
 	}
@@ -424,13 +419,8 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 	// TODO: Shutdown VM if an error occurs
 
-	fxs := make([]*common.Fx, len(chainParams.FxAliases))
-	for i, fxAlias := range chainParams.FxAliases {
-		fxID, err := m.VMManager.Lookup(fxAlias)
-		if err != nil {
-			return nil, fmt.Errorf("error while looking up Fx: %w", err)
-		}
-
+	fxs := make([]*common.Fx, len(chainParams.FxIDs))
+	for i, fxID := range chainParams.FxIDs {
 		// Get a factory for the fx we want to use on our chain
 		fxFactory, err := m.VMManager.GetFactory(fxID)
 		if err != nil {
