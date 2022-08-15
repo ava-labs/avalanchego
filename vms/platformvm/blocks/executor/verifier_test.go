@@ -65,8 +65,8 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	blkTx := txs.NewMockUnsignedTx(ctrl)
 	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.ProposalTxExecutor{})).DoAndReturn(
 		func(e *executor.ProposalTxExecutor) error {
-			e.OnCommit = onCommitState
-			e.OnAbort = onAbortState
+			e.OnCommitState = onCommitState
+			e.OnAbortState = onAbortState
 			return nil
 		},
 	).Times(1)

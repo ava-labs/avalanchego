@@ -44,11 +44,12 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	tx, err := env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
 	assert.NoError(err)
 
+	parentState, ok := env.GetState(lastAcceptedID)
+	assert.True(ok)
 	txExecutor := ProposalTxExecutor{
-		Backend:          &env.backend,
-		ReferenceBlockID: lastAcceptedID,
-		StateVersions:    env,
-		Tx:               tx,
+		ParentState: parentState,
+		Backend:     &env.backend,
+		Tx:          tx,
 	}
 	assert.Error(tx.Unsigned.Visit(&txExecutor))
 
@@ -59,11 +60,12 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	tx, err = env.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
 	assert.NoError(err)
 
+	parentState, ok = env.GetState(lastAcceptedID)
+	assert.True(ok)
 	txExecutor = ProposalTxExecutor{
-		Backend:          &env.backend,
-		ReferenceBlockID: lastAcceptedID,
-		StateVersions:    env,
-		Tx:               tx,
+		ParentState: parentState,
+		Backend:     &env.backend,
+		Tx:          tx,
 	}
 	assert.Error(tx.Unsigned.Visit(&txExecutor))
 
@@ -71,15 +73,16 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	tx, err = env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
 	assert.NoError(err)
 
+	parentState, ok = env.GetState(lastAcceptedID)
+	assert.True(ok)
 	txExecutor = ProposalTxExecutor{
-		Backend:          &env.backend,
-		ReferenceBlockID: lastAcceptedID,
-		StateVersions:    env,
-		Tx:               tx,
+		ParentState: parentState,
+		Backend:     &env.backend,
+		Tx:          tx,
 	}
 	assert.NoError(tx.Unsigned.Visit(&txExecutor))
 
-	onCommitStakerIterator, err := txExecutor.OnCommit.GetCurrentStakerIterator()
+	onCommitStakerIterator, err := txExecutor.OnCommitState.GetCurrentStakerIterator()
 	assert.NoError(err)
 	assert.True(onCommitStakerIterator.Next())
 
@@ -94,7 +97,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	oldBalance, err := avax.GetBalance(env.state, stakeOwners)
 	assert.NoError(err)
 
-	txExecutor.OnCommit.Apply(env.state)
+	txExecutor.OnCommitState.Apply(env.state)
 	env.state.SetHeight(dummyHeight)
 	assert.NoError(env.state.Commit())
 
@@ -126,11 +129,12 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	tx, err := env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
 	assert.NoError(err)
 
+	parentState, ok := env.GetState(lastAcceptedID)
+	assert.True(ok)
 	txExecutor := ProposalTxExecutor{
-		Backend:          &env.backend,
-		ReferenceBlockID: lastAcceptedID,
-		StateVersions:    env,
-		Tx:               tx,
+		ParentState: parentState,
+		Backend:     &env.backend,
+		Tx:          tx,
 	}
 	assert.Error(tx.Unsigned.Visit(&txExecutor))
 
@@ -142,10 +146,9 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	assert.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
-		Backend:          &env.backend,
-		ReferenceBlockID: lastAcceptedID,
-		StateVersions:    env,
-		Tx:               tx,
+		ParentState: parentState,
+		Backend:     &env.backend,
+		Tx:          tx,
 	}
 	assert.Error(tx.Unsigned.Visit(&txExecutor))
 
@@ -153,15 +156,16 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	tx, err = env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
 	assert.NoError(err)
 
+	parentState, ok = env.GetState(lastAcceptedID)
+	assert.True(ok)
 	txExecutor = ProposalTxExecutor{
-		Backend:          &env.backend,
-		ReferenceBlockID: lastAcceptedID,
-		StateVersions:    env,
-		Tx:               tx,
+		ParentState: parentState,
+		Backend:     &env.backend,
+		Tx:          tx,
 	}
 	assert.NoError(tx.Unsigned.Visit(&txExecutor))
 
-	onAbortStakerIterator, err := txExecutor.OnAbort.GetCurrentStakerIterator()
+	onAbortStakerIterator, err := txExecutor.OnAbortState.GetCurrentStakerIterator()
 	assert.NoError(err)
 	assert.True(onAbortStakerIterator.Next())
 
@@ -176,7 +180,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	oldBalance, err := avax.GetBalance(env.state, stakeOwners)
 	assert.NoError(err)
 
-	txExecutor.OnAbort.Apply(env.state)
+	txExecutor.OnAbortState.Apply(env.state)
 	env.state.SetHeight(dummyHeight)
 	assert.NoError(env.state.Commit())
 
@@ -262,11 +266,12 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 
+	parentState, ok := env.GetState(lastAcceptedID)
+	assert.True(ok)
 	txExecutor := ProposalTxExecutor{
-		Backend:          &env.backend,
-		ReferenceBlockID: lastAcceptedID,
-		StateVersions:    env,
-		Tx:               tx,
+		ParentState: parentState,
+		Backend:     &env.backend,
+		Tx:          tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
 	assert.NoError(err)
@@ -283,7 +288,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	oldDelBalance, err := avax.GetBalance(env.state, delDestSet)
 	assert.NoError(err)
 
-	txExecutor.OnCommit.Apply(env.state)
+	txExecutor.OnCommitState.Apply(env.state)
 	env.state.SetHeight(dummyHeight)
 	assert.NoError(env.state.Commit())
 
@@ -380,11 +385,12 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 
+	parentState, ok := env.GetState(lastAcceptedID)
+	assert.True(ok)
 	txExecutor := ProposalTxExecutor{
-		Backend:          &env.backend,
-		ReferenceBlockID: lastAcceptedID,
-		StateVersions:    env,
-		Tx:               tx,
+		ParentState: parentState,
+		Backend:     &env.backend,
+		Tx:          tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
 	assert.NoError(err)
@@ -401,7 +407,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	oldDelBalance, err := avax.GetBalance(env.state, delDestSet)
 	assert.NoError(err)
 
-	txExecutor.OnAbort.Apply(env.state)
+	txExecutor.OnAbortState.Apply(env.state)
 	env.state.SetHeight(dummyHeight)
 	assert.NoError(env.state.Commit())
 

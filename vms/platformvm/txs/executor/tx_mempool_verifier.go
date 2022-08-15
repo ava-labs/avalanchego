@@ -5,6 +5,7 @@ package executor
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -58,13 +59,27 @@ func (v *MempoolTxVerifier) proposalTx(tx txs.StakerTx) error {
 		return errFutureStakeTime
 	}
 
-	executor := ProposalTxExecutor{
-		Backend:          v.Backend,
-		ReferenceBlockID: v.ParentID,
-		StateVersions:    v.StateVersions,
-		Tx:               v.Tx,
+	onCommitState, err := state.NewDiff(v.ParentID, v.StateVersions)
+	if err != nil {
+		return err
 	}
-	err := tx.Visit(&executor)
+	onAbortState, err := state.NewDiff(v.ParentID, v.StateVersions)
+	if err != nil {
+		return err
+	}
+
+	parentState, ok := v.StateVersions.GetState(v.ParentID)
+	if !ok {
+		return fmt.Errorf("missing parent state %s", v.ParentID)
+	}
+	executor := ProposalTxExecutor{
+		ParentState:   parentState,
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       v.Backend,
+		Tx:            v.Tx,
+	}
+	err = tx.Visit(&executor)
 	// We ignore [errFutureStakeTime] here because an advanceTimeTx will be
 	// issued before this transaction is issued.
 	if errors.Is(err, errFutureStakeTime) {
