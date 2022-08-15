@@ -47,6 +47,7 @@ var (
 	errShouldBeDSValidator       = errors.New("expected validator to be in the primary network")
 	errWrongTxType               = errors.New("wrong transaction type")
 	errInvalidID                 = errors.New("invalid ID")
+	errEmptyNodeID               = errors.New("validator nodeID cannot be empty")
 )
 
 type ProposalTxExecutor struct {
@@ -103,12 +104,20 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		return state.ErrMissingParentState
 	}
 
+	currentTimestamp := parentState.GetTimestamp()
+
+	// Blueberry disallows creating a validator with the empty ID.
+	if !currentTimestamp.Before(e.Config.BlueberryTime) {
+		if tx.Validator.NodeID == ids.EmptyNodeID {
+			return errEmptyNodeID
+		}
+	}
+
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.Stake))
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.Stake)
 
 	if e.Bootstrapped.GetValue() {
-		currentTimestamp := parentState.GetTimestamp()
 		// Ensure the proposed validator starts after the current time
 		startTime := tx.StartTime()
 		if !currentTimestamp.Before(startTime) {

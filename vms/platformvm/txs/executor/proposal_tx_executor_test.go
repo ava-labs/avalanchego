@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -948,5 +950,63 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		if err == nil {
 			t.Fatal("should have failed because tx fee paying key has no funds")
 		}
+	}
+}
+
+func TestBlueberryAddValidatorTxEmptyNodeID(t *testing.T) {
+	env := newEnvironment()
+	env.ctx.Lock.Lock()
+	defer func() {
+		if err := shutdownEnvironment(env); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	chainTime := env.state.GetTimestamp()
+	startTime := defaultGenesisTime.Add(1 * time.Second)
+
+	tests := []struct {
+		blueberryTime time.Time
+		expectedError error
+	}{
+		{ // Case: Before blueberry
+			blueberryTime: chainTime.Add(1),
+			expectedError: nil,
+		},
+		{ // Case: At blueberry
+			blueberryTime: chainTime,
+			expectedError: errEmptyNodeID,
+		},
+		{ // Case: After blueberry
+			blueberryTime: chainTime.Add(-1),
+			expectedError: errEmptyNodeID,
+		},
+	}
+	for _, test := range tests {
+		// Case: Empty validator node ID after blueberry
+		env.config.BlueberryTime = test.blueberryTime
+
+		tx, err := env.txBuilder.NewAddValidatorTx( // create the tx
+			env.config.MinValidatorStake,
+			uint64(startTime.Unix()),
+			uint64(defaultValidateEndTime.Unix()),
+			ids.EmptyNodeID,
+			ids.GenerateTestShortID(),
+			reward.PercentDenominator,
+			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			ids.ShortEmpty, // change addr
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		executor := ProposalTxExecutor{
+			Backend:       &env.backend,
+			ParentID:      lastAcceptedID,
+			StateVersions: env,
+			Tx:            tx,
+		}
+		err = tx.Unsigned.Visit(&executor)
+		assert.ErrorIs(t, err, test.expectedError)
 	}
 }
