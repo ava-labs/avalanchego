@@ -108,24 +108,13 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
 	}
 
-	blkState := &blockState{
-		statelessBlock: b,
+	onCommitState, err := state.NewDiff(parentID, v.backend)
+	if err != nil {
+		return err
 	}
-
-	{
-		onCommitState, err := state.NewDiff(parentID, v.backend)
-		if err != nil {
-			return err
-		}
-		blkState.onCommitState = onCommitState
-	}
-
-	{
-		onAbortState, err := state.NewDiff(parentID, v.backend)
-		if err != nil {
-			return err
-		}
-		blkState.onAbortState = onAbortState
+	onAbortState, err := state.NewDiff(parentID, v.backend)
+	if err != nil {
+		return err
 	}
 
 	// Apply the changes, if any, from advancing the chain time.
@@ -134,8 +123,7 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 	if err != nil {
 		return err
 	}
-
-	for _, state := range []state.Diff{blkState.onCommitState, blkState.onAbortState} {
+	for _, state := range []state.Diff{onCommitState, onAbortState} {
 		state.SetTimestamp(nextChainTime)
 		state.SetCurrentSupply(updated.Supply)
 
@@ -158,8 +146,8 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 
 	// Check the transaction's validity.
 	txExecutor := executor.ProposalTxExecutor{
-		OnCommitState: blkState.onCommitState,
-		OnAbortState:  blkState.onAbortState,
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
 		Backend:       v.txExecutorBackend,
 		Tx:            b.Tx,
 	}
@@ -170,11 +158,18 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 		return err
 	}
 
-	blkState.onCommitState.AddTx(b.Tx, status.Committed)
-	blkState.onAbortState.AddTx(b.Tx, status.Aborted)
+	onCommitState.AddTx(b.Tx, status.Committed)
+	onAbortState.AddTx(b.Tx, status.Aborted)
 
-	blkState.timestamp = b.Timestamp()
-	blkState.initiallyPreferCommit = txExecutor.PrefersCommit
+	blkState := &blockState{
+		proposalBlockState: proposalBlockState{
+			initiallyPreferCommit: txExecutor.PrefersCommit,
+			onCommitState:         onCommitState,
+			onAbortState:          onAbortState,
+		},
+		statelessBlock: b,
+		timestamp:      b.Timestamp(),
+	}
 
 	v.blkIDToState[blkID] = blkState
 	v.Mempool.RemoveProposalTx(b.Tx)
