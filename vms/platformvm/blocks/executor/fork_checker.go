@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/forks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
@@ -117,7 +118,7 @@ func (f *forkChecker) validateBlueberryBlocksTimestamp(b blocks.Block) error {
 
 	parentState, ok := f.GetState(parentID)
 	if !ok {
-		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, b.ID())
+		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 	nextStakerChangeTime, err := executor.GetNextStakerChangeTime(parentState)
 	if err != nil {

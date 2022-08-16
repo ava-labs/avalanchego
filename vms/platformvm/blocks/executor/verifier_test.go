@@ -730,7 +730,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	assert.ErrorIs(err, errConflictingParentTxs)
 }
 
-func TestVerifierVisitStandardBlockWithProposalBlockParent(t *testing.T) {
+func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) {
 	assert := assert.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -787,5 +787,68 @@ func TestVerifierVisitStandardBlockWithProposalBlockParent(t *testing.T) {
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 
 	err = verifier.ApricotStandardBlock(blk)
+	assert.ErrorIs(err, state.ErrMissingParentState)
+}
+
+func TestVerifierVisitBlueberryStandardBlockWithProposalBlockParent(t *testing.T) {
+	assert := assert.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Create mocked dependencies.
+	s := state.NewMockState(ctrl)
+	mempool := mempool.NewMockMempool(ctrl)
+	parentID := ids.GenerateTestID()
+	parentStatelessBlk := blocks.NewMockBlock(ctrl)
+	parentTime := time.Now()
+	parentStatelessBlk.EXPECT().Timestamp().Return(parentTime).Times(1)
+	parentOnCommitState := state.NewMockDiff(ctrl)
+	parentOnAbortState := state.NewMockDiff(ctrl)
+
+	backend := &backend{
+		blkIDToState: map[ids.ID]*blockState{
+			parentID: {
+				statelessBlock: parentStatelessBlk,
+				proposalBlockState: proposalBlockState{
+					onCommitState: parentOnCommitState,
+					onAbortState:  parentOnAbortState,
+				},
+				standardBlockState: standardBlockState{},
+			},
+		},
+		Mempool: mempool,
+		state:   s,
+		ctx: &snow.Context{
+			Log: logging.NoLog{},
+		},
+		cfg: &config.Config{
+			BlueberryTime: time.Time{}, // Blueberry is activated
+		},
+	}
+	verifier := &verifier{
+		txExecutorBackend: &executor.Backend{},
+		backend:           backend,
+		forkChecker: &forkChecker{
+			backend: backend,
+			clk:     &mockable.Clock{},
+		},
+	}
+
+	blk, err := blocks.NewBlueberryStandardBlock(
+		parentTime.Add(time.Second),
+		parentID,
+		2,
+		[]*txs.Tx{
+			{
+				Unsigned: &txs.AdvanceTimeTx{},
+				Creds:    []verify.Verifiable{},
+			},
+		},
+	)
+	assert.NoError(err)
+
+	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
+
+	err = verifier.BlueberryStandardBlock(blk)
 	assert.ErrorIs(err, state.ErrMissingParentState)
 }

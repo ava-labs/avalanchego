@@ -47,7 +47,7 @@ func (v *verifier) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
 	parentID := b.Parent()
 	parentState, ok := v.blkIDToState[parentID]
 	if !ok {
-		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
+		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 
 	blkState := &blockState{
@@ -74,7 +74,7 @@ func (v *verifier) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
 	parentID := b.Parent()
 	parentState, ok := v.blkIDToState[parentID]
 	if !ok {
-		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
+		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 
 	blkState := &blockState{
@@ -105,7 +105,7 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 	parentID := b.Parent()
 	parentState, ok := v.GetState(parentID)
 	if !ok {
-		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
+		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 
 	onCommitState, err := state.NewDiff(parentID, v.backend)
@@ -196,7 +196,7 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 	parentID := b.Parent()
 	parentState, ok := v.GetState(parentID)
 	if !ok {
-		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
+		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 	nextChainTime := b.Timestamp()
 
@@ -330,7 +330,7 @@ func (v *verifier) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 	parentID := b.Parent()
 	parentState, ok := v.blkIDToState[parentID]
 	if !ok {
-		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
+		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 	onAcceptState := parentState.onAbortState
 
@@ -358,7 +358,7 @@ func (v *verifier) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 	parentID := b.Parent()
 	parentState, ok := v.blkIDToState[parentID]
 	if !ok {
-		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
+		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 	onAcceptState := parentState.onCommitState
 
@@ -541,7 +541,7 @@ func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 	parentID := b.Parent()
 	parentState, ok := v.GetState(parentID)
 	if !ok {
-		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
+		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 
 	cfg := v.txExecutorBackend.Config
