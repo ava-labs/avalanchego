@@ -36,6 +36,7 @@ func testCodeSyncer(t *testing.T, test codeSyncerTest) {
 	for _, codeBytes := range test.codeByteSlices {
 		codeHash := crypto.Keccak256Hash(codeBytes)
 		rawdb.WriteCode(serverDB, codeHash, codeBytes)
+		codeHashes = append(codeHashes, codeHash)
 	}
 
 	// Set up mockClient
@@ -70,10 +71,10 @@ func testCodeSyncer(t *testing.T, test codeSyncerTest) {
 	err := <-codeSyncer.Done()
 	if test.err != nil {
 		if err == nil {
-			assert.Error(t, err, "expected non-nil error: %s", test.err)
-		} else {
-			assert.ErrorIs(t, err, test.err)
+			t.Fatal(t, "expected non-nil error: %s", test.err)
 		}
+		assert.ErrorIs(t, err, test.err)
+		return
 	} else if err != nil {
 		t.Fatal(err)
 	}
