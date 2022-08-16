@@ -122,7 +122,6 @@ func init() {
 	// Preserving the log level allows us to update the root handler while writing to the original
 	// [os.Stderr] that is being piped through to the logger via the rpcchainvm.
 	originalStderr = os.Stderr
-	log.Root().SetHandler(log.LvlFilterHandler(log.LvlDebug, log.StreamHandler(originalStderr, log.TerminalFormat(false))))
 }
 
 // VM implements the snowman.ChainVM interface
@@ -175,40 +174,7 @@ type VM struct {
 	multiGatherer avalanchegoMetrics.MultiGatherer
 
 	bootstrapped bool
-}
-
-// setLogLevel initializes logger and sets the log level with the original [os.StdErr] interface
-// along with the context logger.
-func (vm *VM) setLogLevel(logLevel log.Lvl) {
-	prefix, err := vm.ctx.BCLookup.PrimaryAlias(vm.ctx.ChainID)
-	if err != nil {
-		prefix = vm.ctx.ChainID.String()
-	}
-	prefix = fmt.Sprintf("<%s Chain>", prefix)
-	format := SubnetEVMFormat(prefix)
-	log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.MultiHandler(
-		log.StreamHandler(originalStderr, format),
-		log.StreamHandler(vm.ctx.Log, format),
-	)))
-}
-
-func SubnetEVMFormat(prefix string) log.Format {
-	return log.FormatFunc(func(r *log.Record) []byte {
-		location := fmt.Sprintf("%+v", r.Call)
-		newMsg := fmt.Sprintf("%s %s: %s", prefix, location, r.Msg)
-		// need to deep copy since we're using a multihandler
-		// as a result it will alter R.msg twice.
-		newRecord := log.Record{
-			Time:     r.Time,
-			Lvl:      r.Lvl,
-			Msg:      newMsg,
-			Ctx:      r.Ctx,
-			Call:     r.Call,
-			KeyNames: r.KeyNames,
-		}
-		b := log.TerminalFormat(false).Format(&newRecord)
-		return b
-	})
+	logger       SubnetEVMLogger
 }
 
 /*
@@ -243,14 +209,21 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	// Set log level
-	logLevel, err := log.LvlFromString(vm.config.LogLevel)
+	vm.ctx = ctx
+
+	// Create logger
+	alias, err := vm.ctx.BCLookup.PrimaryAlias(vm.ctx.ChainID)
+	if err != nil {
+		// fallback to ChainID string instead of erroring
+		alias = vm.ctx.ChainID.String()
+	}
+
+	subnetEVMLogger, err := InitLogger(alias, vm.config.LogLevel, vm.config.LogJSONFormat, originalStderr)
 	if err != nil {
 		return fmt.Errorf("failed to initialize logger due to: %w ", err)
 	}
+	vm.logger = subnetEVMLogger
 
-	vm.ctx = ctx
-	vm.setLogLevel(logLevel)
 	if b, err := json.Marshal(vm.config); err == nil {
 		log.Info("Initializing Subnet EVM VM", "Version", Version, "Config", string(b))
 	} else {
