@@ -352,7 +352,7 @@ func (v *verifier) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 	}
 
 	if err := v.apricotCommonBlock(b); err != nil {
-		return fmt.Errorf("couldn't verify common block of %s: %s", blkID, err)
+		return fmt.Errorf("couldn't verify common block of %s: %w", blkID, err)
 	}
 
 	parentID := b.Parent()

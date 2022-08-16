@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/forks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -146,7 +147,9 @@ func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 	return b.GossipTx(tx)
 }
 
-// BuildBlock builds a block to be added to consensus
+// BuildBlock builds a block to be added to consensus.
+// This method removes the transactions from the returned
+// blocks from the mempool.
 func (b *builder) BuildBlock() (snowman.Block, error) {
 	b.Mempool.DisableAdding()
 	defer func() {
@@ -156,12 +159,62 @@ func (b *builder) BuildBlock() (snowman.Block, error) {
 
 	ctx := b.txExecutorBackend.Ctx
 	ctx.Log.Debug("starting to attempt to build a block")
-	blkBuildingStrategy, err := b.getBuildingStrategy()
+
+	blk, txs, err := b.buildBlock()
 	if err != nil {
 		return nil, err
 	}
+	// remove selected txs from mempool only when we are sure
+	// a valid block containing it has been generated
+	b.Mempool.Remove(txs)
+	return blk, nil
+}
 
-	return blkBuildingStrategy.buildBlock()
+// Returns:
+// 1. The block we want to build and issue.
+// 2. The transactions in that block.
+// Only modifies state to remove expired proposal txs.
+func (b *builder) buildBlock() (snowman.Block, []*txs.Tx, error) {
+	// Get the block to build on top of and retrieve the new block's context.
+	preferred, err := b.Preferred()
+	if err != nil {
+		return nil, nil, err
+	}
+	prefBlkID := preferred.ID()
+	nextHeight := preferred.Height() + 1
+	currentFork, err := b.blkManager.GetFork(prefBlkID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not fork for block %s: %w", prefBlkID, err)
+	}
+
+	preferredState, ok := b.blkManager.GetState(prefBlkID)
+	if !ok {
+		return nil, nil, fmt.Errorf("could not retrieve state for block %s. Preferred block must be a decision block", prefBlkID)
+	}
+
+	var fb forkBuilder
+
+	// select transactions to include based on the current fork
+	switch currentFork {
+	case forks.Apricot:
+		fb = &apricotBuilder{
+			builder:     b,
+			parentBlkID: prefBlkID,
+			parentState: preferredState,
+			nextHeight:  nextHeight,
+		}
+	case forks.Blueberry:
+		fb = &blueberryStrategy{
+			builder:     b,
+			parentBlkID: prefBlkID,
+			parentState: preferredState,
+			height:      nextHeight,
+		}
+	default:
+		return nil, nil, fmt.Errorf("unsupported fork %s", currentFork)
+	}
+
+	return fb.buildBlock()
 }
 
 func (b *builder) Shutdown() {
@@ -273,18 +326,8 @@ func (b *builder) setNextBuildBlockTime() {
 		)
 		return
 	}
-	blkBuildStrategy, err := b.getBuildingStrategy()
-	if err != nil {
-		return
-	}
-
-	// check if there are txs to be included in the block
-	// or if chain time can be moved ahead via block timestamp
-	hasContent, err := blkBuildStrategy.hasContent()
-	if err != nil {
-		return
-	}
-	if hasContent {
+	if _, _, err := b.buildBlock(); err == nil {
+		// We can build a block now
 		b.notifyBlockReady()
 		return
 	}

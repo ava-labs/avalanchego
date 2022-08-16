@@ -15,9 +15,10 @@ import (
 	transactions "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ buildingStrategy = &apricotStrategy{}
+var _ forkBuilder = &apricotBuilder{}
 
-type apricotStrategy struct {
+// Build blocks for the Apricot network fork.
+type apricotBuilder struct {
 	*builder
 
 	// inputs
@@ -26,71 +27,54 @@ type apricotStrategy struct {
 	parentState state.Chain
 	// Build a block with this height.
 	nextHeight uint64
-
-	// outputs
-	// Set in [selectBlockContent].
-	txs []*transactions.Tx
 }
 
-func (a *apricotStrategy) hasContent() (bool, error) {
-	if err := a.selectBlockContent(); err != nil {
-		return false, err
-	}
-
-	return len(a.txs) != 0, nil
-}
-
-// Note: selectBlockContent will only peek into mempool and must not remove
-// any transactions. It's up to the caller to cleanup the mempool if necessary.
-// If this method returns nil, [a.txs] won't be empty.
-func (a *apricotStrategy) selectBlockContent() error {
+// Returns the transactions we should include in the block.
+// Only updates the mempool to remove expired proposal txs.
+// It's up to the caller to cleanup the mempool if necessary.
+func (a *apricotBuilder) selectTxs() ([]*transactions.Tx, error) {
 	// try including as many standard txs as possible. No need to advance chain time
 	if a.Mempool.HasDecisionTxs() {
-		a.txs = a.Mempool.PeekDecisionTxs(targetBlockSize)
-		return nil
+		return a.Mempool.PeekDecisionTxs(targetBlockSize), nil
 	}
 
 	// try rewarding stakers whose staking period ends at current chain time.
 	stakerTxID, shouldReward, err := a.builder.getNextStakerToReward(a.parentState)
 	if err != nil {
-		return fmt.Errorf("could not find next staker to reward %s", err)
+		return nil, fmt.Errorf("could not find next staker to reward: %w", err)
 	}
 	if shouldReward {
 		rewardValidatorTx, err := a.txBuilder.NewRewardValidatorTx(stakerTxID)
 		if err != nil {
-			return fmt.Errorf("could not build tx to reward staker %s", err)
+			return nil, fmt.Errorf("could not build tx to reward staker: %w", err)
 		}
 
-		a.txs = []*transactions.Tx{rewardValidatorTx}
-		return nil
+		return []*transactions.Tx{rewardValidatorTx}, nil
 	}
 
 	// try advancing chain time
 	nextChainTime, shouldAdvanceTime, err := a.builder.getNextChainTime(a.parentState)
 	if err != nil {
-		return fmt.Errorf("could not retrieve next chain time %s", err)
+		return nil, fmt.Errorf("could not retrieve next chain time: %w", err)
 	}
 	if shouldAdvanceTime {
 		advanceTimeTx, err := a.txBuilder.NewAdvanceTimeTx(nextChainTime)
 		if err != nil {
-			return fmt.Errorf("could not build tx to reward staker %s", err)
+			return nil, fmt.Errorf("could not build tx to reward staker: %w", err)
 		}
-		a.txs = []*transactions.Tx{advanceTimeTx}
-		return nil
+		return []*transactions.Tx{advanceTimeTx}, nil
 	}
 
 	tx, err := a.nextProposalTx()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	a.txs = []*transactions.Tx{tx}
-	return nil
+	return []*transactions.Tx{tx}, nil
 }
 
 // Try to get/make a proposal tx to put into a block.
 // Returns an error if there's no suitable proposal tx.
-// Doesn't modify [a.Mempool].
-func (a *apricotStrategy) nextProposalTx() (*transactions.Tx, error) {
+func (a *apricotBuilder) nextProposalTx() (*transactions.Tx, error) {
 	// clean out transactions with an invalid timestamp.
 	a.dropExpiredProposalTxs()
 
@@ -114,20 +98,20 @@ func (a *apricotStrategy) nextProposalTx() (*transactions.Tx, error) {
 	now := a.txExecutorBackend.Clk.Time()
 	advanceTimeTx, err := a.txBuilder.NewAdvanceTimeTx(now)
 	if err != nil {
-		return nil, fmt.Errorf("could not build tx to advance time %s", err)
+		return nil, fmt.Errorf("could not build tx to advance time: %w", err)
 	}
 	return advanceTimeTx, nil
 }
 
-func (a *apricotStrategy) buildBlock() (snowman.Block, error) {
-	if err := a.selectBlockContent(); err != nil {
-		return nil, err
+func (a *apricotBuilder) buildBlock() (snowman.Block, []*transactions.Tx, error) {
+	txs, err := a.selectTxs()
+	if err != nil {
+		return nil, nil, err
 	}
 
 	var (
-		tx           = a.txs[0]
+		tx           = txs[0]
 		statelessBlk blocks.Block
-		err          error
 	)
 	switch tx.Unsigned.(type) {
 	case transactions.StakerTx,
@@ -150,18 +134,15 @@ func (a *apricotStrategy) buildBlock() (snowman.Block, error) {
 		statelessBlk, err = blocks.NewApricotStandardBlock(
 			a.parentBlkID,
 			a.nextHeight,
-			a.txs,
+			txs,
 		)
 
 	default:
-		return nil, fmt.Errorf("unhandled tx type %T, could not include into a block", tx.Unsigned)
+		return nil, nil, fmt.Errorf("unhandled tx type %T, could not include into a block", tx.Unsigned)
 	}
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	// remove selected txs from mempool only when we are sure
-	// a valid block containing it has been generated
-	a.Mempool.Remove(a.txs)
-	return a.blkManager.NewBlock(statelessBlk), nil
+	return a.blkManager.NewBlock(statelessBlk), txs, nil
 }

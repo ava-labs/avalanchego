@@ -16,7 +16,7 @@ import (
 	transactions "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ buildingStrategy = &blueberryStrategy{}
+var _ forkBuilder = &blueberryStrategy{}
 
 type blueberryStrategy struct {
 	*builder
@@ -26,67 +26,45 @@ type blueberryStrategy struct {
 	parentBlkID ids.ID
 	parentState state.Chain
 	height      uint64
-
-	// outputs
-	// All set in [selectBlockContent].
-	txs     []*transactions.Tx
-	blkTime time.Time
 }
 
-func (b *blueberryStrategy) hasContent() (bool, error) {
-	if err := b.selectBlockContent(); err != nil {
-		return false, err
-	}
-
-	if len(b.txs) == 0 {
-		// blueberry allows empty blocks with non-zero timestamp
-		// to move ahead chain time
-		return !b.blkTime.IsZero(), nil
-	}
-
-	return true, nil
-}
-
-// Note: selectBlockContent will only peek into mempool and must not
-// remove any transactions. It's up to the caller to cleanup the mempool
-// if it must
-func (b *blueberryStrategy) selectBlockContent() error {
-	// blkTimestamp is zeroed for Apricot blocks
+// Returns:
+// 1. The transactions we should include in the block
+//    Note that this may be nil -- empty blocks can advance the timestamp.
+// 2. The timestamp for the block
+// Only updates the mempool to remove expired proposal txs.
+// It's up to the caller to cleanup the mempool if necessary.
+func (b *blueberryStrategy) selectTxs() ([]*transactions.Tx, time.Time, error) {
+	// timestamp is zeroed for Apricot blocks
 	// it is set to the proposed chainTime for Blueberry ones
-	blkTime := b.parentState.GetTimestamp()
+	parentTimestamp := b.parentState.GetTimestamp()
 
 	// try including as many standard txs as possible. No need to advance chain time
 	if b.Mempool.HasDecisionTxs() {
-		b.txs = b.Mempool.PeekDecisionTxs(targetBlockSize)
-		b.blkTime = blkTime
-		return nil
+		return b.Mempool.PeekDecisionTxs(targetBlockSize), parentTimestamp, nil
 	}
 
 	// try rewarding stakers whose staking period ends at current chain time.
 	stakerTxID, shouldReward, err := b.builder.getNextStakerToReward(b.parentState)
 	if err != nil {
-		return fmt.Errorf("could not find next staker to reward %s", err)
+		return nil, time.Time{}, fmt.Errorf("could not find next staker to reward: %w", err)
 	}
 	if shouldReward {
 		rewardValidatorTx, err := b.txBuilder.NewRewardValidatorTx(stakerTxID)
 		if err != nil {
-			return fmt.Errorf("could not build tx to reward staker %s", err)
+			return nil, time.Time{}, fmt.Errorf("could not build tx to reward staker: %w", err)
 		}
 
-		b.txs = []*transactions.Tx{rewardValidatorTx}
-		b.blkTime = blkTime
-		return nil
+		return []*transactions.Tx{rewardValidatorTx}, parentTimestamp, nil
 	}
 
 	// try advancing chain time. It may result in empty blocks
 	nextChainTime, shouldAdvanceTime, err := b.getNextChainTime(b.parentState)
 	if err != nil {
-		return fmt.Errorf("could not retrieve next chain time %s", err)
+		return nil, time.Time{}, fmt.Errorf("could not retrieve next chain time: %w", err)
 	}
 	if shouldAdvanceTime {
-		b.txs = nil
-		b.blkTime = nextChainTime
-		return nil
+		return nil, nextChainTime, nil
 	}
 
 	// clean out the mempool's transactions with invalid timestamps.
@@ -95,7 +73,7 @@ func (b *blueberryStrategy) selectBlockContent() error {
 	// try including a mempool proposal tx is available.
 	if !b.Mempool.HasProposalTx() {
 		b.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
-		return errNoPendingBlocks
+		return nil, time.Time{}, errNoPendingBlocks
 	}
 	tx := b.Mempool.PeekProposalTx()
 
@@ -105,47 +83,45 @@ func (b *blueberryStrategy) selectBlockContent() error {
 	startTime := tx.Unsigned.(transactions.StakerTx).StartTime()
 	maxChainStartTime := b.parentState.GetTimestamp().Add(executor.MaxFutureStartTime)
 
-	b.txs = []*transactions.Tx{tx}
+	newTimestamp := parentTimestamp
 	if startTime.After(maxChainStartTime) {
 		// setting blkTime to now to propose moving chain time ahead
-		now := b.txExecutorBackend.Clk.Time()
-		b.blkTime = now
-	} else {
-		b.blkTime = blkTime // do not change chain time
+		newTimestamp = b.txExecutorBackend.Clk.Time()
 	}
-	return nil
+
+	return []*transactions.Tx{tx}, newTimestamp, nil
 }
 
-func (b *blueberryStrategy) buildBlock() (snowman.Block, error) {
-	if err := b.selectBlockContent(); err != nil {
-		return nil, err
+func (b *blueberryStrategy) buildBlock() (snowman.Block, []*transactions.Tx, error) {
+	txs, timestamp, err := b.selectTxs()
+	if err != nil {
+		return nil, nil, err
 	}
 
-	if len(b.txs) == 0 {
+	if len(txs) == 0 {
 		// empty standard block are allowed to move chain time head
 		statelessBlk, err := blocks.NewBlueberryStandardBlock(
-			b.blkTime,
+			timestamp,
 			b.parentBlkID,
 			b.height,
 			nil,
 		)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return b.blkManager.NewBlock(statelessBlk), nil
+		return b.blkManager.NewBlock(statelessBlk), txs, nil
 	}
 
 	var (
-		tx           = b.txs[0]
+		tx           = txs[0]
 		statelessBlk blocks.Block
-		err          error
 	)
 	switch tx.Unsigned.(type) {
 	case transactions.StakerTx,
 		*transactions.RewardValidatorTx,
 		*transactions.AdvanceTimeTx:
 		statelessBlk, err = blocks.NewBlueberryProposalBlock(
-			b.blkTime,
+			timestamp,
 			b.parentBlkID,
 			b.height,
 			tx,
@@ -156,21 +132,18 @@ func (b *blueberryStrategy) buildBlock() (snowman.Block, error) {
 		*transactions.ImportTx,
 		*transactions.ExportTx:
 		statelessBlk, err = blocks.NewBlueberryStandardBlock(
-			b.blkTime,
+			timestamp,
 			b.parentBlkID,
 			b.height,
-			b.txs,
+			txs,
 		)
 
 	default:
-		return nil, fmt.Errorf("unhandled tx type %T, could not include into a block", tx.Unsigned)
+		return nil, nil, fmt.Errorf("unhandled tx type %T, could not include into a block", tx.Unsigned)
 	}
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	// remove selected txs from mempool only when we are sure
-	// a valid block containing it has been generated
-	b.Mempool.Remove(b.txs)
-	return b.blkManager.NewBlock(statelessBlk), nil
+	return b.blkManager.NewBlock(statelessBlk), txs, nil
 }

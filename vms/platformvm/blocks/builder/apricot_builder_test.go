@@ -122,7 +122,10 @@ func TestApricotPickingOrder(t *testing.T) {
 	require.NoError(err)
 	commitBlk := options[0]
 	require.NoError(commitBlk.Verify())
+	abortBlk := options[1]
+	require.NoError(abortBlk.Verify())
 	require.NoError(commitBlk.Accept())
+	require.NoError(abortBlk.Reject())
 	env.Builder.SetPreference(commitBlk.ID())
 
 	// mempool proposal tx is too far in the future. An advance time tx
@@ -146,7 +149,10 @@ func TestApricotPickingOrder(t *testing.T) {
 	require.NoError(err)
 	commitBlk = options[0]
 	require.NoError(commitBlk.Verify())
+	abortBlk = options[1]
+	require.NoError(abortBlk.Verify())
 	require.NoError(commitBlk.Accept())
+	require.NoError(abortBlk.Reject())
 	env.Builder.SetPreference(commitBlk.ID())
 
 	// finally mempool addValidatorTx must be picked
