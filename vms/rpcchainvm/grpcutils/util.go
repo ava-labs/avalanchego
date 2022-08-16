@@ -79,6 +79,7 @@ var (
 		grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt),
 			grpc.MaxCallSendMsgSize(math.MaxInt),
+			grpc.WaitForReady(true),
 		),
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
 			Time:                defaultClientKeepAliveTime,
