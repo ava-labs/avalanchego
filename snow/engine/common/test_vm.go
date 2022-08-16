@@ -52,7 +52,7 @@ type TestVM struct {
 	HealthCheckF          func() (interface{}, error)
 	AppRequestF           func(nodeID ids.NodeID, chainID ids.ID, requestID uint32, deadline time.Time, msg []byte) error
 	AppResponseF          func(nodeID ids.NodeID, chainID ids.ID, requestID uint32, msg []byte) error
-	AppGossipF            func(nodeID ids.NodeID, chainID ids.ID, msg []byte) error
+	AppGossipF            func(nodeID ids.NodeID, msg []byte) error
 	AppRequestFailedF     func(nodeID ids.NodeID, chainID ids.ID, requestID uint32) error
 	VersionF              func() (string, error)
 }
@@ -178,9 +178,9 @@ func (vm *TestVM) AppResponse(nodeID ids.NodeID, chainID ids.ID, requestID uint3
 	return errAppResponse
 }
 
-func (vm *TestVM) AppGossip(nodeID ids.NodeID, chainID ids.ID, msg []byte) error {
+func (vm *TestVM) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	if vm.AppGossipF != nil {
-		return vm.AppGossipF(nodeID, chainID, msg)
+		return vm.AppGossipF(nodeID, msg)
 	}
 	if !vm.CantAppGossip {
 		return nil

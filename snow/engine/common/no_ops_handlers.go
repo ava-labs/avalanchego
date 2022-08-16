@@ -10,7 +10,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -261,24 +260,26 @@ func (nop *noOpChitsHandler) QueryFailed(nodeID ids.NodeID, requestID uint32) er
 }
 
 type noOpAppHandler struct {
-	*snow.Context
+	chainID ids.ID
+	log     logging.Logger
 }
 
-func NewNoOpAppHandler(ctx *snow.Context) AppHandler {
+func NewNoOpAppHandler(chainID ids.ID, logger logging.Logger) AppHandler {
 	return &noOpAppHandler{
-		Context: ctx,
+		chainID: chainID,
+		log:     logger,
 	}
 }
 
 func (nop *noOpAppHandler) AppRequest(nodeID ids.NodeID, chainID ids.ID, requestID uint32, deadline time.Time, _ []byte) error {
 	var op message.Op
-	if nop.ChainID != chainID {
+	if nop.chainID != chainID {
 		op = message.CrossChainAppRequest
 	} else {
 		op = message.AppRequest
 	}
 
-	nop.Log.Debug("dropping request",
+	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", op),
 		zap.Stringer("nodeID", nodeID),
@@ -290,13 +291,13 @@ func (nop *noOpAppHandler) AppRequest(nodeID ids.NodeID, chainID ids.ID, request
 
 func (nop *noOpAppHandler) AppRequestFailed(nodeID ids.NodeID, chainID ids.ID, requestID uint32) error {
 	var op message.Op
-	if nop.ChainID != chainID {
+	if nop.chainID != chainID {
 		op = message.CrossChainAppRequestFailed
 	} else {
 		op = message.AppRequestFailed
 	}
 
-	nop.Log.Debug("dropping request",
+	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", op),
 		zap.Stringer("nodeID", nodeID),
@@ -308,12 +309,12 @@ func (nop *noOpAppHandler) AppRequestFailed(nodeID ids.NodeID, chainID ids.ID, r
 
 func (nop *noOpAppHandler) AppResponse(nodeID ids.NodeID, chainID ids.ID, requestID uint32, _ []byte) error {
 	var op message.Op
-	if nop.ChainID != chainID {
+	if nop.chainID != chainID {
 		op = message.CrossChainAppResponse
 	} else {
 		op = message.AppResponse
 	}
-	nop.Log.Debug("dropping request",
+	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", op),
 		zap.Stringer("nodeID", nodeID),
@@ -323,18 +324,11 @@ func (nop *noOpAppHandler) AppResponse(nodeID ids.NodeID, chainID ids.ID, reques
 	return nil
 }
 
-func (nop *noOpAppHandler) AppGossip(nodeID ids.NodeID, chainID ids.ID, _ []byte) error {
-	var op message.Op
-	if nop.ChainID != chainID {
-		op = message.CrossChainAppGossip
-	} else {
-		op = message.AppGossip
-	}
-	nop.Log.Debug("dropping request",
+func (nop *noOpAppHandler) AppGossip(nodeID ids.NodeID, _ []byte) error {
+	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", op),
+		zap.Stringer("messageOp", message.AppGossip),
 		zap.Stringer("nodeID", nodeID),
-		zap.Stringer("chainID", chainID),
 	)
 	return nil
 }

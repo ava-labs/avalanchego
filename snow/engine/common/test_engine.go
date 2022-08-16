@@ -122,7 +122,7 @@ type EngineTest struct {
 	HealthF                   func() (interface{}, error)
 	GetVMF                    func() VM
 	AppRequestF, AppResponseF func(nodeID ids.NodeID, chainID ids.ID, requestID uint32, msg []byte) error
-	AppGossipF                func(nodeID ids.NodeID, chainID ids.ID, msg []byte) error
+	AppGossipF                func(nodeID ids.NodeID, msg []byte) error
 }
 
 func (e *EngineTest) Default(cant bool) {
@@ -540,9 +540,9 @@ func (e *EngineTest) AppRequestFailed(nodeID ids.NodeID, chainID ids.ID, request
 	return errAppRequestFailed
 }
 
-func (e *EngineTest) AppGossip(nodeID ids.NodeID, chainID ids.ID, msg []byte) error {
+func (e *EngineTest) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	if e.AppGossipF != nil {
-		return e.AppGossipF(nodeID, chainID, msg)
+		return e.AppGossipF(nodeID, msg)
 	}
 	if !e.CantAppGossip {
 		return nil

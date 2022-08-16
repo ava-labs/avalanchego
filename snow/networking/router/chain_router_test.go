@@ -669,7 +669,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 	chainRouter.RegisterRequest(vID, senderCtx.ChainID, receiverCtx.ChainID, uint32(1), message.CrossChainAppRequest)
 
 	msg := []byte("foobar")
-	chainRouter.HandleInbound(mc.InboundAppRequest(senderCtx.ChainID, receiverCtx.ChainID, uint32(1), time.Minute, msg, vID))
+	chainRouter.HandleInbound(mc.InboundCrossChainAppRequest(senderCtx.ChainID, receiverCtx.ChainID, uint32(1), time.Minute, msg, vID))
 
 	// We should have received the new message in the receiver chain
 	require.Equal(t, 2, chainRouter.chains[receiverCtx.ChainID].Len())

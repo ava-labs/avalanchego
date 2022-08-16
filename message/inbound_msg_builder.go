@@ -104,6 +104,14 @@ type InboundMsgBuilder interface {
 	) InboundMessage
 
 	InboundAppRequest(
+		chainID ids.ID,
+		requestID uint32,
+		deadline time.Duration,
+		msg []byte,
+		nodeID ids.NodeID,
+	) InboundMessage
+
+	InboundCrossChainAppRequest(
 		sourceChainID ids.ID,
 		chainID ids.ID,
 		requestID uint32,
@@ -113,6 +121,13 @@ type InboundMsgBuilder interface {
 	) InboundMessage
 
 	InboundAppResponse(
+		chainID ids.ID,
+		requestID uint32,
+		msg []byte,
+		nodeID ids.NodeID,
+	) InboundMessage
+
+	InboundCrossChainAppResponse(
 		sourceChainID ids.ID,
 		chainID ids.ID,
 		requestID uint32,
@@ -467,14 +482,14 @@ func (b *inMsgBuilderWithPacker) InboundCrossChainAppResponse(
 ) InboundMessage {
 	return &inboundMessageWithPacker{
 		inboundMessage: inboundMessage{
-			op: CrossChainAppResponse,
+			op:     CrossChainAppResponse,
 			nodeID: nodeID,
 		},
 		fields: map[Field]interface{}{
-			SourceChainID:      sourceChainID[:],
-			ChainID: destinationChainID[:],
-			RequestID:          requestID,
-			AppBytes:           msg,
+			SourceChainID: sourceChainID[:],
+			ChainID:       destinationChainID[:],
+			RequestID:     requestID,
+			AppBytes:      msg,
 		},
 	}
 }

@@ -294,9 +294,9 @@ func (t *Transitive) AppResponse(nodeID ids.NodeID, chainID ids.ID, requestID ui
 	return t.VM.AppResponse(nodeID, chainID, requestID, response)
 }
 
-func (t *Transitive) AppGossip(nodeID ids.NodeID, chainID ids.ID, msg []byte) error {
+func (t *Transitive) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	// Notify the VM of this message which has been gossiped to it
-	return t.VM.AppGossip(nodeID, chainID, msg)
+	return t.VM.AppGossip(nodeID, msg)
 }
 
 func (t *Transitive) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {

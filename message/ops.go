@@ -52,7 +52,6 @@ const (
 	// Cross-chain messaging:
 	CrossChainAppRequest
 	CrossChainAppResponse
-	CrossChainAppGossip
 
 	// Internal messages (External messages should be added above these):
 	GetAcceptedFrontierFailed
@@ -168,7 +167,6 @@ var (
 		AppResponse,
 
 		CrossChainAppRequest,
-		CrossChainAppGossip,
 		CrossChainAppRequestFailed,
 		CrossChainAppResponse,
 	}
@@ -217,7 +215,6 @@ var (
 		AppRequest:              {},
 		AppGossip:               {},
 		CrossChainAppRequest:    {},
-		CrossChainAppGossip:     {},
 		GetStateSummaryFrontier: {},
 		GetAcceptedStateSummary: {},
 	}
@@ -252,7 +249,6 @@ var (
 		// Cross-chain application messaging
 		CrossChainAppRequest:  {SourceChainID, ChainID, RequestID, Deadline, AppBytes},
 		CrossChainAppResponse: {SourceChainID, ChainID, RequestID, AppBytes},
-		CrossChainAppGossip:   {SourceChainID, ChainID, AppBytes},
 		// State Sync
 		GetStateSummaryFrontier: {ChainID, RequestID, Deadline},
 		StateSummaryFrontier:    {ChainID, RequestID, SummaryBytes},
@@ -265,7 +261,7 @@ func (op Op) Compressible() bool {
 	switch op {
 	case PeerList, Put, Ancestors, PushQuery,
 		AppRequest, AppResponse, AppGossip,
-		CrossChainAppRequest, CrossChainAppResponse, CrossChainAppGossip,
+		CrossChainAppRequest, CrossChainAppResponse,
 		StateSummaryFrontier, GetAcceptedStateSummary, AcceptedStateSummary:
 		return true
 	default:
@@ -315,8 +311,6 @@ func (op Op) String() string {
 		return "cross_chain_app_request"
 	case CrossChainAppResponse:
 		return "cross_chain_app_response"
-	case CrossChainAppGossip:
-		return "cross_chain_app_gossip"
 	case GetStateSummaryFrontier:
 		return "get_state_summary_frontier"
 	case StateSummaryFrontier:

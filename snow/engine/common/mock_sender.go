@@ -101,31 +101,31 @@ func (mr *MockSenderMockRecorder) SendAncestors(nodeID, requestID, containers in
 }
 
 // SendAppGossip mocks base method.
-func (m *MockSender) SendAppGossip(sourceChainID, destinationChainID ids.ID, appGossipBytes []byte) error {
+func (m *MockSender) SendAppGossip(appGossipBytes []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendAppGossip", sourceChainID, destinationChainID, appGossipBytes)
+	ret := m.ctrl.Call(m, "SendAppGossip", appGossipBytes)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SendAppGossip indicates an expected call of SendAppGossip.
-func (mr *MockSenderMockRecorder) SendAppGossip(sourceChainID, destinationChainID, appGossipBytes interface{}) *gomock.Call {
+func (mr *MockSenderMockRecorder) SendAppGossip(appGossipBytes interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendAppGossip", reflect.TypeOf((*MockSender)(nil).SendAppGossip), sourceChainID, destinationChainID, appGossipBytes)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendAppGossip", reflect.TypeOf((*MockSender)(nil).SendAppGossip), appGossipBytes)
 }
 
 // SendAppGossipSpecific mocks base method.
-func (m *MockSender) SendAppGossipSpecific(nodeIDs ids.NodeIDSet, sourceChainID, destinationChainID ids.ID, appGossipBytes []byte) error {
+func (m *MockSender) SendAppGossipSpecific(nodeIDs ids.NodeIDSet, appGossipBytes []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendAppGossipSpecific", nodeIDs, sourceChainID, destinationChainID, appGossipBytes)
+	ret := m.ctrl.Call(m, "SendAppGossipSpecific", nodeIDs, appGossipBytes)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SendAppGossipSpecific indicates an expected call of SendAppGossipSpecific.
-func (mr *MockSenderMockRecorder) SendAppGossipSpecific(nodeIDs, sourceChainID, destinationChainID, appGossipBytes interface{}) *gomock.Call {
+func (mr *MockSenderMockRecorder) SendAppGossipSpecific(nodeIDs, appGossipBytes interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendAppGossipSpecific", reflect.TypeOf((*MockSender)(nil).SendAppGossipSpecific), nodeIDs, sourceChainID, destinationChainID, appGossipBytes)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendAppGossipSpecific", reflect.TypeOf((*MockSender)(nil).SendAppGossipSpecific), nodeIDs, appGossipBytes)
 }
 
 // SendAppRequest mocks base method.
@@ -677,31 +677,31 @@ func (m *MockAppSender) EXPECT() *MockAppSenderMockRecorder {
 }
 
 // SendAppGossip mocks base method.
-func (m *MockAppSender) SendAppGossip(sourceChainID, destinationChainID ids.ID, appGossipBytes []byte) error {
+func (m *MockAppSender) SendAppGossip(appGossipBytes []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendAppGossip", sourceChainID, destinationChainID, appGossipBytes)
+	ret := m.ctrl.Call(m, "SendAppGossip", appGossipBytes)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SendAppGossip indicates an expected call of SendAppGossip.
-func (mr *MockAppSenderMockRecorder) SendAppGossip(sourceChainID, destinationChainID, appGossipBytes interface{}) *gomock.Call {
+func (mr *MockAppSenderMockRecorder) SendAppGossip(appGossipBytes interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendAppGossip", reflect.TypeOf((*MockAppSender)(nil).SendAppGossip), sourceChainID, destinationChainID, appGossipBytes)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendAppGossip", reflect.TypeOf((*MockAppSender)(nil).SendAppGossip), appGossipBytes)
 }
 
 // SendAppGossipSpecific mocks base method.
-func (m *MockAppSender) SendAppGossipSpecific(nodeIDs ids.NodeIDSet, sourceChainID, destinationChainID ids.ID, appGossipBytes []byte) error {
+func (m *MockAppSender) SendAppGossipSpecific(nodeIDs ids.NodeIDSet, appGossipBytes []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendAppGossipSpecific", nodeIDs, sourceChainID, destinationChainID, appGossipBytes)
+	ret := m.ctrl.Call(m, "SendAppGossipSpecific", nodeIDs, appGossipBytes)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SendAppGossipSpecific indicates an expected call of SendAppGossipSpecific.
-func (mr *MockAppSenderMockRecorder) SendAppGossipSpecific(nodeIDs, sourceChainID, destinationChainID, appGossipBytes interface{}) *gomock.Call {
+func (mr *MockAppSenderMockRecorder) SendAppGossipSpecific(nodeIDs, appGossipBytes interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendAppGossipSpecific", reflect.TypeOf((*MockAppSender)(nil).SendAppGossipSpecific), nodeIDs, sourceChainID, destinationChainID, appGossipBytes)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendAppGossipSpecific", reflect.TypeOf((*MockAppSender)(nil).SendAppGossipSpecific), nodeIDs, appGossipBytes)
 }
 
 // SendAppRequest mocks base method.

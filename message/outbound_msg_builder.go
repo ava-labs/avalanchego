@@ -132,22 +132,34 @@ type OutboundMsgBuilder interface {
 	) (OutboundMessage, error)
 
 	AppRequest(
-		sourceChainID ids.ID,
 		chainID ids.ID,
 		requestID uint32,
 		deadline time.Duration,
 		msg []byte,
 	) (OutboundMessage, error)
 
-	AppResponse(
+	CrossChainAppRequest(
 		sourceChainID ids.ID,
+		destinationChainID ids.ID,
+		requestID uint32,
+		deadline time.Duration,
+		msg []byte,
+	) (OutboundMessage, error)
+
+	AppResponse(
 		chainID ids.ID,
 		requestID uint32,
 		msg []byte,
 	) (OutboundMessage, error)
 
-	AppGossip(
+	CrossChainAppResponse(
 		sourceChainID ids.ID,
+		destinationChainID ids.ID,
+		requestID uint32,
+		msg []byte,
+	) (OutboundMessage, error)
+
+	AppGossip(
 		chainID ids.ID,
 		msg []byte,
 	) (OutboundMessage, error)

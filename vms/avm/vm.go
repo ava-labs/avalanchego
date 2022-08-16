@@ -109,7 +109,6 @@ type VM struct {
 	addressTxsIndexer index.AddressTxsIndexer
 
 	uniqueTxs cache.Deduplicator
-	sender    common.AppSender
 }
 
 func (vm *VM) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
@@ -139,7 +138,7 @@ func (vm *VM) Initialize(
 	configBytes []byte,
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
-	sender common.AppSender,
+	_ common.AppSender,
 ) error {
 	avmConfig := Config{}
 	if len(configBytes) > 0 {
@@ -244,7 +243,6 @@ func (vm *VM) Initialize(
 		}
 	}
 
-	vm.sender = sender
 	return vm.db.Commit()
 }
 
@@ -1064,7 +1062,7 @@ func (vm *VM) AppRequestFailed(nodeID ids.NodeID, chainID ids.ID, requestID uint
 }
 
 // This VM doesn't (currently) have any app-specific messages
-func (vm *VM) AppGossip(nodeID ids.NodeID, chainID ids.ID, msg []byte) error {
+func (vm *VM) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	return nil
 }
 

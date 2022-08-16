@@ -214,8 +214,6 @@ message AppGossipMsg {
   bytes node_id = 1;
   // The message body
   bytes msg = 2;
-  // The chain id that sent us a gossip message
-  bytes chain_id = 3;
 }
 
 message ConnectedRequest {

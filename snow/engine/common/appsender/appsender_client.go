@@ -61,19 +61,17 @@ func (c *Client) SendAppResponse(nodeID ids.NodeID, sourceChainID ids.ID, destin
 	return err
 }
 
-func (c *Client) SendAppGossip(sourceChainID ids.ID, destinationChainID ids.ID, msg []byte) error {
+func (c *Client) SendAppGossip(msg []byte) error {
 	_, err := c.client.SendAppGossip(
 		context.Background(),
 		&appsenderpb.SendAppGossipMsg{
-			SourceChainId:      sourceChainID[:],
-			DestinationChainId: destinationChainID[:],
-			Msg:                msg,
+			Msg: msg,
 		},
 	)
 	return err
 }
 
-func (c *Client) SendAppGossipSpecific(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, msg []byte) error {
+func (c *Client) SendAppGossipSpecific(nodeIDs ids.NodeIDSet, msg []byte) error {
 	nodeIDsBytes := make([][]byte, nodeIDs.Len())
 	i := 0
 	for nodeID := range nodeIDs {
@@ -85,10 +83,8 @@ func (c *Client) SendAppGossipSpecific(nodeIDs ids.NodeIDSet, sourceChainID ids.
 	_, err := c.client.SendAppGossipSpecific(
 		context.Background(),
 		&appsenderpb.SendAppGossipSpecificMsg{
-			NodeIds:            nodeIDsBytes,
-			SourceChainId:      sourceChainID[:],
-			DestinationChainId: destinationChainID[:],
-			Msg:                msg,
+			NodeIds: nodeIDsBytes,
+			Msg:     msg,
 		},
 	)
 	return err

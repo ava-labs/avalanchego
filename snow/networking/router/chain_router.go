@@ -202,7 +202,7 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 
 	switch op {
 	case message.CrossChainAppRequest, message.CrossChainAppResponse,
-		message.CrossChainAppGossip, message.CrossChainAppRequestFailed:
+		message.CrossChainAppRequestFailed:
 		sourceChainID, err = ids.ToID(msg.Get(message.SourceChainID).([]byte))
 		cr.log.AssertNoError(err)
 	default:
@@ -215,7 +215,7 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	// Here we assign the requestID already in use for gossiped containers
 	// to allow a uniform handling of all messages
 	var requestID uint32
-	if op == message.AppGossip || op == message.CrossChainAppGossip {
+	if op == message.AppGossip {
 		requestID = constants.GossipMsgRequestID
 	} else {
 		// Invariant: Getting a [RequestID] must never error in the handler. Any

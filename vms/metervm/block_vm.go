@@ -161,6 +161,6 @@ func (vm *blockVM) AppRequestFailed(nodeID ids.NodeID, chainID ids.ID, requestID
 	return vm.ChainVM.AppRequestFailed(nodeID, chainID, requestID)
 }
 
-func (vm *blockVM) AppGossip(nodeID ids.NodeID, chainID ids.ID, msg []byte) error {
-	return vm.ChainVM.AppGossip(nodeID, chainID, msg)
+func (vm *blockVM) AppGossip(nodeID ids.NodeID, msg []byte) error {
+	return vm.ChainVM.AppGossip(nodeID, msg)
 }

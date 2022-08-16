@@ -845,6 +845,19 @@ func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, des
 		failedOp = message.AppRequestFailed
 	}
 
+	// Only local cross-chain messages are currently supported
+	if crossChain && nodeIDs.Contains(s.ctx.NodeID) && nodeIDs.Len() > 1 {
+		s.ctx.Log.Debug(
+			"Only local cross-chain messages are supported, dropping messages to peers.",
+			zap.Int("dropped", nodeIDs.Len()-1),
+		)
+
+		self := ids.NodeIDSet{}
+		self.Add(s.ctx.NodeID)
+
+		nodeIDs = self
+	}
+
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
 	// We register timeouts for all nodes, regardless of whether we fail
@@ -864,7 +877,13 @@ func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, des
 	// Just put it right into the router. Do so asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
-		inMsg := s.msgCreator.InboundAppRequest(sourceChainID, destinationChainID, requestID, deadline, appRequestBytes, s.ctx.NodeID)
+		var inMsg message.InboundMessage
+
+		if crossChain {
+			inMsg = s.msgCreator.InboundCrossChainAppRequest(sourceChainID, destinationChainID, requestID, deadline, appRequestBytes, s.ctx.NodeID)
+		} else {
+			inMsg = s.msgCreator.InboundAppRequest(destinationChainID, requestID, deadline, appRequestBytes, s.ctx.NodeID)
+		}
 		go s.router.HandleInbound(inMsg)
 	}
 
@@ -884,7 +903,7 @@ func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, des
 
 	// Create the outbound message.
 	// [sentTo] are the IDs of nodes who may receive the message.
-	outMsg, err := s.msgCreator.AppRequest(sourceChainID, destinationChainID, requestID, deadline, appRequestBytes)
+	outMsg, err := s.msgCreator.AppRequest(destinationChainID, requestID, deadline, appRequestBytes)
 
 	// Send the message over the network.
 	var sentTo ids.NodeIDSet
@@ -940,6 +959,11 @@ func (s *sender) SendAppResponse(nodeID ids.NodeID, requestID uint32, appRespons
 		return nil
 	}
 
+	var (
+		outMsg message.OutboundMessage
+		op     message.Op
+		err    error
+	)
 	// Create the outbound message.
 	outMsg, err := msgCreator.AppResponse(s.ctx.ChainID, requestID, appResponseBytes)
 	if err != nil {
@@ -1019,8 +1043,7 @@ func (s *sender) SendAppGossip(appGossipBytes []byte) error {
 	if err != nil {
 		s.ctx.Log.Error("failed to build message",
 			zap.Stringer("messageOp", message.AppGossip),
-			zap.Stringer("sourceChainID", sourceChainID),
-			zap.Stringer("chainID", destinationChainID),
+			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Binary("payload", appGossipBytes),
 			zap.Error(err),
 		)
@@ -1035,11 +1058,11 @@ func (s *sender) SendAppGossip(appGossipBytes []byte) error {
 	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
 			zap.Stringer("messageOp", outMsg.Op()),
-			zap.Stringer("chainID", destinationChainID),
+			zap.Stringer("chainID", s.ctx.ChainID),
 		)
 		s.ctx.Log.Verbo("failed to send message",
 			zap.Stringer("messageOp", outMsg.Op()),
-			zap.Stringer("chainID", destinationChainID),
+			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Binary("payload", appGossipBytes),
 		)
 	}

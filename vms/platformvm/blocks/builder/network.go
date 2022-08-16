@@ -145,5 +145,5 @@ func (n *network) GossipTx(tx *txs.Tx) error {
 	if err != nil {
 		return fmt.Errorf("GossipTx: failed to build Tx message: %w", err)
 	}
-	return n.appSender.SendAppGossip(n.ctx.ChainID, n.ctx.ChainID, msgBytes)
+	return n.appSender.SendAppGossip(msgBytes)
 }

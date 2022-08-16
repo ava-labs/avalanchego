@@ -44,17 +44,17 @@ func (m *MockChainVM) EXPECT() *MockChainVMMockRecorder {
 }
 
 // AppGossip mocks base method.
-func (m *MockChainVM) AppGossip(nodeID ids.NodeID, chainID ids.ID, msg []byte) error {
+func (m *MockChainVM) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AppGossip", nodeID, chainID, msg)
+	ret := m.ctrl.Call(m, "AppGossip", nodeID, msg)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AppGossip indicates an expected call of AppGossip.
-func (mr *MockChainVMMockRecorder) AppGossip(nodeID, chainID, msg interface{}) *gomock.Call {
+func (mr *MockChainVMMockRecorder) AppGossip(nodeID, msg interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppGossip", reflect.TypeOf((*MockChainVM)(nil).AppGossip), nodeID, chainID, msg)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppGossip", reflect.TypeOf((*MockChainVM)(nil).AppGossip), nodeID, msg)
 }
 
 // AppRequest mocks base method.

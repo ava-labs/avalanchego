@@ -65,15 +65,7 @@ func (s *Server) SendAppResponse(_ context.Context, req *appsenderpb.SendAppResp
 }
 
 func (s *Server) SendAppGossip(_ context.Context, req *appsenderpb.SendAppGossipMsg) (*emptypb.Empty, error) {
-	sourceChainID, err := ids.ToID(req.SourceChainId)
-	if err != nil {
-		return nil, err
-	}
-	destinationChainID, err := ids.ToID(req.DestinationChainId)
-	if err != nil {
-		return nil, err
-	}
-	err = s.appSender.SendAppGossip(sourceChainID, destinationChainID, req.Msg)
+	err := s.appSender.SendAppGossip(req.Msg)
 	return &emptypb.Empty{}, err
 }
 
@@ -86,14 +78,7 @@ func (s *Server) SendAppGossipSpecific(_ context.Context, req *appsenderpb.SendA
 		}
 		nodeIDs.Add(nodeID)
 	}
-	sourceChainID, err := ids.ToID(req.SourceChainId)
-	if err != nil {
-		return nil, err
-	}
-	destinationChainID, err := ids.ToID(req.DestinationChainId)
-	if err != nil {
-		return nil, err
-	}
-	err = s.appSender.SendAppGossipSpecific(nodeIDs, sourceChainID, destinationChainID, req.Msg)
+
+	err := s.appSender.SendAppGossipSpecific(nodeIDs, req.Msg)
 	return &emptypb.Empty{}, err
 }

@@ -140,6 +140,6 @@ type AppSender interface {
 	SendAppResponse(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, appResponseBytes []byte) error
 	// Gossip an application-level message.
 	// A non-nil error should be considered fatal.
-	SendAppGossip(sourceChainID ids.ID, destinationChainID ids.ID, appGossipBytes []byte) error
-	SendAppGossipSpecific(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, appGossipBytes []byte) error
+	SendAppGossip(appGossipBytes []byte) error
+	SendAppGossipSpecific(nodeIDs ids.NodeIDSet, appGossipBytes []byte) error
 }

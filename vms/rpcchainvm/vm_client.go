@@ -597,13 +597,12 @@ func (vm *VMClient) AppRequestFailed(nodeID ids.NodeID, chainID ids.ID, requestI
 	return err
 }
 
-func (vm *VMClient) AppGossip(nodeID ids.NodeID, chainID ids.ID, msg []byte) error {
+func (vm *VMClient) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	_, err := vm.client.AppGossip(
 		context.Background(),
 		&vmpb.AppGossipMsg{
-			NodeId:  nodeID[:],
-			ChainId: chainID[:],
-			Msg:     msg,
+			NodeId: nodeID[:],
+			Msg:    msg,
 		},
 	)
 	return err

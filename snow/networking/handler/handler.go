@@ -233,7 +233,7 @@ func (h *handler) HealthCheck() (interface{}, error) {
 func (h *handler) Push(msg message.InboundMessage) {
 	switch msg.Op() {
 	case message.AppRequest, message.AppGossip, message.AppRequestFailed, message.AppResponse,
-		message.CrossChainAppRequest, message.CrossChainAppGossip, message.CrossChainAppRequestFailed, message.CrossChainAppResponse:
+		message.CrossChainAppRequest, message.CrossChainAppRequestFailed, message.CrossChainAppResponse:
 		h.asyncMessageQueue.Push(msg)
 	default:
 		h.syncMessageQueue.Push(msg)
@@ -976,14 +976,6 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 			return err
 		}
 		return engine.AppRequestFailed(nodeID, sourceChainID, reqID)
-
-	case message.CrossChainAppGossip:
-		appBytes := msg.Get(message.AppBytes).([]byte)
-		sourceChainID, err := ids.ToID(msg.Get(message.SourceChainID).([]byte))
-		if err != nil {
-			return err
-		}
-		return engine.AppGossip(nodeID, sourceChainID, appBytes)
 
 	default:
 		return fmt.Errorf(

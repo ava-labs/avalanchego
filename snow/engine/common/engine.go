@@ -449,7 +449,7 @@ type AppHandler interface {
 	//
 	// A node may gossip the same message multiple times. That is,
 	// AppGossip([nodeID], [msg]) may be called multiple times.
-	AppGossip(nodeID ids.NodeID, chainID ids.ID, msg []byte) error
+	AppGossip(nodeID ids.NodeID, msg []byte) error
 }
 
 // InternalHandler defines how this consensus engine reacts to messages from

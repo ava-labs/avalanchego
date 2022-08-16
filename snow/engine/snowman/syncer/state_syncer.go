@@ -98,7 +98,7 @@ func New(
 		PutHandler:              common.NewNoOpPutHandler(cfg.Ctx.Log),
 		QueryHandler:            common.NewNoOpQueryHandler(cfg.Ctx.Log),
 		ChitsHandler:            common.NewNoOpChitsHandler(cfg.Ctx.Log),
-		AppHandler:              common.NewNoOpAppHandler(cfg.Ctx.Context),
+		AppHandler:              common.NewNoOpAppHandler(cfg.Ctx.ChainID, cfg.Ctx.Log),
 		stateSyncVM:             ssVM,
 		onDoneStateSyncing:      onDoneStateSyncing,
 	}

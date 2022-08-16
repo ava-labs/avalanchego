@@ -521,11 +521,7 @@ func (vm *VMServer) AppGossip(_ context.Context, req *vmpb.AppGossipMsg) (*empty
 	if err != nil {
 		return nil, err
 	}
-	chainID, err := ids.ToID(req.ChainId)
-	if err != nil {
-		return nil, err
-	}
-	return &emptypb.Empty{}, vm.vm.AppGossip(nodeID, chainID, req.Msg)
+	return &emptypb.Empty{}, vm.vm.AppGossip(nodeID, req.Msg)
 }
 
 func (vm *VMServer) Gather(context.Context, *emptypb.Empty) (*vmpb.GatherResponse, error) {
