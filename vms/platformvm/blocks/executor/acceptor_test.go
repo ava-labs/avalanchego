@@ -336,7 +336,6 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		s.EXPECT().SetHeight(blk.Height()).Times(1),
 		s.EXPECT().AddStatelessBlock(blk, choices.Accepted).Times(1),
 
-		parentOnAcceptState.EXPECT().Apply(s).Times(1),
 		onAcceptState.EXPECT().Apply(s).Times(1),
 		s.EXPECT().Commit().Return(nil).Times(1),
 	)
@@ -427,7 +426,6 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 		s.EXPECT().SetHeight(blk.Height()).Times(1),
 		s.EXPECT().AddStatelessBlock(blk, choices.Accepted).Times(1),
 
-		parentOnAcceptState.EXPECT().Apply(s).Times(1),
 		onAcceptState.EXPECT().Apply(s).Times(1),
 		s.EXPECT().Commit().Return(nil).Times(1),
 	)

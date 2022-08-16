@@ -294,11 +294,21 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 				tt.setup(freshTH)
 			}
 
+			onCommitState, err := state.NewDiff(lastAcceptedID, freshTH)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			onAbortState, err := state.NewDiff(lastAcceptedID, freshTH)
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			executor := ProposalTxExecutor{
-				Backend:          &freshTH.backend,
-				ReferenceBlockID: lastAcceptedID,
-				StateVersions:    freshTH,
-				Tx:               tx,
+				OnCommitState: onCommitState,
+				OnAbortState:  onAbortState,
+				Backend:       &freshTH.backend,
+				Tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			if err != nil && !tt.shouldErr {
@@ -338,11 +348,21 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			Backend:          &env.backend,
-			ReferenceBlockID: lastAcceptedID,
-			StateVersions:    env,
-			Tx:               tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -368,11 +388,21 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			Backend:          &env.backend,
-			ReferenceBlockID: lastAcceptedID,
-			StateVersions:    env,
-			Tx:               tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err != nil {
@@ -420,11 +450,21 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			Backend:          &env.backend,
-			ReferenceBlockID: lastAcceptedID,
-			StateVersions:    env,
-			Tx:               tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -466,11 +506,21 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			Backend:          &env.backend,
-			ReferenceBlockID: lastAcceptedID,
-			StateVersions:    env,
-			Tx:               tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -494,11 +544,21 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			Backend:          &env.backend,
-			ReferenceBlockID: lastAcceptedID,
-			StateVersions:    env,
-			Tx:               tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -522,11 +582,21 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			Backend:          &env.backend,
-			ReferenceBlockID: lastAcceptedID,
-			StateVersions:    env,
-			Tx:               tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err != nil {
@@ -553,11 +623,21 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			Backend:          &env.backend,
-			ReferenceBlockID: lastAcceptedID,
-			StateVersions:    env,
-			Tx:               tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -612,11 +692,21 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			Backend:          &env.backend,
-			ReferenceBlockID: lastAcceptedID,
-			StateVersions:    env,
-			Tx:               duplicateSubnetTx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            duplicateSubnetTx,
 		}
 		err = duplicateSubnetTx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -645,11 +735,21 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			Backend:          &env.backend,
-			ReferenceBlockID: lastAcceptedID,
-			StateVersions:    env,
-			Tx:               tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -679,11 +779,21 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 		addSubnetValidatorTx.SyntacticallyVerified = false
 
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			Backend:          &env.backend,
-			ReferenceBlockID: lastAcceptedID,
-			StateVersions:    env,
-			Tx:               tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -712,11 +822,21 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		}
 		copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			Backend:          &env.backend,
-			ReferenceBlockID: lastAcceptedID,
-			StateVersions:    env,
-			Tx:               tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -753,11 +873,22 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 		if err := env.state.Commit(); err != nil {
 			t.Fatal(err)
 		}
+
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			Backend:          &env.backend,
-			ReferenceBlockID: lastAcceptedID,
-			StateVersions:    env,
-			Tx:               tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -798,11 +929,21 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			Backend:          &env.backend,
-			ReferenceBlockID: lastAcceptedID,
-			StateVersions:    env,
-			Tx:               tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -826,11 +967,21 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			Backend:          &env.backend,
-			ReferenceBlockID: lastAcceptedID,
-			StateVersions:    env,
-			Tx:               tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -854,11 +1005,21 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			Backend:          &env.backend,
-			ReferenceBlockID: lastAcceptedID,
-			StateVersions:    env,
-			Tx:               tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -903,11 +1064,21 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			Backend:          &env.backend,
-			ReferenceBlockID: lastAcceptedID,
-			StateVersions:    env,
-			Tx:               tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -940,11 +1111,21 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			env.state.DeleteUTXO(utxoID)
 		}
 
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			Backend:          &env.backend,
-			ReferenceBlockID: lastAcceptedID,
-			StateVersions:    env,
-			Tx:               tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -1000,11 +1181,21 @@ func TestBlueberryAddValidatorTxEmptyNodeID(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		executor := ProposalTxExecutor{
-			Backend:          &env.backend,
-			ReferenceBlockID: lastAcceptedID,
-			StateVersions:    env,
-			Tx:               tx,
+			OnCommitState: onCommitState,
+			OnAbortState:  onAbortState,
+			Backend:       &env.backend,
+			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		assert.ErrorIs(t, err, test.expectedError)

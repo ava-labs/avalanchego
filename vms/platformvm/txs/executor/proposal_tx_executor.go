@@ -53,19 +53,21 @@ var (
 type ProposalTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
-
-	// Apricot proposalTxs are validated against some parent state parameters
-	// On the contrary, Blueberry proposalTxs are validated again the current
-	// block state, which is generated processing block timestamp
-	ReferenceBlockID ids.ID
-
-	StateVersions state.Versions
-
 	Tx *txs.Tx
+	// [OnCommitState] is the state used for validation.
+	// In practice, both [OnCommitState] and [onAbortState] are
+	// identical when passed into this struct, so we could use either.
+	// [OnCommitState] is modified by this struct's methods to
+	// reflect changes made to the state if the proposal is committed.
+	OnCommitState state.Diff
+	// [OnAbortState] is modified by this struct's methods to
+	// reflect changes made to the state if the proposal is aborted.
+	OnAbortState state.Diff
 
-	// outputs of visitor execution
-	OnCommit      state.Diff
-	OnAbort       state.Diff
+	// outputs populated by this struct's methods.
+	//
+	// [PrefersCommit] is true iff this node initially prefers to
+	// commit this block transaction.
 	PrefersCommit bool
 }
 
@@ -105,12 +107,7 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		return errStakeTooLong
 	}
 
-	parentState, ok := e.StateVersions.GetState(e.ReferenceBlockID)
-	if !ok {
-		return state.ErrMissingParentState
-	}
-
-	currentTimestamp := parentState.GetTimestamp()
+	currentTimestamp := e.OnCommitState.GetTimestamp()
 
 	// Blueberry disallows creating a validator with the empty ID.
 	if !currentTimestamp.Before(e.Config.BlueberryTime) {
@@ -134,7 +131,7 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 			)
 		}
 
-		_, err := GetValidator(parentState, constants.PrimaryNetworkID, tx.Validator.NodeID)
+		_, err := GetValidator(e.OnCommitState, constants.PrimaryNetworkID, tx.Validator.NodeID)
 		if err == nil {
 			return fmt.Errorf(
 				"attempted to issue duplicate validation for %s",
@@ -152,7 +149,7 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		// Verify the flowcheck
 		if err := e.FlowChecker.VerifySpend(
 			tx,
-			parentState,
+			e.OnCommitState,
 			tx.Ins,
 			outs,
 			e.Tx.Creds,
@@ -175,33 +172,21 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	txID := e.Tx.ID()
 
 	// Set up the state if this tx is committed
-	onCommit, err := state.NewDiff(e.ReferenceBlockID, e.StateVersions)
-	if err != nil {
-		return err
-	}
-	e.OnCommit = onCommit
-
 	// Consume the UTXOS
-	utxo.Consume(e.OnCommit, tx.Ins)
+	utxo.Consume(e.OnCommitState, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.OnCommit, txID, tx.Outs)
+	utxo.Produce(e.OnCommitState, txID, tx.Outs)
 
 	newStaker := state.NewPrimaryNetworkStaker(txID, &tx.Validator)
 	newStaker.NextTime = newStaker.StartTime
 	newStaker.Priority = state.PrimaryNetworkValidatorPendingPriority
-	e.OnCommit.PutPendingValidator(newStaker)
+	e.OnCommitState.PutPendingValidator(newStaker)
 
 	// Set up the state if this tx is aborted
-	onAbort, err := state.NewDiff(e.ReferenceBlockID, e.StateVersions)
-	if err != nil {
-		return err
-	}
-	e.OnAbort = onAbort
-
 	// Consume the UTXOS
-	utxo.Consume(e.OnAbort, tx.Ins)
+	utxo.Consume(e.OnAbortState, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.OnAbort, txID, outs)
+	utxo.Produce(e.OnAbortState, txID, outs)
 
 	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
@@ -228,13 +213,8 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		return errWrongNumberOfCredentials
 	}
 
-	parentState, ok := e.StateVersions.GetState(e.ReferenceBlockID)
-	if !ok {
-		return state.ErrMissingParentState
-	}
-
 	if e.Bootstrapped.GetValue() {
-		currentTimestamp := parentState.GetTimestamp()
+		currentTimestamp := e.OnCommitState.GetTimestamp()
 		// Ensure the proposed validator starts after the current timestamp
 		validatorStartTime := tx.StartTime()
 		if !currentTimestamp.Before(validatorStartTime) {
@@ -245,7 +225,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 			)
 		}
 
-		_, err := GetValidator(parentState, tx.Validator.Subnet, tx.Validator.NodeID)
+		_, err := GetValidator(e.OnCommitState, tx.Validator.Subnet, tx.Validator.NodeID)
 		if err == nil {
 			return fmt.Errorf(
 				"attempted to issue duplicate subnet validation for %s",
@@ -260,7 +240,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 			)
 		}
 
-		primaryNetworkValidator, err := GetValidator(parentState, constants.PrimaryNetworkID, tx.Validator.NodeID)
+		primaryNetworkValidator, err := GetValidator(e.OnCommitState, constants.PrimaryNetworkID, tx.Validator.NodeID)
 		if err != nil {
 			return fmt.Errorf(
 				"failed to fetch the primary network validator for %s: %w",
@@ -279,7 +259,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		baseTxCreds := e.Tx.Creds[:baseTxCredsLen]
 		subnetCred := e.Tx.Creds[baseTxCredsLen]
 
-		subnetIntf, _, err := parentState.GetTx(tx.Validator.Subnet)
+		subnetIntf, _, err := e.OnCommitState.GetTx(tx.Validator.Subnet)
 		if err != nil {
 			return fmt.Errorf(
 				"couldn't find subnet %q: %w",
@@ -303,7 +283,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		// Verify the flowcheck
 		if err := e.FlowChecker.VerifySpend(
 			tx,
-			parentState,
+			e.OnCommitState,
 			tx.Ins,
 			tx.Outs,
 			baseTxCreds,
@@ -326,33 +306,21 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	txID := e.Tx.ID()
 
 	// Set up the state if this tx is committed
-	onCommit, err := state.NewDiff(e.ReferenceBlockID, e.StateVersions)
-	if err != nil {
-		return err
-	}
-	e.OnCommit = onCommit
-
 	// Consume the UTXOS
-	utxo.Consume(e.OnCommit, tx.Ins)
+	utxo.Consume(e.OnCommitState, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.OnCommit, txID, tx.Outs)
+	utxo.Produce(e.OnCommitState, txID, tx.Outs)
 
 	newStaker := state.NewSubnetStaker(txID, &tx.Validator)
 	newStaker.NextTime = newStaker.StartTime
 	newStaker.Priority = state.SubnetValidatorPendingPriority
-	e.OnCommit.PutPendingValidator(newStaker)
+	e.OnCommitState.PutPendingValidator(newStaker)
 
 	// Set up the state if this tx is aborted
-	onAbort, err := state.NewDiff(e.ReferenceBlockID, e.StateVersions)
-	if err != nil {
-		return err
-	}
-	e.OnAbort = onAbort
-
 	// Consume the UTXOS
-	utxo.Consume(e.OnAbort, tx.Ins)
+	utxo.Consume(e.OnAbortState, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.OnAbort, txID, tx.Outs)
+	utxo.Produce(e.OnAbortState, txID, tx.Outs)
 
 	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
@@ -383,11 +351,6 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.Stake)
 
-	parentState, ok := e.StateVersions.GetState(e.ReferenceBlockID)
-	if !ok {
-		return state.ErrMissingParentState
-	}
-
 	txID := e.Tx.ID()
 
 	newStaker := state.NewPrimaryNetworkStaker(txID, &tx.Validator)
@@ -395,7 +358,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	newStaker.Priority = state.PrimaryNetworkDelegatorPendingPriority
 
 	if e.Bootstrapped.GetValue() {
-		currentTimestamp := parentState.GetTimestamp()
+		currentTimestamp := e.OnCommitState.GetTimestamp()
 		// Ensure the proposed validator starts after the current timestamp
 		validatorStartTime := tx.StartTime()
 		if !currentTimestamp.Before(validatorStartTime) {
@@ -406,7 +369,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 			)
 		}
 
-		primaryNetworkValidator, err := GetValidator(parentState, constants.PrimaryNetworkID, tx.Validator.NodeID)
+		primaryNetworkValidator, err := GetValidator(e.OnCommitState, constants.PrimaryNetworkID, tx.Validator.NodeID)
 		if err != nil {
 			return fmt.Errorf(
 				"failed to fetch the primary network validator for %s: %w",
@@ -424,7 +387,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 			maximumWeight = math.Min64(maximumWeight, e.Config.MaxValidatorStake)
 		}
 
-		canDelegate, err := canDelegate(parentState, primaryNetworkValidator, maximumWeight, newStaker)
+		canDelegate, err := canDelegate(e.OnCommitState, primaryNetworkValidator, maximumWeight, newStaker)
 		if err != nil {
 			return err
 		}
@@ -435,7 +398,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		// Verify the flowcheck
 		if err := e.FlowChecker.VerifySpend(
 			tx,
-			parentState,
+			e.OnCommitState,
 			tx.Ins,
 			outs,
 			e.Tx.Creds,
@@ -456,30 +419,18 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	}
 
 	// Set up the state if this tx is committed
-	onCommit, err := state.NewDiff(e.ReferenceBlockID, e.StateVersions)
-	if err != nil {
-		return err
-	}
-	e.OnCommit = onCommit
-
 	// Consume the UTXOS
-	utxo.Consume(e.OnCommit, tx.Ins)
+	utxo.Consume(e.OnCommitState, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.OnCommit, txID, tx.Outs)
+	utxo.Produce(e.OnCommitState, txID, tx.Outs)
 
-	e.OnCommit.PutPendingDelegator(newStaker)
+	e.OnCommitState.PutPendingDelegator(newStaker)
 
 	// Set up the state if this tx is aborted
-	onAbort, err := state.NewDiff(e.ReferenceBlockID, e.StateVersions)
-	if err != nil {
-		return err
-	}
-	e.OnAbort = onAbort
-
 	// Consume the UTXOS
-	utxo.Consume(e.OnAbort, tx.Ins)
+	utxo.Consume(e.OnAbortState, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.OnAbort, txID, outs)
+	utxo.Produce(e.OnAbortState, txID, outs)
 
 	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
@@ -493,14 +444,9 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		return errWrongNumberOfCredentials
 	}
 
-	parentState, ok := e.StateVersions.GetState(e.ReferenceBlockID)
-	if !ok {
-		return state.ErrMissingParentState
-	}
-
 	// Only allow timestamp to move forward as far as the time of next staker
 	// set change time
-	nextStakerChangeTime, err := GetNextStakerChangeTime(parentState)
+	nextStakerChangeTime, err := GetNextStakerChangeTime(e.OnCommitState)
 	if err != nil {
 		return err
 	}
@@ -509,7 +455,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 	var (
 		proposedChainTime = tx.Timestamp()
 		now               = e.Clk.Time()
-		currentChainTime  = parentState.GetTimestamp()
+		currentChainTime  = e.OnCommitState.GetTimestamp()
 	)
 	if err := ValidateProposedChainTime(
 		proposedChainTime,
@@ -521,42 +467,34 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		return err
 	}
 
-	updated, err := UpdateStakerSet(parentState, proposedChainTime, e.Backend.Rewards)
+	updated, err := UpdateStakerSet(e.OnCommitState, proposedChainTime, e.Backend.Rewards)
 	if err != nil {
 		return err
 	}
 
-	e.OnCommit, err = state.NewDiff(e.ReferenceBlockID, e.StateVersions)
-	if err != nil {
-		return err
-	}
-
-	e.OnCommit.SetTimestamp(proposedChainTime)
-	e.OnCommit.SetCurrentSupply(updated.Supply)
+	// Update the state if this tx is committed
+	e.OnCommitState.SetTimestamp(proposedChainTime)
+	e.OnCommitState.SetCurrentSupply(updated.Supply)
 
 	for _, currentValidatorToAdd := range updated.CurrentValidatorsToAdd {
-		e.OnCommit.PutCurrentValidator(currentValidatorToAdd)
+		e.OnCommitState.PutCurrentValidator(currentValidatorToAdd)
 	}
 	for _, pendingValidatorToRemove := range updated.PendingValidatorsToRemove {
-		e.OnCommit.DeletePendingValidator(pendingValidatorToRemove)
+		e.OnCommitState.DeletePendingValidator(pendingValidatorToRemove)
 	}
 	for _, currentDelegatorToAdd := range updated.CurrentDelegatorsToAdd {
-		e.OnCommit.PutCurrentDelegator(currentDelegatorToAdd)
+		e.OnCommitState.PutCurrentDelegator(currentDelegatorToAdd)
 	}
 	for _, pendingDelegatorToRemove := range updated.PendingDelegatorsToRemove {
-		e.OnCommit.DeletePendingDelegator(pendingDelegatorToRemove)
+		e.OnCommitState.DeletePendingDelegator(pendingDelegatorToRemove)
 	}
 	for _, currentValidatorToRemove := range updated.CurrentValidatorsToRemove {
-		e.OnCommit.DeleteCurrentValidator(currentValidatorToRemove)
-	}
-
-	// State doesn't change if this proposal is aborted
-	e.OnAbort, err = state.NewDiff(e.ReferenceBlockID, e.StateVersions)
-	if err != nil {
-		return err
+		e.OnCommitState.DeleteCurrentValidator(currentValidatorToRemove)
 	}
 
 	e.PrefersCommit = !proposedChainTime.After(now.Add(SyncBound))
+
+	// Note that state doesn't change if this proposal is aborted
 	return nil
 }
 
@@ -570,12 +508,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return errWrongNumberOfCredentials
 	}
 
-	parentState, ok := e.StateVersions.GetState(e.ReferenceBlockID)
-	if !ok {
-		return state.ErrMissingParentState
-	}
-
-	currentStakerIterator, err := parentState.GetCurrentStakerIterator()
+	currentStakerIterator, err := e.OnCommitState.GetCurrentStakerIterator()
 	if err != nil {
 		return err
 	}
@@ -594,7 +527,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	}
 
 	// Verify that the chain's timestamp is the validator's end time
-	currentChainTime := parentState.GetTimestamp()
+	currentChainTime := e.OnCommitState.GetTimestamp()
 	if !stakerToRemove.EndTime.Equal(currentChainTime) {
 		return fmt.Errorf(
 			"attempting to remove TxID: %s before their end time %s",
@@ -603,28 +536,18 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		)
 	}
 
-	stakerTx, _, err := parentState.GetTx(stakerToRemove.TxID)
+	stakerTx, _, err := e.OnCommitState.GetTx(stakerToRemove.TxID)
 	if err != nil {
 		return fmt.Errorf("failed to get next removed staker tx: %w", err)
 	}
 
-	e.OnCommit, err = state.NewDiff(e.ReferenceBlockID, e.StateVersions)
-	if err != nil {
-		return err
-	}
-
-	e.OnAbort, err = state.NewDiff(e.ReferenceBlockID, e.StateVersions)
-	if err != nil {
-		return err
-	}
-
 	// If the reward is aborted, then the current supply should be decreased.
-	currentSupply := e.OnAbort.GetCurrentSupply()
+	currentSupply := e.OnAbortState.GetCurrentSupply()
 	newSupply, err := math.Sub64(currentSupply, stakerToRemove.PotentialReward)
 	if err != nil {
 		return err
 	}
-	e.OnAbort.SetCurrentSupply(newSupply)
+	e.OnAbortState.SetCurrentSupply(newSupply)
 
 	var (
 		nodeID    ids.NodeID
@@ -632,8 +555,8 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	)
 	switch uStakerTx := stakerTx.Unsigned.(type) {
 	case *txs.AddValidatorTx:
-		e.OnCommit.DeleteCurrentValidator(stakerToRemove)
-		e.OnAbort.DeleteCurrentValidator(stakerToRemove)
+		e.OnCommitState.DeleteCurrentValidator(stakerToRemove)
+		e.OnAbortState.DeleteCurrentValidator(stakerToRemove)
 
 		// Refund the stake here
 		for i, out := range uStakerTx.Stake {
@@ -645,8 +568,8 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 				Asset: avax.Asset{ID: e.Ctx.AVAXAssetID},
 				Out:   out.Output(),
 			}
-			e.OnCommit.AddUTXO(utxo)
-			e.OnAbort.AddUTXO(utxo)
+			e.OnCommitState.AddUTXO(utxo)
+			e.OnAbortState.AddUTXO(utxo)
 		}
 
 		// Provide the reward here
@@ -669,16 +592,16 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 				Out:   out,
 			}
 
-			e.OnCommit.AddUTXO(utxo)
-			e.OnCommit.AddRewardUTXO(tx.TxID, utxo)
+			e.OnCommitState.AddUTXO(utxo)
+			e.OnCommitState.AddRewardUTXO(tx.TxID, utxo)
 		}
 
 		// Handle reward preferences
 		nodeID = uStakerTx.Validator.ID()
 		startTime = uStakerTx.StartTime()
 	case *txs.AddDelegatorTx:
-		e.OnCommit.DeleteCurrentDelegator(stakerToRemove)
-		e.OnAbort.DeleteCurrentDelegator(stakerToRemove)
+		e.OnCommitState.DeleteCurrentDelegator(stakerToRemove)
+		e.OnAbortState.DeleteCurrentDelegator(stakerToRemove)
 
 		// Refund the stake here
 		for i, out := range uStakerTx.Stake {
@@ -690,13 +613,13 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 				Asset: avax.Asset{ID: e.Ctx.AVAXAssetID},
 				Out:   out.Output(),
 			}
-			e.OnCommit.AddUTXO(utxo)
-			e.OnAbort.AddUTXO(utxo)
+			e.OnCommitState.AddUTXO(utxo)
+			e.OnAbortState.AddUTXO(utxo)
 		}
 
 		// We're removing a delegator, so we need to fetch the validator they
 		// are delegated to.
-		vdrStaker, err := parentState.GetCurrentValidator(constants.PrimaryNetworkID, uStakerTx.Validator.NodeID)
+		vdrStaker, err := e.OnCommitState.GetCurrentValidator(constants.PrimaryNetworkID, uStakerTx.Validator.NodeID)
 		if err != nil {
 			return fmt.Errorf(
 				"failed to get whether %s is a validator: %w",
@@ -705,7 +628,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 			)
 		}
 
-		vdrTxIntf, _, err := parentState.GetTx(vdrStaker.TxID)
+		vdrTxIntf, _, err := e.OnCommitState.GetTx(vdrStaker.TxID)
 		if err != nil {
 			return fmt.Errorf(
 				"failed to get whether %s is a validator: %w",
@@ -750,8 +673,8 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 				Out:   out,
 			}
 
-			e.OnCommit.AddUTXO(utxo)
-			e.OnCommit.AddRewardUTXO(tx.TxID, utxo)
+			e.OnCommitState.AddUTXO(utxo)
+			e.OnCommitState.AddRewardUTXO(tx.TxID, utxo)
 
 			offset++
 		}
@@ -775,8 +698,8 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 				Out:   out,
 			}
 
-			e.OnCommit.AddUTXO(utxo)
-			e.OnCommit.AddRewardUTXO(tx.TxID, utxo)
+			e.OnCommitState.AddUTXO(utxo)
+			e.OnCommitState.AddRewardUTXO(tx.TxID, utxo)
 		}
 
 		nodeID = uStakerTx.Validator.ID()

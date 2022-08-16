@@ -102,58 +102,54 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 		return errAdvanceTimeTxCannotBeIncluded
 	}
 
-	blkState := &blockState{
-		statelessBlock: b,
-	}
-
 	parentID := b.Parent()
 	parentState, ok := v.GetState(parentID)
 	if !ok {
 		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
 	}
-	nextChainTime := b.Timestamp()
 
-	// Having verifier block timestamp, we update staker set
-	// before processing block transaction
+	onCommitState, err := state.NewDiff(parentID, v.backend)
+	if err != nil {
+		return err
+	}
+	onAbortState, err := state.NewDiff(parentID, v.backend)
+	if err != nil {
+		return err
+	}
+
+	// Apply the changes, if any, from advancing the chain time.
+	nextChainTime := b.Timestamp()
 	updated, err := executor.UpdateStakerSet(parentState, nextChainTime, v.txExecutorBackend.Rewards)
 	if err != nil {
 		return err
 	}
+	for _, state := range []state.Diff{onCommitState, onAbortState} {
+		state.SetTimestamp(nextChainTime)
+		state.SetCurrentSupply(updated.Supply)
 
-	onAcceptState, err := state.NewDiff(parentID, v.backend)
-	if err != nil {
-		return err
+		for _, currentValidatorToAdd := range updated.CurrentValidatorsToAdd {
+			state.PutCurrentValidator(currentValidatorToAdd)
+		}
+		for _, pendingValidatorToRemove := range updated.PendingValidatorsToRemove {
+			state.DeletePendingValidator(pendingValidatorToRemove)
+		}
+		for _, currentDelegatorToAdd := range updated.CurrentDelegatorsToAdd {
+			state.PutCurrentDelegator(currentDelegatorToAdd)
+		}
+		for _, pendingDelegatorToRemove := range updated.PendingDelegatorsToRemove {
+			state.DeletePendingDelegator(pendingDelegatorToRemove)
+		}
+		for _, currentValidatorToRemove := range updated.CurrentValidatorsToRemove {
+			state.DeleteCurrentValidator(currentValidatorToRemove)
+		}
 	}
-	onAcceptState.SetTimestamp(nextChainTime)
-	onAcceptState.SetCurrentSupply(updated.Supply)
 
-	for _, currentValidatorToAdd := range updated.CurrentValidatorsToAdd {
-		onAcceptState.PutCurrentValidator(currentValidatorToAdd)
-	}
-	for _, pendingValidatorToRemove := range updated.PendingValidatorsToRemove {
-		onAcceptState.DeletePendingValidator(pendingValidatorToRemove)
-	}
-	for _, currentDelegatorToAdd := range updated.CurrentDelegatorsToAdd {
-		onAcceptState.PutCurrentDelegator(currentDelegatorToAdd)
-	}
-	for _, pendingDelegatorToRemove := range updated.PendingDelegatorsToRemove {
-		onAcceptState.DeletePendingDelegator(pendingDelegatorToRemove)
-	}
-	for _, currentValidatorToRemove := range updated.CurrentValidatorsToRemove {
-		onAcceptState.DeleteCurrentValidator(currentValidatorToRemove)
-	}
-	blkState.onAcceptState = onAcceptState
-
-	// Finally we process block transaction
-	// Unlike ApricotProposalBlock,we register an entry for BlueberryProposalBlock in stateVersions.
-	// We do it before processing the proposal block tx, since it needs the state for correct verification.
-	v.blkIDToState[blkID] = blkState
-
+	// Check the transaction's validity.
 	txExecutor := executor.ProposalTxExecutor{
-		Backend:          v.txExecutorBackend,
-		ReferenceBlockID: blkID,
-		StateVersions:    v.backend,
-		Tx:               b.Tx,
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       v.txExecutorBackend,
+		Tx:            b.Tx,
 	}
 
 	if err := b.Tx.Unsigned.Visit(&txExecutor); err != nil {
@@ -162,16 +158,18 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 		return err
 	}
 
-	onCommitState := txExecutor.OnCommit
 	onCommitState.AddTx(b.Tx, status.Committed)
-	blkState.onCommitState = onCommitState
-
-	onAbortState := txExecutor.OnAbort
 	onAbortState.AddTx(b.Tx, status.Aborted)
-	blkState.onAbortState = onAbortState
 
-	blkState.timestamp = b.Timestamp()
-	blkState.initiallyPreferCommit = txExecutor.PrefersCommit
+	blkState := &blockState{
+		proposalBlockState: proposalBlockState{
+			initiallyPreferCommit: txExecutor.PrefersCommit,
+			onCommitState:         onCommitState,
+			onAbortState:          onAbortState,
+		},
+		statelessBlock: b,
+		timestamp:      b.Timestamp(),
+	}
 
 	v.blkIDToState[blkID] = blkState
 	v.Mempool.RemoveProposalTx(b.Tx)
@@ -385,11 +383,21 @@ func (v *verifier) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 		return err
 	}
 
+	parentID := b.Parent()
+	onCommitState, err := state.NewDiff(parentID, v.backend)
+	if err != nil {
+		return err
+	}
+	onAbortState, err := state.NewDiff(parentID, v.backend)
+	if err != nil {
+		return err
+	}
+
 	txExecutor := &executor.ProposalTxExecutor{
-		Backend:          v.txExecutorBackend,
-		ReferenceBlockID: b.Parent(),
-		StateVersions:    v.backend,
-		Tx:               b.Tx,
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       v.txExecutorBackend,
+		Tx:            b.Tx,
 	}
 	if err := b.Tx.Unsigned.Visit(txExecutor); err != nil {
 		txID := b.Tx.ID()
@@ -397,10 +405,7 @@ func (v *verifier) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 		return err
 	}
 
-	onCommitState := txExecutor.OnCommit
 	onCommitState.AddTx(b.Tx, status.Committed)
-
-	onAbortState := txExecutor.OnAbort
 	onAbortState.AddTx(b.Tx, status.Aborted)
 
 	v.blkIDToState[blkID] = &blockState{
@@ -410,9 +415,8 @@ func (v *verifier) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 			onAbortState:          onAbortState,
 			initiallyPreferCommit: txExecutor.PrefersCommit,
 		},
-
-		// It is safe to use [pb.onAbortState] here because the timestamp will
-		// never be modified by an Abort block.
+		// It is safe to use [b.onAbortState] here because the timestamp will
+		// never be modified by an Apricot Abort block.
 		timestamp: onAbortState.GetTimestamp(),
 	}
 

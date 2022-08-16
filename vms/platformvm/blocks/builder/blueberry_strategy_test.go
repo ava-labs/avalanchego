@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
@@ -41,24 +42,35 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	validatorTx, err := createTestValidatorTx(env, validatorStartTime, nextChainTime)
 	assert.NoError(err)
 
+	onCommitState, err := state.NewDiff(env.state.GetLastAccepted(), env.blkManager)
+	assert.NoError(err)
+
+	onAbortState, err := state.NewDiff(env.state.GetLastAccepted(), env.blkManager)
+	assert.NoError(err)
+
 	// accept validator as pending
 	txExecutor := txexecutor.ProposalTxExecutor{
-		Backend:          &env.backend,
-		ReferenceBlockID: env.state.GetLastAccepted(),
-		StateVersions:    env.blkManager,
-		Tx:               validatorTx,
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       &env.backend,
+		Tx:            validatorTx,
 	}
 	assert.NoError(validatorTx.Unsigned.Visit(&txExecutor))
-	txExecutor.OnCommit.AddTx(validatorTx, status.Committed)
-	txExecutor.OnCommit.Apply(env.state)
+	txExecutor.OnCommitState.AddTx(validatorTx, status.Committed)
+	txExecutor.OnCommitState.Apply(env.state)
 	assert.NoError(env.state.Commit())
 
 	// promote validator to current
+	// Reset onCommitState and onAbortState
+	txExecutor.OnCommitState, err = state.NewDiff(env.state.GetLastAccepted(), env.blkManager)
+	assert.NoError(err)
+	txExecutor.OnAbortState, err = state.NewDiff(env.state.GetLastAccepted(), env.blkManager)
+	assert.NoError(err)
 	advanceTime, err := env.txBuilder.NewAdvanceTimeTx(validatorStartTime)
 	assert.NoError(err)
 	txExecutor.Tx = advanceTime
 	assert.NoError(advanceTime.Unsigned.Visit(&txExecutor))
-	txExecutor.OnCommit.Apply(env.state)
+	txExecutor.OnCommitState.Apply(env.state)
 	assert.NoError(env.state.Commit())
 
 	// move chain time to current validator's
