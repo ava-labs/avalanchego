@@ -1,13 +1,12 @@
 module github.com/ava-labs/avalanchego
 
 // Changes to the minimum golang version must also be replicated in
-// scripts/ansible/roles/golang_base/defaults/main.yml
 // scripts/build_avalanche.sh
 // scripts/local.Dockerfile
 // Dockerfile
 // README.md
 // go.mod (here, only major.minor can be specified)
-go 1.17
+go 1.18
 
 require (
 	github.com/Microsoft/go-winio v0.5.2
@@ -53,7 +52,7 @@ require (
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	gonum.org/v1/gonum v0.11.0
 	google.golang.org/genproto v0.0.0-20220712132514-bdd2acd4974d
-	google.golang.org/grpc v1.47.0
+	google.golang.org/grpc v1.50.0-dev
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )

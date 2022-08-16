@@ -334,6 +334,38 @@ func TestGenesisFromFlag(t *testing.T) {
 	}
 }
 
+func TestGenesis(t *testing.T) {
+	tests := []struct {
+		networkID  uint32
+		expectedID string
+	}{
+		{
+			networkID:  constants.MainnetID,
+			expectedID: "UUvXi6j7QhVvgpbKM89MP5HdrxKm9CaJeHc187TsDNf8nZdLk",
+		},
+		{
+			networkID:  constants.FujiID,
+			expectedID: "MSj6o9TpezwsQx4Tv7SHqpVvCbJ8of1ikjsqPZ1bKRjc9zBy3",
+		},
+		{
+			networkID:  constants.LocalID,
+			expectedID: "3299eeA1MEK33tBTVb3bRckdEnZLVoaxov87Bw4HeDtucVhUY",
+		},
+	}
+	for _, test := range tests {
+		t.Run(constants.NetworkIDToNetworkName[test.networkID], func(t *testing.T) {
+			assert := assert.New(t)
+
+			config := GetConfig(test.networkID)
+			genesisBytes, _, err := FromConfig(config)
+			assert.NoError(err)
+
+			var genesisID ids.ID = hashing.ComputeHash256Array(genesisBytes)
+			assert.Equal(test.expectedID, genesisID.String())
+		})
+	}
+}
+
 func TestVMGenesis(t *testing.T) {
 	type vmTest struct {
 		vmID       ids.ID

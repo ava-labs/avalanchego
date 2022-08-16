@@ -523,8 +523,8 @@ func createTestValidatorTx(env *environment, startTime, endTime time.Time) (*txs
 		env.config.MinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
-		env.ctx.NodeID, // node ID
-		ids.ShortID{},  // reward address
+		ids.GenerateTestNodeID(), // node ID
+		ids.ShortID{},            // reward address
 		reward.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 		preFundedKeys[0].PublicKey().Address(), // change addr

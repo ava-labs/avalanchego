@@ -30,7 +30,7 @@ func TestDiffMissingState(t *testing.T) {
 	versions.EXPECT().GetState(parentID).Times(1).Return(nil, false)
 
 	_, err := NewDiff(parentID, versions)
-	assert.ErrorIs(err, errMissingParentState)
+	assert.ErrorIs(err, ErrMissingParentState)
 }
 
 func TestDiffCreation(t *testing.T) {
