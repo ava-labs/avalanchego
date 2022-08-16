@@ -30,6 +30,10 @@ const (
 
 	// [numFeeConfigField] fields in FeeConfig struct
 	feeConfigInputLen = common.HashLength * numFeeConfigField
+
+	SetFeeConfigGasCost     = writeGasCostPerSlot * (numFeeConfigField + 1) // plus one for setting last changed at
+	GetFeeConfigGasCost     = readGasCostPerSlot * numFeeConfigField
+	GetLastChangedAtGasCost = readGasCostPerSlot
 )
 
 var (

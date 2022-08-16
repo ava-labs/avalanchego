@@ -44,6 +44,13 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
+const (
+	setAdminFuncKey      = "setAdmin"
+	setEnabledFuncKey    = "setEnabled"
+	setNoneFuncKey       = "setNone"
+	readAllowListFuncKey = "readAllowList"
+)
+
 // Lang is a target programming language selector to generate bindings for.
 type Lang int
 
@@ -57,7 +64,7 @@ const (
 // to be used as is in client code, but rather as an intermediate struct which
 // enforces compile time type safety and naming convention opposed to having to
 // manually maintain hard coded strings that break on runtime.
-func Bind(types []string, abis []string, bytecodes []string, fsigs []map[string]string, pkg string, lang Lang, libs map[string]string, aliases map[string]string) (string, error) {
+func Bind(types []string, abis []string, bytecodes []string, fsigs []map[string]string, pkg string, lang Lang, libs map[string]string, aliases map[string]string, isPrecompile bool) (string, error) {
 	var (
 		// contracts is the map of each individual contract requested binding
 		contracts = make(map[string]*tmplContract)
@@ -68,6 +75,7 @@ func Bind(types []string, abis []string, bytecodes []string, fsigs []map[string]
 		// isLib is the map used to flag each encountered library as such
 		isLib = make(map[string]struct{})
 	)
+
 	for i := 0; i < len(types); i++ {
 		// Parse the actual ABI to generate the binding for
 		evmABI, err := abi.JSON(strings.NewReader(abis[i]))
@@ -224,12 +232,32 @@ func Bind(types []string, abis []string, bytecodes []string, fsigs []map[string]
 		_, ok := isLib[types[i]]
 		contracts[types[i]].Library = ok
 	}
-	// Generate the contract template data content and render it
-	data := &tmplData{
-		Package:   pkg,
-		Contracts: contracts,
-		Libraries: libs,
-		Structs:   structs,
+
+	var (
+		data           interface{}
+		templateSource string
+	)
+
+	// Generate the contract template data according to contract type (precompile/non)
+	if isPrecompile {
+		if lang != LangGo {
+			return "", errors.New("only GoLang binding for precompiled contracts is supported yet")
+		}
+
+		if len(contracts) != 1 {
+			return "", errors.New("cannot generate more than 1 contract")
+		}
+		precompileType := types[0]
+		firstContract := contracts[precompileType]
+		data, templateSource = createPrecompileDataAndTemplate(firstContract, structs)
+	} else {
+		templateSource = tmplSource[lang]
+		data = &tmplData{
+			Package:   pkg,
+			Contracts: contracts,
+			Libraries: libs,
+			Structs:   structs,
+		}
 	}
 	buffer := new(bytes.Buffer)
 
@@ -240,7 +268,9 @@ func Bind(types []string, abis []string, bytecodes []string, fsigs []map[string]
 		"capitalise":    capitalise,
 		"decapitalise":  decapitalise,
 	}
-	tmpl := template.Must(template.New("").Funcs(funcs).Parse(tmplSource[lang]))
+
+	// render the template
+	tmpl := template.Must(template.New("").Funcs(funcs).Parse(templateSource))
 	if err := tmpl.Execute(buffer, data); err != nil {
 		return "", err
 	}
@@ -600,4 +630,46 @@ func hasStruct(t abi.Type) bool {
 	default:
 		return false
 	}
+}
+
+func createPrecompileDataAndTemplate(contract *tmplContract, structs map[string]*tmplStruct) (interface{}, string) {
+	funcs := make(map[string]*tmplMethod)
+
+	for k, v := range contract.Transacts {
+		funcs[k] = v
+	}
+
+	for k, v := range contract.Calls {
+		funcs[k] = v
+	}
+	isAllowList := allowListEnabled(funcs)
+	if isAllowList {
+		// remove these functions as we will directly inherit AllowList
+		delete(funcs, readAllowListFuncKey)
+		delete(funcs, setAdminFuncKey)
+		delete(funcs, setEnabledFuncKey)
+		delete(funcs, setNoneFuncKey)
+	}
+
+	precompileContract := &tmplPrecompileContract{
+		tmplContract: contract,
+		AllowList:    isAllowList,
+		Funcs:        funcs,
+	}
+
+	data := &tmplPrecompileData{
+		Contract: precompileContract,
+		Structs:  structs,
+	}
+	return data, tmplSourcePrecompileGo
+}
+
+func allowListEnabled(funcs map[string]*tmplMethod) bool {
+	keys := []string{readAllowListFuncKey, setAdminFuncKey, setEnabledFuncKey, setNoneFuncKey}
+	for _, key := range keys {
+		if _, ok := funcs[key]; !ok {
+			return false
+		}
+	}
+	return true
 }

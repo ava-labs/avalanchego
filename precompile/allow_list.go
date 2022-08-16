@@ -15,6 +15,16 @@ import (
 // Enum constants for valid AllowListRole
 type AllowListRole common.Hash
 
+const (
+	SetAdminFuncKey      = "setAdmin"
+	SetEnabledFuncKey    = "setEnabled"
+	SetNoneFuncKey       = "setNone"
+	ReadAllowListFuncKey = "readAllowList"
+
+	ModifyAllowListGasCost = writeGasCostPerSlot
+	ReadAllowListGasCost   = readGasCostPerSlot
+)
+
 var (
 	AllowListNoRole  AllowListRole = AllowListRole(common.BigToHash(big.NewInt(0))) // No role assigned - this is equivalent to common.Hash{} and deletes the key from the DB when set
 	AllowListEnabled AllowListRole = AllowListRole(common.BigToHash(big.NewInt(1))) // Deployers are allowed to create new contracts

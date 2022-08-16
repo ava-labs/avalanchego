@@ -17,6 +17,8 @@ const (
 	mintInputAmountSlot
 
 	mintInputLen = common.HashLength + common.HashLength
+
+	MintGasCost = 30_000
 )
 
 var (

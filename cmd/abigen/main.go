@@ -232,7 +232,7 @@ func abigen(c *cli.Context) error {
 		}
 	}
 	// Generate the contract binding
-	code, err := bind.Bind(types, abis, bins, sigs, c.String(pkgFlag.Name), lang, libs, aliases)
+	code, err := bind.Bind(types, abis, bins, sigs, c.String(pkgFlag.Name), lang, libs, aliases, false)
 	if err != nil {
 		utils.Fatalf("Failed to generate ABI binding: %v", err)
 	}
@@ -241,7 +241,7 @@ func abigen(c *cli.Context) error {
 		fmt.Printf("%s\n", code)
 		return nil
 	}
-	if err := os.WriteFile(c.String(outFlag.Name), []byte(code), 0600); err != nil {
+	if err := os.WriteFile(c.String(outFlag.Name), []byte(code), 0o600); err != nil {
 		utils.Fatalf("Failed to write ABI binding: %v", err)
 	}
 	return nil

@@ -13,15 +13,6 @@ import (
 const (
 	writeGasCostPerSlot = 20_000
 	readGasCostPerSlot  = 5_000
-
-	ModifyAllowListGasCost = writeGasCostPerSlot
-	ReadAllowListGasCost   = readGasCostPerSlot
-
-	MintGasCost = 30_000
-
-	SetFeeConfigGasCost     = writeGasCostPerSlot * (numFeeConfigField + 1) // plus one for setting last changed at
-	GetFeeConfigGasCost     = readGasCostPerSlot * numFeeConfigField
-	GetLastChangedAtGasCost = readGasCostPerSlot
 )
 
 // Designated addresses of stateful precompiles
@@ -40,12 +31,16 @@ var (
 	ContractNativeMinterAddress      = common.HexToAddress("0x0200000000000000000000000000000000000001")
 	TxAllowListAddress               = common.HexToAddress("0x0200000000000000000000000000000000000002")
 	FeeConfigManagerAddress          = common.HexToAddress("0x0200000000000000000000000000000000000003")
+	// ADD YOUR PRECOMPILE HERE
+	// {YourPrecompile}Address       = common.HexToAddress("0x03000000000000000000000000000000000000??")
 
 	UsedAddresses = []common.Address{
 		ContractDeployerAllowListAddress,
 		ContractNativeMinterAddress,
 		TxAllowListAddress,
 		FeeConfigManagerAddress,
+		// ADD YOUR PRECOMPILE HERE
+		// YourPrecompileAddress
 	}
 	reservedRanges = []AddressRange{
 		{

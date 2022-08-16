@@ -21,11 +21,12 @@ const (
 	contractNativeMinterKey
 	txAllowListKey
 	feeManagerKey
+	// ADD YOUR PRECOMPILE HERE
+	// {yourPrecompile}Key
 )
 
-var (
-	precompileKeys = []precompileKey{contractDeployerAllowListKey, contractNativeMinterKey, txAllowListKey, feeManagerKey}
-)
+// ADD YOUR PRECOMPILE HERE
+var precompileKeys = []precompileKey{contractDeployerAllowListKey, contractNativeMinterKey, txAllowListKey, feeManagerKey /* {yourPrecompile}Key */}
 
 // PrecompileUpgrade is a helper struct embedded in UpgradeConfig, representing
 // each of the possible stateful precompile types that can be activated
@@ -35,6 +36,8 @@ type PrecompileUpgrade struct {
 	ContractNativeMinterConfig      *precompile.ContractNativeMinterConfig      `json:"contractNativeMinterConfig,omitempty"`      // Config for the native minter precompile
 	TxAllowListConfig               *precompile.TxAllowListConfig               `json:"txAllowListConfig,omitempty"`               // Config for the tx allow list precompile
 	FeeManagerConfig                *precompile.FeeConfigManagerConfig          `json:"feeManagerConfig,omitempty"`                // Config for the fee manager precompile
+	// ADD YOUR PRECOMPILE HERE
+	// {YourPrecompile}Config  *precompile.{YourPrecompile}Config `json:"{yourPrecompile}Config,omitempty"`
 }
 
 func (p *PrecompileUpgrade) getByKey(key precompileKey) (precompile.StatefulPrecompileConfig, bool) {
@@ -47,6 +50,11 @@ func (p *PrecompileUpgrade) getByKey(key precompileKey) (precompile.StatefulPrec
 		return p.TxAllowListConfig, p.TxAllowListConfig != nil
 	case feeManagerKey:
 		return p.FeeManagerConfig, p.FeeManagerConfig != nil
+	// ADD YOUR PRECOMPILE HERE
+	/*
+		case {yourPrecompile}Key:
+		return p.{YourPrecompile}Config , p.{YourPrecompile}Config  != nil
+	*/
 	default:
 		panic(fmt.Sprintf("unknown upgrade key: %v", key))
 	}
@@ -191,6 +199,15 @@ func (c *ChainConfig) GetFeeConfigManagerConfig(blockTimestamp *big.Int) *precom
 	}
 	return nil
 }
+
+/* ADD YOUR PRECOMPILE HERE
+func (c *ChainConfig) Get{YourPrecompile}Config(blockTimestamp *big.Int) *precompile.{YourPrecompile}Config {
+	if val := c.getActivePrecompileConfig(blockTimestamp, {yourPrecompile}Key, c.PrecompileUpgrades); val != nil {
+		return val.(*precompile.{YourPrecompile}Config)
+	}
+	return nil
+}
+*/
 
 // CheckPrecompilesCompatible checks if [precompileUpgrades] are compatible with [c] at [headTimestamp].
 // Returns a ConfigCompatError if upgrades already forked at [headTimestamp] are missing from
