@@ -489,7 +489,7 @@ func TestBlueberryProposalBlockUpdateStakers(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(ts *testing.T) {
-			assert := require.New(ts)
+			require := require.New(ts)
 			env := newEnvironment(t, nil)
 			defer func() {
 				if err := shutdownEnvironment(env); err != nil {
