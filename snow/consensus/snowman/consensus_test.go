@@ -44,6 +44,7 @@ var (
 		StatusOrProcessingIssuedTest,
 		RecordPollAcceptSingleBlockTest,
 		RecordPollAcceptAndRejectTest,
+		RecordPollSplitVoteNoChangeTest,
 		RecordPollWhenFinalizedTest,
 		RecordPollRejectTransitivelyTest,
 		RecordPollTransitivelyResetConfidenceTest,
@@ -569,6 +570,69 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 	} else if status := secondBlock.Status(); status != choices.Rejected {
 		t.Fatalf("Block's status should have been set to rejected")
 	}
+}
+
+func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
+	require := require.New(t)
+	sm := factory.New()
+
+	ctx := snow.DefaultConsensusContextTest()
+	registerer := prometheus.NewRegistry()
+	ctx.Registerer = registerer
+
+	params := snowball.Parameters{
+		K:                     2,
+		Alpha:                 2,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
+	}
+	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight))
+
+	firstBlock := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(1),
+			StatusV: choices.Processing,
+		},
+		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
+	}
+	secondBlock := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(2),
+			StatusV: choices.Processing,
+		},
+		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
+	}
+
+	require.NoError(sm.Add(firstBlock))
+	require.NoError(sm.Add(secondBlock))
+
+	votes := ids.Bag{}
+	votes.Add(firstBlock.ID())
+	votes.Add(secondBlock.ID())
+
+	// The first poll will accept shared bits
+	require.NoError(sm.RecordPoll(votes))
+	require.Equal(firstBlock.ID(), sm.Preference())
+	require.False(sm.Finalized())
+
+	metrics := gatherCounterGauge(t, registerer)
+	require.EqualValues(0, metrics["polls_failed"])
+	require.EqualValues(1, metrics["polls_successful"])
+
+	// The second poll will do nothing
+	require.NoError(sm.RecordPoll(votes))
+	require.Equal(firstBlock.ID(), sm.Preference())
+	require.False(sm.Finalized())
+
+	metrics = gatherCounterGauge(t, registerer)
+	require.EqualValues(1, metrics["polls_failed"])
+	require.EqualValues(1, metrics["polls_successful"])
 }
 
 func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {
@@ -1722,4 +1786,28 @@ func ErrorOnAddDuplicateBlockID(t *testing.T, factory Factory) {
 
 	require.NoError(sm.Add(block0))
 	require.ErrorIs(sm.Add(block1), errDuplicateAdd)
+}
+
+func gatherCounterGauge(t *testing.T, reg *prometheus.Registry) map[string]float64 {
+	ms, err := reg.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	mss := make(map[string]float64)
+	for _, mf := range ms {
+		name := mf.GetName()
+		for _, m := range mf.GetMetric() {
+			cnt := m.GetCounter()
+			if cnt != nil {
+				mss[name] = cnt.GetValue()
+				break
+			}
+			gg := m.GetGauge()
+			if gg != nil {
+				mss[name] = gg.GetValue()
+				break
+			}
+		}
+	}
+	return mss
 }
