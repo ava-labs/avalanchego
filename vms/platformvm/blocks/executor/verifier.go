@@ -416,7 +416,7 @@ func (v *verifier) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 			initiallyPreferCommit: txExecutor.PrefersCommit,
 		},
 		// It is safe to use [b.onAbortState] here because the timestamp will
-		// never be modified by an Abort block.
+		// never be modified by an Apricot Abort block.
 		timestamp: onAbortState.GetTimestamp(),
 	}
 
