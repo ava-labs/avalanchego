@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // ReadSyncRoot reads the root corresponding to the main trie of an in-progress
@@ -26,6 +27,37 @@ func ReadSyncRoot(db ethdb.KeyValueReader) (common.Hash, error) {
 // WriteSyncRoot writes root as the root of the main trie of the in-progress sync.
 func WriteSyncRoot(db ethdb.KeyValueWriter, root common.Hash) error {
 	return db.Put(syncRootKey, root[:])
+}
+
+// AddCodeToFetch adds a marker that we need to fetch the code for [hash].
+func AddCodeToFetch(db ethdb.KeyValueWriter, hash common.Hash) {
+	if err := db.Put(codeToFetchKey(hash), nil); err != nil {
+		log.Crit("Failed to put code to fetch", "codeHash", hash, "err", err)
+	}
+}
+
+// DeleteCodeToFetch removes the marker that the code corresponding to [hash] needs to be fetched.
+func DeleteCodeToFetch(db ethdb.KeyValueWriter, hash common.Hash) {
+	if err := db.Delete(codeToFetchKey(hash)); err != nil {
+		log.Crit("Failed to delete code to fetch", "codeHash", hash, "err", err)
+	}
+}
+
+// NewCodeToFetchIterator returns a KeyLength iterator over all code
+// hashes that are pending syncing. It is the caller's responsibility to
+// unpack the key and call Release on the returned iterator.
+func NewCodeToFetchIterator(db ethdb.Iteratee) ethdb.Iterator {
+	return rawdb.NewKeyLengthIterator(
+		db.NewIterator(CodeToFetchPrefix, nil),
+		codeToFetchKeyLength,
+	)
+}
+
+func codeToFetchKey(hash common.Hash) []byte {
+	codeToFetchKey := make([]byte, codeToFetchKeyLength)
+	copy(codeToFetchKey, CodeToFetchPrefix)
+	copy(codeToFetchKey[len(CodeToFetchPrefix):], hash[:])
+	return codeToFetchKey
 }
 
 // NewSyncSegmentsIterator returns a KeyLength iterator over all trie segments
