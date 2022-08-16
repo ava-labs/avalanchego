@@ -6,20 +6,20 @@ package secp256k1fx
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 func TestMintOutputVerifyNil(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	out := (*MintOutput)(nil)
-	assert.ErrorIs(out.Verify(), errNilOutput)
+	require.ErrorIs(out.Verify(), errNilOutput)
 }
 
 func TestMintOutputState(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	intf := interface{}(&MintOutput{})
 	_, ok := intf.(verify.State)
-	assert.True(ok)
+	require.True(ok)
 }

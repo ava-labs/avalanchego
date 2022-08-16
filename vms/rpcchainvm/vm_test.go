@@ -27,7 +27,7 @@ import (
 	hclog "github.com/hashicorp/go-hclog"
 	plugin "github.com/hashicorp/go-plugin"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -85,7 +85,7 @@ func chainVMTestPlugin(t *testing.T, _ bool) (plugin.Plugin, *gomock.Controller)
 // serving the handlers exposed by the subnet. The test then will exercise the service
 // as a regression test.
 func Test_VMCreateHandlers(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	pr := &pingRequest{
 		Version: "2.0",
 		Method:  "subnet.ping",
@@ -93,7 +93,7 @@ func Test_VMCreateHandlers(t *testing.T) {
 		ID:      "1",
 	}
 	pingBody, err := stdjson.Marshal(pr)
-	assert.NoError(err)
+	require.NoError(err)
 
 	scenarios := []struct {
 		name    string
@@ -116,38 +116,38 @@ func Test_VMCreateHandlers(t *testing.T) {
 			defer c.Kill()
 
 			_, err := c.Start()
-			assert.NoErrorf(err, "failed to start plugin: %v", err)
+			require.NoErrorf(err, "failed to start plugin: %v", err)
 
 			if v := c.Protocol(); v != plugin.ProtocolGRPC {
-				assert.NoErrorf(err, "invalid protocol %q: :%v", c.Protocol(), err)
+				require.NoErrorf(err, "invalid protocol %q: :%v", c.Protocol(), err)
 			}
 
 			// Get the plugin client.
 			client, err := c.Client()
-			assert.NoErrorf(err, "failed to get plugin client: %v", err)
+			require.NoErrorf(err, "failed to get plugin client: %v", err)
 
 			// Grab the vm implementation.
 			raw, err := client.Dispense(chainVMTestKey)
-			assert.NoErrorf(err, "failed to dispense plugin: %v", err)
+			require.NoErrorf(err, "failed to dispense plugin: %v", err)
 
 			// Get vm client.
 			vm, ok := raw.(*TestVMClient)
-			assert.True(ok)
+			require.True(ok)
 
 			// Get the handlers exposed by the subnet vm.
 			handlers, err := vm.CreateHandlers()
-			assert.NoErrorf(err, "failed to get handlers: %v", err)
+			require.NoErrorf(err, "failed to get handlers: %v", err)
 
 			r := mux.NewRouter()
 			for ep, handler := range handlers {
 				r.Handle(ep, handler.Handler)
 			}
 			listener, err := net.Listen("tcp", "localhost:0")
-			assert.NoErrorf(err, "failed to create listener: %v", err)
+			require.NoErrorf(err, "failed to create listener: %v", err)
 
 			go func() {
 				err := http.Serve(listener, r)
-				assert.NoErrorf(err, "failed to serve HTTP: %v", err)
+				require.NoErrorf(err, "failed to serve HTTP: %v", err)
 			}()
 
 			target := listener.Addr().String()
@@ -156,14 +156,14 @@ func Test_VMCreateHandlers(t *testing.T) {
 				switch endpoint {
 				case "/rpc":
 					err := testHTTPPingRequest(target, endpoint, scenario.payload)
-					assert.NoErrorf(err, "%s rpc ping failed: %v", endpoint, err)
+					require.NoErrorf(err, "%s rpc ping failed: %v", endpoint, err)
 
 				case "/ws":
 					// expected number of msg echos to receive from websocket server.
 					// This test is sanity for conn hijack and server push.
 					expectedMsgCount := 5
 					err := testWebsocketEchoRequest(target, endpoint, expectedMsgCount, scenario.payload)
-					assert.NoErrorf(err, "%s websocket echo failed: %v", endpoint, err)
+					require.NoErrorf(err, "%s websocket echo failed: %v", endpoint, err)
 				default:
 					t.Fatal("unknown handler")
 				}

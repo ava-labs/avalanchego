@@ -6,7 +6,7 @@ package blocks
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
@@ -20,11 +20,11 @@ var preFundedKeys = crypto.BuildTestKeys()
 
 func TestStandardBlock(t *testing.T) {
 	// check standard block can be built and parsed
-	assert := assert.New(t)
+	require := require.New(t)
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
 	height := uint64(2022)
 	txs, err := testDecisionTxs()
-	assert.NoError(err)
+	require.NoError(err)
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
@@ -33,31 +33,31 @@ func TestStandardBlock(t *testing.T) {
 			height,
 			txs,
 		)
-		assert.NoError(err)
+		require.NoError(err)
 
 		// parse block
 		parsed, err := Parse(cdc, standardBlk.Bytes())
-		assert.NoError(err)
+		require.NoError(err)
 
 		// compare content
-		assert.Equal(standardBlk.ID(), parsed.ID())
-		assert.Equal(standardBlk.Bytes(), parsed.Bytes())
-		assert.Equal(standardBlk.Parent(), parsed.Parent())
-		assert.Equal(standardBlk.Height(), parsed.Height())
+		require.Equal(standardBlk.ID(), parsed.ID())
+		require.Equal(standardBlk.Bytes(), parsed.Bytes())
+		require.Equal(standardBlk.Parent(), parsed.Parent())
+		require.Equal(standardBlk.Height(), parsed.Height())
 
 		parsedStandardBlk, ok := parsed.(*StandardBlock)
-		assert.True(ok)
-		assert.Equal(txs, parsedStandardBlk.Transactions)
+		require.True(ok)
+		require.Equal(txs, parsedStandardBlk.Transactions)
 	}
 }
 
 func TestProposalBlock(t *testing.T) {
 	// check proposal block can be built and parsed
-	assert := assert.New(t)
+	require := require.New(t)
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
 	height := uint64(2022)
 	tx, err := testProposalTx()
-	assert.NoError(err)
+	require.NoError(err)
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
@@ -66,77 +66,77 @@ func TestProposalBlock(t *testing.T) {
 			height,
 			tx,
 		)
-		assert.NoError(err)
+		require.NoError(err)
 
 		// parse block
 		parsed, err := Parse(cdc, proposalBlk.Bytes())
-		assert.NoError(err)
+		require.NoError(err)
 
 		// compare content
-		assert.Equal(proposalBlk.ID(), parsed.ID())
-		assert.Equal(proposalBlk.Bytes(), parsed.Bytes())
-		assert.Equal(proposalBlk.Parent(), parsed.Parent())
-		assert.Equal(proposalBlk.Height(), parsed.Height())
+		require.Equal(proposalBlk.ID(), parsed.ID())
+		require.Equal(proposalBlk.Bytes(), parsed.Bytes())
+		require.Equal(proposalBlk.Parent(), parsed.Parent())
+		require.Equal(proposalBlk.Height(), parsed.Height())
 
 		parsedProposalBlk, ok := parsed.(*ProposalBlock)
-		assert.True(ok)
-		assert.Equal(tx, parsedProposalBlk.Tx)
+		require.True(ok)
+		require.Equal(tx, parsedProposalBlk.Tx)
 	}
 }
 
 func TestCommitBlock(t *testing.T) {
 	// check commit block can be built and parsed
-	assert := assert.New(t)
+	require := require.New(t)
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
 	height := uint64(2022)
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
 		commitBlk, err := NewCommitBlock(parentID, height)
-		assert.NoError(err)
+		require.NoError(err)
 
 		// parse block
 		parsed, err := Parse(cdc, commitBlk.Bytes())
-		assert.NoError(err)
+		require.NoError(err)
 
 		// compare content
-		assert.Equal(commitBlk.ID(), parsed.ID())
-		assert.Equal(commitBlk.Bytes(), parsed.Bytes())
-		assert.Equal(commitBlk.Parent(), parsed.Parent())
-		assert.Equal(commitBlk.Height(), parsed.Height())
+		require.Equal(commitBlk.ID(), parsed.ID())
+		require.Equal(commitBlk.Bytes(), parsed.Bytes())
+		require.Equal(commitBlk.Parent(), parsed.Parent())
+		require.Equal(commitBlk.Height(), parsed.Height())
 	}
 }
 
 func TestAbortBlock(t *testing.T) {
 	// check abort block can be built and parsed
-	assert := assert.New(t)
+	require := require.New(t)
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
 	height := uint64(2022)
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
 		abortBlk, err := NewAbortBlock(parentID, height)
-		assert.NoError(err)
+		require.NoError(err)
 
 		// parse block
 		parsed, err := Parse(cdc, abortBlk.Bytes())
-		assert.NoError(err)
+		require.NoError(err)
 
 		// compare content
-		assert.Equal(abortBlk.ID(), parsed.ID())
-		assert.Equal(abortBlk.Bytes(), parsed.Bytes())
-		assert.Equal(abortBlk.Parent(), parsed.Parent())
-		assert.Equal(abortBlk.Height(), parsed.Height())
+		require.Equal(abortBlk.ID(), parsed.ID())
+		require.Equal(abortBlk.Bytes(), parsed.Bytes())
+		require.Equal(abortBlk.Parent(), parsed.Parent())
+		require.Equal(abortBlk.Height(), parsed.Height())
 	}
 }
 
 func TestAtomicBlock(t *testing.T) {
 	// check atomic block can be built and parsed
-	assert := assert.New(t)
+	require := require.New(t)
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
 	height := uint64(2022)
 	tx, err := testAtomicTx()
-	assert.NoError(err)
+	require.NoError(err)
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
@@ -145,21 +145,21 @@ func TestAtomicBlock(t *testing.T) {
 			height,
 			tx,
 		)
-		assert.NoError(err)
+		require.NoError(err)
 
 		// parse block
 		parsed, err := Parse(cdc, atomicBlk.Bytes())
-		assert.NoError(err)
+		require.NoError(err)
 
 		// compare content
-		assert.Equal(atomicBlk.ID(), parsed.ID())
-		assert.Equal(atomicBlk.Bytes(), parsed.Bytes())
-		assert.Equal(atomicBlk.Parent(), parsed.Parent())
-		assert.Equal(atomicBlk.Height(), parsed.Height())
+		require.Equal(atomicBlk.ID(), parsed.ID())
+		require.Equal(atomicBlk.Bytes(), parsed.Bytes())
+		require.Equal(atomicBlk.Parent(), parsed.Parent())
+		require.Equal(atomicBlk.Height(), parsed.Height())
 
 		parsedAtomicBlk, ok := parsed.(*AtomicBlock)
-		assert.True(ok)
-		assert.Equal(tx, parsedAtomicBlk.Tx)
+		require.True(ok)
+		require.Equal(tx, parsedAtomicBlk.Tx)
 	}
 }
 

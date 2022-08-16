@@ -3,12 +3,10 @@
 
 package block
 
-import (
-	"github.com/stretchr/testify/assert"
-)
+import "github.com/stretchr/testify/require"
 
-func equalHeader(assert *assert.Assertions, want, have Header) {
-	assert.Equal(want.ChainID(), have.ChainID())
-	assert.Equal(want.ParentID(), have.ParentID())
-	assert.Equal(want.BodyID(), have.BodyID())
+func equalHeader(require *require.Assertions, want, have Header) {
+	require.Equal(want.ChainID(), have.ChainID())
+	require.Equal(want.ParentID(), have.ParentID())
+	require.Equal(want.BodyID(), have.BodyID())
 }

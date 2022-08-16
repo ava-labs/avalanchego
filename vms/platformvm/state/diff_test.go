@@ -9,7 +9,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -20,7 +20,7 @@ import (
 )
 
 func TestDiffMissingState(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -30,46 +30,46 @@ func TestDiffMissingState(t *testing.T) {
 	versions.EXPECT().GetState(parentID).Times(1).Return(nil, false)
 
 	_, err := NewDiff(parentID, versions)
-	assert.ErrorIs(err, ErrMissingParentState)
+	require.ErrorIs(err, ErrMissingParentState)
 }
 
 func TestDiffCreation(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	lastAcceptedID := ids.GenerateTestID()
-	state, _ := newInitializedState(assert)
+	state, _ := newInitializedState(require)
 	versions := NewMockVersions(ctrl)
 	versions.EXPECT().GetState(lastAcceptedID).AnyTimes().Return(state, true)
 
 	d, err := NewDiff(lastAcceptedID, versions)
-	assert.NoError(err)
+	require.NoError(err)
 	assertChainsEqual(t, state, d)
 }
 
 func TestDiffCurrentSupply(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	lastAcceptedID := ids.GenerateTestID()
-	state, _ := newInitializedState(assert)
+	state, _ := newInitializedState(require)
 	versions := NewMockVersions(ctrl)
 	versions.EXPECT().GetState(lastAcceptedID).AnyTimes().Return(state, true)
 
 	d, err := NewDiff(lastAcceptedID, versions)
-	assert.NoError(err)
+	require.NoError(err)
 
 	initialCurrentSupply := d.GetCurrentSupply()
 	newCurrentSupply := initialCurrentSupply + 1
 	d.SetCurrentSupply(newCurrentSupply)
-	assert.Equal(newCurrentSupply, d.GetCurrentSupply())
-	assert.Equal(initialCurrentSupply, state.GetCurrentSupply())
+	require.Equal(newCurrentSupply, d.GetCurrentSupply())
+	require.Equal(initialCurrentSupply, state.GetCurrentSupply())
 }
 
 func TestDiffCurrentValidator(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -83,7 +83,7 @@ func TestDiffCurrentValidator(t *testing.T) {
 	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
 
 	d, err := NewDiff(lastAcceptedID, states)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Put a current validator
 	currentValidator := &Staker{
@@ -95,19 +95,19 @@ func TestDiffCurrentValidator(t *testing.T) {
 
 	// Assert that we get the current validator back
 	gotCurrentValidator, err := d.GetCurrentValidator(currentValidator.SubnetID, currentValidator.NodeID)
-	assert.NoError(err)
-	assert.Equal(currentValidator, gotCurrentValidator)
+	require.NoError(err)
+	require.Equal(currentValidator, gotCurrentValidator)
 
 	// Delete the current validator
 	d.DeleteCurrentValidator(currentValidator)
 
 	// Make sure the deletion worked
 	_, err = d.GetCurrentValidator(currentValidator.SubnetID, currentValidator.NodeID)
-	assert.ErrorIs(err, database.ErrNotFound)
+	require.ErrorIs(err, database.ErrNotFound)
 }
 
 func TestDiffPendingValidator(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -121,7 +121,7 @@ func TestDiffPendingValidator(t *testing.T) {
 	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
 
 	d, err := NewDiff(lastAcceptedID, states)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Put a pending validator
 	pendingValidator := &Staker{
@@ -133,19 +133,19 @@ func TestDiffPendingValidator(t *testing.T) {
 
 	// Assert that we get the pending validator back
 	gotPendingValidator, err := d.GetPendingValidator(pendingValidator.SubnetID, pendingValidator.NodeID)
-	assert.NoError(err)
-	assert.Equal(pendingValidator, gotPendingValidator)
+	require.NoError(err)
+	require.Equal(pendingValidator, gotPendingValidator)
 
 	// Delete the pending validator
 	d.DeletePendingValidator(pendingValidator)
 
 	// Make sure the deletion worked
 	_, err = d.GetPendingValidator(pendingValidator.SubnetID, pendingValidator.NodeID)
-	assert.ErrorIs(err, database.ErrNotFound)
+	require.ErrorIs(err, database.ErrNotFound)
 }
 
 func TestDiffCurrentDelegator(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -165,7 +165,7 @@ func TestDiffCurrentDelegator(t *testing.T) {
 	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
 
 	d, err := NewDiff(lastAcceptedID, states)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Put a current delegator
 	d.PutCurrentDelegator(currentDelegator)
@@ -180,10 +180,10 @@ func TestDiffCurrentDelegator(t *testing.T) {
 		currentDelegator.NodeID,
 	).Return(stateCurrentDelegatorIter, nil).Times(2)
 	gotCurrentDelegatorIter, err := d.GetCurrentDelegatorIterator(currentDelegator.SubnetID, currentDelegator.NodeID)
-	assert.NoError(err)
+	require.NoError(err)
 	// The iterator should have the 1 delegator we put in [d]
-	assert.True(gotCurrentDelegatorIter.Next())
-	assert.Equal(gotCurrentDelegatorIter.Value(), currentDelegator)
+	require.True(gotCurrentDelegatorIter.Next())
+	require.Equal(gotCurrentDelegatorIter.Value(), currentDelegator)
 
 	// Delete the current delegator
 	d.DeleteCurrentDelegator(currentDelegator)
@@ -191,12 +191,12 @@ func TestDiffCurrentDelegator(t *testing.T) {
 	// Make sure the deletion worked.
 	// The iterator should have no elements.
 	gotCurrentDelegatorIter, err = d.GetCurrentDelegatorIterator(currentDelegator.SubnetID, currentDelegator.NodeID)
-	assert.NoError(err)
-	assert.False(gotCurrentDelegatorIter.Next())
+	require.NoError(err)
+	require.False(gotCurrentDelegatorIter.Next())
 }
 
 func TestDiffPendingDelegator(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -216,7 +216,7 @@ func TestDiffPendingDelegator(t *testing.T) {
 	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
 
 	d, err := NewDiff(lastAcceptedID, states)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Put a pending delegator
 	d.PutPendingDelegator(pendingDelegator)
@@ -231,10 +231,10 @@ func TestDiffPendingDelegator(t *testing.T) {
 		pendingDelegator.NodeID,
 	).Return(statePendingDelegatorIter, nil).Times(2)
 	gotPendingDelegatorIter, err := d.GetPendingDelegatorIterator(pendingDelegator.SubnetID, pendingDelegator.NodeID)
-	assert.NoError(err)
+	require.NoError(err)
 	// The iterator should have the 1 delegator we put in [d]
-	assert.True(gotPendingDelegatorIter.Next())
-	assert.Equal(gotPendingDelegatorIter.Value(), pendingDelegator)
+	require.True(gotPendingDelegatorIter.Next())
+	require.Equal(gotPendingDelegatorIter.Value(), pendingDelegator)
 
 	// Delete the pending delegator
 	d.DeletePendingDelegator(pendingDelegator)
@@ -242,12 +242,12 @@ func TestDiffPendingDelegator(t *testing.T) {
 	// Make sure the deletion worked.
 	// The iterator should have no elements.
 	gotPendingDelegatorIter, err = d.GetPendingDelegatorIterator(pendingDelegator.SubnetID, pendingDelegator.NodeID)
-	assert.NoError(err)
-	assert.False(gotPendingDelegatorIter.Next())
+	require.NoError(err)
+	require.False(gotPendingDelegatorIter.Next())
 }
 
 func TestDiffSubnet(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -261,7 +261,7 @@ func TestDiffSubnet(t *testing.T) {
 	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
 
 	d, err := NewDiff(lastAcceptedID, states)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Put a subnet
 	createSubnetTx := &txs.Tx{}
@@ -272,14 +272,14 @@ func TestDiffSubnet(t *testing.T) {
 	parentStateCreateSubnetTx := &txs.Tx{}
 	state.EXPECT().GetSubnets().Return([]*txs.Tx{parentStateCreateSubnetTx}, nil).Times(1)
 	gotSubnets, err := d.GetSubnets()
-	assert.NoError(err)
-	assert.Len(gotSubnets, 2)
-	assert.Equal(gotSubnets[0], parentStateCreateSubnetTx)
-	assert.Equal(gotSubnets[1], createSubnetTx)
+	require.NoError(err)
+	require.Len(gotSubnets, 2)
+	require.Equal(gotSubnets[0], parentStateCreateSubnetTx)
+	require.Equal(gotSubnets[1], createSubnetTx)
 }
 
 func TestDiffChain(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -293,7 +293,7 @@ func TestDiffChain(t *testing.T) {
 	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
 
 	d, err := NewDiff(lastAcceptedID, states)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Put a chain
 	subnetID := ids.GenerateTestID()
@@ -313,14 +313,14 @@ func TestDiffChain(t *testing.T) {
 	}
 	state.EXPECT().GetChains(subnetID).Return([]*txs.Tx{parentStateCreateChainTx}, nil).Times(1)
 	gotChains, err := d.GetChains(subnetID)
-	assert.NoError(err)
-	assert.Len(gotChains, 2)
-	assert.Equal(gotChains[0], parentStateCreateChainTx)
-	assert.Equal(gotChains[1], createChainTx)
+	require.NoError(err)
+	require.Len(gotChains, 2)
+	require.Equal(gotChains[0], parentStateCreateChainTx)
+	require.Equal(gotChains[1], createChainTx)
 }
 
 func TestDiffTx(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -334,7 +334,7 @@ func TestDiffTx(t *testing.T) {
 	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
 
 	d, err := NewDiff(lastAcceptedID, states)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Put a tx
 	subnetID := ids.GenerateTestID()
@@ -349,9 +349,9 @@ func TestDiffTx(t *testing.T) {
 	{
 		// Assert that we get the tx back
 		gotTx, gotStatus, err := d.GetTx(tx.ID())
-		assert.NoError(err)
-		assert.Equal(status.Committed, gotStatus)
-		assert.Equal(tx, gotTx)
+		require.NoError(err)
+		require.Equal(status.Committed, gotStatus)
+		require.Equal(tx, gotTx)
 	}
 
 	{
@@ -365,14 +365,14 @@ func TestDiffTx(t *testing.T) {
 		parentTx.Initialize(utils.RandomBytes(16), utils.RandomBytes(16))
 		state.EXPECT().GetTx(parentTx.ID()).Return(parentTx, status.Committed, nil).Times(1)
 		gotParentTx, gotStatus, err := d.GetTx(parentTx.ID())
-		assert.NoError(err)
-		assert.Equal(status.Committed, gotStatus)
-		assert.Equal(parentTx, gotParentTx)
+		require.NoError(err)
+		require.Equal(status.Committed, gotStatus)
+		require.Equal(parentTx, gotParentTx)
 	}
 }
 
 func TestDiffRewardUTXO(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -386,7 +386,7 @@ func TestDiffRewardUTXO(t *testing.T) {
 	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
 
 	d, err := NewDiff(lastAcceptedID, states)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Put a reward UTXO
 	txID := ids.GenerateTestID()
@@ -398,9 +398,9 @@ func TestDiffRewardUTXO(t *testing.T) {
 	{
 		// Assert that we get the UTXO back
 		gotRewardUTXOs, err := d.GetRewardUTXOs(txID)
-		assert.NoError(err)
-		assert.Len(gotRewardUTXOs, 1)
-		assert.Equal(rewardUTXO, gotRewardUTXOs[0])
+		require.NoError(err)
+		require.Len(gotRewardUTXOs, 1)
+		require.Equal(rewardUTXO, gotRewardUTXOs[0])
 	}
 
 	{
@@ -412,14 +412,14 @@ func TestDiffRewardUTXO(t *testing.T) {
 		}
 		state.EXPECT().GetRewardUTXOs(txID2).Return([]*avax.UTXO{parentRewardUTXO}, nil).Times(1)
 		gotParentRewardUTXOs, err := d.GetRewardUTXOs(txID2)
-		assert.NoError(err)
-		assert.Len(gotParentRewardUTXOs, 1)
-		assert.Equal(parentRewardUTXO, gotParentRewardUTXOs[0])
+		require.NoError(err)
+		require.Len(gotParentRewardUTXOs, 1)
+		require.Equal(parentRewardUTXO, gotParentRewardUTXOs[0])
 	}
 }
 
 func TestDiffUTXO(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -433,7 +433,7 @@ func TestDiffUTXO(t *testing.T) {
 	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
 
 	d, err := NewDiff(lastAcceptedID, states)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Put a UTXO
 	utxo := &avax.UTXO{
@@ -444,8 +444,8 @@ func TestDiffUTXO(t *testing.T) {
 	{
 		// Assert that we get the UTXO back
 		gotUTXO, err := d.GetUTXO(utxo.InputID())
-		assert.NoError(err)
-		assert.Equal(utxo, gotUTXO)
+		require.NoError(err)
+		require.Equal(utxo, gotUTXO)
 	}
 
 	{
@@ -456,8 +456,8 @@ func TestDiffUTXO(t *testing.T) {
 		}
 		state.EXPECT().GetUTXO(parentUTXO.InputID()).Return(parentUTXO, nil).Times(1)
 		gotParentUTXO, err := d.GetUTXO(parentUTXO.InputID())
-		assert.NoError(err)
-		assert.Equal(parentUTXO, gotParentUTXO)
+		require.NoError(err)
+		require.Equal(parentUTXO, gotParentUTXO)
 	}
 
 	{
@@ -466,7 +466,7 @@ func TestDiffUTXO(t *testing.T) {
 
 		// Make sure it's gone
 		_, err = d.GetUTXO(utxo.InputID())
-		assert.Error(err)
+		require.Error(err)
 	}
 }
 
@@ -475,35 +475,35 @@ func assertChainsEqual(t *testing.T, expected, actual Chain) {
 
 	expectedCurrentStakerIterator, expectedErr := expected.GetCurrentStakerIterator()
 	actualCurrentStakerIterator, actualErr := actual.GetCurrentStakerIterator()
-	assert.Equal(t, expectedErr, actualErr)
+	require.Equal(t, expectedErr, actualErr)
 	if expectedErr == nil {
 		assertIteratorsEqual(t, expectedCurrentStakerIterator, actualCurrentStakerIterator)
 	}
 
 	expectedPendingStakerIterator, expectedErr := expected.GetPendingStakerIterator()
 	actualPendingStakerIterator, actualErr := actual.GetPendingStakerIterator()
-	assert.Equal(t, expectedErr, actualErr)
+	require.Equal(t, expectedErr, actualErr)
 	if expectedErr == nil {
 		assertIteratorsEqual(t, expectedPendingStakerIterator, actualPendingStakerIterator)
 	}
 
-	assert.Equal(t, expected.GetTimestamp(), actual.GetTimestamp())
-	assert.Equal(t, expected.GetCurrentSupply(), actual.GetCurrentSupply())
+	require.Equal(t, expected.GetTimestamp(), actual.GetTimestamp())
+	require.Equal(t, expected.GetCurrentSupply(), actual.GetCurrentSupply())
 
 	expectedSubnets, expectedErr := expected.GetSubnets()
 	actualSubnets, actualErr := actual.GetSubnets()
-	assert.Equal(t, expectedErr, actualErr)
+	require.Equal(t, expectedErr, actualErr)
 	if expectedErr == nil {
-		assert.Equal(t, expectedSubnets, actualSubnets)
+		require.Equal(t, expectedSubnets, actualSubnets)
 
 		for _, subnet := range expectedSubnets {
 			subnetID := subnet.ID()
 
 			expectedChains, expectedErr := expected.GetChains(subnetID)
 			actualChains, actualErr := actual.GetChains(subnetID)
-			assert.Equal(t, expectedErr, actualErr)
+			require.Equal(t, expectedErr, actualErr)
 			if expectedErr == nil {
-				assert.Equal(t, expectedChains, actualChains)
+				require.Equal(t, expectedChains, actualChains)
 			}
 		}
 	}

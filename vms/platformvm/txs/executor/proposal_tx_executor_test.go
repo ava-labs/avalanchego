@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -1007,6 +1007,6 @@ func TestBlueberryAddValidatorTxEmptyNodeID(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		assert.ErrorIs(t, err, test.expectedError)
+		require.ErrorIs(t, err, test.expectedError)
 	}
 }

@@ -9,7 +9,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
@@ -26,7 +26,7 @@ import (
 )
 
 func TestVerifierVisitProposalBlock(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -75,7 +75,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 			Creds:    []verify.Verifiable{},
 		},
 	)
-	assert.NoError(err)
+	require.NoError(err)
 	blk.Tx.Unsigned = blkTx
 
 	// Set expectations for dependencies.
@@ -88,21 +88,21 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 
 	// Visit the block
 	err = verifier.ProposalBlock(blk)
-	assert.NoError(err)
-	assert.Contains(verifier.backend.blkIDToState, blk.ID())
+	require.NoError(err)
+	require.Contains(verifier.backend.blkIDToState, blk.ID())
 	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
-	assert.Equal(blk, gotBlkState.statelessBlock)
-	assert.Equal(onCommitState, gotBlkState.onCommitState)
-	assert.Equal(onAbortState, gotBlkState.onAbortState)
-	assert.Equal(timestamp, gotBlkState.timestamp)
+	require.Equal(blk, gotBlkState.statelessBlock)
+	require.Equal(onCommitState, gotBlkState.onCommitState)
+	require.Equal(onAbortState, gotBlkState.onAbortState)
+	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
 	err = verifier.ProposalBlock(blk)
-	assert.NoError(err)
+	require.NoError(err)
 }
 
 func TestVerifierVisitAtomicBlock(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -157,7 +157,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 			Creds:    []verify.Verifiable{},
 		},
 	)
-	assert.NoError(err)
+	require.NoError(err)
 	blk.Tx.Unsigned = blkTx
 
 	// Set expectations for dependencies.
@@ -170,22 +170,22 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	onAccept.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 
 	err = verifier.AtomicBlock(blk)
-	assert.NoError(err)
+	require.NoError(err)
 
-	assert.Contains(verifier.backend.blkIDToState, blk.ID())
+	require.Contains(verifier.backend.blkIDToState, blk.ID())
 	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
-	assert.Equal(blk, gotBlkState.statelessBlock)
-	assert.Equal(onAccept, gotBlkState.onAcceptState)
-	assert.Equal(inputs, gotBlkState.inputs)
-	assert.Equal(timestamp, gotBlkState.timestamp)
+	require.Equal(blk, gotBlkState.statelessBlock)
+	require.Equal(onAccept, gotBlkState.onAcceptState)
+	require.Equal(inputs, gotBlkState.inputs)
+	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
 	err = verifier.AtomicBlock(blk)
-	assert.NoError(err)
+	require.NoError(err)
 }
 
 func TestVerifierVisitStandardBlock(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -253,7 +253,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 			},
 		},
 	)
-	assert.NoError(err)
+	require.NoError(err)
 	blk.Transactions[0].Unsigned = blkTx
 
 	// Set expectations for dependencies.
@@ -264,22 +264,22 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	mempool.EXPECT().RemoveDecisionTxs(blk.Transactions).Times(1)
 
 	err = verifier.StandardBlock(blk)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Assert expected state.
-	assert.Contains(verifier.backend.blkIDToState, blk.ID())
+	require.Contains(verifier.backend.blkIDToState, blk.ID())
 	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
-	assert.Equal(blk, gotBlkState.statelessBlock)
-	assert.Equal(ids.Set{}, gotBlkState.inputs)
-	assert.Equal(timestamp, gotBlkState.timestamp)
+	require.Equal(blk, gotBlkState.statelessBlock)
+	require.Equal(ids.Set{}, gotBlkState.inputs)
+	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
 	err = verifier.StandardBlock(blk)
-	assert.NoError(err)
+	require.NoError(err)
 }
 
 func TestVerifierVisitCommitBlock(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -315,7 +315,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 		parentID,
 		2,
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
@@ -326,21 +326,21 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 
 	// Verify the block.
 	err = verifier.CommitBlock(blk)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Assert expected state.
-	assert.Contains(verifier.backend.blkIDToState, blk.ID())
+	require.Contains(verifier.backend.blkIDToState, blk.ID())
 	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
-	assert.Equal(parentOnAbortState, gotBlkState.onAcceptState)
-	assert.Equal(timestamp, gotBlkState.timestamp)
+	require.Equal(parentOnAbortState, gotBlkState.onAcceptState)
+	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
 	err = verifier.CommitBlock(blk)
-	assert.NoError(err)
+	require.NoError(err)
 }
 
 func TestVerifierVisitAbortBlock(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -376,7 +376,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 		parentID,
 		2,
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
@@ -387,21 +387,21 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 
 	// Verify the block.
 	err = verifier.AbortBlock(blk)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Assert expected state.
-	assert.Contains(verifier.backend.blkIDToState, blk.ID())
+	require.Contains(verifier.backend.blkIDToState, blk.ID())
 	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
-	assert.Equal(parentOnAbortState, gotBlkState.onAcceptState)
-	assert.Equal(timestamp, gotBlkState.timestamp)
+	require.Equal(parentOnAbortState, gotBlkState.onAcceptState)
+	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
 	err = verifier.AbortBlock(blk)
-	assert.NoError(err)
+	require.NoError(err)
 }
 
 func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -482,7 +482,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 			},
 		},
 	)
-	assert.NoError(err)
+	require.NoError(err)
 	blk.Transactions[0].Unsigned = blkTx
 
 	// Set expectations for dependencies.
@@ -493,11 +493,11 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	parentStatelessBlk.EXPECT().Parent().Return(grandParentID).Times(1)
 
 	err = verifier.StandardBlock(blk)
-	assert.ErrorIs(err, errConflictingParentTxs)
+	require.ErrorIs(err, errConflictingParentTxs)
 }
 
 func TestVerifierVisitStandardBlockWithProposalBlockParent(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -539,10 +539,10 @@ func TestVerifierVisitStandardBlockWithProposalBlockParent(t *testing.T) {
 			},
 		},
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 
 	err = verifier.StandardBlock(blk)
-	assert.ErrorIs(err, state.ErrMissingParentState)
+	require.ErrorIs(err, state.ErrMissingParentState)
 }

@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"go.uber.org/zap"
 
 	"golang.org/x/time/rate"
@@ -16,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 var _ bandwidthThrottler = &bandwidthThrottlerImpl{}

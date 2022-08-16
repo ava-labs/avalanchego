@@ -13,7 +13,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/rocksdb"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -43,14 +43,14 @@ func TestNewSingleRocksDB(t *testing.T) {
 
 	semDB := manager.Current()
 	cmp := semDB.Version.Compare(v1)
-	assert.Equal(t, 0, cmp, "incorrect version on current database")
+	require.Equal(t, 0, cmp, "incorrect version on current database")
 
 	_, exists := manager.Previous()
-	assert.False(t, exists, "there should be no previous database")
+	require.False(t, exists, "there should be no previous database")
 
 	dbs := manager.GetDatabases()
-	assert.Len(t, dbs, 1)
+	require.Len(t, dbs, 1)
 
 	err = manager.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }

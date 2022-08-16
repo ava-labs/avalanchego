@@ -11,7 +11,7 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
@@ -249,7 +249,7 @@ func lastAcceptedBlockPostStateSummaryAcceptTestPlugin(t *testing.T, loadExpecta
 	return New(ssVM), ctrl
 }
 
-func buildClientHelper(assert *assert.Assertions, testKey string, mockedPlugin plugin.Plugin) (*VMClient, *plugin.Client) {
+func buildClientHelper(require *require.Assertions, testKey string, mockedPlugin plugin.Plugin) (*VMClient, *plugin.Client) {
 	process := helperProcess(testKey)
 	c := plugin.NewClient(&plugin.ClientConfig{
 		Cmd:              process,
@@ -259,216 +259,216 @@ func buildClientHelper(assert *assert.Assertions, testKey string, mockedPlugin p
 	})
 
 	_, err := c.Start()
-	assert.NoErrorf(err, "failed to start plugin: %v", err)
-	assert.True(c.Protocol() == plugin.ProtocolGRPC)
+	require.NoErrorf(err, "failed to start plugin: %v", err)
+	require.True(c.Protocol() == plugin.ProtocolGRPC)
 
 	// Get the plugin client.
 	client, err := c.Client()
-	assert.NoErrorf(err, "failed to get plugin client: %v", err)
+	require.NoErrorf(err, "failed to get plugin client: %v", err)
 
 	// Grab the vm implementation.
 	raw, err := client.Dispense(testKey)
-	assert.NoErrorf(err, "failed to dispense plugin: %v", err)
+	require.NoErrorf(err, "failed to dispense plugin: %v", err)
 
 	// Get vm client.
 	vm, ok := raw.(*VMClient)
-	assert.True(ok)
+	require.True(ok)
 
 	return vm, c
 }
 
 func TestStateSyncEnabled(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	testKey := stateSyncEnabledTestKey
 
 	mockedPlugin, ctrl := stateSyncEnabledTestPlugin(t, false /*loadExpectations*/)
 	defer ctrl.Finish()
 
 	// Create and start the plugin
-	vm, c := buildClientHelper(assert, testKey, mockedPlugin)
+	vm, c := buildClientHelper(require, testKey, mockedPlugin)
 	defer c.Kill()
 
 	// test state sync not implemented
 	// Note that enabled == false is returned rather than
 	// common.ErrStateSyncableVMNotImplemented
 	enabled, err := vm.StateSyncEnabled()
-	assert.NoError(err)
-	assert.False(enabled)
+	require.NoError(err)
+	require.False(enabled)
 
 	// test state sync disabled
 	enabled, err = vm.StateSyncEnabled()
-	assert.NoError(err)
-	assert.False(enabled)
+	require.NoError(err)
+	require.False(enabled)
 
 	// test state sync enabled
 	enabled, err = vm.StateSyncEnabled()
-	assert.NoError(err)
-	assert.True(enabled)
+	require.NoError(err)
+	require.True(enabled)
 
 	// test a non-special error.
 	// TODO: retrieve exact error
 	_, err = vm.StateSyncEnabled()
-	assert.Error(err)
+	require.Error(err)
 }
 
 func TestGetOngoingSyncStateSummary(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	testKey := getOngoingSyncStateSummaryTestKey
 
 	mockedPlugin, ctrl := getOngoingSyncStateSummaryTestPlugin(t, false /*loadExpectations*/)
 	defer ctrl.Finish()
 
 	// Create and start the plugin
-	vm, c := buildClientHelper(assert, testKey, mockedPlugin)
+	vm, c := buildClientHelper(require, testKey, mockedPlugin)
 	defer c.Kill()
 
 	// test unimplemented case; this is just a guard
 	_, err := vm.GetOngoingSyncStateSummary()
-	assert.Equal(block.ErrStateSyncableVMNotImplemented, err)
+	require.Equal(block.ErrStateSyncableVMNotImplemented, err)
 
 	// test successful retrieval
 	summary, err := vm.GetOngoingSyncStateSummary()
-	assert.NoError(err)
-	assert.Equal(mockedSummary.ID(), summary.ID())
-	assert.Equal(mockedSummary.Height(), summary.Height())
-	assert.Equal(mockedSummary.Bytes(), summary.Bytes())
+	require.NoError(err)
+	require.Equal(mockedSummary.ID(), summary.ID())
+	require.Equal(mockedSummary.Height(), summary.Height())
+	require.Equal(mockedSummary.Bytes(), summary.Bytes())
 
 	// test a non-special error.
 	// TODO: retrieve exact error
 	_, err = vm.GetOngoingSyncStateSummary()
-	assert.Error(err)
+	require.Error(err)
 }
 
 func TestGetLastStateSummary(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	testKey := getLastStateSummaryTestKey
 
 	mockedPlugin, ctrl := getLastStateSummaryTestPlugin(t, false /*loadExpectations*/)
 	defer ctrl.Finish()
 
 	// Create and start the plugin
-	vm, c := buildClientHelper(assert, testKey, mockedPlugin)
+	vm, c := buildClientHelper(require, testKey, mockedPlugin)
 	defer c.Kill()
 
 	// test unimplemented case; this is just a guard
 	_, err := vm.GetLastStateSummary()
-	assert.Equal(block.ErrStateSyncableVMNotImplemented, err)
+	require.Equal(block.ErrStateSyncableVMNotImplemented, err)
 
 	// test successful retrieval
 	summary, err := vm.GetLastStateSummary()
-	assert.NoError(err)
-	assert.Equal(mockedSummary.ID(), summary.ID())
-	assert.Equal(mockedSummary.Height(), summary.Height())
-	assert.Equal(mockedSummary.Bytes(), summary.Bytes())
+	require.NoError(err)
+	require.Equal(mockedSummary.ID(), summary.ID())
+	require.Equal(mockedSummary.Height(), summary.Height())
+	require.Equal(mockedSummary.Bytes(), summary.Bytes())
 
 	// test a non-special error.
 	// TODO: retrieve exact error
 	_, err = vm.GetLastStateSummary()
-	assert.Error(err)
+	require.Error(err)
 }
 
 func TestParseStateSummary(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	testKey := parseStateSummaryTestKey
 
 	mockedPlugin, ctrl := parseStateSummaryTestPlugin(t, false /*loadExpectations*/)
 	defer ctrl.Finish()
 
 	// Create and start the plugin
-	vm, c := buildClientHelper(assert, testKey, mockedPlugin)
+	vm, c := buildClientHelper(require, testKey, mockedPlugin)
 	defer c.Kill()
 
 	// test unimplemented case; this is just a guard
 	_, err := vm.ParseStateSummary(mockedSummary.Bytes())
-	assert.Equal(block.ErrStateSyncableVMNotImplemented, err)
+	require.Equal(block.ErrStateSyncableVMNotImplemented, err)
 
 	// test successful parsing
 	summary, err := vm.ParseStateSummary(mockedSummary.Bytes())
-	assert.NoError(err)
-	assert.Equal(mockedSummary.ID(), summary.ID())
-	assert.Equal(mockedSummary.Height(), summary.Height())
-	assert.Equal(mockedSummary.Bytes(), summary.Bytes())
+	require.NoError(err)
+	require.Equal(mockedSummary.ID(), summary.ID())
+	require.Equal(mockedSummary.Height(), summary.Height())
+	require.Equal(mockedSummary.Bytes(), summary.Bytes())
 
 	// test parsing nil summary
 	_, err = vm.ParseStateSummary(nil)
-	assert.Error(err)
+	require.Error(err)
 
 	// test a non-special error.
 	// TODO: retrieve exact error
 	_, err = vm.ParseStateSummary(mockedSummary.Bytes())
-	assert.Error(err)
+	require.Error(err)
 }
 
 func TestGetStateSummary(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	testKey := getStateSummaryTestKey
 
 	mockedPlugin, ctrl := getStateSummaryTestPlugin(t, false /*loadExpectations*/)
 	defer ctrl.Finish()
 
 	// Create and start the plugin
-	vm, c := buildClientHelper(assert, testKey, mockedPlugin)
+	vm, c := buildClientHelper(require, testKey, mockedPlugin)
 	defer c.Kill()
 
 	// test unimplemented case; this is just a guard
 	_, err := vm.GetStateSummary(mockedSummary.Height())
-	assert.Equal(block.ErrStateSyncableVMNotImplemented, err)
+	require.Equal(block.ErrStateSyncableVMNotImplemented, err)
 
 	// test successful retrieval
 	summary, err := vm.GetStateSummary(mockedSummary.Height())
-	assert.NoError(err)
-	assert.Equal(mockedSummary.ID(), summary.ID())
-	assert.Equal(mockedSummary.Height(), summary.Height())
-	assert.Equal(mockedSummary.Bytes(), summary.Bytes())
+	require.NoError(err)
+	require.Equal(mockedSummary.ID(), summary.ID())
+	require.Equal(mockedSummary.Height(), summary.Height())
+	require.Equal(mockedSummary.Bytes(), summary.Bytes())
 
 	// test a non-special error.
 	// TODO: retrieve exact error
 	_, err = vm.GetStateSummary(mockedSummary.Height())
-	assert.Error(err)
+	require.Error(err)
 }
 
 func TestAcceptStateSummary(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	testKey := acceptStateSummaryTestKey
 
 	mockedPlugin, ctrl := acceptStateSummaryTestPlugin(t, false /*loadExpectations*/)
 	defer ctrl.Finish()
 
 	// Create and start the plugin
-	vm, c := buildClientHelper(assert, testKey, mockedPlugin)
+	vm, c := buildClientHelper(require, testKey, mockedPlugin)
 	defer c.Kill()
 
 	// retrieve the summary first
 	summary, err := vm.GetStateSummary(mockedSummary.Height())
-	assert.NoError(err)
+	require.NoError(err)
 
 	// test accepted Summary
 	accepted, err := summary.Accept()
-	assert.NoError(err)
-	assert.True(accepted)
+	require.NoError(err)
+	require.True(accepted)
 
 	// test skipped Summary
 	accepted, err = summary.Accept()
-	assert.NoError(err)
-	assert.False(accepted)
+	require.NoError(err)
+	require.False(accepted)
 
 	// test a non-special error.
 	// TODO: retrieve exact error
 	_, err = summary.Accept()
-	assert.Error(err)
+	require.Error(err)
 }
 
 // Show that LastAccepted call returns the right answer after a StateSummary
 // is accepted AND engine state moves to bootstrapping
 func TestLastAcceptedBlockPostStateSummaryAccept(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	testKey := lastAcceptedBlockPostStateSummaryAcceptTestKey
 
 	mockedPlugin, ctrl := lastAcceptedBlockPostStateSummaryAcceptTestPlugin(t, false /*loadExpectations*/)
 	defer ctrl.Finish()
 
 	// Create and start the plugin
-	vm, c := buildClientHelper(assert, testKey, mockedPlugin)
+	vm, c := buildClientHelper(require, testKey, mockedPlugin)
 	defer c.Kill()
 
 	// Step 1: initialize VM and check initial LastAcceptedBlock
@@ -476,40 +476,40 @@ func TestLastAcceptedBlockPostStateSummaryAccept(t *testing.T) {
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 	dbManager = dbManager.NewPrefixDBManager([]byte{})
 
-	assert.NoError(vm.Initialize(ctx, dbManager, nil, nil, nil, nil, nil, nil))
+	require.NoError(vm.Initialize(ctx, dbManager, nil, nil, nil, nil, nil, nil))
 
 	blkID, err := vm.LastAccepted()
-	assert.NoError(err)
-	assert.Equal(preSummaryBlk.ID(), blkID)
+	require.NoError(err)
+	require.Equal(preSummaryBlk.ID(), blkID)
 
 	lastBlk, err := vm.GetBlock(blkID)
-	assert.NoError(err)
-	assert.Equal(preSummaryBlk.Height(), lastBlk.Height())
+	require.NoError(err)
+	require.Equal(preSummaryBlk.Height(), lastBlk.Height())
 
 	// Step 2: pick a state summary to an higher height and accept it
 	summary, err := vm.ParseStateSummary(mockedSummary.Bytes())
-	assert.NoError(err)
+	require.NoError(err)
 
 	accepted, err := summary.Accept()
-	assert.NoError(err)
-	assert.True(accepted)
+	require.NoError(err)
+	require.True(accepted)
 
 	// State Sync accept does not duly update LastAccepted block information
 	// since state sync can complete asynchronously
 	blkID, err = vm.LastAccepted()
-	assert.NoError(err)
+	require.NoError(err)
 
 	lastBlk, err = vm.GetBlock(blkID)
-	assert.NoError(err)
-	assert.Equal(preSummaryBlk.Height(), lastBlk.Height())
+	require.NoError(err)
+	require.Equal(preSummaryBlk.Height(), lastBlk.Height())
 
 	// Setting state to bootstrapping duly update last accepted block
-	assert.NoError(vm.SetState(snow.Bootstrapping))
+	require.NoError(vm.SetState(snow.Bootstrapping))
 
 	blkID, err = vm.LastAccepted()
-	assert.NoError(err)
+	require.NoError(err)
 
 	lastBlk, err = vm.GetBlock(blkID)
-	assert.NoError(err)
-	assert.Equal(summary.Height(), lastBlk.Height())
+	require.NoError(err)
+	require.Equal(summary.Height(), lastBlk.Height())
 }

@@ -7,14 +7,14 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func TestBlockingMessageQueue(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	q := NewBlockingMessageQueue(
 		SendFailedFunc(func(msg message.OutboundMessage) {
@@ -26,7 +26,7 @@ func TestBlockingMessageQueue(t *testing.T) {
 
 	mc := newMessageCreator(t)
 	msg, err := mc.Ping()
-	assert.NoError(err)
+	require.NoError(err)
 
 	numToSend := 10
 	go func() {
@@ -37,14 +37,14 @@ func TestBlockingMessageQueue(t *testing.T) {
 
 	for i := 0; i < numToSend; i++ {
 		_, ok := q.Pop()
-		assert.True(ok)
+		require.True(ok)
 	}
 
 	_, ok := q.PopNow()
-	assert.False(ok)
+	require.False(ok)
 
 	q.Close()
 
 	_, ok = q.Pop()
-	assert.False(ok)
+	require.False(ok)
 }

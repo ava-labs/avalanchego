@@ -10,7 +10,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -87,9 +87,9 @@ func TestAdaptiveTimeoutManagerInit(t *testing.T) {
 	for _, test := range tests {
 		_, err := NewAdaptiveTimeoutManager(&test.config, "", prometheus.NewRegistry())
 		if err != nil && test.shouldErrWith == "" {
-			assert.FailNow(t, "error from valid config", err)
+			require.FailNow(t, "error from valid config", err)
 		} else if err == nil && test.shouldErrWith != "" {
-			assert.FailNowf(t, "should have errored", test.shouldErrWith)
+			require.FailNowf(t, "should have errored", test.shouldErrWith)
 		}
 	}
 }

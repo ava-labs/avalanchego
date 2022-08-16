@@ -6,20 +6,20 @@ package sampler
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestWeightedHeapInitialize(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	h := weightedHeap{}
 
 	err := h.Initialize([]uint64{2, 2, 1, 3, 3, 1, 3})
-	assert.NoError(err)
+	require.NoError(err)
 
 	expectedOrdering := []int{3, 4, 6, 0, 1, 2, 5}
 	for i, elem := range h.heap {
 		expected := expectedOrdering[i]
-		assert.Equal(expected, elem.index)
+		require.Equal(expected, elem.index)
 	}
 }

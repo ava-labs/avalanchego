@@ -7,13 +7,15 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/assert"
 )
 
 var _ BlockTimer = &dummyBlkTimer{}
@@ -27,11 +29,11 @@ var preFundedKeys = crypto.BuildTestKeys()
 // shows that valid tx is not added to mempool if this would exceed its maximum
 // size
 func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
 	mpool, err := NewMempool("mempool", registerer, &dummyBlkTimer{})
-	assert.NoError(err)
+	require.NoError(err)
 
 	// create candidate tx
 	utx := &txs.CreateChainTx{
@@ -68,17 +70,17 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 		SubnetAuth:  &secp256k1fx.Input{SigIndices: []uint32{1}},
 	}
 	tx, err := txs.NewSigned(utx, txs.Codec, nil)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// shortcut to simulated almost filled mempool
 	mpool.(*mempool).bytesAvailable = len(tx.Bytes()) - 1
 
 	err = mpool.Add(tx)
-	assert.True(errors.Is(err, errMempoolFull), err, "max mempool size breached")
+	require.True(errors.Is(err, errMempoolFull), err, "max mempool size breached")
 
 	// shortcut to simulated almost filled mempool
 	mpool.(*mempool).bytesAvailable = len(tx.Bytes())
 
 	err = mpool.Add(tx)
-	assert.NoError(err, "should have added tx to mempool")
+	require.NoError(err, "should have added tx to mempool")
 }

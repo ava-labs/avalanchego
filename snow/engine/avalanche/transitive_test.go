@@ -11,7 +11,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -4064,7 +4064,7 @@ func TestEngineBubbleVotes(t *testing.T) {
 
 	vdr := ids.GenerateTestNodeID()
 	err := vals.AddWeight(vdr, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
@@ -4152,7 +4152,7 @@ func TestEngineBubbleVotes(t *testing.T) {
 		case pendingVtx1.ID():
 			return pendingVtx1, nil
 		}
-		assert.FailNow(t, "unknown vertex", "vtxID: %s", id)
+		require.FailNow(t, "unknown vertex", "vtxID: %s", id)
 		panic("should have errored")
 	}
 
@@ -4168,39 +4168,39 @@ func TestEngineBubbleVotes(t *testing.T) {
 	queryReqID := new(uint32)
 	queried := new(bool)
 	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, vtxID ids.ID, _ []byte) {
-		assert.Len(t, inVdrs, 1, "wrong number of validators")
+		require.Len(t, inVdrs, 1, "wrong number of validators")
 		*queryReqID = requestID
-		assert.Equal(t, vtx.ID(), vtxID, "wrong vertex requested")
+		require.Equal(t, vtx.ID(), vtxID, "wrong vertex requested")
 		*queried = true
 	}
 
 	getReqID := new(uint32)
 	fetched := new(bool)
 	sender.SendGetF = func(inVdr ids.NodeID, requestID uint32, vtxID ids.ID) {
-		assert.Equal(t, vdr, inVdr, "wrong validator")
+		require.Equal(t, vdr, inVdr, "wrong validator")
 		*getReqID = requestID
-		assert.Equal(t, missingVtx.ID(), vtxID, "wrong vertex requested")
+		require.Equal(t, missingVtx.ID(), vtxID, "wrong vertex requested")
 		*fetched = true
 	}
 
 	issued, err := te.issueFrom(vdr, pendingVtx1)
-	assert.NoError(t, err)
-	assert.False(t, issued, "shouldn't have been able to issue %s", pendingVtx1.ID())
-	assert.True(t, *queried, "should have queried for %s", vtx.ID())
-	assert.True(t, *fetched, "should have fetched %s", missingVtx.ID())
+	require.NoError(t, err)
+	require.False(t, issued, "shouldn't have been able to issue %s", pendingVtx1.ID())
+	require.True(t, *queried, "should have queried for %s", vtx.ID())
+	require.True(t, *fetched, "should have fetched %s", missingVtx.ID())
 
 	// can't apply votes yet because pendingVtx0 isn't issued because missingVtx
 	// is missing
 	err = te.Chits(vdr, *queryReqID, []ids.ID{pendingVtx1.ID()})
-	assert.NoError(t, err)
-	assert.Equal(t, choices.Processing, tx0.Status(), "wrong tx status")
-	assert.Equal(t, choices.Processing, tx1.Status(), "wrong tx status")
+	require.NoError(t, err)
+	require.Equal(t, choices.Processing, tx0.Status(), "wrong tx status")
+	require.Equal(t, choices.Processing, tx1.Status(), "wrong tx status")
 
 	// vote for pendingVtx1 should be bubbled up to pendingVtx0 and then to vtx
 	err = te.GetFailed(vdr, *getReqID)
-	assert.NoError(t, err)
-	assert.Equal(t, choices.Accepted, tx0.Status(), "wrong tx status")
-	assert.Equal(t, choices.Processing, tx1.Status(), "wrong tx status")
+	require.NoError(t, err)
+	require.Equal(t, choices.Accepted, tx0.Status(), "wrong tx status")
+	require.Equal(t, choices.Processing, tx1.Status(), "wrong tx status")
 }
 
 func TestEngineIssue(t *testing.T) {
@@ -4348,7 +4348,7 @@ func TestEngineIssue(t *testing.T) {
 // even if there are outstanding requests for vertices when the
 // dependency fails verification.
 func TestAbandonTx(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	_, _, engCfg := DefaultConfig()
 	engCfg.Params.BatchSize = 1
 	engCfg.Params.BetaVirtuous = 1
@@ -4446,11 +4446,11 @@ func TestAbandonTx(t *testing.T) {
 	sender.CantSendGet = false
 	sender.CantSendChits = false
 	err = te.PullQuery(vdr, 0, vtx1.ID())
-	assert.NoError(err)
+	require.NoError(err)
 	err = te.PullQuery(vdr, 0, vtx0.ID())
-	assert.NoError(err)
+	require.NoError(err)
 	err = te.PullQuery(vdr, 0, ids.GenerateTestID())
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Give the engine vtx1. It should wait to issue vtx1
 	// until tx0 is issued, because tx1 depends on tx0.
@@ -4459,14 +4459,14 @@ func TestAbandonTx(t *testing.T) {
 			vtx1.StatusV = choices.Processing
 			return vtx1, nil
 		}
-		assert.FailNow("should have asked to parse vtx1")
+		require.FailNow("should have asked to parse vtx1")
 		return nil, errors.New("should have asked to parse vtx1")
 	}
 	err = te.Put(vdr, 0, vtx1.Bytes())
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Verify that vtx1 is waiting to be issued.
-	assert.True(te.pending.Contains(vtx1.ID()))
+	require.True(te.pending.Contains(vtx1.ID()))
 
 	// Give the engine vtx0. It should try to issue vtx0
 	// but then abandon it because tx0 fails verification.
@@ -4475,17 +4475,17 @@ func TestAbandonTx(t *testing.T) {
 			vtx0.StatusV = choices.Processing
 			return vtx0, nil
 		}
-		assert.FailNow("should have asked to parse vtx0")
+		require.FailNow("should have asked to parse vtx0")
 		return nil, errors.New("should have asked to parse vtx0")
 	}
 	err = te.Put(vdr, 0, vtx0.Bytes())
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Despite the fact that there is still an outstanding vertex request,
 	// vtx1 should have been abandoned because tx0 failed verification
-	assert.False(te.pending.Contains(vtx1.ID()))
+	require.False(te.pending.Contains(vtx1.ID()))
 	// sanity check that there is indeed an outstanding vertex request
-	assert.True(te.outstandingVtxReqs.Len() == 1)
+	require.True(te.outstandingVtxReqs.Len() == 1)
 }
 
 func TestSendMixedQuery(t *testing.T) {
@@ -4625,7 +4625,7 @@ func TestSendMixedQuery(t *testing.T) {
 }
 
 func TestHandleChitsV2(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	_, _, engCfg := DefaultConfig()
 
 	sender := &common.SenderTest{T: t}
@@ -4647,10 +4647,10 @@ func TestHandleChitsV2(t *testing.T) {
 	engCfg.Ctx.Registerer = reg
 
 	te, err := newTransitive(engCfg)
-	assert.NoError(err)
-	assert.NoError(te.Start(0))
+	require.NoError(err)
+	require.NoError(te.Start(0))
 
 	// expects chits v2 to v1 conversion
-	assert.NoError(te.ChitsV2(ids.GenerateTestNodeID(), 0, []ids.ID{ids.GenerateTestID()}, ids.Empty))
-	assert.True(*asked)
+	require.NoError(te.ChitsV2(ids.GenerateTestNodeID(), 0, []ids.ID{ids.GenerateTestID()}, ids.Empty))
+	require.True(*asked)
 }

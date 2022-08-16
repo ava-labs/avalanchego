@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -55,7 +55,7 @@ func TestMeters(t *testing.T) {
 
 func NewTest(t *testing.T, factory Factory) {
 	m := factory.New(halflife)
-	assert.NotNil(t, m, "should have returned a valid interface")
+	require.NotNil(t, m, "should have returned a valid interface")
 }
 
 func TimeTravelTest(t *testing.T, factory Factory) {
@@ -184,9 +184,9 @@ func TestTimeUntil(t *testing.T) {
 	now = now.Add(timeUntilDesiredVal)
 	actualVal := m.Read(now)
 	// Make sure the actual/expected are close
-	assert.InDelta(t, desiredVal, actualVal, .00001)
+	require.InDelta(t, desiredVal, actualVal, .00001)
 	// Make sure TimeUntil returns the zero duration if
 	// the value provided >= the current value
-	assert.Zero(t, m.TimeUntil(now, actualVal))
-	assert.Zero(t, m.TimeUntil(now, actualVal+.1))
+	require.Zero(t, m.TimeUntil(now, actualVal))
+	require.Zero(t, m.TimeUntil(now, actualVal+.1))
 }

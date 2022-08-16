@@ -6,13 +6,14 @@ package tests
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestLoadTestKeys(t *testing.T) {
 	keys, err := LoadHexTestKeys("test.insecure.secp256k1.keys")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	for i, k := range keys {
 		curAddr := encodeShortAddr(k)
 		t.Logf("[%d] loaded %v", i, curAddr)

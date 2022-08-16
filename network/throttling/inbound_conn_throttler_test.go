@@ -7,7 +7,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var _ net.Listener = &MockListener{}
@@ -51,8 +51,8 @@ func TestInboundConnThrottlerClose(t *testing.T) {
 	}
 	wrappedL := NewThrottledListener(l, 1)
 	err := wrappedL.Close()
-	assert.NoError(t, err)
-	assert.True(t, closed)
+	require.NoError(t, err)
+	require.True(t, closed)
 	select {
 	case <-wrappedL.(*throttledListener).ctx.Done():
 	default:
@@ -61,7 +61,7 @@ func TestInboundConnThrottlerClose(t *testing.T) {
 
 	// Accept() should return an error because the context is cancelled
 	_, err = wrappedL.Accept()
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestInboundConnThrottlerAddr(t *testing.T) {
@@ -72,7 +72,7 @@ func TestInboundConnThrottlerAddr(t *testing.T) {
 	}
 	wrappedL := NewThrottledListener(l, 1)
 	_ = wrappedL.Addr()
-	assert.True(t, addrCalled)
+	require.True(t, addrCalled)
 }
 
 func TestInboundConnThrottlerAccept(t *testing.T) {
@@ -86,6 +86,6 @@ func TestInboundConnThrottlerAccept(t *testing.T) {
 	}
 	wrappedL := NewThrottledListener(l, 1)
 	_, err := wrappedL.Accept()
-	assert.NoError(t, err)
-	assert.True(t, acceptCalled)
+	require.NoError(t, err)
+	require.True(t, acceptCalled)
 }

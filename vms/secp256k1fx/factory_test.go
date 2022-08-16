@@ -6,13 +6,13 @@ package secp256k1fx
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFactory(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	factory := Factory{}
 	fx, err := factory.New(nil)
-	assert.NoError(err)
-	assert.NotNil(fx)
+	require.NoError(err)
+	require.NotNil(fx)
 }

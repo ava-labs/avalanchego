@@ -11,7 +11,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -52,7 +52,7 @@ func (a *apiServerMock) AddAliases(string, ...string) error {
 
 // Test that newIndexer sets fields correctly
 func TestNewIndexer(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	config := Config{
 		IndexingEnabled:        true,
 		AllowIncompleteIndex:   true,
@@ -65,31 +65,31 @@ func TestNewIndexer(t *testing.T) {
 	}
 
 	idxrIntf, err := NewIndexer(config)
-	assert.NoError(err)
+	require.NoError(err)
 	idxr, ok := idxrIntf.(*indexer)
-	assert.True(ok)
-	assert.NotNil(idxr.codec)
-	assert.NotNil(idxr.log)
-	assert.NotNil(idxr.db)
-	assert.False(idxr.closed)
-	assert.NotNil(idxr.pathAdder)
-	assert.True(idxr.indexingEnabled)
-	assert.True(idxr.allowIncompleteIndex)
-	assert.NotNil(idxr.blockIndices)
-	assert.Len(idxr.blockIndices, 0)
-	assert.NotNil(idxr.txIndices)
-	assert.Len(idxr.txIndices, 0)
-	assert.NotNil(idxr.vtxIndices)
-	assert.Len(idxr.vtxIndices, 0)
-	assert.NotNil(idxr.consensusAcceptorGroup)
-	assert.NotNil(idxr.decisionAcceptorGroup)
-	assert.NotNil(idxr.shutdownF)
-	assert.False(idxr.hasRunBefore)
+	require.True(ok)
+	require.NotNil(idxr.codec)
+	require.NotNil(idxr.log)
+	require.NotNil(idxr.db)
+	require.False(idxr.closed)
+	require.NotNil(idxr.pathAdder)
+	require.True(idxr.indexingEnabled)
+	require.True(idxr.allowIncompleteIndex)
+	require.NotNil(idxr.blockIndices)
+	require.Len(idxr.blockIndices, 0)
+	require.NotNil(idxr.txIndices)
+	require.Len(idxr.txIndices, 0)
+	require.NotNil(idxr.vtxIndices)
+	require.Len(idxr.vtxIndices, 0)
+	require.NotNil(idxr.consensusAcceptorGroup)
+	require.NotNil(idxr.decisionAcceptorGroup)
+	require.NotNil(idxr.shutdownF)
+	require.False(idxr.hasRunBefore)
 }
 
 // Test that [hasRunBefore] is set correctly and that Shutdown is called on close
 func TestMarkHasRunAndShutdown(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
 	shutdown := &sync.WaitGroup{}
@@ -105,27 +105,27 @@ func TestMarkHasRunAndShutdown(t *testing.T) {
 	}
 
 	idxrIntf, err := NewIndexer(config)
-	assert.NoError(err)
-	assert.False(idxrIntf.(*indexer).hasRunBefore)
-	assert.NoError(db.Commit())
-	assert.NoError(idxrIntf.Close())
+	require.NoError(err)
+	require.False(idxrIntf.(*indexer).hasRunBefore)
+	require.NoError(db.Commit())
+	require.NoError(idxrIntf.Close())
 	shutdown.Wait()
 	shutdown.Add(1)
 
 	config.DB = versiondb.New(baseDB)
 	idxrIntf, err = NewIndexer(config)
-	assert.NoError(err)
+	require.NoError(err)
 	idxr, ok := idxrIntf.(*indexer)
-	assert.True(ok)
-	assert.True(idxr.hasRunBefore)
-	assert.NoError(idxr.Close())
+	require.True(ok)
+	require.True(idxr.hasRunBefore)
+	require.NoError(idxr.Close())
 	shutdown.Wait()
 }
 
 // Test registering a linear chain and a DAG chain and accepting
 // some vertices
 func TestIndexer(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -144,9 +144,9 @@ func TestIndexer(t *testing.T) {
 
 	// Create indexer
 	idxrIntf, err := NewIndexer(config)
-	assert.NoError(err)
+	require.NoError(err)
 	idxr, ok := idxrIntf.(*indexer)
-	assert.True(ok)
+	require.True(ok)
 	now := time.Now()
 	idxr.clock.Set(now)
 
@@ -154,11 +154,11 @@ func TestIndexer(t *testing.T) {
 	chain1Ctx := snow.DefaultConsensusContextTest()
 	chain1Ctx.ChainID = ids.GenerateTestID()
 	isIncomplete, err := idxr.isIncomplete(chain1Ctx.ChainID)
-	assert.NoError(err)
-	assert.False(isIncomplete)
+	require.NoError(err)
+	require.False(isIncomplete)
 	previouslyIndexed, err := idxr.previouslyIndexed(chain1Ctx.ChainID)
-	assert.NoError(err)
-	assert.False(previouslyIndexed)
+	require.NoError(err)
+	require.False(previouslyIndexed)
 
 	// Register this chain, creating a new index
 	chainVM := smblockmocks.NewMockChainVM(ctrl)
@@ -168,18 +168,18 @@ func TestIndexer(t *testing.T) {
 
 	idxr.RegisterChain("chain1", chainEngine)
 	isIncomplete, err = idxr.isIncomplete(chain1Ctx.ChainID)
-	assert.NoError(err)
-	assert.False(isIncomplete)
+	require.NoError(err)
+	require.False(isIncomplete)
 	previouslyIndexed, err = idxr.previouslyIndexed(chain1Ctx.ChainID)
-	assert.NoError(err)
-	assert.True(previouslyIndexed)
+	require.NoError(err)
+	require.True(previouslyIndexed)
 	server := config.APIServer.(*apiServerMock)
-	assert.EqualValues(1, server.timesCalled)
-	assert.EqualValues("index/chain1", server.bases[0])
-	assert.EqualValues("/block", server.endpoints[0])
-	assert.Len(idxr.blockIndices, 1)
-	assert.Len(idxr.txIndices, 0)
-	assert.Len(idxr.vtxIndices, 0)
+	require.EqualValues(1, server.timesCalled)
+	require.EqualValues("index/chain1", server.bases[0])
+	require.EqualValues("/block", server.endpoints[0])
+	require.Len(idxr.blockIndices, 1)
+	require.Len(idxr.txIndices, 0)
+	require.Len(idxr.vtxIndices, 0)
 
 	// Accept a container
 	blkID, blkBytes := ids.GenerateTestID(), utils.RandomBytes(32)
@@ -189,98 +189,98 @@ func TestIndexer(t *testing.T) {
 		Timestamp: now.UnixNano(),
 	}
 
-	assert.NoError(config.ConsensusAcceptorGroup.Accept(chain1Ctx, blkID, blkBytes))
+	require.NoError(config.ConsensusAcceptorGroup.Accept(chain1Ctx, blkID, blkBytes))
 
 	blkIdx := idxr.blockIndices[chain1Ctx.ChainID]
-	assert.NotNil(blkIdx)
+	require.NotNil(blkIdx)
 
 	// Verify GetLastAccepted is right
 	gotLastAccepted, err := blkIdx.GetLastAccepted()
-	assert.NoError(err)
-	assert.Equal(expectedContainer, gotLastAccepted)
+	require.NoError(err)
+	require.Equal(expectedContainer, gotLastAccepted)
 
 	// Verify GetContainerByID is right
 	container, err := blkIdx.GetContainerByID(blkID)
-	assert.NoError(err)
-	assert.Equal(expectedContainer, container)
+	require.NoError(err)
+	require.Equal(expectedContainer, container)
 
 	// Verify GetIndex is right
 	index, err := blkIdx.GetIndex(blkID)
-	assert.NoError(err)
-	assert.EqualValues(0, index)
+	require.NoError(err)
+	require.EqualValues(0, index)
 
 	// Verify GetContainerByIndex is right
 	container, err = blkIdx.GetContainerByIndex(0)
-	assert.NoError(err)
-	assert.Equal(expectedContainer, container)
+	require.NoError(err)
+	require.Equal(expectedContainer, container)
 
 	// Verify GetContainerRange is right
 	containers, err := blkIdx.GetContainerRange(0, 1)
-	assert.NoError(err)
-	assert.Len(containers, 1)
-	assert.Equal(expectedContainer, containers[0])
+	require.NoError(err)
+	require.Len(containers, 1)
+	require.Equal(expectedContainer, containers[0])
 
 	// Close the indexer
-	assert.NoError(db.Commit())
-	assert.NoError(idxr.Close())
-	assert.True(idxr.closed)
+	require.NoError(db.Commit())
+	require.NoError(idxr.Close())
+	require.True(idxr.closed)
 	// Calling Close again should be fine
-	assert.NoError(idxr.Close())
+	require.NoError(idxr.Close())
 	server.timesCalled = 0
 
 	// Re-open the indexer
 	config.DB = versiondb.New(baseDB)
 	idxrIntf, err = NewIndexer(config)
-	assert.NoError(err)
+	require.NoError(err)
 	idxr, ok = idxrIntf.(*indexer)
 	now = time.Now()
 	idxr.clock.Set(now)
-	assert.True(ok)
-	assert.Len(idxr.blockIndices, 0)
-	assert.Len(idxr.txIndices, 0)
-	assert.Len(idxr.vtxIndices, 0)
-	assert.True(idxr.hasRunBefore)
+	require.True(ok)
+	require.Len(idxr.blockIndices, 0)
+	require.Len(idxr.txIndices, 0)
+	require.Len(idxr.vtxIndices, 0)
+	require.True(idxr.hasRunBefore)
 	previouslyIndexed, err = idxr.previouslyIndexed(chain1Ctx.ChainID)
-	assert.NoError(err)
-	assert.True(previouslyIndexed)
+	require.NoError(err)
+	require.True(previouslyIndexed)
 	hasRun, err := idxr.hasRun()
-	assert.NoError(err)
-	assert.True(hasRun)
+	require.NoError(err)
+	require.True(hasRun)
 	isIncomplete, err = idxr.isIncomplete(chain1Ctx.ChainID)
-	assert.NoError(err)
-	assert.False(isIncomplete)
+	require.NoError(err)
+	require.False(isIncomplete)
 
 	// Register the same chain as before
 	idxr.RegisterChain("chain1", chainEngine)
 	blkIdx = idxr.blockIndices[chain1Ctx.ChainID]
-	assert.NotNil(blkIdx)
+	require.NotNil(blkIdx)
 	container, err = blkIdx.GetLastAccepted()
-	assert.NoError(err)
-	assert.Equal(blkID, container.ID)
+	require.NoError(err)
+	require.Equal(blkID, container.ID)
 
 	// Register a DAG chain
 	chain2Ctx := snow.DefaultConsensusContextTest()
 	chain2Ctx.ChainID = ids.GenerateTestID()
 	isIncomplete, err = idxr.isIncomplete(chain2Ctx.ChainID)
-	assert.NoError(err)
-	assert.False(isIncomplete)
+	require.NoError(err)
+	require.False(isIncomplete)
 	previouslyIndexed, err = idxr.previouslyIndexed(chain2Ctx.ChainID)
-	assert.NoError(err)
-	assert.False(previouslyIndexed)
+	require.NoError(err)
+	require.False(previouslyIndexed)
 	dagVM := &avvtxmocks.DAGVM{}
 	dagEngine := &avengmocks.Engine{}
 	dagEngine.On("Context").Return(chain2Ctx)
 	dagEngine.On("GetVM").Return(dagVM).Once()
 	idxr.RegisterChain("chain2", dagEngine)
-	assert.NoError(err)
+	require.NoError(err)
 	server = config.APIServer.(*apiServerMock)
-	assert.EqualValues(3, server.timesCalled) // block index, vtx index, tx index
-	assert.Contains(server.bases, "index/chain2")
-	assert.Contains(server.endpoints, "/vtx")
-	assert.Contains(server.endpoints, "/tx")
-	assert.Len(idxr.blockIndices, 1)
-	assert.Len(idxr.txIndices, 1)
-	assert.Len(idxr.vtxIndices, 1)
+	require.EqualValues(3, server.timesCalled) // block index, vtx index, tx index
+	require.Contains(server.bases, "index/chain2")
+	require.Contains(server.endpoints, "/vtx")
+	require.Contains(server.endpoints, "/tx")
+	require.Len(idxr.blockIndices, 1)
+	require.Len(idxr.txIndices, 1)
+	require.Len(idxr.vtxIndices, 1)
 
 	// Accept a vertex
 	vtxID, vtxBytes := ids.GenerateTestID(), utils.RandomBytes(32)
@@ -300,36 +300,36 @@ func TestIndexer(t *testing.T) {
 		}, nil,
 	).Once()
 
-	assert.NoError(config.ConsensusAcceptorGroup.Accept(chain2Ctx, vtxID, blkBytes))
+	require.NoError(config.ConsensusAcceptorGroup.Accept(chain2Ctx, vtxID, blkBytes))
 
 	vtxIdx := idxr.vtxIndices[chain2Ctx.ChainID]
-	assert.NotNil(vtxIdx)
+	require.NotNil(vtxIdx)
 
 	// Verify GetLastAccepted is right
 	gotLastAccepted, err = vtxIdx.GetLastAccepted()
-	assert.NoError(err)
-	assert.Equal(expectedVtx, gotLastAccepted)
+	require.NoError(err)
+	require.Equal(expectedVtx, gotLastAccepted)
 
 	// Verify GetContainerByID is right
 	vtx, err := vtxIdx.GetContainerByID(vtxID)
-	assert.NoError(err)
-	assert.Equal(expectedVtx, vtx)
+	require.NoError(err)
+	require.Equal(expectedVtx, vtx)
 
 	// Verify GetIndex is right
 	index, err = vtxIdx.GetIndex(vtxID)
-	assert.NoError(err)
-	assert.EqualValues(0, index)
+	require.NoError(err)
+	require.EqualValues(0, index)
 
 	// Verify GetContainerByIndex is right
 	vtx, err = vtxIdx.GetContainerByIndex(0)
-	assert.NoError(err)
-	assert.Equal(expectedVtx, vtx)
+	require.NoError(err)
+	require.Equal(expectedVtx, vtx)
 
 	// Verify GetContainerRange is right
 	vtxs, err := vtxIdx.GetContainerRange(0, 1)
-	assert.NoError(err)
-	assert.Len(vtxs, 1)
-	assert.Equal(expectedVtx, vtxs[0])
+	require.NoError(err)
+	require.Len(vtxs, 1)
+	require.Equal(expectedVtx, vtxs[0])
 
 	// Accept a tx
 	txID, txBytes := ids.GenerateTestID(), utils.RandomBytes(32)
@@ -349,78 +349,78 @@ func TestIndexer(t *testing.T) {
 		}, nil,
 	).Once()
 
-	assert.NoError(config.DecisionAcceptorGroup.Accept(chain2Ctx, txID, blkBytes))
+	require.NoError(config.DecisionAcceptorGroup.Accept(chain2Ctx, txID, blkBytes))
 
 	txIdx := idxr.txIndices[chain2Ctx.ChainID]
-	assert.NotNil(txIdx)
+	require.NotNil(txIdx)
 
 	// Verify GetLastAccepted is right
 	gotLastAccepted, err = txIdx.GetLastAccepted()
-	assert.NoError(err)
-	assert.Equal(expectedTx, gotLastAccepted)
+	require.NoError(err)
+	require.Equal(expectedTx, gotLastAccepted)
 
 	// Verify GetContainerByID is right
 	tx, err := txIdx.GetContainerByID(txID)
-	assert.NoError(err)
-	assert.Equal(expectedTx, tx)
+	require.NoError(err)
+	require.Equal(expectedTx, tx)
 
 	// Verify GetIndex is right
 	index, err = txIdx.GetIndex(txID)
-	assert.NoError(err)
-	assert.EqualValues(0, index)
+	require.NoError(err)
+	require.EqualValues(0, index)
 
 	// Verify GetContainerByIndex is right
 	tx, err = txIdx.GetContainerByIndex(0)
-	assert.NoError(err)
-	assert.Equal(expectedTx, tx)
+	require.NoError(err)
+	require.Equal(expectedTx, tx)
 
 	// Verify GetContainerRange is right
 	txs, err := txIdx.GetContainerRange(0, 1)
-	assert.NoError(err)
-	assert.Len(txs, 1)
-	assert.Equal(expectedTx, txs[0])
+	require.NoError(err)
+	require.Len(txs, 1)
+	require.Equal(expectedTx, txs[0])
 
 	// Accepting a vertex shouldn't have caused anything to
 	// happen on the block/tx index. Similar for tx.
 	lastAcceptedTx, err := txIdx.GetLastAccepted()
-	assert.NoError(err)
-	assert.EqualValues(txID, lastAcceptedTx.ID)
+	require.NoError(err)
+	require.EqualValues(txID, lastAcceptedTx.ID)
 	lastAcceptedVtx, err := vtxIdx.GetLastAccepted()
-	assert.NoError(err)
-	assert.EqualValues(vtxID, lastAcceptedVtx.ID)
+	require.NoError(err)
+	require.EqualValues(vtxID, lastAcceptedVtx.ID)
 	lastAcceptedBlk, err := blkIdx.GetLastAccepted()
-	assert.NoError(err)
-	assert.EqualValues(blkID, lastAcceptedBlk.ID)
+	require.NoError(err)
+	require.EqualValues(blkID, lastAcceptedBlk.ID)
 
 	// Close the indexer again
-	assert.NoError(config.DB.(*versiondb.Database).Commit())
-	assert.NoError(idxr.Close())
+	require.NoError(config.DB.(*versiondb.Database).Commit())
+	require.NoError(idxr.Close())
 
 	// Re-open one more time and re-register chains
 	config.DB = versiondb.New(baseDB)
 	idxrIntf, err = NewIndexer(config)
-	assert.NoError(err)
+	require.NoError(err)
 	idxr, ok = idxrIntf.(*indexer)
-	assert.True(ok)
+	require.True(ok)
 	idxr.RegisterChain("chain1", chainEngine)
 	idxr.RegisterChain("chain2", dagEngine)
 
 	// Verify state
 	lastAcceptedTx, err = idxr.txIndices[chain2Ctx.ChainID].GetLastAccepted()
-	assert.NoError(err)
-	assert.EqualValues(txID, lastAcceptedTx.ID)
+	require.NoError(err)
+	require.EqualValues(txID, lastAcceptedTx.ID)
 	lastAcceptedVtx, err = idxr.vtxIndices[chain2Ctx.ChainID].GetLastAccepted()
-	assert.NoError(err)
-	assert.EqualValues(vtxID, lastAcceptedVtx.ID)
+	require.NoError(err)
+	require.EqualValues(vtxID, lastAcceptedVtx.ID)
 	lastAcceptedBlk, err = idxr.blockIndices[chain1Ctx.ChainID].GetLastAccepted()
-	assert.NoError(err)
-	assert.EqualValues(blkID, lastAcceptedBlk.ID)
+	require.NoError(err)
+	require.EqualValues(blkID, lastAcceptedBlk.ID)
 }
 
 // Make sure the indexer doesn't allow incomplete indices unless explicitly allowed
 func TestIncompleteIndex(t *testing.T) {
 	// Create an indexer with indexing disabled
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -436,74 +436,74 @@ func TestIncompleteIndex(t *testing.T) {
 		ShutdownF:              func() {},
 	}
 	idxrIntf, err := NewIndexer(config)
-	assert.NoError(err)
+	require.NoError(err)
 	idxr, ok := idxrIntf.(*indexer)
-	assert.True(ok)
-	assert.False(idxr.indexingEnabled)
+	require.True(ok)
+	require.False(idxr.indexingEnabled)
 
 	// Register a chain
 	chain1Ctx := snow.DefaultConsensusContextTest()
 	chain1Ctx.ChainID = ids.GenerateTestID()
 	isIncomplete, err := idxr.isIncomplete(chain1Ctx.ChainID)
-	assert.NoError(err)
-	assert.False(isIncomplete)
+	require.NoError(err)
+	require.False(isIncomplete)
 	previouslyIndexed, err := idxr.previouslyIndexed(chain1Ctx.ChainID)
-	assert.NoError(err)
-	assert.False(previouslyIndexed)
+	require.NoError(err)
+	require.False(previouslyIndexed)
 	chainEngine := &smengmocks.Engine{}
 	chainEngine.On("Context").Return(chain1Ctx)
 	idxr.RegisterChain("chain1", chainEngine)
 	isIncomplete, err = idxr.isIncomplete(chain1Ctx.ChainID)
-	assert.NoError(err)
-	assert.True(isIncomplete)
-	assert.Len(idxr.blockIndices, 0)
+	require.NoError(err)
+	require.True(isIncomplete)
+	require.Len(idxr.blockIndices, 0)
 
 	// Close and re-open the indexer, this time with indexing enabled
-	assert.NoError(config.DB.(*versiondb.Database).Commit())
-	assert.NoError(idxr.Close())
+	require.NoError(config.DB.(*versiondb.Database).Commit())
+	require.NoError(idxr.Close())
 	config.IndexingEnabled = true
 	config.DB = versiondb.New(baseDB)
 	idxrIntf, err = NewIndexer(config)
-	assert.NoError(err)
+	require.NoError(err)
 	idxr, ok = idxrIntf.(*indexer)
-	assert.True(ok)
-	assert.True(idxr.indexingEnabled)
+	require.True(ok)
+	require.True(idxr.indexingEnabled)
 
 	// Register the chain again. Should die due to incomplete index.
-	assert.NoError(config.DB.(*versiondb.Database).Commit())
+	require.NoError(config.DB.(*versiondb.Database).Commit())
 	idxr.RegisterChain("chain1", chainEngine)
-	assert.True(idxr.closed)
+	require.True(idxr.closed)
 
 	// Close and re-open the indexer, this time with indexing enabled
 	// and incomplete index allowed.
-	assert.NoError(idxr.Close())
+	require.NoError(idxr.Close())
 	config.AllowIncompleteIndex = true
 	config.DB = versiondb.New(baseDB)
 	idxrIntf, err = NewIndexer(config)
-	assert.NoError(err)
+	require.NoError(err)
 	idxr, ok = idxrIntf.(*indexer)
-	assert.True(ok)
-	assert.True(idxr.allowIncompleteIndex)
+	require.True(ok)
+	require.True(idxr.allowIncompleteIndex)
 
 	// Register the chain again. Should be OK
 	idxr.RegisterChain("chain1", chainEngine)
-	assert.False(idxr.closed)
+	require.False(idxr.closed)
 
 	// Close the indexer and re-open with indexing disabled and
 	// incomplete index not allowed.
-	assert.NoError(idxr.Close())
+	require.NoError(idxr.Close())
 	config.AllowIncompleteIndex = false
 	config.IndexingEnabled = false
 	config.DB = versiondb.New(baseDB)
 	idxrIntf, err = NewIndexer(config)
-	assert.NoError(err)
+	require.NoError(err)
 	_, ok = idxrIntf.(*indexer)
-	assert.True(ok)
+	require.True(ok)
 }
 
 // Ensure we only index chains in the primary network
 func TestIgnoreNonDefaultChains(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -522,9 +522,9 @@ func TestIgnoreNonDefaultChains(t *testing.T) {
 
 	// Create indexer
 	idxrIntf, err := NewIndexer(config)
-	assert.NoError(err)
+	require.NoError(err)
 	idxr, ok := idxrIntf.(*indexer)
-	assert.True(ok)
+	require.True(ok)
 
 	// Assert state is right
 	chain1Ctx := snow.DefaultConsensusContextTest()
@@ -537,5 +537,5 @@ func TestIgnoreNonDefaultChains(t *testing.T) {
 	chainEngine.On("Context").Return(chain1Ctx)
 	chainEngine.On("GetVM").Return(chainVM)
 	idxr.RegisterChain("chain1", chainEngine)
-	assert.Len(idxr.blockIndices, 0)
+	require.Len(idxr.blockIndices, 0)
 }

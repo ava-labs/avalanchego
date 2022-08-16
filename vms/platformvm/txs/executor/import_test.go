@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -169,7 +169,7 @@ func TestNewImportTx(t *testing.T) {
 	to := ids.GenerateTestShortID()
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 
 			env.msm.SharedMemory = tt.sharedMemory
 			tx, err := env.txBuilder.NewImportTx(
@@ -179,14 +179,14 @@ func TestNewImportTx(t *testing.T) {
 				ids.ShortEmpty,
 			)
 			if tt.shouldErr {
-				assert.Error(err)
+				require.Error(err)
 				return
 			}
-			assert.NoError(err)
+			require.NoError(err)
 
 			unsignedTx := tx.Unsigned.(*txs.ImportTx)
-			assert.NotEmpty(unsignedTx.ImportedInputs)
-			assert.Equal(len(tx.Creds), len(unsignedTx.Ins)+len(unsignedTx.ImportedInputs), "should have the same number of credentials as inputs")
+			require.NotEmpty(unsignedTx.ImportedInputs)
+			require.Equal(len(tx.Creds), len(unsignedTx.Ins)+len(unsignedTx.ImportedInputs), "should have the same number of credentials as inputs")
 
 			totalIn := uint64(0)
 			for _, in := range unsignedTx.Ins {
@@ -200,10 +200,10 @@ func TestNewImportTx(t *testing.T) {
 				totalOut += out.Out.Amount()
 			}
 
-			assert.Equal(env.config.TxFee, totalIn-totalOut, "burned too much")
+			require.Equal(env.config.TxFee, totalIn-totalOut, "burned too much")
 
 			fakedState, err := state.NewDiff(lastAcceptedID, env)
-			assert.NoError(err)
+			require.NoError(err)
 
 			fakedState.SetTimestamp(tt.timestamp)
 
@@ -218,9 +218,9 @@ func TestNewImportTx(t *testing.T) {
 			}
 			err = tx.Unsigned.Visit(&verifier)
 			if tt.shouldVerify {
-				assert.NoError(err)
+				require.NoError(err)
 			} else {
-				assert.Error(err)
+				require.Error(err)
 			}
 		})
 	}

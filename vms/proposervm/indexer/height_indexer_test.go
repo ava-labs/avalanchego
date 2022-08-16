@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -18,11 +20,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestHeightBlockIndexPostFork(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
@@ -47,8 +48,8 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 			dummyPCH,
 			blockBytes[:],
 		)
-		assert.NoError(err)
-		assert.NoError(storedState.PutBlock(postForkStatelessBlk, choices.Accepted))
+		require.NoError(err)
+		require.NoError(storedState.PutBlock(postForkStatelessBlk, choices.Accepted))
 
 		// ... and create a corresponding test block just for block server
 		postForkBlk := &snowman.TestBlock{
@@ -84,22 +85,22 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 	hIndex.commitFrequency = 0 // commit each block
 
 	// checkpoint last accepted block and show the whole chain in reindexed
-	assert.NoError(hIndex.state.SetCheckpoint(lastBlkID))
-	assert.NoError(hIndex.RepairHeightIndex(context.Background()))
-	assert.True(hIndex.IsRepaired())
+	require.NoError(hIndex.state.SetCheckpoint(lastBlkID))
+	require.NoError(hIndex.RepairHeightIndex(context.Background()))
+	require.True(hIndex.IsRepaired())
 
 	// check that height index is fully built
 	loadedForkHeight, err := storedState.GetForkHeight()
-	assert.NoError(err)
-	assert.True(loadedForkHeight == 1)
+	require.NoError(err)
+	require.True(loadedForkHeight == 1)
 	for height := uint64(1); height <= blkNumber; height++ {
 		_, err := storedState.GetBlockIDAtHeight(height)
-		assert.NoError(err)
+		require.NoError(err)
 	}
 }
 
 func TestHeightBlockIndexAcrossFork(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
@@ -125,8 +126,8 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 			dummyPCH,
 			blockBytes[:],
 		)
-		assert.NoError(err)
-		assert.NoError(storedState.PutBlock(postForkStatelessBlk, choices.Accepted))
+		require.NoError(err)
+		require.NoError(storedState.PutBlock(postForkStatelessBlk, choices.Accepted))
 
 		// ... and create a corresponding test block just for block server
 		postForkBlk := &snowman.TestBlock{
@@ -162,26 +163,26 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 	hIndex.commitFrequency = 0 // commit each block
 
 	// checkpoint last accepted block and show the whole chain in reindexed
-	assert.NoError(hIndex.state.SetCheckpoint(lastBlkID))
-	assert.NoError(hIndex.RepairHeightIndex(context.Background()))
-	assert.True(hIndex.IsRepaired())
+	require.NoError(hIndex.state.SetCheckpoint(lastBlkID))
+	require.NoError(hIndex.RepairHeightIndex(context.Background()))
+	require.True(hIndex.IsRepaired())
 
 	// check that height index is fully built
 	loadedForkHeight, err := storedState.GetForkHeight()
-	assert.NoError(err)
-	assert.True(loadedForkHeight == forkHeight)
+	require.NoError(err)
+	require.True(loadedForkHeight == forkHeight)
 	for height := uint64(0); height < forkHeight; height++ {
 		_, err := storedState.GetBlockIDAtHeight(height)
-		assert.Error(err, database.ErrNotFound)
+		require.Error(err, database.ErrNotFound)
 	}
 	for height := forkHeight; height <= blkNumber; height++ {
 		_, err := storedState.GetBlockIDAtHeight(height)
-		assert.NoError(err)
+		require.NoError(err)
 	}
 }
 
 func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
@@ -207,8 +208,8 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 			dummyPCH,
 			blockBytes[:],
 		)
-		assert.NoError(err)
-		assert.NoError(storedState.PutBlock(postForkStatelessBlk, choices.Accepted))
+		require.NoError(err)
+		require.NoError(storedState.PutBlock(postForkStatelessBlk, choices.Accepted))
 
 		// ... and create a corresponding test block just for block server
 		postForkBlk := &snowman.TestBlock{
@@ -252,20 +253,20 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 		}
 
 		checkpointBlk = blk
-		assert.NoError(hIndex.state.SetCheckpoint(checkpointBlk.ID()))
+		require.NoError(hIndex.state.SetCheckpoint(checkpointBlk.ID()))
 		break
 	}
 
 	// perform repair and show index is built
-	assert.NoError(hIndex.RepairHeightIndex(context.Background()))
-	assert.True(hIndex.IsRepaired())
+	require.NoError(hIndex.RepairHeightIndex(context.Background()))
+	require.True(hIndex.IsRepaired())
 
 	// check that height index is fully built
 	loadedForkHeight, err := storedState.GetForkHeight()
-	assert.NoError(err)
-	assert.True(loadedForkHeight == forkHeight)
+	require.NoError(err)
+	require.True(loadedForkHeight == forkHeight)
 	for height := forkHeight; height <= checkpointBlk.Height(); height++ {
 		_, err := storedState.GetBlockIDAtHeight(height)
-		assert.NoError(err)
+		require.NoError(err)
 	}
 }
