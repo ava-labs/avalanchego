@@ -9,7 +9,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
@@ -29,7 +29,7 @@ import (
 )
 
 func TestVerifierVisitProposalBlock(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -82,7 +82,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 			Creds:    []verify.Verifiable{},
 		},
 	)
-	assert.NoError(err)
+	require.NoError(err)
 	blk.Tx.Unsigned = blkTx
 
 	// Set expectations for dependencies.
@@ -92,28 +92,28 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 
 	// Visit the block
 	err = verifier.ApricotProposalBlock(blk)
-	assert.NoError(err)
-	assert.Contains(verifier.backend.blkIDToState, blk.ID())
+	require.NoError(err)
+	require.Contains(verifier.backend.blkIDToState, blk.ID())
 	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
-	assert.Equal(blk, gotBlkState.statelessBlock)
-	assert.Equal(timestamp, gotBlkState.timestamp)
+	require.Equal(blk, gotBlkState.statelessBlock)
+	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Assert that the expected tx statuses are set.
 	_, gotStatus, err := gotBlkState.onCommitState.GetTx(tx.ID())
-	assert.NoError(err)
-	assert.Equal(status.Committed, gotStatus)
+	require.NoError(err)
+	require.Equal(status.Committed, gotStatus)
 
 	_, gotStatus, err = gotBlkState.onAbortState.GetTx(tx.ID())
-	assert.NoError(err)
-	assert.Equal(status.Aborted, gotStatus)
+	require.NoError(err)
+	require.Equal(status.Aborted, gotStatus)
 
 	// Visiting again should return nil without using dependencies.
 	err = verifier.ApricotProposalBlock(blk)
-	assert.NoError(err)
+	require.NoError(err)
 }
 
 func TestVerifierVisitAtomicBlock(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -176,7 +176,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 			Creds:    []verify.Verifiable{},
 		},
 	)
-	assert.NoError(err)
+	require.NoError(err)
 	blk.Tx.Unsigned = blkTx
 
 	// Set expectations for dependencies.
@@ -189,22 +189,22 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	onAccept.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 
 	err = verifier.ApricotAtomicBlock(blk)
-	assert.NoError(err)
+	require.NoError(err)
 
-	assert.Contains(verifier.backend.blkIDToState, blk.ID())
+	require.Contains(verifier.backend.blkIDToState, blk.ID())
 	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
-	assert.Equal(blk, gotBlkState.statelessBlock)
-	assert.Equal(onAccept, gotBlkState.onAcceptState)
-	assert.Equal(inputs, gotBlkState.inputs)
-	assert.Equal(timestamp, gotBlkState.timestamp)
+	require.Equal(blk, gotBlkState.statelessBlock)
+	require.Equal(onAccept, gotBlkState.onAcceptState)
+	require.Equal(inputs, gotBlkState.inputs)
+	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
 	err = verifier.ApricotAtomicBlock(blk)
-	assert.NoError(err)
+	require.NoError(err)
 }
 
 func TestVerifierVisitStandardBlock(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -278,7 +278,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 			},
 		},
 	)
-	assert.NoError(err)
+	require.NoError(err)
 	blk.Transactions[0].Unsigned = blkTx
 
 	// Set expectations for dependencies.
@@ -289,22 +289,22 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	mempool.EXPECT().RemoveDecisionTxs(blk.Txs()).Times(1)
 
 	err = verifier.ApricotStandardBlock(blk)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Assert expected state.
-	assert.Contains(verifier.backend.blkIDToState, blk.ID())
+	require.Contains(verifier.backend.blkIDToState, blk.ID())
 	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
-	assert.Equal(blk, gotBlkState.statelessBlock)
-	assert.Equal(ids.Set{}, gotBlkState.inputs)
-	assert.Equal(timestamp, gotBlkState.timestamp)
+	require.Equal(blk, gotBlkState.statelessBlock)
+	require.Equal(ids.Set{}, gotBlkState.inputs)
+	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
 	err = verifier.ApricotStandardBlock(blk)
-	assert.NoError(err)
+	require.NoError(err)
 }
 
 func TestVerifierVisitCommitBlock(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -343,7 +343,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	}
 
 	blk, err := blocks.NewApricotCommitBlock(parentID, 2 /*height*/)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
@@ -354,21 +354,21 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 
 	// Verify the block.
 	err = verifier.ApricotCommitBlock(blk)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Assert expected state.
-	assert.Contains(verifier.backend.blkIDToState, blk.ID())
+	require.Contains(verifier.backend.blkIDToState, blk.ID())
 	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
-	assert.Equal(parentOnAbortState, gotBlkState.onAcceptState)
-	assert.Equal(timestamp, gotBlkState.timestamp)
+	require.Equal(parentOnAbortState, gotBlkState.onAcceptState)
+	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
 	err = verifier.ApricotCommitBlock(blk)
-	assert.NoError(err)
+	require.NoError(err)
 }
 
 func TestVerifierVisitAbortBlock(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -407,7 +407,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	}
 
 	blk, err := blocks.NewApricotAbortBlock(parentID, 2 /*height*/)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
@@ -418,22 +418,22 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 
 	// Verify the block.
 	err = verifier.ApricotAbortBlock(blk)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Assert expected state.
-	assert.Contains(verifier.backend.blkIDToState, blk.ID())
+	require.Contains(verifier.backend.blkIDToState, blk.ID())
 	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
-	assert.Equal(parentOnAbortState, gotBlkState.onAcceptState)
-	assert.Equal(timestamp, gotBlkState.timestamp)
+	require.Equal(parentOnAbortState, gotBlkState.onAcceptState)
+	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
 	err = verifier.ApricotAbortBlock(blk)
-	assert.NoError(err)
+	require.NoError(err)
 }
 
 // Assert that a block with an unverified parent fails verification.
 func TestVerifyUnverifiedParent(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -460,14 +460,14 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 	}
 
 	blk, err := blocks.NewApricotAbortBlock(parentID /*not in memory or persisted state*/, 2 /*height*/)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Set expectations for dependencies.
 	s.EXPECT().GetStatelessBlock(parentID).Return(nil, choices.Unknown, database.ErrNotFound).Times(1)
 
 	// Verify the block.
 	err = blk.Visit(verifier)
-	assert.Error(err)
+	require.Error(err)
 }
 
 func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
@@ -504,7 +504,7 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 
 			// Create mocked dependencies.
 			s := state.NewMockState(ctrl)
@@ -536,13 +536,13 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 			// build and verify child block
 			childHeight := parentHeight + 1
 			statelessAbortBlk, err := blocks.NewBlueberryAbortBlock(test.childTime, parentID, childHeight)
-			assert.NoError(err)
+			require.NoError(err)
 
 			// Set expectations for dependencies.
 			parentStatelessBlk.EXPECT().Timestamp().Return(test.parentTime).Times(1)
 
 			err = statelessAbortBlk.Visit(fc)
-			assert.ErrorIs(err, test.result)
+			require.ErrorIs(err, test.result)
 		})
 	}
 }
@@ -582,7 +582,7 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 
 			// Create mocked dependencies.
 			s := state.NewMockState(ctrl)
@@ -617,15 +617,15 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 
 			// Set expectations for dependencies.
 			parentStatelessBlk.EXPECT().Timestamp().Return(test.parentTime).Times(1)
-			assert.NoError(err)
+			require.NoError(err)
 			err = statelessCommitBlk.Visit(fc)
-			assert.ErrorIs(err, test.result)
+			require.ErrorIs(err, test.result)
 		})
 	}
 }
 
 func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -716,7 +716,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 			},
 		},
 	)
-	assert.NoError(err)
+	require.NoError(err)
 	blk.Transactions[0].Unsigned = blkTx
 
 	// Set expectations for dependencies.
@@ -727,11 +727,11 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	parentStatelessBlk.EXPECT().Parent().Return(grandParentID).Times(1)
 
 	err = verifier.ApricotStandardBlock(blk)
-	assert.ErrorIs(err, errConflictingParentTxs)
+	require.ErrorIs(err, errConflictingParentTxs)
 }
 
 func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -782,16 +782,16 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 			},
 		},
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 
 	err = verifier.ApricotStandardBlock(blk)
-	assert.ErrorIs(err, state.ErrMissingParentState)
+	require.ErrorIs(err, state.ErrMissingParentState)
 }
 
 func TestVerifierVisitBlueberryStandardBlockWithProposalBlockParent(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -845,10 +845,10 @@ func TestVerifierVisitBlueberryStandardBlockWithProposalBlockParent(t *testing.T
 			},
 		},
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 
 	err = verifier.BlueberryStandardBlock(blk)
-	assert.ErrorIs(err, state.ErrMissingParentState)
+	require.ErrorIs(err, state.ErrMissingParentState)
 }

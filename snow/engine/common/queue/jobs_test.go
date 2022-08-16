@@ -7,13 +7,15 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/assert"
 )
 
 // Magic value that comes from the size in bytes of a serialized key-value bootstrap checkpoint in a database +
@@ -48,7 +50,7 @@ func testJob(t *testing.T, jobID ids.ID, executed *bool, parentID ids.ID, parent
 
 // Test that creating a new queue can be created and that it is initially empty.
 func TestNew(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	parser := &TestParser{T: t}
 	db := memdb.New()
@@ -62,14 +64,14 @@ func TestNew(t *testing.T) {
 	}
 
 	dbSize, err := database.Size(db)
-	assert.NoError(err)
-	assert.Zero(dbSize)
+	require.NoError(err)
+	require.Zero(dbSize)
 }
 
 // Test that a job can be added to a queue, and then the job can be executed
 // from the queue after a shutdown.
 func TestPushAndExecute(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	parser := &TestParser{T: t}
 	db := memdb.New()
@@ -85,60 +87,60 @@ func TestPushAndExecute(t *testing.T) {
 	jobID := ids.GenerateTestID()
 	job := testJob(t, jobID, nil, ids.Empty, nil)
 	has, err := jobs.Has(jobID)
-	assert.NoError(err)
-	assert.False(has)
+	require.NoError(err)
+	require.False(has)
 
 	pushed, err := jobs.Push(job)
-	assert.True(pushed)
-	assert.NoError(err)
+	require.True(pushed)
+	require.NoError(err)
 
 	has, err = jobs.Has(jobID)
-	assert.NoError(err)
-	assert.True(has)
+	require.NoError(err)
+	require.True(has)
 
 	err = jobs.Commit()
-	assert.NoError(err)
+	require.NoError(err)
 
 	jobs, err = New(db, "", prometheus.NewRegistry())
-	assert.NoError(err)
+	require.NoError(err)
 	if err := jobs.SetParser(parser); err != nil {
 		t.Fatal(err)
 	}
 
 	has, err = jobs.Has(jobID)
-	assert.NoError(err)
-	assert.True(has)
+	require.NoError(err)
+	require.True(has)
 
 	hasNext, err := jobs.state.HasRunnableJob()
-	assert.NoError(err)
-	assert.True(hasNext)
+	require.NoError(err)
+	require.True(hasNext)
 
 	parser.ParseF = func(b []byte) (Job, error) {
-		assert.Equal([]byte{0}, b)
+		require.Equal([]byte{0}, b)
 		return job, nil
 	}
 
 	count, err := jobs.ExecuteAll(snow.DefaultConsensusContextTest(), &common.Halter{}, false)
-	assert.NoError(err)
-	assert.Equal(1, count)
+	require.NoError(err)
+	require.Equal(1, count)
 
 	has, err = jobs.Has(jobID)
-	assert.NoError(err)
-	assert.False(has)
+	require.NoError(err)
+	require.False(has)
 
 	hasNext, err = jobs.state.HasRunnableJob()
-	assert.NoError(err)
-	assert.False(hasNext)
+	require.NoError(err)
+	require.False(hasNext)
 
 	dbSize, err := database.Size(db)
-	assert.NoError(err)
-	assert.Equal(bootstrapProgressCheckpointSize, dbSize)
+	require.NoError(err)
+	require.Equal(bootstrapProgressCheckpointSize, dbSize)
 }
 
 // Test that executing a job will cause a dependent job to be placed on to the
 // ready queue
 func TestRemoveDependency(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	parser := &TestParser{T: t}
 	db := memdb.New()
@@ -159,20 +161,20 @@ func TestRemoveDependency(t *testing.T) {
 	job1.BytesF = func() []byte { return []byte{1} }
 
 	pushed, err := jobs.Push(job1)
-	assert.True(pushed)
-	assert.NoError(err)
+	require.True(pushed)
+	require.NoError(err)
 
 	hasNext, err := jobs.state.HasRunnableJob()
-	assert.NoError(err)
-	assert.False(hasNext)
+	require.NoError(err)
+	require.False(hasNext)
 
 	pushed, err = jobs.Push(job0)
-	assert.True(pushed)
-	assert.NoError(err)
+	require.True(pushed)
+	require.NoError(err)
 
 	hasNext, err = jobs.state.HasRunnableJob()
-	assert.NoError(err)
-	assert.True(hasNext)
+	require.NoError(err)
+	require.True(hasNext)
 
 	parser.ParseF = func(b []byte) (Job, error) {
 		switch {
@@ -181,29 +183,29 @@ func TestRemoveDependency(t *testing.T) {
 		case bytes.Equal(b, []byte{1}):
 			return job1, nil
 		default:
-			assert.FailNow("Unknown job")
+			require.FailNow("Unknown job")
 			return nil, nil
 		}
 	}
 
 	count, err := jobs.ExecuteAll(snow.DefaultConsensusContextTest(), &common.Halter{}, false)
-	assert.NoError(err)
-	assert.Equal(2, count)
-	assert.True(executed0)
-	assert.True(executed1)
+	require.NoError(err)
+	require.Equal(2, count)
+	require.True(executed0)
+	require.True(executed1)
 
 	hasNext, err = jobs.state.HasRunnableJob()
-	assert.NoError(err)
-	assert.False(hasNext)
+	require.NoError(err)
+	require.False(hasNext)
 
 	dbSize, err := database.Size(db)
-	assert.NoError(err)
-	assert.Equal(bootstrapProgressCheckpointSize, dbSize)
+	require.NoError(err)
+	require.Equal(bootstrapProgressCheckpointSize, dbSize)
 }
 
 // Test that a job that is ready to be executed can only be added once
 func TestDuplicatedExecutablePush(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	db := memdb.New()
 
@@ -216,27 +218,27 @@ func TestDuplicatedExecutablePush(t *testing.T) {
 	job := testJob(t, jobID, nil, ids.Empty, nil)
 
 	pushed, err := jobs.Push(job)
-	assert.True(pushed)
-	assert.NoError(err)
+	require.True(pushed)
+	require.NoError(err)
 
 	pushed, err = jobs.Push(job)
-	assert.False(pushed)
-	assert.NoError(err)
+	require.False(pushed)
+	require.NoError(err)
 
 	err = jobs.Commit()
-	assert.NoError(err)
+	require.NoError(err)
 
 	jobs, err = New(db, "", prometheus.NewRegistry())
-	assert.NoError(err)
+	require.NoError(err)
 
 	pushed, err = jobs.Push(job)
-	assert.False(pushed)
-	assert.NoError(err)
+	require.False(pushed)
+	require.NoError(err)
 }
 
 // Test that a job that isn't ready to be executed can only be added once
 func TestDuplicatedNotExecutablePush(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	db := memdb.New()
 
@@ -250,32 +252,32 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 	job1 := testJob(t, job1ID, nil, job0ID, &executed0)
 
 	pushed, err := jobs.Push(job1)
-	assert.True(pushed)
-	assert.NoError(err)
+	require.True(pushed)
+	require.NoError(err)
 
 	pushed, err = jobs.Push(job1)
-	assert.False(pushed)
-	assert.NoError(err)
+	require.False(pushed)
+	require.NoError(err)
 
 	err = jobs.Commit()
-	assert.NoError(err)
+	require.NoError(err)
 
 	jobs, err = New(db, "", prometheus.NewRegistry())
-	assert.NoError(err)
+	require.NoError(err)
 
 	pushed, err = jobs.Push(job1)
-	assert.False(pushed)
-	assert.NoError(err)
+	require.False(pushed)
+	require.NoError(err)
 }
 
 func TestMissingJobs(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	parser := &TestParser{T: t}
 	db := memdb.New()
 
 	jobs, err := NewWithMissing(db, "", prometheus.NewRegistry())
-	assert.NoError(err)
+	require.NoError(err)
 	if err := jobs.SetParser(parser); err != nil {
 		t.Fatal(err)
 	}
@@ -287,27 +289,27 @@ func TestMissingJobs(t *testing.T) {
 	jobs.AddMissingID(job1ID)
 
 	err = jobs.Commit()
-	assert.NoError(err)
+	require.NoError(err)
 
 	numMissingIDs := jobs.NumMissingIDs()
-	assert.Equal(2, numMissingIDs)
+	require.Equal(2, numMissingIDs)
 
 	missingIDSet := ids.Set{}
 	missingIDSet.Add(jobs.MissingIDs()...)
 
 	containsJob0ID := missingIDSet.Contains(job0ID)
-	assert.True(containsJob0ID)
+	require.True(containsJob0ID)
 
 	containsJob1ID := missingIDSet.Contains(job1ID)
-	assert.True(containsJob1ID)
+	require.True(containsJob1ID)
 
 	jobs.RemoveMissingID(job1ID)
 
 	err = jobs.Commit()
-	assert.NoError(err)
+	require.NoError(err)
 
 	jobs, err = NewWithMissing(db, "", prometheus.NewRegistry())
-	assert.NoError(err)
+	require.NoError(err)
 	if err := jobs.SetParser(parser); err != nil {
 		t.Fatal(err)
 	}
@@ -316,14 +318,14 @@ func TestMissingJobs(t *testing.T) {
 	missingIDSet.Add(jobs.MissingIDs()...)
 
 	containsJob0ID = missingIDSet.Contains(job0ID)
-	assert.True(containsJob0ID)
+	require.True(containsJob0ID)
 
 	containsJob1ID = missingIDSet.Contains(job1ID)
-	assert.False(containsJob1ID)
+	require.False(containsJob1ID)
 }
 
 func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	parser := &TestParser{T: t}
 	db := memdb.New()
@@ -344,20 +346,20 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	job1.BytesF = func() []byte { return []byte{1} }
 
 	pushed, err := jobs.Push(job1)
-	assert.True(pushed)
-	assert.NoError(err)
+	require.True(pushed)
+	require.NoError(err)
 
 	hasNext, err := jobs.state.HasRunnableJob()
-	assert.NoError(err)
-	assert.False(hasNext)
+	require.NoError(err)
+	require.False(hasNext)
 
 	pushed, err = jobs.Push(job0)
-	assert.True(pushed)
-	assert.NoError(err)
+	require.True(pushed)
+	require.NoError(err)
 
 	hasNext, err = jobs.state.HasRunnableJob()
-	assert.NoError(err)
-	assert.True(hasNext)
+	require.NoError(err)
+	require.True(hasNext)
 
 	parser.ParseF = func(b []byte) (Job, error) {
 		switch {
@@ -366,7 +368,7 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 		case bytes.Equal(b, []byte{1}):
 			return job1, nil
 		default:
-			assert.FailNow("Unknown job")
+			require.FailNow("Unknown job")
 			return nil, nil
 		}
 	}
@@ -374,9 +376,9 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	_, err = jobs.ExecuteAll(snow.DefaultConsensusContextTest(), &common.Halter{}, false)
 	// Assert that the database closed error on job1 causes ExecuteAll
 	// to fail in the middle of execution.
-	assert.Error(err)
-	assert.True(executed0)
-	assert.False(executed1)
+	require.Error(err)
+	require.True(executed0)
+	require.False(executed1)
 
 	executed0 = false
 	job1.ExecuteF = func() error { executed1 = true; return nil } // job1 succeeds the second time
@@ -392,26 +394,26 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	}
 
 	missingIDs := jobs.MissingIDs()
-	assert.Equal(1, len(missingIDs))
+	require.Equal(1, len(missingIDs))
 
-	assert.Equal(missingIDs[0], job0.ID())
+	require.Equal(missingIDs[0], job0.ID())
 
 	pushed, err = jobs.Push(job0)
-	assert.NoError(err)
-	assert.True(pushed)
+	require.NoError(err)
+	require.True(pushed)
 
 	hasNext, err = jobs.state.HasRunnableJob()
-	assert.NoError(err)
-	assert.True(hasNext)
+	require.NoError(err)
+	require.True(hasNext)
 
 	count, err := jobs.ExecuteAll(snow.DefaultConsensusContextTest(), &common.Halter{}, false)
-	assert.NoError(err)
-	assert.Equal(2, count)
-	assert.True(executed1)
+	require.NoError(err)
+	require.Equal(2, count)
+	require.True(executed1)
 }
 
 func TestInitializeNumJobs(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	parser := &TestParser{T: t}
 	db := memdb.New()
@@ -445,33 +447,33 @@ func TestInitializeNumJobs(t *testing.T) {
 	}
 
 	pushed, err := jobs.Push(job0)
-	assert.True(pushed)
-	assert.NoError(err)
-	assert.EqualValues(1, jobs.state.numJobs)
+	require.True(pushed)
+	require.NoError(err)
+	require.EqualValues(1, jobs.state.numJobs)
 
 	pushed, err = jobs.Push(job1)
-	assert.True(pushed)
-	assert.NoError(err)
-	assert.EqualValues(2, jobs.state.numJobs)
+	require.True(pushed)
+	require.NoError(err)
+	require.EqualValues(2, jobs.state.numJobs)
 
 	err = jobs.Commit()
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = database.Clear(jobs.state.metadataDB, jobs.state.metadataDB)
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = jobs.Commit()
-	assert.NoError(err)
+	require.NoError(err)
 
 	jobs, err = NewWithMissing(db, "", prometheus.NewRegistry())
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.EqualValues(2, jobs.state.numJobs)
+	require.EqualValues(2, jobs.state.numJobs)
 }
 
 func TestClearAll(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	parser := &TestParser{T: t}
 	db := memdb.New()
@@ -490,12 +492,12 @@ func TestClearAll(t *testing.T) {
 	job1.BytesF = func() []byte { return []byte{1} }
 
 	pushed, err := jobs.Push(job0)
-	assert.NoError(err)
-	assert.True(pushed)
+	require.NoError(err)
+	require.True(pushed)
 
 	pushed, err = jobs.Push(job1)
-	assert.True(pushed)
-	assert.NoError(err)
+	require.True(pushed)
+	require.NoError(err)
 
 	parser.ParseF = func(b []byte) (Job, error) {
 		switch {
@@ -504,16 +506,16 @@ func TestClearAll(t *testing.T) {
 		case bytes.Equal(b, []byte{1}):
 			return job1, nil
 		default:
-			assert.FailNow("Unknown job")
+			require.FailNow("Unknown job")
 			return nil, nil
 		}
 	}
 
-	assert.NoError(jobs.Clear())
+	require.NoError(jobs.Clear())
 	hasJob0, err := jobs.Has(job0.ID())
-	assert.NoError(err)
-	assert.False(hasJob0)
+	require.NoError(err)
+	require.False(hasJob0)
 	hasJob1, err := jobs.Has(job1.ID())
-	assert.NoError(err)
-	assert.False(hasJob1)
+	require.NoError(err)
+	require.False(hasJob1)
 }

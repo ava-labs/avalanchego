@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -19,7 +19,7 @@ import (
 )
 
 func TestBlueberryPickingOrder(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	// mock ResetBlockTimer to control timing of block formation
 	env := newEnvironment(t, true /*mockResetBlockTimer*/)
@@ -40,13 +40,13 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	// create validator
 	validatorStartTime := now.Add(time.Second)
 	validatorTx, err := createTestValidatorTx(env, validatorStartTime, nextChainTime)
-	assert.NoError(err)
+	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(env.state.GetLastAccepted(), env.blkManager)
-	assert.NoError(err)
+	require.NoError(err)
 
 	onAbortState, err := state.NewDiff(env.state.GetLastAccepted(), env.blkManager)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// accept validator as pending
 	txExecutor := txexecutor.ProposalTxExecutor{
@@ -55,23 +55,23 @@ func TestBlueberryPickingOrder(t *testing.T) {
 		Backend:       &env.backend,
 		Tx:            validatorTx,
 	}
-	assert.NoError(validatorTx.Unsigned.Visit(&txExecutor))
+	require.NoError(validatorTx.Unsigned.Visit(&txExecutor))
 	txExecutor.OnCommitState.AddTx(validatorTx, status.Committed)
 	txExecutor.OnCommitState.Apply(env.state)
-	assert.NoError(env.state.Commit())
+	require.NoError(env.state.Commit())
 
 	// promote validator to current
 	// Reset onCommitState and onAbortState
 	txExecutor.OnCommitState, err = state.NewDiff(env.state.GetLastAccepted(), env.blkManager)
-	assert.NoError(err)
+	require.NoError(err)
 	txExecutor.OnAbortState, err = state.NewDiff(env.state.GetLastAccepted(), env.blkManager)
-	assert.NoError(err)
+	require.NoError(err)
 	advanceTime, err := env.txBuilder.NewAdvanceTimeTx(validatorStartTime)
-	assert.NoError(err)
+	require.NoError(err)
 	txExecutor.Tx = advanceTime
-	assert.NoError(advanceTime.Unsigned.Visit(&txExecutor))
+	require.NoError(advanceTime.Unsigned.Visit(&txExecutor))
 	txExecutor.OnCommitState.Apply(env.state)
-	assert.NoError(env.state.Commit())
+	require.NoError(env.state.Commit())
 
 	// move chain time to current validator's
 	// end of staking time, so that it may be rewarded
@@ -81,52 +81,52 @@ func TestBlueberryPickingOrder(t *testing.T) {
 
 	// add decisionTx and stakerTxs to mempool
 	decisionTxs, err := createTestDecisionTxes(2)
-	assert.NoError(err)
+	require.NoError(err)
 	for _, dt := range decisionTxs {
-		assert.NoError(env.mempool.Add(dt))
+		require.NoError(env.mempool.Add(dt))
 	}
 
 	// start time is beyond maximal distance from chain time
 	starkerTxStartTime := nextChainTime.Add(txexecutor.MaxFutureStartTime).Add(time.Second)
 	stakerTx, err := createTestValidatorTx(env, starkerTxStartTime, starkerTxStartTime.Add(time.Hour))
-	assert.NoError(err)
-	assert.NoError(env.mempool.Add(stakerTx))
+	require.NoError(err)
+	require.NoError(env.mempool.Add(stakerTx))
 
 	// test: decisionTxs must be picked first
 	blk, err := env.Builder.BuildBlock()
-	assert.NoError(err)
-	assert.True(blk.Timestamp().Equal(nextChainTime))
+	require.NoError(err)
+	require.True(blk.Timestamp().Equal(nextChainTime))
 	stdBlk, ok := blk.(*blockexecutor.Block)
-	assert.True(ok)
+	require.True(ok)
 	_, ok = stdBlk.Block.(*blocks.BlueberryStandardBlock)
-	assert.True(ok)
-	assert.True(len(decisionTxs) == len(stdBlk.Txs()))
+	require.True(ok)
+	require.True(len(decisionTxs) == len(stdBlk.Txs()))
 	for i, tx := range stdBlk.Txs() {
-		assert.Equal(decisionTxs[i].ID(), tx.ID())
+		require.Equal(decisionTxs[i].ID(), tx.ID())
 	}
 
-	assert.False(env.mempool.HasDecisionTxs())
+	require.False(env.mempool.HasDecisionTxs())
 
 	// test: reward validator blocks must follow, one per endingValidator
 	blk, err = env.Builder.BuildBlock()
-	assert.NoError(err)
-	assert.True(blk.Timestamp().Equal(nextChainTime))
+	require.NoError(err)
+	require.True(blk.Timestamp().Equal(nextChainTime))
 	rewardBlk, ok := blk.(*blockexecutor.Block)
-	assert.True(ok)
+	require.True(ok)
 	_, ok = rewardBlk.Block.(*blocks.BlueberryProposalBlock)
-	assert.True(ok)
+	require.True(ok)
 	rewardTx, ok := rewardBlk.Txs()[0].Unsigned.(*txs.RewardValidatorTx)
-	assert.True(ok)
-	assert.Equal(validatorTx.ID(), rewardTx.TxID)
+	require.True(ok)
+	require.Equal(validatorTx.ID(), rewardTx.TxID)
 
 	// accept reward validator tx so that current validator is removed
-	assert.NoError(blk.Verify())
-	assert.NoError(blk.Accept())
+	require.NoError(blk.Verify())
+	require.NoError(blk.Accept())
 	options, err := rewardBlk.Options()
-	assert.NoError(err)
+	require.NoError(err)
 	commitBlk := options[0]
-	assert.NoError(commitBlk.Verify())
-	assert.NoError(commitBlk.Accept())
+	require.NoError(commitBlk.Verify())
+	require.NoError(commitBlk.Accept())
 	env.Builder.SetPreference(commitBlk.ID())
 
 	// mempool proposal tx is too far in the future. A
@@ -135,27 +135,27 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	now = nextChainTime.Add(txexecutor.MaxFutureStartTime / 2)
 	env.clk.Set(now)
 	blk, err = env.Builder.BuildBlock()
-	assert.NoError(err)
-	assert.True(blk.Timestamp().Equal(now))
+	require.NoError(err)
+	require.True(blk.Timestamp().Equal(now))
 	proposalBlk, ok := blk.(*blockexecutor.Block)
-	assert.True(ok)
+	require.True(ok)
 	_, ok = proposalBlk.Block.(*blocks.BlueberryProposalBlock)
-	assert.True(ok)
-	assert.Equal(stakerTx.ID(), proposalBlk.Txs()[0].ID())
+	require.True(ok)
+	require.Equal(stakerTx.ID(), proposalBlk.Txs()[0].ID())
 
 	// Finally an empty standard block can be issued to advance time
 	// if no mempool txs are available
 	now, err = txexecutor.GetNextStakerChangeTime(env.state)
-	assert.NoError(err)
+	require.NoError(err)
 	env.clk.Set(now)
 
 	// finally mempool addValidatorTx must be picked
 	blk, err = env.Builder.BuildBlock()
-	assert.NoError(err)
-	assert.True(blk.Timestamp().Equal(now))
+	require.NoError(err)
+	require.True(blk.Timestamp().Equal(now))
 	emptyStdBlk, ok := blk.(*blockexecutor.Block)
-	assert.True(ok)
+	require.True(ok)
 	_, ok = emptyStdBlk.Block.(*blocks.BlueberryStandardBlock)
-	assert.True(ok)
-	assert.True(len(emptyStdBlk.Txs()) == 0)
+	require.True(ok)
+	require.True(len(emptyStdBlk.Txs()) == 0)
 }

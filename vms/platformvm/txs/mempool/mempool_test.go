@@ -10,7 +10,8 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/assert"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -33,55 +34,55 @@ var preFundedKeys = crypto.BuildTestKeys()
 // shows that valid tx is not added to mempool if this would exceed its maximum
 // size
 func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
 	mpool, err := NewMempool("mempool", registerer, &noopBlkTimer{})
-	assert.NoError(err)
+	require.NoError(err)
 
 	txs, err := createTestDecisiontxs(1)
-	assert.NoError(err)
+	require.NoError(err)
 	tx := txs[0]
 
 	// shortcut to simulated almost filled mempool
 	mpool.(*mempool).bytesAvailable = len(tx.Bytes()) - 1
 
 	err = mpool.Add(tx)
-	assert.True(errors.Is(err, errMempoolFull), err, "max mempool size breached")
+	require.True(errors.Is(err, errMempoolFull), err, "max mempool size breached")
 
 	// shortcut to simulated almost filled mempool
 	mpool.(*mempool).bytesAvailable = len(tx.Bytes())
 
 	err = mpool.Add(tx)
-	assert.NoError(err, "should have added tx to mempool")
+	require.NoError(err, "should have added tx to mempool")
 }
 
 func TestDecisionTxsInMempool(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
 	mpool, err := NewMempool("mempool", registerer, &noopBlkTimer{})
-	assert.NoError(err)
+	require.NoError(err)
 
 	txs, err := createTestDecisiontxs(2)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// txs must not already there before we start
-	assert.False(mpool.HasDecisionTxs())
+	require.False(mpool.HasDecisionTxs())
 
 	for _, tx := range txs {
 		// tx not already there
-		assert.False(mpool.Has(tx.ID()))
+		require.False(mpool.Has(tx.ID()))
 
 		// we can insert
-		assert.NoError(mpool.Add(tx))
+		require.NoError(mpool.Add(tx))
 
 		// we can get it
-		assert.True(mpool.Has(tx.ID()))
+		require.True(mpool.Has(tx.ID()))
 
 		retrieved := mpool.Get(tx.ID())
-		assert.True(retrieved != nil)
-		assert.Equal(tx, retrieved)
+		require.True(retrieved != nil)
+		require.Equal(tx, retrieved)
 
 		// we can peek it
 		peeked := mpool.PeekDecisionTxs(math.MaxInt)
@@ -95,23 +96,23 @@ func TestDecisionTxsInMempool(t *testing.T) {
 				break
 			}
 		}
-		assert.True(found)
+		require.True(found)
 
 		// once removed it cannot be there
 		mpool.Remove([]*transactions.Tx{tx})
 
-		assert.False(mpool.Has(tx.ID()))
-		assert.Equal((*transactions.Tx)(nil), mpool.Get(tx.ID()))
+		require.False(mpool.Has(tx.ID()))
+		require.Equal((*transactions.Tx)(nil), mpool.Get(tx.ID()))
 
 		// we can reinsert it
-		assert.NoError(mpool.Add(tx))
+		require.NoError(mpool.Add(tx))
 
 		// we can mark it as dropped, but it'll still be in mempool
 		mpool.MarkDropped(tx.ID(), "dropped for test")
-		assert.True(mpool.Has(tx.ID()))
-		assert.Equal(tx, mpool.Get(tx.ID()))
+		require.True(mpool.Has(tx.ID()))
+		require.Equal(tx, mpool.Get(tx.ID()))
 		_, dropped := mpool.GetDropReason(tx.ID())
-		assert.True(dropped)
+		require.True(dropped)
 
 		// we can pop it
 		txSize := len(tx.Bytes())
@@ -123,71 +124,71 @@ func TestDecisionTxsInMempool(t *testing.T) {
 				break
 			}
 		}
-		assert.True(found)
+		require.True(found)
 
 		// once popped it cannot be there
-		assert.False(mpool.Has(tx.ID()))
-		assert.Equal((*transactions.Tx)(nil), mpool.Get(tx.ID()))
-		assert.Equal([]*transactions.Tx{}, mpool.PeekDecisionTxs(txSize))
+		require.False(mpool.Has(tx.ID()))
+		require.Equal((*transactions.Tx)(nil), mpool.Get(tx.ID()))
+		require.Equal([]*transactions.Tx{}, mpool.PeekDecisionTxs(txSize))
 
 		// we can reinsert it again to grow the mempool
-		assert.NoError(mpool.Add(tx))
+		require.NoError(mpool.Add(tx))
 	}
 }
 
 func TestProposalTxsInMempool(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	registerer := prometheus.NewRegistry()
 	mpool, err := NewMempool("mempool", registerer, &noopBlkTimer{})
-	assert.NoError(err)
+	require.NoError(err)
 
 	// it's key to this test that proposal txs
 	// are ordered by decreasing start time
 	txs, err := createTestProposaltxs(2)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// txs should not be already there
-	assert.False(mpool.HasProposalTx())
+	require.False(mpool.HasProposalTx())
 
 	for _, tx := range txs {
-		assert.False(mpool.Has(tx.ID()))
+		require.False(mpool.Has(tx.ID()))
 
 		// we can insert
-		assert.NoError(mpool.Add(tx))
+		require.NoError(mpool.Add(tx))
 
 		// we can get it
-		assert.True(mpool.HasProposalTx())
-		assert.True(mpool.Has(tx.ID()))
+		require.True(mpool.HasProposalTx())
+		require.True(mpool.Has(tx.ID()))
 
 		retrieved := mpool.Get(tx.ID())
-		assert.True(retrieved != nil)
-		assert.Equal(tx, retrieved)
+		require.True(retrieved != nil)
+		require.Equal(tx, retrieved)
 
 		// we can peek it
 		peeked := mpool.PeekProposalTx()
-		assert.True(peeked != nil)
-		assert.Equal(tx, peeked)
+		require.True(peeked != nil)
+		require.Equal(tx, peeked)
 
 		// once removed it cannot be there
 		mpool.Remove([]*transactions.Tx{tx})
 
-		assert.False(mpool.Has(tx.ID()))
-		assert.Equal((*transactions.Tx)(nil), mpool.Get(tx.ID()))
+		require.False(mpool.Has(tx.ID()))
+		require.Equal((*transactions.Tx)(nil), mpool.Get(tx.ID()))
 
 		// we can reinsert it
-		assert.NoError(mpool.Add(tx))
+		require.NoError(mpool.Add(tx))
 
 		// we can pop it
 		popped := mpool.PopProposalTx()
-		assert.Equal(tx, popped)
+		require.Equal(tx, popped)
 
 		// once popped it cannot be there
-		assert.False(mpool.Has(tx.ID()))
-		assert.Equal((*transactions.Tx)(nil), mpool.Get(tx.ID()))
+		require.False(mpool.Has(tx.ID()))
+		require.Equal((*transactions.Tx)(nil), mpool.Get(tx.ID()))
 
 		// we can reinsert it again to grow the mempool
-		assert.NoError(mpool.Add(tx))
+		require.NoError(mpool.Add(tx))
 	}
 }
 

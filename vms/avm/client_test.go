@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
@@ -16,7 +16,7 @@ import (
 )
 
 type mockClient struct {
-	assert         *assert.Assertions
+	require        *require.Assertions
 	expectedInData interface{}
 }
 
@@ -27,12 +27,12 @@ func (mc *mockClient) SendRequest(
 	reply interface{},
 	options ...rpc.Option,
 ) error {
-	mc.assert.Equal(inData, mc.expectedInData)
+	mc.require.Equal(inData, mc.expectedInData)
 	return nil
 }
 
 func TestClientCreateAsset(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	client := client{}
 	{
 		// empty slices
@@ -53,7 +53,7 @@ func TestClientCreateAsset(t *testing.T) {
 			MinterSets:     serviceMinters,
 		}
 		client.requester = &mockClient{
-			assert:         assert,
+			require:        require,
 			expectedInData: expectedInData,
 		}
 		_, err := client.CreateAsset(
@@ -67,7 +67,7 @@ func TestClientCreateAsset(t *testing.T) {
 			clientHolders,
 			clientMinters,
 		)
-		assert.NoError(err)
+		require.NoError(err)
 	}
 	{
 		// non empty slices
@@ -108,7 +108,7 @@ func TestClientCreateAsset(t *testing.T) {
 			MinterSets:     serviceMinters,
 		}
 		client.requester = &mockClient{
-			assert:         assert,
+			require:        require,
 			expectedInData: expectedInData,
 		}
 		_, err := client.CreateAsset(
@@ -122,12 +122,12 @@ func TestClientCreateAsset(t *testing.T) {
 			clientHolders,
 			clientMinters,
 		)
-		assert.NoError(err)
+		require.NoError(err)
 	}
 }
 
 func TestClientCreateFixedCapAsset(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	client := client{}
 	{
 		// empty slices
@@ -145,7 +145,7 @@ func TestClientCreateFixedCapAsset(t *testing.T) {
 			InitialHolders: serviceHolders,
 		}
 		client.requester = &mockClient{
-			assert:         assert,
+			require:        require,
 			expectedInData: expectedInData,
 		}
 		_, err := client.CreateFixedCapAsset(
@@ -158,7 +158,7 @@ func TestClientCreateFixedCapAsset(t *testing.T) {
 			0,
 			clientHolders,
 		)
-		assert.NoError(err)
+		require.NoError(err)
 	}
 	{
 		// non empty slices
@@ -186,7 +186,7 @@ func TestClientCreateFixedCapAsset(t *testing.T) {
 			InitialHolders: serviceHolders,
 		}
 		client.requester = &mockClient{
-			assert:         assert,
+			require:        require,
 			expectedInData: expectedInData,
 		}
 		_, err := client.CreateFixedCapAsset(
@@ -199,6 +199,6 @@ func TestClientCreateFixedCapAsset(t *testing.T) {
 			0,
 			clientHolders,
 		)
-		assert.NoError(err)
+		require.NoError(err)
 	}
 }

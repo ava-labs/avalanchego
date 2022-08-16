@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -22,7 +22,7 @@ import (
 var preFundedKeys = crypto.BuildTestKeys()
 
 func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	clk := mockable.Clock{}
 	ctx := snow.DefaultContextTest()
 	ctx.AVAXAssetID = ids.GenerateTestID()
@@ -35,10 +35,10 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	)
 
 	// Case : signed tx is nil
-	assert.ErrorIs(stx.SyntacticVerify(ctx), errNilSignedTx)
+	require.ErrorIs(stx.SyntacticVerify(ctx), errNilSignedTx)
 
 	// Case : unsigned tx is nil
-	assert.ErrorIs(addDelegatorTx.SyntacticVerify(ctx), ErrNilTx)
+	require.ErrorIs(addDelegatorTx.SyntacticVerify(ctx), ErrNilTx)
 
 	validatorWeight := uint64(2022)
 	inputs := []*avax.TransferableInput{{
@@ -99,33 +99,33 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: signed tx not initialized
 	stx = &Tx{Unsigned: addDelegatorTx}
-	assert.ErrorIs(stx.SyntacticVerify(ctx), errSignedTxNotInitialized)
+	require.ErrorIs(stx.SyntacticVerify(ctx), errSignedTxNotInitialized)
 
 	// Case: valid tx
 	stx, err = NewSigned(addDelegatorTx, Codec, signers)
-	assert.NoError(err)
-	assert.NoError(stx.SyntacticVerify(ctx))
+	require.NoError(err)
+	require.NoError(stx.SyntacticVerify(ctx))
 
 	// Case: Wrong network ID
 	addDelegatorTx.SyntacticallyVerified = false
 	addDelegatorTx.NetworkID++
 	stx, err = NewSigned(addDelegatorTx, Codec, signers)
-	assert.NoError(err)
+	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	assert.Error(err)
+	require.Error(err)
 	addDelegatorTx.NetworkID--
 
 	// Case: delegator weight is not equal to total stake weight
 	addDelegatorTx.SyntacticallyVerified = false
 	addDelegatorTx.Validator.Wght = 2 * validatorWeight
 	stx, err = NewSigned(addDelegatorTx, Codec, signers)
-	assert.NoError(err)
-	assert.ErrorIs(stx.SyntacticVerify(ctx), errDelegatorWeightMismatch)
+	require.NoError(err)
+	require.ErrorIs(stx.SyntacticVerify(ctx), errDelegatorWeightMismatch)
 	addDelegatorTx.Validator.Wght = validatorWeight
 }
 
 func TestAddDelegatorTxSyntacticVerifyNotAVAX(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	clk := mockable.Clock{}
 	ctx := snow.DefaultContextTest()
 	ctx.AVAXAssetID = ids.GenerateTestID()
@@ -196,6 +196,6 @@ func TestAddDelegatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 	}
 
 	stx, err = NewSigned(addDelegatorTx, Codec, signers)
-	assert.NoError(err)
-	assert.Error(stx.SyntacticVerify(ctx))
+	require.NoError(err)
+	require.Error(stx.SyntacticVerify(ctx))
 }

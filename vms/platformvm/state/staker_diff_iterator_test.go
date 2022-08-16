@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
 
 func TestStakerDiffIterator(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	currentStakers := []*Staker{
 		{
 			TxID:     ids.GenerateTestID(),
@@ -100,18 +100,18 @@ func TestStakerDiffIterator(t *testing.T) {
 		NewSliceIterator(pendingStakers...),
 	)
 	for _, expectedStaker := range stakerDiffs {
-		assert.True(it.Next())
+		require.True(it.Next())
 		staker, isAdded := it.Value()
-		assert.Equal(expectedStaker.txID, staker.TxID)
-		assert.Equal(expectedStaker.isAdded, isAdded)
+		require.Equal(expectedStaker.txID, staker.TxID)
+		require.Equal(expectedStaker.isAdded, isAdded)
 	}
-	assert.False(it.Next())
+	require.False(it.Next())
 	it.Release()
-	assert.False(it.Next())
+	require.False(it.Next())
 }
 
 func TestMutableStakerIterator(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	initialStakers := []*Staker{
 		{
 			TxID:     ids.GenerateTestID(),
@@ -158,7 +158,7 @@ func TestMutableStakerIterator(t *testing.T) {
 
 	// Next must be called before Add.
 	hasNext := it.Next()
-	assert.True(hasNext)
+	require.True(hasNext)
 
 	for _, staker := range addedStakers {
 		it.Add(staker)
@@ -174,12 +174,12 @@ func TestMutableStakerIterator(t *testing.T) {
 	}
 
 	for _, expectedStakerTxID := range stakerDiffs {
-		assert.True(hasNext)
+		require.True(hasNext)
 		staker := it.Value()
-		assert.Equal(expectedStakerTxID, staker.TxID)
+		require.Equal(expectedStakerTxID, staker.TxID)
 		hasNext = it.Next()
 	}
-	assert.False(hasNext)
+	require.False(hasNext)
 	it.Release()
-	assert.False(it.Next())
+	require.False(it.Next())
 }

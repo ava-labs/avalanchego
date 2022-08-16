@@ -13,7 +13,7 @@ import (
 
 	stdjson "encoding/json"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/keystore"
@@ -455,12 +455,12 @@ func TestGetBalance(t *testing.T) {
 }
 
 func TestGetStake(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	service, _ := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		assert.NoError(service.vm.Shutdown())
+		require.NoError(service.vm.Shutdown())
 		service.vm.ctx.Lock.Unlock()
 	}()
 
@@ -478,24 +478,24 @@ func TestGetStake(t *testing.T) {
 			formatting.Hex,
 		}
 		response := GetStakeReply{}
-		assert.NoError(service.GetStake(nil, &args, &response))
-		assert.EqualValues(uint64(defaultWeight), uint64(response.Staked))
-		assert.Len(response.Outputs, 1)
+		require.NoError(service.GetStake(nil, &args, &response))
+		require.EqualValues(uint64(defaultWeight), uint64(response.Staked))
+		require.Len(response.Outputs, 1)
 
 		// Unmarshal into an output
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[0])
-		assert.NoError(err)
+		require.NoError(err)
 
 		var output avax.TransferableOutput
 		_, err = txs.Codec.Unmarshal(outputBytes, &output)
-		assert.NoError(err)
+		require.NoError(err)
 
 		out := output.Out.(*secp256k1fx.TransferOutput)
-		assert.EqualValues(out.Amount(), defaultWeight)
-		assert.EqualValues(out.Threshold, 1)
-		assert.Len(out.Addrs, 1)
-		assert.Equal(keys[i].PublicKey().Address(), out.Addrs[0])
-		assert.EqualValues(out.Locktime, 0)
+		require.EqualValues(out.Amount(), defaultWeight)
+		require.EqualValues(out.Threshold, 1)
+		require.Len(out.Addrs, 1)
+		require.Equal(keys[i].PublicKey().Address(), out.Addrs[0])
+		require.EqualValues(out.Locktime, 0)
 	}
 
 	// Make sure this works for multiple addresses
@@ -506,23 +506,23 @@ func TestGetStake(t *testing.T) {
 		formatting.Hex,
 	}
 	response := GetStakeReply{}
-	assert.NoError(service.GetStake(nil, &args, &response))
-	assert.EqualValues(len(genesis.Validators)*defaultWeight, response.Staked)
-	assert.Len(response.Outputs, len(genesis.Validators))
+	require.NoError(service.GetStake(nil, &args, &response))
+	require.EqualValues(len(genesis.Validators)*defaultWeight, response.Staked)
+	require.Len(response.Outputs, len(genesis.Validators))
 
 	for _, outputStr := range response.Outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, outputStr)
-		assert.NoError(err)
+		require.NoError(err)
 
 		var output avax.TransferableOutput
 		_, err = txs.Codec.Unmarshal(outputBytes, &output)
-		assert.NoError(err)
+		require.NoError(err)
 
 		out := output.Out.(*secp256k1fx.TransferOutput)
-		assert.EqualValues(defaultWeight, out.Amount())
-		assert.EqualValues(out.Threshold, 1)
-		assert.EqualValues(out.Locktime, 0)
-		assert.Len(out.Addrs, 1)
+		require.EqualValues(defaultWeight, out.Amount())
+		require.EqualValues(out.Threshold, 1)
+		require.EqualValues(out.Locktime, 0)
+		require.Len(out.Addrs, 1)
 	}
 
 	oldStake := uint64(defaultWeight)
@@ -540,7 +540,7 @@ func TestGetStake(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		keys[0].PublicKey().Address(), // change addr
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
 	staker := state.NewPrimaryNetworkStaker(tx.ID(), &tx.Unsigned.(*txs.AddDelegatorTx).Validator)
 	staker.PotentialReward = 0
@@ -549,26 +549,26 @@ func TestGetStake(t *testing.T) {
 
 	service.vm.state.PutCurrentDelegator(staker)
 	service.vm.state.AddTx(tx, status.Committed)
-	assert.NoError(service.vm.state.Commit())
+	require.NoError(service.vm.state.Commit())
 
 	// Make sure the delegator addr has the right stake (old stake + stakeAmount)
 	addr, _ := service.addrManager.FormatLocalAddress(keys[0].PublicKey().Address())
 	args.Addresses = []string{addr}
-	assert.NoError(service.GetStake(nil, &args, &response))
-	assert.EqualValues(oldStake+stakeAmount, uint64(response.Staked))
-	assert.Len(response.Outputs, 2)
+	require.NoError(service.GetStake(nil, &args, &response))
+	require.EqualValues(oldStake+stakeAmount, uint64(response.Staked))
+	require.Len(response.Outputs, 2)
 
 	// Unmarshal into transferable outputs
 	outputs := make([]avax.TransferableOutput, 2)
 	for i := range outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[i])
-		assert.NoError(err)
+		require.NoError(err)
 		_, err = txs.Codec.Unmarshal(outputBytes, &outputs[i])
-		assert.NoError(err)
+		require.NoError(err)
 	}
 
 	// Make sure the stake amount is as expected
-	assert.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount())
+	require.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount())
 
 	oldStake = uint64(response.Staked)
 
@@ -587,7 +587,7 @@ func TestGetStake(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		keys[0].PublicKey().Address(), // change addr
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
 	staker = state.NewPrimaryNetworkStaker(tx.ID(), &tx.Unsigned.(*txs.AddValidatorTx).Validator)
 	staker.NextTime = staker.StartTime
@@ -595,24 +595,24 @@ func TestGetStake(t *testing.T) {
 
 	service.vm.state.PutPendingValidator(staker)
 	service.vm.state.AddTx(tx, status.Committed)
-	assert.NoError(service.vm.state.Commit())
+	require.NoError(service.vm.state.Commit())
 
 	// Make sure the delegator has the right stake (old stake + stakeAmount)
-	assert.NoError(service.GetStake(nil, &args, &response))
-	assert.EqualValues(oldStake+stakeAmount, response.Staked)
-	assert.Len(response.Outputs, 3)
+	require.NoError(service.GetStake(nil, &args, &response))
+	require.EqualValues(oldStake+stakeAmount, response.Staked)
+	require.Len(response.Outputs, 3)
 
 	// Unmarshal
 	outputs = make([]avax.TransferableOutput, 3)
 	for i := range outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[i])
-		assert.NoError(err)
+		require.NoError(err)
 		_, err = txs.Codec.Unmarshal(outputBytes, &outputs[i])
-		assert.NoError(err)
+		require.NoError(err)
 	}
 
 	// Make sure the stake amount is as expected
-	assert.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount()+outputs[2].Out.Amount())
+	require.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount()+outputs[2].Out.Amount())
 }
 
 // Test method GetCurrentValidators
@@ -746,23 +746,23 @@ func TestGetCurrentValidators(t *testing.T) {
 }
 
 func TestGetTimestamp(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	service, _ := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		assert.NoError(service.vm.Shutdown())
+		require.NoError(service.vm.Shutdown())
 		service.vm.ctx.Lock.Unlock()
 	}()
 
 	reply := GetTimestampReply{}
-	assert.NoError(service.GetTimestamp(nil, nil, &reply))
-	assert.Equal(service.vm.state.GetTimestamp(), reply.Timestamp)
+	require.NoError(service.GetTimestamp(nil, nil, &reply))
+	require.Equal(service.vm.state.GetTimestamp(), reply.Timestamp)
 
 	newTimestamp := reply.Timestamp.Add(time.Second)
 	service.vm.state.SetTimestamp(newTimestamp)
 
-	assert.NoError(service.GetTimestamp(nil, nil, &reply))
-	assert.Equal(newTimestamp, reply.Timestamp)
+	require.NoError(service.GetTimestamp(nil, nil, &reply))
+	require.Equal(newTimestamp, reply.Timestamp)
 }
 
 func TestGetBlock(t *testing.T) {
@@ -830,13 +830,13 @@ func TestGetBlock(t *testing.T) {
 
 			switch {
 			case test.encoding == formatting.JSON:
-				assert.Equal(t, block, response.Block)
+				require.Equal(t, block, response.Block)
 			default:
 				decoded, _ := formatting.Decode(response.Encoding, response.Block.(string))
-				assert.Equal(t, block.Bytes(), decoded)
+				require.Equal(t, block.Bytes(), decoded)
 			}
 
-			assert.Equal(t, test.encoding, response.Encoding)
+			require.Equal(t, test.encoding, response.Encoding)
 		})
 	}
 }

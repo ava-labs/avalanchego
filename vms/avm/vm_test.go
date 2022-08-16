@@ -14,7 +14,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -961,8 +961,8 @@ func setupTxFeeAssets(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.M
 	}
 	genesisBytes, issuer, vm, m := GenesisVMWithArgs(t, nil, customArgs)
 	expectedID, err := vm.Aliaser.Lookup(assetAlias)
-	assert.NoError(t, err)
-	assert.Equal(t, expectedID, vm.feeAssetID)
+	require.NoError(t, err)
+	require.Equal(t, expectedID, vm.feeAssetID)
 	return genesisBytes, issuer, vm, m
 }
 
@@ -971,23 +971,23 @@ func TestIssueTxWithFeeAsset(t *testing.T) {
 	ctx := vm.ctx
 	defer func() {
 		err := vm.Shutdown()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		ctx.Lock.Unlock()
 	}()
 	// send first asset
 	newTx := NewTxWithAsset(t, genesisBytes, vm, feeAssetName)
 
 	txID, err := vm.IssueTx(newTx.Bytes())
-	assert.NoError(t, err)
-	assert.Equal(t, txID, newTx.ID())
+	require.NoError(t, err)
+	require.Equal(t, txID, newTx.ID())
 
 	ctx.Lock.Unlock()
 
 	msg := <-issuer
-	assert.Equal(t, msg, common.PendingTxs)
+	require.Equal(t, msg, common.PendingTxs)
 
 	ctx.Lock.Lock()
-	assert.Len(t, vm.PendingTxs(), 1)
+	require.Len(t, vm.PendingTxs(), 1)
 	t.Log(vm.PendingTxs())
 }
 
@@ -996,7 +996,7 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 	ctx := vm.ctx
 	defer func() {
 		err := vm.Shutdown()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		ctx.Lock.Unlock()
 	}()
 
@@ -1049,16 +1049,16 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 	}
 
 	txID, err := vm.IssueTx(newTx.Bytes())
-	assert.NoError(t, err)
-	assert.Equal(t, txID, newTx.ID())
+	require.NoError(t, err)
+	require.Equal(t, txID, newTx.ID())
 
 	ctx.Lock.Unlock()
 
 	msg := <-issuer
-	assert.Equal(t, msg, common.PendingTxs)
+	require.Equal(t, msg, common.PendingTxs)
 
 	ctx.Lock.Lock()
-	assert.Len(t, vm.PendingTxs(), 1)
+	require.Len(t, vm.PendingTxs(), 1)
 }
 
 func TestVMFormat(t *testing.T) {
@@ -1103,7 +1103,7 @@ func TestTxCached(t *testing.T) {
 	txBytes := newTx.Bytes()
 
 	_, err := vm.ParseTx(txBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	db := mockdb.New()
 	called := new(bool)
@@ -1115,14 +1115,14 @@ func TestTxCached(t *testing.T) {
 	registerer := prometheus.NewRegistry()
 
 	err = vm.metrics.Initialize("", registerer)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	vm.state, err = states.New(prefixdb.New([]byte("tx"), db), vm.parser, registerer)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = vm.ParseTx(txBytes)
-	assert.NoError(t, err)
-	assert.False(t, *called, "shouldn't have called the DB")
+	require.NoError(t, err)
+	require.False(t, *called, "shouldn't have called the DB")
 }
 
 func TestTxNotCached(t *testing.T) {
@@ -1139,7 +1139,7 @@ func TestTxNotCached(t *testing.T) {
 	txBytes := newTx.Bytes()
 
 	_, err := vm.ParseTx(txBytes)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	db := mockdb.New()
 	called := new(bool)
@@ -1150,19 +1150,19 @@ func TestTxNotCached(t *testing.T) {
 	db.OnPut = func([]byte, []byte) error { return nil }
 
 	registerer := prometheus.NewRegistry()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = vm.metrics.Initialize("", registerer)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	vm.state, err = states.New(db, vm.parser, registerer)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	vm.uniqueTxs.Flush()
 
 	_, err = vm.ParseTx(txBytes)
-	assert.NoError(t, err)
-	assert.True(t, *called, "should have called the DB")
+	require.NoError(t, err)
+	require.True(t, *called, "should have called the DB")
 }
 
 func TestTxVerifyAfterIssueTx(t *testing.T) {
@@ -1404,7 +1404,7 @@ func TestImportTxSerialization(t *testing.T) {
 	if err := vm.parser.InitializeTx(tx); err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, tx.ID().String(), "9wdPb5rsThXYLX4WxkNeyYrNMfDE5cuWLgifSjxKiA2dCmgCZ")
+	require.Equal(t, tx.ID().String(), "9wdPb5rsThXYLX4WxkNeyYrNMfDE5cuWLgifSjxKiA2dCmgCZ")
 	result := tx.Bytes()
 	if !bytes.Equal(expected, result) {
 		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
@@ -1462,7 +1462,7 @@ func TestImportTxSerialization(t *testing.T) {
 	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0], keys[0]}, {keys[0], keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, tx.ID().String(), "pCW7sVBytzdZ1WrqzGY1DvA2S9UaMr72xpUMxVyx1QHBARNYx")
+	require.Equal(t, tx.ID().String(), "pCW7sVBytzdZ1WrqzGY1DvA2S9UaMr72xpUMxVyx1QHBARNYx")
 	result = tx.Bytes()
 
 	// there are two credentials
@@ -1498,7 +1498,7 @@ func TestIssueImportTx(t *testing.T) {
 	}
 
 	avmConfigBytes, err := stdjson.Marshal(avmConfig)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	vm := &VM{}
 	err = vm.Initialize(
 		ctx,
@@ -1901,7 +1901,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		IndexTransactions: true,
 	}
 	avmConfigBytes, err := stdjson.Marshal(avmConfig)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	vm := &VM{}
 	err = vm.Initialize(
 		ctx,

@@ -9,7 +9,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -77,8 +77,8 @@ func TestLoadVMsSuccess(t *testing.T) {
 	reply := LoadVMsReply{}
 	err := resources.admin.LoadVMs(nil, nil, &reply)
 
-	assert.Equal(t, expectedVMRegistry, reply.NewVMs)
-	assert.Equal(t, err, nil)
+	require.Equal(t, expectedVMRegistry, reply.NewVMs)
+	require.Equal(t, err, nil)
 }
 
 // Tests behavior for LoadVMs if we fail to reload vms.
@@ -93,7 +93,7 @@ func TestLoadVMsReloadFails(t *testing.T) {
 	reply := LoadVMsReply{}
 	err := resources.admin.LoadVMs(nil, nil, &reply)
 
-	assert.Equal(t, err, errOops)
+	require.Equal(t, err, errOops)
 }
 
 // Tests behavior for LoadVMs if we fail to fetch our aliases
@@ -118,5 +118,5 @@ func TestLoadVMsGetAliasesFails(t *testing.T) {
 	reply := LoadVMsReply{}
 	err := resources.admin.LoadVMs(nil, nil, &reply)
 
-	assert.Equal(t, err, errOops)
+	require.Equal(t, err, errOops)
 }

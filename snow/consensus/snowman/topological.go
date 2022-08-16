@@ -450,6 +450,7 @@ func (ts *Topological) vote(voteStack []votes) (ids.ID, error) {
 	// keep track of the new preferred block
 	newPreferred := ts.head
 	onPreferredBranch := true
+	pollSuccessful := false
 	for len(voteStack) > 0 {
 		// pop a vote off the stack
 		newStackSize := len(voteStack) - 1
@@ -481,7 +482,7 @@ func (ts *Topological) vote(voteStack []votes) (ids.ID, error) {
 		}
 
 		// apply the votes for this snowball instance
-		parentBlock.sb.RecordPoll(vote.votes)
+		pollSuccessful = parentBlock.sb.RecordPoll(vote.votes) || pollSuccessful
 
 		// Only accept when you are finalized and the head.
 		if parentBlock.sb.Finalized() && ts.head == vote.parentID {
@@ -545,7 +546,11 @@ func (ts *Topological) vote(voteStack []votes) (ids.ID, error) {
 		}
 	}
 
-	ts.Polls.Successful()
+	if pollSuccessful {
+		ts.Polls.Successful()
+	} else {
+		ts.Polls.Failed()
+	}
 	return newPreferred, nil
 }
 

@@ -7,17 +7,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestBlueberryFork(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	// mock ResetBlockTimer to control timing of block formation
 	env := newEnvironment(t, true /*mockResetBlockTimer*/)
@@ -54,42 +55,42 @@ func TestBlueberryFork(t *testing.T) {
 			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[i]},
 			ids.ShortEmpty,
 		)
-		assert.NoError(err)
-		assert.NoError(env.mempool.Add(addPendingValidatorTx))
+		require.NoError(err)
+		require.NoError(env.mempool.Add(addPendingValidatorTx))
 
 		proposalBlk, err := env.Builder.BuildBlock()
-		assert.NoError(err)
-		assert.NoError(proposalBlk.Verify())
-		assert.NoError(proposalBlk.Accept())
-		assert.NoError(env.state.Commit())
+		require.NoError(err)
+		require.NoError(proposalBlk.Verify())
+		require.NoError(proposalBlk.Accept())
+		require.NoError(env.state.Commit())
 
 		options, err := proposalBlk.(snowman.OracleBlock).Options()
-		assert.NoError(err)
+		require.NoError(err)
 		commitBlk := options[0]
-		assert.NoError(commitBlk.Verify())
-		assert.NoError(commitBlk.Accept())
-		assert.NoError(env.state.Commit())
+		require.NoError(commitBlk.Verify())
+		require.NoError(commitBlk.Accept())
+		require.NoError(env.state.Commit())
 		env.Builder.SetPreference(commitBlk.ID())
 
 		// advance chain time
 		env.clk.Set(nextValidatorStartTime)
 		advanceTimeBlk, err := env.Builder.BuildBlock()
-		assert.NoError(err)
-		assert.NoError(advanceTimeBlk.Verify())
-		assert.NoError(advanceTimeBlk.Accept())
-		assert.NoError(env.state.Commit())
+		require.NoError(err)
+		require.NoError(advanceTimeBlk.Verify())
+		require.NoError(advanceTimeBlk.Accept())
+		require.NoError(env.state.Commit())
 
 		options, err = advanceTimeBlk.(snowman.OracleBlock).Options()
-		assert.NoError(err)
+		require.NoError(err)
 		commitBlk = options[0]
-		assert.NoError(commitBlk.Verify())
-		assert.NoError(commitBlk.Accept())
-		assert.NoError(env.state.Commit())
+		require.NoError(commitBlk.Verify())
+		require.NoError(commitBlk.Accept())
+		require.NoError(env.state.Commit())
 		env.Builder.SetPreference(commitBlk.ID())
 	}
 
 	// check Blueberry fork is activated
-	assert.True(env.state.GetTimestamp().Equal(env.config.BlueberryTime))
+	require.True(env.state.GetTimestamp().Equal(env.config.BlueberryTime))
 
 	createChainTx, err := env.txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
@@ -100,12 +101,12 @@ func TestBlueberryFork(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
 	)
-	assert.NoError(err)
-	assert.NoError(env.mempool.Add(createChainTx))
+	require.NoError(err)
+	require.NoError(env.mempool.Add(createChainTx))
 
 	proposalBlk, err := env.Builder.BuildBlock()
-	assert.NoError(err)
-	assert.NoError(proposalBlk.Verify())
-	assert.NoError(proposalBlk.Accept())
-	assert.NoError(env.state.Commit())
+	require.NoError(err)
+	require.NoError(proposalBlk.Verify())
+	require.NoError(proposalBlk.Accept())
+	require.NoError(env.state.Commit())
 }

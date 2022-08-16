@@ -7,8 +7,9 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestGzipCompressDecompress(t *testing.T) {
@@ -25,38 +26,38 @@ func TestGzipCompressDecompress(t *testing.T) {
 	compressor := NewGzipCompressor(2 * units.MiB)
 
 	dataCompressed, err := compressor.Compress(data)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	data2Compressed, err := compressor.Compress(data2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	dataDecompressed, err := compressor.Decompress(dataCompressed)
-	assert.NoError(t, err)
-	assert.EqualValues(t, data, dataDecompressed)
+	require.NoError(t, err)
+	require.EqualValues(t, data, dataDecompressed)
 
 	data2Decompressed, err := compressor.Decompress(data2Compressed)
-	assert.NoError(t, err)
-	assert.EqualValues(t, data2, data2Decompressed)
+	require.NoError(t, err)
+	require.EqualValues(t, data2, data2Decompressed)
 
 	dataDecompressed, err = compressor.Decompress(dataCompressed)
-	assert.NoError(t, err)
-	assert.EqualValues(t, data, dataDecompressed)
+	require.NoError(t, err)
+	require.EqualValues(t, data, dataDecompressed)
 
 	nonGzipData := []byte{1, 2, 3}
 	_, err = compressor.Decompress(nonGzipData)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestGzipSizeLimiting(t *testing.T) {
 	data := make([]byte, 3*units.MiB)
 	compressor := NewGzipCompressor(2 * units.MiB)
 	_, err := compressor.Compress(data) // should be too large
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	compressor2 := NewGzipCompressor(4 * units.MiB)
 	dataCompressed, err := compressor2.Compress(data)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = compressor.Decompress(dataCompressed) // should be too large
-	assert.Error(t, err)
+	require.Error(t, err)
 }

@@ -8,14 +8,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
 )
 
 func TestBuild(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
@@ -24,7 +24,7 @@ func TestBuild(t *testing.T) {
 	chainID := ids.ID{4}
 
 	tlsCert, err := staking.NewTLSCert()
-	assert.NoError(err)
+	require.NoError(err)
 
 	cert := tlsCert.Leaf
 	key := tlsCert.PrivateKey.(crypto.Signer)
@@ -38,18 +38,18 @@ func TestBuild(t *testing.T) {
 		chainID,
 		key,
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
-	assert.Equal(parentID, builtBlock.ParentID())
-	assert.Equal(pChainHeight, builtBlock.PChainHeight())
-	assert.Equal(timestamp, builtBlock.Timestamp())
-	assert.Equal(innerBlockBytes, builtBlock.Block())
+	require.Equal(parentID, builtBlock.ParentID())
+	require.Equal(pChainHeight, builtBlock.PChainHeight())
+	require.Equal(timestamp, builtBlock.Timestamp())
+	require.Equal(innerBlockBytes, builtBlock.Block())
 
 	err = builtBlock.Verify(true, chainID)
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = builtBlock.Verify(false, chainID)
-	assert.Error(err)
+	require.Error(err)
 }
 
 func TestBuildUnsigned(t *testing.T) {
@@ -58,26 +58,26 @@ func TestBuildUnsigned(t *testing.T) {
 	pChainHeight := uint64(2)
 	innerBlockBytes := []byte{3}
 
-	assert := assert.New(t)
+	require := require.New(t)
 
 	builtBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes)
-	assert.NoError(err)
+	require.NoError(err)
 
-	assert.Equal(parentID, builtBlock.ParentID())
-	assert.Equal(pChainHeight, builtBlock.PChainHeight())
-	assert.Equal(timestamp, builtBlock.Timestamp())
-	assert.Equal(innerBlockBytes, builtBlock.Block())
-	assert.Equal(ids.EmptyNodeID, builtBlock.Proposer())
+	require.Equal(parentID, builtBlock.ParentID())
+	require.Equal(pChainHeight, builtBlock.PChainHeight())
+	require.Equal(timestamp, builtBlock.Timestamp())
+	require.Equal(innerBlockBytes, builtBlock.Block())
+	require.Equal(ids.EmptyNodeID, builtBlock.Proposer())
 
 	err = builtBlock.Verify(false, ids.Empty)
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = builtBlock.Verify(true, ids.Empty)
-	assert.Error(err)
+	require.Error(err)
 }
 
 func TestBuildHeader(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	chainID := ids.ID{1}
 	parentID := ids.ID{2}
@@ -88,22 +88,22 @@ func TestBuildHeader(t *testing.T) {
 		parentID,
 		bodyID,
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
-	assert.Equal(chainID, builtHeader.ChainID())
-	assert.Equal(parentID, builtHeader.ParentID())
-	assert.Equal(bodyID, builtHeader.BodyID())
+	require.Equal(chainID, builtHeader.ChainID())
+	require.Equal(parentID, builtHeader.ParentID())
+	require.Equal(bodyID, builtHeader.BodyID())
 }
 
 func TestBuildOption(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	parentID := ids.ID{1}
 	innerBlockBytes := []byte{3}
 
 	builtOption, err := BuildOption(parentID, innerBlockBytes)
-	assert.NoError(err)
+	require.NoError(err)
 
-	assert.Equal(parentID, builtOption.ParentID())
-	assert.Equal(innerBlockBytes, builtOption.Block())
+	require.Equal(parentID, builtOption.ParentID())
+	require.Equal(innerBlockBytes, builtOption.Block())
 }

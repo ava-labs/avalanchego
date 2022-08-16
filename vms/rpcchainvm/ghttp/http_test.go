@@ -7,13 +7,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	httppb "github.com/ava-labs/avalanchego/proto/pb/http"
 )
 
 func Test_convertWriteResponse(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	scenerios := map[string]struct {
 		resp *httppb.HandleSimpleHTTPResponse
@@ -48,7 +48,7 @@ func Test_convertWriteResponse(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			w := httptest.NewRecorder()
 			err := convertWriteResponse(w, scenerio.resp)
-			assert.NoError(err)
+			require.NoError(err)
 		})
 	}
 }

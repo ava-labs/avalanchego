@@ -9,7 +9,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
@@ -29,7 +29,7 @@ import (
 )
 
 func TestAcceptorVisitProposalBlock(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -46,7 +46,7 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 			Creds: []verify.Verifiable{},
 		},
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
 	blkID := blk.ID()
 
@@ -66,21 +66,21 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 	}
 
 	err = acceptor.ApricotProposalBlock(blk)
-	assert.NoError(err)
+	require.NoError(err)
 
-	assert.Equal(blkID, acceptor.backend.lastAccepted)
+	require.Equal(blkID, acceptor.backend.lastAccepted)
 
 	_, exists := acceptor.GetState(blkID)
-	assert.False(exists)
+	require.False(exists)
 
 	s.EXPECT().GetLastAccepted().Return(lastAcceptedID).Times(1)
 
 	_, exists = acceptor.GetState(lastAcceptedID)
-	assert.True(exists)
+	require.True(exists)
 }
 
 func TestAcceptorVisitAtomicBlock(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -117,7 +117,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 			Creds: []verify.Verifiable{},
 		},
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Set expected calls on the state.
 	// We should error after [commonAccept] is called.
@@ -126,7 +126,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	s.EXPECT().AddStatelessBlock(blk, choices.Accepted).Times(1)
 
 	err = acceptor.ApricotAtomicBlock(blk)
-	assert.Error(err, "should fail because the block isn't in the state map")
+	require.Error(err, "should fail because the block isn't in the state map")
 
 	// Set [blk]'s state in the map as though it had been verified.
 	onAcceptState := state.NewMockDiff(ctrl)
@@ -160,11 +160,11 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1)
 
 	err = acceptor.ApricotAtomicBlock(blk)
-	assert.NoError(err)
+	require.NoError(err)
 }
 
 func TestAcceptorVisitStandardBlock(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -203,7 +203,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 			},
 		},
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Set expected calls on the state.
 	// We should error after [commonAccept] is called.
@@ -212,7 +212,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	s.EXPECT().AddStatelessBlock(blk, choices.Accepted).Times(1)
 
 	err = acceptor.ApricotStandardBlock(blk)
-	assert.Error(err, "should fail because the block isn't in the state map")
+	require.Error(err, "should fail because the block isn't in the state map")
 
 	// Set [blk]'s state in the map as though it had been verified.
 	onAcceptState := state.NewMockDiff(ctrl)
@@ -250,13 +250,13 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1)
 
 	err = acceptor.ApricotStandardBlock(blk)
-	assert.NoError(err)
-	assert.True(calledOnAcceptFunc)
-	assert.Equal(blk.ID(), acceptor.backend.lastAccepted)
+	require.NoError(err)
+	require.True(calledOnAcceptFunc)
+	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }
 
 func TestAcceptorVisitCommitBlock(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -284,11 +284,11 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	}
 
 	blk, err := blocks.NewApricotCommitBlock(parentID, 1 /*height*/)
-	assert.NoError(err)
+	require.NoError(err)
 
 	blkID := blk.ID()
 	err = acceptor.ApricotCommitBlock(blk)
-	assert.Error(err, "should fail because the block isn't in the state map")
+	require.Error(err, "should fail because the block isn't in the state map")
 
 	// Set [blk]'s state in the map as though it had been verified.
 	onAcceptState := state.NewMockDiff(ctrl)
@@ -341,12 +341,12 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	)
 
 	err = acceptor.ApricotCommitBlock(blk)
-	assert.NoError(err)
-	assert.Equal(blk.ID(), acceptor.backend.lastAccepted)
+	require.NoError(err)
+	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }
 
 func TestAcceptorVisitAbortBlock(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -374,11 +374,11 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	}
 
 	blk, err := blocks.NewApricotAbortBlock(parentID, 1 /*height*/)
-	assert.NoError(err)
+	require.NoError(err)
 
 	blkID := blk.ID()
 	err = acceptor.ApricotAbortBlock(blk)
-	assert.Error(err, "should fail because the block isn't in the state map")
+	require.Error(err, "should fail because the block isn't in the state map")
 
 	// Set [blk]'s state in the map as though it had been verified.
 	onAcceptState := state.NewMockDiff(ctrl)
@@ -431,6 +431,6 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	)
 
 	err = acceptor.ApricotAbortBlock(blk)
-	assert.NoError(err)
-	assert.Equal(blk.ID(), acceptor.backend.lastAccepted)
+	require.NoError(err)
+	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }

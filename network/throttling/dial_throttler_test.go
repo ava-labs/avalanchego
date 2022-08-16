@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Test that the DialThrottler returned by NewDialThrottler works
@@ -22,7 +22,7 @@ func TestDialThrottler(t *testing.T) {
 		// Should return immediately because < 5 taken this second
 		go func() {
 			err := throttler.Acquire(context.Background())
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			acquiredChan <- struct{}{}
 		}()
 		select {
@@ -37,7 +37,7 @@ func TestDialThrottler(t *testing.T) {
 	go func() {
 		// Should block because 5 already taken within last second
 		err := throttler.Acquire(context.Background())
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		acquiredChan <- struct{}{}
 	}()
 
@@ -70,7 +70,7 @@ func TestDialThrottlerCancel(t *testing.T) {
 		// Should return immediately because < 5 taken this second
 		go func() {
 			err := throttler.Acquire(context.Background())
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			acquiredChan <- struct{}{}
 		}()
 		select {
@@ -87,7 +87,7 @@ func TestDialThrottlerCancel(t *testing.T) {
 		// Should block because 5 already taken within last second
 		err := throttler.Acquire(ctx)
 		// Should error because we call cancel() below
-		assert.Error(t, err)
+		require.Error(t, err)
 		acquiredChan <- struct{}{}
 	}()
 
@@ -107,7 +107,7 @@ func TestNoDialThrottler(t *testing.T) {
 	for i := 0; i < 250; i++ {
 		startTime := time.Now()
 		err := throttler.Acquire(context.Background()) // Should always immediately return
-		assert.NoError(t, err)
-		assert.WithinDuration(t, time.Now(), startTime, 25*time.Millisecond)
+		require.NoError(t, err)
+		require.WithinDuration(t, time.Now(), startTime, 25*time.Millisecond)
 	}
 }

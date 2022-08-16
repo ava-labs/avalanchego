@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -21,7 +21,7 @@ import (
 )
 
 func TestAddValidatorTxSyntacticVerify(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	clk := mockable.Clock{}
 	ctx := snow.DefaultContextTest()
 	ctx.AVAXAssetID = ids.GenerateTestID()
@@ -34,10 +34,10 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	)
 
 	// Case : signed tx is nil
-	assert.ErrorIs(stx.SyntacticVerify(ctx), errNilSignedTx)
+	require.ErrorIs(stx.SyntacticVerify(ctx), errNilSignedTx)
 
 	// Case : unsigned tx is nil
-	assert.ErrorIs(addValidatorTx.SyntacticVerify(ctx), ErrNilTx)
+	require.ErrorIs(addValidatorTx.SyntacticVerify(ctx), ErrNilTx)
 
 	validatorWeight := uint64(2022)
 	rewardAddress := preFundedKeys[0].PublicKey().Address()
@@ -99,16 +99,16 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: valid tx
 	stx, err = NewSigned(addValidatorTx, Codec, signers)
-	assert.NoError(err)
-	assert.NoError(stx.SyntacticVerify(ctx))
+	require.NoError(err)
+	require.NoError(stx.SyntacticVerify(ctx))
 
 	// Case: Wrong network ID
 	addValidatorTx.SyntacticallyVerified = false
 	addValidatorTx.NetworkID++
 	stx, err = NewSigned(addValidatorTx, Codec, signers)
-	assert.NoError(err)
+	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	assert.Error(err)
+	require.Error(err)
 	addValidatorTx.NetworkID--
 
 	// Case: Stake owner has no addresses
@@ -118,32 +118,32 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		TransferableOut.(*secp256k1fx.TransferOutput).
 		Addrs = nil
 	stx, err = NewSigned(addValidatorTx, Codec, signers)
-	assert.NoError(err)
+	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	assert.Error(err)
+	require.Error(err)
 	addValidatorTx.Stake = stakes
 
 	// Case: Rewards owner has no addresses
 	addValidatorTx.SyntacticallyVerified = false
 	addValidatorTx.RewardsOwner.(*secp256k1fx.OutputOwners).Addrs = nil
 	stx, err = NewSigned(addValidatorTx, Codec, signers)
-	assert.NoError(err)
+	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	assert.Error(err)
+	require.Error(err)
 	addValidatorTx.RewardsOwner.(*secp256k1fx.OutputOwners).Addrs = []ids.ShortID{rewardAddress}
 
 	// Case: Too many shares
 	addValidatorTx.SyntacticallyVerified = false
 	addValidatorTx.Shares++ // 1 more than max amount
 	stx, err = NewSigned(addValidatorTx, Codec, signers)
-	assert.NoError(err)
+	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	assert.Error(err)
+	require.Error(err)
 	addValidatorTx.Shares--
 }
 
 func TestAddValidatorTxSyntacticVerifyNotAVAX(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	clk := mockable.Clock{}
 	ctx := snow.DefaultContextTest()
 	ctx.AVAXAssetID = ids.GenerateTestID()
@@ -215,6 +215,6 @@ func TestAddValidatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 	}
 
 	stx, err = NewSigned(addValidatorTx, Codec, signers)
-	assert.NoError(err)
-	assert.Error(stx.SyntacticVerify(ctx))
+	require.NoError(err)
+	require.Error(stx.SyntacticVerify(ctx))
 }

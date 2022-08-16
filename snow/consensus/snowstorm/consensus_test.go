@@ -13,7 +13,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -736,10 +736,10 @@ func AddNonEmptyWhitelistTest(t *testing.T, factory Factory) {
 
 	// check if stop vertex has been issued but not accepted
 	mss := gatherCounterGauge(t, reg)
-	assert.Equal(t, 5., mss["rogue_tx_processing"])
-	assert.Equal(t, 2., mss["virtuous_tx_processing"])
-	assert.Equal(t, 0., mss["whitelist_tx_accepted_count"])
-	assert.Equal(t, 2., mss["whitelist_tx_processing"])
+	require.Equal(t, 5., mss["rogue_tx_processing"])
+	require.Equal(t, 2., mss["virtuous_tx_processing"])
+	require.Equal(t, 0., mss["whitelist_tx_accepted_count"])
+	require.Equal(t, 2., mss["whitelist_tx_processing"])
 
 	vset1 := graph.Virtuous()
 	if !vset1.Equals(ids.Set{
@@ -791,10 +791,10 @@ func AddNonEmptyWhitelistTest(t *testing.T, factory Factory) {
 	}
 
 	mss = gatherCounterGauge(t, reg)
-	assert.Equal(t, 5., mss["rogue_tx_processing"])
-	assert.Equal(t, 1., mss["virtuous_tx_processing"])
-	assert.Equal(t, 0., mss["whitelist_tx_accepted_count"])
-	assert.Equal(t, 2., mss["whitelist_tx_processing"])
+	require.Equal(t, 5., mss["rogue_tx_processing"])
+	require.Equal(t, 1., mss["virtuous_tx_processing"])
+	require.Equal(t, 0., mss["whitelist_tx_accepted_count"])
+	require.Equal(t, 2., mss["whitelist_tx_processing"])
 }
 
 func gatherCounterGauge(t *testing.T, reg *prometheus.Registry) map[string]float64 {
@@ -1669,37 +1669,37 @@ func UTXOCleanupTest(t *testing.T, factory Factory) {
 		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = graph.Add(Red)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = graph.Add(Green)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	redVotes := ids.Bag{}
 	redVotes.Add(Red.ID())
 	changed, err := graph.RecordPoll(redVotes)
-	assert.NoError(t, err)
-	assert.False(t, changed, "shouldn't have accepted the red tx")
+	require.NoError(t, err)
+	require.False(t, changed, "shouldn't have accepted the red tx")
 
 	changed, err = graph.RecordPoll(redVotes)
-	assert.NoError(t, err)
-	assert.True(t, changed, "should have accepted the red tx")
+	require.NoError(t, err)
+	require.True(t, changed, "should have accepted the red tx")
 
-	assert.Equal(t, choices.Accepted, Red.Status())
-	assert.Equal(t, choices.Rejected, Green.Status())
+	require.Equal(t, choices.Accepted, Red.Status())
+	require.Equal(t, choices.Rejected, Green.Status())
 
 	err = graph.Add(Blue)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	blueVotes := ids.Bag{}
 	blueVotes.Add(Blue.ID())
 	changed, err = graph.RecordPoll(blueVotes)
-	assert.NoError(t, err)
-	assert.True(t, changed, "should have accepted the blue tx")
+	require.NoError(t, err)
+	require.True(t, changed, "should have accepted the blue tx")
 
-	assert.Equal(t, choices.Accepted, Blue.Status())
+	require.Equal(t, choices.Accepted, Blue.Status())
 }
 
 func RemoveVirtuousTest(t *testing.T, factory Factory) {
@@ -1716,19 +1716,19 @@ func RemoveVirtuousTest(t *testing.T, factory Factory) {
 		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = graph.Add(Red)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	virtuous := graph.Virtuous()
-	assert.NotEmpty(t, virtuous, "a virtuous transaction was added but not tracked")
+	require.NotEmpty(t, virtuous, "a virtuous transaction was added but not tracked")
 
 	err = graph.Remove(Red.ID())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	virtuous = graph.Virtuous()
-	assert.Empty(t, virtuous, "removal of a virtuous transaction should have emptied the virtuous set")
+	require.Empty(t, virtuous, "removal of a virtuous transaction should have emptied the virtuous set")
 }
 
 func StringTest(t *testing.T, factory Factory, prefix string) {

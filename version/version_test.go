@@ -6,7 +6,7 @@ package version
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSemanticString(t *testing.T) {
@@ -16,5 +16,5 @@ func TestSemanticString(t *testing.T) {
 		Patch: 3,
 	}
 
-	assert.Equal(t, "v1.2.3", v.String())
+	require.Equal(t, "v1.2.3", v.String())
 }

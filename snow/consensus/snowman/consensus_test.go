@@ -13,7 +13,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -44,6 +44,7 @@ var (
 		StatusOrProcessingIssuedTest,
 		RecordPollAcceptSingleBlockTest,
 		RecordPollAcceptAndRejectTest,
+		RecordPollSplitVoteNoChangeTest,
 		RecordPollWhenFinalizedTest,
 		RecordPollRejectTransitivelyTest,
 		RecordPollTransitivelyResetConfidenceTest,
@@ -571,6 +572,69 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 	}
 }
 
+func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
+	require := require.New(t)
+	sm := factory.New()
+
+	ctx := snow.DefaultConsensusContextTest()
+	registerer := prometheus.NewRegistry()
+	ctx.Registerer = registerer
+
+	params := snowball.Parameters{
+		K:                     2,
+		Alpha:                 2,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
+	}
+	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight))
+
+	firstBlock := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(1),
+			StatusV: choices.Processing,
+		},
+		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
+	}
+	secondBlock := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(2),
+			StatusV: choices.Processing,
+		},
+		ParentV: Genesis.IDV,
+		HeightV: Genesis.HeightV + 1,
+	}
+
+	require.NoError(sm.Add(firstBlock))
+	require.NoError(sm.Add(secondBlock))
+
+	votes := ids.Bag{}
+	votes.Add(firstBlock.ID())
+	votes.Add(secondBlock.ID())
+
+	// The first poll will accept shared bits
+	require.NoError(sm.RecordPoll(votes))
+	require.Equal(firstBlock.ID(), sm.Preference())
+	require.False(sm.Finalized())
+
+	metrics := gatherCounterGauge(t, registerer)
+	require.EqualValues(0, metrics["polls_failed"])
+	require.EqualValues(1, metrics["polls_successful"])
+
+	// The second poll will do nothing
+	require.NoError(sm.RecordPoll(votes))
+	require.Equal(firstBlock.ID(), sm.Preference())
+	require.False(sm.Finalized())
+
+	metrics = gatherCounterGauge(t, registerer)
+	require.EqualValues(1, metrics["polls_failed"])
+	require.EqualValues(1, metrics["polls_successful"])
+}
+
 func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
@@ -999,7 +1063,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 
 func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	sm := factory.New()
-	assert := assert.New(t)
+	require := require.New(t)
 
 	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
@@ -1013,7 +1077,7 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 		MaxItemProcessingTime: 1,
 	}
 	err := sm.Initialize(ctx, params, GenesisID, GenesisHeight)
-	assert.NoError(err)
+	require.NoError(err)
 
 	block0 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1049,10 +1113,10 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	}
 
 	err = sm.Add(block0)
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = sm.Add(block1)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// The first bit is contested as either 0 or 1. When voting for [block0] and
 	// when the first bit is 1, the following bits have been decided to follow
@@ -1060,25 +1124,25 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	votes0 := ids.Bag{}
 	votes0.Add(block0.ID())
 	err = sm.RecordPoll(votes0)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Although we are adding in [block2] here - the underlying snowball
 	// instance has already decided it is rejected. Snowman doesn't actually
 	// know that though, because that is an implementation detail of the
 	// Snowball trie that is used.
 	err = sm.Add(block2)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Because [block2] is effectively rejected, [block3] is also effectively
 	// rejected.
 	err = sm.Add(block3)
-	assert.NoError(err)
+	require.NoError(err)
 
-	assert.Equal(block0.ID(), sm.Preference())
-	assert.Equal(choices.Processing, block0.Status(), "should not be accepted yet")
-	assert.Equal(choices.Processing, block1.Status(), "should not be rejected yet")
-	assert.Equal(choices.Processing, block2.Status(), "should not be rejected yet")
-	assert.Equal(choices.Processing, block3.Status(), "should not be rejected yet")
+	require.Equal(block0.ID(), sm.Preference())
+	require.Equal(choices.Processing, block0.Status(), "should not be accepted yet")
+	require.Equal(choices.Processing, block1.Status(), "should not be rejected yet")
+	require.Equal(choices.Processing, block2.Status(), "should not be rejected yet")
+	require.Equal(choices.Processing, block3.Status(), "should not be rejected yet")
 
 	// Current graph structure:
 	//       G
@@ -1099,18 +1163,18 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	votes3 := ids.Bag{}
 	votes3.Add(block3.ID())
 	err = sm.RecordPoll(votes3)
-	assert.NoError(err)
+	require.NoError(err)
 
-	assert.True(sm.Finalized(), "finalized too late")
-	assert.Equal(choices.Accepted, block0.Status(), "should be accepted")
-	assert.Equal(choices.Rejected, block1.Status())
-	assert.Equal(choices.Rejected, block2.Status())
-	assert.Equal(choices.Rejected, block3.Status())
+	require.True(sm.Finalized(), "finalized too late")
+	require.Equal(choices.Accepted, block0.Status(), "should be accepted")
+	require.Equal(choices.Rejected, block1.Status())
+	require.Equal(choices.Rejected, block2.Status())
+	require.Equal(choices.Rejected, block3.Status())
 }
 
 func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Factory) {
 	sm := factory.New()
-	assert := assert.New(t)
+	require := require.New(t)
 
 	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
@@ -1123,7 +1187,7 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	assert.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight))
+	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight))
 
 	block0 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1158,8 +1222,8 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 		HeightV: block2.HeightV + 1,
 	}
 
-	assert.NoError(sm.Add(block0))
-	assert.NoError(sm.Add(block1))
+	require.NoError(sm.Add(block0))
+	require.NoError(sm.Add(block1))
 
 	// When voting for [block0], we end up finalizing the first bit as 0. The
 	// second bit is contested as either 0 or 1. For when the second bit is 1,
@@ -1167,23 +1231,23 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 	// [block0].
 	votes0 := ids.Bag{}
 	votes0.Add(block0.ID())
-	assert.NoError(sm.RecordPoll(votes0))
+	require.NoError(sm.RecordPoll(votes0))
 
 	// Although we are adding in [block2] here - the underlying snowball
 	// instance has already decided it is rejected. Snowman doesn't actually
 	// know that though, because that is an implementation detail of the
 	// Snowball trie that is used.
-	assert.NoError(sm.Add(block2))
+	require.NoError(sm.Add(block2))
 
 	// Because [block2] is effectively rejected, [block3] is also effectively
 	// rejected.
-	assert.NoError(sm.Add(block3))
+	require.NoError(sm.Add(block3))
 
-	assert.Equal(block0.ID(), sm.Preference())
-	assert.Equal(choices.Processing, block0.Status(), "should not be decided yet")
-	assert.Equal(choices.Processing, block1.Status(), "should not be decided yet")
-	assert.Equal(choices.Processing, block2.Status(), "should not be decided yet")
-	assert.Equal(choices.Processing, block3.Status(), "should not be decided yet")
+	require.Equal(block0.ID(), sm.Preference())
+	require.Equal(choices.Processing, block0.Status(), "should not be decided yet")
+	require.Equal(choices.Processing, block1.Status(), "should not be decided yet")
+	require.Equal(choices.Processing, block2.Status(), "should not be decided yet")
+	require.Equal(choices.Processing, block3.Status(), "should not be decided yet")
 
 	// Current graph structure:
 	//       G
@@ -1203,13 +1267,13 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 	// will never happen.
 	votes3 := ids.Bag{}
 	votes3.Add(block3.ID())
-	assert.NoError(sm.RecordPoll(votes3))
+	require.NoError(sm.RecordPoll(votes3))
 
-	assert.False(sm.Finalized(), "finalized too early")
-	assert.Equal(choices.Processing, block0.Status())
-	assert.Equal(choices.Processing, block1.Status())
-	assert.Equal(choices.Processing, block2.Status())
-	assert.Equal(choices.Processing, block3.Status())
+	require.False(sm.Finalized(), "finalized too early")
+	require.Equal(choices.Processing, block0.Status())
+	require.Equal(choices.Processing, block1.Status())
+	require.Equal(choices.Processing, block2.Status())
+	require.Equal(choices.Processing, block3.Status())
 }
 
 func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
@@ -1660,7 +1724,7 @@ func RandomizedConsistencyTest(t *testing.T, factory Factory) {
 
 func ErrorOnAddDecidedBlock(t *testing.T, factory Factory) {
 	sm := factory.New()
-	assert := assert.New(t)
+	require := require.New(t)
 
 	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
@@ -1673,7 +1737,7 @@ func ErrorOnAddDecidedBlock(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	assert.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight))
+	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight))
 
 	block0 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1683,12 +1747,12 @@ func ErrorOnAddDecidedBlock(t *testing.T, factory Factory) {
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
-	assert.ErrorIs(sm.Add(block0), errDuplicateAdd)
+	require.ErrorIs(sm.Add(block0), errDuplicateAdd)
 }
 
 func ErrorOnAddDuplicateBlockID(t *testing.T, factory Factory) {
 	sm := factory.New()
-	assert := assert.New(t)
+	require := require.New(t)
 
 	ctx := snow.DefaultConsensusContextTest()
 	params := snowball.Parameters{
@@ -1701,7 +1765,7 @@ func ErrorOnAddDuplicateBlockID(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	assert.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight))
+	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight))
 
 	block0 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1720,6 +1784,30 @@ func ErrorOnAddDuplicateBlockID(t *testing.T, factory Factory) {
 		HeightV: block0.HeightV + 1,
 	}
 
-	assert.NoError(sm.Add(block0))
-	assert.ErrorIs(sm.Add(block1), errDuplicateAdd)
+	require.NoError(sm.Add(block0))
+	require.ErrorIs(sm.Add(block1), errDuplicateAdd)
+}
+
+func gatherCounterGauge(t *testing.T, reg *prometheus.Registry) map[string]float64 {
+	ms, err := reg.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	mss := make(map[string]float64)
+	for _, mf := range ms {
+		name := mf.GetName()
+		for _, m := range mf.GetMetric() {
+			cnt := m.GetCounter()
+			if cnt != nil {
+				mss[name] = cnt.GetValue()
+				break
+			}
+			gg := m.GetGauge()
+			if gg != nil {
+				mss[name] = gg.GetValue()
+				break
+			}
+		}
+	}
+	return mss
 }

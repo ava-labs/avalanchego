@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewDefaultApplication(t *testing.T) {
@@ -17,9 +17,9 @@ func TestNewDefaultApplication(t *testing.T) {
 		Patch: 3,
 	}
 
-	assert.Equal(t, "avalanche/1.2.3", v.String())
-	assert.NoError(t, v.Compatible(v))
-	assert.False(t, v.Before(v))
+	require.Equal(t, "avalanche/1.2.3", v.String())
+	require.NoError(t, v.Compatible(v))
+	require.False(t, v.Before(v))
 }
 
 func TestComparingVersions(t *testing.T) {

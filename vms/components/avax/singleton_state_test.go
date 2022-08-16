@@ -6,25 +6,25 @@ package avax
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 )
 
 func TestSingletonState(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	db := memdb.New()
 	s := NewSingletonState(db)
 
 	isInitialized, err := s.IsInitialized()
-	assert.NoError(err)
-	assert.False(isInitialized)
+	require.NoError(err)
+	require.False(isInitialized)
 
 	err = s.SetInitialized()
-	assert.NoError(err)
+	require.NoError(err)
 
 	isInitialized, err = s.IsInitialized()
-	assert.NoError(err)
-	assert.True(isInitialized)
+	require.NoError(err)
+	require.True(isInitialized)
 }

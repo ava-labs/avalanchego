@@ -6,14 +6,14 @@ package ulimit
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 // Test_SetDefault performs sanity checks for the os default.
 func Test_SetDefault(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	err := Set(DefaultFDLimit, logging.NoLog{})
-	assert.NoErrorf(err, "default fd-limit failed %v", err)
+	require.NoErrorf(err, "default fd-limit failed %v", err)
 }

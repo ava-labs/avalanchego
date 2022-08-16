@@ -3,13 +3,11 @@
 
 package block
 
-import (
-	"github.com/stretchr/testify/assert"
-)
+import "github.com/stretchr/testify/require"
 
-func equalOption(assert *assert.Assertions, want, have Block) {
-	assert.Equal(want.ID(), have.ID())
-	assert.Equal(want.ParentID(), have.ParentID())
-	assert.Equal(want.Block(), have.Block())
-	assert.Equal(want.Bytes(), have.Bytes())
+func equalOption(require *require.Assertions, want, have Block) {
+	require.Equal(want.ID(), have.ID())
+	require.Equal(want.ParentID(), have.ParentID())
+	require.Equal(want.Block(), have.Block())
+	require.Equal(want.Bytes(), have.Bytes())
 }

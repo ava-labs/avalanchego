@@ -6,7 +6,7 @@ package ids
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUniqueBag(t *testing.T) {
@@ -116,11 +116,11 @@ func TestUniqueBagClear(t *testing.T) {
 	b.Add(1, id1, id2)
 
 	b.Clear()
-	assert.Len(t, b.List(), 0)
+	require.Len(t, b.List(), 0)
 
 	bs := b.GetSet(id1)
-	assert.EqualValues(t, 0, bs.Len())
+	require.EqualValues(t, 0, bs.Len())
 
 	bs = b.GetSet(id2)
-	assert.EqualValues(t, 0, bs.Len())
+	require.EqualValues(t, 0, bs.Len())
 }

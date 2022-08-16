@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEncodingMarshalJSON(t *testing.T) {
@@ -44,7 +44,7 @@ func TestEncodingUnmarshalJSON(t *testing.T) {
 
 func TestEncodingString(t *testing.T) {
 	enc := Hex
-	assert.Equal(t, enc.String(), "hex")
+	require.Equal(t, enc.String(), "hex")
 }
 
 // Test encoding bytes to a string and decoding back to bytes
@@ -86,14 +86,14 @@ func TestEncodeDecode(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Make sure the string repr. is what we expected
-		assert.Equal(t, test.str, strResult)
+		require.Equal(t, test.str, strResult)
 		// Decode the string
 		bytesResult, err := Decode(test.encoding, strResult)
 		if err != nil {
 			t.Fatal(err)
 		}
 		// Make sure we got the same bytes back
-		assert.Equal(t, test.bytes, bytesResult)
+		require.Equal(t, test.bytes, bytesResult)
 	}
 }
 
@@ -103,7 +103,7 @@ func TestEncodeNil(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, "0x7852b855", str)
+	require.Equal(t, "0x7852b855", str)
 }
 
 func TestDecodeHexInvalid(t *testing.T) {
