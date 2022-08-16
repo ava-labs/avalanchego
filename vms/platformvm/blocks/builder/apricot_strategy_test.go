@@ -63,6 +63,11 @@ func TestApricotPickingOrder(t *testing.T) {
 	assert.NoError(env.state.Commit())
 
 	// promote validator to current
+	// Reset onCommitState and onAbortState
+	txExecutor.OnCommitState, err = state.NewDiff(env.state.GetLastAccepted(), env.blkManager)
+	assert.NoError(err)
+	txExecutor.OnAbortState, err = state.NewDiff(env.state.GetLastAccepted(), env.blkManager)
+	assert.NoError(err)
 	advanceTime, err := env.txBuilder.NewAdvanceTimeTx(validatorStartTime)
 	assert.NoError(err)
 	txExecutor.Tx = advanceTime
