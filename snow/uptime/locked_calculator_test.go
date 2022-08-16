@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/mock"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
