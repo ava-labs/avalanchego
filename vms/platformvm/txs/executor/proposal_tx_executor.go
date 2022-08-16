@@ -54,14 +54,20 @@ type ProposalTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
 	Tx *txs.Tx
-	// [ParentState] may be read but not written by this struct.
-	// ParentState state.Chain
-	// [OnCommitState] may be written by this struct.
+	// [OnCommitState] is the state used for validation.
+	// In practice, both [OnCommitState] and [onAbortState] are
+	// identical when passed into this struct, so we could use either.
+	// [OnCommitState] is modified by this struct's methods to
+	// reflect changes made to the state if the proposal is committed.
 	OnCommitState state.Diff
-	// [onAbortState] may be written by this struct.
+	// [OnAbortState] is modified by this struct's methods to
+	// reflect changes made to the state if the proposal is aborted.
 	OnAbortState state.Diff
 
-	// outputs of visitor execution
+	// outputs populated by this struct's methods.
+	//
+	// [PrefersCommit] is true iff this node initially prefers to
+	// commit this block transaction.
 	PrefersCommit bool
 }
 
