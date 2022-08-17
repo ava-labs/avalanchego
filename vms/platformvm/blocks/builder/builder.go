@@ -276,11 +276,9 @@ func (b *builder) getNextChainTime(preferredState state.Chain) (time.Time, bool,
 // May not remove all expired txs since txs aren't necessarily popped
 // ordered by start time.
 func (b *builder) dropExpiredProposalTxs() {
-	var (
-		ctx      = b.txExecutorBackend.Ctx
-		now      = b.txExecutorBackend.Clk.Time()
-		syncTime = now.Add(txexecutor.SyncBound)
-	)
+	ctx := b.txExecutorBackend.Ctx
+	now := b.txExecutorBackend.Clk.Time()
+	syncTime := now.Add(txexecutor.SyncBound)
 	for b.Mempool.HasProposalTx() {
 		tx := b.Mempool.PeekProposalTx()
 		startTime := tx.Unsigned.(txs.StakerTx).StartTime()
