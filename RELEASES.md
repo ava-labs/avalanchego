@@ -1,5 +1,42 @@
 # Release Notes
 
+## [v1.7.18](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.18)
+
+This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged. The supported plugin version is `15`.
+
+### Fixes
+
+- Fixed platformvm `couldn't get preferred block state` log due to attempted block building during bootstrapping
+- Fixed platformvm `failed to fetch next staker to reward` error log due to an incorrect `lastAcceptedID` reference
+- Fixed AWS AMI creation
+- Fixed bug in `codeToFetch` database accessors that caused an error when starting/stopping state sync
+
+### PlatformVM
+
+- Refactored platformvm metrics handling
+- Refactored platformvm block creation
+- Introduced support to prevent empty nodeID use on the P-chain to be activated in a future upgrade
+
+### Coreth
+
+- Updated gas price estimation to limit lookback window based on block timestamps
+- Added metrics for processed/accepted gas
+- Simplified syntactic block verification
+- Ensured statedb errors during block processing are logged
+- Removed deprecated gossiper/block building logic from pre-Apricot Phase 4
+- Added marshal function for duration to improve config output
+
+### Miscellaneous
+
+- Updated local network genesis to use a newer start time
+- Updated minimum golang version to go1.18.1
+- Removed support for RocksDB
+- Bumped go-ethereum version to v1.10.21
+- Added various additional tests
+- Introduced additional database invariants for all database implementations
+- Added retries to windows CI installations
+- Removed useless ID aliasing during chain creation
+
 ## [v1.7.17](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.17)
 
 This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged. The supported plugin version is `15`.
