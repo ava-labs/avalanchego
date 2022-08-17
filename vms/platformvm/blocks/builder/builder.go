@@ -172,9 +172,7 @@ func (b *builder) BuildBlock() (snowman.Block, error) {
 	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
-// Returns:
-// 1. The block we want to build and issue.
-// 2. The transactions in that block.
+// Returns the block we want to build and issue.
 // Only modifies state to remove expired proposal txs.
 func (b *builder) buildBlock() (blocks.Block, error) {
 	// Get the block to build on top of and retrieve the new block's context.
@@ -182,13 +180,13 @@ func (b *builder) buildBlock() (blocks.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	prefBlkID := preferred.ID()
+	preferredID := preferred.ID()
 	nextHeight := preferred.Height() + 1
-	currentFork := b.blkManager.GetFork(prefBlkID)
+	currentFork := b.blkManager.GetFork(preferredID)
 
-	preferredState, ok := b.blkManager.GetState(prefBlkID)
+	preferredState, ok := b.blkManager.GetState(preferredID)
 	if !ok {
-		return nil, fmt.Errorf("could not retrieve state for block %s. Preferred block must be a decision block", prefBlkID)
+		return nil, fmt.Errorf("could not retrieve state for block %s", preferredID)
 	}
 
 	// select transactions to include based on the current fork
@@ -196,14 +194,14 @@ func (b *builder) buildBlock() (blocks.Block, error) {
 	case forks.Apricot:
 		return buildApricotBlock(
 			b,
-			prefBlkID,
+			preferredID,
 			nextHeight,
 			preferredState,
 		)
 	case forks.Blueberry:
 		return buildBlueberryBlock(
 			b,
-			prefBlkID,
+			preferredID,
 			nextHeight,
 			preferredState,
 		)
