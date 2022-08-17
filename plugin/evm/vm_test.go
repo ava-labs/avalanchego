@@ -32,15 +32,16 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
 	engCommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	avaConstants "github.com/ava-labs/avalanchego/utils/constants"
 
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
+	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/eth"
@@ -117,9 +118,9 @@ func NewContext() *snow.Context {
 	_ = aliaser.Alias(testXChainID, testXChainID.String())
 	ctx.SNLookup = &snLookup{
 		chainsToSubnet: map[ids.ID]ids.ID{
-			constants.PlatformChainID: constants.PrimaryNetworkID,
-			testXChainID:              constants.PrimaryNetworkID,
-			testCChainID:              constants.PrimaryNetworkID,
+			avaConstants.PlatformChainID: avaConstants.PrimaryNetworkID,
+			testXChainID:                 avaConstants.PrimaryNetworkID,
+			testCChainID:                 avaConstants.PrimaryNetworkID,
 		},
 	}
 	return ctx
@@ -2468,4 +2469,115 @@ func TestFeeManagerChangeFee(t *testing.T) {
 
 	err = vm.txPool.AddRemote(signedTx2)
 	assert.ErrorIs(t, err, core.ErrUnderpriced)
+}
+
+// Test Allow Fee Recipients is disabled and, etherbase must be blackhole address
+func TestAllowFeeRecipientDisabled(t *testing.T) {
+	genesis := &core.Genesis{}
+	if err := genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)); err != nil {
+		t.Fatal(err)
+	}
+	genesis.Config.AllowFeeRecipients = false // set to false initially
+	genesisJSON, err := genesis.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	issuer, vm, _, _ := GenesisVM(t, true, string(genesisJSON), "", "")
+
+	vm.miner.SetEtherbase(common.BigToAddress(common.Big1)) // set non-blackhole address by force
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
+	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
+
+	tx := types.NewTransaction(uint64(0), testEthAddrs[1], new(big.Int).Mul(firstTxAmount, big.NewInt(4)), 21000, big.NewInt(testMinGasPrice*3), nil)
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	txErrors := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+	for i, err := range txErrors {
+		if err != nil {
+			t.Fatalf("Failed to add tx at index %d: %s", i, err)
+		}
+	}
+
+	<-issuer
+
+	_, err = vm.BuildBlock()
+	if !errors.Is(err, errInvalidBlock) {
+		t.Fatal("should have got error: %w", errInvalidBlock)
+	}
+
+	vm.miner.SetEtherbase(constants.BlackholeAddr) // set blackhole address
+
+	_, err = vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAllowFeeRecipientEnabled(t *testing.T) {
+	genesis := &core.Genesis{}
+	if err := genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)); err != nil {
+		t.Fatal(err)
+	}
+	genesis.Config.AllowFeeRecipients = true
+	genesisJSON, err := genesis.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	etherBase := common.BigToAddress(common.Big1)
+	c := Config{}
+	c.SetDefaults()
+	c.FeeRecipient = etherBase.String()
+	configJSON, err := json.Marshal(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	issuer, vm, _, _ := GenesisVM(t, true, string(genesisJSON), string(configJSON), "")
+
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
+	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
+
+	tx := types.NewTransaction(uint64(0), testEthAddrs[1], new(big.Int).Mul(firstTxAmount, big.NewInt(4)), 21000, big.NewInt(testMinGasPrice*3), nil)
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	txErrors := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+	for i, err := range txErrors {
+		if err != nil {
+			t.Fatalf("Failed to add tx at index %d: %s", i, err)
+		}
+	}
+
+	blk := issueAndAccept(t, issuer, vm)
+	newHead := <-newTxPoolHeadChan
+	if newHead.Head.Hash() != common.Hash(blk.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+	ethBlock := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
+	assert.Equal(t, ethBlock.Coinbase(), etherBase)
+	// Verify that etherBase has received fees
+	blkState, err := vm.blockChain.StateAt(ethBlock.Root())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	balance := blkState.GetBalance(etherBase)
+	assert.Equal(t, 1, balance.Cmp(common.Big0))
 }
