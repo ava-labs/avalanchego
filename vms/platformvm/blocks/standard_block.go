@@ -16,6 +16,14 @@ var (
 	_ Block = &ApricotStandardBlock{}
 )
 
+type BlueberryStandardBlock struct {
+	Time                 uint64 `serialize:"true" json:"time"`
+	ApricotStandardBlock `serialize:"true"`
+}
+
+func (b *BlueberryStandardBlock) Timestamp() time.Time  { return time.Unix(int64(b.Time), 0) }
+func (b *BlueberryStandardBlock) Visit(v Visitor) error { return v.BlueberryStandardBlock(b) }
+
 func NewBlueberryStandardBlock(
 	timestamp time.Time,
 	parentID ids.ID,
@@ -35,18 +43,23 @@ func NewBlueberryStandardBlock(
 	return blk, initialize(blk)
 }
 
-type BlueberryStandardBlock struct {
-	Time                 uint64 `serialize:"true" json:"time"`
-	ApricotStandardBlock `serialize:"true"`
+type ApricotStandardBlock struct {
+	CommonBlock  `serialize:"true"`
+	Transactions []*txs.Tx `serialize:"true" json:"txs"`
 }
 
-func (b *BlueberryStandardBlock) Timestamp() time.Time {
-	return time.Unix(int64(b.Time), 0)
+func (b *ApricotStandardBlock) initialize(bytes []byte) error {
+	b.CommonBlock.initialize(bytes)
+	for _, tx := range b.Transactions {
+		if err := tx.Sign(txs.Codec, nil); err != nil {
+			return fmt.Errorf("failed to sign block: %w", err)
+		}
+	}
+	return nil
 }
 
-func (b *BlueberryStandardBlock) Visit(v Visitor) error {
-	return v.BlueberryStandardBlock(b)
-}
+func (b *ApricotStandardBlock) Txs() []*txs.Tx        { return b.Transactions }
+func (b *ApricotStandardBlock) Visit(v Visitor) error { return v.ApricotStandardBlock(b) }
 
 func NewApricotStandardBlock(
 	parentID ids.ID,
@@ -61,26 +74,4 @@ func NewApricotStandardBlock(
 		Transactions: txes,
 	}
 	return blk, initialize(blk)
-}
-
-type ApricotStandardBlock struct {
-	CommonBlock `serialize:"true"`
-
-	Transactions []*txs.Tx `serialize:"true" json:"txs"`
-}
-
-func (b *ApricotStandardBlock) initialize(bytes []byte) error {
-	b.CommonBlock.initialize(bytes)
-	for _, tx := range b.Transactions {
-		if err := tx.Sign(txs.Codec, nil); err != nil {
-			return fmt.Errorf("failed to sign block: %w", err)
-		}
-	}
-	return nil
-}
-
-func (b *ApricotStandardBlock) Txs() []*txs.Tx { return b.Transactions }
-
-func (b *ApricotStandardBlock) Visit(v Visitor) error {
-	return v.ApricotStandardBlock(b)
 }

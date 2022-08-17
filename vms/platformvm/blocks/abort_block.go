@@ -15,6 +15,14 @@ var (
 	_ Block = &ApricotAbortBlock{}
 )
 
+type BlueberryAbortBlock struct {
+	Time              uint64 `serialize:"true" json:"time"`
+	ApricotAbortBlock `serialize:"true"`
+}
+
+func (b *BlueberryAbortBlock) Timestamp() time.Time  { return time.Unix(int64(b.Time), 0) }
+func (b *BlueberryAbortBlock) Visit(v Visitor) error { return v.BlueberryAbortBlock(b) }
+
 func NewBlueberryAbortBlock(
 	timestamp time.Time,
 	parentID ids.ID,
@@ -32,18 +40,17 @@ func NewBlueberryAbortBlock(
 	return blk, initialize(blk)
 }
 
-type BlueberryAbortBlock struct {
-	Time              uint64 `serialize:"true" json:"time"`
-	ApricotAbortBlock `serialize:"true"`
+type ApricotAbortBlock struct {
+	CommonBlock `serialize:"true"`
 }
 
-func (b *BlueberryAbortBlock) Timestamp() time.Time {
-	return time.Unix(int64(b.Time), 0)
+func (b *ApricotAbortBlock) initialize(bytes []byte) error {
+	b.CommonBlock.initialize(bytes)
+	return nil
 }
 
-func (b *BlueberryAbortBlock) Visit(v Visitor) error {
-	return v.BlueberryAbortBlock(b)
-}
+func (*ApricotAbortBlock) Txs() []*txs.Tx          { return nil }
+func (b *ApricotAbortBlock) Visit(v Visitor) error { return v.ApricotAbortBlock(b) }
 
 func NewApricotAbortBlock(
 	parentID ids.ID,
@@ -56,19 +63,4 @@ func NewApricotAbortBlock(
 		},
 	}
 	return blk, initialize(blk)
-}
-
-type ApricotAbortBlock struct {
-	CommonBlock `serialize:"true"`
-}
-
-func (b *ApricotAbortBlock) initialize(bytes []byte) error {
-	b.CommonBlock.initialize(bytes)
-	return nil
-}
-
-func (*ApricotAbortBlock) Txs() []*txs.Tx { return nil }
-
-func (b *ApricotAbortBlock) Visit(v Visitor) error {
-	return v.ApricotAbortBlock(b)
 }
