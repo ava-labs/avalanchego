@@ -100,3 +100,34 @@ func (b *backend) getStatelessBlock(blkID ids.ID) (blocks.Block, error) {
 	statelessBlk, _, err := b.state.GetStatelessBlock(blkID)
 	return statelessBlk, err
 }
+
+func (b *backend) getTimestamp(block blocks.Block) time.Time {
+	switch blk := block.(type) {
+	case *blocks.BlueberryAbortBlock:
+		return blk.Timestamp()
+
+	case *blocks.BlueberryCommitBlock:
+		return blk.Timestamp()
+
+	case *blocks.BlueberryProposalBlock:
+		return blk.Timestamp()
+
+	case *blocks.BlueberryStandardBlock:
+		return blk.Timestamp()
+
+	default: // these are apricot blocks
+		// If this is the last accepted block and the block was loaded from disk
+		// since it was accepted, then the timestamp wouldn't be set correctly. So,
+		// we explicitly return the chain time.
+		// Check if the block is processing.
+		if blkState, ok := b.blkIDToState[blk.ID()]; ok {
+			return blkState.timestamp
+		}
+
+		// The block isn't processing.
+		// According to the snowman.Block interface, the last accepted
+		// block is the only accepted block that must return a correct timestamp,
+		// so we just return the chain time.
+		return b.state.GetTimestamp()
+	}
+}

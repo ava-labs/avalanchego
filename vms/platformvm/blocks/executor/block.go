@@ -57,30 +57,7 @@ func (b *Block) Status() choices.Status {
 }
 
 func (b *Block) Timestamp() time.Time {
-	switch b.Block.(type) {
-	case *blocks.ApricotAbortBlock,
-		*blocks.ApricotCommitBlock,
-		*blocks.ApricotProposalBlock,
-		*blocks.ApricotStandardBlock,
-		*blocks.ApricotAtomicBlock:
-		// If this is the last accepted block and the block was loaded from disk
-		// since it was accepted, then the timestamp wouldn't be set correctly. So,
-		// we explicitly return the chain time.
-		// Check if the block is processing.
-		if blkState, ok := b.manager.blkIDToState[b.ID()]; ok {
-			return blkState.timestamp
-		}
-
-		// The block isn't processing.
-		// According to the snowman.Block interface, the last accepted
-		// block is the only accepted block that must return a correct timestamp,
-		// so we just return the chain time.
-		return b.manager.state.GetTimestamp()
-
-	default:
-		// from blueberry on, timestamps are serialized in blocks
-		return b.Block.Timestamp()
-	}
+	return b.manager.getTimestamp(b.Block)
 }
 
 func (b *Block) Options() ([2]snowman.Block, error) {
@@ -93,7 +70,7 @@ func (b *Block) Options() ([2]snowman.Block, error) {
 		nextHeight = b.Height() + 1
 	)
 
-	switch b.Block.(type) {
+	switch blk := b.Block.(type) {
 	case *blocks.ApricotProposalBlock:
 		statelessCommitBlk, err = blocks.NewApricotCommitBlock(blkID, nextHeight)
 		if err != nil {
@@ -112,7 +89,7 @@ func (b *Block) Options() ([2]snowman.Block, error) {
 		}
 
 	case *blocks.BlueberryProposalBlock:
-		timestamp := b.Block.Timestamp()
+		timestamp := blk.Timestamp()
 		statelessCommitBlk, err = blocks.NewBlueberryCommitBlock(timestamp, blkID, nextHeight)
 		if err != nil {
 			return [2]snowman.Block{}, fmt.Errorf(

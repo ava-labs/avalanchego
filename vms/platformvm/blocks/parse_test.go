@@ -35,43 +35,41 @@ func TestStandardBlocks(t *testing.T) {
 		require.NoError(err)
 
 		// parse block
-		parsedBlueberry, err := Parse(cdc, apricotStandardBlk.Bytes())
+		parsed, err := Parse(cdc, apricotStandardBlk.Bytes())
 		require.NoError(err)
 
 		// compare content
-		require.Equal(apricotStandardBlk.ID(), parsedBlueberry.ID())
-		require.Equal(apricotStandardBlk.Bytes(), parsedBlueberry.Bytes())
-		require.Equal(apricotStandardBlk.Parent(), parsedBlueberry.Parent())
-		require.Equal(apricotStandardBlk.Height(), parsedBlueberry.Height())
+		require.Equal(apricotStandardBlk.ID(), parsed.ID())
+		require.Equal(apricotStandardBlk.Bytes(), parsed.Bytes())
+		require.Equal(apricotStandardBlk.Parent(), parsed.Parent())
+		require.Equal(apricotStandardBlk.Height(), parsed.Height())
 
-		// timestamp is not serialized in apricot blocks
-		// no matter if block is built with a non-zero timestamp
-		require.Equal(time.Unix(0, 0), parsedBlueberry.Timestamp())
-
-		parsedApricot, ok := parsedBlueberry.(*ApricotStandardBlock)
+		_, ok := parsed.(*ApricotStandardBlock)
 		require.True(ok)
-		require.Equal(txs, parsedApricot.Txs())
+		require.Equal(txs, parsed.Txs())
 
 		// check that blueberry standard block can be built and parsed
 		blueberryStandardBlk, err := NewBlueberryStandardBlock(blkTimestamp, parentID, height, txs)
 		require.NoError(err)
 
 		// parse block
-		parsedBlueberry, err = Parse(cdc, blueberryStandardBlk.Bytes())
+		parsed, err = Parse(cdc, blueberryStandardBlk.Bytes())
 		require.NoError(err)
 
 		// compare content
-		require.Equal(blueberryStandardBlk.ID(), parsedBlueberry.ID())
-		require.Equal(blueberryStandardBlk.Bytes(), parsedBlueberry.Bytes())
-		require.Equal(blueberryStandardBlk.Parent(), blueberryStandardBlk.Parent())
-		require.Equal(blueberryStandardBlk.Height(), parsedBlueberry.Height())
-		require.Equal(blueberryStandardBlk.Timestamp(), parsedBlueberry.Timestamp())
-		parsedBlueberryStandardBlk, ok := parsedBlueberry.(*BlueberryStandardBlock)
+		require.Equal(blueberryStandardBlk.ID(), parsed.ID())
+		require.Equal(blueberryStandardBlk.Bytes(), parsed.Bytes())
+		require.Equal(blueberryStandardBlk.Parent(), parsed.Parent())
+		require.Equal(blueberryStandardBlk.Height(), parsed.Height())
+		parsedBlueberryStandardBlk, ok := parsed.(*BlueberryStandardBlock)
 		require.True(ok)
 		require.Equal(txs, parsedBlueberryStandardBlk.Txs())
 
+		// timestamp check for blueberry blocks only
+		require.Equal(blueberryStandardBlk.Timestamp(), parsedBlueberryStandardBlk.Timestamp())
+
 		// backward compatibility check
-		require.Equal(parsedApricot.Txs(), parsedBlueberryStandardBlk.Txs())
+		require.Equal(parsed.Txs(), parsedBlueberryStandardBlk.Txs())
 	}
 }
 
@@ -103,10 +101,6 @@ func TestProposalBlocks(t *testing.T) {
 		require.Equal(apricotProposalBlk.Parent(), parsed.Parent())
 		require.Equal(apricotProposalBlk.Height(), parsed.Height())
 
-		// timestamp is not serialized in apricot blocks
-		// no matter if block is built with a non-zero timestamp
-		require.Equal(time.Unix(0, 0), parsed.Timestamp())
-
 		parsedApricotProposalBlk, ok := parsed.(*ApricotProposalBlock)
 		require.True(ok)
 		require.Equal([]*transactions.Tx{tx}, parsedApricotProposalBlk.Txs())
@@ -129,10 +123,12 @@ func TestProposalBlocks(t *testing.T) {
 		require.Equal(blueberryProposalBlk.Bytes(), parsed.Bytes())
 		require.Equal(blueberryProposalBlk.Parent(), blueberryProposalBlk.Parent())
 		require.Equal(blueberryProposalBlk.Height(), parsed.Height())
-		require.Equal(blueberryProposalBlk.Timestamp(), parsed.Timestamp())
 		parsedBlueberryProposalBlk, ok := parsed.(*BlueberryProposalBlock)
 		require.True(ok)
 		require.Equal([]*transactions.Tx{tx}, parsedBlueberryProposalBlk.Txs())
+
+		// timestamp check for blueberry blocks only
+		require.Equal(blueberryProposalBlk.Timestamp(), parsedBlueberryProposalBlk.Timestamp())
 
 		// backward compatibility check
 		require.Equal(parsedApricotProposalBlk.Txs(), parsedBlueberryProposalBlk.Txs())
@@ -161,10 +157,6 @@ func TestCommitBlock(t *testing.T) {
 		require.Equal(apricotCommitBlk.Parent(), parsed.Parent())
 		require.Equal(apricotCommitBlk.Height(), parsed.Height())
 
-		// timestamp is not serialized in apricot blocks
-		// no matter if block is built with a non-zero timestamp
-		require.Equal(time.Unix(0, 0), parsed.Timestamp())
-
 		// check that blueberry commit block can be built and parsed
 		blueberryCommitBlk, err := NewBlueberryCommitBlock(blkTimestamp, parentID, height)
 		require.NoError(err)
@@ -178,7 +170,11 @@ func TestCommitBlock(t *testing.T) {
 		require.Equal(blueberryCommitBlk.Bytes(), parsed.Bytes())
 		require.Equal(blueberryCommitBlk.Parent(), blueberryCommitBlk.Parent())
 		require.Equal(blueberryCommitBlk.Height(), parsed.Height())
-		require.Equal(blueberryCommitBlk.Timestamp(), parsed.Timestamp())
+
+		// timestamp check for blueberry blocks only
+		parsedBlueberryCommitBlk, ok := parsed.(*BlueberryCommitBlock)
+		require.True(ok)
+		require.Equal(blueberryCommitBlk.Timestamp(), parsedBlueberryCommitBlk.Timestamp())
 	}
 }
 
@@ -204,10 +200,6 @@ func TestAbortBlock(t *testing.T) {
 		require.Equal(apricotAbortBlk.Parent(), parsed.Parent())
 		require.Equal(apricotAbortBlk.Height(), parsed.Height())
 
-		// timestamp is not serialized in apricot blocks
-		// no matter if block is built with a non-zero timestamp
-		require.Equal(time.Unix(0, 0), parsed.Timestamp())
-
 		// check that blueberry abort block can be built and parsed
 		blueberryAbortBlk, err := NewBlueberryAbortBlock(blkTimestamp, parentID, height)
 		require.NoError(err)
@@ -221,7 +213,11 @@ func TestAbortBlock(t *testing.T) {
 		require.Equal(blueberryAbortBlk.Bytes(), parsed.Bytes())
 		require.Equal(blueberryAbortBlk.Parent(), blueberryAbortBlk.Parent())
 		require.Equal(blueberryAbortBlk.Height(), parsed.Height())
-		require.Equal(blueberryAbortBlk.Timestamp(), parsed.Timestamp())
+
+		// timestamp check for blueberry blocks only
+		parsedBlueberryAbortBlk, ok := parsed.(*BlueberryAbortBlock)
+		require.True(ok)
+		require.Equal(blueberryAbortBlk.Timestamp(), parsedBlueberryAbortBlk.Timestamp())
 	}
 }
 
@@ -251,7 +247,6 @@ func TestAtomicBlock(t *testing.T) {
 		require.Equal(atomicBlk.Bytes(), parsed.Bytes())
 		require.Equal(atomicBlk.Parent(), parsed.Parent())
 		require.Equal(atomicBlk.Height(), parsed.Height())
-		require.Equal(time.Unix(0, 0), parsed.Timestamp())
 
 		parsedAtomicBlk, ok := parsed.(*ApricotAtomicBlock)
 		require.True(ok)

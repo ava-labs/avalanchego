@@ -539,7 +539,7 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 			require.NoError(err)
 
 			// Set expectations for dependencies.
-			parentStatelessBlk.EXPECT().Timestamp().Return(test.parentTime).Times(1)
+			parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1)
 
 			err = statelessAbortBlk.Visit(fc)
 			require.ErrorIs(err, test.result)
@@ -616,7 +616,7 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 			statelessCommitBlk, err := blocks.NewBlueberryCommitBlock(test.childTime, parentID, childHeight)
 
 			// Set expectations for dependencies.
-			parentStatelessBlk.EXPECT().Timestamp().Return(test.parentTime).Times(1)
+			parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1)
 			require.NoError(err)
 			err = statelessCommitBlk.Visit(fc)
 			require.ErrorIs(err, test.result)
@@ -801,7 +801,6 @@ func TestVerifierVisitBlueberryStandardBlockWithProposalBlockParent(t *testing.T
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	parentTime := time.Now()
-	parentStatelessBlk.EXPECT().Timestamp().Return(parentTime).Times(1)
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
 
@@ -847,6 +846,7 @@ func TestVerifierVisitBlueberryStandardBlockWithProposalBlockParent(t *testing.T
 	)
 	require.NoError(err)
 
+	parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 
 	err = verifier.BlueberryStandardBlock(blk)

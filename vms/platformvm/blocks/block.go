@@ -5,7 +5,6 @@ package blocks
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -17,7 +16,6 @@ type Block interface {
 	Parent() ids.ID
 	Bytes() []byte
 	Height() uint64
-	Timestamp() time.Time
 
 	// Txs returns list of transactions contained in the block
 	Txs() []*txs.Tx

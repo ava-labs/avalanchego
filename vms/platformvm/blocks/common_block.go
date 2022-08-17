@@ -4,8 +4,6 @@
 package blocks
 
 import (
-	"time"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
@@ -31,7 +29,3 @@ func (b *ApricotCommonBlock) ID() ids.ID     { return b.id }
 func (b *ApricotCommonBlock) Parent() ids.ID { return b.PrntID }
 func (b *ApricotCommonBlock) Bytes() []byte  { return b.bytes }
 func (b *ApricotCommonBlock) Height() uint64 { return b.Hght }
-
-func (b *ApricotCommonBlock) Timestamp() time.Time {
-	return time.Unix(0, 0)
-}
