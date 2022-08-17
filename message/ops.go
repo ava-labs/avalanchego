@@ -87,7 +87,6 @@ var (
 		PushQuery,
 		PullQuery,
 		AppRequest,
-		CrossChainAppRequest,
 		GetStateSummaryFrontier,
 		GetAcceptedStateSummary,
 	}
@@ -98,7 +97,6 @@ var (
 		Put,
 		Chits,
 		AppResponse,
-		CrossChainAppResponse,
 		StateSummaryFrontier,
 		AcceptedStateSummary,
 	}
@@ -118,7 +116,6 @@ var (
 		GetFailed,
 		QueryFailed,
 		AppRequestFailed,
-		CrossChainAppRequestFailed,
 		Timeout,
 		Connected,
 		Disconnected,
@@ -126,6 +123,9 @@ var (
 		GossipRequest,
 		GetStateSummaryFrontierFailed,
 		GetAcceptedStateSummaryFailed,
+		CrossChainAppRequest,
+		CrossChainAppRequestFailed,
+		CrossChainAppResponse,
 	}
 	ConsensusOps = append(ConsensusExternalOps, ConsensusInternalOps...)
 

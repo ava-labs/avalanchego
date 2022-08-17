@@ -113,7 +113,7 @@ type InboundMsgBuilder interface {
 
 	InboundCrossChainAppRequest(
 		sourceChainID ids.ID,
-		chainID ids.ID,
+		destinationChainID ids.ID,
 		requestID uint32,
 		deadline time.Duration,
 		msg []byte,
@@ -129,7 +129,7 @@ type InboundMsgBuilder interface {
 
 	InboundCrossChainAppResponse(
 		sourceChainID ids.ID,
-		chainID ids.ID,
+		destinationChainID ids.ID,
 		requestID uint32,
 		msg []byte,
 		nodeID ids.NodeID,

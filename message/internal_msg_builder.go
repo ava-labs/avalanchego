@@ -14,8 +14,14 @@ type InternalMsgBuilder interface {
 	InternalFailedRequest(
 		op Op,
 		nodeID ids.NodeID,
-		sourceChainID ids.ID,
 		chainID ids.ID,
+		requestID uint32,
+	) InboundMessage
+	InternalFailedCrossChainRequest(
+		op Op,
+		nodeID ids.NodeID,
+		sourceChainID ids.ID,
+		destinationChainID ids.ID,
 		requestID uint32,
 	) InboundMessage
 	InternalTimeout(nodeID ids.NodeID) InboundMessage
@@ -45,6 +51,27 @@ func (internalMsgBuilder) InternalFailedRequest(
 		fields: map[Field]interface{}{
 			ChainID:   chainID[:],
 			RequestID: requestID,
+		},
+	}
+}
+
+func (internalMsgBuilder) InternalFailedCrossChainRequest(
+	op Op,
+	nodeID ids.NodeID,
+	sourceChainID ids.ID,
+	destinationChainID ids.ID,
+	requestID uint32,
+) InboundMessage {
+
+	return &inboundMessageWithPacker{
+		inboundMessage: inboundMessage{
+			op:     op,
+			nodeID: nodeID,
+		},
+		fields: map[Field]interface{}{
+			SourceChainID: sourceChainID[:],
+			ChainID:       destinationChainID[:],
+			RequestID:     requestID,
 		},
 	}
 }

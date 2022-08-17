@@ -137,12 +137,12 @@ func (cr *ChainRouter) Initialize(
 // and passing it to the appropriate chain or by a timeout.
 // This method registers a timeout that calls such methods if we don't get a
 // reply in time.
-func (cr *ChainRouter) RegisterRequest(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainiD ids.ID, requestID uint32, op message.Op) {
+func (cr *ChainRouter) RegisterRequest(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, op message.Op) {
 	cr.lock.Lock()
 	// When we receive a response message type (Chits, Put, Accepted, etc.)
 	// we validate that we actually sent the corresponding request.
 	// Give this request a unique ID so we can do that validation.
-	uniqueRequestID := cr.createRequestID(nodeID, sourceChainID, destinationChainiD, requestID, op)
+	uniqueRequestID := cr.createRequestID(nodeID, sourceChainID, destinationChainID, requestID, op)
 	// Add to the set of unfulfilled requests
 	cr.timedRequests.Put(uniqueRequestID, requestEntry{
 		time: cr.clock.Time(),
@@ -161,8 +161,13 @@ func (cr *ChainRouter) RegisterRequest(nodeID ids.NodeID, sourceChainID ids.ID, 
 	}
 
 	// Register a timeout to fire if we don't get a reply in time.
-	cr.timeoutManager.RegisterRequest(nodeID, destinationChainiD, op, uniqueRequestID, func() {
-		msg := cr.msgCreator.InternalFailedRequest(failedOp, nodeID, sourceChainID, destinationChainiD, requestID)
+	cr.timeoutManager.RegisterRequest(nodeID, destinationChainID, op, uniqueRequestID, func() {
+		var msg message.InboundMessage
+		if sourceChainID != destinationChainID {
+			msg = cr.msgCreator.InternalFailedCrossChainRequest(failedOp, nodeID, sourceChainID, destinationChainID, requestID)
+		} else {
+			msg = cr.msgCreator.InternalFailedRequest(failedOp, nodeID, destinationChainID, requestID)
+		}
 		cr.HandleInbound(msg)
 	})
 }
