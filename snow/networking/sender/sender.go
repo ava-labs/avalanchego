@@ -827,11 +827,24 @@ func (s *sender) SendChits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) 
 // SendAppRequest sends an application-level request to the given nodes.
 // The meaning of this request, and how it should be handled, is defined by the VM.
 func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, appRequestBytes []byte) error {
+	// Tell the router to expect a response message or a message notifying
+	// that we won't get a response from each of these nodes.
+	// We register timeouts for all nodes, regardless of whether we fail
+	// to send them a message, to avoid busy looping when disconnected from
+	// the internet.
+	for nodeID := range nodeIDs {
+		s.router.RegisterRequest(nodeID, sourceChainID, destinationChainID, requestID, message.AppResponse)
+	}
+
+	// Note that this timeout duration won't exactly match the one that gets
+	// registered. That's OK.
+	deadline := s.timeouts.TimeoutDuration()
+
 	// cross-chain messages
 	if sourceChainID != destinationChainID {
 		for nodeID := range nodeIDs {
 			if nodeID == s.ctx.NodeID {
-				inMsg := s.msgCreator.InboundCrossChainAppRequest(sourceChainID, destinationChainID, requestID, s.timeouts.TimeoutDuration(), appRequestBytes, nodeID)
+				inMsg := s.msgCreator.InboundCrossChainAppRequest(sourceChainID, destinationChainID, requestID, deadline, appRequestBytes, nodeID)
 				go s.router.HandleInbound(inMsg)
 			} else {
 				// We don't currently support remote cross-chain messages,
