@@ -23,7 +23,7 @@ func NewBlueberryAbortBlock(
 	blk := &BlueberryAbortBlock{
 		Time: uint64(timestamp.Unix()),
 		ApricotAbortBlock: ApricotAbortBlock{
-			ApricotCommonBlock: ApricotCommonBlock{
+			CommonBlock: CommonBlock{
 				PrntID: parentID,
 				Hght:   height,
 			},
@@ -50,7 +50,7 @@ func NewApricotAbortBlock(
 	height uint64,
 ) (*ApricotAbortBlock, error) {
 	blk := &ApricotAbortBlock{
-		ApricotCommonBlock: ApricotCommonBlock{
+		CommonBlock: CommonBlock{
 			PrntID: parentID,
 			Hght:   height,
 		},
@@ -59,11 +59,11 @@ func NewApricotAbortBlock(
 }
 
 type ApricotAbortBlock struct {
-	ApricotCommonBlock `serialize:"true"`
+	CommonBlock `serialize:"true"`
 }
 
 func (b *ApricotAbortBlock) initialize(bytes []byte) error {
-	b.ApricotCommonBlock.initialize(bytes)
+	b.CommonBlock.initialize(bytes)
 	return nil
 }
 

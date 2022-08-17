@@ -25,7 +25,7 @@ func NewBlueberryStandardBlock(
 	blk := &BlueberryStandardBlock{
 		Time: uint64(timestamp.Unix()),
 		ApricotStandardBlock: ApricotStandardBlock{
-			ApricotCommonBlock: ApricotCommonBlock{
+			CommonBlock: CommonBlock{
 				PrntID: parentID,
 				Hght:   height,
 			},
@@ -54,7 +54,7 @@ func NewApricotStandardBlock(
 	txes []*txs.Tx,
 ) (*ApricotStandardBlock, error) {
 	blk := &ApricotStandardBlock{
-		ApricotCommonBlock: ApricotCommonBlock{
+		CommonBlock: CommonBlock{
 			PrntID: parentID,
 			Hght:   height,
 		},
@@ -64,13 +64,13 @@ func NewApricotStandardBlock(
 }
 
 type ApricotStandardBlock struct {
-	ApricotCommonBlock `serialize:"true"`
+	CommonBlock `serialize:"true"`
 
 	Transactions []*txs.Tx `serialize:"true" json:"txs"`
 }
 
 func (b *ApricotStandardBlock) initialize(bytes []byte) error {
-	b.ApricotCommonBlock.initialize(bytes)
+	b.CommonBlock.initialize(bytes)
 	for _, tx := range b.Transactions {
 		if err := tx.Sign(txs.Codec, nil); err != nil {
 			return fmt.Errorf("failed to sign block: %w", err)

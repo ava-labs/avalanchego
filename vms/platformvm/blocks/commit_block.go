@@ -23,7 +23,7 @@ func NewBlueberryCommitBlock(
 	blk := &BlueberryCommitBlock{
 		Time: uint64(timestamp.Unix()),
 		ApricotCommitBlock: ApricotCommitBlock{
-			ApricotCommonBlock: ApricotCommonBlock{
+			CommonBlock: CommonBlock{
 				PrntID: parentID,
 				Hght:   height,
 			},
@@ -50,7 +50,7 @@ func NewApricotCommitBlock(
 	height uint64,
 ) (*ApricotCommitBlock, error) {
 	blk := &ApricotCommitBlock{
-		ApricotCommonBlock: ApricotCommonBlock{
+		CommonBlock: CommonBlock{
 			PrntID: parentID,
 			Hght:   height,
 		},
@@ -59,11 +59,11 @@ func NewApricotCommitBlock(
 }
 
 type ApricotCommitBlock struct {
-	ApricotCommonBlock `serialize:"true"`
+	CommonBlock `serialize:"true"`
 }
 
 func (b *ApricotCommitBlock) initialize(bytes []byte) error {
-	b.ApricotCommonBlock.initialize(bytes)
+	b.CommonBlock.initialize(bytes)
 	return nil
 }
 

@@ -8,8 +8,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-// ApricotCommonBlock contains fields and methods common to all blocks in this VM.
-type ApricotCommonBlock struct {
+// CommonBlock contains fields and methods common to all blocks in this VM.
+type CommonBlock struct {
 	// parent's ID
 	PrntID ids.ID `serialize:"true" json:"parentID"`
 
@@ -20,12 +20,12 @@ type ApricotCommonBlock struct {
 	bytes []byte
 }
 
-func (b *ApricotCommonBlock) initialize(bytes []byte) {
+func (b *CommonBlock) initialize(bytes []byte) {
 	b.id = hashing.ComputeHash256Array(bytes)
 	b.bytes = bytes
 }
 
-func (b *ApricotCommonBlock) ID() ids.ID     { return b.id }
-func (b *ApricotCommonBlock) Parent() ids.ID { return b.PrntID }
-func (b *ApricotCommonBlock) Bytes() []byte  { return b.bytes }
-func (b *ApricotCommonBlock) Height() uint64 { return b.Hght }
+func (b *CommonBlock) ID() ids.ID     { return b.id }
+func (b *CommonBlock) Parent() ids.ID { return b.PrntID }
+func (b *CommonBlock) Bytes() []byte  { return b.bytes }
+func (b *CommonBlock) Height() uint64 { return b.Hght }
