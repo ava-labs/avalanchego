@@ -1,0 +1,10 @@
+{
+    "precompileUpgrades": [
+      {
+        "feeManagerConfig": {
+          "adminAddresses": ["0x42E4BAA2C0B140bE35684824FFf7204159C588B9","0x813738EC93E15dA3c333d834bde68036cFAAb110"],
+          "blockTimestamp": 1661266800
+        }
+      }
+    ]
+}
