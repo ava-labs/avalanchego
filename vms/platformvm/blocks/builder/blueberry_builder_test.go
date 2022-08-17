@@ -7,15 +7,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
+	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
 func TestBlueberryPickingOrder(t *testing.T) {
@@ -158,4 +165,181 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	_, ok = emptyStdBlk.Block.(*blocks.BlueberryStandardBlock)
 	require.True(ok)
 	require.True(len(emptyStdBlk.Txs()) == 0)
+}
+
+func TestBuildBlueberryBlock(t *testing.T) {
+	var (
+		parentID = ids.GenerateTestID()
+		height   = uint64(1337)
+		txs      = []*txs.Tx{
+			{
+				Unsigned: &txs.AdvanceTimeTx{
+					Time: uint64(123),
+				},
+				Creds: []verify.Verifiable{
+					&secp256k1fx.Credential{
+						Sigs: [][crypto.SECP256K1RSigLen]byte{{1, 3, 3, 7}},
+					},
+				},
+			},
+		}
+		now        = time.Now()
+		stakerTxID = ids.GenerateTestID()
+	)
+
+	type test struct {
+		name         string
+		builderF     func(*gomock.Controller) *builder
+		parentStateF func(*gomock.Controller) state.Chain
+		expectedBlkF func() blocks.Block
+		shouldErr    bool
+	}
+
+	tests := []test{
+		{
+			name: "has decision txs",
+			builderF: func(ctrl *gomock.Controller) *builder {
+				mempool := mempool.NewMockMempool(ctrl)
+				mempool.EXPECT().HasDecisionTxs().Return(true)
+				mempool.EXPECT().PeekDecisionTxs(targetBlockSize).Return(txs)
+				return &builder{
+					Mempool: mempool,
+				}
+			},
+			parentStateF: func(ctrl *gomock.Controller) state.Chain {
+				s := state.NewMockChain(ctrl)
+				s.EXPECT().GetTimestamp().Return(now)
+				return s
+			},
+			expectedBlkF: func() blocks.Block {
+				expectedBlk, _ := blocks.NewBlueberryStandardBlock(
+					now,
+					parentID,
+					height,
+					txs,
+				)
+				return expectedBlk
+			},
+			shouldErr: false,
+		},
+		{
+			name: "should reward",
+			builderF: func(ctrl *gomock.Controller) *builder {
+				// There are no decision txs
+				mempool := mempool.NewMockMempool(ctrl)
+				mempool.EXPECT().HasDecisionTxs().Return(false)
+
+				// The tx builder should be asked to build a reward tx
+				txBuilder := txbuilder.NewMockBuilder(ctrl)
+				txBuilder.EXPECT().NewRewardValidatorTx(stakerTxID).Return(txs[0], nil)
+
+				return &builder{
+					Mempool:   mempool,
+					txBuilder: txBuilder,
+				}
+			},
+			parentStateF: func(ctrl *gomock.Controller) state.Chain {
+				s := state.NewMockChain(ctrl)
+
+				// Once in [buildBlueberryBlock], once in [getNextStakerToReward]
+				s.EXPECT().GetTimestamp().Return(now).Times(2)
+
+				// add current validator that ends at [now]
+				// i.e. it should be rewarded
+				currentStakerIter := state.NewMockStakerIterator(ctrl)
+				currentStakerIter.EXPECT().Next().Return(true)
+				currentStakerIter.EXPECT().Value().Return(&state.Staker{
+					TxID:     stakerTxID,
+					Priority: state.PrimaryNetworkDelegatorCurrentPriority,
+					EndTime:  now,
+				})
+				currentStakerIter.EXPECT().Release()
+
+				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
+
+				return s
+			},
+			expectedBlkF: func() blocks.Block {
+				expectedBlk, _ := blocks.NewBlueberryProposalBlock(
+					now,
+					parentID,
+					height,
+					txs[0],
+				)
+				return expectedBlk
+			},
+			shouldErr: false,
+		},
+		// {
+		// 	name: "should reward",
+		// 	builderF: func(ctrl *gomock.Controller) *builder {
+		// 		// There are no decision txs
+		// 		mempool := mempool.NewMockMempool(ctrl)
+		// 		mempool.EXPECT().HasDecisionTxs().Return(false)
+		// 		clk := &mockable.Clock{}
+		// 		clk.Set(now)
+		// 		return &builder{
+		// 			Mempool: mempool,
+		// 			txExecutorBackend: &txexecutor.Backend{
+		// 				Clk: clk,
+		// 			},
+		// 		}
+		// 	},
+		// 	parentStateF: func(ctrl *gomock.Controller) state.Chain {
+		// 		s := state.NewMockChain(ctrl)
+
+		// 		// Once in [buildBlueberryBlock], once in [GetNextStakerChangeTime]
+		// 		s.EXPECT().GetTimestamp().Return(now).Times(2)
+
+		// 		// GetNextStakerChangeTime iterates over stakers.
+		// 		// add current validator that ends at [now] - 1 second
+		// 		currentStakerIter := state.NewMockStakerIterator(ctrl)
+		// 		currentStakerIter.EXPECT().Next().Return(true)
+		// 		currentStakerIter.EXPECT().Value().Return(&state.Staker{
+		// 			NextTime: now.Add(-1 * time.Second),
+		// 		})
+		// 		currentStakerIter.EXPECT().Next().Return(false)
+		// 		currentStakerIter.EXPECT().Release()
+
+		// 		pendingStakerIter := state.NewMockStakerIterator(ctrl)
+		// 		pendingStakerIter.EXPECT().Next().Return(false)
+		// 		pendingStakerIter.EXPECT().Release()
+
+		// 		s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
+		// 		s.EXPECT().GetPendingStakerIterator().Return(pendingStakerIter, nil)
+		// 		return s
+		// 	},
+		// 	expectedBlkF: func() blocks.Block {
+		// 		expectedBlk, _ := blocks.NewBlueberryStandardBlock(
+		// 			now.Add(-1*time.Second),
+		// 			parentID,
+		// 			height,
+		// 			txs,
+		// 		)
+		// 		return expectedBlk
+		// 	},
+		// 	shouldErr: false,
+		// },
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			gotBlk, err := buildBlueberryBlock(
+				tt.builderF(ctrl),
+				parentID,
+				height,
+				tt.parentStateF(ctrl),
+			)
+			if tt.shouldErr {
+				require.Error(err)
+				return
+			}
+			require.NoError(err)
+			require.EqualValues(tt.expectedBlkF(), gotBlk)
+		})
+	}
 }
