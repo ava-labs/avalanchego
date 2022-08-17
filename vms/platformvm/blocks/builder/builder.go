@@ -328,13 +328,16 @@ func (b *builder) setNextBuildBlockTime() {
 	if !ok {
 		// The preferred block should always be a decision block
 		ctx.Log.Error("couldn't get preferred block state",
-			zap.Stringer("blkID", b.preferredBlockID),
+			zap.Stringer("preferredID", b.preferredBlockID),
+			zap.Stringer("lastAcceptedID", b.blkManager.LastAccepted()),
 		)
 		return
 	}
 	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
 	if err != nil {
 		ctx.Log.Error("couldn't get next staker change time",
+			zap.Stringer("preferredID", b.preferredBlockID),
+			zap.Stringer("lastAcceptedID", b.blkManager.LastAccepted()),
 			zap.Error(err),
 		)
 		return
@@ -358,7 +361,6 @@ func (b *builder) notifyBlockReady() {
 	select {
 	case b.toEngine <- common.PendingTxs:
 	default:
-		ctx := b.txExecutorBackend.Ctx
-		ctx.Log.Debug("dropping message to consensus engine")
+		b.txExecutorBackend.Ctx.Log.Debug("dropping message to consensus engine")
 	}
 }
