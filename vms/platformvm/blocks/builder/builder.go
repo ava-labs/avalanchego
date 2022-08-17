@@ -317,6 +317,7 @@ func (b *builder) setNextBuildBlockTime() {
 		)
 		return
 	}
+
 	if _, err := b.buildBlock(); err == nil {
 		// We can build a block now
 		b.notifyBlockReady()
@@ -333,6 +334,7 @@ func (b *builder) setNextBuildBlockTime() {
 		)
 		return
 	}
+
 	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
 	if err != nil {
 		ctx.Log.Error("couldn't get next staker change time",
@@ -342,10 +344,9 @@ func (b *builder) setNextBuildBlockTime() {
 		)
 		return
 	}
-	var (
-		now      = b.txExecutorBackend.Clk.Time()
-		waitTime = nextStakerChangeTime.Sub(now)
-	)
+
+	now := b.txExecutorBackend.Clk.Time()
+	waitTime := nextStakerChangeTime.Sub(now)
 	ctx.Log.Debug("setting next scheduled event",
 		zap.Time("nextEventTime", nextStakerChangeTime),
 		zap.Duration("timeUntil", waitTime),
