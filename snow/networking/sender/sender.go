@@ -840,18 +840,20 @@ func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, des
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
 
-	// cross-chain messages
+	// Handle cross-chain messages
 	if sourceChainID != destinationChainID {
 		for nodeID := range nodeIDs {
+			var inMsg message.InboundMessage
+
 			if nodeID == s.ctx.NodeID {
-				inMsg := s.msgCreator.InboundCrossChainAppRequest(sourceChainID, destinationChainID, requestID, deadline, appRequestBytes, nodeID)
-				go s.router.HandleInbound(inMsg)
+				inMsg = s.msgCreator.InboundCrossChainAppRequest(sourceChainID, destinationChainID, requestID, deadline, appRequestBytes, nodeID)
 			} else {
 				// We don't currently support remote cross-chain messages,
 				// so we should fail them immediately.
-				inMsg := s.msgCreator.InternalFailedCrossChainRequest(message.CrossChainAppRequestFailed, nodeID, sourceChainID, destinationChainID, requestID)
-				go s.router.HandleInbound(inMsg)
+				inMsg = s.msgCreator.InternalFailedCrossChainRequest(message.CrossChainAppRequestFailed, nodeID, sourceChainID, destinationChainID, requestID)
 			}
+
+			go s.router.HandleInbound(inMsg)
 		}
 
 		return nil
