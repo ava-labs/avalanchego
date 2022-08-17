@@ -53,6 +53,7 @@ type peer struct {
 // Note that consensus engines are uniquely identified by the ID of the chain
 // that they are working on.
 type ChainRouter struct {
+	nodeID     ids.NodeID
 	clock      mockable.Clock
 	log        logging.Logger
 	msgCreator message.InternalMsgBuilder
@@ -99,6 +100,7 @@ func (cr *ChainRouter) Initialize(
 	metricsNamespace string,
 	metricsRegisterer prometheus.Registerer,
 ) error {
+	cr.nodeID = nodeID
 	cr.log = log
 	cr.msgCreator = msgCreator
 	cr.chains = make(map[ids.ID]handler.Handler)
@@ -210,6 +212,23 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 		message.CrossChainAppRequestFailed:
 		sourceChainID, err = ids.ToID(msg.Get(message.SourceChainID).([]byte))
 		cr.log.AssertNoError(err)
+		nodeID, err := ids.ToNodeID(msg.Get(message.NodeID).([]byte))
+		cr.log.AssertNoError(err)
+
+		// Only local cross-chain messages are supported.
+		if nodeID != cr.nodeID {
+			cr.log.Debug(
+				"dropping message",
+				zap.Stringer("messageOp", op),
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("sourceChainID", sourceChainID),
+				zap.Stringer("destinationChainID", chainID),
+			)
+
+			msg.OnFinishedHandling()
+			return
+		}
+
 	default:
 		sourceChainID = chainID
 	}
