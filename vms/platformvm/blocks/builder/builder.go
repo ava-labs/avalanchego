@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/forks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -160,25 +161,26 @@ func (b *builder) BuildBlock() (snowman.Block, error) {
 	ctx := b.txExecutorBackend.Ctx
 	ctx.Log.Debug("starting to attempt to build a block")
 
-	blk, txs, err := b.buildBlock()
+	statelessBlk, err := b.buildBlock()
 	if err != nil {
 		return nil, err
 	}
+	txs := statelessBlk.Txs()
 	// remove selected txs from mempool only when we are sure
 	// a valid block containing it has been generated
 	b.Mempool.Remove(txs)
-	return blk, nil
+	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
 // Returns:
 // 1. The block we want to build and issue.
 // 2. The transactions in that block.
 // Only modifies state to remove expired proposal txs.
-func (b *builder) buildBlock() (snowman.Block, []*txs.Tx, error) {
+func (b *builder) buildBlock() (blocks.Block, error) {
 	// Get the block to build on top of and retrieve the new block's context.
 	preferred, err := b.Preferred()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	prefBlkID := preferred.ID()
 	nextHeight := preferred.Height() + 1
@@ -186,32 +188,28 @@ func (b *builder) buildBlock() (snowman.Block, []*txs.Tx, error) {
 
 	preferredState, ok := b.blkManager.GetState(prefBlkID)
 	if !ok {
-		return nil, nil, fmt.Errorf("could not retrieve state for block %s. Preferred block must be a decision block", prefBlkID)
+		return nil, fmt.Errorf("could not retrieve state for block %s. Preferred block must be a decision block", prefBlkID)
 	}
-
-	var fb forkBuilder
 
 	// select transactions to include based on the current fork
 	switch currentFork {
 	case forks.Apricot:
-		fb = &apricotBuilder{
-			builder:     b,
-			parentBlkID: prefBlkID,
-			parentState: preferredState,
-			nextHeight:  nextHeight,
-		}
+		return buildApricotBlock(
+			b,
+			prefBlkID,
+			nextHeight,
+			preferredState,
+		)
 	case forks.Blueberry:
-		fb = &blueberryStrategy{
-			builder:     b,
-			parentBlkID: prefBlkID,
-			parentState: preferredState,
-			height:      nextHeight,
-		}
+		return buildBlueberryBlock(
+			b,
+			prefBlkID,
+			nextHeight,
+			preferredState,
+		)
 	default:
-		return nil, nil, fmt.Errorf("unsupported fork %s", currentFork)
+		return nil, fmt.Errorf("unsupported fork %s", currentFork)
 	}
-
-	return fb.buildBlock()
 }
 
 func (b *builder) Shutdown() {
@@ -323,7 +321,7 @@ func (b *builder) setNextBuildBlockTime() {
 		)
 		return
 	}
-	if _, _, err := b.buildBlock(); err == nil {
+	if _, err := b.buildBlock(); err == nil {
 		// We can build a block now
 		b.notifyBlockReady()
 		return
