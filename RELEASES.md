@@ -2,7 +2,7 @@
 
 ## [v0.8.16](https://github.com/ava-labs/coreth/releases/tag/v0.8.16)
 
-- Fix state sync bug caused by tracking code to sync incorrectly
+- Fix bug in `codeToFetch` database accessors that caused an error when starting/stopping state sync
 - Bump go-ethereum version to v1.10.21
 - Update gas price estimation to limit lookback window based on block timestamps
 - Add metrics for processed/accepted gas
