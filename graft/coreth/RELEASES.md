@@ -1,5 +1,16 @@
 # Release Notes
 
+## [v0.8.16](https://github.com/ava-labs/coreth/releases/tag/v0.8.16)
+
+- Fix state sync bug caused by tracking code to sync incorrectly
+- Bump go-ethereum version to v1.10.21
+- Update gas price estimation to limit lookback window based on block timestamps
+- Add metrics for processed/accepted gas
+- Simplify syntactic block verification
+- Ensure statedb errors during block processing are logged
+- Remove deprecated gossiper/block building logic from pre-Apricot Phase 4
+- Add marshal function for duration to improve config output
+
 ## [v0.8.15](https://github.com/ava-labs/coreth/releases/tag/v0.8.15)
 
 - Add optional JSON logging
