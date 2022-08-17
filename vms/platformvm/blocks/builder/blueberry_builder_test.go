@@ -315,15 +315,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 					currentStakerIter.EXPECT().Release(),
 				)
 
-				// // Handle calls in [GetNextStakerChangeTime] when figuring
-				// // out whether to advance the chain time.
-				// currentStakerIter.EXPECT().Next().Return(true)
-				// currentStakerIter.EXPECT().Value().Return(&state.Staker{
-				// 	NextTime: now.Add(-1 * time.Second),
-				// })
-				// currentStakerIter.EXPECT().Release()
-
-				// We also iteratore over the pending stakers in [getNextStakerToReward]
+				// We also iterate over the pending stakers in [getNextStakerToReward]
 				pendingStakerIter := state.NewMockStakerIterator(ctrl)
 				pendingStakerIter.EXPECT().Next().Return(false)
 				pendingStakerIter.EXPECT().Release()
