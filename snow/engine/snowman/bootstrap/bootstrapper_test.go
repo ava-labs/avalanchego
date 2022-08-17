@@ -10,7 +10,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -96,7 +96,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 }
 
 func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	sender := &common.SenderTest{T: t}
 	vm := &block.TestVM{
@@ -133,7 +133,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	blocker, _ := queue.NewWithMissing(memdb.New(), "", prometheus.NewRegistry())
 	snowGetHandler, err := getter.New(vm, commonCfg)
-	assert.NoError(err)
+	require.NoError(err)
 	cfg := Config{
 		Config:        commonCfg,
 		AllGetsServer: snowGetHandler,
@@ -154,14 +154,14 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	vm.CantLastAccepted = false
 	vm.LastAcceptedF = func() (ids.ID, error) { return blk0.ID(), nil }
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		assert.Equal(blk0.ID(), blkID)
+		require.Equal(blk0.ID(), blkID)
 		return blk0, nil
 	}
 
 	// create bootstrapper
 	dummyCallback := func(lastReqID uint32) error { cfg.Ctx.SetState(snow.NormalOp); return nil }
 	bs, err := New(cfg, dummyCallback)
-	assert.NoError(err)
+	require.NoError(err)
 
 	vm.CantSetState = false
 	vm.CantConnected = true
@@ -174,22 +174,22 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	}
 
 	// attempt starting bootstrapper with no stake connected. Bootstrapper should stall.
-	assert.NoError(bs.Start(0))
-	assert.False(frontierRequested)
+	require.NoError(bs.Start(0))
+	require.False(frontierRequested)
 
 	// attempt starting bootstrapper with not enough stake connected. Bootstrapper should stall.
 	vdr0 := ids.GenerateTestNodeID()
-	assert.NoError(peers.AddWeight(vdr0, startupAlpha/2))
-	assert.NoError(bs.Connected(vdr0, version.CurrentApp))
+	require.NoError(peers.AddWeight(vdr0, startupAlpha/2))
+	require.NoError(bs.Connected(vdr0, version.CurrentApp))
 
-	assert.NoError(bs.Start(0))
-	assert.False(frontierRequested)
+	require.NoError(bs.Start(0))
+	require.False(frontierRequested)
 
 	// finally attempt starting bootstrapper with enough stake connected. Frontiers should be requested.
 	vdr := ids.GenerateTestNodeID()
-	assert.NoError(peers.AddWeight(vdr, startupAlpha))
-	assert.NoError(bs.Connected(vdr, version.CurrentApp))
-	assert.True(frontierRequested)
+	require.NoError(peers.AddWeight(vdr, startupAlpha))
+	require.NoError(bs.Connected(vdr, version.CurrentApp))
+	require.True(frontierRequested)
 }
 
 // Single node in the accepted frontier; no need to fetch parent
@@ -223,7 +223,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	vm.CantLastAccepted = false
 	vm.LastAcceptedF = func() (ids.ID, error) { return blk0.ID(), nil }
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		assert.Equal(t, blk0.ID(), blkID)
+		require.Equal(t, blk0.ID(), blkID)
 		return blk0, nil
 	}
 
@@ -321,7 +321,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	vm.CantLastAccepted = false
 	vm.LastAcceptedF = func() (ids.ID, error) { return blk0.ID(), nil }
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		assert.Equal(t, blk0.ID(), blkID)
+		require.Equal(t, blk0.ID(), blkID)
 		return blk0, nil
 	}
 
@@ -476,7 +476,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	vm.CantLastAccepted = false
 	vm.LastAcceptedF = func() (ids.ID, error) { return blk0.ID(), nil }
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		assert.Equal(t, blk0.ID(), blkID)
+		require.Equal(t, blk0.ID(), blkID)
 		return blk0, nil
 	}
 
@@ -634,7 +634,7 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	vm.CantLastAccepted = false
 	vm.LastAcceptedF = func() (ids.ID, error) { return blk0.ID(), nil }
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		assert.Equal(t, blk0.ID(), blkID)
+		require.Equal(t, blk0.ID(), blkID)
 		return blk0, nil
 	}
 
@@ -757,7 +757,7 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	}
 
 	// check peerToBlacklist was removed from the fetch set
-	assert.False(t, bs.(*bootstrapper).fetchFrom.Contains(peerToBlacklist))
+	require.False(t, bs.(*bootstrapper).fetchFrom.Contains(peerToBlacklist))
 }
 
 // There are multiple needed blocks and Ancestors returns all at once
@@ -814,7 +814,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 	vm.CantLastAccepted = false
 	vm.LastAcceptedF = func() (ids.ID, error) { return blk0.ID(), nil }
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		assert.Equal(t, blk0.ID(), blkID)
+		require.Equal(t, blk0.ID(), blkID)
 		return blk0, nil
 	}
 
@@ -952,7 +952,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	vm.CantLastAccepted = false
 	vm.LastAcceptedF = func() (ids.ID, error) { return blk0.ID(), nil }
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		assert.Equal(t, blk0.ID(), blkID)
+		require.Equal(t, blk0.ID(), blkID)
 		return blk0, nil
 	}
 	bs, err := New(

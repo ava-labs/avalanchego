@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -21,7 +21,7 @@ import (
 )
 
 func TestAtomicTxImports(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
@@ -54,7 +54,7 @@ func TestAtomicTxImports(t *testing.T) {
 		},
 	}
 	utxoBytes, err := blocks.Codec.Marshal(txs.Version, utxo)
-	assert.NoError(err)
+	require.NoError(err)
 
 	inputID := utxo.InputID()
 	err = peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
@@ -66,7 +66,7 @@ func TestAtomicTxImports(t *testing.T) {
 			},
 		}}},
 	})
-	assert.NoError(err)
+	require.NoError(err)
 
 	tx, err := env.txBuilder.NewImportTx(
 		env.ctx.XChainID,
@@ -74,18 +74,18 @@ func TestAtomicTxImports(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{recipientKey},
 		ids.ShortEmpty, // change addr
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
 	env.state.SetTimestamp(env.config.ApricotPhase5Time.Add(100 * time.Second))
 
 	env.Builder.AddDecisionTx(tx)
 	b, err := env.BuildBlock()
-	assert.NoError(err)
+	require.NoError(err)
 	// Test multiple verify calls work
-	assert.NoError(b.Verify())
-	assert.NoError(b.Accept())
+	require.NoError(b.Verify())
+	require.NoError(b.Accept())
 	_, txStatus, err := env.state.GetTx(tx.ID())
-	assert.NoError(err)
+	require.NoError(err)
 	// Ensure transaction is in the committed state
-	assert.Equal(txStatus, status.Committed)
+	require.Equal(txStatus, status.Committed)
 }

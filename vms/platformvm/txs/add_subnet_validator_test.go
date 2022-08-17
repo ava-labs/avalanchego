@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -19,7 +19,7 @@ import (
 )
 
 func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	clk := mockable.Clock{}
 	ctx := snow.DefaultContextTest()
 	signers := [][]*crypto.PrivateKeySECP256K1R{preFundedKeys}
@@ -31,10 +31,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	)
 
 	// Case : signed tx is nil
-	assert.ErrorIs(stx.SyntacticVerify(ctx), errNilSignedTx)
+	require.ErrorIs(stx.SyntacticVerify(ctx), errNilSignedTx)
 
 	// Case : unsigned tx is nil
-	assert.ErrorIs(addSubnetValidatorTx.SyntacticVerify(ctx), ErrNilTx)
+	require.ErrorIs(addSubnetValidatorTx.SyntacticVerify(ctx), ErrNilTx)
 
 	validatorWeight := uint64(2022)
 	subnetID := ids.ID{'s', 'u', 'b', 'n', 'e', 't', 'I', 'D'}
@@ -84,34 +84,34 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: valid tx
 	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
-	assert.NoError(err)
-	assert.NoError(stx.SyntacticVerify(ctx))
+	require.NoError(err)
+	require.NoError(stx.SyntacticVerify(ctx))
 
 	// Case: Wrong network ID
 	addSubnetValidatorTx.SyntacticallyVerified = false
 	addSubnetValidatorTx.NetworkID++
 	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
-	assert.NoError(err)
+	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	assert.Error(err)
+	require.Error(err)
 	addSubnetValidatorTx.NetworkID--
 
 	// Case: Missing Subnet ID
 	addSubnetValidatorTx.SyntacticallyVerified = false
 	addSubnetValidatorTx.Validator.Subnet = ids.Empty
 	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
-	assert.NoError(err)
+	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	assert.Error(err)
+	require.Error(err)
 	addSubnetValidatorTx.Validator.Subnet = subnetID
 
 	// Case: No weight
 	addSubnetValidatorTx.SyntacticallyVerified = false
 	addSubnetValidatorTx.Validator.Wght = 0
 	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
-	assert.NoError(err)
+	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	assert.Error(err)
+	require.Error(err)
 	addSubnetValidatorTx.Validator.Wght = validatorWeight
 
 	// Case: Subnet auth indices not unique
@@ -119,13 +119,13 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	input := addSubnetValidatorTx.SubnetAuth.(*secp256k1fx.Input)
 	input.SigIndices[0] = input.SigIndices[1]
 	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
-	assert.NoError(err)
+	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	assert.Error(err)
+	require.Error(err)
 }
 
 func TestAddSubnetValidatorMarshal(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	clk := mockable.Clock{}
 	ctx := snow.DefaultContextTest()
 	signers := [][]*crypto.PrivateKeySECP256K1R{preFundedKeys}
@@ -185,15 +185,15 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 
 	// Case: valid tx
 	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
-	assert.NoError(err)
-	assert.NoError(stx.SyntacticVerify(ctx))
+	require.NoError(err)
+	require.NoError(stx.SyntacticVerify(ctx))
 
 	txBytes, err := Codec.Marshal(Version, stx)
-	assert.NoError(err)
+	require.NoError(err)
 
 	parsedTx, err := Parse(Codec, txBytes)
-	assert.NoError(err)
+	require.NoError(err)
 
-	assert.NoError(parsedTx.SyntacticVerify(ctx))
-	assert.Equal(stx, parsedTx)
+	require.NoError(parsedTx.SyntacticVerify(ctx))
+	require.Equal(stx, parsedTx)
 }

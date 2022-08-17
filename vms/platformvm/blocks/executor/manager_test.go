@@ -8,7 +8,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -18,12 +18,12 @@ import (
 )
 
 func TestGetBlock(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	statelessBlk, err := blocks.NewCommitBlock(ids.GenerateTestID(), 2)
-	assert.NoError(err)
+	require.NoError(err)
 	state := state.NewMockState(ctrl)
 	manager := &manager{
 		backend: &backend{
@@ -36,18 +36,18 @@ func TestGetBlock(t *testing.T) {
 		// Case: block isn't in memory or database
 		state.EXPECT().GetStatelessBlock(statelessBlk.ID()).Return(nil, choices.Unknown, database.ErrNotFound).Times(1)
 		_, err := manager.GetBlock(statelessBlk.ID())
-		assert.Error(err)
+		require.Error(err)
 	}
 	{
 		// Case: block isn't in memory but is in database.
 		state.EXPECT().GetStatelessBlock(statelessBlk.ID()).Return(statelessBlk, choices.Accepted, nil).Times(1)
 		gotBlk, err := manager.GetBlock(statelessBlk.ID())
-		assert.NoError(err)
-		assert.Equal(statelessBlk.ID(), gotBlk.ID())
+		require.NoError(err)
+		require.Equal(statelessBlk.ID(), gotBlk.ID())
 		innerBlk, ok := gotBlk.(*Block)
-		assert.True(ok)
-		assert.Equal(statelessBlk, innerBlk.Block)
-		assert.Equal(manager, innerBlk.manager)
+		require.True(ok)
+		require.Equal(statelessBlk, innerBlk.Block)
+		require.Equal(manager, innerBlk.manager)
 	}
 	{
 		// Case: block is in memory
@@ -55,17 +55,17 @@ func TestGetBlock(t *testing.T) {
 			statelessBlock: statelessBlk,
 		}
 		gotBlk, err := manager.GetBlock(statelessBlk.ID())
-		assert.NoError(err)
-		assert.Equal(statelessBlk.ID(), gotBlk.ID())
+		require.NoError(err)
+		require.Equal(statelessBlk.ID(), gotBlk.ID())
 		innerBlk, ok := gotBlk.(*Block)
-		assert.True(ok)
-		assert.Equal(statelessBlk, innerBlk.Block)
-		assert.Equal(manager, innerBlk.manager)
+		require.True(ok)
+		require.Equal(statelessBlk, innerBlk.Block)
+		require.Equal(manager, innerBlk.manager)
 	}
 }
 
 func TestManagerLastAccepted(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	lastAcceptedID := ids.GenerateTestID()
 	manager := &manager{
@@ -74,5 +74,5 @@ func TestManagerLastAccepted(t *testing.T) {
 		},
 	}
 
-	assert.Equal(lastAcceptedID, manager.LastAccepted())
+	require.Equal(lastAcceptedID, manager.LastAccepted())
 }

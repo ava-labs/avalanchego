@@ -8,7 +8,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -121,7 +121,7 @@ func TestBaseTxSerialization(t *testing.T) {
 	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, tx.ID().String(), "zeqT8FTnRAxes7QQQYkaWhNkHavd9d6aCdH8TQu2Mx5KEydEz")
+	require.Equal(t, tx.ID().String(), "zeqT8FTnRAxes7QQQYkaWhNkHavd9d6aCdH8TQu2Mx5KEydEz")
 	result := tx.Bytes()
 	if !bytes.Equal(expected, result) {
 		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
@@ -179,7 +179,7 @@ func TestBaseTxSerialization(t *testing.T) {
 	if err := tx.SignSECP256K1Fx(c, [][]*crypto.PrivateKeySECP256K1R{{keys[0], keys[0]}, {keys[0], keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, tx.ID().String(), "QnTUuie2qe6BKyYrC2jqd73bJ828QNhYnZbdA2HWsnVRPjBfV")
+	require.Equal(t, tx.ID().String(), "QnTUuie2qe6BKyYrC2jqd73bJ828QNhYnZbdA2HWsnVRPjBfV")
 	result = tx.Bytes()
 
 	// there are two credentials

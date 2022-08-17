@@ -9,7 +9,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -58,7 +58,7 @@ func TestNewExportTx(t *testing.T) {
 	to := ids.GenerateTestShortID()
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
@@ -70,13 +70,13 @@ func TestNewExportTx(t *testing.T) {
 				ids.ShortEmpty, // Change address
 			)
 			if tt.shouldErr {
-				assert.Error(err)
+				require.Error(err)
 				return
 			}
-			assert.NoError(err)
+			require.NoError(err)
 
 			fakedState, err := state.NewDiff(lastAcceptedID, env)
-			assert.NoError(err)
+			require.NoError(err)
 
 			fakedState.SetTimestamp(tt.timestamp)
 
@@ -91,9 +91,9 @@ func TestNewExportTx(t *testing.T) {
 			}
 			err = tx.Unsigned.Visit(&verifier)
 			if tt.shouldVerify {
-				assert.NoError(err)
+				require.NoError(err)
 			} else {
-				assert.Error(err)
+				require.Error(err)
 			}
 		})
 	}

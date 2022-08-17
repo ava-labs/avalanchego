@@ -33,7 +33,6 @@ const (
 var (
 	_ txs.Visitor = &ProposalTxExecutor{}
 
-	errMissingParentState        = errors.New("missing parent state")
 	errWeightTooSmall            = errors.New("weight of this validator is too low")
 	errWeightTooLarge            = errors.New("weight of this validator is too large")
 	errStakeTooShort             = errors.New("staking period is too short")
@@ -48,6 +47,7 @@ var (
 	errShouldBeDSValidator       = errors.New("expected validator to be in the primary network")
 	errWrongTxType               = errors.New("wrong transaction type")
 	errInvalidID                 = errors.New("invalid ID")
+	errEmptyNodeID               = errors.New("validator nodeID cannot be empty")
 )
 
 type ProposalTxExecutor struct {
@@ -101,7 +101,16 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 
 	parentState, ok := e.StateVersions.GetState(e.ParentID)
 	if !ok {
-		return errMissingParentState
+		return state.ErrMissingParentState
+	}
+
+	currentTimestamp := parentState.GetTimestamp()
+
+	// Blueberry disallows creating a validator with the empty ID.
+	if !currentTimestamp.Before(e.Config.BlueberryTime) {
+		if tx.Validator.NodeID == ids.EmptyNodeID {
+			return errEmptyNodeID
+		}
 	}
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.Stake))
@@ -109,7 +118,6 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	copy(outs[len(tx.Outs):], tx.Stake)
 
 	if e.Bootstrapped.GetValue() {
-		currentTimestamp := parentState.GetTimestamp()
 		// Ensure the proposed validator starts after the current time
 		startTime := tx.StartTime()
 		if !currentTimestamp.Before(startTime) {
@@ -216,7 +224,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 
 	parentState, ok := e.StateVersions.GetState(e.ParentID)
 	if !ok {
-		return errMissingParentState
+		return state.ErrMissingParentState
 	}
 
 	if e.Bootstrapped.GetValue() {
@@ -371,7 +379,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 
 	parentState, ok := e.StateVersions.GetState(e.ParentID)
 	if !ok {
-		return errMissingParentState
+		return state.ErrMissingParentState
 	}
 
 	txID := e.Tx.ID()
@@ -492,7 +500,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 
 	parentState, ok := e.StateVersions.GetState(e.ParentID)
 	if !ok {
-		return errMissingParentState
+		return state.ErrMissingParentState
 	}
 
 	if chainTimestamp := parentState.GetTimestamp(); !txTimestamp.After(chainTimestamp) {
@@ -661,7 +669,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 
 	parentState, ok := e.StateVersions.GetState(e.ParentID)
 	if !ok {
-		return errMissingParentState
+		return state.ErrMissingParentState
 	}
 
 	currentStakerIterator, err := parentState.GetCurrentStakerIterator()

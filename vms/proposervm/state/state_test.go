@@ -7,14 +7,15 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/assert"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 )
 
 func TestState(t *testing.T) {
-	a := assert.New(t)
+	a := require.New(t)
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
@@ -25,7 +26,7 @@ func TestState(t *testing.T) {
 }
 
 func TestMeteredState(t *testing.T) {
-	a := assert.New(t)
+	a := require.New(t)
 
 	db := memdb.New()
 	vdb := versiondb.New(db)

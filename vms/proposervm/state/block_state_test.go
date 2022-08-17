@@ -9,7 +9,8 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/assert"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -19,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-func testBlockState(a *assert.Assertions, bs BlockState) {
+func testBlockState(a *require.Assertions, bs BlockState) {
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
@@ -64,7 +65,7 @@ func testBlockState(a *assert.Assertions, bs BlockState) {
 }
 
 func TestBlockState(t *testing.T) {
-	a := assert.New(t)
+	a := require.New(t)
 
 	db := memdb.New()
 	bs := NewBlockState(db)
@@ -73,7 +74,7 @@ func TestBlockState(t *testing.T) {
 }
 
 func TestMeteredBlockState(t *testing.T) {
-	a := assert.New(t)
+	a := require.New(t)
 
 	db := memdb.New()
 	bs, err := NewMeteredBlockState(db, "", prometheus.NewRegistry())

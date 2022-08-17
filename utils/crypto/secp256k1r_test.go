@@ -7,7 +7,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v3"
 
@@ -16,19 +16,19 @@ import (
 )
 
 func TestRecover(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	f := FactorySECP256K1R{}
 	key, err := f.NewPrivateKey()
-	assert.NoError(err)
+	require.NoError(err)
 
 	msg := []byte{1, 2, 3}
 	sig, err := key.Sign(msg)
-	assert.NoError(err)
+	require.NoError(err)
 
 	pub := key.PublicKey()
 	pubRec, err := f.RecoverPublicKey(msg, sig)
-	assert.NoError(err)
+	require.NoError(err)
 
 	if !bytes.Equal(pub.Bytes(), pubRec.Bytes()) {
 		t.Fatalf("Should have been equal")
@@ -36,20 +36,20 @@ func TestRecover(t *testing.T) {
 }
 
 func TestCachedRecover(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	f := FactorySECP256K1R{Cache: cache.LRU{Size: 1}}
 	key, err := f.NewPrivateKey()
-	assert.NoError(err)
+	require.NoError(err)
 
 	msg := []byte{1, 2, 3}
 	sig, err := key.Sign(msg)
-	assert.NoError(err)
+	require.NoError(err)
 
 	pub1, err := f.RecoverPublicKey(msg, sig)
-	assert.NoError(err)
+	require.NoError(err)
 	pub2, err := f.RecoverPublicKey(msg, sig)
-	assert.NoError(err)
+	require.NoError(err)
 
 	if pub1 != pub2 {
 		t.Fatalf("Should have returned the same public key")
@@ -92,12 +92,12 @@ func TestVerifyMutatedSignature(t *testing.T) {
 	factory := FactorySECP256K1R{}
 
 	sk, err := factory.NewPrivateKey()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	msg := []byte{'h', 'e', 'l', 'l', 'o'}
 
 	sig, err := sk.Sign(msg)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var s secp256k1.ModNScalar
 	s.SetByteSlice(sig[32:64])
@@ -106,24 +106,24 @@ func TestVerifyMutatedSignature(t *testing.T) {
 	copy(sig[32:], newSBytes[:])
 
 	_, err = factory.RecoverPublicKey(msg, sig)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestPrivateKeySECP256K1RUnmarshalJSON(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	f := FactorySECP256K1R{}
 	keyIntf, err := f.NewPrivateKey()
-	assert.NoError(err)
+	require.NoError(err)
 	key := keyIntf.(*PrivateKeySECP256K1R)
 
 	keyJSON, err := key.MarshalJSON()
-	assert.NoError(err)
+	require.NoError(err)
 
 	key2 := PrivateKeySECP256K1R{}
 	err = key2.UnmarshalJSON(keyJSON)
-	assert.NoError(err)
-	assert.Equal(key.PublicKey().Address(), key2.PublicKey().Address())
+	require.NoError(err)
+	require.Equal(key.PublicKey().Address(), key2.PublicKey().Address())
 }
 
 func TestPrivateKeySECP256K1RUnmarshalJSONError(t *testing.T) {
@@ -158,11 +158,11 @@ func TestPrivateKeySECP256K1RUnmarshalJSONError(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 
 			foo := PrivateKeySECP256K1R{}
 			err := foo.UnmarshalJSON(tt.in)
-			assert.Error(err)
+			require.Error(err)
 		})
 	}
 }
@@ -220,11 +220,11 @@ func TestSigning(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(string(tt.msg), func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 
 			bytes, err := key.Sign(tt.msg)
-			assert.NoError(err)
-			assert.Equal(tt.sig, bytes)
+			require.NoError(err)
+			require.Equal(tt.sig, bytes)
 		})
 	}
 }

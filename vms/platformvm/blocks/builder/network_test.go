@@ -6,7 +6,7 @@ package builder
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -35,12 +35,12 @@ func getValidTx(txBuilder txbuilder.Builder, t *testing.T) *txs.Tx {
 
 // show that a tx learned from gossip is validated and added to mempool
 func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
 	defer func() {
-		assert.NoError(shutdownEnvironment(env))
+		require.NoError(shutdownEnvironment(env))
 	}()
 
 	var gossipedBytes []byte
@@ -57,40 +57,40 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 
 	msg := message.Tx{Tx: tx.Bytes()}
 	msgBytes, err := message.Build(&msg)
-	assert.NoError(err)
+	require.NoError(err)
 	// Free lock because [AppGossip] waits for the context lock
 	env.ctx.Lock.Unlock()
 	// show that unknown tx is added to mempool
 	err = env.AppGossip(nodeID, msgBytes)
-	assert.NoError(err, "error in reception of gossiped tx")
-	assert.True(env.Builder.Has(txID))
+	require.NoError(err, "error in reception of gossiped tx")
+	require.True(env.Builder.Has(txID))
 	// Grab lock back
 	env.ctx.Lock.Lock()
 
 	// and gossiped if it has just been discovered
-	assert.True(gossipedBytes != nil)
+	require.True(gossipedBytes != nil)
 
 	// show gossiped bytes can be decoded to the original tx
 	replyIntf, err := message.Parse(gossipedBytes)
-	assert.NoError(err, "failed to parse gossip")
+	require.NoError(err, "failed to parse gossip")
 
 	reply, ok := replyIntf.(*message.Tx)
-	assert.True(ok, "unknown message type")
+	require.True(ok, "unknown message type")
 
 	retrivedTx, err := txs.Parse(txs.Codec, reply.Tx)
-	assert.NoError(err, "failed parsing tx")
+	require.NoError(err, "failed parsing tx")
 
-	assert.Equal(txID, retrivedTx.ID())
+	require.Equal(txID, retrivedTx.ID())
 }
 
 // show that txs already marked as invalid are not re-requested on gossiping
 func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
 	defer func() {
-		assert.NoError(shutdownEnvironment(env))
+		require.NoError(shutdownEnvironment(env))
 	}()
 
 	// create a tx and mark as invalid
@@ -102,22 +102,22 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	msg := message.Tx{Tx: tx.Bytes()}
 	msgBytes, err := message.Build(&msg)
-	assert.NoError(err)
+	require.NoError(err)
 	env.ctx.Lock.Unlock()
 	err = env.AppGossip(nodeID, msgBytes)
 	env.ctx.Lock.Lock()
-	assert.NoError(err, "error in reception of gossiped tx")
-	assert.False(env.Builder.Has(txID))
+	require.NoError(err, "error in reception of gossiped tx")
+	require.False(env.Builder.Has(txID))
 }
 
 // show that locally generated txs are gossiped
 func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
 	defer func() {
-		assert.NoError(shutdownEnvironment(env))
+		require.NoError(shutdownEnvironment(env))
 	}()
 
 	var gossipedBytes []byte
@@ -131,26 +131,26 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	txID := tx.ID()
 
 	err := env.Builder.AddUnverifiedTx(tx)
-	assert.NoError(err, "couldn't add tx to mempool")
-	assert.True(gossipedBytes != nil)
+	require.NoError(err, "couldn't add tx to mempool")
+	require.True(gossipedBytes != nil)
 
 	// show gossiped bytes can be decoded to the original tx
 	replyIntf, err := message.Parse(gossipedBytes)
-	assert.NoError(err, "failed to parse gossip")
+	require.NoError(err, "failed to parse gossip")
 
 	reply, ok := replyIntf.(*message.Tx)
-	assert.True(ok, "unknown message type")
+	require.True(ok, "unknown message type")
 
 	retrivedTx, err := txs.Parse(txs.Codec, reply.Tx)
-	assert.NoError(err, "failed parsing tx")
+	require.NoError(err, "failed parsing tx")
 
-	assert.Equal(txID, retrivedTx.ID())
+	require.Equal(txID, retrivedTx.ID())
 
 	// show that transaction is not re-gossiped is recently added to mempool
 	gossipedBytes = nil
 	env.Builder.RemoveDecisionTxs([]*txs.Tx{tx})
 	err = env.Builder.Add(tx)
-	assert.NoError(err, "could not reintroduce tx to mempool")
+	require.NoError(err, "could not reintroduce tx to mempool")
 
-	assert.True(gossipedBytes == nil)
+	require.True(gossipedBytes == nil)
 }

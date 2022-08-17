@@ -8,7 +8,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -117,12 +117,12 @@ func TestRejectBlock(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
 			blk, err := tt.newBlockFunc()
-			assert.NoError(err)
+			require.NoError(err)
 
 			mempool := mempool.NewMockMempool(ctrl)
 			state := state.NewMockState(ctrl)
@@ -151,9 +151,9 @@ func TestRejectBlock(t *testing.T) {
 			)
 
 			err = tt.rejectFunc(rejector, blk)
-			assert.NoError(err)
+			require.NoError(err)
 			// Make sure block and its parent are removed from the state map.
-			assert.NotContains(rejector.blkIDToState, blk.ID())
+			require.NotContains(rejector.blkIDToState, blk.ID())
 		})
 	}
 }

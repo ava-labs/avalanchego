@@ -6,26 +6,26 @@ package secp256k1fx
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
 
 func TestMintOutputOwnersVerifyNil(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	out := (*OutputOwners)(nil)
-	assert.ErrorIs(out.Verify(), errNilOutput)
+	require.ErrorIs(out.Verify(), errNilOutput)
 }
 
 func TestMintOutputOwnersExactEquals(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	out0 := (*OutputOwners)(nil)
 	out1 := (*OutputOwners)(nil)
-	assert.True(out0.Equals(out1))
+	require.True(out0.Equals(out1))
 }
 
 func TestMintOutputOwnersNotEqual(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	out0 := &OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
@@ -38,11 +38,11 @@ func TestMintOutputOwnersNotEqual(t *testing.T) {
 			{1},
 		},
 	}
-	assert.False(out0.Equals(out1))
+	require.False(out0.Equals(out1))
 }
 
 func TestMintOutputOwnersNotSorted(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	out := &OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
@@ -50,13 +50,13 @@ func TestMintOutputOwnersNotSorted(t *testing.T) {
 			{0},
 		},
 	}
-	assert.ErrorIs(out.Verify(), errAddrsNotSortedUnique)
+	require.ErrorIs(out.Verify(), errAddrsNotSortedUnique)
 	out.Sort()
-	assert.NoError(out.Verify())
+	require.NoError(out.Verify())
 }
 
 func TestMarshalJSONRequiresCtxWhenAddrsArePresent(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	out := &OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
@@ -66,11 +66,11 @@ func TestMarshalJSONRequiresCtxWhenAddrsArePresent(t *testing.T) {
 	}
 
 	_, err := out.MarshalJSON()
-	assert.ErrorIs(err, errMarshal)
+	require.ErrorIs(err, errMarshal)
 }
 
 func TestMarshalJSONDoesNotRequireCtxWhenAddrsAreAbsent(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	out := &OutputOwners{
 		Threshold: 1,
 		Locktime:  2,
@@ -78,8 +78,8 @@ func TestMarshalJSONDoesNotRequireCtxWhenAddrsAreAbsent(t *testing.T) {
 	}
 
 	b, err := out.MarshalJSON()
-	assert.NoError(err)
+	require.NoError(err)
 
 	jsonData := string(b)
-	assert.Equal(jsonData, "{\"addresses\":[],\"locktime\":2,\"threshold\":1}")
+	require.Equal(jsonData, "{\"addresses\":[],\"locktime\":2,\"threshold\":1}")
 }

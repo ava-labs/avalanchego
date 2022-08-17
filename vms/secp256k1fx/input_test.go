@@ -6,11 +6,11 @@ package secp256k1fx
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInputVerifyNil(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	in := (*Input)(nil)
-	assert.ErrorIs(in.Verify(), errNilInput)
+	require.ErrorIs(in.Verify(), errNilInput)
 }

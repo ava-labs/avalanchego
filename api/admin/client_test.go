@@ -8,7 +8,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
@@ -177,8 +177,8 @@ func TestGetChainAliases(t *testing.T) {
 		}, nil)}
 
 		reply, err := mockClient.GetChainAliases(context.Background(), "chain")
-		assert.NoError(t, err)
-		assert.ElementsMatch(t, expectedReply, reply)
+		require.NoError(t, err)
+		require.ElementsMatch(t, expectedReply, reply)
 	})
 
 	t.Run("failure", func(t *testing.T) {
@@ -186,7 +186,7 @@ func TestGetChainAliases(t *testing.T) {
 
 		_, err := mockClient.GetChainAliases(context.Background(), "chain")
 
-		assert.EqualError(t, err, "some error")
+		require.EqualError(t, err, "some error")
 	})
 }
 
@@ -222,9 +222,9 @@ func TestReloadInstalledVMs(t *testing.T) {
 		}, nil)}
 
 		loadedVMs, failedVMs, err := mockClient.LoadVMs(context.Background())
-		assert.NoError(t, err)
-		assert.Equal(t, expectedNewVMs, loadedVMs)
-		assert.Equal(t, expectedFailedVMs, failedVMs)
+		require.NoError(t, err)
+		require.Equal(t, expectedNewVMs, loadedVMs)
+		require.Equal(t, expectedFailedVMs, failedVMs)
 	})
 
 	t.Run("failure", func(t *testing.T) {
@@ -232,7 +232,7 @@ func TestReloadInstalledVMs(t *testing.T) {
 
 		_, _, err := mockClient.LoadVMs(context.Background())
 
-		assert.EqualError(t, err, "some error")
+		require.EqualError(t, err, "some error")
 	})
 }
 
@@ -276,7 +276,7 @@ func TestSetLoggerLevel(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 			var err error
 			if tt.serviceErr {
 				err = errors.New("some error")
@@ -289,9 +289,9 @@ func TestSetLoggerLevel(t *testing.T) {
 				tt.displayLevel,
 			)
 			if tt.clientShouldErr {
-				assert.Error(err)
+				require.Error(err)
 			} else {
-				assert.NoError(err)
+				require.NoError(err)
 			}
 		})
 	}
@@ -325,7 +325,7 @@ func TestGetLoggerLevel(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 			var err error
 			if tt.serviceErr {
 				err = errors.New("some error")
@@ -336,11 +336,11 @@ func TestGetLoggerLevel(t *testing.T) {
 				tt.loggerName,
 			)
 			if tt.clientShouldErr {
-				assert.Error(err)
+				require.Error(err)
 				return
 			}
-			assert.NoError(err)
-			assert.EqualValues(tt.serviceResponse, res)
+			require.NoError(err)
+			require.EqualValues(tt.serviceResponse, res)
 		})
 	}
 }
@@ -369,7 +369,7 @@ func TestGetConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 			var err error
 			if tt.serviceErr {
 				err = errors.New("some error")
@@ -377,11 +377,11 @@ func TestGetConfig(t *testing.T) {
 			mockClient := client{requester: NewMockClient(tt.expectedResponse, err)}
 			res, err := mockClient.GetConfig(context.Background())
 			if tt.clientShouldErr {
-				assert.Error(err)
+				require.Error(err)
 				return
 			}
-			assert.NoError(err)
-			assert.EqualValues("response", res)
+			require.NoError(err)
+			require.EqualValues("response", res)
 		})
 	}
 }

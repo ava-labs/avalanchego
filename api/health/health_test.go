@@ -12,7 +12,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -54,91 +54,91 @@ func awaitLiveness(r Reporter, liveness bool) {
 }
 
 func TestDuplicatedRegistations(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	check := CheckerFunc(func() (interface{}, error) {
 		return "", nil
 	})
 
 	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = h.RegisterReadinessCheck("check", check)
-	assert.NoError(err)
+	require.NoError(err)
 	err = h.RegisterReadinessCheck("check", check)
-	assert.ErrorIs(err, errDuplicateCheck)
+	require.ErrorIs(err, errDuplicateCheck)
 
 	err = h.RegisterHealthCheck("check", check)
-	assert.NoError(err)
+	require.NoError(err)
 	err = h.RegisterHealthCheck("check", check)
-	assert.ErrorIs(err, errDuplicateCheck)
+	require.ErrorIs(err, errDuplicateCheck)
 
 	err = h.RegisterLivenessCheck("check", check)
-	assert.NoError(err)
+	require.NoError(err)
 	err = h.RegisterLivenessCheck("check", check)
-	assert.ErrorIs(err, errDuplicateCheck)
+	require.ErrorIs(err, errDuplicateCheck)
 }
 
 func TestDefaultFailing(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	check := CheckerFunc(func() (interface{}, error) {
 		return "", nil
 	})
 
 	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
-	assert.NoError(err)
+	require.NoError(err)
 
 	{
 		err = h.RegisterReadinessCheck("check", check)
-		assert.NoError(err)
+		require.NoError(err)
 
 		readinessResult, readiness := h.Readiness()
-		assert.Len(readinessResult, 1)
-		assert.Contains(readinessResult, "check")
-		assert.Equal(notYetRunResult, readinessResult["check"])
-		assert.False(readiness)
+		require.Len(readinessResult, 1)
+		require.Contains(readinessResult, "check")
+		require.Equal(notYetRunResult, readinessResult["check"])
+		require.False(readiness)
 	}
 
 	{
 		err = h.RegisterHealthCheck("check", check)
-		assert.NoError(err)
+		require.NoError(err)
 
 		healthResult, health := h.Health()
-		assert.Len(healthResult, 1)
-		assert.Contains(healthResult, "check")
-		assert.Equal(notYetRunResult, healthResult["check"])
-		assert.False(health)
+		require.Len(healthResult, 1)
+		require.Contains(healthResult, "check")
+		require.Equal(notYetRunResult, healthResult["check"])
+		require.False(health)
 	}
 
 	{
 		err = h.RegisterLivenessCheck("check", check)
-		assert.NoError(err)
+		require.NoError(err)
 
 		livenessResult, liveness := h.Liveness()
-		assert.Len(livenessResult, 1)
-		assert.Contains(livenessResult, "check")
-		assert.Equal(notYetRunResult, livenessResult["check"])
-		assert.False(liveness)
+		require.Len(livenessResult, 1)
+		require.Contains(livenessResult, "check")
+		require.Equal(notYetRunResult, livenessResult["check"])
+		require.False(liveness)
 	}
 }
 
 func TestPassingChecks(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	check := CheckerFunc(func() (interface{}, error) {
 		return "", nil
 	})
 
 	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = h.RegisterReadinessCheck("check", check)
-	assert.NoError(err)
+	require.NoError(err)
 	err = h.RegisterHealthCheck("check", check)
-	assert.NoError(err)
+	require.NoError(err)
 	err = h.RegisterLivenessCheck("check", check)
-	assert.NoError(err)
+	require.NoError(err)
 
 	h.Start(checkFreq)
 	defer h.Stop()
@@ -147,47 +147,47 @@ func TestPassingChecks(t *testing.T) {
 		awaitReadiness(h)
 
 		readinessResult, readiness := h.Readiness()
-		assert.Len(readinessResult, 1)
-		assert.Contains(readinessResult, "check")
+		require.Len(readinessResult, 1)
+		require.Contains(readinessResult, "check")
 
 		result := readinessResult["check"]
-		assert.Equal("", result.Details)
-		assert.Nil(result.Error)
-		assert.Zero(result.ContiguousFailures)
-		assert.True(readiness)
+		require.Equal("", result.Details)
+		require.Nil(result.Error)
+		require.Zero(result.ContiguousFailures)
+		require.True(readiness)
 	}
 
 	{
 		awaitHealthy(h, true)
 
 		healthResult, health := h.Health()
-		assert.Len(healthResult, 1)
-		assert.Contains(healthResult, "check")
+		require.Len(healthResult, 1)
+		require.Contains(healthResult, "check")
 
 		result := healthResult["check"]
-		assert.Equal("", result.Details)
-		assert.Nil(result.Error)
-		assert.Zero(result.ContiguousFailures)
-		assert.True(health)
+		require.Equal("", result.Details)
+		require.Nil(result.Error)
+		require.Zero(result.ContiguousFailures)
+		require.True(health)
 	}
 
 	{
 		awaitLiveness(h, true)
 
 		livenessResult, liveness := h.Liveness()
-		assert.Len(livenessResult, 1)
-		assert.Contains(livenessResult, "check")
+		require.Len(livenessResult, 1)
+		require.Contains(livenessResult, "check")
 
 		result := livenessResult["check"]
-		assert.Equal("", result.Details)
-		assert.Nil(result.Error)
-		assert.Zero(result.ContiguousFailures)
-		assert.True(liveness)
+		require.Equal("", result.Details)
+		require.Nil(result.Error)
+		require.Zero(result.ContiguousFailures)
+		require.True(liveness)
 	}
 }
 
 func TestPassingThenFailingChecks(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	var (
 		shouldCheckErr utils.AtomicBool
@@ -201,14 +201,14 @@ func TestPassingThenFailingChecks(t *testing.T) {
 	})
 
 	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = h.RegisterReadinessCheck("check", check)
-	assert.NoError(err)
+	require.NoError(err)
 	err = h.RegisterHealthCheck("check", check)
-	assert.NoError(err)
+	require.NoError(err)
 	err = h.RegisterLivenessCheck("check", check)
-	assert.NoError(err)
+	require.NoError(err)
 
 	h.Start(checkFreq)
 	defer h.Stop()
@@ -219,13 +219,13 @@ func TestPassingThenFailingChecks(t *testing.T) {
 
 	{
 		_, readiness := h.Readiness()
-		assert.True(readiness)
+		require.True(readiness)
 
 		_, health := h.Health()
-		assert.True(health)
+		require.True(health)
 
 		_, liveness := h.Liveness()
-		assert.True(liveness)
+		require.True(liveness)
 	}
 
 	shouldCheckErr.SetValue(true)
@@ -237,21 +237,21 @@ func TestPassingThenFailingChecks(t *testing.T) {
 		// Notice that Readiness is a monotonic check - so it still reports
 		// ready.
 		_, readiness := h.Readiness()
-		assert.True(readiness)
+		require.True(readiness)
 
 		_, health := h.Health()
-		assert.False(health)
+		require.False(health)
 
 		_, liveness := h.Liveness()
-		assert.False(liveness)
+		require.False(liveness)
 	}
 }
 
 func TestDeadlockRegression(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
-	assert.NoError(err)
+	require.NoError(err)
 
 	var lock sync.Mutex
 	check := CheckerFunc(func() (interface{}, error) {
@@ -268,7 +268,7 @@ func TestDeadlockRegression(t *testing.T) {
 		lock.Lock()
 		err = h.RegisterHealthCheck(fmt.Sprintf("check-%d", i), check)
 		lock.Unlock()
-		assert.NoError(err)
+		require.NoError(err)
 	}
 
 	awaitHealthy(h, true)

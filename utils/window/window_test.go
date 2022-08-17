@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
@@ -55,10 +55,10 @@ func TestAdd(t *testing.T) {
 
 			window.Add(test.newlyAdded)
 
-			assert.Equal(t, len(test.window)+1, window.Length())
+			require.Equal(t, len(test.window)+1, window.Length())
 			oldest, ok := window.Oldest()
-			assert.Equal(t, test.expectedOldest, oldest.(int))
-			assert.True(t, ok)
+			require.Equal(t, test.expectedOldest, oldest.(int))
+			require.True(t, ok)
 		})
 	}
 }
@@ -83,10 +83,10 @@ func TestTTLAdd(t *testing.T) {
 	window.Add(2)
 	window.Add(3)
 
-	assert.Equal(t, 3, window.Length())
+	require.Equal(t, 3, window.Length())
 	oldest, ok := window.Oldest()
-	assert.Equal(t, 1, oldest.(int))
-	assert.True(t, ok)
+	require.Equal(t, 1, oldest.(int))
+	require.True(t, ok)
 	// Now we're one second past the ttl of 10 seconds as defined in testTTL,
 	// so all existing elements need to be evicted.
 	clock.Set(epochStart.Add(11 * time.Second))
@@ -95,21 +95,21 @@ func TestTTLAdd(t *testing.T) {
 	// [4]
 	window.Add(4)
 
-	assert.Equal(t, 1, window.Length())
+	require.Equal(t, 1, window.Length())
 	oldest, ok = window.Oldest()
-	assert.Equal(t, 4, oldest.(int))
-	assert.True(t, ok)
+	require.Equal(t, 4, oldest.(int))
+	require.True(t, ok)
 	// Now we're one second past the ttl of 10 seconds of when [4] was added,
 	// so all existing elements should be evicted.
 	clock.Set(epochStart.Add(22 * time.Second))
 
 	// Now the window should look like this:
 	// []
-	assert.Equal(t, 0, window.Length())
+	require.Equal(t, 0, window.Length())
 
 	oldest, ok = window.Oldest()
-	assert.Nil(t, oldest)
-	assert.False(t, ok)
+	require.Nil(t, oldest)
+	require.False(t, ok)
 }
 
 // TestTTLReadOnly tests that stale elements are still evicted on Length
@@ -131,14 +131,14 @@ func TestTTLLength(t *testing.T) {
 	window.Add(2)
 	window.Add(3)
 
-	assert.Equal(t, 3, window.Length())
+	require.Equal(t, 3, window.Length())
 
 	// Now we're one second past the ttl of 10 seconds as defined in testTTL,
 	// so all existing elements need to be evicted.
 	clock.Set(epochStart.Add(11 * time.Second))
 
 	// No more elements should be present in the window.
-	assert.Equal(t, 0, window.Length())
+	require.Equal(t, 0, window.Length())
 }
 
 // TestTTLReadOnly tests that stale elements are still evicted on calling Oldest
@@ -161,9 +161,9 @@ func TestTTLOldest(t *testing.T) {
 	window.Add(3)
 
 	oldest, ok := window.Oldest()
-	assert.Equal(t, 1, oldest.(int))
-	assert.True(t, ok)
-	assert.Equal(t, 3, window.size)
+	require.Equal(t, 1, oldest.(int))
+	require.True(t, ok)
+	require.Equal(t, 3, window.size)
 
 	// Now we're one second past the ttl of 10 seconds as defined in testTTL,
 	// so all existing elements need to be evicted.
@@ -171,9 +171,9 @@ func TestTTLOldest(t *testing.T) {
 
 	// Now there shouldn't be any elements in the window
 	oldest, ok = window.Oldest()
-	assert.Nil(t, oldest)
-	assert.False(t, ok)
-	assert.Equal(t, 0, window.size)
+	require.Nil(t, oldest)
+	require.False(t, ok)
+	require.Equal(t, 0, window.size)
 }
 
 // Tests that we bound the amount of elements in the window
@@ -205,8 +205,8 @@ func TestMaxCapacity(t *testing.T) {
 	// [4, 5, 6]
 	window.Add(6)
 
-	assert.Equal(t, 3, window.Length())
+	require.Equal(t, 3, window.Length())
 	oldest, ok := window.Oldest()
-	assert.Equal(t, 4, oldest.(int))
-	assert.True(t, ok)
+	require.Equal(t, 4, oldest.(int))
+	require.True(t, ok)
 }

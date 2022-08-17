@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -1342,7 +1342,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Len(t, te.blocked, 2)
+	require.Len(t, te.blocked, 2)
 	sender.CantSendPullQuery = false
 
 	missingBlk.StatusV = choices.Processing

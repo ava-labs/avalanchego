@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -122,13 +122,13 @@ func TestStakerLess(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.less, test.left.Less(test.right))
+			require.Equal(t, test.less, test.left.Less(test.right))
 		})
 	}
 }
 
 func TestNewPrimaryNetworkStaker(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	txID := ids.GenerateTestID()
 	vdr := &validator.Validator{
 		NodeID: ids.GenerateTestNodeID(),
@@ -138,20 +138,20 @@ func TestNewPrimaryNetworkStaker(t *testing.T) {
 	}
 
 	staker := NewPrimaryNetworkStaker(txID, vdr)
-	assert.NotNil(staker)
-	assert.Equal(txID, staker.TxID)
-	assert.Equal(vdr.NodeID, staker.NodeID)
-	assert.Equal(constants.PrimaryNetworkID, staker.SubnetID)
-	assert.Equal(vdr.Wght, staker.Weight)
-	assert.Equal(vdr.StartTime(), staker.StartTime)
-	assert.Equal(vdr.EndTime(), staker.EndTime)
-	assert.Zero(staker.PotentialReward)
-	assert.Zero(staker.NextTime)
-	assert.Zero(staker.Priority)
+	require.NotNil(staker)
+	require.Equal(txID, staker.TxID)
+	require.Equal(vdr.NodeID, staker.NodeID)
+	require.Equal(constants.PrimaryNetworkID, staker.SubnetID)
+	require.Equal(vdr.Wght, staker.Weight)
+	require.Equal(vdr.StartTime(), staker.StartTime)
+	require.Equal(vdr.EndTime(), staker.EndTime)
+	require.Zero(staker.PotentialReward)
+	require.Zero(staker.NextTime)
+	require.Zero(staker.Priority)
 }
 
 func TestNewSubnetStaker(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	txID := ids.GenerateTestID()
 	vdr := &validator.SubnetValidator{
 		Validator: validator.Validator{
@@ -164,14 +164,14 @@ func TestNewSubnetStaker(t *testing.T) {
 	}
 
 	staker := NewSubnetStaker(txID, vdr)
-	assert.NotNil(staker)
-	assert.Equal(txID, staker.TxID)
-	assert.Equal(vdr.NodeID, staker.NodeID)
-	assert.Equal(vdr.Subnet, staker.SubnetID)
-	assert.Equal(vdr.Wght, staker.Weight)
-	assert.Equal(vdr.StartTime(), staker.StartTime)
-	assert.Equal(vdr.EndTime(), staker.EndTime)
-	assert.Zero(staker.PotentialReward)
-	assert.Zero(staker.NextTime)
-	assert.Zero(staker.Priority)
+	require.NotNil(staker)
+	require.Equal(txID, staker.TxID)
+	require.Equal(vdr.NodeID, staker.NodeID)
+	require.Equal(vdr.Subnet, staker.SubnetID)
+	require.Equal(vdr.Wght, staker.Weight)
+	require.Equal(vdr.StartTime(), staker.StartTime)
+	require.Equal(vdr.EndTime(), staker.EndTime)
+	require.Zero(staker.PotentialReward)
+	require.Zero(staker.NextTime)
+	require.Zero(staker.Priority)
 }

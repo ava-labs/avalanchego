@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -16,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (

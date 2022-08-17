@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -46,17 +46,17 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 
 			env := newEnvironment()
 			env.config.ApricotPhase3Time = ap3Time
 			env.ctx.Lock.Lock()
 			defer func() {
-				assert.NoError(shutdownEnvironment(env))
+				require.NoError(shutdownEnvironment(env))
 			}()
 
 			ins, outs, _, signers, err := env.utxosHandler.Spend(preFundedKeys, 0, test.fee, ids.ShortEmpty)
-			assert.NoError(err)
+			require.NoError(err)
 
 			// Create the tx
 			utx := &txs.CreateSubnetTx{
@@ -69,10 +69,10 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 				Owner: &secp256k1fx.OutputOwners{},
 			}
 			tx := &txs.Tx{Unsigned: utx}
-			assert.NoError(tx.Sign(txs.Codec, signers))
+			require.NoError(tx.Sign(txs.Codec, signers))
 
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)
-			assert.NoError(err)
+			require.NoError(err)
 
 			stateDiff.SetTimestamp(test.time)
 
@@ -82,7 +82,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 				Tx:      tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
-			assert.Equal(test.expectsError, err != nil)
+			require.Equal(test.expectsError, err != nil)
 		})
 	}
 }

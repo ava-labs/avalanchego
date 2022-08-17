@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestShortString(t *testing.T) {
@@ -158,5 +158,5 @@ func TestShortIDsToStrings(t *testing.T) {
 	shortIDs := []ShortID{{1}, {2}, {2}}
 	expected := []string{"6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt", "BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp", "BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp"}
 	shortStrings := ShortIDsToStrings(shortIDs)
-	assert.EqualValues(t, expected, shortStrings)
+	require.EqualValues(t, expected, shortStrings)
 }

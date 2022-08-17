@@ -9,7 +9,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
@@ -30,7 +30,7 @@ const (
 )
 
 func TestInterface(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	chainID0 := ids.GenerateTestID()
 	chainID1 := ids.GenerateTestID()
@@ -48,10 +48,10 @@ func TestInterface(t *testing.T) {
 		test(t, chainID0, chainID1, sm0, sm1, testDB)
 
 		err := conn0.Close()
-		assert.NoError(err)
+		require.NoError(err)
 
 		err = conn1.Close()
-		assert.NoError(err)
+		require.NoError(err)
 	}
 }
 
