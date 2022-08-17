@@ -117,7 +117,7 @@ func (vm *VM) Initialize(
 	_ []*common.Fx,
 	appSender common.AppSender,
 ) error {
-	ctx.Log.Info("initializing platform chain, chainIDs", zap.Stringer("chainID", ctx.ChainID))
+	ctx.Log.Verbo("initializing platform chain")
 
 	registerer := prometheus.NewRegistry()
 	if err := ctx.Metrics.Register(registerer); err != nil {
