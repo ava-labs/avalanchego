@@ -9,9 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-
-	transactions "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 func buildApricotBlock(
@@ -79,7 +78,7 @@ func buildApricotBlock(
 
 // Try to get/make a proposal tx to put into a block.
 // Returns an error if there's no suitable proposal tx.
-func nextApricotProposalTx(builder *builder, parentState state.Chain) (*transactions.Tx, error) {
+func nextApricotProposalTx(builder *builder, parentState state.Chain) (*txs.Tx, error) {
 	// clean out transactions with an invalid timestamp.
 	builder.dropExpiredProposalTxs()
 
@@ -89,7 +88,7 @@ func nextApricotProposalTx(builder *builder, parentState state.Chain) (*transact
 		return nil, errNoPendingBlocks
 	}
 	tx := builder.Mempool.PeekProposalTx()
-	startTime := tx.Unsigned.(transactions.StakerTx).StartTime()
+	startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 
 	// Check whether this staker starts within at most [MaxFutureStartTime].
 	// If it does, issue the staking tx.
