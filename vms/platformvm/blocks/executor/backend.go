@@ -72,7 +72,7 @@ func (b *backend) LastAccepted() ids.ID {
 // If the parent is accepted, the parent is the most recently
 // accepted block.
 // If the parent hasn't been accepted, the parent is in memory.
-func (b *backend) GetFork(blkID ids.ID) (forks.Fork, error) {
+func (b *backend) GetFork(blkID ids.ID) forks.Fork {
 	var parentTimestamp time.Time
 	if parentState, ok := b.blkIDToState[blkID]; ok {
 		parentTimestamp = parentState.timestamp
@@ -82,9 +82,9 @@ func (b *backend) GetFork(blkID ids.ID) (forks.Fork, error) {
 
 	forkTime := b.cfg.BlueberryTime
 	if parentTimestamp.Before(forkTime) {
-		return forks.Apricot, nil
+		return forks.Apricot
 	}
-	return forks.Blueberry, nil
+	return forks.Blueberry
 }
 
 func (b *backend) free(blkID ids.ID) {

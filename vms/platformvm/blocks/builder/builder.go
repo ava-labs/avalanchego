@@ -182,10 +182,7 @@ func (b *builder) buildBlock() (snowman.Block, []*txs.Tx, error) {
 	}
 	prefBlkID := preferred.ID()
 	nextHeight := preferred.Height() + 1
-	currentFork, err := b.blkManager.GetFork(prefBlkID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not fork for block %s: %w", prefBlkID, err)
-	}
+	currentFork := b.blkManager.GetFork(prefBlkID)
 
 	preferredState, ok := b.blkManager.GetState(prefBlkID)
 	if !ok {

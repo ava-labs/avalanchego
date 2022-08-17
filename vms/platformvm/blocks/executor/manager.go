@@ -26,7 +26,7 @@ type Manager interface {
 	NewBlock(blocks.Block) snowman.Block
 
 	// GetFork returns the fork of [blkID]'s child.
-	GetFork(blkID ids.ID) (forks.Fork, error)
+	GetFork(blkID ids.ID) forks.Fork
 }
 
 func NewManager(

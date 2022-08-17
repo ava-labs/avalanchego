@@ -77,10 +77,7 @@ func (f *forkChecker) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 }
 
 func (f *forkChecker) assertFork(parent ids.ID, expectedFork forks.Fork) error {
-	currentFork, err := f.GetFork(parent)
-	if err != nil {
-		return fmt.Errorf("couldn't get fork from parent %s: %w", parent, err)
-	}
+	currentFork := f.GetFork(parent)
 	if currentFork != expectedFork {
 		return fmt.Errorf("expected fork %d but got %d", expectedFork, currentFork)
 	}
