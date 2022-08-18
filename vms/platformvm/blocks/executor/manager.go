@@ -68,9 +68,9 @@ func NewManager(
 
 type manager struct {
 	*backend
-	verifier *verifier
-	acceptor *acceptor
-	rejector *rejector
+	verifier blocks.Visitor
+	acceptor blocks.Visitor
+	rejector blocks.Visitor
 }
 
 func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {

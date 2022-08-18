@@ -31,9 +31,10 @@ func (a *acceptor) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
 		zap.String("blockType", "blueberry abort"),
 		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
-	return a.acceptOptionBlock(b)
+
+	return a.optionBlock(b)
 }
 
 func (a *acceptor) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
@@ -42,50 +43,10 @@ func (a *acceptor) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
 		zap.String("blockType", "blueberry commit"),
 		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
-	return a.acceptOptionBlock(b)
-}
 
-func (a *acceptor) acceptOptionBlock(b blocks.Block) error {
-	blkID := b.ID()
-	parentID := b.Parent()
-
-	defer func() {
-		a.free(blkID)
-		// Note: we assume this block's sibling doesn't
-		// need the parent's state when it's rejected.
-		a.free(parentID)
-	}()
-
-	// Note that the parent must be accepted first.
-	parentState, ok := a.blkIDToState[parentID]
-	if !ok {
-		return fmt.Errorf("couldn't find state of block %s, parent of %s", parentID, blkID)
-	}
-	if err := a.commonAccept(parentState.statelessBlock); err != nil {
-		return err
-	}
-
-	if err := a.commonAccept(b); err != nil {
-		return err
-	}
-
-	// Update metrics
-	if a.bootstrapped.GetValue() {
-		wasPreferred := parentState.initiallyPreferCommit
-		if wasPreferred {
-			a.metrics.MarkOptionVoteWon()
-		} else {
-			a.metrics.MarkOptionVoteLost()
-		}
-	}
-	blkState, ok := a.blkIDToState[blkID]
-	if !ok {
-		return fmt.Errorf("couldn't find state of block %s", blkID)
-	}
-	blkState.onAcceptState.Apply(a.state)
-	return a.state.Commit()
+	return a.optionBlock(b)
 }
 
 func (a *acceptor) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) error {
@@ -97,32 +58,11 @@ func (a *acceptor) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 		zap.String("blockType", "blueberry proposal"),
 		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
 
-	a.commonVisitProposalBlock(b)
+	a.proposalBlock(b)
 	return nil
-}
-
-func (a *acceptor) commonVisitProposalBlock(b blocks.Block) {
-	// Note that:
-	//
-	// * We don't free the proposal block in this method.
-	//   It is freed when its child is accepted.
-	//   We need to keep this block's state in memory for its child to use.
-	//
-	// * We only update the metrics to reflect this block's
-	//   acceptance when its child is accepted.
-	//
-	// * We don't write this block to state here.
-	//   That is done when this block's child (a CommitBlock or AbortBlock) is accepted.
-	//   We do this so that in the event that the node shuts down, the proposal block
-	//   is not written to disk unless its child is.
-	//   (The VM's Shutdown method commits the database.)
-	//   The snowman.Engine requires that the last committed block is a decision block
-
-	// See comment for [lastAccepted].
-	a.backend.lastAccepted = b.ID()
 }
 
 func (a *acceptor) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) error {
@@ -131,47 +71,10 @@ func (a *acceptor) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 		zap.String("blockType", "blueberry standard"),
 		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
 
 	return a.standardBlock(b)
-}
-
-func (a *acceptor) standardBlock(b blocks.Block) error {
-	blkID := b.ID()
-	defer a.free(blkID)
-
-	if err := a.commonAccept(b); err != nil {
-		return err
-	}
-
-	blkState, ok := a.blkIDToState[blkID]
-	if !ok {
-		return fmt.Errorf("couldn't find state of block %s", blkID)
-	}
-
-	// Update the state to reflect the changes made in [onAcceptState].
-	blkState.onAcceptState.Apply(a.state)
-
-	defer a.state.Abort()
-	batch, err := a.state.CommitBatch()
-	if err != nil {
-		return fmt.Errorf(
-			"failed to commit VM's database for block %s: %w",
-			blkID,
-			err,
-		)
-	}
-
-	// Note that this method writes [batch] to the database.
-	if err := a.ctx.SharedMemory.Apply(blkState.atomicRequests, batch); err != nil {
-		return fmt.Errorf("failed to apply vm's state to shared memory: %w", err)
-	}
-
-	if onAcceptFunc := blkState.onAcceptFunc; onAcceptFunc != nil {
-		onAcceptFunc()
-	}
-	return nil
 }
 
 func (a *acceptor) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
@@ -180,9 +83,10 @@ func (a *acceptor) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 		zap.String("blockType", "apricot abort"),
 		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
-	return a.acceptOptionBlock(b)
+
+	return a.optionBlock(b)
 }
 
 func (a *acceptor) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
@@ -191,9 +95,10 @@ func (a *acceptor) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 		zap.String("blockType", "apricot commit"),
 		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
-	return a.acceptOptionBlock(b)
+
+	return a.optionBlock(b)
 }
 
 func (a *acceptor) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
@@ -202,10 +107,10 @@ func (a *acceptor) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 		zap.String("blockType", "apricot proposal"),
 		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
 
-	a.commonVisitProposalBlock(b)
+	a.proposalBlock(b)
 	return nil
 }
 
@@ -215,7 +120,7 @@ func (a *acceptor) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 		zap.String("blockType", "apricot standard"),
 		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
-		zap.Stringer("parent", b.Parent()),
+		zap.Stringer("parentID", b.Parent()),
 	)
 
 	return a.standardBlock(b)
@@ -263,6 +168,105 @@ func (a *acceptor) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 			blkID,
 			err,
 		)
+	}
+	return nil
+}
+
+func (a *acceptor) optionBlock(b blocks.Block) error {
+	blkID := b.ID()
+	parentID := b.Parent()
+
+	defer func() {
+		a.free(blkID)
+		// Note: we assume this block's sibling doesn't
+		// need the parent's state when it's rejected.
+		a.free(parentID)
+	}()
+
+	// Note that the parent must be accepted first.
+	parentState, ok := a.blkIDToState[parentID]
+	if !ok {
+		return fmt.Errorf("couldn't find state of block %s, parent of %s", parentID, blkID)
+	}
+	if err := a.commonAccept(parentState.statelessBlock); err != nil {
+		return err
+	}
+
+	if err := a.commonAccept(b); err != nil {
+		return err
+	}
+
+	// Update metrics
+	if a.bootstrapped.GetValue() {
+		wasPreferred := parentState.initiallyPreferCommit
+		if wasPreferred {
+			a.metrics.MarkOptionVoteWon()
+		} else {
+			a.metrics.MarkOptionVoteLost()
+		}
+	}
+	blkState, ok := a.blkIDToState[blkID]
+	if !ok {
+		return fmt.Errorf("couldn't find state of block %s", blkID)
+	}
+	blkState.onAcceptState.Apply(a.state)
+	return a.state.Commit()
+}
+
+func (a *acceptor) proposalBlock(b blocks.Block) {
+	// Note that:
+	//
+	// * We don't free the proposal block in this method.
+	//   It is freed when its child is accepted.
+	//   We need to keep this block's state in memory for its child to use.
+	//
+	// * We only update the metrics to reflect this block's
+	//   acceptance when its child is accepted.
+	//
+	// * We don't write this block to state here.
+	//   That is done when this block's child (a CommitBlock or AbortBlock) is accepted.
+	//   We do this so that in the event that the node shuts down, the proposal block
+	//   is not written to disk unless its child is.
+	//   (The VM's Shutdown method commits the database.)
+	//   The snowman.Engine requires that the last committed block is a decision block
+
+	// See comment for [lastAccepted].
+	a.backend.lastAccepted = b.ID()
+}
+
+func (a *acceptor) standardBlock(b blocks.Block) error {
+	blkID := b.ID()
+	defer a.free(blkID)
+
+	if err := a.commonAccept(b); err != nil {
+		return err
+	}
+
+	blkState, ok := a.blkIDToState[blkID]
+	if !ok {
+		return fmt.Errorf("couldn't find state of block %s", blkID)
+	}
+
+	// Update the state to reflect the changes made in [onAcceptState].
+	blkState.onAcceptState.Apply(a.state)
+
+	defer a.state.Abort()
+	batch, err := a.state.CommitBatch()
+	if err != nil {
+		return fmt.Errorf(
+			"failed to commit VM's database for block %s: %w",
+			blkID,
+			err,
+		)
+	}
+
+	// Note that this method writes [batch] to the database.
+	if err := a.ctx.SharedMemory.Apply(blkState.atomicRequests, batch); err != nil {
+		return fmt.Errorf("failed to apply vm's state to shared memory: %w", err)
+	}
+
+	if onAcceptFunc := blkState.onAcceptFunc; onAcceptFunc != nil {
+		onAcceptFunc()
 	}
 	return nil
 }
