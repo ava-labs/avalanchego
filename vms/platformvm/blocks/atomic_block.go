@@ -12,13 +12,23 @@ import (
 
 var _ Block = &ApricotAtomicBlock{}
 
-// ApricotAtomicBlock being accepted results in the atomic transaction contained in the
-// block to be accepted and committed to the chain.
+// ApricotAtomicBlock being accepted results in the atomic transaction contained
+// in the block to be accepted and committed to the chain.
 type ApricotAtomicBlock struct {
-	ApricotCommonBlock `serialize:"true"`
-
-	Tx *txs.Tx `serialize:"true" json:"tx"`
+	CommonBlock `serialize:"true"`
+	Tx          *txs.Tx `serialize:"true" json:"tx"`
 }
+
+func (b *ApricotAtomicBlock) initialize(bytes []byte) error {
+	b.CommonBlock.initialize(bytes)
+	if err := b.Tx.Sign(txs.Codec, nil); err != nil {
+		return fmt.Errorf("failed to initialize tx: %w", err)
+	}
+	return nil
+}
+
+func (b *ApricotAtomicBlock) Txs() []*txs.Tx        { return []*txs.Tx{b.Tx} }
+func (b *ApricotAtomicBlock) Visit(v Visitor) error { return v.ApricotAtomicBlock(b) }
 
 func NewApricotAtomicBlock(
 	parentID ids.ID,
@@ -26,25 +36,11 @@ func NewApricotAtomicBlock(
 	tx *txs.Tx,
 ) (*ApricotAtomicBlock, error) {
 	blk := &ApricotAtomicBlock{
-		ApricotCommonBlock: ApricotCommonBlock{
+		CommonBlock: CommonBlock{
 			PrntID: parentID,
 			Hght:   height,
 		},
 		Tx: tx,
 	}
 	return blk, initialize(blk)
-}
-
-func (b *ApricotAtomicBlock) initialize(bytes []byte) error {
-	b.ApricotCommonBlock.initialize(bytes)
-	if err := b.Tx.Sign(txs.Codec, nil); err != nil {
-		return fmt.Errorf("failed to initialize tx: %w", err)
-	}
-	return nil
-}
-
-func (b *ApricotAtomicBlock) Txs() []*txs.Tx { return []*txs.Tx{b.Tx} }
-
-func (b *ApricotAtomicBlock) Visit(v Visitor) error {
-	return v.ApricotAtomicBlock(b)
 }

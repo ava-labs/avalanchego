@@ -172,9 +172,7 @@ func (b *builder) BuildBlock() (snowman.Block, error) {
 	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
-// Returns:
-// 1. The block we want to build and issue.
-// 2. The transactions in that block.
+// Returns the block we want to build and issue.
 // Only modifies state to remove expired proposal txs.
 func (b *builder) buildBlock() (blocks.Block, error) {
 	// Get the block to build on top of and retrieve the new block's context.
@@ -182,13 +180,13 @@ func (b *builder) buildBlock() (blocks.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	prefBlkID := preferred.ID()
+	preferredID := preferred.ID()
 	nextHeight := preferred.Height() + 1
-	currentFork := b.blkManager.GetFork(prefBlkID)
+	currentFork := b.blkManager.GetFork(preferredID)
 
-	preferredState, ok := b.blkManager.GetState(prefBlkID)
+	preferredState, ok := b.blkManager.GetState(preferredID)
 	if !ok {
-		return nil, fmt.Errorf("could not retrieve state for block %s. Preferred block must be a decision block", prefBlkID)
+		return nil, fmt.Errorf("could not retrieve state for block %s", preferredID)
 	}
 
 	// select transactions to include based on the current fork
@@ -196,14 +194,14 @@ func (b *builder) buildBlock() (blocks.Block, error) {
 	case forks.Apricot:
 		return buildApricotBlock(
 			b,
-			prefBlkID,
+			preferredID,
 			nextHeight,
 			preferredState,
 		)
 	case forks.Blueberry:
 		return buildBlueberryBlock(
 			b,
-			prefBlkID,
+			preferredID,
 			nextHeight,
 			preferredState,
 		)
@@ -266,11 +264,9 @@ func getNextStakerToReward(preferredState state.Chain) (ids.ID, bool, error) {
 // May not remove all expired txs since txs aren't necessarily popped
 // ordered by start time.
 func (b *builder) dropExpiredProposalTxs() {
-	var (
-		ctx      = b.txExecutorBackend.Ctx
-		now      = b.txExecutorBackend.Clk.Time()
-		syncTime = now.Add(txexecutor.SyncBound)
-	)
+	ctx := b.txExecutorBackend.Ctx
+	now := b.txExecutorBackend.Clk.Time()
+	syncTime := now.Add(txexecutor.SyncBound)
 	for b.Mempool.HasProposalTx() {
 		tx := b.Mempool.PeekProposalTx()
 		startTime := tx.Unsigned.(txs.StakerTx).StartTime()
@@ -309,6 +305,7 @@ func (b *builder) setNextBuildBlockTime() {
 		)
 		return
 	}
+
 	if _, err := b.buildBlock(); err == nil {
 		// We can build a block now
 		b.notifyBlockReady()
@@ -320,21 +317,24 @@ func (b *builder) setNextBuildBlockTime() {
 	if !ok {
 		// The preferred block should always be a decision block
 		ctx.Log.Error("couldn't get preferred block state",
-			zap.Stringer("blkID", b.preferredBlockID),
+			zap.Stringer("preferredID", b.preferredBlockID),
+			zap.Stringer("lastAcceptedID", b.blkManager.LastAccepted()),
 		)
 		return
 	}
+
 	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
 	if err != nil {
 		ctx.Log.Error("couldn't get next staker change time",
+			zap.Stringer("preferredID", b.preferredBlockID),
+			zap.Stringer("lastAcceptedID", b.blkManager.LastAccepted()),
 			zap.Error(err),
 		)
 		return
 	}
-	var (
-		now      = b.txExecutorBackend.Clk.Time()
-		waitTime = nextStakerChangeTime.Sub(now)
-	)
+
+	now := b.txExecutorBackend.Clk.Time()
+	waitTime := nextStakerChangeTime.Sub(now)
 	ctx.Log.Debug("setting next scheduled event",
 		zap.Time("nextEventTime", nextStakerChangeTime),
 		zap.Duration("timeUntil", waitTime),
@@ -350,8 +350,7 @@ func (b *builder) notifyBlockReady() {
 	select {
 	case b.toEngine <- common.PendingTxs:
 	default:
-		ctx := b.txExecutorBackend.Ctx
-		ctx.Log.Debug("dropping message to consensus engine")
+		b.txExecutorBackend.Ctx.Log.Debug("dropping message to consensus engine")
 	}
 }
 

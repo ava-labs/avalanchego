@@ -15,6 +15,14 @@ var (
 	_ Block = &ApricotCommitBlock{}
 )
 
+type BlueberryCommitBlock struct {
+	Time               uint64 `serialize:"true" json:"time"`
+	ApricotCommitBlock `serialize:"true"`
+}
+
+func (b *BlueberryCommitBlock) Timestamp() time.Time  { return time.Unix(int64(b.Time), 0) }
+func (b *BlueberryCommitBlock) Visit(v Visitor) error { return v.BlueberryCommitBlock(b) }
+
 func NewBlueberryCommitBlock(
 	timestamp time.Time,
 	parentID ids.ID,
@@ -23,7 +31,7 @@ func NewBlueberryCommitBlock(
 	blk := &BlueberryCommitBlock{
 		Time: uint64(timestamp.Unix()),
 		ApricotCommitBlock: ApricotCommitBlock{
-			ApricotCommonBlock: ApricotCommonBlock{
+			CommonBlock: CommonBlock{
 				PrntID: parentID,
 				Hght:   height,
 			},
@@ -32,43 +40,27 @@ func NewBlueberryCommitBlock(
 	return blk, initialize(blk)
 }
 
-type BlueberryCommitBlock struct {
-	Time               uint64 `serialize:"true" json:"time"`
-	ApricotCommitBlock `serialize:"true"`
+type ApricotCommitBlock struct {
+	CommonBlock `serialize:"true"`
 }
 
-func (b *BlueberryCommitBlock) Timestamp() time.Time {
-	return time.Unix(int64(b.Time), 0)
+func (b *ApricotCommitBlock) initialize(bytes []byte) error {
+	b.CommonBlock.initialize(bytes)
+	return nil
 }
 
-func (b *BlueberryCommitBlock) Visit(v Visitor) error {
-	return v.BlueberryCommitBlock(b)
-}
+func (*ApricotCommitBlock) Txs() []*txs.Tx          { return nil }
+func (b *ApricotCommitBlock) Visit(v Visitor) error { return v.ApricotCommitBlock(b) }
 
 func NewApricotCommitBlock(
 	parentID ids.ID,
 	height uint64,
 ) (*ApricotCommitBlock, error) {
 	blk := &ApricotCommitBlock{
-		ApricotCommonBlock: ApricotCommonBlock{
+		CommonBlock: CommonBlock{
 			PrntID: parentID,
 			Hght:   height,
 		},
 	}
 	return blk, initialize(blk)
-}
-
-type ApricotCommitBlock struct {
-	ApricotCommonBlock `serialize:"true"`
-}
-
-func (b *ApricotCommitBlock) initialize(bytes []byte) error {
-	b.ApricotCommonBlock.initialize(bytes)
-	return nil
-}
-
-func (*ApricotCommitBlock) Txs() []*txs.Tx { return nil }
-
-func (b *ApricotCommitBlock) Visit(v Visitor) error {
-	return v.ApricotCommitBlock(b)
 }

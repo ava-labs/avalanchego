@@ -9,9 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-
-	transactions "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 func buildBlueberryBlock(
@@ -82,7 +81,7 @@ func buildBlueberryBlock(
 	// if the chain timestamp is too far in the past to issue this transaction
 	// but according to local time, it's ready to be issued, then attempt to
 	// advance the timestamp, so it can be issued.
-	startTime := tx.Unsigned.(transactions.StakerTx).StartTime()
+	startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 	maxChainStartTime := parentTimestamp.Add(executor.MaxFutureStartTime)
 
 	newTimestamp := parentTimestamp

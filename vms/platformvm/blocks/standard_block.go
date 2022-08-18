@@ -16,6 +16,14 @@ var (
 	_ Block = &ApricotStandardBlock{}
 )
 
+type BlueberryStandardBlock struct {
+	Time                 uint64 `serialize:"true" json:"time"`
+	ApricotStandardBlock `serialize:"true"`
+}
+
+func (b *BlueberryStandardBlock) Timestamp() time.Time  { return time.Unix(int64(b.Time), 0) }
+func (b *BlueberryStandardBlock) Visit(v Visitor) error { return v.BlueberryStandardBlock(b) }
+
 func NewBlueberryStandardBlock(
 	timestamp time.Time,
 	parentID ids.ID,
@@ -25,7 +33,7 @@ func NewBlueberryStandardBlock(
 	blk := &BlueberryStandardBlock{
 		Time: uint64(timestamp.Unix()),
 		ApricotStandardBlock: ApricotStandardBlock{
-			ApricotCommonBlock: ApricotCommonBlock{
+			CommonBlock: CommonBlock{
 				PrntID: parentID,
 				Hght:   height,
 			},
@@ -35,42 +43,13 @@ func NewBlueberryStandardBlock(
 	return blk, initialize(blk)
 }
 
-type BlueberryStandardBlock struct {
-	Time                 uint64 `serialize:"true" json:"time"`
-	ApricotStandardBlock `serialize:"true"`
-}
-
-func (b *BlueberryStandardBlock) Timestamp() time.Time {
-	return time.Unix(int64(b.Time), 0)
-}
-
-func (b *BlueberryStandardBlock) Visit(v Visitor) error {
-	return v.BlueberryStandardBlock(b)
-}
-
-func NewApricotStandardBlock(
-	parentID ids.ID,
-	height uint64,
-	txes []*txs.Tx,
-) (*ApricotStandardBlock, error) {
-	blk := &ApricotStandardBlock{
-		ApricotCommonBlock: ApricotCommonBlock{
-			PrntID: parentID,
-			Hght:   height,
-		},
-		Transactions: txes,
-	}
-	return blk, initialize(blk)
-}
-
 type ApricotStandardBlock struct {
-	ApricotCommonBlock `serialize:"true"`
-
+	CommonBlock  `serialize:"true"`
 	Transactions []*txs.Tx `serialize:"true" json:"txs"`
 }
 
 func (b *ApricotStandardBlock) initialize(bytes []byte) error {
-	b.ApricotCommonBlock.initialize(bytes)
+	b.CommonBlock.initialize(bytes)
 	for _, tx := range b.Transactions {
 		if err := tx.Sign(txs.Codec, nil); err != nil {
 			return fmt.Errorf("failed to sign block: %w", err)
@@ -79,8 +58,20 @@ func (b *ApricotStandardBlock) initialize(bytes []byte) error {
 	return nil
 }
 
-func (b *ApricotStandardBlock) Txs() []*txs.Tx { return b.Transactions }
+func (b *ApricotStandardBlock) Txs() []*txs.Tx        { return b.Transactions }
+func (b *ApricotStandardBlock) Visit(v Visitor) error { return v.ApricotStandardBlock(b) }
 
-func (b *ApricotStandardBlock) Visit(v Visitor) error {
-	return v.ApricotStandardBlock(b)
+func NewApricotStandardBlock(
+	parentID ids.ID,
+	height uint64,
+	txes []*txs.Tx,
+) (*ApricotStandardBlock, error) {
+	blk := &ApricotStandardBlock{
+		CommonBlock: CommonBlock{
+			PrntID: parentID,
+			Hght:   height,
+		},
+		Transactions: txes,
+	}
+	return blk, initialize(blk)
 }
