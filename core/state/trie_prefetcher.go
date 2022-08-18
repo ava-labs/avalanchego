@@ -342,7 +342,10 @@ func (sf *subfetcher) loop() {
 					if _, ok := sf.seen[string(task)]; ok {
 						sf.dups++
 					} else {
-						sf.trie.TryGet(task)
+						_, err := sf.trie.TryGet(task)
+						if err != nil {
+							log.Error("Trie prefetcher failed fetching", "root", sf.root, "err", err)
+						}
 						sf.seen[string(task)] = struct{}{}
 					}
 				}
