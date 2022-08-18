@@ -11,13 +11,17 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
@@ -172,10 +176,41 @@ func TestBuildBlueberryBlock(t *testing.T) {
 	var (
 		parentID = ids.GenerateTestID()
 		height   = uint64(1337)
-		txs      = []*txs.Tx{
+		output   = &avax.TransferableOutput{
+			Asset: avax.Asset{ID: ids.GenerateTestID()},
+			Out: &secp256k1fx.TransferOutput{
+				OutputOwners: secp256k1fx.OutputOwners{
+					Addrs: []ids.ShortID{ids.GenerateTestShortID()},
+				},
+			},
+		}
+		now = time.Now()
+		txs = []*txs.Tx{
 			{
-				Unsigned: &txs.AdvanceTimeTx{
-					Time: uint64(123),
+				Unsigned: &txs.AddValidatorTx{
+					BaseTx: txs.BaseTx{
+						BaseTx: avax.BaseTx{
+							Ins: []*avax.TransferableInput{
+								{
+									Asset: avax.Asset{ID: ids.GenerateTestID()},
+									In: &secp256k1fx.TransferInput{
+										Input: secp256k1fx.Input{
+											SigIndices: []uint32{0},
+										},
+									},
+								},
+							},
+							Outs: []*avax.TransferableOutput{output},
+						},
+					},
+					Validator: validator.Validator{
+						// Shouldn't be dropped
+						Start: uint64(now.Add(2 * txexecutor.SyncBound).Unix()),
+					},
+					Stake: []*avax.TransferableOutput{output},
+					RewardsOwner: &secp256k1fx.OutputOwners{
+						Addrs: []ids.ShortID{ids.GenerateTestShortID()},
+					},
 				},
 				Creds: []verify.Verifiable{
 					&secp256k1fx.Credential{
@@ -184,7 +219,6 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				},
 			},
 		}
-		now        = time.Now()
 		stakerTxID = ids.GenerateTestID()
 	)
 
@@ -192,8 +226,8 @@ func TestBuildBlueberryBlock(t *testing.T) {
 		name         string
 		builderF     func(*gomock.Controller) *builder
 		parentStateF func(*gomock.Controller) state.Chain
-		expectedBlkF func() blocks.Block
-		shouldErr    bool
+		expectedBlkF func(*require.Assertions) blocks.Block
+		expectedErr  error
 	}
 
 	tests := []test{
@@ -212,16 +246,17 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				s.EXPECT().GetTimestamp().Return(now)
 				return s
 			},
-			expectedBlkF: func() blocks.Block {
-				expectedBlk, _ := blocks.NewBlueberryStandardBlock(
+			expectedBlkF: func(require *require.Assertions) blocks.Block {
+				expectedBlk, err := blocks.NewBlueberryStandardBlock(
 					now,
 					parentID,
 					height,
 					txs,
 				)
+				require.NoError(err)
 				return expectedBlk
 			},
-			shouldErr: false,
+			expectedErr: nil,
 		},
 		{
 			name: "should reward",
@@ -260,16 +295,17 @@ func TestBuildBlueberryBlock(t *testing.T) {
 
 				return s
 			},
-			expectedBlkF: func() blocks.Block {
-				expectedBlk, _ := blocks.NewBlueberryProposalBlock(
+			expectedBlkF: func(require *require.Assertions) blocks.Block {
+				expectedBlk, err := blocks.NewBlueberryProposalBlock(
 					now,
 					parentID,
 					height,
 					txs[0],
 				)
+				require.NoError(err)
 				return expectedBlk
 			},
-			shouldErr: false,
+			expectedErr: nil,
 		},
 		{
 			name: "should advance time",
@@ -324,16 +360,155 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				s.EXPECT().GetPendingStakerIterator().Return(pendingStakerIter, nil)
 				return s
 			},
-			expectedBlkF: func() blocks.Block {
-				expectedBlk, _ := blocks.NewBlueberryStandardBlock(
+			expectedBlkF: func(require *require.Assertions) blocks.Block {
+				expectedBlk, err := blocks.NewBlueberryStandardBlock(
 					now.Add(-1*time.Second),
 					parentID,
 					height,
 					nil, // empty block to advance time
 				)
+				require.NoError(err)
 				return expectedBlk
 			},
-			shouldErr: false,
+			expectedErr: nil,
+		},
+		{
+			name: "no proposal tx",
+			builderF: func(ctrl *gomock.Controller) *builder {
+				// There are no decision txs
+				mempool := mempool.NewMockMempool(ctrl)
+				mempool.EXPECT().HasDecisionTxs().Return(false)
+
+				// There is a proposal tx.
+				mempool.EXPECT().HasProposalTx().Return(false).AnyTimes()
+
+				clk := &mockable.Clock{}
+				clk.Set(now)
+				return &builder{
+					Mempool: mempool,
+					txExecutorBackend: &txexecutor.Backend{
+						Ctx: &snow.Context{
+							Log: logging.NoLog{},
+						},
+						Clk: clk,
+					},
+				}
+			},
+			parentStateF: func(ctrl *gomock.Controller) state.Chain {
+				s := state.NewMockChain(ctrl)
+
+				// Once in [buildBlueberryBlock], once in [GetNextStakerChangeTime],
+				s.EXPECT().GetTimestamp().Return(now).Times(2)
+
+				// Handle calls in [getNextStakerToReward]
+				// and [GetNextStakerChangeTime].
+				// Next validator change time is in the future.
+				currentStakerIter := state.NewMockStakerIterator(ctrl)
+				gomock.InOrder(
+					// expect calls from [getNextStakerToReward]
+					currentStakerIter.EXPECT().Next().Return(true),
+					currentStakerIter.EXPECT().Value().Return(&state.Staker{
+						NextTime: now.Add(time.Second),
+					}),
+					currentStakerIter.EXPECT().Next().Return(false),
+					currentStakerIter.EXPECT().Release(),
+
+					// expect calls from [GetNextStakerChangeTime]
+					currentStakerIter.EXPECT().Next().Return(true),
+					currentStakerIter.EXPECT().Value().Return(&state.Staker{
+						NextTime: now.Add(time.Second),
+					}),
+					currentStakerIter.EXPECT().Release(),
+				)
+
+				// We also iterate over the pending stakers in [getNextStakerToReward]
+				pendingStakerIter := state.NewMockStakerIterator(ctrl)
+				pendingStakerIter.EXPECT().Next().Return(false)
+				pendingStakerIter.EXPECT().Release()
+
+				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).Times(2)
+				s.EXPECT().GetPendingStakerIterator().Return(pendingStakerIter, nil)
+				return s
+			},
+			expectedBlkF: func(require *require.Assertions) blocks.Block {
+				expectedBlk, err := blocks.NewBlueberryProposalBlock(
+					now,
+					parentID,
+					height,
+					txs[0],
+				)
+				require.NoError(err)
+				return expectedBlk
+			},
+			expectedErr: errNoPendingBlocks,
+		},
+		{
+			name: "has a proposal tx",
+			builderF: func(ctrl *gomock.Controller) *builder {
+				// There are no decision txs
+				mempool := mempool.NewMockMempool(ctrl)
+				mempool.EXPECT().HasDecisionTxs().Return(false)
+
+				// There is a proposal tx.
+				mempool.EXPECT().HasProposalTx().Return(true).AnyTimes()
+				mempool.EXPECT().PeekProposalTx().Return(txs[0]).AnyTimes()
+
+				clk := &mockable.Clock{}
+				clk.Set(now)
+				return &builder{
+					Mempool: mempool,
+					txExecutorBackend: &txexecutor.Backend{
+						Clk: clk,
+					},
+				}
+			},
+			parentStateF: func(ctrl *gomock.Controller) state.Chain {
+				s := state.NewMockChain(ctrl)
+
+				// Once in [buildBlueberryBlock], once in [GetNextStakerChangeTime],
+				s.EXPECT().GetTimestamp().Return(now).Times(2)
+
+				// Handle calls in [getNextStakerToReward]
+				// and [GetNextStakerChangeTime].
+				// Next validator change time is in the future.
+				currentStakerIter := state.NewMockStakerIterator(ctrl)
+				gomock.InOrder(
+					// expect calls from [getNextStakerToReward]
+					currentStakerIter.EXPECT().Next().Return(true),
+					currentStakerIter.EXPECT().Value().Return(&state.Staker{
+						NextTime: now.Add(time.Second),
+					}),
+					currentStakerIter.EXPECT().Next().Return(false),
+					currentStakerIter.EXPECT().Release(),
+
+					// expect calls from [GetNextStakerChangeTime]
+					currentStakerIter.EXPECT().Next().Return(true),
+					currentStakerIter.EXPECT().Value().Return(&state.Staker{
+						NextTime: now.Add(time.Second),
+					}),
+					currentStakerIter.EXPECT().Release(),
+				)
+
+				// We also iterate over the pending stakers in [getNextStakerToReward]
+				pendingStakerIter := state.NewMockStakerIterator(ctrl)
+				pendingStakerIter.EXPECT().Next().Return(false)
+				pendingStakerIter.EXPECT().Release()
+
+				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).Times(2)
+				s.EXPECT().GetPendingStakerIterator().Return(pendingStakerIter, nil)
+				return s
+			},
+			expectedBlkF: func(require *require.Assertions) blocks.Block {
+				expectedBlk, err := blocks.NewBlueberryProposalBlock(
+					now,
+					parentID,
+					height,
+					txs[0],
+				)
+				require.NoError(err)
+				return expectedBlk
+			},
+			expectedErr: nil,
 		},
 	}
 
@@ -349,12 +524,12 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				height,
 				tt.parentStateF(ctrl),
 			)
-			if tt.shouldErr {
-				require.Error(err)
+			if tt.expectedErr != nil {
+				require.ErrorIs(err, tt.expectedErr)
 				return
 			}
 			require.NoError(err)
-			require.EqualValues(tt.expectedBlkF(), gotBlk)
+			require.EqualValues(tt.expectedBlkF(require), gotBlk)
 		})
 	}
 }

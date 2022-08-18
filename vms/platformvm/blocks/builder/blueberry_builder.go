@@ -83,7 +83,7 @@ func buildBlueberryBlock(
 	// but according to local time, it's ready to be issued, then attempt to
 	// advance the timestamp, so it can be issued.
 	startTime := tx.Unsigned.(transactions.StakerTx).StartTime()
-	maxChainStartTime := parentState.GetTimestamp().Add(executor.MaxFutureStartTime)
+	maxChainStartTime := parentTimestamp.Add(executor.MaxFutureStartTime)
 
 	newTimestamp := parentTimestamp
 	if startTime.After(maxChainStartTime) {
