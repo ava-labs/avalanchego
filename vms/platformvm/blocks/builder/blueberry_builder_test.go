@@ -184,8 +184,9 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				},
 			},
 		}
-		now = time.Now()
-		txs = []*txs.Tx{
+		now             = time.Now()
+		parentTimestamp = now.Add(-2 * time.Second)
+		txs             = []*txs.Tx{
 			{
 				Unsigned: &txs.AddValidatorTx{
 					BaseTx: txs.BaseTx{
@@ -243,12 +244,12 @@ func TestBuildBlueberryBlock(t *testing.T) {
 			},
 			parentStateF: func(ctrl *gomock.Controller) state.Chain {
 				s := state.NewMockChain(ctrl)
-				s.EXPECT().GetTimestamp().Return(now)
+				s.EXPECT().GetTimestamp().Return(parentTimestamp)
 				return s
 			},
 			expectedBlkF: func(require *require.Assertions) blocks.Block {
 				expectedBlk, err := blocks.NewBlueberryStandardBlock(
-					now,
+					parentTimestamp,
 					parentID,
 					height,
 					txs,
@@ -278,16 +279,16 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				s := state.NewMockChain(ctrl)
 
 				// Once in [buildBlueberryBlock], once in [getNextStakerToReward]
-				s.EXPECT().GetTimestamp().Return(now).Times(2)
+				s.EXPECT().GetTimestamp().Return(parentTimestamp).Times(2)
 
-				// add current validator that ends at [now]
+				// add current validator that ends at [parentTimestamp]
 				// i.e. it should be rewarded
 				currentStakerIter := state.NewMockStakerIterator(ctrl)
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
 					TxID:     stakerTxID,
 					Priority: state.PrimaryNetworkDelegatorCurrentPriority,
-					EndTime:  now,
+					EndTime:  parentTimestamp,
 				})
 				currentStakerIter.EXPECT().Release()
 
@@ -297,7 +298,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 			},
 			expectedBlkF: func(require *require.Assertions) blocks.Block {
 				expectedBlk, err := blocks.NewBlueberryProposalBlock(
-					now,
+					parentTimestamp,
 					parentID,
 					height,
 					txs[0],
@@ -327,9 +328,10 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				s := state.NewMockChain(ctrl)
 
 				// Once in [buildBlueberryBlock], once in [GetNextStakerChangeTime]
-				s.EXPECT().GetTimestamp().Return(now).Times(2)
+				s.EXPECT().GetTimestamp().Return(parentTimestamp).Times(2)
 
 				// add current validator that ends at [now] - 1 second.
+				// That is, it ends in the past but after the current chain time.
 				// Handle calls in [getNextStakerToReward]
 				// and [GetNextStakerChangeTime]
 				// when determining whether to issue a reward tx.
@@ -362,7 +364,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 			},
 			expectedBlkF: func(require *require.Assertions) blocks.Block {
 				expectedBlk, err := blocks.NewBlueberryStandardBlock(
-					now.Add(-1*time.Second),
+					now.Add(-1*time.Second), // note the advanced time
 					parentID,
 					height,
 					nil, // empty block to advance time
@@ -398,7 +400,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				s := state.NewMockChain(ctrl)
 
 				// Once in [buildBlueberryBlock], once in [GetNextStakerChangeTime],
-				s.EXPECT().GetTimestamp().Return(now).Times(2)
+				s.EXPECT().GetTimestamp().Return(parentTimestamp).Times(2)
 
 				// Handle calls in [getNextStakerToReward]
 				// and [GetNextStakerChangeTime].
@@ -431,14 +433,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				return s
 			},
 			expectedBlkF: func(require *require.Assertions) blocks.Block {
-				expectedBlk, err := blocks.NewBlueberryProposalBlock(
-					now,
-					parentID,
-					height,
-					txs[0],
-				)
-				require.NoError(err)
-				return expectedBlk
+				return nil
 			},
 			expectedErr: errNoPendingBlocks,
 		},
@@ -466,7 +461,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				s := state.NewMockChain(ctrl)
 
 				// Once in [buildBlueberryBlock], once in [GetNextStakerChangeTime],
-				s.EXPECT().GetTimestamp().Return(now).Times(2)
+				s.EXPECT().GetTimestamp().Return(parentTimestamp).Times(2)
 
 				// Handle calls in [getNextStakerToReward]
 				// and [GetNextStakerChangeTime].
@@ -500,7 +495,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 			},
 			expectedBlkF: func(require *require.Assertions) blocks.Block {
 				expectedBlk, err := blocks.NewBlueberryProposalBlock(
-					now,
+					parentTimestamp,
 					parentID,
 					height,
 					txs[0],
