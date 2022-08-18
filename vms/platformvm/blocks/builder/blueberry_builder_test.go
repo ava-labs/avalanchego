@@ -30,7 +30,6 @@ import (
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
@@ -65,7 +64,7 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	require.NoError(err)
 
 	// accept validator as pending
-	txExecutor := txexecutor.ProposalTxExecutor{
+	txExecutor := executor.ProposalTxExecutor{
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
@@ -103,7 +102,7 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	}
 
 	// start time is beyond maximal distance from chain time
-	starkerTxStartTime := nextChainTime.Add(txexecutor.MaxFutureStartTime).Add(time.Second)
+	starkerTxStartTime := nextChainTime.Add(executor.MaxFutureStartTime).Add(time.Second)
 	stakerTx, err := createTestValidatorTx(env, starkerTxStartTime, starkerTxStartTime.Add(time.Hour))
 	require.NoError(err)
 	require.NoError(env.mempool.Add(stakerTx))
@@ -148,7 +147,7 @@ func TestBlueberryPickingOrder(t *testing.T) {
 	// mempool proposal tx is too far in the future. A
 	// proposal block including mempool proposalTx
 	// will be issued to advance time and
-	now = nextChainTime.Add(txexecutor.MaxFutureStartTime / 2)
+	now = nextChainTime.Add(executor.MaxFutureStartTime / 2)
 	env.clk.Set(now)
 	blk, err = env.Builder.BuildBlock()
 	require.NoError(err)
@@ -161,7 +160,7 @@ func TestBlueberryPickingOrder(t *testing.T) {
 
 	// Finally an empty standard block can be issued to advance time
 	// if no mempool txs are available
-	now, err = txexecutor.GetNextStakerChangeTime(env.state)
+	now, err = executor.GetNextStakerChangeTime(env.state)
 	require.NoError(err)
 	env.clk.Set(now)
 
@@ -300,7 +299,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 					},
 					Validator: validator.Validator{
 						// Shouldn't be dropped
-						Start: uint64(now.Add(2 * txexecutor.SyncBound).Unix()),
+						Start: uint64(now.Add(2 * executor.SyncBound).Unix()),
 					},
 					Stake: []*avax.TransferableOutput{output},
 					RewardsOwner: &secp256k1fx.OutputOwners{
@@ -413,7 +412,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				clk.Set(now)
 				return &builder{
 					Mempool: mempool,
-					txExecutorBackend: &txexecutor.Backend{
+					txExecutorBackend: &executor.Backend{
 						Clk: clk,
 					},
 				}
@@ -482,7 +481,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				clk.Set(now)
 				return &builder{
 					Mempool: mempool,
-					txExecutorBackend: &txexecutor.Backend{
+					txExecutorBackend: &executor.Backend{
 						Ctx: &snow.Context{
 							Log: logging.NoLog{},
 						},
@@ -546,7 +545,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				clk.Set(now)
 				return &builder{
 					Mempool: mempool,
-					txExecutorBackend: &txexecutor.Backend{
+					txExecutorBackend: &executor.Backend{
 						Clk: clk,
 					},
 				}
