@@ -129,31 +129,31 @@ func (mr *MockSenderMockRecorder) SendAppGossipSpecific(nodeIDs, appGossipBytes 
 }
 
 // SendAppRequest mocks base method.
-func (m *MockSender) SendAppRequest(nodeIDs ids.NodeIDSet, sourceChainID, destinationChainID ids.ID, requestID uint32, appRequestBytes []byte) error {
+func (m *MockSender) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, appRequestBytes []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendAppRequest", nodeIDs, sourceChainID, destinationChainID, requestID, appRequestBytes)
+	ret := m.ctrl.Call(m, "SendAppRequest", nodeIDs, requestID, appRequestBytes)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SendAppRequest indicates an expected call of SendAppRequest.
-func (mr *MockSenderMockRecorder) SendAppRequest(nodeIDs, sourceChainID, destinationChainID, requestID, appRequestBytes interface{}) *gomock.Call {
+func (mr *MockSenderMockRecorder) SendAppRequest(nodeIDs, requestID, appRequestBytes interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendAppRequest", reflect.TypeOf((*MockSender)(nil).SendAppRequest), nodeIDs, sourceChainID, destinationChainID, requestID, appRequestBytes)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendAppRequest", reflect.TypeOf((*MockSender)(nil).SendAppRequest), nodeIDs, requestID, appRequestBytes)
 }
 
 // SendAppResponse mocks base method.
-func (m *MockSender) SendAppResponse(nodeID ids.NodeID, sourceChainID, destinationChainID ids.ID, requestID uint32, appResponseBytes []byte) error {
+func (m *MockSender) SendAppResponse(nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendAppResponse", nodeID, sourceChainID, destinationChainID, requestID, appResponseBytes)
+	ret := m.ctrl.Call(m, "SendAppResponse", nodeID, requestID, appResponseBytes)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SendAppResponse indicates an expected call of SendAppResponse.
-func (mr *MockSenderMockRecorder) SendAppResponse(nodeID, sourceChainID, destinationChainID, requestID, appResponseBytes interface{}) *gomock.Call {
+func (mr *MockSenderMockRecorder) SendAppResponse(nodeID, requestID, appResponseBytes interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendAppResponse", reflect.TypeOf((*MockSender)(nil).SendAppResponse), nodeID, sourceChainID, destinationChainID, requestID, appResponseBytes)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendAppResponse", reflect.TypeOf((*MockSender)(nil).SendAppResponse), nodeID, requestID, appResponseBytes)
 }
 
 // SendChits mocks base method.
@@ -166,6 +166,34 @@ func (m *MockSender) SendChits(nodeID ids.NodeID, requestID uint32, votes []ids.
 func (mr *MockSenderMockRecorder) SendChits(nodeID, requestID, votes interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendChits", reflect.TypeOf((*MockSender)(nil).SendChits), nodeID, requestID, votes)
+}
+
+// SendCrossChainAppRequest mocks base method.
+func (m *MockSender) SendCrossChainAppRequest(chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SendCrossChainAppRequest", chainID, requestID, appRequestBytes)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SendCrossChainAppRequest indicates an expected call of SendCrossChainAppRequest.
+func (mr *MockSenderMockRecorder) SendCrossChainAppRequest(chainID, requestID, appRequestBytes interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendCrossChainAppRequest", reflect.TypeOf((*MockSender)(nil).SendCrossChainAppRequest), chainID, requestID, appRequestBytes)
+}
+
+// SendCrossChainAppResponse mocks base method.
+func (m *MockSender) SendCrossChainAppResponse(chainID ids.ID, requestID uint32, appResponseBytes []byte) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SendCrossChainAppResponse", chainID, requestID, appResponseBytes)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SendCrossChainAppResponse indicates an expected call of SendCrossChainAppResponse.
+func (mr *MockSenderMockRecorder) SendCrossChainAppResponse(chainID, requestID, appResponseBytes interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendCrossChainAppResponse", reflect.TypeOf((*MockSender)(nil).SendCrossChainAppResponse), chainID, requestID, appResponseBytes)
 }
 
 // SendGet mocks base method.
@@ -653,6 +681,57 @@ func (mr *MockGossiperMockRecorder) SendGossip(container interface{}) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendGossip", reflect.TypeOf((*MockGossiper)(nil).SendGossip), container)
 }
 
+// MockCrossChainAppSender is a mock of CrossChainAppSender interface.
+type MockCrossChainAppSender struct {
+	ctrl     *gomock.Controller
+	recorder *MockCrossChainAppSenderMockRecorder
+}
+
+// MockCrossChainAppSenderMockRecorder is the mock recorder for MockCrossChainAppSender.
+type MockCrossChainAppSenderMockRecorder struct {
+	mock *MockCrossChainAppSender
+}
+
+// NewMockCrossChainAppSender creates a new mock instance.
+func NewMockCrossChainAppSender(ctrl *gomock.Controller) *MockCrossChainAppSender {
+	mock := &MockCrossChainAppSender{ctrl: ctrl}
+	mock.recorder = &MockCrossChainAppSenderMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockCrossChainAppSender) EXPECT() *MockCrossChainAppSenderMockRecorder {
+	return m.recorder
+}
+
+// SendCrossChainAppRequest mocks base method.
+func (m *MockCrossChainAppSender) SendCrossChainAppRequest(chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SendCrossChainAppRequest", chainID, requestID, appRequestBytes)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SendCrossChainAppRequest indicates an expected call of SendCrossChainAppRequest.
+func (mr *MockCrossChainAppSenderMockRecorder) SendCrossChainAppRequest(chainID, requestID, appRequestBytes interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendCrossChainAppRequest", reflect.TypeOf((*MockCrossChainAppSender)(nil).SendCrossChainAppRequest), chainID, requestID, appRequestBytes)
+}
+
+// SendCrossChainAppResponse mocks base method.
+func (m *MockCrossChainAppSender) SendCrossChainAppResponse(chainID ids.ID, requestID uint32, appResponseBytes []byte) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SendCrossChainAppResponse", chainID, requestID, appResponseBytes)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SendCrossChainAppResponse indicates an expected call of SendCrossChainAppResponse.
+func (mr *MockCrossChainAppSenderMockRecorder) SendCrossChainAppResponse(chainID, requestID, appResponseBytes interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendCrossChainAppResponse", reflect.TypeOf((*MockCrossChainAppSender)(nil).SendCrossChainAppResponse), chainID, requestID, appResponseBytes)
+}
+
 // MockAppSender is a mock of AppSender interface.
 type MockAppSender struct {
 	ctrl     *gomock.Controller
@@ -705,29 +784,57 @@ func (mr *MockAppSenderMockRecorder) SendAppGossipSpecific(nodeIDs, appGossipByt
 }
 
 // SendAppRequest mocks base method.
-func (m *MockAppSender) SendAppRequest(nodeIDs ids.NodeIDSet, sourceChainID, destinationChainID ids.ID, requestID uint32, appRequestBytes []byte) error {
+func (m *MockAppSender) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, appRequestBytes []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendAppRequest", nodeIDs, sourceChainID, destinationChainID, requestID, appRequestBytes)
+	ret := m.ctrl.Call(m, "SendAppRequest", nodeIDs, requestID, appRequestBytes)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SendAppRequest indicates an expected call of SendAppRequest.
-func (mr *MockAppSenderMockRecorder) SendAppRequest(nodeIDs, sourceChainID, destinationChainID, requestID, appRequestBytes interface{}) *gomock.Call {
+func (mr *MockAppSenderMockRecorder) SendAppRequest(nodeIDs, requestID, appRequestBytes interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendAppRequest", reflect.TypeOf((*MockAppSender)(nil).SendAppRequest), nodeIDs, sourceChainID, destinationChainID, requestID, appRequestBytes)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendAppRequest", reflect.TypeOf((*MockAppSender)(nil).SendAppRequest), nodeIDs, requestID, appRequestBytes)
 }
 
 // SendAppResponse mocks base method.
-func (m *MockAppSender) SendAppResponse(nodeID ids.NodeID, sourceChainID, destinationChainID ids.ID, requestID uint32, appResponseBytes []byte) error {
+func (m *MockAppSender) SendAppResponse(nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendAppResponse", nodeID, sourceChainID, destinationChainID, requestID, appResponseBytes)
+	ret := m.ctrl.Call(m, "SendAppResponse", nodeID, requestID, appResponseBytes)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SendAppResponse indicates an expected call of SendAppResponse.
-func (mr *MockAppSenderMockRecorder) SendAppResponse(nodeID, sourceChainID, destinationChainID, requestID, appResponseBytes interface{}) *gomock.Call {
+func (mr *MockAppSenderMockRecorder) SendAppResponse(nodeID, requestID, appResponseBytes interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendAppResponse", reflect.TypeOf((*MockAppSender)(nil).SendAppResponse), nodeID, sourceChainID, destinationChainID, requestID, appResponseBytes)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendAppResponse", reflect.TypeOf((*MockAppSender)(nil).SendAppResponse), nodeID, requestID, appResponseBytes)
+}
+
+// SendCrossChainAppRequest mocks base method.
+func (m *MockAppSender) SendCrossChainAppRequest(chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SendCrossChainAppRequest", chainID, requestID, appRequestBytes)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SendCrossChainAppRequest indicates an expected call of SendCrossChainAppRequest.
+func (mr *MockAppSenderMockRecorder) SendCrossChainAppRequest(chainID, requestID, appRequestBytes interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendCrossChainAppRequest", reflect.TypeOf((*MockAppSender)(nil).SendCrossChainAppRequest), chainID, requestID, appRequestBytes)
+}
+
+// SendCrossChainAppResponse mocks base method.
+func (m *MockAppSender) SendCrossChainAppResponse(chainID ids.ID, requestID uint32, appResponseBytes []byte) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SendCrossChainAppResponse", chainID, requestID, appResponseBytes)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SendCrossChainAppResponse indicates an expected call of SendCrossChainAppResponse.
+func (mr *MockAppSenderMockRecorder) SendCrossChainAppResponse(chainID, requestID, appResponseBytes interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendCrossChainAppResponse", reflect.TypeOf((*MockAppSender)(nil).SendCrossChainAppResponse), chainID, requestID, appResponseBytes)
 }

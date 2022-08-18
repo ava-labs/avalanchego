@@ -4,7 +4,10 @@
 package message
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -17,12 +20,26 @@ type InternalMsgBuilder interface {
 		chainID ids.ID,
 		requestID uint32,
 	) InboundMessage
-	InternalFailedCrossChainRequest(
-		op Op,
+	InternalCrossChainAppRequestFailed(
 		nodeID ids.NodeID,
 		sourceChainID ids.ID,
 		destinationChainID ids.ID,
 		requestID uint32,
+	) InboundMessage
+	InboundCrossChainAppRequest(
+		nodeID ids.NodeID,
+		sourceChainID ids.ID,
+		destinationChainID ids.ID,
+		requestID uint32,
+		deadline time.Duration,
+		msg []byte,
+	) InboundMessage
+	InboundCrossChainAppResponse(
+		nodeID ids.NodeID,
+		sourceChainID ids.ID,
+		destinationChainID ids.ID,
+		requestID uint32,
+		msg []byte,
 	) InboundMessage
 	InternalTimeout(nodeID ids.NodeID) InboundMessage
 	InternalConnected(nodeID ids.NodeID, nodeVersion *version.Application) InboundMessage
@@ -31,13 +48,15 @@ type InternalMsgBuilder interface {
 	InternalGossipRequest(nodeID ids.NodeID) InboundMessage
 }
 
-type internalMsgBuilder struct{}
+type internalMsgBuilder struct {
+	clock mockable.Clock
+}
 
 func NewInternalBuilder() InternalMsgBuilder {
 	return internalMsgBuilder{}
 }
 
-func (internalMsgBuilder) InternalFailedRequest(
+func (i internalMsgBuilder) InternalFailedRequest(
 	op Op,
 	nodeID ids.NodeID,
 	chainID ids.ID,

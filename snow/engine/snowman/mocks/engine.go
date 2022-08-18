@@ -92,13 +92,13 @@ func (_m *Engine) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	return r0
 }
 
-// AppRequest provides a mock function with given fields: nodeID, chainID, requestID, deadline, request
-func (_m *Engine) AppRequest(nodeID ids.NodeID, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
-	ret := _m.Called(nodeID, chainID, requestID, deadline, request)
+// AppRequest provides a mock function with given fields: nodeID, requestID, deadline, request
+func (_m *Engine) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
+	ret := _m.Called(nodeID, requestID, deadline, request)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.NodeID, ids.ID, uint32, time.Time, []byte) error); ok {
-		r0 = rf(nodeID, chainID, requestID, deadline, request)
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32, time.Time, []byte) error); ok {
+		r0 = rf(nodeID, requestID, deadline, request)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -106,13 +106,13 @@ func (_m *Engine) AppRequest(nodeID ids.NodeID, chainID ids.ID, requestID uint32
 	return r0
 }
 
-// AppRequestFailed provides a mock function with given fields: nodeID, chainID, requestID
-func (_m *Engine) AppRequestFailed(nodeID ids.NodeID, chainID ids.ID, requestID uint32) error {
-	ret := _m.Called(nodeID, chainID, requestID)
+// AppRequestFailed provides a mock function with given fields: nodeID, requestID
+func (_m *Engine) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
+	ret := _m.Called(nodeID, requestID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.NodeID, ids.ID, uint32) error); ok {
-		r0 = rf(nodeID, chainID, requestID)
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32) error); ok {
+		r0 = rf(nodeID, requestID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -120,13 +120,13 @@ func (_m *Engine) AppRequestFailed(nodeID ids.NodeID, chainID ids.ID, requestID 
 	return r0
 }
 
-// AppResponse provides a mock function with given fields: nodeID, chainID, requestID, response
-func (_m *Engine) AppResponse(nodeID ids.NodeID, chainID ids.ID, requestID uint32, response []byte) error {
-	ret := _m.Called(nodeID, chainID, requestID, response)
+// AppResponse provides a mock function with given fields: nodeID, requestID, response
+func (_m *Engine) AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
+	ret := _m.Called(nodeID, requestID, response)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.NodeID, ids.ID, uint32, []byte) error); ok {
-		r0 = rf(nodeID, chainID, requestID, response)
+	if rf, ok := ret.Get(0).(func(ids.NodeID, uint32, []byte) error); ok {
+		r0 = rf(nodeID, requestID, response)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -173,6 +173,48 @@ func (_m *Engine) Context() *snow.ConsensusContext {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*snow.ConsensusContext)
 		}
+	}
+
+	return r0
+}
+
+// CrossChainAppRequest provides a mock function with given fields: chainID, requestID, deadline, request
+func (_m *Engine) CrossChainAppRequest(chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+	ret := _m.Called(chainID, requestID, deadline, request)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(ids.ID, uint32, time.Time, []byte) error); ok {
+		r0 = rf(chainID, requestID, deadline, request)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// CrossChainAppRequestFailed provides a mock function with given fields: chainID, requestID
+func (_m *Engine) CrossChainAppRequestFailed(chainID ids.ID, requestID uint32) error {
+	ret := _m.Called(chainID, requestID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(ids.ID, uint32) error); ok {
+		r0 = rf(chainID, requestID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// CrossChainAppResponse provides a mock function with given fields: chainID, requestID, response
+func (_m *Engine) CrossChainAppResponse(chainID ids.ID, requestID uint32, response []byte) error {
+	ret := _m.Called(chainID, requestID, response)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(ids.ID, uint32, []byte) error); ok {
+		r0 = rf(chainID, requestID, response)
+	} else {
+		r0 = ret.Error(0)
 	}
 
 	return r0

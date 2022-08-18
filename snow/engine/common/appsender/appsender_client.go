@@ -23,7 +23,33 @@ func NewClient(client appsenderpb.AppSenderClient) *Client {
 	return &Client{client: client}
 }
 
-func (c *Client) SendAppRequest(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, request []byte) error {
+func (c *Client) SendCrossChainAppRequest(chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
+	_, err := c.client.SendCrossChainAppRequest(
+		context.Background(),
+		&appsenderpb.SendCrossChainAppRequestMsg{
+			ChainId:   chainID[:],
+			RequestId: requestID,
+			Request:   appRequestBytes[:],
+		},
+	)
+
+	return err
+}
+
+func (c *Client) SendCrossChainAppResponse(chainID ids.ID, requestID uint32, appResponseBytes []byte) error {
+	_, err := c.client.SendCrossChainAppResponse(
+		context.Background(),
+		&appsenderpb.SendCrossChainAppResponseMsg{
+			ChainId:   chainID[:],
+			RequestId: requestID,
+			Response:  appResponseBytes[:],
+		},
+	)
+
+	return err
+}
+
+func (c *Client) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, request []byte) error {
 	nodeIDsBytes := make([][]byte, nodeIDs.Len())
 	i := 0
 	for nodeID := range nodeIDs {
@@ -35,26 +61,22 @@ func (c *Client) SendAppRequest(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, des
 	_, err := c.client.SendAppRequest(
 		context.Background(),
 		&appsenderpb.SendAppRequestMsg{
-			NodeIds:            nodeIDsBytes,
-			SourceChainId:      sourceChainID[:],
-			DestinationChainId: destinationChainID[:],
-			RequestId:          requestID,
-			Request:            request,
+			NodeIds:   nodeIDsBytes,
+			RequestId: requestID,
+			Request:   request,
 		},
 	)
 
 	return err
 }
 
-func (c *Client) SendAppResponse(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, response []byte) error {
+func (c *Client) SendAppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
 	_, err := c.client.SendAppResponse(
 		context.Background(),
 		&appsenderpb.SendAppResponseMsg{
-			NodeId:             nodeID[:],
-			SourceChainId:      sourceChainID[:],
-			DestinationChainId: destinationChainID[:],
-			RequestId:          requestID,
-			Response:           response,
+			NodeId:    nodeID[:],
+			RequestId: requestID,
+			Response:  response,
 		},
 	)
 

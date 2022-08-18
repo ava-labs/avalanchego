@@ -392,9 +392,17 @@ type ChitsHandler interface {
 	QueryFailed(validatorID ids.NodeID, requestID uint32) error
 }
 
+type CrossChainAppHandler interface {
+	CrossChainAppRequest(chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error
+	CrossChainAppRequestFailed(chainID ids.ID, requestID uint32) error
+	CrossChainAppResponse(chainID ids.ID, requestID uint32, response []byte) error
+}
+
 // AppHandler defines how a consensus engine reacts to app specific messages.
 // Functions only return fatal errors.
 type AppHandler interface {
+	CrossChainAppHandler
+
 	// Notify this engine of a request for data from [nodeID].
 	//
 	// The meaning of [request], and what should be sent in response to it, is
@@ -406,7 +414,7 @@ type AppHandler interface {
 	// This node should typically send an AppResponse to [nodeID] in response to
 	// a valid message using the same request ID before the deadline. However,
 	// the VM may arbitrarily choose to not send a response to this request.
-	AppRequest(nodeID ids.NodeID, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error
+	AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error
 
 	// Notify this engine that an AppRequest message it sent to [nodeID] with
 	// request ID [requestID] failed.
@@ -418,7 +426,7 @@ type AppHandler interface {
 	// * This engine sent a request to [nodeID] with ID [requestID].
 	// * AppRequestFailed([nodeID], [requestID]) has not already been called.
 	// * AppResponse([nodeID], [requestID]) has not already been called.
-	AppRequestFailed(nodeID ids.NodeID, chainID ids.ID, requestID uint32) error
+	AppRequestFailed(nodeID ids.NodeID, requestID uint32) error
 
 	// Notify this engine of a response to the AppRequest message it sent to
 	// [nodeID] with request ID [requestID].
@@ -437,7 +445,7 @@ type AppHandler interface {
 	// If [response] is invalid or not the expected response, the VM chooses how
 	// to react. For example, the VM may send another AppRequest, or it may give
 	// up trying to get the requested information.
-	AppResponse(nodeID ids.NodeID, chainID ids.ID, requestID uint32, response []byte) error
+	AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error
 
 	// Notify this engine of a gossip message from [nodeID].
 	//

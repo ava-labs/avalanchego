@@ -93,6 +93,10 @@ type EngineTest struct {
 
 	CantHealth,
 
+	CantCrossChainAppRequest,
+	CantCrossChainAppRequestFailed,
+	CantCrossChainAppResponse,
+
 	CantAppRequest,
 	CantAppResponse,
 	CantAppGossip,
@@ -113,16 +117,18 @@ type EngineTest struct {
 	GetStateSummaryFrontierF, GetStateSummaryFrontierFailedF, GetAcceptedStateSummaryFailedF,
 	GetAcceptedFrontierF, GetFailedF, GetAncestorsFailedF,
 	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF func(nodeID ids.NodeID, requestID uint32) error
-	AppRequestFailedF         func(nodeID ids.NodeID, chainID ids.ID, requestID uint32) error
-	StateSummaryFrontierF     func(nodeID ids.NodeID, requestID uint32, summary []byte) error
-	GetAcceptedStateSummaryF  func(nodeID ids.NodeID, requestID uint32, keys []uint64) error
-	AcceptedStateSummaryF     func(nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error
-	ConnectedF                func(nodeID ids.NodeID, nodeVersion *version.Application) error
-	DisconnectedF             func(nodeID ids.NodeID) error
-	HealthF                   func() (interface{}, error)
-	GetVMF                    func() VM
-	AppRequestF, AppResponseF func(nodeID ids.NodeID, chainID ids.ID, requestID uint32, msg []byte) error
-	AppGossipF                func(nodeID ids.NodeID, msg []byte) error
+	AppRequestFailedF                             func(nodeID ids.NodeID, requestID uint32) error
+	StateSummaryFrontierF                         func(nodeID ids.NodeID, requestID uint32, summary []byte) error
+	GetAcceptedStateSummaryF                      func(nodeID ids.NodeID, requestID uint32, keys []uint64) error
+	AcceptedStateSummaryF                         func(nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error
+	ConnectedF                                    func(nodeID ids.NodeID, nodeVersion *version.Application) error
+	DisconnectedF                                 func(nodeID ids.NodeID) error
+	HealthF                                       func() (interface{}, error)
+	GetVMF                                        func() VM
+	AppRequestF, AppResponseF                     func(nodeID ids.NodeID, requestID uint32, msg []byte) error
+	AppGossipF                                    func(nodeID ids.NodeID, msg []byte) error
+	CrossChainAppRequestF, CrossChainAppResponseF func(chainID ids.ID, requestID uint32, msg []byte) error
+	CrossChainAppRequestFailedF                   func(chainID ids.ID, requestID uint32) error
 }
 
 func (e *EngineTest) Default(cant bool) {
@@ -164,6 +170,9 @@ func (e *EngineTest) Default(cant bool) {
 	e.CantAppResponse = cant
 	e.CantAppGossip = cant
 	e.CantGetVM = cant
+	e.CantCrossChainAppRequest = cant
+	e.CantCrossChainAppRequestFailed = cant
+	e.CantCrossChainAppResponse = cant
 }
 
 func (e *EngineTest) Start(startReqID uint32) error {
@@ -501,9 +510,51 @@ func (e *EngineTest) QueryFailed(nodeID ids.NodeID, requestID uint32) error {
 	return errQueryFailed
 }
 
-func (e *EngineTest) AppRequest(nodeID ids.NodeID, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+func (e *EngineTest) CrossChainAppRequest(chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+	if e.CrossChainAppRequestF != nil {
+		return e.CrossChainAppRequestF(chainID, requestID, request)
+	}
+	if !e.CantCrossChainAppRequest {
+		return nil
+	}
+	if e.T != nil {
+		e.T.Fatal(errCrossChainAppRequest)
+	}
+
+	return errCrossChainAppRequest
+}
+
+func (e *EngineTest) CrossChainAppRequestFailed(chainID ids.ID, requestID uint32) error {
+	if e.CrossChainAppRequestFailedF != nil {
+		return e.CrossChainAppRequestFailedF(chainID, requestID)
+	}
+	if !e.CantCrossChainAppRequestFailed {
+		return nil
+	}
+	if e.T != nil {
+		e.T.Fatal(errCrossChainAppRequestFailed)
+	}
+
+	return errCrossChainAppRequestFailed
+}
+
+func (e *EngineTest) CrossChainAppResponse(chainID ids.ID, requestID uint32, response []byte) error {
+	if e.CrossChainAppResponseF != nil {
+		return e.CrossChainAppResponseF(chainID, requestID, response)
+	}
+	if !e.CantCrossChainAppResponse {
+		return nil
+	}
+	if e.T != nil {
+		e.T.Fatal(errCrossChainAppResponse)
+	}
+
+	return errCrossChainAppResponse
+}
+
+func (e *EngineTest) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	if e.AppRequestF != nil {
-		return e.AppRequestF(nodeID, chainID, requestID, request)
+		return e.AppRequestF(nodeID, requestID, request)
 	}
 	if !e.CantAppRequest {
 		return nil
@@ -514,9 +565,9 @@ func (e *EngineTest) AppRequest(nodeID ids.NodeID, chainID ids.ID, requestID uin
 	return errAppRequest
 }
 
-func (e *EngineTest) AppResponse(nodeID ids.NodeID, chainID ids.ID, requestID uint32, response []byte) error {
+func (e *EngineTest) AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
 	if e.AppResponseF != nil {
-		return e.AppResponseF(nodeID, chainID, requestID, response)
+		return e.AppResponseF(nodeID, requestID, response)
 	}
 	if !e.CantAppResponse {
 		return nil
@@ -527,9 +578,9 @@ func (e *EngineTest) AppResponse(nodeID ids.NodeID, chainID ids.ID, requestID ui
 	return errAppResponse
 }
 
-func (e *EngineTest) AppRequestFailed(nodeID ids.NodeID, chainID ids.ID, requestID uint32) error {
+func (e *EngineTest) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
 	if e.AppRequestFailedF != nil {
-		return e.AppRequestFailedF(nodeID, chainID, requestID)
+		return e.AppRequestFailedF(nodeID, requestID)
 	}
 	if !e.CantAppRequestFailed {
 		return nil

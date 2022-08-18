@@ -666,17 +666,14 @@ func TestRouterCrossChainMessages(t *testing.T) {
 	r.Equal(t, 1, chainRouter.chains[senderCtx.ChainID].Len())
 	r.Equal(t, 1, chainRouter.chains[receiverCtx.ChainID].Len())
 
-	// register the cross-chain request/response so we don't drop them
-	vID := ids.GenerateTestNodeID()
-	chainRouter.RegisterRequest(vID, senderCtx.ChainID, receiverCtx.ChainID, uint32(1), message.CrossChainAppRequest)
-	chainRouter.RegisterRequest(vID, senderCtx.ChainID, receiverCtx.ChainID, uint32(1), message.CrossChainAppResponse)
-
 	msg := []byte("foobar")
-	chainRouter.HandleInbound(mc.InboundCrossChainAppRequest(senderCtx.ChainID, receiverCtx.ChainID, uint32(1), time.Minute, msg, vID))
-	chainRouter.HandleInbound(mc.InboundCrossChainAppResponse(senderCtx.ChainID, receiverCtx.ChainID, uint32(1), msg, vID))
+	chainRouter.HandleInbound(mc.InboundCrossChainAppRequest(nodeID, senderCtx.ChainID, receiverCtx.ChainID, uint32(1), time.Minute, msg))
+	r.Equal(t, 2, chainRouter.chains[receiverCtx.ChainID].Len())
 
-	// We should have received the new message in the receiver chain
-	r.Equal(3, chainRouter.chains[receiverCtx.ChainID].Len())
+	// register the cross-chain response so we don't drop it
+	chainRouter.RegisterRequest(nodeID, senderCtx.ChainID, receiverCtx.ChainID, uint32(1), message.CrossChainAppResponse)
+	chainRouter.HandleInbound(mc.InboundCrossChainAppResponse(nodeID, senderCtx.ChainID, receiverCtx.ChainID, uint32(1), msg))
+	r.Equal(t, 3, chainRouter.chains[receiverCtx.ChainID].Len())
 
 	// The sender chain shouldn't have any new messages.
 	r.Equal(1, chainRouter.chains[senderCtx.ChainID].Len())

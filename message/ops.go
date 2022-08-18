@@ -246,9 +246,6 @@ var (
 		AppResponse: {ChainID, RequestID, AppBytes},
 		AppGossip:   {ChainID, AppBytes},
 
-		// Cross-chain application messaging
-		CrossChainAppRequest:  {SourceChainID, ChainID, RequestID, Deadline, AppBytes},
-		CrossChainAppResponse: {SourceChainID, ChainID, RequestID, AppBytes},
 		// State Sync
 		GetStateSummaryFrontier: {ChainID, RequestID, Deadline},
 		StateSummaryFrontier:    {ChainID, RequestID, SummaryBytes},

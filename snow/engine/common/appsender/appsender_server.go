@@ -26,6 +26,24 @@ func NewServer(appSender common.AppSender) *Server {
 	return &Server{appSender: appSender}
 }
 
+func (s *Server) SendCrossChainAppRequest(ctx context.Context, msg *appsenderpb.SendCrossChainAppRequestMsg) (*emptypb.Empty, error) {
+	chainID, err := ids.ToID(msg.ChainId)
+	if err != nil {
+		return &emptypb.Empty{}, err
+	}
+
+	return &emptypb.Empty{}, s.appSender.SendCrossChainAppRequest(chainID, msg.RequestId, msg.Request)
+}
+
+func (s *Server) SendCrossChainAppResponse(ctx context.Context, msg *appsenderpb.SendCrossChainAppResponseMsg) (*emptypb.Empty, error) {
+	chainID, err := ids.ToID(msg.ChainId)
+	if err != nil {
+		return &emptypb.Empty{}, err
+	}
+
+	return &emptypb.Empty{}, s.appSender.SendCrossChainAppResponse(chainID, msg.RequestId, msg.Response)
+}
+
 func (s *Server) SendAppRequest(_ context.Context, req *appsenderpb.SendAppRequestMsg) (*emptypb.Empty, error) {
 	nodeIDs := ids.NewNodeIDSet(len(req.NodeIds))
 	for _, nodeIDBytes := range req.NodeIds {
@@ -35,15 +53,8 @@ func (s *Server) SendAppRequest(_ context.Context, req *appsenderpb.SendAppReque
 		}
 		nodeIDs.Add(nodeID)
 	}
-	sourceChainID, err := ids.ToID(req.SourceChainId)
-	if err != nil {
-		return nil, err
-	}
-	destinationChainID, err := ids.ToID(req.DestinationChainId)
-	if err != nil {
-		return nil, err
-	}
-	err = s.appSender.SendAppRequest(nodeIDs, sourceChainID, destinationChainID, req.RequestId, req.Request)
+
+	err := s.appSender.SendAppRequest(nodeIDs, req.RequestId, req.Request)
 	return &emptypb.Empty{}, err
 }
 
@@ -52,15 +63,8 @@ func (s *Server) SendAppResponse(_ context.Context, req *appsenderpb.SendAppResp
 	if err != nil {
 		return nil, err
 	}
-	sourceChainID, err := ids.ToID(req.SourceChainId)
-	if err != nil {
-		return nil, err
-	}
-	destinationChainID, err := ids.ToID(req.DestinationChainId)
-	if err != nil {
-		return nil, err
-	}
-	err = s.appSender.SendAppResponse(nodeID, sourceChainID, destinationChainID, req.RequestId, req.Response)
+
+	err = s.appSender.SendAppResponse(nodeID, req.RequestId, req.Response)
 	return &emptypb.Empty{}, err
 }
 

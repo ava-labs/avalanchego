@@ -20,10 +20,6 @@ message SendAppRequestMsg {
   uint32 request_id = 2;
   // The request body
   bytes request = 3;
-  // The chain that this message is coming from
-  bytes source_chain_id = 4;
-  // The chain that this message is going to
-  bytes destination_chain_id = 5;
 }
 
 message SendAppResponseMsg {
@@ -33,10 +29,6 @@ message SendAppResponseMsg {
   uint32 request_id = 2;
   // The response body
   bytes response = 3;
-  // The chain that this message is coming from
-  bytes source_chain_id = 4;
-  // The chain that this message is going to
-  bytes destination_chain_id = 5;
 }
 
 message SendAppGossipMsg {
@@ -51,7 +43,21 @@ message SendAppGossipSpecificMsg {
   bytes msg = 2;
 }
 
+message SendCrossChainAppRequestMsg {
+  bytes chain_id = 1;
+  uint32 request_id = 2;
+  bytes request = 3;
+}
+
+message SendCrossChainAppResponseMsg {
+  bytes chain_id = 1;
+  uint32 request_id = 2;
+  bytes response = 3;
+}
+
 service AppSender {
+  rpc SendCrossChainAppRequest(SendCrossChainAppRequestMsg) returns (google.protobuf.Empty);
+  rpc SendCrossChainAppResponse(SendCrossChainAppResponseMsg) returns (google.protobuf.Empty);
   rpc SendAppRequest(SendAppRequestMsg) returns (google.protobuf.Empty);
   rpc SendAppResponse(SendAppResponseMsg) returns (google.protobuf.Empty);
   rpc SendAppGossip(SendAppGossipMsg) returns (google.protobuf.Empty);

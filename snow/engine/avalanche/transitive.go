@@ -235,18 +235,30 @@ func (t *Transitive) QueryFailed(nodeID ids.NodeID, requestID uint32) error {
 	return t.Chits(nodeID, requestID, nil)
 }
 
-func (t *Transitive) AppRequest(nodeID ids.NodeID, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
-	return t.VM.AppRequest(nodeID, chainID, requestID, deadline, request)
+func (t *Transitive) CrossChainAppRequest(chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+	return t.VM.CrossChainAppRequest(chainID, requestID, deadline, request)
 }
 
-func (t *Transitive) AppRequestFailed(nodeID ids.NodeID, chainID ids.ID, requestID uint32) error {
+func (t *Transitive) CrossChainAppRequestFailed(chainID ids.ID, requestID uint32) error {
+	return t.VM.CrossChainAppRequestFailed(chainID, requestID)
+}
+
+func (t *Transitive) CrossChainAppResponse(chainID ids.ID, requestID uint32, response []byte) error {
+	return t.VM.CrossChainAppResponse(chainID, requestID, response)
+}
+
+func (t *Transitive) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
+	return t.VM.AppRequest(nodeID, requestID, deadline, request)
+}
+
+func (t *Transitive) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
 	// Notify the VM that a request it made failed
-	return t.VM.AppRequestFailed(nodeID, chainID, requestID)
+	return t.VM.AppRequestFailed(nodeID, requestID)
 }
 
-func (t *Transitive) AppResponse(nodeID ids.NodeID, chainID ids.ID, requestID uint32, response []byte) error {
+func (t *Transitive) AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
 	// Notify the VM of a response to its request
-	return t.VM.AppResponse(nodeID, chainID, requestID, response)
+	return t.VM.AppResponse(nodeID, requestID, response)
 }
 
 func (t *Transitive) AppGossip(nodeID ids.NodeID, msg []byte) error {

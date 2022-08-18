@@ -149,16 +149,16 @@ func (vm *blockVM) LastAccepted() (ids.ID, error) {
 	return lastAcceptedID, err
 }
 
-func (vm *blockVM) AppRequest(nodeID ids.NodeID, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
-	return vm.ChainVM.AppRequest(nodeID, chainID, requestID, deadline, request)
+func (vm *blockVM) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
+	return vm.ChainVM.AppRequest(nodeID, requestID, deadline, request)
 }
 
-func (vm *blockVM) AppResponse(nodeID ids.NodeID, chainID ids.ID, requestID uint32, response []byte) error {
-	return vm.ChainVM.AppResponse(nodeID, chainID, requestID, response)
+func (vm *blockVM) AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
+	return vm.ChainVM.AppResponse(nodeID, requestID, response)
 }
 
-func (vm *blockVM) AppRequestFailed(nodeID ids.NodeID, chainID ids.ID, requestID uint32) error {
-	return vm.ChainVM.AppRequestFailed(nodeID, chainID, requestID)
+func (vm *blockVM) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
+	return vm.ChainVM.AppRequestFailed(nodeID, requestID)
 }
 
 func (vm *blockVM) AppGossip(nodeID ids.NodeID, msg []byte) error {

@@ -824,82 +824,75 @@ func (s *sender) SendChits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) 
 	}
 }
 
+func (s *sender) SendCrossChainAppRequest(chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
+	inMsg := s.msgCreator.InboundCrossChainAppRequest(
+		s.ctx.NodeID,
+		s.ctx.ChainID,
+		chainID,
+		requestID,
+		s.timeouts.TimeoutDuration(),
+		appRequestBytes,
+	)
+
+	go s.router.HandleInbound(inMsg)
+	return nil
+}
+
+func (s *sender) SendCrossChainAppResponse(chainID ids.ID, requestID uint32, appResponseBytes []byte) error {
+	inMsg := s.msgCreator.InboundCrossChainAppResponse(
+		s.ctx.NodeID,
+		s.ctx.ChainID,
+		chainID,
+		requestID,
+		appResponseBytes,
+	)
+
+	go s.router.HandleInbound(inMsg)
+	return nil
+}
+
 // SendAppRequest sends an application-level request to the given nodes.
 // The meaning of this request, and how it should be handled, is defined by the VM.
-func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, appRequestBytes []byte) error {
+func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, appRequestBytes []byte) error {
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
 	// We register timeouts for all nodes, regardless of whether we fail
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(nodeID, sourceChainID, destinationChainID, requestID, message.AppResponse)
+		s.router.RegisterRequest(nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID, message.AppResponse)
 	}
 
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
-
-	// Handle cross-chain messages
-	if sourceChainID != destinationChainID {
-		for nodeID := range nodeIDs {
-			var inMsg message.InboundMessage
-
-			if nodeID == s.ctx.NodeID {
-				inMsg = s.msgCreator.InboundCrossChainAppRequest(sourceChainID, destinationChainID, requestID, deadline, appRequestBytes, nodeID)
-			} else {
-				// We don't currently support remote cross-chain messages,
-				// so we should fail them immediately.
-				inMsg = s.msgCreator.InternalFailedCrossChainRequest(message.CrossChainAppRequestFailed, nodeID, sourceChainID, destinationChainID, requestID)
-			}
-
-			go s.router.HandleInbound(inMsg)
-		}
-
-		return nil
-	}
-
-	// Tell the router to expect a response message or a message notifying
-	// that we won't get a response from each of these nodes.
-	// We register timeouts for all nodes, regardless of whether we fail
-	// to send them a message, to avoid busy looping when disconnected from
-	// the internet.
-	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(nodeID, sourceChainID, destinationChainID, requestID, message.AppResponse)
-	}
-
-	// Note that this timeout duration won't exactly match the one that gets
-	// registered. That's OK.
-	deadline := s.timeouts.TimeoutDuration()
-
-	msgCreator := s.getMsgCreator()
 
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Do so asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 
-		inMsg := s.msgCreator.InboundAppRequest(destinationChainID, requestID, deadline, appRequestBytes, s.ctx.NodeID)
+		inMsg := s.msgCreator.InboundAppRequest(s.ctx.ChainID, requestID, deadline, appRequestBytes, s.ctx.NodeID)
 		go s.router.HandleInbound(inMsg)
 	}
 
 	// Some of the nodes in [nodeIDs] may be benched. That is, they've been unresponsive
 	// so we don't even bother sending messages to them. We just have them immediately fail.
 	for nodeID := range nodeIDs {
-		if s.timeouts.IsBenched(nodeID, destinationChainID) {
+		if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
 			s.failedDueToBench[message.AppRequest].Inc() // update metric
 			nodeIDs.Remove(nodeID)
 			s.timeouts.RegisterRequestToUnreachableValidator()
 
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
-			inMsg := s.msgCreator.InternalFailedRequest(message.AppRequestFailed, nodeID, destinationChainID, requestID)
+			inMsg := s.msgCreator.InternalFailedRequest(message.AppRequestFailed, nodeID, s.ctx.ChainID, requestID)
 			go s.router.HandleInbound(inMsg)
 		}
 	}
 
 	// Create the outbound message.
 	// [sentTo] are the IDs of nodes who may receive the message.
-	outMsg, err := s.msgCreator.AppRequest(destinationChainID, requestID, deadline, appRequestBytes)
+	outMsg, err := s.msgCreator.AppRequest(s.ctx.ChainID, requestID, deadline, appRequestBytes)
 
 	// Send the message over the network.
 	var sentTo ids.NodeIDSet
@@ -908,8 +901,7 @@ func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, des
 	} else {
 		s.ctx.Log.Error("failed to build message",
 			zap.Stringer("messageOp", message.AppRequest),
-			zap.Stringer("sourceChainID", sourceChainID),
-			zap.Stringer("destinationChainID", destinationChainID),
+			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
 			zap.Binary("payload", appRequestBytes),
 			zap.Error(err),
@@ -921,15 +913,13 @@ func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, des
 			s.ctx.Log.Debug("failed to send message",
 				zap.Stringer("messageOp", message.AppRequest),
 				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("sourceChainID", sourceChainID),
-				zap.Stringer("destinationChainID", destinationChainID),
+				zap.Stringer("chainID", s.ctx.ChainID),
 				zap.Uint32("requestID", requestID),
 			)
 			s.ctx.Log.Verbo("failed to send message",
 				zap.Stringer("messageOp", message.AppRequest),
 				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("sourceChainID", sourceChainID),
-				zap.Stringer("destinationChainID", destinationChainID),
+				zap.Stringer("chainID", s.ctx.ChainID),
 				zap.Uint32("requestID", requestID),
 				zap.Binary("payload", appRequestBytes),
 			)
@@ -937,7 +927,7 @@ func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, des
 			// Register failures for nodes we didn't send a request to.
 			s.timeouts.RegisterRequestToUnreachableValidator()
 
-			inMsg := s.msgCreator.InternalFailedRequest(message.AppRequestFailed, nodeID, destinationChainID, requestID)
+			inMsg := s.msgCreator.InternalFailedRequest(message.AppRequestFailed, nodeID, s.ctx.ChainID, requestID)
 			go s.router.HandleInbound(inMsg)
 		}
 	}

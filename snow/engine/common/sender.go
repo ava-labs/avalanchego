@@ -122,9 +122,19 @@ type Gossiper interface {
 	SendGossip(container []byte)
 }
 
+// CrossChainAppSender sends local VM level messages to another VM.
+type CrossChainAppSender interface {
+	// Send an application-level request to a specfic chain
+	SendCrossChainAppRequest(chainID ids.ID, requestID uint32, appRequestBytes []byte) error
+	// Send an application-level response to a specific chain
+	SendCrossChainAppResponse(chainID ids.ID, requestID uint32, appResponseBytes []byte) error
+}
+
 // AppSender sends application (VM) level messages.
 // See also common.AppHandler.
 type AppSender interface {
+	CrossChainAppSender
+
 	// Send an application-level request.
 	// A nil return value guarantees that for each nodeID in [nodeIDs],
 	// the VM corresponding to this AppSender eventually receives either:
@@ -132,12 +142,12 @@ type AppSender interface {
 	// * An AppRequestFailed from nodeID with ID [requestID]
 	// Exactly one of the above messages will eventually be received per nodeID.
 	// A non-nil error should be considered fatal.
-	SendAppRequest(nodeIDs ids.NodeIDSet, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, appRequestBytes []byte) error
+	SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, appRequestBytes []byte) error
 	// Send an application-level response to a request.
 	// This response must be in response to an AppRequest that the VM corresponding
 	// to this AppSender received from [nodeID] with ID [requestID].
 	// A non-nil error should be considered fatal.
-	SendAppResponse(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, appResponseBytes []byte) error
+	SendAppResponse(nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error
 	// Gossip an application-level message.
 	// A non-nil error should be considered fatal.
 	SendAppGossip(appGossipBytes []byte) error

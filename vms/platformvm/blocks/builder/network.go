@@ -56,19 +56,37 @@ func NewNetwork(
 	}
 }
 
-func (n *network) AppRequestFailed(nodeID ids.NodeID, chainID ids.ID, requestID uint32) error {
+func (n *network) CrossChainAppRequestFailed(chainID ids.ID, requestID uint32) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (n *network) AppRequest(nodeID ids.NodeID, chainID ids.ID, requestID uint32, deadline time.Time, msgBytes []byte) error {
+func (n *network) CrossChainAppRequest(chainID ids.ID, requestID uint32, deadline time.Time, msgBytes []byte) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (n *network) AppResponse(nodeID ids.NodeID, chainID ids.ID, requestID uint32, msgBytes []byte) error {
+func (n *network) CrossChainAppResponse(chainID ids.ID, requestID uint32, msgBytes []byte) error {
+	// This VM currently only supports gossiping of txs, so there are no
+	// requests.
+	return nil
+}
+
+func (n *network) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
+	// This VM currently only supports gossiping of txs, so there are no
+	// requests.
+	return nil
+}
+
+func (n *network) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, msgBytes []byte) error {
+	// This VM currently only supports gossiping of txs, so there are no
+	// requests.
+	return nil
+}
+
+func (n *network) AppResponse(nodeID ids.NodeID, requestID uint32, msgBytes []byte) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil

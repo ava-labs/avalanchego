@@ -958,7 +958,7 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 			return err
 		}
 		appBytes := msg.Get(message.AppBytes).([]byte)
-		return engine.AppRequest(nodeID, sourceChainID, reqID, msg.ExpirationTime(), appBytes)
+		return engine.CrossChainAppRequest(sourceChainID, reqID, msg.ExpirationTime(), appBytes)
 
 	case message.CrossChainAppResponse:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -967,7 +967,7 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 			return err
 		}
 		appBytes := msg.Get(message.AppBytes).([]byte)
-		return engine.AppResponse(nodeID, sourceChainID, reqID, appBytes)
+		return engine.CrossChainAppResponse(sourceChainID, reqID, appBytes)
 
 	case message.CrossChainAppRequestFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -975,7 +975,7 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 		if err != nil {
 			return err
 		}
-		return engine.AppRequestFailed(nodeID, sourceChainID, reqID)
+		return engine.CrossChainAppRequestFailed(sourceChainID, reqID)
 
 	default:
 		return fmt.Errorf(

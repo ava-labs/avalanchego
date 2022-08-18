@@ -166,7 +166,7 @@ func (cr *ChainRouter) RegisterRequest(nodeID ids.NodeID, sourceChainID ids.ID, 
 	cr.timeoutManager.RegisterRequest(nodeID, destinationChainID, op, uniqueRequestID, func() {
 		var msg message.InboundMessage
 		if sourceChainID != destinationChainID {
-			msg = cr.msgCreator.InternalFailedCrossChainRequest(failedOp, nodeID, sourceChainID, destinationChainID, requestID)
+			msg = cr.msgCreator.InternalCrossChainAppRequestFailed(cr.nodeID, sourceChainID, destinationChainID, requestID)
 		} else {
 			msg = cr.msgCreator.InternalFailedRequest(failedOp, nodeID, destinationChainID, requestID)
 		}
@@ -228,9 +228,6 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 			msg.OnFinishedHandling()
 			return
 		}
-
-	default:
-		sourceChainID = chainID
 	}
 
 
@@ -575,7 +572,6 @@ func (cr *ChainRouter) clearRequest(
 	requestID uint32,
 ) (ids.ID, *requestEntry) {
 	// Create the request ID of the request we sent that this message is (allegedly) in response to.
-	// uniqueRequestID := cr.createRequestID(nodeID, sourceChainID, destinationChainID, requestID, op)
 	uniqueRequestID := cr.createRequestID(nodeID, sourceChainID, destinationChainID, requestID, op)
 	// Mark that an outstanding request has been fulfilled
 	request, exists := cr.timedRequests.Get(uniqueRequestID)
