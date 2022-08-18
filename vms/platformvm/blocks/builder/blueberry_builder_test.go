@@ -184,8 +184,9 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				},
 			},
 		}
-		now = time.Now()
-		txs = []*txs.Tx{
+		now             = time.Now()
+		parentTimestamp = now.Add(-2 * time.Second)
+		txs             = []*txs.Tx{
 			{
 				Unsigned: &txs.AddValidatorTx{
 					BaseTx: txs.BaseTx{
@@ -243,7 +244,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 			},
 			parentStateF: func(ctrl *gomock.Controller) state.Chain {
 				s := state.NewMockChain(ctrl)
-				s.EXPECT().GetTimestamp().Return(now)
+				s.EXPECT().GetTimestamp().Return(parentTimestamp)
 				return s
 			},
 			expectedBlkF: func(require *require.Assertions) blocks.Block {
@@ -278,7 +279,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				s := state.NewMockChain(ctrl)
 
 				// Once in [buildBlueberryBlock], once in [getNextStakerToReward]
-				s.EXPECT().GetTimestamp().Return(now).Times(2)
+				s.EXPECT().GetTimestamp().Return(parentTimestamp).Times(2)
 
 				// add current validator that ends at [now]
 				// i.e. it should be rewarded
@@ -327,7 +328,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				s := state.NewMockChain(ctrl)
 
 				// Once in [buildBlueberryBlock], once in [GetNextStakerChangeTime]
-				s.EXPECT().GetTimestamp().Return(now).Times(2)
+				s.EXPECT().GetTimestamp().Return(parentTimestamp).Times(2)
 
 				// add current validator that ends at [now] - 1 second.
 				// Handle calls in [getNextStakerToReward]
@@ -398,7 +399,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				s := state.NewMockChain(ctrl)
 
 				// Once in [buildBlueberryBlock], once in [GetNextStakerChangeTime],
-				s.EXPECT().GetTimestamp().Return(now).Times(2)
+				s.EXPECT().GetTimestamp().Return(parentTimestamp).Times(2)
 
 				// Handle calls in [getNextStakerToReward]
 				// and [GetNextStakerChangeTime].
@@ -466,7 +467,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				s := state.NewMockChain(ctrl)
 
 				// Once in [buildBlueberryBlock], once in [GetNextStakerChangeTime],
-				s.EXPECT().GetTimestamp().Return(now).Times(2)
+				s.EXPECT().GetTimestamp().Return(parentTimestamp).Times(2)
 
 				// Handle calls in [getNextStakerToReward]
 				// and [GetNextStakerChangeTime].
