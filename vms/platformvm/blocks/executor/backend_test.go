@@ -6,7 +6,10 @@ package executor
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
@@ -60,5 +63,49 @@ func TestGetState(t *testing.T) {
 		gotState, ok := b.GetState(blkID)
 		require.True(ok)
 		require.Equal(mockState, gotState)
+	}
+}
+
+func TestBackendGetBlock(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var (
+		blkID1       = ids.GenerateTestID()
+		statelessBlk = blocks.NewMockBlock(ctrl)
+		state        = state.NewMockState(ctrl)
+		b            = &backend{
+			state: state,
+			blkIDToState: map[ids.ID]*blockState{
+				blkID1: {
+					statelessBlock: statelessBlk,
+				},
+			},
+		}
+	)
+
+	{
+		// Case: block is in the map.
+		gotBlk, err := b.GetBlock(blkID1)
+		require.Nil(err)
+		require.Equal(statelessBlk, gotBlk)
+	}
+
+	{
+		// Case: block isn't in the map or database.
+		blkID := ids.GenerateTestID()
+		state.EXPECT().GetStatelessBlock(blkID).Return(nil, choices.Unknown, database.ErrNotFound)
+		_, err := b.GetBlock(blkID)
+		require.Equal(database.ErrNotFound, err)
+	}
+
+	{
+		// Case: block isn't in the map and is in database.
+		blkID := ids.GenerateTestID()
+		state.EXPECT().GetStatelessBlock(blkID).Return(statelessBlk, choices.Accepted, nil)
+		gotBlk, err := b.GetBlock(blkID)
+		require.NoError(err)
+		require.Equal(statelessBlk, gotBlk)
 	}
 }
