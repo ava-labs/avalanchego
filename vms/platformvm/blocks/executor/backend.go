@@ -91,16 +91,6 @@ func (b *backend) free(blkID ids.ID) {
 	delete(b.blkIDToState, blkID)
 }
 
-func (b *backend) getStatelessBlock(blkID ids.ID) (blocks.Block, error) {
-	// See if the block is in memory.
-	if blk, ok := b.blkIDToState[blkID]; ok {
-		return blk.statelessBlock, nil
-	}
-	// The block isn't in memory. Check the database.
-	statelessBlk, _, err := b.state.GetStatelessBlock(blkID)
-	return statelessBlk, err
-}
-
 func (b *backend) getTimestamp(block blocks.Block) time.Time {
 	switch blk := block.(type) {
 	case *blocks.BlueberryAbortBlock:
@@ -115,7 +105,8 @@ func (b *backend) getTimestamp(block blocks.Block) time.Time {
 	case *blocks.BlueberryStandardBlock:
 		return blk.Timestamp()
 
-	default: // these are apricot blocks
+	default:
+		// these are apricot blocks
 		// If this is the last accepted block and the block was loaded from disk
 		// since it was accepted, then the timestamp wouldn't be set correctly. So,
 		// we explicitly return the chain time.

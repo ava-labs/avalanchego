@@ -86,7 +86,7 @@ func (f *forkChecker) assertFork(parent ids.ID, expectedFork forks.Fork) error {
 
 func (f *forkChecker) validateBlueberryOptionsTimestamp(b blocks.Block) error {
 	parentID := b.Parent()
-	parentBlk, err := f.getStatelessBlock(parentID)
+	parentBlk, err := f.backend.GetBlock(parentID)
 	if err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ func (f *forkChecker) validateBlueberryOptionsTimestamp(b blocks.Block) error {
 
 func (f *forkChecker) validateBlueberryBlocksTimestamp(b blocks.Block) error {
 	parentID := b.Parent()
-	parentBlk, err := f.getStatelessBlock(parentID)
+	parentBlk, err := f.backend.GetBlock(parentID)
 	if err != nil {
 		return err
 	}
