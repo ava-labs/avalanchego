@@ -188,8 +188,9 @@ func TestBuildApricotBlock(t *testing.T) {
 				},
 			},
 		}
-		now = time.Now()
-		txs = []*txs.Tx{
+		now             = time.Now()
+		parentTimestamp = now.Add(-2 * time.Second)
+		blockTxs        = []*txs.Tx{
 			{
 				Unsigned: &txs.AddValidatorTx{
 					BaseTx: txs.BaseTx{
@@ -240,7 +241,7 @@ func TestBuildApricotBlock(t *testing.T) {
 			builderF: func(ctrl *gomock.Controller) *builder {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().HasDecisionTxs().Return(true)
-				mempool.EXPECT().PeekDecisionTxs(targetBlockSize).Return(txs)
+				mempool.EXPECT().PeekDecisionTxs(targetBlockSize).Return(blockTxs)
 				return &builder{
 					Mempool: mempool,
 				}
@@ -252,7 +253,7 @@ func TestBuildApricotBlock(t *testing.T) {
 				expectedBlk, err := blocks.NewApricotStandardBlock(
 					parentID,
 					height,
-					txs,
+					blockTxs,
 				)
 				require.NoError(err)
 				return expectedBlk
@@ -268,7 +269,7 @@ func TestBuildApricotBlock(t *testing.T) {
 
 				// The tx builder should be asked to build a reward tx
 				txBuilder := txbuilder.NewMockBuilder(ctrl)
-				txBuilder.EXPECT().NewRewardValidatorTx(stakerTxID).Return(txs[0], nil)
+				txBuilder.EXPECT().NewRewardValidatorTx(stakerTxID).Return(blockTxs[0], nil)
 
 				return &builder{
 					Mempool:   mempool,
@@ -278,16 +279,16 @@ func TestBuildApricotBlock(t *testing.T) {
 			parentStateF: func(ctrl *gomock.Controller) state.Chain {
 				s := state.NewMockChain(ctrl)
 
-				s.EXPECT().GetTimestamp().Return(now)
+				s.EXPECT().GetTimestamp().Return(parentTimestamp)
 
-				// add current validator that ends at [now]
+				// add current validator that ends at [parentTimestamp]
 				// i.e. it should be rewarded
 				currentStakerIter := state.NewMockStakerIterator(ctrl)
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
 					TxID:     stakerTxID,
 					Priority: state.PrimaryNetworkDelegatorCurrentPriority,
-					EndTime:  now,
+					EndTime:  parentTimestamp,
 				})
 				currentStakerIter.EXPECT().Release()
 
@@ -299,7 +300,7 @@ func TestBuildApricotBlock(t *testing.T) {
 				expectedBlk, err := blocks.NewApricotProposalBlock(
 					parentID,
 					height,
-					txs[0],
+					blockTxs[0],
 				)
 				require.NoError(err)
 				return expectedBlk
@@ -313,14 +314,20 @@ func TestBuildApricotBlock(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().HasDecisionTxs().Return(false)
 
-				// The tx builder should be asked to build a reward tx
+				// The tx builder should be asked to build an advance time tx
+				advanceTimeTx := &txs.Tx{
+					Unsigned: &txs.AdvanceTimeTx{
+						Time: uint64(now.Add(-1 * time.Second).Unix()),
+					},
+				}
 				txBuilder := txbuilder.NewMockBuilder(ctrl)
-				txBuilder.EXPECT().NewAdvanceTimeTx(now).Return(txs[0], nil)
+				txBuilder.EXPECT().NewAdvanceTimeTx(now.Add(-1*time.Second)).Return(advanceTimeTx, nil)
 
 				clk := &mockable.Clock{}
 				clk.Set(now)
 				return &builder{
-					Mempool: mempool,
+					Mempool:   mempool,
+					txBuilder: txBuilder,
 					txExecutorBackend: &txexecutor.Backend{
 						Clk: clk,
 					},
@@ -329,7 +336,7 @@ func TestBuildApricotBlock(t *testing.T) {
 			parentStateF: func(ctrl *gomock.Controller) state.Chain {
 				s := state.NewMockChain(ctrl)
 
-				s.EXPECT().GetTimestamp().Return(now)
+				s.EXPECT().GetTimestamp().Return(parentTimestamp)
 
 				// add current validator that ends at [now] - 1 second.
 				// Handle calls in [getNextStakerToReward]
@@ -363,10 +370,14 @@ func TestBuildApricotBlock(t *testing.T) {
 				return s
 			},
 			expectedBlkF: func(require *require.Assertions) blocks.Block {
-				expectedBlk, err := blocks.NewApricotStandardBlock(
+				expectedBlk, err := blocks.NewApricotProposalBlock(
 					parentID,
 					height,
-					nil, // empty block to advance time
+					&txs.Tx{ // advances time
+						Unsigned: &txs.AdvanceTimeTx{
+							Time: uint64(now.Add(-1 * time.Second).Unix()),
+						},
+					},
 				)
 				require.NoError(err)
 				return expectedBlk
@@ -398,11 +409,8 @@ func TestBuildApricotBlock(t *testing.T) {
 			parentStateF: func(ctrl *gomock.Controller) state.Chain {
 				s := state.NewMockChain(ctrl)
 
-				// Once in [buildBlueberryBlock], once in [GetNextStakerChangeTime],
-				s.EXPECT().GetTimestamp().Return(now).Times(2)
+				s.EXPECT().GetTimestamp().Return(parentTimestamp)
 
-				// Handle calls in [getNextStakerToReward]
-				// and [GetNextStakerChangeTime].
 				// Next validator change time is in the future.
 				currentStakerIter := state.NewMockStakerIterator(ctrl)
 				gomock.InOrder(
@@ -435,7 +443,7 @@ func TestBuildApricotBlock(t *testing.T) {
 				expectedBlk, err := blocks.NewApricotProposalBlock(
 					parentID,
 					height,
-					txs[0],
+					blockTxs[0],
 				)
 				require.NoError(err)
 				return expectedBlk
@@ -451,7 +459,7 @@ func TestBuildApricotBlock(t *testing.T) {
 
 				// There is a proposal tx.
 				mempool.EXPECT().HasProposalTx().Return(true).AnyTimes()
-				mempool.EXPECT().PeekProposalTx().Return(txs[0]).AnyTimes()
+				mempool.EXPECT().PeekProposalTx().Return(blockTxs[0]).AnyTimes()
 
 				clk := &mockable.Clock{}
 				clk.Set(now)
@@ -466,7 +474,7 @@ func TestBuildApricotBlock(t *testing.T) {
 				s := state.NewMockChain(ctrl)
 
 				// Once in [buildBlueberryBlock], once in [GetNextStakerChangeTime],
-				s.EXPECT().GetTimestamp().Return(now).Times(2)
+				s.EXPECT().GetTimestamp().Return(parentTimestamp).Times(2)
 
 				// Handle calls in [getNextStakerToReward]
 				// and [GetNextStakerChangeTime].
@@ -502,7 +510,7 @@ func TestBuildApricotBlock(t *testing.T) {
 				expectedBlk, err := blocks.NewApricotProposalBlock(
 					parentID,
 					height,
-					txs[0],
+					blockTxs[0],
 				)
 				require.NoError(err)
 				return expectedBlk
