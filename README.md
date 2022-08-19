@@ -16,7 +16,7 @@ The minimum recommended hardware specification for nodes connected to Mainnet is
 
 - CPU: Equivalent of 8 AWS vCPU
 - RAM: 16 GiB
-- Storage: 1TB 
+- Storage: 1 TiB
 - OS: Ubuntu 18.04/20.04 or macOS >= 10.15 (Catalina)
 - Network: Reliable IPv4 or IPv6 network connection, with an open public port.
 
@@ -39,13 +39,17 @@ This will clone and checkout to `master` branch.
 
 #### Building the Avalanche Executable
 
-Build Avalanche using the build script:
+Build Avalanche by running the build script:
 
 ```sh
 ./scripts/build.sh
 ```
 
-The Avalanche binary, named `avalanchego`, is in the `build` directory.
+The output of the script will be the Avalanche binary named `avalanchego`. It is located in the build directory:
+
+```sh
+./build/avalanchego
+```
 
 ### Binary Repository
 

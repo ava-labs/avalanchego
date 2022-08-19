@@ -14,26 +14,38 @@ import (
 func TestNewBlueberryAbortBlock(t *testing.T) {
 	require := require.New(t)
 
+	timestamp := time.Now().Truncate(time.Second)
+	parentID := ids.GenerateTestID()
+	height := uint64(1337)
 	blk, err := NewBlueberryAbortBlock(
-		time.Now(),
-		ids.GenerateTestID(),
-		1337,
+		timestamp,
+		parentID,
+		height,
 	)
 	require.NoError(err)
 
 	// Make sure the block is initialized
 	require.NotNil(blk.Bytes())
+
+	require.Equal(timestamp, blk.Timestamp())
+	require.Equal(parentID, blk.Parent())
+	require.Equal(height, blk.Height())
 }
 
 func TestNewApricotAbortBlock(t *testing.T) {
 	require := require.New(t)
 
+	parentID := ids.GenerateTestID()
+	height := uint64(1337)
 	blk, err := NewApricotAbortBlock(
-		ids.GenerateTestID(),
-		1337,
+		parentID,
+		height,
 	)
 	require.NoError(err)
 
 	// Make sure the block is initialized
 	require.NotNil(blk.Bytes())
+
+	require.Equal(parentID, blk.Parent())
+	require.Equal(height, blk.Height())
 }
