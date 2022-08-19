@@ -295,6 +295,7 @@ func (b *builder) dropExpiredProposalTxs() {
 			startTime,
 		)
 
+		b.Mempool.RemoveProposalTx(tx)
 		b.Mempool.MarkDropped(txID, errMsg) // cache tx as dropped
 		ctx.Log.Debug("dropping tx",
 			zap.String("reason", errMsg),
