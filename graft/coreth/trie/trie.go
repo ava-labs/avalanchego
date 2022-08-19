@@ -31,7 +31,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"sync"
 
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
@@ -605,7 +604,7 @@ func (t *Trie) Hash() common.Hash {
 
 // Commit writes all nodes to the trie's memory database, tracking the internal
 // and external (for account tries) references.
-func (t *Trie) Commit(onleaf LeafCallback) (common.Hash, int, error) {
+func (t *Trie) Commit(onleaf LeafCallback, referenceRoot bool) (common.Hash, int, error) {
 	if t.db == nil {
 		panic("commit called on trie with nil database")
 	}
@@ -617,7 +616,7 @@ func (t *Trie) Commit(onleaf LeafCallback) (common.Hash, int, error) {
 	// Derive the hash for all dirty nodes first. We hold the assumption
 	// in the following procedure that all nodes are hashed.
 	rootHash := t.Hash()
-	h := newCommitter()
+	h := newCommitter(onleaf)
 	defer returnCommitterToPool(h)
 
 	// Do a quick check if we really need to commit, before we spin
@@ -629,27 +628,14 @@ func (t *Trie) Commit(onleaf LeafCallback) (common.Hash, int, error) {
 		t.root = hashedNode
 		return rootHash, 0, nil
 	}
-	var wg sync.WaitGroup
-	if onleaf != nil {
-		h.onleaf = onleaf
-		h.leafCh = make(chan *leaf, leafChanSize)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			h.commitLoop(t.db)
-		}()
-	}
+	t.db.dirtiesLock.Lock()
+	defer t.db.dirtiesLock.Unlock()
 	newRoot, committed, err := h.Commit(t.root, t.db)
-	if onleaf != nil {
-		// The leafch is created in newCommitter if there was an onleaf callback
-		// provided. The commitLoop only _reads_ from it, and the commit
-		// operation was the sole writer. Therefore, it's safe to close this
-		// channel here.
-		close(h.leafCh)
-		wg.Wait()
-	}
 	if err != nil {
 		return common.Hash{}, 0, err
+	}
+	if referenceRoot {
+		t.db.Reference(rootHash, common.Hash{}, false)
 	}
 	t.root = newRoot
 	return rootHash, committed, nil

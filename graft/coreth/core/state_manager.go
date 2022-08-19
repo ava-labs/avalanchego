@@ -58,14 +58,13 @@ const (
 )
 
 type TrieWriter interface {
-	InsertTrie(block *types.Block) error // Insert reference to trie [root]
+	InsertTrie(block *types.Block) error // Handle inserted trie reference of [root]
 	AcceptTrie(block *types.Block) error // Mark [root] as part of an accepted block
 	RejectTrie(block *types.Block) error // Notify TrieWriter that the block containing [root] has been rejected
 	Shutdown() error
 }
 
 type TrieDB interface {
-	Reference(child common.Hash, parent common.Hash)
 	Dereference(root common.Hash)
 	Commit(root common.Hash, report bool, callback func(common.Hash)) error
 	Size() (common.StorageSize, common.StorageSize)
@@ -98,7 +97,6 @@ type noPruningTrieWriter struct {
 func (np *noPruningTrieWriter) InsertTrie(block *types.Block) error {
 	// We don't attempt to [Cap] here because we should never have
 	// a significant amount of [TrieDB.Dirties] (we commit each block).
-	np.TrieDB.Reference(block.Root(), common.Hash{})
 	return nil
 }
 
@@ -127,8 +125,6 @@ type cappedMemoryTrieWriter struct {
 }
 
 func (cm *cappedMemoryTrieWriter) InsertTrie(block *types.Block) error {
-	cm.TrieDB.Reference(block.Root(), common.Hash{})
-
 	// The use of [Cap] in [InsertTrie] prevents exceeding the configured memory
 	// limit (and OOM) in case there is a large backlog of processing (unaccepted) blocks.
 	nodes, imgs := cm.TrieDB.Size()

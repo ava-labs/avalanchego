@@ -99,7 +99,7 @@ func testMissingNode(t *testing.T, memonly bool) {
 	trie := NewEmpty(triedb)
 	updateString(trie, "120000", "qwerqwerqwerqwerqwerqwerqwerqwer")
 	updateString(trie, "123456", "asdfasdfasdfasdfasdfasdfasdfasdf")
-	root, _, _ := trie.Commit(nil)
+	root, _, _ := trie.Commit(nil, false)
 	if !memonly {
 		triedb.Commit(root, true, nil)
 	}
@@ -181,7 +181,7 @@ func TestInsert(t *testing.T) {
 	updateString(trie, "A", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
 	exp = common.HexToHash("d23786fb4a010da3ce639d66d5e904a11dbc02746d1ce25029e53290cabf28ab")
-	root, _, err := trie.Commit(nil)
+	root, _, err := trie.Commit(nil, false)
 	if err != nil {
 		t.Fatalf("commit error: %v", err)
 	}
@@ -210,7 +210,7 @@ func TestGet(t *testing.T) {
 		if i == 1 {
 			return
 		}
-		trie.Commit(nil)
+		trie.Commit(nil, false)
 	}
 }
 
@@ -279,7 +279,7 @@ func TestReplication(t *testing.T) {
 	for _, val := range vals {
 		updateString(trie, val.k, val.v)
 	}
-	exp, _, err := trie.Commit(nil)
+	exp, _, err := trie.Commit(nil, false)
 	if err != nil {
 		t.Fatalf("commit error: %v", err)
 	}
@@ -294,7 +294,7 @@ func TestReplication(t *testing.T) {
 			t.Errorf("trie2 doesn't have %q => %q", kv.k, kv.v)
 		}
 	}
-	hash, _, err := trie2.Commit(nil)
+	hash, _, err := trie2.Commit(nil, false)
 	if err != nil {
 		t.Fatalf("commit error: %v", err)
 	}
@@ -441,12 +441,12 @@ func runRandTest(rt randTest) bool {
 				rt[i].err = fmt.Errorf("mismatch for key %#x, got %#x want %#x", step.key, v, want)
 			}
 		case opCommit:
-			_, _, rt[i].err = tr.Commit(nil)
+			_, _, rt[i].err = tr.Commit(nil, false)
 			origTrie = tr.Copy()
 		case opHash:
 			tr.Hash()
 		case opReset:
-			hash, _, err := tr.Commit(nil)
+			hash, _, err := tr.Commit(nil, false)
 			if err != nil {
 				rt[i].err = err
 				return false
@@ -560,7 +560,7 @@ func benchGet(b *testing.B, commit bool) {
 	}
 	binary.LittleEndian.PutUint64(k, benchElemCount/2)
 	if commit {
-		trie.Commit(nil)
+		trie.Commit(nil, false)
 	}
 
 	b.ResetTimer()
@@ -653,7 +653,7 @@ func benchmarkCommitAfterHash(b *testing.B, onleaf LeafCallback) {
 	trie.Hash()
 	b.ResetTimer()
 	b.ReportAllocs()
-	trie.Commit(onleaf)
+	trie.Commit(onleaf, false)
 }
 
 func TestTinyTrie(t *testing.T) {
@@ -691,13 +691,13 @@ func TestCommitAfterHash(t *testing.T) {
 	}
 	// Insert the accounts into the trie and hash it
 	trie.Hash()
-	trie.Commit(nil)
+	trie.Commit(nil, false)
 	root := trie.Hash()
 	exp := common.HexToHash("72f9d3f3fe1e1dd7b8936442e7642aef76371472d94319900790053c493f3fe6")
 	if exp != root {
 		t.Errorf("got %x, exp %x", root, exp)
 	}
-	root, _, _ = trie.Commit(nil)
+	root, _, _ = trie.Commit(nil, false)
 	if exp != root {
 		t.Errorf("got %x, exp %x", root, exp)
 	}
@@ -805,7 +805,7 @@ func TestCommitSequence(t *testing.T) {
 			trie.Update(crypto.Keccak256(addresses[i][:]), accounts[i])
 		}
 		// Flush trie -> database
-		root, _, _ := trie.Commit(nil)
+		root, _, _ := trie.Commit(nil, false)
 		// Flush memdb -> disk (sponge)
 		db.Commit(root, false, func(c common.Hash) {
 			// And spongify the callback-order
@@ -857,7 +857,7 @@ func TestCommitSequenceRandomBlobs(t *testing.T) {
 			trie.Update(key, val)
 		}
 		// Flush trie -> database
-		root, _, _ := trie.Commit(nil)
+		root, _, _ := trie.Commit(nil, false)
 		// Flush memdb -> disk (sponge)
 		db.Commit(root, false, func(c common.Hash) {
 			// And spongify the callback-order
@@ -899,7 +899,7 @@ func TestCommitSequenceStackTrie(t *testing.T) {
 			stTrie.TryUpdate(key, val)
 		}
 		// Flush trie -> database
-		root, _, _ := trie.Commit(nil)
+		root, _, _ := trie.Commit(nil, false)
 		// Flush memdb -> disk (sponge)
 		db.Commit(root, false, nil)
 		// And flush stacktrie -> disk
@@ -944,7 +944,7 @@ func TestCommitSequenceSmallRoot(t *testing.T) {
 	trie.TryUpdate(key, []byte{0x1})
 	stTrie.TryUpdate(key, []byte{0x1})
 	// Flush trie -> database
-	root, _, _ := trie.Commit(nil)
+	root, _, _ := trie.Commit(nil, false)
 	// Flush memdb -> disk (sponge)
 	db.Commit(root, false, nil)
 	// And flush stacktrie -> disk
@@ -1065,7 +1065,7 @@ func benchmarkCommitAfterHashFixedSize(b *testing.B, addresses [][20]byte, accou
 	// Insert the accounts into the trie and hash it
 	trie.Hash()
 	b.StartTimer()
-	trie.Commit(nil)
+	trie.Commit(nil, false)
 	b.StopTimer()
 }
 
@@ -1115,7 +1115,7 @@ func benchmarkDerefRootFixedSize(b *testing.B, addresses [][20]byte, accounts []
 		trie.Update(crypto.Keccak256(addresses[i][:]), accounts[i])
 	}
 	h := trie.Hash()
-	trie.Commit(nil)
+	trie.Commit(nil, false)
 	b.StartTimer()
 	trie.db.Dereference(h)
 	b.StopTimer()

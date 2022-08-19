@@ -34,18 +34,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-// leafChanSize is the size of the leafCh. It's a pretty arbitrary number, to allow
-// some parallelism but not incur too much memory overhead.
-const leafChanSize = 200
-
-// leaf represents a trie leaf value
-type leaf struct {
-	size int         // size of the rlp data (estimate)
-	hash common.Hash // hash of rlp data
-	node node        // the node to commit
-	path []byte      // the path from the root node
-}
-
 // committer is a type used for the trie Commit operation. A committer has some
 // internal preallocated temp space, and also a callback that is invoked when
 // leaves are committed. The leafs are passed through the `leafCh`,  to allow
@@ -54,7 +42,6 @@ type leaf struct {
 // processed sequentially - onleaf will never be called in parallel or out of order.
 type committer struct {
 	onleaf LeafCallback
-	leafCh chan *leaf
 }
 
 // committers live in a global sync.Pool
@@ -65,13 +52,14 @@ var committerPool = sync.Pool{
 }
 
 // newCommitter creates a new committer or picks one from the pool.
-func newCommitter() *committer {
-	return committerPool.Get().(*committer)
+func newCommitter(onleaf LeafCallback) *committer {
+	committer := committerPool.Get().(*committer)
+	committer.onleaf = onleaf
+	return committer
 }
 
 func returnCommitterToPool(h *committer) {
 	h.onleaf = nil
-	h.leafCh = nil
 	committerPool.Put(h)
 }
 
@@ -80,6 +68,7 @@ func (c *committer) Commit(n node, db *Database) (hashNode, int, error) {
 	if db == nil {
 		return nil, 0, errors.New("no db provided")
 	}
+
 	h, committed, err := c.commit(nil, n, db)
 	if err != nil {
 		return nil, 0, err
@@ -179,10 +168,10 @@ func (c *committer) commitChildren(path []byte, n *fullNode, db *Database) ([17]
 func (c *committer) store(path []byte, n node, db *Database) node {
 	// Larger nodes are replaced by their hash and stored in the database.
 	var (
-		hash, _ = n.cache()
-		size    int
+		hashNode, _ = n.cache()
+		size        int
 	)
-	if hash == nil {
+	if hashNode == nil {
 		// This was not generated - must be a small node stored in the parent.
 		// In theory, we should apply the leafCall here if it's not nil(embedded
 		// node usually contains value). But small value(less than 32bytes) is
@@ -193,49 +182,29 @@ func (c *committer) store(path []byte, n node, db *Database) node {
 		// The size is used for mem tracking, does not need to be exact
 		size = estimateSize(n)
 	}
-	// If we're using channel-based leaf-reporting, send to channel.
-	// The leaf channel will be active only when there an active leaf-callback
-	if c.leafCh != nil {
-		c.leafCh <- &leaf{
-			size: size,
-			hash: common.BytesToHash(hash),
-			node: n,
-			path: path,
-		}
-	} else if db != nil {
-		// No leaf-callback used, but there's still a database. Do serial
-		// insertion
-		db.Insert(common.BytesToHash(hash), size, n)
+
+	hash := common.BytesToHash(hashNode)
+	// Serially insert the nodes into the database
+	if db != nil {
+		db.insert(hash, size, n)
 	}
-	return hash
-}
 
-// commitLoop does the actual insert + leaf callback for nodes.
-func (c *committer) commitLoop(db *Database) {
-	for item := range c.leafCh {
-		var (
-			hash = item.hash
-			size = item.size
-			n    = item.node
-		)
-		// We are pooling the trie nodes into an intermediate memory cache
-		db.Insert(hash, size, n)
-
-		if c.onleaf != nil {
-			switch n := n.(type) {
-			case *shortNode:
-				if child, ok := n.Val.(valueNode); ok {
-					c.onleaf(nil, nil, child, hash, nil)
-				}
-			case *fullNode:
-				// For children in range [0, 15], it's impossible
-				// to contain valueNode. Only check the 17th child.
-				if n.Children[16] != nil {
-					c.onleaf(nil, nil, n.Children[16].(valueNode), hash, nil)
-				}
+	// Invoke the leaf callback if present
+	if c.onleaf != nil {
+		switch n := n.(type) {
+		case *shortNode:
+			if child, ok := n.Val.(valueNode); ok {
+				c.onleaf(nil, nil, child, hash, nil)
+			}
+		case *fullNode:
+			// For children in range [0, 15], it's impossible
+			// to contain valueNode. Only check the 17th child.
+			if n.Children[16] != nil {
+				c.onleaf(nil, nil, n.Children[16].(valueNode), hash, nil)
 			}
 		}
 	}
+	return hashNode
 }
 
 // estimateSize estimates the size of an rlp-encoded node, without actually

@@ -322,10 +322,8 @@ func (db *Database) DiskDB() ethdb.KeyValueStore {
 // The blob size must be specified to allow proper size tracking.
 // All nodes inserted by this function will be reference tracked
 // and in theory should only used for **trie nodes** insertion.
-func (db *Database) Insert(hash common.Hash, size int, node node) {
-	db.dirtiesLock.Lock()
-	defer db.dirtiesLock.Unlock()
-
+// insert assumes that the dirtiesLock is held by the caller.
+func (db *Database) insert(hash common.Hash, size int, node node) {
 	// If the node's already cached, skip
 	if _, ok := db.dirties[hash]; ok {
 		return
@@ -483,9 +481,11 @@ func (db *Database) Nodes() []common.Hash {
 // This function is used to add reference between internal trie node
 // and external node(e.g. storage trie root), all internal trie nodes
 // are referenced together by database itself.
-func (db *Database) Reference(child common.Hash, parent common.Hash) {
-	db.dirtiesLock.Lock()
-	defer db.dirtiesLock.Unlock()
+func (db *Database) Reference(child common.Hash, parent common.Hash, grabDirtyLock bool) {
+	if grabDirtyLock {
+		db.dirtiesLock.Lock()
+		defer db.dirtiesLock.Unlock()
+	}
 
 	// If the node does not exist, it's a node pulled from disk, skip
 	node, ok := db.dirties[child]
