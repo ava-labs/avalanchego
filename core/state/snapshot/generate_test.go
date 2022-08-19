@@ -56,7 +56,7 @@ func TestGeneration(t *testing.T) {
 	stTrie.Update([]byte("key-1"), []byte("val-1")) // 0x1314700b81afc49f94db3623ef1df38f3ed18b73a1b7ea2f6c095118cf6118a0
 	stTrie.Update([]byte("key-2"), []byte("val-2")) // 0x18a0f4d79cff4459642dd7604f303886ad9d77c30cf3d7d7cedb3a693ab6d371
 	stTrie.Update([]byte("key-3"), []byte("val-3")) // 0x51c71a47af0695957647fb68766d0becee77e953df17c29b3c2f25436f055c78
-	stTrie.Commit(nil)                              // Root: 0xddefcd9376dd029653ef384bd2f0a126bb755fe84fdcc9e7cf421ba454f2bc67
+	stTrie.Commit(nil, false)                       // Root: 0xddefcd9376dd029653ef384bd2f0a126bb755fe84fdcc9e7cf421ba454f2bc67
 
 	accTrie, _ := trie.NewSecure(common.Hash{}, triedb)
 	acc := &Account{Balance: big.NewInt(1), Root: stTrie.Hash().Bytes(), CodeHash: emptyCode.Bytes()}
@@ -69,8 +69,8 @@ func TestGeneration(t *testing.T) {
 
 	acc = &Account{Balance: big.NewInt(3), Root: stTrie.Hash().Bytes(), CodeHash: emptyCode.Bytes()}
 	val, _ = rlp.EncodeToBytes(acc)
-	accTrie.Update([]byte("acc-3"), val) // 0x50815097425d000edfc8b3a4a13e175fc2bdcfee8bdfbf2d1ff61041d3c235b2
-	root, _, _ := accTrie.Commit(nil)    // Root: 0xe3712f1a226f3782caca78ca770ccc19ee000552813a9f59d479f8611db9b1fd
+	accTrie.Update([]byte("acc-3"), val)     // 0x50815097425d000edfc8b3a4a13e175fc2bdcfee8bdfbf2d1ff61041d3c235b2
+	root, _, _ := accTrie.Commit(nil, false) // Root: 0xe3712f1a226f3782caca78ca770ccc19ee000552813a9f59d479f8611db9b1fd
 	triedb.Commit(root, false, nil)
 
 	if have, want := root, common.HexToHash("0xe3712f1a226f3782caca78ca770ccc19ee000552813a9f59d479f8611db9b1fd"); have != want {
@@ -113,7 +113,7 @@ func TestGenerateExistentState(t *testing.T) {
 	stTrie.Update([]byte("key-1"), []byte("val-1")) // 0x1314700b81afc49f94db3623ef1df38f3ed18b73a1b7ea2f6c095118cf6118a0
 	stTrie.Update([]byte("key-2"), []byte("val-2")) // 0x18a0f4d79cff4459642dd7604f303886ad9d77c30cf3d7d7cedb3a693ab6d371
 	stTrie.Update([]byte("key-3"), []byte("val-3")) // 0x51c71a47af0695957647fb68766d0becee77e953df17c29b3c2f25436f055c78
-	stTrie.Commit(nil)                              // Root: 0xddefcd9376dd029653ef384bd2f0a126bb755fe84fdcc9e7cf421ba454f2bc67
+	stTrie.Commit(nil, false)                       // Root: 0xddefcd9376dd029653ef384bd2f0a126bb755fe84fdcc9e7cf421ba454f2bc67
 
 	accTrie, _ := trie.NewSecure(common.Hash{}, triedb)
 	acc := &Account{Balance: big.NewInt(1), Root: stTrie.Hash().Bytes(), CodeHash: emptyCode.Bytes()}
@@ -138,7 +138,7 @@ func TestGenerateExistentState(t *testing.T) {
 	rawdb.WriteStorageSnapshot(diskdb, hashData([]byte("acc-3")), hashData([]byte("key-2")), []byte("val-2"))
 	rawdb.WriteStorageSnapshot(diskdb, hashData([]byte("acc-3")), hashData([]byte("key-3")), []byte("val-3"))
 
-	root, _, _ := accTrie.Commit(nil) // Root: 0xe3712f1a226f3782caca78ca770ccc19ee000552813a9f59d479f8611db9b1fd
+	root, _, _ := accTrie.Commit(nil, false) // Root: 0xe3712f1a226f3782caca78ca770ccc19ee000552813a9f59d479f8611db9b1fd
 	triedb.Commit(root, false, nil)
 
 	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xdeadbeef"), root, nil)
@@ -224,12 +224,12 @@ func (t *testHelper) makeStorageTrie(keys []string, vals []string) []byte {
 	for i, k := range keys {
 		stTrie.Update([]byte(k), []byte(vals[i]))
 	}
-	root, _, _ := stTrie.Commit(nil)
+	root, _, _ := stTrie.Commit(nil, false)
 	return root.Bytes()
 }
 
 func (t *testHelper) Generate() (common.Hash, *diskLayer) {
-	root, _, _ := t.accTrie.Commit(nil)
+	root, _, _ := t.accTrie.Commit(nil, false)
 	t.triedb.Commit(root, false, nil)
 	snap := generateSnapshot(t.diskdb, t.triedb, 16, common.HexToHash("0xdeadbeef"), root, nil)
 	return root, snap
@@ -403,7 +403,7 @@ func TestGenerateCorruptAccountTrie(t *testing.T) {
 	acc = &Account{Balance: big.NewInt(3), Root: emptyRoot.Bytes(), CodeHash: emptyCode.Bytes()}
 	val, _ = rlp.EncodeToBytes(acc)
 	tr.Update([]byte("acc-3"), val) // 0x515d3de35e143cd976ad476398d910aa7bf8a02e8fd7eb9e3baacddbbcbfcb41
-	tr.Commit(nil)                  // Root: 0xa04693ea110a31037fb5ee814308a6f1d76bdab0b11676bdf4541d2de55ba978
+	tr.Commit(nil, false)           // Root: 0xa04693ea110a31037fb5ee814308a6f1d76bdab0b11676bdf4541d2de55ba978
 
 	// Delete an account trie leaf and ensure the generator chokes
 	triedb.Commit(common.HexToHash("0xa04693ea110a31037fb5ee814308a6f1d76bdab0b11676bdf4541d2de55ba978"), false, nil)
@@ -439,7 +439,7 @@ func TestGenerateMissingStorageTrie(t *testing.T) {
 	stTrie.Update([]byte("key-1"), []byte("val-1")) // 0x1314700b81afc49f94db3623ef1df38f3ed18b73a1b7ea2f6c095118cf6118a0
 	stTrie.Update([]byte("key-2"), []byte("val-2")) // 0x18a0f4d79cff4459642dd7604f303886ad9d77c30cf3d7d7cedb3a693ab6d371
 	stTrie.Update([]byte("key-3"), []byte("val-3")) // 0x51c71a47af0695957647fb68766d0becee77e953df17c29b3c2f25436f055c78
-	stTrie.Commit(nil)                              // Root: 0xddefcd9376dd029653ef384bd2f0a126bb755fe84fdcc9e7cf421ba454f2bc67
+	stTrie.Commit(nil, false)                       // Root: 0xddefcd9376dd029653ef384bd2f0a126bb755fe84fdcc9e7cf421ba454f2bc67
 
 	accTrie, _ := trie.NewSecure(common.Hash{}, triedb)
 	acc := &Account{Balance: big.NewInt(1), Root: stTrie.Hash().Bytes(), CodeHash: emptyCode.Bytes()}
@@ -453,16 +453,18 @@ func TestGenerateMissingStorageTrie(t *testing.T) {
 	acc = &Account{Balance: big.NewInt(3), Root: stTrie.Hash().Bytes(), CodeHash: emptyCode.Bytes()}
 	val, _ = rlp.EncodeToBytes(acc)
 	accTrie.Update([]byte("acc-3"), val) // 0x50815097425d000edfc8b3a4a13e175fc2bdcfee8bdfbf2d1ff61041d3c235b2
-	accTrie.Commit(nil)                  // Root: 0xe3712f1a226f3782caca78ca770ccc19ee000552813a9f59d479f8611db9b1fd
+	accTrie.Commit(nil, false)           // Root: 0xe3712f1a226f3782caca78ca770ccc19ee000552813a9f59d479f8611db9b1fd
 
 	// We can only corrupt the disk database, so flush the tries out
 	triedb.Reference(
 		common.HexToHash("0xddefcd9376dd029653ef384bd2f0a126bb755fe84fdcc9e7cf421ba454f2bc67"),
 		common.HexToHash("0x9250573b9c18c664139f3b6a7a8081b7d8f8916a8fcc5d94feec6c29f5fd4e9e"),
+		true,
 	)
 	triedb.Reference(
 		common.HexToHash("0xddefcd9376dd029653ef384bd2f0a126bb755fe84fdcc9e7cf421ba454f2bc67"),
 		common.HexToHash("0x50815097425d000edfc8b3a4a13e175fc2bdcfee8bdfbf2d1ff61041d3c235b2"),
+		true,
 	)
 	triedb.Commit(common.HexToHash("0xe3712f1a226f3782caca78ca770ccc19ee000552813a9f59d479f8611db9b1fd"), false, nil)
 
@@ -498,7 +500,7 @@ func TestGenerateCorruptStorageTrie(t *testing.T) {
 	stTrie.Update([]byte("key-1"), []byte("val-1")) // 0x1314700b81afc49f94db3623ef1df38f3ed18b73a1b7ea2f6c095118cf6118a0
 	stTrie.Update([]byte("key-2"), []byte("val-2")) // 0x18a0f4d79cff4459642dd7604f303886ad9d77c30cf3d7d7cedb3a693ab6d371
 	stTrie.Update([]byte("key-3"), []byte("val-3")) // 0x51c71a47af0695957647fb68766d0becee77e953df17c29b3c2f25436f055c78
-	stTrie.Commit(nil)                              // Root: 0xddefcd9376dd029653ef384bd2f0a126bb755fe84fdcc9e7cf421ba454f2bc67
+	stTrie.Commit(nil, false)                       // Root: 0xddefcd9376dd029653ef384bd2f0a126bb755fe84fdcc9e7cf421ba454f2bc67
 
 	accTrie, _ := trie.NewSecure(common.Hash{}, triedb)
 	acc := &Account{Balance: big.NewInt(1), Root: stTrie.Hash().Bytes(), CodeHash: emptyCode.Bytes()}
@@ -512,16 +514,18 @@ func TestGenerateCorruptStorageTrie(t *testing.T) {
 	acc = &Account{Balance: big.NewInt(3), Root: stTrie.Hash().Bytes(), CodeHash: emptyCode.Bytes()}
 	val, _ = rlp.EncodeToBytes(acc)
 	accTrie.Update([]byte("acc-3"), val) // 0x50815097425d000edfc8b3a4a13e175fc2bdcfee8bdfbf2d1ff61041d3c235b2
-	accTrie.Commit(nil)                  // Root: 0xe3712f1a226f3782caca78ca770ccc19ee000552813a9f59d479f8611db9b1fd
+	accTrie.Commit(nil, false)           // Root: 0xe3712f1a226f3782caca78ca770ccc19ee000552813a9f59d479f8611db9b1fd
 
 	// We can only corrupt the disk database, so flush the tries out
 	triedb.Reference(
 		common.HexToHash("0xddefcd9376dd029653ef384bd2f0a126bb755fe84fdcc9e7cf421ba454f2bc67"),
 		common.HexToHash("0x9250573b9c18c664139f3b6a7a8081b7d8f8916a8fcc5d94feec6c29f5fd4e9e"),
+		true,
 	)
 	triedb.Reference(
 		common.HexToHash("0xddefcd9376dd029653ef384bd2f0a126bb755fe84fdcc9e7cf421ba454f2bc67"),
 		common.HexToHash("0x50815097425d000edfc8b3a4a13e175fc2bdcfee8bdfbf2d1ff61041d3c235b2"),
+		true,
 	)
 	triedb.Commit(common.HexToHash("0xe3712f1a226f3782caca78ca770ccc19ee000552813a9f59d479f8611db9b1fd"), false, nil)
 
@@ -550,7 +554,7 @@ func getStorageTrie(n int, triedb *trie.Database) *trie.SecureTrie {
 		v := fmt.Sprintf("val-%d", i)
 		stTrie.Update([]byte(k), []byte(v))
 	}
-	stTrie.Commit(nil)
+	stTrie.Commit(nil, false)
 	return stTrie
 }
 
@@ -584,7 +588,7 @@ func TestGenerateWithExtraAccounts(t *testing.T) {
 		rawdb.WriteStorageSnapshot(diskdb, key, hashData([]byte("b-key-2")), []byte("b-val-2"))
 		rawdb.WriteStorageSnapshot(diskdb, key, hashData([]byte("b-key-3")), []byte("b-val-3"))
 	}
-	root, _, _ := accTrie.Commit(nil)
+	root, _, _ := accTrie.Commit(nil, false)
 	t.Logf("root: %x", root)
 	triedb.Commit(root, false, nil)
 	// To verify the test: If we now inspect the snap db, there should exist extraneous storage items
@@ -646,7 +650,7 @@ func TestGenerateWithManyExtraAccounts(t *testing.T) {
 			rawdb.WriteAccountSnapshot(diskdb, key, val)
 		}
 	}
-	root, _, _ := accTrie.Commit(nil)
+	root, _, _ := accTrie.Commit(nil, false)
 	t.Logf("root: %x", root)
 	triedb.Commit(root, false, nil)
 
@@ -698,7 +702,7 @@ func TestGenerateWithExtraBeforeAndAfter(t *testing.T) {
 		rawdb.WriteAccountSnapshot(diskdb, common.HexToHash("0x07"), val)
 	}
 
-	root, _, _ := accTrie.Commit(nil)
+	root, _, _ := accTrie.Commit(nil, false)
 	t.Logf("root: %x", root)
 	triedb.Commit(root, false, nil)
 
@@ -741,7 +745,7 @@ func TestGenerateWithMalformedSnapdata(t *testing.T) {
 		rawdb.WriteAccountSnapshot(diskdb, common.HexToHash("0x05"), junk)
 	}
 
-	root, _, _ := accTrie.Commit(nil)
+	root, _, _ := accTrie.Commit(nil, false)
 	t.Logf("root: %x", root)
 	triedb.Commit(root, false, nil)
 

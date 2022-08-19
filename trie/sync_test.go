@@ -56,7 +56,7 @@ func makeTestTrie() (*Database, *SecureTrie, map[string][]byte) {
 			trie.Update(key, val)
 		}
 	}
-	trie.Commit(nil)
+	trie.Commit(nil, false)
 
 	// Return the generated trie
 	return triedb, trie, content

@@ -909,14 +909,15 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	if err := blockBatch.Write(); err != nil {
 		log.Crit("Failed to write block into disk", "err", err)
 	}
+
 	// Commit all cached state changes into underlying memory database.
 	// If snapshots are enabled, call CommitWithSnaps to explicitly create a snapshot
 	// diff layer for the block.
 	var err error
 	if bc.snaps == nil {
-		_, err = state.Commit(bc.chainConfig.IsEIP158(block.Number()))
+		_, err = state.Commit(bc.chainConfig.IsEIP158(block.Number()), true)
 	} else {
-		_, err = state.CommitWithSnap(bc.chainConfig.IsEIP158(block.Number()), bc.snaps, block.Hash(), block.ParentHash())
+		_, err = state.CommitWithSnap(bc.chainConfig.IsEIP158(block.Number()), bc.snaps, block.Hash(), block.ParentHash(), true)
 	}
 	if err != nil {
 		return err
@@ -936,7 +937,6 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 		}
 		return err
 	}
-
 	return nil
 }
 
@@ -1385,9 +1385,9 @@ func (bc *BlockChain) reprocessBlock(parent *types.Block, current *types.Block) 
 	// If snapshots are enabled, call CommitWithSnaps to explicitly create a snapshot
 	// diff layer for the block.
 	if bc.snaps == nil {
-		return statedb.Commit(bc.chainConfig.IsEIP158(current.Number()))
+		return statedb.Commit(bc.chainConfig.IsEIP158(current.Number()), false)
 	}
-	return statedb.CommitWithSnap(bc.chainConfig.IsEIP158(current.Number()), bc.snaps, current.Hash(), current.ParentHash())
+	return statedb.CommitWithSnap(bc.chainConfig.IsEIP158(current.Number()), bc.snaps, current.Hash(), current.ParentHash(), false)
 }
 
 // initSnapshot instantiates a Snapshot instance and adds it to [bc]
@@ -1522,7 +1522,7 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64) error 
 		// Flatten snapshot if initialized, holding a reference to the state root until the next block
 		// is processed.
 		if err := bc.flattenSnapshot(func() error {
-			triedb.Reference(root, common.Hash{})
+			triedb.Reference(root, common.Hash{}, true)
 			if previousRoot != (common.Hash{}) {
 				triedb.Dereference(previousRoot)
 			}
@@ -1680,15 +1680,15 @@ func (bc *BlockChain) CleanBlockRootsAboveLastAccepted() error {
 // consensus engine will reject the lowest ancestor first. In this case, these blocks will not be considered acceptable in
 // the future.
 // Ex.
-//    A
-//  /   \
-// B     C
-// |
-// D
-// |
-// E
-// |
-// F
+//	   A
+//	 /   \
+//	B     C
+//	|
+//	D
+//	|
+//	E
+//	|
+//	F
 //
 // The consensus engine accepts block C and proceeds to reject the other branch in order (B, D, E, F).
 // If the consensus engine dies after rejecting block D, block D will be deleted, such that the forward iteration

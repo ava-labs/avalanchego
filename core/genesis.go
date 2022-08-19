@@ -169,10 +169,10 @@ func (e *GenesisMismatchError) Error() string {
 // SetupGenesisBlock writes or updates the genesis block in db.
 // The block that will be used is:
 //
-//                          genesis == nil       genesis != nil
-//                       +------------------------------------------
-//     db has no genesis |  ErrNoGenesis      |  genesis
-//     db has genesis    |  ErrNoGenesis      |  genesis (if compatible both block hash and chain config), else error
+//	                     genesis == nil       genesis != nil
+//	                  +------------------------------------------
+//	db has no genesis |  ErrNoGenesis      |  genesis
+//	db has genesis    |  ErrNoGenesis      |  genesis (if compatible both block hash and chain config), else error
 
 // The argument [genesis] must be specified and must contain a valid chain config.
 // If the genesis block has already been set up, then we verify the hash matches the genesis passed in
@@ -327,7 +327,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 			head.BaseFee = g.Config.FeeConfig.MinBaseFee
 		}
 	}
-	statedb.Commit(false)
+	statedb.Commit(false, false)
 	if err := statedb.Database().TrieDB().Commit(root, true, nil); err != nil {
 		panic(fmt.Sprintf("unable to commit genesis block: %v", err))
 	}

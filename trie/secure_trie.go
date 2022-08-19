@@ -171,14 +171,14 @@ func (t *SecureTrie) GetKey(shaKey []byte) []byte {
 //
 // Committing flushes nodes from memory. Subsequent Get calls will load nodes
 // from the database.
-func (t *SecureTrie) Commit(onleaf LeafCallback) (common.Hash, int, error) {
+func (t *SecureTrie) Commit(onleaf LeafCallback, referenceRoot bool) (common.Hash, int, error) {
 	// Write all the pre-images to the actual disk database
 	if len(t.getSecKeyCache()) > 0 {
 		t.trie.db.InsertPreimages(t.secKeyCache) // if preimages are disabled, this returns immediately
 		t.secKeyCache = make(map[string][]byte)
 	}
 	// Commit the trie to its intermediate node database
-	return t.trie.Commit(onleaf)
+	return t.trie.Commit(onleaf, referenceRoot)
 }
 
 // Hash returns the root hash of SecureTrie. It does not write to the

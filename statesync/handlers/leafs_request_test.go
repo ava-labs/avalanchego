@@ -46,7 +46,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 	}
 
 	// commit the trie
-	root, _, err := tr.Commit(nil)
+	root, _, err := tr.Commit(nil, false)
 	if err != nil {
 		t.Fatal("could not commit trie", err)
 	}
