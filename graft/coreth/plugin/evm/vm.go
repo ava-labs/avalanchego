@@ -347,12 +347,7 @@ func (vm *VM) Initialize(
 	}
 	vm.logger = corethLogger
 
-	if b, err := json.Marshal(vm.config); err == nil {
-		log.Info("Initializing Coreth VM", "Version", Version, "Config", string(b))
-	} else {
-		// Log a warning message since we have already successfully unmarshalled into the struct
-		log.Warn("Problem initializing Coreth VM", "Version", Version, "Config", string(b), "err", err)
-	}
+	log.Info("Initializing Coreth VM", "Version", Version, "Config", vm.config)
 
 	if len(fxs) > 0 {
 		return errUnsupportedFXs

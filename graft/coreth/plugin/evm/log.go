@@ -4,10 +4,18 @@
 package evm
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
+	"time"
 
 	"github.com/ethereum/go-ethereum/log"
+)
+
+const (
+	errorKey   = "LOG15_ERROR"
+	timeFormat = "2006-01-02T15:04:05-0700"
 )
 
 type CorethLogger struct {
@@ -56,12 +64,56 @@ func CorethTermFormat(alias string) log.Format {
 func CorethJSONFormat(alias string) log.Format {
 	prefix := fmt.Sprintf("%s Chain", alias)
 	return log.FormatFunc(func(r *log.Record) []byte {
-		location := fmt.Sprintf("%+v", r.Call)
-		r.KeyNames.Lvl = "level"
-		r.KeyNames.Time = "timestamp"
-		r.Ctx = append(r.Ctx, "logger", prefix)
-		r.Ctx = append(r.Ctx, "caller", location)
+		props := make(map[string]interface{}, 5+len(r.Ctx)/2)
+		props["timestamp"] = r.Time
+		props["level"] = r.Lvl.String()
+		props[r.KeyNames.Msg] = r.Msg
+		props["logger"] = prefix
+		props["caller"] = fmt.Sprintf("%+v", r.Call)
+		for i := 0; i < len(r.Ctx); i += 2 {
+			k, ok := r.Ctx[i].(string)
+			if !ok {
+				props[errorKey] = fmt.Sprintf("%+v is not a string key", r.Ctx[i])
+			} else {
+				props[k] = formatJSONValue(r.Ctx[i+1])
+			}
+		}
 
-		return log.JSONFormat().Format(r)
+		b, err := json.Marshal(props)
+		if err != nil {
+			b, _ = json.Marshal(map[string]string{
+				errorKey: err.Error(),
+			})
+			return b
+		}
+
+		b = append(b, '\n')
+		return b
 	})
+}
+
+func formatJSONValue(value interface{}) (result interface{}) {
+	defer func() {
+		if err := recover(); err != nil {
+			if v := reflect.ValueOf(value); v.Kind() == reflect.Ptr && v.IsNil() {
+				result = "nil"
+			} else {
+				panic(err)
+			}
+		}
+	}()
+
+	switch v := value.(type) {
+	case time.Time:
+		return v.Format(timeFormat)
+
+	case error:
+		return v.Error()
+
+	case fmt.Stringer:
+		return v.String()
+
+	default:
+		return v
+	}
 }
