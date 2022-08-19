@@ -39,13 +39,17 @@ This will clone and checkout to `master` branch.
 
 #### Building the Avalanche Executable
 
-Build Avalanche using the build script:
+Build Avalanche by running the build script:
 
 ```sh
 ./scripts/build.sh
 ```
 
-The Avalanche binary, named `avalanchego`, is in the `build` directory.
+The output of the script will be the Avalanche binary named `avalanchego`. It is located in the build directory:
+
+```sh
+./build/avalanchego
+```
 
 ### Binary Repository
 
