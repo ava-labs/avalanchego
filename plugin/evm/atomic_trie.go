@@ -287,7 +287,7 @@ func (a *atomicTrie) initialize(lastAcceptedBlockNumber uint64) error {
 		// keep track of progress and keep commit size under commitSizeCap
 		commitHeight := nearestCommitHeight(height, a.commitHeightInterval)
 		if lastHeight < commitHeight {
-			hash, _, err := a.trie.Commit(nil)
+			hash, _, err := a.trie.Commit(nil, false)
 			if err != nil {
 				return err
 			}
@@ -403,7 +403,7 @@ func (a *atomicTrie) validateIndexHeight(height uint64) error {
 // assumes that the caller is aware of the commit rules i.e. the height being within commitInterval.
 // returns the trie root from the commit
 func (a *atomicTrie) commit(height uint64) error {
-	hash, _, err := a.trie.Commit(nil)
+	hash, _, err := a.trie.Commit(nil, false)
 	if err != nil {
 		return err
 	}

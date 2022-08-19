@@ -198,13 +198,13 @@ func (t *testHelper) makeStorageTrie(owner common.Hash, keys []string, vals []st
 	if !commit {
 		root = stTrie.Hash()
 	} else {
-		root, _, _ = stTrie.Commit(nil)
+		root, _, _ = stTrie.Commit(nil, false)
 	}
 	return root.Bytes()
 }
 
 func (t *testHelper) Commit() common.Hash {
-	root, _, _ := t.accTrie.Commit(nil)
+	root, _, _ := t.accTrie.Commit(nil, false)
 	t.triedb.Commit(root, false, nil)
 	return root
 }
@@ -223,10 +223,12 @@ func (t *testHelper) CommitAndGenerate() (common.Hash, *diskLayer) {
 //   - miss in the beginning
 //   - miss in the middle
 //   - miss in the end
+//
 // - the contract(non-empty storage) has wrong storage slots
 //   - wrong slots in the beginning
 //   - wrong slots in the middle
 //   - wrong slots in the end
+//
 // - the contract(non-empty storage) has extra storage slots
 //   - extra slots in the beginning
 //   - extra slots in the middle
@@ -388,7 +390,7 @@ func TestGenerateCorruptAccountTrie(t *testing.T) {
 	helper.addTrieAccount("acc-2", &Account{Balance: big.NewInt(2), Root: emptyRoot.Bytes(), CodeHash: emptyCode.Bytes()}) // 0xf73118e0254ce091588d66038744a0afae5f65a194de67cff310c683ae43329e
 	helper.addTrieAccount("acc-3", &Account{Balance: big.NewInt(3), Root: emptyRoot.Bytes(), CodeHash: emptyCode.Bytes()}) // 0x515d3de35e143cd976ad476398d910aa7bf8a02e8fd7eb9e3baacddbbcbfcb41
 
-	root, _, _ := helper.accTrie.Commit(nil) // Root: 0xfa04f652e8bd3938971bf7d71c3c688574af334ca8bc20e64b01ba610ae93cad
+	root, _, _ := helper.accTrie.Commit(nil, false) // Root: 0xfa04f652e8bd3938971bf7d71c3c688574af334ca8bc20e64b01ba610ae93cad
 
 	// Delete an account trie leaf and ensure the generator chokes
 	helper.triedb.Commit(root, false, nil)
@@ -423,16 +425,18 @@ func TestGenerateMissingStorageTrie(t *testing.T) {
 	helper.addTrieAccount("acc-2", &Account{Balance: big.NewInt(2), Root: emptyRoot.Bytes(), CodeHash: emptyCode.Bytes()})                      // 0xf73118e0254ce091588d66038744a0afae5f65a194de67cff310c683ae43329e
 	stRoot = helper.makeStorageTrie(hashData([]byte("acc-3")), []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"}, true)
 	helper.addTrieAccount("acc-3", &Account{Balance: big.NewInt(3), Root: stRoot, CodeHash: emptyCode.Bytes()}) // 0x70da4ebd7602dd313c936b39000ed9ab7f849986a90ea934f0c3ec4cc9840441
-	root, _, _ := helper.accTrie.Commit(nil)
+	root, _, _ := helper.accTrie.Commit(nil, false)
 
 	// We can only corrupt the disk database, so flush the tries out
 	helper.triedb.Reference(
 		common.BytesToHash(stRoot),
 		common.HexToHash("0x547b07c3a71669c00eda14077d85c7fd14575b92d459572540b25b9a11914dcb"),
+		true,
 	)
 	helper.triedb.Reference(
 		common.BytesToHash(stRoot),
 		common.HexToHash("0x70da4ebd7602dd313c936b39000ed9ab7f849986a90ea934f0c3ec4cc9840441"),
+		true,
 	)
 	helper.triedb.Commit(root, false, nil)
 
@@ -468,16 +472,18 @@ func TestGenerateCorruptStorageTrie(t *testing.T) {
 	stRoot = helper.makeStorageTrie(hashData([]byte("acc-3")), []string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"}, true)
 	helper.addTrieAccount("acc-3", &Account{Balance: big.NewInt(3), Root: stRoot, CodeHash: emptyCode.Bytes()}) // 0x70da4ebd7602dd313c936b39000ed9ab7f849986a90ea934f0c3ec4cc9840441
 
-	root, _, _ := helper.accTrie.Commit(nil)
+	root, _, _ := helper.accTrie.Commit(nil, false)
 
 	// We can only corrupt the disk database, so flush the tries out
 	helper.triedb.Reference(
 		common.BytesToHash(stRoot),
 		common.HexToHash("0x547b07c3a71669c00eda14077d85c7fd14575b92d459572540b25b9a11914dcb"),
+		true,
 	)
 	helper.triedb.Reference(
 		common.BytesToHash(stRoot),
 		common.HexToHash("0x70da4ebd7602dd313c936b39000ed9ab7f849986a90ea934f0c3ec4cc9840441"),
+		true,
 	)
 	helper.triedb.Commit(root, false, nil)
 

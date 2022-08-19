@@ -32,7 +32,7 @@ func GenerateTrie(t *testing.T, trieDB *Database, numKeys int, keySize int) (com
 	keys, values := FillTrie(t, numKeys, keySize, testTrie)
 
 	// Commit the root to [trieDB]
-	root, _, err := testTrie.Commit(nil)
+	root, _, err := testTrie.Commit(nil, false)
 	assert.NoError(t, err)
 	err = trieDB.Commit(root, false, nil)
 	assert.NoError(t, err)
@@ -174,7 +174,7 @@ func FillAccounts(
 		accounts[key] = &acc
 	}
 
-	newRoot, _, err := tr.Commit(nil)
+	newRoot, _, err := tr.Commit(nil, false)
 	if err != nil {
 		t.Fatalf("error committing trie: %v", err)
 	}

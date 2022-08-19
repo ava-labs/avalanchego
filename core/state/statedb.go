@@ -673,8 +673,8 @@ func (s *StateDB) createObject(addr common.Address) (newobj, prev *stateObject) 
 // CreateAccount is called during the EVM CREATE operation. The situation might arise that
 // a contract does the following:
 //
-//   1. sends funds to sha(account ++ (nonce + 1))
-//   2. tx_create(sha(account ++ nonce)) (note that this gets the address of 1)
+//  1. sends funds to sha(account ++ (nonce + 1))
+//  2. tx_create(sha(account ++ nonce)) (note that this gets the address of 1)
 //
 // Carrying over the balance ensures that Ether doesn't disappear.
 func (s *StateDB) CreateAccount(addr common.Address) {
@@ -967,18 +967,18 @@ func (s *StateDB) clearJournalAndRefund() {
 }
 
 // Commit writes the state to the underlying in-memory trie database.
-func (s *StateDB) Commit(deleteEmptyObjects bool) (common.Hash, error) {
-	return s.commit(deleteEmptyObjects, nil, common.Hash{}, common.Hash{})
+func (s *StateDB) Commit(deleteEmptyObjects bool, referenceRoot bool) (common.Hash, error) {
+	return s.commit(deleteEmptyObjects, nil, common.Hash{}, common.Hash{}, referenceRoot)
 }
 
 // CommitWithSnap writes the state to the underlying in-memory trie database and
 // generates a snapshot layer for the newly committed state.
-func (s *StateDB) CommitWithSnap(deleteEmptyObjects bool, snaps *snapshot.Tree, blockHash, parentHash common.Hash) (common.Hash, error) {
-	return s.commit(deleteEmptyObjects, snaps, blockHash, parentHash)
+func (s *StateDB) CommitWithSnap(deleteEmptyObjects bool, snaps *snapshot.Tree, blockHash, parentHash common.Hash, referenceRoot bool) (common.Hash, error) {
+	return s.commit(deleteEmptyObjects, snaps, blockHash, parentHash, referenceRoot)
 }
 
 // Commit writes the state to the underlying in-memory trie database.
-func (s *StateDB) commit(deleteEmptyObjects bool, snaps *snapshot.Tree, blockHash, parentHash common.Hash) (common.Hash, error) {
+func (s *StateDB) commit(deleteEmptyObjects bool, snaps *snapshot.Tree, blockHash, parentHash common.Hash, referenceRoot bool) (common.Hash, error) {
 	if s.dbErr != nil {
 		return common.Hash{}, fmt.Errorf("commit aborted due to earlier error: %v", s.dbErr)
 	}
@@ -1024,10 +1024,10 @@ func (s *StateDB) commit(deleteEmptyObjects bool, snaps *snapshot.Tree, blockHas
 			return nil
 		}
 		if account.Root != emptyRoot {
-			s.db.TrieDB().Reference(account.Root, parent)
+			s.db.TrieDB().Reference(account.Root, parent, false)
 		}
 		return nil
-	})
+	}, referenceRoot)
 	if err != nil {
 		return common.Hash{}, err
 	}
