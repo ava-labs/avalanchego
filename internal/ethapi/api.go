@@ -1003,6 +1003,33 @@ func (e *revertError) ErrorData() interface{} {
 	return e.reason
 }
 
+type DetailedExecutionResult struct {
+	UsedGas    uint64        `json:"gas"`        // Total used gas but include the refunded gas
+	Err        string        `json:"err"`        // Any error encountered during the execution(listed in core/vm/errors.go)
+	ReturnData hexutil.Bytes `json:"returnData"` // Data from evm(function result or data supplied with revert opcode)
+}
+
+// CallDetailed performs the same call as Call, but returns the full context
+func (s *PublicBlockChainAPI) CallDetailed(ctx context.Context, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *StateOverride) (*DetailedExecutionResult, error) {
+	result, err := DoCall(ctx, s.b, args, blockNrOrHash, overrides, s.b.RPCEVMTimeout(), s.b.RPCGasCap())
+	if err != nil {
+		return nil, err
+	}
+
+	reply := &DetailedExecutionResult{
+		UsedGas:    result.UsedGas,
+		ReturnData: result.ReturnData,
+	}
+	if result.Err != nil {
+		reply.Err = result.Err.Error()
+	}
+	// If the result contains a revert reason, try to unpack and return it.
+	if len(result.Revert()) > 0 {
+		reply.Err = newRevertError(result).Error()
+	}
+	return reply, nil
+}
+
 // Call executes the given transaction on the state for the given block number.
 //
 // Additionally, the caller can specify a batch of contract for fields overriding.
