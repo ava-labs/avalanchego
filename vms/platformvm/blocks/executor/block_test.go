@@ -158,7 +158,7 @@ func TestOptions(t *testing.T) {
 			expectedPreferenceType: &blocks.ApricotCommitBlock{},
 		},
 		{
-			name: "apricot proposal block; commit not preferred",
+			name: "apricot proposal block; abort preferred",
 			blkF: func(ctrl *gomock.Controller) *Block {
 				innerBlk := &blocks.ApricotProposalBlock{}
 				blkID := innerBlk.ID()
@@ -204,7 +204,7 @@ func TestOptions(t *testing.T) {
 			expectedPreferenceType: &blocks.BlueberryCommitBlock{},
 		},
 		{
-			name: "blueberry proposal block; commit not preferred",
+			name: "blueberry proposal block; abort preferred",
 			blkF: func(ctrl *gomock.Controller) *Block {
 				innerBlk := &blocks.BlueberryProposalBlock{}
 				blkID := innerBlk.ID()
