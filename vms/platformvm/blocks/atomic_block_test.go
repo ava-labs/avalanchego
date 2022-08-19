@@ -37,4 +37,5 @@ func TestNewApricotAtomicBlock(t *testing.T) {
 	// Make sure the block and tx are initialized
 	require.NotNil(blk.Bytes())
 	require.NotNil(blk.Tx.Bytes())
+	require.NotEqual(ids.Empty, blk.Tx.ID())
 }

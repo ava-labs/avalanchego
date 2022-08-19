@@ -47,6 +47,7 @@ func TestNewBlueberryStandardBlock(t *testing.T) {
 	// Make sure the block and tx are initialized
 	require.NotNil(blk.Bytes())
 	require.NotNil(blk.Transactions[0].Bytes())
+	require.NotEqual(ids.Empty, blk.Transactions[0].ID())
 }
 
 func TestNewApricotStandardBlock(t *testing.T) {
@@ -79,4 +80,5 @@ func TestNewApricotStandardBlock(t *testing.T) {
 	// Make sure the block and tx are initialized
 	require.NotNil(blk.Bytes())
 	require.NotNil(blk.Transactions[0].Bytes())
+	require.NotEqual(ids.Empty, blk.Transactions[0].ID())
 }
