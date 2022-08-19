@@ -392,9 +392,59 @@ type ChitsHandler interface {
 	QueryFailed(validatorID ids.NodeID, requestID uint32) error
 }
 
+// CrossChainAppHandler defines how a consensus engine reacts to cross-chain app
+// specific messages.
+//
+// Functions only return fatal errors.
 type CrossChainAppHandler interface {
+	// CrossChainAppRequest Notify this engine of a request for data from
+	// [chainID].
+	//
+	// The meaning of [request], and what should be sent in response to it, is
+	// application (VM) specific.
+	//
+	// It is not guaranteed that:
+	// * [request] is well-formed/valid.
+	//
+	// This node should typically send a CrossChainAppResponse to [chainID] in
+	// response to a valid message using the same request ID before the
+	// deadline. However, the VM may arbitrarily choose to not send a response
+	// to this request.
 	CrossChainAppRequest(chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error
+	// CrossChainAppRequestFailed notifies this engine that a
+	// CrossChainAppRequest message it sent to [chainID] with request ID
+	// [requestID] failed.
+	//
+	// This may be because the request timed out or because the message couldn't
+	// be sent to [chainID].
+	//
+	// It is guaranteed that:
+	// * This engine sent a request to [chainID] with ID [requestID].
+	// * CrossChainAppRequestFailed([chainID], [requestID]) has not already been
+	// called.
+	// * CrossChainAppResponse([chainID], [requestID]) has not already been
+	// called.
 	CrossChainAppRequestFailed(chainID ids.ID, requestID uint32) error
+	// CrossChainAppResponse notifies this engine of a response to the
+	// CrossChainAppRequest message it sent to [chainID] with request ID
+	// [requestID].
+	//
+	// The meaning of [response] is application (VM) specifc.
+	//
+	// It is guaranteed that:
+	// * This engine sent a request to [chainID] with ID [requestID].
+	// * CrossChainAppRequestFailed([chainID], [requestID]) has not already been
+	// called.
+	// * CrossChainAppResponse([chainID], [requestID]) has not already been
+	// called.
+	//
+	// It is not guaranteed that:
+	// * [response] contains the expected response
+	// * [response] is well-formed/valid.
+	//
+	// If [response] is invalid or not the expected response, the VM chooses how
+	// to react. For example, the VM may send another CrossChainAppRequest, or
+	// it may give up trying to get the requested information.
 	CrossChainAppResponse(chainID ids.ID, requestID uint32, response []byte) error
 }
 
