@@ -16,25 +16,34 @@ import (
 func TestNewApricotAtomicBlock(t *testing.T) {
 	require := require.New(t)
 
-	blk, err := NewApricotAtomicBlock(
-		ids.GenerateTestID(),
-		1337,
-		&txs.Tx{
-			Unsigned: &txs.ImportTx{
-				BaseTx: txs.BaseTx{
-					BaseTx: avax.BaseTx{
-						Ins:  []*avax.TransferableInput{},
-						Outs: []*avax.TransferableOutput{},
-					},
+	parentID := ids.GenerateTestID()
+	height := uint64(1337)
+	tx := &txs.Tx{
+		Unsigned: &txs.ImportTx{
+			BaseTx: txs.BaseTx{
+				BaseTx: avax.BaseTx{
+					Ins:  []*avax.TransferableInput{},
+					Outs: []*avax.TransferableOutput{},
 				},
-				ImportedInputs: []*avax.TransferableInput{},
 			},
-			Creds: []verify.Verifiable{},
+			ImportedInputs: []*avax.TransferableInput{},
 		},
+		Creds: []verify.Verifiable{},
+	}
+	require.NoError(tx.Sign(txs.Codec, nil))
+
+	blk, err := NewApricotAtomicBlock(
+		parentID,
+		height,
+		tx,
 	)
 	require.NoError(err)
 
 	// Make sure the block and tx are initialized
 	require.NotNil(blk.Bytes())
 	require.NotNil(blk.Tx.Bytes())
+
+	require.Equal(tx.Bytes(), blk.Tx.Bytes())
+	require.Equal(parentID, blk.Parent())
+	require.Equal(height, blk.Height())
 }

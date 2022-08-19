@@ -19,64 +19,82 @@ import (
 func TestNewBlueberryStandardBlock(t *testing.T) {
 	require := require.New(t)
 
-	blk, err := NewBlueberryStandardBlock(
-		time.Now(),
-		ids.GenerateTestID(),
-		1337,
-		[]*txs.Tx{
-			{
-				Unsigned: &txs.AddValidatorTx{
-					BaseTx: txs.BaseTx{
-						BaseTx: avax.BaseTx{
-							Ins:  []*avax.TransferableInput{},
-							Outs: []*avax.TransferableOutput{},
-						},
-					},
-					Stake:     []*avax.TransferableOutput{},
-					Validator: validator.Validator{},
-					RewardsOwner: &secp256k1fx.OutputOwners{
-						Addrs: []ids.ShortID{},
-					},
+	timestamp := time.Now().Truncate(time.Second)
+	parentID := ids.GenerateTestID()
+	height := uint64(1337)
+
+	tx := &txs.Tx{
+		Unsigned: &txs.AddValidatorTx{
+			BaseTx: txs.BaseTx{
+				BaseTx: avax.BaseTx{
+					Ins:  []*avax.TransferableInput{},
+					Outs: []*avax.TransferableOutput{},
 				},
-				Creds: []verify.Verifiable{},
+			},
+			Stake:     []*avax.TransferableOutput{},
+			Validator: validator.Validator{},
+			RewardsOwner: &secp256k1fx.OutputOwners{
+				Addrs: []ids.ShortID{},
 			},
 		},
+		Creds: []verify.Verifiable{},
+	}
+	require.NoError(tx.Sign(txs.Codec, nil))
+
+	blk, err := NewBlueberryStandardBlock(
+		timestamp,
+		parentID,
+		height,
+		[]*txs.Tx{tx},
 	)
 	require.NoError(err)
 
 	// Make sure the block and tx are initialized
 	require.NotNil(blk.Bytes())
 	require.NotNil(blk.Transactions[0].Bytes())
+
+	require.Equal(tx.Bytes(), blk.Transactions[0].Bytes())
+	require.Equal(timestamp, blk.Timestamp())
+	require.Equal(parentID, blk.Parent())
+	require.Equal(height, blk.Height())
 }
 
 func TestNewApricotStandardBlock(t *testing.T) {
 	require := require.New(t)
 
-	blk, err := NewApricotStandardBlock(
-		ids.GenerateTestID(),
-		1337,
-		[]*txs.Tx{
-			{
-				Unsigned: &txs.AddValidatorTx{
-					BaseTx: txs.BaseTx{
-						BaseTx: avax.BaseTx{
-							Ins:  []*avax.TransferableInput{},
-							Outs: []*avax.TransferableOutput{},
-						},
-					},
-					Stake:     []*avax.TransferableOutput{},
-					Validator: validator.Validator{},
-					RewardsOwner: &secp256k1fx.OutputOwners{
-						Addrs: []ids.ShortID{},
-					},
+	parentID := ids.GenerateTestID()
+	height := uint64(1337)
+
+	tx := &txs.Tx{
+		Unsigned: &txs.AddValidatorTx{
+			BaseTx: txs.BaseTx{
+				BaseTx: avax.BaseTx{
+					Ins:  []*avax.TransferableInput{},
+					Outs: []*avax.TransferableOutput{},
 				},
-				Creds: []verify.Verifiable{},
+			},
+			Stake:     []*avax.TransferableOutput{},
+			Validator: validator.Validator{},
+			RewardsOwner: &secp256k1fx.OutputOwners{
+				Addrs: []ids.ShortID{},
 			},
 		},
+		Creds: []verify.Verifiable{},
+	}
+	require.NoError(tx.Sign(txs.Codec, nil))
+
+	blk, err := NewApricotStandardBlock(
+		parentID,
+		height,
+		[]*txs.Tx{tx},
 	)
 	require.NoError(err)
 
 	// Make sure the block and tx are initialized
 	require.NotNil(blk.Bytes())
 	require.NotNil(blk.Transactions[0].Bytes())
+
+	require.Equal(tx.Bytes(), blk.Transactions[0].Bytes())
+	require.Equal(parentID, blk.Parent())
+	require.Equal(height, blk.Height())
 }
