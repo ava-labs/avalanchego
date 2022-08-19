@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanche-network-runner/client"
 	"github.com/ava-labs/avalanche-network-runner/rpcpb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/subnet-evm/tests/e2e/utils"
 	"github.com/onsi/ginkgo/v2/formatter"
 
@@ -46,12 +47,25 @@ func GetClient() client.Client {
 func InitializeRunner(execPath_ string, grpcEp string, networkRunnerLogLevel string) error {
 	execPath = execPath_
 
-	var err error
+	// Create the logger
+	logLevel, err := logging.ToLevel(networkRunnerLogLevel)
+	if err != nil {
+		return err
+	}
+
+	logFactory := logging.NewFactory(logging.Config{
+		DisplayLevel: logLevel,
+		LogLevel:     logging.Off, // Disable writing logs to files in favor of only writing logs to display
+	})
+	log, err := logFactory.Make("main")
+	if err != nil {
+		return err
+	}
+
 	cli, err = client.New(client.Config{
-		LogLevel:    networkRunnerLogLevel,
 		Endpoint:    grpcEp,
 		DialTimeout: 10 * time.Second,
-	})
+	}, log)
 	return err
 }
 
