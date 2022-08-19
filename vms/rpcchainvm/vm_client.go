@@ -565,7 +565,7 @@ func (vm *VMClient) CrossChainAppRequest(chainID ids.ID, requestID uint32, deadl
 			ChainId:   chainID[:],
 			RequestId: requestID,
 			Deadline:  grpcutils.TimestampFromTime(deadline),
-			Request:   request[:],
+			Request:   request,
 		},
 	)
 
@@ -590,7 +590,7 @@ func (vm *VMClient) CrossChainAppResponse(chainID ids.ID, requestID uint32, resp
 		&vmpb.CrossChainAppResponseMsg{
 			ChainId:   chainID[:],
 			RequestId: requestID,
-			Response:  response[:],
+			Response:  response,
 		},
 	)
 

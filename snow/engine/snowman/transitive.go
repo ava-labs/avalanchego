@@ -278,6 +278,7 @@ func (t *Transitive) QueryFailed(vdr ids.NodeID, requestID uint32) error {
 	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 	return t.buildBlocks()
 }
+
 func (t *Transitive) CrossChainAppRequest(chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
 	return t.VM.CrossChainAppRequest(chainID, requestID, deadline, request)
 }
