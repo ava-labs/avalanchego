@@ -122,7 +122,7 @@ type Gossiper interface {
 	SendGossip(container []byte)
 }
 
-// CrossChainAppSender sends local VM level messages to another VM.
+// CrossChainAppSender sends local VM-level messages to another VM.
 type CrossChainAppSender interface {
 	// SendCrossChainAppRequest sends an application-level request to a
 	// specific chain.
