@@ -6,11 +6,12 @@ package blocks
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/stretchr/testify/require"
 )
 
 func TestNewApricotAtomicBlock(t *testing.T) {
