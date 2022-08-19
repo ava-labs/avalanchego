@@ -1026,6 +1026,7 @@ func (e *revertError) ErrorData() interface{} {
 
 type ExecutionResult struct {
 	UsedGas    uint64        `json:"gas"`        // Total used gas but include the refunded gas
+	ErrCode    int           `json:"errCode"`    // EVM error code
 	Err        string        `json:"err"`        // Any error encountered during the execution(listed in core/vm/errors.go)
 	ReturnData hexutil.Bytes `json:"returnData"` // Data from evm(function result or data supplied with revert opcode)
 }
@@ -1042,11 +1043,16 @@ func (s *BlockChainAPI) CallDetailed(ctx context.Context, args TransactionArgs, 
 		ReturnData: result.ReturnData,
 	}
 	if result.Err != nil {
+		if err, ok := result.Err.(rpc.Error); ok {
+			reply.ErrCode = err.ErrorCode()
+		}
 		reply.Err = result.Err.Error()
 	}
 	// If the result contains a revert reason, try to unpack and return it.
 	if len(result.Revert()) > 0 {
-		reply.Err = newRevertError(result).Error()
+		err := newRevertError(result)
+		reply.ErrCode = err.ErrorCode()
+		reply.Err = err.Error()
 	}
 	return reply, nil
 }
