@@ -257,12 +257,10 @@ func getNextStakerToReward(preferredState state.Chain) (ids.ID, bool, error) {
 	return ids.Empty, false, nil
 }
 
-// dropExpiredProposalTxs drops add validator transactions in the mempool
+// dropExpiredProposalTxs drops add validator/delegator transactions in the mempool
 // whose start time is not sufficiently far in the future
 // (i.e. within local time plus [MaxFutureStartFrom]).
 // Guarantees that [PeekProposalTx] will return a valid tx after calling.
-// May not remove all expired txs since txs aren't necessarily popped
-// ordered by start time.
 func (b *builder) dropExpiredProposalTxs() {
 	ctx := b.txExecutorBackend.Ctx
 	now := b.txExecutorBackend.Clk.Time()
