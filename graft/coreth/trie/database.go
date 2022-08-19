@@ -481,8 +481,8 @@ func (db *Database) Nodes() []common.Hash {
 // This function is used to add reference between internal trie node
 // and external node(e.g. storage trie root), all internal trie nodes
 // are referenced together by database itself.
-func (db *Database) Reference(child common.Hash, parent common.Hash, grabDirtyLock bool) {
-	if grabDirtyLock {
+func (db *Database) Reference(child common.Hash, parent common.Hash, exclusive bool) {
+	if exclusive {
 		db.dirtiesLock.Lock()
 		defer db.dirtiesLock.Unlock()
 	}
