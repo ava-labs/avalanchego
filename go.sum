@@ -58,8 +58,8 @@ github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156/go.mod h1:Cb/ax
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/ava-labs/avalanche-network-runner-sdk v0.1.0 h1:m35SkmT7OO0cxrnqHCtQ0v8BHsDw8EZmo+yjH0DTqIs=
 github.com/ava-labs/avalanche-network-runner-sdk v0.1.0/go.mod h1:1oDcmKg7Ed2QN3uxl6r5FqMsZMSAsGVBtI4ra0ewW/A=
-github.com/ava-labs/coreth v0.8.16-rc.0 h1:JuE7uSt9jXVxhSmy9qyqmy5isBVCOQ3xiLcRpH4YVTU=
-github.com/ava-labs/coreth v0.8.16-rc.0/go.mod h1:iOB8EcOy/9yY1+/MAUqI2UM5GUIuIbX2MVKK1gCHqHs=
+github.com/ava-labs/coreth v0.8.16-rc.2 h1:Yo6J5faqK9sdnp7yzTIIEGodZqPctvy9l4SLRTVTWck=
+github.com/ava-labs/coreth v0.8.16-rc.2/go.mod h1:iOB8EcOy/9yY1+/MAUqI2UM5GUIuIbX2MVKK1gCHqHs=
 github.com/benbjohnson/clock v1.1.0 h1:Q92kusRqC1XV2MjkWETPvjJVqKetz1OzxZB7mHJLju8=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
