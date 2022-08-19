@@ -6,7 +6,7 @@ on:
 jobs:
   run_build_unit_tests:
     name: build_unit_test
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v3

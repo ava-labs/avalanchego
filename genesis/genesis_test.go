@@ -349,7 +349,7 @@ func TestGenesis(t *testing.T) {
 		},
 		{
 			networkID:  constants.LocalID,
-			expectedID: "3299eeA1MEK33tBTVb3bRckdEnZLVoaxov87Bw4HeDtucVhUY",
+			expectedID: "hBbtNFKLpjuKti32L5bnfZ2vspABkN268t8FincYhQWnWLHxw",
 		},
 	}
 	for _, test := range tests {
