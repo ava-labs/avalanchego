@@ -97,28 +97,44 @@ func (b *EthAPIBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumb
 	return b.eth.blockchain.GetHeaderByNumber(uint64(number)), nil
 }
 
+func (b *EthAPIBackend) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	header := b.eth.blockchain.GetHeaderByHash(hash)
+	if header == nil {
+		return nil, nil
+	}
+
+	if b.eth.blockchain.GetCanonicalHash(header.Number.Uint64()) != hash {
+		return nil, nil
+	}
+
+	acceptedBlock := b.eth.LastAcceptedBlock()
+	if !b.GetVMConfig().AllowUnfinalizedQueries && acceptedBlock != nil {
+		if header.Number.Cmp(acceptedBlock.Number()) > 0 {
+			return nil, ErrUnfinalizedData
+		}
+	}
+	return header, nil
+}
+
 func (b *EthAPIBackend) HeaderByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*types.Header, error) {
 	if blockNr, ok := blockNrOrHash.Number(); ok {
 		return b.HeaderByNumber(ctx, blockNr)
 	}
 	if hash, ok := blockNrOrHash.Hash(); ok {
-		header := b.eth.blockchain.GetHeaderByHash(hash)
+		header, err := b.HeaderByHash(ctx, hash)
+		if err != nil {
+			return nil, err
+		}
 		if header == nil {
 			return nil, errors.New("header for hash not found")
-		}
-		if blockNrOrHash.RequireCanonical && b.eth.blockchain.GetCanonicalHash(header.Number.Uint64()) != hash {
-			return nil, errors.New("hash is not currently canonical")
 		}
 		return header, nil
 	}
 	return nil, errors.New("invalid arguments; neither block nor hash specified")
-}
-
-func (b *EthAPIBackend) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	return b.eth.blockchain.GetHeaderByHash(hash), nil
 }
 
 func (b *EthAPIBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error) {
@@ -145,7 +161,24 @@ func (b *EthAPIBackend) BlockByHash(ctx context.Context, hash common.Hash) (*typ
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	return b.eth.blockchain.GetBlockByHash(hash), nil
+
+	block := b.eth.blockchain.GetBlockByHash(hash)
+	if block == nil {
+		return nil, nil
+	}
+
+	number := block.Number()
+	if b.eth.blockchain.GetCanonicalHash(number.Uint64()) != hash {
+		return nil, nil
+	}
+
+	acceptedBlock := b.eth.LastAcceptedBlock()
+	if !b.GetVMConfig().AllowUnfinalizedQueries && acceptedBlock != nil {
+		if number.Cmp(acceptedBlock.Number()) > 0 {
+			return nil, ErrUnfinalizedData
+		}
+	}
+	return block, nil
 }
 
 func (b *EthAPIBackend) BlockByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*types.Block, error) {
@@ -156,16 +189,12 @@ func (b *EthAPIBackend) BlockByNumberOrHash(ctx context.Context, blockNrOrHash r
 		return nil, err
 	}
 	if hash, ok := blockNrOrHash.Hash(); ok {
-		header := b.eth.blockchain.GetHeaderByHash(hash)
-		if header == nil {
-			return nil, errors.New("header for hash not found")
+		block, err := b.BlockByHash(ctx, hash)
+		if err != nil {
+			return nil, err
 		}
-		if blockNrOrHash.RequireCanonical && b.eth.blockchain.GetCanonicalHash(header.Number.Uint64()) != hash {
-			return nil, errors.New("hash is not currently canonical")
-		}
-		block := b.eth.blockchain.GetBlock(hash, header.Number.Uint64())
 		if block == nil {
-			return nil, errors.New("header found, but block body is missing")
+			return nil, errors.New("header for hash not found")
 		}
 		return block, nil
 	}
@@ -204,9 +233,6 @@ func (b *EthAPIBackend) StateAndHeaderByNumberOrHash(ctx context.Context, blockN
 		if header == nil {
 			return nil, nil, errors.New("header for hash not found")
 		}
-		if blockNrOrHash.RequireCanonical && b.eth.blockchain.GetCanonicalHash(header.Number.Uint64()) != hash {
-			return nil, nil, errors.New("hash is not currently canonical")
-		}
 		stateDb, err := b.eth.BlockChain().StateAt(header.Root)
 		return stateDb, header, err
 	}
@@ -224,14 +250,17 @@ func (b *EthAPIBackend) GetLogs(ctx context.Context, hash common.Hash) ([][]*typ
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	db := b.eth.ChainDb()
-	number := rawdb.ReadHeaderNumber(db, hash)
-	if number == nil {
+
+	header, err := b.HeaderByHash(ctx, hash)
+	if header == nil || err != nil {
 		return nil, fmt.Errorf("failed to get block number for hash %#x", hash)
 	}
-	logs := rawdb.ReadLogs(db, hash, *number)
+
+	db := b.eth.ChainDb()
+	number := header.Number.Uint64()
+	logs := rawdb.ReadLogs(db, hash, number)
 	if logs == nil {
-		return nil, fmt.Errorf("failed to get logs for block #%d (0x%s)", *number, hash.TerminalString())
+		return nil, fmt.Errorf("failed to get logs for block #%d (0x%s)", number, hash.TerminalString())
 	}
 	return logs, nil
 }
@@ -303,6 +332,8 @@ func (b *EthAPIBackend) GetPoolTransaction(hash common.Hash) *types.Transaction 
 }
 
 func (b *EthAPIBackend) GetTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error) {
+	// Note: we only index transactions during Accept, so the below check against unfinalized queries is technically redundant, but
+	// we keep it for defense in depth.
 	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(b.eth.ChainDb(), txHash)
 
 	// Respond as if the transaction does not exist if it is not yet in an
