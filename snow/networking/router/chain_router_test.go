@@ -50,6 +50,9 @@ func TestShutdown(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
+	metrics := prometheus.NewRegistry()
+	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
+	require.NoError(t, err)
 
 	mc := message.NewInternalBuilder()
 	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
