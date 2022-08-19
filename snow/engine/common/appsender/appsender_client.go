@@ -32,7 +32,6 @@ func (c *Client) SendCrossChainAppRequest(chainID ids.ID, requestID uint32, appR
 			Request:   appRequestBytes[:],
 		},
 	)
-
 	return err
 }
 
@@ -45,7 +44,6 @@ func (c *Client) SendCrossChainAppResponse(chainID ids.ID, requestID uint32, app
 			Response:  appResponseBytes[:],
 		},
 	)
-
 	return err
 }
 
@@ -57,7 +55,6 @@ func (c *Client) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, request
 		nodeIDsBytes[i] = nodeID[:]
 		i++
 	}
-
 	_, err := c.client.SendAppRequest(
 		context.Background(),
 		&appsenderpb.SendAppRequestMsg{
@@ -66,7 +63,6 @@ func (c *Client) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, request
 			Request:   request,
 		},
 	)
-
 	return err
 }
 
@@ -79,7 +75,6 @@ func (c *Client) SendAppResponse(nodeID ids.NodeID, requestID uint32, response [
 			Response:  response,
 		},
 	)
-
 	return err
 }
 
@@ -101,7 +96,6 @@ func (c *Client) SendAppGossipSpecific(nodeIDs ids.NodeIDSet, msg []byte) error 
 		nodeIDsBytes[i] = nodeID[:]
 		i++
 	}
-
 	_, err := c.client.SendAppGossipSpecific(
 		context.Background(),
 		&appsenderpb.SendAppGossipSpecificMsg{

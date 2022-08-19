@@ -260,14 +260,12 @@ func (nop *noOpChitsHandler) QueryFailed(nodeID ids.NodeID, requestID uint32) er
 }
 
 type noOpAppHandler struct {
-	chainID ids.ID
-	log     logging.Logger
+	log logging.Logger
 }
 
-func NewNoOpAppHandler(chainID ids.ID, logger logging.Logger) AppHandler {
+func NewNoOpAppHandler(logger logging.Logger) AppHandler {
 	return &noOpAppHandler{
-		chainID: chainID,
-		log:     logger,
+		log: logger,
 	}
 }
 
