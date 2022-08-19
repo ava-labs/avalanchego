@@ -14,14 +14,10 @@ import (
 )
 
 type MockTrieDB struct {
-	LastReference   common.Hash
 	LastDereference common.Hash
 	LastCommit      common.Hash
 }
 
-func (t *MockTrieDB) Reference(child common.Hash, parent common.Hash, exclusive bool) {
-	t.LastReference = child
-}
 func (t *MockTrieDB) Dereference(root common.Hash) {
 	t.LastDereference = root
 }
@@ -52,12 +48,10 @@ func TestCappedMemoryTrieWriter(t *testing.T) {
 		)
 
 		assert.NoError(w.InsertTrie(block))
-		assert.Equal(common.Hash{}, m.LastReference, "should not have referenced block on insert")
 		assert.Equal(common.Hash{}, m.LastDereference, "should not have dereferenced block on insert")
 		assert.Equal(common.Hash{}, m.LastCommit, "should not have committed block on insert")
 
 		w.AcceptTrie(block)
-		assert.Equal(common.Hash{}, m.LastReference, "should not have referenced block on accept")
 		if i <= tipBufferSize {
 			assert.Equal(common.Hash{}, m.LastDereference, "should not have dereferenced block on accept")
 		} else {
@@ -72,7 +66,6 @@ func TestCappedMemoryTrieWriter(t *testing.T) {
 		}
 
 		w.RejectTrie(block)
-		assert.Equal(common.Hash{}, m.LastReference, "should not have referenced block on reject")
 		assert.Equal(block.Root(), m.LastDereference, "should have dereferenced block on reject")
 		assert.Equal(common.Hash{}, m.LastCommit, "should not have committed block on reject")
 		m.LastDereference = common.Hash{}
@@ -94,18 +87,15 @@ func TestNoPruningTrieWriter(t *testing.T) {
 		)
 
 		assert.NoError(w.InsertTrie(block))
-		assert.Equal(common.Hash{}, m.LastReference, "should not have referenced block on insert")
 		assert.Equal(common.Hash{}, m.LastDereference, "should not have dereferenced block on insert")
 		assert.Equal(common.Hash{}, m.LastCommit, "should not have committed block on insert")
 
 		w.AcceptTrie(block)
-		assert.Equal(common.Hash{}, m.LastReference, "should not have referenced block on accept")
 		assert.Equal(common.Hash{}, m.LastDereference, "should not have dereferenced block on accept")
 		assert.Equal(block.Root(), m.LastCommit, "should have committed block on accept")
 		m.LastCommit = common.Hash{}
 
 		w.RejectTrie(block)
-		assert.Equal(common.Hash{}, m.LastReference, "should not have referenced block on reject")
 		assert.Equal(block.Root(), m.LastDereference, "should have dereferenced block on reject")
 		assert.Equal(common.Hash{}, m.LastCommit, "should not have committed block on reject")
 		m.LastDereference = common.Hash{}
