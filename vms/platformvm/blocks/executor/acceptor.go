@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
 var _ blocks.Visitor = &acceptor{}
@@ -34,7 +35,22 @@ func (a *acceptor) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
 		zap.Stringer("parentID", b.Parent()),
 	)
 
-	return a.optionBlock(b, false /*commit*/)
+	parentState, ok := a.blkIDToState[b.Parent()]
+	if !ok {
+		return fmt.Errorf("%w: %s", state.ErrMissingParentState, b.Parent())
+	}
+
+	// Update metrics
+	if a.bootstrapped.GetValue() {
+		wasPreferred := parentState.initiallyPreferCommit
+		if !wasPreferred {
+			a.metrics.MarkOptionVoteWon()
+		} else {
+			a.metrics.MarkOptionVoteLost()
+		}
+	}
+
+	return a.optionBlock(b)
 }
 
 func (a *acceptor) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
@@ -46,7 +62,22 @@ func (a *acceptor) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
 		zap.Stringer("parentID", b.Parent()),
 	)
 
-	return a.optionBlock(b, true)
+	parentState, ok := a.blkIDToState[b.Parent()]
+	if !ok {
+		return fmt.Errorf("%w: %s", state.ErrMissingParentState, b.Parent())
+	}
+
+	// Update metrics
+	if a.bootstrapped.GetValue() {
+		wasPreferred := parentState.initiallyPreferCommit
+		if wasPreferred {
+			a.metrics.MarkOptionVoteWon()
+		} else {
+			a.metrics.MarkOptionVoteLost()
+		}
+	}
+
+	return a.optionBlock(b)
 }
 
 func (a *acceptor) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) error {
@@ -86,7 +117,22 @@ func (a *acceptor) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 		zap.Stringer("parentID", b.Parent()),
 	)
 
-	return a.optionBlock(b, false /*commit*/)
+	parentState, ok := a.blkIDToState[b.Parent()]
+	if !ok {
+		return fmt.Errorf("%w: %s", state.ErrMissingParentState, b.Parent())
+	}
+
+	// Update metrics
+	if a.bootstrapped.GetValue() {
+		wasPreferred := parentState.initiallyPreferCommit
+		if !wasPreferred {
+			a.metrics.MarkOptionVoteWon()
+		} else {
+			a.metrics.MarkOptionVoteLost()
+		}
+	}
+
+	return a.optionBlock(b)
 }
 
 func (a *acceptor) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
@@ -98,7 +144,22 @@ func (a *acceptor) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 		zap.Stringer("parentID", b.Parent()),
 	)
 
-	return a.optionBlock(b, true /*commit*/)
+	parentState, ok := a.blkIDToState[b.Parent()]
+	if !ok {
+		return fmt.Errorf("%w: %s", state.ErrMissingParentState, b.Parent())
+	}
+
+	// Update metrics
+	if a.bootstrapped.GetValue() {
+		wasPreferred := parentState.initiallyPreferCommit
+		if wasPreferred {
+			a.metrics.MarkOptionVoteWon()
+		} else {
+			a.metrics.MarkOptionVoteLost()
+		}
+	}
+
+	return a.optionBlock(b)
 }
 
 func (a *acceptor) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
@@ -172,7 +233,7 @@ func (a *acceptor) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 	return nil
 }
 
-func (a *acceptor) optionBlock(b blocks.Block, commit bool) error {
+func (a *acceptor) optionBlock(b blocks.Block) error {
 	blkID := b.ID()
 	parentID := b.Parent()
 
@@ -196,15 +257,6 @@ func (a *acceptor) optionBlock(b blocks.Block, commit bool) error {
 		return err
 	}
 
-	// Update metrics
-	if a.bootstrapped.GetValue() {
-		wasPreferred := parentState.initiallyPreferCommit
-		if (wasPreferred && commit) || (!wasPreferred && !commit) {
-			a.metrics.MarkOptionVoteWon()
-		} else {
-			a.metrics.MarkOptionVoteLost()
-		}
-	}
 	blkState, ok := a.blkIDToState[blkID]
 	if !ok {
 		return fmt.Errorf("couldn't find state of block %s", blkID)
