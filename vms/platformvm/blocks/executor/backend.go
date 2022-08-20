@@ -93,16 +93,7 @@ func (b *backend) free(blkID ids.ID) {
 
 func (b *backend) getTimestamp(block blocks.Block) time.Time {
 	switch blk := block.(type) {
-	case *blocks.BlueberryAbortBlock:
-		return blk.Timestamp()
-
-	case *blocks.BlueberryCommitBlock:
-		return blk.Timestamp()
-
-	case *blocks.BlueberryProposalBlock:
-		return blk.Timestamp()
-
-	case *blocks.BlueberryStandardBlock:
+	case blocks.BlueberryBlock:
 		return blk.Timestamp()
 
 	default:

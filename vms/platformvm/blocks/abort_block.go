@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	_ Block = &BlueberryAbortBlock{}
-	_ Block = &ApricotAbortBlock{}
+	_ BlueberryBlock = &BlueberryAbortBlock{}
+	_ Block          = &ApricotAbortBlock{}
 )
 
 type BlueberryAbortBlock struct {

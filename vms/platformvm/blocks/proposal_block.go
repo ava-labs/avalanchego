@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	_ Block = &BlueberryProposalBlock{}
-	_ Block = &ApricotProposalBlock{}
+	_ BlueberryBlock = &BlueberryProposalBlock{}
+	_ Block          = &ApricotProposalBlock{}
 )
 
 type BlueberryProposalBlock struct {

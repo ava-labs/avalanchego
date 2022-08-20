@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	_ Block = &BlueberryCommitBlock{}
-	_ Block = &ApricotCommitBlock{}
+	_ BlueberryBlock = &BlueberryCommitBlock{}
+	_ Block          = &ApricotCommitBlock{}
 )
 
 type BlueberryCommitBlock struct {
