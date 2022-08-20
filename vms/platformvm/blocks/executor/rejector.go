@@ -57,6 +57,8 @@ func (r *rejector) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 
 func (r *rejector) rejectBlock(b blocks.Block, blockType string) error {
 	blkID := b.ID()
+	defer r.free(blkID)
+
 	r.ctx.Log.Verbo(
 		"rejecting block",
 		zap.String("blockType", blockType),
@@ -77,7 +79,5 @@ func (r *rejector) rejectBlock(b blocks.Block, blockType string) error {
 	}
 
 	r.state.AddStatelessBlock(b, choices.Rejected)
-	err := r.state.Commit()
-	r.free(blkID)
-	return err
+	return r.state.Commit()
 }
