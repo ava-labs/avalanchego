@@ -177,10 +177,10 @@ func (a *acceptor) optionBlock(b blocks.Block, commit bool) error {
 	parentID := b.Parent()
 
 	defer func() {
-		a.free(blkID)
 		// Note: we assume this block's sibling doesn't
 		// need the parent's state when it's rejected.
 		a.free(parentID)
+		a.free(blkID)
 	}()
 
 	// Note that the parent must be accepted first.
