@@ -34,7 +34,7 @@ func (a *acceptor) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
 		zap.Stringer("parentID", b.Parent()),
 	)
 
-	return a.optionBlock(b)
+	return a.optionBlock(b, false /*commit*/)
 }
 
 func (a *acceptor) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
@@ -46,7 +46,7 @@ func (a *acceptor) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
 		zap.Stringer("parentID", b.Parent()),
 	)
 
-	return a.optionBlock(b)
+	return a.optionBlock(b, true)
 }
 
 func (a *acceptor) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) error {
@@ -86,7 +86,7 @@ func (a *acceptor) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 		zap.Stringer("parentID", b.Parent()),
 	)
 
-	return a.optionBlock(b)
+	return a.optionBlock(b, false /*commit*/)
 }
 
 func (a *acceptor) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
@@ -98,7 +98,7 @@ func (a *acceptor) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 		zap.Stringer("parentID", b.Parent()),
 	)
 
-	return a.optionBlock(b)
+	return a.optionBlock(b, true /*commit*/)
 }
 
 func (a *acceptor) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
@@ -172,7 +172,7 @@ func (a *acceptor) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 	return nil
 }
 
-func (a *acceptor) optionBlock(b blocks.Block) error {
+func (a *acceptor) optionBlock(b blocks.Block, commit bool) error {
 	blkID := b.ID()
 	parentID := b.Parent()
 
@@ -199,7 +199,7 @@ func (a *acceptor) optionBlock(b blocks.Block) error {
 	// Update metrics
 	if a.bootstrapped.GetValue() {
 		wasPreferred := parentState.initiallyPreferCommit
-		if wasPreferred {
+		if (wasPreferred && commit) || (!wasPreferred && !commit) {
 			a.metrics.MarkOptionVoteWon()
 		} else {
 			a.metrics.MarkOptionVoteLost()
