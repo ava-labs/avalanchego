@@ -31,12 +31,9 @@ const (
 )
 
 var (
-	_ Mempool     = &mempool{}
-	_ txs.Visitor = &mempoolIssuer{}
+	_ Mempool = &mempool{}
 
-	errMempoolFull                = errors.New("mempool is full")
-	errCantIssueAdvanceTimeTx     = errors.New("can not issue an advance time tx")
-	errCantIssueRewardValidatorTx = errors.New("can not issue a reward validator tx")
+	errMempoolFull = errors.New("mempool is full")
 )
 
 type BlockTimer interface {
@@ -334,52 +331,4 @@ func (m *mempool) deregister(tx *txs.Tx) {
 
 	inputs := tx.Unsigned.InputIDs()
 	m.consumedUTXOs.Difference(inputs)
-}
-
-type mempoolIssuer struct {
-	m  *mempool
-	tx *txs.Tx
-}
-
-func (i *mempoolIssuer) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
-	return errCantIssueAdvanceTimeTx
-}
-
-func (i *mempoolIssuer) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
-	return errCantIssueRewardValidatorTx
-}
-
-func (i *mempoolIssuer) AddValidatorTx(*txs.AddValidatorTx) error {
-	i.m.addProposalTx(i.tx)
-	return nil
-}
-
-func (i *mempoolIssuer) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	i.m.addProposalTx(i.tx)
-	return nil
-}
-
-func (i *mempoolIssuer) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
-	i.m.addProposalTx(i.tx)
-	return nil
-}
-
-func (i *mempoolIssuer) CreateChainTx(tx *txs.CreateChainTx) error {
-	i.m.addDecisionTx(i.tx)
-	return nil
-}
-
-func (i *mempoolIssuer) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
-	i.m.addDecisionTx(i.tx)
-	return nil
-}
-
-func (i *mempoolIssuer) ImportTx(tx *txs.ImportTx) error {
-	i.m.addDecisionTx(i.tx)
-	return nil
-}
-
-func (i *mempoolIssuer) ExportTx(tx *txs.ExportTx) error {
-	i.m.addDecisionTx(i.tx)
-	return nil
 }
