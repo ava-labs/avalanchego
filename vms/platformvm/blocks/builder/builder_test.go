@@ -287,7 +287,8 @@ func TestGetNextStakerToReward(t *testing.T) {
 			defer ctrl.Finish()
 
 			state := tt.stateF(ctrl)
-			txID, shouldReward, err := getNextStakerToReward(state)
+			b := builder{}
+			txID, shouldReward, err := b.getNextStakerToReward(state)
 			if tt.expectedErr != nil {
 				require.Equal(tt.expectedErr, err)
 				return

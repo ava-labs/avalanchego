@@ -29,7 +29,7 @@ func buildApricotBlock(
 	}
 
 	// try rewarding stakers whose staking period ends at current chain time.
-	stakerTxID, shouldReward, err := getNextStakerToReward(parentState)
+	stakerTxID, shouldReward, err := builder.getNextStakerToReward(parentState)
 	if err != nil {
 		return nil, fmt.Errorf("could not find next staker to reward: %w", err)
 	}
@@ -47,7 +47,7 @@ func buildApricotBlock(
 	}
 
 	// try advancing chain time
-	nextChainTime, shouldAdvanceTime, err := getNextChainTime(parentState, builder.txExecutorBackend.Clk.Time())
+	nextChainTime, shouldAdvanceTime, err := builder.getNextChainTime(parentState)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve next chain time: %w", err)
 	}
