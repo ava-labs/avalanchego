@@ -37,7 +37,7 @@ func getValidTx(txBuilder txbuilder.Builder, t *testing.T) *txs.Tx {
 func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, false /*mockResetBlockTimer*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -87,7 +87,7 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, false /*mockResetBlockTimer*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -114,7 +114,7 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t)
+	env := newEnvironment(t, false /*mockResetBlockTimer*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))

@@ -57,50 +57,60 @@ func (b *Block) Status() choices.Status {
 }
 
 func (b *Block) Timestamp() time.Time {
-	// If this is the last accepted block and the block was loaded from disk
-	// since it was accepted, then the timestamp wouldn't be set correctly. So,
-	// we explicitly return the chain time.
-	// Check if the block is processing.
-	if blkState, ok := b.manager.blkIDToState[b.ID()]; ok {
-		return blkState.timestamp
-	}
-	// The block isn't processing.
-	// According to the snowman.Block interface, the last accepted
-	// block is the only accepted block that must return a correct timestamp,
-	// so we just return the chain time.
-	return b.manager.state.GetTimestamp()
+	return b.manager.getTimestamp(b.Block)
 }
 
 func (b *Block) Options() ([2]snowman.Block, error) {
-	if _, ok := b.Block.(*blocks.ApricotProposalBlock); !ok {
+	var (
+		statelessCommitBlk blocks.Block
+		statelessAbortBlk  blocks.Block
+		err                error
+
+		blkID      = b.ID()
+		nextHeight = b.Height() + 1
+	)
+
+	switch blk := b.Block.(type) {
+	case *blocks.ApricotProposalBlock:
+		statelessCommitBlk, err = blocks.NewApricotCommitBlock(blkID, nextHeight)
+		if err != nil {
+			return [2]snowman.Block{}, fmt.Errorf(
+				"failed to create commit block: %w",
+				err,
+			)
+		}
+
+		statelessAbortBlk, err = blocks.NewApricotAbortBlock(blkID, nextHeight)
+		if err != nil {
+			return [2]snowman.Block{}, fmt.Errorf(
+				"failed to create abort block: %w",
+				err,
+			)
+		}
+
+	case *blocks.BlueberryProposalBlock:
+		timestamp := blk.Timestamp()
+		statelessCommitBlk, err = blocks.NewBlueberryCommitBlock(timestamp, blkID, nextHeight)
+		if err != nil {
+			return [2]snowman.Block{}, fmt.Errorf(
+				"failed to create commit block: %w",
+				err,
+			)
+		}
+
+		statelessAbortBlk, err = blocks.NewBlueberryAbortBlock(timestamp, blkID, nextHeight)
+		if err != nil {
+			return [2]snowman.Block{}, fmt.Errorf(
+				"failed to create abort block: %w",
+				err,
+			)
+		}
+
+	default:
 		return [2]snowman.Block{}, snowman.ErrNotOracle
 	}
 
-	blkID := b.ID()
-	nextHeight := b.Height() + 1
-
-	statelessCommitBlk, err := blocks.NewApricotCommitBlock(
-		blkID,
-		nextHeight,
-	)
-	if err != nil {
-		return [2]snowman.Block{}, fmt.Errorf(
-			"failed to create commit block: %w",
-			err,
-		)
-	}
 	commitBlock := b.manager.NewBlock(statelessCommitBlk)
-
-	statelessAbortBlk, err := blocks.NewApricotAbortBlock(
-		blkID,
-		nextHeight,
-	)
-	if err != nil {
-		return [2]snowman.Block{}, fmt.Errorf(
-			"failed to create abort block: %w",
-			err,
-		)
-	}
 	abortBlock := b.manager.NewBlock(statelessAbortBlk)
 
 	blkState, ok := b.manager.blkIDToState[blkID]

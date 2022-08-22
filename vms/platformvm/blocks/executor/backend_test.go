@@ -5,6 +5,7 @@ package executor
 
 import (
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 
@@ -109,5 +110,119 @@ func TestBackendGetBlock(t *testing.T) {
 		gotBlk, err := b.GetBlock(blkID)
 		require.NoError(err)
 		require.Equal(statelessBlk, gotBlk)
+	}
+}
+
+func TestGetTimestamp(t *testing.T) {
+	type test struct {
+		name              string
+		blkF              func(*gomock.Controller) blocks.Block
+		backendF          func(*gomock.Controller) *backend
+		expectedTimestamp time.Time
+	}
+
+	var (
+		blueberryAbortBlockTime    = time.Unix(0, 0)
+		blueberryCommitBlockTime   = time.Unix(1, 0)
+		blueberryProposalBlockTime = time.Unix(2, 0)
+		blueberryStandardBlockTime = time.Unix(3, 0)
+		blkID                      = ids.GenerateTestID()
+	)
+	tests := []test{
+		{
+			name: "blueberry abort block",
+			blkF: func(*gomock.Controller) blocks.Block {
+				return &blocks.BlueberryAbortBlock{
+					Time: uint64(blueberryAbortBlockTime.Unix()),
+				}
+			},
+			backendF: func(*gomock.Controller) *backend {
+				return &backend{}
+			},
+			expectedTimestamp: blueberryAbortBlockTime,
+		},
+		{
+			name: "blueberry commit block",
+			blkF: func(*gomock.Controller) blocks.Block {
+				return &blocks.BlueberryCommitBlock{
+					Time: uint64(blueberryCommitBlockTime.Unix()),
+				}
+			},
+			backendF: func(*gomock.Controller) *backend {
+				return &backend{}
+			},
+			expectedTimestamp: blueberryCommitBlockTime,
+		},
+		{
+			name: "blueberry proposal block",
+			blkF: func(*gomock.Controller) blocks.Block {
+				return &blocks.BlueberryProposalBlock{
+					Time: uint64(blueberryProposalBlockTime.Unix()),
+				}
+			},
+			backendF: func(*gomock.Controller) *backend {
+				return &backend{}
+			},
+			expectedTimestamp: blueberryProposalBlockTime,
+		},
+		{
+			name: "blueberry standard block",
+			blkF: func(*gomock.Controller) blocks.Block {
+				return &blocks.BlueberryStandardBlock{
+					Time: uint64(blueberryStandardBlockTime.Unix()),
+				}
+			},
+			backendF: func(*gomock.Controller) *backend {
+				return &backend{}
+			},
+			expectedTimestamp: blueberryStandardBlockTime,
+		},
+		{
+			name: "apricot block is in map",
+			blkF: func(ctrl *gomock.Controller) blocks.Block {
+				blk := blocks.NewMockBlock(ctrl)
+				blk.EXPECT().ID().Return(blkID)
+				return blk
+			},
+			backendF: func(ctrl *gomock.Controller) *backend {
+				return &backend{
+					blkIDToState: map[ids.ID]*blockState{
+						blkID: {
+							timestamp: time.Unix(1337, 0),
+						},
+					},
+				}
+			},
+			expectedTimestamp: time.Unix(1337, 0),
+		},
+		{
+			name: "apricot block isn't map",
+			blkF: func(ctrl *gomock.Controller) blocks.Block {
+				blk := blocks.NewMockBlock(ctrl)
+				blk.EXPECT().ID().Return(blkID)
+				return blk
+			},
+			backendF: func(ctrl *gomock.Controller) *backend {
+				state := state.NewMockState(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Unix(1337, 0))
+				return &backend{
+					state: state,
+				}
+			},
+			expectedTimestamp: time.Unix(1337, 0),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			backend := tt.backendF(ctrl)
+			blk := tt.blkF(ctrl)
+			gotTimestamp := backend.getTimestamp(blk)
+			require.Equal(tt.expectedTimestamp, gotTimestamp)
+		})
 	}
 }

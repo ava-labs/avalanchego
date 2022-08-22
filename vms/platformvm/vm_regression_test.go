@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/version"
+
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -24,7 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -69,14 +71,14 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	// trigger block creation
 	require.NoError(vm.Builder.AddUnverifiedTx(addValidatorTx))
 
-	addValidatorBlock, err := vm.BuildBlock()
+	addValidatorBlock, err := vm.Builder.BuildBlock()
 	require.NoError(err)
 
 	verifyAndAcceptProposalCommitment(require, vm, addValidatorBlock)
 
 	vm.clock.Set(validatorStartTime)
 
-	firstAdvanceTimeBlock, err := vm.BuildBlock()
+	firstAdvanceTimeBlock, err := vm.Builder.BuildBlock()
 	require.NoError(err)
 
 	verifyAndAcceptProposalCommitment(require, vm, firstAdvanceTimeBlock)
@@ -99,14 +101,14 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	// trigger block creation
 	require.NoError(vm.Builder.AddUnverifiedTx(addFirstDelegatorTx))
 
-	addFirstDelegatorBlock, err := vm.BuildBlock()
+	addFirstDelegatorBlock, err := vm.Builder.BuildBlock()
 	require.NoError(err)
 
 	verifyAndAcceptProposalCommitment(require, vm, addFirstDelegatorBlock)
 
 	vm.clock.Set(firstDelegatorStartTime)
 
-	secondAdvanceTimeBlock, err := vm.BuildBlock()
+	secondAdvanceTimeBlock, err := vm.Builder.BuildBlock()
 	require.NoError(err)
 
 	verifyAndAcceptProposalCommitment(require, vm, secondAdvanceTimeBlock)
@@ -131,7 +133,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	// trigger block creation
 	require.NoError(vm.Builder.AddUnverifiedTx(addSecondDelegatorTx))
 
-	addSecondDelegatorBlock, err := vm.BuildBlock()
+	addSecondDelegatorBlock, err := vm.Builder.BuildBlock()
 	require.NoError(err)
 
 	verifyAndAcceptProposalCommitment(require, vm, addSecondDelegatorBlock)
@@ -233,7 +235,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 
 			// trigger block creation for the validator tx
-			addValidatorBlock, err := vm.BuildBlock()
+			addValidatorBlock, err := vm.Builder.BuildBlock()
 			require.NoError(err)
 
 			verifyAndAcceptProposalCommitment(require, vm, addValidatorBlock)
@@ -255,7 +257,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 
 			// trigger block creation for the first add delegator tx
-			addFirstDelegatorBlock, err := vm.BuildBlock()
+			addFirstDelegatorBlock, err := vm.Builder.BuildBlock()
 			require.NoError(err)
 
 			verifyAndAcceptProposalCommitment(require, vm, addFirstDelegatorBlock)
@@ -277,7 +279,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 
 			// trigger block creation for the second add delegator tx
-			addSecondDelegatorBlock, err := vm.BuildBlock()
+			addSecondDelegatorBlock, err := vm.Builder.BuildBlock()
 			require.NoError(err)
 
 			verifyAndAcceptProposalCommitment(require, vm, addSecondDelegatorBlock)
@@ -299,7 +301,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 
 			// trigger block creation for the third add delegator tx
-			addThirdDelegatorBlock, err := vm.BuildBlock()
+			addThirdDelegatorBlock, err := vm.Builder.BuildBlock()
 			require.NoError(err)
 
 			verifyAndAcceptProposalCommitment(require, vm, addThirdDelegatorBlock)
@@ -321,7 +323,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 
 			// trigger block creation for the fourth add delegator tx
-			addFourthDelegatorBlock, err := vm.BuildBlock()
+			addFourthDelegatorBlock, err := vm.Builder.BuildBlock()
 
 			if test.shouldFail {
 				require.Error(err, "should have failed to allow new delegator")
@@ -351,6 +353,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 			MinStakeDuration:       defaultMinStakingDuration,
 			MaxStakeDuration:       defaultMaxStakingDuration,
 			RewardConfig:           defaultRewardConfig,
+			BlueberryTime:          mockable.MaxTime, // Blueberry not yet active
 		},
 	}}
 
@@ -407,7 +410,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	preferred, err := vm.Preferred()
+	preferred, err := vm.Builder.Preferred()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -498,7 +501,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	require.NoError(err)
 
 	// Create the proposal block to add the new validator
-	preferred, err := vm.Preferred()
+	preferred, err := vm.Builder.Preferred()
 	require.NoError(err)
 
 	preferredID := preferred.ID()
@@ -742,7 +745,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require.NoError(err)
 
 	// Create the proposal block to add the first new validator
-	preferred, err := vm.Preferred()
+	preferred, err := vm.Builder.Preferred()
 	require.NoError(err)
 
 	preferredID := preferred.ID()
@@ -1143,7 +1146,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	require.NoError(err)
 
 	// Create the proposal block to add the first new validator
-	preferred, err := vm.Preferred()
+	preferred, err := vm.Builder.Preferred()
 	require.NoError(err)
 
 	preferredID := preferred.ID()
@@ -1177,7 +1180,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 
 	// Create the proposal block that moves the first new validator from the
 	// pending validator set into the current validator set.
-	preferred, err = vm.Preferred()
+	preferred, err = vm.Builder.Preferred()
 	require.NoError(err)
 
 	preferredID = preferred.ID()
@@ -1265,7 +1268,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	require.NoError(err)
 
 	// trigger block creation for the validator tx
-	addValidatorBlock, err := vm.BuildBlock()
+	addValidatorBlock, err := vm.Builder.BuildBlock()
 	require.NoError(err)
 
 	verifyAndAcceptProposalCommitment(require, vm, addValidatorBlock)
@@ -1287,7 +1290,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	require.NoError(err)
 
 	// trigger block creation for the first add delegator tx
-	addFirstDelegatorBlock, err := vm.BuildBlock()
+	addFirstDelegatorBlock, err := vm.Builder.BuildBlock()
 	require.NoError(err)
 
 	verifyAndAcceptProposalCommitment(require, vm, addFirstDelegatorBlock)
@@ -1319,12 +1322,14 @@ func verifyAndAcceptProposalCommitment(require *require.Assertions, vm *VM, blk 
 	require.NoError(err)
 
 	// verify the preferences
-	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
+	commit, ok := options[0].(*blockexecutor.Block)
+	require.True(ok)
+	_, ok = options[0].(*blockexecutor.Block).Block.(*blocks.ApricotCommitBlock)
 	require.True(ok, "expected commit block to be preferred")
 
-	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
+	abort, ok := options[1].(*blockexecutor.Block)
+	require.True(ok)
+	_, ok = options[1].(*blockexecutor.Block).Block.(*blocks.ApricotAbortBlock)
 	require.True(ok, "expected abort block to be issued")
 
 	// Verify the options

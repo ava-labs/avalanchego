@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/forks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -160,6 +161,20 @@ func (b *builder) BuildBlock() (snowman.Block, error) {
 	ctx := b.txExecutorBackend.Ctx
 	ctx.Log.Debug("starting to attempt to build a block")
 
+	statelessBlk, err := b.buildBlock()
+	if err != nil {
+		return nil, err
+	}
+	txs := statelessBlk.Txs()
+	// remove selected txs from mempool only when we are sure
+	// a valid block containing it has been generated
+	b.Mempool.Remove(txs)
+	return b.blkManager.NewBlock(statelessBlk), nil
+}
+
+// Returns the block we want to build and issue.
+// Only modifies state to remove expired proposal txs.
+func (b *builder) buildBlock() (blocks.Block, error) {
 	// Get the block to build on top of and retrieve the new block's context.
 	preferred, err := b.Preferred()
 	if err != nil {
@@ -167,99 +182,32 @@ func (b *builder) BuildBlock() (snowman.Block, error) {
 	}
 	preferredID := preferred.ID()
 	nextHeight := preferred.Height() + 1
+	currentFork := b.blkManager.GetFork(preferredID)
 
 	preferredState, ok := b.blkManager.GetState(preferredID)
 	if !ok {
 		return nil, fmt.Errorf("could not retrieve state for block %s", preferredID)
 	}
 
-	// Try building a standard block.
-	if b.Mempool.HasDecisionTxs() {
-		txs := b.Mempool.PopDecisionTxs(targetBlockSize)
-		statelessBlk, err := blocks.NewApricotStandardBlock(preferredID, nextHeight, txs)
-		if err != nil {
-			return nil, err
-		}
-		return b.blkManager.NewBlock(statelessBlk), nil
-	}
-
-	// Try building a proposal block that rewards a staker.
-	stakerTxID, shouldReward, err := getNextStakerToReward(preferredState)
-	if err != nil {
-		return nil, err
-	}
-	if shouldReward {
-		rewardValidatorTx, err := b.txBuilder.NewRewardValidatorTx(stakerTxID)
-		if err != nil {
-			return nil, err
-		}
-		statelessBlk, err := blocks.NewApricotProposalBlock(
+	// select transactions to include based on the current fork
+	switch currentFork {
+	case forks.Apricot:
+		return buildApricotBlock(
+			b,
 			preferredID,
 			nextHeight,
-			rewardValidatorTx,
+			preferredState,
 		)
-		if err != nil {
-			return nil, err
-		}
-		return b.blkManager.NewBlock(statelessBlk), nil
-	}
-
-	// Try building a proposal block that advances the chain timestamp.
-	nextChainTime, shouldAdvanceTime, err := getNextChainTime(preferredState, b.txExecutorBackend.Clk.Time())
-	if err != nil {
-		return nil, err
-	}
-	if shouldAdvanceTime {
-		advanceTimeTx, err := b.txBuilder.NewAdvanceTimeTx(nextChainTime)
-		if err != nil {
-			return nil, err
-		}
-		statelessBlk, err := blocks.NewApricotProposalBlock(
+	case forks.Blueberry:
+		return buildBlueberryBlock(
+			b,
 			preferredID,
 			nextHeight,
-			advanceTimeTx,
+			preferredState,
 		)
-		if err != nil {
-			return nil, err
-		}
-		return b.blkManager.NewBlock(statelessBlk), nil
+	default:
+		return nil, fmt.Errorf("unsupported fork %s", currentFork)
 	}
-
-	// Clean out the mempool's transactions with invalid timestamps.
-	if hasProposalTxs := b.dropTooEarlyMempoolProposalTxs(); !hasProposalTxs {
-		ctx.Log.Debug("no pending blocks to build")
-		return nil, errNoPendingBlocks
-	}
-
-	// Get the proposal transaction that should be issued.
-	tx := b.Mempool.PopProposalTx()
-	startTime := tx.Unsigned.(txs.StakerTx).StartTime()
-
-	// If the chain timestamp is too far in the past to issue this transaction
-	// but according to local time, it's ready to be issued, then attempt to
-	// advance the timestamp, so it can be issued.
-	maxChainStartTime := preferredState.GetTimestamp().Add(txexecutor.MaxFutureStartTime)
-	if startTime.After(maxChainStartTime) {
-		if err := b.Mempool.Add(tx); err != nil {
-			return nil, err
-		}
-
-		advanceTimeTx, err := b.txBuilder.NewAdvanceTimeTx(b.txExecutorBackend.Clk.Time())
-		if err != nil {
-			return nil, err
-		}
-		statelessBlk, err := blocks.NewApricotProposalBlock(preferredID, nextHeight, advanceTimeTx)
-		if err != nil {
-			return nil, err
-		}
-		return b.blkManager.NewBlock(statelessBlk), nil
-	}
-
-	statelessBlk, err := blocks.NewApricotProposalBlock(preferredID, nextHeight, tx)
-	if err != nil {
-		return nil, err
-	}
-	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
 func (b *builder) Shutdown() {
@@ -309,13 +257,11 @@ func getNextStakerToReward(preferredState state.Chain) (ids.ID, bool, error) {
 	return ids.Empty, false, nil
 }
 
-// dropTooEarlyMempoolProposalTxs drops mempool's validators whose start time is
-// too close in the future i.e. within local time plus Delta.
-// dropTooEarlyMempoolProposalTxs makes sure that mempool's top proposal tx has
-// a valid starting time but does not necessarily remove all txs since
-// popped txs are not necessarily ordered by start time.
-// Returns true/false if mempool is non-empty/empty following cleanup.
-func (b *builder) dropTooEarlyMempoolProposalTxs() bool {
+// dropExpiredProposalTxs drops add validator/delegator transactions in the mempool
+// whose start time is not sufficiently far in the future
+// (i.e. within local time plus [MaxFutureStartFrom]).
+// Guarantees that [PeekProposalTx] will return a valid tx after calling.
+func (b *builder) dropExpiredProposalTxs() {
 	ctx := b.txExecutorBackend.Ctx
 	now := b.txExecutorBackend.Clk.Time()
 	syncTime := now.Add(txexecutor.SyncBound)
@@ -325,7 +271,7 @@ func (b *builder) dropTooEarlyMempoolProposalTxs() bool {
 		if !startTime.Before(syncTime) {
 			// The next proposal tx in the mempool starts
 			// sufficiently far in the future.
-			return true
+			return
 		}
 
 		txID := tx.ID()
@@ -342,7 +288,6 @@ func (b *builder) dropTooEarlyMempoolProposalTxs() bool {
 			zap.Stringer("txID", txID),
 		)
 	}
-	return false
 }
 
 func (b *builder) setNextBuildBlockTime() {
@@ -360,12 +305,13 @@ func (b *builder) setNextBuildBlockTime() {
 		return
 	}
 
-	// If there is a pending transaction trigger building of a block with that transaction
-	if b.Mempool.HasDecisionTxs() {
+	if _, err := b.buildBlock(); err == nil {
+		// We can build a block now
 		b.notifyBlockReady()
 		return
 	}
 
+	// Wake up when it's time to add/remove the next validator/delegator
 	preferredState, ok := b.blkManager.GetState(b.preferredBlockID)
 	if !ok {
 		// The preferred block should always be a decision block
@@ -376,41 +322,6 @@ func (b *builder) setNextBuildBlockTime() {
 		return
 	}
 
-	_, shouldReward, err := getNextStakerToReward(preferredState)
-	if err != nil {
-		ctx.Log.Error("failed to fetch next staker to reward",
-			zap.Stringer("preferredID", b.preferredBlockID),
-			zap.Stringer("lastAcceptedID", b.blkManager.LastAccepted()),
-			zap.Error(err),
-		)
-		return
-	}
-	if shouldReward {
-		b.notifyBlockReady()
-		return
-	}
-
-	_, shouldAdvanceTime, err := getNextChainTime(preferredState, b.txExecutorBackend.Clk.Time())
-	if err != nil {
-		ctx.Log.Error("failed to fetch next chain time",
-			zap.Stringer("preferredID", b.preferredBlockID),
-			zap.Stringer("lastAcceptedID", b.blkManager.LastAccepted()),
-			zap.Error(err),
-		)
-		return
-	}
-	if shouldAdvanceTime {
-		// time is at or after the time for the next validator to join/leave
-		b.notifyBlockReady() // Should issue a proposal to advance timestamp
-		return
-	}
-
-	if hasProposalTxs := b.dropTooEarlyMempoolProposalTxs(); hasProposalTxs {
-		b.notifyBlockReady() // Should issue a ProposeAddValidator
-		return
-	}
-
-	now := b.txExecutorBackend.Clk.Time()
 	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
 	if err != nil {
 		ctx.Log.Error("couldn't get next staker change time",
@@ -420,6 +331,8 @@ func (b *builder) setNextBuildBlockTime() {
 		)
 		return
 	}
+
+	now := b.txExecutorBackend.Clk.Time()
 	waitTime := nextStakerChangeTime.Sub(now)
 	ctx.Log.Debug("setting next scheduled event",
 		zap.Time("nextEventTime", nextStakerChangeTime),

@@ -29,7 +29,8 @@ type blockState struct {
 	standardBlockState
 	proposalBlockState
 	statelessBlock blocks.Block
-	onAcceptState  state.Diff
+
+	onAcceptState state.Diff
 
 	timestamp      time.Time
 	atomicRequests map[ids.ID]*atomic.Requests

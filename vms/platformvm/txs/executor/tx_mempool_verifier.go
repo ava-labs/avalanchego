@@ -58,13 +58,22 @@ func (v *MempoolTxVerifier) proposalTx(tx txs.StakerTx) error {
 		return errFutureStakeTime
 	}
 
+	onCommitState, err := state.NewDiff(v.ParentID, v.StateVersions)
+	if err != nil {
+		return err
+	}
+	onAbortState, err := state.NewDiff(v.ParentID, v.StateVersions)
+	if err != nil {
+		return err
+	}
+
 	executor := ProposalTxExecutor{
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
 		Backend:       v.Backend,
-		ParentID:      v.ParentID,
-		StateVersions: v.StateVersions,
 		Tx:            v.Tx,
 	}
-	err := tx.Visit(&executor)
+	err = tx.Visit(&executor)
 	// We ignore [errFutureStakeTime] here because an advanceTimeTx will be
 	// issued before this transaction is issued.
 	if errors.Is(err, errFutureStakeTime) {

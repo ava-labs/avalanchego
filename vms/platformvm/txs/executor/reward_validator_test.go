@@ -44,10 +44,20 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	tx, err := env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
 	require.NoError(err)
 
+	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	txExecutor := ProposalTxExecutor{
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
-		ParentID:      lastAcceptedID,
-		StateVersions: env,
 		Tx:            tx,
 	}
 	require.Error(tx.Unsigned.Visit(&txExecutor))
@@ -59,10 +69,20 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	tx, err = env.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
 	require.NoError(err)
 
+	onCommitState, err = state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onAbortState, err = state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	txExecutor = ProposalTxExecutor{
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
-		ParentID:      lastAcceptedID,
-		StateVersions: env,
 		Tx:            tx,
 	}
 	require.Error(tx.Unsigned.Visit(&txExecutor))
@@ -71,15 +91,25 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	tx, err = env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
 	require.NoError(err)
 
+	onCommitState, err = state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onAbortState, err = state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	txExecutor = ProposalTxExecutor{
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
-		ParentID:      lastAcceptedID,
-		StateVersions: env,
 		Tx:            tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&txExecutor))
 
-	onCommitStakerIterator, err := txExecutor.OnCommit.GetCurrentStakerIterator()
+	onCommitStakerIterator, err := txExecutor.OnCommitState.GetCurrentStakerIterator()
 	require.NoError(err)
 	require.True(onCommitStakerIterator.Next())
 
@@ -94,7 +124,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	oldBalance, err := avax.GetBalance(env.state, stakeOwners)
 	require.NoError(err)
 
-	txExecutor.OnCommit.Apply(env.state)
+	txExecutor.OnCommitState.Apply(env.state)
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
@@ -126,10 +156,20 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	tx, err := env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
 	require.NoError(err)
 
+	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	txExecutor := ProposalTxExecutor{
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
-		ParentID:      lastAcceptedID,
-		StateVersions: env,
 		Tx:            tx,
 	}
 	require.Error(tx.Unsigned.Visit(&txExecutor))
@@ -142,9 +182,9 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
-		ParentID:      lastAcceptedID,
-		StateVersions: env,
 		Tx:            tx,
 	}
 	require.Error(tx.Unsigned.Visit(&txExecutor))
@@ -153,15 +193,25 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	tx, err = env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
 	require.NoError(err)
 
+	onCommitState, err = state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onAbortState, err = state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	txExecutor = ProposalTxExecutor{
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
-		ParentID:      lastAcceptedID,
-		StateVersions: env,
 		Tx:            tx,
 	}
 	require.NoError(tx.Unsigned.Visit(&txExecutor))
 
-	onAbortStakerIterator, err := txExecutor.OnAbort.GetCurrentStakerIterator()
+	onAbortStakerIterator, err := txExecutor.OnAbortState.GetCurrentStakerIterator()
 	require.NoError(err)
 	require.True(onAbortStakerIterator.Next())
 
@@ -176,7 +226,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	oldBalance, err := avax.GetBalance(env.state, stakeOwners)
 	require.NoError(err)
 
-	txExecutor.OnAbort.Apply(env.state)
+	txExecutor.OnAbortState.Apply(env.state)
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
@@ -262,10 +312,20 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
 	require.NoError(err)
 
+	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	txExecutor := ProposalTxExecutor{
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
-		ParentID:      lastAcceptedID,
-		StateVersions: env,
 		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
@@ -283,7 +343,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	oldDelBalance, err := avax.GetBalance(env.state, delDestSet)
 	require.NoError(err)
 
-	txExecutor.OnCommit.Apply(env.state)
+	txExecutor.OnCommitState.Apply(env.state)
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
@@ -380,10 +440,20 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
 	require.NoError(err)
 
+	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	txExecutor := ProposalTxExecutor{
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
-		ParentID:      lastAcceptedID,
-		StateVersions: env,
 		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
@@ -401,7 +471,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	oldDelBalance, err := avax.GetBalance(env.state, delDestSet)
 	require.NoError(err)
 
-	txExecutor.OnAbort.Apply(env.state)
+	txExecutor.OnAbortState.Apply(env.state)
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 

@@ -4,10 +4,14 @@
 package executor
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/forks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
@@ -29,6 +33,7 @@ type backend struct {
 	state        state.State
 
 	ctx          *snow.Context
+	cfg          *config.Config
 	bootstrapped *utils.AtomicBool
 }
 
@@ -61,6 +66,50 @@ func (b *backend) LastAccepted() ids.ID {
 	return b.lastAccepted
 }
 
+// GetFork needs the parent's timestamp to carry out its calculations.
+// Verify was already called on the parent (guaranteed by consensus engine).
+// The parent hasn't been rejected (guaranteed by consensus engine).
+// If the parent is accepted, the parent is the most recently
+// accepted block.
+// If the parent hasn't been accepted, the parent is in memory.
+func (b *backend) GetFork(blkID ids.ID) forks.Fork {
+	var parentTimestamp time.Time
+	if parentState, ok := b.blkIDToState[blkID]; ok {
+		parentTimestamp = parentState.timestamp
+	} else {
+		parentTimestamp = b.state.GetTimestamp()
+	}
+
+	forkTime := b.cfg.BlueberryTime
+	if parentTimestamp.Before(forkTime) {
+		return forks.Apricot
+	}
+	return forks.Blueberry
+}
+
 func (b *backend) free(blkID ids.ID) {
 	delete(b.blkIDToState, blkID)
+}
+
+func (b *backend) getTimestamp(block blocks.Block) time.Time {
+	switch blk := block.(type) {
+	case blocks.BlueberryBlock:
+		return blk.Timestamp()
+
+	default:
+		// these are apricot blocks
+		// If this is the last accepted block and the block was loaded from disk
+		// since it was accepted, then the timestamp wouldn't be set correctly. So,
+		// we explicitly return the chain time.
+		// Check if the block is processing.
+		if blkState, ok := b.blkIDToState[blk.ID()]; ok {
+			return blkState.timestamp
+		}
+
+		// The block isn't processing.
+		// According to the snowman.Block interface, the last accepted
+		// block is the only accepted block that must return a correct timestamp,
+		// so we just return the chain time.
+		return b.state.GetTimestamp()
+	}
 }

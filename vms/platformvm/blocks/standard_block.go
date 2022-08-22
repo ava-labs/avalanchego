@@ -5,12 +5,43 @@ package blocks
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ Block = &ApricotStandardBlock{}
+var (
+	_ BlueberryBlock = &BlueberryStandardBlock{}
+	_ Block          = &ApricotStandardBlock{}
+)
+
+type BlueberryStandardBlock struct {
+	Time                 uint64 `serialize:"true" json:"time"`
+	ApricotStandardBlock `serialize:"true"`
+}
+
+func (b *BlueberryStandardBlock) Timestamp() time.Time  { return time.Unix(int64(b.Time), 0) }
+func (b *BlueberryStandardBlock) Visit(v Visitor) error { return v.BlueberryStandardBlock(b) }
+
+func NewBlueberryStandardBlock(
+	timestamp time.Time,
+	parentID ids.ID,
+	height uint64,
+	txes []*txs.Tx,
+) (*BlueberryStandardBlock, error) {
+	blk := &BlueberryStandardBlock{
+		Time: uint64(timestamp.Unix()),
+		ApricotStandardBlock: ApricotStandardBlock{
+			CommonBlock: CommonBlock{
+				PrntID: parentID,
+				Hght:   height,
+			},
+			Transactions: txes,
+		},
+	}
+	return blk, initialize(blk)
+}
 
 type ApricotStandardBlock struct {
 	CommonBlock  `serialize:"true"`

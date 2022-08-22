@@ -44,6 +44,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -328,6 +329,7 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 			RewardConfig:           defaultRewardConfig,
 			ApricotPhase3Time:      defaultValidateEndTime,
 			ApricotPhase5Time:      defaultValidateEndTime,
+			BlueberryTime:          mockable.MaxTime,
 		},
 	}}
 
@@ -372,7 +374,7 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 		panic(err)
 	} else if err := vm.Builder.AddUnverifiedTx(testSubnet1); err != nil {
 		panic(err)
-	} else if blk, err := vm.BuildBlock(); err != nil {
+	} else if blk, err := vm.Builder.BuildBlock(); err != nil {
 		panic(err)
 	} else if err := blk.Verify(); err != nil {
 		panic(err)
@@ -406,6 +408,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 			MinStakeDuration:       defaultMinStakingDuration,
 			MaxStakeDuration:       defaultMaxStakingDuration,
 			RewardConfig:           defaultRewardConfig,
+			BlueberryTime:          mockable.MaxTime,
 		},
 	}}
 
@@ -446,7 +449,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 		panic(err)
 	} else if err := vm.Builder.AddUnverifiedTx(testSubnet1); err != nil {
 		panic(err)
-	} else if blk, err := vm.BuildBlock(); err != nil {
+	} else if blk, err := vm.Builder.BuildBlock(); err != nil {
 		panic(err)
 	} else if err := blk.Verify(); err != nil {
 		panic(err)
@@ -573,7 +576,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	// trigger block creation
 	require.NoError(vm.Builder.AddUnverifiedTx(tx))
 
-	blk, err := vm.BuildBlock()
+	blk, err := vm.Builder.BuildBlock()
 	require.NoError(err)
 
 	require.NoError(blk.Verify())
@@ -631,13 +634,17 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	preferred, err := vm.Preferred()
+	preferred, err := vm.Builder.Preferred()
 	if err != nil {
 		t.Fatal(err)
 	}
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
-	statelessBlk, err := blocks.NewApricotProposalBlock(preferredID, preferredHeight+1, tx)
+	statelessBlk, err := blocks.NewApricotProposalBlock(
+		preferredID,
+		preferredHeight+1,
+		tx,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -655,7 +662,8 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	if err := parsedBlock.Verify(); err == nil {
 		t.Fatalf("Should have errored during verification")
 	}
-	if _, dropped := vm.Builder.GetDropReason(statelessBlk.Tx.ID()); !dropped {
+	txID := statelessBlk.Txs()[0].ID()
+	if _, dropped := vm.Builder.GetDropReason(txID); !dropped {
 		t.Fatal("tx should be in dropped tx cache")
 	}
 }
@@ -691,7 +699,7 @@ func TestAddValidatorReject(t *testing.T) {
 	// trigger block creation
 	require.NoError(vm.Builder.AddUnverifiedTx(tx))
 
-	blk, err := vm.BuildBlock()
+	blk, err := vm.Builder.BuildBlock()
 	require.NoError(err)
 
 	require.NoError(blk.Verify())
@@ -791,7 +799,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	// trigger block creation
 	require.NoError(vm.Builder.AddUnverifiedTx(tx))
 
-	blk, err := vm.BuildBlock()
+	blk, err := vm.Builder.BuildBlock()
 	require.NoError(err)
 
 	require.NoError(blk.Verify())
@@ -864,7 +872,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	// trigger block creation
 	require.NoError(vm.Builder.AddUnverifiedTx(tx))
 
-	blk, err := vm.BuildBlock()
+	blk, err := vm.Builder.BuildBlock()
 	require.NoError(err)
 
 	require.NoError(blk.Verify())
@@ -919,7 +927,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	// Fast forward clock to time for genesis validators to leave
 	vm.clock.Set(defaultValidateEndTime)
 
-	blk, err := vm.BuildBlock() // should contain proposal to advance time
+	blk, err := vm.Builder.BuildBlock() // should contain proposal to advance time
 	require.NoError(err)
 
 	require.NoError(blk.Verify())
@@ -963,7 +971,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	timestamp := vm.state.GetTimestamp()
 	require.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
 
-	blk, err = vm.BuildBlock() // should contain proposal to reward genesis validator
+	blk, err = vm.Builder.BuildBlock() // should contain proposal to reward genesis validator
 	require.NoError(err)
 
 	require.NoError(blk.Verify())
@@ -1018,7 +1026,7 @@ func TestRewardValidatorReject(t *testing.T) {
 	// Fast forward clock to time for genesis validators to leave
 	vm.clock.Set(defaultValidateEndTime)
 
-	blk, err := vm.BuildBlock() // should contain proposal to advance time
+	blk, err := vm.Builder.BuildBlock() // should contain proposal to advance time
 	require.NoError(err)
 	require.NoError(blk.Verify())
 
@@ -1059,7 +1067,7 @@ func TestRewardValidatorReject(t *testing.T) {
 	timestamp := vm.state.GetTimestamp()
 	require.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
 
-	blk, err = vm.BuildBlock() // should contain proposal to reward genesis validator
+	blk, err = vm.Builder.BuildBlock() // should contain proposal to reward genesis validator
 	require.NoError(err)
 
 	require.NoError(blk.Verify())
@@ -1113,7 +1121,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	// Fast forward clock to time for genesis validators to leave
 	vm.clock.Set(defaultValidateEndTime)
 
-	blk, err := vm.BuildBlock() // should contain proposal to advance time
+	blk, err := vm.Builder.BuildBlock() // should contain proposal to advance time
 	require.NoError(err)
 	require.NoError(blk.Verify())
 
@@ -1155,7 +1163,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	require.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
 
 	// should contain proposal to reward genesis validator
-	blk, err = vm.BuildBlock()
+	blk, err = vm.Builder.BuildBlock()
 	require.NoError(err)
 
 	require.NoError(blk.Verify())
@@ -1206,7 +1214,7 @@ func TestUnneededBuildBlock(t *testing.T) {
 		}
 		vm.ctx.Lock.Unlock()
 	}()
-	if _, err := vm.BuildBlock(); err == nil {
+	if _, err := vm.Builder.BuildBlock(); err == nil {
 		t.Fatalf("Should have errored on BuildBlock")
 	}
 }
@@ -1235,7 +1243,7 @@ func TestCreateChain(t *testing.T) {
 		t.Fatal(err)
 	} else if err := vm.Builder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
-	} else if blk, err := vm.BuildBlock(); err != nil { // should contain proposal to create chain
+	} else if blk, err := vm.Builder.BuildBlock(); err != nil { // should contain proposal to create chain
 		t.Fatal(err)
 	} else if err := blk.Verify(); err != nil {
 		t.Fatal(err)
@@ -1293,7 +1301,7 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(vm.Builder.AddUnverifiedTx(createSubnetTx))
 
 	// should contain proposal to create subnet
-	blk, err := vm.BuildBlock()
+	blk, err := vm.Builder.BuildBlock()
 	require.NoError(err)
 
 	require.NoError(blk.Verify())
@@ -1333,7 +1341,7 @@ func TestCreateSubnet(t *testing.T) {
 
 	require.NoError(vm.Builder.AddUnverifiedTx(addValidatorTx))
 
-	blk, err = vm.BuildBlock() // should add validator to the new subnet
+	blk, err = vm.Builder.BuildBlock() // should add validator to the new subnet
 	require.NoError(err)
 
 	require.NoError(blk.Verify())
@@ -1379,7 +1387,7 @@ func TestCreateSubnet(t *testing.T) {
 	// Create a block with an advance time tx that moves validator
 	// from pending to current validator set
 	vm.clock.Set(startTime)
-	blk, err = vm.BuildBlock() // should be advance time tx
+	blk, err = vm.Builder.BuildBlock() // should be advance time tx
 	require.NoError(err)
 
 	require.NoError(blk.Verify())
@@ -1426,7 +1434,7 @@ func TestCreateSubnet(t *testing.T) {
 
 	// fast forward clock to time validator should stop validating
 	vm.clock.Set(endTime)
-	blk, err = vm.BuildBlock() // should be advance time tx
+	blk, err = vm.Builder.BuildBlock() // should be advance time tx
 	require.NoError(err)
 
 	require.NoError(blk.Verify())
@@ -1544,7 +1552,7 @@ func TestAtomicImport(t *testing.T) {
 
 	if err := vm.Builder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
-	} else if blk, err := vm.BuildBlock(); err != nil {
+	} else if blk, err := vm.Builder.BuildBlock(); err != nil {
 		t.Fatal(err)
 	} else if err := blk.Verify(); err != nil {
 		t.Fatal(err)
@@ -1593,7 +1601,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	preferred, err := vm.Preferred()
+	preferred, err := vm.Builder.Preferred()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1654,6 +1662,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 			MinStakeDuration:       defaultMinStakingDuration,
 			MaxStakeDuration:       defaultMaxStakingDuration,
 			RewardConfig:           defaultRewardConfig,
+			BlueberryTime:          mockable.MaxTime,
 		},
 	}}
 	firstVM.clock.Set(defaultGenesisTime)
@@ -1675,7 +1684,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	preferred, err := firstVM.Preferred()
+	preferred, err := firstVM.Builder.Preferred()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1744,6 +1753,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 			MinStakeDuration:       defaultMinStakingDuration,
 			MaxStakeDuration:       defaultMaxStakingDuration,
 			RewardConfig:           defaultRewardConfig,
+			BlueberryTime:          mockable.MaxTime,
 		},
 	}}
 
@@ -1786,6 +1796,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 			MinStakeDuration:       defaultMinStakingDuration,
 			MaxStakeDuration:       defaultMaxStakingDuration,
 			RewardConfig:           defaultRewardConfig,
+			BlueberryTime:          mockable.MaxTime,
 		},
 	}}
 
@@ -1803,7 +1814,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	preferred, err := firstVM.Preferred()
+	preferred, err := firstVM.Builder.Preferred()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1870,6 +1881,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 			MinStakeDuration:       defaultMinStakingDuration,
 			MaxStakeDuration:       defaultMaxStakingDuration,
 			RewardConfig:           defaultRewardConfig,
+			BlueberryTime:          mockable.MaxTime,
 		},
 	}}
 
@@ -1918,6 +1930,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			MinStakeDuration:       defaultMinStakingDuration,
 			MaxStakeDuration:       defaultMaxStakingDuration,
 			RewardConfig:           defaultRewardConfig,
+			BlueberryTime:          mockable.MaxTime,
 		},
 	}}
 
@@ -1933,7 +1946,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	preferred, err := vm.Preferred()
+	preferred, err := vm.Builder.Preferred()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2167,7 +2180,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	preferred, err = vm.Preferred()
+	preferred, err = vm.Builder.Preferred()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2194,7 +2207,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 func TestUnverifiedParent(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 
 	vm := &VM{Factory: Factory{
@@ -2205,6 +2217,7 @@ func TestUnverifiedParent(t *testing.T) {
 			MinStakeDuration:       defaultMinStakingDuration,
 			MaxStakeDuration:       defaultMaxStakingDuration,
 			RewardConfig:           defaultRewardConfig,
+			BlueberryTime:          mockable.MaxTime,
 		},
 	}}
 
@@ -2228,7 +2241,7 @@ func TestUnverifiedParent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	preferred, err := vm.Preferred()
+	preferred, err := vm.Builder.Preferred()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2348,6 +2361,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 			RewardConfig:           defaultRewardConfig,
 			Validators:             validators.NewManager(),
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
+			BlueberryTime:          mockable.MaxTime,
 		},
 	}}
 
@@ -2376,6 +2390,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 			UptimePercentage:       .21,
 			Validators:             validators.NewManager(),
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
+			BlueberryTime:          mockable.MaxTime,
 		},
 	}}
 
@@ -2398,7 +2413,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	secondVM.clock.Set(defaultValidateEndTime)
 	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
 
-	blk, err := secondVM.BuildBlock() // should contain proposal to advance time
+	blk, err := secondVM.Builder.BuildBlock() // should contain proposal to advance time
 	require.NoError(err)
 
 	require.NoError(blk.Verify())
@@ -2442,7 +2457,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	timestamp := secondVM.state.GetTimestamp()
 	require.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
 
-	blk, err = secondVM.BuildBlock() // should contain proposal to reward genesis validator
+	blk, err = secondVM.Builder.BuildBlock() // should contain proposal to reward genesis validator
 	require.NoError(err)
 
 	require.NoError(blk.Verify())
@@ -2500,6 +2515,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 			RewardConfig:           defaultRewardConfig,
 			Validators:             validators.NewManager(),
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
+			BlueberryTime:          mockable.MaxTime,
 		},
 	}}
 
@@ -2524,7 +2540,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	vm.clock.Set(defaultValidateEndTime)
 	vm.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
 
-	blk, err := vm.BuildBlock() // should contain proposal to advance time
+	blk, err := vm.Builder.BuildBlock() // should contain proposal to advance time
 	require.NoError(err)
 
 	require.NoError(blk.Verify())
@@ -2553,7 +2569,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	require.Equal(defaultValidateEndTime.Unix(), timestamp.Unix())
 
 	// should contain proposal to reward genesis validator
-	blk, err = vm.BuildBlock()
+	blk, err = vm.Builder.BuildBlock()
 	require.NoError(err)
 
 	require.NoError(blk.Verify())

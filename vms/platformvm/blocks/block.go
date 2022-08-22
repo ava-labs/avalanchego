@@ -5,10 +5,16 @@ package blocks
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
+
+type BlueberryBlock interface {
+	Block
+	Timestamp() time.Time
+}
 
 // Block defines the common stateless interface for all blocks
 type Block interface {
