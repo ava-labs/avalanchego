@@ -42,11 +42,7 @@ func (v *verifier) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
 		return nil
 	}
 
-	if err := v.commonBlock(b, forks.Blueberry); err != nil {
-		return err
-	}
-
-	if err := v.validateBlueberryOptionsTimestamp(b); err != nil {
+	if err := v.blueberryOption(b); err != nil {
 		return err
 	}
 
@@ -73,11 +69,7 @@ func (v *verifier) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
 		return nil
 	}
 
-	if err := v.commonBlock(b, forks.Blueberry); err != nil {
-		return err
-	}
-
-	if err := v.validateBlueberryOptionsTimestamp(b); err != nil {
+	if err := v.blueberryOption(b); err != nil {
 		return err
 	}
 
@@ -104,15 +96,11 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 		return nil
 	}
 
-	if err := v.commonBlock(b, forks.Blueberry); err != nil {
-		return err
-	}
-
 	if _, ok := b.Tx.Unsigned.(*txs.AdvanceTimeTx); ok {
 		return errAdvanceTimeTxCannotBeIncluded
 	}
 
-	if err := v.validateBlueberryBlocksTimestamp(b); err != nil {
+	if err := v.blueberryNonOption(b); err != nil {
 		return err
 	}
 
@@ -198,11 +186,7 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 		return nil
 	}
 
-	if err := v.commonBlock(b, forks.Blueberry); err != nil {
-		return err
-	}
-
-	if err := v.validateBlueberryBlocksTimestamp(b); err != nil {
+	if err := v.blueberryNonOption(b); err != nil {
 		return err
 	}
 
@@ -539,14 +523,17 @@ func (v *verifier) commonBlock(b blocks.Block, expectedFork forks.Fork) error {
 	}
 
 	// check fork
-	currentFork := v.GetFork(parentID)
-	if currentFork != expectedFork {
+	if currentFork := v.GetFork(parentID); currentFork != expectedFork {
 		return fmt.Errorf("expected fork %d but got %d", expectedFork, currentFork)
 	}
 	return nil
 }
 
-func (v *verifier) validateBlueberryOptionsTimestamp(b blocks.BlueberryBlock) error {
+func (v *verifier) blueberryOption(b blocks.BlueberryBlock) error {
+	if err := v.commonBlock(b, forks.Blueberry); err != nil {
+		return err
+	}
+
 	parentID := b.Parent()
 	parentBlk, err := v.GetBlock(parentID)
 	if err != nil {
@@ -566,7 +553,11 @@ func (v *verifier) validateBlueberryOptionsTimestamp(b blocks.BlueberryBlock) er
 	return nil
 }
 
-func (v *verifier) validateBlueberryBlocksTimestamp(b blocks.BlueberryBlock) error {
+func (v *verifier) blueberryNonOption(b blocks.BlueberryBlock) error {
+	if err := v.commonBlock(b, forks.Blueberry); err != nil {
+		return err
+	}
+
 	parentID := b.Parent()
 	parentBlk, err := v.GetBlock(parentID)
 	if err != nil {
