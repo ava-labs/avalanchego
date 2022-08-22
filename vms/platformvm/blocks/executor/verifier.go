@@ -9,7 +9,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/forks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -29,7 +31,7 @@ var (
 type verifier struct {
 	*backend
 	txExecutorBackend *executor.Backend
-	forkChecker       *forkChecker
+	clk               *mockable.Clock
 }
 
 func (v *verifier) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
@@ -45,6 +47,13 @@ func (v *verifier) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
 	}
 
 	parentID := b.Parent()
+	if err := v.checkFork(parentID, forks.Blueberry); err != nil {
+		return err
+	}
+	if err := v.validateBlueberryOptionsTimestamp(b); err != nil {
+		return err
+	}
+
 	parentState, ok := v.blkIDToState[parentID]
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
@@ -72,6 +81,13 @@ func (v *verifier) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
 	}
 
 	parentID := b.Parent()
+	if err := v.checkFork(parentID, forks.Blueberry); err != nil {
+		return err
+	}
+	if err := v.validateBlueberryOptionsTimestamp(b); err != nil {
+		return err
+	}
+
 	parentState, ok := v.blkIDToState[parentID]
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
@@ -103,6 +119,13 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 	}
 
 	parentID := b.Parent()
+	if err := v.checkFork(parentID, forks.Blueberry); err != nil {
+		return err
+	}
+	if err := v.validateBlueberryBlocksTimestamp(b); err != nil {
+		return err
+	}
+
 	parentState, ok := v.GetState(parentID)
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
@@ -188,12 +211,19 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 		return err
 	}
 
+	parentID := b.Parent()
+	if err := v.checkFork(parentID, forks.Blueberry); err != nil {
+		return err
+	}
+	if err := v.validateBlueberryBlocksTimestamp(b); err != nil {
+		return err
+	}
+
 	blkState := &blockState{
 		statelessBlock: b,
 		atomicRequests: make(map[ids.ID]*atomic.Requests),
 	}
 
-	parentID := b.Parent()
 	parentState, ok := v.GetState(parentID)
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
@@ -328,6 +358,10 @@ func (v *verifier) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 	}
 
 	parentID := b.Parent()
+	if err := v.checkFork(parentID, forks.Apricot); err != nil {
+		return err
+	}
+
 	parentState, ok := v.blkIDToState[parentID]
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
@@ -356,6 +390,10 @@ func (v *verifier) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 	}
 
 	parentID := b.Parent()
+	if err := v.checkFork(parentID, forks.Apricot); err != nil {
+		return err
+	}
+
 	parentState, ok := v.blkIDToState[parentID]
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
@@ -440,6 +478,11 @@ func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 		return err
 	}
 
+	parentID := b.Parent()
+	if err := v.checkFork(parentID, forks.Apricot); err != nil {
+		return err
+	}
+
 	onAcceptState, err := state.NewDiff(b.Parent(), v)
 	if err != nil {
 		return err
@@ -518,8 +561,63 @@ func (v *verifier) commonBlock(b blocks.Block) error {
 		)
 	}
 
-	// check whether block type is allowed in current fork
-	return b.Visit(v.forkChecker)
+	return nil
+}
+
+func (v *verifier) checkFork(parent ids.ID, expectedFork forks.Fork) error {
+	currentFork := v.GetFork(parent)
+	if currentFork != expectedFork {
+		return fmt.Errorf("expected fork %d but got %d", expectedFork, currentFork)
+	}
+	return nil
+}
+
+func (v *verifier) validateBlueberryOptionsTimestamp(b blocks.BlueberryBlock) error {
+	parentID := b.Parent()
+	parentBlk, err := v.GetBlock(parentID)
+	if err != nil {
+		return err
+	}
+	parentBlkTime := v.getTimestamp(parentBlk)
+	blkTime := b.Timestamp()
+
+	if !blkTime.Equal(parentBlkTime) {
+		return fmt.Errorf(
+			"%w parent block timestamp (%s) option block timestamp (%s)",
+			errOptionBlockTimestampNotMatchingParent,
+			parentBlkTime,
+			blkTime,
+		)
+	}
+	return nil
+}
+
+func (v *verifier) validateBlueberryBlocksTimestamp(b blocks.BlueberryBlock) error {
+	parentID := b.Parent()
+	parentBlk, err := v.GetBlock(parentID)
+	if err != nil {
+		return err
+	}
+	parentBlkTime := v.getTimestamp(parentBlk)
+	blkTime := v.getTimestamp(b)
+
+	parentState, ok := v.GetState(parentID)
+	if !ok {
+		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
+	}
+	nextStakerChangeTime, err := executor.GetNextStakerChangeTime(parentState)
+	if err != nil {
+		return fmt.Errorf("could not verify block timestamp: %w", err)
+	}
+	localTime := v.clk.Time()
+
+	return executor.ValidateProposedChainTime(
+		blkTime,
+		parentBlkTime,
+		nextStakerChangeTime,
+		localTime,
+		false, /*enforceStrictness*/
+	)
 }
 
 func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
@@ -535,6 +633,10 @@ func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 	}
 
 	parentID := b.Parent()
+	if err := v.checkFork(parentID, forks.Apricot); err != nil {
+		return err
+	}
+
 	parentState, ok := v.GetState(parentID)
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)

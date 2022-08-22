@@ -51,10 +51,7 @@ func NewManager(
 		verifier: &verifier{
 			backend:           backend,
 			txExecutorBackend: txExecutorBackend,
-			forkChecker: &forkChecker{
-				backend: backend,
-				clk:     txExecutorBackend.Clk,
-			},
+			clk:               txExecutorBackend.Clk,
 		},
 		acceptor: &acceptor{
 			backend:          backend,
