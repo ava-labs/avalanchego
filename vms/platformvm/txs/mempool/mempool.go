@@ -12,8 +12,9 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txheap"
+
+	transactions "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 const (
@@ -31,8 +32,8 @@ const (
 )
 
 var (
-	_ Mempool     = &mempool{}
-	_ txs.Visitor = &mempoolIssuer{}
+	_ Mempool              = &mempool{}
+	_ transactions.Visitor = &mempoolIssuer{}
 
 	errMempoolFull                = errors.New("mempool is full")
 	errCantIssueAdvanceTimeTx     = errors.New("can not issue an advance time tx")
@@ -52,24 +53,32 @@ type Mempool interface {
 	EnableAdding()
 	DisableAdding()
 
-	Add(tx *txs.Tx) error
+	Add(tx *transactions.Tx) error
 	Has(txID ids.ID) bool
-	Get(txID ids.ID) *txs.Tx
-
-	AddDecisionTx(tx *txs.Tx)
-	AddProposalTx(tx *txs.Tx)
+	Get(txID ids.ID) *transactions.Tx
+	Remove(txs []*transactions.Tx)
 
 	HasDecisionTxs() bool
 	HasProposalTx() bool
 
-	RemoveDecisionTxs(txs []*txs.Tx)
-	RemoveProposalTx(tx *txs.Tx)
+	RemoveDecisionTxs(txs []*transactions.Tx)
+	RemoveProposalTx(tx *transactions.Tx)
 
-	PopDecisionTxs(maxTxsBytes int) []*txs.Tx
-	PopProposalTx() *txs.Tx
+	PopDecisionTxs(maxTxsBytes int) []*transactions.Tx
+	PopProposalTx() *transactions.Tx
+
+	// PeekDecisionTxs returns the next decisionTxs
+	// up to maxTxsBytes without removing them from the mempool.
+	// It returns nil if !HasDecisionTxs()
+	PeekDecisionTxs(maxTxsBytes int) []*transactions.Tx
+
+	// PeekProposalTx returns the next proposalTx
+	// without removing it from mempool.
+	// It returns nil if !HasProposalTx()
+	PeekProposalTx() *transactions.Tx
 
 	// Note: dropped txs are added to droppedTxIDs but not
-	// not evicted from unissued decision/proposal txs.
+	// not evicted from unissued decision/proposal transactions.
 	// This allows previously dropped txs to be possibly
 	// reissued.
 	MarkDropped(txID ids.ID, reason string)
@@ -156,7 +165,7 @@ func NewMempool(
 func (m *mempool) EnableAdding()  { m.dropIncoming = false }
 func (m *mempool) DisableAdding() { m.dropIncoming = true }
 
-func (m *mempool) Add(tx *txs.Tx) error {
+func (m *mempool) Add(tx *transactions.Tx) error {
 	if m.dropIncoming {
 		return fmt.Errorf("tx %s not added because mempool is closed", tx.ID())
 	}
@@ -206,19 +215,32 @@ func (m *mempool) Has(txID ids.ID) bool {
 	return m.Get(txID) != nil
 }
 
-func (m *mempool) Get(txID ids.ID) *txs.Tx {
+func (m *mempool) Get(txID ids.ID) *transactions.Tx {
 	if tx := m.unissuedDecisionTxs.Get(txID); tx != nil {
 		return tx
 	}
 	return m.unissuedProposalTxs.Get(txID)
 }
 
-func (m *mempool) AddDecisionTx(tx *txs.Tx) {
+func (m *mempool) Remove(txs []*transactions.Tx) {
+	for _, tx := range txs {
+		switch tx.Unsigned.(type) {
+		case *transactions.AddValidatorTx, *transactions.AddDelegatorTx, *transactions.AddSubnetValidatorTx:
+			m.RemoveProposalTx(tx)
+		case *transactions.CreateChainTx, *transactions.CreateSubnetTx, *transactions.ImportTx, *transactions.ExportTx:
+			m.RemoveDecisionTxs([]*transactions.Tx{tx})
+		default:
+			// nothing to remove here
+		}
+	}
+}
+
+func (m *mempool) addDecisionTx(tx *transactions.Tx) {
 	m.unissuedDecisionTxs.Add(tx)
 	m.register(tx)
 }
 
-func (m *mempool) AddProposalTx(tx *txs.Tx) {
+func (m *mempool) addProposalTx(tx *transactions.Tx) {
 	m.unissuedProposalTxs.Add(tx)
 	m.register(tx)
 }
@@ -227,7 +249,7 @@ func (m *mempool) HasDecisionTxs() bool { return m.unissuedDecisionTxs.Len() > 0
 
 func (m *mempool) HasProposalTx() bool { return m.unissuedProposalTxs.Len() > 0 }
 
-func (m *mempool) RemoveDecisionTxs(txs []*txs.Tx) {
+func (m *mempool) RemoveDecisionTxs(txs []*transactions.Tx) {
 	for _, tx := range txs {
 		txID := tx.ID()
 		if m.unissuedDecisionTxs.Remove(txID) != nil {
@@ -236,15 +258,15 @@ func (m *mempool) RemoveDecisionTxs(txs []*txs.Tx) {
 	}
 }
 
-func (m *mempool) RemoveProposalTx(tx *txs.Tx) {
+func (m *mempool) RemoveProposalTx(tx *transactions.Tx) {
 	txID := tx.ID()
 	if m.unissuedProposalTxs.Remove(txID) != nil {
 		m.deregister(tx)
 	}
 }
 
-func (m *mempool) PopDecisionTxs(maxTxsBytes int) []*txs.Tx {
-	var txs []*txs.Tx
+func (m *mempool) PopDecisionTxs(maxTxsBytes int) []*transactions.Tx {
+	var txs []*transactions.Tx
 	for m.unissuedDecisionTxs.Len() > 0 {
 		tx := m.unissuedDecisionTxs.Peek()
 		txBytes := tx.Bytes()
@@ -260,7 +282,31 @@ func (m *mempool) PopDecisionTxs(maxTxsBytes int) []*txs.Tx {
 	return txs
 }
 
-func (m *mempool) PopProposalTx() *txs.Tx {
+func (m *mempool) PeekDecisionTxs(maxTxsBytes int) []*transactions.Tx {
+	list := m.unissuedDecisionTxs.List()
+
+	totalBytes, txsToKeep := 0, 0
+	for _, tx := range list {
+		totalBytes += len(tx.Bytes())
+		if totalBytes > maxTxsBytes {
+			break
+		}
+		txsToKeep++
+	}
+
+	list = list[:txsToKeep]
+	return list
+}
+
+func (m *mempool) PeekProposalTx() *transactions.Tx {
+	if m.unissuedProposalTxs.Len() == 0 {
+		return nil
+	}
+
+	return m.unissuedProposalTxs.Peek()
+}
+
+func (m *mempool) PopProposalTx() *transactions.Tx {
 	tx := m.unissuedProposalTxs.RemoveTop()
 	m.deregister(tx)
 	return tx
@@ -278,13 +324,13 @@ func (m *mempool) GetDropReason(txID ids.ID) (string, bool) {
 	return reason.(string), true
 }
 
-func (m *mempool) register(tx *txs.Tx) {
+func (m *mempool) register(tx *transactions.Tx) {
 	txBytes := tx.Bytes()
 	m.bytesAvailable -= len(txBytes)
 	m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
 }
 
-func (m *mempool) deregister(tx *txs.Tx) {
+func (m *mempool) deregister(tx *transactions.Tx) {
 	txBytes := tx.Bytes()
 	m.bytesAvailable += len(txBytes)
 	m.bytesAvailableMetric.Set(float64(m.bytesAvailable))
@@ -295,48 +341,48 @@ func (m *mempool) deregister(tx *txs.Tx) {
 
 type mempoolIssuer struct {
 	m  *mempool
-	tx *txs.Tx
+	tx *transactions.Tx
 }
 
-func (i *mempoolIssuer) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
+func (i *mempoolIssuer) AdvanceTimeTx(tx *transactions.AdvanceTimeTx) error {
 	return errCantIssueAdvanceTimeTx
 }
 
-func (i *mempoolIssuer) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
+func (i *mempoolIssuer) RewardValidatorTx(tx *transactions.RewardValidatorTx) error {
 	return errCantIssueRewardValidatorTx
 }
 
-func (i *mempoolIssuer) AddValidatorTx(*txs.AddValidatorTx) error {
-	i.m.AddProposalTx(i.tx)
+func (i *mempoolIssuer) AddValidatorTx(*transactions.AddValidatorTx) error {
+	i.m.addProposalTx(i.tx)
 	return nil
 }
 
-func (i *mempoolIssuer) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	i.m.AddProposalTx(i.tx)
+func (i *mempoolIssuer) AddSubnetValidatorTx(tx *transactions.AddSubnetValidatorTx) error {
+	i.m.addProposalTx(i.tx)
 	return nil
 }
 
-func (i *mempoolIssuer) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
-	i.m.AddProposalTx(i.tx)
+func (i *mempoolIssuer) AddDelegatorTx(tx *transactions.AddDelegatorTx) error {
+	i.m.addProposalTx(i.tx)
 	return nil
 }
 
-func (i *mempoolIssuer) CreateChainTx(tx *txs.CreateChainTx) error {
-	i.m.AddDecisionTx(i.tx)
+func (i *mempoolIssuer) CreateChainTx(tx *transactions.CreateChainTx) error {
+	i.m.addDecisionTx(i.tx)
 	return nil
 }
 
-func (i *mempoolIssuer) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
-	i.m.AddDecisionTx(i.tx)
+func (i *mempoolIssuer) CreateSubnetTx(tx *transactions.CreateSubnetTx) error {
+	i.m.addDecisionTx(i.tx)
 	return nil
 }
 
-func (i *mempoolIssuer) ImportTx(tx *txs.ImportTx) error {
-	i.m.AddDecisionTx(i.tx)
+func (i *mempoolIssuer) ImportTx(tx *transactions.ImportTx) error {
+	i.m.addDecisionTx(i.tx)
 	return nil
 }
 
-func (i *mempoolIssuer) ExportTx(tx *txs.ExportTx) error {
-	i.m.AddDecisionTx(i.tx)
+func (i *mempoolIssuer) ExportTx(tx *transactions.ExportTx) error {
+	i.m.addDecisionTx(i.tx)
 	return nil
 }

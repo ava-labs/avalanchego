@@ -240,7 +240,9 @@ func (b *builder) BuildBlock() (snowman.Block, error) {
 	// advance the timestamp, so it can be issued.
 	maxChainStartTime := preferredState.GetTimestamp().Add(txexecutor.MaxFutureStartTime)
 	if startTime.After(maxChainStartTime) {
-		b.Mempool.AddProposalTx(tx)
+		if err := b.Mempool.Add(tx); err != nil {
+			return nil, err
+		}
 
 		advanceTimeTx, err := b.txBuilder.NewAdvanceTimeTx(b.txExecutorBackend.Clk.Time())
 		if err != nil {
@@ -318,10 +320,11 @@ func (b *builder) dropTooEarlyMempoolProposalTxs() bool {
 	now := b.txExecutorBackend.Clk.Time()
 	syncTime := now.Add(txexecutor.SyncBound)
 	for b.Mempool.HasProposalTx() {
-		tx := b.Mempool.PopProposalTx()
+		tx := b.Mempool.PeekProposalTx()
 		startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 		if !startTime.Before(syncTime) {
-			b.Mempool.AddProposalTx(tx)
+			// The next proposal tx in the mempool starts
+			// sufficiently far in the future.
 			return true
 		}
 
@@ -332,6 +335,7 @@ func (b *builder) dropTooEarlyMempoolProposalTxs() bool {
 			startTime,
 		)
 
+		b.Mempool.RemoveProposalTx(tx)
 		b.Mempool.MarkDropped(txID, errMsg) // cache tx as dropped
 		ctx.Log.Debug("dropping tx",
 			zap.String("reason", errMsg),
