@@ -83,19 +83,18 @@ func (a *acceptor) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 
 // Note that:
 //
-// * We don't free the proposal block in this method.
-//   It is freed when its child is accepted.
-//   We need to keep this block's state in memory for its child to use.
+//   - We don't free the proposal block in this method.
+//     It is freed when its child is accepted.
+//     We need to keep this block's state in memory for its child to use.
 //
-// * We only update the metrics to reflect this block's
-//   acceptance when its child is accepted.
+//   - We only update the metrics to reflect this block's
+//     acceptance when its child is accepted.
 //
-// * We don't write this block to state here.
-//   That is done when this block's child (a CommitBlock or AbortBlock) is accepted.
-//   We do this so that in the event that the node shuts down, the proposal block
-//   is not written to disk unless its child is.
-//   (The VM's Shutdown method commits the database.)
-//   The snowman.Engine requires that the last committed block is a decision block
+//   - We don't write this block to state here.
+//     That is done when this block's child (a CommitBlock or AbortBlock) is
+//     accepted. We do this so that in the event that the node shuts down, the
+//     proposal block is not written to disk unless its child is.
+//     (The VM's Shutdown method commits the database.)
 func (a *acceptor) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 	blkID := b.ID()
 	a.ctx.Log.Verbo(
@@ -147,7 +146,11 @@ func (a *acceptor) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 
 	// Note that this method writes [batch] to the database.
 	if err := a.ctx.SharedMemory.Apply(blkState.atomicRequests, batch); err != nil {
-		return fmt.Errorf("failed to apply vm's state to shared memory: %w", err)
+		return fmt.Errorf(
+			"failed to apply vm's state to shared memory in block %s: %w",
+			blkID,
+			err,
+		)
 	}
 
 	if onAcceptFunc := blkState.onAcceptFunc; onAcceptFunc != nil {
