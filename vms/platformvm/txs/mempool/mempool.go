@@ -222,15 +222,13 @@ func (m *mempool) Get(txID ids.ID) *txs.Tx {
 }
 
 func (m *mempool) Remove(txsToRemove []*txs.Tx) {
+	remover := &remover{
+		m: m,
+	}
+
 	for _, tx := range txsToRemove {
-		switch tx.Unsigned.(type) {
-		case *txs.AddValidatorTx, *txs.AddDelegatorTx, *txs.AddSubnetValidatorTx:
-			m.RemoveProposalTx(tx)
-		case *txs.CreateChainTx, *txs.CreateSubnetTx, *txs.ImportTx, *txs.ExportTx:
-			m.RemoveDecisionTxs([]*txs.Tx{tx})
-		default:
-			// nothing to remove here
-		}
+		remover.tx = tx
+		_ = tx.Unsigned.Visit(remover)
 	}
 }
 
