@@ -263,9 +263,12 @@ type SendCrossChainAppRequestMsg struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ChainId   []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// The chain to send this request to
+	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// the ID of this request
 	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	Request   []byte `protobuf:"bytes,3,opt,name=request,proto3" json:"request,omitempty"`
+	// The request body
+	Request []byte `protobuf:"bytes,3,opt,name=request,proto3" json:"request,omitempty"`
 }
 
 func (x *SendCrossChainAppRequestMsg) Reset() {
@@ -326,9 +329,12 @@ type SendCrossChainAppResponseMsg struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ChainId   []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// The chain to send this request to
+	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// the ID of this request
 	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	Response  []byte `protobuf:"bytes,3,opt,name=response,proto3" json:"response,omitempty"`
+	// The response body
+	Response []byte `protobuf:"bytes,3,opt,name=response,proto3" json:"response,omitempty"`
 }
 
 func (x *SendCrossChainAppResponseMsg) Reset() {
