@@ -19,28 +19,30 @@ type rejector struct {
 	*backend
 }
 
-func (r *rejector) ProposalBlock(b *blocks.ProposalBlock) error {
+func (r *rejector) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 	return r.rejectBlock(b, "proposal")
 }
 
-func (r *rejector) AtomicBlock(b *blocks.AtomicBlock) error {
+func (r *rejector) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 	return r.rejectBlock(b, "atomic")
 }
 
-func (r *rejector) StandardBlock(b *blocks.StandardBlock) error {
+func (r *rejector) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 	return r.rejectBlock(b, "standard")
 }
 
-func (r *rejector) CommitBlock(b *blocks.CommitBlock) error {
+func (r *rejector) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 	return r.rejectBlock(b, "commit")
 }
 
-func (r *rejector) AbortBlock(b *blocks.AbortBlock) error {
+func (r *rejector) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 	return r.rejectBlock(b, "abort")
 }
 
 func (r *rejector) rejectBlock(b blocks.Block, blockType string) error {
 	blkID := b.ID()
+	defer r.free(blkID)
+
 	r.ctx.Log.Verbo(
 		"rejecting block",
 		zap.String("blockType", blockType),
@@ -61,7 +63,5 @@ func (r *rejector) rejectBlock(b blocks.Block, blockType string) error {
 	}
 
 	r.state.AddStatelessBlock(b, choices.Rejected)
-	err := r.state.Commit()
-	r.free(blkID)
-	return err
+	return r.state.Commit()
 }

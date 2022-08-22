@@ -56,17 +56,17 @@ func newBlockMetric(
 	return blockMetric
 }
 
-func (m *blockMetrics) ProposalBlock(b *blocks.ProposalBlock) error {
+func (m *blockMetrics) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 	m.numProposalBlocks.Inc()
 	return b.Tx.Unsigned.Visit(m.txMetrics)
 }
 
-func (m *blockMetrics) AtomicBlock(b *blocks.AtomicBlock) error {
+func (m *blockMetrics) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 	m.numAtomicBlocks.Inc()
 	return b.Tx.Unsigned.Visit(m.txMetrics)
 }
 
-func (m *blockMetrics) StandardBlock(b *blocks.StandardBlock) error {
+func (m *blockMetrics) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 	m.numStandardBlocks.Inc()
 	for _, tx := range b.Transactions {
 		if err := tx.Unsigned.Visit(m.txMetrics); err != nil {
@@ -76,12 +76,12 @@ func (m *blockMetrics) StandardBlock(b *blocks.StandardBlock) error {
 	return nil
 }
 
-func (m *blockMetrics) CommitBlock(*blocks.CommitBlock) error {
+func (m *blockMetrics) ApricotCommitBlock(*blocks.ApricotCommitBlock) error {
 	m.numCommitBlocks.Inc()
 	return nil
 }
 
-func (m *blockMetrics) AbortBlock(*blocks.AbortBlock) error {
+func (m *blockMetrics) ApricotAbortBlock(*blocks.ApricotAbortBlock) error {
 	m.numAbortBlocks.Inc()
 	return nil
 }

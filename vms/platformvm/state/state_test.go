@@ -310,7 +310,7 @@ func newInitializedState(require *require.Assertions) (State, database.Database)
 		InitialSupply: units.Schmeckle + units.Avax,
 	}
 
-	genesisBlk, err := blocks.NewCommitBlock(genesisBlkID, 0)
+	genesisBlk, err := blocks.NewApricotCommitBlock(genesisBlkID, 0)
 	require.NoError(err)
 	require.NoError(s.(*state).syncGenesis(genesisBlk, genesisState))
 

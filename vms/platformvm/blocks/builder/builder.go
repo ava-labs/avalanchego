@@ -55,7 +55,7 @@ type Builder interface {
 	// next block
 	BuildBlock() (snowman.Block, error)
 
-	// Shutdown cleanly shuts BlockBuilder down
+	// Shutdown cleanly shuts Builder down
 	Shutdown()
 }
 
@@ -147,7 +147,9 @@ func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 	return b.GossipTx(tx)
 }
 
-// BuildBlock builds a block to be added to consensus
+// BuildBlock builds a block to be added to consensus.
+// This method removes the transactions from the returned
+// blocks from the mempool.
 func (b *builder) BuildBlock() (snowman.Block, error) {
 	b.Mempool.DisableAdding()
 	defer func() {
@@ -174,7 +176,7 @@ func (b *builder) BuildBlock() (snowman.Block, error) {
 	// Try building a standard block.
 	if b.Mempool.HasDecisionTxs() {
 		txs := b.Mempool.PopDecisionTxs(targetBlockSize)
-		statelessBlk, err := blocks.NewStandardBlock(preferredID, nextHeight, txs)
+		statelessBlk, err := blocks.NewApricotStandardBlock(preferredID, nextHeight, txs)
 		if err != nil {
 			return nil, err
 		}
@@ -191,7 +193,7 @@ func (b *builder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		statelessBlk, err := blocks.NewProposalBlock(
+		statelessBlk, err := blocks.NewApricotProposalBlock(
 			preferredID,
 			nextHeight,
 			rewardValidatorTx,
@@ -212,7 +214,7 @@ func (b *builder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		statelessBlk, err := blocks.NewProposalBlock(
+		statelessBlk, err := blocks.NewApricotProposalBlock(
 			preferredID,
 			nextHeight,
 			advanceTimeTx,
@@ -238,20 +240,22 @@ func (b *builder) BuildBlock() (snowman.Block, error) {
 	// advance the timestamp, so it can be issued.
 	maxChainStartTime := preferredState.GetTimestamp().Add(txexecutor.MaxFutureStartTime)
 	if startTime.After(maxChainStartTime) {
-		b.Mempool.AddProposalTx(tx)
+		if err := b.Mempool.Add(tx); err != nil {
+			return nil, err
+		}
 
 		advanceTimeTx, err := b.txBuilder.NewAdvanceTimeTx(b.txExecutorBackend.Clk.Time())
 		if err != nil {
 			return nil, err
 		}
-		statelessBlk, err := blocks.NewProposalBlock(preferredID, nextHeight, advanceTimeTx)
+		statelessBlk, err := blocks.NewApricotProposalBlock(preferredID, nextHeight, advanceTimeTx)
 		if err != nil {
 			return nil, err
 		}
 		return b.blkManager.NewBlock(statelessBlk), nil
 	}
 
-	statelessBlk, err := blocks.NewProposalBlock(preferredID, nextHeight, tx)
+	statelessBlk, err := blocks.NewApricotProposalBlock(preferredID, nextHeight, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -328,10 +332,11 @@ func (b *builder) dropTooEarlyMempoolProposalTxs() bool {
 	now := b.txExecutorBackend.Clk.Time()
 	syncTime := now.Add(txexecutor.SyncBound)
 	for b.Mempool.HasProposalTx() {
-		tx := b.Mempool.PopProposalTx()
+		tx := b.Mempool.PeekProposalTx()
 		startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 		if !startTime.Before(syncTime) {
-			b.Mempool.AddProposalTx(tx)
+			// The next proposal tx in the mempool starts
+			// sufficiently far in the future.
 			return true
 		}
 
@@ -342,6 +347,7 @@ func (b *builder) dropTooEarlyMempoolProposalTxs() bool {
 			startTime,
 		)
 
+		b.Mempool.RemoveProposalTx(tx)
 		b.Mempool.MarkDropped(txID, errMsg) // cache tx as dropped
 		ctx.Log.Debug("dropping tx",
 			zap.String("reason", errMsg),

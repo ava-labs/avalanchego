@@ -376,7 +376,7 @@ func TestGetTx(t *testing.T) {
 						t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 					}
 					commit := options[0].(*blockexecutor.Block)
-					if _, ok := commit.Block.(*blocks.CommitBlock); !ok {
+					if _, ok := commit.Block.(*blocks.ApricotCommitBlock); !ok {
 						t.Fatalf("failed test '%s - %s': should prefer to commit", test.description, encoding.String())
 					}
 					if err := commit.Verify(); err != nil {
@@ -803,7 +803,7 @@ func TestGetBlock(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			statelessBlock, err := blocks.NewStandardBlock(
+			statelessBlock, err := blocks.NewApricotStandardBlock(
 				preferred.ID(),
 				preferred.Height()+1,
 				[]*txs.Tx{tx},

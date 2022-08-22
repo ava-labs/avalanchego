@@ -18,8 +18,8 @@ import (
 
 var preFundedKeys = crypto.BuildTestKeys()
 
-func TestStandardBlock(t *testing.T) {
-	// check standard block can be built and parsed
+func TestStandardBlocks(t *testing.T) {
+	// check Apricot standard block can be built and parsed
 	require := require.New(t)
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
 	height := uint64(2022)
@@ -28,31 +28,27 @@ func TestStandardBlock(t *testing.T) {
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
-		standardBlk, err := NewStandardBlock(
-			parentID,
-			height,
-			txs,
-		)
+		apricotStandardBlk, err := NewApricotStandardBlock(parentID, height, txs)
 		require.NoError(err)
 
 		// parse block
-		parsed, err := Parse(cdc, standardBlk.Bytes())
+		parsed, err := Parse(cdc, apricotStandardBlk.Bytes())
 		require.NoError(err)
 
 		// compare content
-		require.Equal(standardBlk.ID(), parsed.ID())
-		require.Equal(standardBlk.Bytes(), parsed.Bytes())
-		require.Equal(standardBlk.Parent(), parsed.Parent())
-		require.Equal(standardBlk.Height(), parsed.Height())
+		require.Equal(apricotStandardBlk.ID(), parsed.ID())
+		require.Equal(apricotStandardBlk.Bytes(), parsed.Bytes())
+		require.Equal(apricotStandardBlk.Parent(), parsed.Parent())
+		require.Equal(apricotStandardBlk.Height(), parsed.Height())
 
-		parsedStandardBlk, ok := parsed.(*StandardBlock)
+		_, ok := parsed.(*ApricotStandardBlock)
 		require.True(ok)
-		require.Equal(txs, parsedStandardBlk.Transactions)
+		require.Equal(txs, parsed.Txs())
 	}
 }
 
-func TestProposalBlock(t *testing.T) {
-	// check proposal block can be built and parsed
+func TestProposalBlocks(t *testing.T) {
+	// check Apricot proposal block can be built and parsed
 	require := require.New(t)
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
 	height := uint64(2022)
@@ -61,7 +57,7 @@ func TestProposalBlock(t *testing.T) {
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
-		proposalBlk, err := NewProposalBlock(
+		apricotProposalBlk, err := NewApricotProposalBlock(
 			parentID,
 			height,
 			tx,
@@ -69,64 +65,64 @@ func TestProposalBlock(t *testing.T) {
 		require.NoError(err)
 
 		// parse block
-		parsed, err := Parse(cdc, proposalBlk.Bytes())
+		parsed, err := Parse(cdc, apricotProposalBlk.Bytes())
 		require.NoError(err)
 
 		// compare content
-		require.Equal(proposalBlk.ID(), parsed.ID())
-		require.Equal(proposalBlk.Bytes(), parsed.Bytes())
-		require.Equal(proposalBlk.Parent(), parsed.Parent())
-		require.Equal(proposalBlk.Height(), parsed.Height())
+		require.Equal(apricotProposalBlk.ID(), parsed.ID())
+		require.Equal(apricotProposalBlk.Bytes(), parsed.Bytes())
+		require.Equal(apricotProposalBlk.Parent(), parsed.Parent())
+		require.Equal(apricotProposalBlk.Height(), parsed.Height())
 
-		parsedProposalBlk, ok := parsed.(*ProposalBlock)
+		parsedApricotProposalBlk, ok := parsed.(*ApricotProposalBlock)
 		require.True(ok)
-		require.Equal(tx, parsedProposalBlk.Tx)
+		require.Equal([]*txs.Tx{tx}, parsedApricotProposalBlk.Txs())
 	}
 }
 
 func TestCommitBlock(t *testing.T) {
-	// check commit block can be built and parsed
+	// check Apricot commit block can be built and parsed
 	require := require.New(t)
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
 	height := uint64(2022)
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
-		commitBlk, err := NewCommitBlock(parentID, height)
+		apricotCommitBlk, err := NewApricotCommitBlock(parentID, height)
 		require.NoError(err)
 
 		// parse block
-		parsed, err := Parse(cdc, commitBlk.Bytes())
+		parsed, err := Parse(cdc, apricotCommitBlk.Bytes())
 		require.NoError(err)
 
 		// compare content
-		require.Equal(commitBlk.ID(), parsed.ID())
-		require.Equal(commitBlk.Bytes(), parsed.Bytes())
-		require.Equal(commitBlk.Parent(), parsed.Parent())
-		require.Equal(commitBlk.Height(), parsed.Height())
+		require.Equal(apricotCommitBlk.ID(), parsed.ID())
+		require.Equal(apricotCommitBlk.Bytes(), parsed.Bytes())
+		require.Equal(apricotCommitBlk.Parent(), parsed.Parent())
+		require.Equal(apricotCommitBlk.Height(), parsed.Height())
 	}
 }
 
 func TestAbortBlock(t *testing.T) {
-	// check abort block can be built and parsed
+	// check Apricot abort block can be built and parsed
 	require := require.New(t)
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
 	height := uint64(2022)
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
-		abortBlk, err := NewAbortBlock(parentID, height)
+		apricotAbortBlk, err := NewApricotAbortBlock(parentID, height)
 		require.NoError(err)
 
 		// parse block
-		parsed, err := Parse(cdc, abortBlk.Bytes())
+		parsed, err := Parse(cdc, apricotAbortBlk.Bytes())
 		require.NoError(err)
 
 		// compare content
-		require.Equal(abortBlk.ID(), parsed.ID())
-		require.Equal(abortBlk.Bytes(), parsed.Bytes())
-		require.Equal(abortBlk.Parent(), parsed.Parent())
-		require.Equal(abortBlk.Height(), parsed.Height())
+		require.Equal(apricotAbortBlk.ID(), parsed.ID())
+		require.Equal(apricotAbortBlk.Bytes(), parsed.Bytes())
+		require.Equal(apricotAbortBlk.Parent(), parsed.Parent())
+		require.Equal(apricotAbortBlk.Height(), parsed.Height())
 	}
 }
 
@@ -140,7 +136,7 @@ func TestAtomicBlock(t *testing.T) {
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
-		atomicBlk, err := NewAtomicBlock(
+		atomicBlk, err := NewApricotAtomicBlock(
 			parentID,
 			height,
 			tx,
@@ -157,9 +153,9 @@ func TestAtomicBlock(t *testing.T) {
 		require.Equal(atomicBlk.Parent(), parsed.Parent())
 		require.Equal(atomicBlk.Height(), parsed.Height())
 
-		parsedAtomicBlk, ok := parsed.(*AtomicBlock)
+		parsedAtomicBlk, ok := parsed.(*ApricotAtomicBlock)
 		require.True(ok)
-		require.Equal(tx, parsedAtomicBlk.Tx)
+		require.Equal([]*txs.Tx{tx}, parsedAtomicBlk.Txs())
 	}
 }
 
@@ -210,7 +206,7 @@ func testAtomicTx() (*txs.Tx, error) {
 
 func testDecisionTxs() ([]*txs.Tx, error) {
 	countTxs := 2
-	txes := make([]*txs.Tx, 0, countTxs)
+	decisionTxs := make([]*txs.Tx, 0, countTxs)
 	for i := 0; i < countTxs; i++ {
 		// Create the tx
 		utx := &txs.CreateChainTx{
@@ -253,9 +249,9 @@ func testDecisionTxs() ([]*txs.Tx, error) {
 		if err != nil {
 			return nil, err
 		}
-		txes = append(txes, tx)
+		decisionTxs = append(decisionTxs, tx)
 	}
-	return txes, nil
+	return decisionTxs, nil
 }
 
 func testProposalTx() (*txs.Tx, error) {

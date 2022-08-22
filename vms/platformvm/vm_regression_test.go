@@ -414,7 +414,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessStandardBlk, err := blocks.NewStandardBlock(
+	statelessStandardBlk, err := blocks.NewApricotStandardBlock(
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{addSubnetTx0},
@@ -424,7 +424,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	}
 	addSubnetBlk0 := vm.manager.NewBlock(statelessStandardBlk)
 
-	statelessStandardBlk, err = blocks.NewStandardBlock(
+	statelessStandardBlk, err = blocks.NewApricotStandardBlock(
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{addSubnetTx1},
@@ -434,7 +434,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	}
 	addSubnetBlk1 := vm.manager.NewBlock(statelessStandardBlk)
 
-	statelessStandardBlk, err = blocks.NewStandardBlock(
+	statelessStandardBlk, err = blocks.NewApricotStandardBlock(
 		addSubnetBlk1.ID(),
 		preferredHeight+2,
 		[]*txs.Tx{addSubnetTx2},
@@ -504,7 +504,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := blocks.NewProposalBlock(
+	statelessBlk, err := blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx,
@@ -578,7 +578,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID = addValidatorProposalCommit.ID()
 	preferredHeight = addValidatorProposalCommit.Height()
 
-	statelessImportBlk, err := blocks.NewStandardBlock(
+	statelessImportBlk, err := blocks.NewApricotStandardBlock(
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{signedImportTx},
@@ -641,7 +641,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID = importBlk.ID()
 	preferredHeight = importBlk.Height()
 
-	statelessAdvanceTimeProposalBlk, err := blocks.NewProposalBlock(
+	statelessAdvanceTimeProposalBlk, err := blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx,
@@ -661,7 +661,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	advanceTimeProposalCommitIntf := advanceTimeProposalOptions[0]
 	advanceTimeProposalCommit, ok := advanceTimeProposalCommitIntf.(*blockexecutor.Block)
 	require.True(ok)
-	_, ok = advanceTimeProposalCommit.Block.(*blocks.CommitBlock)
+	_, ok = advanceTimeProposalCommit.Block.(*blocks.ApricotCommitBlock)
 	require.True(ok)
 
 	err = advanceTimeProposalCommit.Verify()
@@ -748,7 +748,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessAddValidatorProposalBlk0, err := blocks.NewProposalBlock(
+	statelessAddValidatorProposalBlk0, err := blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx0,
@@ -766,7 +766,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	addValidatorProposalCommitIntf0 := addValidatorProposalOptions0[0]
 	addValidatorProposalCommit0, ok := addValidatorProposalCommitIntf0.(*blockexecutor.Block)
 	require.True(ok)
-	_, ok = addValidatorProposalCommit0.Block.(*blocks.CommitBlock)
+	_, ok = addValidatorProposalCommit0.Block.(*blocks.ApricotCommitBlock)
 	require.True(ok)
 
 	err = addValidatorProposalCommit0.Verify()
@@ -792,7 +792,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = addValidatorProposalCommit0.ID()
 	preferredHeight = addValidatorProposalCommit0.Height()
 
-	statelessAdvanceTimeProposalBlk0, err := blocks.NewProposalBlock(
+	statelessAdvanceTimeProposalBlk0, err := blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx0,
@@ -813,7 +813,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	advanceTimeProposalCommitIntf0 := advanceTimeProposalOptions0[0]
 	advanceTimeProposalCommit0, ok := advanceTimeProposalCommitIntf0.(*blockexecutor.Block)
 	require.True(ok)
-	_, ok = advanceTimeProposalCommit0.Block.(*blocks.CommitBlock)
+	_, ok = advanceTimeProposalCommit0.Block.(*blocks.ApricotCommitBlock)
 	require.True(ok)
 
 	err = advanceTimeProposalCommit0.Verify()
@@ -876,7 +876,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = advanceTimeProposalCommit0.ID()
 	preferredHeight = advanceTimeProposalCommit0.Height()
 
-	statelessImportBlk, err := blocks.NewStandardBlock(
+	statelessImportBlk, err := blocks.NewApricotStandardBlock(
 		preferredID,
 		preferredHeight+1,
 		[]*txs.Tx{signedImportTx},
@@ -949,7 +949,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = importBlk.ID()
 	preferredHeight = importBlk.Height()
 
-	statelessAddValidatorProposalBlk1, err := blocks.NewProposalBlock(
+	statelessAddValidatorProposalBlk1, err := blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx1,
@@ -968,7 +968,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	addValidatorProposalCommitIntf1 := addValidatorProposalOptions1[0]
 	addValidatorProposalCommit1, ok := addValidatorProposalCommitIntf1.(*blockexecutor.Block)
 	require.True(ok)
-	_, ok = addValidatorProposalCommit1.Block.(*blocks.CommitBlock)
+	_, ok = addValidatorProposalCommit1.Block.(*blocks.ApricotCommitBlock)
 	require.True(ok)
 
 	err = addValidatorProposalCommit1.Verify()
@@ -994,7 +994,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = addValidatorProposalCommit1.ID()
 	preferredHeight = addValidatorProposalCommit1.Height()
 
-	statelessAdvanceTimeProposalBlk1, err := blocks.NewProposalBlock(
+	statelessAdvanceTimeProposalBlk1, err := blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx1,
@@ -1015,7 +1015,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	advanceTimeProposalCommitIntf1 := advanceTimeProposalOptions1[0]
 	advanceTimeProposalCommit1, ok := advanceTimeProposalCommitIntf1.(*blockexecutor.Block)
 	require.True(ok)
-	_, ok = advanceTimeProposalCommit1.Block.(*blocks.CommitBlock)
+	_, ok = advanceTimeProposalCommit1.Block.(*blocks.ApricotCommitBlock)
 	require.True(ok)
 
 	err = advanceTimeProposalCommit1.Verify()
@@ -1149,7 +1149,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessProposalBlk, err := blocks.NewProposalBlock(
+	statelessProposalBlk, err := blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		addValidatorTx0,
@@ -1183,7 +1183,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	preferredID = preferred.ID()
 	preferredHeight = preferred.Height()
 
-	statelessProposalBlk, err = blocks.NewProposalBlock(
+	statelessProposalBlk, err = blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx0,
@@ -1320,11 +1320,11 @@ func verifyAndAcceptProposalCommitment(require *require.Assertions, vm *VM, blk 
 
 	// verify the preferences
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.CommitBlock)
+	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
 	require.True(ok, "expected commit block to be preferred")
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	require.True(ok, "expected abort block to be issued")
 
 	// Verify the options

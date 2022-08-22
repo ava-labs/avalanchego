@@ -10,35 +10,31 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ Block = &ProposalBlock{}
+var _ Block = &ApricotProposalBlock{}
 
 // As is, this is duplication of atomic block. But let's tolerate some code duplication for now
-type ProposalBlock struct {
+type ApricotProposalBlock struct {
 	CommonBlock `serialize:"true"`
-
-	Tx *txs.Tx `serialize:"true" json:"tx"`
+	Tx          *txs.Tx `serialize:"true" json:"tx"`
 }
 
-func (pb *ProposalBlock) initialize(bytes []byte) error {
-	pb.CommonBlock.initialize(bytes)
-	if err := pb.Tx.Sign(txs.Codec, nil); err != nil {
+func (b *ApricotProposalBlock) initialize(bytes []byte) error {
+	b.CommonBlock.initialize(bytes)
+	if err := b.Tx.Sign(txs.Codec, nil); err != nil {
 		return fmt.Errorf("failed to initialize tx: %w", err)
 	}
 	return nil
 }
 
-func (pb *ProposalBlock) Txs() []*txs.Tx { return []*txs.Tx{pb.Tx} }
+func (b *ApricotProposalBlock) Txs() []*txs.Tx        { return []*txs.Tx{b.Tx} }
+func (b *ApricotProposalBlock) Visit(v Visitor) error { return v.ApricotProposalBlock(b) }
 
-func (pb *ProposalBlock) Visit(v Visitor) error {
-	return v.ProposalBlock(pb)
-}
-
-func NewProposalBlock(
+func NewApricotProposalBlock(
 	parentID ids.ID,
 	height uint64,
 	tx *txs.Tx,
-) (*ProposalBlock, error) {
-	blk := &ProposalBlock{
+) (*ApricotProposalBlock, error) {
+	blk := &ApricotProposalBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
 			Hght:   height,

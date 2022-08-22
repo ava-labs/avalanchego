@@ -67,7 +67,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	// Serialize this block with a dummy tx
 	// and replace it after creation with the mock tx.
 	// TODO allow serialization of mock txs.
-	blk, err := blocks.NewProposalBlock(
+	blk, err := blocks.NewApricotProposalBlock(
 		parentID,
 		2,
 		&txs.Tx{
@@ -87,7 +87,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	onAbortState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 
 	// Visit the block
-	err = verifier.ProposalBlock(blk)
+	err = verifier.ApricotProposalBlock(blk)
 	require.NoError(err)
 	require.Contains(verifier.backend.blkIDToState, blk.ID())
 	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
@@ -97,7 +97,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.ProposalBlock(blk)
+	err = verifier.ApricotProposalBlock(blk)
 	require.NoError(err)
 }
 
@@ -149,7 +149,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	// Serialize this block with a dummy tx and replace it after creation with
 	// the mock tx.
 	// TODO allow serialization of mock txs.
-	blk, err := blocks.NewAtomicBlock(
+	blk, err := blocks.NewApricotAtomicBlock(
 		parentID,
 		2,
 		&txs.Tx{
@@ -169,7 +169,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	onAccept.EXPECT().AddTx(blk.Tx, status.Committed).Times(1)
 	onAccept.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 
-	err = verifier.AtomicBlock(blk)
+	err = verifier.ApricotAtomicBlock(blk)
 	require.NoError(err)
 
 	require.Contains(verifier.backend.blkIDToState, blk.ID())
@@ -180,7 +180,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.AtomicBlock(blk)
+	err = verifier.ApricotAtomicBlock(blk)
 	require.NoError(err)
 }
 
@@ -243,7 +243,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	// Serialize this block with a dummy tx
 	// and replace it after creation with the mock tx.
 	// TODO allow serialization of mock txs.
-	blk, err := blocks.NewStandardBlock(
+	blk, err := blocks.NewApricotStandardBlock(
 		parentID,
 		2,
 		[]*txs.Tx{
@@ -263,7 +263,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	mempool.EXPECT().RemoveDecisionTxs(blk.Transactions).Times(1)
 
-	err = verifier.StandardBlock(blk)
+	err = verifier.ApricotStandardBlock(blk)
 	require.NoError(err)
 
 	// Assert expected state.
@@ -274,7 +274,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.StandardBlock(blk)
+	err = verifier.ApricotStandardBlock(blk)
 	require.NoError(err)
 }
 
@@ -311,7 +311,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 		},
 	}
 
-	blk, err := blocks.NewCommitBlock(
+	blk, err := blocks.NewApricotCommitBlock(
 		parentID,
 		2,
 	)
@@ -325,7 +325,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	)
 
 	// Verify the block.
-	err = verifier.CommitBlock(blk)
+	err = verifier.ApricotCommitBlock(blk)
 	require.NoError(err)
 
 	// Assert expected state.
@@ -335,7 +335,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.CommitBlock(blk)
+	err = verifier.ApricotCommitBlock(blk)
 	require.NoError(err)
 }
 
@@ -372,7 +372,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 		},
 	}
 
-	blk, err := blocks.NewAbortBlock(
+	blk, err := blocks.NewApricotAbortBlock(
 		parentID,
 		2,
 	)
@@ -386,7 +386,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	)
 
 	// Verify the block.
-	err = verifier.AbortBlock(blk)
+	err = verifier.ApricotAbortBlock(blk)
 	require.NoError(err)
 
 	// Assert expected state.
@@ -396,7 +396,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.AbortBlock(blk)
+	err = verifier.ApricotAbortBlock(blk)
 	require.NoError(err)
 }
 
@@ -472,7 +472,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	// Serialize this block with a dummy tx
 	// and replace it after creation with the mock tx.
 	// TODO allow serialization of mock txs.
-	blk, err := blocks.NewStandardBlock(
+	blk, err := blocks.NewApricotStandardBlock(
 		parentID,
 		2,
 		[]*txs.Tx{
@@ -492,7 +492,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	parentState.EXPECT().GetCurrentSupply().Return(uint64(10000)).Times(1)
 	parentStatelessBlk.EXPECT().Parent().Return(grandParentID).Times(1)
 
-	err = verifier.StandardBlock(blk)
+	err = verifier.ApricotStandardBlock(blk)
 	require.ErrorIs(err, errConflictingParentTxs)
 }
 
@@ -529,7 +529,7 @@ func TestVerifierVisitStandardBlockWithProposalBlockParent(t *testing.T) {
 		},
 	}
 
-	blk, err := blocks.NewStandardBlock(
+	blk, err := blocks.NewApricotStandardBlock(
 		parentID,
 		2,
 		[]*txs.Tx{
@@ -543,6 +543,6 @@ func TestVerifierVisitStandardBlockWithProposalBlockParent(t *testing.T) {
 
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 
-	err = verifier.StandardBlock(blk)
+	err = verifier.ApricotStandardBlock(blk)
 	require.ErrorIs(err, state.ErrMissingParentState)
 }

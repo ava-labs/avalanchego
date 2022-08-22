@@ -1,12 +1,10 @@
-# PlatformVM
-
-## Mempool Gossiping
+# Mempool Gossiping
 
 The PlatformVM has a mempool which tracks unconfirmed transactions that are waiting to be issued into blocks. The mempool is volatile, i.e. it does not persist unconfirmed transactions.
 
-In conjunction with the introduction of [Snowman++](../proposervm), the mempool was opened to the network, allowing the gossiping of local transactions as well as the hosting of remote ones.
+In conjunction with the introduction of [Snowman++](../../proposervm), the mempool was opened to the network, allowing the gossiping of local transactions as well as the hosting of remote ones.
 
-### Mempool Gossiping Workflow
+## Mempool Gossiping Workflow
 
 The PlatformVM's mempool performs the following workflow:
 

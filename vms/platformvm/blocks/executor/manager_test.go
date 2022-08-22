@@ -22,7 +22,7 @@ func TestGetBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	statelessBlk, err := blocks.NewCommitBlock(ids.GenerateTestID(), 2)
+	statelessBlk, err := blocks.NewApricotCommitBlock(ids.GenerateTestID() /*parent*/, 2 /*height*/)
 	require.NoError(err)
 	state := state.NewMockState(ctrl)
 	manager := &manager{

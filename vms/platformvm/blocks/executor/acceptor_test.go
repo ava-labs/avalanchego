@@ -35,7 +35,7 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 
 	lastAcceptedID := ids.GenerateTestID()
 
-	blk, err := blocks.NewProposalBlock(
+	blk, err := blocks.NewApricotProposalBlock(
 		lastAcceptedID,
 		1,
 		&txs.Tx{
@@ -65,7 +65,7 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 		recentlyAccepted: nil,
 	}
 
-	err = acceptor.ProposalBlock(blk)
+	err = acceptor.ApricotProposalBlock(blk)
 	require.NoError(err)
 
 	require.Equal(blkID, acceptor.backend.lastAccepted)
@@ -106,7 +106,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 		}),
 	}
 
-	blk, err := blocks.NewAtomicBlock(
+	blk, err := blocks.NewApricotAtomicBlock(
 		parentID,
 		1,
 		&txs.Tx{
@@ -125,7 +125,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	s.EXPECT().SetHeight(blk.Height()).Times(1)
 	s.EXPECT().AddStatelessBlock(blk, choices.Accepted).Times(1)
 
-	err = acceptor.AtomicBlock(blk)
+	err = acceptor.ApricotAtomicBlock(blk)
 	require.Error(err, "should fail because the block isn't in the state map")
 
 	// Set [blk]'s state in the map as though it had been verified.
@@ -159,7 +159,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	onAcceptState.EXPECT().Apply(s).Times(1)
 	sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1)
 
-	err = acceptor.AtomicBlock(blk)
+	err = acceptor.ApricotAtomicBlock(blk)
 	require.NoError(err)
 }
 
@@ -190,7 +190,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 		}),
 	}
 
-	blk, err := blocks.NewStandardBlock(
+	blk, err := blocks.NewApricotStandardBlock(
 		parentID,
 		1,
 		[]*txs.Tx{
@@ -211,7 +211,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	s.EXPECT().SetHeight(blk.Height()).Times(1)
 	s.EXPECT().AddStatelessBlock(blk, choices.Accepted).Times(1)
 
-	err = acceptor.StandardBlock(blk)
+	err = acceptor.ApricotStandardBlock(blk)
 	require.Error(err, "should fail because the block isn't in the state map")
 
 	// Set [blk]'s state in the map as though it had been verified.
@@ -249,7 +249,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	onAcceptState.EXPECT().Apply(s).Times(1)
 	sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1)
 
-	err = acceptor.StandardBlock(blk)
+	err = acceptor.ApricotStandardBlock(blk)
 	require.NoError(err)
 	require.True(calledOnAcceptFunc)
 	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
@@ -283,14 +283,11 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		}),
 	}
 
-	blk, err := blocks.NewCommitBlock(
-		parentID,
-		1,
-	)
+	blk, err := blocks.NewApricotCommitBlock(parentID, 1 /*height*/)
 	require.NoError(err)
-	blkID := blk.ID()
 
-	err = acceptor.CommitBlock(blk)
+	blkID := blk.ID()
+	err = acceptor.ApricotCommitBlock(blk)
 	require.Error(err, "should fail because the block isn't in the state map")
 
 	// Set [blk]'s state in the map as though it had been verified.
@@ -343,7 +340,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		s.EXPECT().Commit().Return(nil).Times(1),
 	)
 
-	err = acceptor.CommitBlock(blk)
+	err = acceptor.ApricotCommitBlock(blk)
 	require.NoError(err)
 	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }
@@ -376,14 +373,11 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 		}),
 	}
 
-	blk, err := blocks.NewAbortBlock(
-		parentID,
-		1,
-	)
+	blk, err := blocks.NewApricotAbortBlock(parentID, 1 /*height*/)
 	require.NoError(err)
-	blkID := blk.ID()
 
-	err = acceptor.AbortBlock(blk)
+	blkID := blk.ID()
+	err = acceptor.ApricotAbortBlock(blk)
 	require.Error(err, "should fail because the block isn't in the state map")
 
 	// Set [blk]'s state in the map as though it had been verified.
@@ -436,7 +430,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 		s.EXPECT().Commit().Return(nil).Times(1),
 	)
 
-	err = acceptor.AbortBlock(blk)
+	err = acceptor.ApricotAbortBlock(blk)
 	require.NoError(err)
 	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }
