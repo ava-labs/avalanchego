@@ -229,12 +229,11 @@ func (v *verifier) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 	}
 
 	parentID := b.Parent()
-	parentState, ok := v.blkIDToState[parentID]
+	onAcceptState, ok := v.GetOnCommitState(parentID)
 	if !ok {
 		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
 	}
 
-	onAcceptState := parentState.onCommitState
 	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
 		timestamp:      onAcceptState.GetTimestamp(),
@@ -256,12 +255,11 @@ func (v *verifier) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 	}
 
 	parentID := b.Parent()
-	parentState, ok := v.blkIDToState[parentID]
+	onAcceptState, ok := v.GetOnAbortState(parentID)
 	if !ok {
 		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
 	}
 
-	onAcceptState := parentState.onAbortState
 	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
 		timestamp:      onAcceptState.GetTimestamp(),
