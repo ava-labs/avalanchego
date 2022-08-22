@@ -42,18 +42,15 @@ func (v *verifier) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
 		return nil
 	}
 
-	if err := v.commonBlock(b); err != nil {
+	if err := v.commonBlock(b, forks.Blueberry); err != nil {
 		return err
 	}
 
-	parentID := b.Parent()
-	if err := v.checkFork(parentID, forks.Blueberry); err != nil {
-		return err
-	}
 	if err := v.validateBlueberryOptionsTimestamp(b); err != nil {
 		return err
 	}
 
+	parentID := b.Parent()
 	parentState, ok := v.blkIDToState[parentID]
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
@@ -76,18 +73,15 @@ func (v *verifier) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
 		return nil
 	}
 
-	if err := v.commonBlock(b); err != nil {
+	if err := v.commonBlock(b, forks.Blueberry); err != nil {
 		return err
 	}
 
-	parentID := b.Parent()
-	if err := v.checkFork(parentID, forks.Blueberry); err != nil {
-		return err
-	}
 	if err := v.validateBlueberryOptionsTimestamp(b); err != nil {
 		return err
 	}
 
+	parentID := b.Parent()
 	parentState, ok := v.blkIDToState[parentID]
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
@@ -110,7 +104,7 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 		return nil
 	}
 
-	if err := v.commonBlock(b); err != nil {
+	if err := v.commonBlock(b, forks.Blueberry); err != nil {
 		return err
 	}
 
@@ -118,14 +112,11 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 		return errAdvanceTimeTxCannotBeIncluded
 	}
 
-	parentID := b.Parent()
-	if err := v.checkFork(parentID, forks.Blueberry); err != nil {
-		return err
-	}
 	if err := v.validateBlueberryBlocksTimestamp(b); err != nil {
 		return err
 	}
 
+	parentID := b.Parent()
 	parentState, ok := v.GetState(parentID)
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
@@ -207,14 +198,10 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 		return nil
 	}
 
-	if err := v.commonBlock(b); err != nil {
+	if err := v.commonBlock(b, forks.Blueberry); err != nil {
 		return err
 	}
 
-	parentID := b.Parent()
-	if err := v.checkFork(parentID, forks.Blueberry); err != nil {
-		return err
-	}
 	if err := v.validateBlueberryBlocksTimestamp(b); err != nil {
 		return err
 	}
@@ -224,6 +211,7 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 		atomicRequests: make(map[ids.ID]*atomic.Requests),
 	}
 
+	parentID := b.Parent()
 	parentState, ok := v.GetState(parentID)
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
@@ -353,15 +341,11 @@ func (v *verifier) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 		return nil
 	}
 
-	if err := v.commonBlock(b); err != nil {
+	if err := v.commonBlock(b, forks.Apricot); err != nil {
 		return err
 	}
 
 	parentID := b.Parent()
-	if err := v.checkFork(parentID, forks.Apricot); err != nil {
-		return err
-	}
-
 	parentState, ok := v.blkIDToState[parentID]
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
@@ -385,15 +369,11 @@ func (v *verifier) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 		return nil
 	}
 
-	if err := v.commonBlock(b); err != nil {
+	if err := v.commonBlock(b, forks.Apricot); err != nil {
 		return fmt.Errorf("couldn't verify common block of %s: %w", blkID, err)
 	}
 
 	parentID := b.Parent()
-	if err := v.checkFork(parentID, forks.Apricot); err != nil {
-		return err
-	}
-
 	parentState, ok := v.blkIDToState[parentID]
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
@@ -417,7 +397,7 @@ func (v *verifier) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 		return nil
 	}
 
-	if err := v.commonBlock(b); err != nil {
+	if err := v.commonBlock(b, forks.Apricot); err != nil {
 		return err
 	}
 
@@ -474,16 +454,12 @@ func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 		atomicRequests: make(map[ids.ID]*atomic.Requests),
 	}
 
-	if err := v.commonBlock(b); err != nil {
+	if err := v.commonBlock(b, forks.Apricot); err != nil {
 		return err
 	}
 
 	parentID := b.Parent()
-	if err := v.checkFork(parentID, forks.Apricot); err != nil {
-		return err
-	}
-
-	onAcceptState, err := state.NewDiff(b.Parent(), v)
+	onAcceptState, err := state.NewDiff(parentID, v)
 	if err != nil {
 		return err
 	}
@@ -546,13 +522,14 @@ func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 	return nil
 }
 
-func (v *verifier) commonBlock(b blocks.Block) error {
+func (v *verifier) commonBlock(b blocks.Block, expectedFork forks.Fork) error {
 	parentID := b.Parent()
 	parent, err := v.GetBlock(parentID)
 	if err != nil {
 		return err
 	}
 
+	// check height
 	if expectedHeight := parent.Height() + 1; expectedHeight != b.Height() {
 		return fmt.Errorf(
 			"expected block to have height %d, but found %d",
@@ -561,11 +538,8 @@ func (v *verifier) commonBlock(b blocks.Block) error {
 		)
 	}
 
-	return nil
-}
-
-func (v *verifier) checkFork(parent ids.ID, expectedFork forks.Fork) error {
-	currentFork := v.GetFork(parent)
+	// check fork
+	currentFork := v.GetFork(parentID)
 	if currentFork != expectedFork {
 		return fmt.Errorf("expected fork %d but got %d", expectedFork, currentFork)
 	}
@@ -628,15 +602,11 @@ func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 		return nil
 	}
 
-	if err := v.commonBlock(b); err != nil {
+	if err := v.commonBlock(b, forks.Apricot); err != nil {
 		return err
 	}
 
 	parentID := b.Parent()
-	if err := v.checkFork(parentID, forks.Apricot); err != nil {
-		return err
-	}
-
 	parentState, ok := v.GetState(parentID)
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
