@@ -20,13 +20,14 @@ type InternalMsgBuilder interface {
 		chainID ids.ID,
 		requestID uint32,
 	) InboundMessage
-	InternalCrossChainAppRequestFailed(
+	InternalFailedCrossChainAppRequest(
+		op Op,
 		nodeID ids.NodeID,
 		sourceChainID ids.ID,
 		destinationChainID ids.ID,
 		requestID uint32,
 	) InboundMessage
-	InboundCrossChainAppRequest(
+	InternalCrossChainAppRequest(
 		nodeID ids.NodeID,
 		sourceChainID ids.ID,
 		destinationChainID ids.ID,
@@ -34,7 +35,7 @@ type InternalMsgBuilder interface {
 		deadline time.Duration,
 		msg []byte,
 	) InboundMessage
-	InboundCrossChainAppResponse(
+	InternalCrossChainAppResponse(
 		nodeID ids.NodeID,
 		sourceChainID ids.ID,
 		destinationChainID ids.ID,
@@ -95,7 +96,40 @@ func (internalMsgBuilder) InternalFailedCrossChainRequest(
 	}
 }
 
-func (internalMsgBuilder) InternalTimeout(nodeID ids.NodeID) InboundMessage {
+func (i internalMsgBuilder) InternalCrossChainAppRequest(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, deadline time.Duration, msg []byte) InboundMessage {
+	received := i.clock.Time()
+
+	return &inboundMessageWithPacker{
+		inboundMessage: inboundMessage{
+			op: CrossChainAppRequest,
+			nodeID: nodeID,
+			expirationTime: received.Add(deadline),
+		},
+		fields: map[Field]interface{}{
+			SourceChainID: sourceChainID[:],
+			ChainID:       destinationChainID[:],
+			RequestID:     requestID,
+			AppBytes:      msg,
+		},
+	}
+}
+
+func (i internalMsgBuilder) InternalCrossChainAppResponse(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, msg []byte) InboundMessage {
+	return &inboundMessageWithPacker{
+		inboundMessage: inboundMessage{
+			op: CrossChainAppResponse,
+			nodeID: nodeID,
+		},
+		fields: map[Field]interface{}{
+			SourceChainID: sourceChainID[:],
+			ChainID:       destinationChainID[:],
+			RequestID:     requestID,
+			AppBytes:      msg,
+		},
+	}
+}
+
+func (i internalMsgBuilder) InternalTimeout(nodeID ids.NodeID) InboundMessage {
 	return &inboundMessageWithPacker{
 		inboundMessage: inboundMessage{
 			op:     Timeout,
