@@ -190,7 +190,7 @@ func (m *mempool) Add(tx *txs.Tx) error {
 		return fmt.Errorf("tx %s conflicts with a transaction in the mempool", txID)
 	}
 
-	if err := tx.Unsigned.Visit(&mempoolIssuer{
+	if err := tx.Unsigned.Visit(&issuer{
 		m:  m,
 		tx: tx,
 	}); err != nil {

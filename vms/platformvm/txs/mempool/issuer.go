@@ -10,56 +10,56 @@ import (
 )
 
 var (
-	_ txs.Visitor = &mempoolIssuer{}
+	_ txs.Visitor = &issuer{}
 
 	errCantIssueAdvanceTimeTx     = errors.New("can not issue an advance time tx")
 	errCantIssueRewardValidatorTx = errors.New("can not issue a reward validator tx")
 )
 
-type mempoolIssuer struct {
+type issuer struct {
 	m  *mempool
 	tx *txs.Tx
 }
 
-func (i *mempoolIssuer) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
+func (i *issuer) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 	return errCantIssueAdvanceTimeTx
 }
 
-func (i *mempoolIssuer) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
+func (i *issuer) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
 	return errCantIssueRewardValidatorTx
 }
 
-func (i *mempoolIssuer) AddValidatorTx(*txs.AddValidatorTx) error {
+func (i *issuer) AddValidatorTx(*txs.AddValidatorTx) error {
 	i.m.addProposalTx(i.tx)
 	return nil
 }
 
-func (i *mempoolIssuer) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
+func (i *issuer) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 	i.m.addProposalTx(i.tx)
 	return nil
 }
 
-func (i *mempoolIssuer) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
+func (i *issuer) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	i.m.addProposalTx(i.tx)
 	return nil
 }
 
-func (i *mempoolIssuer) CreateChainTx(tx *txs.CreateChainTx) error {
+func (i *issuer) CreateChainTx(tx *txs.CreateChainTx) error {
 	i.m.addDecisionTx(i.tx)
 	return nil
 }
 
-func (i *mempoolIssuer) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
+func (i *issuer) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	i.m.addDecisionTx(i.tx)
 	return nil
 }
 
-func (i *mempoolIssuer) ImportTx(tx *txs.ImportTx) error {
+func (i *issuer) ImportTx(tx *txs.ImportTx) error {
 	i.m.addDecisionTx(i.tx)
 	return nil
 }
 
-func (i *mempoolIssuer) ExportTx(tx *txs.ExportTx) error {
+func (i *issuer) ExportTx(tx *txs.ExportTx) error {
 	i.m.addDecisionTx(i.tx)
 	return nil
 }
