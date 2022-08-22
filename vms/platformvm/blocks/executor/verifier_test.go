@@ -536,10 +536,12 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 			require.NoError(err)
 
 			// Set expectations for dependencies.
-			parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1)
+			gomock.InOrder(
+				parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
+				parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1),
+			)
 
-			// TODO ABENEGIA: extendo verifier tests
-			err = verifier.validateBlueberryOptionsTimestamp(statelessAbortBlk)
+			err = statelessAbortBlk.Visit(verifier)
 			require.ErrorIs(err, test.result)
 		})
 	}
@@ -617,8 +619,12 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 			require.NoError(err)
 
 			// Set expectations for dependencies.
-			parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1)
-			err = verifier.validateBlueberryOptionsTimestamp(statelessCommitBlk)
+			gomock.InOrder(
+				parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
+				parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1),
+			)
+
+			err = statelessCommitBlk.Visit(verifier)
 			require.ErrorIs(err, test.result)
 		})
 	}
