@@ -599,7 +599,7 @@ func (v *verifier) validateBlueberryBlocksTimestamp(b blocks.BlueberryBlock) err
 		return err
 	}
 	parentBlkTime := v.getTimestamp(parentBlk)
-	blkTime := v.getTimestamp(b)
+	blkTime := b.Timestamp()
 
 	parentState, ok := v.GetState(parentID)
 	if !ok {
