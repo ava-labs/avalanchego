@@ -283,13 +283,10 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		}),
 	}
 
-	blk, err := blocks.NewApricotCommitBlock(
-		parentID,
-		1,
-	)
+	blk, err := blocks.NewApricotCommitBlock(parentID, 1 /*height*/)
 	require.NoError(err)
-	blkID := blk.ID()
 
+	blkID := blk.ID()
 	err = acceptor.ApricotCommitBlock(blk)
 	require.Error(err, "should fail because the block isn't in the state map")
 
@@ -376,13 +373,10 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 		}),
 	}
 
-	blk, err := blocks.NewApricotAbortBlock(
-		parentID,
-		1,
-	)
+	blk, err := blocks.NewApricotAbortBlock(parentID, 1 /*height*/)
 	require.NoError(err)
-	blkID := blk.ID()
 
+	blkID := blk.ID()
 	err = acceptor.ApricotAbortBlock(blk)
 	require.Error(err, "should fail because the block isn't in the state map")
 

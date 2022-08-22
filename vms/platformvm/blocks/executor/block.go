@@ -40,11 +40,11 @@ func (b *Block) Status() choices.Status {
 	// If this block is an accepted Proposal block with no accepted children, it
 	// will be in [blkIDToState], but we should return accepted, not processing,
 	// so we do this check.
-	if b.manager.backend.lastAccepted == blkID {
+	if b.manager.lastAccepted == blkID {
 		return choices.Accepted
 	}
 	// Check if the block is in memory. If so, it's processing.
-	if _, ok := b.manager.backend.blkIDToState[blkID]; ok {
+	if _, ok := b.manager.blkIDToState[blkID]; ok {
 		return choices.Processing
 	}
 	// Block isn't in memory. Check in the database.
@@ -103,10 +103,11 @@ func (b *Block) Options() ([2]snowman.Block, error) {
 	}
 	abortBlock := b.manager.NewBlock(statelessAbortBlk)
 
-	blkState, ok := b.manager.backend.blkIDToState[blkID]
+	blkState, ok := b.manager.blkIDToState[blkID]
 	if !ok {
 		return [2]snowman.Block{}, fmt.Errorf("block %s state not found", blkID)
 	}
+
 	if blkState.initiallyPreferCommit {
 		return [2]snowman.Block{commitBlock, abortBlock}, nil
 	}
