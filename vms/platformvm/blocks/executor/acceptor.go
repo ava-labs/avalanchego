@@ -30,7 +30,7 @@ func (a *acceptor) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 	parentID := b.Parent()
 	a.ctx.Log.Verbo(
 		"accepting block",
-		zap.String("blockType", "abort"),
+		zap.String("blockType", "apricot abort"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", parentID),
@@ -58,7 +58,7 @@ func (a *acceptor) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 	parentID := b.Parent()
 	a.ctx.Log.Verbo(
 		"accepting block",
-		zap.String("blockType", "commit"),
+		zap.String("blockType", "apricot commit"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", parentID),
@@ -100,7 +100,7 @@ func (a *acceptor) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 	blkID := b.ID()
 	a.ctx.Log.Verbo(
 		"accepting block",
-		zap.String("blockType", "proposal"),
+		zap.String("blockType", "apricot proposal"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),
@@ -117,7 +117,7 @@ func (a *acceptor) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 
 	a.ctx.Log.Verbo(
 		"accepting block",
-		zap.String("blockType", "standard"),
+		zap.String("blockType", "apricot standard"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),
@@ -162,7 +162,7 @@ func (a *acceptor) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 
 	a.ctx.Log.Verbo(
 		"accepting block",
-		zap.String("blockType", "atomic"),
+		zap.String("blockType", "apricot atomic"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),
