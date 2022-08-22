@@ -106,7 +106,7 @@ func (a *acceptor) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 	)
 
 	// See comment for [lastAccepted].
-	a.backend.lastAccepted = b.ID()
+	a.backend.lastAccepted = blkID
 	return nil
 }
 
