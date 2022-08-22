@@ -584,7 +584,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.CommitBlock)
+	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
 	require.True(ok)
 
 	require.NoError(block.Accept())
@@ -637,7 +637,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	}
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
-	statelessBlk, err := blocks.NewProposalBlock(preferredID, preferredHeight+1, tx)
+	statelessBlk, err := blocks.NewApricotProposalBlock(preferredID, preferredHeight+1, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -702,11 +702,11 @@ func TestAddValidatorReject(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.CommitBlock)
+	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
 	require.True(ok)
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	require.True(ok)
 
 	require.NoError(block.Accept())
@@ -802,11 +802,11 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.CommitBlock)
+	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
 	require.True(ok)
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	require.True(ok)
 
 	require.NoError(block.Accept())
@@ -875,11 +875,11 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.CommitBlock)
+	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
 	require.True(ok)
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	require.True(ok)
 
 	require.NoError(block.Accept())
@@ -930,10 +930,10 @@ func TestRewardValidatorAccept(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.CommitBlock)
+	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
 	require.True(ok)
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	require.True(ok)
 
 	require.NoError(block.Accept())
@@ -974,11 +974,11 @@ func TestRewardValidatorAccept(t *testing.T) {
 	require.NoError(err)
 
 	commit = options[0].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.CommitBlock)
+	_, ok = commit.Block.(*blocks.ApricotCommitBlock)
 	require.True(ok)
 
 	abort = options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	require.True(ok)
 
 	require.NoError(block.Accept())
@@ -1028,11 +1028,11 @@ func TestRewardValidatorReject(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.CommitBlock)
+	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
 	require.True(ok)
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	require.True(ok)
 
 	require.NoError(block.Accept())
@@ -1069,11 +1069,11 @@ func TestRewardValidatorReject(t *testing.T) {
 	require.NoError(err)
 
 	commit = options[0].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.CommitBlock)
+	_, ok = commit.Block.(*blocks.ApricotCommitBlock)
 	require.True(ok)
 
 	abort = options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	require.True(ok)
 
 	require.NoError(blk.Accept())
@@ -1123,11 +1123,11 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.CommitBlock)
+	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
 	require.True(ok)
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	require.True(ok)
 
 	require.NoError(block.Accept())
@@ -1165,11 +1165,11 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	require.NoError(err)
 
 	commit = options[0].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.CommitBlock)
+	_, ok = commit.Block.(*blocks.ApricotCommitBlock)
 	require.True(ok)
 
 	abort = options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	require.True(ok)
 
 	require.NoError(blk.Accept())
@@ -1344,11 +1344,11 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.CommitBlock)
+	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
 	require.True(ok)
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	require.True(ok)
 
 	require.NoError(block.Accept())
@@ -1390,11 +1390,11 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(err)
 
 	commit = options[0].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.CommitBlock)
+	_, ok = commit.Block.(*blocks.ApricotCommitBlock)
 	require.True(ok)
 
 	abort = options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	require.True(ok)
 
 	require.NoError(block.Accept())
@@ -1438,11 +1438,11 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(err)
 
 	commit = options[0].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.CommitBlock)
+	_, ok = commit.Block.(*blocks.ApricotCommitBlock)
 	require.True(ok)
 
 	abort = options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	require.True(ok)
 
 	require.NoError(block.Accept())
@@ -1600,7 +1600,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := blocks.NewAtomicBlock(
+	statelessBlk, err := blocks.NewApricotAtomicBlock(
 		preferredID,
 		preferredHeight+1,
 		tx,
@@ -1682,7 +1682,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := blocks.NewProposalBlock(
+	statelessBlk, err := blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		firstAdvanceTimeTx,
@@ -1810,7 +1810,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := blocks.NewProposalBlock(
+	statelessBlk, err := blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		firstAdvanceTimeTx,
@@ -1944,7 +1944,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	statelessBlk, err := blocks.NewProposalBlock(
+	statelessBlk, err := blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		advanceTimeTx,
@@ -2235,7 +2235,7 @@ func TestUnverifiedParent(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := blocks.NewProposalBlock(
+	statelessBlk, err := blocks.NewApricotProposalBlock(
 		preferredID,
 		preferredHeight+1,
 		firstAdvanceTimeTx,
@@ -2261,7 +2261,7 @@ func TestUnverifiedParent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	statelessSecondAdvanceTimeBlk, err := blocks.NewProposalBlock(
+	statelessSecondAdvanceTimeBlk, err := blocks.NewApricotProposalBlock(
 		firstOption.ID(),
 		firstOption.(*blockexecutor.Block).Height()+1,
 		secondAdvanceTimeTx,
@@ -2409,11 +2409,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.CommitBlock)
+	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
 	require.True(ok)
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	require.True(ok)
 
 	require.NoError(block.Accept())
@@ -2452,11 +2452,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require.NoError(err)
 
 	commit = options[1].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.CommitBlock)
+	_, ok = commit.Block.(*blocks.ApricotCommitBlock)
 	require.True(ok)
 
 	abort = options[0].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	require.True(ok)
 
 	require.NoError(blk.Accept())
@@ -2535,11 +2535,11 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.CommitBlock)
+	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
 	require.True(ok)
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	require.True(ok)
 
 	require.NoError(block.Accept())
@@ -2563,11 +2563,11 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	require.NoError(err)
 
 	abort = options[0].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.AbortBlock)
+	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
 	require.True(ok)
 
 	commit = options[1].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.CommitBlock)
+	_, ok = commit.Block.(*blocks.ApricotCommitBlock)
 	require.True(ok)
 
 	require.NoError(blk.Accept())

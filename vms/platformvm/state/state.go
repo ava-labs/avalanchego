@@ -829,7 +829,7 @@ func (s *state) ValidatorSet(subnetID ids.ID) (validators.Set, error) {
 	return vdrs, nil
 }
 
-func (s *state) syncGenesis(genesisBlk *blocks.CommitBlock, genesis *genesis.State) error {
+func (s *state) syncGenesis(genesisBlk *blocks.ApricotCommitBlock, genesis *genesis.State) error {
 	genesisBlkID := genesisBlk.ID()
 	s.SetLastAccepted(genesisBlkID)
 	s.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
@@ -1217,7 +1217,7 @@ func (s *state) init(genesisBytes []byte) error {
 	// genesisBlock.Accept() because then it'd look for genesisBlock's
 	// non-existent parent)
 	genesisID := hashing.ComputeHash256Array(genesisBytes)
-	genesisBlock, err := blocks.NewCommitBlock(
+	genesisBlock, err := blocks.NewApricotCommitBlock(
 		genesisID,
 		0,
 	)

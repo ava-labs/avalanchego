@@ -23,6 +23,8 @@ type Block interface {
 	// Visit calls [visitor] with this block's concrete type
 	Visit(visitor Visitor) error
 
+	// note: initialize does not assume that block transactions
+	// are initialized, and initializes them itself if they aren't.
 	initialize(bytes []byte) error
 }
 

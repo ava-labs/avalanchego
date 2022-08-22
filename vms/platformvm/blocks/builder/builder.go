@@ -174,7 +174,7 @@ func (b *builder) BuildBlock() (snowman.Block, error) {
 	// Try building a standard block.
 	if b.Mempool.HasDecisionTxs() {
 		txs := b.Mempool.PopDecisionTxs(targetBlockSize)
-		statelessBlk, err := blocks.NewStandardBlock(preferredID, nextHeight, txs)
+		statelessBlk, err := blocks.NewApricotStandardBlock(preferredID, nextHeight, txs)
 		if err != nil {
 			return nil, err
 		}
@@ -191,7 +191,7 @@ func (b *builder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		statelessBlk, err := blocks.NewProposalBlock(
+		statelessBlk, err := blocks.NewApricotProposalBlock(
 			preferredID,
 			nextHeight,
 			rewardValidatorTx,
@@ -212,7 +212,7 @@ func (b *builder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		statelessBlk, err := blocks.NewProposalBlock(
+		statelessBlk, err := blocks.NewApricotProposalBlock(
 			preferredID,
 			nextHeight,
 			advanceTimeTx,
@@ -244,14 +244,14 @@ func (b *builder) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		statelessBlk, err := blocks.NewProposalBlock(preferredID, nextHeight, advanceTimeTx)
+		statelessBlk, err := blocks.NewApricotProposalBlock(preferredID, nextHeight, advanceTimeTx)
 		if err != nil {
 			return nil, err
 		}
 		return b.blkManager.NewBlock(statelessBlk), nil
 	}
 
-	statelessBlk, err := blocks.NewProposalBlock(preferredID, nextHeight, tx)
+	statelessBlk, err := blocks.NewApricotProposalBlock(preferredID, nextHeight, tx)
 	if err != nil {
 		return nil, err
 	}

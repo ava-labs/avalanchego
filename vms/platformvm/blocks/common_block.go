@@ -10,8 +10,11 @@ import (
 
 // CommonBlock contains fields and methods common to all blocks in this VM.
 type CommonBlock struct {
-	PrntID ids.ID `serialize:"true" json:"parentID"` // parent's ID
-	Hght   uint64 `serialize:"true" json:"height"`   // This block's height. The genesis block is at height 0.
+	// parent's ID
+	PrntID ids.ID `serialize:"true" json:"parentID"`
+
+	// This block's height. The genesis block is at height 0.
+	Hght uint64 `serialize:"true" json:"height"`
 
 	id    ids.ID
 	bytes []byte

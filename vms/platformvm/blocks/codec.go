@@ -30,7 +30,7 @@ func init() {
 	errs := wrappers.Errs{}
 	for _, c := range []codec.Registry{c, gc} {
 		errs.Add(
-			RegisterBlockTypes(c),
+			RegisterApricotBlockTypes(c),
 			txs.RegisterUnsignedTxsTypes(c),
 		)
 	}
@@ -43,18 +43,18 @@ func init() {
 	}
 }
 
-// RegisterBlockTypes allows registering relevant type of blocks package
+// RegisterApricotBlockTypes allows registering relevant type of blocks package
 // in the right sequence. Following repackaging of platformvm package, a few
 // subpackage-level codecs were introduced, each handling serialization of
 // specific types.
-func RegisterBlockTypes(targetCodec codec.Registry) error {
+func RegisterApricotBlockTypes(targetCodec codec.Registry) error {
 	errs := wrappers.Errs{}
 	errs.Add(
-		targetCodec.RegisterType(&ProposalBlock{}),
-		targetCodec.RegisterType(&AbortBlock{}),
-		targetCodec.RegisterType(&CommitBlock{}),
-		targetCodec.RegisterType(&StandardBlock{}),
-		targetCodec.RegisterType(&AtomicBlock{}),
+		targetCodec.RegisterType(&ApricotProposalBlock{}),
+		targetCodec.RegisterType(&ApricotAbortBlock{}),
+		targetCodec.RegisterType(&ApricotCommitBlock{}),
+		targetCodec.RegisterType(&ApricotStandardBlock{}),
+		targetCodec.RegisterType(&ApricotAtomicBlock{}),
 	)
 	return errs.Err
 }

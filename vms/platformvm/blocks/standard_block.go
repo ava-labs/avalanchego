@@ -10,36 +10,32 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ Block = &StandardBlock{}
+var _ Block = &ApricotStandardBlock{}
 
-type StandardBlock struct {
-	CommonBlock `serialize:"true"`
-
+type ApricotStandardBlock struct {
+	CommonBlock  `serialize:"true"`
 	Transactions []*txs.Tx `serialize:"true" json:"txs"`
 }
 
-func (sb *StandardBlock) initialize(bytes []byte) error {
-	sb.CommonBlock.initialize(bytes)
-	for _, tx := range sb.Transactions {
+func (b *ApricotStandardBlock) initialize(bytes []byte) error {
+	b.CommonBlock.initialize(bytes)
+	for _, tx := range b.Transactions {
 		if err := tx.Sign(txs.Codec, nil); err != nil {
-			return fmt.Errorf("failed to initialize tx: %w", err)
+			return fmt.Errorf("failed to sign block: %w", err)
 		}
 	}
 	return nil
 }
 
-func (sb *StandardBlock) Txs() []*txs.Tx { return sb.Transactions }
+func (b *ApricotStandardBlock) Txs() []*txs.Tx        { return b.Transactions }
+func (b *ApricotStandardBlock) Visit(v Visitor) error { return v.ApricotStandardBlock(b) }
 
-func (sb *StandardBlock) Visit(v Visitor) error {
-	return v.StandardBlock(sb)
-}
-
-func NewStandardBlock(
+func NewApricotStandardBlock(
 	parentID ids.ID,
 	height uint64,
 	txes []*txs.Tx,
-) (*StandardBlock, error) {
-	blk := &StandardBlock{
+) (*ApricotStandardBlock, error) {
+	blk := &ApricotStandardBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
 			Hght:   height,

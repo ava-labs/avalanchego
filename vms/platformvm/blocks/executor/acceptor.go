@@ -35,7 +35,7 @@ type acceptor struct {
 //     child (a CommitBlock or AbortBlock) is accepted. We do this so that in the
 //     event that the node shuts down, the proposal block is not written to disk
 //     unless its child is. (The VM's Shutdown method commits the database.)
-func (a *acceptor) ProposalBlock(b *blocks.ProposalBlock) error {
+func (a *acceptor) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 	blkID := b.ID()
 	a.ctx.Log.Verbo(
 		"accepting block",
@@ -50,7 +50,7 @@ func (a *acceptor) ProposalBlock(b *blocks.ProposalBlock) error {
 	return nil
 }
 
-func (a *acceptor) AtomicBlock(b *blocks.AtomicBlock) error {
+func (a *acceptor) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 	blkID := b.ID()
 	defer a.free(blkID)
 
@@ -96,7 +96,7 @@ func (a *acceptor) AtomicBlock(b *blocks.AtomicBlock) error {
 	return nil
 }
 
-func (a *acceptor) StandardBlock(b *blocks.StandardBlock) error {
+func (a *acceptor) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 	blkID := b.ID()
 	defer a.free(blkID)
 
@@ -141,7 +141,7 @@ func (a *acceptor) StandardBlock(b *blocks.StandardBlock) error {
 	return nil
 }
 
-func (a *acceptor) CommitBlock(b *blocks.CommitBlock) error {
+func (a *acceptor) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 	blkID := b.ID()
 	parentID := b.Parent()
 	a.ctx.Log.Verbo(
@@ -169,7 +169,7 @@ func (a *acceptor) CommitBlock(b *blocks.CommitBlock) error {
 	return a.acceptOptionBlock(b, parentState.statelessBlock)
 }
 
-func (a *acceptor) AbortBlock(b *blocks.AbortBlock) error {
+func (a *acceptor) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 	blkID := b.ID()
 	parentID := b.Parent()
 	a.ctx.Log.Verbo(

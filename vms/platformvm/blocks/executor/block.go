@@ -72,14 +72,14 @@ func (b *Block) Timestamp() time.Time {
 }
 
 func (b *Block) Options() ([2]snowman.Block, error) {
-	if _, ok := b.Block.(*blocks.ProposalBlock); !ok {
+	if _, ok := b.Block.(*blocks.ApricotProposalBlock); !ok {
 		return [2]snowman.Block{}, snowman.ErrNotOracle
 	}
 
 	blkID := b.ID()
 	nextHeight := b.Height() + 1
 
-	statelessCommitBlk, err := blocks.NewCommitBlock(
+	statelessCommitBlk, err := blocks.NewApricotCommitBlock(
 		blkID,
 		nextHeight,
 	)
@@ -91,7 +91,7 @@ func (b *Block) Options() ([2]snowman.Block, error) {
 	}
 	commitBlock := b.manager.NewBlock(statelessCommitBlk)
 
-	statelessAbortBlk, err := blocks.NewAbortBlock(
+	statelessAbortBlk, err := blocks.NewApricotAbortBlock(
 		blkID,
 		nextHeight,
 	)

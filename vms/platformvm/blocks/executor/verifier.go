@@ -29,7 +29,7 @@ type verifier struct {
 	txExecutorBackend *executor.Backend
 }
 
-func (v *verifier) ProposalBlock(b *blocks.ProposalBlock) error {
+func (v *verifier) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {
@@ -76,7 +76,7 @@ func (v *verifier) ProposalBlock(b *blocks.ProposalBlock) error {
 	return nil
 }
 
-func (v *verifier) AtomicBlock(b *blocks.AtomicBlock) error {
+func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {
@@ -137,7 +137,7 @@ func (v *verifier) AtomicBlock(b *blocks.AtomicBlock) error {
 	return nil
 }
 
-func (v *verifier) StandardBlock(b *blocks.StandardBlock) error {
+func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {
@@ -216,7 +216,7 @@ func (v *verifier) StandardBlock(b *blocks.StandardBlock) error {
 	return nil
 }
 
-func (v *verifier) CommitBlock(b *blocks.CommitBlock) error {
+func (v *verifier) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {
@@ -243,7 +243,7 @@ func (v *verifier) CommitBlock(b *blocks.CommitBlock) error {
 	return nil
 }
 
-func (v *verifier) AbortBlock(b *blocks.AbortBlock) error {
+func (v *verifier) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 	blkID := b.ID()
 
 	if _, ok := v.blkIDToState[blkID]; ok {
