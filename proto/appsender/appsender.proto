@@ -44,14 +44,20 @@ message SendAppGossipSpecificMsg {
 }
 
 message SendCrossChainAppRequestMsg {
+  // The chain to send this request to
   bytes chain_id = 1;
+  // the ID of this request
   uint32 request_id = 2;
+  // The request body
   bytes request = 3;
 }
 
 message SendCrossChainAppResponseMsg {
+  // The chain to send this request to
   bytes chain_id = 1;
+  // the ID of this request
   uint32 request_id = 2;
+  // The response body
   bytes response = 3;
 }
 
