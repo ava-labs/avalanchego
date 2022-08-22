@@ -206,7 +206,7 @@ func testAtomicTx() (*txs.Tx, error) {
 
 func testDecisionTxs() ([]*txs.Tx, error) {
 	countTxs := 2
-	testTxs := make([]*txs.Tx, 0, countTxs)
+	decisionTxs := make([]*txs.Tx, 0, countTxs)
 	for i := 0; i < countTxs; i++ {
 		// Create the tx
 		utx := &txs.CreateChainTx{
@@ -249,9 +249,9 @@ func testDecisionTxs() ([]*txs.Tx, error) {
 		if err != nil {
 			return nil, err
 		}
-		testTxs = append(testTxs, tx)
+		decisionTxs = append(decisionTxs, tx)
 	}
-	return testTxs, nil
+	return decisionTxs, nil
 }
 
 func testProposalTx() (*txs.Tx, error) {
