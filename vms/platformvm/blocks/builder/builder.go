@@ -184,7 +184,7 @@ func (b *builder) BuildBlock() (snowman.Block, error) {
 	}
 
 	// Try building a proposal block that rewards a staker.
-	stakerTxID, shouldReward, err := getNextStakerToReward(preferredState)
+	stakerTxID, shouldReward, err := b.getNextStakerToReward(preferredState)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +205,7 @@ func (b *builder) BuildBlock() (snowman.Block, error) {
 	}
 
 	// Try building a proposal block that advances the chain timestamp.
-	nextChainTime, shouldAdvanceTime, err := getNextChainTime(preferredState, b.txExecutorBackend.Clk.Time())
+	nextChainTime, shouldAdvanceTime, err := b.getNextChainTime(preferredState)
 	if err != nil {
 		return nil, err
 	}
@@ -283,7 +283,7 @@ func (b *builder) ResetBlockTimer() {
 // - [txID] of the next staker to reward
 // - [shouldReward] if the txID exists and is ready to be rewarded
 // - [err] if something bad happened
-func getNextStakerToReward(preferredState state.Chain) (ids.ID, bool, error) {
+func (b *builder) getNextStakerToReward(preferredState state.Chain) (ids.ID, bool, error) {
 	currentChainTimestamp := preferredState.GetTimestamp()
 	if !currentChainTimestamp.Before(mockable.MaxTime) {
 		return ids.Empty, false, errEndOfTime
@@ -307,6 +307,18 @@ func getNextStakerToReward(preferredState state.Chain) (ids.ID, bool, error) {
 		}
 	}
 	return ids.Empty, false, nil
+}
+
+// getNextChainTime returns the timestamp for the next chain time and if the
+// local time is >= time of the next staker set change.
+func (b *builder) getNextChainTime(preferredState state.Chain) (time.Time, bool, error) {
+	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
+	if err != nil {
+		return time.Time{}, false, err
+	}
+
+	now := b.txExecutorBackend.Clk.Time()
+	return nextStakerChangeTime, !now.Before(nextStakerChangeTime), nil
 }
 
 // dropTooEarlyMempoolProposalTxs drops mempool's validators whose start time is
@@ -376,7 +388,7 @@ func (b *builder) setNextBuildBlockTime() {
 		return
 	}
 
-	_, shouldReward, err := getNextStakerToReward(preferredState)
+	_, shouldReward, err := b.getNextStakerToReward(preferredState)
 	if err != nil {
 		ctx.Log.Error("failed to fetch next staker to reward",
 			zap.Stringer("preferredID", b.preferredBlockID),
@@ -390,7 +402,7 @@ func (b *builder) setNextBuildBlockTime() {
 		return
 	}
 
-	_, shouldAdvanceTime, err := getNextChainTime(preferredState, b.txExecutorBackend.Clk.Time())
+	_, shouldAdvanceTime, err := b.getNextChainTime(preferredState)
 	if err != nil {
 		ctx.Log.Error("failed to fetch next chain time",
 			zap.Stringer("preferredID", b.preferredBlockID),
@@ -438,15 +450,4 @@ func (b *builder) notifyBlockReady() {
 	default:
 		b.txExecutorBackend.Ctx.Log.Debug("dropping message to consensus engine")
 	}
-}
-
-// getNextChainTime returns the timestamp for the next chain time and if the
-// local time is >= time of the next staker set change.
-func getNextChainTime(preferredState state.Chain, now time.Time) (time.Time, bool, error) {
-	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
-	if err != nil {
-		return time.Time{}, false, err
-	}
-
-	return nextStakerChangeTime, !now.Before(nextStakerChangeTime), nil
 }
