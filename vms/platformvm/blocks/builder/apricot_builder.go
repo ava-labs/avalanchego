@@ -63,6 +63,15 @@ func buildApricotBlock(
 		)
 	}
 
+	// clean out transactions with an invalid timestamp.
+	builder.dropExpiredProposalTxs()
+
+	// Check the mempool
+	if !builder.Mempool.HasProposalTx() {
+		builder.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
+		return nil, errNoPendingBlocks
+	}
+
 	tx, err := nextApricotProposalTx(builder, parentState)
 	if err != nil {
 		return nil, err
@@ -78,14 +87,6 @@ func buildApricotBlock(
 // Try to get/make a proposal tx to put into a block.
 // Returns an error if there's no suitable proposal tx.
 func nextApricotProposalTx(builder *builder, parentState state.Chain) (*txs.Tx, error) {
-	// clean out transactions with an invalid timestamp.
-	builder.dropExpiredProposalTxs()
-
-	// Check the mempool
-	if !builder.Mempool.HasProposalTx() {
-		builder.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
-		return nil, errNoPendingBlocks
-	}
 	tx := builder.Mempool.PeekProposalTx()
 	startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 
