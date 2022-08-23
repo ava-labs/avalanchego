@@ -31,8 +31,8 @@ func buildBlueberryBlock(
 		)
 	}
 
-	// try rewarding stakers whose staking period ends at current chain time.
-	stakerTxID, shouldReward, err := builder.getNextStakerToReward(parentState)
+	// try rewarding stakers whose staking period ends at the new chain time.
+	stakerTxID, shouldReward, err := builder.getNextStakerToReward(timestamp, parentState)
 	if err != nil {
 		return nil, fmt.Errorf("could not find next staker to reward: %w", err)
 	}
@@ -51,7 +51,7 @@ func buildBlueberryBlock(
 	}
 
 	// clean out the mempool's transactions with invalid timestamps.
-	builder.dropExpiredProposalTxs()
+	builder.dropExpiredProposalTxs(timestamp)
 
 	// try including a mempool proposal tx.
 	if builder.Mempool.HasProposalTx() {

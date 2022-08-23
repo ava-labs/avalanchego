@@ -34,7 +34,7 @@ func buildApricotBlock(
 	}
 
 	// try rewarding stakers whose staking period ends at current chain time.
-	stakerTxID, shouldReward, err := builder.getNextStakerToReward(parentState)
+	stakerTxID, shouldReward, err := builder.getNextStakerToReward(parentState.GetTimestamp(), parentState)
 	if err != nil {
 		return nil, fmt.Errorf("could not find next staker to reward: %w", err)
 	}
@@ -66,7 +66,7 @@ func buildApricotBlock(
 	}
 
 	// clean out transactions with an invalid timestamp.
-	builder.dropExpiredProposalTxs()
+	builder.dropExpiredProposalTxs(timestamp)
 
 	// Check the mempool
 	if !builder.Mempool.HasProposalTx() {

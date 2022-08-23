@@ -121,6 +121,7 @@ func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
 func TestGetNextStakerToReward(t *testing.T) {
 	type test struct {
 		name                 string
+		timestamp            time.Time
 		stateF               func(*gomock.Controller) state.Chain
 		expectedTxID         ids.ID
 		expectedShouldReward bool
@@ -133,30 +134,30 @@ func TestGetNextStakerToReward(t *testing.T) {
 	)
 	tests := []test{
 		{
-			name: "end of time",
+			name:      "end of time",
+			timestamp: mockable.MaxTime,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				s := state.NewMockChain(ctrl)
-				s.EXPECT().GetTimestamp().Return(mockable.MaxTime)
-				return s
+				return state.NewMockChain(ctrl)
 			},
 			expectedErr: errEndOfTime,
 		},
 		{
-			name: "no stakers",
+			name:      "no stakers",
+			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
 				currentStakerIter := state.NewMockStakerIterator(ctrl)
 				currentStakerIter.EXPECT().Next().Return(false)
 				currentStakerIter.EXPECT().Release()
 
 				s := state.NewMockChain(ctrl)
-				s.EXPECT().GetTimestamp().Return(now)
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
 
 				return s
 			},
 		},
 		{
-			name: "expired subnet validator/delegator",
+			name:      "expired subnet validator/delegator",
+			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
 				currentStakerIter := state.NewMockStakerIterator(ctrl)
 
@@ -174,14 +175,14 @@ func TestGetNextStakerToReward(t *testing.T) {
 				currentStakerIter.EXPECT().Release()
 
 				s := state.NewMockChain(ctrl)
-				s.EXPECT().GetTimestamp().Return(now)
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
 
 				return s
 			},
 		},
 		{
-			name: "expired primary network validator after subnet expired subnet validator",
+			name:      "expired primary network validator after subnet expired subnet validator",
+			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
 				currentStakerIter := state.NewMockStakerIterator(ctrl)
 
@@ -199,7 +200,6 @@ func TestGetNextStakerToReward(t *testing.T) {
 				currentStakerIter.EXPECT().Release()
 
 				s := state.NewMockChain(ctrl)
-				s.EXPECT().GetTimestamp().Return(now)
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
 
 				return s
@@ -208,7 +208,8 @@ func TestGetNextStakerToReward(t *testing.T) {
 			expectedShouldReward: true,
 		},
 		{
-			name: "expired primary network delegator after subnet expired subnet validator",
+			name:      "expired primary network delegator after subnet expired subnet validator",
+			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
 				currentStakerIter := state.NewMockStakerIterator(ctrl)
 
@@ -226,7 +227,6 @@ func TestGetNextStakerToReward(t *testing.T) {
 				currentStakerIter.EXPECT().Release()
 
 				s := state.NewMockChain(ctrl)
-				s.EXPECT().GetTimestamp().Return(now)
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
 
 				return s
@@ -235,7 +235,8 @@ func TestGetNextStakerToReward(t *testing.T) {
 			expectedShouldReward: true,
 		},
 		{
-			name: "non-expired primary network delegator",
+			name:      "non-expired primary network delegator",
+			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
 				currentStakerIter := state.NewMockStakerIterator(ctrl)
 
@@ -248,7 +249,6 @@ func TestGetNextStakerToReward(t *testing.T) {
 				currentStakerIter.EXPECT().Release()
 
 				s := state.NewMockChain(ctrl)
-				s.EXPECT().GetTimestamp().Return(now)
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
 
 				return s
@@ -257,7 +257,8 @@ func TestGetNextStakerToReward(t *testing.T) {
 			expectedShouldReward: false,
 		},
 		{
-			name: "non-expired primary network validator",
+			name:      "non-expired primary network validator",
+			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
 				currentStakerIter := state.NewMockStakerIterator(ctrl)
 
@@ -270,7 +271,6 @@ func TestGetNextStakerToReward(t *testing.T) {
 				currentStakerIter.EXPECT().Release()
 
 				s := state.NewMockChain(ctrl)
-				s.EXPECT().GetTimestamp().Return(now)
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
 
 				return s
@@ -288,7 +288,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 
 			state := tt.stateF(ctrl)
 			b := builder{}
-			txID, shouldReward, err := b.getNextStakerToReward(state)
+			txID, shouldReward, err := b.getNextStakerToReward(tt.timestamp, state)
 			if tt.expectedErr != nil {
 				require.Equal(tt.expectedErr, err)
 				return

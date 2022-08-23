@@ -238,9 +238,6 @@ func TestBuildBlueberryBlock(t *testing.T) {
 			parentStateF: func(ctrl *gomock.Controller) state.Chain {
 				s := state.NewMockChain(ctrl)
 
-				// Once in [getNextStakerToReward]
-				s.EXPECT().GetTimestamp().Return(parentTimestamp).Times(1)
-
 				// add current validator that ends at [parentTimestamp]
 				// i.e. it should be rewarded
 				currentStakerIter := state.NewMockStakerIterator(ctrl)
@@ -295,9 +292,6 @@ func TestBuildBlueberryBlock(t *testing.T) {
 			parentStateF: func(ctrl *gomock.Controller) state.Chain {
 				s := state.NewMockChain(ctrl)
 
-				// Once in [GetNextStakerChangeTime],
-				s.EXPECT().GetTimestamp().Return(parentTimestamp).Times(1)
-
 				// Handle calls in [getNextStakerToReward]
 				// and [GetNextStakerChangeTime].
 				// Next validator change time is in the future.
@@ -343,9 +337,6 @@ func TestBuildBlueberryBlock(t *testing.T) {
 			forceAdvanceTime: true,
 			parentStateF: func(ctrl *gomock.Controller) state.Chain {
 				s := state.NewMockChain(ctrl)
-
-				// Once in [GetNextStakerChangeTime]
-				s.EXPECT().GetTimestamp().Return(parentTimestamp).Times(1)
 
 				// add current validator that ends at [now] - 1 second.
 				// That is, it ends in the past but after the current chain time.
@@ -403,9 +394,6 @@ func TestBuildBlueberryBlock(t *testing.T) {
 			parentStateF: func(ctrl *gomock.Controller) state.Chain {
 				s := state.NewMockChain(ctrl)
 
-				// Once in [GetNextStakerChangeTime],
-				s.EXPECT().GetTimestamp().Return(parentTimestamp).Times(1)
-
 				// Handle calls in [getNextStakerToReward]
 				// and [GetNextStakerChangeTime].
 				// Next validator change time is in the future.
@@ -459,9 +447,6 @@ func TestBuildBlueberryBlock(t *testing.T) {
 			forceAdvanceTime: true,
 			parentStateF: func(ctrl *gomock.Controller) state.Chain {
 				s := state.NewMockChain(ctrl)
-
-				// Once in [GetNextStakerChangeTime],
-				s.EXPECT().GetTimestamp().Return(parentTimestamp).Times(1)
 
 				// Handle calls in [getNextStakerToReward]
 				// and [GetNextStakerChangeTime].

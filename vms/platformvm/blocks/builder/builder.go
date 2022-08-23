@@ -6,6 +6,7 @@ package builder
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -251,14 +252,18 @@ func (b *builder) ResetBlockTimer() {
 }
 
 // getNextStakerToReward returns the next staker txID to remove from the staking
-// set with a RewardValidatorTx rather than an AdvanceTimeTx.
+// set with a RewardValidatorTx rather than an AdvanceTimeTx. [chainTimestamp]
+// is the timestamp of the chain at the time this validator would be getting
+// removed and is used to calculate [shouldReward].
 // Returns:
 // - [txID] of the next staker to reward
 // - [shouldReward] if the txID exists and is ready to be rewarded
 // - [err] if something bad happened
-func (b *builder) getNextStakerToReward(preferredState state.Chain) (ids.ID, bool, error) {
-	currentChainTimestamp := preferredState.GetTimestamp()
-	if !currentChainTimestamp.Before(mockable.MaxTime) {
+func (b *builder) getNextStakerToReward(
+	chainTimestamp time.Time,
+	preferredState state.Chain,
+) (ids.ID, bool, error) {
+	if !chainTimestamp.Before(mockable.MaxTime) {
 		return ids.Empty, false, errEndOfTime
 	}
 
@@ -276,7 +281,7 @@ func (b *builder) getNextStakerToReward(preferredState state.Chain) (ids.ID, boo
 		// rather than an AdvanceTimeTx.
 		if priority == state.PrimaryNetworkDelegatorCurrentPriority ||
 			priority == state.PrimaryNetworkValidatorCurrentPriority {
-			return currentStaker.TxID, currentChainTimestamp.Equal(currentStaker.EndTime), nil
+			return currentStaker.TxID, chainTimestamp.Equal(currentStaker.EndTime), nil
 		}
 	}
 	return ids.Empty, false, nil
@@ -286,14 +291,12 @@ func (b *builder) getNextStakerToReward(preferredState state.Chain) (ids.ID, boo
 // whose start time is not sufficiently far in the future
 // (i.e. within local time plus [MaxFutureStartFrom]).
 // Guarantees that [PeekProposalTx] will return a valid tx after calling.
-func (b *builder) dropExpiredProposalTxs() {
-	ctx := b.txExecutorBackend.Ctx
-	now := b.txExecutorBackend.Clk.Time()
-	syncTime := now.Add(txexecutor.SyncBound)
+func (b *builder) dropExpiredProposalTxs(timestamp time.Time) {
+	minStartTime := timestamp.Add(txexecutor.SyncBound)
 	for b.Mempool.HasProposalTx() {
 		tx := b.Mempool.PeekProposalTx()
 		startTime := tx.Unsigned.(txs.StakerTx).StartTime()
-		if !startTime.Before(syncTime) {
+		if !startTime.Before(minStartTime) {
 			// The next proposal tx in the mempool starts
 			// sufficiently far in the future.
 			return
@@ -302,13 +305,13 @@ func (b *builder) dropExpiredProposalTxs() {
 		txID := tx.ID()
 		errMsg := fmt.Sprintf(
 			"synchrony bound (%s) is later than staker start time (%s)",
-			syncTime,
+			minStartTime,
 			startTime,
 		)
 
 		b.Mempool.RemoveProposalTx(tx)
 		b.Mempool.MarkDropped(txID, errMsg) // cache tx as dropped
-		ctx.Log.Debug("dropping tx",
+		b.txExecutorBackend.Ctx.Log.Debug("dropping tx",
 			zap.String("reason", errMsg),
 			zap.Stringer("txID", txID),
 		)
