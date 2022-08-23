@@ -64,7 +64,7 @@ type ProposalTxExecutor struct {
 	// reflect changes made to the state if the proposal is aborted.
 	OnAbortState state.Diff
 
-	// outputs populated by this struct's methods.
+	// outputs populated by this struct's methods:
 	//
 	// [PrefersCommit] is true iff this node initially prefers to
 	// commit this block transaction.

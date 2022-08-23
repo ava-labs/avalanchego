@@ -31,12 +31,13 @@ var (
 // it's after [currentChainTime] and before [nextStakerChangeTime]
 // and [now] + [syncBound].
 //
-// -----|--------|---------X------------|----------------------|
-//      ^        ^         ^            ^                      ^
-//      |        |         |            |                      |
-//  now |        |         |   now + syncBound                 |
-//        currentChainTime |                          nextStakerChangeTime
-//                  proposedChainTime
+//	----|--------|---------X------------|----------------------|
+//
+//	    ^        ^         ^            ^                      ^
+//	    |        |         |            |                      |
+//	now |        |         |   now + syncBound                 |
+//	      currentChainTime |                          nextStakerChangeTime
+//	                proposedChainTime
 func ValidateProposedChainTime(
 	proposedChainTime,
 	currentChainTime,
@@ -89,27 +90,26 @@ func ValidateProposedChainTime(
 	return nil
 }
 
-type UpdatedStateData struct {
-	CurrentValidatorsToAdd    []*state.Staker
-	CurrentValidatorsToRemove []*state.Staker
-	PendingValidatorsToRemove []*state.Staker
-	CurrentDelegatorsToAdd    []*state.Staker
-	PendingDelegatorsToRemove []*state.Staker
+type StateChanges struct {
 	Supply                    uint64
+	CurrentValidatorsToAdd    []*state.Staker
+	CurrentDelegatorsToAdd    []*state.Staker
+	PendingValidatorsToRemove []*state.Staker
+	PendingDelegatorsToRemove []*state.Staker
+	CurrentValidatorsToRemove []*state.Staker
 }
 
 // UpdateStakerSet does not modify [parentState].
 // Instead it returns an UpdatedStateData struct with all values modified by
 // the advancing of chain time.
-func UpdateStakerSet(parentState state.Chain, proposedChainTime time.Time, rewards reward.Calculator) (*UpdatedStateData, error) {
-	var (
-		updated = &UpdatedStateData{}
-		err     error
-	)
-	updated.Supply = parentState.GetCurrentSupply()
+func UpdateStakerSet(parentState state.Chain, proposedChainTime time.Time, rewards reward.Calculator) (*StateChanges, error) {
 	pendingStakerIterator, err := parentState.GetPendingStakerIterator()
 	if err != nil {
 		return nil, err
+	}
+
+	changes := &StateChanges{
+		Supply: parentState.GetCurrentSupply(),
 	}
 
 	// Add to the staker set any pending stakers whose start time is at or
@@ -129,9 +129,9 @@ func UpdateStakerSet(parentState state.Chain, proposedChainTime time.Time, rewar
 			potentialReward := rewards.Calculate(
 				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
 				stakerToRemove.Weight,
-				updated.Supply,
+				changes.Supply,
 			)
-			updated.Supply, err = math.Add64(updated.Supply, potentialReward)
+			changes.Supply, err = math.Add64(changes.Supply, potentialReward)
 			if err != nil {
 				pendingStakerIterator.Release()
 				return nil, err
@@ -139,15 +139,15 @@ func UpdateStakerSet(parentState state.Chain, proposedChainTime time.Time, rewar
 
 			stakerToAdd.PotentialReward = potentialReward
 
-			updated.CurrentDelegatorsToAdd = append(updated.CurrentDelegatorsToAdd, &stakerToAdd)
-			updated.PendingDelegatorsToRemove = append(updated.PendingDelegatorsToRemove, stakerToRemove)
+			changes.CurrentDelegatorsToAdd = append(changes.CurrentDelegatorsToAdd, &stakerToAdd)
+			changes.PendingDelegatorsToRemove = append(changes.PendingDelegatorsToRemove, stakerToRemove)
 		case state.PrimaryNetworkValidatorPendingPriority:
 			potentialReward := rewards.Calculate(
 				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
 				stakerToRemove.Weight,
-				updated.Supply,
+				changes.Supply,
 			)
-			updated.Supply, err = math.Add64(updated.Supply, potentialReward)
+			changes.Supply, err = math.Add64(changes.Supply, potentialReward)
 			if err != nil {
 				pendingStakerIterator.Release()
 				return nil, err
@@ -155,16 +155,16 @@ func UpdateStakerSet(parentState state.Chain, proposedChainTime time.Time, rewar
 
 			stakerToAdd.PotentialReward = potentialReward
 
-			updated.CurrentValidatorsToAdd = append(updated.CurrentValidatorsToAdd, &stakerToAdd)
-			updated.PendingValidatorsToRemove = append(updated.PendingValidatorsToRemove, stakerToRemove)
+			changes.CurrentValidatorsToAdd = append(changes.CurrentValidatorsToAdd, &stakerToAdd)
+			changes.PendingValidatorsToRemove = append(changes.PendingValidatorsToRemove, stakerToRemove)
 		case state.SubnetValidatorPendingPriority:
 			// We require that the [txTimestamp] <= [nextStakerChangeTime].
 			// Additionally, the minimum stake duration is > 0. This means we
 			// know that the staker we are adding here should never be attempted
 			// to be removed in the following loop.
 
-			updated.CurrentValidatorsToAdd = append(updated.CurrentValidatorsToAdd, &stakerToAdd)
-			updated.PendingValidatorsToRemove = append(updated.PendingValidatorsToRemove, stakerToRemove)
+			changes.CurrentValidatorsToAdd = append(changes.CurrentValidatorsToAdd, &stakerToAdd)
+			changes.PendingValidatorsToRemove = append(changes.PendingValidatorsToRemove, stakerToRemove)
 		default:
 			pendingStakerIterator.Release()
 			return nil, fmt.Errorf("expected staker priority got %d", stakerToRemove.Priority)
@@ -191,8 +191,8 @@ func UpdateStakerSet(parentState state.Chain, proposedChainTime time.Time, rewar
 			break
 		}
 
-		updated.CurrentValidatorsToRemove = append(updated.CurrentValidatorsToRemove, stakerToRemove)
+		changes.CurrentValidatorsToRemove = append(changes.CurrentValidatorsToRemove, stakerToRemove)
 	}
 	currentStakerIterator.Release()
-	return updated, err
+	return changes, nil
 }
