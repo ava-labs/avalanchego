@@ -35,22 +35,7 @@ func (a *acceptor) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
 		zap.Stringer("parentID", b.Parent()),
 	)
 
-	parentState, ok := a.blkIDToState[b.Parent()]
-	if !ok {
-		return fmt.Errorf("%w: %s", state.ErrMissingParentState, b.Parent())
-	}
-
-	// Update metrics
-	if a.bootstrapped.GetValue() {
-		wasPreferred := parentState.initiallyPreferCommit
-		if !wasPreferred {
-			a.metrics.MarkOptionVoteWon()
-		} else {
-			a.metrics.MarkOptionVoteLost()
-		}
-	}
-
-	return a.optionBlock(b)
+	return a.abortBlock(b)
 }
 
 func (a *acceptor) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
@@ -62,28 +47,10 @@ func (a *acceptor) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
 		zap.Stringer("parentID", b.Parent()),
 	)
 
-	parentState, ok := a.blkIDToState[b.Parent()]
-	if !ok {
-		return fmt.Errorf("%w: %s", state.ErrMissingParentState, b.Parent())
-	}
-
-	// Update metrics
-	if a.bootstrapped.GetValue() {
-		wasPreferred := parentState.initiallyPreferCommit
-		if wasPreferred {
-			a.metrics.MarkOptionVoteWon()
-		} else {
-			a.metrics.MarkOptionVoteLost()
-		}
-	}
-
-	return a.optionBlock(b)
+	return a.commitBlock(b)
 }
 
 func (a *acceptor) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) error {
-	// Blueberry proposal blocks do modify chain state by (possibly) advancing
-	// chain time. We carry out these state changes when accepting the selected child
-	// option, before moving to options.
 	a.ctx.Log.Verbo(
 		"accepting block",
 		zap.String("blockType", "blueberry proposal"),
@@ -117,22 +84,7 @@ func (a *acceptor) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 		zap.Stringer("parentID", b.Parent()),
 	)
 
-	parentState, ok := a.blkIDToState[b.Parent()]
-	if !ok {
-		return fmt.Errorf("%w: %s", state.ErrMissingParentState, b.Parent())
-	}
-
-	// Update metrics
-	if a.bootstrapped.GetValue() {
-		wasPreferred := parentState.initiallyPreferCommit
-		if !wasPreferred {
-			a.metrics.MarkOptionVoteWon()
-		} else {
-			a.metrics.MarkOptionVoteLost()
-		}
-	}
-
-	return a.optionBlock(b)
+	return a.abortBlock(b)
 }
 
 func (a *acceptor) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
@@ -144,22 +96,7 @@ func (a *acceptor) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 		zap.Stringer("parentID", b.Parent()),
 	)
 
-	parentState, ok := a.blkIDToState[b.Parent()]
-	if !ok {
-		return fmt.Errorf("%w: %s", state.ErrMissingParentState, b.Parent())
-	}
-
-	// Update metrics
-	if a.bootstrapped.GetValue() {
-		wasPreferred := parentState.initiallyPreferCommit
-		if wasPreferred {
-			a.metrics.MarkOptionVoteWon()
-		} else {
-			a.metrics.MarkOptionVoteLost()
-		}
-	}
-
-	return a.optionBlock(b)
+	return a.commitBlock(b)
 }
 
 func (a *acceptor) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
@@ -233,9 +170,45 @@ func (a *acceptor) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 	return nil
 }
 
-func (a *acceptor) optionBlock(b blocks.Block) error {
-	blkID := b.ID()
+func (a *acceptor) abortBlock(b blocks.Block) error {
 	parentID := b.Parent()
+	parentState, ok := a.blkIDToState[parentID]
+	if !ok {
+		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
+	}
+
+	if a.bootstrapped.GetValue() {
+		if parentState.initiallyPreferCommit {
+			a.metrics.MarkOptionVoteLost()
+		} else {
+			a.metrics.MarkOptionVoteWon()
+		}
+	}
+
+	return a.optionBlock(b, parentState.statelessBlock)
+}
+
+func (a *acceptor) commitBlock(b blocks.Block) error {
+	parentID := b.Parent()
+	parentState, ok := a.blkIDToState[parentID]
+	if !ok {
+		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
+	}
+
+	if a.bootstrapped.GetValue() {
+		if parentState.initiallyPreferCommit {
+			a.metrics.MarkOptionVoteWon()
+		} else {
+			a.metrics.MarkOptionVoteLost()
+		}
+	}
+
+	return a.optionBlock(b, parentState.statelessBlock)
+}
+
+func (a *acceptor) optionBlock(b, parent blocks.Block) error {
+	blkID := b.ID()
+	parentID := parent.ID()
 
 	defer func() {
 		// Note: we assume this block's sibling doesn't
@@ -245,11 +218,7 @@ func (a *acceptor) optionBlock(b blocks.Block) error {
 	}()
 
 	// Note that the parent must be accepted first.
-	parentState, ok := a.blkIDToState[parentID]
-	if !ok {
-		return fmt.Errorf("couldn't find state of block %s, parent of %s", parentID, blkID)
-	}
-	if err := a.commonAccept(parentState.statelessBlock); err != nil {
+	if err := a.commonAccept(parent); err != nil {
 		return err
 	}
 

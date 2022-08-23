@@ -326,7 +326,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	// Set expected calls on dependencies.
 	// Make sure the parent is accepted first.
 	gomock.InOrder(
-		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1),
+		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(2),
 		s.EXPECT().SetLastAccepted(parentID).Times(1),
 		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
 		s.EXPECT().SetHeight(blk.Height()-1).Times(1),
@@ -416,7 +416,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	// Set expected calls on dependencies.
 	// Make sure the parent is accepted first.
 	gomock.InOrder(
-		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1),
+		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(2),
 		s.EXPECT().SetLastAccepted(parentID).Times(1),
 		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
 		s.EXPECT().SetHeight(blk.Height()-1).Times(1),
