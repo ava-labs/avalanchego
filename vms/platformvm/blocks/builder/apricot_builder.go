@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -74,6 +76,10 @@ func buildApricotBlock(
 
 	tx, err := nextApricotProposalTx(builder, parentState)
 	if err != nil {
+		builder.txExecutorBackend.Ctx.Log.Error(
+			"failed to get the next proposal tx",
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
@@ -85,7 +91,7 @@ func buildApricotBlock(
 }
 
 // Try to get/make a proposal tx to put into a block.
-// Returns an error if there's no suitable proposal tx.
+// Any returned error is unexpected.
 func nextApricotProposalTx(builder *builder, parentState state.Chain) (*txs.Tx, error) {
 	tx := builder.Mempool.PeekProposalTx()
 	startTime := tx.Unsigned.(txs.StakerTx).StartTime()
