@@ -3,7 +3,11 @@
 
 package ids
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/ava-labs/avalanchego/utils"
+)
 
 const (
 	minShortSetSize = 16
@@ -111,7 +115,7 @@ func (ids ShortSet) List() []ShortID {
 // SortedList returns this set as a sorted list
 func (ids ShortSet) SortedList() []ShortID {
 	lst := ids.List()
-	SortShortIDs(lst)
+	utils.SortSlice(lst)
 	return lst
 }
 

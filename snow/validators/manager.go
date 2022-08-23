@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 var _ Manager = &manager{}
@@ -159,7 +160,7 @@ func (m *manager) String() string {
 	for subnetID := range m.subnetToVdrs {
 		subnets = append(subnets, subnetID)
 	}
-	ids.SortIDs(subnets)
+	utils.SortSlice(subnets)
 
 	sb := strings.Builder{}
 

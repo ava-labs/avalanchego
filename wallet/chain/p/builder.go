@@ -10,6 +10,7 @@ import (
 	stdcontext "context"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -240,7 +241,7 @@ func (b *builder) NewAddValidatorTx(
 		return nil, err
 	}
 
-	ids.SortShortIDs(rewardsOwner.Addrs)
+	utils.SortSlice(rewardsOwner.Addrs)
 	return &txs.AddValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
@@ -303,7 +304,7 @@ func (b *builder) NewAddDelegatorTx(
 		return nil, err
 	}
 
-	ids.SortShortIDs(rewardsOwner.Addrs)
+	utils.SortSlice(rewardsOwner.Addrs)
 	return &txs.AddDelegatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
@@ -341,7 +342,7 @@ func (b *builder) NewCreateChainTx(
 		return nil, err
 	}
 
-	ids.SortIDs(fxIDs)
+	utils.SortSlice(fxIDs)
 	return &txs.CreateChainTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
@@ -373,7 +374,7 @@ func (b *builder) NewCreateSubnetTx(
 		return nil, err
 	}
 
-	ids.SortShortIDs(owner.Addrs)
+	utils.SortSlice(owner.Addrs)
 	return &txs.CreateSubnetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),

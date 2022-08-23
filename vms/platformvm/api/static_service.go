@@ -11,6 +11,7 @@ import (
 	"sort"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -260,7 +261,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			}
 			owner.Addrs = append(owner.Addrs, addrID)
 		}
-		ids.SortShortIDs(owner.Addrs)
+		utils.SortSlice(owner.Addrs)
 
 		delegationFee := uint32(0)
 		if vdr.ExactDelegationFee != nil {

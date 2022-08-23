@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
@@ -59,7 +60,7 @@ func buildVtx(
 	verifyFunc func(innerStatelessVertex) error,
 	stopVertex bool,
 ) (StatelessVertex, error) {
-	ids.SortIDs(parentIDs)
+	utils.SortSlice(parentIDs)
 	SortHashOf(txs)
 
 	codecVer := codecVersion

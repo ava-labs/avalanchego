@@ -8,6 +8,27 @@ import (
 	"sort"
 )
 
+type Sortable[T any] interface {
+	Less(T) bool
+}
+
+// TODO add tests
+func SortSlice[T Sortable[T]](s []T) {
+	sort.Slice(s, func(i, j int) bool {
+		return s[i].Less(s[j])
+	})
+}
+
+// TODO add tests
+func IsSortedAndUniqueSlice[T Sortable[T]](s []T) bool {
+	for i := 0; i < len(s)-1; i++ {
+		if !s[i].Less(s[i+1]) {
+			return false
+		}
+	}
+	return true
+}
+
 // IsSortedAndUnique returns true if the elements in the data are unique and sorted.
 func IsSortedAndUnique(data sort.Interface) bool {
 	for i := data.Len() - 2; i >= 0; i-- {

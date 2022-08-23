@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -57,6 +58,7 @@ func TestIsUniqueShortIDs(t *testing.T) {
 	}
 }
 
+// TODO remove
 func TestIsSortedAndUniqueShortIDs(t *testing.T) {
 	id0 := ShortID{0}
 	id1 := ShortID{1}
@@ -118,10 +120,10 @@ func TestIsSortedAndUniqueShortIDs(t *testing.T) {
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%v", test.arr), func(t *testing.T) {
 			if test.isSorted {
-				if !IsSortedAndUniqueShortIDs(test.arr) {
+				if !utils.IsSortedAndUniqueSlice(test.arr) {
 					t.Fatal("should have been marked as sorted and unique")
 				}
-			} else if IsSortedAndUniqueShortIDs(test.arr) {
+			} else if utils.IsSortedAndUniqueSlice(test.arr) {
 				t.Fatal("shouldn't have been marked as sorted and unique")
 			}
 		})

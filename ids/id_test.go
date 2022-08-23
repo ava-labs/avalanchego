@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"reflect"
 	"testing"
+
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 func TestID(t *testing.T) {
@@ -175,7 +177,7 @@ func TestSortIDs(t *testing.T) {
 		{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'},
 		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 	}
-	SortIDs(ids)
+	utils.SortSlice(ids)
 	expected := []ID{
 		{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'},
 		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
@@ -183,30 +185,6 @@ func TestSortIDs(t *testing.T) {
 	}
 	if !reflect.DeepEqual(ids, expected) {
 		t.Fatal("[]ID was not sorted lexographically")
-	}
-}
-
-func TestIsSortedAndUnique(t *testing.T) {
-	unsorted := []ID{
-		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-	}
-	if IsSortedAndUniqueIDs(unsorted) {
-		t.Fatal("Wrongly accepted unsorted IDs")
-	}
-	duplicated := []ID{
-		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-	}
-	if IsSortedAndUniqueIDs(duplicated) {
-		t.Fatal("Wrongly accepted duplicated IDs")
-	}
-	sorted := []ID{
-		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-	}
-	if !IsSortedAndUniqueIDs(sorted) {
-		t.Fatal("Wrongly rejected sorted, unique IDs")
 	}
 }
 
