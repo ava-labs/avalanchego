@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -32,7 +31,6 @@ var (
 type verifier struct {
 	*backend
 	txExecutorBackend *executor.Backend
-	clk               *mockable.Clock
 }
 
 func (v *verifier) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
@@ -627,7 +625,7 @@ func (v *verifier) blueberryNonOptionBlock(b blocks.BlueberryBlock) error {
 	if err != nil {
 		return fmt.Errorf("could not verify block timestamp: %w", err)
 	}
-	now := v.clk.Time()
+	now := v.txExecutorBackend.Clk.Time()
 
 	return executor.ValidateProposedChainTime(
 		blkTime,
