@@ -51,12 +51,11 @@ func (v *verifier) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 
-	blkState := &blockState{
+	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
-		timestamp:      b.Timestamp(),
 		onAcceptState:  parentState.onAbortState,
+		timestamp:      b.Timestamp(),
 	}
-	v.blkIDToState[blkID] = blkState
 	return nil
 }
 
@@ -78,12 +77,11 @@ func (v *verifier) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 
-	blkState := &blockState{
+	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
 		onAcceptState:  parentState.onCommitState,
 		timestamp:      b.Timestamp(),
 	}
-	v.blkIDToState[blkID] = blkState
 	return nil
 }
 
@@ -162,7 +160,7 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 	onCommitState.AddTx(b.Tx, status.Committed)
 	onAbortState.AddTx(b.Tx, status.Aborted)
 
-	blkState := &blockState{
+	v.blkIDToState[blkID] = &blockState{
 		proposalBlockState: proposalBlockState{
 			initiallyPreferCommit: txExecutor.PrefersCommit,
 			onCommitState:         onCommitState,
@@ -171,8 +169,6 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 		statelessBlock: b,
 		timestamp:      b.Timestamp(),
 	}
-
-	v.blkIDToState[blkID] = blkState
 	v.Mempool.RemoveProposalTx(b.Tx)
 	return nil
 }
@@ -333,14 +329,13 @@ func (v *verifier) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
-	onAcceptState := parentState.onAbortState
 
-	blkState := &blockState{
+	onAcceptState := parentState.onAbortState
+	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
-		timestamp:      onAcceptState.GetTimestamp(),
 		onAcceptState:  onAcceptState,
+		timestamp:      onAcceptState.GetTimestamp(),
 	}
-	v.blkIDToState[blkID] = blkState
 	return nil
 }
 
@@ -361,14 +356,13 @@ func (v *verifier) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
-	onAcceptState := parentState.onCommitState
 
-	blkState := &blockState{
+	onAcceptState := parentState.onCommitState
+	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
 		onAcceptState:  onAcceptState,
 		timestamp:      onAcceptState.GetTimestamp(),
 	}
-	v.blkIDToState[blkID] = blkState
 	return nil
 }
 
@@ -410,12 +404,12 @@ func (v *verifier) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 	onAbortState.AddTx(b.Tx, status.Aborted)
 
 	v.blkIDToState[blkID] = &blockState{
-		statelessBlock: b,
 		proposalBlockState: proposalBlockState{
 			onCommitState:         onCommitState,
 			onAbortState:          onAbortState,
 			initiallyPreferCommit: txExecutor.PrefersCommit,
 		},
+		statelessBlock: b,
 		// It is safe to use [b.onAbortState] here because the timestamp will
 		// never be modified by an Apricot Abort block.
 		timestamp: onAbortState.GetTimestamp(),
@@ -566,16 +560,15 @@ func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 		}
 	}
 
-	blkState := &blockState{
-		statelessBlock: b,
-		onAcceptState:  atomicExecutor.OnAccept,
+	v.blkIDToState[blkID] = &blockState{
 		standardBlockState: standardBlockState{
 			inputs: atomicExecutor.Inputs,
 		},
-		atomicRequests: atomicExecutor.AtomicRequests,
+		statelessBlock: b,
+		onAcceptState:  atomicExecutor.OnAccept,
 		timestamp:      atomicExecutor.OnAccept.GetTimestamp(),
+		atomicRequests: atomicExecutor.AtomicRequests,
 	}
-	v.blkIDToState[blkID] = blkState
 	v.Mempool.RemoveDecisionTxs([]*txs.Tx{b.Tx})
 	return nil
 }
