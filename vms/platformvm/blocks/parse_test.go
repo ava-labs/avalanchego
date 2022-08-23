@@ -13,8 +13,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var preFundedKeys = crypto.BuildTestKeys()
@@ -300,7 +301,7 @@ func testAtomicTx() (*txs.Tx, error) {
 
 func testDecisionTxs() ([]*txs.Tx, error) {
 	countTxs := 2
-	decisionTxs := make([]*txs.Tx, 0, countTxs)
+	transactions := make([]*txs.Tx, 0, countTxs)
 	for i := 0; i < countTxs; i++ {
 		// Create the tx
 		utx := &txs.CreateChainTx{
@@ -343,9 +344,9 @@ func testDecisionTxs() ([]*txs.Tx, error) {
 		if err != nil {
 			return nil, err
 		}
-		decisionTxs = append(decisionTxs, tx)
+		transactions = append(transactions, tx)
 	}
-	return decisionTxs, nil
+	return transactions, nil
 }
 
 func testProposalTx() (*txs.Tx, error) {

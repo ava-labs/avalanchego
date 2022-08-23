@@ -43,6 +43,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	parentOnAcceptState.EXPECT().GetTimestamp().Return(timestamp).Times(2)
 	parentOnAcceptState.EXPECT().GetCurrentSupply().Return(uint64(10000)).Times(2)
 
+	clk := &mockable.Clock{}
 	backend := &backend{
 		lastAccepted: parentID,
 		blkIDToState: map[ids.ID]*blockState{
@@ -61,9 +62,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{},
 		backend:           backend,
-		forkChecker: &forkChecker{
-			backend: backend,
-		},
+		clk:               clk,
 	}
 
 	blkTx := txs.NewMockUnsignedTx(ctrl)
@@ -129,6 +128,8 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 		ApricotPhase5Time: time.Now().Add(time.Hour),
 		BlueberryTime:     mockable.MaxTime, // blueberry is not activated
 	}
+
+	clk := &mockable.Clock{}
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
 			parentID: {
@@ -148,9 +149,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 			Config: config,
 		},
 		backend: backend,
-		forkChecker: &forkChecker{
-			backend: backend,
-		},
+		clk:     clk,
 	}
 
 	onAccept := state.NewMockDiff(ctrl)
@@ -215,6 +214,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	parentState := state.NewMockDiff(ctrl)
 
+	clk := &mockable.Clock{}
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
 			parentID: {
@@ -236,9 +236,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 			},
 		},
 		backend: backend,
-		forkChecker: &forkChecker{
-			backend: backend,
-		},
+		clk:     clk,
 	}
 
 	blkTx := txs.NewMockUnsignedTx(ctrl)
@@ -316,6 +314,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
 
+	clk := &mockable.Clock{}
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
 			parentID: {
@@ -337,9 +336,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{},
 		backend:           backend,
-		forkChecker: &forkChecker{
-			backend: backend,
-		},
+		clk:               clk,
 	}
 
 	blk, err := blocks.NewApricotCommitBlock(
@@ -383,6 +380,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
 
+	clk := &mockable.Clock{}
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
 			parentID: {
@@ -404,9 +402,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{},
 		backend:           backend,
-		forkChecker: &forkChecker{
-			backend: backend,
-		},
+		clk:               clk,
 	}
 
 	blk, err := blocks.NewApricotAbortBlock(
@@ -448,6 +444,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
 
+	clk := &mockable.Clock{}
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{},
 		Mempool:      mempool,
@@ -460,9 +457,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{},
 		backend:           backend,
-		forkChecker: &forkChecker{
-			backend: backend,
-		},
+		clk:               clk,
 	}
 
 	blk, err := blocks.NewApricotAbortBlock(parentID /*not in memory or persisted state*/, 2 /*height*/)
@@ -519,6 +514,7 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 			parentStatelessBlk := blocks.NewMockBlock(ctrl)
 			parentHeight := uint64(1)
 
+			clk := &mockable.Clock{}
 			backend := &backend{
 				blkIDToState: map[ids.ID]*blockState{
 					parentID: {
@@ -534,9 +530,10 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 				// Blueberry is activated
 				cfg: &config.Config{BlueberryTime: time.Time{}},
 			}
-			fc := &forkChecker{
-				backend: backend,
-				clk:     &mockable.Clock{},
+			verifier := &verifier{
+				txExecutorBackend: &executor.Backend{},
+				backend:           backend,
+				clk:               clk,
 			}
 
 			// build and verify child block
@@ -545,9 +542,12 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 			require.NoError(err)
 
 			// Set expectations for dependencies.
-			parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1)
+			gomock.InOrder(
+				parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
+				parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1),
+			)
 
-			err = statelessAbortBlk.Visit(fc)
+			err = statelessAbortBlk.Visit(verifier)
 			require.ErrorIs(err, test.result)
 		})
 	}
@@ -597,6 +597,7 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 			parentStatelessBlk := blocks.NewMockBlock(ctrl)
 			parentHeight := uint64(1)
 
+			clk := &mockable.Clock{}
 			backend := &backend{
 				blkIDToState: map[ids.ID]*blockState{
 					parentID: {
@@ -612,19 +613,24 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 				// Blueberry is activated
 				cfg: &config.Config{BlueberryTime: time.Time{}},
 			}
-			fc := &forkChecker{
-				backend: backend,
-				clk:     &mockable.Clock{},
+			verifier := &verifier{
+				txExecutorBackend: &executor.Backend{},
+				backend:           backend,
+				clk:               clk,
 			}
 
 			// build and verify child block
 			childHeight := parentHeight + 1
 			statelessCommitBlk, err := blocks.NewBlueberryCommitBlock(test.childTime, parentID, childHeight)
+			require.NoError(err)
 
 			// Set expectations for dependencies.
-			parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1)
-			require.NoError(err)
-			err = statelessCommitBlk.Visit(fc)
+			gomock.InOrder(
+				parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
+				parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1),
+			)
+
+			err = statelessCommitBlk.Visit(verifier)
 			require.ErrorIs(err, test.result)
 		})
 	}
@@ -654,6 +660,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 		BlueberryTime:     mockable.MaxTime,
 	}
 
+	clk := &mockable.Clock{}
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
 			grandParentID: {
@@ -680,9 +687,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 			Config: config,
 		},
 		backend: backend,
-		forkChecker: &forkChecker{
-			backend: backend,
-		},
+		clk:     clk,
 	}
 
 	blkTx := txs.NewMockUnsignedTx(ctrl)
@@ -749,6 +754,7 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
 
+	clk := &mockable.Clock{}
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
 			parentID: {
@@ -772,10 +778,7 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{},
 		backend:           backend,
-		forkChecker: &forkChecker{
-			backend: backend,
-			clk:     &mockable.Clock{},
-		},
+		clk:               clk,
 	}
 
 	blk, err := blocks.NewApricotStandardBlock(
@@ -810,6 +813,7 @@ func TestVerifierVisitBlueberryStandardBlockWithProposalBlockParent(t *testing.T
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
 
+	clk := &mockable.Clock{}
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
 			parentID: {
@@ -833,10 +837,7 @@ func TestVerifierVisitBlueberryStandardBlockWithProposalBlockParent(t *testing.T
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{},
 		backend:           backend,
-		forkChecker: &forkChecker{
-			backend: backend,
-			clk:     &mockable.Clock{},
-		},
+		clk:               clk,
 	}
 
 	blk, err := blocks.NewBlueberryStandardBlock(
