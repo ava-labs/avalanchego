@@ -5,8 +5,9 @@ package syncer
 
 import (
 	"fmt"
-	stdmath "math"
 	"time"
+
+	stdmath "math"
 
 	"go.uber.org/zap"
 
