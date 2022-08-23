@@ -11,11 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-type BlueberryBlock interface {
-	Block
-	Timestamp() time.Time
-}
-
 // Block defines the common stateless interface for all blocks
 type Block interface {
 	ID() ids.ID
@@ -32,6 +27,11 @@ type Block interface {
 	// note: initialize does not assume that block transactions
 	// are initialized, and initializes them itself if they aren't.
 	initialize(bytes []byte) error
+}
+
+type BlueberryBlock interface {
+	Block
+	Timestamp() time.Time
 }
 
 func initialize(blk Block) error {
