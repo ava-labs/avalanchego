@@ -248,6 +248,7 @@ func (t *Transitive) CrossChainAppResponse(sourceChainID ids.ID, requestID uint3
 }
 
 func (t *Transitive) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
+	// Notify the VM of this request
 	return t.VM.AppRequest(nodeID, requestID, deadline, request)
 }
 
