@@ -9,6 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
+
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
@@ -46,8 +50,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/golang/mock/gomock"
-	"github.com/prometheus/client_golang/prometheus"
 
 	db_manager "github.com/ava-labs/avalanchego/database/manager"
 	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
