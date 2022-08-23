@@ -5,6 +5,7 @@ package builder
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
@@ -17,6 +18,8 @@ func buildApricotBlock(
 	builder *builder,
 	parentID ids.ID,
 	height uint64,
+	timestamp time.Time,
+	shouldAdvanceTime bool,
 	parentState state.Chain,
 ) (blocks.Block, error) {
 	// try including as many standard txs as possible. No need to advance chain time
@@ -47,12 +50,8 @@ func buildApricotBlock(
 	}
 
 	// try advancing chain time
-	nextChainTime, shouldAdvanceTime, err := builder.getNextChainTime(parentState)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve next chain time: %w", err)
-	}
 	if shouldAdvanceTime {
-		advanceTimeTx, err := builder.txBuilder.NewAdvanceTimeTx(nextChainTime)
+		advanceTimeTx, err := builder.txBuilder.NewAdvanceTimeTx(timestamp)
 		if err != nil {
 			return nil, fmt.Errorf("could not build tx to reward staker: %w", err)
 		}

@@ -27,7 +27,7 @@ Block formation terminates as soon as any of the steps executed manage to select
 
 ## Blueberry block formation logic
 
-The activation of the Blueberry fork only makes minor changes to the way the P-chain selects transactions to be included in next block, such as block timestamp calculation. In this brief document we detail the process and the changes.
+The activation of the Blueberry fork only makes minor changes to the way the P-chain selects transactions to be included in next block, such as block timestamp calculation. In this section we detail the process and the changes.
 
 We carry out operations in the following order:
 
@@ -36,5 +36,5 @@ We carry out operations in the following order:
 * We try to move chain time ahead to the earliest staker set change event. Unlike Apricot, here we issue a Standard block with no transactions whose timestamp is the proposed chain time. A Standard block does not require any voting, and will be either accepted or rejected. Hence this solution is marginally faster.
 * We try to build a Proposal block with one mempool proposal transaction, if any. No changes to chain time are proposed here.
 
-[^1]: Proposal transactions whose start time is too close to local time are dropped first and won't be included in any block. TODO: I am not sure why is this, but it's coherent with P-chain API dropping any AddValidator/Delegator/SubnetValidator request whose start time is too close.
+[^1]: Proposal transactions whose start time is too close to local time are dropped first and won't be included in any block.
 [^2]: Of course advance time transactions are proposal transactions and they do change chain time. But advance time transactions are generated just in time and never stored in a mempool. Here I refer to mempool proposal transactions which are AddValidator, AddDelegator and AddSubnetValidator. Reward delegator transaction is a proposal transaction which does not change chain time but which is never in mempool (it's generated just in time).

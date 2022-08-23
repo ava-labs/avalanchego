@@ -86,6 +86,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 
 	// Set expectations for dependencies.
 	tx := blk.Txs()[0]
+	s.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	mempool.EXPECT().RemoveProposalTx(tx).Times(1)
 
@@ -180,6 +181,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
+	s.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	parentStatelessBlk.EXPECT().Parent().Return(grandparentID).Times(1)
@@ -281,6 +283,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
+	s.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	parentState.EXPECT().GetCurrentSupply().Return(uint64(10000)).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
@@ -349,6 +352,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	timestamp := time.Now()
 	gomock.InOrder(
 		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
+		s.EXPECT().GetTimestamp().Return(timestamp).Times(1),
 		parentOnCommitState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
 	)
 
@@ -415,6 +419,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	timestamp := time.Now()
 	gomock.InOrder(
 		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
+		s.EXPECT().GetTimestamp().Return(timestamp).Times(1),
 		parentOnAbortState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
 	)
 
@@ -527,7 +532,8 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 				ctx: &snow.Context{
 					Log: logging.NoLog{},
 				},
-				// Blueberry is activated
+				// Blueberry is activated. Fork time set to zero
+				// so that any block timestamp is valid
 				cfg: &config.Config{BlueberryTime: time.Time{}},
 			}
 			verifier := &verifier{
@@ -610,7 +616,8 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 				ctx: &snow.Context{
 					Log: logging.NoLog{},
 				},
-				// Blueberry is activated
+				// Blueberry is activated. Fork time set to zero
+				// so that any block timestamp is valid
 				cfg: &config.Config{BlueberryTime: time.Time{}},
 			}
 			verifier := &verifier{
@@ -734,6 +741,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	timestamp := time.Now()
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
+	s.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	parentState.EXPECT().GetCurrentSupply().Return(uint64(10000)).Times(1)
 	parentStatelessBlk.EXPECT().Parent().Return(grandParentID).Times(1)
 
@@ -794,6 +802,7 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 	require.NoError(err)
 
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
+	s.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 
 	err = verifier.ApricotStandardBlock(blk)
 	require.ErrorIs(err, state.ErrMissingParentState)

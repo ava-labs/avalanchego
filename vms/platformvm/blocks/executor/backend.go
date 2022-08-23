@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/forks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -64,27 +63,6 @@ func (b *backend) GetBlock(blkID ids.ID) (blocks.Block, error) {
 
 func (b *backend) LastAccepted() ids.ID {
 	return b.lastAccepted
-}
-
-// GetFork needs the parent's timestamp to carry out its calculations.
-// Verify was already called on the parent (guaranteed by consensus engine).
-// The parent hasn't been rejected (guaranteed by consensus engine).
-// If the parent is accepted, the parent is the most recently
-// accepted block.
-// If the parent hasn't been accepted, the parent is in memory.
-func (b *backend) GetFork(blkID ids.ID) forks.Fork {
-	var parentTimestamp time.Time
-	if parentState, ok := b.blkIDToState[blkID]; ok {
-		parentTimestamp = parentState.timestamp
-	} else {
-		parentTimestamp = b.state.GetTimestamp()
-	}
-
-	forkTime := b.cfg.BlueberryTime
-	if parentTimestamp.Before(forkTime) {
-		return forks.Apricot
-	}
-	return forks.Blueberry
 }
 
 func (b *backend) free(blkID ids.ID) {

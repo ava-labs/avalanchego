@@ -81,11 +81,13 @@ func TestBuildApricotBlock(t *testing.T) {
 	)
 
 	type test struct {
-		name         string
-		builderF     func(*gomock.Controller) *builder
-		parentStateF func(*gomock.Controller) state.Chain
-		expectedBlkF func(*require.Assertions) blocks.Block
-		expectedErr  error
+		name              string
+		builderF          func(*gomock.Controller) *builder
+		timestamp         time.Time
+		shouldAdvanceTime bool
+		parentStateF      func(*gomock.Controller) state.Chain
+		expectedBlkF      func(*require.Assertions) blocks.Block
+		expectedErr       error
 	}
 
 	tests := []test{
@@ -99,6 +101,8 @@ func TestBuildApricotBlock(t *testing.T) {
 					Mempool: mempool,
 				}
 			},
+			timestamp:         time.Time{},
+			shouldAdvanceTime: false,
 			parentStateF: func(ctrl *gomock.Controller) state.Chain {
 				return state.NewMockChain(ctrl)
 			},
@@ -129,6 +133,8 @@ func TestBuildApricotBlock(t *testing.T) {
 					txBuilder: txBuilder,
 				}
 			},
+			timestamp:         time.Time{},
+			shouldAdvanceTime: false,
 			parentStateF: func(ctrl *gomock.Controller) state.Chain {
 				s := state.NewMockChain(ctrl)
 
@@ -186,6 +192,8 @@ func TestBuildApricotBlock(t *testing.T) {
 					},
 				}
 			},
+			timestamp:         now.Add(-1 * time.Second),
+			shouldAdvanceTime: true,
 			parentStateF: func(ctrl *gomock.Controller) state.Chain {
 				s := state.NewMockChain(ctrl)
 
@@ -204,22 +212,9 @@ func TestBuildApricotBlock(t *testing.T) {
 					}),
 					currentStakerIter.EXPECT().Next().Return(false),
 					currentStakerIter.EXPECT().Release(),
-
-					// expect calls from [GetNextStakerChangeTime]
-					currentStakerIter.EXPECT().Next().Return(true),
-					currentStakerIter.EXPECT().Value().Return(&state.Staker{
-						NextTime: now.Add(-1 * time.Second),
-					}),
-					currentStakerIter.EXPECT().Release(),
 				)
 
-				// We also iterate over the pending stakers in [getNextStakerToReward]
-				pendingStakerIter := state.NewMockStakerIterator(ctrl)
-				pendingStakerIter.EXPECT().Next().Return(false)
-				pendingStakerIter.EXPECT().Release()
-
-				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).Times(2)
-				s.EXPECT().GetPendingStakerIterator().Return(pendingStakerIter, nil)
+				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).Times(1)
 				return s
 			},
 			expectedBlkF: func(require *require.Assertions) blocks.Block {
@@ -259,6 +254,8 @@ func TestBuildApricotBlock(t *testing.T) {
 					},
 				}
 			},
+			timestamp:         time.Time{},
+			shouldAdvanceTime: false,
 			parentStateF: func(ctrl *gomock.Controller) state.Chain {
 				s := state.NewMockChain(ctrl)
 
@@ -274,22 +271,9 @@ func TestBuildApricotBlock(t *testing.T) {
 					}),
 					currentStakerIter.EXPECT().Next().Return(false),
 					currentStakerIter.EXPECT().Release(),
-
-					// expect calls from [GetNextStakerChangeTime]
-					currentStakerIter.EXPECT().Next().Return(true),
-					currentStakerIter.EXPECT().Value().Return(&state.Staker{
-						NextTime: now.Add(time.Second),
-					}),
-					currentStakerIter.EXPECT().Release(),
 				)
 
-				// We also iterate over the pending stakers in [getNextStakerToReward]
-				pendingStakerIter := state.NewMockStakerIterator(ctrl)
-				pendingStakerIter.EXPECT().Next().Return(false)
-				pendingStakerIter.EXPECT().Release()
-
-				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).Times(2)
-				s.EXPECT().GetPendingStakerIterator().Return(pendingStakerIter, nil)
+				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).Times(1)
 				return s
 			},
 			expectedBlkF: func(require *require.Assertions) blocks.Block {
@@ -323,6 +307,8 @@ func TestBuildApricotBlock(t *testing.T) {
 					},
 				}
 			},
+			timestamp:         time.Time{},
+			shouldAdvanceTime: false,
 			parentStateF: func(ctrl *gomock.Controller) state.Chain {
 				s := state.NewMockChain(ctrl)
 
@@ -341,22 +327,9 @@ func TestBuildApricotBlock(t *testing.T) {
 					}),
 					currentStakerIter.EXPECT().Next().Return(false),
 					currentStakerIter.EXPECT().Release(),
-
-					// expect calls from [GetNextStakerChangeTime]
-					currentStakerIter.EXPECT().Next().Return(true),
-					currentStakerIter.EXPECT().Value().Return(&state.Staker{
-						NextTime: now.Add(time.Second),
-					}),
-					currentStakerIter.EXPECT().Release(),
 				)
 
-				// We also iterate over the pending stakers in [getNextStakerToReward]
-				pendingStakerIter := state.NewMockStakerIterator(ctrl)
-				pendingStakerIter.EXPECT().Next().Return(false)
-				pendingStakerIter.EXPECT().Release()
-
-				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).Times(2)
-				s.EXPECT().GetPendingStakerIterator().Return(pendingStakerIter, nil)
+				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).Times(1)
 				return s
 			},
 			expectedBlkF: func(require *require.Assertions) blocks.Block {
@@ -382,6 +355,8 @@ func TestBuildApricotBlock(t *testing.T) {
 				tt.builderF(ctrl),
 				parentID,
 				height,
+				tt.timestamp,
+				tt.shouldAdvanceTime,
 				tt.parentStateF(ctrl),
 			)
 			if tt.expectedErr != nil {

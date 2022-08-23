@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/forks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -83,6 +84,13 @@ type Config struct {
 
 	// Time of the Blueberry network upgrade
 	BlueberryTime time.Time
+}
+
+func (c *Config) GetFork(blkTime time.Time) forks.Fork {
+	if blkTime.Before(c.BlueberryTime) {
+		return forks.Apricot
+	}
+	return forks.Blueberry
 }
 
 func (c *Config) GetCreateBlockchainTxFee(t time.Time) uint64 {

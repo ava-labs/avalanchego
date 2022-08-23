@@ -6,7 +6,6 @@ package builder
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -182,27 +181,53 @@ func (b *builder) buildBlock() (blocks.Block, error) {
 	}
 	preferredID := preferred.ID()
 	nextHeight := preferred.Height() + 1
-	currentFork := b.blkManager.GetFork(preferredID)
-
 	preferredState, ok := b.blkManager.GetState(preferredID)
 	if !ok {
-		return nil, fmt.Errorf("could not retrieve state for block %s", preferredID)
+		return nil, fmt.Errorf("%w: %s", state.ErrMissingParentState, preferredID)
 	}
+
+	timestamp := b.txExecutorBackend.Clk.Time()
+	if parentTime := preferred.Timestamp(); parentTime.After(timestamp) {
+		timestamp = parentTime
+	}
+	// [timestamp] = max(now, parentTime)
+
+	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
+	if err != nil {
+		return nil, fmt.Errorf("could not verify block timestamp: %w", err)
+	}
+
+	// timeWasCapped means that [timestamp] was reduced to
+	// [nextStakerChangeTime]. It is used as a flag for [buildApricotBlock] to
+	// be willing to issue an advanceTimeTx. It is also used as a flag for
+	// [buildBlueberryBlock] to force the issuance of an empty block to advance
+	// the time forward; if there are no available transactions.
+	timeWasCapped := !timestamp.Before(nextStakerChangeTime)
+	if timeWasCapped {
+		timestamp = nextStakerChangeTime
+	}
+	// [timestamp] = min(max(now, parentTime), nextStakerChangeTime)
+
+	currentFork := b.txExecutorBackend.Config.GetFork(timestamp)
 
 	// select transactions to include based on the current fork
 	switch currentFork {
-	case forks.Apricot:
-		return buildApricotBlock(
-			b,
-			preferredID,
-			nextHeight,
-			preferredState,
-		)
 	case forks.Blueberry:
 		return buildBlueberryBlock(
 			b,
 			preferredID,
 			nextHeight,
+			timestamp,
+			timeWasCapped,
+			preferredState,
+		)
+	case forks.Apricot:
+		return buildApricotBlock(
+			b,
+			preferredID,
+			nextHeight,
+			timestamp,
+			timeWasCapped,
 			preferredState,
 		)
 	default:
@@ -255,18 +280,6 @@ func (b *builder) getNextStakerToReward(preferredState state.Chain) (ids.ID, boo
 		}
 	}
 	return ids.Empty, false, nil
-}
-
-// getNextChainTime returns the timestamp for the next chain time and if the
-// local time is >= time of the next staker set change.
-func (b *builder) getNextChainTime(preferredState state.Chain) (time.Time, bool, error) {
-	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
-	if err != nil {
-		return time.Time{}, false, err
-	}
-
-	now := b.txExecutorBackend.Clk.Time()
-	return nextStakerChangeTime, !now.Before(nextStakerChangeTime), nil
 }
 
 // dropExpiredProposalTxs drops add validator/delegator transactions in the mempool

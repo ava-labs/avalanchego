@@ -58,10 +58,11 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 		onAcceptState:  onParentAccept,
 	}
 	env.blkManager.(*manager).lastAccepted = parentID
+	chainTime := env.clk.Time().Truncate(time.Second)
+	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
 
 	// create a proposal transaction to be included into proposal block
-	chainTime := env.clk.Time().Truncate(time.Second)
 	utx := &txs.AddValidatorTx{
 		BaseTx:       txs.BaseTx{},
 		Validator:    validator.Validator{End: uint64(chainTime.Unix())},

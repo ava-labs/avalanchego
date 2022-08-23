@@ -8,7 +8,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/forks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -24,9 +23,6 @@ type Manager interface {
 	LastAccepted() ids.ID
 	GetBlock(blkID ids.ID) (snowman.Block, error)
 	NewBlock(blocks.Block) snowman.Block
-
-	// GetFork returns the fork of [blkID]'s child.
-	GetFork(blkID ids.ID) forks.Fork
 }
 
 func NewManager(

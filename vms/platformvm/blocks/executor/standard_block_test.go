@@ -56,9 +56,10 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 		onAcceptState:  onParentAccept,
 	}
 	env.blkManager.(*manager).lastAccepted = parentID
-	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
 
 	chainTime := env.clk.Time().Truncate(time.Second)
+	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
+	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	onParentAccept.EXPECT().GetCurrentSupply().Return(uint64(1000)).AnyTimes()
 
@@ -122,6 +123,7 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 	}
 	env.blkManager.(*manager).lastAccepted = parentID
 	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
+	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 
 	nextStakerTime := chainTime.Add(txexecutor.SyncBound).Add(-1 * time.Second)
 

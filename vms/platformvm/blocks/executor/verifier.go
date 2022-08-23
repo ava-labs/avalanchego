@@ -523,7 +523,8 @@ func (v *verifier) commonBlock(b blocks.Block, expectedFork forks.Fork) error {
 	}
 
 	// check fork
-	if currentFork := v.GetFork(parentID); currentFork != expectedFork {
+	blkTime := v.getTimestamp(b)
+	if currentFork := v.cfg.GetFork(blkTime); currentFork != expectedFork {
 		return fmt.Errorf("expected fork %d but got %d", expectedFork, currentFork)
 	}
 	return nil
