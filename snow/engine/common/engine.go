@@ -398,7 +398,7 @@ type ChitsHandler interface {
 // Functions only return fatal errors.
 type CrossChainAppHandler interface {
 	// CrossChainAppRequest Notify this engine of a request for data from
-	// [chainID].
+	// [sourceChainID].
 	//
 	// The meaning of [request], and what should be sent in response to it, is
 	// application (VM) specific.
@@ -406,36 +406,36 @@ type CrossChainAppHandler interface {
 	// It is not guaranteed that:
 	// * [request] is well-formed/valid.
 	//
-	// This node should typically send a CrossChainAppResponse to [chainID] in
+	// This node should typically send a CrossChainAppResponse to [sourceChainID] in
 	// response to a valid message using the same request ID before the
 	// deadline. However, the VM may arbitrarily choose to not send a response
 	// to this request.
-	CrossChainAppRequest(chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error
+	CrossChainAppRequest(sourceChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error
 	// CrossChainAppRequestFailed notifies this engine that a
-	// CrossChainAppRequest message it sent to [chainID] with request ID
+	// CrossChainAppRequest message it sent to [sourceChainID] with request ID
 	// [requestID] failed.
 	//
 	// This may be because the request timed out or because the message couldn't
-	// be sent to [chainID].
+	// be sent to [sourceChainID].
 	//
 	// It is guaranteed that:
-	// * This engine sent a request to [chainID] with ID [requestID].
-	// * CrossChainAppRequestFailed([chainID], [requestID]) has not already been
+	// * This engine sent a request to [sourceChainID] with ID [requestID].
+	// * CrossChainAppRequestFailed([sourceChainID], [requestID]) has not already been
 	// called.
-	// * CrossChainAppResponse([chainID], [requestID]) has not already been
+	// * CrossChainAppResponse([sourceChainID], [requestID]) has not already been
 	// called.
-	CrossChainAppRequestFailed(chainID ids.ID, requestID uint32) error
+	CrossChainAppRequestFailed(sourceChainID ids.ID, requestID uint32) error
 	// CrossChainAppResponse notifies this engine of a response to the
-	// CrossChainAppRequest message it sent to [chainID] with request ID
+	// CrossChainAppRequest message it sent to [sourceChainID] with request ID
 	// [requestID].
 	//
-	// The meaning of [response] is application (VM) specifc.
+	// The meaning of [response] is application (VM) specific.
 	//
 	// It is guaranteed that:
-	// * This engine sent a request to [chainID] with ID [requestID].
-	// * CrossChainAppRequestFailed([chainID], [requestID]) has not already been
+	// * This engine sent a request to [sourceChainID] with ID [requestID].
+	// * CrossChainAppRequestFailed([sourceChainID], [requestID]) has not already been
 	// called.
-	// * CrossChainAppResponse([chainID], [requestID]) has not already been
+	// * CrossChainAppResponse([sourceChainID], [requestID]) has not already been
 	// called.
 	//
 	// It is not guaranteed that:
@@ -445,7 +445,7 @@ type CrossChainAppHandler interface {
 	// If [response] is invalid or not the expected response, the VM chooses how
 	// to react. For example, the VM may send another CrossChainAppRequest, or
 	// it may give up trying to get the requested information.
-	CrossChainAppResponse(chainID ids.ID, requestID uint32, response []byte) error
+	CrossChainAppResponse(sourceChainID ids.ID, requestID uint32, response []byte) error
 }
 
 // AppHandler defines how a consensus engine reacts to app specific messages.

@@ -179,12 +179,12 @@ func (_m *Engine) Context() *snow.ConsensusContext {
 }
 
 // CrossChainAppRequest provides a mock function with given fields: chainID, requestID, deadline, request
-func (_m *Engine) CrossChainAppRequest(chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
-	ret := _m.Called(chainID, requestID, deadline, request)
+func (_m *Engine) CrossChainAppRequest(sourceChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+	ret := _m.Called(sourceChainID, requestID, deadline, request)
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(ids.ID, uint32, time.Time, []byte) error); ok {
-		r0 = rf(chainID, requestID, deadline, request)
+		r0 = rf(sourceChainID, requestID, deadline, request)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -193,12 +193,12 @@ func (_m *Engine) CrossChainAppRequest(chainID ids.ID, requestID uint32, deadlin
 }
 
 // CrossChainAppRequestFailed provides a mock function with given fields: chainID, requestID
-func (_m *Engine) CrossChainAppRequestFailed(chainID ids.ID, requestID uint32) error {
-	ret := _m.Called(chainID, requestID)
+func (_m *Engine) CrossChainAppRequestFailed(sourceChainID ids.ID, requestID uint32) error {
+	ret := _m.Called(sourceChainID, requestID)
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(ids.ID, uint32) error); ok {
-		r0 = rf(chainID, requestID)
+		r0 = rf(sourceChainID, requestID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -207,12 +207,12 @@ func (_m *Engine) CrossChainAppRequestFailed(chainID ids.ID, requestID uint32) e
 }
 
 // CrossChainAppResponse provides a mock function with given fields: chainID, requestID, response
-func (_m *Engine) CrossChainAppResponse(chainID ids.ID, requestID uint32, response []byte) error {
-	ret := _m.Called(chainID, requestID, response)
+func (_m *Engine) CrossChainAppResponse(sourceChainID ids.ID, requestID uint32, response []byte) error {
+	ret := _m.Called(sourceChainID, requestID, response)
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(ids.ID, uint32, []byte) error); ok {
-		r0 = rf(chainID, requestID, response)
+		r0 = rf(sourceChainID, requestID, response)
 	} else {
 		r0 = ret.Error(0)
 	}

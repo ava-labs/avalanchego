@@ -558,11 +558,11 @@ func (vm *VMClient) Version() (string, error) {
 	return resp.Version, nil
 }
 
-func (vm *VMClient) CrossChainAppRequest(chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+func (vm *VMClient) CrossChainAppRequest(sourceChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
 	_, err := vm.client.CrossChainAppRequest(
 		context.Background(),
 		&vmpb.CrossChainAppRequestMsg{
-			ChainId:   chainID[:],
+			ChainId:   sourceChainID[:],
 			RequestId: requestID,
 			Deadline:  grpcutils.TimestampFromTime(deadline),
 			Request:   request,
@@ -572,11 +572,11 @@ func (vm *VMClient) CrossChainAppRequest(chainID ids.ID, requestID uint32, deadl
 	return err
 }
 
-func (vm *VMClient) CrossChainAppRequestFailed(chainID ids.ID, requestID uint32) error {
+func (vm *VMClient) CrossChainAppRequestFailed(sourceChainID ids.ID, requestID uint32) error {
 	_, err := vm.client.CrossChainAppRequestFailed(
 		context.Background(),
 		&vmpb.CrossChainAppRequestFailedMsg{
-			ChainId:   chainID[:],
+			ChainId:   sourceChainID[:],
 			RequestId: requestID,
 		},
 	)
@@ -584,11 +584,11 @@ func (vm *VMClient) CrossChainAppRequestFailed(chainID ids.ID, requestID uint32)
 	return err
 }
 
-func (vm *VMClient) CrossChainAppResponse(chainID ids.ID, requestID uint32, response []byte) error {
+func (vm *VMClient) CrossChainAppResponse(sourceChainID ids.ID, requestID uint32, response []byte) error {
 	_, err := vm.client.CrossChainAppResponse(
 		context.Background(),
 		&vmpb.CrossChainAppResponseMsg{
-			ChainId:   chainID[:],
+			ChainId:   sourceChainID[:],
 			RequestId: requestID,
 			Response:  response,
 		},

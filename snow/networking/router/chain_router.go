@@ -246,8 +246,6 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 		}
 	}
 
-
-
 	// AppGossip is the only message currently not containing a requestID
 	// Here we assign the requestID already in use for gossiped containers
 	// to allow a uniform handling of all messages
@@ -281,7 +279,6 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 		cr.log.Debug("dropping message",
 			zap.Stringer("messageOp", op),
 			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("sourceChainID", sourceChainID),
 			zap.Stringer("chainID", chainID),
 			zap.Error(errUnknownChain),
 		)

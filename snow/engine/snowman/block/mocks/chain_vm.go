@@ -159,9 +159,9 @@ func (mr *MockChainVMMockRecorder) CreateStaticHandlers() *gomock.Call {
 }
 
 // CrossChainAppRequest mocks base method.
-func (m *MockChainVM) CrossChainAppRequest(chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+func (m *MockChainVM) CrossChainAppRequest(sourceChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CrossChainAppRequest", chainID, requestID, deadline, request)
+	ret := m.ctrl.Call(m, "CrossChainAppRequest", sourceChainID, requestID, deadline, request)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
@@ -173,9 +173,9 @@ func (mr *MockChainVMMockRecorder) CrossChainAppRequest(chainID, requestID, dead
 }
 
 // CrossChainAppRequestFailed mocks base method.
-func (m *MockChainVM) CrossChainAppRequestFailed(chainID ids.ID, requestID uint32) error {
+func (m *MockChainVM) CrossChainAppRequestFailed(sourceChainID ids.ID, requestID uint32) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CrossChainAppRequestFailed", chainID, requestID)
+	ret := m.ctrl.Call(m, "CrossChainAppRequestFailed", sourceChainID, requestID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
@@ -187,9 +187,9 @@ func (mr *MockChainVMMockRecorder) CrossChainAppRequestFailed(chainID, requestID
 }
 
 // CrossChainAppResponse mocks base method.
-func (m *MockChainVM) CrossChainAppResponse(chainID ids.ID, requestID uint32, response []byte) error {
+func (m *MockChainVM) CrossChainAppResponse(sourceChainID ids.ID, requestID uint32, response []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CrossChainAppResponse", chainID, requestID, response)
+	ret := m.ctrl.Call(m, "CrossChainAppResponse", sourceChainID, requestID, response)
 	ret0, _ := ret[0].(error)
 	return ret0
 }

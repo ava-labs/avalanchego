@@ -279,16 +279,16 @@ func (t *Transitive) QueryFailed(vdr ids.NodeID, requestID uint32) error {
 	return t.buildBlocks()
 }
 
-func (t *Transitive) CrossChainAppRequest(chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
-	return t.VM.CrossChainAppRequest(chainID, requestID, deadline, request)
+func (t *Transitive) CrossChainAppRequest(sourceChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+	return t.VM.CrossChainAppRequest(sourceChainID, requestID, deadline, request)
 }
 
-func (t *Transitive) CrossChainAppRequestFailed(chainID ids.ID, requestID uint32) error {
-	return t.VM.CrossChainAppRequestFailed(chainID, requestID)
+func (t *Transitive) CrossChainAppRequestFailed(sourceChainID ids.ID, requestID uint32) error {
+	return t.VM.CrossChainAppRequestFailed(sourceChainID, requestID)
 }
 
-func (t *Transitive) CrossChainAppResponse(chainID ids.ID, requestID uint32, response []byte) error {
-	return t.VM.CrossChainAppResponse(chainID, requestID, response)
+func (t *Transitive) CrossChainAppResponse(sourceChainID ids.ID, requestID uint32, response []byte) error {
+	return t.VM.CrossChainAppResponse(sourceChainID, requestID, response)
 }
 
 func (t *Transitive) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {

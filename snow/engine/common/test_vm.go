@@ -201,9 +201,9 @@ func (vm *TestVM) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	return errAppGossip
 }
 
-func (vm *TestVM) CrossChainAppRequest(chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+func (vm *TestVM) CrossChainAppRequest(sourceChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
 	if vm.CrossChainAppRequestF != nil {
-		return vm.CrossChainAppRequestF(chainID, requestID, deadline, request)
+		return vm.CrossChainAppRequestF(sourceChainID, requestID, deadline, request)
 	}
 	if !vm.CantCrossChainAppRequest {
 		return nil
@@ -214,9 +214,9 @@ func (vm *TestVM) CrossChainAppRequest(chainID ids.ID, requestID uint32, deadlin
 	return errCrossChainAppRequest
 }
 
-func (vm *TestVM) CrossChainAppRequestFailed(chainID ids.ID, requestID uint32) error {
+func (vm *TestVM) CrossChainAppRequestFailed(sourceChainID ids.ID, requestID uint32) error {
 	if vm.CrossChainAppRequestFailedF != nil {
-		return vm.CrossChainAppRequestFailedF(chainID, requestID)
+		return vm.CrossChainAppRequestFailedF(sourceChainID, requestID)
 	}
 	if !vm.CantCrossChainAppRequestFailed {
 		return nil
@@ -227,9 +227,9 @@ func (vm *TestVM) CrossChainAppRequestFailed(chainID ids.ID, requestID uint32) e
 	return errCrossChainAppRequestFailed
 }
 
-func (vm *TestVM) CrossChainAppResponse(chainID ids.ID, requestID uint32, response []byte) error {
+func (vm *TestVM) CrossChainAppResponse(sourceChainID ids.ID, requestID uint32, response []byte) error {
 	if vm.CrossChainAppResponseF != nil {
-		return vm.CrossChainAppResponseF(chainID, requestID, response)
+		return vm.CrossChainAppResponseF(sourceChainID, requestID, response)
 	}
 	if !vm.CantCrossChainAppResponse {
 		return nil
