@@ -674,7 +674,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 	require.Equal(t, 2, chainRouter.chains[receiverCtx.ChainID].Len())
 
 	// register the cross-chain response so we don't drop it
-	chainRouter.RegisterCrossChainRequest(senderCtx.ChainID, receiverCtx.ChainID, uint32(1), message.CrossChainAppResponse)
+	chainRouter.RegisterRequest(senderCtx.NodeID, senderCtx.ChainID, receiverCtx.ChainID, uint32(1), message.CrossChainAppResponse)
 	chainRouter.HandleInbound(mc.InternalCrossChainAppResponse(senderCtx.ChainID, receiverCtx.ChainID, uint32(1), msg))
 	require.Equal(t, 3, chainRouter.chains[receiverCtx.ChainID].Len())
 

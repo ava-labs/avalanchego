@@ -227,9 +227,9 @@ func (vm *TestVM) CrossChainAppRequestFailed(sourceChainID ids.ID, requestID uin
 	return errCrossChainAppRequestFailed
 }
 
-func (vm *TestVM) CrossChainAppResponse(sourceChainID ids.ID, requestID uint32, response []byte) error {
+func (vm *TestVM) CrossChainAppResponse(destinationChainID ids.ID, requestID uint32, response []byte) error {
 	if vm.CrossChainAppResponseF != nil {
-		return vm.CrossChainAppResponseF(sourceChainID, requestID, response)
+		return vm.CrossChainAppResponseF(destinationChainID, requestID, response)
 	}
 	if !vm.CantCrossChainAppResponse {
 		return nil

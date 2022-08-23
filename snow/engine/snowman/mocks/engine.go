@@ -207,12 +207,12 @@ func (_m *Engine) CrossChainAppRequestFailed(sourceChainID ids.ID, requestID uin
 }
 
 // CrossChainAppResponse provides a mock function with given fields: chainID, requestID, response
-func (_m *Engine) CrossChainAppResponse(sourceChainID ids.ID, requestID uint32, response []byte) error {
-	ret := _m.Called(sourceChainID, requestID, response)
+func (_m *Engine) CrossChainAppResponse(destinationChainID ids.ID, requestID uint32, response []byte) error {
+	ret := _m.Called(destinationChainID, requestID, response)
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(ids.ID, uint32, []byte) error); ok {
-		r0 = rf(sourceChainID, requestID, response)
+		r0 = rf(destinationChainID, requestID, response)
 	} else {
 		r0 = ret.Error(0)
 	}

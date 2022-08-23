@@ -538,9 +538,9 @@ func (e *EngineTest) CrossChainAppRequestFailed(sourceChainID ids.ID, requestID 
 	return errCrossChainAppRequestFailed
 }
 
-func (e *EngineTest) CrossChainAppResponse(sourceChainID ids.ID, requestID uint32, response []byte) error {
+func (e *EngineTest) CrossChainAppResponse(destinationChainID ids.ID, requestID uint32, response []byte) error {
 	if e.CrossChainAppResponseF != nil {
-		return e.CrossChainAppResponseF(sourceChainID, requestID, response)
+		return e.CrossChainAppResponseF(destinationChainID, requestID, response)
 	}
 	if !e.CantCrossChainAppResponse {
 		return nil

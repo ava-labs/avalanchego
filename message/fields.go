@@ -49,7 +49,7 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPackLong
 	case IP:
 		return wrappers.TryPackIP
-	case ChainID, SourceChainID, ContainerID: // TODO: This will be shortened to use a modified varint spec
+	case ChainID, ContainerID: // TODO: This will be shortened to use a modified varint spec
 		return wrappers.TryPackHash
 	case ContainerBytes, AppBytes, SigBytes, SummaryBytes:
 		return wrappers.TryPackBytes
@@ -79,7 +79,7 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpackLong
 	case IP:
 		return wrappers.TryUnpackIP
-	case ChainID, SourceChainID, ContainerID: // TODO: This will be shortened to use a modified varint spec
+	case ChainID, ContainerID: // TODO: This will be shortened to use a modified varint spec
 		return wrappers.TryUnpackHash
 	case ContainerBytes, AppBytes, SigBytes, SummaryBytes:
 		return wrappers.TryUnpackBytes

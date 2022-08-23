@@ -68,7 +68,7 @@ func (n *network) CrossChainAppRequest(sourceChainID ids.ID, requestID uint32, d
 	return nil
 }
 
-func (n *network) CrossChainAppResponse(sourceChainID ids.ID, requestID uint32, response []byte) error {
+func (n *network) CrossChainAppResponse(destinationChainID ids.ID, requestID uint32, response []byte) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil

@@ -953,28 +953,19 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 
 	case message.CrossChainAppRequest:
 		reqID := msg.Get(message.RequestID).(uint32)
-		sourceChainID, err := ids.ToID(msg.Get(message.SourceChainID).([]byte))
-		if err != nil {
-			return err
-		}
+		sourceChainID := msg.Get(message.SourceChainID).(ids.ID)
 		appBytes := msg.Get(message.AppBytes).([]byte)
 		return engine.CrossChainAppRequest(sourceChainID, reqID, msg.ExpirationTime(), appBytes)
 
 	case message.CrossChainAppResponse:
 		reqID := msg.Get(message.RequestID).(uint32)
-		sourceChainID, err := ids.ToID(msg.Get(message.SourceChainID).([]byte))
-		if err != nil {
-			return err
-		}
+		sourceChainID := msg.Get(message.SourceChainID).(ids.ID)
 		appBytes := msg.Get(message.AppBytes).([]byte)
 		return engine.CrossChainAppResponse(sourceChainID, reqID, appBytes)
 
 	case message.CrossChainAppRequestFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		sourceChainID, err := ids.ToID(msg.Get(message.SourceChainID).([]byte))
-		if err != nil {
-			return err
-		}
+		sourceChainID := msg.Get(message.SourceChainID).(ids.ID)
 		return engine.CrossChainAppRequestFailed(sourceChainID, reqID)
 
 	default:

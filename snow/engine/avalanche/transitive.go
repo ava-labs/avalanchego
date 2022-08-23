@@ -243,8 +243,8 @@ func (t *Transitive) CrossChainAppRequestFailed(sourceChainID ids.ID, requestID 
 	return t.VM.CrossChainAppRequestFailed(sourceChainID, requestID)
 }
 
-func (t *Transitive) CrossChainAppResponse(sourceChainID ids.ID, requestID uint32, response []byte) error {
-	return t.VM.CrossChainAppResponse(sourceChainID, requestID, response)
+func (t *Transitive) CrossChainAppResponse(destinationChainID ids.ID, requestID uint32, response []byte) error {
+	return t.VM.CrossChainAppResponse(destinationChainID, requestID, response)
 }
 
 func (t *Transitive) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {

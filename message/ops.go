@@ -258,7 +258,6 @@ func (op Op) Compressible() bool {
 	switch op {
 	case PeerList, Put, Ancestors, PushQuery,
 		AppRequest, AppResponse, AppGossip,
-		CrossChainAppRequest, CrossChainAppResponse,
 		StateSummaryFrontier, GetAcceptedStateSummary, AcceptedStateSummary:
 		return true
 	default:

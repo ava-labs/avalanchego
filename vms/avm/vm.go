@@ -5,11 +5,12 @@ package avm
 
 import (
 	"container/list"
-	stdjson "encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
 	"time"
+
+	stdjson "encoding/json"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -1054,7 +1055,7 @@ func (vm *VM) CrossChainAppRequestFailed(sourceChainID ids.ID, requestID uint32)
 	return nil
 }
 
-func (vm *VM) CrossChainAppResponse(sourceChainID ids.ID, requestID uint32, response []byte) error {
+func (vm *VM) CrossChainAppResponse(destinationChainID ids.ID, requestID uint32, response []byte) error {
 	return nil
 }
 

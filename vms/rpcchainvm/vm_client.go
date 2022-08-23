@@ -584,11 +584,11 @@ func (vm *VMClient) CrossChainAppRequestFailed(sourceChainID ids.ID, requestID u
 	return err
 }
 
-func (vm *VMClient) CrossChainAppResponse(sourceChainID ids.ID, requestID uint32, response []byte) error {
+func (vm *VMClient) CrossChainAppResponse(destinationChainID ids.ID, requestID uint32, response []byte) error {
 	_, err := vm.client.CrossChainAppResponse(
 		context.Background(),
 		&vmpb.CrossChainAppResponseMsg{
-			ChainId:   sourceChainID[:],
+			ChainId:   destinationChainID[:],
 			RequestId: requestID,
 			Response:  response,
 		},
