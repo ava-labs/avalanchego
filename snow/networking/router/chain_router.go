@@ -30,7 +30,8 @@ import (
 )
 
 var (
-	errUnknownChain = errors.New("received message for unknown chain")
+	errUnknownChain     = errors.New("received message for unknown chain")
+	errInvalidOperation = errors.New("failed to convert message operation")
 
 	_ Router              = &ChainRouter{}
 	_ benchlist.Benchable = &ChainRouter{}
@@ -131,16 +132,14 @@ func (cr *ChainRouter) Initialize(
 	return nil
 }
 
-// RegisterCrossChainRequest marks that we should expect to receive a reply from the given
-// validator regarding the given chain and the reply should have the given
-// requestID.
-// The type of message we expect is [op].
-// Every registered request must be cleared either by receiving a valid reply
-// and passing it to the appropriate chain or by a timeout.
-// This method registers a timeout that calls such methods if we don't get a
-// reply in time.
+// RegisterCrossChainRequest marks that we should expect to see a reply from
+// [destinationChainID] for a request issued by [sourceChainID]
+//
+// See RegisterRequest for more.
 func (cr *ChainRouter) RegisterCrossChainRequest(sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, op message.Op) {
-	cr.registerRequest(cr.nodeID, sourceChainID, destinationChainID, requestID, op)
+	cr.registerRequest(cr.nodeID, sourceChainID, destinationChainID, requestID, op, func() (message.InboundMessage, error) {
+		return cr.msgCreator.InternalFailedCrossChainRequest(sourceChainID, destinationChainID, requestID), nil
+	})
 }
 
 // RegisterRequest marks that we should expect to receive a reply from the given
@@ -152,10 +151,18 @@ func (cr *ChainRouter) RegisterCrossChainRequest(sourceChainID ids.ID, destinati
 // This method registers a timeout that calls such methods if we don't get a
 // reply in time.
 func (cr *ChainRouter) RegisterRequest(nodeID ids.NodeID, chainID ids.ID, requestID uint32, op message.Op) {
-	cr.registerRequest(nodeID, chainID, chainID, requestID, op)
+	cr.registerRequest(nodeID, chainID, chainID, requestID, op, func() (message.InboundMessage, error) {
+		failedOp, exists := message.ResponseToFailedOps[op]
+		if !exists {
+			// This should never happen
+			return nil, errInvalidOperation
+		}
+
+		return cr.msgCreator.InternalFailedRequest(failedOp, nodeID, chainID, requestID), nil
+	})
 }
 
-func (cr *ChainRouter) registerRequest(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, op message.Op) {
+func (cr *ChainRouter) registerRequest(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, op message.Op, failureMsg func() (message.InboundMessage, error)) {
 	cr.lock.Lock()
 	// When we receive a response message type (Chits, Put, Accepted, etc.)
 	// we validate that we actually sent the corresponding request.
@@ -169,22 +176,17 @@ func (cr *ChainRouter) registerRequest(nodeID ids.NodeID, sourceChainID ids.ID, 
 	cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
 	cr.lock.Unlock()
 
-	failedOp, exists := message.ResponseToFailedOps[op]
-	if !exists {
-		// This should never happen
-		cr.log.Error("failed to convert message operation",
-			zap.Stringer("messageOp", op),
-		)
-		return
-	}
-
 	// Register a timeout to fire if we don't get a reply in time.
 	cr.timeoutManager.RegisterRequest(nodeID, destinationChainID, op, uniqueRequestID, func() {
-		var msg message.InboundMessage
-		if sourceChainID != destinationChainID {
-			msg = cr.msgCreator.InternalCrossChainAppRequestFailed(sourceChainID, destinationChainID, requestID)
-		} else {
-			msg = cr.msgCreator.InternalFailedRequest(failedOp, nodeID, destinationChainID, requestID)
+		msg, err := failureMsg()
+		if err != nil {
+			cr.log.Error(
+				"failed to construct failure message",
+				zap.Error(err),
+				zap.Stringer("messageOp", op),
+			)
+
+			return
 		}
 		cr.HandleInbound(msg)
 	})
@@ -226,6 +228,9 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	switch op {
 	case message.CrossChainAppRequest, message.CrossChainAppResponse,
 		message.CrossChainAppRequestFailed:
+		// Cross-chain messages are always guaranteed to be local,
+		// so we can use our own NodeID.
+		nodeID = cr.nodeID
 		sourceChainID, err = ids.ToID(msg.Get(message.SourceChainID).([]byte))
 		cr.log.AssertNoError(err)
 		nodeID, err := ids.ToNodeID(msg.Get(message.NodeID).([]byte))

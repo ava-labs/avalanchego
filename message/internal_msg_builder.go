@@ -75,7 +75,7 @@ func (i internalMsgBuilder) InternalFailedRequest(
 	}
 }
 
-func (internalMsgBuilder) InternalFailedCrossChainRequest(
+func (internalMsgBuilder) InternalFailedCrossChainAppRequest(
 	op Op,
 	nodeID ids.NodeID,
 	sourceChainID ids.ID,
