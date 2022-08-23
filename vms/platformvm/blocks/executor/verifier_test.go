@@ -351,8 +351,8 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	// Set expectations for dependencies.
 	timestamp := time.Now()
 	gomock.InOrder(
-		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
 		s.EXPECT().GetTimestamp().Return(timestamp).Times(1),
+		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
 		parentOnCommitState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
 	)
 
@@ -418,8 +418,8 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	// Set expectations for dependencies.
 	timestamp := time.Now()
 	gomock.InOrder(
-		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
 		s.EXPECT().GetTimestamp().Return(timestamp).Times(1),
+		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
 		parentOnAbortState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
 	)
 
@@ -469,6 +469,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 	require.NoError(err)
 
 	// Set expectations for dependencies.
+	s.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	s.EXPECT().GetStatelessBlock(parentID).Return(nil, choices.Unknown, database.ErrNotFound).Times(1)
 
 	// Verify the block.

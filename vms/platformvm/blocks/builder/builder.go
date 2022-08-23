@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks/forks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -209,11 +208,9 @@ func (b *builder) buildBlock() (blocks.Block, error) {
 	}
 	// [timestamp] = min(max(now, parentTime), nextStakerChangeTime)
 
-	currentFork := b.txExecutorBackend.Config.GetFork(timestamp)
-
-	// select transactions to include based on the current fork
-	switch currentFork {
-	case forks.Blueberry:
+	// If the timestamp has passed to a point that the network should have
+	// blueberry activated, then build blueberry blocks.
+	if b.txExecutorBackend.Config.IsBlueberryActivated(timestamp) {
 		return buildBlueberryBlock(
 			b,
 			preferredID,
@@ -222,18 +219,16 @@ func (b *builder) buildBlock() (blocks.Block, error) {
 			timeWasCapped,
 			preferredState,
 		)
-	case forks.Apricot:
-		return buildApricotBlock(
-			b,
-			preferredID,
-			nextHeight,
-			timestamp,
-			timeWasCapped,
-			preferredState,
-		)
-	default:
-		return nil, fmt.Errorf("unsupported fork %s", currentFork)
 	}
+
+	return buildApricotBlock(
+		b,
+		preferredID,
+		nextHeight,
+		timestamp,
+		timeWasCapped,
+		preferredState,
+	)
 }
 
 func (b *builder) Shutdown() {

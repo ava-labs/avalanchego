@@ -383,7 +383,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 			return errStakeOverflow
 		}
 
-		if !currentTimestamp.Before(e.Config.ApricotPhase3Time) {
+		if e.Config.IsApricotPhase3Activated(currentTimestamp) {
 			maximumWeight = math.Min64(maximumWeight, e.Config.MaxValidatorStake)
 		}
 
