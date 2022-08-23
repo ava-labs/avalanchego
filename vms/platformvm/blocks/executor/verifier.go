@@ -574,13 +574,13 @@ func (v *verifier) blueberryNonOption(b blocks.BlueberryBlock) error {
 	if err != nil {
 		return fmt.Errorf("could not verify block timestamp: %w", err)
 	}
-	localTime := v.clk.Time()
+	now := v.clk.Time()
 
 	return executor.ValidateProposedChainTime(
 		blkTime,
 		parentBlkTime,
 		nextStakerChangeTime,
-		localTime,
+		now,
 		false, /*enforceStrictness*/
 	)
 }
