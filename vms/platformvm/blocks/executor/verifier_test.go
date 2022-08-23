@@ -342,7 +342,10 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 		},
 	}
 
-	blk, err := blocks.NewApricotCommitBlock(parentID, 2 /*height*/)
+	blk, err := blocks.NewApricotCommitBlock(
+		parentID,
+		2,
+	)
 	require.NoError(err)
 
 	// Set expectations for dependencies.
@@ -406,7 +409,10 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 		},
 	}
 
-	blk, err := blocks.NewApricotAbortBlock(parentID, 2 /*height*/)
+	blk, err := blocks.NewApricotAbortBlock(
+		parentID,
+		2,
+	)
 	require.NoError(err)
 
 	// Set expectations for dependencies.

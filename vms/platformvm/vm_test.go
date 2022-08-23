@@ -640,11 +640,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	}
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
-	statelessBlk, err := blocks.NewApricotProposalBlock(
-		preferredID,
-		preferredHeight+1,
-		tx,
-	)
+	statelessBlk, err := blocks.NewApricotProposalBlock(preferredID, preferredHeight+1, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
