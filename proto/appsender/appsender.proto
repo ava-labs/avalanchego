@@ -53,7 +53,7 @@ message SendCrossChainAppRequestMsg {
 }
 
 message SendCrossChainAppResponseMsg {
-  // The chain to send this request to
+  // The chain this request was sent from
   bytes chain_id = 1;
   // the ID of this request
   uint32 request_id = 2;
