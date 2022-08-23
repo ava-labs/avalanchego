@@ -131,6 +131,18 @@ func (cr *ChainRouter) Initialize(
 	return nil
 }
 
+// RegisterCrossChainRequest marks that we should expect to receive a reply from the given
+// validator regarding the given chain and the reply should have the given
+// requestID.
+// The type of message we expect is [op].
+// Every registered request must be cleared either by receiving a valid reply
+// and passing it to the appropriate chain or by a timeout.
+// This method registers a timeout that calls such methods if we don't get a
+// reply in time.
+func (cr *ChainRouter) RegisterCrossChainRequest(sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, op message.Op) {
+	cr.registerRequest(cr.nodeID, sourceChainID, destinationChainID, requestID, op)
+}
+
 // RegisterRequest marks that we should expect to receive a reply from the given
 // validator regarding the given chain and the reply should have the given
 // requestID.
@@ -139,7 +151,11 @@ func (cr *ChainRouter) Initialize(
 // and passing it to the appropriate chain or by a timeout.
 // This method registers a timeout that calls such methods if we don't get a
 // reply in time.
-func (cr *ChainRouter) RegisterRequest(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, op message.Op) {
+func (cr *ChainRouter) RegisterRequest(nodeID ids.NodeID, chainID ids.ID, requestID uint32, op message.Op) {
+	cr.registerRequest(nodeID, chainID, chainID, requestID, op)
+}
+
+func (cr *ChainRouter) registerRequest(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, op message.Op) {
 	cr.lock.Lock()
 	// When we receive a response message type (Chits, Put, Accepted, etc.)
 	// we validate that we actually sent the corresponding request.
@@ -166,7 +182,7 @@ func (cr *ChainRouter) RegisterRequest(nodeID ids.NodeID, sourceChainID ids.ID, 
 	cr.timeoutManager.RegisterRequest(nodeID, destinationChainID, op, uniqueRequestID, func() {
 		var msg message.InboundMessage
 		if sourceChainID != destinationChainID {
-			msg = cr.msgCreator.InternalCrossChainAppRequestFailed(cr.nodeID, sourceChainID, destinationChainID, requestID)
+			msg = cr.msgCreator.InternalCrossChainAppRequestFailed(sourceChainID, destinationChainID, requestID)
 		} else {
 			msg = cr.msgCreator.InternalFailedRequest(failedOp, nodeID, destinationChainID, requestID)
 		}
