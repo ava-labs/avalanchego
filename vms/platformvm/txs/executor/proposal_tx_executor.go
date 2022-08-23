@@ -39,6 +39,7 @@ var (
 	errStakeTooLong              = errors.New("staking period is too long")
 	errInsufficientDelegationFee = errors.New("staker charges an insufficient delegation fee")
 	errFutureStakeTime           = fmt.Errorf("staker is attempting to start staking more than %s ahead of the current chain time", MaxFutureStartTime)
+	errChildBlockNotAfterParent  = errors.New("proposed timestamp not after current chain time")
 	errWrongNumberOfCredentials  = errors.New("should have the same number of credentials as inputs")
 	errValidatorSubset           = errors.New("all subnets' staking period must be a subset of the primary network")
 	errStakeOverflow             = errors.New("validator stake exceeds limit")
@@ -444,6 +445,18 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		return errWrongNumberOfCredentials
 	}
 
+	// Validate [newChainTime]
+	newChainTime := tx.Timestamp()
+	parentChainTime := e.OnCommitState.GetTimestamp()
+	if !newChainTime.After(parentChainTime) {
+		return fmt.Errorf(
+			"%w, proposed timestamp (%s), chain time (%s)",
+			errChildBlockNotAfterParent,
+			parentChainTime,
+			parentChainTime,
+		)
+	}
+
 	// Only allow timestamp to move forward as far as the time of next staker
 	// set change time
 	nextStakerChangeTime, err := GetNextStakerChangeTime(e.OnCommitState)
@@ -451,48 +464,25 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		return err
 	}
 
-	// Validate [proposedChainTime]
-	var (
-		proposedChainTime = tx.Timestamp()
-		now               = e.Clk.Time()
-		currentChainTime  = e.OnCommitState.GetTimestamp()
-	)
-	if err := ValidateProposedChainTime(
-		proposedChainTime,
-		currentChainTime,
+	now := e.Clk.Time()
+	if err := VerifyNewChainTime(
+		newChainTime,
 		nextStakerChangeTime,
 		now,
-		true, /*enforceStrictness*/
 	); err != nil {
 		return err
 	}
 
-	updated, err := UpdateStakerSet(e.OnCommitState, proposedChainTime, e.Backend.Rewards)
+	changes, err := AdvanceTimeTo(e.OnCommitState, newChainTime, e.Backend.Rewards)
 	if err != nil {
 		return err
 	}
 
 	// Update the state if this tx is committed
-	e.OnCommitState.SetTimestamp(proposedChainTime)
-	e.OnCommitState.SetCurrentSupply(updated.Supply)
+	e.OnCommitState.SetTimestamp(newChainTime)
+	changes.Apply(e.OnCommitState)
 
-	for _, currentValidatorToAdd := range updated.CurrentValidatorsToAdd {
-		e.OnCommitState.PutCurrentValidator(currentValidatorToAdd)
-	}
-	for _, pendingValidatorToRemove := range updated.PendingValidatorsToRemove {
-		e.OnCommitState.DeletePendingValidator(pendingValidatorToRemove)
-	}
-	for _, currentDelegatorToAdd := range updated.CurrentDelegatorsToAdd {
-		e.OnCommitState.PutCurrentDelegator(currentDelegatorToAdd)
-	}
-	for _, pendingDelegatorToRemove := range updated.PendingDelegatorsToRemove {
-		e.OnCommitState.DeletePendingDelegator(pendingDelegatorToRemove)
-	}
-	for _, currentValidatorToRemove := range updated.CurrentValidatorsToRemove {
-		e.OnCommitState.DeleteCurrentValidator(currentValidatorToRemove)
-	}
-
-	e.PrefersCommit = !proposedChainTime.After(now.Add(SyncBound))
+	e.PrefersCommit = !newChainTime.After(now.Add(SyncBound))
 
 	// Note that state doesn't change if this proposal is aborted
 	return nil

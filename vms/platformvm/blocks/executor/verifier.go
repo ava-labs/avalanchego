@@ -21,6 +21,7 @@ var (
 
 	errBlueberryBlockIssuedBeforeFork        = errors.New("blueberry block issued before fork")
 	errApricotBlockIssuedAfterFork           = errors.New("apricot block issued after fork")
+	errChildBlockEarlierThanParent           = errors.New("proposed timestamp before current chain time")
 	errConflictingBatchTxs                   = errors.New("block contains conflicting transactions")
 	errConflictingParentTxs                  = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
 	errAdvanceTimeTxCannotBeIncluded         = errors.New("advance time tx cannot be included in BlueberryProposalBlock")
@@ -118,30 +119,16 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 
 	// Apply the changes, if any, from advancing the chain time.
 	nextChainTime := b.Timestamp()
-	updated, err := executor.UpdateStakerSet(parentState, nextChainTime, v.txExecutorBackend.Rewards)
+	changes, err := executor.AdvanceTimeTo(parentState, nextChainTime, v.txExecutorBackend.Rewards)
 	if err != nil {
 		return err
 	}
-	for _, state := range []state.Diff{onCommitState, onAbortState} {
-		state.SetTimestamp(nextChainTime)
-		state.SetCurrentSupply(updated.Supply)
 
-		for _, currentValidatorToAdd := range updated.CurrentValidatorsToAdd {
-			state.PutCurrentValidator(currentValidatorToAdd)
-		}
-		for _, pendingValidatorToRemove := range updated.PendingValidatorsToRemove {
-			state.DeletePendingValidator(pendingValidatorToRemove)
-		}
-		for _, currentDelegatorToAdd := range updated.CurrentDelegatorsToAdd {
-			state.PutCurrentDelegator(currentDelegatorToAdd)
-		}
-		for _, pendingDelegatorToRemove := range updated.PendingDelegatorsToRemove {
-			state.DeletePendingDelegator(pendingDelegatorToRemove)
-		}
-		for _, currentValidatorToRemove := range updated.CurrentValidatorsToRemove {
-			state.DeleteCurrentValidator(currentValidatorToRemove)
-		}
-	}
+	onCommitState.SetTimestamp(nextChainTime)
+	changes.Apply(onCommitState)
+
+	onAbortState.SetTimestamp(nextChainTime)
+	changes.Apply(onAbortState)
 
 	// Check the transaction's validity.
 	txExecutor := executor.ProposalTxExecutor{
@@ -199,7 +186,7 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 
 	// Having verifier block timestamp, we update staker set
 	// before processing block transaction
-	updated, err := executor.UpdateStakerSet(parentState, nextChainTime, v.txExecutorBackend.Rewards)
+	changes, err := executor.AdvanceTimeTo(parentState, nextChainTime, v.txExecutorBackend.Rewards)
 	if err != nil {
 		return err
 	}
@@ -209,23 +196,7 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 		return err
 	}
 	onAcceptState.SetTimestamp(nextChainTime)
-	onAcceptState.SetCurrentSupply(updated.Supply)
-
-	for _, currentValidatorToAdd := range updated.CurrentValidatorsToAdd {
-		onAcceptState.PutCurrentValidator(currentValidatorToAdd)
-	}
-	for _, pendingValidatorToRemove := range updated.PendingValidatorsToRemove {
-		onAcceptState.DeletePendingValidator(pendingValidatorToRemove)
-	}
-	for _, currentDelegatorToAdd := range updated.CurrentDelegatorsToAdd {
-		onAcceptState.PutCurrentDelegator(currentDelegatorToAdd)
-	}
-	for _, pendingDelegatorToRemove := range updated.PendingDelegatorsToRemove {
-		onAcceptState.DeletePendingDelegator(pendingDelegatorToRemove)
-	}
-	for _, currentValidatorToRemove := range updated.CurrentValidatorsToRemove {
-		onAcceptState.DeleteCurrentValidator(currentValidatorToRemove)
-	}
+	changes.Apply(onAcceptState)
 
 	// Finally we process block transaction
 	funcs := make([]func(), 0, len(b.Transactions))
@@ -603,29 +574,32 @@ func (v *verifier) blueberryNonOptionBlock(b blocks.BlueberryBlock) error {
 	}
 
 	parentID := b.Parent()
-	parentBlk, err := v.GetBlock(parentID)
-	if err != nil {
-		return err
-	}
-	parentBlkTime := v.getTimestamp(parentBlk)
-	blkTime := b.Timestamp()
-
 	parentState, ok := v.GetState(parentID)
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
+
+	newChainTime := b.Timestamp()
+	parentChainTime := parentState.GetTimestamp()
+	if newChainTime.Before(parentChainTime) {
+		return fmt.Errorf(
+			"%w: proposed timestamp (%s), chain time (%s)",
+			errChildBlockEarlierThanParent,
+			newChainTime,
+			parentChainTime,
+		)
+	}
+
 	nextStakerChangeTime, err := executor.GetNextStakerChangeTime(parentState)
 	if err != nil {
 		return fmt.Errorf("could not verify block timestamp: %w", err)
 	}
-	now := v.txExecutorBackend.Clk.Time()
 
-	return executor.ValidateProposedChainTime(
-		blkTime,
-		parentBlkTime,
+	now := v.txExecutorBackend.Clk.Time()
+	return executor.VerifyNewChainTime(
+		newChainTime,
 		nextStakerChangeTime,
 		now,
-		false, /*enforceStrictness*/
 	)
 }
 
