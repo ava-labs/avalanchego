@@ -263,10 +263,8 @@ type noOpAppHandler struct {
 	log logging.Logger
 }
 
-func NewNoOpAppHandler(logger logging.Logger) AppHandler {
-	return &noOpAppHandler{
-		log: logger,
-	}
+func NewNoOpAppHandler(log logging.Logger) AppHandler {
+	return &noOpAppHandler{log: log}
 }
 
 func (nop *noOpAppHandler) CrossChainAppRequest(sourceChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {

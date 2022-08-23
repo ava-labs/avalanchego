@@ -32,8 +32,7 @@ import (
 var (
 	errUnknownChain = errors.New("received message for unknown chain")
 
-	_ Router = &ChainRouter{}
-
+	_ Router              = &ChainRouter{}
 	_ benchlist.Benchable = &ChainRouter{}
 )
 
@@ -130,15 +129,16 @@ func (cr *ChainRouter) Initialize(
 	return nil
 }
 
-// RegisterRequest marks that we should expect to receive a reply from the given
-// validator regarding the given chain and the reply should have the given
-// requestID.
+// RegisterRequest marks that we should expect to receive a reply for a request
+// issued by [sourceChainID] from the given validator's [destinationChainID]
+// and the reply should have the given requestID.
+//
 // The type of message we expect is [op].
+//
 // Every registered request must be cleared either by receiving a valid reply
 // and passing it to the appropriate chain or by a timeout.
 // This method registers a timeout that calls such methods if we don't get a
 // reply in time.
-// See RegisterRequest for more.
 func (cr *ChainRouter) RegisterRequest(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, op message.Op) {
 	cr.lock.Lock()
 	// When we receive a response message type (Chits, Put, Accepted, etc.)
