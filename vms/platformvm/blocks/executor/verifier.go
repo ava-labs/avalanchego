@@ -34,13 +34,6 @@ type verifier struct {
 }
 
 func (v *verifier) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
-	blkID := b.ID()
-
-	if _, ok := v.blkIDToState[blkID]; ok {
-		// This block has already been verified.
-		return nil
-	}
-
 	if err := v.blueberryOptionBlock(b); err != nil {
 		return err
 	}
@@ -51,6 +44,7 @@ func (v *verifier) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 
+	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
 		onAcceptState:  onAcceptState,
@@ -60,13 +54,6 @@ func (v *verifier) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
 }
 
 func (v *verifier) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
-	blkID := b.ID()
-
-	if _, ok := v.blkIDToState[blkID]; ok {
-		// This block has already been verified.
-		return nil
-	}
-
 	if err := v.blueberryOptionBlock(b); err != nil {
 		return err
 	}
@@ -77,6 +64,7 @@ func (v *verifier) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 
+	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
 		onAcceptState:  onAcceptState,
@@ -86,13 +74,6 @@ func (v *verifier) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
 }
 
 func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) error {
-	blkID := b.ID()
-
-	if _, ok := v.blkIDToState[blkID]; ok {
-		// This block has already been verified.
-		return nil
-	}
-
 	if err := v.blueberryNonOptionBlock(b); err != nil {
 		return err
 	}
@@ -142,6 +123,7 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 	onCommitState.AddTx(b.Tx, status.Committed)
 	onAbortState.AddTx(b.Tx, status.Aborted)
 
+	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
 		proposalBlockState: proposalBlockState{
 			initiallyPreferCommit: txExecutor.PrefersCommit,
@@ -156,13 +138,6 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 }
 
 func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) error {
-	blkID := b.ID()
-
-	if _, ok := v.blkIDToState[blkID]; ok {
-		// This block has already been verified.
-		return nil
-	}
-
 	if err := v.blueberryNonOptionBlock(b); err != nil {
 		return err
 	}
@@ -247,19 +222,13 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 		}
 	}
 
+	blkID := b.ID()
 	v.blkIDToState[blkID] = blkState
 	v.Mempool.RemoveDecisionTxs(b.Transactions)
 	return nil
 }
 
 func (v *verifier) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
-	blkID := b.ID()
-
-	if _, ok := v.blkIDToState[blkID]; ok {
-		// This block has already been verified.
-		return nil
-	}
-
 	if err := v.commonBlock(b); err != nil {
 		return err
 	}
@@ -276,6 +245,7 @@ func (v *verifier) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 		return fmt.Errorf("%w: timestamp = %s", errApricotBlockIssuedAfterFork, timestamp)
 	}
 
+	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
 		onAcceptState:  onAcceptState,
@@ -285,13 +255,6 @@ func (v *verifier) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 }
 
 func (v *verifier) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
-	blkID := b.ID()
-
-	if _, ok := v.blkIDToState[blkID]; ok {
-		// This block has already been verified.
-		return nil
-	}
-
 	if err := v.commonBlock(b); err != nil {
 		return err
 	}
@@ -308,6 +271,7 @@ func (v *verifier) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 		return fmt.Errorf("%w: timestamp = %s", errApricotBlockIssuedAfterFork, timestamp)
 	}
 
+	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
 		onAcceptState:  onAcceptState,
@@ -317,13 +281,6 @@ func (v *verifier) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 }
 
 func (v *verifier) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
-	blkID := b.ID()
-
-	if _, ok := v.blkIDToState[blkID]; ok {
-		// This block has already been verified.
-		return nil
-	}
-
 	if err := v.commonBlock(b); err != nil {
 		return err
 	}
@@ -359,6 +316,7 @@ func (v *verifier) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 	onCommitState.AddTx(b.Tx, status.Committed)
 	onAbortState.AddTx(b.Tx, status.Aborted)
 
+	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
 		proposalBlockState: proposalBlockState{
 			onCommitState:         onCommitState,
@@ -376,17 +334,6 @@ func (v *verifier) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 }
 
 func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
-	blkID := b.ID()
-
-	if _, ok := v.blkIDToState[blkID]; ok {
-		// This block has already been verified.
-		return nil
-	}
-	blkState := &blockState{
-		statelessBlock: b,
-		atomicRequests: make(map[ids.ID]*atomic.Requests),
-	}
-
 	if err := v.commonBlock(b); err != nil {
 		return err
 	}
@@ -401,6 +348,12 @@ func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 	timestamp := onAcceptState.GetTimestamp()
 	if v.cfg.IsBlueberryActivated(timestamp) {
 		return fmt.Errorf("%w: timestamp = %s", errApricotBlockIssuedAfterFork, timestamp)
+	}
+
+	blkState := &blockState{
+		statelessBlock: b,
+		onAcceptState:  onAcceptState,
+		atomicRequests: make(map[ids.ID]*atomic.Requests),
 	}
 
 	funcs := make([]func(), 0, len(b.Transactions))
@@ -454,21 +407,14 @@ func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 		}
 	}
 	blkState.timestamp = onAcceptState.GetTimestamp()
-	blkState.onAcceptState = onAcceptState
 
+	blkID := b.ID()
 	v.blkIDToState[blkID] = blkState
 	v.Mempool.RemoveDecisionTxs(b.Transactions)
 	return nil
 }
 
 func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
-	blkID := b.ID()
-
-	if _, ok := v.blkIDToState[blkID]; ok {
-		// This block has already been verified.
-		return nil
-	}
-
 	if err := v.commonBlock(b); err != nil {
 		return err
 	}
@@ -514,6 +460,7 @@ func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 		return err
 	}
 
+	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
 		standardBlockState: standardBlockState{
 			inputs: atomicExecutor.Inputs,

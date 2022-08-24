@@ -64,6 +64,10 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 		},
 		backend: backend,
 	}
+	manager := &manager{
+		backend:  backend,
+		verifier: verifier,
+	}
 
 	blkTx := txs.NewMockUnsignedTx(ctrl)
 	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.ProposalTxExecutor{})).Return(nil).Times(1)
@@ -73,7 +77,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	// Serialize this block with a dummy tx
 	// and replace it after creation with the mock tx.
 	// TODO allow serialization of mock txs.
-	blk, err := blocks.NewApricotProposalBlock(
+	apricotBlk, err := blocks.NewApricotProposalBlock(
 		parentID,
 		2,
 		&txs.Tx{
@@ -82,19 +86,20 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 		},
 	)
 	require.NoError(err)
-	blk.Tx.Unsigned = blkTx
+	apricotBlk.Tx.Unsigned = blkTx
 
 	// Set expectations for dependencies.
-	tx := blk.Txs()[0]
+	tx := apricotBlk.Txs()[0]
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	mempool.EXPECT().RemoveProposalTx(tx).Times(1)
 
 	// Visit the block
-	err = verifier.ApricotProposalBlock(blk)
+	blk := manager.NewBlock(apricotBlk)
+	err = blk.Verify()
 	require.NoError(err)
-	require.Contains(verifier.backend.blkIDToState, blk.ID())
-	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
-	require.Equal(blk, gotBlkState.statelessBlock)
+	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
+	gotBlkState := verifier.backend.blkIDToState[apricotBlk.ID()]
+	require.Equal(apricotBlk, gotBlkState.statelessBlock)
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Assert that the expected tx statuses are set.
@@ -107,7 +112,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	require.Equal(status.Aborted, gotStatus)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.ApricotProposalBlock(blk)
+	err = blk.Verify()
 	require.NoError(err)
 }
 
@@ -150,6 +155,10 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 		},
 		backend: backend,
 	}
+	manager := &manager{
+		backend:  backend,
+		verifier: verifier,
+	}
 
 	onAccept := state.NewMockDiff(ctrl)
 	blkTx := txs.NewMockUnsignedTx(ctrl)
@@ -166,7 +175,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	// Serialize this block with a dummy tx and replace it after creation with
 	// the mock tx.
 	// TODO allow serialization of mock txs.
-	blk, err := blocks.NewApricotAtomicBlock(
+	apricotBlk, err := blocks.NewApricotAtomicBlock(
 		parentID,
 		2,
 		&txs.Tx{
@@ -175,29 +184,30 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 		},
 	)
 	require.NoError(err)
-	blk.Tx.Unsigned = blkTx
+	apricotBlk.Tx.Unsigned = blkTx
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(2)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	parentStatelessBlk.EXPECT().Parent().Return(grandparentID).Times(1)
-	mempool.EXPECT().RemoveDecisionTxs([]*txs.Tx{blk.Tx}).Times(1)
-	onAccept.EXPECT().AddTx(blk.Tx, status.Committed).Times(1)
+	mempool.EXPECT().RemoveDecisionTxs([]*txs.Tx{apricotBlk.Tx}).Times(1)
+	onAccept.EXPECT().AddTx(apricotBlk.Tx, status.Committed).Times(1)
 	onAccept.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 
-	err = verifier.ApricotAtomicBlock(blk)
+	blk := manager.NewBlock(apricotBlk)
+	err = blk.Verify()
 	require.NoError(err)
 
-	require.Contains(verifier.backend.blkIDToState, blk.ID())
-	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
-	require.Equal(blk, gotBlkState.statelessBlock)
+	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
+	gotBlkState := verifier.backend.blkIDToState[apricotBlk.ID()]
+	require.Equal(apricotBlk, gotBlkState.statelessBlock)
 	require.Equal(onAccept, gotBlkState.onAcceptState)
 	require.Equal(inputs, gotBlkState.inputs)
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.ApricotAtomicBlock(blk)
+	err = blk.Verify()
 	require.NoError(err)
 }
 
@@ -236,6 +246,10 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 		},
 		backend: backend,
 	}
+	manager := &manager{
+		backend:  backend,
+		verifier: verifier,
+	}
 
 	blkTx := txs.NewMockUnsignedTx(ctrl)
 	atomicRequests := map[ids.ID]*atomic.Requests{
@@ -264,7 +278,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	// Serialize this block with a dummy tx
 	// and replace it after creation with the mock tx.
 	// TODO allow serialization of mock txs.
-	blk, err := blocks.NewApricotStandardBlock(
+	apricotBlk, err := blocks.NewApricotStandardBlock(
 		parentID,
 		2, /*height*/
 		[]*txs.Tx{
@@ -275,27 +289,28 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 		},
 	)
 	require.NoError(err)
-	blk.Transactions[0].Unsigned = blkTx
+	apricotBlk.Transactions[0].Unsigned = blkTx
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	parentState.EXPECT().GetCurrentSupply().Return(uint64(10000)).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
-	mempool.EXPECT().RemoveDecisionTxs(blk.Txs()).Times(1)
+	mempool.EXPECT().RemoveDecisionTxs(apricotBlk.Txs()).Times(1)
 
-	err = verifier.ApricotStandardBlock(blk)
+	blk := manager.NewBlock(apricotBlk)
+	err = blk.Verify()
 	require.NoError(err)
 
 	// Assert expected state.
-	require.Contains(verifier.backend.blkIDToState, blk.ID())
-	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
-	require.Equal(blk, gotBlkState.statelessBlock)
+	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
+	gotBlkState := verifier.backend.blkIDToState[apricotBlk.ID()]
+	require.Equal(apricotBlk, gotBlkState.statelessBlock)
 	require.Equal(ids.Set{}, gotBlkState.inputs)
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.ApricotStandardBlock(blk)
+	err = blk.Verify()
 	require.NoError(err)
 }
 
@@ -336,8 +351,12 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 		},
 		backend: backend,
 	}
+	manager := &manager{
+		backend:  backend,
+		verifier: verifier,
+	}
 
-	blk, err := blocks.NewApricotCommitBlock(
+	apricotBlk, err := blocks.NewApricotCommitBlock(
 		parentID,
 		2,
 	)
@@ -351,17 +370,18 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	)
 
 	// Verify the block.
-	err = verifier.ApricotCommitBlock(blk)
+	blk := manager.NewBlock(apricotBlk)
+	err = blk.Verify()
 	require.NoError(err)
 
 	// Assert expected state.
-	require.Contains(verifier.backend.blkIDToState, blk.ID())
-	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
+	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
+	gotBlkState := verifier.backend.blkIDToState[apricotBlk.ID()]
 	require.Equal(parentOnAbortState, gotBlkState.onAcceptState)
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.ApricotCommitBlock(blk)
+	err = blk.Verify()
 	require.NoError(err)
 }
 
@@ -402,8 +422,12 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 		},
 		backend: backend,
 	}
+	manager := &manager{
+		backend:  backend,
+		verifier: verifier,
+	}
 
-	blk, err := blocks.NewApricotAbortBlock(
+	apricotBlk, err := blocks.NewApricotAbortBlock(
 		parentID,
 		2,
 	)
@@ -417,17 +441,18 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	)
 
 	// Verify the block.
-	err = verifier.ApricotAbortBlock(blk)
+	blk := manager.NewBlock(apricotBlk)
+	err = blk.Verify()
 	require.NoError(err)
 
 	// Assert expected state.
-	require.Contains(verifier.backend.blkIDToState, blk.ID())
-	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
+	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
+	gotBlkState := verifier.backend.blkIDToState[apricotBlk.ID()]
 	require.Equal(parentOnAbortState, gotBlkState.onAcceptState)
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.ApricotAbortBlock(blk)
+	err = blk.Verify()
 	require.NoError(err)
 }
 

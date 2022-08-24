@@ -24,6 +24,12 @@ type Block struct {
 }
 
 func (b *Block) Verify() error {
+	blkID := b.ID()
+	if _, ok := b.manager.blkIDToState[blkID]; ok {
+		// This block has already been verified.
+		return nil
+	}
+
 	return b.Visit(b.manager.verifier)
 }
 
