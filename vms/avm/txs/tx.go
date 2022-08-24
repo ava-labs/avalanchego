@@ -27,8 +27,8 @@ type UnsignedTx interface {
 	Initialize(unsignedBytes []byte)
 	Bytes() []byte
 
-	ConsumedAssetIDs() ids.Set
-	AssetIDs() ids.Set
+	ConsumedAssetIDs() ids.Set[ids.ID]
+	AssetIDs() ids.Set[ids.ID]
 
 	NumCredentials() int
 	InputUTXOs() []*avax.UTXOID

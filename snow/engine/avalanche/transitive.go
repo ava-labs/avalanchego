@@ -49,11 +49,11 @@ type Transitive struct {
 	outstandingVtxReqs common.Requests
 
 	// missingTxs tracks transaction that are missing
-	missingTxs ids.Set
+	missingTxs ids.Set[ids.ID]
 
 	// IDs of vertices that are queued to be added to consensus but haven't yet been
 	// because of missing dependencies
-	pending ids.Set
+	pending ids.Set[ids.ID]
 
 	// vtxBlocked tracks operations that are blocked on vertices
 	// txBlocked tracks operations that are blocked on transactions
@@ -481,7 +481,7 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 	if err != nil {
 		return err
 	}
-	txIDs := ids.NewSet(len(txs))
+	txIDs := ids.NewSet[ids.ID](len(txs))
 	for _, tx := range txs {
 		txIDs.Add(tx.ID())
 	}

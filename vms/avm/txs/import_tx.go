@@ -42,7 +42,7 @@ func (t *ImportTx) InputUTXOs() []*avax.UTXOID {
 }
 
 // ConsumedAssetIDs returns the IDs of the assets this transaction consumes
-func (t *ImportTx) ConsumedAssetIDs() ids.Set {
+func (t *ImportTx) ConsumedAssetIDs() ids.Set[ids.ID] {
 	assets := t.BaseTx.AssetIDs()
 	for _, in := range t.ImportedIns {
 		assets.Add(in.AssetID())
@@ -51,7 +51,7 @@ func (t *ImportTx) ConsumedAssetIDs() ids.Set {
 }
 
 // AssetIDs returns the IDs of the assets this transaction depends on
-func (t *ImportTx) AssetIDs() ids.Set {
+func (t *ImportTx) AssetIDs() ids.Set[ids.ID] {
 	assets := t.BaseTx.AssetIDs()
 	for _, in := range t.ImportedIns {
 		assets.Add(in.AssetID())

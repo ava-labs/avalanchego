@@ -52,7 +52,7 @@ type bootstrapper struct {
 	// IDs of validators that failed to respond with their accepted frontier
 	failedAcceptedFrontier ids.NodeIDSet
 	// IDs of all the returned accepted frontiers
-	acceptedFrontierSet ids.Set
+	acceptedFrontierSet ids.Set[ids.ID]
 
 	// IDs of validators we should request filtering the accepted frontier from
 	pendingSendAccepted ids.NodeIDSet

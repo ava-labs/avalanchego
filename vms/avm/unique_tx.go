@@ -288,7 +288,7 @@ func (tx *UniqueTx) HasWhitelist() bool {
 }
 
 // Whitelist is not supported by this transaction type, so [false] is returned.
-func (tx *UniqueTx) Whitelist() (ids.Set, error) {
+func (tx *UniqueTx) Whitelist() (ids.Set[ids.ID], error) {
 	return nil, nil
 }
 

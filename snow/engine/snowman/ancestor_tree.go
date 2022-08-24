@@ -18,13 +18,13 @@ type AncestorTree interface {
 
 type ancestorTree struct {
 	childToParent    map[ids.ID]ids.ID
-	parentToChildren map[ids.ID]ids.Set
+	parentToChildren map[ids.ID]ids.Set[ids.ID]
 }
 
 func NewAncestorTree() AncestorTree {
 	return &ancestorTree{
 		childToParent:    make(map[ids.ID]ids.ID),
-		parentToChildren: make(map[ids.ID]ids.Set),
+		parentToChildren: make(map[ids.ID]ids.Set[ids.ID]),
 	}
 }
 

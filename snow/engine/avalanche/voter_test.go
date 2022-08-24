@@ -54,7 +54,7 @@ func TestVotingFinishesWithAbandonedDep(t *testing.T) {
 		t:         transitive,
 		requestID: 2,
 		response:  []ids.ID{vote2},
-		deps:      ids.NewSet(0),
+		deps:      ids.NewSet[ids.ID](0),
 		vdr:       vdr1,
 	}
 
@@ -62,7 +62,7 @@ func TestVotingFinishesWithAbandonedDep(t *testing.T) {
 		t:         transitive,
 		requestID: 2,
 		response:  []ids.ID{vote2},
-		deps:      ids.NewSet(0),
+		deps:      ids.NewSet[ids.ID](0),
 		vdr:       vdr3,
 	}
 
@@ -75,7 +75,7 @@ func TestVotingFinishesWithAbandonedDep(t *testing.T) {
 	// vote on request 1
 	// add dependency to voter1's vote which has to be fulfilled prior to finishing
 	voter1Dep := ids.GenerateTestID()
-	voter1DepSet := ids.NewSet(1)
+	voter1DepSet := ids.NewSet[ids.ID](1)
 	voter1DepSet.Add(voter1Dep)
 
 	voter1 = &voter{
@@ -90,7 +90,7 @@ func TestVotingFinishesWithAbandonedDep(t *testing.T) {
 		t:         transitive,
 		requestID: 1,
 		response:  []ids.ID{vote1},
-		deps:      ids.NewSet(0),
+		deps:      ids.NewSet[ids.ID](0),
 		vdr:       vdr2,
 	}
 
@@ -155,7 +155,7 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 		t:         transitive,
 		requestID: 3,
 		response:  []ids.ID{vote3},
-		deps:      ids.NewSet(0),
+		deps:      ids.NewSet[ids.ID](0),
 		vdr:       vdr3,
 	}
 
@@ -163,7 +163,7 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 		t:         transitive,
 		requestID: 3,
 		response:  []ids.ID{vote3},
-		deps:      ids.NewSet(0),
+		deps:      ids.NewSet[ids.ID](0),
 		vdr:       vdr2,
 	}
 
@@ -176,14 +176,14 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 	// vote on request 2
 	// add dependency to req2/voter3's vote which has to be fulfilled prior to finishing
 	req2Voter2Dep := ids.GenerateTestID()
-	req2Voter2DepSet := ids.NewSet(1)
+	req2Voter2DepSet := ids.NewSet[ids.ID](1)
 	req2Voter2DepSet.Add(req2Voter2Dep)
 
 	req2Voter1 := &voter{
 		t:         transitive,
 		requestID: 2,
 		response:  []ids.ID{vote2},
-		deps:      ids.NewSet(0),
+		deps:      ids.NewSet[ids.ID](0),
 		vdr:       vdr1,
 	}
 
@@ -204,7 +204,7 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 	// vote on request 1
 	// add dependency to voter1's vote which has to be fulfilled prior to finishing
 	req1Voter1Dep := ids.GenerateTestID()
-	req1Voter1DepSet := ids.NewSet(1)
+	req1Voter1DepSet := ids.NewSet[ids.ID](1)
 	req1Voter1DepSet.Add(req1Voter1Dep)
 	req1Voter1 := &voter{
 		t:         transitive,
@@ -218,7 +218,7 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 		t:         transitive,
 		requestID: 1,
 		response:  []ids.ID{vote1},
-		deps:      ids.NewSet(0),
+		deps:      ids.NewSet[ids.ID](0),
 		vdr:       vdr2,
 	}
 
@@ -290,7 +290,7 @@ func TestSharedDependency(t *testing.T) {
 		t:         transitive,
 		requestID: 3,
 		response:  []ids.ID{vote3},
-		deps:      ids.NewSet(0),
+		deps:      ids.NewSet[ids.ID](0),
 		vdr:       vdr3,
 	}
 
@@ -300,7 +300,7 @@ func TestSharedDependency(t *testing.T) {
 		t:         transitive,
 		requestID: 3,
 		response:  []ids.ID{vote3},
-		deps:      ids.NewSet(0),
+		deps:      ids.NewSet[ids.ID](0),
 		vdr:       vdr2,
 	}
 
@@ -311,7 +311,7 @@ func TestSharedDependency(t *testing.T) {
 
 	// setup common dependency
 	dep := ids.GenerateTestID()
-	depSet := ids.NewSet(1)
+	depSet := ids.NewSet[ids.ID](1)
 	depSet.Add(dep)
 
 	req2Voter1 := &voter{
@@ -329,7 +329,7 @@ func TestSharedDependency(t *testing.T) {
 		t:         transitive,
 		requestID: 2,
 		response:  []ids.ID{vote2},
-		deps:      ids.NewSet(0),
+		deps:      ids.NewSet[ids.ID](0),
 		vdr:       vdr3,
 	}
 
@@ -353,7 +353,7 @@ func TestSharedDependency(t *testing.T) {
 		t:         transitive,
 		requestID: 1,
 		response:  []ids.ID{vote1},
-		deps:      ids.NewSet(0),
+		deps:      ids.NewSet[ids.ID](0),
 		vdr:       vdr2,
 	}
 

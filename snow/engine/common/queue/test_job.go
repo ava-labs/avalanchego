@@ -26,7 +26,7 @@ type TestJob struct {
 	CantHasMissingDependencies bool
 
 	IDF                     func() ids.ID
-	MissingDependenciesF    func() (ids.Set, error)
+	MissingDependenciesF    func() (ids.Set[ids.ID], error)
 	ExecuteF                func() error
 	BytesF                  func() []byte
 	HasMissingDependenciesF func() (bool, error)
@@ -50,7 +50,7 @@ func (j *TestJob) ID() ids.ID {
 	return ids.ID{}
 }
 
-func (j *TestJob) MissingDependencies() (ids.Set, error) {
+func (j *TestJob) MissingDependencies() (ids.Set[ids.ID], error) {
 	if j.MissingDependenciesF != nil {
 		return j.MissingDependenciesF()
 	}

@@ -91,7 +91,7 @@ func NewHeap() Heap { return &maxHeightVertexHeap{} }
 
 type maxHeightVertexHeap struct {
 	heap       priorityQueue
-	elementIDs ids.Set
+	elementIDs ids.Set[ids.ID]
 }
 
 func (vh *maxHeightVertexHeap) Clear() {

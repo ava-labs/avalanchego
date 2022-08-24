@@ -123,8 +123,8 @@ type Config struct {
 	TLSKey crypto.Signer `json:"-"`
 
 	// WhitelistedSubnets of the node.
-	WhitelistedSubnets ids.Set        `json:"whitelistedSubnets"`
-	Beacons            validators.Set `json:"beacons"`
+	WhitelistedSubnets ids.Set[ids.ID] `json:"whitelistedSubnets"`
+	Beacons            validators.Set  `json:"beacons"`
 
 	// Validators are the current validators in the Avalanche network
 	Validators validators.Manager `json:"validators"`

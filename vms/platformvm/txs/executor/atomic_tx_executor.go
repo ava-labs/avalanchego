@@ -23,7 +23,7 @@ type AtomicTxExecutor struct {
 
 	// outputs of visitor execution
 	OnAccept       state.Diff
-	Inputs         ids.Set
+	Inputs         ids.Set[ids.ID]
 	AtomicRequests map[ids.ID]*atomic.Requests
 }
 

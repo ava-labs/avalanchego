@@ -503,7 +503,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 		return nil
 	}
 
-	subnetSet := ids.NewSet(len(args.IDs))
+	subnetSet := ids.NewSet[ids.ID](len(args.IDs))
 	for _, subnetID := range args.IDs {
 		if subnetSet.Contains(subnetID) {
 			continue

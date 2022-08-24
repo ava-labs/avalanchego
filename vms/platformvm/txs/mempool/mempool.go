@@ -98,7 +98,7 @@ type mempool struct {
 	// Value: String repr. of the verification error
 	droppedTxIDs *cache.LRU
 
-	consumedUTXOs ids.Set
+	consumedUTXOs ids.Set[ids.ID]
 
 	blkTimer BlockTimer
 }
@@ -152,7 +152,7 @@ func NewMempool(
 		unissuedProposalTxs:  unissuedProposalTxs,
 		unknownTxs:           unknownTxs,
 		droppedTxIDs:         &cache.LRU{Size: droppedTxIDsCacheSize},
-		consumedUTXOs:        ids.NewSet(initialConsumedUTXOsSize),
+		consumedUTXOs:        ids.NewSet[ids.ID](initialConsumedUTXOsSize),
 		dropIncoming:         false, // enable tx adding by default
 		blkTimer:             blkTimer,
 	}, nil

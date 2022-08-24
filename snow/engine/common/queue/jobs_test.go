@@ -26,7 +26,7 @@ func testJob(t *testing.T, jobID ids.ID, executed *bool, parentID ids.ID, parent
 	return &TestJob{
 		T:   t,
 		IDF: func() ids.ID { return jobID },
-		MissingDependenciesF: func() (ids.Set, error) {
+		MissingDependenciesF: func() (ids.Set[ids.ID], error) {
 			if parentID != ids.Empty && !*parentExecuted {
 				return ids.Set[ids.ID]{parentID: struct{}{}}, nil
 			}
@@ -433,7 +433,7 @@ func TestInitializeNumJobs(t *testing.T) {
 		T: t,
 
 		IDF:                     func() ids.ID { return job0ID },
-		MissingDependenciesF:    func() (ids.Set, error) { return nil, nil },
+		MissingDependenciesF:    func() (ids.Set[ids.ID], error) { return nil, nil },
 		HasMissingDependenciesF: func() (bool, error) { return false, nil },
 		BytesF:                  func() []byte { return []byte{0} },
 	}
@@ -441,7 +441,7 @@ func TestInitializeNumJobs(t *testing.T) {
 		T: t,
 
 		IDF:                     func() ids.ID { return job1ID },
-		MissingDependenciesF:    func() (ids.Set, error) { return nil, nil },
+		MissingDependenciesF:    func() (ids.Set[ids.ID], error) { return nil, nil },
 		HasMissingDependenciesF: func() (bool, error) { return false, nil },
 		BytesF:                  func() []byte { return []byte{1} },
 	}

@@ -274,7 +274,7 @@ func (s *state) DisableCaching() {
 	s.cachingEnabled = false
 }
 
-func (s *state) AddMissingJobIDs(missingIDs ids.Set) error {
+func (s *state) AddMissingJobIDs(missingIDs ids.Set[ids.ID]) error {
 	for missingID := range missingIDs {
 		missingID := missingID
 		if err := s.missingJobIDs.Put(missingID[:], nil); err != nil {
@@ -284,7 +284,7 @@ func (s *state) AddMissingJobIDs(missingIDs ids.Set) error {
 	return nil
 }
 
-func (s *state) RemoveMissingJobIDs(missingIDs ids.Set) error {
+func (s *state) RemoveMissingJobIDs(missingIDs ids.Set[ids.ID]) error {
 	for missingID := range missingIDs {
 		missingID := missingID
 		if err := s.missingJobIDs.Delete(missingID[:]); err != nil {

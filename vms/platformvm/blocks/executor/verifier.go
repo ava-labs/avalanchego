@@ -288,7 +288,7 @@ func (v *verifier) verifyCommonBlock(b *blocks.CommonBlock) error {
 
 // verifyUniqueInputs verifies that the inputs of the given block are not
 // duplicated in any of the parent blocks pinned in memory.
-func (v *verifier) verifyUniqueInputs(block blocks.Block, inputs ids.Set) error {
+func (v *verifier) verifyUniqueInputs(block blocks.Block, inputs ids.Set[ids.ID]) error {
 	if inputs.Len() == 0 {
 		return nil
 	}

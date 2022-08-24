@@ -84,4 +84,4 @@ func (tv *transactionVertex) InputIDs() []ids.ID { return []ids.ID{tv.vtx.ID()} 
 
 func (tv *transactionVertex) HasWhitelist() bool { return tv.vtx.HasWhitelist() }
 
-func (tv *transactionVertex) Whitelist() (ids.Set, error) { return tv.vtx.Whitelist() }
+func (tv *transactionVertex) Whitelist() (ids.Set[ids.ID], error) { return tv.vtx.Whitelist() }

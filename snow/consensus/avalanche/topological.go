@@ -59,18 +59,18 @@ type Topological struct {
 	cg snowstorm.Consensus
 
 	// preferred is the frontier of vtxIDs that are strongly preferred
-	preferred ids.Set
+	preferred ids.Set[ids.ID]
 
 	// virtuous is the frontier of vtxIDs that are strongly virtuous
-	virtuous ids.Set
+	virtuous ids.Set[ids.ID]
 
 	// orphans are the txIDs that are virtuous, but not preferred
-	orphans ids.Set
+	orphans ids.Set[ids.ID]
 
 	// virtuousVoting are the txIDs that are virtuous and still awaiting
 	// additional votes before acceptance. transactionVertices whose vertices
 	// are not considered virtuous are removed from this set.
-	virtuousVoting ids.Set
+	virtuousVoting ids.Set[ids.ID]
 
 	// frontier is the set of vts that have no descendents
 	frontier map[ids.ID]Vertex
@@ -82,7 +82,7 @@ type Topological struct {
 	// Should only be accessed in those methods.
 	// We use this one instance of ids.Set instead of creating a
 	// new ids.Set during each call to [calculateInDegree].
-	leaves ids.Set
+	leaves ids.Set[ids.ID]
 
 	// Kahn nodes used in [calculateInDegree] and [markAncestorInDegrees].
 	// Should only be accessed in those methods.
@@ -212,11 +212,11 @@ func (ta *Topological) VertexIssued(vtx Vertex) bool {
 
 func (ta *Topological) TxIssued(tx snowstorm.Tx) bool { return ta.cg.Issued(tx) }
 
-func (ta *Topological) Orphans() ids.Set { return ta.orphans }
+func (ta *Topological) Orphans() ids.Set[ids.ID] { return ta.orphans }
 
-func (ta *Topological) Virtuous() ids.Set { return ta.virtuous }
+func (ta *Topological) Virtuous() ids.Set[ids.ID] { return ta.virtuous }
 
-func (ta *Topological) Preferences() ids.Set { return ta.preferred }
+func (ta *Topological) Preferences() ids.Set[ids.ID] { return ta.preferred }
 
 func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
 	// Register a new poll call
@@ -384,7 +384,7 @@ func (ta *Topological) markAncestorInDegrees(
 // vertex ancestors.
 func (ta *Topological) pushVotes() (ids.Bag, error) {
 	ta.votes.Clear()
-	txConflicts := make(map[ids.ID]ids.Set, minMapSize)
+	txConflicts := make(map[ids.ID]ids.Set[ids.ID], minMapSize)
 
 	// A leaf is a node with no inbound edges. This removes each leaf and pushes
 	// the votes upwards, potentially creating new leaves, until there are no

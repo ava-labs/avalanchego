@@ -895,7 +895,7 @@ func WhitelistConflictsTest(t *testing.T, factory Factory) {
 	for i := range txIDs {
 		txIDs[i] = ids.GenerateTestID()
 	}
-	allTxIDs := ids.NewSet(n)
+	allTxIDs := ids.NewSet[ids.ID](n)
 	allTxIDs.Add(txIDs...)
 
 	// each spending each other
@@ -917,7 +917,7 @@ func WhitelistConflictsTest(t *testing.T, factory Factory) {
 		}
 	}
 
-	whitelist := ids.NewSet(1)
+	whitelist := ids.NewSet[ids.ID](1)
 	whitelist.Add(ids.GenerateTestID())
 
 	// make whitelist transaction that conflicts with tx outside of its

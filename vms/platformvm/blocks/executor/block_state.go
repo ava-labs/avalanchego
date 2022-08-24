@@ -14,7 +14,7 @@ import (
 
 type standardBlockState struct {
 	onAcceptFunc func()
-	inputs       ids.Set
+	inputs       ids.Set[ids.ID]
 }
 
 type proposalBlockState struct {

@@ -43,15 +43,15 @@ func (tx *ImportTx) InitCtx(ctx *snow.Context) {
 }
 
 // InputUTXOs returns the UTXOIDs of the imported funds
-func (tx *ImportTx) InputUTXOs() ids.Set {
-	set := ids.NewSet(len(tx.ImportedInputs))
+func (tx *ImportTx) InputUTXOs() ids.Set[ids.ID] {
+	set := ids.NewSet[ids.ID](len(tx.ImportedInputs))
 	for _, in := range tx.ImportedInputs {
 		set.Add(in.InputID())
 	}
 	return set
 }
 
-func (tx *ImportTx) InputIDs() ids.Set {
+func (tx *ImportTx) InputIDs() ids.Set[ids.ID] {
 	inputs := tx.BaseTx.InputIDs()
 	atomicInputs := tx.InputUTXOs()
 	inputs.Union(atomicInputs)

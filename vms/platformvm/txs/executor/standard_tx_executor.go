@@ -31,7 +31,7 @@ type StandardTxExecutor struct {
 
 	// outputs of visitor execution
 	OnAccept       func() // may be nil
-	Inputs         ids.Set
+	Inputs         ids.Set[ids.ID]
 	AtomicRequests map[ids.ID]*atomic.Requests // may be nil
 }
 
@@ -148,7 +148,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 
 	currentChainTime := e.State.GetTimestamp()
 
-	e.Inputs = ids.NewSet(len(tx.ImportedInputs))
+	e.Inputs = ids.NewSet[ids.ID](len(tx.ImportedInputs))
 	utxoIDs := make([][]byte, len(tx.ImportedInputs))
 	for i, in := range tx.ImportedInputs {
 		utxoID := in.UTXOID.InputID()

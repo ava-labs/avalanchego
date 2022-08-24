@@ -101,7 +101,7 @@ type bootstrapper struct {
 
 	// IDs of vertices that we will send a GetAncestors request for once we are
 	// not at the max number of outstanding requests
-	needToFetch ids.Set
+	needToFetch ids.Set[ids.ID]
 
 	// Contains IDs of vertices that have recently been processed
 	processedCache *cache.LRU
@@ -204,7 +204,7 @@ func (b *bootstrapper) Ancestors(nodeID ids.NodeID, requestID uint32, vtxs [][]b
 	if err != nil {
 		return err
 	}
-	eligibleVertices := ids.NewSet(len(parents))
+	eligibleVertices := ids.NewSet[ids.ID](len(parents))
 	for _, parent := range parents {
 		eligibleVertices.Add(parent.ID())
 	}

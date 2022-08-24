@@ -18,7 +18,7 @@ type UnsignedTx interface {
 	Bytes() []byte
 
 	// InputIDs returns the set of inputs this transaction consumes
-	InputIDs() ids.Set
+	InputIDs() ids.Set[ids.ID]
 
 	Outputs() []*avax.TransferableOutput
 

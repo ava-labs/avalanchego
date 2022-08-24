@@ -64,7 +64,7 @@ func GetPaginatedUTXOs(
 ) ([]*UTXO, ids.ShortID, ids.ID, error) {
 	var (
 		utxos      []*UTXO
-		seen       ids.Set              // IDs of UTXOs already in the list
+		seen       ids.Set[ids.ID]      // IDs of UTXOs already in the list
 		searchSize = limit              // the limit diminishes which can impact the expected return
 		addrsList  = addrs.SortedList() // enforces the same ordering for pagination
 	)

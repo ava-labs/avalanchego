@@ -15,10 +15,10 @@ type voter struct {
 	vdr       ids.NodeID
 	requestID uint32
 	response  ids.ID
-	deps      ids.Set
+	deps      ids.Set[ids.ID]
 }
 
-func (v *voter) Dependencies() ids.Set { return v.deps }
+func (v *voter) Dependencies() ids.Set[ids.ID] { return v.deps }
 
 // Mark that a dependency has been met.
 func (v *voter) Fulfill(id ids.ID) {

@@ -48,7 +48,7 @@ type vertexJob struct {
 
 func (v *vertexJob) ID() ids.ID { return v.vtx.ID() }
 
-func (v *vertexJob) MissingDependencies() (ids.Set, error) {
+func (v *vertexJob) MissingDependencies() (ids.Set[ids.ID], error) {
 	missing := ids.Set[ids.ID]{}
 	parents, err := v.vtx.Parents()
 	if err != nil {

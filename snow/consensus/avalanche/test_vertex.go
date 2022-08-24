@@ -19,7 +19,7 @@ type TestVertex struct {
 	ParentsV      []Vertex
 	ParentsErrV   error
 	HasWhitelistV bool
-	WhitelistV    ids.Set
+	WhitelistV    ids.Set[ids.ID]
 	WhitelistErrV error
 	HeightV       uint64
 	HeightErrV    error
@@ -28,10 +28,10 @@ type TestVertex struct {
 	BytesV        []byte
 }
 
-func (v *TestVertex) Verify() error                { return v.VerifyErrV }
-func (v *TestVertex) Parents() ([]Vertex, error)   { return v.ParentsV, v.ParentsErrV }
-func (v *TestVertex) HasWhitelist() bool           { return v.HasWhitelistV }
-func (v *TestVertex) Whitelist() (ids.Set, error)  { return v.WhitelistV, v.WhitelistErrV }
-func (v *TestVertex) Height() (uint64, error)      { return v.HeightV, v.HeightErrV }
-func (v *TestVertex) Txs() ([]snowstorm.Tx, error) { return v.TxsV, v.TxsErrV }
-func (v *TestVertex) Bytes() []byte                { return v.BytesV }
+func (v *TestVertex) Verify() error                       { return v.VerifyErrV }
+func (v *TestVertex) Parents() ([]Vertex, error)          { return v.ParentsV, v.ParentsErrV }
+func (v *TestVertex) HasWhitelist() bool                  { return v.HasWhitelistV }
+func (v *TestVertex) Whitelist() (ids.Set[ids.ID], error) { return v.WhitelistV, v.WhitelistErrV }
+func (v *TestVertex) Height() (uint64, error)             { return v.HeightV, v.HeightErrV }
+func (v *TestVertex) Txs() ([]snowstorm.Tx, error)        { return v.TxsV, v.TxsErrV }
+func (v *TestVertex) Bytes() []byte                       { return v.BytesV }

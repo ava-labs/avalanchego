@@ -14,12 +14,12 @@ var _ events.Blockable = &acceptor{}
 type acceptor struct {
 	g        *Directed
 	errs     *wrappers.Errs
-	deps     ids.Set
+	deps     ids.Set[ids.ID]
 	rejected bool
 	txID     ids.ID
 }
 
-func (a *acceptor) Dependencies() ids.Set { return a.deps }
+func (a *acceptor) Dependencies() ids.Set[ids.ID] { return a.deps }
 
 func (a *acceptor) Fulfill(id ids.ID) {
 	a.deps.Remove(id)

@@ -41,16 +41,16 @@ type Consensus interface {
 
 	// Returns the set of virtuous transactions
 	// that have not yet been accepted or rejected
-	Virtuous() ids.Set
+	Virtuous() ids.Set[ids.ID]
 
 	// Returns the currently preferred transactions to be finalized
-	Preferences() ids.Set
+	Preferences() ids.Set[ids.ID]
 
 	// Return the current virtuous transactions that are being voted on.
-	VirtuousVoting() ids.Set
+	VirtuousVoting() ids.Set[ids.ID]
 
 	// Returns the set of transactions conflicting with <Tx>
-	Conflicts(Tx) ids.Set
+	Conflicts(Tx) ids.Set[ids.ID]
 
 	// Collects the results of a network poll. Assumes all transactions
 	// have been previously added. Returns true if any statuses or preferences

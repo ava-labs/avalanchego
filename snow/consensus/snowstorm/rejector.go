@@ -14,19 +14,19 @@ var _ events.Blockable = &rejector{}
 type rejector struct {
 	g        *Directed
 	errs     *wrappers.Errs
-	deps     ids.Set
+	deps     ids.Set[ids.ID]
 	rejected bool // true if the tx has been rejected
 	txID     ids.ID
 }
 
-func (r *rejector) Dependencies() ids.Set { return r.deps }
+func (r *rejector) Dependencies() ids.Set[ids.ID] { return r.deps }
 
 func (r *rejector) Fulfill(ids.ID) {
 	if r.rejected || r.errs.Errored() {
 		return
 	}
 	r.rejected = true
-	asSet := ids.NewSet(1)
+	asSet := ids.NewSet[ids.ID](1)
 	asSet.Add(r.txID)
 	r.errs.Add(r.g.reject(asSet))
 }

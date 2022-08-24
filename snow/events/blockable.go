@@ -11,7 +11,7 @@ import (
 // dependent events being completed.
 type Blockable interface {
 	// IDs that this object is blocking on
-	Dependencies() ids.Set
+	Dependencies() ids.Set[ids.ID]
 	// Notify this object that an event has been fulfilled
 	Fulfill(ids.ID)
 	// Notify this object that an event has been abandoned

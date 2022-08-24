@@ -38,7 +38,7 @@ type Serializer struct {
 	SerializerConfig
 	versionDB *versiondb.Database
 	state     *prefixedState
-	edge      ids.Set
+	edge      ids.Set[ids.ID]
 }
 
 type SerializerConfig struct {

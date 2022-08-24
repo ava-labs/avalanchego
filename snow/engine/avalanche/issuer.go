@@ -17,7 +17,7 @@ type issuer struct {
 	t                 *Transitive
 	vtx               avalanche.Vertex
 	issued, abandoned bool
-	vtxDeps, txDeps   ids.Set
+	vtxDeps, txDeps   ids.Set[ids.ID]
 }
 
 // Register that a vertex we were waiting on has been issued to consensus.
@@ -176,14 +176,14 @@ func (i *issuer) Update() {
 
 type vtxIssuer struct{ i *issuer }
 
-func (vi *vtxIssuer) Dependencies() ids.Set { return vi.i.vtxDeps }
-func (vi *vtxIssuer) Fulfill(id ids.ID)     { vi.i.FulfillVtx(id) }
-func (vi *vtxIssuer) Abandon(ids.ID)        { vi.i.Abandon() }
-func (vi *vtxIssuer) Update()               { vi.i.Update() }
+func (vi *vtxIssuer) Dependencies() ids.Set[ids.ID] { return vi.i.vtxDeps }
+func (vi *vtxIssuer) Fulfill(id ids.ID)             { vi.i.FulfillVtx(id) }
+func (vi *vtxIssuer) Abandon(ids.ID)                { vi.i.Abandon() }
+func (vi *vtxIssuer) Update()                       { vi.i.Update() }
 
 type txIssuer struct{ i *issuer }
 
-func (ti *txIssuer) Dependencies() ids.Set { return ti.i.txDeps }
-func (ti *txIssuer) Fulfill(id ids.ID)     { ti.i.FulfillTx(id) }
-func (ti *txIssuer) Abandon(ids.ID)        { ti.i.Abandon() }
-func (ti *txIssuer) Update()               { ti.i.Update() }
+func (ti *txIssuer) Dependencies() ids.Set[ids.ID] { return ti.i.txDeps }
+func (ti *txIssuer) Fulfill(id ids.ID)             { ti.i.FulfillTx(id) }
+func (ti *txIssuer) Abandon(ids.ID)                { ti.i.Abandon() }
+func (ti *txIssuer) Update()                       { ti.i.Update() }

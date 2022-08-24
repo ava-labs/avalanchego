@@ -36,8 +36,8 @@ func (tx *BaseTx) Initialize(unsignedBytes []byte) { tx.unsignedBytes = unsigned
 
 func (tx *BaseTx) Bytes() []byte { return tx.unsignedBytes }
 
-func (tx *BaseTx) InputIDs() ids.Set {
-	inputIDs := ids.NewSet(len(tx.Ins))
+func (tx *BaseTx) InputIDs() ids.Set[ids.ID] {
+	inputIDs := ids.NewSet[ids.ID](len(tx.Ins))
 	for _, in := range tx.Ins {
 		inputIDs.Add(in.InputID())
 	}

@@ -74,10 +74,10 @@ func (mr *MockUnsignedTxMockRecorder) Initialize(arg0 interface{}) *gomock.Call 
 }
 
 // InputIDs mocks base method
-func (m *MockUnsignedTx) InputIDs() ids.Set {
+func (m *MockUnsignedTx) InputIDs() ids.Set[ids.ID] {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "InputIDs")
-	ret0, _ := ret[0].(ids.Set)
+	ret0, _ := ret[0].(ids.Set[ids.ID])
 	return ret0
 }
 

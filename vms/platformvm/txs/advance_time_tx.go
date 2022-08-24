@@ -37,7 +37,7 @@ func (tx *AdvanceTimeTx) Timestamp() time.Time {
 	return time.Unix(int64(tx.Time), 0)
 }
 
-func (tx *AdvanceTimeTx) InputIDs() ids.Set                   { return nil }
+func (tx *AdvanceTimeTx) InputIDs() ids.Set[ids.ID]           { return nil }
 func (tx *AdvanceTimeTx) Outputs() []*avax.TransferableOutput { return nil }
 func (tx *AdvanceTimeTx) SyntacticVerify(*snow.Context) error { return nil }
 

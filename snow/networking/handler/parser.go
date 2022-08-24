@@ -18,7 +18,7 @@ var (
 func getIDs(field message.Field, msg message.InboundMessage) ([]ids.ID, error) {
 	idsBytes := msg.Get(field).([][]byte)
 	res := make([]ids.ID, len(idsBytes))
-	idSet := ids.NewSet(len(idsBytes))
+	idSet := ids.NewSet[ids.ID](len(idsBytes))
 
 	for i, bytes := range idsBytes {
 		id, err := ids.ToID(bytes)

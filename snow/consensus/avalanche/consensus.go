@@ -48,13 +48,13 @@ type Consensus interface {
 
 	// Returns the set of transaction IDs that are virtuous but not contained in
 	// any preferred vertices.
-	Orphans() ids.Set
+	Orphans() ids.Set[ids.ID]
 
 	// Returns a set of vertex IDs that were virtuous at the last update.
-	Virtuous() ids.Set
+	Virtuous() ids.Set[ids.ID]
 
 	// Returns a set of vertex IDs that are preferred
-	Preferences() ids.Set
+	Preferences() ids.Set[ids.ID]
 
 	// RecordPoll collects the results of a network poll. If a result has not
 	// been added, the result is dropped. Returns if a critical error has

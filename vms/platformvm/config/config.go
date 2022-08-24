@@ -34,7 +34,7 @@ type Config struct {
 	StakingEnabled bool
 
 	// Set of subnets that this node is validating
-	WhitelistedSubnets ids.Set
+	WhitelistedSubnets ids.Set[ids.ID]
 
 	// Fee that must be burned by every create staker transaction
 	AddStakerTxFee uint64

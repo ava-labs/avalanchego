@@ -230,8 +230,8 @@ type JobsWithMissing struct {
 
 	// keep the missing ID set in memory to avoid unnecessary database reads and
 	// writes.
-	missingIDs                            ids.Set
-	removeFromMissingIDs, addToMissingIDs ids.Set
+	missingIDs                            ids.Set[ids.ID]
+	removeFromMissingIDs, addToMissingIDs ids.Set[ids.ID]
 }
 
 func NewWithMissing(

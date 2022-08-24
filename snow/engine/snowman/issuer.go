@@ -13,10 +13,10 @@ type issuer struct {
 	t         *Transitive
 	blk       snowman.Block
 	abandoned bool
-	deps      ids.Set
+	deps      ids.Set[ids.ID]
 }
 
-func (i *issuer) Dependencies() ids.Set { return i.deps }
+func (i *issuer) Dependencies() ids.Set[ids.ID] { return i.deps }
 
 // Mark that a dependency has been met
 func (i *issuer) Fulfill(id ids.ID) {

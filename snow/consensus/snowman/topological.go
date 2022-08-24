@@ -57,7 +57,7 @@ type Topological struct {
 	blocks map[ids.ID]*snowmanBlock // blockID -> snowmanBlock
 
 	// preferredIDs stores the set of IDs that are currently preferred.
-	preferredIDs ids.Set
+	preferredIDs ids.Set[ids.ID]
 
 	// tail is the preferred block with no children
 	tail ids.ID
@@ -66,7 +66,7 @@ type Topological struct {
 	// Should only be accessed in that method.
 	// We use this one instance of ids.Set instead of creating a
 	// new ids.Set during each call to [calculateInDegree].
-	leaves ids.Set
+	leaves ids.Set[ids.ID]
 
 	// Kahn nodes used in [calculateInDegree] and [markAncestorInDegrees].
 	// Should only be accessed in those methods.
