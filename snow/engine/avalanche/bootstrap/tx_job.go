@@ -48,7 +48,7 @@ type txJob struct {
 
 func (t *txJob) ID() ids.ID { return t.tx.ID() }
 func (t *txJob) MissingDependencies() (ids.Set, error) {
-	missing := ids.Set{}
+	missing := ids.Set[ids.ID]{}
 	deps, err := t.tx.Dependencies()
 	if err != nil {
 		return missing, err

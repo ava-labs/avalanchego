@@ -183,7 +183,7 @@ func TestFilterAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	acceptedSet := ids.Set{}
+	acceptedSet := ids.Set[ids.ID]{}
 	acceptedSet.Add(accepted...)
 
 	if acceptedSet.Len() != 2 {

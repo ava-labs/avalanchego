@@ -36,7 +36,7 @@ type SubnetConfig struct {
 
 type subnet struct {
 	lock             sync.RWMutex
-	bootstrapping    ids.Set
+	bootstrapping    ids.Set[ids.ID]
 	once             sync.Once
 	bootstrappedSema chan struct{}
 }

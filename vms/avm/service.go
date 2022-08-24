@@ -464,7 +464,7 @@ func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs
 	}
 
 	now := service.vm.clock.Unix()
-	assetIDs := ids.Set{}               // IDs of assets the address has a non-zero balance of
+	assetIDs := ids.Set[ids.ID]{}       // IDs of assets the address has a non-zero balance of
 	balances := make(map[ids.ID]uint64) // key: ID (as bytes). value: balance of that asset
 	for _, utxo := range utxos {
 		// TODO make this not specific to *secp256k1fx.TransferOutput

@@ -403,7 +403,7 @@ func (dg *Directed) addEdge(src, dst *directedTx) {
 }
 
 func (dg *Directed) Remove(txID ids.ID) error {
-	err := dg.reject(ids.Set{
+	err := dg.reject(ids.Set[ids.ID]{
 		txID: struct{}{},
 	})
 

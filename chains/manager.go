@@ -159,8 +159,8 @@ type ManagerConfig struct {
 	AtomicMemory                *atomic.Memory
 	AVAXAssetID                 ids.ID
 	XChainID                    ids.ID
-	CriticalChains              ids.Set         // Chains that can't exit gracefully
-	WhitelistedSubnets          ids.Set         // Subnets to validate
+	CriticalChains              ids.Set[ids.ID] // Chains that can't exit gracefully
+	WhitelistedSubnets          ids.Set[ids.ID] // Subnets to validate
 	TimeoutManager              timeout.Manager // Manages request timeouts when sending messages to other validators
 	Health                      health.Registerer
 	RetryBootstrap              bool                    // Should Bootstrap be retried

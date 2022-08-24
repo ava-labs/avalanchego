@@ -57,7 +57,7 @@ func (j *TestJob) MissingDependencies() (ids.Set, error) {
 	if j.CantMissingDependencies && j.T != nil {
 		j.T.Fatalf("Unexpectedly called MissingDependencies")
 	}
-	return ids.Set{}, nil
+	return ids.Set[ids.ID]{}, nil
 }
 
 func (j *TestJob) Execute() error {

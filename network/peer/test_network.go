@@ -23,7 +23,7 @@ type testNetwork struct {
 	ip        ips.IPPort
 	version   *version.Application
 	signer    crypto.Signer
-	subnets   ids.Set
+	subnets   ids.Set[ids.ID]
 
 	uptime uint8
 }
@@ -35,7 +35,7 @@ func NewTestNetwork(
 	ipPort ips.IPPort,
 	version *version.Application,
 	signer crypto.Signer,
-	subnets ids.Set,
+	subnets ids.Set[ids.ID],
 	uptime uint8,
 ) Network {
 	return &testNetwork{

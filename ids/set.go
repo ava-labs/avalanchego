@@ -6,8 +6,6 @@ package ids
 import (
 	"encoding/json"
 	"strings"
-
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 const (
@@ -19,39 +17,45 @@ const (
 	clearSizeThreshold = 512
 )
 
+// Settable describes an element that can be in a set.
+type Settable interface {
+	comparable
+	String() string
+}
+
 // Set is a set of IDs
-type Set map[ID]struct{}
+type Set[T Settable] map[T]struct{}
 
 // Return a new set with initial capacity [size].
 // More or less than [size] elements can be added to this set.
-// Using NewSet() rather than ids.Set{} is just an optimization that can
+// Using NewSet() rather than ids.Set[ids.ID]{} is just an optimization that can
 // be used if you know how many elements will be put in this set.
-func NewSet(size int) Set {
+func NewSet[T Settable](size int) Set[T] {
 	if size < 0 {
-		return Set{}
+		return Set[T]{}
 	}
-	return make(map[ID]struct{}, size)
+	return make(map[T]struct{}, size)
 }
 
-func (ids *Set) init(size int) {
+func (ids *Set[T]) init(size int) {
 	if *ids == nil {
 		if minSetSize > size {
 			size = minSetSize
 		}
-		*ids = make(map[ID]struct{}, size)
+		*ids = make(map[T]struct{}, size)
 	}
 }
 
 // Add all the ids to this set, if the id is already in the set, nothing happens
-func (ids *Set) Add(idList ...ID) {
-	ids.init(2 * len(idList))
-	for _, id := range idList {
+func (ids *Set[T]) Add(elts ...T) {
+	ids.init(2 * len(elts))
+	for _, id := range elts {
 		(*ids)[id] = struct{}{}
 	}
 }
 
 // Union adds all the ids from the provided set to this set.
-func (ids *Set) Union(set Set) {
+func (ids *Set[T]) Union(set Set[T]) {
 	ids.init(2 * set.Len())
 	for id := range set {
 		(*ids)[id] = struct{}{}
@@ -59,27 +63,27 @@ func (ids *Set) Union(set Set) {
 }
 
 // Difference removes all the ids from the provided set to this set.
-func (ids *Set) Difference(set Set) {
-	for id := range set {
-		delete(*ids, id)
+func (ids *Set[T]) Difference(set Set[T]) {
+	for elt := range set {
+		delete(*ids, elt)
 	}
 }
 
 // Contains returns true if the set contains this id, false otherwise
-func (ids *Set) Contains(id ID) bool {
-	_, contains := (*ids)[id]
+func (ids *Set[T]) Contains(elt T) bool {
+	_, contains := (*ids)[elt]
 	return contains
 }
 
 // Overlaps returns true if the intersection of the set is non-empty
-func (ids *Set) Overlaps(big Set) bool {
+func (ids *Set[T]) Overlaps(big Set[T]) bool {
 	small := *ids
 	if small.Len() > big.Len() {
 		small, big = big, small
 	}
 
-	for id := range small {
-		if _, ok := big[id]; ok {
+	for elt := range small {
+		if _, ok := big[elt]; ok {
 			return true
 		}
 	}
@@ -87,29 +91,29 @@ func (ids *Set) Overlaps(big Set) bool {
 }
 
 // Len returns the number of ids in this set
-func (ids Set) Len() int { return len(ids) }
+func (ids Set[T]) Len() int { return len(ids) }
 
 // Remove all the id from this set, if the id isn't in the set, nothing happens
-func (ids *Set) Remove(idList ...ID) {
-	for _, id := range idList {
-		delete(*ids, id)
+func (ids *Set[T]) Remove(elts ...T) {
+	for _, elt := range elts {
+		delete(*ids, elt)
 	}
 }
 
 // Clear empties this set
-func (ids *Set) Clear() {
+func (ids *Set[T]) Clear() {
 	if len(*ids) > clearSizeThreshold {
 		*ids = nil
 		return
 	}
-	for key := range *ids {
-		delete(*ids, key)
+	for elt := range *ids {
+		delete(*ids, elt)
 	}
 }
 
 // List converts this set into a list
-func (ids Set) List() []ID {
-	idList := make([]ID, ids.Len())
+func (ids Set[T]) List() []T {
+	idList := make([]T, ids.Len())
 	i := 0
 	for id := range ids {
 		idList[i] = id
@@ -118,16 +122,9 @@ func (ids Set) List() []ID {
 	return idList
 }
 
-// SortedList returns this set as a sorted list
-func (ids Set) SortedList() []ID {
-	lst := ids.List()
-	utils.SortSliceSortable(lst)
-	return lst
-}
-
 // CappedList returns a list of length at most [size].
 // Size should be >= 0. If size < 0, returns nil.
-func (ids Set) CappedList(size int) []ID {
+func (ids Set[T]) CappedList(size int) []T {
 	if size < 0 {
 		return nil
 	}
@@ -135,24 +132,24 @@ func (ids Set) CappedList(size int) []ID {
 		size = l
 	}
 	i := 0
-	idList := make([]ID, size)
-	for id := range ids {
+	idList := make([]T, size)
+	for elt := range ids {
 		if i >= size {
 			break
 		}
-		idList[i] = id
+		idList[i] = elt
 		i++
 	}
 	return idList
 }
 
 // Equals returns true if the sets contain the same elements
-func (ids Set) Equals(oIDs Set) bool {
-	if ids.Len() != oIDs.Len() {
+func (ids Set[T]) Equals(other Set[T]) bool {
+	if ids.Len() != other.Len() {
 		return false
 	}
-	for key := range oIDs {
-		if _, contains := ids[key]; !contains {
+	for elt := range other {
+		if _, contains := ids[elt]; !contains {
 			return false
 		}
 	}
@@ -160,7 +157,7 @@ func (ids Set) Equals(oIDs Set) bool {
 }
 
 // String returns the string representation of a set
-func (ids Set) String() string {
+func (ids Set[T]) String() string {
 	sb := strings.Builder{}
 	sb.WriteString("{")
 	first := true
@@ -177,16 +174,18 @@ func (ids Set) String() string {
 
 // Removes and returns an element. If the set is empty, does nothing and returns
 // false.
-func (ids *Set) Pop() (ID, bool) {
+func (ids *Set[T]) Pop() (T, bool) {
 	for id := range *ids {
 		delete(*ids, id)
 		return id, true
 	}
-	return ID{}, false
+	var t T
+	return t, false
 }
 
-func (ids *Set) MarshalJSON() ([]byte, error) {
+func (ids *Set[T]) MarshalJSON() ([]byte, error) {
 	idsList := ids.List()
-	utils.SortSliceSortable(idsList)
+	// TODO is it possible to do sorting here?
+	// utils.SortSliceOrdered(idsList)
 	return json.Marshal(idsList)
 }

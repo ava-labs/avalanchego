@@ -28,9 +28,9 @@ func testJob(t *testing.T, jobID ids.ID, executed *bool, parentID ids.ID, parent
 		IDF: func() ids.ID { return jobID },
 		MissingDependenciesF: func() (ids.Set, error) {
 			if parentID != ids.Empty && !*parentExecuted {
-				return ids.Set{parentID: struct{}{}}, nil
+				return ids.Set[ids.ID]{parentID: struct{}{}}, nil
 			}
-			return ids.Set{}, nil
+			return ids.Set[ids.ID]{}, nil
 		},
 		HasMissingDependenciesF: func() (bool, error) {
 			if parentID != ids.Empty && !*parentExecuted {
@@ -294,7 +294,7 @@ func TestMissingJobs(t *testing.T) {
 	numMissingIDs := jobs.NumMissingIDs()
 	require.Equal(2, numMissingIDs)
 
-	missingIDSet := ids.Set{}
+	missingIDSet := ids.Set[ids.ID]{}
 	missingIDSet.Add(jobs.MissingIDs()...)
 
 	containsJob0ID := missingIDSet.Contains(job0ID)
@@ -314,7 +314,7 @@ func TestMissingJobs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	missingIDSet = ids.Set{}
+	missingIDSet = ids.Set[ids.ID]{}
 	missingIDSet.Add(jobs.MissingIDs()...)
 
 	containsJob0ID = missingIDSet.Contains(job0ID)

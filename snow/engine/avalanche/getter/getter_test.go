@@ -88,7 +88,7 @@ func TestAcceptedFrontier(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	acceptedSet := ids.Set{}
+	acceptedSet := ids.Set[ids.ID]{}
 	acceptedSet.Add(accepted...)
 
 	manager.EdgeF = nil
@@ -153,7 +153,7 @@ func TestFilterAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	acceptedSet := ids.Set{}
+	acceptedSet := ids.Set[ids.ID]{}
 	acceptedSet.Add(accepted...)
 
 	manager.GetVtxF = nil

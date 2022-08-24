@@ -28,7 +28,7 @@ type metrics struct {
 	nodeUptimeRewardingStake  prometheus.Gauge
 }
 
-func newMetrics(namespace string, registerer prometheus.Registerer, initialSubnetIDs ids.Set) (*metrics, error) {
+func newMetrics(namespace string, registerer prometheus.Registerer, initialSubnetIDs ids.Set[ids.ID]) (*metrics, error) {
 	m := &metrics{
 		numPeers: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,

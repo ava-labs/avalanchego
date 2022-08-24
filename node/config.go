@@ -191,7 +191,7 @@ type Config struct {
 	ConsensusGossipFrequency time.Duration `json:"consensusGossipFreq"`
 
 	// Subnet Whitelist
-	WhitelistedSubnets ids.Set `json:"whitelistedSubnets"`
+	WhitelistedSubnets ids.Set[ids.ID] `json:"whitelistedSubnets"`
 
 	// SubnetConfigs
 	SubnetConfigs map[ids.ID]chains.SubnetConfig `json:"subnetConfigs"`

@@ -386,7 +386,7 @@ func (b *bootstrapper) process(vtxs ...avalanche.Vertex) error {
 		}
 	}
 
-	vtxHeightSet := ids.Set{}
+	vtxHeightSet := ids.Set[ids.ID]{}
 	prevHeight := uint64(0)
 
 	for toProcess.Len() > 0 { // While there are unprocessed vertices

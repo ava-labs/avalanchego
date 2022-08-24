@@ -136,7 +136,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 
 	onAccept := state.NewMockDiff(ctrl)
 	blkTx := txs.NewMockUnsignedTx(ctrl)
-	inputs := ids.Set{ids.GenerateTestID(): struct{}{}}
+	inputs := ids.Set[ids.ID]{ids.GenerateTestID(): struct{}{}}
 	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.AtomicTxExecutor{})).DoAndReturn(
 		func(e *executor.AtomicTxExecutor) error {
 			e.OnAccept = onAccept
@@ -232,7 +232,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.StandardTxExecutor{})).DoAndReturn(
 		func(e *executor.StandardTxExecutor) error {
 			e.OnAccept = func() {}
-			e.Inputs = ids.Set{}
+			e.Inputs = ids.Set[ids.ID]{}
 			e.AtomicRequests = atomicRequests
 			return nil
 		},
@@ -270,7 +270,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	require.Contains(verifier.backend.blkIDToState, blk.ID())
 	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
 	require.Equal(blk, gotBlkState.statelessBlock)
-	require.Equal(ids.Set{}, gotBlkState.inputs)
+	require.Equal(ids.Set[ids.ID]{}, gotBlkState.inputs)
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
@@ -414,7 +414,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	parentState := state.NewMockDiff(ctrl)
-	atomicInputs := ids.Set{
+	atomicInputs := ids.Set[ids.ID]{
 		ids.GenerateTestID(): struct{}{},
 	}
 	verifier := &verifier{

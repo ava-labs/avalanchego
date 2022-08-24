@@ -52,7 +52,7 @@ type blockJob struct {
 
 func (b *blockJob) ID() ids.ID { return b.blk.ID() }
 func (b *blockJob) MissingDependencies() (ids.Set, error) {
-	missing := ids.Set{}
+	missing := ids.Set[ids.ID]{}
 	parentID := b.blk.Parent()
 	if parent, err := b.vm.GetBlock(parentID); err != nil || parent.Status() != choices.Accepted {
 		missing.Add(parentID)

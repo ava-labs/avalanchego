@@ -22,7 +22,7 @@ func TestBlocker(t *testing.T) {
 	a.dependencies = func() ids.Set {
 		*calledDep = true
 
-		s := ids.Set{}
+		s := ids.Set[ids.ID]{}
 		s.Add(id0, id1)
 		return s
 	}
@@ -85,7 +85,7 @@ type testBlockable struct {
 
 func newTestBlockable() *testBlockable {
 	return &testBlockable{
-		dependencies: func() ids.Set { return ids.Set{} },
+		dependencies: func() ids.Set { return ids.Set[ids.ID]{} },
 		fulfill:      func(ids.ID) {},
 		abandon:      func(ids.ID) {},
 		update:       func() {},

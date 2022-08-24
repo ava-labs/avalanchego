@@ -115,7 +115,7 @@ func (ts *Topological) Initialize(ctx *snow.ConsensusContext, params snowball.Pa
 	}
 	ts.Height = heightMetrics
 
-	ts.leaves = ids.Set{}
+	ts.leaves = ids.Set[ids.ID]{}
 	ts.kahnNodes = make(map[ids.ID]kahnNode)
 	ts.ctx = ctx
 	ts.params = params

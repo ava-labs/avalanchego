@@ -545,14 +545,14 @@ func (t *Transitive) batch(txs []snowstorm.Tx, opt batchOption) ([]snowstorm.Tx,
 	if opt.limit && t.Params.OptimalProcessing <= t.Consensus.NumProcessing() {
 		return txs, nil
 	}
-	issuedTxs := ids.Set{}
-	consumed := ids.Set{}
+	issuedTxs := ids.Set[ids.ID]{}
+	consumed := ids.Set[ids.ID]{}
 	orphans := t.Consensus.Orphans()
 	start := 0
 	end := 0
 	for end < len(txs) {
 		tx := txs[end]
-		inputs := ids.Set{}
+		inputs := ids.Set[ids.ID]{}
 		inputs.Add(tx.InputIDs()...)
 		overlaps := consumed.Overlaps(inputs)
 		if end-start >= t.Params.BatchSize || (opt.force && overlaps) {

@@ -112,7 +112,7 @@ func (ta *Topological) Initialize(
 
 	ta.ctx = ctx
 	ta.params = params
-	ta.leaves = ids.Set{}
+	ta.leaves = ids.Set[ids.ID]{}
 	ta.votes = ids.UniqueBag{}
 	ta.kahnNodes = make(map[ids.ID]kahnNode)
 

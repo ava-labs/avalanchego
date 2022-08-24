@@ -804,8 +804,8 @@ func getGenesisData(v *viper.Viper, networkID uint32) ([]byte, ids.ID, error) {
 	return genesis.FromConfig(config)
 }
 
-func getWhitelistedSubnets(v *viper.Viper) (ids.Set, error) {
-	whitelistedSubnetIDs := ids.Set{}
+func getWhitelistedSubnets(v *viper.Viper) (ids.Set[ids.ID], error) {
+	whitelistedSubnetIDs := ids.Set[ids.ID]{}
 	for _, subnet := range strings.Split(v.GetString(WhitelistedSubnetsKey), ",") {
 		if subnet == "" {
 			continue

@@ -42,7 +42,7 @@ func (t *BaseTx) InputUTXOs() []*UTXOID {
 
 // ConsumedAssetIDs returns the IDs of the assets this transaction consumes
 func (t *BaseTx) ConsumedAssetIDs() ids.Set {
-	assets := ids.Set{}
+	assets := ids.Set[ids.ID]{}
 	for _, in := range t.Ins {
 		assets.Add(in.AssetID())
 	}

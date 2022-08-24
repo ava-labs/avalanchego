@@ -2141,7 +2141,7 @@ func OrphansUpdateTest(t *testing.T, factory Factory) {
 	// vtx0 is virtuous, so it should be preferred. vtx1 and vtx2 conflict, but
 	// vtx1 was issued before vtx2, so vtx1 should be preferred and vtx2 should
 	// not be preferred.
-	expectedPreferredSet := ids.Set{
+	expectedPreferredSet := ids.Set[ids.ID]{
 		vtx0.ID(): struct{}{},
 		vtx1.ID(): struct{}{},
 	}
@@ -2160,7 +2160,7 @@ func OrphansUpdateTest(t *testing.T, factory Factory) {
 
 	// Because vtx2 was voted for over vtx1, they should be swapped in the
 	// preferred set.
-	expectedPreferredSet = ids.Set{
+	expectedPreferredSet = ids.Set[ids.ID]{
 		vtx0.ID(): struct{}{},
 		vtx2.ID(): struct{}{},
 	}
@@ -2171,7 +2171,7 @@ func OrphansUpdateTest(t *testing.T, factory Factory) {
 
 	// Because there are no virtuous transactions that are not in a preferred
 	// vertex, there should be no orphans.
-	expectedOrphanSet := ids.Set{}
+	expectedOrphanSet := ids.Set[ids.ID]{}
 	orphanSet := avl.Orphans()
 	if !ids.UnsortedEquals(expectedOrphanSet.List(), orphanSet.List()) {
 		t.Fatalf("expected orphanSet %v, got %v", expectedOrphanSet, orphanSet)
