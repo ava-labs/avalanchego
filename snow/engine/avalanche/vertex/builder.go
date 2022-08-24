@@ -61,7 +61,7 @@ func buildVtx(
 	stopVertex bool,
 ) (StatelessVertex, error) {
 	utils.SortSlice(parentIDs)
-	SortHashOf(txs)
+	utils.Sort2DBytes(txs)
 
 	codecVer := codecVersion
 	if stopVertex {

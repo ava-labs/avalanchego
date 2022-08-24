@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -898,7 +899,7 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 	for i, vdr := range sample {
 		reply.Validators[i] = vdr.ID()
 	}
-	ids.SortNodeIDs(reply.Validators)
+	utils.SortSlice(reply.Validators)
 	return nil
 }
 

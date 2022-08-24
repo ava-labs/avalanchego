@@ -6,7 +6,6 @@ package ids
 import (
 	"bytes"
 	"encoding/json"
-	"reflect"
 	"testing"
 )
 
@@ -160,23 +159,6 @@ func TestNodeIDString(t *testing.T) {
 				t.Errorf("got %q, expected %q", result, tt.expected)
 			}
 		})
-	}
-}
-
-func TestSortNodeIDs(t *testing.T) {
-	ids := []NodeID{
-		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-		{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'},
-		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-	}
-	SortNodeIDs(ids)
-	expected := []NodeID{
-		{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'},
-		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-	}
-	if !reflect.DeepEqual(ids, expected) {
-		t.Fatal("[]NodeID was not sorted lexographically")
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
@@ -28,7 +29,7 @@ func (n *Network) shuffleColors() {
 		colors = append(colors, n.colors[int(index)])
 	}
 	n.colors = colors
-	SortTestBlocks(n.colors)
+	utils.SortSlice(n.colors)
 }
 
 func (n *Network) Initialize(params snowball.Parameters, numColors int) {

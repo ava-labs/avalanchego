@@ -3,7 +3,11 @@
 
 package ids
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/ava-labs/avalanchego/utils"
+)
 
 // NodeIDSet is a set of NodeIDs
 type NodeIDSet map[NodeID]struct{}
@@ -107,7 +111,7 @@ func (ids NodeIDSet) List() []NodeID {
 // SortedList returns this set as a sorted list
 func (ids NodeIDSet) SortedList() []NodeID {
 	lst := ids.List()
-	SortNodeIDs(lst)
+	utils.SortSlice(lst)
 	return lst
 }
 
