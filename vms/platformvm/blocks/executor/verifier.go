@@ -24,7 +24,6 @@ var (
 	errChildBlockEarlierThanParent           = errors.New("proposed timestamp before current chain time")
 	errConflictingBatchTxs                   = errors.New("block contains conflicting transactions")
 	errConflictingParentTxs                  = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
-	errAdvanceTimeTxCannotBeIncluded         = errors.New("advance time tx cannot be included in BlueberryProposalBlock")
 	errOptionBlockTimestampNotMatchingParent = errors.New("option block proposed timestamp not matching parent block one")
 )
 
@@ -96,10 +95,6 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 
 	if err := v.blueberryNonOptionBlock(b); err != nil {
 		return err
-	}
-
-	if _, ok := b.Tx.Unsigned.(*txs.AdvanceTimeTx); ok {
-		return errAdvanceTimeTxCannotBeIncluded
 	}
 
 	parentID := b.Parent()

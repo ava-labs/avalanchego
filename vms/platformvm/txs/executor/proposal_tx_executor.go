@@ -447,6 +447,14 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 
 	// Validate [newChainTime]
 	newChainTime := tx.Timestamp()
+	if e.Config.IsBlueberryActivated(newChainTime) {
+		return fmt.Errorf(
+			"proposed timestamp (%s), would cross Blueberry fork time (%s)",
+			newChainTime,
+			e.Config.BlueberryTime,
+		)
+	}
+
 	parentChainTime := e.OnCommitState.GetTimestamp()
 	if !newChainTime.After(parentChainTime) {
 		return fmt.Errorf(
