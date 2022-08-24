@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"sort"
 
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"golang.org/x/exp/constraints"
 )
 
@@ -53,6 +54,27 @@ func IsSortedAndUnique(data sort.Interface) bool {
 func IsSortedAndUniqueOrdered[T constraints.Ordered](s []T) bool {
 	for i := 0; i < len(s)-1; i++ {
 		if s[i] >= s[i+1] {
+			return false
+		}
+	}
+	return true
+}
+
+type Hashable interface {
+	~[]byte
+}
+
+// TODO test
+func SortByHash[T Hashable](s []T) {
+	sort.Slice(s, func(i, j int) bool {
+		return bytes.Compare(hashing.ComputeHash256(s[i]), hashing.ComputeHash256(s[j])) == -1
+	})
+}
+
+// TODO test
+func IsSortedAndUniqueByHash[T Hashable](s []T) bool {
+	for i := 0; i < len(s)-1; i++ {
+		if bytes.Compare(hashing.ComputeHash256(s[i]), hashing.ComputeHash256(s[i+1])) != -1 {
 			return false
 		}
 	}

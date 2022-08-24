@@ -98,7 +98,7 @@ func (v innerStatelessVertex) verify() error {
 		return errTooManyTxs
 	case !utils.IsSortedAndUniqueSortable(v.ParentIDs):
 		return errInvalidParents
-	case !IsSortedAndUniqueByHash(v.Txs):
+	case !utils.IsSortedAndUniqueByHash(v.Txs):
 		return errInvalidTxs
 	default:
 		return nil

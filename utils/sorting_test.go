@@ -8,6 +8,8 @@ import (
 	"testing"
 )
 
+// TODO add tests
+
 func TestSort2dByteArray(t *testing.T) {
 	numSubArrs := 20
 	maxLength := 100
