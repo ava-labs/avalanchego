@@ -9,6 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
+const minSetSize = 16
+
 // NodeIDSet is a set of NodeIDs
 type NodeIDSet map[NodeID]struct{}
 
@@ -25,8 +27,8 @@ func NewNodeIDSet(size int) NodeIDSet {
 
 func (ids *NodeIDSet) init(size int) {
 	if *ids == nil {
-		if minShortSetSize > size {
-			size = minShortSetSize
+		if minSetSize > size {
+			size = minSetSize
 		}
 		*ids = make(map[NodeID]struct{}, size)
 	}

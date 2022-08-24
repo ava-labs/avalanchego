@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
@@ -22,7 +23,7 @@ type Keychain struct {
 	addrToKeyIndex map[ids.ShortID]int
 
 	// These can be used to iterate over. However, they should not be modified externally.
-	Addrs ids.ShortSet
+	Addrs set.Set[ids.ShortID]
 	Keys  []*crypto.PrivateKeySECP256K1R
 }
 
@@ -57,7 +58,7 @@ func (kc Keychain) Get(id ids.ShortID) (*crypto.PrivateKeySECP256K1R, bool) {
 }
 
 // Addresses returns a list of addresses this keychain manages
-func (kc Keychain) Addresses() ids.ShortSet { return kc.Addrs }
+func (kc Keychain) Addresses() set.Set[ids.ShortID] { return kc.Addrs }
 
 // New returns a newly generated private key
 func (kc *Keychain) New() (*crypto.PrivateKeySECP256K1R, error) {

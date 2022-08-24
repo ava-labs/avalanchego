@@ -189,3 +189,11 @@ func (ids *Set[T]) MarshalJSON() ([]byte, error) {
 	// utils.SortSliceOrdered(idsList)
 	return json.Marshal(idsList)
 }
+
+// Returns an element. If the set is empty, returns false
+func (ids *Set[T]) Peek() (T, bool) {
+	for id := range *ids {
+		return id, true
+	}
+	return *new(T), false
+}
