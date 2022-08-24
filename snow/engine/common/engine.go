@@ -465,8 +465,10 @@ type CrossChainAppHandler interface {
 	// The meaning of [request], and what should be sent in response to it, is
 	// application (VM) specific.
 	//
-	// It is not guaranteed that:
-	// * [request] is well-formed/valid.
+	// Guarantees surrounding the request are specific to the implementation of
+	// the requesting VM. For example, the request may or may not be guaranteed
+	// to be well-formed/valid depending on the implementation of the requesting
+	// VM.
 	//
 	// This node should typically send a CrossChainAppResponse to [sourceChainID] in
 	// response to a valid message using the same request ID before the
@@ -500,9 +502,10 @@ type CrossChainAppHandler interface {
 	// * CrossChainAppResponse([destinationChainID], [requestID]) has not already been
 	// called.
 	//
-	// It is not guaranteed that:
-	// * [response] contains the expected response
-	// * [response] is well-formed/valid.
+	// Guarantees surrounding the response are specific to the implementation of
+	// the responding VM. For example, the response may or may not be guaranteed
+	// to be well-formed/valid depending on the implementation of the requesting
+	// VM.
 	//
 	// If [response] is invalid or not the expected response, the VM chooses how
 	// to react. For example, the VM may send another CrossChainAppRequest, or
