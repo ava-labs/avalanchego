@@ -85,12 +85,6 @@ func (p *process) Start() error {
 		)
 	}
 
-	// Check if transaction signatures should be checked
-	if !p.config.EnableCrypto {
-		// TODO: actually disable crypto verification
-		log.Warn("transaction signatures are not being checked")
-	}
-
 	// Track if assertions should be executed
 	if p.config.LoggingConfig.Assertions {
 		log.Debug("assertions are enabled. This may slow down execution")
