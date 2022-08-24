@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInitialStateVerifySerialization(t *testing.T) {
@@ -176,4 +177,16 @@ func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
 	if err := is.Verify(m, numFxs); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestInitialStateLess(t *testing.T) {
+	require := require.New(t)
+
+	var is1, is2 InitialState
+	require.False(is1.Less(&is2))
+	require.False(is2.Less(&is1))
+
+	is1.FxIndex = 1
+	require.False(is1.Less(&is2))
+	require.True(is2.Less(&is1))
 }

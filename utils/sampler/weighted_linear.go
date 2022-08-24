@@ -15,6 +15,7 @@ type weightedLinearElement struct {
 	index            int
 }
 
+// Note that this sorts in order of decreasing cumulative weight.
 // TODO can we define this on *weightedLinearElement?
 func (e weightedLinearElement) Less(other weightedLinearElement) bool {
 	return e.cumulativeWeight > other.cumulativeWeight
