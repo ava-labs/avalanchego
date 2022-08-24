@@ -42,7 +42,7 @@ func SortOrdered[T constraints.Ordered](s []T) {
 
 // IsSortedAndUnique returns true if the elements in the data are unique and sorted.
 func IsSortedAndUnique(data sort.Interface) bool {
-	for i := data.Len() - 2; i >= 0; i-- {
+	for i := 0; i < data.Len()-1; i++ {
 		if !data.Less(i, i+1) {
 			return false
 		}
