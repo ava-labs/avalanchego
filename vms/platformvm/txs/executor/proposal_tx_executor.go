@@ -33,22 +33,23 @@ const (
 var (
 	_ txs.Visitor = &ProposalTxExecutor{}
 
-	errWeightTooSmall            = errors.New("weight of this validator is too low")
-	errWeightTooLarge            = errors.New("weight of this validator is too large")
-	errStakeTooShort             = errors.New("staking period is too short")
-	errStakeTooLong              = errors.New("staking period is too long")
-	errInsufficientDelegationFee = errors.New("staker charges an insufficient delegation fee")
-	errFutureStakeTime           = fmt.Errorf("staker is attempting to start staking more than %s ahead of the current chain time", MaxFutureStartTime)
-	errChildBlockNotAfterParent  = errors.New("proposed timestamp not after current chain time")
-	errWrongNumberOfCredentials  = errors.New("should have the same number of credentials as inputs")
-	errValidatorSubset           = errors.New("all subnets' staking period must be a subset of the primary network")
-	errStakeOverflow             = errors.New("validator stake exceeds limit")
-	errInvalidState              = errors.New("generated output isn't valid state")
-	errOverDelegated             = errors.New("validator would be over delegated")
-	errShouldBeDSValidator       = errors.New("expected validator to be in the primary network")
-	errWrongTxType               = errors.New("wrong transaction type")
-	errInvalidID                 = errors.New("invalid ID")
-	errEmptyNodeID               = errors.New("validator nodeID cannot be empty")
+	errWeightTooSmall                    = errors.New("weight of this validator is too low")
+	errWeightTooLarge                    = errors.New("weight of this validator is too large")
+	errStakeTooShort                     = errors.New("staking period is too short")
+	errStakeTooLong                      = errors.New("staking period is too long")
+	errInsufficientDelegationFee         = errors.New("staker charges an insufficient delegation fee")
+	errFutureStakeTime                   = fmt.Errorf("staker is attempting to start staking more than %s ahead of the current chain time", MaxFutureStartTime)
+	errChildBlockNotAfterParent          = errors.New("proposed timestamp not after current chain time")
+	errWrongNumberOfCredentials          = errors.New("should have the same number of credentials as inputs")
+	errValidatorSubset                   = errors.New("all subnets' staking period must be a subset of the primary network")
+	errStakeOverflow                     = errors.New("validator stake exceeds limit")
+	errInvalidState                      = errors.New("generated output isn't valid state")
+	errOverDelegated                     = errors.New("validator would be over delegated")
+	errShouldBeDSValidator               = errors.New("expected validator to be in the primary network")
+	errWrongTxType                       = errors.New("wrong transaction type")
+	errInvalidID                         = errors.New("invalid ID")
+	errEmptyNodeID                       = errors.New("validator nodeID cannot be empty")
+	errAdvanceTimeTxIssuedAfterBlueberry = errors.New("AdvanceTimeTx issued after Blueberry")
 )
 
 type ProposalTxExecutor struct {
@@ -449,7 +450,8 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 	newChainTime := tx.Timestamp()
 	if e.Config.IsBlueberryActivated(newChainTime) {
 		return fmt.Errorf(
-			"proposed timestamp (%s), would cross Blueberry fork time (%s)",
+			"%w: proposed timestamp (%s) >= Blueberry fork time (%s)",
+			errAdvanceTimeTxIssuedAfterBlueberry,
 			newChainTime,
 			e.Config.BlueberryTime,
 		)
