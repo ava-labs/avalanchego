@@ -114,7 +114,7 @@ func UniformDistributionTest(t *testing.T, s Uniform) {
 	val, err := s.Sample(3)
 	require.NoError(t, err)
 
-	utils.SortOrdered(val)
+	utils.SortSliceOrdered(val)
 	require.Equal(
 		t,
 		[]uint64{0, 1, 2},
