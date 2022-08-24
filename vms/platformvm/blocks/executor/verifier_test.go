@@ -86,7 +86,6 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 
 	// Set expectations for dependencies.
 	tx := blk.Txs()[0]
-	s.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	mempool.EXPECT().RemoveProposalTx(tx).Times(1)
 
@@ -180,8 +179,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
-	s.EXPECT().GetTimestamp().Return(timestamp).Times(1)
-	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
+	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(2)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	parentStatelessBlk.EXPECT().Parent().Return(grandparentID).Times(1)
 	mempool.EXPECT().RemoveDecisionTxs([]*txs.Tx{blk.Tx}).Times(1)
@@ -281,7 +279,6 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
-	s.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	parentState.EXPECT().GetCurrentSupply().Return(uint64(10000)).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
@@ -349,9 +346,8 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	// Set expectations for dependencies.
 	timestamp := time.Now()
 	gomock.InOrder(
-		s.EXPECT().GetTimestamp().Return(timestamp).Times(1),
 		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
-		parentOnCommitState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
+		parentOnCommitState.EXPECT().GetTimestamp().Return(timestamp).Times(2),
 	)
 
 	// Verify the block.
@@ -416,9 +412,8 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	// Set expectations for dependencies.
 	timestamp := time.Now()
 	gomock.InOrder(
-		s.EXPECT().GetTimestamp().Return(timestamp).Times(1),
 		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
-		parentOnAbortState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
+		parentOnAbortState.EXPECT().GetTimestamp().Return(timestamp).Times(2),
 	)
 
 	// Verify the block.
@@ -467,7 +462,6 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 	require.NoError(err)
 
 	// Set expectations for dependencies.
-	s.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	s.EXPECT().GetStatelessBlock(parentID).Return(nil, choices.Unknown, database.ErrNotFound).Times(1)
 
 	// Verify the block.
@@ -769,7 +763,6 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	timestamp := time.Now()
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
-	s.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	parentState.EXPECT().GetCurrentSupply().Return(uint64(10000)).Times(1)
 	parentStatelessBlk.EXPECT().Parent().Return(grandParentID).Times(1)
 
@@ -830,7 +823,6 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 	require.NoError(err)
 
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
-	s.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 
 	err = verifier.ApricotStandardBlock(blk)
 	require.ErrorIs(err, state.ErrMissingParentState)

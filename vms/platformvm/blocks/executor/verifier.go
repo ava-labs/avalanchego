@@ -290,7 +290,7 @@ func (v *verifier) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 		return nil
 	}
 
-	if err := v.apricotCommonBlock(b); err != nil {
+	if err := v.commonBlock(b); err != nil {
 		return err
 	}
 
@@ -298,6 +298,12 @@ func (v *verifier) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 	onAcceptState, ok := v.getOnAbortState(parentID)
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
+	}
+
+	// check fork
+	timestamp := onAcceptState.GetTimestamp()
+	if v.cfg.IsBlueberryActivated(timestamp) {
+		return fmt.Errorf("%w: timestamp = %s", errApricotBlockIssuedAfterFork, timestamp)
 	}
 
 	v.blkIDToState[blkID] = &blockState{
@@ -316,14 +322,20 @@ func (v *verifier) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 		return nil
 	}
 
-	if err := v.apricotCommonBlock(b); err != nil {
-		return fmt.Errorf("couldn't verify common block of %s: %w", blkID, err)
+	if err := v.commonBlock(b); err != nil {
+		return err
 	}
 
 	parentID := b.Parent()
 	onAcceptState, ok := v.getOnCommitState(parentID)
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
+	}
+
+	// check fork
+	timestamp := onAcceptState.GetTimestamp()
+	if v.cfg.IsBlueberryActivated(timestamp) {
+		return fmt.Errorf("%w: timestamp = %s", errApricotBlockIssuedAfterFork, timestamp)
 	}
 
 	v.blkIDToState[blkID] = &blockState{
@@ -342,7 +354,7 @@ func (v *verifier) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 		return nil
 	}
 
-	if err := v.apricotCommonBlock(b); err != nil {
+	if err := v.commonBlock(b); err != nil {
 		return err
 	}
 
@@ -354,6 +366,12 @@ func (v *verifier) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 	onAbortState, err := state.NewDiff(parentID, v.backend)
 	if err != nil {
 		return err
+	}
+
+	// check fork
+	timestamp := onAbortState.GetTimestamp()
+	if v.cfg.IsBlueberryActivated(timestamp) {
+		return fmt.Errorf("%w: timestamp = %s", errApricotBlockIssuedAfterFork, timestamp)
 	}
 
 	txExecutor := &executor.ProposalTxExecutor{
@@ -399,7 +417,7 @@ func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 		atomicRequests: make(map[ids.ID]*atomic.Requests),
 	}
 
-	if err := v.apricotCommonBlock(b); err != nil {
+	if err := v.commonBlock(b); err != nil {
 		return err
 	}
 
@@ -407,6 +425,12 @@ func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 	onAcceptState, err := state.NewDiff(parentID, v)
 	if err != nil {
 		return err
+	}
+
+	// check fork
+	timestamp := onAcceptState.GetTimestamp()
+	if v.cfg.IsBlueberryActivated(timestamp) {
+		return fmt.Errorf("%w: timestamp = %s", errApricotBlockIssuedAfterFork, timestamp)
 	}
 
 	funcs := make([]func(), 0, len(b.Transactions))
@@ -475,7 +499,7 @@ func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 		return nil
 	}
 
-	if err := v.apricotCommonBlock(b); err != nil {
+	if err := v.commonBlock(b); err != nil {
 		return err
 	}
 
@@ -483,6 +507,12 @@ func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 	parentState, ok := v.GetState(parentID)
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
+	}
+
+	// check fork
+	timestamp := parentState.GetTimestamp()
+	if v.cfg.IsBlueberryActivated(timestamp) {
+		return fmt.Errorf("%w: timestamp = %s", errApricotBlockIssuedAfterFork, timestamp)
 	}
 
 	cfg := v.txExecutorBackend.Config
@@ -600,18 +630,11 @@ func (v *verifier) blueberryNonOptionBlock(b blocks.BlueberryBlock) error {
 	)
 }
 
-func (v *verifier) blueberryCommonBlock(b blocks.BlueberryBlock) error { // check fork
+func (v *verifier) blueberryCommonBlock(b blocks.BlueberryBlock) error {
+	// check fork
 	timestamp := b.Timestamp()
 	if !v.cfg.IsBlueberryActivated(timestamp) {
 		return fmt.Errorf("%w: timestamp = %s", errBlueberryBlockIssuedBeforeFork, timestamp)
-	}
-	return v.commonBlock(b)
-}
-
-func (v *verifier) apricotCommonBlock(b blocks.Block) error { // check fork
-	timestamp := v.getTimestamp(b)
-	if v.cfg.IsBlueberryActivated(timestamp) {
-		return fmt.Errorf("%w: timestamp = %s", errApricotBlockIssuedAfterFork, timestamp)
 	}
 	return v.commonBlock(b)
 }
