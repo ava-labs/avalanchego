@@ -194,12 +194,6 @@ func SortTransferableInputsWithSigners(ins []*TransferableInput, signers [][]*cr
 	sort.Sort(&innerSortTransferableInputsWithSigners{ins: ins, signers: signers})
 }
 
-// IsSortedAndUniqueTransferableInputsWithSigners returns true if the inputs are
-// sorted and unique
-func IsSortedAndUniqueTransferableInputsWithSigners(ins []*TransferableInput, signers [][]*crypto.PrivateKeySECP256K1R) bool {
-	return utils.IsSortedAndUnique(&innerSortTransferableInputsWithSigners{ins: ins, signers: signers})
-}
-
 // VerifyTx verifies that the inputs and outputs flowcheck, including a fee.
 // Additionally, this verifies that the inputs and outputs are sorted.
 func VerifyTx(

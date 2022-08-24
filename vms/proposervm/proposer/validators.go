@@ -14,13 +14,6 @@ type validatorData struct {
 	weight uint64
 }
 
-type validatorsSlice []validatorData
-
-func (d validatorsSlice) Len() int      { return len(d) }
-func (d validatorsSlice) Swap(i, j int) { d[i], d[j] = d[j], d[i] }
-
-func (d validatorsSlice) Less(i, j int) bool {
-	iID := d[i].id
-	jID := d[j].id
-	return bytes.Compare(iID[:], jID[:]) == -1
+func (d validatorData) Less(other validatorData) bool {
+	return bytes.Compare(d.id[:], other.id[:]) == -1
 }

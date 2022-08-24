@@ -4,11 +4,11 @@
 package proposer
 
 import (
-	"sort"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -62,7 +62,7 @@ func (w *windower) Delay(chainHeight, pChainHeight uint64, validatorID ids.NodeI
 	}
 
 	// convert the map of validators to a slice
-	validators := make(validatorsSlice, 0, len(validatorsMap))
+	validators := make([]validatorData, 0, len(validatorsMap))
 	weight := uint64(0)
 	for k, v := range validatorsMap {
 		validators = append(validators, validatorData{
@@ -79,7 +79,7 @@ func (w *windower) Delay(chainHeight, pChainHeight uint64, validatorID ids.NodeI
 	// canonically sort validators
 	// Note: validators are sorted by ID, sorting by weight would not create a
 	// canonically sorted list
-	sort.Sort(validators)
+	utils.SortSliceSortable(validators)
 
 	// convert the slice of validators to a slice of weights
 	validatorWeights := make([]uint64, len(validators))

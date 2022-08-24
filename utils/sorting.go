@@ -11,6 +11,8 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
+// TODO can we handle sorting where the Less function relies on a codec?
+
 type Sortable[T any] interface {
 	Less(T) bool
 }

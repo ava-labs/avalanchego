@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"sort"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
@@ -46,6 +45,33 @@ type UTXO struct {
 	Amount   json.Uint64 `json:"amount"`
 	Address  string      `json:"address"`
 	Message  string      `json:"message"`
+}
+
+// TODO can we define this on *UTXO?
+func (utxo UTXO) Less(other UTXO) bool {
+	if utxo.Locktime < other.Locktime {
+		return true
+	} else if utxo.Locktime > other.Locktime {
+		return false
+	}
+
+	if utxo.Amount < other.Amount {
+		return true
+	} else if utxo.Amount > other.Amount {
+		return false
+	}
+
+	utxoAddr, err := bech32ToID(utxo.Address)
+	if err != nil {
+		return false
+	}
+
+	otherAddr, err := bech32ToID(other.Address)
+	if err != nil {
+		return false
+	}
+
+	return bytes.Compare(utxoAddr.Bytes(), otherAddr.Bytes()) == -1
 }
 
 // TODO: refactor APIStaker, APIValidators and merge them together for SubnetValidators + PrimaryValidators
@@ -210,7 +236,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	for _, vdr := range args.Validators {
 		weight := uint64(0)
 		stake := make([]*avax.TransferableOutput, len(vdr.Staked))
-		sortUTXOs(vdr.Staked)
+		utils.SortSliceSortable(vdr.Staked)
 		for i, apiUTXO := range vdr.Staked {
 			addrID, err := bech32ToID(apiUTXO.Address)
 			if err != nil {
@@ -340,36 +366,3 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	reply.Encoding = args.Encoding
 	return nil
 }
-
-type innerSortUTXO []UTXO
-
-func (s innerSortUTXO) Less(i, j int) bool {
-	if s[i].Locktime < s[j].Locktime {
-		return true
-	} else if s[i].Locktime > s[j].Locktime {
-		return false
-	}
-
-	if s[i].Amount < s[j].Amount {
-		return true
-	} else if s[i].Amount > s[j].Amount {
-		return false
-	}
-
-	iAddrID, err := bech32ToID(s[i].Address)
-	if err != nil {
-		return false
-	}
-
-	jAddrID, err := bech32ToID(s[j].Address)
-	if err != nil {
-		return false
-	}
-
-	return bytes.Compare(iAddrID.Bytes(), jAddrID.Bytes()) == -1
-}
-
-func (s innerSortUTXO) Len() int      { return len(s) }
-func (s innerSortUTXO) Swap(i, j int) { s[j], s[i] = s[i], s[j] }
-
-func sortUTXOs(utxos []UTXO) { sort.Sort(innerSortUTXO(utxos)) }

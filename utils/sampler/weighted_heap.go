@@ -4,8 +4,7 @@
 package sampler
 
 import (
-	"sort"
-
+	"github.com/ava-labs/avalanchego/utils"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
@@ -15,6 +14,20 @@ type weightedHeapElement struct {
 	weight           uint64
 	cumulativeWeight uint64
 	index            int
+}
+
+// TODO can we define this on *weightedHeapElement?
+func (e weightedHeapElement) Less(other weightedHeapElement) bool {
+	// By accounting for the initial index of the weights, this results in a
+	// stable sort. We do this rather than using `sort.Stable` because of the
+	// reported change in performance of the sort used.
+	if e.weight > other.weight {
+		return true
+	}
+	if e.weight < other.weight {
+		return false
+	}
+	return e.index < other.index
 }
 
 // Sampling is performed by executing a search over a tree of elements in the
@@ -44,7 +57,7 @@ func (s *weightedHeap) Initialize(weights []uint64) error {
 	}
 
 	// Optimize so that the most probable values are at the top of the heap
-	sortWeightedHeap(s.heap)
+	utils.SortSliceSortable(s.heap)
 
 	// Initialize the heap
 	for i := len(s.heap) - 1; i > 0; i-- {
@@ -88,31 +101,4 @@ func (s *weightedHeap) Sample(value uint64) (int, error) {
 			index++
 		}
 	}
-}
-
-type innerSortWeightedHeap []weightedHeapElement
-
-func (lst innerSortWeightedHeap) Less(i, j int) bool {
-	// By accounting for the initial index of the weights, this results in a
-	// stable sort. We do this rather than using `sort.Stable` because of the
-	// reported change in performance of the sort used.
-	if lst[i].weight > lst[j].weight {
-		return true
-	}
-	if lst[i].weight < lst[j].weight {
-		return false
-	}
-	return lst[i].index < lst[j].index
-}
-
-func (lst innerSortWeightedHeap) Len() int {
-	return len(lst)
-}
-
-func (lst innerSortWeightedHeap) Swap(i, j int) {
-	lst[j], lst[i] = lst[i], lst[j]
-}
-
-func sortWeightedHeap(heap []weightedHeapElement) {
-	sort.Sort(innerSortWeightedHeap(heap))
 }

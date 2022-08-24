@@ -4,8 +4,7 @@
 package sampler
 
 import (
-	"sort"
-
+	"github.com/ava-labs/avalanchego/utils"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
@@ -14,6 +13,11 @@ var _ Weighted = &weightedLinear{}
 type weightedLinearElement struct {
 	cumulativeWeight uint64
 	index            int
+}
+
+// TODO can we define this on *weightedLinearElement?
+func (e weightedLinearElement) Less(other weightedLinearElement) bool {
+	return e.cumulativeWeight < other.cumulativeWeight
 }
 
 // Sampling is performed by executing a linear search over the provided elements
@@ -43,7 +47,7 @@ func (s *weightedLinear) Initialize(weights []uint64) error {
 	}
 
 	// Optimize so that the most probable values are at the front of the array
-	sortWeightedLinear(s.arr)
+	utils.SortSliceSortable(s.arr)
 
 	for i := 1; i < len(s.arr); i++ {
 		newWeight, err := safemath.Add64(
@@ -71,22 +75,4 @@ func (s *weightedLinear) Sample(value uint64) (int, error) {
 		}
 		index++
 	}
-}
-
-type innerSortWeightedLinear []weightedLinearElement
-
-func (lst innerSortWeightedLinear) Less(i, j int) bool {
-	return lst[i].cumulativeWeight > lst[j].cumulativeWeight
-}
-
-func (lst innerSortWeightedLinear) Len() int {
-	return len(lst)
-}
-
-func (lst innerSortWeightedLinear) Swap(i, j int) {
-	lst[j], lst[i] = lst[i], lst[j]
-}
-
-func sortWeightedLinear(lst []weightedLinearElement) {
-	sort.Sort(innerSortWeightedLinear(lst))
 }

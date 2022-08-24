@@ -4,8 +4,7 @@
 package sampler
 
 import (
-	"sort"
-
+	"github.com/ava-labs/avalanchego/utils"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
@@ -14,6 +13,11 @@ var _ Weighted = &weightedArray{}
 type weightedArrayElement struct {
 	cumulativeWeight uint64
 	index            int
+}
+
+// TODO can we define this on *weightedArrayElement?
+func (e weightedArrayElement) Less(other weightedArrayElement) bool {
+	return e.cumulativeWeight > other.cumulativeWeight
 }
 
 // Sampling is performed by executing a modified binary search over the provided
@@ -45,7 +49,7 @@ func (s *weightedArray) Initialize(weights []uint64) error {
 	}
 
 	// Optimize so that the array is closer to the uniform distribution
-	sortWeightedArray(s.arr)
+	utils.SortSliceSortable(s.arr)
 
 	maxIndex := len(s.arr) - 1
 	oneIfOdd := 1 & maxIndex
@@ -113,22 +117,4 @@ func (s *weightedArray) Sample(value uint64) (int, error) {
 
 		index = int(lookupMass/float64(valueRange)) + minIndex
 	}
-}
-
-type innerSortWeightedArray []weightedArrayElement
-
-func (lst innerSortWeightedArray) Less(i, j int) bool {
-	return lst[i].cumulativeWeight > lst[j].cumulativeWeight
-}
-
-func (lst innerSortWeightedArray) Len() int {
-	return len(lst)
-}
-
-func (lst innerSortWeightedArray) Swap(i, j int) {
-	lst[j], lst[i] = lst[i], lst[j]
-}
-
-func sortWeightedArray(lst []weightedArrayElement) {
-	sort.Sort(innerSortWeightedArray(lst))
 }
