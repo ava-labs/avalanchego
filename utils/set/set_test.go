@@ -4,12 +4,16 @@
 package set
 
 import (
-	"crypto/rand"
 	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+func init() {
+	rand.Seed(1337) // For determinism in generateTestSettable
+}
 
 // TODO is this the best way to make a testSettable?
 type testSettable [20]byte
@@ -20,7 +24,7 @@ func (s testSettable) String() string {
 
 func generateTestSettable() testSettable {
 	var s testSettable
-	_, _ = rand.Read(s[:])
+	_, _ = rand.Read(s[:]) // #nosec G404
 	return s
 }
 

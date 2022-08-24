@@ -182,8 +182,7 @@ func (ids *Set[T]) Pop() (T, bool) {
 		delete(*ids, id)
 		return id, true
 	}
-	var t T
-	return t, false
+	return *new(T), false //nolint:gocritic
 }
 
 func (ids *Set[T]) MarshalJSON() ([]byte, error) {
@@ -222,5 +221,5 @@ func (ids *Set[T]) Peek() (T, bool) {
 	for id := range *ids {
 		return id, true
 	}
-	return *new(T), false
+	return *new(T), false //nolint:gocritic
 }
