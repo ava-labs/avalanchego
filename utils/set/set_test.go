@@ -11,10 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TODO is this the best way to make a testSettable?
 type testSettable [20]byte
 
 func (s testSettable) String() string {
-	return ""
+	return fmt.Sprintf("%v", [20]byte(s))
 }
 
 func generateTestSettable() testSettable {
@@ -189,7 +190,7 @@ func TestSetMarshalJSON(t *testing.T) {
 		require.NoError(err)
 		require.Equal("[]", string(asJSON))
 	}
-	id1, id2 := generateTestSettable(), generateTestSettable()
+	id1, id2 := testSettable{1}, testSettable{2}
 	set.Add(id1)
 	{
 		asJSON, err := set.MarshalJSON()

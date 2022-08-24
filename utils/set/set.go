@@ -4,8 +4,11 @@
 package set
 
 import (
-	"encoding/json"
+	"bytes"
+	"sort"
 	"strings"
+
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
@@ -185,9 +188,33 @@ func (ids *Set[T]) Pop() (T, bool) {
 
 func (ids *Set[T]) MarshalJSON() ([]byte, error) {
 	idsList := ids.List()
-	// TODO is it possible to do sorting here?
-	// utils.SortSliceOrdered(idsList)
-	return json.Marshal(idsList)
+
+	// Sort for determinism
+	asStrs := make([]string, len(idsList))
+	for i, id := range idsList {
+		asStrs[i] = id.String()
+	}
+	sort.Strings(asStrs)
+
+	// Build the JSON
+	var (
+		jsonStr = bytes.Buffer{}
+		errs    = wrappers.Errs{}
+	)
+	_, err := jsonStr.WriteString("[")
+	errs.Add(err)
+	for i, str := range asStrs {
+		_, err := jsonStr.WriteString("\"" + str + "\"")
+		errs.Add(err)
+		if i != len(asStrs)-1 {
+			_, err := jsonStr.WriteString(",")
+			errs.Add(err)
+		}
+	}
+	_, err = jsonStr.WriteString("]")
+	errs.Add(err)
+
+	return jsonStr.Bytes(), errs.Err
 }
 
 // Returns an element. If the set is empty, returns false
