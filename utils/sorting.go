@@ -25,7 +25,6 @@ func SortSliceSortable[T Sortable[T]](s []T) {
 }
 
 // Sorts the elements of [s].
-// TODO add tests
 func SortSliceOrdered[T constraints.Ordered](s []T) {
 	sort.Slice(s, func(i, j int) bool {
 		return s[i] < s[j]
@@ -33,7 +32,6 @@ func SortSliceOrdered[T constraints.Ordered](s []T) {
 }
 
 // Sorts the elements of [s] based on their hashes.
-// TODO add tests
 func SortByHash[T ~[]byte](s []T) {
 	sort.Slice(s, func(i, j int) bool {
 		return bytes.Compare(hashing.ComputeHash256(s[i]), hashing.ComputeHash256(s[j])) == -1
@@ -49,7 +47,6 @@ func Sort2DByteSlice[T ~[]byte](arr []T) {
 }
 
 // Returns true iff the elements in [s] are unique and sorted.
-// TODO add tests
 func IsSortedAndUniqueSortable[T Sortable[T]](s []T) bool {
 	for i := 0; i < len(s)-1; i++ {
 		if !s[i].Less(s[i+1]) {
@@ -60,7 +57,6 @@ func IsSortedAndUniqueSortable[T Sortable[T]](s []T) bool {
 }
 
 // Returns true iff the elements in [s] are unique and sorted.
-// TODO add tests
 func IsSortedAndUniqueOrdered[T constraints.Ordered](s []T) bool {
 	for i := 0; i < len(s)-1; i++ {
 		if s[i] >= s[i+1] {
@@ -72,7 +68,6 @@ func IsSortedAndUniqueOrdered[T constraints.Ordered](s []T) bool {
 
 // Returns true iff the elements in [s] are unique and sorted
 // based by their hashes.
-// TODO test
 func IsSortedAndUniqueByHash[T ~[]byte](s []T) bool {
 	for i := 0; i < len(s)-1; i++ {
 		if bytes.Compare(hashing.ComputeHash256(s[i]), hashing.ComputeHash256(s[i+1])) != -1 {

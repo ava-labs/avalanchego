@@ -4,6 +4,7 @@
 package utils
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -115,7 +116,7 @@ func TestIsSortedAndUniqueSortable(t *testing.T) {
 	require.False(IsSortedAndUniqueSortable(s))
 }
 
-func TestSort2DByteSlice(t *testing.T) {
+func TestSort2DByteSliceAndIsSorted2DByteSlice(t *testing.T) {
 	require := require.New(t)
 
 	var s [][]byte
@@ -259,4 +260,57 @@ func TestIsSortedAndUniqueOrdered(t *testing.T) {
 
 	s = []int{2, 1, 2}
 	require.False(IsSortedAndUniqueOrdered(s))
+}
+
+var _ sort.Interface = &sortableSlice{}
+
+type sortableSlice []int
+
+func (s sortableSlice) Len() int {
+	return len(s)
+}
+
+func (s sortableSlice) Less(i, j int) bool {
+	return s[i] < s[j]
+}
+
+func (s sortableSlice) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func TestIsSortedAndUnique(t *testing.T) {
+	require := require.New(t)
+
+	var s sortableSlice
+	require.True(IsSortedAndUnique(s))
+
+	s = sortableSlice{}
+	require.True(IsSortedAndUnique(s))
+
+	s = sortableSlice{1}
+	require.True(IsSortedAndUnique(s))
+
+	s = sortableSlice{1, 2}
+	require.True(IsSortedAndUnique(s))
+
+	s = sortableSlice{1, 1}
+	require.False(IsSortedAndUnique(s))
+
+	s = sortableSlice{2, 1}
+	require.False(IsSortedAndUnique(s))
+
+	s = sortableSlice{1, 2, 1}
+	require.False(IsSortedAndUnique(s))
+
+	s = sortableSlice{1, 2, 0}
+	require.False(IsSortedAndUnique(s))
+
+	s = sortableSlice{1, 2, 2}
+	require.False(IsSortedAndUnique(s))
+
+	s = sortableSlice{2, 1, 2}
+	require.False(IsSortedAndUnique(s))
+
+	s = sortableSlice{1, 2, 3}
+	require.True(IsSortedAndUnique(s))
 }
