@@ -125,10 +125,10 @@ func TestStatus(t *testing.T) {
 	}
 }
 
-func TestOptions(t *testing.T) {
+func TestBlockOptions(t *testing.T) {
 	type test struct {
 		name                   string
-		blkF                   func(*gomock.Controller) *Block
+		blkF                   func() *Block
 		expectedPreferenceType blocks.Block
 		expectedErr            error
 	}
@@ -136,7 +136,7 @@ func TestOptions(t *testing.T) {
 	tests := []test{
 		{
 			name: "apricot proposal block; commit preferred",
-			blkF: func(ctrl *gomock.Controller) *Block {
+			blkF: func() *Block {
 				innerBlk := &blocks.ApricotProposalBlock{}
 				blkID := innerBlk.ID()
 
@@ -161,7 +161,7 @@ func TestOptions(t *testing.T) {
 		},
 		{
 			name: "apricot proposal block; abort preferred",
-			blkF: func(ctrl *gomock.Controller) *Block {
+			blkF: func() *Block {
 				innerBlk := &blocks.ApricotProposalBlock{}
 				blkID := innerBlk.ID()
 
@@ -182,7 +182,7 @@ func TestOptions(t *testing.T) {
 		},
 		{
 			name: "blueberry proposal block; commit preferred",
-			blkF: func(ctrl *gomock.Controller) *Block {
+			blkF: func() *Block {
 				innerBlk := &blocks.BlueberryProposalBlock{}
 				blkID := innerBlk.ID()
 
@@ -207,7 +207,7 @@ func TestOptions(t *testing.T) {
 		},
 		{
 			name: "blueberry proposal block; abort preferred",
-			blkF: func(ctrl *gomock.Controller) *Block {
+			blkF: func() *Block {
 				innerBlk := &blocks.BlueberryProposalBlock{}
 				blkID := innerBlk.ID()
 
@@ -228,13 +228,9 @@ func TestOptions(t *testing.T) {
 		},
 		{
 			name: "non oracle block",
-			blkF: func(ctrl *gomock.Controller) *Block {
-				blk := blocks.NewMockBlock(ctrl)
-				blk.EXPECT().ID().Return(ids.GenerateTestID())
-				blk.EXPECT().Height().Return(uint64(1337))
-
+			blkF: func() *Block {
 				return &Block{
-					Block:   blk,
+					Block:   &blocks.BlueberryStandardBlock{},
 					manager: &manager{},
 				}
 			},
@@ -248,10 +244,10 @@ func TestOptions(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			blk := tt.blkF(ctrl)
+			blk := tt.blkF()
 			options, err := blk.Options()
 			if tt.expectedErr != nil {
-				require.ErrorIs(err, snowman.ErrNotOracle)
+				require.ErrorIs(err, tt.expectedErr)
 				return
 			}
 			require.IsType(tt.expectedPreferenceType, options[0].(*Block).Block)
