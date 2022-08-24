@@ -4,6 +4,7 @@
 package genesis
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -44,6 +45,12 @@ func (a Allocation) Unparse(networkID uint32) (UnparsedAllocation, error) {
 	)
 	ua.AVAXAddr = avaxAddr
 	return ua, err
+}
+
+func (a Allocation) Less(other Allocation) bool {
+	return a.InitialAmount < other.InitialAmount ||
+		(a.InitialAmount == other.InitialAmount &&
+			bytes.Compare(a.AVAXAddr.Bytes(), other.AVAXAddr.Bytes()) == -1)
 }
 
 type Staker struct {
