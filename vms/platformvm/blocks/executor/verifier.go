@@ -233,33 +233,8 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 		}
 	}
 
-	// Check for conflicts in ancestors.
-	if blkState.inputs.Len() > 0 {
-		var nextBlock blocks.Block = b
-		for {
-			parentID := nextBlock.Parent()
-			parentState := v.blkIDToState[parentID]
-			if parentState == nil {
-				// The parent state isn't pinned in memory.
-				// This means the parent must be accepted already.
-				break
-			}
-			if parentState.inputs.Overlaps(blkState.inputs) {
-				return errConflictingParentTxs
-			}
-			var parent blocks.Block
-			if parentState, ok := v.blkIDToState[parentID]; ok {
-				// The parent is in memory.
-				parent = parentState.statelessBlock
-			} else {
-				var err error
-				parent, _, err = v.state.GetStatelessBlock(parentID)
-				if err != nil {
-					return err
-				}
-			}
-			nextBlock = parent
-		}
+	if err := v.verifyUniqueInputs(b, blkState.inputs); err != nil {
+		return err
 	}
 
 	if numFuncs := len(funcs); numFuncs == 1 {
@@ -535,22 +510,8 @@ func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 
 	atomicExecutor.OnAccept.AddTx(b.Tx, status.Committed)
 
-	// Check for conflicts in atomic inputs.
-	if len(atomicExecutor.Inputs) > 0 {
-		var nextBlock blocks.Block = b
-		for {
-			parentID := nextBlock.Parent()
-			parentState := v.blkIDToState[parentID]
-			if parentState == nil {
-				// The parent state isn't pinned in memory.
-				// This means the parent must be accepted already.
-				break
-			}
-			if parentState.inputs.Overlaps(atomicExecutor.Inputs) {
-				return errConflictingParentTxs
-			}
-			nextBlock = parentState.statelessBlock
-		}
+	if err := v.verifyUniqueInputs(b, atomicExecutor.Inputs); err != nil {
+		return err
 	}
 
 	v.blkIDToState[blkID] = &blockState{
