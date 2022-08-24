@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAllocationless(t *testing.T) {
+func TestAllocationLess(t *testing.T) {
 	type test struct {
 		name     string
 		alloc1   Allocation
