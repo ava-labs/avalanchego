@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var _ snowstorm.Tx = &transactionVertex{}
@@ -84,4 +85,4 @@ func (tv *transactionVertex) InputIDs() []ids.ID { return []ids.ID{tv.vtx.ID()} 
 
 func (tv *transactionVertex) HasWhitelist() bool { return tv.vtx.HasWhitelist() }
 
-func (tv *transactionVertex) Whitelist() (ids.Set[ids.ID], error) { return tv.vtx.Whitelist() }
+func (tv *transactionVertex) Whitelist() (set.Set[ids.ID], error) { return tv.vtx.Whitelist() }

@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var errMissingTxDependenciesOnAccept = errors.New("attempting to accept a transaction with missing dependencies")
@@ -47,8 +48,8 @@ type txJob struct {
 }
 
 func (t *txJob) ID() ids.ID { return t.tx.ID() }
-func (t *txJob) MissingDependencies() (ids.Set[ids.ID], error) {
-	missing := ids.Set[ids.ID]{}
+func (t *txJob) MissingDependencies() (set.Set[ids.ID], error) {
+	missing := set.Set[ids.ID]{}
 	deps, err := t.tx.Dependencies()
 	if err != nil {
 		return missing, err

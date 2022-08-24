@@ -1,108 +1,121 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package ids
+package set
 
 import (
+	"crypto/rand"
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
+type settable [20]byte
+
+func (s settable) String() string {
+	return ""
+}
+
+func generateTestSettable() settable {
+	var s settable
+	_, _ = rand.Read(s[:])
+	return s
+}
+
 func TestSet(t *testing.T) {
-	id1 := ID{1}
+	id1 := settable{1}
 
-	ids := Set[ID]{id1: struct{}{}}
+	s := Set[settable]{id1: struct{}{}}
 
-	ids.Add(id1)
-	if !ids.Contains(id1) {
+	s.Add(id1)
+	if !s.Contains(id1) {
 		t.Fatalf("Initial value not set correctly")
 	}
 
-	ids.Remove(id1)
-	if ids.Contains(id1) {
+	s.Remove(id1)
+	if s.Contains(id1) {
 		t.Fatalf("Value not removed correctly")
 	}
 
-	ids.Add(id1)
-	if !ids.Contains(id1) {
+	s.Add(id1)
+	if !s.Contains(id1) {
 		t.Fatalf("Initial value not set correctly")
-	} else if ids.Len() != 1 {
+	} else if s.Len() != 1 {
 		t.Fatalf("Bad set size")
-	} else if list := ids.List(); len(list) != 1 {
+	} else if list := s.List(); len(list) != 1 {
 		t.Fatalf("Bad list size")
 	} else if list[0] != id1 {
 		t.Fatalf("Set value not correct")
 	}
 
-	ids.Clear()
-	if ids.Contains(id1) {
+	s.Clear()
+	if s.Contains(id1) {
 		t.Fatalf("Value not removed correctly")
 	}
 
-	ids.Add(id1)
+	s.Add(id1)
 
-	ids2 := Set[ID]{}
+	s2 := Set[settable]{}
 
-	if ids.Overlaps(ids2) {
+	if s.Overlaps(s2) {
 		t.Fatalf("Empty set shouldn't overlap")
 	}
 
-	ids2.Union(ids)
-	if !ids2.Contains(id1) {
+	s2.Union(s)
+	if !s2.Contains(id1) {
 		t.Fatalf("Value not union added correctly")
 	}
 
-	if !ids.Overlaps(ids2) {
+	if !s.Overlaps(s2) {
 		t.Fatalf("Sets overlap")
 	}
 
-	ids2.Difference(ids)
-	if ids2.Contains(id1) {
+	s2.Difference(s)
+	if s2.Contains(id1) {
 		t.Fatalf("Value not difference removed correctly")
 	}
 
-	if ids.Overlaps(ids2) {
+	if s.Overlaps(s2) {
 		t.Fatalf("Sets don't overlap")
 	}
 }
 
 func TestSetCappedList(t *testing.T) {
-	set := Set[ID]{}
+	s := Set[settable]{}
 
-	id := Empty
+	var id settable
 
-	if list := set.CappedList(0); len(list) != 0 {
+	if list := s.CappedList(0); len(list) != 0 {
 		t.Fatalf("List should have been empty but was %v", list)
 	}
 
-	set.Add(id)
+	s.Add(id)
 
-	if list := set.CappedList(0); len(list) != 0 {
+	if list := s.CappedList(0); len(list) != 0 {
 		t.Fatalf("List should have been empty but was %v", list)
-	} else if list := set.CappedList(1); len(list) != 1 {
+	} else if list := s.CappedList(1); len(list) != 1 {
 		t.Fatalf("List should have had length %d but had %d", 1, len(list))
 	} else if returnedID := list[0]; id != returnedID {
 		t.Fatalf("List should have been %s but was %s", id, returnedID)
-	} else if list := set.CappedList(2); len(list) != 1 {
+	} else if list := s.CappedList(2); len(list) != 1 {
 		t.Fatalf("List should have had length %d but had %d", 1, len(list))
 	} else if returnedID := list[0]; id != returnedID {
 		t.Fatalf("List should have been %s but was %s", id, returnedID)
 	}
 
-	id2 := ID{1}
-	set.Add(id2)
+	id2 := settable{1}
+	s.Add(id2)
 
-	if list := set.CappedList(0); len(list) != 0 {
+	if list := s.CappedList(0); len(list) != 0 {
 		t.Fatalf("List should have been empty but was %v", list)
-	} else if list := set.CappedList(1); len(list) != 1 {
+	} else if list := s.CappedList(1); len(list) != 1 {
 		t.Fatalf("List should have had length %d but had %d", 1, len(list))
 	} else if returnedID := list[0]; id != returnedID && id2 != returnedID {
 		t.Fatalf("List should have been %s but was %s", id, returnedID)
-	} else if list := set.CappedList(2); len(list) != 2 {
+	} else if list := s.CappedList(2); len(list) != 2 {
 		t.Fatalf("List should have had length %d but had %d", 2, len(list))
-	} else if list := set.CappedList(3); len(list) != 2 {
+	} else if list := s.CappedList(3); len(list) != 2 {
 		t.Fatalf("List should have had length %d but had %d", 2, len(list))
 	} else if returnedID := list[0]; id != returnedID && id2 != returnedID {
 		t.Fatalf("list contains unexpected element %s", returnedID)
@@ -114,44 +127,44 @@ func TestSetCappedList(t *testing.T) {
 // Test that Clear() works with both the iterative and set-to-nil path
 func TestSetClearLarge(t *testing.T) {
 	// Using iterative clear path
-	set := Set[ID]{}
+	set := Set[settable]{}
 	for i := 0; i < clearSizeThreshold; i++ {
-		set.Add(GenerateTestID())
+		set.Add(generateTestSettable())
 	}
 	set.Clear()
 	if set.Len() != 0 {
 		t.Fatal("length should be 0")
 	}
-	set.Add(GenerateTestID())
+	set.Add(generateTestSettable())
 	if set.Len() != 1 {
 		t.Fatal("length should be 1")
 	}
 
 	// Using bulk (set map to nil) path
-	set = Set[ID]{}
+	set = Set[settable]{}
 	for i := 0; i < clearSizeThreshold+1; i++ {
-		set.Add(GenerateTestID())
+		set.Add(generateTestSettable())
 	}
 	set.Clear()
 	if set.Len() != 0 {
 		t.Fatal("length should be 0")
 	}
-	set.Add(GenerateTestID())
+	set.Add(generateTestSettable())
 	if set.Len() != 1 {
 		t.Fatal("length should be 1")
 	}
 }
 
 func TestSetPop(t *testing.T) {
-	var s Set[ID]
+	var s Set[settable]
 	_, ok := s.Pop()
 	require.False(t, ok)
 
-	s = make(Set[ID])
+	s = make(Set[settable])
 	_, ok = s.Pop()
 	require.False(t, ok)
 
-	id1, id2 := GenerateTestID(), GenerateTestID()
+	id1, id2 := generateTestSettable(), generateTestSettable()
 	s.Add(id1, id2)
 
 	got, ok := s.Pop()
@@ -170,13 +183,13 @@ func TestSetPop(t *testing.T) {
 
 func TestSetMarshalJSON(t *testing.T) {
 	require := require.New(t)
-	set := Set[ID]{}
+	set := Set[settable]{}
 	{
 		asJSON, err := set.MarshalJSON()
 		require.NoError(err)
 		require.Equal("[]", string(asJSON))
 	}
-	id1, id2 := GenerateTestID(), GenerateTestID()
+	id1, id2 := generateTestSettable(), generateTestSettable()
 	set.Add(id1)
 	{
 		asJSON, err := set.MarshalJSON()
@@ -195,7 +208,7 @@ func TestSetMarshalJSON(t *testing.T) {
 // func TestSortedList(t *testing.T) {
 // 	require := require.New(t)
 
-// 	set := Set[ID]{}
+// 	set := Set[settable]{}
 // 	require.Len(set.SortedList(), 0)
 
 // 	set.Add(ID{0})

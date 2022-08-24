@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -101,7 +102,7 @@ type bootstrapper struct {
 
 	// IDs of vertices that we will send a GetAncestors request for once we are
 	// not at the max number of outstanding requests
-	needToFetch ids.Set[ids.ID]
+	needToFetch set.Set[ids.ID]
 
 	// Contains IDs of vertices that have recently been processed
 	processedCache *cache.LRU
@@ -204,7 +205,7 @@ func (b *bootstrapper) Ancestors(nodeID ids.NodeID, requestID uint32, vtxs [][]b
 	if err != nil {
 		return err
 	}
-	eligibleVertices := ids.NewSet[ids.ID](len(parents))
+	eligibleVertices := set.NewSet[ids.ID](len(parents))
 	for _, parent := range parents {
 		eligibleVertices.Add(parent.ID())
 	}
@@ -386,7 +387,7 @@ func (b *bootstrapper) process(vtxs ...avalanche.Vertex) error {
 		}
 	}
 
-	vtxHeightSet := ids.Set[ids.ID]{}
+	vtxHeightSet := set.Set[ids.ID]{}
 	prevHeight := uint64(0)
 
 	for toProcess.Len() > 0 { // While there are unprocessed vertices

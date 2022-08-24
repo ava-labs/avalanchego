@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/utils/ips"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -23,7 +24,7 @@ type testNetwork struct {
 	ip        ips.IPPort
 	version   *version.Application
 	signer    crypto.Signer
-	subnets   ids.Set[ids.ID]
+	subnets   set.Set[ids.ID]
 
 	uptime uint8
 }
@@ -35,7 +36,7 @@ func NewTestNetwork(
 	ipPort ips.IPPort,
 	version *version.Application,
 	signer crypto.Signer,
-	subnets ids.Set[ids.ID],
+	subnets set.Set[ids.ID],
 	uptime uint8,
 ) Network {
 	return &testNetwork{

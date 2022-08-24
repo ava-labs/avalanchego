@@ -6,6 +6,7 @@ package snowstorm
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/events"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -14,12 +15,12 @@ var _ events.Blockable = &acceptor{}
 type acceptor struct {
 	g        *Directed
 	errs     *wrappers.Errs
-	deps     ids.Set[ids.ID]
+	deps     set.Set[ids.ID]
 	rejected bool
 	txID     ids.ID
 }
 
-func (a *acceptor) Dependencies() ids.Set[ids.ID] { return a.deps }
+func (a *acceptor) Dependencies() set.Set[ids.ID] { return a.deps }
 
 func (a *acceptor) Fulfill(id ids.ID) {
 	a.deps.Remove(id)

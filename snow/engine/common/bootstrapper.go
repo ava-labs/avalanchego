@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 const (
@@ -52,7 +53,7 @@ type bootstrapper struct {
 	// IDs of validators that failed to respond with their accepted frontier
 	failedAcceptedFrontier ids.NodeIDSet
 	// IDs of all the returned accepted frontiers
-	acceptedFrontierSet ids.Set[ids.ID]
+	acceptedFrontierSet set.Set[ids.ID]
 
 	// IDs of validators we should request filtering the accepted frontier from
 	pendingSendAccepted ids.NodeIDSet

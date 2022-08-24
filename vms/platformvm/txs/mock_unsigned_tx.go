@@ -6,6 +6,7 @@ package txs
 
 import (
 	ids "github.com/ava-labs/avalanchego/ids"
+	set "github.com/ava-labs/avalanchego/utils/set"
 	snow "github.com/ava-labs/avalanchego/snow"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
 	gomock "github.com/golang/mock/gomock"
@@ -74,10 +75,10 @@ func (mr *MockUnsignedTxMockRecorder) Initialize(arg0 interface{}) *gomock.Call 
 }
 
 // InputIDs mocks base method
-func (m *MockUnsignedTx) InputIDs() ids.Set[ids.ID] {
+func (m *MockUnsignedTx) InputIDs() set.Set[ids.ID] {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "InputIDs")
-	ret0, _ := ret[0].(ids.Set[ids.ID])
+	ret0, _ := ret[0].(set.Set[ids.ID])
 	return ret0
 }
 

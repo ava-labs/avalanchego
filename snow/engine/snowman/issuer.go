@@ -6,6 +6,7 @@ package snowman
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // issuer issues [blk] into to consensus after its dependencies are met.
@@ -13,10 +14,10 @@ type issuer struct {
 	t         *Transitive
 	blk       snowman.Block
 	abandoned bool
-	deps      ids.Set[ids.ID]
+	deps      set.Set[ids.ID]
 }
 
-func (i *issuer) Dependencies() ids.Set[ids.ID] { return i.deps }
+func (i *issuer) Dependencies() set.Set[ids.ID] { return i.deps }
 
 // Mark that a dependency has been met
 func (i *issuer) Fulfill(id ids.ID) {

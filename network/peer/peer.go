@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -72,7 +73,7 @@ type Peer interface {
 
 	// TrackedSubnets returns the subnets this peer is running. It should only
 	// be called after [Ready] returns true.
-	TrackedSubnets() ids.Set[ids.ID]
+	TrackedSubnets() set.Set[ids.ID]
 
 	// ObservedUptime returns the local node's uptime according to the peer. The
 	// value ranges from [0, 100]. It should only be called after [Ready]
@@ -120,7 +121,7 @@ type peer struct {
 	version *version.Application
 	// trackedSubnets is the subset of subnetIDs the peer sent us in the Version
 	// message that we are also tracking.
-	trackedSubnets ids.Set[ids.ID]
+	trackedSubnets set.Set[ids.ID]
 
 	observedUptimeLock sync.RWMutex
 	// [observedUptimeLock] must be held while accessing [observedUptime]
@@ -241,7 +242,7 @@ func (p *peer) IP() *SignedIP { return p.ip }
 
 func (p *peer) Version() *version.Application { return p.version }
 
-func (p *peer) TrackedSubnets() ids.Set[ids.ID] { return p.trackedSubnets }
+func (p *peer) TrackedSubnets() set.Set[ids.ID] { return p.trackedSubnets }
 
 func (p *peer) ObservedUptime() uint8 {
 	p.observedUptimeLock.RLock()

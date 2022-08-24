@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/metrics"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 const minMapSize = 16
@@ -59,18 +60,18 @@ type Topological struct {
 	cg snowstorm.Consensus
 
 	// preferred is the frontier of vtxIDs that are strongly preferred
-	preferred ids.Set[ids.ID]
+	preferred set.Set[ids.ID]
 
 	// virtuous is the frontier of vtxIDs that are strongly virtuous
-	virtuous ids.Set[ids.ID]
+	virtuous set.Set[ids.ID]
 
 	// orphans are the txIDs that are virtuous, but not preferred
-	orphans ids.Set[ids.ID]
+	orphans set.Set[ids.ID]
 
 	// virtuousVoting are the txIDs that are virtuous and still awaiting
 	// additional votes before acceptance. transactionVertices whose vertices
 	// are not considered virtuous are removed from this set.
-	virtuousVoting ids.Set[ids.ID]
+	virtuousVoting set.Set[ids.ID]
 
 	// frontier is the set of vts that have no descendents
 	frontier map[ids.ID]Vertex
@@ -80,9 +81,9 @@ type Topological struct {
 
 	// Used in [calculateInDegree] and [markAncestorInDegrees].
 	// Should only be accessed in those methods.
-	// We use this one instance of ids.Set instead of creating a
-	// new ids.Set during each call to [calculateInDegree].
-	leaves ids.Set[ids.ID]
+	// We use this one instance of set.Set instead of creating a
+	// new set.Set during each call to [calculateInDegree].
+	leaves set.Set[ids.ID]
 
 	// Kahn nodes used in [calculateInDegree] and [markAncestorInDegrees].
 	// Should only be accessed in those methods.
@@ -112,7 +113,7 @@ func (ta *Topological) Initialize(
 
 	ta.ctx = ctx
 	ta.params = params
-	ta.leaves = ids.Set[ids.ID]{}
+	ta.leaves = set.Set[ids.ID]{}
 	ta.votes = ids.UniqueBag{}
 	ta.kahnNodes = make(map[ids.ID]kahnNode)
 
@@ -212,11 +213,11 @@ func (ta *Topological) VertexIssued(vtx Vertex) bool {
 
 func (ta *Topological) TxIssued(tx snowstorm.Tx) bool { return ta.cg.Issued(tx) }
 
-func (ta *Topological) Orphans() ids.Set[ids.ID] { return ta.orphans }
+func (ta *Topological) Orphans() set.Set[ids.ID] { return ta.orphans }
 
-func (ta *Topological) Virtuous() ids.Set[ids.ID] { return ta.virtuous }
+func (ta *Topological) Virtuous() set.Set[ids.ID] { return ta.virtuous }
 
-func (ta *Topological) Preferences() ids.Set[ids.ID] { return ta.preferred }
+func (ta *Topological) Preferences() set.Set[ids.ID] { return ta.preferred }
 
 func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
 	// Register a new poll call
@@ -384,7 +385,7 @@ func (ta *Topological) markAncestorInDegrees(
 // vertex ancestors.
 func (ta *Topological) pushVotes() (ids.Bag, error) {
 	ta.votes.Clear()
-	txConflicts := make(map[ids.ID]ids.Set[ids.ID], minMapSize)
+	txConflicts := make(map[ids.ID]set.Set[ids.ID], minMapSize)
 
 	// A leaf is a node with no inbound edges. This removes each leaf and pushes
 	// the votes upwards, potentially creating new leaves, until there are no

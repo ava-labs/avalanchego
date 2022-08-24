@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -36,8 +37,8 @@ func (tx *BaseTx) Initialize(unsignedBytes []byte) { tx.unsignedBytes = unsigned
 
 func (tx *BaseTx) Bytes() []byte { return tx.unsignedBytes }
 
-func (tx *BaseTx) InputIDs() ids.Set[ids.ID] {
-	inputIDs := ids.NewSet[ids.ID](len(tx.Ins))
+func (tx *BaseTx) InputIDs() set.Set[ids.ID] {
+	inputIDs := set.NewSet[ids.ID](len(tx.Ins))
 	for _, in := range tx.Ins {
 		inputIDs.Add(in.InputID())
 	}

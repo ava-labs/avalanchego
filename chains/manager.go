@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/metervm"
@@ -159,8 +160,8 @@ type ManagerConfig struct {
 	AtomicMemory                *atomic.Memory
 	AVAXAssetID                 ids.ID
 	XChainID                    ids.ID
-	CriticalChains              ids.Set[ids.ID] // Chains that can't exit gracefully
-	WhitelistedSubnets          ids.Set[ids.ID] // Subnets to validate
+	CriticalChains              set.Set[ids.ID] // Chains that can't exit gracefully
+	WhitelistedSubnets          set.Set[ids.ID] // Subnets to validate
 	TimeoutManager              timeout.Manager // Manages request timeouts when sending messages to other validators
 	Health                      health.Registerer
 	RetryBootstrap              bool                    // Should Bootstrap be retried

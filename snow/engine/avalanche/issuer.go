@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // issuer issues [vtx] into consensus after its dependencies are met.
@@ -17,7 +18,7 @@ type issuer struct {
 	t                 *Transitive
 	vtx               avalanche.Vertex
 	issued, abandoned bool
-	vtxDeps, txDeps   ids.Set[ids.ID]
+	vtxDeps, txDeps   set.Set[ids.ID]
 }
 
 // Register that a vertex we were waiting on has been issued to consensus.
@@ -176,14 +177,14 @@ func (i *issuer) Update() {
 
 type vtxIssuer struct{ i *issuer }
 
-func (vi *vtxIssuer) Dependencies() ids.Set[ids.ID] { return vi.i.vtxDeps }
+func (vi *vtxIssuer) Dependencies() set.Set[ids.ID] { return vi.i.vtxDeps }
 func (vi *vtxIssuer) Fulfill(id ids.ID)             { vi.i.FulfillVtx(id) }
 func (vi *vtxIssuer) Abandon(ids.ID)                { vi.i.Abandon() }
 func (vi *vtxIssuer) Update()                       { vi.i.Update() }
 
 type txIssuer struct{ i *issuer }
 
-func (ti *txIssuer) Dependencies() ids.Set[ids.ID] { return ti.i.txDeps }
+func (ti *txIssuer) Dependencies() set.Set[ids.ID] { return ti.i.txDeps }
 func (ti *txIssuer) Fulfill(id ids.ID)             { ti.i.FulfillTx(id) }
 func (ti *txIssuer) Abandon(ids.ID)                { ti.i.Abandon() }
 func (ti *txIssuer) Update()                       { ti.i.Update() }

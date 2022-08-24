@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var errMissingVtxDependenciesOnAccept = errors.New("attempting to execute blocked vertex")
@@ -48,8 +49,8 @@ type vertexJob struct {
 
 func (v *vertexJob) ID() ids.ID { return v.vtx.ID() }
 
-func (v *vertexJob) MissingDependencies() (ids.Set[ids.ID], error) {
-	missing := ids.Set[ids.ID]{}
+func (v *vertexJob) MissingDependencies() (set.Set[ids.ID], error) {
+	missing := set.Set[ids.ID]{}
 	parents, err := v.vtx.Parents()
 	if err != nil {
 		return missing, err

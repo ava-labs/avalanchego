@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var errMissingDependenciesOnAccept = errors.New("attempting to accept a block with missing dependencies")
@@ -51,8 +52,8 @@ type blockJob struct {
 }
 
 func (b *blockJob) ID() ids.ID { return b.blk.ID() }
-func (b *blockJob) MissingDependencies() (ids.Set[ids.ID], error) {
-	missing := ids.Set[ids.ID]{}
+func (b *blockJob) MissingDependencies() (set.Set[ids.ID], error) {
+	missing := set.Set[ids.ID]{}
 	parentID := b.blk.Parent()
 	if parent, err := b.vm.GetBlock(parentID); err != nil || parent.Status() != choices.Accepted {
 		missing.Add(parentID)

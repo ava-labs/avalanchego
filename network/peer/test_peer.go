@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -112,12 +113,12 @@ func StartTestPeer(
 				ipPort,
 				version.CurrentApp,
 				tlsCert.PrivateKey.(crypto.Signer),
-				ids.Set[ids.ID]{},
+				set.Set[ids.ID]{},
 				100,
 			),
 			Router:               router,
 			VersionCompatibility: version.GetCompatibility(networkID),
-			MySubnets:            ids.Set[ids.ID]{},
+			MySubnets:            set.Set[ids.ID]{},
 			Beacons:              validators.NewSet(),
 			NetworkID:            networkID,
 			PingFrequency:        constants.DefaultPingFrequency,

@@ -5,12 +5,13 @@ package queue
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // Job defines the interface required to be placed on the job queue.
 type Job interface {
 	ID() ids.ID
-	MissingDependencies() (ids.Set[ids.ID], error)
+	MissingDependencies() (set.Set[ids.ID], error)
 	// Returns true if this job has at least 1 missing dependency
 	HasMissingDependencies() (bool, error)
 	Execute() error

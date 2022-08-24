@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/ips"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // HealthConfig describes parameters for network layer health checks.
@@ -123,7 +124,7 @@ type Config struct {
 	TLSKey crypto.Signer `json:"-"`
 
 	// WhitelistedSubnets of the node.
-	WhitelistedSubnets ids.Set[ids.ID] `json:"whitelistedSubnets"`
+	WhitelistedSubnets set.Set[ids.ID] `json:"whitelistedSubnets"`
 	Beacons            validators.Set  `json:"beacons"`
 
 	// Validators are the current validators in the Avalanche network

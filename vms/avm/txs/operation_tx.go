@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -49,7 +50,7 @@ func (t *OperationTx) InputUTXOs() []*avax.UTXOID {
 }
 
 // ConsumedAssetIDs returns the IDs of the assets this transaction consumes
-func (t *OperationTx) ConsumedAssetIDs() ids.Set[ids.ID] {
+func (t *OperationTx) ConsumedAssetIDs() set.Set[ids.ID] {
 	assets := t.AssetIDs()
 	for _, op := range t.Ops {
 		if len(op.UTXOIDs) > 0 {
@@ -60,7 +61,7 @@ func (t *OperationTx) ConsumedAssetIDs() ids.Set[ids.ID] {
 }
 
 // AssetIDs returns the IDs of the assets this transaction depends on
-func (t *OperationTx) AssetIDs() ids.Set[ids.ID] {
+func (t *OperationTx) AssetIDs() set.Set[ids.ID] {
 	assets := t.BaseTx.AssetIDs()
 	for _, op := range t.Ops {
 		assets.Add(op.AssetID())
@@ -93,7 +94,7 @@ func (t *OperationTx) SyntacticVerify(
 		return err
 	}
 
-	inputs := ids.NewSet[ids.ID](len(t.Ins))
+	inputs := set.NewSet[ids.ID](len(t.Ins))
 	for _, in := range t.Ins {
 		inputs.Add(in.InputID())
 	}

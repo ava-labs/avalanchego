@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -45,7 +46,7 @@ type requestEntry struct {
 
 type peer struct {
 	version        *version.Application
-	trackedSubnets ids.Set[ids.ID]
+	trackedSubnets set.Set[ids.ID]
 }
 
 // ChainRouter routes incoming messages from the validator network
@@ -68,8 +69,8 @@ type ChainRouter struct {
 	peers        map[ids.NodeID]*peer
 	// node ID --> chains that node is benched on
 	// invariant: if a node is benched on any chain, it is treated as disconnected on all chains
-	benched        map[ids.NodeID]ids.Set[ids.ID]
-	criticalChains ids.Set[ids.ID]
+	benched        map[ids.NodeID]set.Set[ids.ID]
+	criticalChains set.Set[ids.ID]
 	onFatal        func(exitCode int)
 	metrics        *routerMetrics
 	// Parameters for doing health checks
@@ -92,8 +93,8 @@ func (cr *ChainRouter) Initialize(
 	msgCreator message.Creator,
 	timeoutManager timeout.Manager,
 	closeTimeout time.Duration,
-	criticalChains ids.Set[ids.ID],
-	whitelistedSubnets ids.Set[ids.ID],
+	criticalChains set.Set[ids.ID],
+	whitelistedSubnets set.Set[ids.ID],
 	onFatal func(exitCode int),
 	healthConfig HealthConfig,
 	metricsNamespace string,
@@ -104,7 +105,7 @@ func (cr *ChainRouter) Initialize(
 	cr.chains = make(map[ids.ID]handler.Handler)
 	cr.timeoutManager = timeoutManager
 	cr.closeTimeout = closeTimeout
-	cr.benched = make(map[ids.NodeID]ids.Set[ids.ID])
+	cr.benched = make(map[ids.NodeID]set.Set[ids.ID])
 	cr.criticalChains = criticalChains
 	cr.onFatal = onFatal
 	cr.timedRequests = linkedhashmap.New()

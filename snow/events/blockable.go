@@ -5,13 +5,14 @@ package events
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // Blockable defines what an object must implement to be able to block on
 // dependent events being completed.
 type Blockable interface {
 	// IDs that this object is blocking on
-	Dependencies() ids.Set[ids.ID]
+	Dependencies() set.Set[ids.ID]
 	// Notify this object that an event has been fulfilled
 	Fulfill(ids.ID)
 	// Notify this object that an event has been abandoned

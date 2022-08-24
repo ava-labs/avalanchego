@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -34,7 +35,7 @@ type Config struct {
 	StakingEnabled bool
 
 	// Set of subnets that this node is validating
-	WhitelistedSubnets ids.Set[ids.ID]
+	WhitelistedSubnets set.Set[ids.ID]
 
 	// Fee that must be burned by every create staker transaction
 	AddStakerTxFee uint64

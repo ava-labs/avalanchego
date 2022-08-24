@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // GetBalance returns the current balance of [addrs]
@@ -64,7 +65,7 @@ func GetPaginatedUTXOs(
 ) ([]*UTXO, ids.ShortID, ids.ID, error) {
 	var (
 		utxos      []*UTXO
-		seen       ids.Set[ids.ID]      // IDs of UTXOs already in the list
+		seen       set.Set[ids.ID]      // IDs of UTXOs already in the list
 		searchSize = limit              // the limit diminishes which can impact the expected return
 		addrsList  = addrs.SortedList() // enforces the same ordering for pagination
 	)

@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/events"
 	"github.com/ava-labs/avalanchego/utils/sampler"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -49,11 +50,11 @@ type Transitive struct {
 	outstandingVtxReqs common.Requests
 
 	// missingTxs tracks transaction that are missing
-	missingTxs ids.Set[ids.ID]
+	missingTxs set.Set[ids.ID]
 
 	// IDs of vertices that are queued to be added to consensus but haven't yet been
 	// because of missing dependencies
-	pending ids.Set[ids.ID]
+	pending set.Set[ids.ID]
 
 	// vtxBlocked tracks operations that are blocked on vertices
 	// txBlocked tracks operations that are blocked on transactions
@@ -481,7 +482,7 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 	if err != nil {
 		return err
 	}
-	txIDs := ids.NewSet[ids.ID](len(txs))
+	txIDs := set.NewSet[ids.ID](len(txs))
 	for _, tx := range txs {
 		txIDs.Add(tx.ID())
 	}
@@ -545,14 +546,14 @@ func (t *Transitive) batch(txs []snowstorm.Tx, opt batchOption) ([]snowstorm.Tx,
 	if opt.limit && t.Params.OptimalProcessing <= t.Consensus.NumProcessing() {
 		return txs, nil
 	}
-	issuedTxs := ids.Set[ids.ID]{}
-	consumed := ids.Set[ids.ID]{}
+	issuedTxs := set.Set[ids.ID]{}
+	consumed := set.Set[ids.ID]{}
 	orphans := t.Consensus.Orphans()
 	start := 0
 	end := 0
 	for end < len(txs) {
 		tx := txs[end]
-		inputs := ids.Set[ids.ID]{}
+		inputs := set.Set[ids.ID]{}
 		inputs.Add(tx.InputIDs()...)
 		overlaps := consumed.Overlaps(inputs)
 		if end-start >= t.Params.BatchSize || (opt.force && overlaps) {

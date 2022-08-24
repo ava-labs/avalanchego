@@ -6,6 +6,7 @@ package txs
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
@@ -18,7 +19,7 @@ type UnsignedTx interface {
 	Bytes() []byte
 
 	// InputIDs returns the set of inputs this transaction consumes
-	InputIDs() ids.Set[ids.ID]
+	InputIDs() set.Set[ids.ID]
 
 	Outputs() []*avax.TransferableOutput
 

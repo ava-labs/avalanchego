@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
@@ -464,7 +465,7 @@ func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs
 	}
 
 	now := service.vm.clock.Unix()
-	assetIDs := ids.Set[ids.ID]{}       // IDs of assets the address has a non-zero balance of
+	assetIDs := set.Set[ids.ID]{}       // IDs of assets the address has a non-zero balance of
 	balances := make(map[ids.ID]uint64) // key: ID (as bytes). value: balance of that asset
 	for _, utxo := range utxos {
 		// TODO make this not specific to *secp256k1fx.TransferOutput

@@ -6,6 +6,8 @@ package ids
 import (
 	"fmt"
 	"strings"
+
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 const (
@@ -24,7 +26,7 @@ type Bag struct {
 	modeFreq int
 
 	threshold    int
-	metThreshold Set[ID]
+	metThreshold set.Set[ID]
 }
 
 func (b *Bag) init() {
@@ -117,7 +119,7 @@ func (b *Bag) Equals(oIDs Bag) bool {
 func (b *Bag) Mode() (ID, int) { return b.mode, b.modeFreq }
 
 // Threshold returns the ids that have been seen at least threshold times.
-func (b *Bag) Threshold() Set[ID] { return b.metThreshold }
+func (b *Bag) Threshold() set.Set[ID] { return b.metThreshold }
 
 // Filter returns the bag of ids with the same counts as this bag, except all
 // the ids in the returned bag must have the same bits in the range [start, end)

@@ -6,6 +6,7 @@ package snowstorm
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var _ Tx = &TestTx{}
@@ -18,7 +19,7 @@ type TestTx struct {
 	DependenciesErrV error
 	InputIDsV        []ids.ID
 	HasWhitelistV    bool
-	WhitelistV       ids.Set[ids.ID]
+	WhitelistV       set.Set[ids.ID]
 	WhitelistErrV    error
 	VerifyV          error
 	BytesV           []byte
@@ -27,6 +28,6 @@ type TestTx struct {
 func (t *TestTx) Dependencies() ([]Tx, error)         { return t.DependenciesV, t.DependenciesErrV }
 func (t *TestTx) InputIDs() []ids.ID                  { return t.InputIDsV }
 func (t *TestTx) HasWhitelist() bool                  { return t.HasWhitelistV }
-func (t *TestTx) Whitelist() (ids.Set[ids.ID], error) { return t.WhitelistV, t.WhitelistErrV }
+func (t *TestTx) Whitelist() (set.Set[ids.ID], error) { return t.WhitelistV, t.WhitelistErrV }
 func (t *TestTx) Verify() error                       { return t.VerifyV }
 func (t *TestTx) Bytes() []byte                       { return t.BytesV }

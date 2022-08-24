@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -230,8 +231,8 @@ type JobsWithMissing struct {
 
 	// keep the missing ID set in memory to avoid unnecessary database reads and
 	// writes.
-	missingIDs                            ids.Set[ids.ID]
-	removeFromMissingIDs, addToMissingIDs ids.Set[ids.ID]
+	missingIDs                            set.Set[ids.ID]
+	removeFromMissingIDs, addToMissingIDs set.Set[ids.ID]
 }
 
 func NewWithMissing(

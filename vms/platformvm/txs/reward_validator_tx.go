@@ -6,6 +6,7 @@ package txs
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
@@ -36,7 +37,7 @@ func (tx *RewardValidatorTx) Initialize(unsignedBytes []byte) {
 }
 func (tx *RewardValidatorTx) InitCtx(*snow.Context)               {}
 func (tx *RewardValidatorTx) Bytes() []byte                       { return tx.unsignedBytes }
-func (tx *RewardValidatorTx) InputIDs() ids.Set[ids.ID]           { return nil }
+func (tx *RewardValidatorTx) InputIDs() set.Set[ids.ID]           { return nil }
 func (tx *RewardValidatorTx) Outputs() []*avax.TransferableOutput { return nil }
 func (tx *RewardValidatorTx) SyntacticVerify(*snow.Context) error { return nil }
 

@@ -7,11 +7,13 @@ import (
 	"crypto/rand"
 	"strconv"
 	"testing"
+
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 func BenchmarkSetListSmall(b *testing.B) {
 	smallLen := 5
-	set := Set[ID]{}
+	set := set.Set[ID]{}
 	for i := 0; i < smallLen; i++ {
 		var id ID
 		if _, err := rand.Read(id[:]); err != nil {
@@ -27,7 +29,7 @@ func BenchmarkSetListSmall(b *testing.B) {
 
 func BenchmarkSetListMedium(b *testing.B) {
 	mediumLen := 25
-	set := Set[ID]{}
+	set := set.Set[ID]{}
 	for i := 0; i < mediumLen; i++ {
 		var id ID
 		if _, err := rand.Read(id[:]); err != nil {
@@ -44,7 +46,7 @@ func BenchmarkSetListMedium(b *testing.B) {
 
 func BenchmarkSetListLarge(b *testing.B) {
 	largeLen := 100000
-	set := Set[ID]{}
+	set := set.Set[ID]{}
 	for i := 0; i < largeLen; i++ {
 		var id ID
 		if _, err := rand.Read(id[:]); err != nil {
@@ -61,7 +63,7 @@ func BenchmarkSetListLarge(b *testing.B) {
 func BenchmarkSetClear(b *testing.B) {
 	for _, numElts := range []int{10, 25, 50, 100, 250, 500, 1000} {
 		b.Run(strconv.Itoa(numElts), func(b *testing.B) {
-			set := NewSet[ID](numElts)
+			set := set.NewSet[ID](numElts)
 			for n := 0; n < b.N; n++ {
 				set.Add(make([]ID, numElts)...)
 				set.Clear()

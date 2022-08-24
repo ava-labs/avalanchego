@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/metrics"
 	"github.com/ava-labs/avalanchego/snow/events"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
@@ -46,13 +47,13 @@ type Directed struct {
 	params sbcon.Parameters
 
 	// each element of preferences is the ID of a transaction that is preferred
-	preferences ids.Set[ids.ID]
+	preferences set.Set[ids.ID]
 
 	// each element of virtuous is the ID of a transaction that is virtuous
-	virtuous ids.Set[ids.ID]
+	virtuous set.Set[ids.ID]
 
 	// each element is in the virtuous set and is still being voted on
-	virtuousVoting ids.Set[ids.ID]
+	virtuousVoting set.Set[ids.ID]
 
 	// number of times RecordPoll has been called
 	pollNumber uint64
@@ -72,10 +73,10 @@ type Directed struct {
 
 	// Key: UTXO ID
 	// Value: IDs of transactions that consume the UTXO specified in the key
-	utxos map[ids.ID]ids.Set[ids.ID]
+	utxos map[ids.ID]set.Set[ids.ID]
 
 	// map transaction ID to the set of whitelisted transaction IDs.
-	whitelists map[ids.ID]ids.Set[ids.ID]
+	whitelists map[ids.ID]set.Set[ids.ID]
 }
 
 type directedTx struct {
@@ -87,11 +88,11 @@ type directedTx struct {
 
 	// ins is the set of txIDs that this tx conflicts with that are less
 	// preferred than this tx
-	ins ids.Set[ids.ID]
+	ins set.Set[ids.ID]
 
 	// outs is the set of txIDs that this tx conflicts with that are more
 	// preferred than this tx
-	outs ids.Set[ids.ID]
+	outs set.Set[ids.ID]
 
 	// tx is the actual transaction this node represents
 	tx Tx
@@ -139,19 +140,19 @@ func (dg *Directed) Initialize(
 	}
 
 	dg.txs = make(map[ids.ID]*directedTx)
-	dg.utxos = make(map[ids.ID]ids.Set[ids.ID])
-	dg.whitelists = make(map[ids.ID]ids.Set[ids.ID])
+	dg.utxos = make(map[ids.ID]set.Set[ids.ID])
+	dg.whitelists = make(map[ids.ID]set.Set[ids.ID])
 
 	return params.Verify()
 }
 
 func (dg *Directed) Parameters() sbcon.Parameters { return dg.params }
 
-func (dg *Directed) Virtuous() ids.Set[ids.ID] { return dg.virtuous }
+func (dg *Directed) Virtuous() set.Set[ids.ID] { return dg.virtuous }
 
-func (dg *Directed) Preferences() ids.Set[ids.ID] { return dg.preferences }
+func (dg *Directed) Preferences() set.Set[ids.ID] { return dg.preferences }
 
-func (dg *Directed) VirtuousVoting() ids.Set[ids.ID] { return dg.virtuousVoting }
+func (dg *Directed) VirtuousVoting() set.Set[ids.ID] { return dg.virtuousVoting }
 
 func (dg *Directed) Quiesce() bool {
 	numVirtuous := dg.virtuousVoting.Len()
@@ -254,8 +255,8 @@ func (dg *Directed) IsVirtuous(tx Tx) bool {
 	return true
 }
 
-func (dg *Directed) Conflicts(tx Tx) ids.Set[ids.ID] {
-	var conflicts ids.Set[ids.ID]
+func (dg *Directed) Conflicts(tx Tx) set.Set[ids.ID] {
+	var conflicts set.Set[ids.ID]
 	if node, exists := dg.txs[tx.ID()]; exists {
 		// If the tx is currently processing, the conflicting txs are just the
 		// union of the inbound conflicts and the outbound conflicts.
@@ -403,7 +404,7 @@ func (dg *Directed) addEdge(src, dst *directedTx) {
 }
 
 func (dg *Directed) Remove(txID ids.ID) error {
-	err := dg.reject(ids.Set[ids.ID]{
+	err := dg.reject(set.Set[ids.ID]{
 		txID: struct{}{},
 	})
 
@@ -536,7 +537,7 @@ func (dg *Directed) accept(txID ids.ID) error {
 }
 
 // reject all the named txIDs and remove them from the graph
-func (dg *Directed) reject(conflictIDs ids.Set[ids.ID]) error {
+func (dg *Directed) reject(conflictIDs set.Set[ids.ID]) error {
 	for conflictKey := range conflictIDs {
 		conflict := dg.txs[conflictKey]
 		// This tx is no longer an option for consuming the UTXOs from its
@@ -626,7 +627,7 @@ func (dg *Directed) redirectEdge(txNode *directedTx, conflictID ids.ID) bool {
 	return true
 }
 
-func (dg *Directed) removeConflict(txIDKey ids.ID, neighborIDs ids.Set[ids.ID]) {
+func (dg *Directed) removeConflict(txIDKey ids.ID, neighborIDs set.Set[ids.ID]) {
 	for neighborID := range neighborIDs {
 		neighbor, exists := dg.txs[neighborID]
 		if !exists {

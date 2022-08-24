@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var _ Subnet = &subnet{}
@@ -36,7 +37,7 @@ type SubnetConfig struct {
 
 type subnet struct {
 	lock             sync.RWMutex
-	bootstrapping    ids.Set[ids.ID]
+	bootstrapping    set.Set[ids.ID]
 	once             sync.Once
 	bootstrappedSema chan struct{}
 }
