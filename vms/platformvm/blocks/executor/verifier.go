@@ -47,14 +47,14 @@ func (v *verifier) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
 	}
 
 	parentID := b.Parent()
-	parentState, ok := v.blkIDToState[parentID]
+	onAcceptState, ok := v.getOnAbortState(parentID)
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 
 	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
-		onAcceptState:  parentState.onAbortState,
+		onAcceptState:  onAcceptState,
 		timestamp:      b.Timestamp(),
 	}
 	return nil
@@ -73,14 +73,14 @@ func (v *verifier) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
 	}
 
 	parentID := b.Parent()
-	parentState, ok := v.blkIDToState[parentID]
+	onAcceptState, ok := v.getOnCommitState(parentID)
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 
 	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
-		onAcceptState:  parentState.onCommitState,
+		onAcceptState:  onAcceptState,
 		timestamp:      b.Timestamp(),
 	}
 	return nil
@@ -295,12 +295,11 @@ func (v *verifier) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 	}
 
 	parentID := b.Parent()
-	parentState, ok := v.blkIDToState[parentID]
+	onAcceptState, ok := v.getOnAbortState(parentID)
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 
-	onAcceptState := parentState.onAbortState
 	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
 		onAcceptState:  onAcceptState,
@@ -322,12 +321,11 @@ func (v *verifier) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 	}
 
 	parentID := b.Parent()
-	parentState, ok := v.blkIDToState[parentID]
+	onAcceptState, ok := v.getOnCommitState(parentID)
 	if !ok {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 
-	onAcceptState := parentState.onCommitState
 	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
 		onAcceptState:  onAcceptState,

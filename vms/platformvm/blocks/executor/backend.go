@@ -51,6 +51,22 @@ func (b *backend) GetState(blkID ids.ID) (state.Chain, bool) {
 	return b.state, blkID == b.state.GetLastAccepted()
 }
 
+func (b *backend) getOnAbortState(blkID ids.ID) (state.Diff, bool) {
+	state, ok := b.blkIDToState[blkID]
+	if !ok || state.onAbortState == nil {
+		return nil, false
+	}
+	return state.onAbortState, true
+}
+
+func (b *backend) getOnCommitState(blkID ids.ID) (state.Diff, bool) {
+	state, ok := b.blkIDToState[blkID]
+	if !ok || state.onCommitState == nil {
+		return nil, false
+	}
+	return state.onCommitState, true
+}
+
 func (b *backend) GetBlock(blkID ids.ID) (blocks.Block, error) {
 	// See if the block is in memory.
 	if blk, ok := b.blkIDToState[blkID]; ok {
