@@ -17,7 +17,7 @@ type weightedLinearElement struct {
 
 // TODO can we define this on *weightedLinearElement?
 func (e weightedLinearElement) Less(other weightedLinearElement) bool {
-	return e.cumulativeWeight < other.cumulativeWeight
+	return e.cumulativeWeight > other.cumulativeWeight
 }
 
 // Sampling is performed by executing a linear search over the provided elements

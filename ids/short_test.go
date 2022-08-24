@@ -88,3 +88,27 @@ func TestShortIDsToStrings(t *testing.T) {
 	shortStrings := ShortIDsToStrings(shortIDs)
 	require.EqualValues(t, expected, shortStrings)
 }
+
+func TestShortIDLess(t *testing.T) {
+	require := require.New(t)
+
+	id1 := ShortID{}
+	id2 := ShortID{}
+	require.False(id1.Less(id2))
+	require.False(id2.Less(id1))
+
+	id1 = ShortID{1}
+	id2 = ShortID{}
+	require.False(id1.Less(id2))
+	require.True(id2.Less(id1))
+
+	id1 = ShortID{1}
+	id2 = ShortID{1}
+	require.False(id1.Less(id2))
+	require.False(id2.Less(id1))
+
+	id1 = ShortID{1}
+	id2 = ShortID{1, 2}
+	require.True(id1.Less(id2))
+	require.False(id2.Less(id1))
+}

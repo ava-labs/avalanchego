@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestNodeIDEquality(t *testing.T) {
@@ -186,4 +188,28 @@ func TestNodeIDMapMarshalling(t *testing.T) {
 			t.Fatalf("map was incorrectly Unmarshalled")
 		}
 	}
+}
+
+func TestNodeIDLess(t *testing.T) {
+	require := require.New(t)
+
+	id1 := NodeID{}
+	id2 := NodeID{}
+	require.False(id1.Less(id2))
+	require.False(id2.Less(id1))
+
+	id1 = NodeID{1}
+	id2 = NodeID{}
+	require.False(id1.Less(id2))
+	require.True(id2.Less(id1))
+
+	id1 = NodeID{1}
+	id2 = NodeID{1}
+	require.False(id1.Less(id2))
+	require.False(id2.Less(id1))
+
+	id1 = NodeID{1}
+	id2 = NodeID{1, 2}
+	require.True(id1.Less(id2))
+	require.False(id2.Less(id1))
 }

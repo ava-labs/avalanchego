@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/stretchr/testify/require"
 )
 
 func TestID(t *testing.T) {
@@ -212,4 +213,28 @@ func TestIDMapMarshalling(t *testing.T) {
 			t.Fatalf("map was incorrectly Unmarshalled")
 		}
 	}
+}
+
+func TestIDLess(t *testing.T) {
+	require := require.New(t)
+
+	id1 := ID{}
+	id2 := ID{}
+	require.False(id1.Less(id2))
+	require.False(id2.Less(id1))
+
+	id1 = ID{1}
+	id2 = ID{}
+	require.False(id1.Less(id2))
+	require.True(id2.Less(id1))
+
+	id1 = ID{1}
+	id2 = ID{1}
+	require.False(id1.Less(id2))
+	require.False(id2.Less(id1))
+
+	id1 = ID{1}
+	id2 = ID{1, 2}
+	require.True(id1.Less(id2))
+	require.False(id2.Less(id1))
 }
