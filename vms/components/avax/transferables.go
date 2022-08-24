@@ -150,17 +150,7 @@ func (in *TransferableInput) Verify() error {
 }
 
 func (in *TransferableInput) Less(other *TransferableInput) bool {
-	inID, inIndex := in.InputSource()
-	otherID, otherIndex := other.InputSource()
-
-	switch bytes.Compare(inID[:], otherID[:]) {
-	case -1:
-		return true
-	case 0:
-		return inIndex < otherIndex
-	default:
-		return false
-	}
+	return in.UTXOID.Less(&other.UTXOID)
 }
 
 type innerSortTransferableInputsWithSigners struct {
@@ -168,7 +158,6 @@ type innerSortTransferableInputsWithSigners struct {
 	signers [][]*crypto.PrivateKeySECP256K1R
 }
 
-// TODO add tests
 func (ins *innerSortTransferableInputsWithSigners) Less(i, j int) bool {
 	iID, iIndex := ins.ins[i].InputSource()
 	jID, jIndex := ins.ins[j].InputSource()

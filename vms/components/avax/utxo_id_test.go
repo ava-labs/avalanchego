@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUTXOIDVerifyNil(t *testing.T) {
@@ -56,5 +57,60 @@ func TestUTXOID(t *testing.T) {
 
 	if utxoID.InputID() != newUTXOID.InputID() {
 		t.Fatalf("Parsing returned the wrong UTXO ID")
+	}
+}
+
+func TestUTXOIDLess(t *testing.T) {
+	type test struct {
+		name     string
+		id1      UTXOID
+		id2      UTXOID
+		expected bool
+	}
+	tests := []test{
+		{
+			name:     "same",
+			id1:      UTXOID{},
+			id2:      UTXOID{},
+			expected: false,
+		},
+		{
+			name: "first id smaller",
+			id1:  UTXOID{},
+			id2: UTXOID{
+				TxID: ids.ID{1},
+			},
+			expected: true,
+		},
+		{
+			name: "first id larger",
+			id1: UTXOID{
+				TxID: ids.ID{1},
+			},
+			id2:      UTXOID{},
+			expected: false,
+		},
+		{
+			name: "first index smaller",
+			id1:  UTXOID{},
+			id2: UTXOID{
+				OutputIndex: 1,
+			},
+			expected: true,
+		},
+		{
+			name: "first index larger",
+			id1: UTXOID{
+				OutputIndex: 1,
+			},
+			id2:      UTXOID{},
+			expected: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			require.Equal(tt.expected, tt.id1.Less(&tt.id2))
+		})
 	}
 }
