@@ -57,6 +57,7 @@ func VerifyNewChainTime(
 
 type StateChanges interface {
 	Apply(onAccept state.Diff)
+	Len() int
 }
 
 type stateChanges struct {
@@ -86,6 +87,12 @@ func (s *stateChanges) Apply(onAccept state.Diff) {
 	for _, currentValidatorToRemove := range s.currentValidatorsToRemove {
 		onAccept.DeleteCurrentValidator(currentValidatorToRemove)
 	}
+}
+
+func (s *stateChanges) Len() int {
+	return len(s.currentValidatorsToAdd) + len(s.currentDelegatorsToAdd) +
+		len(s.pendingValidatorsToRemove) + len(s.pendingDelegatorsToRemove) +
+		len(s.currentValidatorsToRemove)
 }
 
 // AdvanceTimeTo does not modify [parentState].
