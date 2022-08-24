@@ -827,9 +827,9 @@ func (s *sender) SendChits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) 
 func (s *sender) SendCrossChainAppRequest(chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
 	// When registering the request's response we need to flip the
 	// source/destination chainIDs since the responding chain
-	// (the request's destination) will become the source chain id for the
-	// response.
-	s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, chainID, requestID, message.CrossChainAppResponse)
+	// (the current request's destination) will become the source chain id for
+	// the expected corresponding response.
+	s.router.RegisterRequest(s.ctx.NodeID, chainID, s.ctx.ChainID, requestID, message.CrossChainAppResponse)
 
 	inMsg := s.msgCreator.InternalCrossChainAppRequest(
 		s.ctx.ChainID,
