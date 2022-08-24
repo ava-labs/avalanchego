@@ -177,7 +177,7 @@ func (m *mempool) Add(tx *txs.Tx) error {
 		return fmt.Errorf("tx %s size (%d) > target size (%d)", txID, len(txBytes), targetTxSize)
 	}
 	if len(txBytes) > m.bytesAvailable {
-		return fmt.Errorf("%w: tx %s size (%d) exceeds available space (%d)",
+		return fmt.Errorf("%w, tx %s size (%d) exceeds available space (%d)",
 			errMempoolFull,
 			txID,
 			len(txBytes),
