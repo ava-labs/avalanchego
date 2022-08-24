@@ -17,10 +17,6 @@ type Sortable[T any] interface {
 	Less(T) bool
 }
 
-type Hashable interface {
-	~[]byte
-}
-
 // TODO add tests
 func SortSliceSortable[T Sortable[T]](s []T) {
 	sort.Slice(s, func(i, j int) bool {
@@ -37,7 +33,7 @@ func SortSliceOrdered[T constraints.Ordered](s []T) {
 }
 
 // TODO test
-func SortByHash[T Hashable](s []T) {
+func SortByHash[T ~[]byte](s []T) {
 	sort.Slice(s, func(i, j int) bool {
 		return bytes.Compare(hashing.ComputeHash256(s[i]), hashing.ComputeHash256(s[j])) == -1
 	})
@@ -45,7 +41,7 @@ func SortByHash[T Hashable](s []T) {
 
 // Sort2DByteSlice sorts a 2D byte slice.
 // Each byte slice is not sorted internally; the byte slices are sorted relative to another.
-func Sort2DByteSlice[T Hashable](arr []T) {
+func Sort2DByteSlice[T ~[]byte](arr []T) {
 	sort.Slice(
 		arr,
 		func(i, j int) bool {
@@ -74,7 +70,7 @@ func IsSortedAndUniqueOrdered[T constraints.Ordered](s []T) bool {
 }
 
 // TODO test
-func IsSortedAndUniqueByHash[T Hashable](s []T) bool {
+func IsSortedAndUniqueByHash[T ~[]byte](s []T) bool {
 	for i := 0; i < len(s)-1; i++ {
 		if bytes.Compare(hashing.ComputeHash256(s[i]), hashing.ComputeHash256(s[i+1])) != -1 {
 			return false
@@ -84,7 +80,7 @@ func IsSortedAndUniqueByHash[T Hashable](s []T) bool {
 }
 
 // IsSorted2DByteSlice returns true iff [arr] is sorted
-func IsSorted2DByteSlice[T Hashable](arr []T) bool {
+func IsSorted2DByteSlice[T ~[]byte](arr []T) bool {
 	return sort.SliceIsSorted(
 		arr,
 		func(i, j int) bool {
