@@ -519,14 +519,9 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 			parentHeight := uint64(1)
 
 			backend := &backend{
-				blkIDToState: map[ids.ID]*blockState{
-					parentID: {
-						timestamp:      test.parentTime,
-						statelessBlock: parentStatelessBlk,
-					},
-				},
-				Mempool: mempool,
-				state:   s,
+				blkIDToState: make(map[ids.ID]*blockState),
+				Mempool:      mempool,
+				state:        s,
 				ctx: &snow.Context{
 					Log: logging.NoLog{},
 				},
@@ -545,6 +540,26 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 			childHeight := parentHeight + 1
 			statelessAbortBlk, err := blocks.NewBlueberryAbortBlock(test.childTime, parentID, childHeight)
 			require.NoError(err)
+
+			// setup parent state
+			parentTime := defaultGenesisTime
+			parentSupply := uint64(2022)
+			s.EXPECT().GetLastAccepted().Return(parentID).Times(2)
+			s.EXPECT().GetTimestamp().Return(parentTime).Times(2)
+			s.EXPECT().GetCurrentSupply().Return(parentSupply).Times(2)
+
+			onCommitState, err := state.NewDiff(parentID, backend)
+			require.NoError(err)
+			onAbortState, err := state.NewDiff(parentID, backend)
+			require.NoError(err)
+			backend.blkIDToState[parentID] = &blockState{
+				timestamp:      test.parentTime,
+				statelessBlock: parentStatelessBlk,
+				proposalBlockState: proposalBlockState{
+					onCommitState: onCommitState,
+					onAbortState:  onAbortState,
+				},
+			}
 
 			// Set expectations for dependencies.
 			gomock.InOrder(
@@ -603,14 +618,9 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 			parentHeight := uint64(1)
 
 			backend := &backend{
-				blkIDToState: map[ids.ID]*blockState{
-					parentID: {
-						timestamp:      test.parentTime,
-						statelessBlock: parentStatelessBlk,
-					},
-				},
-				Mempool: mempool,
-				state:   s,
+				blkIDToState: make(map[ids.ID]*blockState),
+				Mempool:      mempool,
+				state:        s,
 				ctx: &snow.Context{
 					Log: logging.NoLog{},
 				},
@@ -629,6 +639,26 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 			childHeight := parentHeight + 1
 			statelessCommitBlk, err := blocks.NewBlueberryCommitBlock(test.childTime, parentID, childHeight)
 			require.NoError(err)
+
+			// setup parent state
+			parentTime := defaultGenesisTime
+			parentSupply := uint64(2022)
+			s.EXPECT().GetLastAccepted().Return(parentID).Times(2)
+			s.EXPECT().GetTimestamp().Return(parentTime).Times(2)
+			s.EXPECT().GetCurrentSupply().Return(parentSupply).Times(2)
+
+			onCommitState, err := state.NewDiff(parentID, backend)
+			require.NoError(err)
+			onAbortState, err := state.NewDiff(parentID, backend)
+			require.NoError(err)
+			backend.blkIDToState[parentID] = &blockState{
+				timestamp:      test.parentTime,
+				statelessBlock: parentStatelessBlk,
+				proposalBlockState: proposalBlockState{
+					onCommitState: onCommitState,
+					onAbortState:  onAbortState,
+				},
+			}
 
 			// Set expectations for dependencies.
 			gomock.InOrder(
@@ -860,7 +890,6 @@ func TestVerifierVisitBlueberryStandardBlockWithProposalBlockParent(t *testing.T
 	)
 	require.NoError(err)
 
-	parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 
 	err = verifier.BlueberryStandardBlock(blk)
