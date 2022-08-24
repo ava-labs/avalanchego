@@ -60,7 +60,7 @@ func buildVtx(
 	verifyFunc func(innerStatelessVertex) error,
 	stopVertex bool,
 ) (StatelessVertex, error) {
-	utils.SortSlice(parentIDs)
+	utils.SortSliceSortable(parentIDs)
 	SortByHash(txs)
 
 	codecVer := codecVersion

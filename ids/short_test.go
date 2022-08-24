@@ -5,10 +5,8 @@ package ids
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -55,78 +53,6 @@ func TestIsUniqueShortIDs(t *testing.T) {
 	ids = append(ids, id1)
 	if IsUniqueShortIDs(ids) == true {
 		t.Fatal("should not be unique")
-	}
-}
-
-// TODO remove
-func TestIsSortedAndUniqueShortIDs(t *testing.T) {
-	id0 := ShortID{0}
-	id1 := ShortID{1}
-	id2 := ShortID{2}
-
-	tests := []struct {
-		arr      []ShortID
-		isSorted bool
-	}{
-		{
-			arr:      nil,
-			isSorted: true,
-		},
-		{
-			arr:      []ShortID{},
-			isSorted: true,
-		},
-		{
-			arr:      []ShortID{GenerateTestShortID()},
-			isSorted: true,
-		},
-		{
-			arr:      []ShortID{id0, id0},
-			isSorted: false,
-		},
-		{
-			arr:      []ShortID{id0, id1},
-			isSorted: true,
-		},
-		{
-			arr:      []ShortID{id1, id0},
-			isSorted: false,
-		},
-		{
-			arr:      []ShortID{id0, id1, id2},
-			isSorted: true,
-		},
-		{
-			arr:      []ShortID{id0, id1, id2, id2},
-			isSorted: false,
-		},
-		{
-			arr:      []ShortID{id0, id1, id1},
-			isSorted: false,
-		},
-		{
-			arr:      []ShortID{id0, id0, id1},
-			isSorted: false,
-		},
-		{
-			arr:      []ShortID{id2, id1, id0},
-			isSorted: false,
-		},
-		{
-			arr:      []ShortID{id2, id1, id2},
-			isSorted: false,
-		},
-	}
-	for _, test := range tests {
-		t.Run(fmt.Sprintf("%v", test.arr), func(t *testing.T) {
-			if test.isSorted {
-				if !utils.IsSortedAndUniqueSlice(test.arr) {
-					t.Fatal("should have been marked as sorted and unique")
-				}
-			} else if utils.IsSortedAndUniqueSlice(test.arr) {
-				t.Fatal("shouldn't have been marked as sorted and unique")
-			}
-		})
 	}
 }
 

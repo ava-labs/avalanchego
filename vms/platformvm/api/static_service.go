@@ -261,7 +261,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			}
 			owner.Addrs = append(owner.Addrs, addrID)
 		}
-		utils.SortSlice(owner.Addrs)
+		utils.SortSliceSortable(owner.Addrs)
 
 		delegationFee := uint32(0)
 		if vdr.ExactDelegationFee != nil {

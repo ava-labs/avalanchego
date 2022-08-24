@@ -899,7 +899,7 @@ func (service *Service) SampleValidators(_ *http.Request, args *SampleValidators
 	for i, vdr := range sample {
 		reply.Validators[i] = vdr.ID()
 	}
-	utils.SortSlice(reply.Validators)
+	utils.SortSliceSortable(reply.Validators)
 	return nil
 }
 

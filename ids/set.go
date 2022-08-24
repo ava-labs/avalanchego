@@ -121,7 +121,7 @@ func (ids Set) List() []ID {
 // SortedList returns this set as a sorted list
 func (ids Set) SortedList() []ID {
 	lst := ids.List()
-	utils.SortSlice(lst)
+	utils.SortSliceSortable(lst)
 	return lst
 }
 
@@ -187,6 +187,6 @@ func (ids *Set) Pop() (ID, bool) {
 
 func (ids *Set) MarshalJSON() ([]byte, error) {
 	idsList := ids.List()
-	utils.SortSlice(idsList)
+	utils.SortSliceSortable(idsList)
 	return json.Marshal(idsList)
 }

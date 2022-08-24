@@ -355,7 +355,7 @@ func (b *builder) NewCreateChainTx(
 	signers = append(signers, subnetSigners)
 
 	// Sort the provided fxIDs
-	utils.SortSlice(fxIDs)
+	utils.SortSliceSortable(fxIDs)
 
 	// Create the tx
 	utx := &txs.CreateChainTx{
@@ -393,7 +393,7 @@ func (b *builder) NewCreateSubnetTx(
 	}
 
 	// Sort control addresses
-	utils.SortSlice(ownerAddrs)
+	utils.SortSliceSortable(ownerAddrs)
 
 	// Create the tx
 	utx := &txs.CreateSubnetTx{

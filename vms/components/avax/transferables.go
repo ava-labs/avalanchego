@@ -149,28 +149,18 @@ func (in *TransferableInput) Verify() error {
 	}
 }
 
-type innerSortTransferableInputs []*TransferableInput
+func (in *TransferableInput) Less(other *TransferableInput) bool {
+	inID, inIndex := in.InputSource()
+	otherID, otherIndex := other.InputSource()
 
-func (ins innerSortTransferableInputs) Less(i, j int) bool {
-	iID, iIndex := ins[i].InputSource()
-	jID, jIndex := ins[j].InputSource()
-
-	switch bytes.Compare(iID[:], jID[:]) {
+	switch bytes.Compare(inID[:], otherID[:]) {
 	case -1:
 		return true
 	case 0:
-		return iIndex < jIndex
+		return inIndex < otherIndex
 	default:
 		return false
 	}
-}
-func (ins innerSortTransferableInputs) Len() int      { return len(ins) }
-func (ins innerSortTransferableInputs) Swap(i, j int) { ins[j], ins[i] = ins[i], ins[j] }
-
-func SortTransferableInputs(ins []*TransferableInput) { sort.Sort(innerSortTransferableInputs(ins)) }
-
-func IsSortedAndUniqueTransferableInputs(ins []*TransferableInput) bool {
-	return utils.IsSortedAndUnique(innerSortTransferableInputs(ins))
 }
 
 type innerSortTransferableInputsWithSigners struct {
@@ -178,6 +168,7 @@ type innerSortTransferableInputsWithSigners struct {
 	signers [][]*crypto.PrivateKeySECP256K1R
 }
 
+// TODO add tests
 func (ins *innerSortTransferableInputsWithSigners) Less(i, j int) bool {
 	iID, iIndex := ins.ins[i].InputSource()
 	jID, jIndex := ins.ins[j].InputSource()
@@ -243,7 +234,7 @@ func VerifyTx(
 			}
 			fc.Consume(in.AssetID(), in.Input().Amount())
 		}
-		if !IsSortedAndUniqueTransferableInputs(ins) {
+		if !utils.IsSortedAndUniqueSortable(ins) {
 			return errInputsNotSortedUnique
 		}
 	}

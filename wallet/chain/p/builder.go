@@ -241,7 +241,7 @@ func (b *builder) NewAddValidatorTx(
 		return nil, err
 	}
 
-	utils.SortSlice(rewardsOwner.Addrs)
+	utils.SortSliceSortable(rewardsOwner.Addrs)
 	return &txs.AddValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
@@ -304,7 +304,7 @@ func (b *builder) NewAddDelegatorTx(
 		return nil, err
 	}
 
-	utils.SortSlice(rewardsOwner.Addrs)
+	utils.SortSliceSortable(rewardsOwner.Addrs)
 	return &txs.AddDelegatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
@@ -342,7 +342,7 @@ func (b *builder) NewCreateChainTx(
 		return nil, err
 	}
 
-	utils.SortSlice(fxIDs)
+	utils.SortSliceSortable(fxIDs)
 	return &txs.CreateChainTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
@@ -374,7 +374,7 @@ func (b *builder) NewCreateSubnetTx(
 		return nil, err
 	}
 
-	utils.SortSlice(owner.Addrs)
+	utils.SortSliceSortable(owner.Addrs)
 	return &txs.CreateSubnetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
@@ -438,7 +438,7 @@ func (b *builder) NewImportTx(
 		}
 		importedAmounts[assetID] = newImportedAmount
 	}
-	avax.SortTransferableInputs(importedInputs) // sort imported inputs
+	utils.SortSliceSortable(importedInputs) // sort imported inputs
 
 	if len(importedInputs) == 0 {
 		return nil, fmt.Errorf(
@@ -801,7 +801,7 @@ func (b *builder) spend(
 		}
 	}
 
-	avax.SortTransferableInputs(inputs)                    // sort inputs
+	utils.SortSliceSortable(inputs)                        // sort inputs
 	avax.SortTransferableOutputs(changeOutputs, txs.Codec) // sort the change outputs
 	avax.SortTransferableOutputs(stakeOutputs, txs.Codec)  // sort stake outputs
 	return inputs, changeOutputs, stakeOutputs, nil

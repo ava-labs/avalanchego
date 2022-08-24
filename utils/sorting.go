@@ -15,17 +15,20 @@ type Sortable[T any] interface {
 }
 
 // TODO add tests
-func SortSlice[T Sortable[T]](s []T) {
+func SortSliceSortable[T Sortable[T]](s []T) {
 	sort.Slice(s, func(i, j int) bool {
 		return s[i].Less(s[j])
 	})
 }
 
 // TODO add tests
-func IsSortedAndUniqueSlice[T Sortable[T]](s []T) bool {
-	return sort.SliceIsSorted(s, func(i, j int) bool {
-		return s[i].Less(s[j])
-	})
+func IsSortedAndUniqueSortable[T Sortable[T]](s []T) bool {
+	for i := 0; i < len(s)-1; i++ {
+		if !s[i].Less(s[i+1]) {
+			return false
+		}
+	}
+	return true
 }
 
 // Sorts a slice of elements that satisfy constraints.Ordered.
@@ -48,9 +51,12 @@ func IsSortedAndUnique(data sort.Interface) bool {
 
 // Returns true iff the elements in [s] are unique and sorted.
 func IsSortedAndUniqueOrdered[T constraints.Ordered](s []T) bool {
-	return sort.SliceIsSorted(s, func(i, j int) bool {
-		return s[i] < s[j]
-	})
+	for i := 0; i < len(s)-1; i++ {
+		if s[i] >= s[i+1] {
+			return false
+		}
+	}
+	return true
 }
 
 // Sort2DBytes sorts a 2D byte slice.

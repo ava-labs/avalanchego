@@ -160,7 +160,7 @@ func (m *manager) String() string {
 	for subnetID := range m.subnetToVdrs {
 		subnets = append(subnets, subnetID)
 	}
-	utils.SortSlice(subnets)
+	utils.SortSliceSortable(subnets)
 
 	sb := strings.Builder{}
 

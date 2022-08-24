@@ -126,7 +126,7 @@ func (out *OutputOwners) Verify() error {
 		return errOutputUnspendable
 	case out.Threshold == 0 && len(out.Addrs) > 0:
 		return errOutputUnoptimized
-	case !utils.IsSortedAndUniqueSlice(out.Addrs):
+	case !utils.IsSortedAndUniqueSortable(out.Addrs):
 		return errAddrsNotSortedUnique
 	default:
 		return nil
@@ -135,7 +135,7 @@ func (out *OutputOwners) Verify() error {
 
 func (out *OutputOwners) VerifyState() error { return out.Verify() }
 
-func (out *OutputOwners) Sort() { utils.SortSlice(out.Addrs) }
+func (out *OutputOwners) Sort() { utils.SortSliceSortable(out.Addrs) }
 
 // formatAddress formats a given [addr] into human readable format using
 // [ChainID] and [NetworkID] from the provided [ctx].

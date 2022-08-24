@@ -115,7 +115,7 @@ func (ids ShortSet) List() []ShortID {
 // SortedList returns this set as a sorted list
 func (ids ShortSet) SortedList() []ShortID {
 	lst := ids.List()
-	utils.SortSlice(lst)
+	utils.SortSliceSortable(lst)
 	return lst
 }
 

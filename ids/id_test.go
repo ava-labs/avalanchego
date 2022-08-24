@@ -177,7 +177,7 @@ func TestSortIDs(t *testing.T) {
 		{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'},
 		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 	}
-	utils.SortSlice(ids)
+	utils.SortSliceSortable(ids)
 	expected := []ID{
 		{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'},
 		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
