@@ -172,11 +172,6 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 		return err
 	}
 
-	blkState := &blockState{
-		statelessBlock: b,
-		atomicRequests: make(map[ids.ID]*atomic.Requests),
-	}
-
 	parentID := b.Parent()
 	parentState, ok := v.GetState(parentID)
 	if !ok {
@@ -197,6 +192,13 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 	}
 	onAcceptState.SetTimestamp(nextChainTime)
 	changes.Apply(onAcceptState)
+
+	blkState := &blockState{
+		statelessBlock: b,
+		onAcceptState:  onAcceptState,
+		timestamp:      nextChainTime,
+		atomicRequests: make(map[ids.ID]*atomic.Requests),
+	}
 
 	// Finally we process block transaction
 	funcs := make([]func(), 0, len(b.Transactions))
@@ -274,9 +276,6 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 			}
 		}
 	}
-
-	blkState.timestamp = nextChainTime
-	blkState.onAcceptState = onAcceptState
 
 	v.blkIDToState[blkID] = blkState
 	v.Mempool.RemoveDecisionTxs(b.Transactions)
@@ -626,12 +625,13 @@ func (v *verifier) commonBlock(b blocks.Block) error {
 		return err
 	}
 
-	// check height
-	if expectedHeight := parent.Height() + 1; expectedHeight != b.Height() {
+	expectedHeight := parent.Height() + 1
+	height := b.Height()
+	if expectedHeight != height {
 		return fmt.Errorf(
 			"expected block to have height %d, but found %d",
 			expectedHeight,
-			b.Height(),
+			height,
 		)
 	}
 	return nil
