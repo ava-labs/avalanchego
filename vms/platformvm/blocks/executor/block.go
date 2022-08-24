@@ -63,7 +63,7 @@ func (b *Block) Status() choices.Status {
 }
 
 func (b *Block) Timestamp() time.Time {
-	return b.manager.getTimestamp(b.Block)
+	return b.manager.getTimestamp(b.ID())
 }
 
 func (b *Block) Options() ([2]snowman.Block, error) {

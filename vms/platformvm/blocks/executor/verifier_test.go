@@ -188,7 +188,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
-	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(2)
+	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	parentStatelessBlk.EXPECT().Parent().Return(grandparentID).Times(1)
 	mempool.EXPECT().RemoveDecisionTxs([]*txs.Tx{apricotBlk.Tx}).Times(1)
@@ -366,7 +366,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	timestamp := time.Now()
 	gomock.InOrder(
 		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
-		parentOnCommitState.EXPECT().GetTimestamp().Return(timestamp).Times(2),
+		parentOnCommitState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
 	)
 
 	// Verify the block.
@@ -437,7 +437,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	timestamp := time.Now()
 	gomock.InOrder(
 		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
-		parentOnAbortState.EXPECT().GetTimestamp().Return(timestamp).Times(2),
+		parentOnAbortState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
 	)
 
 	// Verify the block.
@@ -487,6 +487,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 	require.NoError(err)
 
 	// Set expectations for dependencies.
+	s.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	s.EXPECT().GetStatelessBlock(parentID).Return(nil, choices.Unknown, database.ErrNotFound).Times(1)
 
 	// Verify the block.
@@ -581,10 +582,7 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 			}
 
 			// Set expectations for dependencies.
-			gomock.InOrder(
-				parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
-				parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1),
-			)
+			parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 
 			err = statelessAbortBlk.Visit(verifier)
 			require.ErrorIs(err, test.result)
@@ -680,10 +678,7 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 			}
 
 			// Set expectations for dependencies.
-			gomock.InOrder(
-				parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
-				parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1),
-			)
+			parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 
 			err = statelessCommitBlk.Visit(verifier)
 			require.ErrorIs(err, test.result)
