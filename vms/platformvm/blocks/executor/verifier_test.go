@@ -188,7 +188,6 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
-	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	parentStatelessBlk.EXPECT().Parent().Return(grandparentID).Times(1)
 	mempool.EXPECT().RemoveDecisionTxs([]*txs.Tx{apricotBlk.Tx}).Times(1)

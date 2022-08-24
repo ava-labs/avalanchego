@@ -79,11 +79,6 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 	}
 
 	parentID := b.Parent()
-	parentState, ok := v.GetState(parentID)
-	if !ok {
-		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
-	}
-
 	onCommitState, err := state.NewDiff(parentID, v.backend)
 	if err != nil {
 		return err
@@ -95,7 +90,7 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 
 	// Apply the changes, if any, from advancing the chain time.
 	nextChainTime := b.Timestamp()
-	changes, err := executor.AdvanceTimeTo(parentState, nextChainTime, v.txExecutorBackend.Rewards)
+	changes, err := executor.AdvanceTimeTo(onCommitState, nextChainTime, v.txExecutorBackend.Rewards)
 	if err != nil {
 		return err
 	}
@@ -143,23 +138,19 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 	}
 
 	parentID := b.Parent()
-	parentState, ok := v.GetState(parentID)
-	if !ok {
-		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
-	}
-	nextChainTime := b.Timestamp()
-
-	// Having verifier block timestamp, we update staker set
-	// before processing block transaction
-	changes, err := executor.AdvanceTimeTo(parentState, nextChainTime, v.txExecutorBackend.Rewards)
-	if err != nil {
-		return err
-	}
-
 	onAcceptState, err := state.NewDiff(parentID, v.backend)
 	if err != nil {
 		return err
 	}
+
+	// Having verifier block timestamp, we update staker set
+	// before processing block transaction
+	nextChainTime := b.Timestamp()
+	changes, err := executor.AdvanceTimeTo(onAcceptState, nextChainTime, v.txExecutorBackend.Rewards)
+	if err != nil {
+		return err
+	}
+
 	onAcceptState.SetTimestamp(nextChainTime)
 	changes.Apply(onAcceptState)
 
@@ -391,18 +382,16 @@ func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 }
 
 func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
-	if err := v.apricotCommonBlock(b); err != nil {
+	// We call [commonBlock] here rather than [apricotCommonBlock] because below
+	// this check we perform the more strict check that ApricotPhase5 isn't
+	// activated.
+	if err := v.commonBlock(b); err != nil {
 		return err
 	}
 
 	parentID := b.Parent()
-	parentState, ok := v.GetState(parentID)
-	if !ok {
-		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
-	}
-
+	currentTimestamp := v.getTimestamp(parentID)
 	cfg := v.txExecutorBackend.Config
-	currentTimestamp := parentState.GetTimestamp()
 	if cfg.IsApricotPhase5Activated(currentTimestamp) {
 		return fmt.Errorf(
 			"the chain timestamp (%d) is after the apricot phase 5 time (%d), hence atomic transactions should go through the standard block",
