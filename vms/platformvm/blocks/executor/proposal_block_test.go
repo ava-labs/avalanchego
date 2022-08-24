@@ -315,12 +315,12 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 func TestBlueberryProposalBlockUpdateStakers(t *testing.T) {
 	// Chronological order (not in scale):
 	// Staker0:    |--- ??? // Staker0 end time depends on the test
-	// Staker1:        |------------------------------------------------------------------------|
+	// Staker1:        |------------------------------------------------------|
 	// Staker2:            |------------------------|
 	// Staker3:                |------------------------|
 	// Staker3sub:                 |----------------|
 	// Staker4:                |------------------------|
-	// Staker5:                                     |------------------------|
+	// Staker5:                                     |--------------------|
 
 	// Staker0 it's here just to allow to issue a proposal block with the chosen endTime.
 	staker0RewardAddress := ids.GenerateTestShortID()

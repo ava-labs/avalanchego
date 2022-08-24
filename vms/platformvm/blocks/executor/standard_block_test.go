@@ -307,13 +307,12 @@ func TestBlueberryStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 // It will not remove primary network stakers; that happens in rewardTxs.
 func TestBlueberryStandardBlockUpdateStakers(t *testing.T) {
 	// Chronological order (not in scale):
-	// Staker0:    |--- ??? // Staker0 end time depends on the test
-	// Staker1:        |------------------------------------------------------------------------|
-	// Staker2:            |------------------------|
-	// Staker3:                |------------------------|
-	// Staker3sub:                 |----------------|
-	// Staker4:                |------------------------|
-	// Staker5:                                     |------------------------|
+	// Staker1:    |----------------------------------------------------------|
+	// Staker2:        |------------------------|
+	// Staker3:            |------------------------|
+	// Staker3sub:             |----------------|
+	// Staker4:            |------------------------|
+	// Staker5:                                 |--------------------|
 	staker1 := staker{
 		nodeID:        ids.GenerateTestNodeID(),
 		rewardAddress: ids.GenerateTestShortID(),
