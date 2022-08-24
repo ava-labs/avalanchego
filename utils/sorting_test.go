@@ -4,34 +4,259 @@
 package utils
 
 import (
-	"math/rand"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
-// TODO add tests
+type sortable int
 
-func TestSort2dByteArray(t *testing.T) {
-	numSubArrs := 20
-	maxLength := 100
+func (s sortable) Less(other sortable) bool {
+	return s < other
+}
 
-	// Create a random 2D array
-	arr := [][]byte{}
-	for i := 0; i < numSubArrs; i++ {
-		subArrLen := rand.Intn(maxLength) // #nosec G404
-		subArr := make([]byte, subArrLen)
-		_, err := rand.Read(subArr) // #nosec G404
-		if err != nil {
-			t.Fatal(err)
-		}
-		arr = append(arr, subArr)
-	}
+func TestSortSliceSortable(t *testing.T) {
+	require := require.New(t)
 
-	// In the unlikely event the random array is sorted, unsort it
-	if IsSorted2DByteSlice(arr) {
-		arr[0], arr[len(arr)-1] = arr[len(arr)-1], arr[0]
-	}
-	Sort2DByteSlice(arr) // sort it
-	if !IsSorted2DByteSlice(arr) {
-		t.Fatal("should be sorted")
-	}
+	var s []sortable
+	SortSliceSortable(s)
+	require.True(IsSortedAndUniqueSortable(s))
+	require.Equal(0, len(s))
+
+	s = []sortable{1}
+	SortSliceSortable(s)
+	require.True(IsSortedAndUniqueSortable(s))
+	require.Equal([]sortable{1}, s)
+
+	s = []sortable{1, 1}
+	SortSliceSortable(s)
+	require.Equal([]sortable{1, 1}, s)
+
+	s = []sortable{1, 2}
+	SortSliceSortable(s)
+	require.True(IsSortedAndUniqueSortable(s))
+	require.Equal([]sortable{1, 2}, s)
+
+	s = []sortable{2, 1}
+	SortSliceSortable(s)
+	require.True(IsSortedAndUniqueSortable(s))
+	require.Equal([]sortable{1, 2}, s)
+
+	s = []sortable{1, 2, 1}
+	SortSliceSortable(s)
+	require.Equal([]sortable{1, 1, 2}, s)
+
+	s = []sortable{2, 1, 2}
+	SortSliceSortable(s)
+	require.Equal([]sortable{1, 2, 2}, s)
+
+	s = []sortable{3, 1, 2}
+	SortSliceSortable(s)
+	require.Equal([]sortable{1, 2, 3}, s)
+}
+
+func TestSortSliceOrdered(t *testing.T) {
+	require := require.New(t)
+
+	var s []int
+	SortSliceOrdered(s)
+	require.True(IsSortedAndUniqueOrdered(s))
+	require.Equal(0, len(s))
+
+	s = []int{1}
+	SortSliceOrdered(s)
+	require.True(IsSortedAndUniqueOrdered(s))
+	require.Equal([]int{1}, s)
+
+	s = []int{1, 2}
+	SortSliceOrdered(s)
+	require.True(IsSortedAndUniqueOrdered(s))
+	require.Equal([]int{1, 2}, s)
+
+	s = []int{2, 1}
+	SortSliceOrdered(s)
+	require.True(IsSortedAndUniqueOrdered(s))
+	require.Equal([]int{1, 2}, s)
+
+	s = []int{1, 2, 1}
+	SortSliceOrdered(s)
+	require.Equal([]int{1, 1, 2}, s)
+
+	s = []int{2, 1, 3}
+	SortSliceOrdered(s)
+	require.Equal([]int{1, 2, 3}, s)
+}
+
+func TestIsSortedAndUniqueSortable(t *testing.T) {
+	require := require.New(t)
+
+	var s []sortable
+	require.True(IsSortedAndUniqueSortable(s))
+
+	s = []sortable{}
+	require.True(IsSortedAndUniqueSortable(s))
+
+	s = []sortable{1}
+	require.True(IsSortedAndUniqueSortable(s))
+
+	s = []sortable{1, 2}
+	require.True(IsSortedAndUniqueSortable(s))
+
+	s = []sortable{1, 1}
+	require.False(IsSortedAndUniqueSortable(s))
+
+	s = []sortable{2, 1}
+	require.False(IsSortedAndUniqueSortable(s))
+
+	s = []sortable{1, 2, 1}
+	require.False(IsSortedAndUniqueSortable(s))
+
+	s = []sortable{1, 2, 0}
+	require.False(IsSortedAndUniqueSortable(s))
+}
+
+func TestSort2DByteSlice(t *testing.T) {
+	require := require.New(t)
+
+	var s [][]byte
+	Sort2DByteSlice(s)
+	require.True(IsSorted2DByteSlice(s))
+
+	s = [][]byte{{1}}
+	Sort2DByteSlice(s)
+	require.True(IsSorted2DByteSlice(s))
+	require.Equal([]byte{1}, s[0])
+
+	s = [][]byte{{1}, {2}}
+	Sort2DByteSlice(s)
+	require.True(IsSorted2DByteSlice(s))
+	require.Equal([]byte{1}, s[0])
+	require.Equal([]byte{2}, s[1])
+
+	s = [][]byte{{1}, {1}}
+	Sort2DByteSlice(s)
+	require.True(IsSorted2DByteSlice(s))
+	require.Equal([]byte{1}, s[0])
+	require.Equal([]byte{1}, s[1])
+
+	s = [][]byte{{2}, {1}}
+	Sort2DByteSlice(s)
+	require.True(IsSorted2DByteSlice(s))
+	require.Equal([]byte{1}, s[0])
+	require.Equal([]byte{2}, s[1])
+
+	s = [][]byte{{1}, {2}, {3}}
+	Sort2DByteSlice(s)
+	require.True(IsSorted2DByteSlice(s))
+	require.Equal([]byte{1}, s[0])
+	require.Equal([]byte{2}, s[1])
+	require.Equal([]byte{3}, s[2])
+
+	s = [][]byte{{2}, {1}, {2}}
+	Sort2DByteSlice(s)
+	require.True(IsSorted2DByteSlice(s))
+	require.Equal([]byte{1}, s[0])
+	require.Equal([]byte{2}, s[1])
+	require.Equal([]byte{2}, s[2])
+}
+
+func TestSortByHashAndIsSortedAndUniqueByHash(t *testing.T) {
+	require := require.New(t)
+
+	var s [][]byte
+	SortByHash(s)
+	require.True(IsSortedAndUniqueByHash(s))
+	require.Len(s, 0)
+
+	s = [][]byte{{1}}
+	SortByHash(s)
+	require.True(IsSortedAndUniqueByHash(s))
+	require.Equal([]byte{1}, s[0])
+
+	s = [][]byte{{1}, {1}}
+	SortByHash(s)
+	require.False(IsSortedAndUniqueByHash(s))
+	require.Equal([]byte{1}, s[0])
+	require.Equal([]byte{1}, s[1])
+
+	s = [][]byte{{1}, {2}}
+	SortByHash(s)
+	require.True(IsSortedAndUniqueByHash(s))
+	require.Equal([]byte{1}, s[0])
+	require.Equal([]byte{2}, s[1])
+
+	s = [][]byte{{2}, {1}}
+	SortByHash(s)
+	require.True(IsSortedAndUniqueByHash(s))
+	require.Equal([]byte{1}, s[0])
+	require.Equal([]byte{2}, s[1])
+
+	s = [][]byte{{2}, {2}}
+	SortByHash(s)
+	require.False(IsSortedAndUniqueByHash(s))
+	require.Equal([]byte{2}, s[0])
+	require.Equal([]byte{2}, s[1])
+
+	s = [][]byte{{1}, {2}, {3}}
+	SortByHash(s)
+	require.True(IsSortedAndUniqueByHash(s))
+	require.Equal([]byte{3}, s[0])
+	require.Equal([]byte{1}, s[1])
+	require.Equal([]byte{2}, s[2])
+
+	s = [][]byte{{3}, {1}, {2}}
+	SortByHash(s)
+	require.True(IsSortedAndUniqueByHash(s))
+	require.Equal([]byte{3}, s[0])
+	require.Equal([]byte{1}, s[1])
+	require.Equal([]byte{2}, s[2])
+
+	s = [][]byte{{2}, {1}, {3}}
+	SortByHash(s)
+	require.True(IsSortedAndUniqueByHash(s))
+	require.Equal([]byte{3}, s[0])
+	require.Equal([]byte{1}, s[1])
+	require.Equal([]byte{2}, s[2])
+
+	s = [][]byte{{2}, {1}, {3}, {1}}
+	SortByHash(s)
+	require.False(IsSortedAndUniqueByHash(s))
+	require.Equal([]byte{3}, s[0])
+	require.Equal([]byte{1}, s[1])
+	require.Equal([]byte{1}, s[2])
+	require.Equal([]byte{2}, s[3])
+}
+
+func TestIsSortedAndUniqueOrdered(t *testing.T) {
+	require := require.New(t)
+
+	var s []int
+	require.True(IsSortedAndUniqueOrdered(s))
+
+	s = []int{}
+	require.True(IsSortedAndUniqueOrdered(s))
+
+	s = []int{1}
+	require.True(IsSortedAndUniqueOrdered(s))
+
+	s = []int{1, 2}
+	require.True(IsSortedAndUniqueOrdered(s))
+
+	s = []int{1, 1}
+	require.False(IsSortedAndUniqueOrdered(s))
+
+	s = []int{2, 1}
+	require.False(IsSortedAndUniqueOrdered(s))
+
+	s = []int{1, 2, 1}
+	require.False(IsSortedAndUniqueOrdered(s))
+
+	s = []int{1, 2, 0}
+	require.False(IsSortedAndUniqueOrdered(s))
+
+	s = []int{1, 2, 2}
+	require.False(IsSortedAndUniqueOrdered(s))
+
+	s = []int{2, 1, 2}
+	require.False(IsSortedAndUniqueOrdered(s))
 }
