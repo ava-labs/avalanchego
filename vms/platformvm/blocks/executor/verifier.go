@@ -449,10 +449,13 @@ func (v *verifier) blueberryOptionBlock(b blocks.BlueberryBlock) error {
 		return err
 	}
 
+	// Blueberry option blocks must be uniquely generated from the
+	// BlueberryProposalBlock. This means that the timestamp must be
+	// standardized to a specific value. Therefore, we require the timestamp to
+	// be equal to the parents timestamp.
 	parentID := b.Parent()
 	parentBlkTime := v.getTimestamp(parentID)
 	blkTime := b.Timestamp()
-
 	if !blkTime.Equal(parentBlkTime) {
 		return fmt.Errorf(
 			"%w parent block timestamp (%s) option block timestamp (%s)",
