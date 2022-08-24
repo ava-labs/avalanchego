@@ -11,22 +11,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type settable [20]byte
+type testSettable [20]byte
 
-func (s settable) String() string {
+func (s testSettable) String() string {
 	return ""
 }
 
-func generateTestSettable() settable {
-	var s settable
+func generateTestSettable() testSettable {
+	var s testSettable
 	_, _ = rand.Read(s[:])
 	return s
 }
 
 func TestSet(t *testing.T) {
-	id1 := settable{1}
+	id1 := testSettable{1}
 
-	s := Set[settable]{id1: struct{}{}}
+	s := Set[testSettable]{id1: struct{}{}}
 
 	s.Add(id1)
 	if !s.Contains(id1) {
@@ -56,7 +56,7 @@ func TestSet(t *testing.T) {
 
 	s.Add(id1)
 
-	s2 := Set[settable]{}
+	s2 := Set[testSettable]{}
 
 	if s.Overlaps(s2) {
 		t.Fatalf("Empty set shouldn't overlap")
@@ -82,9 +82,9 @@ func TestSet(t *testing.T) {
 }
 
 func TestSetCappedList(t *testing.T) {
-	s := Set[settable]{}
+	s := Set[testSettable]{}
 
-	var id settable
+	var id testSettable
 
 	if list := s.CappedList(0); len(list) != 0 {
 		t.Fatalf("List should have been empty but was %v", list)
@@ -104,7 +104,7 @@ func TestSetCappedList(t *testing.T) {
 		t.Fatalf("List should have been %s but was %s", id, returnedID)
 	}
 
-	id2 := settable{1}
+	id2 := testSettable{1}
 	s.Add(id2)
 
 	if list := s.CappedList(0); len(list) != 0 {
@@ -127,7 +127,7 @@ func TestSetCappedList(t *testing.T) {
 // Test that Clear() works with both the iterative and set-to-nil path
 func TestSetClearLarge(t *testing.T) {
 	// Using iterative clear path
-	set := Set[settable]{}
+	set := Set[testSettable]{}
 	for i := 0; i < clearSizeThreshold; i++ {
 		set.Add(generateTestSettable())
 	}
@@ -141,7 +141,7 @@ func TestSetClearLarge(t *testing.T) {
 	}
 
 	// Using bulk (set map to nil) path
-	set = Set[settable]{}
+	set = Set[testSettable]{}
 	for i := 0; i < clearSizeThreshold+1; i++ {
 		set.Add(generateTestSettable())
 	}
@@ -156,11 +156,11 @@ func TestSetClearLarge(t *testing.T) {
 }
 
 func TestSetPop(t *testing.T) {
-	var s Set[settable]
+	var s Set[testSettable]
 	_, ok := s.Pop()
 	require.False(t, ok)
 
-	s = make(Set[settable])
+	s = make(Set[testSettable])
 	_, ok = s.Pop()
 	require.False(t, ok)
 
@@ -183,7 +183,7 @@ func TestSetPop(t *testing.T) {
 
 func TestSetMarshalJSON(t *testing.T) {
 	require := require.New(t)
-	set := Set[settable]{}
+	set := Set[testSettable]{}
 	{
 		asJSON, err := set.MarshalJSON()
 		require.NoError(err)

@@ -616,7 +616,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	vdrToDelegators := map[ids.NodeID][]platformapi.PrimaryDelegator{}
 
 	// Create set of nodeIDs
-	nodeIDs := ids.NodeIDSet{}
+	nodeIDs := set.Set[ids.NodeID]{}
 	nodeIDs.Add(args.NodeIDs...)
 	includeAllNodes := nodeIDs.Len() == 0
 
@@ -775,7 +775,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 	reply.Delegators = []interface{}{}
 
 	// Create set of nodeIDs
-	nodeIDs := ids.NodeIDSet{}
+	nodeIDs := set.Set[ids.NodeID]{}
 	nodeIDs.Add(args.NodeIDs...)
 	includeAllNodes := nodeIDs.Len() == 0
 

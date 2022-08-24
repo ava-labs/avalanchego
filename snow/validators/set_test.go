@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 func TestSetSet(t *testing.T) {
@@ -158,7 +159,7 @@ func TestSetSubsetWeight(t *testing.T) {
 	weight1 := uint64(123)
 	vdr2 := ids.NodeID{3}
 	weight2 := uint64(810)
-	subset := ids.NodeIDSet{}
+	subset := set.Set[ids.NodeID]{}
 	subset.Add(vdr0)
 	subset.Add(vdr1)
 

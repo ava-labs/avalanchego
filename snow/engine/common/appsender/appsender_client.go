@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/set"
 
 	appsenderpb "github.com/ava-labs/avalanchego/proto/pb/appsender"
 )
@@ -23,7 +24,7 @@ func NewClient(client appsenderpb.AppSenderClient) *Client {
 	return &Client{client: client}
 }
 
-func (c *Client) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, request []byte) error {
+func (c *Client) SendAppRequest(nodeIDs set.Set[ids.NodeID], requestID uint32, request []byte) error {
 	nodeIDsBytes := make([][]byte, nodeIDs.Len())
 	i := 0
 	for nodeID := range nodeIDs {
@@ -64,7 +65,7 @@ func (c *Client) SendAppGossip(msg []byte) error {
 	return err
 }
 
-func (c *Client) SendAppGossipSpecific(nodeIDs ids.NodeIDSet, msg []byte) error {
+func (c *Client) SendAppGossipSpecific(nodeIDs set.Set[ids.NodeID], msg []byte) error {
 	nodeIDsBytes := make([][]byte, nodeIDs.Len())
 	i := 0
 	for nodeID := range nodeIDs {

@@ -6,6 +6,7 @@ package common
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // Sender defines how a consensus engine sends messages and requests to other
@@ -28,7 +29,7 @@ type Sender interface {
 type StateSummarySender interface {
 	// SendGetStateSummaryFrontier requests that every node in [nodeIDs] sends a
 	// StateSummaryFrontier message.
-	SendGetStateSummaryFrontier(nodeIDs ids.NodeIDSet, requestID uint32)
+	SendGetStateSummaryFrontier(nodeIDs set.Set[ids.NodeID], requestID uint32)
 
 	// SendStateSummaryFrontier responds to a StateSummaryFrontier message with this
 	// engine's current state summary frontier.
@@ -39,7 +40,7 @@ type AcceptedStateSummarySender interface {
 	// SendGetAcceptedStateSummary requests that every node in [nodeIDs] sends an
 	// AcceptedStateSummary message with all the state summary IDs referenced by [heights]
 	// that the node thinks are accepted.
-	SendGetAcceptedStateSummary(nodeIDs ids.NodeIDSet, requestID uint32, heights []uint64)
+	SendGetAcceptedStateSummary(nodeIDs set.Set[ids.NodeID], requestID uint32, heights []uint64)
 
 	// SendAcceptedStateSummary responds to a AcceptedStateSummary message with a
 	// set of summary ids that are accepted.
@@ -51,7 +52,7 @@ type AcceptedStateSummarySender interface {
 type FrontierSender interface {
 	// SendGetAcceptedFrontier requests that every node in [nodeIDs] sends an
 	// AcceptedFrontier message.
-	SendGetAcceptedFrontier(nodeIDs ids.NodeIDSet, requestID uint32)
+	SendGetAcceptedFrontier(nodeIDs set.Set[ids.NodeID], requestID uint32)
 
 	// SendAcceptedFrontier responds to a AcceptedFrontier message with this
 	// engine's current accepted frontier.
@@ -69,7 +70,7 @@ type AcceptedSender interface {
 	// message with all the IDs in [containerIDs] that the node thinks are
 	// accepted.
 	SendGetAccepted(
-		nodeIDs ids.NodeIDSet,
+		nodeIDs set.Set[ids.NodeID],
 		requestID uint32,
 		containerIDs []ids.ID,
 	)
@@ -112,7 +113,7 @@ type QuerySender interface {
 	// This is the same as PullQuery, except that this message includes not only
 	// the ID of the container but also its body.
 	SendPushQuery(
-		nodeIDs ids.NodeIDSet,
+		nodeIDs set.Set[ids.NodeID],
 		requestID uint32,
 		containerID ids.ID,
 		container []byte,
@@ -120,7 +121,7 @@ type QuerySender interface {
 
 	// Request from the specified nodes their preferred frontier, given the
 	// existence of the specified container.
-	SendPullQuery(nodeIDs ids.NodeIDSet, requestID uint32, containerID ids.ID)
+	SendPullQuery(nodeIDs set.Set[ids.NodeID], requestID uint32, containerID ids.ID)
 
 	// Send chits to the specified node
 	SendChits(nodeID ids.NodeID, requestID uint32, votes []ids.ID)
@@ -146,7 +147,7 @@ type AppSender interface {
 	// * An AppRequestFailed from nodeID with ID [requestID]
 	// Exactly one of the above messages will eventually be received per nodeID.
 	// A non-nil error should be considered fatal.
-	SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, appRequestBytes []byte) error
+	SendAppRequest(nodeIDs set.Set[ids.NodeID], requestID uint32, appRequestBytes []byte) error
 	// Send an application-level response to a request.
 	// This response must be in response to an AppRequest that the VM corresponding
 	// to this AppSender received from [nodeID] with ID [requestID].
@@ -155,5 +156,5 @@ type AppSender interface {
 	// Gossip an application-level message.
 	// A non-nil error should be considered fatal.
 	SendAppGossip(appGossipBytes []byte) error
-	SendAppGossipSpecific(nodeIDs ids.NodeIDSet, appGossipBytes []byte) error
+	SendAppGossipSpecific(nodeIDs set.Set[ids.NodeID], appGossipBytes []byte) error
 }

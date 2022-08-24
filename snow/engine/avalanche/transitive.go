@@ -614,7 +614,7 @@ func (t *Transitive) issueRepoll() {
 	}
 
 	vdrList := vdrBag.List()
-	vdrSet := ids.NewNodeIDSet(len(vdrList))
+	vdrSet := set.NewSet[ids.NodeID](len(vdrList))
 	vdrSet.Add(vdrList...)
 
 	// Poll the network

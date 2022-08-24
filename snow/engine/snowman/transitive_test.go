@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -260,13 +261,13 @@ func TestEngineQuery(t *testing.T) {
 
 	queried := new(bool)
 	queryRequestID := new(uint32)
-	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
+	sender.SendPushQueryF = func(inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, blkBytes []byte) {
 		if *queried {
 			t.Fatalf("Asked multiple times")
 		}
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := ids.NodeIDSet{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
@@ -331,13 +332,13 @@ func TestEngineQuery(t *testing.T) {
 	}
 
 	*queried = false
-	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
+	sender.SendPushQueryF = func(inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, blkBytes []byte) {
 		if *queried {
 			t.Fatalf("Asked multiple times")
 		}
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := ids.NodeIDSet{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
@@ -467,13 +468,13 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	queried := new(bool)
 	queryRequestID := new(uint32)
-	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
+	sender.SendPushQueryF = func(inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, blkBytes []byte) {
 		if *queried {
 			t.Fatalf("Asked multiple times")
 		}
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := ids.NodeIDSet{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr0, vdr1, vdr2)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
@@ -559,13 +560,13 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	*queried = false
 	secondQueryRequestID := new(uint32)
-	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
+	sender.SendPushQueryF = func(inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, blkBytes []byte) {
 		if *queried {
 			t.Fatalf("Asked multiple times")
 		}
 		*queried = true
 		*secondQueryRequestID = requestID
-		vdrSet := ids.NodeIDSet{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr0, vdr1, vdr2)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
@@ -770,12 +771,12 @@ func TestEnginePushQuery(t *testing.T) {
 	}
 
 	queried := new(bool)
-	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, _ uint32, blkID ids.ID, blkBytes []byte) {
+	sender.SendPushQueryF = func(inVdrs set.Set[ids.NodeID], _ uint32, blkID ids.ID, blkBytes []byte) {
 		if *queried {
 			t.Fatalf("Asked multiple times")
 		}
 		*queried = true
-		vdrSet := ids.NodeIDSet{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
@@ -822,12 +823,12 @@ func TestEngineBuildBlock(t *testing.T) {
 	}
 
 	queried := new(bool)
-	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, _ uint32, blkID ids.ID, blkBytes []byte) {
+	sender.SendPushQueryF = func(inVdrs set.Set[ids.NodeID], _ uint32, blkID ids.ID, blkBytes []byte) {
 		if *queried {
 			t.Fatalf("Asked multiple times")
 		}
 		*queried = true
-		vdrSet := ids.NodeIDSet{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
@@ -850,12 +851,12 @@ func TestEngineRepoll(t *testing.T) {
 	sender.Default(true)
 
 	queried := new(bool)
-	sender.SendPullQueryF = func(inVdrs ids.NodeIDSet, _ uint32, blkID ids.ID) {
+	sender.SendPullQueryF = func(inVdrs set.Set[ids.NodeID], _ uint32, blkID ids.ID) {
 		if *queried {
 			t.Fatalf("Asked multiple times")
 		}
 		*queried = true
-		vdrSet := ids.NodeIDSet{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
@@ -951,13 +952,13 @@ func TestVoteCanceling(t *testing.T) {
 
 	queried := new(bool)
 	queryRequestID := new(uint32)
-	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
+	sender.SendPushQueryF = func(inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, blkBytes []byte) {
 		if *queried {
 			t.Fatalf("Asked multiple times")
 		}
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := ids.NodeIDSet{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr0, vdr1, vdr2)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
@@ -984,7 +985,7 @@ func TestVoteCanceling(t *testing.T) {
 	}
 
 	repolled := new(bool)
-	sender.SendPullQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, blkID ids.ID) {
+	sender.SendPullQueryF = func(inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID) {
 		*repolled = true
 	}
 	if err := te.QueryFailed(vdr1, *queryRequestID); err != nil {
@@ -1319,9 +1320,9 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	}
 
 	queryRequestID := new(uint32)
-	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
+	sender.SendPushQueryF = func(inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, blkBytes []byte) {
 		*queryRequestID = requestID
-		vdrSet := ids.NodeIDSet{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
@@ -1432,10 +1433,10 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 	invalidBlkID := invalidBlk.ID()
 
 	reqID := new(uint32)
-	sender.SendPushQueryF = func(_ ids.NodeIDSet, requestID uint32, _ ids.ID, _ []byte) {
+	sender.SendPushQueryF = func(_ set.Set[ids.NodeID], requestID uint32, _ ids.ID, _ []byte) {
 		*reqID = requestID
 	}
-	sender.SendPullQueryF = func(_ ids.NodeIDSet, requestID uint32, _ ids.ID) {}
+	sender.SendPullQueryF = func(_ set.Set[ids.NodeID], requestID uint32, _ ids.ID) {}
 
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
@@ -1792,10 +1793,10 @@ func TestEngineAggressivePolling(t *testing.T) {
 	}
 
 	numPushed := new(int)
-	sender.SendPushQueryF = func(_ ids.NodeIDSet, _ uint32, _ ids.ID, _ []byte) { *numPushed++ }
+	sender.SendPushQueryF = func(_ set.Set[ids.NodeID], _ uint32, _ ids.ID, _ []byte) { *numPushed++ }
 
 	numPulled := new(int)
-	sender.SendPullQueryF = func(_ ids.NodeIDSet, _ uint32, _ ids.ID) { *numPulled++ }
+	sender.SendPullQueryF = func(_ set.Set[ids.NodeID], _ uint32, _ ids.ID) { *numPulled++ }
 
 	if err := te.Put(vdr, 0, pendingBlk.Bytes()); err != nil {
 		t.Fatal(err)
@@ -1887,13 +1888,13 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	queried := new(bool)
 	queryRequestID := new(uint32)
-	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
+	sender.SendPushQueryF = func(inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, blkBytes []byte) {
 		if *queried {
 			t.Fatalf("Asked multiple times")
 		}
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := ids.NodeIDSet{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr0, vdr1)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
@@ -2024,13 +2025,13 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		queried bool
 		reqID   uint32
 	)
-	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, rID uint32, blkID ids.ID, blkBytes []byte) {
+	sender.SendPushQueryF = func(inVdrs set.Set[ids.NodeID], rID uint32, blkID ids.ID, blkBytes []byte) {
 		reqID = rID
 		if queried {
 			t.Fatalf("Asked multiple times")
 		}
 		queried = true
-		vdrSet := ids.NodeIDSet{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
@@ -2152,7 +2153,7 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 		asked bool
 		reqID uint32
 	)
-	sender.SendPushQueryF = func(_ ids.NodeIDSet, rID uint32, _ ids.ID, blkBytes []byte) {
+	sender.SendPushQueryF = func(_ set.Set[ids.NodeID], rID uint32, _ ids.ID, blkBytes []byte) {
 		asked = true
 		reqID = rID
 	}
@@ -2256,7 +2257,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 		queried bool
 		reqID   uint32
 	)
-	sender.SendPushQueryF = func(_ ids.NodeIDSet, rID uint32, _ ids.ID, blkBytes []byte) {
+	sender.SendPushQueryF = func(_ set.Set[ids.NodeID], rID uint32, _ ids.ID, blkBytes []byte) {
 		queried = true
 		reqID = rID
 	}
@@ -2290,7 +2291,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 
 	queried = false
 	var asked bool
-	sender.SendPushQueryF = func(_ ids.NodeIDSet, rID uint32, _ ids.ID, blkBytes []byte) {
+	sender.SendPushQueryF = func(_ set.Set[ids.NodeID], rID uint32, _ ids.ID, blkBytes []byte) {
 		queried = true
 	}
 	sender.SendGetF = func(_ ids.NodeID, rID uint32, blkID ids.ID) {
@@ -2388,7 +2389,7 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 		queried bool
 		reqID   uint32
 	)
-	sender.SendPushQueryF = func(_ ids.NodeIDSet, rID uint32, _ ids.ID, blkBytes []byte) {
+	sender.SendPushQueryF = func(_ set.Set[ids.NodeID], rID uint32, _ ids.ID, blkBytes []byte) {
 		queried = true
 		reqID = rID
 	}
@@ -2484,7 +2485,7 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 		queried bool
 		reqID   uint32
 	)
-	sender.SendPushQueryF = func(_ ids.NodeIDSet, rID uint32, _ ids.ID, blkBytes []byte) {
+	sender.SendPushQueryF = func(_ set.Set[ids.NodeID], rID uint32, _ ids.ID, blkBytes []byte) {
 		queried = true
 		reqID = rID
 	}
@@ -2575,12 +2576,12 @@ func TestEngineNonPreferredAmplification(t *testing.T) {
 		}
 	}
 
-	sender.SendPushQueryF = func(_ ids.NodeIDSet, _ uint32, blkID ids.ID, _ []byte) {
+	sender.SendPushQueryF = func(_ set.Set[ids.NodeID], _ uint32, blkID ids.ID, _ []byte) {
 		if blkID == nonPreferredBlk.ID() {
 			t.Fatalf("gossiped non-preferred block")
 		}
 	}
-	sender.SendPullQueryF = func(_ ids.NodeIDSet, _ uint32, blkID ids.ID) {
+	sender.SendPullQueryF = func(_ set.Set[ids.NodeID], _ uint32, blkID ids.ID) {
 		if blkID == nonPreferredBlk.ID() {
 			t.Fatalf("gossiped non-preferred block")
 		}
@@ -2684,13 +2685,13 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	// [blk2] since it currently fails verification.
 	queried := new(bool)
 	queryRequestID := new(uint32)
-	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
+	sender.SendPushQueryF = func(inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, blkBytes []byte) {
 		if *queried {
 			t.Fatalf("Asked multiple times")
 		}
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := ids.NodeIDSet{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
@@ -2739,7 +2740,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		}
 	}
 
-	sender.SendPullQueryF = func(_ ids.NodeIDSet, _ uint32, blkID ids.ID) {
+	sender.SendPullQueryF = func(_ set.Set[ids.NodeID], _ uint32, blkID ids.ID) {
 		switch blkID {
 		case blk1.ID():
 			t.Fatal("Unexpectedly sent a PullQuery request for blk1")
@@ -2781,13 +2782,13 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	}
 	*queried = false
 	// Prepare to PushQuery [blk2] after receiving a Gossip message with [blk2].
-	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
+	sender.SendPushQueryF = func(inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, blkBytes []byte) {
 		if *queried {
 			t.Fatalf("Asked multiple times")
 		}
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := ids.NodeIDSet{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
@@ -2921,13 +2922,13 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	// We should not PushQuery [blk3] because [blk2] wasn't issued.
 	queried := new(bool)
 	queryRequestID := new(uint32)
-	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
+	sender.SendPushQueryF = func(inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, blkBytes []byte) {
 		if *queried {
 			t.Fatalf("Asked multiple times")
 		}
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := ids.NodeIDSet{}
+		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
 		if !inVdrs.Equals(vdrSet) {
 			t.Fatalf("Asking wrong validator for preference")
@@ -2969,7 +2970,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 		}
 	}
 
-	sender.SendPullQueryF = func(_ ids.NodeIDSet, _ uint32, blkID ids.ID) {
+	sender.SendPullQueryF = func(_ set.Set[ids.NodeID], _ uint32, blkID ids.ID) {
 		switch blkID {
 		case blk1.ID():
 			t.Fatal("Unexpectedly sent a PullQuery request for blk1")
@@ -3044,7 +3045,7 @@ func TestSendMixedQuery(t *testing.T) {
 				_, vdrSet, sender, vm, te, gBlk := setup(t, commonCfg, engConfig)
 
 				vdrsList := []validators.Validator{}
-				vdrs := ids.NodeIDSet{}
+				vdrs := set.Set[ids.NodeID]{}
 				for i := 0; i < te.Config.Params.K; i++ {
 					vdr := ids.GenerateTestNodeID()
 					vdrs.Add(vdr)
@@ -3092,8 +3093,8 @@ func TestSendMixedQuery(t *testing.T) {
 
 				pullQuerySent := new(bool)
 				pullQueryReqID := new(uint32)
-				pullQueriedVdrs := ids.NodeIDSet{}
-				sender.SendPullQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, blkID ids.ID) {
+				pullQueriedVdrs := set.Set[ids.NodeID]{}
+				sender.SendPullQueryF = func(inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID) {
 					switch {
 					case *pullQuerySent:
 						t.Fatalf("Asked multiple times")
@@ -3107,8 +3108,8 @@ func TestSendMixedQuery(t *testing.T) {
 
 				pushQuerySent := new(bool)
 				pushQueryReqID := new(uint32)
-				pushQueriedVdrs := ids.NodeIDSet{}
-				sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, blkID ids.ID, blkBytes []byte) {
+				pushQueriedVdrs := set.Set[ids.NodeID]{}
+				sender.SendPushQueryF = func(inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, blkBytes []byte) {
 					switch {
 					case *pushQuerySent:
 						t.Fatal("Asked multiple times")

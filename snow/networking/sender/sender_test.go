@@ -76,7 +76,7 @@ func TestTimeout(t *testing.T) {
 
 	wg := sync.WaitGroup{}
 	wg.Add(2)
-	failedVDRs := ids.NodeIDSet{}
+	failedVDRs := set.Set[ids.NodeID]{}
 	ctx := snow.DefaultConsensusContextTest()
 	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
 	require.NoError(t, err)
@@ -116,7 +116,7 @@ func TestTimeout(t *testing.T) {
 	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 	handler.Start(false)
 
-	vdrIDs := ids.NodeIDSet{}
+	vdrIDs := set.Set[ids.NodeID]{}
 	vdrIDs.Add(ids.NodeID{255})
 	vdrIDs.Add(ids.NodeID{254})
 
@@ -212,7 +212,7 @@ func TestReliableMessages(t *testing.T) {
 
 	go func() {
 		for i := 0; i < queriesToSend; i++ {
-			vdrIDs := ids.NodeIDSet{}
+			vdrIDs := set.Set[ids.NodeID]{}
 			vdrIDs.Add(ids.NodeID{1})
 
 			sender.SendPullQuery(vdrIDs, uint32(i), ids.Empty)
@@ -310,7 +310,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			// Send a pull query to some random peer that won't respond
 			// because they don't exist. This will almost immediately trigger
 			// a query failed message
-			vdrIDs := ids.NodeIDSet{}
+			vdrIDs := set.Set[ids.NodeID]{}
 			vdrIDs.Add(ids.GenerateTestNodeID())
 			sender.SendPullQuery(vdrIDs, uint32(i), ids.Empty)
 		}

@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 
 	safeMath "github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
@@ -101,7 +102,7 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	syncer, _, sender := buildTestsObjects(t, &commonCfg)
 
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, u uint32) {}
+	sender.SendGetStateSummaryFrontierF = func(ss set.Set[ids.NodeID], u uint32) {}
 	startReqID := uint32(0)
 
 	// attempt starting bootstrapper with no stake connected. Bootstrapper should stall.
@@ -224,9 +225,9 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	syncer, _, sender := buildTestsObjects(t, &commonCfg)
 
 	// set sender to track nodes reached out
-	contactedFrontiersProviders := ids.NewNodeIDSet(3)
+	contactedFrontiersProviders := set.NewSet[ids.NodeID](3)
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, u uint32) {
+	sender.SendGetStateSummaryFrontierF = func(ss set.Set[ids.NodeID], u uint32) {
 		contactedFrontiersProviders.Union(ss)
 	}
 
@@ -268,7 +269,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, reqID uint32) {
+	sender.SendGetStateSummaryFrontierF = func(ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
 			contactedFrontiersProviders[nodeID] = reqID
 		}
@@ -358,7 +359,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, reqID uint32) {
+	sender.SendGetStateSummaryFrontierF = func(ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
 			contactedFrontiersProviders[nodeID] = reqID
 		}
@@ -429,7 +430,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, reqID uint32) {
+	sender.SendGetStateSummaryFrontierF = func(ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
 			contactedFrontiersProviders[nodeID] = reqID
 		}
@@ -515,7 +516,7 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, reqID uint32) {
+	sender.SendGetStateSummaryFrontierF = func(ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
 			contactedFrontiersProviders[nodeID] = reqID
 		}
@@ -540,7 +541,7 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 
 	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(ss ids.NodeIDSet, reqID uint32, sl []uint64) {
+	sender.SendGetAcceptedStateSummaryF = func(ss set.Set[ids.NodeID], reqID uint32, sl []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -605,7 +606,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, reqID uint32) {
+	sender.SendGetStateSummaryFrontierF = func(ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
 			contactedFrontiersProviders[nodeID] = reqID
 		}
@@ -624,7 +625,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 
 	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(ss ids.NodeIDSet, reqID uint32, sl []uint64) {
+	sender.SendGetAcceptedStateSummaryF = func(ss set.Set[ids.NodeID], reqID uint32, sl []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -678,7 +679,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, reqID uint32) {
+	sender.SendGetStateSummaryFrontierF = func(ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
 			contactedFrontiersProviders[nodeID] = reqID
 		}
@@ -696,7 +697,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 
 	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(ss ids.NodeIDSet, reqID uint32, sl []uint64) {
+	sender.SendGetAcceptedStateSummaryF = func(ss set.Set[ids.NodeID], reqID uint32, sl []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -795,7 +796,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, reqID uint32) {
+	sender.SendGetStateSummaryFrontierF = func(ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
 			contactedFrontiersProviders[nodeID] = reqID
 		}
@@ -813,7 +814,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 
 	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(ss ids.NodeIDSet, reqID uint32, sl []uint64) {
+	sender.SendGetAcceptedStateSummaryF = func(ss set.Set[ids.NodeID], reqID uint32, sl []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -898,7 +899,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, reqID uint32) {
+	sender.SendGetStateSummaryFrontierF = func(ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
 			contactedFrontiersProviders[nodeID] = reqID
 		}
@@ -932,7 +933,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 
 	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(ss ids.NodeIDSet, reqID uint32, sl []uint64) {
+	sender.SendGetAcceptedStateSummaryF = func(ss set.Set[ids.NodeID], reqID uint32, sl []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -1044,7 +1045,7 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, reqID uint32) {
+	sender.SendGetStateSummaryFrontierF = func(ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
 			contactedFrontiersProviders[nodeID] = reqID
 		}
@@ -1064,7 +1065,7 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 
 	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(ss ids.NodeIDSet, reqID uint32, sl []uint64) {
+	sender.SendGetAcceptedStateSummaryF = func(ss set.Set[ids.NodeID], reqID uint32, sl []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -1150,7 +1151,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, reqID uint32) {
+	sender.SendGetStateSummaryFrontierF = func(ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
 			contactedFrontiersProviders[nodeID] = reqID
 		}
@@ -1184,7 +1185,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 
 	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(ss ids.NodeIDSet, reqID uint32, sl []uint64) {
+	sender.SendGetAcceptedStateSummaryF = func(ss set.Set[ids.NodeID], reqID uint32, sl []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}

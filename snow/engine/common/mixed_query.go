@@ -3,7 +3,10 @@
 
 package common
 
-import "github.com/ava-labs/avalanchego/ids"
+import (
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
+)
 
 // Send a query composed partially of push queries and partially of pull queries.
 // The validators in [vdrs] will be queried.
@@ -23,12 +26,12 @@ func SendMixedQuery(
 		numPushTo = len(vdrs)
 	}
 	if numPushTo > 0 {
-		sendPushQueryTo := ids.NewNodeIDSet(numPushTo)
+		sendPushQueryTo := set.NewSet[ids.NodeID](numPushTo)
 		sendPushQueryTo.Add(vdrs[:numPushTo]...)
 		sender.SendPushQuery(sendPushQueryTo, reqID, containerID, container)
 	}
 	if numPullTo := len(vdrs) - numPushTo; numPullTo > 0 {
-		sendPullQueryTo := ids.NewNodeIDSet(numPullTo)
+		sendPullQueryTo := set.NewSet[ids.NodeID](numPullTo)
 		sendPullQueryTo.Add(vdrs[numPushTo:]...)
 		sender.SendPullQuery(sendPullQueryTo, reqID, containerID)
 	}

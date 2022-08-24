@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var _ common.Sender = &sender{}
@@ -85,7 +86,7 @@ func New(
 	return s, nil
 }
 
-func (s *sender) SendGetStateSummaryFrontier(nodeIDs ids.NodeIDSet, requestID uint32) {
+func (s *sender) SendGetStateSummaryFrontier(nodeIDs set.Set[ids.NodeID], requestID uint32) {
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -147,7 +148,7 @@ func (s *sender) SendStateSummaryFrontier(nodeID ids.NodeID, requestID uint32, s
 	}
 
 	// Send the message over the network.
-	nodeIDs := ids.NewNodeIDSet(1)
+	nodeIDs := set.NewSet[ids.NodeID](1)
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
@@ -166,7 +167,7 @@ func (s *sender) SendStateSummaryFrontier(nodeID ids.NodeID, requestID uint32, s
 	}
 }
 
-func (s *sender) SendGetAcceptedStateSummary(nodeIDs ids.NodeIDSet, requestID uint32, heights []uint64) {
+func (s *sender) SendGetAcceptedStateSummary(nodeIDs set.Set[ids.NodeID], requestID uint32, heights []uint64) {
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -192,7 +193,7 @@ func (s *sender) SendGetAcceptedStateSummary(nodeIDs ids.NodeIDSet, requestID ui
 	outMsg, err := s.msgCreator.GetAcceptedStateSummary(s.ctx.ChainID, requestID, deadline, heights)
 
 	// Send the message over the network.
-	var sentTo ids.NodeIDSet
+	var sentTo set.Set[ids.NodeID]
 	if err == nil {
 		sentTo = s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
 	} else {
@@ -239,7 +240,7 @@ func (s *sender) SendAcceptedStateSummary(nodeID ids.NodeID, requestID uint32, s
 	}
 
 	// Send the message over the network.
-	nodeIDs := ids.NewNodeIDSet(1)
+	nodeIDs := set.NewSet[ids.NodeID](1)
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
@@ -252,7 +253,7 @@ func (s *sender) SendAcceptedStateSummary(nodeID ids.NodeID, requestID uint32, s
 	}
 }
 
-func (s *sender) SendGetAcceptedFrontier(nodeIDs ids.NodeIDSet, requestID uint32) {
+func (s *sender) SendGetAcceptedFrontier(nodeIDs set.Set[ids.NodeID], requestID uint32) {
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -314,7 +315,7 @@ func (s *sender) SendAcceptedFrontier(nodeID ids.NodeID, requestID uint32, conta
 	}
 
 	// Send the message over the network.
-	nodeIDs := ids.NewNodeIDSet(1)
+	nodeIDs := set.NewSet[ids.NodeID](1)
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
@@ -327,7 +328,7 @@ func (s *sender) SendAcceptedFrontier(nodeID ids.NodeID, requestID uint32, conta
 	}
 }
 
-func (s *sender) SendGetAccepted(nodeIDs ids.NodeIDSet, requestID uint32, containerIDs []ids.ID) {
+func (s *sender) SendGetAccepted(nodeIDs set.Set[ids.NodeID], requestID uint32, containerIDs []ids.ID) {
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -353,7 +354,7 @@ func (s *sender) SendGetAccepted(nodeIDs ids.NodeIDSet, requestID uint32, contai
 	outMsg, err := s.msgCreator.GetAccepted(s.ctx.ChainID, requestID, deadline, containerIDs)
 
 	// Send the message over the network.
-	var sentTo ids.NodeIDSet
+	var sentTo set.Set[ids.NodeID]
 	if err == nil {
 		sentTo = s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
 	} else {
@@ -400,7 +401,7 @@ func (s *sender) SendAccepted(nodeID ids.NodeID, requestID uint32, containerIDs 
 	}
 
 	// Send the message over the network.
-	nodeIDs := ids.NewNodeIDSet(1)
+	nodeIDs := set.NewSet[ids.NodeID](1)
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
@@ -455,7 +456,7 @@ func (s *sender) SendGetAncestors(nodeID ids.NodeID, requestID uint32, container
 	}
 
 	// Send the message over the network.
-	nodeIDs := ids.NewNodeIDSet(1)
+	nodeIDs := set.NewSet[ids.NodeID](1)
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
@@ -490,7 +491,7 @@ func (s *sender) SendAncestors(nodeID ids.NodeID, requestID uint32, containers [
 	}
 
 	// Send the message over the network.
-	nodeIDs := ids.NewNodeIDSet(1)
+	nodeIDs := set.NewSet[ids.NodeID](1)
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
@@ -537,7 +538,7 @@ func (s *sender) SendGet(nodeID ids.NodeID, requestID uint32, containerID ids.ID
 	s.ctx.Log.AssertNoError(err)
 
 	// Send the message over the network.
-	nodeIDs := ids.NewNodeIDSet(1)
+	nodeIDs := set.NewSet[ids.NodeID](1)
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
@@ -574,7 +575,7 @@ func (s *sender) SendPut(nodeID ids.NodeID, requestID uint32, containerID ids.ID
 	}
 
 	// Send the message over the network.
-	nodeIDs := ids.NewNodeIDSet(1)
+	nodeIDs := set.NewSet[ids.NodeID](1)
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
@@ -599,7 +600,7 @@ func (s *sender) SendPut(nodeID ids.NodeID, requestID uint32, containerID ids.ID
 // on the specified nodes.
 // The PushQuery message signifies that this consensus engine would like each node to send
 // their preferred frontier given the existence of the specified container.
-func (s *sender) SendPushQuery(nodeIDs ids.NodeIDSet, requestID uint32, containerID ids.ID, container []byte) {
+func (s *sender) SendPushQuery(nodeIDs set.Set[ids.NodeID], requestID uint32, containerID ids.ID, container []byte) {
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
 	// We register timeouts for all nodes, regardless of whether we fail
@@ -640,7 +641,7 @@ func (s *sender) SendPushQuery(nodeIDs ids.NodeIDSet, requestID uint32, containe
 	outMsg, err := s.msgCreator.PushQuery(s.ctx.ChainID, requestID, deadline, containerID, container)
 
 	// Send the message over the network.
-	var sentTo ids.NodeIDSet
+	var sentTo set.Set[ids.NodeID]
 	if err == nil {
 		sentTo = s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
 	} else {
@@ -684,7 +685,7 @@ func (s *sender) SendPushQuery(nodeIDs ids.NodeIDSet, requestID uint32, containe
 // on the specified nodes.
 // The PullQuery message signifies that this consensus engine would like each node to send
 // their preferred frontier.
-func (s *sender) SendPullQuery(nodeIDs ids.NodeIDSet, requestID uint32, containerID ids.ID) {
+func (s *sender) SendPullQuery(nodeIDs set.Set[ids.NodeID], requestID uint32, containerID ids.ID) {
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
 	// We register timeouts for all nodes, regardless of whether we fail
@@ -768,7 +769,7 @@ func (s *sender) SendChits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) 
 	}
 
 	// Send the message over the network.
-	nodeIDs := ids.NewNodeIDSet(1)
+	nodeIDs := set.NewSet[ids.NodeID](1)
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
@@ -806,7 +807,7 @@ func (s *sender) SendChitsV2(nodeID ids.NodeID, requestID uint32, votes []ids.ID
 	}
 
 	// Send the message over the network.
-	nodeIDs := ids.NewNodeIDSet(1)
+	nodeIDs := set.NewSet[ids.NodeID](1)
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
@@ -822,7 +823,7 @@ func (s *sender) SendChitsV2(nodeID ids.NodeID, requestID uint32, votes []ids.ID
 
 // SendAppRequest sends an application-level request to the given nodes.
 // The meaning of this request, and how it should be handled, is defined by the VM.
-func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, appRequestBytes []byte) error {
+func (s *sender) SendAppRequest(nodeIDs set.Set[ids.NodeID], requestID uint32, appRequestBytes []byte) error {
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
 	// We register timeouts for all nodes, regardless of whether we fail
@@ -863,7 +864,7 @@ func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, appRequ
 	outMsg, err := s.msgCreator.AppRequest(s.ctx.ChainID, requestID, deadline, appRequestBytes)
 
 	// Send the message over the network.
-	var sentTo ids.NodeIDSet
+	var sentTo set.Set[ids.NodeID]
 	if err == nil {
 		sentTo = s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
 	} else {
@@ -924,7 +925,7 @@ func (s *sender) SendAppResponse(nodeID ids.NodeID, requestID uint32, appRespons
 	}
 
 	// Send the message over the network.
-	nodeIDs := ids.NewNodeIDSet(1)
+	nodeIDs := set.NewSet[ids.NodeID](1)
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
@@ -944,7 +945,7 @@ func (s *sender) SendAppResponse(nodeID ids.NodeID, requestID uint32, appRespons
 	return nil
 }
 
-func (s *sender) SendAppGossipSpecific(nodeIDs ids.NodeIDSet, appGossipBytes []byte) error {
+func (s *sender) SendAppGossipSpecific(nodeIDs set.Set[ids.NodeID], appGossipBytes []byte) error {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
 	if err != nil {

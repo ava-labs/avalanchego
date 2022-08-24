@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -169,7 +170,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	frontierRequested := false
 	sender.CantSendGetAcceptedFrontier = false
-	sender.SendGetAcceptedFrontierF = func(ss ids.NodeIDSet, u uint32) {
+	sender.SendGetAcceptedFrontierF = func(ss set.Set[ids.NodeID], u uint32) {
 		frontierRequested = true
 	}
 

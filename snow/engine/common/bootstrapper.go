@@ -46,23 +46,23 @@ type bootstrapper struct {
 	// Holds the beacons that were sampled for the accepted frontier
 	sampledBeacons validators.Set
 	// IDs of validators we should request an accepted frontier from
-	pendingSendAcceptedFrontier ids.NodeIDSet
+	pendingSendAcceptedFrontier set.Set[ids.NodeID]
 	// IDs of validators we requested an accepted frontier from but haven't
 	// received a reply yet
-	pendingReceiveAcceptedFrontier ids.NodeIDSet
+	pendingReceiveAcceptedFrontier set.Set[ids.NodeID]
 	// IDs of validators that failed to respond with their accepted frontier
-	failedAcceptedFrontier ids.NodeIDSet
+	failedAcceptedFrontier set.Set[ids.NodeID]
 	// IDs of all the returned accepted frontiers
 	acceptedFrontierSet set.Set[ids.ID]
 
 	// IDs of validators we should request filtering the accepted frontier from
-	pendingSendAccepted ids.NodeIDSet
+	pendingSendAccepted set.Set[ids.NodeID]
 	// IDs of validators we requested filtering the accepted frontier from but
 	// haven't received a reply yet
-	pendingReceiveAccepted ids.NodeIDSet
+	pendingReceiveAccepted set.Set[ids.NodeID]
 	// IDs of validators that failed to respond with their filtered accepted
 	// frontier
-	failedAccepted ids.NodeIDSet
+	failedAccepted set.Set[ids.NodeID]
 	// IDs of the returned accepted containers and the stake weight that has
 	// marked them as accepted
 	acceptedVotes    map[ids.ID]uint64
@@ -343,7 +343,7 @@ func (b *bootstrapper) Restart(reset bool) error {
 // Ask up to [MaxOutstandingBroadcastRequests] bootstrap validators to send
 // their accepted frontier with the current accepted frontier
 func (b *bootstrapper) sendGetAcceptedFrontiers() {
-	vdrs := ids.NewNodeIDSet(1)
+	vdrs := set.NewSet[ids.NodeID](1)
 	for b.pendingSendAcceptedFrontier.Len() > 0 && b.pendingReceiveAcceptedFrontier.Len() < MaxOutstandingBroadcastRequests {
 		vdr, _ := b.pendingSendAcceptedFrontier.Pop()
 		// Add the validator to the set to send the messages to
@@ -360,7 +360,7 @@ func (b *bootstrapper) sendGetAcceptedFrontiers() {
 // Ask up to [MaxOutstandingBroadcastRequests] bootstrap validators to send
 // their filtered accepted frontier
 func (b *bootstrapper) sendGetAccepted() {
-	vdrs := ids.NewNodeIDSet(1)
+	vdrs := set.NewSet[ids.NodeID](1)
 	for b.pendingSendAccepted.Len() > 0 && b.pendingReceiveAccepted.Len() < MaxOutstandingBroadcastRequests {
 		vdr, _ := b.pendingSendAccepted.Pop()
 		// Add the validator to the set to send the messages to

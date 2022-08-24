@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var _ Manager = &manager{}
@@ -57,7 +58,7 @@ type manager struct {
 	// Value: The validators that validate the subnet
 	subnetToVdrs map[ids.ID]Set
 
-	maskedVdrs ids.NodeIDSet
+	maskedVdrs set.Set[ids.NodeID]
 }
 
 func (m *manager) Set(subnetID ids.ID, newSet Set) error {
