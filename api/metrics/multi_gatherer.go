@@ -85,8 +85,5 @@ func (g *multiGatherer) Register(namespace string, gatherer prometheus.Gatherer)
 }
 
 func sortMetrics(m []*dto.MetricFamily) {
-	sort.Slice(
-		m,
-		func(i, j int) bool { return *m[i].Name < *m[j].Name },
-	)
+	sort.Slice(m, func(i, j int) bool { return *m[i].Name < *m[j].Name })
 }

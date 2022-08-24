@@ -42,11 +42,9 @@ func SortByHash[T ~[]byte](s []T) {
 // Sort2DByteSlice sorts a 2D byte slice.
 // Each byte slice is not sorted internally; the byte slices are sorted relative to another.
 func Sort2DByteSlice[T ~[]byte](arr []T) {
-	sort.Slice(
-		arr,
-		func(i, j int) bool {
-			return bytes.Compare(arr[i], arr[j]) == -1
-		})
+	sort.Slice(arr, func(i, j int) bool {
+		return bytes.Compare(arr[i], arr[j]) == -1
+	})
 }
 
 // TODO add tests
@@ -79,13 +77,13 @@ func IsSortedAndUniqueByHash[T ~[]byte](s []T) bool {
 	return true
 }
 
-// IsSorted2DByteSlice returns true iff [arr] is sorted
-func IsSorted2DByteSlice[T ~[]byte](arr []T) bool {
-	return sort.SliceIsSorted(
-		arr,
-		func(i, j int) bool {
-			return bytes.Compare(arr[i], arr[j]) == -1
-		})
+// IsSorted2DByteSlice returns true iff [s] is sorted.
+// Note that each byte slice need not be sorted internally.
+// The byte slices must be sorted relative to one another.
+func IsSorted2DByteSlice[T ~[]byte](s []T) bool {
+	return sort.SliceIsSorted(s, func(i, j int) bool {
+		return bytes.Compare(s[i], s[j]) == -1
+	})
 }
 
 // IsSortedAndUnique returns true if the elements in the data are unique and sorted.
