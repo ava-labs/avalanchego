@@ -239,7 +239,7 @@ func TestBuildApricotBlock(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().HasDecisionTxs().Return(false)
 
-				// There is a proposal tx.
+				// There is not a proposal tx.
 				mempool.EXPECT().HasProposalTx().Return(false).AnyTimes()
 
 				clk := &mockable.Clock{}
