@@ -73,7 +73,6 @@ var (
 
 	genesisBlkID ids.ID
 	testSubnet1  *txs.Tx
-	// testSubnet1ControlKeys = preFundedKeys[0:3]
 )
 
 const (
