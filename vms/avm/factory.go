@@ -20,6 +20,10 @@ type Factory struct {
 	BlueberryTime time.Time
 }
 
+func (f *Factory) IsBlueberryActivated(timestamp time.Time) bool {
+	return !timestamp.Before(f.BlueberryTime)
+}
+
 func (f *Factory) New(*snow.Context) (interface{}, error) {
 	return &VM{Factory: *f}, nil
 }

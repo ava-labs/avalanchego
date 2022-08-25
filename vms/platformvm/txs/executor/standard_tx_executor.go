@@ -156,7 +156,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		e.Inputs.Add(utxoID)
 		utxoIDs[i] = utxoID[:]
 
-		if currentChainTime.Before(e.Config.BlueberryTime) {
+		if !e.Config.IsBlueberryActivated(currentChainTime) {
 			// TODO: Remove this check once the Blueberry network upgrade is
 			//       complete.
 			//
