@@ -5,6 +5,7 @@ package blocks
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -21,6 +22,7 @@ var preFundedKeys = crypto.BuildTestKeys()
 func TestStandardBlocks(t *testing.T) {
 	// check Apricot standard block can be built and parsed
 	require := require.New(t)
+	blkTimestamp := time.Now()
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
 	height := uint64(2022)
 	txs, err := testDecisionTxs()
@@ -44,12 +46,36 @@ func TestStandardBlocks(t *testing.T) {
 		_, ok := parsed.(*ApricotStandardBlock)
 		require.True(ok)
 		require.Equal(txs, parsed.Txs())
+
+		// check that blueberry standard block can be built and parsed
+		blueberryStandardBlk, err := NewBlueberryStandardBlock(blkTimestamp, parentID, height, txs)
+		require.NoError(err)
+
+		// parse block
+		parsed, err = Parse(cdc, blueberryStandardBlk.Bytes())
+		require.NoError(err)
+
+		// compare content
+		require.Equal(blueberryStandardBlk.ID(), parsed.ID())
+		require.Equal(blueberryStandardBlk.Bytes(), parsed.Bytes())
+		require.Equal(blueberryStandardBlk.Parent(), parsed.Parent())
+		require.Equal(blueberryStandardBlk.Height(), parsed.Height())
+		parsedBlueberryStandardBlk, ok := parsed.(*BlueberryStandardBlock)
+		require.True(ok)
+		require.Equal(txs, parsedBlueberryStandardBlk.Txs())
+
+		// timestamp check for blueberry blocks only
+		require.Equal(blueberryStandardBlk.Timestamp(), parsedBlueberryStandardBlk.Timestamp())
+
+		// backward compatibility check
+		require.Equal(parsed.Txs(), parsedBlueberryStandardBlk.Txs())
 	}
 }
 
 func TestProposalBlocks(t *testing.T) {
 	// check Apricot proposal block can be built and parsed
 	require := require.New(t)
+	blkTimestamp := time.Now()
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
 	height := uint64(2022)
 	tx, err := testProposalTx()
@@ -77,12 +103,41 @@ func TestProposalBlocks(t *testing.T) {
 		parsedApricotProposalBlk, ok := parsed.(*ApricotProposalBlock)
 		require.True(ok)
 		require.Equal([]*txs.Tx{tx}, parsedApricotProposalBlk.Txs())
+
+		// check that blueberry proposal block can be built and parsed
+		blueberryProposalBlk, err := NewBlueberryProposalBlock(
+			blkTimestamp,
+			parentID,
+			height,
+			tx,
+		)
+		require.NoError(err)
+
+		// parse block
+		parsed, err = Parse(cdc, blueberryProposalBlk.Bytes())
+		require.NoError(err)
+
+		// compare content
+		require.Equal(blueberryProposalBlk.ID(), parsed.ID())
+		require.Equal(blueberryProposalBlk.Bytes(), parsed.Bytes())
+		require.Equal(blueberryProposalBlk.Parent(), blueberryProposalBlk.Parent())
+		require.Equal(blueberryProposalBlk.Height(), parsed.Height())
+		parsedBlueberryProposalBlk, ok := parsed.(*BlueberryProposalBlock)
+		require.True(ok)
+		require.Equal([]*txs.Tx{tx}, parsedBlueberryProposalBlk.Txs())
+
+		// timestamp check for blueberry blocks only
+		require.Equal(blueberryProposalBlk.Timestamp(), parsedBlueberryProposalBlk.Timestamp())
+
+		// backward compatibility check
+		require.Equal(parsedApricotProposalBlk.Txs(), parsedBlueberryProposalBlk.Txs())
 	}
 }
 
 func TestCommitBlock(t *testing.T) {
 	// check Apricot commit block can be built and parsed
 	require := require.New(t)
+	blkTimestamp := time.Now()
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
 	height := uint64(2022)
 
@@ -100,12 +155,32 @@ func TestCommitBlock(t *testing.T) {
 		require.Equal(apricotCommitBlk.Bytes(), parsed.Bytes())
 		require.Equal(apricotCommitBlk.Parent(), parsed.Parent())
 		require.Equal(apricotCommitBlk.Height(), parsed.Height())
+
+		// check that blueberry commit block can be built and parsed
+		blueberryCommitBlk, err := NewBlueberryCommitBlock(blkTimestamp, parentID, height)
+		require.NoError(err)
+
+		// parse block
+		parsed, err = Parse(cdc, blueberryCommitBlk.Bytes())
+		require.NoError(err)
+
+		// compare content
+		require.Equal(blueberryCommitBlk.ID(), parsed.ID())
+		require.Equal(blueberryCommitBlk.Bytes(), parsed.Bytes())
+		require.Equal(blueberryCommitBlk.Parent(), blueberryCommitBlk.Parent())
+		require.Equal(blueberryCommitBlk.Height(), parsed.Height())
+
+		// timestamp check for blueberry blocks only
+		parsedBlueberryCommitBlk, ok := parsed.(*BlueberryCommitBlock)
+		require.True(ok)
+		require.Equal(blueberryCommitBlk.Timestamp(), parsedBlueberryCommitBlk.Timestamp())
 	}
 }
 
 func TestAbortBlock(t *testing.T) {
 	// check Apricot abort block can be built and parsed
 	require := require.New(t)
+	blkTimestamp := time.Now()
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
 	height := uint64(2022)
 
@@ -123,6 +198,25 @@ func TestAbortBlock(t *testing.T) {
 		require.Equal(apricotAbortBlk.Bytes(), parsed.Bytes())
 		require.Equal(apricotAbortBlk.Parent(), parsed.Parent())
 		require.Equal(apricotAbortBlk.Height(), parsed.Height())
+
+		// check that blueberry abort block can be built and parsed
+		blueberryAbortBlk, err := NewBlueberryAbortBlock(blkTimestamp, parentID, height)
+		require.NoError(err)
+
+		// parse block
+		parsed, err = Parse(cdc, blueberryAbortBlk.Bytes())
+		require.NoError(err)
+
+		// compare content
+		require.Equal(blueberryAbortBlk.ID(), parsed.ID())
+		require.Equal(blueberryAbortBlk.Bytes(), parsed.Bytes())
+		require.Equal(blueberryAbortBlk.Parent(), blueberryAbortBlk.Parent())
+		require.Equal(blueberryAbortBlk.Height(), parsed.Height())
+
+		// timestamp check for blueberry blocks only
+		parsedBlueberryAbortBlk, ok := parsed.(*BlueberryAbortBlock)
+		require.True(ok)
+		require.Equal(blueberryAbortBlk.Timestamp(), parsedBlueberryAbortBlk.Timestamp())
 	}
 }
 

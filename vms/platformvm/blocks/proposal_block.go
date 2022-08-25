@@ -5,14 +5,44 @@ package blocks
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ Block = &ApricotProposalBlock{}
+var (
+	_ BlueberryBlock = &BlueberryProposalBlock{}
+	_ Block          = &ApricotProposalBlock{}
+)
 
-// As is, this is duplication of atomic block. But let's tolerate some code duplication for now
+type BlueberryProposalBlock struct {
+	Time                 uint64 `serialize:"true" json:"time"`
+	ApricotProposalBlock `serialize:"true"`
+}
+
+func (b *BlueberryProposalBlock) Timestamp() time.Time  { return time.Unix(int64(b.Time), 0) }
+func (b *BlueberryProposalBlock) Visit(v Visitor) error { return v.BlueberryProposalBlock(b) }
+
+func NewBlueberryProposalBlock(
+	timestamp time.Time,
+	parentID ids.ID,
+	height uint64,
+	tx *txs.Tx,
+) (*BlueberryProposalBlock, error) {
+	blk := &BlueberryProposalBlock{
+		Time: uint64(timestamp.Unix()),
+		ApricotProposalBlock: ApricotProposalBlock{
+			CommonBlock: CommonBlock{
+				PrntID: parentID,
+				Hght:   height,
+			},
+			Tx: tx,
+		},
+	}
+	return blk, initialize(blk)
+}
+
 type ApricotProposalBlock struct {
 	CommonBlock `serialize:"true"`
 	Tx          *txs.Tx `serialize:"true" json:"tx"`

@@ -85,18 +85,30 @@ type Config struct {
 	BlueberryTime time.Time
 }
 
-func (c *Config) GetCreateBlockchainTxFee(t time.Time) uint64 {
-	if t.Before(c.ApricotPhase3Time) {
-		return c.CreateAssetTxFee
-	}
-	return c.CreateBlockchainTxFee
+func (c *Config) IsApricotPhase3Activated(timestamp time.Time) bool {
+	return !timestamp.Before(c.ApricotPhase3Time)
 }
 
-func (c *Config) GetCreateSubnetTxFee(t time.Time) uint64 {
-	if t.Before(c.ApricotPhase3Time) {
-		return c.CreateAssetTxFee
+func (c *Config) IsApricotPhase5Activated(timestamp time.Time) bool {
+	return !timestamp.Before(c.ApricotPhase5Time)
+}
+
+func (c *Config) IsBlueberryActivated(timestamp time.Time) bool {
+	return !timestamp.Before(c.BlueberryTime)
+}
+
+func (c *Config) GetCreateBlockchainTxFee(timestamp time.Time) uint64 {
+	if c.IsApricotPhase3Activated(timestamp) {
+		return c.CreateBlockchainTxFee
 	}
-	return c.CreateSubnetTxFee
+	return c.CreateAssetTxFee
+}
+
+func (c *Config) GetCreateSubnetTxFee(timestamp time.Time) uint64 {
+	if c.IsApricotPhase3Activated(timestamp) {
+		return c.CreateSubnetTxFee
+	}
+	return c.CreateAssetTxFee
 }
 
 // Create the blockchain described in [tx], but only if this node is a member of

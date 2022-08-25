@@ -12,9 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -34,40 +37,49 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	mempool := mempool.NewMockMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
-	verifier := &verifier{
-		txExecutorBackend: &executor.Backend{},
-		backend: &backend{
-			lastAccepted: parentID,
-			blkIDToState: map[ids.ID]*blockState{
-				parentID: {
-					statelessBlock: parentStatelessBlk,
-				},
+	parentOnAcceptState := state.NewMockDiff(ctrl)
+	timestamp := time.Now()
+	// One call for each of onCommitState and onAbortState.
+	parentOnAcceptState.EXPECT().GetTimestamp().Return(timestamp).Times(2)
+	parentOnAcceptState.EXPECT().GetCurrentSupply().Return(uint64(10000)).Times(2)
+
+	backend := &backend{
+		lastAccepted: parentID,
+		blkIDToState: map[ids.ID]*blockState{
+			parentID: {
+				statelessBlock: parentStatelessBlk,
+				onAcceptState:  parentOnAcceptState,
 			},
-			Mempool: mempool,
-			state:   s,
-			ctx: &snow.Context{
-				Log: logging.NoLog{},
-			},
+		},
+		Mempool: mempool,
+		state:   s,
+		ctx: &snow.Context{
+			Log: logging.NoLog{},
 		},
 	}
-
-	onCommitState := state.NewMockDiff(ctrl)
-	onAbortState := state.NewMockDiff(ctrl)
-	blkTx := txs.NewMockUnsignedTx(ctrl)
-	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.ProposalTxExecutor{})).DoAndReturn(
-		func(e *executor.ProposalTxExecutor) error {
-			e.OnCommit = onCommitState
-			e.OnAbort = onAbortState
-			return nil
+	verifier := &verifier{
+		txExecutorBackend: &executor.Backend{
+			Config: &config.Config{
+				BlueberryTime: mockable.MaxTime, // blueberry is not activated
+			},
+			Clk: &mockable.Clock{},
 		},
-	).Times(1)
+		backend: backend,
+	}
+	manager := &manager{
+		backend:  backend,
+		verifier: verifier,
+	}
+
+	blkTx := txs.NewMockUnsignedTx(ctrl)
+	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.ProposalTxExecutor{})).Return(nil).Times(1)
 
 	// We can't serialize [blkTx] because it isn't
 	// registered with the blocks.Codec.
 	// Serialize this block with a dummy tx
 	// and replace it after creation with the mock tx.
 	// TODO allow serialization of mock txs.
-	blk, err := blocks.NewApricotProposalBlock(
+	apricotBlk, err := blocks.NewApricotProposalBlock(
 		parentID,
 		2,
 		&txs.Tx{
@@ -76,28 +88,33 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 		},
 	)
 	require.NoError(err)
-	blk.Tx.Unsigned = blkTx
+	apricotBlk.Tx.Unsigned = blkTx
 
 	// Set expectations for dependencies.
-	timestamp := time.Now()
+	tx := apricotBlk.Txs()[0]
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
-	mempool.EXPECT().RemoveProposalTx(blk.Tx).Times(1)
-	onCommitState.EXPECT().AddTx(blk.Tx, status.Committed).Times(1)
-	onAbortState.EXPECT().AddTx(blk.Tx, status.Aborted).Times(1)
-	onAbortState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
+	mempool.EXPECT().RemoveProposalTx(tx).Times(1)
 
 	// Visit the block
-	err = verifier.ApricotProposalBlock(blk)
+	blk := manager.NewBlock(apricotBlk)
+	err = blk.Verify()
 	require.NoError(err)
-	require.Contains(verifier.backend.blkIDToState, blk.ID())
-	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
-	require.Equal(blk, gotBlkState.statelessBlock)
-	require.Equal(onCommitState, gotBlkState.onCommitState)
-	require.Equal(onAbortState, gotBlkState.onAbortState)
+	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
+	gotBlkState := verifier.backend.blkIDToState[apricotBlk.ID()]
+	require.Equal(apricotBlk, gotBlkState.statelessBlock)
 	require.Equal(timestamp, gotBlkState.timestamp)
 
+	// Assert that the expected tx statuses are set.
+	_, gotStatus, err := gotBlkState.onCommitState.GetTx(tx.ID())
+	require.NoError(err)
+	require.Equal(status.Committed, gotStatus)
+
+	_, gotStatus, err = gotBlkState.onAbortState.GetTx(tx.ID())
+	require.NoError(err)
+	require.Equal(status.Aborted, gotStatus)
+
 	// Visiting again should return nil without using dependencies.
-	err = verifier.ApricotProposalBlock(blk)
+	err = blk.Verify()
 	require.NoError(err)
 }
 
@@ -113,25 +130,33 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	grandparentID := ids.GenerateTestID()
 	parentState := state.NewMockDiff(ctrl)
+
+	backend := &backend{
+		blkIDToState: map[ids.ID]*blockState{
+			parentID: {
+				statelessBlock: parentStatelessBlk,
+				onAcceptState:  parentState,
+			},
+		},
+		Mempool: mempool,
+		state:   s,
+		ctx: &snow.Context{
+			Log: logging.NoLog{},
+		},
+	}
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
 				ApricotPhase5Time: time.Now().Add(time.Hour),
+				BlueberryTime:     mockable.MaxTime, // blueberry is not activated
 			},
+			Clk: &mockable.Clock{},
 		},
-		backend: &backend{
-			blkIDToState: map[ids.ID]*blockState{
-				parentID: {
-					statelessBlock: parentStatelessBlk,
-					onAcceptState:  parentState,
-				},
-			},
-			Mempool: mempool,
-			state:   s,
-			ctx: &snow.Context{
-				Log: logging.NoLog{},
-			},
-		},
+		backend: backend,
+	}
+	manager := &manager{
+		backend:  backend,
+		verifier: verifier,
 	}
 
 	onAccept := state.NewMockDiff(ctrl)
@@ -149,7 +174,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	// Serialize this block with a dummy tx and replace it after creation with
 	// the mock tx.
 	// TODO allow serialization of mock txs.
-	blk, err := blocks.NewApricotAtomicBlock(
+	apricotBlk, err := blocks.NewApricotAtomicBlock(
 		parentID,
 		2,
 		&txs.Tx{
@@ -158,29 +183,29 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 		},
 	)
 	require.NoError(err)
-	blk.Tx.Unsigned = blkTx
+	apricotBlk.Tx.Unsigned = blkTx
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
-	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	parentStatelessBlk.EXPECT().Parent().Return(grandparentID).Times(1)
-	mempool.EXPECT().RemoveDecisionTxs([]*txs.Tx{blk.Tx}).Times(1)
-	onAccept.EXPECT().AddTx(blk.Tx, status.Committed).Times(1)
+	mempool.EXPECT().RemoveDecisionTxs([]*txs.Tx{apricotBlk.Tx}).Times(1)
+	onAccept.EXPECT().AddTx(apricotBlk.Tx, status.Committed).Times(1)
 	onAccept.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 
-	err = verifier.ApricotAtomicBlock(blk)
+	blk := manager.NewBlock(apricotBlk)
+	err = blk.Verify()
 	require.NoError(err)
 
-	require.Contains(verifier.backend.blkIDToState, blk.ID())
-	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
-	require.Equal(blk, gotBlkState.statelessBlock)
+	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
+	gotBlkState := verifier.backend.blkIDToState[apricotBlk.ID()]
+	require.Equal(apricotBlk, gotBlkState.statelessBlock)
 	require.Equal(onAccept, gotBlkState.onAcceptState)
 	require.Equal(inputs, gotBlkState.inputs)
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.ApricotAtomicBlock(blk)
+	err = blk.Verify()
 	require.NoError(err)
 }
 
@@ -195,25 +220,33 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	parentState := state.NewMockDiff(ctrl)
+
+	backend := &backend{
+		blkIDToState: map[ids.ID]*blockState{
+			parentID: {
+				statelessBlock: parentStatelessBlk,
+				onAcceptState:  parentState,
+			},
+		},
+		Mempool: mempool,
+		state:   s,
+		ctx: &snow.Context{
+			Log: logging.NoLog{},
+		},
+	}
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
 				ApricotPhase5Time: time.Now().Add(time.Hour),
+				BlueberryTime:     mockable.MaxTime, // blueberry is not activated
 			},
+			Clk: &mockable.Clock{},
 		},
-		backend: &backend{
-			blkIDToState: map[ids.ID]*blockState{
-				parentID: {
-					statelessBlock: parentStatelessBlk,
-					onAcceptState:  parentState,
-				},
-			},
-			Mempool: mempool,
-			state:   s,
-			ctx: &snow.Context{
-				Log: logging.NoLog{},
-			},
-		},
+		backend: backend,
+	}
+	manager := &manager{
+		backend:  backend,
+		verifier: verifier,
 	}
 
 	blkTx := txs.NewMockUnsignedTx(ctrl)
@@ -243,9 +276,9 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	// Serialize this block with a dummy tx
 	// and replace it after creation with the mock tx.
 	// TODO allow serialization of mock txs.
-	blk, err := blocks.NewApricotStandardBlock(
+	apricotBlk, err := blocks.NewApricotStandardBlock(
 		parentID,
-		2,
+		2, /*height*/
 		[]*txs.Tx{
 			{
 				Unsigned: &txs.AdvanceTimeTx{},
@@ -254,27 +287,28 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 		},
 	)
 	require.NoError(err)
-	blk.Transactions[0].Unsigned = blkTx
+	apricotBlk.Transactions[0].Unsigned = blkTx
 
 	// Set expectations for dependencies.
 	timestamp := time.Now()
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	parentState.EXPECT().GetCurrentSupply().Return(uint64(10000)).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
-	mempool.EXPECT().RemoveDecisionTxs(blk.Transactions).Times(1)
+	mempool.EXPECT().RemoveDecisionTxs(apricotBlk.Txs()).Times(1)
 
-	err = verifier.ApricotStandardBlock(blk)
+	blk := manager.NewBlock(apricotBlk)
+	err = blk.Verify()
 	require.NoError(err)
 
 	// Assert expected state.
-	require.Contains(verifier.backend.blkIDToState, blk.ID())
-	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
-	require.Equal(blk, gotBlkState.statelessBlock)
+	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
+	gotBlkState := verifier.backend.blkIDToState[apricotBlk.ID()]
+	require.Equal(apricotBlk, gotBlkState.statelessBlock)
 	require.Equal(ids.Set{}, gotBlkState.inputs)
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.ApricotStandardBlock(blk)
+	err = blk.Verify()
 	require.NoError(err)
 }
 
@@ -290,28 +324,39 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
-	verifier := &verifier{
-		txExecutorBackend: &executor.Backend{},
-		backend: &backend{
-			blkIDToState: map[ids.ID]*blockState{
-				parentID: {
-					statelessBlock: parentStatelessBlk,
-					proposalBlockState: proposalBlockState{
-						onCommitState: parentOnCommitState,
-						onAbortState:  parentOnAbortState,
-					},
-					standardBlockState: standardBlockState{},
+
+	backend := &backend{
+		blkIDToState: map[ids.ID]*blockState{
+			parentID: {
+				statelessBlock: parentStatelessBlk,
+				proposalBlockState: proposalBlockState{
+					onCommitState: parentOnCommitState,
+					onAbortState:  parentOnAbortState,
 				},
-			},
-			Mempool: mempool,
-			state:   s,
-			ctx: &snow.Context{
-				Log: logging.NoLog{},
+				standardBlockState: standardBlockState{},
 			},
 		},
+		Mempool: mempool,
+		state:   s,
+		ctx: &snow.Context{
+			Log: logging.NoLog{},
+		},
+	}
+	verifier := &verifier{
+		txExecutorBackend: &executor.Backend{
+			Config: &config.Config{
+				BlueberryTime: mockable.MaxTime, // blueberry is not activated
+			},
+			Clk: &mockable.Clock{},
+		},
+		backend: backend,
+	}
+	manager := &manager{
+		backend:  backend,
+		verifier: verifier,
 	}
 
-	blk, err := blocks.NewApricotCommitBlock(
+	apricotBlk, err := blocks.NewApricotCommitBlock(
 		parentID,
 		2,
 	)
@@ -325,17 +370,18 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	)
 
 	// Verify the block.
-	err = verifier.ApricotCommitBlock(blk)
+	blk := manager.NewBlock(apricotBlk)
+	err = blk.Verify()
 	require.NoError(err)
 
 	// Assert expected state.
-	require.Contains(verifier.backend.blkIDToState, blk.ID())
-	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
+	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
+	gotBlkState := verifier.backend.blkIDToState[apricotBlk.ID()]
 	require.Equal(parentOnAbortState, gotBlkState.onAcceptState)
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.ApricotCommitBlock(blk)
+	err = blk.Verify()
 	require.NoError(err)
 }
 
@@ -351,28 +397,39 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
-	verifier := &verifier{
-		txExecutorBackend: &executor.Backend{},
-		backend: &backend{
-			blkIDToState: map[ids.ID]*blockState{
-				parentID: {
-					statelessBlock: parentStatelessBlk,
-					proposalBlockState: proposalBlockState{
-						onCommitState: parentOnCommitState,
-						onAbortState:  parentOnAbortState,
-					},
-					standardBlockState: standardBlockState{},
+
+	backend := &backend{
+		blkIDToState: map[ids.ID]*blockState{
+			parentID: {
+				statelessBlock: parentStatelessBlk,
+				proposalBlockState: proposalBlockState{
+					onCommitState: parentOnCommitState,
+					onAbortState:  parentOnAbortState,
 				},
-			},
-			Mempool: mempool,
-			state:   s,
-			ctx: &snow.Context{
-				Log: logging.NoLog{},
+				standardBlockState: standardBlockState{},
 			},
 		},
+		Mempool: mempool,
+		state:   s,
+		ctx: &snow.Context{
+			Log: logging.NoLog{},
+		},
+	}
+	verifier := &verifier{
+		txExecutorBackend: &executor.Backend{
+			Config: &config.Config{
+				BlueberryTime: mockable.MaxTime, // blueberry is not activated
+			},
+			Clk: &mockable.Clock{},
+		},
+		backend: backend,
+	}
+	manager := &manager{
+		backend:  backend,
+		verifier: verifier,
 	}
 
-	blk, err := blocks.NewApricotAbortBlock(
+	apricotBlk, err := blocks.NewApricotAbortBlock(
 		parentID,
 		2,
 	)
@@ -386,18 +443,251 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	)
 
 	// Verify the block.
-	err = verifier.ApricotAbortBlock(blk)
+	blk := manager.NewBlock(apricotBlk)
+	err = blk.Verify()
 	require.NoError(err)
 
 	// Assert expected state.
-	require.Contains(verifier.backend.blkIDToState, blk.ID())
-	gotBlkState := verifier.backend.blkIDToState[blk.ID()]
+	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
+	gotBlkState := verifier.backend.blkIDToState[apricotBlk.ID()]
 	require.Equal(parentOnAbortState, gotBlkState.onAcceptState)
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = verifier.ApricotAbortBlock(blk)
+	err = blk.Verify()
 	require.NoError(err)
+}
+
+// Assert that a block with an unverified parent fails verification.
+func TestVerifyUnverifiedParent(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Create mocked dependencies.
+	s := state.NewMockState(ctrl)
+	mempool := mempool.NewMockMempool(ctrl)
+	parentID := ids.GenerateTestID()
+
+	backend := &backend{
+		blkIDToState: map[ids.ID]*blockState{},
+		Mempool:      mempool,
+		state:        s,
+		ctx: &snow.Context{
+			Log: logging.NoLog{},
+		},
+	}
+	verifier := &verifier{
+		txExecutorBackend: &executor.Backend{
+			Config: &config.Config{
+				BlueberryTime: mockable.MaxTime, // blueberry is not activated
+			},
+			Clk: &mockable.Clock{},
+		},
+		backend: backend,
+	}
+
+	blk, err := blocks.NewApricotAbortBlock(parentID /*not in memory or persisted state*/, 2 /*height*/)
+	require.NoError(err)
+
+	// Set expectations for dependencies.
+	s.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
+	s.EXPECT().GetStatelessBlock(parentID).Return(nil, choices.Unknown, database.ErrNotFound).Times(1)
+
+	// Verify the block.
+	err = blk.Visit(verifier)
+	require.Error(err)
+}
+
+func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	now := defaultGenesisTime.Add(time.Hour)
+
+	tests := []struct {
+		description string
+		parentTime  time.Time
+		childTime   time.Time
+		result      error
+	}{
+		{
+			description: "abort block timestamp matching parent's one",
+			parentTime:  now,
+			childTime:   now,
+			result:      nil,
+		},
+		{
+			description: "abort block timestamp before parent's one",
+			childTime:   now.Add(-1 * time.Second),
+			parentTime:  now,
+			result:      errOptionBlockTimestampNotMatchingParent,
+		},
+		{
+			description: "abort block timestamp after parent's one",
+			parentTime:  now,
+			childTime:   now.Add(time.Second),
+			result:      errOptionBlockTimestampNotMatchingParent,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			require := require.New(t)
+
+			// Create mocked dependencies.
+			s := state.NewMockState(ctrl)
+			mempool := mempool.NewMockMempool(ctrl)
+			parentID := ids.GenerateTestID()
+			parentStatelessBlk := blocks.NewMockBlock(ctrl)
+			parentHeight := uint64(1)
+
+			backend := &backend{
+				blkIDToState: make(map[ids.ID]*blockState),
+				Mempool:      mempool,
+				state:        s,
+				ctx: &snow.Context{
+					Log: logging.NoLog{},
+				},
+			}
+			verifier := &verifier{
+				txExecutorBackend: &executor.Backend{
+					Config: &config.Config{
+						BlueberryTime: time.Time{}, // blueberry is activated
+					},
+					Clk: &mockable.Clock{},
+				},
+				backend: backend,
+			}
+
+			// build and verify child block
+			childHeight := parentHeight + 1
+			statelessAbortBlk, err := blocks.NewBlueberryAbortBlock(test.childTime, parentID, childHeight)
+			require.NoError(err)
+
+			// setup parent state
+			parentTime := defaultGenesisTime
+			parentSupply := uint64(2022)
+			s.EXPECT().GetLastAccepted().Return(parentID).Times(2)
+			s.EXPECT().GetTimestamp().Return(parentTime).Times(2)
+			s.EXPECT().GetCurrentSupply().Return(parentSupply).Times(2)
+
+			onCommitState, err := state.NewDiff(parentID, backend)
+			require.NoError(err)
+			onAbortState, err := state.NewDiff(parentID, backend)
+			require.NoError(err)
+			backend.blkIDToState[parentID] = &blockState{
+				timestamp:      test.parentTime,
+				statelessBlock: parentStatelessBlk,
+				proposalBlockState: proposalBlockState{
+					onCommitState: onCommitState,
+					onAbortState:  onAbortState,
+				},
+			}
+
+			// Set expectations for dependencies.
+			parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
+
+			err = statelessAbortBlk.Visit(verifier)
+			require.ErrorIs(err, test.result)
+		})
+	}
+}
+
+// TODO combine with TestApricotCommitBlockTimestampChecks
+func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	now := defaultGenesisTime.Add(time.Hour)
+
+	tests := []struct {
+		description string
+		parentTime  time.Time
+		childTime   time.Time
+		result      error
+	}{
+		{
+			description: "commit block timestamp matching parent's one",
+			parentTime:  now,
+			childTime:   now,
+			result:      nil,
+		},
+		{
+			description: "commit block timestamp before parent's one",
+			childTime:   now.Add(-1 * time.Second),
+			parentTime:  now,
+			result:      errOptionBlockTimestampNotMatchingParent,
+		},
+		{
+			description: "commit block timestamp after parent's one",
+			parentTime:  now,
+			childTime:   now.Add(time.Second),
+			result:      errOptionBlockTimestampNotMatchingParent,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			require := require.New(t)
+
+			// Create mocked dependencies.
+			s := state.NewMockState(ctrl)
+			mempool := mempool.NewMockMempool(ctrl)
+			parentID := ids.GenerateTestID()
+			parentStatelessBlk := blocks.NewMockBlock(ctrl)
+			parentHeight := uint64(1)
+
+			backend := &backend{
+				blkIDToState: make(map[ids.ID]*blockState),
+				Mempool:      mempool,
+				state:        s,
+				ctx: &snow.Context{
+					Log: logging.NoLog{},
+				},
+			}
+			verifier := &verifier{
+				txExecutorBackend: &executor.Backend{
+					Config: &config.Config{
+						BlueberryTime: time.Time{}, // blueberry is activated
+					},
+					Clk: &mockable.Clock{},
+				},
+				backend: backend,
+			}
+
+			// build and verify child block
+			childHeight := parentHeight + 1
+			statelessCommitBlk, err := blocks.NewBlueberryCommitBlock(test.childTime, parentID, childHeight)
+			require.NoError(err)
+
+			// setup parent state
+			parentTime := defaultGenesisTime
+			parentSupply := uint64(2022)
+			s.EXPECT().GetLastAccepted().Return(parentID).Times(2)
+			s.EXPECT().GetTimestamp().Return(parentTime).Times(2)
+			s.EXPECT().GetCurrentSupply().Return(parentSupply).Times(2)
+
+			onCommitState, err := state.NewDiff(parentID, backend)
+			require.NoError(err)
+			onAbortState, err := state.NewDiff(parentID, backend)
+			require.NoError(err)
+			backend.blkIDToState[parentID] = &blockState{
+				timestamp:      test.parentTime,
+				statelessBlock: parentStatelessBlk,
+				proposalBlockState: proposalBlockState{
+					onCommitState: onCommitState,
+					onAbortState:  onAbortState,
+				},
+			}
+
+			// Set expectations for dependencies.
+			parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
+
+			err = statelessCommitBlk.Visit(verifier)
+			require.ErrorIs(err, test.result)
+		})
+	}
 }
 
 func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
@@ -408,6 +698,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
 	mempool := mempool.NewMockMempool(ctrl)
+
 	grandParentID := ids.GenerateTestID()
 	grandParentStatelessBlk := blocks.NewMockBlock(ctrl)
 	grandParentState := state.NewMockDiff(ctrl)
@@ -417,32 +708,36 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	atomicInputs := ids.Set{
 		ids.GenerateTestID(): struct{}{},
 	}
+
+	backend := &backend{
+		blkIDToState: map[ids.ID]*blockState{
+			grandParentID: {
+				standardBlockState: standardBlockState{
+					inputs: atomicInputs,
+				},
+				statelessBlock: grandParentStatelessBlk,
+				onAcceptState:  grandParentState,
+			},
+			parentID: {
+				statelessBlock: parentStatelessBlk,
+				onAcceptState:  parentState,
+			},
+		},
+		Mempool: mempool,
+		state:   s,
+		ctx: &snow.Context{
+			Log: logging.NoLog{},
+		},
+	}
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
 				ApricotPhase5Time: time.Now().Add(time.Hour),
+				BlueberryTime:     mockable.MaxTime, // blueberry is not activated
 			},
+			Clk: &mockable.Clock{},
 		},
-		backend: &backend{
-			blkIDToState: map[ids.ID]*blockState{
-				grandParentID: {
-					standardBlockState: standardBlockState{
-						inputs: atomicInputs,
-					},
-					statelessBlock: grandParentStatelessBlk,
-					onAcceptState:  grandParentState,
-				},
-				parentID: {
-					statelessBlock: parentStatelessBlk,
-					onAcceptState:  parentState,
-				},
-			},
-			Mempool: mempool,
-			state:   s,
-			ctx: &snow.Context{
-				Log: logging.NoLog{},
-			},
-		},
+		backend: backend,
 	}
 
 	blkTx := txs.NewMockUnsignedTx(ctrl)
@@ -468,7 +763,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	).Times(1)
 
 	// We can't serialize [blkTx] because it isn't
-	// regiestered with the blocks.Codec.
+	// registered with the blocks.Codec.
 	// Serialize this block with a dummy tx
 	// and replace it after creation with the mock tx.
 	// TODO allow serialization of mock txs.
@@ -496,7 +791,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	require.ErrorIs(err, errConflictingParentTxs)
 }
 
-func TestVerifierVisitStandardBlockWithProposalBlockParent(t *testing.T) {
+func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -508,25 +803,32 @@ func TestVerifierVisitStandardBlockWithProposalBlockParent(t *testing.T) {
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
 	parentOnAbortState := state.NewMockDiff(ctrl)
-	verifier := &verifier{
-		txExecutorBackend: &executor.Backend{},
-		backend: &backend{
-			blkIDToState: map[ids.ID]*blockState{
-				parentID: {
-					statelessBlock: parentStatelessBlk,
-					proposalBlockState: proposalBlockState{
-						onCommitState: parentOnCommitState,
-						onAbortState:  parentOnAbortState,
-					},
-					standardBlockState: standardBlockState{},
+
+	backend := &backend{
+		blkIDToState: map[ids.ID]*blockState{
+			parentID: {
+				statelessBlock: parentStatelessBlk,
+				proposalBlockState: proposalBlockState{
+					onCommitState: parentOnCommitState,
+					onAbortState:  parentOnAbortState,
 				},
-			},
-			Mempool: mempool,
-			state:   s,
-			ctx: &snow.Context{
-				Log: logging.NoLog{},
+				standardBlockState: standardBlockState{},
 			},
 		},
+		Mempool: mempool,
+		state:   s,
+		ctx: &snow.Context{
+			Log: logging.NoLog{},
+		},
+	}
+	verifier := &verifier{
+		txExecutorBackend: &executor.Backend{
+			Config: &config.Config{
+				BlueberryTime: mockable.MaxTime, // blueberry is not activated
+			},
+			Clk: &mockable.Clock{},
+		},
+		backend: backend,
 	}
 
 	blk, err := blocks.NewApricotStandardBlock(
@@ -544,5 +846,65 @@ func TestVerifierVisitStandardBlockWithProposalBlockParent(t *testing.T) {
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 
 	err = verifier.ApricotStandardBlock(blk)
+	require.ErrorIs(err, state.ErrMissingParentState)
+}
+
+func TestVerifierVisitBlueberryStandardBlockWithProposalBlockParent(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Create mocked dependencies.
+	s := state.NewMockState(ctrl)
+	mempool := mempool.NewMockMempool(ctrl)
+	parentID := ids.GenerateTestID()
+	parentStatelessBlk := blocks.NewMockBlock(ctrl)
+	parentTime := time.Now()
+	parentOnCommitState := state.NewMockDiff(ctrl)
+	parentOnAbortState := state.NewMockDiff(ctrl)
+
+	backend := &backend{
+		blkIDToState: map[ids.ID]*blockState{
+			parentID: {
+				statelessBlock: parentStatelessBlk,
+				proposalBlockState: proposalBlockState{
+					onCommitState: parentOnCommitState,
+					onAbortState:  parentOnAbortState,
+				},
+				standardBlockState: standardBlockState{},
+			},
+		},
+		Mempool: mempool,
+		state:   s,
+		ctx: &snow.Context{
+			Log: logging.NoLog{},
+		},
+	}
+	verifier := &verifier{
+		txExecutorBackend: &executor.Backend{
+			Config: &config.Config{
+				BlueberryTime: time.Time{}, // blueberry is activated
+			},
+			Clk: &mockable.Clock{},
+		},
+		backend: backend,
+	}
+
+	blk, err := blocks.NewBlueberryStandardBlock(
+		parentTime.Add(time.Second),
+		parentID,
+		2,
+		[]*txs.Tx{
+			{
+				Unsigned: &txs.AdvanceTimeTx{},
+				Creds:    []verify.Verifiable{},
+			},
+		},
+	)
+	require.NoError(err)
+
+	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
+
+	err = verifier.BlueberryStandardBlock(blk)
 	require.ErrorIs(err, state.ErrMissingParentState)
 }

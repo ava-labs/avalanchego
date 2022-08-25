@@ -273,7 +273,6 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 				Log:          logging.NoLog{},
 				SharedMemory: sharedMemory,
 			},
-			bootstrapped: &utils.AtomicBool{},
 		},
 		metrics: metrics.Noop,
 		recentlyAccepted: window.New(window.Config{
@@ -281,6 +280,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 			MaxSize: 1,
 			TTL:     time.Hour,
 		}),
+		bootstrapped: &utils.AtomicBool{},
 	}
 
 	blk, err := blocks.NewApricotCommitBlock(parentID, 1 /*height*/)
@@ -326,7 +326,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	// Set expected calls on dependencies.
 	// Make sure the parent is accepted first.
 	gomock.InOrder(
-		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1),
+		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(2),
 		s.EXPECT().SetLastAccepted(parentID).Times(1),
 		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
 		s.EXPECT().SetHeight(blk.Height()-1).Times(1),
@@ -363,7 +363,6 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 				Log:          logging.NoLog{},
 				SharedMemory: sharedMemory,
 			},
-			bootstrapped: &utils.AtomicBool{},
 		},
 		metrics: metrics.Noop,
 		recentlyAccepted: window.New(window.Config{
@@ -371,6 +370,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 			MaxSize: 1,
 			TTL:     time.Hour,
 		}),
+		bootstrapped: &utils.AtomicBool{},
 	}
 
 	blk, err := blocks.NewApricotAbortBlock(parentID, 1 /*height*/)
@@ -416,7 +416,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	// Set expected calls on dependencies.
 	// Make sure the parent is accepted first.
 	gomock.InOrder(
-		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1),
+		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(2),
 		s.EXPECT().SetLastAccepted(parentID).Times(1),
 		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
 		s.EXPECT().SetHeight(blk.Height()-1).Times(1),

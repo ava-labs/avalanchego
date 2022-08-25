@@ -39,9 +39,9 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	mpool, err := NewMempool("mempool", registerer, &noopBlkTimer{})
 	require.NoError(err)
 
-	txs, err := createTestDecisionTxs(1)
+	decisionTxs, err := createTestDecisionTxs(1)
 	require.NoError(err)
-	tx := txs[0]
+	tx := decisionTxs[0]
 
 	// shortcut to simulated almost filled mempool
 	mpool.(*mempool).bytesAvailable = len(tx.Bytes()) - 1
@@ -142,7 +142,7 @@ func TestProposalTxsInMempool(t *testing.T) {
 	mpool, err := NewMempool("mempool", registerer, &noopBlkTimer{})
 	require.NoError(err)
 
-	// it's key to this test that proposal proposalTxs
+	// it's key to this test that proposal txs
 	// are ordered by decreasing start time
 	proposalTxs, err := createTestProposalTxs(2)
 	require.NoError(err)

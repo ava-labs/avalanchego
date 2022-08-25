@@ -19,8 +19,13 @@ import (
 var (
 	_ blocks.Visitor = &verifier{}
 
-	errConflictingBatchTxs  = errors.New("block contains conflicting transactions")
-	errConflictingParentTxs = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
+	errBlueberryBlockIssuedBeforeFork        = errors.New("blueberry block issued before fork")
+	errApricotBlockIssuedAfterFork           = errors.New("apricot block issued after fork")
+	errBlueberryStandardBlockWithoutChanges  = errors.New("BlueberryStandardBlock performs no state changes")
+	errChildBlockEarlierThanParent           = errors.New("proposed timestamp before current chain time")
+	errConflictingBatchTxs                   = errors.New("block contains conflicting transactions")
+	errConflictingParentTxs                  = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
+	errOptionBlockTimestampNotMatchingParent = errors.New("option block proposed timestamp not matching parent block one")
 )
 
 // verifier handles the logic for verifying a block.
@@ -29,74 +34,147 @@ type verifier struct {
 	txExecutorBackend *executor.Backend
 }
 
-func (v *verifier) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
-	blkID := b.ID()
-
-	if _, ok := v.blkIDToState[blkID]; ok {
-		// This block has already been verified.
-		return nil
-	}
-
-	if err := v.verifyCommonBlock(&b.CommonBlock); err != nil {
+func (v *verifier) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
+	if err := v.blueberryOptionBlock(b); err != nil {
 		return err
 	}
-
-	txExecutor := &executor.ProposalTxExecutor{
-		Backend:       v.txExecutorBackend,
-		ParentID:      b.Parent(),
-		StateVersions: v,
-		Tx:            b.Tx,
-	}
-	if err := b.Tx.Unsigned.Visit(txExecutor); err != nil {
-		txID := b.Tx.ID()
-		v.MarkDropped(txID, err.Error()) // cache tx as dropped
-		return err
-	}
-
-	onCommitState := txExecutor.OnCommit
-	onCommitState.AddTx(b.Tx, status.Committed)
-
-	onAbortState := txExecutor.OnAbort
-	onAbortState.AddTx(b.Tx, status.Aborted)
-
-	v.blkIDToState[blkID] = &blockState{
-		statelessBlock: b,
-		proposalBlockState: proposalBlockState{
-			onCommitState:         onCommitState,
-			onAbortState:          onAbortState,
-			initiallyPreferCommit: txExecutor.PrefersCommit,
-		},
-
-		// It is safe to use [pb.onAbortState] here because the timestamp will
-		// never be modified by an Abort block.
-		timestamp: onAbortState.GetTimestamp(),
-	}
-
-	v.Mempool.RemoveProposalTx(b.Tx)
-	return nil
+	return v.abortBlock(b)
 }
 
-func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
-	blkID := b.ID()
-
-	if _, ok := v.blkIDToState[blkID]; ok {
-		// This block has already been verified.
-		return nil
+func (v *verifier) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
+	if err := v.blueberryOptionBlock(b); err != nil {
+		return err
 	}
+	return v.commitBlock(b)
+}
 
-	if err := v.verifyCommonBlock(&b.CommonBlock); err != nil {
+func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) error {
+	if err := v.blueberryNonOptionBlock(b); err != nil {
 		return err
 	}
 
 	parentID := b.Parent()
-	parentState, ok := v.GetState(parentID)
-	if !ok {
-		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
+	onCommitState, err := state.NewDiff(parentID, v.backend)
+	if err != nil {
+		return err
+	}
+	onAbortState, err := state.NewDiff(parentID, v.backend)
+	if err != nil {
+		return err
 	}
 
+	// Apply the changes, if any, from advancing the chain time.
+	nextChainTime := b.Timestamp()
+	changes, err := executor.AdvanceTimeTo(
+		onCommitState,
+		nextChainTime,
+		v.txExecutorBackend.Rewards,
+	)
+	if err != nil {
+		return err
+	}
+
+	onCommitState.SetTimestamp(nextChainTime)
+	changes.Apply(onCommitState)
+
+	onAbortState.SetTimestamp(nextChainTime)
+	changes.Apply(onAbortState)
+
+	return v.proposalBlock(&b.ApricotProposalBlock, onCommitState, onAbortState)
+}
+
+func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) error {
+	if err := v.blueberryNonOptionBlock(b); err != nil {
+		return err
+	}
+
+	parentID := b.Parent()
+	onAcceptState, err := state.NewDiff(parentID, v.backend)
+	if err != nil {
+		return err
+	}
+
+	// Apply the changes, if any, from advancing the chain time.
+	nextChainTime := b.Timestamp()
+	changes, err := executor.AdvanceTimeTo(
+		onAcceptState,
+		nextChainTime,
+		v.txExecutorBackend.Rewards,
+	)
+	if err != nil {
+		return err
+	}
+
+	// If this block doesn't perform any changes, then it should never have been
+	// issued.
+	if changes.Len() == 0 && len(b.Transactions) == 0 {
+		return errBlueberryStandardBlockWithoutChanges
+	}
+
+	onAcceptState.SetTimestamp(nextChainTime)
+	changes.Apply(onAcceptState)
+
+	return v.standardBlock(&b.ApricotStandardBlock, onAcceptState)
+}
+
+func (v *verifier) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
+	if err := v.apricotCommonBlock(b); err != nil {
+		return err
+	}
+	return v.abortBlock(b)
+}
+
+func (v *verifier) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
+	if err := v.apricotCommonBlock(b); err != nil {
+		return err
+	}
+	return v.commitBlock(b)
+}
+
+func (v *verifier) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
+	if err := v.apricotCommonBlock(b); err != nil {
+		return err
+	}
+
+	parentID := b.Parent()
+	onCommitState, err := state.NewDiff(parentID, v.backend)
+	if err != nil {
+		return err
+	}
+	onAbortState, err := state.NewDiff(parentID, v.backend)
+	if err != nil {
+		return err
+	}
+
+	return v.proposalBlock(b, onCommitState, onAbortState)
+}
+
+func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
+	if err := v.apricotCommonBlock(b); err != nil {
+		return err
+	}
+
+	parentID := b.Parent()
+	onAcceptState, err := state.NewDiff(parentID, v)
+	if err != nil {
+		return err
+	}
+
+	return v.standardBlock(b, onAcceptState)
+}
+
+func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
+	// We call [commonBlock] here rather than [apricotCommonBlock] because below
+	// this check we perform the more strict check that ApricotPhase5 isn't
+	// activated.
+	if err := v.commonBlock(b); err != nil {
+		return err
+	}
+
+	parentID := b.Parent()
+	currentTimestamp := v.getTimestamp(parentID)
 	cfg := v.txExecutorBackend.Config
-	currentTimestamp := parentState.GetTimestamp()
-	if enbledAP5 := !currentTimestamp.Before(cfg.ApricotPhase5Time); enbledAP5 {
+	if cfg.IsApricotPhase5Activated(currentTimestamp) {
 		return fmt.Errorf(
 			"the chain timestamp (%d) is after the apricot phase 5 time (%d), hence atomic transactions should go through the standard block",
 			currentTimestamp.Unix(),
@@ -104,14 +182,14 @@ func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 		)
 	}
 
-	atomicExecutor := &executor.AtomicTxExecutor{
+	atomicExecutor := executor.AtomicTxExecutor{
 		Backend:       v.txExecutorBackend,
 		ParentID:      parentID,
 		StateVersions: v,
 		Tx:            b.Tx,
 	}
 
-	if err := b.Tx.Unsigned.Visit(atomicExecutor); err != nil {
+	if err := b.Tx.Unsigned.Visit(&atomicExecutor); err != nil {
 		txID := b.Tx.ID()
 		v.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return fmt.Errorf("tx %s failed semantic verification: %w", txID, err)
@@ -123,49 +201,218 @@ func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 		return err
 	}
 
+	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
-		statelessBlock: b,
-		onAcceptState:  atomicExecutor.OnAccept,
 		standardBlockState: standardBlockState{
 			inputs: atomicExecutor.Inputs,
 		},
-		atomicRequests: atomicExecutor.AtomicRequests,
+		statelessBlock: b,
+		onAcceptState:  atomicExecutor.OnAccept,
 		timestamp:      atomicExecutor.OnAccept.GetTimestamp(),
+		atomicRequests: atomicExecutor.AtomicRequests,
 	}
 
 	v.Mempool.RemoveDecisionTxs([]*txs.Tx{b.Tx})
 	return nil
 }
 
-func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
-	blkID := b.ID()
-
-	if _, ok := v.blkIDToState[blkID]; ok {
-		// This block has already been verified.
-		return nil
-	}
-	blkState := &blockState{
-		statelessBlock: b,
-		atomicRequests: make(map[ids.ID]*atomic.Requests),
-	}
-
-	if err := v.verifyCommonBlock(&b.CommonBlock); err != nil {
+func (v *verifier) blueberryOptionBlock(b blocks.BlueberryBlock) error {
+	if err := v.blueberryCommonBlock(b); err != nil {
 		return err
 	}
 
-	onAcceptState, err := state.NewDiff(b.Parent(), v)
+	// Blueberry option blocks must be uniquely generated from the
+	// BlueberryProposalBlock. This means that the timestamp must be
+	// standardized to a specific value. Therefore, we require the timestamp to
+	// be equal to the parents timestamp.
+	parentID := b.Parent()
+	parentBlkTime := v.getTimestamp(parentID)
+	blkTime := b.Timestamp()
+	if !blkTime.Equal(parentBlkTime) {
+		return fmt.Errorf(
+			"%w parent block timestamp (%s) option block timestamp (%s)",
+			errOptionBlockTimestampNotMatchingParent,
+			parentBlkTime,
+			blkTime,
+		)
+	}
+	return nil
+}
+
+func (v *verifier) blueberryNonOptionBlock(b blocks.BlueberryBlock) error {
+	if err := v.blueberryCommonBlock(b); err != nil {
+		return err
+	}
+
+	parentID := b.Parent()
+	parentState, ok := v.GetState(parentID)
+	if !ok {
+		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
+	}
+
+	newChainTime := b.Timestamp()
+	parentChainTime := parentState.GetTimestamp()
+	if newChainTime.Before(parentChainTime) {
+		return fmt.Errorf(
+			"%w: proposed timestamp (%s), chain time (%s)",
+			errChildBlockEarlierThanParent,
+			newChainTime,
+			parentChainTime,
+		)
+	}
+
+	nextStakerChangeTime, err := executor.GetNextStakerChangeTime(parentState)
+	if err != nil {
+		return fmt.Errorf("could not verify block timestamp: %w", err)
+	}
+
+	now := v.txExecutorBackend.Clk.Time()
+	return executor.VerifyNewChainTime(
+		newChainTime,
+		nextStakerChangeTime,
+		now,
+	)
+}
+
+func (v *verifier) blueberryCommonBlock(b blocks.BlueberryBlock) error {
+	timestamp := b.Timestamp()
+	if !v.txExecutorBackend.Config.IsBlueberryActivated(timestamp) {
+		return fmt.Errorf("%w: timestamp = %s", errBlueberryBlockIssuedBeforeFork, timestamp)
+	}
+	return v.commonBlock(b)
+}
+
+func (v *verifier) apricotCommonBlock(b blocks.Block) error {
+	// We can use the parent timestamp here, because we are guaranteed that the
+	// parent was verified. Apricot blocks only update the timestamp with
+	// AdvanceTimeTxs. This means that this block's timestamp will be equal to
+	// the parent block's timestamp; unless this is a CommitBlock. In order for
+	// the timestamp of the CommitBlock to be after the Blueberry activation,
+	// the parent ApricotProposalBlock must include an AdvanceTimeTx with a
+	// timestamp after the Blueberry timestamp. This is verified not to occur
+	// during the verification of the ProposalBlock.
+	parentID := b.Parent()
+	timestamp := v.getTimestamp(parentID)
+	if v.txExecutorBackend.Config.IsBlueberryActivated(timestamp) {
+		return fmt.Errorf("%w: timestamp = %s", errApricotBlockIssuedAfterFork, timestamp)
+	}
+	return v.commonBlock(b)
+}
+
+func (v *verifier) commonBlock(b blocks.Block) error {
+	parentID := b.Parent()
+	parent, err := v.GetBlock(parentID)
 	if err != nil {
 		return err
 	}
 
+	expectedHeight := parent.Height() + 1
+	height := b.Height()
+	if expectedHeight != height {
+		return fmt.Errorf(
+			"expected block to have height %d, but found %d",
+			expectedHeight,
+			height,
+		)
+	}
+	return nil
+}
+
+// abortBlock populates the state of this block if [nil] is returned
+func (v *verifier) abortBlock(b blocks.Block) error {
+	parentID := b.Parent()
+	onAcceptState, ok := v.getOnAbortState(parentID)
+	if !ok {
+		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
+	}
+
+	blkID := b.ID()
+	v.blkIDToState[blkID] = &blockState{
+		statelessBlock: b,
+		onAcceptState:  onAcceptState,
+		timestamp:      onAcceptState.GetTimestamp(),
+	}
+	return nil
+}
+
+// commitBlock populates the state of this block if [nil] is returned
+func (v *verifier) commitBlock(b blocks.Block) error {
+	parentID := b.Parent()
+	onAcceptState, ok := v.getOnCommitState(parentID)
+	if !ok {
+		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
+	}
+
+	blkID := b.ID()
+	v.blkIDToState[blkID] = &blockState{
+		statelessBlock: b,
+		onAcceptState:  onAcceptState,
+		timestamp:      onAcceptState.GetTimestamp(),
+	}
+	return nil
+}
+
+// proposalBlock populates the state of this block if [nil] is returned
+func (v *verifier) proposalBlock(
+	b *blocks.ApricotProposalBlock,
+	onCommitState state.Diff,
+	onAbortState state.Diff,
+) error {
+	txExecutor := executor.ProposalTxExecutor{
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       v.txExecutorBackend,
+		Tx:            b.Tx,
+	}
+
+	if err := b.Tx.Unsigned.Visit(&txExecutor); err != nil {
+		txID := b.Tx.ID()
+		v.MarkDropped(txID, err.Error()) // cache tx as dropped
+		return err
+	}
+
+	onCommitState.AddTx(b.Tx, status.Committed)
+	onAbortState.AddTx(b.Tx, status.Aborted)
+
+	blkID := b.ID()
+	v.blkIDToState[blkID] = &blockState{
+		proposalBlockState: proposalBlockState{
+			onCommitState:         onCommitState,
+			onAbortState:          onAbortState,
+			initiallyPreferCommit: txExecutor.PrefersCommit,
+		},
+		statelessBlock: b,
+		// It is safe to use [b.onAbortState] here because the timestamp will
+		// never be modified by an Apricot Abort block and the timestamp will
+		// always be the same as the Blueberry Proposal Block.
+		timestamp: onAbortState.GetTimestamp(),
+	}
+
+	v.Mempool.RemoveProposalTx(b.Tx)
+	return nil
+}
+
+// standardBlock populates the state of this block if [nil] is returned
+func (v *verifier) standardBlock(
+	b *blocks.ApricotStandardBlock,
+	onAcceptState state.Diff,
+) error {
+	blkState := &blockState{
+		statelessBlock: b,
+		onAcceptState:  onAcceptState,
+		timestamp:      onAcceptState.GetTimestamp(),
+		atomicRequests: make(map[ids.ID]*atomic.Requests),
+	}
+
+	// Finally we process the transactions
 	funcs := make([]func(), 0, len(b.Transactions))
 	for _, tx := range b.Transactions {
-		txExecutor := &executor.StandardTxExecutor{
+		txExecutor := executor.StandardTxExecutor{
 			Backend: v.txExecutorBackend,
 			State:   onAcceptState,
 			Tx:      tx,
 		}
-		if err := tx.Unsigned.Visit(txExecutor); err != nil {
+		if err := tx.Unsigned.Visit(&txExecutor); err != nil {
 			txID := tx.ID()
 			v.MarkDropped(txID, err.Error()) // cache tx as dropped
 			return err
@@ -209,80 +456,10 @@ func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 		}
 	}
 
-	blkState.timestamp = onAcceptState.GetTimestamp()
-	blkState.onAcceptState = onAcceptState
+	blkID := b.ID()
 	v.blkIDToState[blkID] = blkState
+
 	v.Mempool.RemoveDecisionTxs(b.Transactions)
-	return nil
-}
-
-func (v *verifier) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
-	blkID := b.ID()
-
-	if _, ok := v.blkIDToState[blkID]; ok {
-		// This block has already been verified.
-		return nil
-	}
-
-	if err := v.verifyCommonBlock(&b.CommonBlock); err != nil {
-		return err
-	}
-
-	parentID := b.Parent()
-	parentState, ok := v.blkIDToState[parentID]
-	if !ok {
-		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
-	}
-
-	onAcceptState := parentState.onCommitState
-	v.blkIDToState[blkID] = &blockState{
-		statelessBlock: b,
-		timestamp:      onAcceptState.GetTimestamp(),
-		onAcceptState:  onAcceptState,
-	}
-	return nil
-}
-
-func (v *verifier) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
-	blkID := b.ID()
-
-	if _, ok := v.blkIDToState[blkID]; ok {
-		// This block has already been verified.
-		return nil
-	}
-
-	if err := v.verifyCommonBlock(&b.CommonBlock); err != nil {
-		return err
-	}
-
-	parentID := b.Parent()
-	parentState, ok := v.blkIDToState[parentID]
-	if !ok {
-		return fmt.Errorf("could not retrieve state for %s, parent of %s", parentID, blkID)
-	}
-
-	onAcceptState := parentState.onAbortState
-	v.blkIDToState[blkID] = &blockState{
-		statelessBlock: b,
-		timestamp:      onAcceptState.GetTimestamp(),
-		onAcceptState:  onAcceptState,
-	}
-	return nil
-}
-
-func (v *verifier) verifyCommonBlock(b *blocks.CommonBlock) error {
-	parentID := b.Parent()
-	parent, err := v.GetBlock(parentID)
-	if err != nil {
-		return err
-	}
-	if expectedHeight := parent.Height() + 1; expectedHeight != b.Height() {
-		return fmt.Errorf(
-			"expected block to have height %d, but found %d",
-			expectedHeight,
-			b.Height(),
-		)
-	}
 	return nil
 }
 
