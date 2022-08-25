@@ -829,9 +829,10 @@ func (s *sender) SendCrossChainAppRequest(chainID ids.ID, requestID uint32, appR
 	// source/destination chainIDs since the responding chain
 	// (the current request's destination) will become the source chain id for
 	// the expected corresponding response.
-	s.router.RegisterRequest(s.ctx.NodeID, chainID, s.ctx.ChainID, requestID, message.CrossChainAppResponse)
+	s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, chainID, requestID, message.CrossChainAppResponse)
 
 	inMsg := s.msgCreator.InternalCrossChainAppRequest(
+		s.ctx.NodeID,
 		s.ctx.ChainID,
 		chainID,
 		requestID,
@@ -845,6 +846,7 @@ func (s *sender) SendCrossChainAppRequest(chainID ids.ID, requestID uint32, appR
 
 func (s *sender) SendCrossChainAppResponse(chainID ids.ID, requestID uint32, appResponseBytes []byte) error {
 	inMsg := s.msgCreator.InternalCrossChainAppResponse(
+		s.ctx.NodeID,
 		s.ctx.ChainID,
 		chainID,
 		requestID,

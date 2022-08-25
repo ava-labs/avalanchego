@@ -670,12 +670,12 @@ func TestRouterCrossChainMessages(t *testing.T) {
 	r.Equal(t, 1, chainRouter.chains[receiverCtx.ChainID].Len())
 
 	msg := []byte("foobar")
-	chainRouter.HandleInbound(mc.InternalCrossChainAppRequest(senderCtx.ChainID, receiverCtx.ChainID, uint32(1), time.Minute, msg))
+	chainRouter.HandleInbound(mc.InternalCrossChainAppRequest(senderCtx.NodeID, senderCtx.ChainID, receiverCtx.ChainID, uint32(1), time.Minute, msg))
 	require.Equal(t, 2, chainRouter.chains[receiverCtx.ChainID].Len())
 
 	// register the cross-chain response so we don't drop it
 	chainRouter.RegisterRequest(senderCtx.NodeID, senderCtx.ChainID, receiverCtx.ChainID, uint32(1), message.CrossChainAppResponse)
-	chainRouter.HandleInbound(mc.InternalCrossChainAppResponse(senderCtx.ChainID, receiverCtx.ChainID, uint32(1), msg))
+	chainRouter.HandleInbound(mc.InternalCrossChainAppResponse(senderCtx.NodeID, senderCtx.ChainID, receiverCtx.ChainID, uint32(1), msg))
 	require.Equal(t, 3, chainRouter.chains[receiverCtx.ChainID].Len())
 
 	// The sender chain shouldn't have any new messages.

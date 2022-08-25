@@ -144,7 +144,11 @@ func (cr *ChainRouter) RegisterRequest(nodeID ids.NodeID, sourceChainID ids.ID, 
 	// When we receive a response message type (Chits, Put, Accepted, etc.)
 	// we validate that we actually sent the corresponding request.
 	// Give this request a unique ID so we can do that validation.
-	uniqueRequestID := cr.createRequestID(nodeID, sourceChainID, destinationChainID, requestID, op)
+	//
+	// For cross-chain messages, the responding chain is the source of the
+	// response which is sent to the requester which is the destination,
+	// which is why we flip the two in request id generation.
+	uniqueRequestID := cr.createRequestID(nodeID, destinationChainID, sourceChainID, requestID, op)
 	// Add to the set of unfulfilled requests
 	cr.timedRequests.Put(uniqueRequestID, requestEntry{
 		time: cr.clock.Time(),
