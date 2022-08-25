@@ -240,7 +240,7 @@ func (m *mempool) HasTxs() bool {
 }
 
 func (m *mempool) PeekTxs(maxTxsBytes int) []*txs.Tx {
-	res, size := m.peekApricotDecisionTxs(maxTxsBytes)
+	txs, size := m.peekApricotDecisionTxs(maxTxsBytes)
 
 	for m.HasStakerTx() {
 		tx := m.PeekStakerTx()
@@ -248,10 +248,10 @@ func (m *mempool) PeekTxs(maxTxsBytes int) []*txs.Tx {
 		if size > maxTxsBytes {
 			break
 		}
-		res = append(res, tx)
+		txs = append(txs, tx)
 	}
 
-	return res
+	return txs
 }
 
 func (m *mempool) addDecisionTx(tx *txs.Tx) {
@@ -285,8 +285,8 @@ func (m *mempool) removeStakerTx(tx *txs.Tx) {
 }
 
 func (m *mempool) PeekApricotDecisionTxs(maxTxsBytes int) []*txs.Tx {
-	res, _ := m.peekApricotDecisionTxs(maxTxsBytes)
-	return res
+	txs, _ := m.peekApricotDecisionTxs(maxTxsBytes)
+	return txs
 }
 
 func (m *mempool) peekApricotDecisionTxs(maxTxsBytes int) ([]*txs.Tx, int) {
