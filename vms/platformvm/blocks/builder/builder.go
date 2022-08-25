@@ -209,8 +209,7 @@ func (b *builder) buildBlock() (blocks.Block, error) {
 	}
 	// [timestamp] = min(max(now, parentTime), nextStakerChangeTime)
 
-	// If the timestamp has passed to a point that the network should have
-	// blueberry activated, then build blueberry blocks.
+	// If the blueberry timestamp has come, build blueberry blocks.
 	if b.txExecutorBackend.Config.IsBlueberryActivated(timestamp) {
 		return buildBlueberryBlock(
 			b,
