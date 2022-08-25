@@ -17,7 +17,8 @@ var (
 )
 
 type BlueberryProposalBlock struct {
-	Time                 uint64 `serialize:"true" json:"time"`
+	Time                 uint64    `serialize:"true" json:"time"`
+	Transactions         []*txs.Tx `serialize:"true" json:"-"`
 	ApricotProposalBlock `serialize:"true"`
 }
 
