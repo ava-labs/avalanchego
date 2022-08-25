@@ -19,11 +19,11 @@ Apricot allows the following block types with the following content:
   * AddSubnetValidatorTx,
   * RewardValidatorTx,
   * AdvanceTimeTx.
-* *Options blocks*, i.e. *Commit Block* and *Abort Block* do not contain any transaction.
+* *Options blocks*, i.e. *Commit Block* and *Abort Block* do not contain any transactions.
 
 Note that *Atomic blocks* are deprecated as of Apricot phase 5 fork. They used to contain ImportTx and ExportTx which are now included into Standard Blocks.
 
-Each block has an header containing:
+Each block has a header containing:
 
 * ParentID
 * Height
