@@ -2,7 +2,7 @@
 
 The activation of Blueberry fork slightly changes the way the P-chain selects transactions to be included in next block and deals with block timestamps. In this brief document we detail the process and the changes.
 
-## Apricot fork
+## Apricot
 
 ### Apricot block content
 
@@ -53,7 +53,7 @@ Note that the order in which these steps are executed matters. A block updating 
 
 Block formation terminates as soon as any of the steps executed manage to select transactions to be included into a block. An error is raised otherwise to signal that there are not transactions to be issued. Finally a timer is kicked off to schedule the next block formation attempt.
 
-## Blueberry fork
+## Blueberry
 
 ### Blueberry block content
 
