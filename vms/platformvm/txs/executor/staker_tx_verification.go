@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -13,6 +14,19 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+)
+
+var (
+	errWeightTooSmall            = errors.New("weight of this validator is too low")
+	errWeightTooLarge            = errors.New("weight of this validator is too large")
+	errInsufficientDelegationFee = errors.New("staker charges an insufficient delegation fee")
+	errStakeTooShort             = errors.New("staking period is too short")
+	errStakeTooLong              = errors.New("staking period is too long")
+	errFutureStakeTime           = fmt.Errorf("staker is attempting to start staking more than %s ahead of the current chain time", MaxFutureStartTime)
+	errWrongNumberOfCredentials  = errors.New("should have the same number of credentials as inputs")
+	errValidatorSubset           = errors.New("all subnets' staking period must be a subset of the primary network")
+	errStakeOverflow             = errors.New("validator stake exceeds limit")
+	errOverDelegated             = errors.New("validator would be over delegated")
 )
 
 // verifyAddValidatorTx carries out the validation for an AddValidatorTx.
