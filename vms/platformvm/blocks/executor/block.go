@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/zap"
+
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
@@ -54,12 +57,24 @@ func (b *Block) Status() choices.Status {
 		return choices.Processing
 	}
 	// Block isn't in memory. Check in the database.
-	if _, status, err := b.manager.state.GetStatelessBlock(blkID); err == nil {
+	_, status, err := b.manager.state.GetStatelessBlock(blkID)
+	switch err {
+	case nil:
 		return status
+
+	case database.ErrNotFound:
+		// choices.Unknown means we don't have the bytes of the block.
+		// In this case, we do, so we return choices.Processing.
+		return choices.Processing
+
+	default:
+		// TODO: correctly report this error to the consensus engine.
+		b.manager.ctx.Log.Error(
+			"dropping unhandled database error",
+			zap.Error(err),
+		)
+		return choices.Processing
 	}
-	// choices.Unknown means we don't have the bytes of the block.
-	// In this case, we do, so we return choices.Processing.
-	return choices.Processing
 }
 
 func (b *Block) Timestamp() time.Time {
