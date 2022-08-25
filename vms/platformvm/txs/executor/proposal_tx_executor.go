@@ -102,6 +102,7 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 
 	txID := e.Tx.ID()
 
+	// Set up the state if this tx is committed
 	// Consume the UTXOs
 	utxo.Consume(e.OnCommitState, tx.Ins)
 	// Produce the UTXOs
@@ -112,6 +113,7 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	newStaker.Priority = state.PrimaryNetworkValidatorPendingPriority
 	e.OnCommitState.PutPendingValidator(newStaker)
 
+	// Set up the state if this tx is aborted
 	// Consume the UTXOs
 	utxo.Consume(e.OnAbortState, tx.Ins)
 	// Produce the UTXOs
@@ -137,9 +139,9 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	txID := e.Tx.ID()
 
 	// Set up the state if this tx is committed
-	// Consume the UTXOS
+	// Consume the UTXOs
 	utxo.Consume(e.OnCommitState, tx.Ins)
-	// Produce the UTXOS
+	// Produce the UTXOs
 	utxo.Produce(e.OnCommitState, txID, tx.Outs)
 
 	newStaker := state.NewSubnetStaker(txID, &tx.Validator)
@@ -148,9 +150,9 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	e.OnCommitState.PutPendingValidator(newStaker)
 
 	// Set up the state if this tx is aborted
-	// Consume the UTXOS
+	// Consume the UTXOs
 	utxo.Consume(e.OnAbortState, tx.Ins)
-	// Produce the UTXOS
+	// Produce the UTXOs
 	utxo.Produce(e.OnAbortState, txID, tx.Outs)
 
 	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
@@ -173,9 +175,9 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	txID := e.Tx.ID()
 
 	// Set up the state if this tx is committed
-	// Consume the UTXOS
+	// Consume the UTXOs
 	utxo.Consume(e.OnCommitState, tx.Ins)
-	// Produce the UTXOS
+	// Produce the UTXOs
 	utxo.Produce(e.OnCommitState, txID, tx.Outs)
 
 	newStaker := state.NewPrimaryNetworkStaker(txID, &tx.Validator)
@@ -184,9 +186,9 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	e.OnCommitState.PutPendingDelegator(newStaker)
 
 	// Set up the state if this tx is aborted
-	// Consume the UTXOS
+	// Consume the UTXOs
 	utxo.Consume(e.OnAbortState, tx.Ins)
-	// Produce the UTXOS
+	// Produce the UTXOs
 	utxo.Produce(e.OnAbortState, txID, outs)
 
 	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
