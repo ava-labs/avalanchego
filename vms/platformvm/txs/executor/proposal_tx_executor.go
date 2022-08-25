@@ -92,7 +92,7 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		)
 	}
 
-	outs, err := addValidatorValidation(
+	onAbortOuts, err := addValidatorValidation(
 		e.Backend,
 		e.OnCommitState,
 		e.Tx,
@@ -119,7 +119,7 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	// Consume the UTXOs
 	utxo.Consume(e.OnAbortState, tx.Ins)
 	// Produce the UTXOs
-	utxo.Produce(e.OnAbortState, txID, outs)
+	utxo.Produce(e.OnAbortState, txID, onAbortOuts)
 
 	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
@@ -188,7 +188,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		)
 	}
 
-	outs, err := addDelegatorValidation(
+	onAbortOuts, err := addDelegatorValidation(
 		e.Backend,
 		e.OnCommitState,
 		e.Tx,
@@ -215,7 +215,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	// Consume the UTXOs
 	utxo.Consume(e.OnAbortState, tx.Ins)
 	// Produce the UTXOs
-	utxo.Produce(e.OnAbortState, txID, outs)
+	utxo.Produce(e.OnAbortState, txID, onAbortOuts)
 
 	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
