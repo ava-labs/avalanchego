@@ -141,40 +141,34 @@ func TestBuildBlueberryBlock(t *testing.T) {
 		}
 		now             = time.Now()
 		parentTimestamp = now.Add(-2 * time.Second)
-		txs             = []*txs.Tx{
-			{
-				Unsigned: &txs.AddValidatorTx{
-					BaseTx: txs.BaseTx{
-						BaseTx: avax.BaseTx{
-							Ins: []*avax.TransferableInput{
-								{
-									Asset: avax.Asset{ID: ids.GenerateTestID()},
-									In: &secp256k1fx.TransferInput{
-										Input: secp256k1fx.Input{
-											SigIndices: []uint32{0},
-										},
-									},
-								},
+		txs             = []*txs.Tx{{
+			Unsigned: &txs.AddValidatorTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					Ins: []*avax.TransferableInput{{
+						Asset: avax.Asset{ID: ids.GenerateTestID()},
+						In: &secp256k1fx.TransferInput{
+							Input: secp256k1fx.Input{
+								SigIndices: []uint32{0},
 							},
-							Outs: []*avax.TransferableOutput{output},
 						},
-					},
-					Validator: validator.Validator{
-						// Shouldn't be dropped
-						Start: uint64(now.Add(2 * executor.SyncBound).Unix()),
-					},
-					Stake: []*avax.TransferableOutput{output},
-					RewardsOwner: &secp256k1fx.OutputOwners{
-						Addrs: []ids.ShortID{ids.GenerateTestShortID()},
-					},
+					}},
+					Outs: []*avax.TransferableOutput{output},
+				}},
+				Validator: validator.Validator{
+					// Shouldn't be dropped
+					Start: uint64(now.Add(2 * executor.SyncBound).Unix()),
 				},
-				Creds: []verify.Verifiable{
-					&secp256k1fx.Credential{
-						Sigs: [][crypto.SECP256K1RSigLen]byte{{1, 3, 3, 7}},
-					},
+				Stake: []*avax.TransferableOutput{output},
+				RewardsOwner: &secp256k1fx.OutputOwners{
+					Addrs: []ids.ShortID{ids.GenerateTestShortID()},
 				},
 			},
-		}
+			Creds: []verify.Verifiable{
+				&secp256k1fx.Credential{
+					Sigs: [][crypto.SECP256K1RSigLen]byte{{1, 3, 3, 7}},
+				},
+			},
+		}}
 		stakerTxID = ids.GenerateTestID()
 	)
 
