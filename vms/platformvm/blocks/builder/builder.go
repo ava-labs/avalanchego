@@ -195,7 +195,7 @@ func (b *builder) buildBlock() (blocks.Block, error) {
 
 	nextStakerChangeTime, err := txexecutor.GetNextStakerChangeTime(preferredState)
 	if err != nil {
-		return nil, fmt.Errorf("could not verify block timestamp: %w", err)
+		return nil, fmt.Errorf("could not calculate next staker change time: %w", err)
 	}
 
 	// timeWasCapped means that [timestamp] was reduced to
