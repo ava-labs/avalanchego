@@ -282,8 +282,8 @@ func (b *builder) getNextStakerToReward(
 	return ids.Empty, false, nil
 }
 
-// dropExpiredStakerTxs drops add validator/delegator transactions in the mempool
-// whose start time is not sufficiently far in the future
+// dropExpiredStakerTxs drops add validator/delegator transactions in the
+// mempool whose start time is not sufficiently far in the future
 // (i.e. within local time plus [MaxFutureStartFrom]).
 // Guarantees that [PeekStakerTx] will return a valid tx after calling.
 func (b *builder) dropExpiredStakerTxs(timestamp time.Time) {
