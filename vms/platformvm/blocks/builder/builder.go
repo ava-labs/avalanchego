@@ -164,9 +164,10 @@ func (b *builder) BuildBlock() (snowman.Block, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Remove selected txs from mempool now that we are returning the block to
+	// the consensus engine.
 	txs := statelessBlk.Txs()
-	// remove selected txs from mempool only when we are sure
-	// a valid block containing it has been generated
 	b.Mempool.Remove(txs)
 	return b.blkManager.NewBlock(statelessBlk), nil
 }
