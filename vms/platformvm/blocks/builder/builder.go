@@ -282,18 +282,17 @@ func (b *builder) getNextStakerToReward(
 	return ids.Empty, false, nil
 }
 
-// dropExpiredProposalTxs drops add validator/delegator transactions in the mempool
-// whose start time is not sufficiently far in the future
+// dropExpiredProposalTxs drops add validator/delegator transactions in the
+// mempool whose start time is not sufficiently far in the future
 // (i.e. within local time plus [MaxFutureStartFrom]).
-// Guarantees that [PeekProposalTx] will return a valid tx after calling.
 func (b *builder) dropExpiredProposalTxs(timestamp time.Time) {
 	minStartTime := timestamp.Add(txexecutor.SyncBound)
 	for b.Mempool.HasProposalTx() {
 		tx := b.Mempool.PeekProposalTx()
 		startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 		if !startTime.Before(minStartTime) {
-			// The next proposal tx in the mempool starts
-			// sufficiently far in the future.
+			// The next proposal tx in the mempool starts sufficiently far in
+			// the future.
 			return
 		}
 
