@@ -21,13 +21,18 @@ func buildBlueberryBlock(
 	forceAdvanceTime bool,
 	parentState state.Chain,
 ) (blocks.Block, error) {
-	// try including as many standard txs as possible
-	if builder.Mempool.HasDecisionTxs() {
+	// clean out the mempool's transactions with invalid timestamps.
+	builder.dropExpiredStakerTxs(timestamp)
+
+	// try including as many mempool txs as possible
+	// Note that, upon Blueberry activation, all mempool transactions
+	// will be included into a standard block
+	if builder.Mempool.HasTxs() {
 		return blocks.NewBlueberryStandardBlock(
 			timestamp,
 			parentID,
 			height,
-			builder.Mempool.PeekDecisionTxs(targetBlockSize),
+			builder.Mempool.PeekTxs(targetBlockSize),
 		)
 	}
 
@@ -47,20 +52,6 @@ func buildBlueberryBlock(
 			parentID,
 			height,
 			rewardValidatorTx,
-		)
-	}
-
-	// clean out the mempool's transactions with invalid timestamps.
-	builder.dropExpiredProposalTxs(timestamp)
-
-	// try including a mempool proposal tx.
-	if builder.Mempool.HasProposalTx() {
-		tx := builder.Mempool.PeekProposalTx()
-		return blocks.NewBlueberryProposalBlock(
-			timestamp,
-			parentID,
-			height,
-			tx,
 		)
 	}
 

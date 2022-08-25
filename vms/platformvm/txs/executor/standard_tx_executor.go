@@ -35,11 +35,6 @@ type StandardTxExecutor struct {
 	AtomicRequests map[ids.ID]*atomic.Requests // may be nil
 }
 
-func (*StandardTxExecutor) AddValidatorTx(*txs.AddValidatorTx) error { return errWrongTxType }
-func (*StandardTxExecutor) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
-	return errWrongTxType
-}
-func (*StandardTxExecutor) AddDelegatorTx(*txs.AddDelegatorTx) error       { return errWrongTxType }
 func (*StandardTxExecutor) AdvanceTimeTx(*txs.AdvanceTimeTx) error         { return errWrongTxType }
 func (*StandardTxExecutor) RewardValidatorTx(*txs.RewardValidatorTx) error { return errWrongTxType }
 
@@ -295,5 +290,82 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 			PutRequests: elems,
 		},
 	}
+	return nil
+}
+
+// AddValidatorTx has been a proposal transaction till Blueberry fork
+// activation. Following Blueberry activation, AddValidatorTx must be included
+// into standard Blocks.
+func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
+	if _, err := addValidatorValidation(
+		e.Backend,
+		e.State,
+		e.Tx,
+		tx,
+	); err != nil {
+		return err
+	}
+
+	txID := e.Tx.ID()
+
+	newStaker := state.NewPrimaryNetworkStaker(txID, &tx.Validator)
+	newStaker.NextTime = tx.Validator.StartTime()
+	newStaker.Priority = state.PrimaryNetworkValidatorPendingPriority
+
+	e.State.PutPendingValidator(newStaker)
+	utxo.Consume(e.State, tx.Ins)
+	utxo.Produce(e.State, txID, tx.Outs)
+
+	return nil
+}
+
+// AddSubnetValidatorTx has been a proposal transaction till Blueberry fork
+// activation. Following Blueberry activation, AddSubnetValidatorTx must be included
+// into standard Blocks.
+func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
+	if err := addSubnetValidatorValidation(
+		e.Backend,
+		e.State,
+		e.Tx,
+		tx,
+	); err != nil {
+		return err
+	}
+
+	txID := e.Tx.ID()
+
+	newStaker := state.NewSubnetStaker(txID, &tx.Validator)
+	newStaker.NextTime = tx.Validator.StartTime()
+	newStaker.Priority = state.SubnetValidatorPendingPriority
+
+	e.State.PutPendingValidator(newStaker)
+	utxo.Consume(e.State, tx.Ins)
+	utxo.Produce(e.State, txID, tx.Outs)
+
+	return nil
+}
+
+// AddDelegatorTx has been a proposal transaction till Blueberry fork
+// activation. Following Blueberry activation, AddDelegatorTx must be included
+// into standard Blocks.
+func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
+	if _, err := addDelegatorValidation(
+		e.Backend,
+		e.State,
+		e.Tx,
+		tx,
+	); err != nil {
+		return err
+	}
+
+	txID := e.Tx.ID()
+	newStaker := state.NewPrimaryNetworkStaker(txID, &tx.Validator)
+	newStaker.NextTime = tx.Validator.StartTime()
+	newStaker.Priority = state.PrimaryNetworkDelegatorPendingPriority
+
+	e.State.PutPendingDelegator(newStaker)
+	utxo.Consume(e.State, tx.Ins)
+	utxo.Produce(e.State, txID, tx.Outs)
+
 	return nil
 }

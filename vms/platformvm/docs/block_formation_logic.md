@@ -1,20 +1,48 @@
-# Blueberry fork: minor changes to block formation logic
+# Block composition and formation logic
 
 The activation of Blueberry fork slightly changes the way the P-chain selects transactions to be included in next block and deals with block timestamps. In this brief document we detail the process and the changes.
 
-## Apricot block formation logic
+## Apricot fork
 
-Transactions to be included into an Apricot block can originate from the mempool or can be created just in time to duly update the staker set. Block formation logic in the Apricot fork can be broken up into two high-level logical steps:
+### Apricot block content
+
+Apricot allows the following block types with the following content:
+
+* *Standard Blocks* may contain multiple transactions of the following types:
+  * CreateChainTx
+  * CreateSubnetTx,
+  * ImportTx,
+  * ExportTx.
+* *Proposal Blocks* may contain a single transaction of the following types:
+  * AddValidatorTx,
+  * AddDelegatorTx,
+  * AddSubnetValidatorTx,
+  * RewardValidatorTx,
+  * AdvanceTimeTx.
+* *Options blocks*, i.e. *Commit Block* and *Abort Block* do not contain any transaction.
+
+Note that *Atomic blocks* are deprecated as of Apricot phase 5 fork. They used to contain ImportTx and ExportTx which are now included into Standard Blocks.
+
+Each block has an header containing:
+
+* ParentID
+* Height
+
+Note that Apricot block headers do not contain any block timestamp.
+
+### Apricot block formation logic
+
+Transactions included in an Apricot block can originate from the mempool or can be created just in time to duly update the staker set. Block formation logic in the Apricot fork can be broken up into two high-level steps:
 
 * First, we try selecting any candidate decision or proposal transactions which could be included in a block *without advancing the current chain time*;
 * If no such transactions are found, we evaluate candidate transactions which *may require advancing chain time*. If a chain time advancement is required to include these transactions in a block, a proposal block with an advance time transaction is built first; selected transactions may be included in a subsequent block.
 
-In more details, blocks which do not change chain time are build as follows:
+In more detail, blocks which do not change chain time are built as follows:
 
 1. If mempool contains any decision transactions, a Standard block is issued with all of the transactions the default block size can accommodate. Note that Apricot standard blocks do not change the current chain time.
 2. If the current chain time matches the end of any staker's staking time, a reward transaction is issued into a Proposal Block to initiate network voting on whether the specified staker should be rewarded. Note that there could be multiple stakers ending their staking period at the same chain time, hence a Proposal block must be issued for all of them before chain time is moved ahead. Any attempt to move chain time ahead before rewarding all stakers would fail block verification.
 
-While steps above could be executed in any order, we picked decisions transactions first to maximize throughput.
+While the above steps could be executed in any order, we pick decisions transactions first to maximize throughput.
 
 Once all possibilities of create a block not advancing chain time are exhausted, we attempt to build a block which *may* advance chain time as follows:
 
@@ -24,6 +52,35 @@ Once all possibilities of create a block not advancing chain time are exhausted,
 Note that the order in which these steps are executed matters. A block updating chain time would be deemed invalid if it would advance time beyond the staker set's next change event, skipping the associated changes. The order above ensures this never happens because if checks first if chain time should be moved to the time of the next staker set change. It can also be verified by inspection that the timestamp selected for the advance time transactions always respect the synchrony bound.
 
 Block formation terminates as soon as any of the steps executed manage to select transactions to be included into a block. An error is raised otherwise to signal that there are not transactions to be issued. Finally a timer is kicked off to schedule the next block formation attempt.
+
+## Blueberry fork
+
+### Blueberry block content
+
+Blueberry allows the following block types with the following content:
+
+* *Standard Blocks* may contain multiple transactions of the following types:
+  * CreateChainTx
+  * CreateSubnetTx,
+  * ImportTx,
+  * ExportTx,
+  * AddValidatorTx,
+  * AddDelegatorTx,
+  * AddSubnetValidatorTx.
+* *Proposal Blocks* may contain a single transaction of the following types:
+  * RewardValidatorTx,
+* *Options blocks*, i.e. *Commit Block* and *Abort Block* do not contain any transactions.
+  
+Note that each block has an header containing:
+
+* ParentID
+* Height
+* Time
+
+So the two main differences with respect to Apricot are:
+
+* AddValidatorTx, AddDelegatorTx, AddSubnetValidatorTx are included into Standard blocks rather than Proposal blocks so that they don't need to be voted on (i.e. followed by a Commit/Abort block).
+* Block timestamp is explicitly serialized into block header, to allow chain time update.
 
 ## Blueberry block formation logic
 

@@ -140,7 +140,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 		}
 		now             = time.Now()
 		parentTimestamp = now.Add(-2 * time.Second)
-		txs             = []*txs.Tx{{
+		transactions    = []*txs.Tx{{
 			Unsigned: &txs.AddValidatorTx{
 				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 					Ins: []*avax.TransferableInput{{
@@ -186,8 +186,9 @@ func TestBuildBlueberryBlock(t *testing.T) {
 			name: "has decision txs",
 			builderF: func(ctrl *gomock.Controller) *builder {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().HasDecisionTxs().Return(true)
-				mempool.EXPECT().PeekDecisionTxs(targetBlockSize).Return(txs)
+				mempool.EXPECT().HasStakerTx().Return(false)
+				mempool.EXPECT().HasTxs().Return(true)
+				mempool.EXPECT().PeekTxs(targetBlockSize).Return(transactions)
 				return &builder{
 					Mempool: mempool,
 				}
@@ -203,7 +204,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 					parentTimestamp,
 					parentID,
 					height,
-					txs,
+					transactions,
 				)
 				require.NoError(err)
 				return expectedBlk
@@ -213,13 +214,15 @@ func TestBuildBlueberryBlock(t *testing.T) {
 		{
 			name: "should reward",
 			builderF: func(ctrl *gomock.Controller) *builder {
-				// There are no decision txs
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().HasDecisionTxs().Return(false)
+
+				// There are no decision txs
+				mempool.EXPECT().HasStakerTx().Return(false)
+				mempool.EXPECT().HasTxs().Return(false)
 
 				// The tx builder should be asked to build a reward tx
 				txBuilder := txbuilder.NewMockBuilder(ctrl)
-				txBuilder.EXPECT().NewRewardValidatorTx(stakerTxID).Return(txs[0], nil)
+				txBuilder.EXPECT().NewRewardValidatorTx(stakerTxID).Return(transactions[0], nil)
 
 				return &builder{
 					Mempool:   mempool,
@@ -251,7 +254,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 					parentTimestamp,
 					parentID,
 					height,
-					txs[0],
+					transactions[0],
 				)
 				require.NoError(err)
 				return expectedBlk
@@ -259,14 +262,13 @@ func TestBuildBlueberryBlock(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name: "no proposal tx",
+			name: "no stakers tx",
 			builderF: func(ctrl *gomock.Controller) *builder {
-				// There are no decision txs
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().HasDecisionTxs().Return(false)
 
-				// There is not a proposal tx.
-				mempool.EXPECT().HasProposalTx().Return(false).AnyTimes()
+				// There are no decision txs, nor stakers ones.
+				mempool.EXPECT().HasStakerTx().Return(false)
+				mempool.EXPECT().HasTxs().Return(false)
 
 				clk := &mockable.Clock{}
 				clk.Set(now)
@@ -310,12 +312,11 @@ func TestBuildBlueberryBlock(t *testing.T) {
 		{
 			name: "should advance time",
 			builderF: func(ctrl *gomock.Controller) *builder {
-				// There are no decision txs
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().HasDecisionTxs().Return(false)
 
-				// There is not a proposal tx.
-				mempool.EXPECT().HasProposalTx().Return(false).AnyTimes()
+				// There are no decision txs nor staker ones
+				mempool.EXPECT().HasStakerTx().Return(false)
+				mempool.EXPECT().HasTxs().Return(false)
 
 				clk := &mockable.Clock{}
 				clk.Set(now)
@@ -363,15 +364,15 @@ func TestBuildBlueberryBlock(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name: "has a proposal tx no force",
+			name: "has a staker tx no force",
 			builderF: func(ctrl *gomock.Controller) *builder {
-				// There are no decision txs
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().HasDecisionTxs().Return(false)
 
-				// There is a proposal tx.
-				mempool.EXPECT().HasProposalTx().Return(true).AnyTimes()
-				mempool.EXPECT().PeekProposalTx().Return(txs[0]).AnyTimes()
+				// There are no decision txs
+				// There is a staker tx.
+				mempool.EXPECT().HasStakerTx().Return(false)
+				mempool.EXPECT().HasTxs().Return(true)
+				mempool.EXPECT().PeekTxs(targetBlockSize).Return([]*txs.Tx{transactions[0]})
 
 				clk := &mockable.Clock{}
 				clk.Set(now)
@@ -386,30 +387,14 @@ func TestBuildBlueberryBlock(t *testing.T) {
 			forceAdvanceTime: false,
 			parentStateF: func(ctrl *gomock.Controller) state.Chain {
 				s := state.NewMockChain(ctrl)
-
-				// Handle calls in [getNextStakerToReward]
-				// and [GetNextStakerChangeTime].
-				// Next validator change time is in the future.
-				currentStakerIter := state.NewMockStakerIterator(ctrl)
-				gomock.InOrder(
-					// expect calls from [getNextStakerToReward]
-					currentStakerIter.EXPECT().Next().Return(true),
-					currentStakerIter.EXPECT().Value().Return(&state.Staker{
-						NextTime: now.Add(time.Second),
-					}),
-					currentStakerIter.EXPECT().Next().Return(false),
-					currentStakerIter.EXPECT().Release(),
-				)
-
-				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).Times(1)
 				return s
 			},
 			expectedBlkF: func(require *require.Assertions) blocks.Block {
-				expectedBlk, err := blocks.NewBlueberryProposalBlock(
+				expectedBlk, err := blocks.NewBlueberryStandardBlock(
 					parentTimestamp,
 					parentID,
 					height,
-					txs[0],
+					[]*txs.Tx{transactions[0]},
 				)
 				require.NoError(err)
 				return expectedBlk
@@ -417,15 +402,14 @@ func TestBuildBlueberryBlock(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name: "has a proposal tx with force",
+			name: "has a staker tx with force",
 			builderF: func(ctrl *gomock.Controller) *builder {
-				// There are no decision txs
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().HasDecisionTxs().Return(false)
 
-				// There is a proposal tx.
-				mempool.EXPECT().HasProposalTx().Return(true).AnyTimes()
-				mempool.EXPECT().PeekProposalTx().Return(txs[0]).AnyTimes()
+				// There are no decision txs
+				// There is a staker tx.
+				mempool.EXPECT().HasStakerTx().Return(false)
+				mempool.EXPECT().HasTxs().Return(false)
 
 				clk := &mockable.Clock{}
 				clk.Set(now)
@@ -459,11 +443,11 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				return s
 			},
 			expectedBlkF: func(require *require.Assertions) blocks.Block {
-				expectedBlk, err := blocks.NewBlueberryProposalBlock(
+				expectedBlk, err := blocks.NewBlueberryStandardBlock(
 					parentTimestamp,
 					parentID,
 					height,
-					txs[0],
+					nil,
 				)
 				require.NoError(err)
 				return expectedBlk

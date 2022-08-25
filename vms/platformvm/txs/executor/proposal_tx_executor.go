@@ -78,105 +78,33 @@ func (*ProposalTxExecutor) CreateSubnetTx(*txs.CreateSubnetTx) error { return er
 func (*ProposalTxExecutor) ImportTx(*txs.ImportTx) error             { return errWrongTxType }
 func (*ProposalTxExecutor) ExportTx(*txs.ExportTx) error             { return errWrongTxType }
 
+// AddValidatorTx has been a proposal transaction till Blueberry fork
+// activation. Following Blueberry activation, AddValidatorTx must be included
+// into standard Blocks.
 func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
-	// Verify the tx is well-formed
-	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
-		return err
-	}
-
-	switch {
-	case tx.Validator.Wght < e.Config.MinValidatorStake:
-		// Ensure validator is staking at least the minimum amount
-		return errWeightTooSmall
-
-	case tx.Validator.Wght > e.Config.MaxValidatorStake:
-		// Ensure validator isn't staking too much
-		return errWeightTooLarge
-
-	case tx.Shares < e.Config.MinDelegationFee:
-		// Ensure the validator fee is at least the minimum amount
-		return errInsufficientDelegationFee
-	}
-
-	duration := tx.Validator.Duration()
-	switch {
-	case duration < e.Config.MinStakeDuration:
-		// Ensure staking length is not too short
-		return errStakeTooShort
-
-	case duration > e.Config.MaxStakeDuration:
-		// Ensure staking length is not too long
-		return errStakeTooLong
-	}
-
-	currentTimestamp := e.OnCommitState.GetTimestamp()
-
 	// Blueberry disallows creating a validator with the empty ID.
+	currentTimestamp := e.OnCommitState.GetTimestamp()
 	if !currentTimestamp.Before(e.Config.BlueberryTime) {
 		if tx.Validator.NodeID == ids.EmptyNodeID {
 			return errEmptyNodeID
 		}
 	}
 
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.Stake))
-	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.Stake)
-
-	if e.Bootstrapped.GetValue() {
-		// Ensure the proposed validator starts after the current time
-		startTime := tx.StartTime()
-		if !currentTimestamp.Before(startTime) {
-			return fmt.Errorf(
-				"validator's start time (%s) at or before current timestamp (%s)",
-				startTime,
-				currentTimestamp,
-			)
-		}
-
-		_, err := GetValidator(e.OnCommitState, constants.PrimaryNetworkID, tx.Validator.NodeID)
-		if err == nil {
-			return fmt.Errorf(
-				"attempted to issue duplicate validation for %s",
-				tx.Validator.NodeID,
-			)
-		}
-		if err != database.ErrNotFound {
-			return fmt.Errorf(
-				"failed to find whether %s is a primary network validator: %w",
-				tx.Validator.NodeID,
-				err,
-			)
-		}
-
-		// Verify the flowcheck
-		if err := e.FlowChecker.VerifySpend(
-			tx,
-			e.OnCommitState,
-			tx.Ins,
-			outs,
-			e.Tx.Creds,
-			map[ids.ID]uint64{
-				e.Ctx.AVAXAssetID: e.Config.AddStakerTxFee,
-			},
-		); err != nil {
-			return fmt.Errorf("failed verifySpend: %w", err)
-		}
-
-		// Make sure the tx doesn't start too far in the future. This is done
-		// last to allow the verifier visitor to explicitly check for this
-		// error.
-		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-		if startTime.After(maxStartTime) {
-			return errFutureStakeTime
-		}
+	outs, err := addValidatorValidation(
+		e.Backend,
+		e.OnCommitState,
+		e.Tx,
+		tx,
+	)
+	if err != nil {
+		return err
 	}
 
 	txID := e.Tx.ID()
 
-	// Set up the state if this tx is committed
-	// Consume the UTXOS
+	// Consume the UTXOs
 	utxo.Consume(e.OnCommitState, tx.Ins)
-	// Produce the UTXOS
+	// Produce the UTXOs
 	utxo.Produce(e.OnCommitState, txID, tx.Outs)
 
 	newStaker := state.NewPrimaryNetworkStaker(txID, &tx.Validator)
@@ -184,125 +112,26 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	newStaker.Priority = state.PrimaryNetworkValidatorPendingPriority
 	e.OnCommitState.PutPendingValidator(newStaker)
 
-	// Set up the state if this tx is aborted
-	// Consume the UTXOS
+	// Consume the UTXOs
 	utxo.Consume(e.OnAbortState, tx.Ins)
-	// Produce the UTXOS
+	// Produce the UTXOs
 	utxo.Produce(e.OnAbortState, txID, outs)
 
 	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
 }
 
+// AddSubnetValidatorTx has been a proposal transaction till Blueberry fork
+// activation. Following Blueberry activation, AddSubnetValidatorTx must be included
+// into standard Blocks.
 func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	// Verify the tx is well-formed
-	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
+	if err := addSubnetValidatorValidation(
+		e.Backend,
+		e.OnCommitState,
+		e.Tx,
+		tx,
+	); err != nil {
 		return err
-	}
-
-	duration := tx.Validator.Duration()
-	switch {
-	case duration < e.Config.MinStakeDuration:
-		// Ensure staking length is not too short
-		return errStakeTooShort
-
-	case duration > e.Config.MaxStakeDuration:
-		// Ensure staking length is not too long
-		return errStakeTooLong
-
-	case len(e.Tx.Creds) == 0:
-		// Ensure there is at least one credential for the subnet authorization
-		return errWrongNumberOfCredentials
-	}
-
-	if e.Bootstrapped.GetValue() {
-		currentTimestamp := e.OnCommitState.GetTimestamp()
-		// Ensure the proposed validator starts after the current timestamp
-		validatorStartTime := tx.StartTime()
-		if !currentTimestamp.Before(validatorStartTime) {
-			return fmt.Errorf(
-				"validator's start time (%s) is at or after current chain timestamp (%s)",
-				currentTimestamp,
-				validatorStartTime,
-			)
-		}
-
-		_, err := GetValidator(e.OnCommitState, tx.Validator.Subnet, tx.Validator.NodeID)
-		if err == nil {
-			return fmt.Errorf(
-				"attempted to issue duplicate subnet validation for %s",
-				tx.Validator.NodeID,
-			)
-		}
-		if err != database.ErrNotFound {
-			return fmt.Errorf(
-				"failed to find whether %s is a subnet validator: %w",
-				tx.Validator.NodeID,
-				err,
-			)
-		}
-
-		primaryNetworkValidator, err := GetValidator(e.OnCommitState, constants.PrimaryNetworkID, tx.Validator.NodeID)
-		if err != nil {
-			return fmt.Errorf(
-				"failed to fetch the primary network validator for %s: %w",
-				tx.Validator.NodeID,
-				err,
-			)
-		}
-
-		// Ensure that the period this validator validates the specified subnet
-		// is a subset of the time they validate the primary network.
-		if !tx.Validator.BoundedBy(primaryNetworkValidator.StartTime, primaryNetworkValidator.EndTime) {
-			return errValidatorSubset
-		}
-
-		baseTxCredsLen := len(e.Tx.Creds) - 1
-		baseTxCreds := e.Tx.Creds[:baseTxCredsLen]
-		subnetCred := e.Tx.Creds[baseTxCredsLen]
-
-		subnetIntf, _, err := e.OnCommitState.GetTx(tx.Validator.Subnet)
-		if err != nil {
-			return fmt.Errorf(
-				"couldn't find subnet %q: %w",
-				tx.Validator.Subnet,
-				err,
-			)
-		}
-
-		subnet, ok := subnetIntf.Unsigned.(*txs.CreateSubnetTx)
-		if !ok {
-			return fmt.Errorf(
-				"%s is not a subnet",
-				tx.Validator.Subnet,
-			)
-		}
-
-		if err := e.Fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
-			return err
-		}
-
-		// Verify the flowcheck
-		if err := e.FlowChecker.VerifySpend(
-			tx,
-			e.OnCommitState,
-			tx.Ins,
-			tx.Outs,
-			baseTxCreds,
-			map[ids.ID]uint64{
-				e.Ctx.AVAXAssetID: e.Config.TxFee,
-			},
-		); err != nil {
-			return err
-		}
-
-		// Make sure the tx doesn't start too far in the future. This is done
-		// last to allow the verifier visitor to explicitly check for this
-		// error.
-		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-		if validatorStartTime.After(maxStartTime) {
-			return errFutureStakeTime
-		}
 	}
 
 	txID := e.Tx.ID()
@@ -328,97 +157,20 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	return nil
 }
 
+// AddDelegatorTx has been a proposal transaction till Blueberry fork
+// activation. Following Blueberry activation, AddDelegatorTx must be included
+// into standard Blocks.
 func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
-	// Verify the tx is well-formed
-	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
+	outs, err := addDelegatorValidation(
+		e.Backend,
+		e.OnCommitState,
+		e.Tx,
+		tx,
+	)
+	if err != nil {
 		return err
 	}
-
-	duration := tx.Validator.Duration()
-	switch {
-	case duration < e.Config.MinStakeDuration:
-		// Ensure staking length is not too short
-		return errStakeTooShort
-
-	case duration > e.Config.MaxStakeDuration:
-		// Ensure staking length is not too long
-		return errStakeTooLong
-
-	case tx.Validator.Wght < e.Config.MinDelegatorStake:
-		// Ensure validator is staking at least the minimum amount
-		return errWeightTooSmall
-	}
-
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.Stake))
-	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.Stake)
-
 	txID := e.Tx.ID()
-
-	newStaker := state.NewPrimaryNetworkStaker(txID, &tx.Validator)
-	newStaker.NextTime = newStaker.StartTime
-	newStaker.Priority = state.PrimaryNetworkDelegatorPendingPriority
-
-	if e.Bootstrapped.GetValue() {
-		currentTimestamp := e.OnCommitState.GetTimestamp()
-		// Ensure the proposed validator starts after the current timestamp
-		validatorStartTime := tx.StartTime()
-		if !currentTimestamp.Before(validatorStartTime) {
-			return fmt.Errorf(
-				"chain timestamp (%s) not before validator's start time (%s)",
-				currentTimestamp,
-				validatorStartTime,
-			)
-		}
-
-		primaryNetworkValidator, err := GetValidator(e.OnCommitState, constants.PrimaryNetworkID, tx.Validator.NodeID)
-		if err != nil {
-			return fmt.Errorf(
-				"failed to fetch the primary network validator for %s: %w",
-				tx.Validator.NodeID,
-				err,
-			)
-		}
-
-		maximumWeight, err := math.Mul64(MaxValidatorWeightFactor, primaryNetworkValidator.Weight)
-		if err != nil {
-			return errStakeOverflow
-		}
-
-		if e.Config.IsApricotPhase3Activated(currentTimestamp) {
-			maximumWeight = math.Min64(maximumWeight, e.Config.MaxValidatorStake)
-		}
-
-		canDelegate, err := canDelegate(e.OnCommitState, primaryNetworkValidator, maximumWeight, newStaker)
-		if err != nil {
-			return err
-		}
-		if !canDelegate {
-			return errOverDelegated
-		}
-
-		// Verify the flowcheck
-		if err := e.FlowChecker.VerifySpend(
-			tx,
-			e.OnCommitState,
-			tx.Ins,
-			outs,
-			e.Tx.Creds,
-			map[ids.ID]uint64{
-				e.Ctx.AVAXAssetID: e.Config.AddStakerTxFee,
-			},
-		); err != nil {
-			return fmt.Errorf("failed verifySpend: %w", err)
-		}
-
-		// Make sure the tx doesn't start too far in the future. This is done
-		// last to allow the verifier visitor to explicitly check for this
-		// error.
-		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-		if validatorStartTime.After(maxStartTime) {
-			return errFutureStakeTime
-		}
-	}
 
 	// Set up the state if this tx is committed
 	// Consume the UTXOS
@@ -426,6 +178,9 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	// Produce the UTXOS
 	utxo.Produce(e.OnCommitState, txID, tx.Outs)
 
+	newStaker := state.NewPrimaryNetworkStaker(txID, &tx.Validator)
+	newStaker.NextTime = newStaker.StartTime
+	newStaker.Priority = state.PrimaryNetworkDelegatorPendingPriority
 	e.OnCommitState.PutPendingDelegator(newStaker)
 
 	// Set up the state if this tx is aborted

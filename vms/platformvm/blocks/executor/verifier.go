@@ -53,6 +53,12 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 		return err
 	}
 
+	// following Blueberry fork activation, proposal blocks
+	// are used only to vote over validators reward
+	if tx, ok := b.Tx.Unsigned.(*txs.RewardValidatorTx); !ok {
+		return fmt.Errorf("expected RewardValidatorTx, got %T", tx)
+	}
+
 	parentID := b.Parent()
 	onCommitState, err := state.NewDiff(parentID, v.backend)
 	if err != nil {
@@ -211,8 +217,7 @@ func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 		timestamp:      atomicExecutor.OnAccept.GetTimestamp(),
 		atomicRequests: atomicExecutor.AtomicRequests,
 	}
-
-	v.Mempool.RemoveDecisionTxs([]*txs.Tx{b.Tx})
+	v.Mempool.RemoveTxs([]*txs.Tx{b.Tx})
 	return nil
 }
 
@@ -388,7 +393,7 @@ func (v *verifier) proposalBlock(
 		timestamp: onAbortState.GetTimestamp(),
 	}
 
-	v.Mempool.RemoveProposalTx(b.Tx)
+	v.Mempool.RemoveTxs([]*txs.Tx{b.Tx})
 	return nil
 }
 
@@ -459,7 +464,7 @@ func (v *verifier) standardBlock(
 	blkID := b.ID()
 	v.blkIDToState[blkID] = blkState
 
-	v.Mempool.RemoveDecisionTxs(b.Transactions)
+	v.Mempool.RemoveTxs(b.Transactions)
 	return nil
 }
 

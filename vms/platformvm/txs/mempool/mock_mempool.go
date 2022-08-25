@@ -151,32 +151,46 @@ func (mr *MockMempoolMockRecorder) Has(txID interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Has", reflect.TypeOf((*MockMempool)(nil).Has), txID)
 }
 
-// HasDecisionTxs mocks base method.
-func (m *MockMempool) HasDecisionTxs() bool {
+// HasApricotDecisionTxs mocks base method.
+func (m *MockMempool) HasApricotDecisionTxs() bool {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HasDecisionTxs")
+	ret := m.ctrl.Call(m, "HasApricotDecisionTxs")
 	ret0, _ := ret[0].(bool)
 	return ret0
 }
 
-// HasDecisionTxs indicates an expected call of HasDecisionTxs.
-func (mr *MockMempoolMockRecorder) HasDecisionTxs() *gomock.Call {
+// HasApricotDecisionTxs indicates an expected call of HasApricotDecisionTxs.
+func (mr *MockMempoolMockRecorder) HasApricotDecisionTxs() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasDecisionTxs", reflect.TypeOf((*MockMempool)(nil).HasDecisionTxs))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasApricotDecisionTxs", reflect.TypeOf((*MockMempool)(nil).HasApricotDecisionTxs))
 }
 
-// HasProposalTx mocks base method.
-func (m *MockMempool) HasProposalTx() bool {
+// HasStakerTx mocks base method.
+func (m *MockMempool) HasStakerTx() bool {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HasProposalTx")
+	ret := m.ctrl.Call(m, "HasStakerTx")
 	ret0, _ := ret[0].(bool)
 	return ret0
 }
 
-// HasProposalTx indicates an expected call of HasProposalTx.
-func (mr *MockMempoolMockRecorder) HasProposalTx() *gomock.Call {
+// HasStakerTx indicates an expected call of HasStakerTx.
+func (mr *MockMempoolMockRecorder) HasStakerTx() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasProposalTx", reflect.TypeOf((*MockMempool)(nil).HasProposalTx))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasStakerTx", reflect.TypeOf((*MockMempool)(nil).HasStakerTx))
+}
+
+// HasTxs mocks base method.
+func (m *MockMempool) HasTxs() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HasTxs")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// HasTxs indicates an expected call of HasTxs.
+func (mr *MockMempoolMockRecorder) HasTxs() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasTxs", reflect.TypeOf((*MockMempool)(nil).HasTxs))
 }
 
 // MarkDropped mocks base method.
@@ -191,94 +205,56 @@ func (mr *MockMempoolMockRecorder) MarkDropped(txID, reason interface{}) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkDropped", reflect.TypeOf((*MockMempool)(nil).MarkDropped), txID, reason)
 }
 
-// PeekDecisionTxs mocks base method.
-func (m *MockMempool) PeekDecisionTxs(maxTxsBytes int) []*txs.Tx {
+// PeekApricotDecisionTxs mocks base method.
+func (m *MockMempool) PeekApricotDecisionTxs(maxTxsBytes int) []*txs.Tx {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PeekDecisionTxs", maxTxsBytes)
+	ret := m.ctrl.Call(m, "PeekApricotDecisionTxs", maxTxsBytes)
 	ret0, _ := ret[0].([]*txs.Tx)
 	return ret0
 }
 
-// PeekDecisionTxs indicates an expected call of PeekDecisionTxs.
-func (mr *MockMempoolMockRecorder) PeekDecisionTxs(maxTxsBytes interface{}) *gomock.Call {
+// PeekApricotDecisionTxs indicates an expected call of PeekApricotDecisionTxs.
+func (mr *MockMempoolMockRecorder) PeekApricotDecisionTxs(maxTxsBytes interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PeekDecisionTxs", reflect.TypeOf((*MockMempool)(nil).PeekDecisionTxs), maxTxsBytes)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PeekApricotDecisionTxs", reflect.TypeOf((*MockMempool)(nil).PeekApricotDecisionTxs), maxTxsBytes)
 }
 
-// PeekProposalTx mocks base method.
-func (m *MockMempool) PeekProposalTx() *txs.Tx {
+// PeekStakerTx mocks base method.
+func (m *MockMempool) PeekStakerTx() *txs.Tx {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PeekProposalTx")
+	ret := m.ctrl.Call(m, "PeekStakerTx")
 	ret0, _ := ret[0].(*txs.Tx)
 	return ret0
 }
 
-// PeekProposalTx indicates an expected call of PeekProposalTx.
-func (mr *MockMempoolMockRecorder) PeekProposalTx() *gomock.Call {
+// PeekStakerTx indicates an expected call of PeekStakerTx.
+func (mr *MockMempoolMockRecorder) PeekStakerTx() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PeekProposalTx", reflect.TypeOf((*MockMempool)(nil).PeekProposalTx))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PeekStakerTx", reflect.TypeOf((*MockMempool)(nil).PeekStakerTx))
 }
 
-// PopDecisionTxs mocks base method.
-func (m *MockMempool) PopDecisionTxs(maxTxsBytes int) []*txs.Tx {
+// PeekTxs mocks base method.
+func (m *MockMempool) PeekTxs(maxTxsBytes int) []*txs.Tx {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PopDecisionTxs", maxTxsBytes)
+	ret := m.ctrl.Call(m, "PeekTxs", maxTxsBytes)
 	ret0, _ := ret[0].([]*txs.Tx)
 	return ret0
 }
 
-// PopDecisionTxs indicates an expected call of PopDecisionTxs.
-func (mr *MockMempoolMockRecorder) PopDecisionTxs(maxTxsBytes interface{}) *gomock.Call {
+// PeekTxs indicates an expected call of PeekTxs.
+func (mr *MockMempoolMockRecorder) PeekTxs(maxTxsBytes interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PopDecisionTxs", reflect.TypeOf((*MockMempool)(nil).PopDecisionTxs), maxTxsBytes)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PeekTxs", reflect.TypeOf((*MockMempool)(nil).PeekTxs), maxTxsBytes)
 }
 
-// PopProposalTx mocks base method.
-func (m *MockMempool) PopProposalTx() *txs.Tx {
+// RemoveTxs mocks base method.
+func (m *MockMempool) RemoveTxs(txs []*txs.Tx) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PopProposalTx")
-	ret0, _ := ret[0].(*txs.Tx)
-	return ret0
+	m.ctrl.Call(m, "RemoveTxs", txs)
 }
 
-// PopProposalTx indicates an expected call of PopProposalTx.
-func (mr *MockMempoolMockRecorder) PopProposalTx() *gomock.Call {
+// RemoveTxs indicates an expected call of RemoveTxs.
+func (mr *MockMempoolMockRecorder) RemoveTxs(txs interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PopProposalTx", reflect.TypeOf((*MockMempool)(nil).PopProposalTx))
-}
-
-// Remove mocks base method.
-func (m *MockMempool) Remove(txs []*txs.Tx) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Remove", txs)
-}
-
-// Remove indicates an expected call of Remove.
-func (mr *MockMempoolMockRecorder) Remove(txs interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Remove", reflect.TypeOf((*MockMempool)(nil).Remove), txs)
-}
-
-// RemoveDecisionTxs mocks base method.
-func (m *MockMempool) RemoveDecisionTxs(txs []*txs.Tx) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "RemoveDecisionTxs", txs)
-}
-
-// RemoveDecisionTxs indicates an expected call of RemoveDecisionTxs.
-func (mr *MockMempoolMockRecorder) RemoveDecisionTxs(txs interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveDecisionTxs", reflect.TypeOf((*MockMempool)(nil).RemoveDecisionTxs), txs)
-}
-
-// RemoveProposalTx mocks base method.
-func (m *MockMempool) RemoveProposalTx(tx *txs.Tx) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "RemoveProposalTx", tx)
-}
-
-// RemoveProposalTx indicates an expected call of RemoveProposalTx.
-func (mr *MockMempoolMockRecorder) RemoveProposalTx(tx interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveProposalTx", reflect.TypeOf((*MockMempool)(nil).RemoveProposalTx), tx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveTxs", reflect.TypeOf((*MockMempool)(nil).RemoveTxs), txs)
 }
