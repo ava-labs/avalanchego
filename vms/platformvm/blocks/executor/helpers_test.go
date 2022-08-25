@@ -55,6 +55,13 @@ import (
 	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
 
+const (
+	testNetworkID                 = 10 // To be used in tests
+	defaultWeight                 = 10000
+	maxRecentlyAcceptedWindowSize = 256
+	recentlyAcceptedWindowTTL     = 5 * time.Minute
+)
+
 var (
 	_ mempool.BlockTimer = &environment{}
 
@@ -73,13 +80,6 @@ var (
 
 	genesisBlkID ids.ID
 	testSubnet1  *txs.Tx
-)
-
-const (
-	testNetworkID                 = 10 // To be used in tests
-	defaultWeight                 = 10000
-	maxRecentlyAcceptedWindowSize = 256
-	recentlyAcceptedWindowTTL     = 5 * time.Minute
 )
 
 type environment struct {
