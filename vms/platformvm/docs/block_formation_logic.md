@@ -14,7 +14,7 @@ In more details, blocks which do not change chain time are build as follows:
 1. If mempool contains any decision transactions, a Standard block is issued with all of the transactions the default block size can accommodate. Note that Apricot standard blocks do not change the current chain time.
 2. If the current chain time matches the end of any staker's staking time, a reward transaction is issued into a Proposal Block to initiate network voting on whether the specified staker should be rewarded. Note that there could be multiple stakers ending their staking period at the same chain time, hence a Proposal block must be issued for all of them before chain time is moved ahead. Any attempt to move chain time ahead before rewarding all stakers would fail block verification.
 
-While steps above could be execute in any order, we picked decisions transactions first to maximize throughput.
+While steps above could be executed in any order, we picked decisions transactions first to maximize throughput.
 
 Once all possibilities of create a block not advancing chain time are exhausted, we attempt to build a block which *may* advance chain time as follows:
 
