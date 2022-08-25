@@ -223,8 +223,9 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 			blueberryParentBlk.Height(),
 			blkTx,
 		)
-		block := env.blkManager.NewBlock(statelessProposalBlock)
 		require.NoError(err)
+
+		block := env.blkManager.NewBlock(statelessProposalBlock)
 		require.Error(block.Verify())
 	}
 
@@ -235,8 +236,9 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 			blueberryParentBlk.Height()+1,
 			blkTx,
 		)
-		block := env.blkManager.NewBlock(statelessProposalBlock)
 		require.NoError(err)
+
+		block := env.blkManager.NewBlock(statelessProposalBlock)
 		require.Error(block.Verify())
 	}
 
@@ -248,8 +250,9 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 			blueberryParentBlk.Height()+1,
 			blkTx,
 		)
-		block := env.blkManager.NewBlock(statelessProposalBlock)
 		require.NoError(err)
+
+		block := env.blkManager.NewBlock(statelessProposalBlock)
 		require.Error(block.Verify())
 	}
 
@@ -262,8 +265,9 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 			blueberryParentBlk.Height()+1,
 			blkTx,
 		)
-		block := env.blkManager.NewBlock(statelessProposalBlock)
 		require.NoError(err)
+
+		block := env.blkManager.NewBlock(statelessProposalBlock)
 		require.Error(block.Verify())
 	}
 
@@ -276,8 +280,9 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 			blueberryParentBlk.Height()+1,
 			blkTx,
 		)
-		block := env.blkManager.NewBlock(statelessProposalBlock)
 		require.NoError(err)
+
+		block := env.blkManager.NewBlock(statelessProposalBlock)
 		require.Error(block.Verify())
 	}
 
@@ -295,8 +300,9 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 			blueberryParentBlk.Height()+1,
 			invalidTx,
 		)
-		block := env.blkManager.NewBlock(statelessProposalBlock)
 		require.NoError(err)
+
+		block := env.blkManager.NewBlock(statelessProposalBlock)
 		require.Error(block.Verify())
 	}
 
@@ -308,8 +314,9 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 			blueberryParentBlk.Height()+1,
 			blkTx,
 		)
-		block := env.blkManager.NewBlock(statelessProposalBlock)
 		require.NoError(err)
+
+		block := env.blkManager.NewBlock(statelessProposalBlock)
 		require.NoError(block.Verify())
 	}
 }
