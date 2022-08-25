@@ -83,12 +83,6 @@ type mutableSharedMemory struct {
 	atomic.SharedMemory
 }
 
-var _ mempool.BlockTimer = &noopBlkTimer{}
-
-type noopBlkTimer struct{}
-
-func (*noopBlkTimer) ResetBlockTimer() {}
-
 type environment struct {
 	Builder
 	blkManager blockexecutor.Manager
