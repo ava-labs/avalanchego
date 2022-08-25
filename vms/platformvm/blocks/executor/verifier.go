@@ -37,40 +37,14 @@ func (v *verifier) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
 	if err := v.blueberryOptionBlock(b); err != nil {
 		return err
 	}
-
-	parentID := b.Parent()
-	onAcceptState, ok := v.getOnAbortState(parentID)
-	if !ok {
-		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
-	}
-
-	blkID := b.ID()
-	v.blkIDToState[blkID] = &blockState{
-		statelessBlock: b,
-		onAcceptState:  onAcceptState,
-		timestamp:      b.Timestamp(),
-	}
-	return nil
+	return v.abortBlock(b)
 }
 
 func (v *verifier) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
 	if err := v.blueberryOptionBlock(b); err != nil {
 		return err
 	}
-
-	parentID := b.Parent()
-	onAcceptState, ok := v.getOnCommitState(parentID)
-	if !ok {
-		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
-	}
-
-	blkID := b.ID()
-	v.blkIDToState[blkID] = &blockState{
-		statelessBlock: b,
-		onAcceptState:  onAcceptState,
-		timestamp:      b.Timestamp(),
-	}
-	return nil
+	return v.commitBlock(b)
 }
 
 func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) error {
@@ -90,7 +64,11 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 
 	// Apply the changes, if any, from advancing the chain time.
 	nextChainTime := b.Timestamp()
-	changes, err := executor.AdvanceTimeTo(onCommitState, nextChainTime, v.txExecutorBackend.Rewards)
+	changes, err := executor.AdvanceTimeTo(
+		onCommitState,
+		nextChainTime,
+		v.txExecutorBackend.Rewards,
+	)
 	if err != nil {
 		return err
 	}
@@ -101,35 +79,7 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 	onAbortState.SetTimestamp(nextChainTime)
 	changes.Apply(onAbortState)
 
-	// Check the transaction's validity.
-	txExecutor := executor.ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       v.txExecutorBackend,
-		Tx:            b.Tx,
-	}
-
-	if err := b.Tx.Unsigned.Visit(&txExecutor); err != nil {
-		txID := b.Tx.ID()
-		v.MarkDropped(txID, err.Error()) // cache tx as dropped
-		return err
-	}
-
-	onCommitState.AddTx(b.Tx, status.Committed)
-	onAbortState.AddTx(b.Tx, status.Aborted)
-
-	blkID := b.ID()
-	v.blkIDToState[blkID] = &blockState{
-		proposalBlockState: proposalBlockState{
-			initiallyPreferCommit: txExecutor.PrefersCommit,
-			onCommitState:         onCommitState,
-			onAbortState:          onAbortState,
-		},
-		statelessBlock: b,
-		timestamp:      b.Timestamp(),
-	}
-	v.Mempool.RemoveProposalTx(b.Tx)
-	return nil
+	return v.proposalBlock(&b.ApricotProposalBlock, onCommitState, onAbortState)
 }
 
 func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) error {
@@ -143,10 +93,13 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 		return err
 	}
 
-	// Having verifier block timestamp, we update staker set
-	// before processing block transaction
+	// Apply the changes, if any, from advancing the chain time.
 	nextChainTime := b.Timestamp()
-	changes, err := executor.AdvanceTimeTo(onAcceptState, nextChainTime, v.txExecutorBackend.Rewards)
+	changes, err := executor.AdvanceTimeTo(
+		onAcceptState,
+		nextChainTime,
+		v.txExecutorBackend.Rewards,
+	)
 	if err != nil {
 		return err
 	}
@@ -154,109 +107,21 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 	onAcceptState.SetTimestamp(nextChainTime)
 	changes.Apply(onAcceptState)
 
-	blkState := &blockState{
-		statelessBlock: b,
-		onAcceptState:  onAcceptState,
-		timestamp:      nextChainTime,
-		atomicRequests: make(map[ids.ID]*atomic.Requests),
-	}
-
-	// Finally we process block transaction
-	funcs := make([]func(), 0, len(b.Transactions))
-	for _, tx := range b.Transactions {
-		txExecutor := executor.StandardTxExecutor{
-			Backend: v.txExecutorBackend,
-			State:   onAcceptState,
-			Tx:      tx,
-		}
-		if err := tx.Unsigned.Visit(&txExecutor); err != nil {
-			txID := tx.ID()
-			v.MarkDropped(txID, err.Error()) // cache tx as dropped
-			return err
-		}
-		// ensure it doesn't overlap with current input batch
-		if blkState.inputs.Overlaps(txExecutor.Inputs) {
-			return errConflictingBatchTxs
-		}
-		// Add UTXOs to batch
-		blkState.inputs.Union(txExecutor.Inputs)
-
-		onAcceptState.AddTx(tx, status.Committed)
-		if txExecutor.OnAccept != nil {
-			funcs = append(funcs, txExecutor.OnAccept)
-		}
-
-		for chainID, txRequests := range txExecutor.AtomicRequests {
-			// Add/merge in the atomic requests represented by [tx]
-			chainRequests, exists := blkState.atomicRequests[chainID]
-			if !exists {
-				blkState.atomicRequests[chainID] = txRequests
-				continue
-			}
-
-			chainRequests.PutRequests = append(chainRequests.PutRequests, txRequests.PutRequests...)
-			chainRequests.RemoveRequests = append(chainRequests.RemoveRequests, txRequests.RemoveRequests...)
-		}
-	}
-
-	if err := v.verifyUniqueInputs(b, blkState.inputs); err != nil {
-		return err
-	}
-
-	if numFuncs := len(funcs); numFuncs == 1 {
-		blkState.onAcceptFunc = funcs[0]
-	} else if numFuncs > 1 {
-		blkState.onAcceptFunc = func() {
-			for _, f := range funcs {
-				f()
-			}
-		}
-	}
-
-	blkID := b.ID()
-	v.blkIDToState[blkID] = blkState
-	v.Mempool.RemoveDecisionTxs(b.Transactions)
-	return nil
+	return v.standardBlock(&b.ApricotStandardBlock, onAcceptState)
 }
 
 func (v *verifier) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 	if err := v.apricotCommonBlock(b); err != nil {
 		return err
 	}
-
-	parentID := b.Parent()
-	onAcceptState, ok := v.getOnAbortState(parentID)
-	if !ok {
-		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
-	}
-
-	blkID := b.ID()
-	v.blkIDToState[blkID] = &blockState{
-		statelessBlock: b,
-		onAcceptState:  onAcceptState,
-		timestamp:      onAcceptState.GetTimestamp(),
-	}
-	return nil
+	return v.abortBlock(b)
 }
 
 func (v *verifier) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 	if err := v.apricotCommonBlock(b); err != nil {
 		return err
 	}
-
-	parentID := b.Parent()
-	onAcceptState, ok := v.getOnCommitState(parentID)
-	if !ok {
-		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
-	}
-
-	blkID := b.ID()
-	v.blkIDToState[blkID] = &blockState{
-		statelessBlock: b,
-		onAcceptState:  onAcceptState,
-		timestamp:      onAcceptState.GetTimestamp(),
-	}
-	return nil
+	return v.commitBlock(b)
 }
 
 func (v *verifier) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
@@ -274,36 +139,7 @@ func (v *verifier) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 		return err
 	}
 
-	txExecutor := &executor.ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       v.txExecutorBackend,
-		Tx:            b.Tx,
-	}
-	if err := b.Tx.Unsigned.Visit(txExecutor); err != nil {
-		txID := b.Tx.ID()
-		v.MarkDropped(txID, err.Error()) // cache tx as dropped
-		return err
-	}
-
-	onCommitState.AddTx(b.Tx, status.Committed)
-	onAbortState.AddTx(b.Tx, status.Aborted)
-
-	blkID := b.ID()
-	v.blkIDToState[blkID] = &blockState{
-		proposalBlockState: proposalBlockState{
-			onCommitState:         onCommitState,
-			onAbortState:          onAbortState,
-			initiallyPreferCommit: txExecutor.PrefersCommit,
-		},
-		statelessBlock: b,
-		// It is safe to use [b.onAbortState] here because the timestamp will
-		// never be modified by an Apricot Abort block.
-		timestamp: onAbortState.GetTimestamp(),
-	}
-
-	v.Mempool.RemoveProposalTx(b.Tx)
-	return nil
+	return v.proposalBlock(b, onCommitState, onAbortState)
 }
 
 func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
@@ -317,68 +153,7 @@ func (v *verifier) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
 		return err
 	}
 
-	blkState := &blockState{
-		statelessBlock: b,
-		onAcceptState:  onAcceptState,
-		atomicRequests: make(map[ids.ID]*atomic.Requests),
-	}
-
-	funcs := make([]func(), 0, len(b.Transactions))
-	for _, tx := range b.Transactions {
-		txExecutor := &executor.StandardTxExecutor{
-			Backend: v.txExecutorBackend,
-			State:   onAcceptState,
-			Tx:      tx,
-		}
-		if err := tx.Unsigned.Visit(txExecutor); err != nil {
-			txID := tx.ID()
-			v.MarkDropped(txID, err.Error()) // cache tx as dropped
-			return err
-		}
-		// ensure it doesn't overlap with current input batch
-		if blkState.inputs.Overlaps(txExecutor.Inputs) {
-			return errConflictingBatchTxs
-		}
-		// Add UTXOs to batch
-		blkState.inputs.Union(txExecutor.Inputs)
-
-		onAcceptState.AddTx(tx, status.Committed)
-		if txExecutor.OnAccept != nil {
-			funcs = append(funcs, txExecutor.OnAccept)
-		}
-
-		for chainID, txRequests := range txExecutor.AtomicRequests {
-			// Add/merge in the atomic requests represented by [tx]
-			chainRequests, exists := blkState.atomicRequests[chainID]
-			if !exists {
-				blkState.atomicRequests[chainID] = txRequests
-				continue
-			}
-
-			chainRequests.PutRequests = append(chainRequests.PutRequests, txRequests.PutRequests...)
-			chainRequests.RemoveRequests = append(chainRequests.RemoveRequests, txRequests.RemoveRequests...)
-		}
-	}
-
-	if err := v.verifyUniqueInputs(b, blkState.inputs); err != nil {
-		return err
-	}
-
-	if numFuncs := len(funcs); numFuncs == 1 {
-		blkState.onAcceptFunc = funcs[0]
-	} else if numFuncs > 1 {
-		blkState.onAcceptFunc = func() {
-			for _, f := range funcs {
-				f()
-			}
-		}
-	}
-	blkState.timestamp = onAcceptState.GetTimestamp()
-
-	blkID := b.ID()
-	v.blkIDToState[blkID] = blkState
-	v.Mempool.RemoveDecisionTxs(b.Transactions)
-	return nil
+	return v.standardBlock(b, onAcceptState)
 }
 
 func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
@@ -532,6 +307,151 @@ func (v *verifier) commonBlock(b blocks.Block) error {
 			height,
 		)
 	}
+	return nil
+}
+
+// abortBlock populates the state of this block if [nil] is returned
+func (v *verifier) abortBlock(b blocks.Block) error {
+	parentID := b.Parent()
+	onAcceptState, ok := v.getOnAbortState(parentID)
+	if !ok {
+		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
+	}
+
+	blkID := b.ID()
+	v.blkIDToState[blkID] = &blockState{
+		statelessBlock: b,
+		onAcceptState:  onAcceptState,
+		timestamp:      onAcceptState.GetTimestamp(),
+	}
+	return nil
+}
+
+// commitBlock populates the state of this block if [nil] is returned
+func (v *verifier) commitBlock(b blocks.Block) error {
+	parentID := b.Parent()
+	onAcceptState, ok := v.getOnCommitState(parentID)
+	if !ok {
+		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
+	}
+
+	blkID := b.ID()
+	v.blkIDToState[blkID] = &blockState{
+		statelessBlock: b,
+		onAcceptState:  onAcceptState,
+		timestamp:      onAcceptState.GetTimestamp(),
+	}
+	return nil
+}
+
+// proposalBlock populates the state of this block if [nil] is returned
+func (v *verifier) proposalBlock(
+	b *blocks.ApricotProposalBlock,
+	onCommitState state.Diff,
+	onAbortState state.Diff,
+) error {
+	txExecutor := &executor.ProposalTxExecutor{
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       v.txExecutorBackend,
+		Tx:            b.Tx,
+	}
+
+	if err := b.Tx.Unsigned.Visit(txExecutor); err != nil {
+		txID := b.Tx.ID()
+		v.MarkDropped(txID, err.Error()) // cache tx as dropped
+		return err
+	}
+
+	onCommitState.AddTx(b.Tx, status.Committed)
+	onAbortState.AddTx(b.Tx, status.Aborted)
+
+	blkID := b.ID()
+	v.blkIDToState[blkID] = &blockState{
+		proposalBlockState: proposalBlockState{
+			onCommitState:         onCommitState,
+			onAbortState:          onAbortState,
+			initiallyPreferCommit: txExecutor.PrefersCommit,
+		},
+		statelessBlock: b,
+		// It is safe to use [b.onAbortState] here because the timestamp will
+		// never be modified by an Apricot Abort block and the timestamp will
+		// always be the same as the Blueberry Proposal Block.
+		timestamp: onAbortState.GetTimestamp(),
+	}
+
+	v.Mempool.RemoveProposalTx(b.Tx)
+	return nil
+}
+
+// standardBlock populates the state of this block if [nil] is returned
+func (v *verifier) standardBlock(
+	b *blocks.ApricotStandardBlock,
+	onAcceptState state.Diff,
+) error {
+	blkState := &blockState{
+		statelessBlock: b,
+		onAcceptState:  onAcceptState,
+		timestamp:      onAcceptState.GetTimestamp(),
+		atomicRequests: make(map[ids.ID]*atomic.Requests),
+	}
+
+	// Finally we process block transaction
+	funcs := make([]func(), 0, len(b.Transactions))
+	for _, tx := range b.Transactions {
+		txExecutor := executor.StandardTxExecutor{
+			Backend: v.txExecutorBackend,
+			State:   onAcceptState,
+			Tx:      tx,
+		}
+		if err := tx.Unsigned.Visit(&txExecutor); err != nil {
+			txID := tx.ID()
+			v.MarkDropped(txID, err.Error()) // cache tx as dropped
+			return err
+		}
+		// ensure it doesn't overlap with current input batch
+		if blkState.inputs.Overlaps(txExecutor.Inputs) {
+			return errConflictingBatchTxs
+		}
+		// Add UTXOs to batch
+		blkState.inputs.Union(txExecutor.Inputs)
+
+		onAcceptState.AddTx(tx, status.Committed)
+		if txExecutor.OnAccept != nil {
+			funcs = append(funcs, txExecutor.OnAccept)
+		}
+
+		for chainID, txRequests := range txExecutor.AtomicRequests {
+			// Add/merge in the atomic requests represented by [tx]
+			chainRequests, exists := blkState.atomicRequests[chainID]
+			if !exists {
+				blkState.atomicRequests[chainID] = txRequests
+				continue
+			}
+
+			chainRequests.PutRequests = append(chainRequests.PutRequests, txRequests.PutRequests...)
+			chainRequests.RemoveRequests = append(chainRequests.RemoveRequests, txRequests.RemoveRequests...)
+		}
+	}
+
+	if err := v.verifyUniqueInputs(b, blkState.inputs); err != nil {
+		return err
+	}
+
+	if numFuncs := len(funcs); numFuncs == 1 {
+		blkState.onAcceptFunc = funcs[0]
+	} else if numFuncs > 1 {
+		blkState.onAcceptFunc = func() {
+			for _, f := range funcs {
+				f()
+			}
+		}
+	}
+
+	blkID := b.ID()
+	v.blkIDToState[blkID] = blkState
+
+	v.Mempool.RemoveDecisionTxs(b.Transactions)
 	return nil
 }
 
