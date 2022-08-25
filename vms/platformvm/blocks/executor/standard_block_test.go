@@ -16,11 +16,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
@@ -148,12 +150,45 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetCurrentSupply().Return(uint64(1000)).AnyTimes()
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 
+	txID := ids.GenerateTestID()
+	utxo := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID: txID,
+		},
+		Asset: avax.Asset{
+			ID: avaxAssetID,
+		},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: env.config.CreateSubnetTxFee,
+		},
+	}
+	utxoID := utxo.InputID()
+	onParentAccept.EXPECT().GetUTXO(utxoID).Return(utxo, nil).AnyTimes()
+
+	// Create the tx
+	utx := &txs.CreateSubnetTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    env.ctx.NetworkID,
+			BlockchainID: env.ctx.ChainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: utxo.UTXOID,
+				Asset:  utxo.Asset,
+				In: &secp256k1fx.TransferInput{
+					Amt: env.config.CreateSubnetTxFee,
+				},
+			}},
+		}},
+		Owner: &secp256k1fx.OutputOwners{},
+	}
+	tx := &txs.Tx{Unsigned: utx}
+	require.NoError(tx.Sign(txs.Codec, [][]*crypto.PrivateKeySECP256K1R{{}}))
+
 	{
 		// wrong version
 		blueberryChildBlk, err := blocks.NewApricotStandardBlock(
 			blueberryParentBlk.ID(),
 			blueberryParentBlk.Height()+1,
-			nil, // txs nulled to simplify test
+			[]*txs.Tx{tx},
 		)
 		require.NoError(err)
 		block := env.blkManager.NewBlock(blueberryChildBlk)
@@ -167,7 +202,7 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 			childTimestamp,
 			blueberryParentBlk.ID(),
 			blueberryParentBlk.Height(),
-			nil, // txs nulled to simplify test
+			[]*txs.Tx{tx},
 		)
 		require.NoError(err)
 		block := env.blkManager.NewBlock(blueberryChildBlk)
@@ -181,7 +216,7 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 			childTimestamp,
 			blueberryParentBlk.ID(),
 			blueberryParentBlk.Height()+1,
-			nil, // txs nulled to simplify test
+			[]*txs.Tx{tx},
 		)
 		require.NoError(err)
 		block := env.blkManager.NewBlock(blueberryChildBlk)
@@ -195,7 +230,7 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 			childTimestamp,
 			blueberryParentBlk.ID(),
 			blueberryParentBlk.Height()+1,
-			nil, // txs nulled to simplify test
+			[]*txs.Tx{tx},
 		)
 		require.NoError(err)
 		block := env.blkManager.NewBlock(blueberryChildBlk)
@@ -209,11 +244,25 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 			childTimestamp,
 			blueberryParentBlk.ID(),
 			blueberryParentBlk.Height()+1,
-			nil, // txs nulled to simplify test
+			[]*txs.Tx{tx},
 		)
 		require.NoError(err)
 		block := env.blkManager.NewBlock(blueberryChildBlk)
 		require.Error(block.Verify())
+	}
+
+	{
+		// no state changes
+		childTimestamp := parentTime
+		blueberryChildBlk, err := blocks.NewBlueberryStandardBlock(
+			childTimestamp,
+			blueberryParentBlk.ID(),
+			blueberryParentBlk.Height()+1,
+			nil,
+		)
+		require.NoError(err)
+		block := env.blkManager.NewBlock(blueberryChildBlk)
+		require.ErrorIs(block.Verify(), errBlueberryStandardBlockWithoutChanges)
 	}
 
 	{
@@ -223,7 +272,7 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 			childTimestamp,
 			blueberryParentBlk.ID(),
 			blueberryParentBlk.Height()+1,
-			nil, // txs nulled to simplify test
+			[]*txs.Tx{tx},
 		)
 		require.NoError(err)
 		block := env.blkManager.NewBlock(blueberryChildBlk)
@@ -237,7 +286,7 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 			childTimestamp,
 			blueberryParentBlk.ID(),
 			blueberryParentBlk.Height()+1,
-			nil, // txs nulled to simplify test
+			[]*txs.Tx{tx},
 		)
 		require.NoError(err)
 		block := env.blkManager.NewBlock(blueberryChildBlk)
@@ -351,26 +400,6 @@ func TestBlueberryStandardBlockUpdateStakers(t *testing.T) {
 	}
 
 	tests := []test{
-		{
-			description:   "advance time to before staker1 start with subnet",
-			stakers:       []staker{staker1, staker2, staker3, staker4, staker5},
-			subnetStakers: []staker{staker1, staker2, staker3, staker4, staker5},
-			advanceTimeTo: []time.Time{staker1.startTime.Add(-1 * time.Second)},
-			expectedStakers: map[ids.NodeID]stakerStatus{
-				staker1.nodeID: pending,
-				staker2.nodeID: pending,
-				staker3.nodeID: pending,
-				staker4.nodeID: pending,
-				staker5.nodeID: pending,
-			},
-			expectedSubnetStakers: map[ids.NodeID]stakerStatus{
-				staker1.nodeID: pending,
-				staker2.nodeID: pending,
-				staker3.nodeID: pending,
-				staker4.nodeID: pending,
-				staker5.nodeID: pending,
-			},
-		},
 		{
 			description:   "advance time to staker 1 start with subnet",
 			stakers:       []staker{staker1, staker2, staker3, staker4, staker5},

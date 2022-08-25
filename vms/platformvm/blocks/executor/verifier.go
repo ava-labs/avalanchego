@@ -21,6 +21,7 @@ var (
 
 	errBlueberryBlockIssuedBeforeFork        = errors.New("blueberry block issued before fork")
 	errApricotBlockIssuedAfterFork           = errors.New("apricot block issued after fork")
+	errBlueberryStandardBlockWithoutChanges  = errors.New("BlueberryStandardBlock performs no state changes")
 	errChildBlockEarlierThanParent           = errors.New("proposed timestamp before current chain time")
 	errConflictingBatchTxs                   = errors.New("block contains conflicting transactions")
 	errConflictingParentTxs                  = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
@@ -102,6 +103,12 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 	)
 	if err != nil {
 		return err
+	}
+
+	// If this block doesn't perform any changes, then it should never have been
+	// issued.
+	if changes.Len() == 0 && len(b.Transactions) == 0 {
+		return errBlueberryStandardBlockWithoutChanges
 	}
 
 	onAcceptState.SetTimestamp(nextChainTime)
