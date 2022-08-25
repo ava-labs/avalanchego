@@ -182,14 +182,14 @@ func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 		)
 	}
 
-	atomicExecutor := &executor.AtomicTxExecutor{
+	atomicExecutor := executor.AtomicTxExecutor{
 		Backend:       v.txExecutorBackend,
 		ParentID:      parentID,
 		StateVersions: v,
 		Tx:            b.Tx,
 	}
 
-	if err := b.Tx.Unsigned.Visit(atomicExecutor); err != nil {
+	if err := b.Tx.Unsigned.Visit(&atomicExecutor); err != nil {
 		txID := b.Tx.ID()
 		v.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return fmt.Errorf("tx %s failed semantic verification: %w", txID, err)
@@ -357,14 +357,14 @@ func (v *verifier) proposalBlock(
 	onCommitState state.Diff,
 	onAbortState state.Diff,
 ) error {
-	txExecutor := &executor.ProposalTxExecutor{
+	txExecutor := executor.ProposalTxExecutor{
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
 		Backend:       v.txExecutorBackend,
 		Tx:            b.Tx,
 	}
 
-	if err := b.Tx.Unsigned.Visit(txExecutor); err != nil {
+	if err := b.Tx.Unsigned.Visit(&txExecutor); err != nil {
 		txID := b.Tx.ID()
 		v.MarkDropped(txID, err.Error()) // cache tx as dropped
 		return err
