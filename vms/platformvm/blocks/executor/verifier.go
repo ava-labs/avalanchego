@@ -404,7 +404,7 @@ func (v *verifier) standardBlock(
 		atomicRequests: make(map[ids.ID]*atomic.Requests),
 	}
 
-	// Finally we process block transaction
+	// Finally we process the transactions
 	funcs := make([]func(), 0, len(b.Transactions))
 	for _, tx := range b.Transactions {
 		txExecutor := executor.StandardTxExecutor{
