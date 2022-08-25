@@ -56,7 +56,7 @@ type Mempool interface {
 
 	// Following Blueberry activation, all mempool transactions,
 	// (both decisions and stakers one) are included into Standard blocks.
-	// HasTxs allow to check for availablilty of any mempool transaction.
+	// HasTxs allow to check for availability of any mempool transaction.
 	HasTxs() bool
 	// PeekTxs returns the next txs for Blueberry blocks
 	// up to maxTxsBytes without removing them from the mempool.
@@ -64,20 +64,10 @@ type Mempool interface {
 	PeekTxs(maxTxsBytes int) []*txs.Tx
 
 	HasStakerTx() bool
-	// PeekStakerTx returns next stakerTx
-	// without removing it from mempool.
-	// It returns nil if !HasApricotProposalTx().
-	// It's guaranteed that the returned tx, if not nil,
-	// is a StakerTx.
+	// PeekStakerTx returns the next stakerTx without removing it from mempool.
+	// It returns nil if !HasStakerTx().
+	// It's guaranteed that the returned tx, if not nil, is a StakerTx.
 	PeekStakerTx() *txs.Tx
-
-	// Pre Blueberry activation, decision transactions are included into standard blocks.
-	// TODO: following Blueberry activation, these methods can be dropped
-	HasApricotDecisionTxs() bool
-	// PeekApricotDecisionTxs returns the next decisionTxs
-	// up to maxTxsBytes without removing them from the mempool.
-	// It returns nil if !HasApricotDecisionTxs()
-	PeekApricotDecisionTxs(maxTxsBytes int) []*txs.Tx
 
 	// Note: dropped txs are added to droppedTxIDs but not
 	// not evicted from unissued decision/staker txs.
@@ -85,6 +75,16 @@ type Mempool interface {
 	// reissued.
 	MarkDropped(txID ids.ID, reason string)
 	GetDropReason(txID ids.ID) (string, bool)
+
+	// TODO: following Blueberry, these methods can be removed
+
+	// Pre Blueberry activation, decision transactions are included into
+	// standard blocks.
+	HasApricotDecisionTxs() bool
+	// PeekApricotDecisionTxs returns the next decisionTxs, up to maxTxsBytes,
+	// without removing them from the mempool.
+	// It returns nil if !HasApricotDecisionTxs()
+	PeekApricotDecisionTxs(maxTxsBytes int) []*txs.Tx
 }
 
 // Transactions from clients that have not yet been put into blocks and added to
