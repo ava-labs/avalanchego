@@ -98,7 +98,7 @@ func TestDecisionTxsInMempool(t *testing.T) {
 		require.True(found)
 
 		// once removed it cannot be there
-		mpool.RemoveTxs([]*txs.Tx{tx})
+		mpool.Remove([]*txs.Tx{tx})
 
 		require.False(mpool.Has(tx.ID()))
 		require.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
@@ -143,7 +143,7 @@ func TestProposalTxsInMempool(t *testing.T) {
 		require.Equal(tx, peeked)
 
 		// once removed it cannot be there
-		mpool.RemoveTxs([]*txs.Tx{tx})
+		mpool.Remove([]*txs.Tx{tx})
 
 		require.False(mpool.Has(tx.ID()))
 		require.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))

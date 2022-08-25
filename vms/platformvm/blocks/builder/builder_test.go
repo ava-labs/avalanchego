@@ -85,7 +85,7 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 
 	// A previously dropped tx, popped then re-added to mempool,
 	// is not dropped anymore
-	env.mempool.RemoveTxs([]*txs.Tx{tx})
+	env.mempool.Remove([]*txs.Tx{tx})
 	require.NoError(env.mempool.Add(tx))
 
 	require.True(env.mempool.Has(txID))

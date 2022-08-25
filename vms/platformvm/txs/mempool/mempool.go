@@ -52,6 +52,7 @@ type Mempool interface {
 	Add(tx *txs.Tx) error
 	Has(txID ids.ID) bool
 	Get(txID ids.ID) *txs.Tx
+	Remove(txs []*txs.Tx)
 
 	// Following Blueberry activation, all mempool transactions,
 	// (both decisions and stakers one) are included into Standard blocks.
@@ -61,7 +62,6 @@ type Mempool interface {
 	// up to maxTxsBytes without removing them from the mempool.
 	// It returns nil if !HasTxs()
 	PeekTxs(maxTxsBytes int) []*txs.Tx
-	RemoveTxs(txs []*txs.Tx)
 
 	HasStakerTx() bool
 	// PeekStakerTx returns next stakerTx
@@ -224,7 +224,7 @@ func (m *mempool) Get(txID ids.ID) *txs.Tx {
 	return m.unissuedStakerTxs.Get(txID)
 }
 
-func (m *mempool) RemoveTxs(txsToRemove []*txs.Tx) {
+func (m *mempool) Remove(txsToRemove []*txs.Tx) {
 	remover := &remover{
 		m: m,
 	}

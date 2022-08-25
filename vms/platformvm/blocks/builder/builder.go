@@ -168,7 +168,7 @@ func (b *builder) BuildBlock() (snowman.Block, error) {
 	// Remove selected txs from mempool now that we are returning the block to
 	// the consensus engine.
 	txs := statelessBlk.Txs()
-	b.Mempool.RemoveTxs(txs)
+	b.Mempool.Remove(txs)
 	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
@@ -303,7 +303,7 @@ func (b *builder) dropExpiredStakerTxs(timestamp time.Time) {
 			startTime,
 		)
 
-		b.Mempool.RemoveTxs([]*txs.Tx{tx})
+		b.Mempool.Remove([]*txs.Tx{tx})
 		b.Mempool.MarkDropped(txID, errMsg) // cache tx as dropped
 		b.txExecutorBackend.Ctx.Log.Debug("dropping tx",
 			zap.String("reason", errMsg),

@@ -217,7 +217,7 @@ func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 		atomicRequests: atomicExecutor.AtomicRequests,
 	}
 
-	v.Mempool.RemoveTxs([]*txs.Tx{b.Tx})
+	v.Mempool.Remove([]*txs.Tx{b.Tx})
 	return nil
 }
 
@@ -393,7 +393,7 @@ func (v *verifier) proposalBlock(
 		timestamp: onAbortState.GetTimestamp(),
 	}
 
-	v.Mempool.RemoveTxs([]*txs.Tx{b.Tx})
+	v.Mempool.Remove([]*txs.Tx{b.Tx})
 	return nil
 }
 
@@ -464,7 +464,7 @@ func (v *verifier) standardBlock(
 	blkID := b.ID()
 	v.blkIDToState[blkID] = blkState
 
-	v.Mempool.RemoveTxs(b.Transactions)
+	v.Mempool.Remove(b.Transactions)
 	return nil
 }
 
