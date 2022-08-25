@@ -179,7 +179,6 @@ func newEnvironment(t *testing.T) *environment {
 	}
 
 	res.mempool, err = mempool.NewMempool("mempool", registerer, res)
-
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}
@@ -203,7 +202,6 @@ func newEnvironment(t *testing.T) *environment {
 	res.Builder.SetPreference(genesisID)
 	addSubnet(res)
 
-	res.ResetBlockTimer()
 	return res
 }
 
