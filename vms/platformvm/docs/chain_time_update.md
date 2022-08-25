@@ -6,13 +6,13 @@ The activation of the Blueberry fork changes the way P-chain tracks its `ChainTi
 
 One of the P-chain's main responsibilities is to record staking periods of any staker (i.e. any validator or delegator) on any subnet to duly reward their activity.
 
-The P-chain tracks a network agreed timestamp called `ChainTime` that allows nodes to reach agreement about when a staker starts and stops its staking time. These start/stop times are basic inputs to determine whether the staker should be rewarded based on what percentage of `ChainTime` it was perceived as active from other validators.
+The P-chain tracks a network agreed timestamp called `ChainTime` that allows nodes to reach agreement about when a staker starts and stops staking. These start/stop times are basic inputs to determine whether the staker should be rewarded based on what percentage of `ChainTime` it was perceived as active from other validators.
 
 Note that this `ChainTime` has nothing to do with the `Snowman++` timestamp. `Snowman++` timestamps are local times used to reduce network congestion and have no role in rewarding of any staker.
 
 ## Pre Blueberry fork context
 
-Before Blueberry fork activation, `ChainTime` was incremented by an `AdvanceTimeTx` transaction, being included into a `ProposalBlock` block type. Validators voted on `ChainTime` advance by accepting either the `CommitBlock` or the `AbortBlock` following the `ProposalBlock`. `ChainTime` was moved ahead only if the `CommitBlock` was accepted.
+Before the Blueberry fork activation, `ChainTime` was incremented by an `AdvanceTimeTx` transaction, being included into a `ProposalBlock` block type. Validators voted on `ChainTime` advance by accepting either the `CommitBlock` or the `AbortBlock` following the `ProposalBlock`. `ChainTime` was moved ahead only if the `CommitBlock` was accepted.
 
 `AdvanceTimeTx` transactions are zero-fee transactions subject to three main validations:
 
@@ -53,6 +53,6 @@ However upon Blueberry activation some transactions and blocks type will be forb
 
 Note that unlike `blocks.Apricot*` blocks, `blocks.Blueberry*` blocks will serialize block timestamp.
 
-Note Blueberry fork won't change any transactions format, so transactions byte representation is fully backward compatible. Also Blueberry won't change any codec version
+Note the Blueberry fork won't change any transaction formats. So, transaction byte representations are fully backward compatible. Also, Blueberry won't change any codec version.
 
 [^1]: note that avalanchego codebase includes `blocks.ApricotAtomicBlock`, which has been forbidden on Apricot Phase 5 fork. This type is kept just to allow bootstrapping from genesis and it is forbidden on Blueberry as well as subsequent Apricot forks.
