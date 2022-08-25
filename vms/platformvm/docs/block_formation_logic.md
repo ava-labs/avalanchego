@@ -31,10 +31,10 @@ The activation of the Blueberry fork only makes minor changes to the way the P-c
 
 We carry out operations in the following order:
 
-* We try to fill a Standard block with mempool decision transactions
-* We check if any staker needs to be rewarded, issuing as many Proposal blocks as needed, as above
-* We try to move chain time ahead to the earliest staker set change event. Unlike Apricot, here we issue a Standard block with no transactions whose timestamp is the proposed chain time. A Standard block does not require any voting, and will be either accepted or rejected. Hence this solution is marginally faster.
-* We try to build a Proposal block with one mempool proposal transaction, if any. No changes to chain time are proposed here.
+* We try to move chain time ahead to the current local time or the earliest staker set change event. Unlike Apricot, here we issue either a Standard block or a Proposal block to advance the time.
+* We try to fill a Standard block with mempool decision transactions.
+* We check if any staker needs to be rewarded, issuing as many Proposal blocks as needed, as above.
+* We try to build a Proposal block with one mempool proposal transaction, if any.
 
 [^1]: Proposal transactions whose start time is too close to local time are dropped first and won't be included in any block.
-[^2]: Of course advance time transactions are proposal transactions and they do change chain time. But advance time transactions are generated just in time and never stored in a mempool. Here I refer to mempool proposal transactions which are AddValidator, AddDelegator and AddSubnetValidator. Reward delegator transaction is a proposal transaction which does not change chain time but which is never in mempool (it's generated just in time).
+[^2]: Advance time transactions are proposal transactions and they do change chain time. But advance time transactions are generated just in time and never stored in the mempool. Here mempool proposal transactions refer to AddValidator, AddDelegator and AddSubnetValidator transactions. Reward validator transactions are proposal transactions which do not change chain time but which never in mempool (they are generated just in time).
