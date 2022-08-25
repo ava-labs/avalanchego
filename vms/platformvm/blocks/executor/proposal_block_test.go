@@ -104,8 +104,9 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 		parentHeight,
 		blkTx,
 	)
-	block := env.blkManager.NewBlock(statelessProposalBlock)
 	require.NoError(err)
+
+	block := env.blkManager.NewBlock(statelessProposalBlock)
 	require.Error(block.Verify())
 
 	// valid
@@ -114,8 +115,9 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 		parentHeight+1,
 		blkTx,
 	)
-	block = env.blkManager.NewBlock(statelessProposalBlock)
 	require.NoError(err)
+
+	block = env.blkManager.NewBlock(statelessProposalBlock)
 	require.NoError(block.Verify())
 }
 
@@ -1009,8 +1011,9 @@ func TestBlueberryProposalBlockDelegatorStakerWeight(t *testing.T) {
 		parentBlk.Height()+1,
 		s0RewardTx,
 	)
-	propBlk = env.blkManager.NewBlock(statelessProposalBlock)
 	require.NoError(err)
+
+	propBlk = env.blkManager.NewBlock(statelessProposalBlock)
 	require.NoError(propBlk.Verify())
 
 	options, err = propBlk.(snowman.OracleBlock).Options()
