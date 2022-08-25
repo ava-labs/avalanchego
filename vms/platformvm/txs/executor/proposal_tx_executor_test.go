@@ -19,18 +19,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func TestAddDelegatorTxExecute(t *testing.T) {
+func TestProposalTxExecuteAddDelegator(t *testing.T) {
 	dummyHeight := uint64(1)
 	rewardAddress := preFundedKeys[0].PublicKey().Address()
 	nodeID := ids.NodeID(rewardAddress)
 
-	factory := crypto.FactorySECP256K1R{}
-	keyIntf, err := factory.NewPrivateKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	newValidatorKey := keyIntf.(*crypto.PrivateKeySECP256K1R)
-	newValidatorID := ids.NodeID(newValidatorKey.PublicKey().Address())
+	newValidatorID := ids.GenerateTestNodeID()
 	newValidatorStartTime := uint64(defaultValidateStartTime.Add(5 * time.Second).Unix())
 	newValidatorEndTime := uint64(defaultValidateEndTime.Add(-5 * time.Second).Unix())
 
@@ -318,7 +312,7 @@ func TestAddDelegatorTxExecute(t *testing.T) {
 	}
 }
 
-func TestAddSubnetValidatorTxExecute(t *testing.T) {
+func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	env := newEnvironment()
 	env.ctx.Lock.Lock()
 	defer func() {
@@ -895,7 +889,7 @@ func TestAddSubnetValidatorTxExecute(t *testing.T) {
 	}
 }
 
-func TestAddValidatorTxExecute(t *testing.T) {
+func TestProposalTxExecuteAddValidator(t *testing.T) {
 	env := newEnvironment()
 	env.ctx.Lock.Lock()
 	defer func() {
@@ -904,12 +898,7 @@ func TestAddValidatorTxExecute(t *testing.T) {
 		}
 	}()
 
-	factory := crypto.FactorySECP256K1R{}
-	key, err := factory.NewPrivateKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	nodeID := key.PublicKey().Address()
+	nodeID := ids.GenerateTestNodeID()
 
 	{
 		// Case: Validator's start time too early
@@ -917,8 +906,8 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			env.config.MinValidatorStake,
 			uint64(defaultValidateStartTime.Unix())-1,
 			uint64(defaultValidateEndTime.Unix()),
-			ids.NodeID(nodeID),
 			nodeID,
+			ids.ShortEmpty,
 			reward.PercentDenominator,
 			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
@@ -955,8 +944,8 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			env.config.MinValidatorStake,
 			uint64(defaultValidateStartTime.Add(MaxFutureStartTime).Unix()+1),
 			uint64(defaultValidateStartTime.Add(MaxFutureStartTime).Add(defaultMinStakingDuration).Unix()+1),
-			ids.NodeID(nodeID),
 			nodeID,
+			ids.ShortEmpty,
 			reward.PercentDenominator,
 			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
@@ -993,8 +982,8 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			env.config.MinValidatorStake,
 			uint64(defaultValidateStartTime.Unix()),
 			uint64(defaultValidateEndTime.Unix()),
-			ids.NodeID(nodeID), // node ID
-			nodeID,             // reward address
+			nodeID,
+			ids.ShortEmpty,
 			reward.PercentDenominator,
 			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
@@ -1027,20 +1016,16 @@ func TestAddValidatorTxExecute(t *testing.T) {
 
 	{
 		// Case: Validator in pending validator set of primary network
-		key2, err := testKeyfactory.NewPrivateKey()
-		if err != nil {
-			t.Fatal(err)
-		}
 		startTime := defaultGenesisTime.Add(1 * time.Second)
 		tx, err := env.txBuilder.NewAddValidatorTx(
 			env.config.MinValidatorStake,                            // stake amount
 			uint64(startTime.Unix()),                                // start time
 			uint64(startTime.Add(defaultMinStakingDuration).Unix()), // end time
-			ids.NodeID(nodeID),                                      // node ID
-			key2.PublicKey().Address(),                              // reward address
-			reward.PercentDenominator,                               // shares
+			nodeID,
+			ids.ShortEmpty,
+			reward.PercentDenominator, // shares
 			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
-			ids.ShortEmpty, // change addr // key
+			ids.ShortEmpty, // change addr
 		)
 		if err != nil {
 			t.Fatal(err)
@@ -1090,8 +1075,8 @@ func TestAddValidatorTxExecute(t *testing.T) {
 			env.config.MinValidatorStake,
 			uint64(defaultValidateStartTime.Unix()),
 			uint64(defaultValidateEndTime.Unix()),
-			ids.NodeID(nodeID),
 			nodeID,
+			ids.ShortEmpty,
 			reward.PercentDenominator,
 			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
