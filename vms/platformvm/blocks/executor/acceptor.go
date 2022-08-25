@@ -251,7 +251,6 @@ func (a *acceptor) proposalBlock(b blocks.Block) {
 	//   (The VM's Shutdown method commits the database.)
 	//   The snowman.Engine requires that the last committed block is a decision block
 
-	// See comment for [lastAccepted].
 	a.backend.lastAccepted = b.ID()
 }
 
