@@ -4,59 +4,51 @@
 package worker
 
 import (
-	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 
-	"github.com/spf13/viper"
-)
-
-const (
-	endpointsKey   = "endpoints"
-	baseFeeKey     = "base-fee"
-	priorityFeeKey = "priority-fee"
-	concurrencyKey = "concurrency"
+	"sigs.k8s.io/yaml"
 )
 
 type Config struct {
-	Endpoints   []string
-	Concurrency int
-	BaseFee     uint64
-	PriorityFee uint64
+	Endpoints   []string `json:"endpoints"`
+	Concurrency int      `json:"concurrency"`
+	BaseFee     uint64   `json:"base-fee"`
+	PriorityFee uint64   `json:"priority-fee"`
 }
 
 // LoadConfig parses and validates the [config] in [.simulator]
-func LoadConfig() (*Config, error) {
-	v := viper.New()
-	v.SetConfigName("config")
-	v.AddConfigPath(".simulator")
-	if err := v.ReadInConfig(); err != nil {
-		return nil, fmt.Errorf("%w: unable to read config", err)
+func LoadConfig(configPath string) (cfg *Config, err error) {
+	var d []byte
+	d, err = os.ReadFile(configPath)
+	if err != nil {
+		return nil, err
 	}
-	endpoints := v.GetStringSlice(endpointsKey)
-	if len(endpoints) == 0 {
-		log.Fatal("no available endpoints")
+	cfg = &Config{}
+	if err = yaml.Unmarshal(d, cfg); err != nil {
+		return nil, err
 	}
-	concurrency := v.GetInt(concurrencyKey)
-	if concurrency == 0 {
-		log.Fatal("concurrency is 0")
-	}
-	baseFee := v.GetUint64(baseFeeKey)
-	if baseFee == 0 {
-		log.Fatal("base fee is 0")
-	}
-	// We allow a priority fee of 0, so we don't check this
-	priorityFee := v.GetUint64(priorityFeeKey)
 	log.Printf(
 		"loaded config (endpoints=%v concurrency=%d base fee=%d priority fee=%d)\n",
-		endpoints,
-		baseFee,
-		priorityFee,
-		concurrency,
+		cfg.Endpoints,
+		cfg.BaseFee,
+		cfg.PriorityFee,
+		cfg.Concurrency,
 	)
-	return &Config{
-		Endpoints:   endpoints,
-		Concurrency: concurrency,
-		BaseFee:     baseFee,
-		PriorityFee: priorityFee,
-	}, nil
+	return cfg, nil
+}
+
+const fsModeWrite = 0o600
+
+func (c *Config) Save(p string) error {
+	log.Printf("saving config to %q", p)
+	if err := os.MkdirAll(filepath.Dir(p), fsModeWrite); err != nil {
+		return err
+	}
+	ob, err := yaml.Marshal(c)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(p, ob, fsModeWrite)
 }

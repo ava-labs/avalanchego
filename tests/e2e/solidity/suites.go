@@ -1,20 +1,19 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Implements ping tests, requires network-runner cluster.
+// Implements solidity tests.
 package solidity
 
 import (
 	"fmt"
 	"os/exec"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
-
-	"github.com/onsi/gomega"
-
 	"github.com/ava-labs/subnet-evm/plugin/evm"
 	"github.com/ava-labs/subnet-evm/tests/e2e/runner"
 	"github.com/ava-labs/subnet-evm/tests/e2e/utils"
+
+	ginkgo "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 const vmName = "subnetevm"

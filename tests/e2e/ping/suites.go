@@ -8,11 +8,11 @@ import (
 	"context"
 	"time"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
-
 	"github.com/ava-labs/subnet-evm/tests/e2e/runner"
 	"github.com/ava-labs/subnet-evm/tests/e2e/utils"
+
+	ginkgo "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 var _ = utils.DescribeLocal("[Ping]", func() {

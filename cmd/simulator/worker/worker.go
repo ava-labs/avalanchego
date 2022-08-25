@@ -11,18 +11,13 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/ava-labs/subnet-evm/cmd/simulator/key"
+	"github.com/ava-labs/subnet-evm/cmd/simulator/metrics"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/ethclient"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
 	"golang.org/x/sync/errgroup"
-
-	"github.com/ava-labs/subnet-evm/cmd/simulator/key"
-	"github.com/ava-labs/subnet-evm/cmd/simulator/metrics"
-)
-
-const (
-	workerKeyDir = ".simulator/keys"
 )
 
 var (
@@ -54,11 +49,16 @@ func setupVars(cID *big.Int, bFee uint64, pFee uint64) {
 	minFunderBalance = new(big.Int).Add(maxTransferCost, requestAmount)
 }
 
-func createWorkers(ctx context.Context, keys []*key.Key, endpoints []string, desiredWorkers int) (*worker, []*worker, error) {
+func createWorkers(ctx context.Context, keysDir string, endpoints []string, desiredWorkers int) (*worker, []*worker, error) {
+	keys, err := key.LoadAll(ctx, keysDir)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to load keys: %w", err)
+	}
+
 	var master *worker
 	var workers []*worker
 	for i, k := range keys {
-		worker, err := newWorker(k, endpoints[i%len(endpoints)])
+		worker, err := newWorker(k, endpoints[i%len(endpoints)], keysDir)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -83,9 +83,8 @@ func createWorkers(ctx context.Context, keys []*key.Key, endpoints []string, des
 		}
 	}
 
-	var err error
 	if master == nil {
-		master, err = newWorker(nil, endpoints[rand.Intn(len(endpoints))])
+		master, err = newWorker(nil, endpoints[rand.Intn(len(endpoints))], keysDir)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to create master: %w", err)
 		}
@@ -93,7 +92,7 @@ func createWorkers(ctx context.Context, keys []*key.Key, endpoints []string, des
 
 	for len(workers) < desiredWorkers {
 		i := len(workers)
-		worker, err := newWorker(nil, endpoints[i%len(endpoints)])
+		worker, err := newWorker(nil, endpoints[i%len(endpoints)], keysDir)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to create worker: %w", err)
 		}
@@ -112,7 +111,7 @@ type worker struct {
 	nonce   uint64
 }
 
-func newWorker(k *key.Key, endpoint string) (*worker, error) {
+func newWorker(k *key.Key, endpoint string, keysDir string) (*worker, error) {
 	client, err := ethclient.Dial(endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ethclient: %w", err)
@@ -124,7 +123,7 @@ func newWorker(k *key.Key, endpoint string) (*worker, error) {
 			return nil, fmt.Errorf("problem creating new private key: %w", err)
 		}
 
-		if err := k.Save(workerKeyDir); err != nil {
+		if err := k.Save(keysDir); err != nil {
 			return nil, fmt.Errorf("could not save key: %w", err)
 		}
 	}
@@ -276,13 +275,8 @@ func (w *worker) confirmTransaction(ctx context.Context, tx common.Hash) (*big.I
 
 // Run attempts to apply load to a network specified in .simulator/config.yml
 // and periodically prints metrics about the traffic it generates.
-func Run(ctx context.Context) error {
-	c, err := LoadConfig()
-	if err != nil {
-		return fmt.Errorf("%w: cannot load config", err)
-	}
-
-	rclient, err := ethclient.Dial(c.Endpoints[0])
+func Run(ctx context.Context, cfg *Config, keysDir string) error {
+	rclient, err := ethclient.Dial(cfg.Endpoints[0])
 	if err != nil {
 		return err
 	}
@@ -290,13 +284,9 @@ func Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	setupVars(chainId, c.BaseFee, c.PriorityFee)
+	setupVars(chainId, cfg.BaseFee, cfg.PriorityFee)
 
-	ks, err := key.LoadAll(ctx, workerKeyDir)
-	if err != nil {
-		return fmt.Errorf("unable to load keys: %w", err)
-	}
-	master, workers, err := createWorkers(ctx, ks, c.Endpoints, c.Concurrency)
+	master, workers, err := createWorkers(ctx, keysDir, cfg.Endpoints, cfg.Concurrency)
 	if err != nil {
 		return fmt.Errorf("unable to load available workers: %w", err)
 	}
