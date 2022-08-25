@@ -307,6 +307,21 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	}
 
 	{
+		// include too many transactions
+		statelessProposalBlock, err := blocks.NewBlueberryProposalBlock(
+			nextStakerTime,
+			parentID,
+			blueberryParentBlk.Height()+1,
+			blkTx,
+		)
+		require.NoError(err)
+
+		statelessProposalBlock.Transactions = []*txs.Tx{blkTx}
+		block := env.blkManager.NewBlock(statelessProposalBlock)
+		require.ErrorIs(block.Verify(), errBlueberryProposalBlockWithMultipleTransactions)
+	}
+
+	{
 		// valid
 		statelessProposalBlock, err := blocks.NewBlueberryProposalBlock(
 			nextStakerTime,
