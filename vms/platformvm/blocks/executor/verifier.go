@@ -185,7 +185,7 @@ func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 	atomicExecutor := &executor.AtomicTxExecutor{
 		Backend:       v.txExecutorBackend,
 		ParentID:      parentID,
-		StateVersions: v.backend,
+		StateVersions: v,
 		Tx:            b.Tx,
 	}
 
