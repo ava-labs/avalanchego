@@ -55,7 +55,7 @@ type Mempool interface {
 	Remove(txs []*txs.Tx)
 
 	// Following Blueberry activation, all mempool transactions,
-	// (both decisions and stakers one) are included into Standard blocks.
+	// (both decision and staker) are included into Standard blocks.
 	// HasTxs allow to check for availability of any mempool transaction.
 	HasTxs() bool
 	// PeekTxs returns the next txs for Blueberry blocks
