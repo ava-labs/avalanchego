@@ -34,7 +34,7 @@ var (
 // added to the staking set.
 func verifyAddValidatorTx(
 	backend *Backend,
-	state state.Chain,
+	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddValidatorTx,
 ) (
@@ -78,7 +78,7 @@ func verifyAddValidatorTx(
 		return outs, nil
 	}
 
-	currentTimestamp := state.GetTimestamp()
+	currentTimestamp := chainState.GetTimestamp()
 	// Ensure the proposed validator starts after the current time
 	startTime := tx.StartTime()
 	if !currentTimestamp.Before(startTime) {
@@ -89,7 +89,7 @@ func verifyAddValidatorTx(
 		)
 	}
 
-	_, err := GetValidator(state, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	_, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
 	if err == nil {
 		return nil, fmt.Errorf(
 			"attempted to issue duplicate validation for %s",
@@ -107,7 +107,7 @@ func verifyAddValidatorTx(
 	// Verify the flowcheck
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
-		state,
+		chainState,
 		tx.Ins,
 		outs,
 		sTx.Creds,
@@ -118,9 +118,8 @@ func verifyAddValidatorTx(
 		return nil, fmt.Errorf("failed verifySpend: %w", err)
 	}
 
-	// Make sure the tx doesn't start too far in the future. This is done
-	// last to allow the verifier visitor to explicitly check for this
-	// error.
+	// Make sure the tx doesn't start too far in the future. This is done last
+	// to allow the verifier visitor to explicitly check for this error.
 	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
 	if startTime.After(maxStartTime) {
 		return nil, errFutureStakeTime
@@ -133,7 +132,7 @@ func verifyAddValidatorTx(
 // AddSubnetValidatorTx.
 func verifyAddSubnetValidatorTx(
 	backend *Backend,
-	state state.Chain,
+	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddSubnetValidatorTx,
 ) error {
@@ -161,7 +160,7 @@ func verifyAddSubnetValidatorTx(
 		return nil
 	}
 
-	currentTimestamp := state.GetTimestamp()
+	currentTimestamp := chainState.GetTimestamp()
 	// Ensure the proposed validator starts after the current timestamp
 	validatorStartTime := tx.StartTime()
 	if !currentTimestamp.Before(validatorStartTime) {
@@ -172,7 +171,7 @@ func verifyAddSubnetValidatorTx(
 		)
 	}
 
-	_, err := GetValidator(state, tx.Validator.Subnet, tx.Validator.NodeID)
+	_, err := GetValidator(chainState, tx.Validator.Subnet, tx.Validator.NodeID)
 	if err == nil {
 		return fmt.Errorf(
 			"attempted to issue duplicate subnet validation for %s",
@@ -187,7 +186,7 @@ func verifyAddSubnetValidatorTx(
 		)
 	}
 
-	primaryNetworkValidator, err := GetValidator(state, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to fetch the primary network validator for %s: %w",
@@ -206,7 +205,7 @@ func verifyAddSubnetValidatorTx(
 	baseTxCreds := sTx.Creds[:baseTxCredsLen]
 	subnetCred := sTx.Creds[baseTxCredsLen]
 
-	subnetIntf, _, err := state.GetTx(tx.Validator.Subnet)
+	subnetIntf, _, err := chainState.GetTx(tx.Validator.Subnet)
 	if err != nil {
 		return fmt.Errorf(
 			"couldn't find subnet %q: %w",
@@ -230,7 +229,7 @@ func verifyAddSubnetValidatorTx(
 	// Verify the flowcheck
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
-		state,
+		chainState,
 		tx.Ins,
 		tx.Outs,
 		baseTxCreds,
@@ -241,9 +240,8 @@ func verifyAddSubnetValidatorTx(
 		return err
 	}
 
-	// Make sure the tx doesn't start too far in the future. This is done
-	// last to allow the verifier visitor to explicitly check for this
-	// error.
+	// Make sure the tx doesn't start too far in the future. This is done last
+	// to allow the verifier visitor to explicitly check for this error.
 	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
 	if validatorStartTime.After(maxStartTime) {
 		return errFutureStakeTime
@@ -257,7 +255,7 @@ func verifyAddSubnetValidatorTx(
 // added to the staking set.
 func verifyAddDelegatorTx(
 	backend *Backend,
-	parentState state.Chain,
+	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddDelegatorTx,
 ) (
@@ -292,7 +290,7 @@ func verifyAddDelegatorTx(
 		return outs, nil
 	}
 
-	currentTimestamp := parentState.GetTimestamp()
+	currentTimestamp := chainState.GetTimestamp()
 	// Ensure the proposed validator starts after the current timestamp
 	validatorStartTime := tx.StartTime()
 	if !currentTimestamp.Before(validatorStartTime) {
@@ -303,7 +301,7 @@ func verifyAddDelegatorTx(
 		)
 	}
 
-	primaryNetworkValidator, err := GetValidator(parentState, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to fetch the primary network validator for %s: %w",
@@ -327,7 +325,7 @@ func verifyAddDelegatorTx(
 	newStaker.NextTime = newStaker.StartTime
 	newStaker.Priority = state.PrimaryNetworkDelegatorPendingPriority
 
-	canDelegate, err := canDelegate(parentState, primaryNetworkValidator, maximumWeight, newStaker)
+	canDelegate, err := canDelegate(chainState, primaryNetworkValidator, maximumWeight, newStaker)
 	if err != nil {
 		return nil, err
 	}
@@ -338,7 +336,7 @@ func verifyAddDelegatorTx(
 	// Verify the flowcheck
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
-		parentState,
+		chainState,
 		tx.Ins,
 		outs,
 		sTx.Creds,
@@ -349,9 +347,8 @@ func verifyAddDelegatorTx(
 		return nil, fmt.Errorf("failed verifySpend: %w", err)
 	}
 
-	// Make sure the tx doesn't start too far in the future. This is done
-	// last to allow the verifier visitor to explicitly check for this
-	// error.
+	// Make sure the tx doesn't start too far in the future. This is done last
+	// to allow the verifier visitor to explicitly check for this error.
 	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
 	if validatorStartTime.After(maxStartTime) {
 		return nil, errFutureStakeTime
