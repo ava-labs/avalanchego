@@ -56,6 +56,9 @@ import (
 )
 
 const (
+	pending stakerStatus = iota
+	current
+
 	testNetworkID                 = 10 // To be used in tests
 	defaultWeight                 = 10000
 	maxRecentlyAcceptedWindowSize = 256
@@ -81,6 +84,23 @@ var (
 	genesisBlkID ids.ID
 	testSubnet1  *txs.Tx
 )
+
+type stakerStatus uint
+
+type staker struct {
+	nodeID             ids.NodeID
+	rewardAddress      ids.ShortID
+	startTime, endTime time.Time
+}
+
+type test struct {
+	description           string
+	stakers               []staker
+	subnetStakers         []staker
+	advanceTimeTo         []time.Time
+	expectedStakers       map[ids.NodeID]stakerStatus
+	expectedSubnetStakers map[ids.NodeID]stakerStatus
+}
 
 type environment struct {
 	blkManager Manager
@@ -469,4 +489,43 @@ func shutdownEnvironment(t *environment) error {
 	}
 	errs.Add(t.baseDB.Close())
 	return errs.Err
+}
+
+func addPendingValidator(
+	env *environment,
+	startTime time.Time,
+	endTime time.Time,
+	nodeID ids.NodeID,
+	rewardAddress ids.ShortID,
+	keys []*crypto.PrivateKeySECP256K1R,
+) (*txs.Tx, error) {
+	addPendingValidatorTx, err := env.txBuilder.NewAddValidatorTx(
+		env.config.MinValidatorStake,
+		uint64(startTime.Unix()),
+		uint64(endTime.Unix()),
+		nodeID,
+		rewardAddress,
+		reward.PercentDenominator,
+		keys,
+		ids.ShortEmpty,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	staker := state.NewPrimaryNetworkStaker(
+		addPendingValidatorTx.ID(),
+		&addPendingValidatorTx.Unsigned.(*txs.AddValidatorTx).Validator,
+	)
+	staker.NextTime = staker.StartTime
+	staker.Priority = state.PrimaryNetworkValidatorPendingPriority
+
+	env.state.PutPendingValidator(staker)
+	env.state.AddTx(addPendingValidatorTx, status.Committed)
+	dummyHeight := uint64(1)
+	env.state.SetHeight(dummyHeight)
+	if err := env.state.Commit(); err != nil {
+		return nil, err
+	}
+	return addPendingValidatorTx, nil
 }
