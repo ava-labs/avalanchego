@@ -217,6 +217,7 @@ func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 		timestamp:      atomicExecutor.OnAccept.GetTimestamp(),
 		atomicRequests: atomicExecutor.AtomicRequests,
 	}
+
 	v.Mempool.RemoveTxs([]*txs.Tx{b.Tx})
 	return nil
 }
