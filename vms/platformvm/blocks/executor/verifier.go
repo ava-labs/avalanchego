@@ -58,12 +58,6 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 		return err
 	}
 
-	// following Blueberry fork activation, proposal blocks
-	// are used only to vote over validators reward
-	if tx, ok := b.Tx.Unsigned.(*txs.RewardValidatorTx); !ok {
-		return fmt.Errorf("expected RewardValidatorTx, got %T", tx)
-	}
-
 	parentID := b.Parent()
 	onCommitState, err := state.NewDiff(parentID, v.backend)
 	if err != nil {

@@ -48,7 +48,7 @@ var (
 	errShouldBeDSValidator               = errors.New("expected validator to be in the primary network")
 	errWrongTxType                       = errors.New("wrong transaction type")
 	errInvalidID                         = errors.New("invalid ID")
-	errEmptyNodeID                       = errors.New("validator nodeID cannot be empty")
+	errProposedAddStakerTxAfterBlueberry = errors.New("staker transaction proposed after Blueberry")
 	errAdvanceTimeTxIssuedAfterBlueberry = errors.New("AdvanceTimeTx issued after Blueberry")
 )
 
@@ -78,16 +78,18 @@ func (*ProposalTxExecutor) CreateSubnetTx(*txs.CreateSubnetTx) error { return er
 func (*ProposalTxExecutor) ImportTx(*txs.ImportTx) error             { return errWrongTxType }
 func (*ProposalTxExecutor) ExportTx(*txs.ExportTx) error             { return errWrongTxType }
 
-// AddValidatorTx has been a proposal transaction till Blueberry fork
-// activation. Following Blueberry activation, AddValidatorTx must be included
-// into standard Blocks.
 func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
-	// Blueberry disallows creating a validator with the empty ID.
+	// AddValidatorTx is a proposal transaction until the Blueberry fork
+	// activation. Following the activation, AddValidatorTxs must be issued into
+	// StandardBlocks.
 	currentTimestamp := e.OnCommitState.GetTimestamp()
 	if e.Config.IsBlueberryActivated(currentTimestamp) {
-		if tx.Validator.NodeID == ids.EmptyNodeID {
-			return errEmptyNodeID
-		}
+		return fmt.Errorf(
+			"%w: timestamp (%s) >= Blueberry fork time (%s)",
+			errProposedAddStakerTxAfterBlueberry,
+			currentTimestamp,
+			e.Config.BlueberryTime,
+		)
 	}
 
 	outs, err := addValidatorValidation(
@@ -123,10 +125,20 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	return nil
 }
 
-// AddSubnetValidatorTx has been a proposal transaction till Blueberry fork
-// activation. Following Blueberry activation, AddSubnetValidatorTx must be included
-// into standard Blocks.
 func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
+	// AddSubnetValidatorTx is a proposal transaction until the Blueberry fork
+	// activation. Following the activation, AddSubnetValidatorTxs must be
+	// issued into StandardBlocks.
+	currentTimestamp := e.OnCommitState.GetTimestamp()
+	if e.Config.IsBlueberryActivated(currentTimestamp) {
+		return fmt.Errorf(
+			"%w: timestamp (%s) >= Blueberry fork time (%s)",
+			errProposedAddStakerTxAfterBlueberry,
+			currentTimestamp,
+			e.Config.BlueberryTime,
+		)
+	}
+
 	if err := addSubnetValidatorValidation(
 		e.Backend,
 		e.OnCommitState,
@@ -163,6 +175,19 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 // activation. Following Blueberry activation, AddDelegatorTx must be included
 // into standard Blocks.
 func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
+	// AddDelegatorTx is a proposal transaction until the Blueberry fork
+	// activation. Following the activation, AddDelegatorTxs must be issued into
+	// StandardBlocks.
+	currentTimestamp := e.OnCommitState.GetTimestamp()
+	if e.Config.IsBlueberryActivated(currentTimestamp) {
+		return fmt.Errorf(
+			"%w: timestamp (%s) >= Blueberry fork time (%s)",
+			errProposedAddStakerTxAfterBlueberry,
+			currentTimestamp,
+			e.Config.BlueberryTime,
+		)
+	}
+
 	outs, err := addDelegatorValidation(
 		e.Backend,
 		e.OnCommitState,
@@ -172,6 +197,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	if err != nil {
 		return err
 	}
+
 	txID := e.Tx.ID()
 
 	// Set up the state if this tx is committed
