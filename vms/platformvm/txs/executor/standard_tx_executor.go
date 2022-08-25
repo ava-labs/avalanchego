@@ -313,7 +313,7 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		return errEmptyNodeID
 	}
 
-	if _, err := addValidatorValidation(
+	if _, err := verifyAddValidatorTx(
 		e.Backend,
 		e.State,
 		e.Tx,
@@ -349,7 +349,7 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		)
 	}
 
-	if err := addSubnetValidatorValidation(
+	if err := verifyAddSubnetValidatorTx(
 		e.Backend,
 		e.State,
 		e.Tx,
@@ -385,7 +385,7 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		)
 	}
 
-	if _, err := addDelegatorValidation(
+	if _, err := verifyAddDelegatorTx(
 		e.Backend,
 		e.State,
 		e.Tx,
