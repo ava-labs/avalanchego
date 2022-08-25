@@ -84,7 +84,7 @@ func (*ProposalTxExecutor) ExportTx(*txs.ExportTx) error             { return er
 func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	// Blueberry disallows creating a validator with the empty ID.
 	currentTimestamp := e.OnCommitState.GetTimestamp()
-	if !currentTimestamp.Before(e.Config.BlueberryTime) {
+	if e.Config.IsBlueberryActivated(currentTimestamp) {
 		if tx.Validator.NodeID == ids.EmptyNodeID {
 			return errEmptyNodeID
 		}

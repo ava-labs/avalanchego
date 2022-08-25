@@ -68,6 +68,11 @@ func (m *blockMetrics) BlueberryCommitBlock(*blocks.BlueberryCommitBlock) error 
 
 func (m *blockMetrics) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) error {
 	m.numProposalBlocks.Inc()
+	for _, tx := range b.Transactions {
+		if err := tx.Unsigned.Visit(m.txMetrics); err != nil {
+			return err
+		}
+	}
 	return b.Tx.Unsigned.Visit(m.txMetrics)
 }
 

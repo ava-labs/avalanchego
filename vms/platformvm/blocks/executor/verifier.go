@@ -19,13 +19,14 @@ import (
 var (
 	_ blocks.Visitor = &verifier{}
 
-	errBlueberryBlockIssuedBeforeFork        = errors.New("blueberry block issued before fork")
-	errApricotBlockIssuedAfterFork           = errors.New("apricot block issued after fork")
-	errBlueberryStandardBlockWithoutChanges  = errors.New("BlueberryStandardBlock performs no state changes")
-	errChildBlockEarlierThanParent           = errors.New("proposed timestamp before current chain time")
-	errConflictingBatchTxs                   = errors.New("block contains conflicting transactions")
-	errConflictingParentTxs                  = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
-	errOptionBlockTimestampNotMatchingParent = errors.New("option block proposed timestamp not matching parent block one")
+	errBlueberryBlockIssuedBeforeFork                 = errors.New("blueberry block issued before fork")
+	errApricotBlockIssuedAfterFork                    = errors.New("apricot block issued after fork")
+	errBlueberryProposalBlockWithMultipleTransactions = errors.New("BlueberryProposalBlock contains multiple transactions")
+	errBlueberryStandardBlockWithoutChanges           = errors.New("BlueberryStandardBlock performs no state changes")
+	errChildBlockEarlierThanParent                    = errors.New("proposed timestamp before current chain time")
+	errConflictingBatchTxs                            = errors.New("block contains conflicting transactions")
+	errConflictingParentTxs                           = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
+	errOptionBlockTimestampNotMatchingParent          = errors.New("option block proposed timestamp not matching parent block one")
 )
 
 // verifier handles the logic for verifying a block.
@@ -49,6 +50,10 @@ func (v *verifier) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
 }
 
 func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) error {
+	if len(b.Transactions) != 0 {
+		return errBlueberryProposalBlockWithMultipleTransactions
+	}
+
 	if err := v.blueberryNonOptionBlock(b); err != nil {
 		return err
 	}
