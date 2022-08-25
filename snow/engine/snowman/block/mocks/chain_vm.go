@@ -159,45 +159,45 @@ func (mr *MockChainVMMockRecorder) CreateStaticHandlers() *gomock.Call {
 }
 
 // CrossChainAppRequest mocks base method.
-func (m *MockChainVM) CrossChainAppRequest(sourceChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+func (m *MockChainVM) CrossChainAppRequest(requestingChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CrossChainAppRequest", sourceChainID, requestID, deadline, request)
+	ret := m.ctrl.Call(m, "CrossChainAppRequest", requestingChainID, requestID, deadline, request)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CrossChainAppRequest indicates an expected call of CrossChainAppRequest.
-func (mr *MockChainVMMockRecorder) CrossChainAppRequest(sourceChainID, requestID, deadline, request interface{}) *gomock.Call {
+func (mr *MockChainVMMockRecorder) CrossChainAppRequest(requestingChainID, requestID, deadline, request interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CrossChainAppRequest", reflect.TypeOf((*MockChainVM)(nil).CrossChainAppRequest), sourceChainID, requestID, deadline, request)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CrossChainAppRequest", reflect.TypeOf((*MockChainVM)(nil).CrossChainAppRequest), requestingChainID, requestID, deadline, request)
 }
 
 // CrossChainAppRequestFailed mocks base method.
-func (m *MockChainVM) CrossChainAppRequestFailed(sourceChainID ids.ID, requestID uint32) error {
+func (m *MockChainVM) CrossChainAppRequestFailed(respondingChainID ids.ID, requestID uint32) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CrossChainAppRequestFailed", sourceChainID, requestID)
+	ret := m.ctrl.Call(m, "CrossChainAppRequestFailed", respondingChainID, requestID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CrossChainAppRequestFailed indicates an expected call of CrossChainAppRequestFailed.
-func (mr *MockChainVMMockRecorder) CrossChainAppRequestFailed(sourceChainID, requestID interface{}) *gomock.Call {
+func (mr *MockChainVMMockRecorder) CrossChainAppRequestFailed(respondingChainID, requestID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CrossChainAppRequestFailed", reflect.TypeOf((*MockChainVM)(nil).CrossChainAppRequestFailed), sourceChainID, requestID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CrossChainAppRequestFailed", reflect.TypeOf((*MockChainVM)(nil).CrossChainAppRequestFailed), respondingChainID, requestID)
 }
 
 // CrossChainAppResponse mocks base method.
-func (m *MockChainVM) CrossChainAppResponse(destinationChainID ids.ID, requestID uint32, response []byte) error {
+func (m *MockChainVM) CrossChainAppResponse(respondingChainID ids.ID, requestID uint32, response []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CrossChainAppResponse", destinationChainID, requestID, response)
+	ret := m.ctrl.Call(m, "CrossChainAppResponse", respondingChainID, requestID, response)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CrossChainAppResponse indicates an expected call of CrossChainAppResponse.
-func (mr *MockChainVMMockRecorder) CrossChainAppResponse(destinationChainID, requestID, response interface{}) *gomock.Call {
+func (mr *MockChainVMMockRecorder) CrossChainAppResponse(respondingChainID, requestID, response interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CrossChainAppResponse", reflect.TypeOf((*MockChainVM)(nil).CrossChainAppResponse), destinationChainID, requestID, response)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CrossChainAppResponse", reflect.TypeOf((*MockChainVM)(nil).CrossChainAppResponse), respondingChainID, requestID, response)
 }
 
 // Disconnected mocks base method.

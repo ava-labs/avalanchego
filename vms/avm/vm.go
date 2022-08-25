@@ -5,12 +5,11 @@ package avm
 
 import (
 	"container/list"
+	stdjson "encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
 	"time"
-
-	stdjson "encoding/json"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -1047,15 +1046,15 @@ func (vm *VM) lookupAssetID(asset string) (ids.ID, error) {
 	return ids.ID{}, fmt.Errorf("asset '%s' not found", asset)
 }
 
-func (vm *VM) CrossChainAppRequest(sourceChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+func (vm *VM) CrossChainAppRequest(requestingChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
 	return nil
 }
 
-func (vm *VM) CrossChainAppRequestFailed(sourceChainID ids.ID, requestID uint32) error {
+func (vm *VM) CrossChainAppRequestFailed(respondingChainID ids.ID, requestID uint32) error {
 	return nil
 }
 
-func (vm *VM) CrossChainAppResponse(destinationChainID ids.ID, requestID uint32, response []byte) error {
+func (vm *VM) CrossChainAppResponse(respondingChainID ids.ID, requestID uint32, response []byte) error {
 	return nil
 }
 

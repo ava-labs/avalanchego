@@ -477,7 +477,7 @@ func (vm *VMServer) Version(context.Context, *emptypb.Empty) (*vmpb.VersionRespo
 }
 
 func (vm *VMServer) CrossChainAppRequest(ctx context.Context, msg *vmpb.CrossChainAppRequestMsg) (*emptypb.Empty, error) {
-	chainID, err := ids.ToID(msg.ChainId)
+	requestingChainID, err := ids.ToID(msg.RequestingChainId)
 	if err != nil {
 		return nil, err
 	}
@@ -485,23 +485,23 @@ func (vm *VMServer) CrossChainAppRequest(ctx context.Context, msg *vmpb.CrossCha
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.CrossChainAppRequest(chainID, msg.RequestId, deadline, msg.Request)
+	return &emptypb.Empty{}, vm.vm.CrossChainAppRequest(requestingChainID, msg.RequestId, deadline, msg.Request)
 }
 
 func (vm *VMServer) CrossChainAppRequestFailed(ctx context.Context, msg *vmpb.CrossChainAppRequestFailedMsg) (*emptypb.Empty, error) {
-	chainID, err := ids.ToID(msg.ChainId)
+	respondingChainID, err := ids.ToID(msg.RespondingChainId)
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.CrossChainAppRequestFailed(chainID, msg.RequestId)
+	return &emptypb.Empty{}, vm.vm.CrossChainAppRequestFailed(respondingChainID, msg.RequestId)
 }
 
 func (vm *VMServer) CrossChainAppResponse(ctx context.Context, msg *vmpb.CrossChainAppResponseMsg) (*emptypb.Empty, error) {
-	chainID, err := ids.ToID(msg.ChainId)
+	respondingChainID, err := ids.ToID(msg.RespondingChainId)
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.CrossChainAppResponse(chainID, msg.RequestId, msg.Response)
+	return &emptypb.Empty{}, vm.vm.CrossChainAppResponse(respondingChainID, msg.RequestId, msg.Response)
 }
 
 func (vm *VMServer) AppRequest(_ context.Context, req *vmpb.AppRequestMsg) (*emptypb.Empty, error) {

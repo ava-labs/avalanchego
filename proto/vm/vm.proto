@@ -215,7 +215,7 @@ message AppGossipMsg {
 
 message CrossChainAppRequestMsg {
   // The chain that sent us this request
-  bytes chain_id = 1;
+  bytes requesting_chain_id = 1;
   // The ID of this request
   uint32 request_id = 2;
   // deadline for this request
@@ -226,14 +226,14 @@ message CrossChainAppRequestMsg {
 
 message CrossChainAppRequestFailedMsg {
   // The chain that we failed to get a response from
-  bytes chain_id = 1;
+  bytes responding_chain_id = 1;
   // The ID of the request we sent and didn't get a response to
   uint32 request_id = 2;
 }
 
 message CrossChainAppResponseMsg {
   // The chain that we got a response from
-  bytes chain_id = 1;
+  bytes responding_chain_id = 1;
   // Request ID of request that this is in response to
   uint32 request_id = 2;
   // The response body
