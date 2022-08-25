@@ -123,17 +123,13 @@ func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
 	return subnetID, nil
 }
 
-func newEnvironment(t *testing.T, mockResetBlockTimer bool) *environment {
-	var (
-		res = &environment{}
-		err error
-	)
-
-	res.isBootstrapped = &utils.AtomicBool{}
+func newEnvironment(t *testing.T) *environment {
+	res := &environment{
+		isBootstrapped: &utils.AtomicBool{},
+		config:         defaultConfig(),
+		clk:            defaultClock(),
+	}
 	res.isBootstrapped.SetValue(true)
-
-	res.config = defaultConfig()
-	res.clk = defaultClock()
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	res.baseDB = versiondb.New(baseDBManager.Current().Database)
@@ -188,12 +184,7 @@ func newEnvironment(t *testing.T, mockResetBlockTimer bool) *environment {
 		panic(fmt.Errorf("failed to create metrics: %w", err))
 	}
 
-	if mockResetBlockTimer {
-		dummy := &noopBlkTimer{}
-		res.mempool, err = mempool.NewMempool("mempool", registerer, dummy)
-	} else {
-		res.mempool, err = mempool.NewMempool("mempool", registerer, res)
-	}
+	res.mempool, err = mempool.NewMempool("mempool", registerer, res)
 
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
@@ -218,12 +209,11 @@ func newEnvironment(t *testing.T, mockResetBlockTimer bool) *environment {
 	res.Builder.SetPreference(genesisID)
 	addSubnet(res)
 
+	res.ResetBlockTimer()
 	return res
 }
 
-func addSubnet(
-	env *environment,
-) {
+func addSubnet(env *environment) {
 	// Create a subnet
 	var err error
 	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(

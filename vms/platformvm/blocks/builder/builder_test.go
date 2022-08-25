@@ -25,7 +25,7 @@ import (
 func TestBlockBuilderAddLocalTx(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, false /*mockResetBlockTimer*/)
+	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
@@ -60,7 +60,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, false /*mockResetBlockTimer*/)
+	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
@@ -105,7 +105,7 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 }
 
 func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
-	env := newEnvironment(t, false /*mockResetBlockTimer*/)
+	env := newEnvironment(t)
 	env.ctx.Lock.Lock()
 	env.isBootstrapped.SetValue(false)
 	env.ctx.Log = logging.NoWarn{}
