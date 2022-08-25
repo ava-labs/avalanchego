@@ -120,16 +120,12 @@ func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
 }
 
 func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
-	var (
-		res = &environment{}
-		err error
-	)
-
-	res.isBootstrapped = &utils.AtomicBool{}
+	res := &environment{
+		isBootstrapped: &utils.AtomicBool{},
+		config:         defaultConfig(),
+		clk:            defaultClock(),
+	}
 	res.isBootstrapped.SetValue(true)
-
-	res.config = defaultConfig()
-	res.clk = defaultClock()
 
 	baseDBManager := db_manager.NewMemDB(version.Semantic1_0_0)
 	res.baseDB = versiondb.New(baseDBManager.Current().Database)
@@ -193,6 +189,8 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	res.sender = &common.SenderTest{T: t}
 
 	metrics := metrics.Noop
+
+	var err error
 	res.mempool, err = mempool.NewMempool("mempool", registerer, res)
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
