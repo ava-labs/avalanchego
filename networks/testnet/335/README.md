@@ -6,6 +6,8 @@
 | :-------------------- | ---------------------------------------------------------------: |
 | Subnet Name           |                                        DeFi Kingdoms Fuji Subnet |
 | Chain Name            |                                                         DfkChain |
+| Subnet ID             |                XHLRR9cvMtCR8KZsjU8nLxg1JbV7aS23AcLVeBMVHLKkSBriS |
+| VM ID                 |                mDV3QWRXfwgKUWb9sggkv4vQxAQR4y2CyKrt5pLZ5SzQ7EHBv |
 | Blockchain ID         |               2pDrf9iZaP8eBGmhut8NhERLMw9QyFjoebiiPMgwbwbxagaP6Z |
 | Eth Chain ID          |                                                              335 |
 | RPC URL               | https://subnets.avax.network/defi-kingdoms/dfk-chain-testnet/rpc |

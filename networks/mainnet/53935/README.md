@@ -6,6 +6,8 @@
 | :-------------------- | -------------------------------------------------------: |
 | Subnet Name           |                                     DeFi Kingdoms Subnet |
 | Chain Name            |                                                DFK Chain |
+| Subnet ID             |        Vn3aX6hNRstj5VHHm63TCgPNaeGnRSqCYXQqemSqDd2TQH4qJ |
+| VM ID                 |        mDV3QWRXfwgKUWb9sggkv4vQxAQR4y2CyKrt5pLZ5SzQ7EHBv |
 | Blockchain ID         |        q2aTwKuyzgs8pynF7UXBZCU7DejbZbZ6EUyHr3JQzYgwNPUPi |
 | Eth Chain ID          |                                                    53935 |
 | RPC URL               | https://subnets.avax.network/defi-kingdoms/dfk-chain/rpc |
