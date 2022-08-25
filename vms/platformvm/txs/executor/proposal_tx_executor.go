@@ -171,9 +171,6 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	return nil
 }
 
-// AddDelegatorTx has been a proposal transaction till Blueberry fork
-// activation. Following Blueberry activation, AddDelegatorTx must be included
-// into standard Blocks.
 func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	// AddDelegatorTx is a proposal transaction until the Blueberry fork
 	// activation. Following the activation, AddDelegatorTxs must be issued into
