@@ -45,7 +45,7 @@ func NewStatusState(db database.Database) StatusState {
 }
 
 func NewMeteredStatusState(db database.Database, metrics prometheus.Registerer) (StatusState, error) {
-	cache, err := metercacher.New(
+	cache, err := metercacher.New[ids.ID, *choices.Status](
 		"status_cache",
 		metrics,
 		&cache.LRU[ids.ID, *choices.Status]{Size: statusCacheSize},

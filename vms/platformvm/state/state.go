@@ -367,7 +367,7 @@ func new(
 
 	validatorDiffsDB := prefixdb.New(validatorDiffsPrefix, validatorsDB)
 
-	validatorDiffsCache, err := metercacher.New(
+	validatorDiffsCache, err := metercacher.New[string, map[ids.NodeID]*ValidatorWeightDiff](
 		"validator_diffs_cache",
 		metricsReg,
 		&cache.LRU[string, map[ids.NodeID]*ValidatorWeightDiff]{Size: validatorDiffsCacheSize},
@@ -376,7 +376,7 @@ func new(
 		return nil, err
 	}
 
-	txCache, err := metercacher.New(
+	txCache, err := metercacher.New[ids.ID, *txAndStatus](
 		"tx_cache",
 		metricsReg,
 		&cache.LRU[ids.ID, *txAndStatus]{Size: txCacheSize},
@@ -386,7 +386,7 @@ func new(
 	}
 
 	rewardUTXODB := prefixdb.New(rewardUTXOsPrefix, baseDB)
-	rewardUTXOsCache, err := metercacher.New(
+	rewardUTXOsCache, err := metercacher.New[ids.ID, []*avax.UTXO](
 		"reward_utxos_cache",
 		metricsReg,
 		&cache.LRU[ids.ID, []*avax.UTXO]{Size: rewardUTXOsCacheSize},
@@ -403,7 +403,7 @@ func new(
 
 	subnetBaseDB := prefixdb.New(subnetPrefix, baseDB)
 
-	chainCache, err := metercacher.New(
+	chainCache, err := metercacher.New[ids.ID, []*txs.Tx](
 		"chain_cache",
 		metricsReg,
 		&cache.LRU[ids.ID, []*txs.Tx]{Size: chainCacheSize},
@@ -412,7 +412,7 @@ func new(
 		return nil, err
 	}
 
-	chainDBCache, err := metercacher.New(
+	chainDBCache, err := metercacher.New[ids.ID, linkeddb.LinkedDB](
 		"chain_db_cache",
 		metricsReg,
 		&cache.LRU[ids.ID, linkeddb.LinkedDB]{Size: chainDBCacheSize},

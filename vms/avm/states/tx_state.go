@@ -40,7 +40,7 @@ type txState struct {
 }
 
 func NewTxState(db database.Database, parser txs.Parser, metrics prometheus.Registerer) (TxState, error) {
-	cache, err := metercacher.New(
+	cache, err := metercacher.New[ids.ID, *txs.Tx](
 		"tx_cache",
 		metrics,
 		&cache.LRU[ids.ID, *txs.Tx]{Size: txCacheSize},

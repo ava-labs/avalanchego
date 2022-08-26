@@ -165,8 +165,8 @@ func (vtx *uniqueVertex) setStatus(status choices.Status) error {
 	return vtx.serializer.state.SetStatus(vtx.ID(), status)
 }
 
-func (vtx *uniqueVertex) ID() ids.ID       { return vtx.id }
-func (vtx *uniqueVertex) Key() interface{} { return vtx.id }
+func (vtx *uniqueVertex) ID() ids.ID  { return vtx.id }
+func (vtx *uniqueVertex) Key() ids.ID { return vtx.id }
 
 func (vtx *uniqueVertex) Accept() error {
 	if err := vtx.setStatus(choices.Accepted); err != nil {

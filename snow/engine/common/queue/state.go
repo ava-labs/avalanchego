@@ -60,7 +60,13 @@ func newState(
 	metricsRegisterer prometheus.Registerer,
 ) (*state, error) {
 	jobsCacheMetricsNamespace := fmt.Sprintf("%s_jobs_cache", metricsNamespace)
-	jobsCache, err := metercacher.New(jobsCacheMetricsNamespace, metricsRegisterer, &cache.LRU[ids.ID, linkeddb.LinkedDB]{Size: jobsCacheSize})
+	jobsCache, err := metercacher.New[ids.ID, Job](
+		jobsCacheMetricsNamespace,
+		metricsRegisterer,
+		&cache.LRU[ids.ID, Job]{
+			Size: jobsCacheSize,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create metered cache: %w", err)
 	}

@@ -109,7 +109,7 @@ type VM struct {
 
 	addressTxsIndexer index.AddressTxsIndexer
 
-	uniqueTxs cache.Deduplicator
+	uniqueTxs cache.Deduplicator[*UniqueTx]
 }
 
 func (vm *VM) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
@@ -222,7 +222,7 @@ func (vm *VM) Initialize(
 	go ctx.Log.RecoverAndPanic(vm.timer.Dispatch)
 	vm.batchTimeout = batchTimeout
 
-	vm.uniqueTxs = &cache.EvictableLRU{
+	vm.uniqueTxs = &cache.EvictableLRU[ids.ID, *UniqueTx]{
 		Size: txDeduplicatorSize,
 	}
 	vm.walletService.vm = vm

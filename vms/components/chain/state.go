@@ -142,7 +142,7 @@ func NewMeteredState(
 	registerer prometheus.Registerer,
 	config *Config,
 ) (*State, error) {
-	decidedCache, err := metercacher.New(
+	decidedCache, err := metercacher.New[ids.ID, *BlockWrapper](
 		"decided_cache",
 		registerer,
 		&cache.LRU[ids.ID, *BlockWrapper]{Size: config.DecidedCacheSize},
@@ -150,7 +150,7 @@ func NewMeteredState(
 	if err != nil {
 		return nil, err
 	}
-	missingCache, err := metercacher.New(
+	missingCache, err := metercacher.New[ids.ID, struct{}](
 		"missing_cache",
 		registerer,
 		&cache.LRU[ids.ID, struct{}]{Size: config.MissingCacheSize},
@@ -158,7 +158,7 @@ func NewMeteredState(
 	if err != nil {
 		return nil, err
 	}
-	unverifiedCache, err := metercacher.New(
+	unverifiedCache, err := metercacher.New[ids.ID, *BlockWrapper](
 		"unverified_cache",
 		registerer,
 		&cache.LRU[ids.ID, *BlockWrapper]{Size: config.UnverifiedCacheSize},
@@ -166,7 +166,7 @@ func NewMeteredState(
 	if err != nil {
 		return nil, err
 	}
-	bytesToIDCache, err := metercacher.New(
+	bytesToIDCache, err := metercacher.New[string, ids.ID](
 		"bytes_to_id_cache",
 		registerer,
 		&cache.LRU[string, ids.ID]{Size: config.BytesToIDCacheSize},

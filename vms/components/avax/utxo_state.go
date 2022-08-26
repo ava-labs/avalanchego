@@ -83,7 +83,7 @@ func NewUTXOState(db database.Database, codec codec.Manager) UTXOState {
 }
 
 func NewMeteredUTXOState(db database.Database, codec codec.Manager, metrics prometheus.Registerer) (UTXOState, error) {
-	utxoCache, err := metercacher.New(
+	utxoCache, err := metercacher.New[ids.ID, *UTXO](
 		"utxo_cache",
 		metrics,
 		&cache.LRU[ids.ID, *UTXO]{Size: utxoCacheSize},
@@ -92,7 +92,7 @@ func NewMeteredUTXOState(db database.Database, codec codec.Manager, metrics prom
 		return nil, err
 	}
 
-	indexCache, err := metercacher.New(
+	indexCache, err := metercacher.New[string, linkeddb.LinkedDB](
 		"index_cache",
 		metrics,
 		&cache.LRU[string, linkeddb.LinkedDB]{
