@@ -123,7 +123,7 @@ func TestProposalTxsInMempool(t *testing.T) {
 	// txs should not be already there
 	require.False(mpool.HasStakerTx())
 
-	for _, tx := range proposalTxs {
+	for i, tx := range proposalTxs {
 		require.False(mpool.Has(tx.ID()))
 
 		// we can insert
@@ -137,10 +137,29 @@ func TestProposalTxsInMempool(t *testing.T) {
 		require.True(retrieved != nil)
 		require.Equal(tx, retrieved)
 
-		// we can peek it
-		peeked := mpool.PeekStakerTx()
-		require.True(peeked != nil)
-		require.Equal(tx, peeked)
+		{
+			// we can peek it
+			peeked := mpool.PeekStakerTx()
+			require.True(peeked != nil)
+			require.Equal(tx, peeked)
+		}
+
+		{
+			// we can peek it
+			peeked := mpool.PeekTxs(math.MaxInt)
+			require.Len(peeked, i+1)
+
+			// tx will be among those peeked,
+			// in NO PARTICULAR ORDER
+			found := false
+			for _, pk := range peeked {
+				if pk.ID() == tx.ID() {
+					found = true
+					break
+				}
+			}
+			require.True(found)
+		}
 
 		// once removed it cannot be there
 		mpool.Remove([]*txs.Tx{tx})

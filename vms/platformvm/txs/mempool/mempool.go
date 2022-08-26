@@ -242,8 +242,7 @@ func (m *mempool) HasTxs() bool {
 func (m *mempool) PeekTxs(maxTxsBytes int) []*txs.Tx {
 	txs, size := m.peekApricotDecisionTxs(maxTxsBytes)
 
-	for m.HasStakerTx() {
-		tx := m.PeekStakerTx()
+	for _, tx := range m.unissuedStakerTxs.List() {
 		size += len(tx.Bytes())
 		if size > maxTxsBytes {
 			break
