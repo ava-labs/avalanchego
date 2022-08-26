@@ -18,7 +18,7 @@ func (e *evictable[T]) Key() T { return e.id }
 func (e *evictable[T]) Evict() { e.evicted++ }
 
 func TestEvictableLRU(t *testing.T) {
-	cache := EvictableLRU[ids.ID, int]{}
+	cache := EvictableLRU[ids.ID, *evictable[ids.ID]]{}
 
 	expectedValue1 := &evictable[ids.ID]{id: ids.ID{1}}
 	if returnedValue := cache.Deduplicate(expectedValue1).(*evictable[ids.ID]); returnedValue != expectedValue1 {

@@ -109,7 +109,7 @@ type VM struct {
 
 	addressTxsIndexer index.AddressTxsIndexer
 
-	uniqueTxs cache.Deduplicator[*UniqueTx]
+	uniqueTxs cache.Deduplicator[ids.ID, *UniqueTx]
 }
 
 func (vm *VM) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {

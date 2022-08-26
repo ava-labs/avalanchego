@@ -12,7 +12,7 @@ import (
 // var _ Deduplicator = &EvictableLRU{}
 
 // EvictableLRU is an LRU cache that notifies the objects when they are evicted.
-type EvictableLRU[T comparable, K any] struct {
+type EvictableLRU[T comparable, K Evictable[T]] struct {
 	lock      sync.Mutex
 	entryMap  map[T]*list.Element
 	entryList *list.List

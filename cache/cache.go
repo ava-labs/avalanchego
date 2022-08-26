@@ -23,14 +23,12 @@ type Cacher[T comparable, K any] interface {
 
 // Evictable allows the object to be notified when it is evicted
 type Evictable[T comparable] interface {
-	// Key must return a comparable value as defined by
-	// https://golang.org/ref/spec#Comparison_operators.
 	Key() T
 	Evict()
 }
 
 // Deduplicator acts as a best effort deduplication service
-type Deduplicator[T comparable] interface {
+type Deduplicator[T comparable, K Evictable[T]] interface {
 	// Deduplicate returns either the provided value, or a previously provided
 	// value with the same ID that hasn't yet been evicted
 	Deduplicate(Evictable[T]) Evictable[T]
