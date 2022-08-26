@@ -19,21 +19,21 @@ type EvictableLRU[T comparable, K Evictable[T]] struct {
 	Size      int
 }
 
-func (c *EvictableLRU[T, K]) Deduplicate(value Evictable[T]) Evictable[T] {
+func (c *EvictableLRU[T, _]) Deduplicate(value Evictable[T]) Evictable[T] {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	return c.deduplicate(value)
 }
 
-func (c *EvictableLRU[T, K]) Flush() {
+func (c *EvictableLRU[_, _]) Flush() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.flush()
 }
 
-func (c *EvictableLRU[T, K]) init() {
+func (c *EvictableLRU[T, _]) init() {
 	if c.entryMap == nil {
 		c.entryMap = make(map[T]*list.Element)
 	}
@@ -45,7 +45,7 @@ func (c *EvictableLRU[T, K]) init() {
 	}
 }
 
-func (c *EvictableLRU[T, K]) resize() {
+func (c *EvictableLRU[T, _]) resize() {
 	for c.entryList.Len() > c.Size {
 		e := c.entryList.Front()
 		c.entryList.Remove(e)
@@ -56,7 +56,7 @@ func (c *EvictableLRU[T, K]) resize() {
 	}
 }
 
-func (c *EvictableLRU[T, K]) deduplicate(value Evictable[T]) Evictable[T] {
+func (c *EvictableLRU[T, _]) deduplicate(value Evictable[T]) Evictable[T] {
 	c.init()
 	c.resize()
 
@@ -84,7 +84,7 @@ func (c *EvictableLRU[T, K]) deduplicate(value Evictable[T]) Evictable[T] {
 	return value
 }
 
-func (c *EvictableLRU[T, K]) flush() {
+func (c *EvictableLRU[_, _]) flush() {
 	c.init()
 
 	size := c.Size
