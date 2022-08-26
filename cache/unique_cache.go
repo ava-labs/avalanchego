@@ -14,7 +14,7 @@ import (
 // EvictableLRU is an LRU cache that notifies the objects when they are evicted.
 type EvictableLRU[T comparable, K any] struct {
 	lock      sync.Mutex
-	entryMap  map[interface{}]*list.Element
+	entryMap  map[T]*list.Element
 	entryList *list.List
 	Size      int
 }
@@ -35,7 +35,7 @@ func (c *EvictableLRU[T, K]) Flush() {
 
 func (c *EvictableLRU[T, K]) init() {
 	if c.entryMap == nil {
-		c.entryMap = make(map[interface{}]*list.Element)
+		c.entryMap = make(map[T]*list.Element)
 	}
 	if c.entryList == nil {
 		c.entryList = list.New()
