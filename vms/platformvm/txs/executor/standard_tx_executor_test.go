@@ -1229,28 +1229,13 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					},
 				}
 				env.state.EXPECT().GetTx(env.unsignedTx.Subnet).Return(subnetTx, status.Committed, nil).Times(1)
-				env.state.EXPECT().DeleteCurrentValidator(env.staker)
-				env.state.EXPECT().DeletePendingValidator(env.staker)
-				mockCurrDelegatorIter := state.NewMockStakerIterator(ctrl)
-				mockCurrDelegatorIter.EXPECT().Next().Return(true).Times(1)
-				mockCurrDelegatorIter.EXPECT().Next().Return(false).Times(1)
-				mockCurrDelegatorIter.EXPECT().Value().Return(env.staker).Times(1)
-				mockCurrDelegatorIter.EXPECT().Release().Times(1)
-				mockPendingDelegatorIter := state.NewMockStakerIterator(ctrl)
-				mockPendingDelegatorIter.EXPECT().Next().Return(true).Times(1)
-				mockPendingDelegatorIter.EXPECT().Next().Return(false).Times(1)
-				mockPendingDelegatorIter.EXPECT().Value().Return(env.staker).Times(1)
-				mockPendingDelegatorIter.EXPECT().Release().Times(1)
-				env.state.EXPECT().GetCurrentDelegatorIterator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(mockCurrDelegatorIter, nil).Times(1)
-				env.state.EXPECT().GetPendingDelegatorIterator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(mockPendingDelegatorIter, nil).Times(1)
-				env.state.EXPECT().DeleteCurrentDelegator(env.staker).Times(1)
-				env.state.EXPECT().DeletePendingDelegator(env.staker).Times(1)
-				env.state.EXPECT().DeleteUTXO(gomock.Any()).Times(len(env.unsignedTx.Ins))
-				env.state.EXPECT().AddUTXO(gomock.Any()).Times(len(env.unsignedTx.Outs))
 				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
 				env.flowChecker.EXPECT().VerifySpend(
 					env.unsignedTx, env.state, env.unsignedTx.Ins, env.unsignedTx.Outs, env.tx.Creds[:len(env.tx.Creds)-1], gomock.Any(),
 				).Return(nil).Times(1)
+				env.state.EXPECT().DeleteCurrentValidator(env.staker)
+				env.state.EXPECT().DeleteUTXO(gomock.Any()).Times(len(env.unsignedTx.Ins))
+				env.state.EXPECT().AddUTXO(gomock.Any()).Times(len(env.unsignedTx.Outs))
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
@@ -1288,7 +1273,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				return env.unsignedTx, e
 			},
 			shouldErr:   true,
-			expectedErr: errRemoveSubnetValidatorTxApricot,
+			expectedErr: errRemoveSubnetValidatorTxBeforeBlueberry,
 		},
 		{
 			name: "tx fails syntactic verification",
@@ -1350,7 +1335,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.blueberryTime).Times(1)
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
-				env.state.EXPECT().GetPendingValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, errNotValidator)
+				env.state.EXPECT().GetPendingValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
@@ -1429,7 +1414,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				return env.unsignedTx, e
 			},
 			shouldErr:   true,
-			expectedErr: errNoPermission,
+			expectedErr: errUnauthorizedSubnetModification,
 		},
 		{
 			name: "flow checker failed",

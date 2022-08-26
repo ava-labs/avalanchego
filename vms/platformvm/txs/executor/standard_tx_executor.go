@@ -20,10 +20,10 @@ import (
 var (
 	_ txs.Visitor = &StandardTxExecutor{}
 
-	errEmptyNodeID                      = errors.New("validator nodeID cannot be empty")
-	errIssuedAddStakerTxBeforeBlueberry = errors.New("staker transaction issued before Blueberry")
-	errCustomAssetBeforeBlueberry       = errors.New("custom assets can only be imported after Blueberry")
-	errRemoveSubnetValidatorTxApricot   = errors.New("RemoveSubnetValidatorTxs aren't supported in Apricot")
+	errEmptyNodeID                            = errors.New("validator nodeID cannot be empty")
+	errIssuedAddStakerTxBeforeBlueberry       = errors.New("staker transaction issued before Blueberry")
+	errCustomAssetBeforeBlueberry             = errors.New("custom assets can only be imported after Blueberry")
+	errRemoveSubnetValidatorTxBeforeBlueberry = errors.New("RemoveSubnetValidatorTx issued before Blueberry")
 )
 
 type StandardTxExecutor struct {
@@ -407,17 +407,23 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	return nil
 }
 
-// Verifies a [*txs.RemoveSubnetValidatorTx] and, if it passes, executes it on [e.State].
-// For verification rules, see [removeSubnetValidatorValidation].
-// The effect of the execution is that:
-// * [tx.NodeID] is removed as a validator of [tx.SubnetID].
-//   (Note that it may be either a current or pending validator.)
+// Verifies a [*txs.RemoveSubnetValidatorTx] and, if it passes, executes it on
+// [e.State]. For verification rules, see [removeSubnetValidatorValidation].
+// This transaction will result in [tx.NodeID] being removed as a validator of
+// [tx.SubnetID].
+// Note: [tx.NodeID] may be either a current or pending validator.
 func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
-	if !e.Config.IsBlueberryActivated(e.State.GetTimestamp()) {
-		return errRemoveSubnetValidatorTxApricot
+	currentTimestamp := e.State.GetTimestamp()
+	if !e.Config.IsBlueberryActivated(currentTimestamp) {
+		return fmt.Errorf(
+			"%w: timestamp (%s) < Blueberry fork time (%s)",
+			errRemoveSubnetValidatorTxBeforeBlueberry,
+			currentTimestamp,
+			e.Config.BlueberryTime,
+		)
 	}
 
-	staker, err := removeSubnetValidatorValidation(
+	staker, isCurrentValidator, err := removeSubnetValidatorValidation(
 		e.Backend,
 		e.State,
 		e.Tx,
@@ -427,17 +433,13 @@ func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidat
 		return err
 	}
 
-	switch staker.Priority {
-	case state.SubnetValidatorPendingPriority:
-		e.State.DeletePendingValidator(staker)
-	case state.SubnetValidatorCurrentPriority:
+	if isCurrentValidator {
 		e.State.DeleteCurrentValidator(staker)
-	default:
-		return fmt.Errorf("unexpected staker priority %d", staker.Priority)
+	} else {
+		e.State.DeletePendingValidator(staker)
 	}
 
-	// Note that we assume there aren't subnet delegators
-	// so we don't remove them here.
+	// Note: we assume there aren't subnet delegators, so we don't remove them.
 
 	txID := e.Tx.ID()
 	utxo.Consume(e.State, tx.Ins)
