@@ -115,8 +115,9 @@ func TestProposalTxsInMempool(t *testing.T) {
 	mpool, err := NewMempool("mempool", registerer, &noopBlkTimer{})
 	require.NoError(err)
 
-	// it's key to this test that proposal txs
-	// are ordered by decreasing start time
+	// The proposal txs are ordered by decreasing start time. This means after
+	// each insertion, the last inserted transaction should be on the top of the
+	// heap.
 	proposalTxs, err := createTestProposalTxs(2)
 	require.NoError(err)
 
