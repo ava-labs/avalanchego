@@ -42,21 +42,21 @@ func (c *LRU[T, K]) Get(key T) (K, bool) {
 	return c.get(key)
 }
 
-func (c *LRU[T, K]) Evict(key T) {
+func (c *LRU[T, _]) Evict(key T) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.evict(key)
 }
 
-func (c *LRU[T, K]) Flush() {
+func (c *LRU[T, _]) Flush() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.flush()
 }
 
-func (c *LRU[T, K]) init() {
+func (c *LRU[T, _]) init() {
 	if c.entryMap == nil {
 		c.entryMap = make(map[T]*list.Element, minCacheSize)
 	}
@@ -119,7 +119,7 @@ func (c *LRU[T, K]) get(key T) (K, bool) {
 	return *new(K), false //nolint:gocritic
 }
 
-func (c *LRU[T, K]) evict(key T) {
+func (c *LRU[T, _]) evict(key T) {
 	c.init()
 	c.resize()
 
@@ -129,7 +129,7 @@ func (c *LRU[T, K]) evict(key T) {
 	}
 }
 
-func (c *LRU[T, K]) flush() {
+func (c *LRU[T, _]) flush() {
 	c.init()
 
 	c.entryMap = make(map[T]*list.Element, minCacheSize)
