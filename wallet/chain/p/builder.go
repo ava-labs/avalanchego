@@ -161,10 +161,10 @@ type builder struct {
 
 // NewBuilder returns a new transaction builder.
 //
-// - [addrs] is the set of addresses that the builder assumes can be used when
-//   signing the transactions in the future.
-// - [backend] provides the required access to the chain's context and state to
-//   build out the transactions.
+//   - [addrs] is the set of addresses that the builder assumes can be used when
+//     signing the transactions in the future.
+//   - [backend] provides the required access to the chain's context and state
+//     to build out the transactions.
 func NewBuilder(addrs ids.ShortSet, backend BuilderBackend) Builder {
 	return &builder{
 		addrs:   addrs,
@@ -261,7 +261,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 	options ...common.Option,
 ) (*txs.AddSubnetValidatorTx, error) {
 	toBurn := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): b.backend.CreateSubnetTxFee(),
+		b.backend.AVAXAssetID(): b.backend.BaseTxFee(),
 	}
 	toStake := map[ids.ID]uint64{}
 	ops := common.NewOptions(options)
@@ -327,7 +327,7 @@ func (b *builder) NewCreateChainTx(
 	options ...common.Option,
 ) (*txs.CreateChainTx, error) {
 	toBurn := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): b.backend.CreateSubnetTxFee(),
+		b.backend.AVAXAssetID(): b.backend.CreateBlockchainTxFee(),
 	}
 	toStake := map[ids.ID]uint64{}
 	ops := common.NewOptions(options)
@@ -580,15 +580,15 @@ func (b *builder) getBalance(
 
 // spend takes in the requested burn amounts and the requested stake amounts.
 //
-// - [amountsToBurn] maps assetID to the amount of the asset to spend without
-//   producing an output. This is typically used for fees. However, it can also
-//   be used to consume some of an asset that will be produced in separate
-//   outputs, such as ExportedOutputs. Only unlocked UTXOs are able to be
-//   burned here.
-// - [amountsToStake] maps assetID to the amount of the asset to spend and place
-//   into the staked outputs. First locked UTXOs are attempted to be used for
-//   these funds, and then unlocked UTXOs will be attempted to be used. There is
-//   no preferential ordering on the unlock times.
+//   - [amountsToBurn] maps assetID to the amount of the asset to spend without
+//     producing an output. This is typically used for fees. However, it can
+//     also be used to consume some of an asset that will be produced in
+//     separate outputs, such as ExportedOutputs. Only unlocked UTXOs are able
+//     to be burned here.
+//   - [amountsToStake] maps assetID to the amount of the asset to spend and
+//     place into the staked outputs. First locked UTXOs are attempted to be
+//     used for these funds, and then unlocked UTXOs will be attempted to be
+//     used. There is no preferential ordering on the unlock times.
 func (b *builder) spend(
 	amountsToBurn map[ids.ID]uint64,
 	amountsToStake map[ids.ID]uint64,
