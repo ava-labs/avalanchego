@@ -35,7 +35,7 @@ type txState struct {
 
 	// Caches TxID -> *Tx. If the *Tx is nil, that means the tx is not in
 	// storage.
-	txCache cache.Cacher
+	txCache cache.Cacher[ids.ID, *txs.Tx]
 	txDB    database.Database
 }
 
@@ -43,7 +43,7 @@ func NewTxState(db database.Database, parser txs.Parser, metrics prometheus.Regi
 	cache, err := metercacher.New(
 		"tx_cache",
 		metrics,
-		&cache.LRU{Size: txCacheSize},
+		&cache.LRU[ids.ID, *txs.Tx]{Size: txCacheSize},
 	)
 	return &txState{
 		parser: parser,
@@ -54,11 +54,11 @@ func NewTxState(db database.Database, parser txs.Parser, metrics prometheus.Regi
 }
 
 func (s *txState) GetTx(txID ids.ID) (*txs.Tx, error) {
-	if txIntf, found := s.txCache.Get(txID); found {
-		if txIntf == nil {
+	if tx, found := s.txCache.Get(txID); found {
+		if tx == nil {
 			return nil, database.ErrNotFound
 		}
-		return txIntf.(*txs.Tx), nil
+		return tx, nil
 	}
 
 	txBytes, err := s.txDB.Get(txID[:])

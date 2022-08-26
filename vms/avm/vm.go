@@ -566,8 +566,7 @@ func (vm *VM) getFx(val interface{}) (int, error) {
 
 func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	// Check cache to see whether this asset supports this fx
-	fxIDs, assetInCache := vm.assetToFxCache.Get(assetID)
-	if assetInCache {
+	if fxIDs, ok := vm.assetToFxCache.Get(assetID); ok {
 		return fxIDs.Contains(uint(fxID))
 	}
 	// Caches doesn't say whether this asset support this fx.

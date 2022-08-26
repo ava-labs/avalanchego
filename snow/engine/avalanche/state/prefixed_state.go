@@ -39,10 +39,11 @@ func (s *prefixedState) UniqueVertex(vtx *uniqueVertex) *uniqueVertex {
 }
 
 func (s *prefixedState) Vertex(id ids.ID) vertex.StatelessVertex {
-	var vID ids.ID
-	if cachedVtxIDIntf, found := s.vtx.Get(id); found {
-		vID = cachedVtxIDIntf.(ids.ID)
-	} else {
+	var (
+		vID ids.ID
+		ok  bool
+	)
+	if vID, ok = s.vtx.Get(id); !ok {
 		vID = id.Prefix(vtxID)
 		s.vtx.Put(id, vID)
 	}

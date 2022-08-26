@@ -33,13 +33,13 @@ type StatusState interface {
 type statusState struct {
 	// ID -> Status of thing with that ID, or nil if StatusState doesn't have
 	// that status.
-	statusCache cache.Cacher
+	statusCache cache.Cacher[ids.ID, *choices.Status]
 	statusDB    database.Database
 }
 
 func NewStatusState(db database.Database) StatusState {
 	return &statusState{
-		statusCache: &cache.LRU{Size: statusCacheSize},
+		statusCache: &cache.LRU[ids.ID, *choices.Status]{Size: statusCacheSize},
 		statusDB:    db,
 	}
 }
@@ -48,7 +48,7 @@ func NewMeteredStatusState(db database.Database, metrics prometheus.Registerer) 
 	cache, err := metercacher.New(
 		"status_cache",
 		metrics,
-		&cache.LRU{Size: statusCacheSize},
+		&cache.LRU[ids.ID, *choices.Status]{Size: statusCacheSize},
 	)
 	return &statusState{
 		statusCache: cache,
@@ -57,11 +57,11 @@ func NewMeteredStatusState(db database.Database, metrics prometheus.Registerer) 
 }
 
 func (s *statusState) GetStatus(id ids.ID) (choices.Status, error) {
-	if statusIntf, found := s.statusCache.Get(id); found {
-		if statusIntf == nil {
+	if status, found := s.statusCache.Get(id); found {
+		if status == nil {
 			return choices.Unknown, database.ErrNotFound
 		}
-		return statusIntf.(choices.Status), nil
+		return *status, nil
 	}
 
 	val, err := database.GetUInt32(s.statusDB, id[:])
@@ -78,12 +78,12 @@ func (s *statusState) GetStatus(id ids.ID) (choices.Status, error) {
 		return choices.Unknown, err
 	}
 
-	s.statusCache.Put(id, status)
+	s.statusCache.Put(id, &status)
 	return status, nil
 }
 
 func (s *statusState) PutStatus(id ids.ID, status choices.Status) error {
-	s.statusCache.Put(id, status)
+	s.statusCache.Put(id, &status)
 	return database.PutUInt32(s.statusDB, id[:], uint32(status))
 }
 

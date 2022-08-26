@@ -63,22 +63,22 @@ type utxoState struct {
 	codec codec.Manager
 
 	// UTXO ID -> *UTXO. If the *UTXO is nil the UTXO doesn't exist
-	utxoCache cache.Cacher
+	utxoCache cache.Cacher[ids.ID, *UTXO]
 	utxoDB    database.Database
 
 	indexDB    database.Database
-	indexCache cache.Cacher
+	indexCache cache.Cacher[string, linkeddb.LinkedDB]
 }
 
 func NewUTXOState(db database.Database, codec codec.Manager) UTXOState {
 	return &utxoState{
 		codec: codec,
 
-		utxoCache: &cache.LRU{Size: utxoCacheSize},
+		utxoCache: &cache.LRU[ids.ID, *UTXO]{Size: utxoCacheSize},
 		utxoDB:    prefixdb.New(utxoPrefix, db),
 
 		indexDB:    prefixdb.New(indexPrefix, db),
-		indexCache: &cache.LRU{Size: indexCacheSize},
+		indexCache: &cache.LRU[string, linkeddb.LinkedDB]{Size: indexCacheSize},
 	}
 }
 
@@ -86,7 +86,7 @@ func NewMeteredUTXOState(db database.Database, codec codec.Manager, metrics prom
 	utxoCache, err := metercacher.New(
 		"utxo_cache",
 		metrics,
-		&cache.LRU{Size: utxoCacheSize},
+		&cache.LRU[ids.ID, *UTXO]{Size: utxoCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -95,7 +95,7 @@ func NewMeteredUTXOState(db database.Database, codec codec.Manager, metrics prom
 	indexCache, err := metercacher.New(
 		"index_cache",
 		metrics,
-		&cache.LRU{
+		&cache.LRU[string, linkeddb.LinkedDB]{
 			Size: indexCacheSize,
 		},
 	)
@@ -111,11 +111,11 @@ func NewMeteredUTXOState(db database.Database, codec codec.Manager, metrics prom
 }
 
 func (s *utxoState) GetUTXO(utxoID ids.ID) (*UTXO, error) {
-	if utxoIntf, found := s.utxoCache.Get(utxoID); found {
-		if utxoIntf == nil {
+	if utxo, found := s.utxoCache.Get(utxoID); found {
+		if utxo == nil {
 			return nil, database.ErrNotFound
 		}
-		return utxoIntf.(*UTXO), nil
+		return utxo, nil
 	}
 
 	bytes, err := s.utxoDB.Get(utxoID[:])
