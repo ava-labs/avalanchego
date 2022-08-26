@@ -251,11 +251,10 @@ func verifyAddSubnetValidatorTx(
 }
 
 var (
-	errRemoveSubnetValidatorTxApricot = errors.New("RemoveSubnetValidatorTxs aren't supported in Apricot")
-	errNotValidator                   = errors.New("isn't a current or pending validator")
-	errCantFindSubnet                 = errors.New("couldn't find subnet")
-	errNoPermission                   = errors.New("unauthorized to remove validator")
-	errFlowCheckFailed                = errors.New("flow check failed")
+	errNotValidator    = errors.New("isn't a current or pending validator")
+	errCantFindSubnet  = errors.New("couldn't find subnet")
+	errNoPermission    = errors.New("unauthorized to remove validator")
+	errFlowCheckFailed = errors.New("flow check failed")
 )
 
 // Returns the representation of [tx.NodeID] validating [tx.Subnet].
@@ -271,10 +270,6 @@ func removeSubnetValidatorValidation(
 	sTx *txs.Tx,
 	tx *txs.RemoveSubnetValidatorTx,
 ) (*state.Staker, error) {
-	if !backend.Config.IsBlueberryActivated(parentState.GetTimestamp()) {
-		return nil, errRemoveSubnetValidatorTxApricot
-	}
-
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
 		return nil, err

@@ -23,6 +23,7 @@ var (
 	errEmptyNodeID                      = errors.New("validator nodeID cannot be empty")
 	errIssuedAddStakerTxBeforeBlueberry = errors.New("staker transaction issued before Blueberry")
 	errCustomAssetBeforeBlueberry       = errors.New("custom assets can only be imported after Blueberry")
+	errRemoveSubnetValidatorTxApricot   = errors.New("RemoveSubnetValidatorTxs aren't supported in Apricot")
 )
 
 type StandardTxExecutor struct {
@@ -411,9 +412,11 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 // The effect of the execution is that:
 // * [tx.NodeID] is removed as a validator of [tx.SubnetID].
 //   (Note that it may be either a current or pending validator.)
-// * All current delegators to [tx.NodeID] on [tx.SubnetID] are removed.
-// * All pending delegators to [tx.NodeID] on [tx.SubnetID] are removed.
 func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
+	if !e.Config.IsBlueberryActivated(e.State.GetTimestamp()) {
+		return errRemoveSubnetValidatorTxApricot
+	}
+
 	staker, err := removeSubnetValidatorValidation(
 		e.Backend,
 		e.State,
