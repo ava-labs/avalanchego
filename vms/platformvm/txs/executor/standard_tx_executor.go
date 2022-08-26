@@ -429,35 +429,8 @@ func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidat
 	e.State.DeleteCurrentValidator(staker)
 	e.State.DeletePendingValidator(staker)
 
-	// Remove all current delegators to [tx.NodeID] on [tx.SubnetID].
-	// Note that we don't modify the state while iterating over it.
-	toDelete := []*state.Staker{}
-	iter, err := e.State.GetCurrentDelegatorIterator(tx.Subnet, tx.NodeID)
-	if err != nil {
-		return err
-	}
-	for iter.Next() {
-		toDelete = append(toDelete, iter.Value())
-	}
-	iter.Release()
-	for _, toDeleteStaker := range toDelete {
-		e.State.DeleteCurrentDelegator(toDeleteStaker)
-	}
-	toDelete = toDelete[:0]
-
-	// Remove all pending delegators to [tx.NodeID] on [tx.SubnetID].
-	// Note that we don't modify the state while iterating over it.
-	iter, err = e.State.GetPendingDelegatorIterator(tx.Subnet, tx.NodeID)
-	if err != nil {
-		return err
-	}
-	for iter.Next() {
-		toDelete = append(toDelete, iter.Value())
-	}
-	iter.Release()
-	for _, toDeleteStaker := range toDelete {
-		e.State.DeletePendingDelegator(toDeleteStaker)
-	}
+	// Note that we assume there aren't subnet delegators
+	// so we don't remove them here.
 
 	txID := e.Tx.ID()
 	utxo.Consume(e.State, tx.Ins)

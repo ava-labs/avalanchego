@@ -302,7 +302,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	options ...common.Option,
 ) (*txs.RemoveSubnetValidatorTx, error) {
 	toBurn := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): b.backend.CreateSubnetTxFee(),
+		b.backend.AVAXAssetID(): b.backend.BaseTxFee(),
 	}
 	toStake := map[ids.ID]uint64{}
 	ops := common.NewOptions(options)

@@ -39,8 +39,6 @@ func (tx *RemoveSubnetValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	case tx.SyntacticallyVerified:
 		// already passed syntactic verification
 		return nil
-	case tx.NodeID == ids.EmptyNodeID:
-		return errEmptyNodeID
 	case tx.Subnet == constants.PrimaryNetworkID:
 		return errRemovePrimaryNetworkValidator
 	}
