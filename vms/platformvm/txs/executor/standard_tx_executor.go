@@ -427,10 +427,14 @@ func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidat
 		return err
 	}
 
-	// We assume that a validator can't simultaneously be a
-	// current and pending validator of a subnet so this is safe.
-	e.State.DeleteCurrentValidator(staker)
-	e.State.DeletePendingValidator(staker)
+	switch staker.Priority {
+	case state.SubnetValidatorPendingPriority:
+		e.State.DeletePendingValidator(staker)
+	case state.SubnetValidatorCurrentPriority:
+		e.State.DeleteCurrentValidator(staker)
+	default:
+		return fmt.Errorf("unexpected staker priority %d", staker.Priority)
+	}
 
 	// Note that we assume there aren't subnet delegators
 	// so we don't remove them here.
