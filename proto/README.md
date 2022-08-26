@@ -1,7 +1,6 @@
 # Avalanche gRPC
-## buf
 
-Protobuf files are hosted at [https://buf.build/ava-labs/avalanchego](https://buf.build/ava-labs/avalanchego) and can be used as dependencies in other projects.
+Protobuf files are hosted at [https://buf.build/ava-labs/avalanche](https://buf.build/ava-labs/avalanche) and can be used as dependencies in other projects.
 
 Protobuf linting and generation for this project is managed by [buf](https://github.com/bufbuild/buf).
 

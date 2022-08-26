@@ -51,7 +51,7 @@ require (
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	gonum.org/v1/gonum v0.11.0
 	google.golang.org/genproto v0.0.0-20220712132514-bdd2acd4974d
-	google.golang.org/grpc v1.50.0-dev
+	google.golang.org/grpc v1.49.0
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
