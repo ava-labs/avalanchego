@@ -12,7 +12,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -1457,20 +1456,20 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
 			unsignedTx, executor := tt.newExecutor(ctrl)
 			err := executor.RemoveSubnetValidatorTx(unsignedTx)
 			if tt.shouldErr {
-				assert.Error(err)
+				require.Error(err)
 				if tt.expectedErr != nil {
-					assert.ErrorIs(err, tt.expectedErr)
+					require.ErrorIs(err, tt.expectedErr)
 				}
 				return
 			}
-			assert.NoError(err)
+			require.NoError(err)
 		})
 	}
 }

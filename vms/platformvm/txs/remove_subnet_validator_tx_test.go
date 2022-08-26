@@ -9,7 +9,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -23,9 +23,9 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		name      string
 		txFunc    func(*gomock.Controller) *RemoveSubnetValidatorTx
 		shouldErr bool
-		// If [shouldErr] and [assertSpecificErr] != nil,
-		// assert that the error we get is [assertSpecificErr].
-		assertSpecificErr error
+		// If [shouldErr] and [requireSpecificErr] != nil,
+		// require that the error we get is [requireSpecificErr].
+		requireSpecificErr error
 	}
 
 	var (
@@ -44,7 +44,7 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		SyntacticallyVerified: true,
 	}
 	// Sanity check.
-	assert.NoError(t, verifiedBaseTx.SyntacticVerify(ctx))
+	require.NoError(t, verifiedBaseTx.SyntacticVerify(ctx))
 
 	// A BaseTx that passes syntactic verification.
 	validBaseTx := BaseTx{
@@ -54,14 +54,14 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		},
 	}
 	// Sanity check.
-	assert.NoError(t, validBaseTx.SyntacticVerify(ctx))
+	require.NoError(t, validBaseTx.SyntacticVerify(ctx))
 	// Make sure we're not caching the verification result.
-	assert.False(t, validBaseTx.SyntacticallyVerified)
+	require.False(t, validBaseTx.SyntacticallyVerified)
 
 	// A BaseTx that fails syntactic verification.
 	invalidBaseTx := BaseTx{}
 	// Sanity check.
-	assert.Error(t, invalidBaseTx.SyntacticVerify(ctx))
+	require.Error(t, invalidBaseTx.SyntacticVerify(ctx))
 
 	tests := []test{
 		{
@@ -99,22 +99,8 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 					Subnet: constants.PrimaryNetworkID,
 				}
 			},
-			shouldErr:         true,
-			assertSpecificErr: errRemovePrimaryNetworkValidator,
-		},
-		{
-			name: "invalid nodeID",
-			txFunc: func(*gomock.Controller) *RemoveSubnetValidatorTx {
-				return &RemoveSubnetValidatorTx{
-					BaseTx: validBaseTx,
-					// Set subnetID so we don't error on that check.
-					Subnet: ids.GenerateTestID(),
-					// Set NodeID so we don't error on that check.
-					NodeID: ids.EmptyNodeID,
-				}
-			},
-			shouldErr:         true,
-			assertSpecificErr: errEmptyNodeID,
+			shouldErr:          true,
+			requireSpecificErr: errRemovePrimaryNetworkValidator,
 		},
 		{
 			name: "invalid subnetAuth",
@@ -131,8 +117,8 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 					SubnetAuth: invalidSubnetAuth,
 				}
 			},
-			shouldErr:         true,
-			assertSpecificErr: errInvalidSubnetAuth,
+			shouldErr:          true,
+			requireSpecificErr: errInvalidSubnetAuth,
 		},
 		{
 			name: "passes verification",
@@ -155,21 +141,21 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
 			tx := tt.txFunc(ctrl)
 			err := tx.SyntacticVerify(ctx)
 			if tt.shouldErr {
-				assert.Error(err)
-				if tt.assertSpecificErr != nil {
-					assert.ErrorIs(err, tt.assertSpecificErr)
+				require.Error(err)
+				if tt.requireSpecificErr != nil {
+					require.ErrorIs(err, tt.requireSpecificErr)
 				}
 				return
 			}
-			assert.NoError(err)
-			assert.True(tx.SyntacticallyVerified)
+			require.NoError(err)
+			require.True(tx.SyntacticallyVerified)
 		})
 	}
 }

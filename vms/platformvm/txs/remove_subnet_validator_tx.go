@@ -18,7 +18,6 @@ var (
 	_ secp256k1fx.UnsignedTx = &ImportTx{}
 
 	errRemovePrimaryNetworkValidator = errors.New("can't remove primary network validator with RemoveSubnetValidatorTx")
-	errEmptyNodeID                   = errors.New("empty node ID")
 )
 
 // Removes a validator from a subnet.
