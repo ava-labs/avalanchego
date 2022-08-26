@@ -89,9 +89,8 @@ The activation of the Blueberry fork only makes minor changes to the way the P-c
 We carry out operations in the following order:
 
 * We try to move chain time ahead to the current local time or the earliest staker set change event. Unlike Apricot, here we issue either a Standard block or a Proposal block to advance the time.
-* We try to fill a Standard block with mempool decision transactions.
 * We check if any staker needs to be rewarded, issuing as many Proposal blocks as needed, as above.
-* We try to build a Proposal block with one mempool proposal transaction, if any.
+* We try to fill a Standard block with mempool decision transactions.
 
 [^1]: Proposal transactions whose start time is too close to local time are dropped first and won't be included in any block.
 [^2]: Advance time transactions are proposal transactions and they do change chain time. But advance time transactions are generated just in time and never stored in the mempool. Here mempool proposal transactions refer to AddValidator, AddDelegator and AddSubnetValidator transactions. Reward validator transactions are proposal transactions which do not change chain time but which never in mempool (they are generated just in time).

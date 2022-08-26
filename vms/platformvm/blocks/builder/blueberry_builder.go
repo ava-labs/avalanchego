@@ -21,21 +21,6 @@ func buildBlueberryBlock(
 	forceAdvanceTime bool,
 	parentState state.Chain,
 ) (blocks.Block, error) {
-	// clean out the mempool's transactions with invalid timestamps.
-	builder.dropExpiredStakerTxs(timestamp)
-
-	// try including as many mempool txs as possible
-	// Note that, upon Blueberry activation, all mempool transactions
-	// will be included into a standard block
-	if builder.Mempool.HasTxs() {
-		return blocks.NewBlueberryStandardBlock(
-			timestamp,
-			parentID,
-			height,
-			builder.Mempool.PeekTxs(targetBlockSize),
-		)
-	}
-
 	// try rewarding stakers whose staking period ends at the new chain time.
 	stakerTxID, shouldReward, err := builder.getNextStakerToReward(timestamp, parentState)
 	if err != nil {
@@ -55,17 +40,20 @@ func buildBlueberryBlock(
 		)
 	}
 
-	if forceAdvanceTime {
-		// We should issue an empty block to advance the chain time because the
-		// staker set should change.
-		return blocks.NewBlueberryStandardBlock(
-			timestamp,
-			parentID,
-			height,
-			nil,
-		)
+	// Clean out the mempool's transactions with invalid timestamps.
+	builder.dropExpiredStakerTxs(timestamp)
+
+	// If there is no reason to build a block, don't.
+	if !builder.Mempool.HasTxs() && !forceAdvanceTime {
+		builder.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
+		return nil, errNoPendingBlocks
 	}
 
-	builder.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
-	return nil, errNoPendingBlocks
+	// Issue a block with as many transactions as possible.
+	return blocks.NewBlueberryStandardBlock(
+		timestamp,
+		parentID,
+		height,
+		builder.Mempool.PeekTxs(targetBlockSize),
+	)
 }
