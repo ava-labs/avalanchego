@@ -250,6 +250,96 @@ func verifyAddSubnetValidatorTx(
 	return nil
 }
 
+var (
+	errRemoveSubnetValidatorTxApricot = errors.New("RemoveSubnetValidatorTxs aren't supported in Apricot")
+	errNotValidator                   = errors.New("isn't a current or pending validator")
+	errCantFindSubnet                 = errors.New("couldn't find subnet")
+	errNoPermission                   = errors.New("unauthorized to remove validator")
+	errFlowCheckFailed                = errors.New("flow check failed")
+)
+
+// Returns the representation of [tx.NodeID] validating [tx.Subnet].
+// Returns an error if the given tx is invalid.
+// The transaction is valid if:
+// * [tx.NodeID] is a current/pending validator of [tx.Subnet].
+// * [sTx]'s creds authorize it to spend the stated inputs.
+// * [sTx]'s creds authorize it to remove a validator from [tx.Subnet].
+// * The flow checker passes.
+func removeSubnetValidatorValidation(
+	backend *Backend,
+	parentState state.Chain,
+	sTx *txs.Tx,
+	tx *txs.RemoveSubnetValidatorTx,
+) (*state.Staker, error) {
+	if !backend.Config.IsBlueberryActivated(parentState.GetTimestamp()) {
+		return nil, errRemoveSubnetValidatorTxApricot
+	}
+
+	// Verify the tx is well-formed
+	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
+		return nil, err
+	}
+
+	if len(sTx.Creds) == 0 {
+		// Ensure there is at least one credential for the subnet authorization
+		return nil, errWrongNumberOfCredentials
+	}
+
+	// See if [tx.NodeID] is a current validator of [tx.Subnet].
+	vdr, err := GetValidator(parentState, tx.Subnet, tx.NodeID)
+	if err != nil {
+		// It isn't a current or pending validator.
+		return nil, fmt.Errorf("%s %w of %s", tx.NodeID, errNotValidator, tx.Subnet)
+	}
+
+	if !backend.Bootstrapped.GetValue() {
+		// Not bootstrapped yet -- don't need to do full verification.
+		return vdr, nil
+	}
+
+	baseTxCredsLen := len(sTx.Creds) - 1
+	baseTxCreds := sTx.Creds[:baseTxCredsLen]
+	subnetCred := sTx.Creds[baseTxCredsLen]
+
+	subnetIntf, _, err := parentState.GetTx(tx.Subnet)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"%w %q: %s",
+			errCantFindSubnet,
+			tx.Subnet,
+			err,
+		)
+	}
+
+	subnet, ok := subnetIntf.Unsigned.(*txs.CreateSubnetTx)
+	if !ok {
+		return nil, fmt.Errorf(
+			"%s is not a subnet",
+			tx.Subnet,
+		)
+	}
+
+	if err := backend.Fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
+		return nil, fmt.Errorf("%w: %s", errNoPermission, err)
+	}
+
+	if err := backend.FlowChecker.VerifySpend(
+		tx,
+		parentState,
+		tx.Ins,
+		tx.Outs,
+		baseTxCreds,
+		map[ids.ID]uint64{
+			backend.Ctx.AVAXAssetID: backend.Config.TxFee,
+		},
+	); err != nil {
+		return nil, fmt.Errorf("%w: %s", errFlowCheckFailed, err)
+	}
+
+	// Verify the flowcheck
+	return vdr, nil
+}
+
 // verifyAddDelegatorTx carries out the validation for an AddDelegatorTx.
 // It returns the tx outputs that should be returned if this delegator is not
 // added to the staking set.

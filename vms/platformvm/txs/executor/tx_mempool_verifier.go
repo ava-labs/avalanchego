@@ -51,6 +51,10 @@ func (v *MempoolTxVerifier) ExportTx(tx *txs.ExportTx) error {
 	return v.standardTx(tx)
 }
 
+func (v *MempoolTxVerifier) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
+	return v.standardTx(tx)
+}
+
 // TODO: simplify this function after Blueberry is activated.
 func (v *MempoolTxVerifier) proposalTx(tx txs.StakerTx) error {
 	startTime := tx.StartTime()

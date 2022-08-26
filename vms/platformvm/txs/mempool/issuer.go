@@ -44,6 +44,11 @@ func (i *issuer) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	return nil
 }
 
+func (i *issuer) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
+	i.m.addDecisionTx(i.tx)
+	return nil
+}
+
 func (i *issuer) CreateChainTx(tx *txs.CreateChainTx) error {
 	i.m.addDecisionTx(i.tx)
 	return nil

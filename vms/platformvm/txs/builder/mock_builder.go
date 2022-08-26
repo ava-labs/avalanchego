@@ -157,6 +157,21 @@ func (mr *MockBuilderMockRecorder) NewImportTx(arg0, arg1, arg2, arg3 interface{
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewImportTx", reflect.TypeOf((*MockBuilder)(nil).NewImportTx), arg0, arg1, arg2, arg3)
 }
 
+// NewRemoveSubnetValidatorTx mocks base method.
+func (m *MockBuilder) NewRemoveSubnetValidatorTx(arg0 ids.NodeID, arg1 ids.ID, arg2 []*crypto.PrivateKeySECP256K1R, arg3 ids.ShortID) (*txs.Tx, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewRemoveSubnetValidatorTx", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(*txs.Tx)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NewRemoveSubnetValidatorTx indicates an expected call of NewRemoveSubnetValidatorTx.
+func (mr *MockBuilderMockRecorder) NewRemoveSubnetValidatorTx(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewRemoveSubnetValidatorTx", reflect.TypeOf((*MockBuilder)(nil).NewRemoveSubnetValidatorTx), arg0, arg1, arg2, arg3)
+}
+
 // NewRewardValidatorTx mocks base method.
 func (m *MockBuilder) NewRewardValidatorTx(arg0 ids.ID) (*txs.Tx, error) {
 	m.ctrl.T.Helper()

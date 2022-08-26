@@ -205,6 +205,18 @@ func (w *wallet) IssueAddSubnetValidatorTx(
 	return w.IssueUnsignedTx(utx, options...)
 }
 
+func (w *wallet) IssueRemoveSubnetValidatorTx(
+	nodeID ids.NodeID,
+	subnetID ids.ID,
+	options ...common.Option,
+) (ids.ID, error) {
+	utx, err := w.builder.NewRemoveSubnetValidatorTx(nodeID, subnetID, options...)
+	if err != nil {
+		return ids.Empty, err
+	}
+	return w.IssueUnsignedTx(utx, options...)
+}
+
 func (w *wallet) IssueAddDelegatorTx(
 	vdr *validator.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,

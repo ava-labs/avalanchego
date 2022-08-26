@@ -34,6 +34,9 @@ func (*AtomicTxExecutor) CreateChainTx(*txs.CreateChainTx) error               {
 func (*AtomicTxExecutor) CreateSubnetTx(*txs.CreateSubnetTx) error             { return errWrongTxType }
 func (*AtomicTxExecutor) AdvanceTimeTx(*txs.AdvanceTimeTx) error               { return errWrongTxType }
 func (*AtomicTxExecutor) RewardValidatorTx(*txs.RewardValidatorTx) error       { return errWrongTxType }
+func (*AtomicTxExecutor) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
+	return errWrongTxType
+}
 
 func (e *AtomicTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	return e.atomicTx(tx)

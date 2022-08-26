@@ -67,6 +67,9 @@ func (*ProposalTxExecutor) CreateChainTx(*txs.CreateChainTx) error   { return er
 func (*ProposalTxExecutor) CreateSubnetTx(*txs.CreateSubnetTx) error { return errWrongTxType }
 func (*ProposalTxExecutor) ImportTx(*txs.ImportTx) error             { return errWrongTxType }
 func (*ProposalTxExecutor) ExportTx(*txs.ExportTx) error             { return errWrongTxType }
+func (*ProposalTxExecutor) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
+	return errWrongTxType
+}
 
 func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	// AddValidatorTx is a proposal transaction until the Blueberry fork

@@ -27,6 +27,11 @@ func (r *remover) AddDelegatorTx(*txs.AddDelegatorTx) error {
 	return nil
 }
 
+func (r *remover) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
+	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
+	return nil
+}
+
 func (r *remover) CreateChainTx(*txs.CreateChainTx) error {
 	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
 	return nil

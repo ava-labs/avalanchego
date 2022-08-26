@@ -148,6 +148,17 @@ type ProposalTxBuilder interface {
 		changeAddr ids.ShortID,
 	) (*txs.Tx, error)
 
+	// Creates a transaction that removes [nodeID]
+	// as a validator from [subnetID]
+	// keys: keys to use for removing the validator
+	// changeAddr: address to send change to, if there is any
+	NewRemoveSubnetValidatorTx(
+		nodeID ids.NodeID,
+		subnetID ids.ID,
+		keys []*crypto.PrivateKeySECP256K1R,
+		changeAddr ids.ShortID,
+	) (*txs.Tx, error)
+
 	// newAdvanceTimeTx creates a new tx that, if it is accepted and followed by a
 	// Commit block, will set the chain's timestamp to [timestamp].
 	NewAdvanceTimeTx(timestamp time.Time) (*txs.Tx, error)
@@ -535,6 +546,42 @@ func (b *builder) NewAddSubnetValidatorTx(
 			},
 			Subnet: subnetID,
 		},
+		SubnetAuth: subnetAuth,
+	}
+	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+	if err != nil {
+		return nil, err
+	}
+	return tx, tx.SyntacticVerify(b.ctx)
+}
+
+func (b *builder) NewRemoveSubnetValidatorTx(
+	nodeID ids.NodeID,
+	subnetID ids.ID,
+	keys []*crypto.PrivateKeySECP256K1R,
+	changeAddr ids.ShortID,
+) (*txs.Tx, error) {
+	ins, outs, _, signers, err := b.Spend(keys, 0, b.cfg.TxFee, changeAddr)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+
+	subnetAuth, subnetSigners, err := b.Authorize(b.state, subnetID, keys)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't authorize tx's subnet restrictions: %w", err)
+	}
+	signers = append(signers, subnetSigners)
+
+	// Create the tx
+	utx := &txs.RemoveSubnetValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.ctx.NetworkID,
+			BlockchainID: b.ctx.ChainID,
+			Ins:          ins,
+			Outs:         outs,
+		}},
+		Subnet:     subnetID,
+		NodeID:     nodeID,
 		SubnetAuth: subnetAuth,
 	}
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)
