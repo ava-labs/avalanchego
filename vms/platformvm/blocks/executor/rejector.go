@@ -19,24 +19,40 @@ type rejector struct {
 	*backend
 }
 
-func (r *rejector) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
-	return r.rejectBlock(b, "proposal")
+func (r *rejector) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
+	return r.rejectBlock(b, "blueberry abort")
 }
 
-func (r *rejector) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
-	return r.rejectBlock(b, "atomic")
+func (r *rejector) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
+	return r.rejectBlock(b, "blueberry commit")
 }
 
-func (r *rejector) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
-	return r.rejectBlock(b, "standard")
+func (r *rejector) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) error {
+	return r.rejectBlock(b, "blueberry proposal")
 }
 
-func (r *rejector) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
-	return r.rejectBlock(b, "commit")
+func (r *rejector) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) error {
+	return r.rejectBlock(b, "blueberry standard")
 }
 
 func (r *rejector) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
-	return r.rejectBlock(b, "abort")
+	return r.rejectBlock(b, "apricot abort")
+}
+
+func (r *rejector) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
+	return r.rejectBlock(b, "apricot commit")
+}
+
+func (r *rejector) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
+	return r.rejectBlock(b, "apricot proposal")
+}
+
+func (r *rejector) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
+	return r.rejectBlock(b, "apricot standard")
+}
+
+func (r *rejector) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
+	return r.rejectBlock(b, "apricot atomic")
 }
 
 func (r *rejector) rejectBlock(b blocks.Block, blockType string) error {

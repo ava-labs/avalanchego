@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -19,7 +21,69 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func TestProposalTxExecuteAddDelegator(t *testing.T) {
+func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
+	env := newEnvironment()
+	env.ctx.Lock.Lock()
+	defer func() {
+		if err := shutdownEnvironment(env); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	chainTime := env.state.GetTimestamp()
+	startTime := defaultGenesisTime.Add(1 * time.Second)
+
+	tests := []struct {
+		blueberryTime time.Time
+		expectedError error
+	}{
+		{ // Case: Before blueberry
+			blueberryTime: chainTime.Add(1),
+			expectedError: errIssuedAddStakerTxBeforeBlueberry,
+		},
+		{ // Case: At blueberry
+			blueberryTime: chainTime,
+			expectedError: errEmptyNodeID,
+		},
+		{ // Case: After blueberry
+			blueberryTime: chainTime.Add(-1),
+			expectedError: errEmptyNodeID,
+		},
+	}
+	for _, test := range tests {
+		// Case: Empty validator node ID after blueberry
+		env.config.BlueberryTime = test.blueberryTime
+
+		tx, err := env.txBuilder.NewAddValidatorTx( // create the tx
+			env.config.MinValidatorStake,
+			uint64(startTime.Unix()),
+			uint64(defaultValidateEndTime.Unix()),
+			ids.EmptyNodeID,
+			ids.GenerateTestShortID(),
+			reward.PercentDenominator,
+			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+			ids.ShortEmpty, // change addr
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		stateDiff, err := state.NewDiff(lastAcceptedID, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		executor := StandardTxExecutor{
+			Backend: &env.backend,
+			State:   stateDiff,
+			Tx:      tx,
+		}
+		err = tx.Unsigned.Visit(&executor)
+		require.ErrorIs(t, err, test.expectedError)
+	}
+}
+
+func TestStandardTxExecutorAddDelegator(t *testing.T) {
 	dummyHeight := uint64(1)
 	rewardAddress := preFundedKeys[0].PublicKey().Address()
 	nodeID := ids.NodeID(rewardAddress)
@@ -286,21 +350,17 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 				tt.setup(freshTH)
 			}
 
-			onCommitState, err := state.NewDiff(lastAcceptedID, freshTH)
+			onAcceptState, err := state.NewDiff(lastAcceptedID, freshTH)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			onAbortState, err := state.NewDiff(lastAcceptedID, freshTH)
-			if err != nil {
-				t.Fatal(err)
-			}
+			freshTH.config.BlueberryTime = onAcceptState.GetTimestamp()
 
-			executor := ProposalTxExecutor{
-				OnCommitState: onCommitState,
-				OnAbortState:  onAbortState,
-				Backend:       &freshTH.backend,
-				Tx:            tx,
+			executor := StandardTxExecutor{
+				Backend: &freshTH.backend,
+				State:   onAcceptState,
+				Tx:      tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
 			if err != nil && !tt.shouldErr {
@@ -325,7 +385,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 	}
 }
 
-func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
+func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	env := newEnvironment()
 	env.ctx.Lock.Lock()
 	defer func() {
@@ -335,6 +395,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	}()
 
 	nodeID := preFundedKeys[0].PublicKey().Address()
+	env.config.BlueberryTime = env.state.GetTimestamp()
 
 	{
 		// Case: Proposed validator currently validating primary network
@@ -353,21 +414,15 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+		executor := StandardTxExecutor{
+			Backend: &env.backend,
+			State:   onAcceptState,
+			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -393,21 +448,15 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+		executor := StandardTxExecutor{
+			Backend: &env.backend,
+			State:   onAcceptState,
+			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err != nil {
@@ -455,21 +504,15 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+		executor := StandardTxExecutor{
+			Backend: &env.backend,
+			State:   onAcceptState,
+			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -511,21 +554,15 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+		executor := StandardTxExecutor{
+			Backend: &env.backend,
+			State:   onAcceptState,
+			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -549,21 +586,15 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+		executor := StandardTxExecutor{
+			Backend: &env.backend,
+			State:   onAcceptState,
+			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -587,21 +618,15 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+		executor := StandardTxExecutor{
+			Backend: &env.backend,
+			State:   onAcceptState,
+			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err != nil {
@@ -628,21 +653,15 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+		executor := StandardTxExecutor{
+			Backend: &env.backend,
+			State:   onAcceptState,
+			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -697,21 +716,15 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            duplicateSubnetTx,
+		executor := StandardTxExecutor{
+			Backend: &env.backend,
+			State:   onAcceptState,
+			Tx:      duplicateSubnetTx,
 		}
 		err = duplicateSubnetTx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -740,21 +753,15 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+		executor := StandardTxExecutor{
+			Backend: &env.backend,
+			State:   onAcceptState,
+			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -784,21 +791,15 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 		addSubnetValidatorTx.SyntacticallyVerified = false
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+		executor := StandardTxExecutor{
+			Backend: &env.backend,
+			State:   onAcceptState,
+			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -827,21 +828,15 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		}
 		copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+		executor := StandardTxExecutor{
+			Backend: &env.backend,
+			State:   onAcceptState,
+			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -879,21 +874,15 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+		executor := StandardTxExecutor{
+			Backend: &env.backend,
+			State:   onAcceptState,
+			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -902,7 +891,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	}
 }
 
-func TestProposalTxExecuteAddValidator(t *testing.T) {
+func TestStandardTxExecutorAddValidator(t *testing.T) {
 	env := newEnvironment()
 	env.ctx.Lock.Lock()
 	defer func() {
@@ -912,6 +901,8 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 	}()
 
 	nodeID := ids.GenerateTestNodeID()
+
+	env.config.BlueberryTime = env.state.GetTimestamp()
 
 	{
 		// Case: Validator's start time too early
@@ -929,21 +920,15 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+		executor := StandardTxExecutor{
+			Backend: &env.backend,
+			State:   onAcceptState,
+			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -967,21 +952,15 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+		executor := StandardTxExecutor{
+			Backend: &env.backend,
+			State:   onAcceptState,
+			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -1005,21 +984,15 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+		executor := StandardTxExecutor{
+			Backend: &env.backend,
+			State:   onAcceptState,
+			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -1038,7 +1011,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			ids.ShortEmpty,
 			reward.PercentDenominator, // shares
 			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
-			ids.ShortEmpty, // change addr
+			ids.ShortEmpty, // change addr // key
 		)
 		if err != nil {
 			t.Fatal(err)
@@ -1060,21 +1033,15 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+		executor := StandardTxExecutor{
+			Backend: &env.backend,
+			State:   onAcceptState,
+			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {
@@ -1107,21 +1074,15 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			env.state.DeleteUTXO(utxoID)
 		}
 
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
+		executor := StandardTxExecutor{
+			Backend: &env.backend,
+			State:   onAcceptState,
+			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
 		if err == nil {

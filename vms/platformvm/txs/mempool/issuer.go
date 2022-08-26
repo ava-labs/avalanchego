@@ -30,17 +30,17 @@ func (i *issuer) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
 }
 
 func (i *issuer) AddValidatorTx(*txs.AddValidatorTx) error {
-	i.m.addProposalTx(i.tx)
+	i.m.addStakerTx(i.tx)
 	return nil
 }
 
 func (i *issuer) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	i.m.addProposalTx(i.tx)
+	i.m.addStakerTx(i.tx)
 	return nil
 }
 
 func (i *issuer) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
-	i.m.addProposalTx(i.tx)
+	i.m.addStakerTx(i.tx)
 	return nil
 }
 

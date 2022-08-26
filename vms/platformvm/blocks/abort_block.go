@@ -4,11 +4,41 @@
 package blocks
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ Block = &ApricotAbortBlock{}
+var (
+	_ BlueberryBlock = &BlueberryAbortBlock{}
+	_ Block          = &ApricotAbortBlock{}
+)
+
+type BlueberryAbortBlock struct {
+	Time              uint64 `serialize:"true" json:"time"`
+	ApricotAbortBlock `serialize:"true"`
+}
+
+func (b *BlueberryAbortBlock) Timestamp() time.Time  { return time.Unix(int64(b.Time), 0) }
+func (b *BlueberryAbortBlock) Visit(v Visitor) error { return v.BlueberryAbortBlock(b) }
+
+func NewBlueberryAbortBlock(
+	timestamp time.Time,
+	parentID ids.ID,
+	height uint64,
+) (*BlueberryAbortBlock, error) {
+	blk := &BlueberryAbortBlock{
+		Time: uint64(timestamp.Unix()),
+		ApricotAbortBlock: ApricotAbortBlock{
+			CommonBlock: CommonBlock{
+				PrntID: parentID,
+				Hght:   height,
+			},
+		},
+	}
+	return blk, initialize(blk)
+}
 
 type ApricotAbortBlock struct {
 	CommonBlock `serialize:"true"`

@@ -4,6 +4,11 @@
 package blocks
 
 type Visitor interface {
+	BlueberryAbortBlock(*BlueberryAbortBlock) error
+	BlueberryCommitBlock(*BlueberryCommitBlock) error
+	BlueberryProposalBlock(*BlueberryProposalBlock) error
+	BlueberryStandardBlock(*BlueberryStandardBlock) error
+
 	ApricotAbortBlock(*ApricotAbortBlock) error
 	ApricotCommitBlock(*ApricotCommitBlock) error
 	ApricotProposalBlock(*ApricotProposalBlock) error

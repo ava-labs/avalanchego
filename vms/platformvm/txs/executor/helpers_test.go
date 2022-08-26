@@ -253,7 +253,7 @@ func defaultState(
 	if err := state.Commit(); err != nil {
 		panic(err)
 	}
-
+	lastAcceptedID = state.GetLastAccepted()
 	return state
 }
 
@@ -303,6 +303,7 @@ func defaultConfig() config.Config {
 		},
 		ApricotPhase3Time: defaultValidateEndTime,
 		ApricotPhase5Time: defaultValidateEndTime,
+		BlueberryTime:     mockable.MaxTime,
 	}
 }
 

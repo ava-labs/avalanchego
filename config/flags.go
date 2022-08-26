@@ -124,9 +124,6 @@ func addNodeFlags(fs *flag.FlagSet) {
 	// Assertions
 	fs.Bool(AssertionsEnabledKey, true, "Turn on assertion execution")
 
-	// Signature Verification
-	fs.Bool(SignatureVerificationEnabledKey, true, "Turn on signature verification")
-
 	// Peer List Gossip
 	gossipHelpMsg := fmt.Sprintf(
 		"Gossip [%s] validator IPs to [%s] validators, [%s] non-validators, and [%s] validating or non-validating peers every [%s]",

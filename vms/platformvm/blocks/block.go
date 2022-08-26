@@ -5,6 +5,7 @@ package blocks
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -26,6 +27,11 @@ type Block interface {
 	// note: initialize does not assume that block transactions
 	// are initialized, and initializes them itself if they aren't.
 	initialize(bytes []byte) error
+}
+
+type BlueberryBlock interface {
+	Block
+	Timestamp() time.Time
 }
 
 func initialize(blk Block) error {

@@ -1268,9 +1268,6 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	// Assertions
 	nodeConfig.EnableAssertions = v.GetBool(AssertionsEnabledKey)
 
-	// Crypto
-	nodeConfig.EnableCrypto = v.GetBool(SignatureVerificationEnabledKey)
-
 	// StateSync Configs
 	nodeConfig.StateSyncConfig, err = getStateSyncConfig(v)
 	if err != nil {

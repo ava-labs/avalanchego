@@ -36,7 +36,6 @@ func NewManager(
 		Mempool:      mempool,
 		lastAccepted: s.GetLastAccepted(),
 		state:        s,
-		bootstrapped: txExecutorBackend.Bootstrapped,
 		ctx:          txExecutorBackend.Ctx,
 		blkIDToState: map[ids.ID]*blockState{},
 	}
@@ -51,6 +50,7 @@ func NewManager(
 			backend:          backend,
 			metrics:          metrics,
 			recentlyAccepted: recentlyAccepted,
+			bootstrapped:     txExecutorBackend.Bootstrapped,
 		},
 		rejector: &rejector{backend: backend},
 	}
