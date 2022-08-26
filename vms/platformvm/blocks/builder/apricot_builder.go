@@ -74,7 +74,7 @@ func buildApricotBlock(
 		return nil, errNoPendingBlocks
 	}
 
-	tx, err := nextApricotProposalTx(builder, parentState)
+	tx, err := nextApricotProposalTx(builder, timestamp, parentState)
 	if err != nil {
 		builder.txExecutorBackend.Ctx.Log.Error(
 			"failed to get the next proposal tx",
@@ -92,7 +92,7 @@ func buildApricotBlock(
 
 // Try to get/make a proposal tx to put into a block.
 // Any returned error is unexpected.
-func nextApricotProposalTx(builder *builder, parentState state.Chain) (*txs.Tx, error) {
+func nextApricotProposalTx(builder *builder, timestamp time.Time, parentState state.Chain) (*txs.Tx, error) {
 	tx := builder.Mempool.PeekProposalTx()
 	startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 
@@ -105,8 +105,7 @@ func nextApricotProposalTx(builder *builder, parentState state.Chain) (*txs.Tx, 
 	}
 
 	// The chain timestamp is too far in the past. Advance it.
-	now := builder.txExecutorBackend.Clk.Time()
-	advanceTimeTx, err := builder.txBuilder.NewAdvanceTimeTx(now)
+	advanceTimeTx, err := builder.txBuilder.NewAdvanceTimeTx(timestamp)
 	if err != nil {
 		return nil, fmt.Errorf("could not build tx to advance time: %w", err)
 	}
