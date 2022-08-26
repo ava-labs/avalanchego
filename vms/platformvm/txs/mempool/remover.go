@@ -13,37 +13,37 @@ type remover struct {
 }
 
 func (r *remover) AddValidatorTx(*txs.AddValidatorTx) error {
-	r.m.RemoveProposalTx(r.tx)
+	r.m.removeStakerTx(r.tx)
 	return nil
 }
 
 func (r *remover) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
-	r.m.RemoveProposalTx(r.tx)
+	r.m.removeStakerTx(r.tx)
 	return nil
 }
 
 func (r *remover) AddDelegatorTx(*txs.AddDelegatorTx) error {
-	r.m.RemoveProposalTx(r.tx)
+	r.m.removeStakerTx(r.tx)
 	return nil
 }
 
 func (r *remover) CreateChainTx(*txs.CreateChainTx) error {
-	r.m.RemoveDecisionTxs([]*txs.Tx{r.tx})
+	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
 	return nil
 }
 
 func (r *remover) CreateSubnetTx(*txs.CreateSubnetTx) error {
-	r.m.RemoveDecisionTxs([]*txs.Tx{r.tx})
+	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
 	return nil
 }
 
 func (r *remover) ImportTx(*txs.ImportTx) error {
-	r.m.RemoveDecisionTxs([]*txs.Tx{r.tx})
+	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
 	return nil
 }
 
 func (r *remover) ExportTx(*txs.ExportTx) error {
-	r.m.RemoveDecisionTxs([]*txs.Tx{r.tx})
+	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
 	return nil
 }
 

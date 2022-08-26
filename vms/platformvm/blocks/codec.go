@@ -32,6 +32,7 @@ func init() {
 		errs.Add(
 			RegisterApricotBlockTypes(c),
 			txs.RegisterUnsignedTxsTypes(c),
+			RegisterBlueberryBlockTypes(c),
 		)
 	}
 	errs.Add(
@@ -55,6 +56,17 @@ func RegisterApricotBlockTypes(targetCodec codec.Registry) error {
 		targetCodec.RegisterType(&ApricotCommitBlock{}),
 		targetCodec.RegisterType(&ApricotStandardBlock{}),
 		targetCodec.RegisterType(&ApricotAtomicBlock{}),
+	)
+	return errs.Err
+}
+
+func RegisterBlueberryBlockTypes(targetCodec codec.Registry) error {
+	errs := wrappers.Errs{}
+	errs.Add(
+		targetCodec.RegisterType(&BlueberryProposalBlock{}),
+		targetCodec.RegisterType(&BlueberryAbortBlock{}),
+		targetCodec.RegisterType(&BlueberryCommitBlock{}),
+		targetCodec.RegisterType(&BlueberryStandardBlock{}),
 	)
 	return errs.Err
 }

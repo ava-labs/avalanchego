@@ -5,6 +5,7 @@ package executor
 
 import (
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 
@@ -109,5 +110,53 @@ func TestBackendGetBlock(t *testing.T) {
 		gotBlk, err := b.GetBlock(blkID)
 		require.NoError(err)
 		require.Equal(statelessBlk, gotBlk)
+	}
+}
+
+func TestGetTimestamp(t *testing.T) {
+	type test struct {
+		name              string
+		backendF          func(*gomock.Controller) *backend
+		expectedTimestamp time.Time
+	}
+
+	blkID := ids.GenerateTestID()
+	tests := []test{
+		{
+			name: "block is in map",
+			backendF: func(ctrl *gomock.Controller) *backend {
+				return &backend{
+					blkIDToState: map[ids.ID]*blockState{
+						blkID: {
+							timestamp: time.Unix(1337, 0),
+						},
+					},
+				}
+			},
+			expectedTimestamp: time.Unix(1337, 0),
+		},
+		{
+			name: "block isn't map",
+			backendF: func(ctrl *gomock.Controller) *backend {
+				state := state.NewMockState(ctrl)
+				state.EXPECT().GetTimestamp().Return(time.Unix(1337, 0))
+				return &backend{
+					state: state,
+				}
+			},
+			expectedTimestamp: time.Unix(1337, 0),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			backend := tt.backendF(ctrl)
+			gotTimestamp := backend.getTimestamp(blkID)
+			require.Equal(tt.expectedTimestamp, gotTimestamp)
+		})
 	}
 }

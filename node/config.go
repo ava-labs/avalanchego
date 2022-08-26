@@ -150,9 +150,6 @@ type Config struct {
 	// Assertions configuration
 	EnableAssertions bool `json:"enableAssertions"`
 
-	// Crypto configuration
-	EnableCrypto bool `json:"enableCrypto"`
-
 	// Health
 	HealthCheckFreq time.Duration `json:"healthCheckFreq"`
 

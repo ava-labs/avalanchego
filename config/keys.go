@@ -29,7 +29,6 @@ const (
 	StakeMintingPeriodKey                              = "stake-minting-period"
 	StakeSupplyCapKey                                  = "stake-supply-cap"
 	AssertionsEnabledKey                               = "assertions-enabled"
-	SignatureVerificationEnabledKey                    = "signature-verification-enabled"
 	DBTypeKey                                          = "db-type"
 	DBPathKey                                          = "db-dir"
 	DBConfigFileKey                                    = "db-config-file"

@@ -1,13 +1,15 @@
 // Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package builder
+package executor
 
 import (
 	"errors"
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/golang/mock/gomock"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -16,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -45,16 +46,19 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
-	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
-	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	db_manager "github.com/ava-labs/avalanchego/database/manager"
+	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
 
 const (
+	pending stakerStatus = iota
+	current
+
 	testNetworkID                 = 10 // To be used in tests
 	defaultWeight                 = 10000
 	maxRecentlyAcceptedWindowSize = 256
@@ -62,6 +66,8 @@ const (
 )
 
 var (
+	_ mempool.BlockTimer = &environment{}
+
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
 	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -75,17 +81,29 @@ var (
 	xChainID                  = ids.Empty.Prefix(0)
 	cChainID                  = ids.Empty.Prefix(1)
 
-	testSubnet1            *txs.Tx
-	testSubnet1ControlKeys = preFundedKeys[0:3]
+	genesisBlkID ids.ID
+	testSubnet1  *txs.Tx
 )
 
-type mutableSharedMemory struct {
-	atomic.SharedMemory
+type stakerStatus uint
+
+type staker struct {
+	nodeID             ids.NodeID
+	rewardAddress      ids.ShortID
+	startTime, endTime time.Time
+}
+
+type test struct {
+	description           string
+	stakers               []staker
+	subnetStakers         []staker
+	advanceTimeTo         []time.Time
+	expectedStakers       map[ids.NodeID]stakerStatus
+	expectedSubnetStakers map[ids.NodeID]stakerStatus
 }
 
 type environment struct {
-	Builder
-	blkManager blockexecutor.Manager
+	blkManager Manager
 	mempool    mempool.Mempool
 	sender     *common.SenderTest
 
@@ -94,14 +112,18 @@ type environment struct {
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
 	ctx            *snow.Context
-	msm            *mutableSharedMemory
 	fx             fx.Fx
 	state          state.State
+	mockedState    *state.MockState
 	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
 	utxosHandler   utxo.Handler
-	txBuilder      txbuilder.Builder
-	backend        txexecutor.Backend
+	txBuilder      p_tx_builder.Builder
+	backend        *executor.Backend
+}
+
+func (t *environment) ResetBlockTimer() {
+	// dummy call, do nothing for now
 }
 
 // TODO snLookup currently duplicated in vm_test.go. Consider removing duplication
@@ -117,7 +139,7 @@ func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
 	return subnetID, nil
 }
 
-func newEnvironment(t *testing.T) *environment {
+func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	res := &environment{
 		isBootstrapped: &utils.AtomicBool{},
 		config:         defaultConfig(),
@@ -125,34 +147,47 @@ func newEnvironment(t *testing.T) *environment {
 	}
 	res.isBootstrapped.SetValue(true)
 
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
+	baseDBManager := db_manager.NewMemDB(version.Semantic1_0_0)
 	res.baseDB = versiondb.New(baseDBManager.Current().Database)
-	res.ctx, res.msm = defaultCtx(res.baseDB)
-
-	res.ctx.Lock.Lock()
-	defer res.ctx.Lock.Unlock()
-
+	res.ctx = defaultCtx(res.baseDB)
 	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.GetValue())
 
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
-	res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
-
 	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
-	res.uptimes = uptime.NewManager(res.state)
-	res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.state, res.fx)
 
-	res.txBuilder = txbuilder.New(
-		res.ctx,
-		*res.config,
-		res.clk,
-		res.fx,
-		res.state,
-		res.atomicUTXOs,
-		res.utxosHandler,
-	)
+	if ctrl == nil {
+		res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
+		res.uptimes = uptime.NewManager(res.state)
+		res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.state, res.fx)
+		res.txBuilder = p_tx_builder.New(
+			res.ctx,
+			*res.config,
+			res.clk,
+			res.fx,
+			res.state,
+			res.atomicUTXOs,
+			res.utxosHandler,
+		)
+	} else {
+		genesisBlkID = ids.GenerateTestID()
+		res.mockedState = state.NewMockState(ctrl)
+		res.uptimes = uptime.NewManager(res.mockedState)
+		res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.mockedState, res.fx)
+		res.txBuilder = p_tx_builder.New(
+			res.ctx,
+			*res.config,
+			res.clk,
+			res.fx,
+			res.mockedState,
+			res.atomicUTXOs,
+			res.utxosHandler,
+		)
 
-	genesisID := res.state.GetLastAccepted()
-	res.backend = txexecutor.Backend{
+		// setup expectations strictly needed for environment creation
+		res.mockedState.EXPECT().GetLastAccepted().Return(genesisBlkID).Times(1)
+	}
+
+	res.backend = &executor.Backend{
 		Config:       res.config,
 		Ctx:          res.ctx,
 		Clk:          res.clk,
@@ -173,34 +208,34 @@ func newEnvironment(t *testing.T) *environment {
 	)
 	res.sender = &common.SenderTest{T: t}
 
-	metrics, err := metrics.New("", registerer, res.config.WhitelistedSubnets)
-	if err != nil {
-		panic(fmt.Errorf("failed to create metrics: %w", err))
-	}
+	metrics := metrics.Noop
 
+	var err error
 	res.mempool, err = mempool.NewMempool("mempool", registerer, res)
 	if err != nil {
 		panic(fmt.Errorf("failed to create mempool: %w", err))
 	}
-	res.blkManager = blockexecutor.NewManager(
-		res.mempool,
-		metrics,
-		res.state,
-		&res.backend,
-		window,
-	)
 
-	res.Builder = New(
-		res.mempool,
-		res.txBuilder,
-		&res.backend,
-		res.blkManager,
-		nil, // toEngine,
-		res.sender,
-	)
-
-	res.Builder.SetPreference(genesisID)
-	addSubnet(res)
+	if ctrl == nil {
+		res.blkManager = NewManager(
+			res.mempool,
+			metrics,
+			res.state,
+			res.backend,
+			window,
+		)
+		addSubnet(res)
+	} else {
+		res.blkManager = NewManager(
+			res.mempool,
+			metrics,
+			res.mockedState,
+			res.backend,
+			window,
+		)
+		// we do not add any subnet to state, since we can mock
+		// whatever we need
+	}
 
 	return res
 }
@@ -229,8 +264,8 @@ func addSubnet(env *environment) {
 		panic(err)
 	}
 
-	executor := txexecutor.StandardTxExecutor{
-		Backend: &env.backend,
+	executor := executor.StandardTxExecutor{
+		Backend: env.backend,
 		State:   stateDiff,
 		Tx:      testSubnet1,
 	}
@@ -272,11 +307,11 @@ func defaultState(
 	if err := state.Commit(); err != nil {
 		panic(err)
 	}
-
+	genesisBlkID = state.GetLastAccepted()
 	return state
 }
 
-func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
+func defaultCtx(db database.Database) *snow.Context {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = 10
 	ctx.XChainID = xChainID
@@ -285,10 +320,7 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	atomicDB := prefixdb.New([]byte{1}, db)
 	m := atomic.NewMemory(atomicDB)
 
-	msm := &mutableSharedMemory{
-		SharedMemory: m.NewSharedMemory(ctx.ChainID),
-	}
-	ctx.SharedMemory = msm
+	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	ctx.SNLookup = &snLookup{
 		chainsToSubnet: map[ids.ID]ids.ID{
@@ -298,7 +330,7 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 		},
 	}
 
-	return ctx, msm
+	return ctx
 }
 
 func defaultConfig() *config.Config {
@@ -425,9 +457,14 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 	return genesisBytes
 }
 
-func shutdownEnvironment(env *environment) error {
-	if env.isBootstrapped.GetValue() {
-		primaryValidatorSet, exist := env.config.Validators.GetValidators(constants.PrimaryNetworkID)
+func shutdownEnvironment(t *environment) error {
+	if t.mockedState != nil {
+		// state is mocked, nothing to do here
+		return nil
+	}
+
+	if t.isBootstrapped.GetValue() {
+		primaryValidatorSet, exist := t.config.Validators.GetValidators(constants.PrimaryNetworkID)
 		if !exist {
 			return errors.New("no default subnet validators")
 		}
@@ -438,18 +475,57 @@ func shutdownEnvironment(env *environment) error {
 			validatorIDs[i] = vdr.ID()
 		}
 
-		if err := env.uptimes.Shutdown(validatorIDs); err != nil {
+		if err := t.uptimes.Shutdown(validatorIDs); err != nil {
 			return err
 		}
-		if err := env.state.Commit(); err != nil {
+		if err := t.state.Commit(); err != nil {
 			return err
 		}
 	}
 
 	errs := wrappers.Errs{}
-	errs.Add(
-		env.state.Close(),
-		env.baseDB.Close(),
-	)
+	if t.state != nil {
+		errs.Add(t.state.Close())
+	}
+	errs.Add(t.baseDB.Close())
 	return errs.Err
+}
+
+func addPendingValidator(
+	env *environment,
+	startTime time.Time,
+	endTime time.Time,
+	nodeID ids.NodeID,
+	rewardAddress ids.ShortID,
+	keys []*crypto.PrivateKeySECP256K1R,
+) (*txs.Tx, error) {
+	addPendingValidatorTx, err := env.txBuilder.NewAddValidatorTx(
+		env.config.MinValidatorStake,
+		uint64(startTime.Unix()),
+		uint64(endTime.Unix()),
+		nodeID,
+		rewardAddress,
+		reward.PercentDenominator,
+		keys,
+		ids.ShortEmpty,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	staker := state.NewPrimaryNetworkStaker(
+		addPendingValidatorTx.ID(),
+		&addPendingValidatorTx.Unsigned.(*txs.AddValidatorTx).Validator,
+	)
+	staker.NextTime = staker.StartTime
+	staker.Priority = state.PrimaryNetworkValidatorPendingPriority
+
+	env.state.PutPendingValidator(staker)
+	env.state.AddTx(addPendingValidatorTx, status.Committed)
+	dummyHeight := uint64(1)
+	env.state.SetHeight(dummyHeight)
+	if err := env.state.Commit(); err != nil {
+		return nil, err
+	}
+	return addPendingValidatorTx, nil
 }
