@@ -1,10 +1,10 @@
-# Block composition and formation logic
+# Block Composition And Formation Logic
 
 The activation of Blueberry fork slightly changes the way the P-chain selects transactions to be included in next block and deals with block timestamps. In this brief document we detail the process and the changes.
 
 ## Apricot
 
-### Apricot block content
+### Apricot Block Content
 
 Apricot allows the following block types with the following content:
 
@@ -30,7 +30,7 @@ Each block has a header containing:
 
 Note that Apricot block headers do not contain any block timestamp.
 
-### Apricot block formation logic
+### Apricot Block Formation Logic
 
 Transactions included in an Apricot block can originate from the mempool or can be created just in time to duly update the staker set. Block formation logic in the Apricot fork can be broken up into two high-level steps:
 
@@ -55,7 +55,7 @@ Block formation terminates as soon as any of the steps executed manage to select
 
 ## Blueberry
 
-### Blueberry block content
+### Blueberry Block Content
 
 Blueberry allows the following block types with the following content:
 
@@ -82,7 +82,7 @@ So the two main differences with respect to Apricot are:
 * AddValidatorTx, AddDelegatorTx, AddSubnetValidatorTx are included into Standard blocks rather than Proposal blocks so that they don't need to be voted on (i.e. followed by a Commit/Abort block).
 * Block timestamp is explicitly serialized into block header, to allow chain time update.
 
-## Blueberry block formation logic
+## Blueberry Block Formation Logic
 
 The activation of the Blueberry fork only makes minor changes to the way the P-chain selects transactions to be included in next block, such as block timestamp calculation. In this section we detail the process and the changes.
 
