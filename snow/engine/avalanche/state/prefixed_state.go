@@ -54,10 +54,10 @@ func (s *prefixedState) Vertex(id ids.ID) vertex.StatelessVertex {
 func (s *prefixedState) SetVertex(vtx vertex.StatelessVertex) error {
 	rawVertexID := vtx.ID()
 	var (
-		vID   ids.ID
-		found bool
+		vID ids.ID
+		ok  bool
 	)
-	if vID, found = s.vtx.Get(rawVertexID); !found {
+	if vID, ok = s.vtx.Get(rawVertexID); !ok {
 		vID = rawVertexID.Prefix(vtxID)
 		s.vtx.Put(rawVertexID, vID)
 	}
@@ -67,10 +67,10 @@ func (s *prefixedState) SetVertex(vtx vertex.StatelessVertex) error {
 
 func (s *prefixedState) Status(id ids.ID) choices.Status {
 	var (
-		sID   ids.ID
-		found bool
+		sID ids.ID
+		ok  bool
 	)
-	if sID, found = s.status.Get(id); !found {
+	if sID, ok = s.status.Get(id); !ok {
 		sID = id.Prefix(vtxStatusID)
 		s.status.Put(id, sID)
 	}
@@ -80,10 +80,10 @@ func (s *prefixedState) Status(id ids.ID) choices.Status {
 
 func (s *prefixedState) SetStatus(id ids.ID, status choices.Status) error {
 	var (
-		sID   ids.ID
-		found bool
+		sID ids.ID
+		ok  bool
 	)
-	if sID, found = s.status.Get(id); !found {
+	if sID, ok = s.status.Get(id); !ok {
 		sID = id.Prefix(vtxStatusID)
 		s.status.Put(id, sID)
 	}
