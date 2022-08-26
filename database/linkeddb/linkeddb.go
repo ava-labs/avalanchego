@@ -43,7 +43,7 @@ type linkedDB struct {
 	headKeyIsSynced, headKeyExists, headKeyIsUpdated, updatedHeadKeyExists bool
 	headKey, updatedHeadKey                                                []byte
 	// these variables provide caching for the nodes.
-	nodeCache    cache.Cacher // key -> *node
+	nodeCache    cache.Cacher[string, *node] // key -> *node
 	updatedNodes map[string]*node
 
 	// db is the underlying database that this list is stored in.
@@ -62,7 +62,7 @@ type node struct {
 
 func New(db database.Database, cacheSize int) LinkedDB {
 	return &linkedDB{
-		nodeCache:    &cache.LRU{Size: cacheSize},
+		nodeCache:    &cache.LRU[string, *node]{Size: cacheSize},
 		updatedNodes: make(map[string]*node),
 		db:           db,
 		batch:        db.NewBatch(),
@@ -294,8 +294,7 @@ func (ldb *linkedDB) getNode(key []byte) (node, error) {
 	defer ldb.cacheLock.Unlock()
 
 	keyStr := string(key)
-	if nodeIntf, exists := ldb.nodeCache.Get(keyStr); exists {
-		n := nodeIntf.(*node)
+	if n, exists := ldb.nodeCache.Get(keyStr); exists {
 		if n == nil {
 			return node{}, database.ErrNotFound
 		}

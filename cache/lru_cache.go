@@ -10,54 +10,55 @@ import (
 
 const minCacheSize = 32
 
-var _ Cacher = &LRU{}
+// TODO can we do a type assertion with generics?
+// var _ Cacher = &LRU{}
 
-type entry struct {
-	Key   interface{}
-	Value interface{}
+type entry[T comparable, K any] struct {
+	Key   T
+	Value K
 }
 
 // LRU is a key value store with bounded size. If the size is attempted to be
 // exceeded, then an element is removed from the cache before the insertion is
 // done, based on evicting the least recently used value.
-type LRU struct {
+type LRU[T comparable, K any] struct {
 	lock      sync.Mutex
-	entryMap  map[interface{}]*list.Element
+	entryMap  map[T]*list.Element
 	entryList *list.List
 	Size      int
 }
 
-func (c *LRU) Put(key, value interface{}) {
+func (c *LRU[T, K]) Put(key T, value K) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.put(key, value)
 }
 
-func (c *LRU) Get(key interface{}) (interface{}, bool) {
+func (c *LRU[T, K]) Get(key T) (K, bool) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	return c.get(key)
 }
 
-func (c *LRU) Evict(key interface{}) {
+func (c *LRU[T, K]) Evict(key T) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.evict(key)
 }
 
-func (c *LRU) Flush() {
+func (c *LRU[T, K]) Flush() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.flush()
 }
 
-func (c *LRU) init() {
+func (c *LRU[T, K]) init() {
 	if c.entryMap == nil {
-		c.entryMap = make(map[interface{}]*list.Element, minCacheSize)
+		c.entryMap = make(map[T]*list.Element, minCacheSize)
 	}
 	if c.entryList == nil {
 		c.entryList = list.New()
@@ -67,17 +68,17 @@ func (c *LRU) init() {
 	}
 }
 
-func (c *LRU) resize() {
+func (c *LRU[T, K]) resize() {
 	for c.entryList.Len() > c.Size {
 		e := c.entryList.Front()
 		c.entryList.Remove(e)
 
-		val := e.Value.(*entry)
+		val := e.Value.(*entry[T, K])
 		delete(c.entryMap, val.Key)
 	}
 }
 
-func (c *LRU) put(key, value interface{}) {
+func (c *LRU[T, K]) put(key T, value K) {
 	c.init()
 	c.resize()
 
@@ -86,12 +87,12 @@ func (c *LRU) put(key, value interface{}) {
 			e = c.entryList.Front()
 			c.entryList.MoveToBack(e)
 
-			val := e.Value.(*entry)
+			val := e.Value.(*entry[T, K])
 			delete(c.entryMap, val.Key)
 			val.Key = key
 			val.Value = value
 		} else {
-			e = c.entryList.PushBack(&entry{
+			e = c.entryList.PushBack(&entry[T, K]{
 				Key:   key,
 				Value: value,
 			})
@@ -100,25 +101,25 @@ func (c *LRU) put(key, value interface{}) {
 	} else {
 		c.entryList.MoveToBack(e)
 
-		val := e.Value.(*entry)
+		val := e.Value.(*entry[T, K])
 		val.Value = value
 	}
 }
 
-func (c *LRU) get(key interface{}) (interface{}, bool) {
+func (c *LRU[T, K]) get(key T) (K, bool) {
 	c.init()
 	c.resize()
 
 	if e, ok := c.entryMap[key]; ok {
 		c.entryList.MoveToBack(e)
 
-		val := e.Value.(*entry)
+		val := e.Value.(*entry[T, K])
 		return val.Value, true
 	}
-	return struct{}{}, false
+	return *new(K), false //nolint:gocritic
 }
 
-func (c *LRU) evict(key interface{}) {
+func (c *LRU[T, K]) evict(key T) {
 	c.init()
 	c.resize()
 
@@ -128,9 +129,9 @@ func (c *LRU) evict(key interface{}) {
 	}
 }
 
-func (c *LRU) flush() {
+func (c *LRU[T, K]) flush() {
 	c.init()
 
-	c.entryMap = make(map[interface{}]*list.Element, minCacheSize)
+	c.entryMap = make(map[T]*list.Element, minCacheSize)
 	c.entryList = list.New()
 }

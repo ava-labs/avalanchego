@@ -8,31 +8,32 @@ import (
 	"sync"
 )
 
-var _ Deduplicator = &EvictableLRU{}
+// TODO can we do type assertions?
+// var _ Deduplicator = &EvictableLRU{}
 
 // EvictableLRU is an LRU cache that notifies the objects when they are evicted.
-type EvictableLRU struct {
+type EvictableLRU[T comparable, K any] struct {
 	lock      sync.Mutex
 	entryMap  map[interface{}]*list.Element
 	entryList *list.List
 	Size      int
 }
 
-func (c *EvictableLRU) Deduplicate(value Evictable) Evictable {
+func (c *EvictableLRU[T, K]) Deduplicate(value Evictable[T]) Evictable[T] {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	return c.deduplicate(value)
 }
 
-func (c *EvictableLRU) Flush() {
+func (c *EvictableLRU[T, K]) Flush() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.flush()
 }
 
-func (c *EvictableLRU) init() {
+func (c *EvictableLRU[T, K]) init() {
 	if c.entryMap == nil {
 		c.entryMap = make(map[interface{}]*list.Element)
 	}
@@ -44,18 +45,18 @@ func (c *EvictableLRU) init() {
 	}
 }
 
-func (c *EvictableLRU) resize() {
+func (c *EvictableLRU[T, K]) resize() {
 	for c.entryList.Len() > c.Size {
 		e := c.entryList.Front()
 		c.entryList.Remove(e)
 
-		val := e.Value.(Evictable)
+		val := e.Value.(Evictable[T])
 		delete(c.entryMap, val.Key())
 		val.Evict()
 	}
 }
 
-func (c *EvictableLRU) deduplicate(value Evictable) Evictable {
+func (c *EvictableLRU[T, K]) deduplicate(value Evictable[T]) Evictable[T] {
 	c.init()
 	c.resize()
 
@@ -65,7 +66,7 @@ func (c *EvictableLRU) deduplicate(value Evictable) Evictable {
 			e = c.entryList.Front()
 			c.entryList.MoveToBack(e)
 
-			val := e.Value.(Evictable)
+			val := e.Value.(Evictable[T])
 			delete(c.entryMap, val.Key())
 			val.Evict()
 
@@ -77,13 +78,13 @@ func (c *EvictableLRU) deduplicate(value Evictable) Evictable {
 	} else {
 		c.entryList.MoveToBack(e)
 
-		val := e.Value.(Evictable)
+		val := e.Value.(Evictable[T])
 		value = val
 	}
 	return value
 }
 
-func (c *EvictableLRU) flush() {
+func (c *EvictableLRU[T, K]) flush() {
 	c.init()
 
 	size := c.Size

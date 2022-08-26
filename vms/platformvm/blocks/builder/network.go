@@ -40,7 +40,7 @@ type network struct {
 
 	// gossip related attributes
 	appSender common.AppSender
-	recentTxs *cache.LRU
+	recentTxs *cache.LRU[ids.ID, struct{}]
 }
 
 func NewNetwork(
@@ -52,7 +52,7 @@ func NewNetwork(
 		ctx:        ctx,
 		blkBuilder: blkBuilder,
 		appSender:  appSender,
-		recentTxs:  &cache.LRU{Size: recentCacheSize},
+		recentTxs:  &cache.LRU[ids.ID, struct{}]{Size: recentCacheSize},
 	}
 }
 
@@ -134,7 +134,7 @@ func (n *network) GossipTx(tx *txs.Tx) error {
 	if _, has := n.recentTxs.Get(txID); has {
 		return nil
 	}
-	n.recentTxs.Put(txID, nil)
+	n.recentTxs.Put(txID, struct{}{})
 
 	n.ctx.Log.Debug("gossiping tx",
 		zap.Stringer("txID", txID),

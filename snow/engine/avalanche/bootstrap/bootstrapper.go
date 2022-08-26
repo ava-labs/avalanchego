@@ -50,7 +50,7 @@ func New(config Config, onFinished func(lastReqID uint32) error) (common.Bootstr
 		ChitsHandler:                common.NewNoOpChitsHandler(config.Ctx.Log),
 		AppHandler:                  common.NewNoOpAppHandler(config.Ctx.Log),
 
-		processedCache:           &cache.LRU{Size: cacheSize},
+		processedCache:           &cache.LRU[ids.ID, struct{}]{Size: cacheSize},
 		Fetcher:                  common.Fetcher{OnFinished: onFinished},
 		executedStateTransitions: math.MaxInt32,
 	}
@@ -104,7 +104,7 @@ type bootstrapper struct {
 	needToFetch ids.Set
 
 	// Contains IDs of vertices that have recently been processed
-	processedCache *cache.LRU
+	processedCache *cache.LRU[ids.ID, struct{}]
 	// number of state transitions executed
 	executedStateTransitions int
 
@@ -471,7 +471,7 @@ func (b *bootstrapper) process(vtxs ...avalanche.Vertex) error {
 				return err
 			}
 			if height%stripeDistance < stripeWidth { // See comment for stripeDistance
-				b.processedCache.Put(vtxID, nil)
+				b.processedCache.Put(vtxID, struct{}{})
 			}
 			if height == prevHeight {
 				vtxHeightSet.Add(vtxID)

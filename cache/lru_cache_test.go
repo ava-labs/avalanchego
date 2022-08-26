@@ -10,19 +10,19 @@ import (
 )
 
 func TestLRU(t *testing.T) {
-	cache := &LRU{Size: 1}
+	cache := &LRU[ids.ID, int]{Size: 1}
 
 	TestBasic(t, cache)
 }
 
 func TestLRUEviction(t *testing.T) {
-	cache := &LRU{Size: 2}
+	cache := &LRU[ids.ID, int]{Size: 2}
 
 	TestEviction(t, cache)
 }
 
 func TestLRUResize(t *testing.T) {
-	cache := LRU{Size: 2}
+	cache := LRU[ids.ID, int]{Size: 2}
 
 	id1 := ids.ID{1}
 	id2 := ids.ID{2}

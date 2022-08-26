@@ -201,8 +201,8 @@ type state struct {
 
 	currentHeight uint64
 
-	addedBlocks map[ids.ID]stateBlk // map of blockID -> Block
-	blockCache  cache.Cacher        // cache of blockID -> Block, if the entry is nil, it is not in the database
+	addedBlocks map[ids.ID]stateBlk             // map of blockID -> Block
+	blockCache  cache.Cacher[ids.ID, *stateBlk] // cache of blockID -> Block, if the entry is nil, it is not in the database
 	blockDB     database.Database
 
 	uptimes        map[ids.NodeID]*uptimeAndReward // nodeID -> uptimes
@@ -224,15 +224,16 @@ type state struct {
 	pendingSubnetValidatorBaseDB database.Database
 	pendingSubnetValidatorList   linkeddb.LinkedDB
 
-	validatorDiffsCache cache.Cacher // cache of heightWithSubnet -> map[ids.ShortID]*ValidatorWeightDiff
+	// cache of heightWithSubnet -> map[ids.NodeID]*ValidatorWeightDiff
+	validatorDiffsCache cache.Cacher[string, map[ids.NodeID]*ValidatorWeightDiff]
 	validatorDiffsDB    database.Database
 
-	addedTxs map[ids.ID]*txAndStatus // map of txID -> {*txs.Tx, Status}
-	txCache  cache.Cacher            // cache of txID -> {*txs.Tx, Status} if the entry is nil, it is not in the database
+	addedTxs map[ids.ID]*txAndStatus            // map of txID -> {*txs.Tx, Status}
+	txCache  cache.Cacher[ids.ID, *txAndStatus] // cache of txID -> {*txs.Tx, Status} if the entry is nil, it is not in the database
 	txDB     database.Database
 
-	addedRewardUTXOs map[ids.ID][]*avax.UTXO // map of txID -> []*UTXO
-	rewardUTXOsCache cache.Cacher            // cache of txID -> []*UTXO
+	addedRewardUTXOs map[ids.ID][]*avax.UTXO            // map of txID -> []*UTXO
+	rewardUTXOsCache cache.Cacher[ids.ID, []*avax.UTXO] // cache of txID -> []*UTXO
 	rewardUTXODB     database.Database
 
 	modifiedUTXOs map[ids.ID]*avax.UTXO // map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
@@ -244,9 +245,9 @@ type state struct {
 	subnetBaseDB  database.Database
 	subnetDB      linkeddb.LinkedDB
 
-	addedChains  map[ids.ID][]*txs.Tx // maps subnetID -> the newly added chains to the subnet
-	chainCache   cache.Cacher         // cache of subnetID -> the chains after all local modifications []*txs.Tx
-	chainDBCache cache.Cacher         // cache of subnetID -> linkedDB
+	addedChains  map[ids.ID][]*txs.Tx                    // maps subnetID -> the newly added chains to the subnet
+	chainCache   cache.Cacher[ids.ID, []*txs.Tx]         // cache of subnetID -> the chains after all local modifications []*txs.Tx
+	chainDBCache cache.Cacher[ids.ID, linkeddb.LinkedDB] // cache of subnetID -> linkedDB
 	chainDB      database.Database
 
 	// The persisted fields represent the current database value
@@ -341,10 +342,10 @@ func new(
 	metricsReg prometheus.Registerer,
 	rewards reward.Calculator,
 ) (*state, error) {
-	blockCache, err := metercacher.New(
+	blockCache, err := metercacher.New[ids.ID, *stateBlk](
 		"block_cache",
 		metricsReg,
-		&cache.LRU{Size: blockCacheSize},
+		&cache.LRU[ids.ID, *stateBlk]{Size: blockCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -369,7 +370,7 @@ func new(
 	validatorDiffsCache, err := metercacher.New(
 		"validator_diffs_cache",
 		metricsReg,
-		&cache.LRU{Size: validatorDiffsCacheSize},
+		&cache.LRU[string, map[ids.NodeID]*ValidatorWeightDiff]{Size: validatorDiffsCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -378,7 +379,7 @@ func new(
 	txCache, err := metercacher.New(
 		"tx_cache",
 		metricsReg,
-		&cache.LRU{Size: txCacheSize},
+		&cache.LRU[ids.ID, *txAndStatus]{Size: txCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -388,7 +389,7 @@ func new(
 	rewardUTXOsCache, err := metercacher.New(
 		"reward_utxos_cache",
 		metricsReg,
-		&cache.LRU{Size: rewardUTXOsCacheSize},
+		&cache.LRU[ids.ID, []*avax.UTXO]{Size: rewardUTXOsCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -405,7 +406,7 @@ func new(
 	chainCache, err := metercacher.New(
 		"chain_cache",
 		metricsReg,
-		&cache.LRU{Size: chainCacheSize},
+		&cache.LRU[ids.ID, []*txs.Tx]{Size: chainCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -414,7 +415,7 @@ func new(
 	chainDBCache, err := metercacher.New(
 		"chain_db_cache",
 		metricsReg,
-		&cache.LRU{Size: chainDBCacheSize},
+		&cache.LRU[ids.ID, linkeddb.LinkedDB]{Size: chainDBCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -581,8 +582,8 @@ func (s *state) AddSubnet(createSubnetTx *txs.Tx) {
 }
 
 func (s *state) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
-	if chainsIntf, cached := s.chainCache.Get(subnetID); cached {
-		return chainsIntf.([]*txs.Tx), nil
+	if chains, cached := s.chainCache.Get(subnetID); cached {
+		return chains, nil
 	}
 	chainDB := s.getChainDB(subnetID)
 	chainDBIt := chainDB.NewIterator()
@@ -613,8 +614,7 @@ func (s *state) AddChain(createChainTxIntf *txs.Tx) {
 	createChainTx := createChainTxIntf.Unsigned.(*txs.CreateChainTx)
 	subnetID := createChainTx.SubnetID
 	s.addedChains[subnetID] = append(s.addedChains[subnetID], createChainTxIntf)
-	if chainsIntf, cached := s.chainCache.Get(subnetID); cached {
-		chains := chainsIntf.([]*txs.Tx)
+	if chains, cached := s.chainCache.Get(subnetID); cached {
 		chains = append(chains, createChainTxIntf)
 		s.chainCache.Put(subnetID, chains)
 	}
@@ -634,11 +634,10 @@ func (s *state) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 	if tx, exists := s.addedTxs[txID]; exists {
 		return tx.tx, tx.status, nil
 	}
-	if txIntf, cached := s.txCache.Get(txID); cached {
-		if txIntf == nil {
+	if tx, cached := s.txCache.Get(txID); cached {
+		if tx == nil {
 			return nil, status.Unknown, database.ErrNotFound
 		}
-		tx := txIntf.(*txAndStatus)
 		return tx.tx, tx.status, nil
 	}
 	txBytes, err := s.txDB.Get(txID[:])
@@ -680,7 +679,7 @@ func (s *state) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 		return utxos, nil
 	}
 	if utxos, exists := s.rewardUTXOsCache.Get(txID); exists {
-		return utxos.([]*avax.UTXO), nil
+		return utxos, nil
 	}
 
 	rawTxDB := prefixdb.New(txID[:], s.rewardUTXODB)
@@ -777,8 +776,8 @@ func (s *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids
 	}
 	prefixStr := string(prefixBytes)
 
-	if weightDiffsIntf, ok := s.validatorDiffsCache.Get(prefixStr); ok {
-		return weightDiffsIntf.(map[ids.NodeID]*ValidatorWeightDiff), nil
+	if weightDiffs, ok := s.validatorDiffsCache.Get(prefixStr); ok {
+		return weightDiffs, nil
 	}
 
 	rawDiffDB := prefixdb.New(prefixBytes, s.validatorDiffsDB)
@@ -1283,7 +1282,7 @@ func (s *state) writeBlocks() error {
 		}
 
 		delete(s.addedBlocks, blkID)
-		s.blockCache.Put(blkID, stateBlk)
+		s.blockCache.Put(blkID, &stBlk)
 		if err = s.blockDB.Put(blkID[:], blockBytes); err != nil {
 			return fmt.Errorf("failed to write block %s: %w", blkID, err)
 		}
@@ -1295,12 +1294,11 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status,
 	if blk, exists := s.addedBlocks[blockID]; exists {
 		return blk.Blk, blk.Status, nil
 	}
-	if blkIntf, cached := s.blockCache.Get(blockID); cached {
-		if blkIntf == nil {
+	if blkState, cached := s.blockCache.Get(blockID); cached {
+		if blkState == nil {
 			return nil, choices.Processing, database.ErrNotFound // status does not matter here
 		}
 
-		blkState := blkIntf.(stateBlk)
 		return blkState.Blk, blkState.Status, nil
 	}
 
@@ -1323,7 +1321,7 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status,
 		return nil, choices.Processing, err
 	}
 
-	s.blockCache.Put(blockID, blkState)
+	s.blockCache.Put(blockID, &blkState)
 	return blkState.Blk, blkState.Status, nil
 }
 

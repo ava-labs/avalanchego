@@ -21,16 +21,16 @@ var uniqueEdgeID = ids.Empty.Prefix(edgeID)
 type prefixedState struct {
 	state *state
 
-	vtx, status cache.Cacher
-	uniqueVtx   cache.Deduplicator
+	vtx, status cache.Cacher[ids.ID, ids.ID]
+	uniqueVtx   cache.Deduplicator[*uniqueVertex]
 }
 
 func newPrefixedState(state *state, idCacheSizes int) *prefixedState {
 	return &prefixedState{
 		state:     state,
-		vtx:       &cache.LRU{Size: idCacheSizes},
-		status:    &cache.LRU{Size: idCacheSizes},
-		uniqueVtx: &cache.EvictableLRU{Size: idCacheSizes},
+		vtx:       &cache.LRU[ids.ID, ids.ID]{Size: idCacheSizes},
+		status:    &cache.LRU[ids.ID, ids.ID]{Size: idCacheSizes},
+		uniqueVtx: &cache.EvictableLRU[ids.ID, *uniqueVertex]{Size: idCacheSizes},
 	}
 }
 
@@ -52,10 +52,11 @@ func (s *prefixedState) Vertex(id ids.ID) vertex.StatelessVertex {
 
 func (s *prefixedState) SetVertex(vtx vertex.StatelessVertex) error {
 	rawVertexID := vtx.ID()
-	var vID ids.ID
-	if cachedVtxIDIntf, found := s.vtx.Get(rawVertexID); found {
-		vID = cachedVtxIDIntf.(ids.ID)
-	} else {
+	var (
+		vID   ids.ID
+		found bool
+	)
+	if vID, found = s.vtx.Get(rawVertexID); !found {
 		vID = rawVertexID.Prefix(vtxID)
 		s.vtx.Put(rawVertexID, vID)
 	}
@@ -64,10 +65,11 @@ func (s *prefixedState) SetVertex(vtx vertex.StatelessVertex) error {
 }
 
 func (s *prefixedState) Status(id ids.ID) choices.Status {
-	var sID ids.ID
-	if cachedStatusIDIntf, found := s.status.Get(id); found {
-		sID = cachedStatusIDIntf.(ids.ID)
-	} else {
+	var (
+		sID   ids.ID
+		found bool
+	)
+	if sID, found = s.status.Get(id); !found {
 		sID = id.Prefix(vtxStatusID)
 		s.status.Put(id, sID)
 	}
@@ -76,10 +78,11 @@ func (s *prefixedState) Status(id ids.ID) choices.Status {
 }
 
 func (s *prefixedState) SetStatus(id ids.ID, status choices.Status) error {
-	var sID ids.ID
-	if cachedStatusIDIntf, found := s.status.Get(id); found {
-		sID = cachedStatusIDIntf.(ids.ID)
-	} else {
+	var (
+		sID   ids.ID
+		found bool
+	)
+	if sID, found = s.status.Get(id); !found {
 		sID = id.Prefix(vtxStatusID)
 		s.status.Put(id, sID)
 	}

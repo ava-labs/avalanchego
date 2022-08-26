@@ -12,13 +12,13 @@ import (
 // CacherTests is a list of all Cacher tests
 var CacherTests = []struct {
 	Size int
-	Func func(t *testing.T, c Cacher)
+	Func func(t *testing.T, c Cacher[ids.ID, int])
 }{
 	{Size: 1, Func: TestBasic},
 	{Size: 2, Func: TestEviction},
 }
 
-func TestBasic(t *testing.T, cache Cacher) {
+func TestBasic(t *testing.T, cache Cacher[ids.ID, int]) {
 	id1 := ids.ID{1}
 	if _, found := cache.Get(id1); found {
 		t.Fatalf("Retrieved value when none exists")
@@ -60,7 +60,7 @@ func TestBasic(t *testing.T, cache Cacher) {
 	}
 }
 
-func TestEviction(t *testing.T, cache Cacher) {
+func TestEviction(t *testing.T, cache Cacher[ids.ID, int]) {
 	id1 := ids.ID{1}
 	id2 := ids.ID{2}
 	id3 := ids.ID{3}

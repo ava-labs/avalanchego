@@ -102,7 +102,7 @@ type mempool struct {
 
 	// Key: Tx ID
 	// Value: String repr. of the verification error
-	droppedTxIDs *cache.LRU
+	droppedTxIDs *cache.LRU[ids.ID, string]
 
 	consumedUTXOs ids.Set
 
@@ -157,7 +157,7 @@ func NewMempool(
 		unissuedDecisionTxs:  unissuedDecisionTxs,
 		unissuedStakerTxs:    unissuedStakerTxs,
 		unknownTxs:           unknownTxs,
-		droppedTxIDs:         &cache.LRU{Size: droppedTxIDsCacheSize},
+		droppedTxIDs:         &cache.LRU[ids.ID, string]{Size: droppedTxIDsCacheSize},
 		consumedUTXOs:        ids.NewSet(initialConsumedUTXOsSize),
 		dropIncoming:         false, // enable tx adding by default
 		blkTimer:             blkTimer,
@@ -321,7 +321,7 @@ func (m *mempool) GetDropReason(txID ids.ID) (string, bool) {
 	if !exist {
 		return "", false
 	}
-	return reason.(string), true
+	return reason, true
 }
 
 func (m *mempool) register(tx *txs.Tx) {
