@@ -108,6 +108,6 @@ func (m *txMetrics) RewardValidatorTx(*txs.RewardValidatorTx) error {
 }
 
 func (m *txMetrics) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
-	m.numRewardValidatorTxs.Inc()
+	m.numRemoveSubnetValidatorTxs.Inc()
 	return nil
 }
