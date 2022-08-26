@@ -93,7 +93,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	// Set expectations for dependencies.
 	tx := apricotBlk.Txs()[0]
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
-	mempool.EXPECT().RemoveProposalTx(tx).Times(1)
+	mempool.EXPECT().Remove([]*txs.Tx{tx}).Times(1)
 
 	// Visit the block
 	blk := manager.NewBlock(apricotBlk)
@@ -189,7 +189,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	timestamp := time.Now()
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	parentStatelessBlk.EXPECT().Parent().Return(grandparentID).Times(1)
-	mempool.EXPECT().RemoveDecisionTxs([]*txs.Tx{apricotBlk.Tx}).Times(1)
+	mempool.EXPECT().Remove([]*txs.Tx{apricotBlk.Tx}).Times(1)
 	onAccept.EXPECT().AddTx(apricotBlk.Tx, status.Committed).Times(1)
 	onAccept.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 
@@ -294,7 +294,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	parentState.EXPECT().GetCurrentSupply().Return(uint64(10000)).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
-	mempool.EXPECT().RemoveDecisionTxs(apricotBlk.Txs()).Times(1)
+	mempool.EXPECT().Remove(apricotBlk.Txs()).Times(1)
 
 	blk := manager.NewBlock(apricotBlk)
 	err = blk.Verify()

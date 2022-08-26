@@ -67,7 +67,7 @@ func TestDecisionTxsInMempool(t *testing.T) {
 	require.NoError(err)
 
 	// txs must not already there before we start
-	require.False(mpool.HasDecisionTxs())
+	require.False(mpool.HasApricotDecisionTxs())
 
 	for _, tx := range decisionTxs {
 		// tx not already there
@@ -84,7 +84,7 @@ func TestDecisionTxsInMempool(t *testing.T) {
 		require.Equal(tx, retrieved)
 
 		// we can peek it
-		peeked := mpool.PeekDecisionTxs(math.MaxInt)
+		peeked := mpool.PeekApricotDecisionTxs(math.MaxInt)
 
 		// tx will be among those peeked,
 		// in NO PARTICULAR ORDER
@@ -103,33 +103,6 @@ func TestDecisionTxsInMempool(t *testing.T) {
 		require.False(mpool.Has(tx.ID()))
 		require.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
 
-		// we can reinsert it
-		require.NoError(mpool.Add(tx))
-
-		// we can mark it as dropped, but it'll still be in mempool
-		mpool.MarkDropped(tx.ID(), "dropped for test")
-		require.True(mpool.Has(tx.ID()))
-		require.Equal(tx, mpool.Get(tx.ID()))
-		_, dropped := mpool.GetDropReason(tx.ID())
-		require.True(dropped)
-
-		// we can pop it
-		txSize := len(tx.Bytes())
-		popped := mpool.PopDecisionTxs(math.MaxInt)
-		found = false
-		for _, pk := range popped {
-			if pk.ID() == tx.ID() {
-				found = true
-				break
-			}
-		}
-		require.True(found)
-
-		// once popped it cannot be there
-		require.False(mpool.Has(tx.ID()))
-		require.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
-		require.Equal([]*txs.Tx{}, mpool.PeekDecisionTxs(txSize))
-
 		// we can reinsert it again to grow the mempool
 		require.NoError(mpool.Add(tx))
 	}
@@ -142,47 +115,56 @@ func TestProposalTxsInMempool(t *testing.T) {
 	mpool, err := NewMempool("mempool", registerer, &noopBlkTimer{})
 	require.NoError(err)
 
-	// it's key to this test that proposal txs
-	// are ordered by decreasing start time
+	// The proposal txs are ordered by decreasing start time. This means after
+	// each insertion, the last inserted transaction should be on the top of the
+	// heap.
 	proposalTxs, err := createTestProposalTxs(2)
 	require.NoError(err)
 
 	// txs should not be already there
-	require.False(mpool.HasProposalTx())
+	require.False(mpool.HasStakerTx())
 
-	for _, tx := range proposalTxs {
+	for i, tx := range proposalTxs {
 		require.False(mpool.Has(tx.ID()))
 
 		// we can insert
 		require.NoError(mpool.Add(tx))
 
 		// we can get it
-		require.True(mpool.HasProposalTx())
+		require.True(mpool.HasStakerTx())
 		require.True(mpool.Has(tx.ID()))
 
 		retrieved := mpool.Get(tx.ID())
 		require.True(retrieved != nil)
 		require.Equal(tx, retrieved)
 
-		// we can peek it
-		peeked := mpool.PeekProposalTx()
-		require.True(peeked != nil)
-		require.Equal(tx, peeked)
+		{
+			// we can peek it
+			peeked := mpool.PeekStakerTx()
+			require.True(peeked != nil)
+			require.Equal(tx, peeked)
+		}
+
+		{
+			// we can peek it
+			peeked := mpool.PeekTxs(math.MaxInt)
+			require.Len(peeked, i+1)
+
+			// tx will be among those peeked,
+			// in NO PARTICULAR ORDER
+			found := false
+			for _, pk := range peeked {
+				if pk.ID() == tx.ID() {
+					found = true
+					break
+				}
+			}
+			require.True(found)
+		}
 
 		// once removed it cannot be there
 		mpool.Remove([]*txs.Tx{tx})
 
-		require.False(mpool.Has(tx.ID()))
-		require.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
-
-		// we can reinsert it
-		require.NoError(mpool.Add(tx))
-
-		// we can pop it
-		popped := mpool.PopProposalTx()
-		require.Equal(tx, popped)
-
-		// once popped it cannot be there
 		require.False(mpool.Has(tx.ID()))
 		require.Equal((*txs.Tx)(nil), mpool.Get(tx.ID()))
 

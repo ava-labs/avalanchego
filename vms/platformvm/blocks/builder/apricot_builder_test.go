@@ -89,8 +89,8 @@ func TestBuildApricotBlock(t *testing.T) {
 			name: "has decision txs",
 			builderF: func(ctrl *gomock.Controller) *builder {
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().HasDecisionTxs().Return(true)
-				mempool.EXPECT().PeekDecisionTxs(targetBlockSize).Return(blockTxs)
+				mempool.EXPECT().HasApricotDecisionTxs().Return(true)
+				mempool.EXPECT().PeekApricotDecisionTxs(targetBlockSize).Return(blockTxs)
 				return &builder{
 					Mempool: mempool,
 				}
@@ -116,7 +116,7 @@ func TestBuildApricotBlock(t *testing.T) {
 			builderF: func(ctrl *gomock.Controller) *builder {
 				// There are no decision txs
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().HasDecisionTxs().Return(false)
+				mempool.EXPECT().HasApricotDecisionTxs().Return(false)
 
 				// The tx builder should be asked to build a reward tx
 				txBuilder := txbuilder.NewMockBuilder(ctrl)
@@ -165,7 +165,7 @@ func TestBuildApricotBlock(t *testing.T) {
 			builderF: func(ctrl *gomock.Controller) *builder {
 				// There are no decision txs
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().HasDecisionTxs().Return(false)
+				mempool.EXPECT().HasApricotDecisionTxs().Return(false)
 
 				// The tx builder should be asked to build an advance time tx
 				advanceTimeTx := &txs.Tx{Unsigned: &txs.AdvanceTimeTx{
@@ -227,10 +227,10 @@ func TestBuildApricotBlock(t *testing.T) {
 			builderF: func(ctrl *gomock.Controller) *builder {
 				// There are no decision txs
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().HasDecisionTxs().Return(false)
+				mempool.EXPECT().HasApricotDecisionTxs().Return(false)
 
-				// There is not a proposal tx.
-				mempool.EXPECT().HasProposalTx().Return(false).AnyTimes()
+				// There is a staker tx.
+				mempool.EXPECT().HasStakerTx().Return(false).AnyTimes()
 
 				clk := &mockable.Clock{}
 				clk.Set(now)
@@ -282,11 +282,11 @@ func TestBuildApricotBlock(t *testing.T) {
 			builderF: func(ctrl *gomock.Controller) *builder {
 				// There are no decision txs
 				mempool := mempool.NewMockMempool(ctrl)
-				mempool.EXPECT().HasDecisionTxs().Return(false)
+				mempool.EXPECT().HasApricotDecisionTxs().Return(false)
 
 				// There is a proposal tx.
-				mempool.EXPECT().HasProposalTx().Return(true).AnyTimes()
-				mempool.EXPECT().PeekProposalTx().Return(blockTxs[0]).AnyTimes()
+				mempool.EXPECT().HasStakerTx().Return(true).AnyTimes()
+				mempool.EXPECT().PeekStakerTx().Return(blockTxs[0]).AnyTimes()
 
 				clk := &mockable.Clock{}
 				clk.Set(now)

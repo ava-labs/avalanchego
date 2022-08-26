@@ -4,7 +4,6 @@
 package builder
 
 import (
-	"math"
 	"testing"
 	"time"
 
@@ -86,17 +85,7 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 
 	// A previously dropped tx, popped then re-added to mempool,
 	// is not dropped anymore
-	switch tx.Unsigned.(type) {
-	case txs.StakerTx:
-		env.mempool.PopProposalTx()
-	case *txs.CreateChainTx,
-		*txs.CreateSubnetTx,
-		*txs.ImportTx,
-		*txs.ExportTx:
-		env.mempool.PopDecisionTxs(math.MaxInt64)
-	default:
-		t.Fatal("unknown tx type")
-	}
+	env.mempool.Remove([]*txs.Tx{tx})
 	require.NoError(env.mempool.Add(tx))
 
 	require.True(env.mempool.Has(txID))

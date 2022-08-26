@@ -21,17 +21,9 @@ func buildBlueberryBlock(
 	forceAdvanceTime bool,
 	parentState state.Chain,
 ) (blocks.Block, error) {
-	// try including as many standard txs as possible
-	if builder.Mempool.HasDecisionTxs() {
-		return blocks.NewBlueberryStandardBlock(
-			timestamp,
-			parentID,
-			height,
-			builder.Mempool.PeekDecisionTxs(targetBlockSize),
-		)
-	}
-
-	// try rewarding stakers whose staking period ends at the new chain time.
+	// Try rewarding stakers whose staking period ends at the new chain time.
+	// This is done first to prioritize advancing the timestamp as quickly as
+	// possible.
 	stakerTxID, shouldReward, err := builder.getNextStakerToReward(timestamp, parentState)
 	if err != nil {
 		return nil, fmt.Errorf("could not find next staker to reward: %w", err)
@@ -50,31 +42,20 @@ func buildBlueberryBlock(
 		)
 	}
 
-	// clean out the mempool's transactions with invalid timestamps.
-	builder.dropExpiredProposalTxs(timestamp)
+	// Clean out the mempool's transactions with invalid timestamps.
+	builder.dropExpiredStakerTxs(timestamp)
 
-	// try including a mempool proposal tx.
-	if builder.Mempool.HasProposalTx() {
-		tx := builder.Mempool.PeekProposalTx()
-		return blocks.NewBlueberryProposalBlock(
-			timestamp,
-			parentID,
-			height,
-			tx,
-		)
+	// If there is no reason to build a block, don't.
+	if !builder.Mempool.HasTxs() && !forceAdvanceTime {
+		builder.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
+		return nil, errNoPendingBlocks
 	}
 
-	if forceAdvanceTime {
-		// We should issue an empty block to advance the chain time because the
-		// staker set should change.
-		return blocks.NewBlueberryStandardBlock(
-			timestamp,
-			parentID,
-			height,
-			nil,
-		)
-	}
-
-	builder.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
-	return nil, errNoPendingBlocks
+	// Issue a block with as many transactions as possible.
+	return blocks.NewBlueberryStandardBlock(
+		timestamp,
+		parentID,
+		height,
+		builder.Mempool.PeekTxs(targetBlockSize),
+	)
 }

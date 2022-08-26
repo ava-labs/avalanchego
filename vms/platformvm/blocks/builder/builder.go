@@ -282,13 +282,13 @@ func (b *builder) getNextStakerToReward(
 	return ids.Empty, false, nil
 }
 
-// dropExpiredProposalTxs drops add validator/delegator transactions in the
+// dropExpiredStakerTxs drops add validator/delegator transactions in the
 // mempool whose start time is not sufficiently far in the future
 // (i.e. within local time plus [MaxFutureStartFrom]).
-func (b *builder) dropExpiredProposalTxs(timestamp time.Time) {
+func (b *builder) dropExpiredStakerTxs(timestamp time.Time) {
 	minStartTime := timestamp.Add(txexecutor.SyncBound)
-	for b.Mempool.HasProposalTx() {
-		tx := b.Mempool.PeekProposalTx()
+	for b.Mempool.HasStakerTx() {
+		tx := b.Mempool.PeekStakerTx()
 		startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 		if !startTime.Before(minStartTime) {
 			// The next proposal tx in the mempool starts sufficiently far in
@@ -303,7 +303,7 @@ func (b *builder) dropExpiredProposalTxs(timestamp time.Time) {
 			startTime,
 		)
 
-		b.Mempool.RemoveProposalTx(tx)
+		b.Mempool.Remove([]*txs.Tx{tx})
 		b.Mempool.MarkDropped(txID, errMsg) // cache tx as dropped
 		b.txExecutorBackend.Ctx.Log.Debug("dropping tx",
 			zap.String("reason", errMsg),

@@ -25,11 +25,11 @@ func buildApricotBlock(
 	parentState state.Chain,
 ) (blocks.Block, error) {
 	// try including as many standard txs as possible. No need to advance chain time
-	if builder.Mempool.HasDecisionTxs() {
+	if builder.Mempool.HasApricotDecisionTxs() {
 		return blocks.NewApricotStandardBlock(
 			parentID,
 			height,
-			builder.Mempool.PeekDecisionTxs(targetBlockSize),
+			builder.Mempool.PeekApricotDecisionTxs(targetBlockSize),
 		)
 	}
 
@@ -65,11 +65,11 @@ func buildApricotBlock(
 		)
 	}
 
-	// clean out transactions with an invalid timestamp.
-	builder.dropExpiredProposalTxs(timestamp)
+	// Clean out transactions with an invalid timestamp.
+	builder.dropExpiredStakerTxs(timestamp)
 
 	// Check the mempool
-	if !builder.Mempool.HasProposalTx() {
+	if !builder.Mempool.HasStakerTx() {
 		builder.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
 		return nil, errNoPendingBlocks
 	}
@@ -93,7 +93,7 @@ func buildApricotBlock(
 // Try to get/make a proposal tx to put into a block.
 // Any returned error is unexpected.
 func nextApricotProposalTx(builder *builder, timestamp time.Time, parentState state.Chain) (*txs.Tx, error) {
-	tx := builder.Mempool.PeekProposalTx()
+	tx := builder.Mempool.PeekStakerTx()
 	startTime := tx.Unsigned.(txs.StakerTx).StartTime()
 
 	// Check whether this staker starts within at most [MaxFutureStartTime].
