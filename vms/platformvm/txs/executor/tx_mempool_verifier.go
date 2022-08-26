@@ -52,15 +52,20 @@ func (v *MempoolTxVerifier) ExportTx(tx *txs.ExportTx) error {
 }
 
 func (v *MempoolTxVerifier) proposalTx(tx txs.StakerTx) error {
+	onCommitState, err := state.NewDiff(v.ParentID, v.StateVersions)
+	if err != nil {
+		return err
+	}
+
+	currentChainTime := onCommitState.GetTimestamp()
+	if v.Backend.Config.IsBlueberryActivated(currentChainTime) {
+		return v.standardTx(tx)
+	}
+
 	startTime := tx.StartTime()
 	maxLocalStartTime := v.Clk.Time().Add(MaxFutureStartTime)
 	if startTime.After(maxLocalStartTime) {
 		return errFutureStakeTime
-	}
-
-	onCommitState, err := state.NewDiff(v.ParentID, v.StateVersions)
-	if err != nil {
-		return err
 	}
 	onAbortState, err := state.NewDiff(v.ParentID, v.StateVersions)
 	if err != nil {
