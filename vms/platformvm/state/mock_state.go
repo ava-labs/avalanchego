@@ -8,10 +8,12 @@ import (
 	reflect "reflect"
 	time "time"
 
+	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"
+	choices "github.com/ava-labs/avalanchego/snow/choices"
 	validators "github.com/ava-labs/avalanchego/snow/validators"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
-	genesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	blocks "github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	gomock "github.com/golang/mock/gomock"
@@ -40,6 +42,18 @@ func (m *MockState) EXPECT() *MockStateMockRecorder {
 	return m.recorder
 }
 
+// Abort mocks base method.
+func (m *MockState) Abort() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Abort")
+}
+
+// Abort indicates an expected call of Abort.
+func (mr *MockStateMockRecorder) Abort() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Abort", reflect.TypeOf((*MockState)(nil).Abort))
+}
+
 // AddChain mocks base method.
 func (m *MockState) AddChain(arg0 *txs.Tx) {
 	m.ctrl.T.Helper()
@@ -62,6 +76,18 @@ func (m *MockState) AddRewardUTXO(arg0 ids.ID, arg1 *avax.UTXO) {
 func (mr *MockStateMockRecorder) AddRewardUTXO(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRewardUTXO", reflect.TypeOf((*MockState)(nil).AddRewardUTXO), arg0, arg1)
+}
+
+// AddStatelessBlock mocks base method.
+func (m *MockState) AddStatelessBlock(arg0 blocks.Block, arg1 choices.Status) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "AddStatelessBlock", arg0, arg1)
+}
+
+// AddStatelessBlock indicates an expected call of AddStatelessBlock.
+func (mr *MockStateMockRecorder) AddStatelessBlock(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddStatelessBlock", reflect.TypeOf((*MockState)(nil).AddStatelessBlock), arg0, arg1)
 }
 
 // AddSubnet mocks base method.
@@ -126,6 +152,35 @@ func (mr *MockStateMockRecorder) Close() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockState)(nil).Close))
 }
 
+// Commit mocks base method.
+func (m *MockState) Commit() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Commit")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Commit indicates an expected call of Commit.
+func (mr *MockStateMockRecorder) Commit() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Commit", reflect.TypeOf((*MockState)(nil).Commit))
+}
+
+// CommitBatch mocks base method.
+func (m *MockState) CommitBatch() (database.Batch, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CommitBatch")
+	ret0, _ := ret[0].(database.Batch)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CommitBatch indicates an expected call of CommitBatch.
+func (mr *MockStateMockRecorder) CommitBatch() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CommitBatch", reflect.TypeOf((*MockState)(nil).CommitBatch))
+}
+
 // DeleteCurrentDelegator mocks base method.
 func (m *MockState) DeleteCurrentDelegator(arg0 *Staker) {
 	m.ctrl.T.Helper()
@@ -184,20 +239,6 @@ func (m *MockState) DeleteUTXO(arg0 ids.ID) {
 func (mr *MockStateMockRecorder) DeleteUTXO(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUTXO", reflect.TypeOf((*MockState)(nil).DeleteUTXO), arg0)
-}
-
-// DoneInit mocks base method.
-func (m *MockState) DoneInit() error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DoneInit")
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// DoneInit indicates an expected call of DoneInit.
-func (mr *MockStateMockRecorder) DoneInit() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DoneInit", reflect.TypeOf((*MockState)(nil).DoneInit))
 }
 
 // GetChains mocks base method.
@@ -378,6 +419,22 @@ func (mr *MockStateMockRecorder) GetStartTime(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStartTime", reflect.TypeOf((*MockState)(nil).GetStartTime), arg0)
 }
 
+// GetStatelessBlock mocks base method.
+func (m *MockState) GetStatelessBlock(arg0 ids.ID) (blocks.Block, choices.Status, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetStatelessBlock", arg0)
+	ret0, _ := ret[0].(blocks.Block)
+	ret1, _ := ret[1].(choices.Status)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetStatelessBlock indicates an expected call of GetStatelessBlock.
+func (mr *MockStateMockRecorder) GetStatelessBlock(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStatelessBlock", reflect.TypeOf((*MockState)(nil).GetStatelessBlock), arg0)
+}
+
 // GetSubnetTransformation mocks base method.
 func (m *MockState) GetSubnetTransformation(arg0 ids.ID) (*txs.Tx, error) {
 	m.ctrl.T.Helper()
@@ -484,20 +541,6 @@ func (mr *MockStateMockRecorder) GetValidatorWeightDiffs(arg0, arg1 interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetValidatorWeightDiffs", reflect.TypeOf((*MockState)(nil).GetValidatorWeightDiffs), arg0, arg1)
 }
 
-// Load mocks base method.
-func (m *MockState) Load() error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Load")
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Load indicates an expected call of Load.
-func (mr *MockStateMockRecorder) Load() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Load", reflect.TypeOf((*MockState)(nil).Load))
-}
-
 // PutCurrentDelegator mocks base method.
 func (m *MockState) PutCurrentDelegator(arg0 *Staker) {
 	m.ctrl.T.Helper()
@@ -570,6 +613,18 @@ func (mr *MockStateMockRecorder) SetCurrentSupply(arg0 interface{}) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentSupply", reflect.TypeOf((*MockState)(nil).SetCurrentSupply), arg0)
 }
 
+// SetHeight mocks base method.
+func (m *MockState) SetHeight(arg0 uint64) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetHeight", arg0)
+}
+
+// SetHeight indicates an expected call of SetHeight.
+func (mr *MockStateMockRecorder) SetHeight(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetHeight", reflect.TypeOf((*MockState)(nil).SetHeight), arg0)
+}
+
 // SetLastAccepted mocks base method.
 func (m *MockState) SetLastAccepted(arg0 ids.ID) {
 	m.ctrl.T.Helper()
@@ -608,35 +663,6 @@ func (mr *MockStateMockRecorder) SetUptime(arg0, arg1, arg2 interface{}) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUptime", reflect.TypeOf((*MockState)(nil).SetUptime), arg0, arg1, arg2)
 }
 
-// ShouldInit mocks base method.
-func (m *MockState) ShouldInit() (bool, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ShouldInit")
-	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ShouldInit indicates an expected call of ShouldInit.
-func (mr *MockStateMockRecorder) ShouldInit() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShouldInit", reflect.TypeOf((*MockState)(nil).ShouldInit))
-}
-
-// SyncGenesis mocks base method.
-func (m *MockState) SyncGenesis(arg0 ids.ID, arg1 *genesis.State) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SyncGenesis", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SyncGenesis indicates an expected call of SyncGenesis.
-func (mr *MockStateMockRecorder) SyncGenesis(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SyncGenesis", reflect.TypeOf((*MockState)(nil).SyncGenesis), arg0, arg1)
-}
-
 // UTXOIDs mocks base method.
 func (m *MockState) UTXOIDs(arg0 []byte, arg1 ids.ID, arg2 int) ([]ids.ID, error) {
 	m.ctrl.T.Helper()
@@ -665,18 +691,4 @@ func (m *MockState) ValidatorSet(arg0 ids.ID) (validators.Set, error) {
 func (mr *MockStateMockRecorder) ValidatorSet(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidatorSet", reflect.TypeOf((*MockState)(nil).ValidatorSet), arg0)
-}
-
-// Write mocks base method.
-func (m *MockState) Write(arg0 uint64) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Write", arg0)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Write indicates an expected call of Write.
-func (mr *MockStateMockRecorder) Write(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Write", reflect.TypeOf((*MockState)(nil).Write), arg0)
 }

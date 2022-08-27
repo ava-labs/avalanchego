@@ -15,14 +15,14 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var (
-	utxoPrefix  = []byte("utxo")
-	indexPrefix = []byte("index")
-)
-
 const (
 	utxoCacheSize  = 8192
 	indexCacheSize = 64
+)
+
+var (
+	utxoPrefix  = []byte("utxo")
+	indexPrefix = []byte("index")
 )
 
 // UTXOState is a thin wrapper around a database to provide, caching,

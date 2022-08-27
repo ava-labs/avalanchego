@@ -70,6 +70,18 @@ func (w *walletWithOptions) IssueAddSubnetValidatorTx(
 	)
 }
 
+func (w *walletWithOptions) IssueRemoveSubnetValidatorTx(
+	nodeID ids.NodeID,
+	subnetID ids.ID,
+	options ...common.Option,
+) (ids.ID, error) {
+	return w.Wallet.IssueRemoveSubnetValidatorTx(
+		nodeID,
+		subnetID,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
 func (w *walletWithOptions) IssueAddDelegatorTx(
 	vdr *validator.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,

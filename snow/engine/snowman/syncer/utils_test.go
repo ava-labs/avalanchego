@@ -6,7 +6,7 @@ package syncer
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -59,7 +59,7 @@ func buildTestPeers(t *testing.T) validators.Set {
 	vdrs := validators.NewSet()
 	for idx := 0; idx < 2*common.MaxOutstandingBroadcastRequests; idx++ {
 		beaconID := ids.GenerateTestNodeID()
-		assert.NoError(t, vdrs.AddWeight(beaconID, uint64(1)))
+		require.NoError(t, vdrs.AddWeight(beaconID, uint64(1)))
 	}
 	return vdrs
 }
@@ -81,14 +81,14 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 		},
 	}
 	dummyGetter, err := getter.New(fullVM, *commonCfg)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	cfg, err := NewConfig(*commonCfg, nil, dummyGetter, fullVM)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	commonSyncer := New(cfg, func(lastReqID uint32) error { return nil })
 	syncer, ok := commonSyncer.(*stateSyncer)
-	assert.True(t, ok)
-	assert.True(t, syncer.stateSyncVM != nil)
+	require.True(t, ok)
+	require.True(t, syncer.stateSyncVM != nil)
 
 	fullVM.GetOngoingSyncStateSummaryF = func() (block.StateSummary, error) {
 		return nil, database.ErrNotFound

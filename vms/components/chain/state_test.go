@@ -9,13 +9,15 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/assert"
 )
 
 var _ Block = &TestBlock{}
@@ -289,7 +291,7 @@ func TestState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get blk3 due to %s", err)
 	}
-	assert.Equal(t, parsedBlk3.ID(), getBlk3.ID(), "State GetBlock returned the wrong block")
+	require.Equal(t, parsedBlk3.ID(), getBlk3.ID(), "State GetBlock returned the wrong block")
 
 	// Check that parsing blk3 does not add it to processing blocks since it has
 	// not been verified.
@@ -369,12 +371,12 @@ func TestBuildBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Len(t, chainState.verifiedBlocks, 0)
+	require.Len(t, chainState.verifiedBlocks, 0)
 
 	if err := builtBlk.Verify(); err != nil {
 		t.Fatalf("Built block failed verification due to %s", err)
 	}
-	assert.Len(t, chainState.verifiedBlocks, 1)
+	require.Len(t, chainState.verifiedBlocks, 1)
 
 	checkProcessingBlock(t, chainState, builtBlk)
 
@@ -417,7 +419,7 @@ func TestStateDecideBlock(t *testing.T) {
 		t.Fatal("Bad block should have failed verification")
 	}
 	// Ensure a block that fails verification is not marked as processing
-	assert.Len(t, chainState.verifiedBlocks, 0)
+	require.Len(t, chainState.verifiedBlocks, 0)
 
 	// Ensure that an error during block acceptance is propagated correctly
 	badBlk, err = chainState.ParseBlock(badAcceptBlk.Bytes())
@@ -427,7 +429,7 @@ func TestStateDecideBlock(t *testing.T) {
 	if err := badBlk.Verify(); err != nil {
 		t.Fatal(err)
 	}
-	assert.Len(t, chainState.verifiedBlocks, 1)
+	require.Len(t, chainState.verifiedBlocks, 1)
 
 	if err := badBlk.Accept(); err == nil {
 		t.Fatal("Block should have errored on Accept")
@@ -692,27 +694,27 @@ func TestStateBytesToIDCache(t *testing.T) {
 
 	// Shouldn't have blk1 ID to start with
 	_, err := chainState.GetBlock(blk1.ID())
-	assert.Error(t, err)
+	require.Error(t, err)
 	_, ok := chainState.bytesToIDCache.Get(string(blk1.Bytes()))
-	assert.False(t, ok)
+	require.False(t, ok)
 
 	// Parse blk1 from bytes
 	_, err = chainState.ParseBlock(blk1.Bytes())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// blk1 should be in cache now
 	_, ok = chainState.bytesToIDCache.Get(string(blk1.Bytes()))
-	assert.True(t, ok)
+	require.True(t, ok)
 
 	// Parse another block
 	_, err = chainState.ParseBlock(blk2.Bytes())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Should have bumped blk1 from cache
 	_, ok = chainState.bytesToIDCache.Get(string(blk2.Bytes()))
-	assert.True(t, ok)
+	require.True(t, ok)
 	_, ok = chainState.bytesToIDCache.Get(string(blk1.Bytes()))
-	assert.False(t, ok)
+	require.False(t, ok)
 }
 
 // TestSetLastAcceptedBlock ensures chainState's last accepted block
@@ -836,16 +838,16 @@ func TestSetLastAcceptedBlockWithProcessingBlocksErrors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Len(t, chainState.verifiedBlocks, 0)
+	require.Len(t, chainState.verifiedBlocks, 0)
 
 	if err := builtBlk.Verify(); err != nil {
 		t.Fatalf("Built block failed verification due to %s", err)
 	}
-	assert.Len(t, chainState.verifiedBlocks, 1)
+	require.Len(t, chainState.verifiedBlocks, 1)
 
 	checkProcessingBlock(t, chainState, builtBlk)
 
-	assert.Error(t, chainState.SetLastAcceptedBlock(resetBlk), "should have errored resetting chain state with processing block")
+	require.Error(t, chainState.SetLastAcceptedBlock(resetBlk), "should have errored resetting chain state with processing block")
 }
 
 func TestStateParseTransitivelyAcceptedBlock(t *testing.T) {

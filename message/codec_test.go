@@ -11,7 +11,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
@@ -21,48 +21,48 @@ import (
 
 func TestCodecPackInvalidOp(t *testing.T) {
 	codec, err := NewCodecWithMemoryPool("", prometheus.NewRegistry(), 2*units.MiB, 10*time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = codec.Pack(math.MaxUint8, make(map[Field]interface{}), false, false)
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	_, err = codec.Pack(math.MaxUint8, make(map[Field]interface{}), true, false)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestCodecPackMissingField(t *testing.T) {
 	codec, err := NewCodecWithMemoryPool("", prometheus.NewRegistry(), 2*units.MiB, 10*time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = codec.Pack(Get, make(map[Field]interface{}), false, false)
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	_, err = codec.Pack(Get, make(map[Field]interface{}), true, false)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestCodecParseInvalidOp(t *testing.T) {
 	codec, err := NewCodecWithMemoryPool("", prometheus.NewRegistry(), 2*units.MiB, 10*time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = codec.Parse([]byte{math.MaxUint8}, dummyNodeID, dummyOnFinishedHandling)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestCodecParseExtraSpace(t *testing.T) {
 	codec, err := NewCodecWithMemoryPool("", prometheus.NewRegistry(), 2*units.MiB, 10*time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = codec.Parse([]byte{byte(Ping), 0x00, 0x00}, dummyNodeID, dummyOnFinishedHandling)
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	_, err = codec.Parse([]byte{byte(Ping), 0x00, 0x01}, dummyNodeID, dummyOnFinishedHandling)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestDeadlineOverride(t *testing.T) {
 	c, err := NewCodecWithMemoryPool("", prometheus.NewRegistry(), 2*units.MiB, 10*time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	id := ids.GenerateTestID()
 	m := inboundMessage{
@@ -77,25 +77,25 @@ func TestDeadlineOverride(t *testing.T) {
 	}
 
 	packedIntf, err := c.Pack(m.op, m.fields, m.op.Compressible(), false)
-	assert.NoError(t, err, "failed to pack on operation %s", m.op)
+	require.NoError(t, err, "failed to pack on operation %s", m.op)
 
 	unpackedIntf, err := c.Parse(packedIntf.Bytes(), dummyNodeID, dummyOnFinishedHandling)
-	assert.NoError(t, err, "failed to parse w/ compression on operation %s", m.op)
+	require.NoError(t, err, "failed to parse w/ compression on operation %s", m.op)
 
 	unpacked := unpackedIntf.(*inboundMessage)
-	assert.NotEqual(t, unpacked.ExpirationTime(), time.Now().Add(1337*time.Hour))
-	assert.True(t, time.Since(unpacked.ExpirationTime()) <= 10*time.Second)
+	require.NotEqual(t, unpacked.ExpirationTime(), time.Now().Add(1337*time.Hour))
+	require.True(t, time.Since(unpacked.ExpirationTime()) <= 10*time.Second)
 }
 
 // Test packing and then parsing messages
 // when using a gzip compressor
 func TestCodecPackParseGzip(t *testing.T) {
 	c, err := NewCodecWithMemoryPool("", prometheus.DefaultRegisterer, 2*units.MiB, 10*time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	id := ids.GenerateTestID()
 
 	tlsCert, err := staking.NewTLSCert()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	cert := tlsCert.Leaf
 
 	msgs := []inboundMessage{
@@ -233,13 +233,13 @@ func TestCodecPackParseGzip(t *testing.T) {
 	}
 	for _, m := range msgs {
 		packedIntf, err := c.Pack(m.op, m.fields, m.op.Compressible(), false)
-		assert.NoError(t, err, "failed to pack on operation %s", m.op)
+		require.NoError(t, err, "failed to pack on operation %s", m.op)
 
 		unpackedIntf, err := c.Parse(packedIntf.Bytes(), dummyNodeID, dummyOnFinishedHandling)
-		assert.NoError(t, err, "failed to parse w/ compression on operation %s", m.op)
+		require.NoError(t, err, "failed to parse w/ compression on operation %s", m.op)
 
 		unpacked := unpackedIntf.(*inboundMessage)
 
-		assert.EqualValues(t, len(m.fields), len(unpacked.fields))
+		require.EqualValues(t, len(m.fields), len(unpacked.fields))
 	}
 }

@@ -7,7 +7,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Test encoding bytes to a string and decoding back to bytes
@@ -48,7 +48,7 @@ func TestEncodeDecode(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Make sure the string repr. is what we expected
-		assert.Equal(t, test.str, strResult)
+		require.Equal(t, test.str, strResult)
 		// Decode the string
 		bytesResult, err := Decode(strResult)
 		if err != nil {

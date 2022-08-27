@@ -98,7 +98,7 @@ func (t *txSemanticVerify) ExportTx(tx *txs.ExportTx) error {
 		}
 
 		assetID := out.AssetID()
-		if now.Before(t.vm.BlueberryTime) {
+		if !t.vm.IsBlueberryActivated(now) {
 			// TODO: Remove this check once the Blueberry network upgrade is
 			//       complete.
 			//

@@ -8,14 +8,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
 func TestWindowerNoValidators(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	subnetID := ids.GenerateTestID()
 	chainID := ids.GenerateTestID()
@@ -30,12 +30,12 @@ func TestWindowerNoValidators(t *testing.T) {
 	w := New(vdrState, subnetID, chainID)
 
 	delay, err := w.Delay(1, 0, nodeID)
-	assert.NoError(err)
-	assert.EqualValues(0, delay)
+	require.NoError(err)
+	require.EqualValues(0, delay)
 }
 
 func TestWindowerRepeatedValidator(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	subnetID := ids.GenerateTestID()
 	chainID := ids.GenerateTestID()
@@ -53,16 +53,16 @@ func TestWindowerRepeatedValidator(t *testing.T) {
 	w := New(vdrState, subnetID, chainID)
 
 	validatorDelay, err := w.Delay(1, 0, validatorID)
-	assert.NoError(err)
-	assert.EqualValues(0, validatorDelay)
+	require.NoError(err)
+	require.EqualValues(0, validatorDelay)
 
 	nonValidatorDelay, err := w.Delay(1, 0, nonValidatorID)
-	assert.NoError(err)
-	assert.EqualValues(MaxDelay, nonValidatorDelay)
+	require.NoError(err)
+	require.EqualValues(MaxDelay, nonValidatorDelay)
 }
 
 func TestWindowerChangeByHeight(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	subnetID := ids.ID{0, 1}
 	chainID := ids.ID{0, 2}
@@ -94,8 +94,8 @@ func TestWindowerChangeByHeight(t *testing.T) {
 	for i, expectedDelay := range expectedDelays1 {
 		vdrID := validatorIDs[i]
 		validatorDelay, err := w.Delay(1, 0, vdrID)
-		assert.NoError(err)
-		assert.EqualValues(expectedDelay, validatorDelay)
+		require.NoError(err)
+		require.EqualValues(expectedDelay, validatorDelay)
 	}
 
 	expectedDelays2 := []time.Duration{
@@ -109,13 +109,13 @@ func TestWindowerChangeByHeight(t *testing.T) {
 	for i, expectedDelay := range expectedDelays2 {
 		vdrID := validatorIDs[i]
 		validatorDelay, err := w.Delay(2, 0, vdrID)
-		assert.NoError(err)
-		assert.EqualValues(expectedDelay, validatorDelay)
+		require.NoError(err)
+		require.EqualValues(expectedDelay, validatorDelay)
 	}
 }
 
 func TestWindowerChangeByChain(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	subnetID := ids.ID{0, 1}
 
@@ -154,8 +154,8 @@ func TestWindowerChangeByChain(t *testing.T) {
 	for i, expectedDelay := range expectedDelays0 {
 		vdrID := validatorIDs[i]
 		validatorDelay, err := w0.Delay(1, 0, vdrID)
-		assert.NoError(err)
-		assert.EqualValues(expectedDelay, validatorDelay)
+		require.NoError(err)
+		require.EqualValues(expectedDelay, validatorDelay)
 	}
 
 	expectedDelays1 := []time.Duration{
@@ -169,7 +169,7 @@ func TestWindowerChangeByChain(t *testing.T) {
 	for i, expectedDelay := range expectedDelays1 {
 		vdrID := validatorIDs[i]
 		validatorDelay, err := w1.Delay(1, 0, vdrID)
-		assert.NoError(err)
-		assert.EqualValues(expectedDelay, validatorDelay)
+		require.NoError(err)
+		require.EqualValues(expectedDelay, validatorDelay)
 	}
 }

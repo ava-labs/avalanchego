@@ -6,17 +6,17 @@ package compression
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNoCompressor(t *testing.T) {
 	data := []byte{1, 2, 3}
 	compressor := NewNoCompressor()
 	compressedBytes, err := compressor.Compress(data)
-	assert.NoError(t, err)
-	assert.EqualValues(t, data, compressedBytes)
+	require.NoError(t, err)
+	require.EqualValues(t, data, compressedBytes)
 
 	decompressedBytes, err := compressor.Decompress(compressedBytes)
-	assert.NoError(t, err)
-	assert.EqualValues(t, data, decompressedBytes)
+	require.NoError(t, err)
+	require.EqualValues(t, data, decompressedBytes)
 }

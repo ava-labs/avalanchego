@@ -7,7 +7,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
@@ -20,21 +20,21 @@ func TestSetSet(t *testing.T) {
 
 	s := NewSet()
 	err := s.Set([]Validator{vdr0, vdr1, vdr2})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	length := s.Len()
-	assert.Equal(t, 2, length, "should have two validators")
+	require.Equal(t, 2, length, "should have two validators")
 
 	contains := s.Contains(vdr0.ID())
-	assert.True(t, contains, "should have contained vdr0")
+	require.True(t, contains, "should have contained vdr0")
 
 	contains = s.Contains(vdr1.ID())
-	assert.True(t, contains, "should have contained vdr1")
+	require.True(t, contains, "should have contained vdr1")
 
 	sampled, err := s.Sample(1)
-	assert.NoError(t, err)
-	assert.Len(t, sampled, 1, "should have only sampled one validator")
-	assert.Equal(t, vdr1.ID(), sampled[0].ID(), "should have sampled vdr1")
+	require.NoError(t, err)
+	require.Len(t, sampled, 1, "should have only sampled one validator")
+	require.Equal(t, vdr1.ID(), sampled[0].ID(), "should have sampled vdr1")
 }
 
 func TestSamplerSample(t *testing.T) {
@@ -43,36 +43,36 @@ func TestSamplerSample(t *testing.T) {
 
 	s := NewSet()
 	err := s.AddWeight(vdr0, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	sampled, err := s.Sample(1)
-	assert.NoError(t, err)
-	assert.Len(t, sampled, 1, "should have only sampled one validator")
-	assert.Equal(t, vdr0, sampled[0].ID(), "should have sampled vdr0")
+	require.NoError(t, err)
+	require.Len(t, sampled, 1, "should have only sampled one validator")
+	require.Equal(t, vdr0, sampled[0].ID(), "should have sampled vdr0")
 
 	_, err = s.Sample(2)
-	assert.Error(t, err, "should have errored during sampling")
+	require.Error(t, err, "should have errored during sampling")
 
 	err = s.AddWeight(vdr1, math.MaxInt64-1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	sampled, err = s.Sample(1)
-	assert.NoError(t, err)
-	assert.Len(t, sampled, 1, "should have only sampled one validator")
-	assert.Equal(t, vdr1, sampled[0].ID(), "should have sampled vdr1")
+	require.NoError(t, err)
+	require.Len(t, sampled, 1, "should have only sampled one validator")
+	require.Equal(t, vdr1, sampled[0].ID(), "should have sampled vdr1")
 
 	sampled, err = s.Sample(2)
-	assert.NoError(t, err)
-	assert.Len(t, sampled, 2, "should have sampled two validators")
-	assert.Equal(t, vdr1, sampled[0].ID(), "should have sampled vdr1")
-	assert.Equal(t, vdr1, sampled[1].ID(), "should have sampled vdr1")
+	require.NoError(t, err)
+	require.Len(t, sampled, 2, "should have sampled two validators")
+	require.Equal(t, vdr1, sampled[0].ID(), "should have sampled vdr1")
+	require.Equal(t, vdr1, sampled[1].ID(), "should have sampled vdr1")
 
 	sampled, err = s.Sample(3)
-	assert.NoError(t, err)
-	assert.Len(t, sampled, 3, "should have sampled three validators")
-	assert.Equal(t, vdr1, sampled[0].ID(), "should have sampled vdr1")
-	assert.Equal(t, vdr1, sampled[1].ID(), "should have sampled vdr1")
-	assert.Equal(t, vdr1, sampled[2].ID(), "should have sampled vdr1")
+	require.NoError(t, err)
+	require.Len(t, sampled, 3, "should have sampled three validators")
+	require.Equal(t, vdr1, sampled[0].ID(), "should have sampled vdr1")
+	require.Equal(t, vdr1, sampled[1].ID(), "should have sampled vdr1")
+	require.Equal(t, vdr1, sampled[2].ID(), "should have sampled vdr1")
 }
 
 func TestSamplerDuplicate(t *testing.T) {
@@ -81,18 +81,18 @@ func TestSamplerDuplicate(t *testing.T) {
 
 	s := NewSet()
 	err := s.AddWeight(vdr0, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = s.AddWeight(vdr1, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = s.AddWeight(vdr1, math.MaxInt64-2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	sampled, err := s.Sample(1)
-	assert.NoError(t, err)
-	assert.Len(t, sampled, 1, "should have only sampled one validator")
-	assert.Equal(t, vdr1, sampled[0].ID(), "should have sampled vdr1")
+	require.NoError(t, err)
+	require.Len(t, sampled, 1, "should have only sampled one validator")
+	require.Equal(t, vdr1, sampled[0].ID(), "should have sampled vdr1")
 }
 
 func TestSamplerContains(t *testing.T) {
@@ -100,16 +100,16 @@ func TestSamplerContains(t *testing.T) {
 
 	s := NewSet()
 	err := s.AddWeight(vdr, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	contains := s.Contains(vdr)
-	assert.True(t, contains, "should have contained validator")
+	require.True(t, contains, "should have contained validator")
 
 	err = s.RemoveWeight(vdr, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	contains = s.Contains(vdr)
-	assert.False(t, contains, "shouldn't have contained validator")
+	require.False(t, contains, "shouldn't have contained validator")
 }
 
 func TestSamplerString(t *testing.T) {
@@ -121,16 +121,16 @@ func TestSamplerString(t *testing.T) {
 
 	s := NewSet()
 	err := s.AddWeight(vdr0, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = s.AddWeight(vdr1, math.MaxInt64-1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	expected := "Validator Set: (Size = 2, SampleableWeight = 9223372036854775807, Weight = 9223372036854775807)\n" +
 		"    Validator[0]: NodeID-111111111111111111116DBWJs, 1/1\n" +
 		"    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806/9223372036854775806"
 	result := s.String()
-	assert.Equal(t, expected, result, "wrong string returned")
+	require.Equal(t, expected, result, "wrong string returned")
 }
 
 func TestSetWeight(t *testing.T) {
@@ -141,14 +141,14 @@ func TestSetWeight(t *testing.T) {
 
 	s := NewSet()
 	err := s.AddWeight(vdr0, weight0)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = s.AddWeight(vdr1, weight1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	setWeight := s.Weight()
 	expectedWeight := weight0 + weight1
-	assert.Equal(t, expectedWeight, setWeight, "wrong set weight")
+	require.Equal(t, expectedWeight, setWeight, "wrong set weight")
 }
 
 func TestSetSubsetWeight(t *testing.T) {
@@ -164,19 +164,19 @@ func TestSetSubsetWeight(t *testing.T) {
 
 	s := NewSet()
 	err := s.AddWeight(vdr0, weight0)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = s.AddWeight(vdr1, weight1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = s.AddWeight(vdr2, weight2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	subsetWeight, err := s.SubsetWeight(subset)
 	if err != nil {
 		t.Fatal(err)
 	}
 	expectedWeight := weight0 + weight1
-	assert.Equal(t, expectedWeight, subsetWeight, "wrong subset weight")
+	require.Equal(t, expectedWeight, subsetWeight, "wrong subset weight")
 }
 
 func TestSamplerMasked(t *testing.T) {
@@ -188,71 +188,71 @@ func TestSamplerMasked(t *testing.T) {
 
 	s := NewSet()
 	err := s.AddWeight(vdr0, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = s.MaskValidator(vdr1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	{
 		expected := "Validator Set: (Size = 1, SampleableWeight = 1, Weight = 1)\n" +
 			"    Validator[0]: NodeID-111111111111111111116DBWJs, 1/1"
 		result := s.String()
-		assert.Equal(t, expected, result, "wrong string returned")
+		require.Equal(t, expected, result, "wrong string returned")
 	}
 
 	err = s.AddWeight(vdr1, math.MaxInt64-1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	{
 		expected := "Validator Set: (Size = 2, SampleableWeight = 1, Weight = 9223372036854775807)\n" +
 			"    Validator[0]: NodeID-111111111111111111116DBWJs, 1/1\n" +
 			"    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 0/9223372036854775806"
 		result := s.String()
-		assert.Equal(t, expected, result, "wrong string returned")
+		require.Equal(t, expected, result, "wrong string returned")
 	}
 
 	err = s.RevealValidator(vdr1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	{
 		expected := "Validator Set: (Size = 2, SampleableWeight = 9223372036854775807, Weight = 9223372036854775807)\n" +
 			"    Validator[0]: NodeID-111111111111111111116DBWJs, 1/1\n" +
 			"    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806/9223372036854775806"
 		result := s.String()
-		assert.Equal(t, expected, result, "wrong string returned")
+		require.Equal(t, expected, result, "wrong string returned")
 	}
 
 	err = s.MaskValidator(vdr1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	{
 		expected := "Validator Set: (Size = 2, SampleableWeight = 1, Weight = 9223372036854775807)\n" +
 			"    Validator[0]: NodeID-111111111111111111116DBWJs, 1/1\n" +
 			"    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 0/9223372036854775806"
 		result := s.String()
-		assert.Equal(t, expected, result, "wrong string returned")
+		require.Equal(t, expected, result, "wrong string returned")
 	}
 
 	err = s.RevealValidator(vdr1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	{
 		expected := "Validator Set: (Size = 2, SampleableWeight = 9223372036854775807, Weight = 9223372036854775807)\n" +
 			"    Validator[0]: NodeID-111111111111111111116DBWJs, 1/1\n" +
 			"    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806/9223372036854775806"
 		result := s.String()
-		assert.Equal(t, expected, result, "wrong string returned")
+		require.Equal(t, expected, result, "wrong string returned")
 	}
 
 	err = s.RevealValidator(vdr1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	{
 		expected := "Validator Set: (Size = 2, SampleableWeight = 9223372036854775807, Weight = 9223372036854775807)\n" +
 			"    Validator[0]: NodeID-111111111111111111116DBWJs, 1/1\n" +
 			"    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806/9223372036854775806"
 		result := s.String()
-		assert.Equal(t, expected, result, "wrong string returned")
+		require.Equal(t, expected, result, "wrong string returned")
 	}
 }
 
@@ -296,26 +296,26 @@ func TestSetAddWeightCallback(t *testing.T) {
 
 	s := NewSet()
 	err := s.AddWeight(vdr0, weight0)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	callcount := 0
 	s.RegisterCallbackListener(&callbackListener{
 		t: t,
 		onAdd: func(nodeID ids.NodeID, weight uint64) {
 			if nodeID == vdr0 {
-				assert.Equal(t, weight0, weight)
+				require.Equal(t, weight0, weight)
 			}
 			callcount++
 		},
 		onWeight: func(nodeID ids.NodeID, oldWeight, newWeight uint64) {
-			assert.Equal(t, vdr0, nodeID)
-			assert.Equal(t, weight0, oldWeight)
-			assert.Equal(t, weight0+weight1, newWeight)
+			require.Equal(t, vdr0, nodeID)
+			require.Equal(t, weight0, oldWeight)
+			require.Equal(t, weight0+weight1, newWeight)
 			callcount++
 		},
 	})
 	err = s.AddWeight(vdr0, weight1)
-	assert.NoError(t, err)
-	assert.Equal(t, 2, callcount)
+	require.NoError(t, err)
+	require.Equal(t, 2, callcount)
 }
 
 func TestSetRemoveWeightCallback(t *testing.T) {
@@ -326,25 +326,25 @@ func TestSetRemoveWeightCallback(t *testing.T) {
 	s := NewSet()
 	callcount := 0
 	err := s.AddWeight(vdr0, weight0)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	s.RegisterCallbackListener(&callbackListener{
 		t: t,
 		onAdd: func(nodeID ids.NodeID, weight uint64) {
 			if nodeID == vdr0 {
-				assert.Equal(t, weight0, weight)
+				require.Equal(t, weight0, weight)
 			}
 			callcount++
 		},
 		onWeight: func(nodeID ids.NodeID, oldWeight, newWeight uint64) {
-			assert.Equal(t, vdr0, nodeID)
-			assert.Equal(t, weight0, oldWeight)
-			assert.Equal(t, weight0-weight1, newWeight)
+			require.Equal(t, vdr0, nodeID)
+			require.Equal(t, weight0, oldWeight)
+			require.Equal(t, weight0-weight1, newWeight)
 			callcount++
 		},
 	})
 	err = s.RemoveWeight(vdr0, weight1)
-	assert.NoError(t, err)
-	assert.Equal(t, 2, callcount)
+	require.NoError(t, err)
+	require.Equal(t, 2, callcount)
 }
 
 func TestSetValidatorRemovedCallback(t *testing.T) {
@@ -354,25 +354,25 @@ func TestSetValidatorRemovedCallback(t *testing.T) {
 	s := NewSet()
 	callcount := 0
 	err := s.AddWeight(vdr0, weight0)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	s.RegisterCallbackListener(&callbackListener{
 		t: t,
 		onAdd: func(nodeID ids.NodeID, weight uint64) {
 			if nodeID == vdr0 {
-				assert.Equal(t, weight0, weight)
+				require.Equal(t, weight0, weight)
 			}
 			callcount++
 		},
 		onRemoved: func(nodeID ids.NodeID, weight uint64) {
-			assert.Equal(t, vdr0, nodeID)
-			assert.Equal(t, weight0, weight)
+			require.Equal(t, vdr0, nodeID)
+			require.Equal(t, weight0, weight)
 			callcount++
 		},
 	})
 	err = s.RemoveWeight(vdr0, weight0)
-	assert.NoError(t, err)
-	assert.Equal(t, 2, callcount)
+	require.NoError(t, err)
+	require.Equal(t, 2, callcount)
 }
 
 func TestSetValidatorSetCallback(t *testing.T) {
@@ -385,9 +385,9 @@ func TestSetValidatorSetCallback(t *testing.T) {
 
 	s := NewSet()
 	err := s.AddWeight(vdr0, weight0)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = s.AddWeight(vdr1, weight1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	newValidators := []Validator{&validator{nodeID: vdr0, weight: weight0}, &validator{nodeID: vdr2, weight: weight2}}
 	callcount := 0
@@ -395,24 +395,24 @@ func TestSetValidatorSetCallback(t *testing.T) {
 		t: t,
 		onAdd: func(nodeID ids.NodeID, weight uint64) {
 			if nodeID == vdr0 {
-				assert.Equal(t, weight0, weight)
+				require.Equal(t, weight0, weight)
 			}
 			if nodeID == vdr1 {
-				assert.Equal(t, weight1, weight)
+				require.Equal(t, weight1, weight)
 			}
 			if nodeID == vdr2 {
-				assert.Equal(t, weight2, weight)
+				require.Equal(t, weight2, weight)
 			}
 			callcount++
 		},
 		onRemoved: func(nodeID ids.NodeID, weight uint64) {
-			assert.Equal(t, vdr1, nodeID)
-			assert.Equal(t, weight1, weight)
+			require.Equal(t, vdr1, nodeID)
+			require.Equal(t, weight1, weight)
 			callcount++
 		},
 	})
 
 	err = s.Set(newValidators)
-	assert.NoError(t, err)
-	assert.Equal(t, 4, callcount)
+	require.NoError(t, err)
+	require.Equal(t, 4, callcount)
 }

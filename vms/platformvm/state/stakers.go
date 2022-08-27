@@ -23,10 +23,14 @@ type CurrentStakers interface {
 
 	// PutCurrentValidator adds the [staker] describing a validator to the
 	// staker set.
+	//
+	// Invariant: [staker] is not currently a CurrentValidator
 	PutCurrentValidator(staker *Staker)
 
 	// DeleteCurrentValidator removes the [staker] describing a validator from
 	// the staker set.
+	//
+	// Invariant: [staker] is currently a CurrentValidator
 	DeleteCurrentValidator(staker *Staker)
 
 	// GetCurrentDelegatorIterator returns the delegators associated with the
@@ -36,10 +40,14 @@ type CurrentStakers interface {
 
 	// PutCurrentDelegator adds the [staker] describing a delegator to the
 	// staker set.
+	//
+	// Invariant: [staker] is not currently a CurrentDelegator
 	PutCurrentDelegator(staker *Staker)
 
 	// DeleteCurrentDelegator removes the [staker] describing a delegator from
 	// the staker set.
+	//
+	// Invariant: [staker] is currently a CurrentDelegator
 	DeleteCurrentDelegator(staker *Staker)
 
 	// GetCurrentStakerIterator returns stakers in order of their removal from
@@ -254,10 +262,10 @@ type diffValidator struct {
 // nodeID.
 //
 // Returns:
-// 1. If the validator was added in this diff, [staker, true] will be returned.
-// 2. If the validator was removed in this diff, [nil, true] will be returned.
-// 3. If the validator was not modified by this diff, [nil, false] will be
-//    returned.
+//  1. If the validator was added in this diff, [staker, true] will be returned.
+//  2. If the validator was removed in this diff, [nil, true] will be returned.
+//  3. If the validator was not modified by this diff, [nil, false] will be
+//     returned.
 func (s *diffStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, bool) {
 	subnetValidatorDiffs, ok := s.validatorDiffs[subnetID]
 	if !ok {

@@ -32,7 +32,7 @@ type TransformSubnetTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// ID of the Subnet to transform
-	SubnetID ids.ID `serialize:"true" json:"subnetID"`
+	Subnet ids.ID `serialize:"true" json:"subnetID"`
 	// Asset to use when staking on the Subnet
 	AssetID ids.ID `serialize:"true" json:"assetID"`
 	// Amount to initially specify as the current supply
@@ -55,7 +55,7 @@ func (tx *TransformSubnetTx) SyntacticVerify(ctx *snow.Context) error {
 		return ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.SubnetID == constants.PrimaryNetworkID:
+	case tx.Subnet == constants.PrimaryNetworkID:
 		return errCantTransformPrimaryNetwork
 	case tx.AssetID == ids.Empty:
 		return errEmptyAssetID

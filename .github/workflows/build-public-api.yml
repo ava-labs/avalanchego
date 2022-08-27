@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - "*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to create AMI from'
+        required: true
 
 jobs:
   build-public-ami-and-upload:
@@ -12,9 +17,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
-          go-version: "1.17.9" # The Go version to download (if necessary) and use.
+          go-version: '1.18'
+          check-latest: true
       - run: go version
 
       - name: Install aws cli
@@ -26,9 +32,15 @@ jobs:
         run: |
           pip install python-packer boto3
 
-      - name: Get the version
-        id: get_version
-        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+      - name: Get the tag
+        id: get_tag
+        run: |
+          if [[ ${{ github.event_name }} == 'push' ]];
+          then
+            echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+          else
+            echo ::set-output name=VERSION::${{ inputs.tag }}
+          fi
         shell: bash
 
       - name: Configure AWS credentials
@@ -42,6 +54,6 @@ jobs:
         run: |
           ./.github/workflows/update-ami.py
         env:
-          TAG: ${{ steps.get_version.outputs.VERSION }}
+          TAG: ${{ steps.get_tag.outputs.VERSION }}
           PRODUCT_ID: ${{ secrets.MARKETPLACE_PRODUCT }}
           ROLE_ARN: ${{ secrets.MARKETPLACE_ROLE }}

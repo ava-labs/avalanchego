@@ -6,7 +6,7 @@ package state
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -14,7 +14,7 @@ import (
 )
 
 func TestHasIndexReset(t *testing.T) {
-	a := assert.New(t)
+	a := require.New(t)
 
 	db := memdb.New()
 	vdb := versiondb.New(db)

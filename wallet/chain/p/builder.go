@@ -84,6 +84,14 @@ type Builder interface {
 		options ...common.Option,
 	) (*txs.AddSubnetValidatorTx, error)
 
+	// NewRemoveSubnetValidatorTx removes [nodeID] from the validator
+	// set [subnetID].
+	NewRemoveSubnetValidatorTx(
+		nodeID ids.NodeID,
+		subnetID ids.ID,
+		options ...common.Option,
+	) (*txs.RemoveSubnetValidatorTx, error)
+
 	// NewAddDelegatorTx creates a new delegator to a validator on the primary
 	// network.
 	//
@@ -186,10 +194,10 @@ type builder struct {
 
 // NewBuilder returns a new transaction builder.
 //
-// - [addrs] is the set of addresses that the builder assumes can be used when
-//   signing the transactions in the future.
-// - [backend] provides the required access to the chain's context and state to
-//   build out the transactions.
+//   - [addrs] is the set of addresses that the builder assumes can be used when
+//     signing the transactions in the future.
+//   - [backend] provides the required access to the chain's context and state
+//     to build out the transactions.
 func NewBuilder(addrs ids.ShortSet, backend BuilderBackend) Builder {
 	return &builder{
 		addrs:   addrs,
@@ -286,7 +294,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 	options ...common.Option,
 ) (*txs.AddSubnetValidatorTx, error) {
 	toBurn := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): b.backend.CreateSubnetTxFee(),
+		b.backend.AVAXAssetID(): b.backend.BaseTxFee(),
 	}
 	toStake := map[ids.ID]uint64{}
 	ops := common.NewOptions(options)
@@ -309,6 +317,40 @@ func (b *builder) NewAddSubnetValidatorTx(
 			Memo:         ops.Memo(),
 		}},
 		Validator:  *vdr,
+		SubnetAuth: subnetAuth,
+	}, nil
+}
+
+func (b *builder) NewRemoveSubnetValidatorTx(
+	nodeID ids.NodeID,
+	subnetID ids.ID,
+	options ...common.Option,
+) (*txs.RemoveSubnetValidatorTx, error) {
+	toBurn := map[ids.ID]uint64{
+		b.backend.AVAXAssetID(): b.backend.BaseTxFee(),
+	}
+	toStake := map[ids.ID]uint64{}
+	ops := common.NewOptions(options)
+	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	return &txs.RemoveSubnetValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Ins:          inputs,
+			Outs:         outputs,
+			Memo:         ops.Memo(),
+		}},
+		Subnet:     subnetID,
+		NodeID:     nodeID,
 		SubnetAuth: subnetAuth,
 	}, nil
 }
@@ -352,7 +394,7 @@ func (b *builder) NewCreateChainTx(
 	options ...common.Option,
 ) (*txs.CreateChainTx, error) {
 	toBurn := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): b.backend.CreateSubnetTxFee(),
+		b.backend.AVAXAssetID(): b.backend.CreateBlockchainTxFee(),
 	}
 	toStake := map[ids.ID]uint64{}
 	ops := common.NewOptions(options)
@@ -588,7 +630,7 @@ func (b *builder) NewTransformSubnetTx(
 			Outs:         outputs,
 			Memo:         ops.Memo(),
 		}},
-		SubnetID:           subnetID,
+		Subnet:             subnetID,
 		AssetID:            assetID,
 		InitialSupply:      initialSupply,
 		MaximumSupply:      maxSupply,
@@ -648,15 +690,15 @@ func (b *builder) getBalance(
 
 // spend takes in the requested burn amounts and the requested stake amounts.
 //
-// - [amountsToBurn] maps assetID to the amount of the asset to spend without
-//   producing an output. This is typically used for fees. However, it can also
-//   be used to consume some of an asset that will be produced in separate
-//   outputs, such as ExportedOutputs. Only unlocked UTXOs are able to be
-//   burned here.
-// - [amountsToStake] maps assetID to the amount of the asset to spend and place
-//   into the staked outputs. First locked UTXOs are attempted to be used for
-//   these funds, and then unlocked UTXOs will be attempted to be used. There is
-//   no preferential ordering on the unlock times.
+//   - [amountsToBurn] maps assetID to the amount of the asset to spend without
+//     producing an output. This is typically used for fees. However, it can
+//     also be used to consume some of an asset that will be produced in
+//     separate outputs, such as ExportedOutputs. Only unlocked UTXOs are able
+//     to be burned here.
+//   - [amountsToStake] maps assetID to the amount of the asset to spend and
+//     place into the staked outputs. First locked UTXOs are attempted to be
+//     used for these funds, and then unlocked UTXOs will be attempted to be
+//     used. There is no preferential ordering on the unlock times.
 func (b *builder) spend(
 	amountsToBurn map[ids.ID]uint64,
 	amountsToStake map[ids.ID]uint64,

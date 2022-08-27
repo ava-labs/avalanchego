@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -1027,25 +1027,22 @@ func TestMultipleTags(codec GeneralCodec, t testing.TB) {
 
 	manager := NewDefaultManager()
 	for _, codecVersion := range []uint16{0, 1, 2022} {
-		if err := manager.RegisterCodec(codecVersion, codec); err != nil {
-			t.Fatal(err)
-		}
+		require := require.New(t)
+		err := manager.RegisterCodec(codecVersion, codec)
+		require.NoError(err)
 
 		bytes, err := manager.Marshal(codecVersion, inputs)
-		if err != nil {
-			t.Fatalf("Could not marshal struct")
-		}
+		require.NoError(err)
 
 		output := MultipleVersionsStruct{}
-		if _, err := manager.Unmarshal(bytes, &output); err != nil {
-			t.Fatalf("Could not unmarshal struct")
-		}
+		_, err = manager.Unmarshal(bytes, &output)
+		require.NoError(err)
 
-		assert.True(t, inputs.BothTags == output.BothTags)
-		assert.True(t, inputs.SingleTag1 == output.SingleTag1)
-		assert.True(t, inputs.SingleTag2 == output.SingleTag2)
-		assert.True(t, inputs.EitherTags1 == output.EitherTags1)
-		assert.True(t, inputs.EitherTags2 == output.EitherTags2)
-		assert.True(t, len(output.NoTags) == 0)
+		require.Equal(inputs.BothTags, output.BothTags)
+		require.Equal(inputs.SingleTag1, output.SingleTag1)
+		require.Equal(inputs.SingleTag2, output.SingleTag2)
+		require.Equal(inputs.EitherTags1, output.EitherTags1)
+		require.Equal(inputs.EitherTags2, output.EitherTags2)
+		require.Empty(output.NoTags)
 	}
 }

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewResolver(t *testing.T) {
@@ -43,12 +43,12 @@ func TestNewResolver(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.service, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 			_, err := NewResolver(tt.service)
 			if tt.validService {
-				assert.NoError(err)
+				require.NoError(err)
 			} else {
-				assert.Error(err)
+				require.Error(err)
 			}
 		})
 	}

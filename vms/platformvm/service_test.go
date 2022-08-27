@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -12,9 +13,7 @@ import (
 
 	stdjson "encoding/json"
 
-	"github.com/golang/mock/gomock"
-
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/keystore"
@@ -22,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -29,14 +29,16 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
+	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
+	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var (
@@ -64,7 +66,7 @@ var (
 )
 
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
-	vm, _, _, mutableSharedMemory := defaultVM()
+	vm, _, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 	ks := keystore.New(logging.NoLog{}, manager.NewMemDB(version.Semantic1_0_0))
@@ -72,7 +74,10 @@ func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
 		t.Fatal(err)
 	}
 	vm.ctx.Keystore = ks.NewBlockchainKeyStore(vm.ctx.ChainID)
-	return &Service{vm: vm}, mutableSharedMemory
+	return &Service{
+		vm:          vm,
+		addrManager: avax.NewAddressManager(vm.ctx),
+	}, mutableSharedMemory
 }
 
 // Give user [testUsername] control of [testPrivateKey] and keys[0] (which is funded)
@@ -83,7 +88,7 @@ func defaultAddress(t *testing.T, service *Service) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pk, err := testKeyfactory.ToPrivateKey(testPrivateKey)
+	pk, err := testKeyFactory.ToPrivateKey(testPrivateKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +217,7 @@ func TestGetTxStatus(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := Codec.Marshal(txs.Version, utxo)
+	utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -251,18 +256,18 @@ func TestGetTxStatus(t *testing.T) {
 	}
 
 	// put the chain in existing chain list
-	if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err == nil {
+	if err := service.vm.Builder.AddUnverifiedTx(tx); err == nil {
 		t.Fatal("should have erred because of missing funds")
 	}
 
 	mutableSharedMemory.SharedMemory = sm
 
-	if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
+	if err := service.vm.Builder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	} else if block, err := service.vm.BuildBlock(); err != nil {
 		t.Fatal(err)
-	} else if blk, ok := block.(*StandardBlock); !ok {
-		t.Fatalf("should be *StandardBlock but is %T", block)
+	} else if blk, ok := block.(*blockexecutor.Block); !ok {
+		t.Fatalf("should be *blockexecutor.Block but is %T", block)
 	} else if err := blk.Verify(); err != nil {
 		t.Fatal(err)
 	} else if err := blk.Accept(); err != nil {
@@ -308,8 +313,8 @@ func TestGetTx(t *testing.T) {
 			func(service *Service) (*txs.Tx, error) {
 				return service.vm.txBuilder.NewAddValidatorTx( // Test GetTx works for proposal blocks
 					service.vm.MinValidatorStake,
-					uint64(service.vm.clock.Time().Add(executor.SyncBound).Unix()),
-					uint64(service.vm.clock.Time().Add(executor.SyncBound).Add(defaultMinStakingDuration).Unix()),
+					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
+					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(defaultMinStakingDuration).Unix()),
 					ids.GenerateTestNodeID(),
 					ids.GenerateTestShortID(),
 					0,
@@ -349,41 +354,56 @@ func TestGetTx(t *testing.T) {
 			var response api.GetTxReply
 			if err := service.GetTx(nil, arg, &response); err == nil {
 				t.Fatalf("failed test '%s - %s': haven't issued tx yet so shouldn't be able to get it", test.description, encoding.String())
-			} else if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
+			}
+			if err := service.vm.Builder.AddUnverifiedTx(tx); err != nil {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
-			} else if block, err := service.vm.BuildBlock(); err != nil {
+			}
+
+			block, err := service.vm.BuildBlock()
+			if err != nil {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
-			} else if err := block.Verify(); err != nil {
+			}
+			if err := block.Verify(); err != nil {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
-			} else if err := block.Accept(); err != nil {
+			}
+			if err := block.Accept(); err != nil {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
-			} else if blk, ok := block.(*ProposalBlock); ok { // For proposal blocks, commit them
-				if options, err := blk.Options(); err != nil {
-					t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
-				} else if commit, ok := options[0].(*CommitBlock); !ok {
-					t.Fatalf("failed test '%s - %s': should prefer to commit", test.description, encoding.String())
-				} else if err := commit.Verify(); err != nil {
-					t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
-				} else if err := commit.Accept(); err != nil {
-					t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
-				}
-			} else if err := service.GetTx(nil, arg, &response); err != nil {
-				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
-			} else {
-				switch encoding {
-				case formatting.Hex:
-					// we're always guaranteed a string for hex encodings.
-					responseTxBytes, err := formatting.Decode(response.Encoding, response.Tx.(string))
+			}
+			if blk, ok := block.(snowman.OracleBlock); ok { // For proposal blocks, commit them
+				options, err := blk.Options()
+				if !errors.Is(err, snowman.ErrNotOracle) {
 					if err != nil {
 						t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 					}
-					if !bytes.Equal(responseTxBytes, tx.Bytes()) {
-						t.Fatalf("failed test '%s - %s': byte representation of tx in response is incorrect", test.description, encoding.String())
+					commit := options[0].(*blockexecutor.Block)
+					if _, ok := commit.Block.(*blocks.ApricotCommitBlock); !ok {
+						t.Fatalf("failed test '%s - %s': should prefer to commit", test.description, encoding.String())
 					}
-				case formatting.JSON:
-					if response.Tx != tx {
-						t.Fatalf("failed test '%s - %s': byte representation of tx in response is incorrect", test.description, encoding.String())
+					if err := commit.Verify(); err != nil {
+						t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 					}
+					if err := commit.Accept(); err != nil {
+						t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
+					}
+				}
+			}
+			if err := service.GetTx(nil, arg, &response); err != nil {
+				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
+			}
+
+			switch encoding {
+			case formatting.Hex:
+				// we're always guaranteed a string for hex encodings.
+				responseTxBytes, err := formatting.Decode(response.Encoding, response.Tx.(string))
+				if err != nil {
+					t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
+				}
+				if !bytes.Equal(responseTxBytes, tx.Bytes()) {
+					t.Fatalf("failed test '%s - %s': byte representation of tx in response is incorrect", test.description, encoding.String())
+				}
+			case formatting.JSON:
+				if response.Tx != tx {
+					t.Fatalf("failed test '%s - %s': byte representation of tx in response is incorrect", test.description, encoding.String())
 				}
 			}
 
@@ -435,12 +455,12 @@ func TestGetBalance(t *testing.T) {
 }
 
 func TestGetStake(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	service, _ := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		assert.NoError(service.vm.Shutdown())
+		require.NoError(service.vm.Shutdown())
 		service.vm.ctx.Lock.Unlock()
 	}()
 
@@ -458,24 +478,24 @@ func TestGetStake(t *testing.T) {
 			formatting.Hex,
 		}
 		response := GetStakeReply{}
-		assert.NoError(service.GetStake(nil, &args, &response))
-		assert.EqualValues(uint64(defaultWeight), uint64(response.Staked))
-		assert.Len(response.Outputs, 1)
+		require.NoError(service.GetStake(nil, &args, &response))
+		require.EqualValues(uint64(defaultWeight), uint64(response.Staked))
+		require.Len(response.Outputs, 1)
 
 		// Unmarshal into an output
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[0])
-		assert.NoError(err)
+		require.NoError(err)
 
 		var output avax.TransferableOutput
-		_, err = Codec.Unmarshal(outputBytes, &output)
-		assert.NoError(err)
+		_, err = txs.Codec.Unmarshal(outputBytes, &output)
+		require.NoError(err)
 
 		out := output.Out.(*secp256k1fx.TransferOutput)
-		assert.EqualValues(out.Amount(), defaultWeight)
-		assert.EqualValues(out.Threshold, 1)
-		assert.Len(out.Addrs, 1)
-		assert.Equal(keys[i].PublicKey().Address(), out.Addrs[0])
-		assert.EqualValues(out.Locktime, 0)
+		require.EqualValues(out.Amount(), defaultWeight)
+		require.EqualValues(out.Threshold, 1)
+		require.Len(out.Addrs, 1)
+		require.Equal(keys[i].PublicKey().Address(), out.Addrs[0])
+		require.EqualValues(out.Locktime, 0)
 	}
 
 	// Make sure this works for multiple addresses
@@ -486,23 +506,23 @@ func TestGetStake(t *testing.T) {
 		formatting.Hex,
 	}
 	response := GetStakeReply{}
-	assert.NoError(service.GetStake(nil, &args, &response))
-	assert.EqualValues(len(genesis.Validators)*defaultWeight, response.Staked)
-	assert.Len(response.Outputs, len(genesis.Validators))
+	require.NoError(service.GetStake(nil, &args, &response))
+	require.EqualValues(len(genesis.Validators)*defaultWeight, response.Staked)
+	require.Len(response.Outputs, len(genesis.Validators))
 
 	for _, outputStr := range response.Outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, outputStr)
-		assert.NoError(err)
+		require.NoError(err)
 
 		var output avax.TransferableOutput
-		_, err = Codec.Unmarshal(outputBytes, &output)
-		assert.NoError(err)
+		_, err = txs.Codec.Unmarshal(outputBytes, &output)
+		require.NoError(err)
 
 		out := output.Out.(*secp256k1fx.TransferOutput)
-		assert.EqualValues(defaultWeight, out.Amount())
-		assert.EqualValues(out.Threshold, 1)
-		assert.EqualValues(out.Locktime, 0)
-		assert.Len(out.Addrs, 1)
+		require.EqualValues(defaultWeight, out.Amount())
+		require.EqualValues(out.Threshold, 1)
+		require.EqualValues(out.Locktime, 0)
+		require.Len(out.Addrs, 1)
 	}
 
 	oldStake := uint64(defaultWeight)
@@ -520,36 +540,35 @@ func TestGetStake(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		keys[0].PublicKey().Address(), // change addr
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
 	staker := state.NewPrimaryNetworkStaker(tx.ID(), &tx.Unsigned.(*txs.AddDelegatorTx).Validator)
 	staker.PotentialReward = 0
 	staker.NextTime = staker.EndTime
 	staker.Priority = state.PrimaryNetworkDelegatorCurrentPriority
 
-	service.vm.internalState.PutCurrentDelegator(staker)
-	service.vm.internalState.AddTx(tx, status.Committed)
-	assert.NoError(service.vm.internalState.Commit())
-	assert.NoError(service.vm.internalState.Load())
+	service.vm.state.PutCurrentDelegator(staker)
+	service.vm.state.AddTx(tx, status.Committed)
+	require.NoError(service.vm.state.Commit())
 
 	// Make sure the delegator addr has the right stake (old stake + stakeAmount)
-	addr, _ := service.vm.FormatLocalAddress(keys[0].PublicKey().Address())
+	addr, _ := service.addrManager.FormatLocalAddress(keys[0].PublicKey().Address())
 	args.Addresses = []string{addr}
-	assert.NoError(service.GetStake(nil, &args, &response))
-	assert.EqualValues(oldStake+stakeAmount, uint64(response.Staked))
-	assert.Len(response.Outputs, 2)
+	require.NoError(service.GetStake(nil, &args, &response))
+	require.EqualValues(oldStake+stakeAmount, uint64(response.Staked))
+	require.Len(response.Outputs, 2)
 
 	// Unmarshal into transferable outputs
 	outputs := make([]avax.TransferableOutput, 2)
 	for i := range outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[i])
-		assert.NoError(err)
-		_, err = Codec.Unmarshal(outputBytes, &outputs[i])
-		assert.NoError(err)
+		require.NoError(err)
+		_, err = txs.Codec.Unmarshal(outputBytes, &outputs[i])
+		require.NoError(err)
 	}
 
 	// Make sure the stake amount is as expected
-	assert.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount())
+	require.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount())
 
 	oldStake = uint64(response.Staked)
 
@@ -568,33 +587,32 @@ func TestGetStake(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		keys[0].PublicKey().Address(), // change addr
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
 	staker = state.NewPrimaryNetworkStaker(tx.ID(), &tx.Unsigned.(*txs.AddValidatorTx).Validator)
 	staker.NextTime = staker.StartTime
 	staker.Priority = state.PrimaryNetworkValidatorPendingPriority
 
-	service.vm.internalState.PutPendingValidator(staker)
-	service.vm.internalState.AddTx(tx, status.Committed)
-	assert.NoError(service.vm.internalState.Commit())
-	assert.NoError(service.vm.internalState.Load())
+	service.vm.state.PutPendingValidator(staker)
+	service.vm.state.AddTx(tx, status.Committed)
+	require.NoError(service.vm.state.Commit())
 
 	// Make sure the delegator has the right stake (old stake + stakeAmount)
-	assert.NoError(service.GetStake(nil, &args, &response))
-	assert.EqualValues(oldStake+stakeAmount, response.Staked)
-	assert.Len(response.Outputs, 3)
+	require.NoError(service.GetStake(nil, &args, &response))
+	require.EqualValues(oldStake+stakeAmount, response.Staked)
+	require.Len(response.Outputs, 3)
 
 	// Unmarshal
 	outputs = make([]avax.TransferableOutput, 3)
 	for i := range outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[i])
-		assert.NoError(err)
-		_, err = Codec.Unmarshal(outputBytes, &outputs[i])
-		assert.NoError(err)
+		require.NoError(err)
+		_, err = txs.Codec.Unmarshal(outputBytes, &outputs[i])
+		require.NoError(err)
 	}
 
 	// Make sure the stake amount is as expected
-	assert.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount()+outputs[2].Out.Amount())
+	require.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount()+outputs[2].Out.Amount())
 }
 
 // Test method GetCurrentValidators
@@ -682,13 +700,9 @@ func TestGetCurrentValidators(t *testing.T) {
 	staker.NextTime = staker.EndTime
 	staker.Priority = state.PrimaryNetworkDelegatorCurrentPriority
 
-	service.vm.internalState.PutCurrentDelegator(staker)
-	service.vm.internalState.AddTx(tx, status.Committed)
-	err = service.vm.internalState.Commit()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = service.vm.internalState.Load()
+	service.vm.state.PutCurrentDelegator(staker)
+	service.vm.state.AddTx(tx, status.Committed)
+	err = service.vm.state.Commit()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -732,23 +746,23 @@ func TestGetCurrentValidators(t *testing.T) {
 }
 
 func TestGetTimestamp(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	service, _ := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		assert.NoError(service.vm.Shutdown())
+		require.NoError(service.vm.Shutdown())
 		service.vm.ctx.Lock.Unlock()
 	}()
 
 	reply := GetTimestampReply{}
-	assert.NoError(service.GetTimestamp(nil, nil, &reply))
-	assert.Equal(service.vm.internalState.GetTimestamp(), reply.Timestamp)
+	require.NoError(service.GetTimestamp(nil, nil, &reply))
+	require.Equal(service.vm.state.GetTimestamp(), reply.Timestamp)
 
 	newTimestamp := reply.Timestamp.Add(time.Second)
-	service.vm.internalState.SetTimestamp(newTimestamp)
+	service.vm.state.SetTimestamp(newTimestamp)
 
-	assert.NoError(service.GetTimestamp(nil, nil, &reply))
-	assert.Equal(newTimestamp, reply.Timestamp)
+	require.NoError(service.GetTimestamp(nil, nil, &reply))
+	require.Equal(newTimestamp, reply.Timestamp)
 }
 
 func TestGetBlock(t *testing.T) {
@@ -768,17 +782,41 @@ func TestGetBlock(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
 			service, _ := defaultService(t)
+			service.vm.ctx.Lock.Lock()
+			defer service.vm.ctx.Lock.Unlock()
 
-			block, err := service.vm.newStandardBlock(ids.GenerateTestID(), 1234, nil)
+			// Make a block an accept it, then check we can get it.
+			tx, err := service.vm.txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks
+				testSubnet1.ID(),
+				nil,
+				constants.AVMID,
+				nil,
+				"chain name",
+				[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+				keys[0].PublicKey().Address(), // change addr
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			preferred, err := service.vm.Builder.Preferred()
+			if err != nil {
+				t.Fatal(err)
+			}
+			statelessBlock, err := blocks.NewApricotStandardBlock(
+				preferred.ID(),
+				preferred.Height()+1,
+				[]*txs.Tx{tx},
+			)
 			if err != nil {
 				t.Fatal("couldn't create block: %w", err)
 			}
-			internalState := NewMockInternalState(ctrl)
-			internalState.EXPECT().GetBlock(block.ID()).Times(1).Return(block, nil)
-
-			service.vm.internalState = internalState
+			block := service.vm.manager.NewBlock(statelessBlock)
+			if err := block.Verify(); err != nil {
+				t.Fatal("couldn't verify block: %w", err)
+			} else if err := block.Accept(); err != nil {
+				t.Fatal("couldn't accept block: %w", err)
+			}
 
 			args := api.GetBlockArgs{
 				BlockID:  block.ID(),
@@ -792,13 +830,13 @@ func TestGetBlock(t *testing.T) {
 
 			switch {
 			case test.encoding == formatting.JSON:
-				assert.Equal(t, block, response.Block)
+				require.Equal(t, block, response.Block)
 			default:
 				decoded, _ := formatting.Decode(response.Encoding, response.Block.(string))
-				assert.Equal(t, block.Bytes(), decoded)
+				require.Equal(t, block.Bytes(), decoded)
 			}
 
-			assert.Equal(t, test.encoding, response.Encoding)
+			require.Equal(t, test.encoding, response.Encoding)
 		})
 	}
 }

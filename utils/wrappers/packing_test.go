@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/ips"
@@ -591,21 +591,21 @@ func TestPacker2DByteSlice(t *testing.T) {
 
 func TestPackX509Certificate(t *testing.T) {
 	cert, err := staking.NewTLSCert()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	p := Packer{MaxSize: 10000}
 	p.PackX509Certificate(cert.Leaf)
-	assert.NoError(t, p.Err)
+	require.NoError(t, p.Err)
 
 	p.Offset = 0
 	unpackedCert := p.UnpackX509Certificate()
 
-	assert.Equal(t, cert.Leaf.Raw, unpackedCert.Raw)
+	require.Equal(t, cert.Leaf.Raw, unpackedCert.Raw)
 }
 
 func TestPackClaimedIPPort(t *testing.T) {
 	cert, err := staking.NewTLSCert()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ip := ips.ClaimedIPPort{
 		IPPort:    ips.IPPort{IP: net.IPv4(1, 2, 3, 4), Port: 5},
@@ -615,19 +615,19 @@ func TestPackClaimedIPPort(t *testing.T) {
 
 	p := Packer{MaxSize: 10000}
 	p.PackClaimedIPPort(ip)
-	assert.NoError(t, p.Err)
+	require.NoError(t, p.Err)
 
 	p.Offset = 0
 	unpackedIPCert := p.UnpackClaimedIPPort()
 
-	assert.Equal(t, ip.IPPort, unpackedIPCert.IPPort)
-	assert.Equal(t, ip.Cert.Raw, unpackedIPCert.Cert.Raw)
-	assert.Equal(t, ip.Signature, unpackedIPCert.Signature)
+	require.Equal(t, ip.IPPort, unpackedIPCert.IPPort)
+	require.Equal(t, ip.Cert.Raw, unpackedIPCert.Cert.Raw)
+	require.Equal(t, ip.Signature, unpackedIPCert.Signature)
 }
 
 func TestPackClaimedIPPortList(t *testing.T) {
 	cert, err := staking.NewTLSCert()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ip := ips.ClaimedIPPort{
 		IPPort:    ips.IPPort{IP: net.IPv4(1, 2, 3, 4), Port: 5},
@@ -638,14 +638,14 @@ func TestPackClaimedIPPortList(t *testing.T) {
 
 	p := Packer{MaxSize: 10000}
 	TryPackClaimedIPPortList(&p, []ips.ClaimedIPPort{ip})
-	assert.NoError(t, p.Err)
+	require.NoError(t, p.Err)
 
 	p.Offset = 0
 	unpackedIPCertList := TryUnpackClaimedIPPortList(&p)
 	resolvedUnpackedIPCertList := unpackedIPCertList.([]ips.ClaimedIPPort)
-	assert.NotEmpty(t, resolvedUnpackedIPCertList)
-	assert.Equal(t, ip.IPPort, resolvedUnpackedIPCertList[0].IPPort)
-	assert.Equal(t, ip.Cert.Raw, resolvedUnpackedIPCertList[0].Cert.Raw)
-	assert.Equal(t, ip.Signature, resolvedUnpackedIPCertList[0].Signature)
-	assert.Equal(t, ip.Timestamp, resolvedUnpackedIPCertList[0].Timestamp)
+	require.NotEmpty(t, resolvedUnpackedIPCertList)
+	require.Equal(t, ip.IPPort, resolvedUnpackedIPCertList[0].IPPort)
+	require.Equal(t, ip.Cert.Raw, resolvedUnpackedIPCertList[0].Cert.Raw)
+	require.Equal(t, ip.Signature, resolvedUnpackedIPCertList[0].Signature)
+	require.Equal(t, ip.Timestamp, resolvedUnpackedIPCertList[0].Timestamp)
 }

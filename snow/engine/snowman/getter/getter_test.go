@@ -9,7 +9,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -95,7 +95,7 @@ func TestAcceptedFrontier(t *testing.T) {
 	vm.CantLastAccepted = false
 	vm.LastAcceptedF = func() (ids.ID, error) { return blkID, nil }
 	vm.GetBlockF = func(bID ids.ID) (snowman.Block, error) {
-		assert.Equal(t, blkID, bID)
+		require.Equal(t, blkID, bID)
 		return dummyBlk, nil
 	}
 
@@ -147,7 +147,7 @@ func TestFilterAccepted(t *testing.T) {
 	vm.CantLastAccepted = false
 	vm.LastAcceptedF = func() (ids.ID, error) { return blk1.ID(), nil }
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		assert.Equal(t, blk1.ID(), blkID)
+		require.Equal(t, blk1.ID(), blkID)
 		return blk1, nil
 	}
 

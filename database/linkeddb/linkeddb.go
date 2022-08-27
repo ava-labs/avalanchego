@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 const (
@@ -94,7 +95,7 @@ func (ldb *linkedDB) Put(key, value []byte) error {
 	// If the key already has a node in the list, update that node.
 	existingNode, err := ldb.getNode(key)
 	if err == nil {
-		existingNode.Value = value
+		existingNode.Value = utils.CopyBytes(value)
 		if err := ldb.putNode(key, existingNode); err != nil {
 			return err
 		}
@@ -105,7 +106,7 @@ func (ldb *linkedDB) Put(key, value []byte) error {
 	}
 
 	// The key isn't currently in the list, so we should add it as the head.
-	newHead := node{Value: value}
+	newHead := node{Value: utils.CopyBytes(value)}
 	if headKey, err := ldb.getHeadKey(); err == nil {
 		// The list currently has a head, so we need to update the old head.
 		oldHead, err := ldb.getNode(headKey)

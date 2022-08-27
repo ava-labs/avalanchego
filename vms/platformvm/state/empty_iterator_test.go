@@ -6,15 +6,15 @@ package state
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEmptyIterator(t *testing.T) {
-	assert := assert.New(t)
-	assert.False(EmptyIterator.Next())
+	require := require.New(t)
+	require.False(EmptyIterator.Next())
 
 	EmptyIterator.Release()
 
-	assert.False(EmptyIterator.Next())
-	assert.Nil(EmptyIterator.Value())
+	require.False(EmptyIterator.Next())
+	require.Nil(EmptyIterator.Value())
 }

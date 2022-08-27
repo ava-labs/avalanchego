@@ -15,8 +15,9 @@ var _ txs.Visitor = &MempoolTxVerifier{}
 
 type MempoolTxVerifier struct {
 	*Backend
-	ParentID ids.ID
-	Tx       *txs.Tx
+	ParentID      ids.ID
+	StateVersions state.Versions
+	Tx            *txs.Tx
 }
 
 func (*MempoolTxVerifier) AdvanceTimeTx(*txs.AdvanceTimeTx) error         { return errWrongTxType }
@@ -50,10 +51,15 @@ func (v *MempoolTxVerifier) ExportTx(tx *txs.ExportTx) error {
 	return v.standardTx(tx)
 }
 
+func (v *MempoolTxVerifier) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
+	return v.standardTx(tx)
+}
+
 func (v *MempoolTxVerifier) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 	return v.standardTx(tx)
 }
 
+// TODO: simplify this function after Blueberry is activated.
 func (v *MempoolTxVerifier) proposalTx(tx txs.StakerTx) error {
 	startTime := tx.StartTime()
 	maxLocalStartTime := v.Clk.Time().Add(MaxFutureStartTime)
@@ -61,14 +67,31 @@ func (v *MempoolTxVerifier) proposalTx(tx txs.StakerTx) error {
 		return errFutureStakeTime
 	}
 
-	executor := ProposalTxExecutor{
-		Backend:  v.Backend,
-		ParentID: v.ParentID,
-		Tx:       v.Tx,
+	onCommitState, err := state.NewDiff(v.ParentID, v.StateVersions)
+	if err != nil {
+		return err
 	}
-	err := tx.Visit(&executor)
-	// We ignore [errFutureStakeTime] here because an advanceTimeTx will be
-	// issued before this transaction is issued.
+
+	// Make sure that the Blueberry fork check will pass.
+	currentChainTime := onCommitState.GetTimestamp()
+	if v.Backend.Config.IsBlueberryActivated(currentChainTime) {
+		return v.standardTx(tx)
+	}
+
+	onAbortState, err := state.NewDiff(v.ParentID, v.StateVersions)
+	if err != nil {
+		return err
+	}
+
+	executor := ProposalTxExecutor{
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       v.Backend,
+		Tx:            v.Tx,
+	}
+	err = tx.Visit(&executor)
+	// We ignore [errFutureStakeTime] here because the time will be advanced
+	// when this transaction is issued.
 	if errors.Is(err, errFutureStakeTime) {
 		return nil
 	}
@@ -89,5 +112,11 @@ func (v *MempoolTxVerifier) standardTx(tx txs.UnsignedTx) error {
 		State:   state,
 		Tx:      v.Tx,
 	}
-	return tx.Visit(&executor)
+	err = tx.Visit(&executor)
+	// We ignore [errFutureStakeTime] here because the time will be advanced
+	// when this transaction is issued.
+	if errors.Is(err, errFutureStakeTime) {
+		return nil
+	}
+	return err
 }

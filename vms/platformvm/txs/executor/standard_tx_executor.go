@@ -20,8 +20,11 @@ import (
 var (
 	_ txs.Visitor = &StandardTxExecutor{}
 
-	errCustomAssetBeforeBlueberry     = errors.New("custom assets can only be imported after the blueberry upgrade")
-	errTransformSubnetBeforeBlueberry = errors.New("subnets can only be transformed after the blueberry upgrade")
+	errEmptyNodeID                            = errors.New("validator nodeID cannot be empty")
+	errIssuedAddStakerTxBeforeBlueberry       = errors.New("staker transaction issued before Blueberry")
+	errCustomAssetBeforeBlueberry             = errors.New("custom assets can only be imported after Blueberry")
+	errRemoveSubnetValidatorTxBeforeBlueberry = errors.New("RemoveSubnetValidatorTx issued before Blueberry")
+	errTransformSubnetTxBeforeBlueberry       = errors.New("TransformSubnetTx issued before Blueberry")
 )
 
 type StandardTxExecutor struct {
@@ -36,11 +39,6 @@ type StandardTxExecutor struct {
 	AtomicRequests map[ids.ID]*atomic.Requests // may be nil
 }
 
-func (*StandardTxExecutor) AddValidatorTx(*txs.AddValidatorTx) error { return errWrongTxType }
-func (*StandardTxExecutor) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
-	return errWrongTxType
-}
-func (*StandardTxExecutor) AddDelegatorTx(*txs.AddDelegatorTx) error       { return errWrongTxType }
 func (*StandardTxExecutor) AdvanceTimeTx(*txs.AdvanceTimeTx) error         { return errWrongTxType }
 func (*StandardTxExecutor) RewardValidatorTx(*txs.RewardValidatorTx) error { return errWrongTxType }
 
@@ -157,7 +155,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		e.Inputs.Add(utxoID)
 		utxoIDs[i] = utxoID[:]
 
-		if currentChainTime.Before(e.Config.BlueberryTime) {
+		if !e.Config.IsBlueberryActivated(currentChainTime) {
 			// TODO: Remove this check once the Blueberry network upgrade is
 			//       complete.
 			//
@@ -299,6 +297,158 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	return nil
 }
 
+func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
+	// AddValidatorTx is a proposal transaction until the Blueberry fork
+	// activation. Following the activation, AddValidatorTxs must be issued into
+	// StandardBlocks.
+	currentTimestamp := e.State.GetTimestamp()
+	if !e.Config.IsBlueberryActivated(currentTimestamp) {
+		return fmt.Errorf(
+			"%w: timestamp (%s) < Blueberry fork time (%s)",
+			errIssuedAddStakerTxBeforeBlueberry,
+			currentTimestamp,
+			e.Config.BlueberryTime,
+		)
+	}
+
+	if tx.Validator.NodeID == ids.EmptyNodeID {
+		return errEmptyNodeID
+	}
+
+	if _, err := verifyAddValidatorTx(
+		e.Backend,
+		e.State,
+		e.Tx,
+		tx,
+	); err != nil {
+		return err
+	}
+
+	txID := e.Tx.ID()
+
+	newStaker := state.NewPrimaryNetworkStaker(txID, &tx.Validator)
+	newStaker.NextTime = tx.Validator.StartTime()
+	newStaker.Priority = state.PrimaryNetworkValidatorPendingPriority
+
+	e.State.PutPendingValidator(newStaker)
+	utxo.Consume(e.State, tx.Ins)
+	utxo.Produce(e.State, txID, tx.Outs)
+
+	return nil
+}
+
+func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
+	// AddSubnetValidatorTx is a proposal transaction until the Blueberry fork
+	// activation. Following the activation, AddSubnetValidatorTxs must be
+	// issued into StandardBlocks.
+	currentTimestamp := e.State.GetTimestamp()
+	if !e.Config.IsBlueberryActivated(currentTimestamp) {
+		return fmt.Errorf(
+			"%w: timestamp (%s) < Blueberry fork time (%s)",
+			errIssuedAddStakerTxBeforeBlueberry,
+			currentTimestamp,
+			e.Config.BlueberryTime,
+		)
+	}
+
+	if err := verifyAddSubnetValidatorTx(
+		e.Backend,
+		e.State,
+		e.Tx,
+		tx,
+	); err != nil {
+		return err
+	}
+
+	txID := e.Tx.ID()
+
+	newStaker := state.NewSubnetStaker(txID, &tx.Validator)
+	newStaker.NextTime = tx.Validator.StartTime()
+	newStaker.Priority = state.SubnetValidatorPendingPriority
+
+	e.State.PutPendingValidator(newStaker)
+	utxo.Consume(e.State, tx.Ins)
+	utxo.Produce(e.State, txID, tx.Outs)
+
+	return nil
+}
+
+func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
+	// AddDelegatorTx is a proposal transaction until the Blueberry fork
+	// activation. Following the activation, AddDelegatorTxs must be issued into
+	// StandardBlocks.
+	currentTimestamp := e.State.GetTimestamp()
+	if !e.Config.IsBlueberryActivated(currentTimestamp) {
+		return fmt.Errorf(
+			"%w: timestamp (%s) < Blueberry fork time (%s)",
+			errIssuedAddStakerTxBeforeBlueberry,
+			currentTimestamp,
+			e.Config.BlueberryTime,
+		)
+	}
+
+	if _, err := verifyAddDelegatorTx(
+		e.Backend,
+		e.State,
+		e.Tx,
+		tx,
+	); err != nil {
+		return err
+	}
+
+	txID := e.Tx.ID()
+	newStaker := state.NewPrimaryNetworkStaker(txID, &tx.Validator)
+	newStaker.NextTime = tx.Validator.StartTime()
+	newStaker.Priority = state.PrimaryNetworkDelegatorPendingPriority
+
+	e.State.PutPendingDelegator(newStaker)
+	utxo.Consume(e.State, tx.Ins)
+	utxo.Produce(e.State, txID, tx.Outs)
+
+	return nil
+}
+
+// Verifies a [*txs.RemoveSubnetValidatorTx] and, if it passes, executes it on
+// [e.State]. For verification rules, see [removeSubnetValidatorValidation].
+// This transaction will result in [tx.NodeID] being removed as a validator of
+// [tx.SubnetID].
+// Note: [tx.NodeID] may be either a current or pending validator.
+func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
+	currentTimestamp := e.State.GetTimestamp()
+	if !e.Config.IsBlueberryActivated(currentTimestamp) {
+		return fmt.Errorf(
+			"%w: timestamp (%s) < Blueberry fork time (%s)",
+			errRemoveSubnetValidatorTxBeforeBlueberry,
+			currentTimestamp,
+			e.Config.BlueberryTime,
+		)
+	}
+
+	staker, isCurrentValidator, err := removeSubnetValidatorValidation(
+		e.Backend,
+		e.State,
+		e.Tx,
+		tx,
+	)
+	if err != nil {
+		return err
+	}
+
+	if isCurrentValidator {
+		e.State.DeleteCurrentValidator(staker)
+	} else {
+		e.State.DeletePendingValidator(staker)
+	}
+
+	// Invariant: There are no permissioned subnet delegators to remove.
+
+	txID := e.Tx.ID()
+	utxo.Consume(e.State, tx.Ins)
+	utxo.Produce(e.State, txID, tx.Outs)
+
+	return nil
+}
+
 func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 	// TODO: Remove this check once the Blueberry network upgrade is complete.
 	//
@@ -306,7 +456,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	// a permissionless subnet.
 	currentChainTime := e.State.GetTimestamp()
 	if currentChainTime.Before(e.Config.BlueberryTime) {
-		return errTransformSubnetBeforeBlueberry
+		return errTransformSubnetTxBeforeBlueberry
 	}
 
 	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
@@ -339,17 +489,17 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		return err
 	}
 
-	_, err := e.State.GetSubnetTransformation(tx.SubnetID)
+	_, err := e.State.GetSubnetTransformation(tx.Subnet)
 	if err == nil {
-		return fmt.Errorf("%s is immutable", tx.SubnetID)
+		return fmt.Errorf("%s is immutable", tx.Subnet)
 	}
 	if err != database.ErrNotFound {
 		return err
 	}
 
-	subnetIntf, _, err := e.State.GetTx(tx.SubnetID)
+	subnetIntf, _, err := e.State.GetTx(tx.Subnet)
 	if err == database.ErrNotFound {
-		return fmt.Errorf("%s isn't a known subnet", tx.SubnetID)
+		return fmt.Errorf("%s isn't a known subnet", tx.Subnet)
 	}
 	if err != nil {
 		return err
@@ -357,7 +507,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 
 	subnet, ok := subnetIntf.Unsigned.(*txs.CreateSubnetTx)
 	if !ok {
-		return fmt.Errorf("%s isn't a subnet", tx.SubnetID)
+		return fmt.Errorf("%s isn't a subnet", tx.Subnet)
 	}
 
 	// Verify that this chain is authorized by the subnet
@@ -373,6 +523,6 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	utxo.Produce(e.State, txID, tx.Outs)
 	// Transform the new subnet in the database
 	e.State.AddSubnetTransformation(e.Tx)
-	e.State.SetCurrentSubnetSupply(tx.SubnetID, tx.InitialSupply)
+	e.State.SetCurrentSubnetSupply(tx.Subnet, tx.InitialSupply)
 	return nil
 }

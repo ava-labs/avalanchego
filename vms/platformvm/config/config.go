@@ -81,9 +81,6 @@ type Config struct {
 	// Time of the AP3 network upgrade
 	ApricotPhase3Time time.Time
 
-	// Time of the AP4 network upgrade
-	ApricotPhase4Time time.Time
-
 	// Time of the AP5 network upgrade
 	ApricotPhase5Time time.Time
 
@@ -91,18 +88,30 @@ type Config struct {
 	BlueberryTime time.Time
 }
 
-func (c *Config) GetCreateBlockchainTxFee(t time.Time) uint64 {
-	if t.Before(c.ApricotPhase3Time) {
-		return c.CreateAssetTxFee
-	}
-	return c.CreateBlockchainTxFee
+func (c *Config) IsApricotPhase3Activated(timestamp time.Time) bool {
+	return !timestamp.Before(c.ApricotPhase3Time)
 }
 
-func (c *Config) GetCreateSubnetTxFee(t time.Time) uint64 {
-	if t.Before(c.ApricotPhase3Time) {
-		return c.CreateAssetTxFee
+func (c *Config) IsApricotPhase5Activated(timestamp time.Time) bool {
+	return !timestamp.Before(c.ApricotPhase5Time)
+}
+
+func (c *Config) IsBlueberryActivated(timestamp time.Time) bool {
+	return !timestamp.Before(c.BlueberryTime)
+}
+
+func (c *Config) GetCreateBlockchainTxFee(timestamp time.Time) uint64 {
+	if c.IsApricotPhase3Activated(timestamp) {
+		return c.CreateBlockchainTxFee
 	}
-	return c.CreateSubnetTxFee
+	return c.CreateAssetTxFee
+}
+
+func (c *Config) GetCreateSubnetTxFee(timestamp time.Time) uint64 {
+	if c.IsApricotPhase3Activated(timestamp) {
+		return c.CreateSubnetTxFee
+	}
+	return c.CreateAssetTxFee
 }
 
 // Create the blockchain described in [tx], but only if this node is a member of
@@ -114,14 +123,11 @@ func (c *Config) CreateChain(chainID ids.ID, tx *txs.CreateChainTx) {
 		return
 	}
 
-	chainParams := chains.ChainParameters{
+	c.Chains.CreateChain(chains.ChainParameters{
 		ID:          chainID,
 		SubnetID:    tx.SubnetID,
 		GenesisData: tx.GenesisData,
-		VMAlias:     tx.VMID.String(),
-	}
-	for _, fxID := range tx.FxIDs {
-		chainParams.FxAliases = append(chainParams.FxAliases, fxID.String())
-	}
-	c.Chains.CreateChain(chainParams)
+		VMID:        tx.VMID,
+		FxIDs:       tx.FxIDs,
+	})
 }

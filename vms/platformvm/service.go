@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -74,7 +75,10 @@ var (
 )
 
 // Service defines the API calls that can be made to the platform chain
-type Service struct{ vm *VM }
+type Service struct {
+	vm          *VM
+	addrManager avax.AddressManager
+}
 
 type GetHeightResponse struct {
 	Height json.Uint64 `json:"height"`
@@ -86,7 +90,7 @@ func (service *Service) GetHeight(r *http.Request, args *struct{}, response *Get
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted block ID: %w", err)
 	}
-	lastAccepted, err := service.vm.getBlock(lastAcceptedID)
+	lastAccepted, err := service.vm.GetBlock(lastAcceptedID)
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted block: %w", err)
 	}
@@ -110,7 +114,7 @@ type ExportKeyReply struct {
 func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *ExportKeyReply) error {
 	service.vm.ctx.Log.Debug("Platform: ExportKey called")
 
-	address, err := avax.ParseServiceAddress(service.vm, args.Address)
+	address, err := avax.ParseServiceAddress(service.addrManager, args.Address)
 	if err != nil {
 		return fmt.Errorf("couldn't parse %s to address: %w", args.Address, err)
 	}
@@ -147,7 +151,7 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 	}
 
 	var err error
-	reply.Address, err = service.vm.FormatLocalAddress(args.PrivateKey.PublicKey().Address())
+	reply.Address, err = service.addrManager.FormatLocalAddress(args.PrivateKey.PublicKey().Address())
 	if err != nil {
 		return fmt.Errorf("problem formatting address: %w", err)
 	}
@@ -196,12 +200,12 @@ func (service *Service) GetBalance(_ *http.Request, args *GetBalanceRequest, res
 	)
 
 	// Parse to address
-	addrs, err := avax.ParseServiceAddresses(service.vm, args.Addresses)
+	addrs, err := avax.ParseServiceAddresses(service.addrManager, args.Addresses)
 	if err != nil {
 		return err
 	}
 
-	utxos, err := avax.GetAllUTXOs(service.vm.internalState, addrs)
+	utxos, err := avax.GetAllUTXOs(service.vm.state, addrs)
 	if err != nil {
 		return fmt.Errorf("couldn't get UTXO set of %v: %w", args.Addresses, err)
 	}
@@ -295,7 +299,7 @@ func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, respo
 		return err
 	}
 
-	response.Address, err = service.vm.FormatLocalAddress(key.PublicKey().Address())
+	response.Address, err = service.addrManager.FormatLocalAddress(key.PublicKey().Address())
 	if err != nil {
 		return fmt.Errorf("problem formatting address: %w", err)
 	}
@@ -318,7 +322,7 @@ func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, respo
 	}
 	response.Addresses = make([]string, len(addresses))
 	for i, addr := range addresses {
-		response.Addresses[i], err = service.vm.FormatLocalAddress(addr)
+		response.Addresses[i], err = service.addrManager.FormatLocalAddress(addr)
 		if err != nil {
 			return fmt.Errorf("problem formatting address: %w", err)
 		}
@@ -355,7 +359,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, respon
 		sourceChain = chainID
 	}
 
-	addrSet, err := avax.ParseServiceAddresses(service.vm, args.Addresses)
+	addrSet, err := avax.ParseServiceAddresses(service.addrManager, args.Addresses)
 	if err != nil {
 		return err
 	}
@@ -363,7 +367,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, respon
 	startAddr := ids.ShortEmpty
 	startUTXO := ids.Empty
 	if args.StartIndex.Address != "" || args.StartIndex.UTXO != "" {
-		startAddr, err = avax.ParseServiceAddress(service.vm, args.StartIndex.Address)
+		startAddr, err = avax.ParseServiceAddress(service.addrManager, args.StartIndex.Address)
 		if err != nil {
 			return fmt.Errorf("couldn't parse start index address %q: %w", args.StartIndex.Address, err)
 		}
@@ -384,14 +388,14 @@ func (service *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, respon
 	}
 	if sourceChain == service.vm.ctx.ChainID {
 		utxos, endAddr, endUTXOID, err = avax.GetPaginatedUTXOs(
-			service.vm.internalState,
+			service.vm.state,
 			addrSet,
 			startAddr,
 			startUTXO,
 			limit,
 		)
 	} else {
-		utxos, endAddr, endUTXOID, err = service.vm.GetAtomicUTXOs(
+		utxos, endAddr, endUTXOID, err = service.vm.atomicUtxosManager.GetAtomicUTXOs(
 			sourceChain,
 			addrSet,
 			startAddr,
@@ -405,7 +409,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, respon
 
 	response.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
-		bytes, err := Codec.Marshal(txs.Version, utxo)
+		bytes, err := txs.Codec.Marshal(txs.Version, utxo)
 		if err != nil {
 			return fmt.Errorf("couldn't serialize UTXO %q: %w", utxo.InputID(), err)
 		}
@@ -415,7 +419,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, respon
 		}
 	}
 
-	endAddress, err := service.vm.FormatLocalAddress(endAddr)
+	endAddress, err := service.addrManager.FormatLocalAddress(endAddr)
 	if err != nil {
 		return fmt.Errorf("problem formatting address: %w", err)
 	}
@@ -466,7 +470,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 
 	getAll := len(args.IDs) == 0
 	if getAll {
-		subnets, err := service.vm.internalState.GetSubnets() // all subnets
+		subnets, err := service.vm.state.GetSubnets() // all subnets
 		if err != nil {
 			return fmt.Errorf("error getting subnets from database: %w", err)
 		}
@@ -477,7 +481,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 			owner := unsignedTx.Owner.(*secp256k1fx.OutputOwners)
 			controlAddrs := []string{}
 			for _, controlKeyID := range owner.Addrs {
-				addr, err := service.vm.FormatLocalAddress(controlKeyID)
+				addr, err := service.addrManager.FormatLocalAddress(controlKeyID)
 				if err != nil {
 					return fmt.Errorf("problem formatting address: %w", err)
 				}
@@ -516,7 +520,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 			continue
 		}
 
-		subnetTx, _, err := service.vm.internalState.GetTx(subnetID)
+		subnetTx, _, err := service.vm.state.GetTx(subnetID)
 		if err == database.ErrNotFound {
 			continue
 		}
@@ -535,7 +539,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 
 		controlAddrs := make([]string, len(owner.Addrs))
 		for i, controlKeyID := range owner.Addrs {
-			addr, err := service.vm.FormatLocalAddress(controlKeyID)
+			addr, err := service.addrManager.FormatLocalAddress(controlKeyID)
 			if err != nil {
 				return fmt.Errorf("problem formatting address: %w", err)
 			}
@@ -614,7 +618,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	nodeIDs.Add(args.NodeIDs...)
 	includeAllNodes := nodeIDs.Len() == 0
 
-	currentStakerIterator, err := service.vm.internalState.GetCurrentStakerIterator()
+	currentStakerIterator, err := service.vm.state.GetCurrentStakerIterator()
 	if err != nil {
 		return err
 	}
@@ -630,7 +634,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			continue
 		}
 
-		tx, _, err := service.vm.internalState.GetTx(staker.TxID)
+		tx, _, err := service.vm.state.GetTx(staker.TxID)
 		if err != nil {
 			return err
 		}
@@ -652,7 +656,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 					Threshold: json.Uint32(owner.Threshold),
 				}
 				for _, addr := range owner.Addrs {
-					addrStr, err := service.vm.FormatLocalAddress(addr)
+					addrStr, err := service.addrManager.FormatLocalAddress(addr)
 					if err != nil {
 						return err
 					}
@@ -690,7 +694,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 					Threshold: json.Uint32(owner.Threshold),
 				}
 				for _, addr := range owner.Addrs {
-					addrStr, err := service.vm.FormatLocalAddress(addr)
+					addrStr, err := service.addrManager.FormatLocalAddress(addr)
 					if err != nil {
 						return err
 					}
@@ -773,7 +777,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 	nodeIDs.Add(args.NodeIDs...)
 	includeAllNodes := nodeIDs.Len() == 0
 
-	pendingStakerIterator, err := service.vm.internalState.GetPendingStakerIterator()
+	pendingStakerIterator, err := service.vm.state.GetPendingStakerIterator()
 	if err != nil {
 		return err
 	}
@@ -788,7 +792,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 			continue
 		}
 
-		tx, _, err := service.vm.internalState.GetTx(staker.TxID)
+		tx, _, err := service.vm.state.GetTx(staker.TxID)
 		if err != nil {
 			return err
 		}
@@ -852,7 +856,7 @@ type GetCurrentSupplyReply struct {
 func (service *Service) GetCurrentSupply(_ *http.Request, _ *struct{}, reply *GetCurrentSupplyReply) error {
 	service.vm.ctx.Log.Debug("Platform: GetCurrentSupply called")
 
-	reply.Supply = json.Uint64(service.vm.internalState.GetCurrentSupply())
+	reply.Supply = json.Uint64(service.vm.state.GetCurrentSupply())
 	return nil
 }
 
@@ -940,6 +944,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 		return errInvalidDelegationRate
 	}
 
+	// Parse the node ID
 	var nodeID ids.NodeID
 	if args.NodeID == ids.EmptyNodeID { // If ID unspecified, use this node's ID
 		nodeID = service.vm.ctx.NodeID
@@ -948,13 +953,13 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 	}
 
 	// Parse the from addresses
-	fromAddrs, err := avax.ParseServiceAddresses(service.vm, args.From)
+	fromAddrs, err := avax.ParseServiceAddresses(service.addrManager, args.From)
 	if err != nil {
 		return err
 	}
 
 	// Parse the reward address
-	rewardAddress, err := avax.ParseServiceAddress(service.vm, args.RewardAddress)
+	rewardAddress, err := avax.ParseServiceAddress(service.addrManager, args.RewardAddress)
 	if err != nil {
 		return fmt.Errorf("problem while parsing reward address: %w", err)
 	}
@@ -977,7 +982,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 	}
 	changeAddr := privKeys.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
-		changeAddr, err = avax.ParseServiceAddress(service.vm, args.ChangeAddr)
+		changeAddr, err = avax.ParseServiceAddress(service.addrManager, args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
@@ -991,20 +996,20 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 		nodeID,                               // Node ID
 		rewardAddress,                        // Reward Address
 		uint32(10000*args.DelegationFeeRate), // Shares
-		privKeys.Keys,                        // Private keys
-		changeAddr,                           // Change address
+		privKeys.Keys,                        // Keys providing the staked tokens
+		changeAddr,
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
 	}
 
 	reply.TxID = tx.ID()
-	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
+	reply.ChangeAddr, err = service.addrManager.FormatLocalAddress(changeAddr)
 
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.blockBuilder.AddUnverifiedTx(tx),
+		service.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
 	return errs.Err
@@ -1050,13 +1055,13 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 	}
 
 	// Parse the reward address
-	rewardAddress, err := avax.ParseServiceAddress(service.vm, args.RewardAddress)
+	rewardAddress, err := avax.ParseServiceAddress(service.addrManager, args.RewardAddress)
 	if err != nil {
 		return fmt.Errorf("problem parsing 'rewardAddress': %w", err)
 	}
 
 	// Parse the from addresses
-	fromAddrs, err := avax.ParseServiceAddresses(service.vm, args.From)
+	fromAddrs, err := avax.ParseServiceAddresses(service.addrManager, args.From)
 	if err != nil {
 		return err
 	}
@@ -1079,7 +1084,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 	}
 	changeAddr := privKeys.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
-		changeAddr, err = avax.ParseServiceAddress(service.vm, args.ChangeAddr)
+		changeAddr, err = avax.ParseServiceAddress(service.addrManager, args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
@@ -1100,12 +1105,12 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 	}
 
 	reply.TxID = tx.ID()
-	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
+	reply.ChangeAddr, err = service.addrManager.FormatLocalAddress(changeAddr)
 
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.blockBuilder.AddUnverifiedTx(tx),
+		service.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
 	return errs.Err
@@ -1154,7 +1159,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	}
 
 	// Parse the from addresses
-	fromAddrs, err := avax.ParseServiceAddresses(service.vm, args.From)
+	fromAddrs, err := avax.ParseServiceAddresses(service.addrManager, args.From)
 	if err != nil {
 		return err
 	}
@@ -1176,7 +1181,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	}
 	changeAddr := keys.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
-		changeAddr, err = avax.ParseServiceAddress(service.vm, args.ChangeAddr)
+		changeAddr, err = avax.ParseServiceAddress(service.addrManager, args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
@@ -1189,20 +1194,20 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 		uint64(args.EndTime),   // End time
 		args.NodeID,            // Node ID
 		subnetID,               // Subnet ID
-		keys.Keys,              // Keys
-		changeAddr,             // Change address
+		keys.Keys,
+		changeAddr,
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
 	}
 
 	response.TxID = tx.ID()
-	response.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
+	response.ChangeAddr, err = service.addrManager.FormatLocalAddress(changeAddr)
 
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.blockBuilder.AddUnverifiedTx(tx),
+		service.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
 	return errs.Err
@@ -1222,13 +1227,13 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	service.vm.ctx.Log.Debug("Platform: CreateSubnet called")
 
 	// Parse the control keys
-	controlKeys, err := avax.ParseServiceAddresses(service.vm, args.ControlKeys)
+	controlKeys, err := avax.ParseServiceAddresses(service.addrManager, args.ControlKeys)
 	if err != nil {
 		return err
 	}
 
 	// Parse the from addresses
-	fromAddrs, err := avax.ParseServiceAddresses(service.vm, args.From)
+	fromAddrs, err := avax.ParseServiceAddresses(service.addrManager, args.From)
 	if err != nil {
 		return err
 	}
@@ -1251,7 +1256,7 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	}
 	changeAddr := privKeys.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
-		changeAddr, err = avax.ParseServiceAddress(service.vm, args.ChangeAddr)
+		changeAddr, err = avax.ParseServiceAddress(service.addrManager, args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
@@ -1262,19 +1267,19 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 		uint32(args.Threshold), // Threshold
 		controlKeys.List(),     // Control Addresses
 		privKeys.Keys,          // Private keys
-		changeAddr,             // Change address
+		changeAddr,
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
 	}
 
 	response.TxID = tx.ID()
-	response.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
+	response.ChangeAddr, err = service.addrManager.FormatLocalAddress(changeAddr)
 
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.blockBuilder.AddUnverifiedTx(tx),
+		service.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
 	return errs.Err
@@ -1306,7 +1311,7 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 	}
 
 	// Get the chainID and parse the to address
-	chainID, to, err := service.vm.ParseAddress(args.To)
+	chainID, to, err := service.addrManager.ParseAddress(args.To)
 	if err != nil {
 		chainID, err = service.vm.ctx.BCLookup.Lookup(args.TargetChain)
 		if err != nil {
@@ -1319,7 +1324,7 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 	}
 
 	// Parse the from addresses
-	fromAddrs, err := avax.ParseServiceAddresses(service.vm, args.From)
+	fromAddrs, err := avax.ParseServiceAddresses(service.addrManager, args.From)
 	if err != nil {
 		return err
 	}
@@ -1342,7 +1347,7 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 	}
 	changeAddr := privKeys.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
-		changeAddr, err = avax.ParseServiceAddress(service.vm, args.ChangeAddr)
+		changeAddr, err = avax.ParseServiceAddress(service.addrManager, args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
@@ -1361,12 +1366,12 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 	}
 
 	response.TxID = tx.ID()
-	response.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
+	response.ChangeAddr, err = service.addrManager.FormatLocalAddress(changeAddr)
 
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.blockBuilder.AddUnverifiedTx(tx),
+		service.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
 	return errs.Err
@@ -1396,13 +1401,13 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 	}
 
 	// Parse the to address
-	to, err := avax.ParseServiceAddress(service.vm, args.To)
+	to, err := avax.ParseServiceAddress(service.addrManager, args.To)
 	if err != nil { // Parse address
 		return fmt.Errorf("couldn't parse argument 'to' to an address: %w", err)
 	}
 
 	// Parse the from addresses
-	fromAddrs, err := avax.ParseServiceAddresses(service.vm, args.From)
+	fromAddrs, err := avax.ParseServiceAddresses(service.addrManager, args.From)
 	if err != nil {
 		return err
 	}
@@ -1425,24 +1430,29 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 	}
 	changeAddr := privKeys.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
-		changeAddr, err = avax.ParseServiceAddress(service.vm, args.ChangeAddr)
+		changeAddr, err = avax.ParseServiceAddress(service.addrManager, args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
 	}
 
-	tx, err := service.vm.txBuilder.NewImportTx(chainID, to, privKeys.Keys, changeAddr)
+	tx, err := service.vm.txBuilder.NewImportTx(
+		chainID,
+		to,
+		privKeys.Keys,
+		changeAddr,
+	)
 	if err != nil {
 		return err
 	}
 
 	response.TxID = tx.ID()
-	response.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
+	response.ChangeAddr, err = service.addrManager.FormatLocalAddress(changeAddr)
 
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.blockBuilder.AddUnverifiedTx(tx),
+		service.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
 	return errs.Err
@@ -1514,7 +1524,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	}
 
 	// Parse the from addresses
-	fromAddrs, err := avax.ParseServiceAddresses(service.vm, args.From)
+	fromAddrs, err := avax.ParseServiceAddresses(service.addrManager, args.From)
 	if err != nil {
 		return err
 	}
@@ -1537,7 +1547,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	}
 	changeAddr := keys.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
 	if args.ChangeAddr != "" {
-		changeAddr, err = avax.ParseServiceAddress(service.vm, args.ChangeAddr)
+		changeAddr, err = avax.ParseServiceAddress(service.addrManager, args.ChangeAddr)
 		if err != nil {
 			return fmt.Errorf("couldn't parse changeAddr: %w", err)
 		}
@@ -1558,12 +1568,12 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	}
 
 	response.TxID = tx.ID()
-	response.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
+	response.ChangeAddr, err = service.addrManager.FormatLocalAddress(changeAddr)
 
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.blockBuilder.AddUnverifiedTx(tx),
+		service.vm.Builder.AddUnverifiedTx(tx),
 		user.Close(),
 	)
 	return errs.Err
@@ -1619,7 +1629,11 @@ func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchain
 		return nil
 	}
 
-	preferred, err := service.chainExists(service.vm.preferred, blockchainID)
+	preferredBlk, err := service.vm.Preferred()
+	if err != nil {
+		return fmt.Errorf("could not retrieve preferred block, err %w", err)
+	}
+	preferred, err := service.chainExists(preferredBlk.ID(), blockchainID)
 	if err != nil {
 		return fmt.Errorf("problem looking up blockchain: %w", err)
 	}
@@ -1632,7 +1646,7 @@ func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchain
 }
 
 func (service *Service) nodeValidates(blockchainID ids.ID) bool {
-	chainTx, _, err := service.vm.internalState.GetTx(blockchainID)
+	chainTx, _, err := service.vm.state.GetTx(blockchainID)
 	if err != nil {
 		return false
 	}
@@ -1651,13 +1665,13 @@ func (service *Service) nodeValidates(blockchainID ids.ID) bool {
 }
 
 func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error) {
-	state, ok := service.vm.stateVersions.GetState(blockID)
+	state, ok := service.vm.manager.GetState(blockID)
 	if !ok {
-		block, err := service.vm.getBlock(blockID)
+		block, err := service.vm.GetBlock(blockID)
 		if err != nil {
 			return false, err
 		}
-		state, ok = service.vm.stateVersions.GetState(block.Parent())
+		state, ok = service.vm.manager.GetState(block.Parent())
 		if !ok {
 			return false, errMissingDecisionBlock
 		}
@@ -1690,7 +1704,7 @@ type ValidatedByResponse struct {
 func (service *Service) ValidatedBy(_ *http.Request, args *ValidatedByArgs, response *ValidatedByResponse) error {
 	service.vm.ctx.Log.Debug("Platform: ValidatedBy called")
 
-	chainTx, _, err := service.vm.internalState.GetTx(args.BlockchainID)
+	chainTx, _, err := service.vm.state.GetTx(args.BlockchainID)
 	if err != nil {
 		return fmt.Errorf(
 			"problem retrieving blockchain %q: %w",
@@ -1721,7 +1735,7 @@ func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response
 	service.vm.ctx.Log.Debug("Platform: Validates called")
 
 	if args.SubnetID != constants.PrimaryNetworkID {
-		subnetTx, _, err := service.vm.internalState.GetTx(args.SubnetID)
+		subnetTx, _, err := service.vm.state.GetTx(args.SubnetID)
 		if err != nil {
 			return fmt.Errorf(
 				"problem retrieving subnet %q: %w",
@@ -1736,7 +1750,7 @@ func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response
 	}
 
 	// Get the chains that exist
-	chains, err := service.vm.internalState.GetChains(args.SubnetID)
+	chains, err := service.vm.state.GetChains(args.SubnetID)
 	if err != nil {
 		return fmt.Errorf("problem retrieving chains for subnet %q: %w", args.SubnetID, err)
 	}
@@ -1773,7 +1787,7 @@ type GetBlockchainsResponse struct {
 func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response *GetBlockchainsResponse) error {
 	service.vm.ctx.Log.Debug("Platform: GetBlockchains called")
 
-	subnets, err := service.vm.internalState.GetSubnets()
+	subnets, err := service.vm.state.GetSubnets()
 	if err != nil {
 		return fmt.Errorf("couldn't retrieve subnets: %w", err)
 	}
@@ -1781,7 +1795,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 	response.Blockchains = []APIBlockchain{}
 	for _, subnet := range subnets {
 		subnetID := subnet.ID()
-		chains, err := service.vm.internalState.GetChains(subnetID)
+		chains, err := service.vm.state.GetChains(subnetID)
 		if err != nil {
 			return fmt.Errorf(
 				"couldn't retrieve chains for subnet %q: %w",
@@ -1805,7 +1819,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 		}
 	}
 
-	chains, err := service.vm.internalState.GetChains(constants.PrimaryNetworkID)
+	chains, err := service.vm.state.GetChains(constants.PrimaryNetworkID)
 	if err != nil {
 		return fmt.Errorf("couldn't retrieve subnets: %w", err)
 	}
@@ -1834,11 +1848,11 @@ func (service *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response
 	if err != nil {
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}
-	tx, err := txs.Parse(Codec, txBytes)
+	tx, err := txs.Parse(txs.Codec, txBytes)
 	if err != nil {
 		return fmt.Errorf("couldn't parse tx: %w", err)
 	}
-	if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
+	if err := service.vm.Builder.AddUnverifiedTx(tx); err != nil {
 		return fmt.Errorf("couldn't issue tx: %w", err)
 	}
 
@@ -1850,7 +1864,7 @@ func (service *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response
 func (service *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *api.GetTxReply) error {
 	service.vm.ctx.Log.Debug("Platform: GetTx called")
 
-	tx, _, err := service.vm.internalState.GetTx(args.TxID)
+	tx, _, err := service.vm.state.GetTx(args.TxID)
 	if err != nil {
 		return fmt.Errorf("couldn't get tx: %w", err)
 	}
@@ -1897,7 +1911,7 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 		zap.Stringer("txID", args.TxID),
 	)
 
-	_, txStatus, err := service.vm.internalState.GetTx(args.TxID)
+	_, txStatus, err := service.vm.state.GetTx(args.TxID)
 	if err == nil { // Found the status. Report it.
 		response.Status = txStatus
 		return nil
@@ -1908,9 +1922,15 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 
 	// The status of this transaction is not in the database - check if the tx
 	// is in the preferred block's db. If so, return that it's processing.
-	onAccept, ok := service.vm.stateVersions.GetState(service.vm.preferred)
+	prefBlk, err := service.vm.Preferred()
+	if err != nil {
+		return err
+	}
+
+	preferredID := prefBlk.ID()
+	onAccept, ok := service.vm.manager.GetState(preferredID)
 	if !ok {
-		return errInvalidBlockType
+		return fmt.Errorf("could not retrieve state for block %s", preferredID)
 	}
 
 	_, _, err = onAccept.GetTx(args.TxID)
@@ -1923,7 +1943,7 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 		return err
 	}
 
-	if service.vm.blockBuilder.Has(args.TxID) {
+	if service.vm.Builder.Has(args.TxID) {
 		// Found the tx in the mempool. Report tx is processing.
 		response.Status = status.Processing
 		return nil
@@ -1931,7 +1951,7 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 
 	// Note: we check if tx is dropped only after having looked for it
 	// in the database and the mempool, because dropped txs may be re-issued.
-	reason, dropped := service.vm.blockBuilder.GetDropReason(args.TxID)
+	reason, dropped := service.vm.Builder.GetDropReason(args.TxID)
 	if !dropped {
 		// The tx isn't being tracked by the node.
 		response.Status = status.Unknown
@@ -2039,12 +2059,12 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 		return fmt.Errorf("%d addresses provided but this method can take at most %d", len(args.Addresses), maxGetStakeAddrs)
 	}
 
-	addrs, err := avax.ParseServiceAddresses(service.vm, args.Addresses)
+	addrs, err := avax.ParseServiceAddresses(service.addrManager, args.Addresses)
 	if err != nil {
 		return err
 	}
 
-	currentStakerIterator, err := service.vm.internalState.GetCurrentStakerIterator()
+	currentStakerIterator, err := service.vm.state.GetCurrentStakerIterator()
 	if err != nil {
 		return err
 	}
@@ -2057,7 +2077,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 	for currentStakerIterator.Next() { // Iterates over current stakers
 		staker := currentStakerIterator.Value()
 
-		tx, _, err := service.vm.internalState.GetTx(staker.TxID)
+		tx, _, err := service.vm.state.GetTx(staker.TxID)
 		if err != nil {
 			return err
 		}
@@ -2073,7 +2093,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 		stakedOuts = append(stakedOuts, outs...)
 	}
 
-	pendingStakerIterator, err := service.vm.internalState.GetPendingStakerIterator()
+	pendingStakerIterator, err := service.vm.state.GetPendingStakerIterator()
 	if err != nil {
 		return err
 	}
@@ -2082,7 +2102,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 	for pendingStakerIterator.Next() { // Iterates over pending stakers
 		staker := pendingStakerIterator.Value()
 
-		tx, _, err := service.vm.internalState.GetTx(staker.TxID)
+		tx, _, err := service.vm.state.GetTx(staker.TxID)
 		if err != nil {
 			return err
 		}
@@ -2101,7 +2121,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 	response.Staked = json.Uint64(totalStake)
 	response.Outputs = make([]string, len(stakedOuts))
 	for i, output := range stakedOuts {
-		bytes, err := Codec.Marshal(txs.Version, output)
+		bytes, err := txs.Codec.Marshal(txs.Version, output)
 		if err != nil {
 			return fmt.Errorf("couldn't serialize output %s: %w", output.ID, err)
 		}
@@ -2180,12 +2200,12 @@ func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmou
 	if startTime.After(endTime) {
 		return errStartAfterEndTime
 	}
-	currentChainTime := service.vm.internalState.GetTimestamp()
-	if startTime.Before(currentChainTime) {
+	now := service.vm.state.GetTimestamp()
+	if startTime.Before(now) {
 		return errStartTimeInThePast
 	}
 
-	staker, err := executor.GetValidator(service.vm.internalState, args.SubnetID, args.NodeID)
+	staker, err := executor.GetValidator(service.vm.state, args.SubnetID, args.NodeID)
 	if err == database.ErrNotFound {
 		return nil
 	}
@@ -2200,7 +2220,7 @@ func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmou
 		return nil
 	}
 
-	maxStakeAmount, err := executor.GetMaxWeight(service.vm.internalState, staker, startTime, endTime)
+	maxStakeAmount, err := executor.GetMaxWeight(service.vm.state, staker, startTime, endTime)
 	reply.Amount = json.Uint64(maxStakeAmount)
 	return err
 }
@@ -2220,7 +2240,7 @@ type GetRewardUTXOsReply struct {
 func (service *Service) GetRewardUTXOs(_ *http.Request, args *api.GetTxArgs, reply *GetRewardUTXOsReply) error {
 	service.vm.ctx.Log.Debug("Platform: GetRewardUTXOs called")
 
-	utxos, err := service.vm.internalState.GetRewardUTXOs(args.TxID)
+	utxos, err := service.vm.state.GetRewardUTXOs(args.TxID)
 	if err != nil {
 		return fmt.Errorf("couldn't get reward UTXOs: %w", err)
 	}
@@ -2228,7 +2248,7 @@ func (service *Service) GetRewardUTXOs(_ *http.Request, args *api.GetTxArgs, rep
 	reply.NumFetched = json.Uint64(len(utxos))
 	reply.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
-		utxoBytes, err := GenesisCodec.Marshal(txs.Version, utxo)
+		utxoBytes, err := blocks.GenesisCodec.Marshal(txs.Version, utxo)
 		if err != nil {
 			return fmt.Errorf("failed to encode UTXO to bytes: %w", err)
 		}
@@ -2253,7 +2273,7 @@ type GetTimestampReply struct {
 func (service *Service) GetTimestamp(_ *http.Request, args *struct{}, reply *GetTimestampReply) error {
 	service.vm.ctx.Log.Debug("Platform: GetTimestamp called")
 
-	reply.Timestamp = service.vm.internalState.GetTimestamp()
+	reply.Timestamp = service.vm.state.GetTimestamp()
 	return nil
 }
 

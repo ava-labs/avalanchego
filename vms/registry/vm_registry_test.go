@@ -8,7 +8,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms"
@@ -55,9 +55,9 @@ func TestReload_Success(t *testing.T) {
 		Return(nil)
 
 	installedVMs, failedVMs, err := resources.vmRegistry.Reload()
-	assert.ElementsMatch(t, []ids.ID{id3, id4}, installedVMs)
-	assert.Empty(t, failedVMs)
-	assert.Nil(t, err)
+	require.ElementsMatch(t, []ids.ID{id3, id4}, installedVMs)
+	require.Empty(t, failedVMs)
+	require.Nil(t, err)
 }
 
 // Tests that we fail if we're not able to get the vms on disk
@@ -68,9 +68,9 @@ func TestReload_GetNewVMsFails(t *testing.T) {
 	resources.mockVMGetter.EXPECT().Get().Times(1).Return(nil, nil, errOops)
 
 	installedVMs, failedVMs, err := resources.vmRegistry.Reload()
-	assert.Nil(t, installedVMs)
-	assert.Empty(t, failedVMs)
-	assert.Equal(t, err, errOops)
+	require.Nil(t, installedVMs)
+	require.Empty(t, failedVMs)
+	require.Equal(t, err, errOops)
 }
 
 // Tests that if we fail to register a VM, we fail.
@@ -108,11 +108,11 @@ func TestReload_PartialRegisterFailure(t *testing.T) {
 
 	installedVMs, failedVMs, err := resources.vmRegistry.Reload()
 
-	assert.Len(t, failedVMs, 1)
-	assert.Equal(t, failedVMs[id3], errOops)
-	assert.Len(t, installedVMs, 1)
-	assert.Equal(t, installedVMs[0], id4)
-	assert.Nil(t, err)
+	require.Len(t, failedVMs, 1)
+	require.Equal(t, failedVMs[id3], errOops)
+	require.Len(t, installedVMs, 1)
+	require.Equal(t, installedVMs[0], id4)
+	require.Nil(t, err)
 }
 
 // Tests the happy case where Reload succeeds.
@@ -149,9 +149,9 @@ func TestReloadWithReadLock_Success(t *testing.T) {
 		Return(nil)
 
 	installedVMs, failedVMs, err := resources.vmRegistry.ReloadWithReadLock()
-	assert.ElementsMatch(t, []ids.ID{id3, id4}, installedVMs)
-	assert.Empty(t, failedVMs)
-	assert.Nil(t, err)
+	require.ElementsMatch(t, []ids.ID{id3, id4}, installedVMs)
+	require.Empty(t, failedVMs)
+	require.Nil(t, err)
 }
 
 // Tests that we fail if we're not able to get the vms on disk
@@ -162,9 +162,9 @@ func TestReloadWithReadLock_GetNewVMsFails(t *testing.T) {
 	resources.mockVMGetter.EXPECT().Get().Times(1).Return(nil, nil, errOops)
 
 	installedVMs, failedVMs, err := resources.vmRegistry.ReloadWithReadLock()
-	assert.Nil(t, installedVMs)
-	assert.Empty(t, failedVMs)
-	assert.Equal(t, err, errOops)
+	require.Nil(t, installedVMs)
+	require.Empty(t, failedVMs)
+	require.Equal(t, err, errOops)
 }
 
 // Tests that if we fail to register a VM, we fail.
@@ -202,11 +202,11 @@ func TestReloadWithReadLock_PartialRegisterFailure(t *testing.T) {
 
 	installedVMs, failedVMs, err := resources.vmRegistry.ReloadWithReadLock()
 
-	assert.Len(t, failedVMs, 1)
-	assert.Equal(t, failedVMs[id3], errOops)
-	assert.Len(t, installedVMs, 1)
-	assert.Equal(t, installedVMs[0], id4)
-	assert.Nil(t, err)
+	require.Len(t, failedVMs, 1)
+	require.Equal(t, failedVMs[id3], errOops)
+	require.Len(t, installedVMs, 1)
+	require.Equal(t, installedVMs[0], id4)
+	require.Nil(t, err)
 }
 
 type registryTestResources struct {

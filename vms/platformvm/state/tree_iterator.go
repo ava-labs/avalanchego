@@ -22,7 +22,7 @@ type treeIterator struct {
 }
 
 // NewTreeIterator returns a new iterator of the stakers in [tree] in ascending
-// order.
+// order. Note that it isn't safe to modify [tree] while iterating over it.
 func NewTreeIterator(tree *btree.BTree) StakerIterator {
 	if tree == nil {
 		return EmptyIterator

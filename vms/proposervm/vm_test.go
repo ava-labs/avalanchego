@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
@@ -1717,7 +1717,7 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 // Ensure that given the chance, built blocks will reference a lagged P-chain
 // height.
 func TestLaggedPChainHeight(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
@@ -1734,19 +1734,19 @@ func TestLaggedPChainHeight(t *testing.T) {
 
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return innerBlock, nil }
 	blockIntf, err := proVM.BuildBlock()
-	assert.NoError(err)
+	require.NoError(err)
 
 	block, ok := blockIntf.(*postForkBlock)
-	assert.True(ok, "expected post fork block")
+	require.True(ok, "expected post fork block")
 
 	pChainHeight := block.PChainHeight()
-	assert.Equal(pChainHeight, coreGenBlk.Height())
+	require.Equal(pChainHeight, coreGenBlk.Height())
 }
 
 // Ensure that rejecting a block does not modify the accepted block ID for the
 // rejected height.
 func TestRejectedHeightNotIndexed(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	coreGenBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1832,16 +1832,16 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	// make sure that DBs are compressed correctly
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
 	err := proVM.Initialize(ctx, dummyDBManager, initialState, nil, nil, nil, nil, nil)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
 	err = proVM.SetState(snow.NormalOp)
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = proVM.SetPreference(coreGenBlk.IDV)
-	assert.NoError(err)
+	require.NoError(err)
 
 	ctx.Lock.Lock()
 	for proVM.VerifyHeightIndex() != nil {
@@ -1865,11 +1865,11 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return xBlock, nil }
 	aBlock, err := proVM.BuildBlock()
-	assert.NoError(err)
+	require.NoError(err)
 
 	coreVM.BuildBlockF = nil
 	err = aBlock.Verify()
-	assert.NoError(err)
+	require.NoError(err)
 
 	// use a different way to construct inner block Y and outer block B
 	yBlock := &snowman.TestBlock{
@@ -1889,7 +1889,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		defaultPChainHeight,
 		yBlock.Bytes(),
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
 	bBlock := postForkBlock{
 		SignedBlock: ySlb,
@@ -1901,30 +1901,30 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	}
 
 	err = bBlock.Verify()
-	assert.NoError(err)
+	require.NoError(err)
 
 	// accept A
 	err = aBlock.Accept()
-	assert.NoError(err)
+	require.NoError(err)
 	coreHeights = append(coreHeights, xBlock.ID())
 
 	blkID, err := proVM.GetBlockIDAtHeight(aBlock.Height())
-	assert.NoError(err)
-	assert.Equal(aBlock.ID(), blkID)
+	require.NoError(err)
+	require.Equal(aBlock.ID(), blkID)
 
 	// reject B
 	err = bBlock.Reject()
-	assert.NoError(err)
+	require.NoError(err)
 
 	blkID, err = proVM.GetBlockIDAtHeight(aBlock.Height())
-	assert.NoError(err)
-	assert.Equal(aBlock.ID(), blkID)
+	require.NoError(err)
+	require.Equal(aBlock.ID(), blkID)
 }
 
 // Ensure that rejecting an option block does not modify the accepted block ID
 // for the rejected height.
 func TestRejectedOptionHeightNotIndexed(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	coreGenBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -2010,16 +2010,16 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	// make sure that DBs are compressed correctly
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
 	err := proVM.Initialize(ctx, dummyDBManager, initialState, nil, nil, nil, nil, nil)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
 	err = proVM.SetState(snow.NormalOp)
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = proVM.SetPreference(coreGenBlk.IDV)
-	assert.NoError(err)
+	require.NoError(err)
 
 	ctx.Lock.Lock()
 	for proVM.VerifyHeightIndex() != nil {
@@ -2064,48 +2064,48 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return xBlock, nil }
 	aBlockIntf, err := proVM.BuildBlock()
-	assert.NoError(err)
+	require.NoError(err)
 
 	aBlock, ok := aBlockIntf.(*postForkBlock)
-	assert.True(ok)
+	require.True(ok)
 
 	opts, err := aBlock.Options()
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = aBlock.Verify()
-	assert.NoError(err)
+	require.NoError(err)
 
 	bBlock := opts[0]
 	err = bBlock.Verify()
-	assert.NoError(err)
+	require.NoError(err)
 
 	cBlock := opts[1]
 	err = cBlock.Verify()
-	assert.NoError(err)
+	require.NoError(err)
 
 	// accept A
 	err = aBlock.Accept()
-	assert.NoError(err)
+	require.NoError(err)
 	coreHeights = append(coreHeights, xBlock.ID())
 
 	blkID, err := proVM.GetBlockIDAtHeight(aBlock.Height())
-	assert.NoError(err)
-	assert.Equal(aBlock.ID(), blkID)
+	require.NoError(err)
+	require.Equal(aBlock.ID(), blkID)
 
 	// accept B
 	err = bBlock.Accept()
-	assert.NoError(err)
+	require.NoError(err)
 	coreHeights = append(coreHeights, xBlock.opts[0].ID())
 
 	blkID, err = proVM.GetBlockIDAtHeight(bBlock.Height())
-	assert.NoError(err)
-	assert.Equal(bBlock.ID(), blkID)
+	require.NoError(err)
+	require.Equal(bBlock.ID(), blkID)
 
 	// reject C
 	err = cBlock.Reject()
-	assert.NoError(err)
+	require.NoError(err)
 
 	blkID, err = proVM.GetBlockIDAtHeight(cBlock.Height())
-	assert.NoError(err)
-	assert.Equal(bBlock.ID(), blkID)
+	require.NoError(err)
+	require.Equal(bBlock.ID(), blkID)
 }

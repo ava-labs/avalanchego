@@ -37,7 +37,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/database/rocksdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/indexer"
@@ -424,19 +423,15 @@ func (n *Node) initDatabase() error {
 		err       error
 	)
 	switch n.Config.DatabaseConfig.Name {
-	case rocksdb.Name:
-		path := filepath.Join(n.Config.DatabaseConfig.Path, rocksdb.Name)
-		dbManager, err = manager.NewRocksDB(path, n.Config.DatabaseConfig.Config, n.Log, version.CurrentDatabase, "db_internal", n.MetricsRegisterer)
 	case leveldb.Name:
 		dbManager, err = manager.NewLevelDB(n.Config.DatabaseConfig.Path, n.Config.DatabaseConfig.Config, n.Log, version.CurrentDatabase, "db_internal", n.MetricsRegisterer)
 	case memdb.Name:
 		dbManager = manager.NewMemDB(version.CurrentDatabase)
 	default:
 		err = fmt.Errorf(
-			"db-type was %q but should have been one of {%s, %s, %s}",
+			"db-type was %q but should have been one of {%s, %s}",
 			n.Config.DatabaseConfig.Name,
 			leveldb.Name,
-			rocksdb.Name,
 			memdb.Name,
 		)
 	}
@@ -553,7 +548,7 @@ func (n *Node) initChains(genesisBytes []byte) {
 		ID:            constants.PlatformChainID,
 		SubnetID:      constants.PrimaryNetworkID,
 		GenesisData:   genesisBytes, // Specifies other chains to create
-		VMAlias:       constants.PlatformVMID.String(),
+		VMID:          constants.PlatformVMID,
 		CustomBeacons: n.beacons,
 	})
 }
@@ -766,7 +761,6 @@ func (n *Node) initVMs() error {
 				MaxStakeDuration:       n.Config.MaxStakeDuration,
 				RewardConfig:           n.Config.RewardConfig,
 				ApricotPhase3Time:      version.GetApricotPhase3Time(n.Config.NetworkID),
-				ApricotPhase4Time:      version.GetApricotPhase4Time(n.Config.NetworkID),
 				ApricotPhase5Time:      version.GetApricotPhase5Time(n.Config.NetworkID),
 				BlueberryTime:          version.GetBlueberryTime(n.Config.NetworkID),
 			},

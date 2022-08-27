@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
 
 func TestMaskedIterator(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	stakers := []*Staker{
 		{
 			TxID:     ids.GenerateTestID(),
@@ -43,10 +43,10 @@ func TestMaskedIterator(t *testing.T) {
 		maskedStakers,
 	)
 
-	assert.True(it.Next())
-	assert.Equal(stakers[1], it.Value())
+	require.True(it.Next())
+	require.Equal(stakers[1], it.Value())
 
-	assert.False(it.Next())
+	require.False(it.Next())
 	it.Release()
-	assert.False(it.Next())
+	require.False(it.Next())
 }

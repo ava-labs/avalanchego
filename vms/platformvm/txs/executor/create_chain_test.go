@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -23,6 +23,7 @@ import (
 // Ensure Execute fails when there are not enough control sigs
 func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	env := newEnvironment()
+	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
@@ -45,7 +46,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	// Remove a signature
 	tx.Creds[0].(*secp256k1fx.Credential).Sigs = tx.Creds[0].(*secp256k1fx.Credential).Sigs[1:]
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env.backend.StateVersions)
+	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,6 +65,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 // Ensure Execute fails when an incorrect control signature is given
 func TestCreateChainTxWrongControlSig(t *testing.T) {
 	env := newEnvironment()
+	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
@@ -97,7 +99,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	}
 	copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env.backend.StateVersions)
+	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,6 +119,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 // its validator set doesn't exist
 func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	env := newEnvironment()
+	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
@@ -138,7 +141,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 
 	tx.Unsigned.(*txs.CreateChainTx).SubnetID = ids.GenerateTestID()
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env.backend.StateVersions)
+	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,6 +160,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 // Ensure valid tx passes semanticVerify
 func TestCreateChainTxValid(t *testing.T) {
 	env := newEnvironment()
+	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
@@ -176,7 +180,7 @@ func TestCreateChainTxValid(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env.backend.StateVersions)
+	stateDiff, err := state.NewDiff(lastAcceptedID, env)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +225,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 
 			env := newEnvironment()
 			env.config.ApricotPhase3Time = ap3Time
@@ -232,10 +236,10 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 				}
 			}()
 			ins, outs, _, signers, err := env.utxosHandler.Spend(preFundedKeys, 0, test.fee, ids.ShortEmpty)
-			assert.NoError(err)
+			require.NoError(err)
 
 			subnetAuth, subnetSigners, err := env.utxosHandler.Authorize(env.state, testSubnet1.ID(), preFundedKeys)
-			assert.NoError(err)
+			require.NoError(err)
 
 			signers = append(signers, subnetSigners)
 
@@ -254,10 +258,10 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			}
 			tx := &txs.Tx{Unsigned: utx}
 			err = tx.Sign(txs.Codec, signers)
-			assert.NoError(err)
+			require.NoError(err)
 
-			stateDiff, err := state.NewDiff(lastAcceptedID, env.backend.StateVersions)
-			assert.NoError(err)
+			stateDiff, err := state.NewDiff(lastAcceptedID, env)
+			require.NoError(err)
 
 			stateDiff.SetTimestamp(test.time)
 
@@ -267,7 +271,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 				Tx:      tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
-			assert.Equal(test.expectsError, err != nil)
+			require.Equal(test.expectsError, err != nil)
 		})
 	}
 }
