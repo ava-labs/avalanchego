@@ -454,9 +454,14 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	//
 	// Blueberry network upgrade allows transforming a permissioned subnet into
 	// a permissionless subnet.
-	currentChainTime := e.State.GetTimestamp()
-	if currentChainTime.Before(e.Config.BlueberryTime) {
-		return errTransformSubnetTxBeforeBlueberry
+	currentTimestamp := e.State.GetTimestamp()
+	if !e.Config.IsBlueberryActivated(currentTimestamp) {
+		return fmt.Errorf(
+			"%w: timestamp (%s) < Blueberry fork time (%s)",
+			errTransformSubnetTxBeforeBlueberry,
+			currentTimestamp,
+			e.Config.BlueberryTime,
+		)
 	}
 
 	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
