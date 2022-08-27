@@ -20,9 +20,10 @@ import (
 var (
 	_ txs.Visitor = &StandardTxExecutor{}
 
-	errEmptyNodeID                      = errors.New("validator nodeID cannot be empty")
-	errIssuedAddStakerTxBeforeBlueberry = errors.New("staker transaction issued before Blueberry")
-	errCustomAssetBeforeBlueberry       = errors.New("custom assets can only be imported after Blueberry")
+	errEmptyNodeID                            = errors.New("validator nodeID cannot be empty")
+	errIssuedAddStakerTxBeforeBlueberry       = errors.New("staker transaction issued before Blueberry")
+	errCustomAssetBeforeBlueberry             = errors.New("custom assets can only be imported after Blueberry")
+	errRemoveSubnetValidatorTxBeforeBlueberry = errors.New("RemoveSubnetValidatorTx issued before Blueberry")
 )
 
 type StandardTxExecutor struct {
@@ -400,6 +401,47 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	newStaker.Priority = state.PrimaryNetworkDelegatorPendingPriority
 
 	e.State.PutPendingDelegator(newStaker)
+	utxo.Consume(e.State, tx.Ins)
+	utxo.Produce(e.State, txID, tx.Outs)
+
+	return nil
+}
+
+// Verifies a [*txs.RemoveSubnetValidatorTx] and, if it passes, executes it on
+// [e.State]. For verification rules, see [removeSubnetValidatorValidation].
+// This transaction will result in [tx.NodeID] being removed as a validator of
+// [tx.SubnetID].
+// Note: [tx.NodeID] may be either a current or pending validator.
+func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
+	currentTimestamp := e.State.GetTimestamp()
+	if !e.Config.IsBlueberryActivated(currentTimestamp) {
+		return fmt.Errorf(
+			"%w: timestamp (%s) < Blueberry fork time (%s)",
+			errRemoveSubnetValidatorTxBeforeBlueberry,
+			currentTimestamp,
+			e.Config.BlueberryTime,
+		)
+	}
+
+	staker, isCurrentValidator, err := removeSubnetValidatorValidation(
+		e.Backend,
+		e.State,
+		e.Tx,
+		tx,
+	)
+	if err != nil {
+		return err
+	}
+
+	if isCurrentValidator {
+		e.State.DeleteCurrentValidator(staker)
+	} else {
+		e.State.DeletePendingValidator(staker)
+	}
+
+	// Invariant: There are no permissioned subnet delegators to remove.
+
+	txID := e.Tx.ID()
 	utxo.Consume(e.State, tx.Ins)
 	utxo.Produce(e.State, txID, tx.Outs)
 

@@ -69,6 +69,16 @@ type Wallet interface {
 		options ...common.Option,
 	) (ids.ID, error)
 
+	// IssueAddSubnetValidatorTx creates, signs, and issues a transaction that
+	// removes a validator of a subnet.
+	//
+	// - [nodeID] is the validator being removed from [subnetID].
+	IssueRemoveSubnetValidatorTx(
+		nodeID ids.NodeID,
+		subnetID ids.ID,
+		options ...common.Option,
+	) (ids.ID, error)
+
 	// IssueAddDelegatorTx creates, signs, and issues a new delegator to a
 	// validator on the primary network.
 	//
@@ -199,6 +209,18 @@ func (w *wallet) IssueAddSubnetValidatorTx(
 	options ...common.Option,
 ) (ids.ID, error) {
 	utx, err := w.builder.NewAddSubnetValidatorTx(vdr, options...)
+	if err != nil {
+		return ids.Empty, err
+	}
+	return w.IssueUnsignedTx(utx, options...)
+}
+
+func (w *wallet) IssueRemoveSubnetValidatorTx(
+	nodeID ids.NodeID,
+	subnetID ids.ID,
+	options ...common.Option,
+) (ids.ID, error) {
+	utx, err := w.builder.NewRemoveSubnetValidatorTx(nodeID, subnetID, options...)
 	if err != nil {
 		return ids.Empty, err
 	}

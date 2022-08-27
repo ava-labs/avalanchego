@@ -17,16 +17,20 @@ import (
 )
 
 var (
-	errWeightTooSmall            = errors.New("weight of this validator is too low")
-	errWeightTooLarge            = errors.New("weight of this validator is too large")
-	errInsufficientDelegationFee = errors.New("staker charges an insufficient delegation fee")
-	errStakeTooShort             = errors.New("staking period is too short")
-	errStakeTooLong              = errors.New("staking period is too long")
-	errFutureStakeTime           = fmt.Errorf("staker is attempting to start staking more than %s ahead of the current chain time", MaxFutureStartTime)
-	errWrongNumberOfCredentials  = errors.New("should have the same number of credentials as inputs")
-	errValidatorSubset           = errors.New("all subnets' staking period must be a subset of the primary network")
-	errStakeOverflow             = errors.New("validator stake exceeds limit")
-	errOverDelegated             = errors.New("validator would be over delegated")
+	errWeightTooSmall                 = errors.New("weight of this validator is too low")
+	errWeightTooLarge                 = errors.New("weight of this validator is too large")
+	errInsufficientDelegationFee      = errors.New("staker charges an insufficient delegation fee")
+	errStakeTooShort                  = errors.New("staking period is too short")
+	errStakeTooLong                   = errors.New("staking period is too long")
+	errFlowCheckFailed                = errors.New("flow check failed")
+	errFutureStakeTime                = fmt.Errorf("staker is attempting to start staking more than %s ahead of the current chain time", MaxFutureStartTime)
+	errWrongNumberOfCredentials       = errors.New("should have the same number of credentials as inputs")
+	errValidatorSubset                = errors.New("all subnets' staking period must be a subset of the primary network")
+	errCantFindSubnet                 = errors.New("couldn't find subnet")
+	errUnauthorizedSubnetModification = errors.New("unauthorized subnet modification")
+	errNotValidator                   = errors.New("isn't a current or pending validator")
+	errStakeOverflow                  = errors.New("validator stake exceeds limit")
+	errOverDelegated                  = errors.New("validator would be over delegated")
 )
 
 // verifyAddValidatorTx carries out the validation for an AddValidatorTx.
@@ -115,7 +119,7 @@ func verifyAddValidatorTx(
 			backend.Ctx.AVAXAssetID: backend.Config.AddStakerTxFee,
 		},
 	); err != nil {
-		return nil, fmt.Errorf("failed verifySpend: %w", err)
+		return nil, fmt.Errorf("%w: %s", errFlowCheckFailed, err)
 	}
 
 	// Make sure the tx doesn't start too far in the future. This is done last
@@ -208,7 +212,8 @@ func verifyAddSubnetValidatorTx(
 	subnetIntf, _, err := chainState.GetTx(tx.Validator.Subnet)
 	if err != nil {
 		return fmt.Errorf(
-			"couldn't find subnet %q: %w",
+			"%w %q: %s",
+			errCantFindSubnet,
 			tx.Validator.Subnet,
 			err,
 		)
@@ -223,7 +228,7 @@ func verifyAddSubnetValidatorTx(
 	}
 
 	if err := backend.Fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
-		return err
+		return fmt.Errorf("%w: %s", errUnauthorizedSubnetModification, err)
 	}
 
 	// Verify the flowcheck
@@ -237,7 +242,7 @@ func verifyAddSubnetValidatorTx(
 			backend.Ctx.AVAXAssetID: backend.Config.TxFee,
 		},
 	); err != nil {
-		return err
+		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
 	}
 
 	// Make sure the tx doesn't start too far in the future. This is done last
@@ -248,6 +253,95 @@ func verifyAddSubnetValidatorTx(
 	}
 
 	return nil
+}
+
+// Returns the representation of [tx.NodeID] validating [tx.Subnet].
+// Returns true if [tx.NodeID] is a current validator of [tx.Subnet].
+// Returns an error if the given tx is invalid.
+// The transaction is valid if:
+// * [tx.NodeID] is a current/pending validator of [tx.Subnet].
+// * [sTx]'s creds authorize it to spend the stated inputs.
+// * [sTx]'s creds authorize it to remove a validator from [tx.Subnet].
+// * The flow checker passes.
+func removeSubnetValidatorValidation(
+	backend *Backend,
+	chainState state.Chain,
+	sTx *txs.Tx,
+	tx *txs.RemoveSubnetValidatorTx,
+) (*state.Staker, bool, error) {
+	// Verify the tx is well-formed
+	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
+		return nil, false, err
+	}
+
+	if len(sTx.Creds) == 0 {
+		// Ensure there is at least one credential for the subnet authorization
+		return nil, false, errWrongNumberOfCredentials
+	}
+
+	isCurrentValidator := true
+	vdr, err := chainState.GetCurrentValidator(tx.Subnet, tx.NodeID)
+	if err == database.ErrNotFound {
+		vdr, err = chainState.GetPendingValidator(tx.Subnet, tx.NodeID)
+		isCurrentValidator = false
+	}
+	if err != nil {
+		// It isn't a current or pending validator.
+		return nil, false, fmt.Errorf(
+			"%s %w of %s: %s",
+			tx.NodeID,
+			errNotValidator,
+			tx.Subnet,
+			err,
+		)
+	}
+
+	if !backend.Bootstrapped.GetValue() {
+		// Not bootstrapped yet -- don't need to do full verification.
+		return vdr, isCurrentValidator, nil
+	}
+
+	baseTxCredsLen := len(sTx.Creds) - 1
+	baseTxCreds := sTx.Creds[:baseTxCredsLen]
+	subnetCred := sTx.Creds[baseTxCredsLen]
+
+	subnetIntf, _, err := chainState.GetTx(tx.Subnet)
+	if err != nil {
+		return nil, false, fmt.Errorf(
+			"%w %q: %s",
+			errCantFindSubnet,
+			tx.Subnet,
+			err,
+		)
+	}
+
+	subnet, ok := subnetIntf.Unsigned.(*txs.CreateSubnetTx)
+	if !ok {
+		return nil, false, fmt.Errorf(
+			"%s is not a subnet",
+			tx.Subnet,
+		)
+	}
+
+	if err := backend.Fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
+		return nil, false, fmt.Errorf("%w: %s", errUnauthorizedSubnetModification, err)
+	}
+
+	// Verify the flowcheck
+	if err := backend.FlowChecker.VerifySpend(
+		tx,
+		chainState,
+		tx.Ins,
+		tx.Outs,
+		baseTxCreds,
+		map[ids.ID]uint64{
+			backend.Ctx.AVAXAssetID: backend.Config.TxFee,
+		},
+	); err != nil {
+		return nil, false, fmt.Errorf("%w: %s", errFlowCheckFailed, err)
+	}
+
+	return vdr, isCurrentValidator, nil
 }
 
 // verifyAddDelegatorTx carries out the validation for an AddDelegatorTx.
@@ -344,7 +438,7 @@ func verifyAddDelegatorTx(
 			backend.Ctx.AVAXAssetID: backend.Config.AddStakerTxFee,
 		},
 	); err != nil {
-		return nil, fmt.Errorf("failed verifySpend: %w", err)
+		return nil, fmt.Errorf("%w: %s", errFlowCheckFailed, err)
 	}
 
 	// Make sure the tx doesn't start too far in the future. This is done last

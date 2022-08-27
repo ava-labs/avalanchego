@@ -84,6 +84,14 @@ type Builder interface {
 		options ...common.Option,
 	) (*txs.AddSubnetValidatorTx, error)
 
+	// NewRemoveSubnetValidatorTx removes [nodeID] from the validator
+	// set [subnetID].
+	NewRemoveSubnetValidatorTx(
+		nodeID ids.NodeID,
+		subnetID ids.ID,
+		options ...common.Option,
+	) (*txs.RemoveSubnetValidatorTx, error)
+
 	// NewAddDelegatorTx creates a new delegator to a validator on the primary
 	// network.
 	//
@@ -284,6 +292,40 @@ func (b *builder) NewAddSubnetValidatorTx(
 			Memo:         ops.Memo(),
 		}},
 		Validator:  *vdr,
+		SubnetAuth: subnetAuth,
+	}, nil
+}
+
+func (b *builder) NewRemoveSubnetValidatorTx(
+	nodeID ids.NodeID,
+	subnetID ids.ID,
+	options ...common.Option,
+) (*txs.RemoveSubnetValidatorTx, error) {
+	toBurn := map[ids.ID]uint64{
+		b.backend.AVAXAssetID(): b.backend.BaseTxFee(),
+	}
+	toStake := map[ids.ID]uint64{}
+	ops := common.NewOptions(options)
+	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	return &txs.RemoveSubnetValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Ins:          inputs,
+			Outs:         outputs,
+			Memo:         ops.Memo(),
+		}},
+		Subnet:     subnetID,
+		NodeID:     nodeID,
 		SubnetAuth: subnetAuth,
 	}, nil
 }

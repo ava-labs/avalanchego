@@ -24,8 +24,7 @@ type txMetrics struct {
 	numExportTxs,
 	numImportTxs,
 	numRewardValidatorTxs,
-	numTransformSubnetTxs,
-	numAddGeneralValidatorTxs prometheus.Counter
+	numRemoveSubnetValidatorTxs prometheus.Counter
 }
 
 func newTxMetrics(
@@ -34,17 +33,16 @@ func newTxMetrics(
 ) (*txMetrics, error) {
 	errs := wrappers.Errs{}
 	m := &txMetrics{
-		numAddDelegatorTxs:        newTxMetric(namespace, "add_delegator", registerer, &errs),
-		numAddSubnetValidatorTxs:  newTxMetric(namespace, "add_subnet_validator", registerer, &errs),
-		numAddValidatorTxs:        newTxMetric(namespace, "add_validator", registerer, &errs),
-		numAdvanceTimeTxs:         newTxMetric(namespace, "advance_time", registerer, &errs),
-		numCreateChainTxs:         newTxMetric(namespace, "create_chain", registerer, &errs),
-		numCreateSubnetTxs:        newTxMetric(namespace, "create_subnet", registerer, &errs),
-		numExportTxs:              newTxMetric(namespace, "export", registerer, &errs),
-		numImportTxs:              newTxMetric(namespace, "import", registerer, &errs),
-		numRewardValidatorTxs:     newTxMetric(namespace, "reward_validator", registerer, &errs),
-		numTransformSubnetTxs:     newTxMetric(namespace, "transform_subnet", registerer, &errs),
-		numAddGeneralValidatorTxs: newTxMetric(namespace, "add_general_validator", registerer, &errs),
+		numAddDelegatorTxs:          newTxMetric(namespace, "add_delegator", registerer, &errs),
+		numAddSubnetValidatorTxs:    newTxMetric(namespace, "add_subnet_validator", registerer, &errs),
+		numAddValidatorTxs:          newTxMetric(namespace, "add_validator", registerer, &errs),
+		numAdvanceTimeTxs:           newTxMetric(namespace, "advance_time", registerer, &errs),
+		numCreateChainTxs:           newTxMetric(namespace, "create_chain", registerer, &errs),
+		numCreateSubnetTxs:          newTxMetric(namespace, "create_subnet", registerer, &errs),
+		numExportTxs:                newTxMetric(namespace, "export", registerer, &errs),
+		numImportTxs:                newTxMetric(namespace, "import", registerer, &errs),
+		numRewardValidatorTxs:       newTxMetric(namespace, "reward_validator", registerer, &errs),
+		numRemoveSubnetValidatorTxs: newTxMetric(namespace, "remove_subnet_validator", registerer, &errs),
 	}
 	return m, errs.Err
 }
@@ -106,5 +104,10 @@ func (m *txMetrics) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
 
 func (m *txMetrics) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	m.numRewardValidatorTxs.Inc()
+	return nil
+}
+
+func (m *txMetrics) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
+	m.numRemoveSubnetValidatorTxs.Inc()
 	return nil
 }

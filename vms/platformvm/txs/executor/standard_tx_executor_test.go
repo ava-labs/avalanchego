@@ -4,20 +4,33 @@
 package executor
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
+
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -1088,5 +1101,375 @@ func TestStandardTxExecutorAddValidator(t *testing.T) {
 		if err == nil {
 			t.Fatal("should have failed because tx fee paying key has no funds")
 		}
+	}
+}
+
+// Returns a RemoveSubnetValidatorTx that passes syntactic verification.
+func newRemoveSubnetValidatorTx(t *testing.T) (*txs.RemoveSubnetValidatorTx, *txs.Tx) {
+	t.Helper()
+
+	creds := []verify.Verifiable{
+		&secp256k1fx.Credential{
+			Sigs: make([][65]byte, 1),
+		},
+		&secp256k1fx.Credential{
+			Sigs: make([][65]byte, 1),
+		},
+	}
+	unsignedTx := &txs.RemoveSubnetValidatorTx{
+		BaseTx: txs.BaseTx{
+			BaseTx: avax.BaseTx{
+				Ins: []*avax.TransferableInput{{
+					UTXOID: avax.UTXOID{
+						TxID: ids.GenerateTestID(),
+					},
+					Asset: avax.Asset{
+						ID: ids.GenerateTestID(),
+					},
+					In: &secp256k1fx.TransferInput{
+						Amt: 1,
+						Input: secp256k1fx.Input{
+							SigIndices: []uint32{0, 1},
+						},
+					},
+				}},
+				Outs: []*avax.TransferableOutput{
+					{
+						Asset: avax.Asset{
+							ID: ids.GenerateTestID(),
+						},
+						Out: &secp256k1fx.TransferOutput{
+							Amt: 1,
+							OutputOwners: secp256k1fx.OutputOwners{
+								Threshold: 1,
+								Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+							},
+						},
+					},
+				},
+				Memo: []byte("hi"),
+			},
+		},
+		Subnet: ids.GenerateTestID(),
+		NodeID: ids.GenerateTestNodeID(),
+		SubnetAuth: &secp256k1fx.Credential{
+			Sigs: make([][65]byte, 1),
+		},
+	}
+	tx := &txs.Tx{
+		Unsigned: unsignedTx,
+		Creds:    creds,
+	}
+	if err := tx.Sign(txs.Codec, nil); err != nil {
+		t.Fatal(err)
+	}
+	return unsignedTx, tx
+}
+
+// mock implementations that can be used in tests
+// for verifying RemoveSubnetValidatorTx.
+type removeSubnetValidatorTxVerifyEnv struct {
+	blueberryTime time.Time
+	fx            *fx.MockFx
+	flowChecker   *utxo.MockVerifier
+	unsignedTx    *txs.RemoveSubnetValidatorTx
+	tx            *txs.Tx
+	state         *state.MockDiff
+	staker        *state.Staker
+}
+
+// Returns mock implementations that can be used in tests
+// for verifying RemoveSubnetValidatorTx.
+func newValidRemoveSubnetValidatorTxVerifyEnv(t *testing.T, ctrl *gomock.Controller) removeSubnetValidatorTxVerifyEnv {
+	t.Helper()
+
+	now := time.Now()
+	mockFx := fx.NewMockFx(ctrl)
+	mockFlowChecker := utxo.NewMockVerifier(ctrl)
+	unsignedTx, tx := newRemoveSubnetValidatorTx(t)
+	mockState := state.NewMockDiff(ctrl)
+	staker := state.NewSubnetStaker(ids.GenerateTestID(), &validator.SubnetValidator{
+		Validator: validator.Validator{
+			NodeID: ids.GenerateTestNodeID(),
+		},
+	})
+	return removeSubnetValidatorTxVerifyEnv{
+		blueberryTime: now,
+		fx:            mockFx,
+		flowChecker:   mockFlowChecker,
+		unsignedTx:    unsignedTx,
+		tx:            tx,
+		state:         mockState,
+		staker:        staker,
+	}
+}
+
+func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
+	type test struct {
+		name        string
+		newExecutor func(*gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor)
+		shouldErr   bool
+		expectedErr error
+	}
+
+	tests := []test{
+		{
+			name: "valid tx",
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+
+				// Set dependency expectations.
+				env.state.EXPECT().GetTimestamp().Return(env.blueberryTime.Add(time.Second)).Times(1)
+				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil).Times(1)
+				subnetOwner := fx.NewMockOwner(ctrl)
+				subnetTx := &txs.Tx{
+					Unsigned: &txs.CreateSubnetTx{
+						Owner: subnetOwner,
+					},
+				}
+				env.state.EXPECT().GetTx(env.unsignedTx.Subnet).Return(subnetTx, status.Committed, nil).Times(1)
+				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
+				env.flowChecker.EXPECT().VerifySpend(
+					env.unsignedTx, env.state, env.unsignedTx.Ins, env.unsignedTx.Outs, env.tx.Creds[:len(env.tx.Creds)-1], gomock.Any(),
+				).Return(nil).Times(1)
+				env.state.EXPECT().DeleteCurrentValidator(env.staker)
+				env.state.EXPECT().DeleteUTXO(gomock.Any()).Times(len(env.unsignedTx.Ins))
+				env.state.EXPECT().AddUTXO(gomock.Any()).Times(len(env.unsignedTx.Outs))
+				e := &StandardTxExecutor{
+					Backend: &Backend{
+						Config: &config.Config{
+							BlueberryTime: env.blueberryTime,
+						},
+						Bootstrapped: &utils.AtomicBool{},
+						Fx:           env.fx,
+						FlowChecker:  env.flowChecker,
+						Ctx:          &snow.Context{},
+					},
+					Tx:    env.tx,
+					State: env.state,
+				}
+				e.Bootstrapped.SetValue(true)
+				return env.unsignedTx, e
+			},
+			shouldErr: false,
+		},
+		{
+			name: "not yet blueberry time",
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+				env.state = state.NewMockDiff(ctrl)
+				env.state.EXPECT().GetTimestamp().Return(env.blueberryTime.Add(-1 * time.Second)).Times(1)
+				e := &StandardTxExecutor{
+					Backend: &Backend{
+						Config: &config.Config{
+							BlueberryTime: env.blueberryTime,
+						},
+						Ctx: &snow.Context{},
+					},
+					State: env.state,
+					Tx:    env.tx,
+				}
+				return env.unsignedTx, e
+			},
+			shouldErr:   true,
+			expectedErr: errRemoveSubnetValidatorTxBeforeBlueberry,
+		},
+		{
+			name: "tx fails syntactic verification",
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+				// Setting the subnet ID to the Primary Network ID makes the tx fail syntactic verification
+				env.tx.Unsigned.(*txs.RemoveSubnetValidatorTx).Subnet = constants.PrimaryNetworkID
+				env.state = state.NewMockDiff(ctrl)
+				env.state.EXPECT().GetTimestamp().Return(env.blueberryTime).Times(1)
+				e := &StandardTxExecutor{
+					Backend: &Backend{
+						Config: &config.Config{
+							BlueberryTime: env.blueberryTime,
+						},
+						Bootstrapped: &utils.AtomicBool{},
+						Fx:           env.fx,
+						FlowChecker:  env.flowChecker,
+						Ctx:          &snow.Context{},
+					},
+					Tx:    env.tx,
+					State: env.state,
+				}
+				e.Bootstrapped.SetValue(true)
+				return env.unsignedTx, e
+			},
+			shouldErr: true,
+		},
+		{
+			name: "tx has no credentials",
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+				// Remove credentials
+				env.tx.Creds = nil
+				env.state = state.NewMockDiff(ctrl)
+				env.state.EXPECT().GetTimestamp().Return(env.blueberryTime).Times(1)
+				e := &StandardTxExecutor{
+					Backend: &Backend{
+						Config: &config.Config{
+							BlueberryTime: env.blueberryTime,
+						},
+						Bootstrapped: &utils.AtomicBool{},
+						Fx:           env.fx,
+						FlowChecker:  env.flowChecker,
+						Ctx:          &snow.Context{},
+					},
+					Tx:    env.tx,
+					State: env.state,
+				}
+				e.Bootstrapped.SetValue(true)
+				return env.unsignedTx, e
+			},
+			shouldErr:   true,
+			expectedErr: errWrongNumberOfCredentials,
+		},
+		{
+			name: "node isn't a validator of the subnet",
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+				env.state = state.NewMockDiff(ctrl)
+				env.state.EXPECT().GetTimestamp().Return(env.blueberryTime).Times(1)
+				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
+				env.state.EXPECT().GetPendingValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
+				e := &StandardTxExecutor{
+					Backend: &Backend{
+						Config: &config.Config{
+							BlueberryTime: env.blueberryTime,
+						},
+						Bootstrapped: &utils.AtomicBool{},
+						Fx:           env.fx,
+						FlowChecker:  env.flowChecker,
+						Ctx:          &snow.Context{},
+					},
+					Tx:    env.tx,
+					State: env.state,
+				}
+				e.Bootstrapped.SetValue(true)
+				return env.unsignedTx, e
+			},
+			shouldErr:   true,
+			expectedErr: errNotValidator,
+		},
+		{
+			name: "can't find subnet",
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+				env.state = state.NewMockDiff(ctrl)
+				env.state.EXPECT().GetTimestamp().Return(env.blueberryTime).Times(1)
+				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
+				env.state.EXPECT().GetTx(env.unsignedTx.Subnet).Return(nil, status.Unknown, database.ErrNotFound)
+				e := &StandardTxExecutor{
+					Backend: &Backend{
+						Config: &config.Config{
+							BlueberryTime: env.blueberryTime,
+						},
+						Bootstrapped: &utils.AtomicBool{},
+						Fx:           env.fx,
+						FlowChecker:  env.flowChecker,
+						Ctx:          &snow.Context{},
+					},
+					Tx:    env.tx,
+					State: env.state,
+				}
+				e.Bootstrapped.SetValue(true)
+				return env.unsignedTx, e
+			},
+			shouldErr:   true,
+			expectedErr: errCantFindSubnet,
+		},
+		{
+			name: "no permission to remove validator",
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+				env.state = state.NewMockDiff(ctrl)
+				env.state.EXPECT().GetTimestamp().Return(env.blueberryTime).Times(1)
+				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
+				subnetOwner := fx.NewMockOwner(ctrl)
+				subnetTx := &txs.Tx{
+					Unsigned: &txs.CreateSubnetTx{
+						Owner: subnetOwner,
+					},
+				}
+				env.state.EXPECT().GetTx(env.unsignedTx.Subnet).Return(subnetTx, status.Committed, nil)
+				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(errors.New(""))
+				e := &StandardTxExecutor{
+					Backend: &Backend{
+						Config: &config.Config{
+							BlueberryTime: env.blueberryTime,
+						},
+						Bootstrapped: &utils.AtomicBool{},
+						Fx:           env.fx,
+						FlowChecker:  env.flowChecker,
+						Ctx:          &snow.Context{},
+					},
+					Tx:    env.tx,
+					State: env.state,
+				}
+				e.Bootstrapped.SetValue(true)
+				return env.unsignedTx, e
+			},
+			shouldErr:   true,
+			expectedErr: errUnauthorizedSubnetModification,
+		},
+		{
+			name: "flow checker failed",
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+				env.state = state.NewMockDiff(ctrl)
+				env.state.EXPECT().GetTimestamp().Return(env.blueberryTime).Times(1)
+				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
+				subnetOwner := fx.NewMockOwner(ctrl)
+				subnetTx := &txs.Tx{
+					Unsigned: &txs.CreateSubnetTx{
+						Owner: subnetOwner,
+					},
+				}
+				env.state.EXPECT().GetTx(env.unsignedTx.Subnet).Return(subnetTx, status.Committed, nil)
+				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil)
+				env.flowChecker.EXPECT().VerifySpend(
+					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
+				).Return(errors.New(""))
+				e := &StandardTxExecutor{
+					Backend: &Backend{
+						Config: &config.Config{
+							BlueberryTime: env.blueberryTime,
+						},
+						Bootstrapped: &utils.AtomicBool{},
+						Fx:           env.fx,
+						FlowChecker:  env.flowChecker,
+						Ctx:          &snow.Context{},
+					},
+					Tx:    env.tx,
+					State: env.state,
+				}
+				e.Bootstrapped.SetValue(true)
+				return env.unsignedTx, e
+			},
+			shouldErr:   true,
+			expectedErr: errFlowCheckFailed,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			unsignedTx, executor := tt.newExecutor(ctrl)
+			err := executor.RemoveSubnetValidatorTx(unsignedTx)
+			if tt.shouldErr {
+				require.Error(err)
+				if tt.expectedErr != nil {
+					require.ErrorIs(err, tt.expectedErr)
+				}
+				return
+			}
+			require.NoError(err)
+		})
 	}
 }
