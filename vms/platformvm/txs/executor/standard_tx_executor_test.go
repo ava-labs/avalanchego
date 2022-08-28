@@ -1301,33 +1301,6 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			shouldErr: true,
 		},
 		{
-			name: "tx has no credentials",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
-				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-				// Remove credentials
-				env.tx.Creds = nil
-				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.blueberryTime).Times(1)
-				e := &StandardTxExecutor{
-					Backend: &Backend{
-						Config: &config.Config{
-							BlueberryTime: env.blueberryTime,
-						},
-						Bootstrapped: &utils.AtomicBool{},
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
-					},
-					Tx:    env.tx,
-					State: env.state,
-				}
-				e.Bootstrapped.SetValue(true)
-				return env.unsignedTx, e
-			},
-			shouldErr:   true,
-			expectedErr: errWrongNumberOfCredentials,
-		},
-		{
 			name: "node isn't a validator of the subnet",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
@@ -1353,6 +1326,34 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			},
 			shouldErr:   true,
 			expectedErr: errNotValidator,
+		},
+		{
+			name: "tx has no credentials",
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+				// Remove credentials
+				env.tx.Creds = nil
+				env.state = state.NewMockDiff(ctrl)
+				env.state.EXPECT().GetTimestamp().Return(env.blueberryTime).Times(1)
+				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
+				e := &StandardTxExecutor{
+					Backend: &Backend{
+						Config: &config.Config{
+							BlueberryTime: env.blueberryTime,
+						},
+						Bootstrapped: &utils.AtomicBool{},
+						Fx:           env.fx,
+						FlowChecker:  env.flowChecker,
+						Ctx:          &snow.Context{},
+					},
+					Tx:    env.tx,
+					State: env.state,
+				}
+				e.Bootstrapped.SetValue(true)
+				return env.unsignedTx, e
+			},
+			shouldErr:   true,
+			expectedErr: errWrongNumberOfCredentials,
 		},
 		{
 			name: "can't find subnet",
