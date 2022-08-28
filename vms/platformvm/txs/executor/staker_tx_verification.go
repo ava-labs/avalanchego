@@ -17,20 +17,17 @@ import (
 )
 
 var (
-	errWeightTooSmall                 = errors.New("weight of this validator is too low")
-	errWeightTooLarge                 = errors.New("weight of this validator is too large")
-	errInsufficientDelegationFee      = errors.New("staker charges an insufficient delegation fee")
-	errStakeTooShort                  = errors.New("staking period is too short")
-	errStakeTooLong                   = errors.New("staking period is too long")
-	errFlowCheckFailed                = errors.New("flow check failed")
-	errFutureStakeTime                = fmt.Errorf("staker is attempting to start staking more than %s ahead of the current chain time", MaxFutureStartTime)
-	errWrongNumberOfCredentials       = errors.New("should have the same number of credentials as inputs")
-	errValidatorSubset                = errors.New("all subnets' staking period must be a subset of the primary network")
-	errCantFindSubnet                 = errors.New("couldn't find subnet")
-	errUnauthorizedSubnetModification = errors.New("unauthorized subnet modification")
-	errNotValidator                   = errors.New("isn't a current or pending validator")
-	errStakeOverflow                  = errors.New("validator stake exceeds limit")
-	errOverDelegated                  = errors.New("validator would be over delegated")
+	errWeightTooSmall            = errors.New("weight of this validator is too low")
+	errWeightTooLarge            = errors.New("weight of this validator is too large")
+	errInsufficientDelegationFee = errors.New("staker charges an insufficient delegation fee")
+	errStakeTooShort             = errors.New("staking period is too short")
+	errStakeTooLong              = errors.New("staking period is too long")
+	errFlowCheckFailed           = errors.New("flow check failed")
+	errFutureStakeTime           = fmt.Errorf("staker is attempting to start staking more than %s ahead of the current chain time", MaxFutureStartTime)
+	errValidatorSubset           = errors.New("all subnets' staking period must be a subset of the primary network")
+	errNotValidator              = errors.New("isn't a current or pending validator")
+	errStakeOverflow             = errors.New("validator stake exceeds limit")
+	errOverDelegated             = errors.New("validator would be over delegated")
 )
 
 // verifyAddValidatorTx carries out the validation for an AddValidatorTx.
@@ -154,10 +151,6 @@ func verifyAddSubnetValidatorTx(
 	case duration > backend.Config.MaxStakeDuration:
 		// Ensure staking length is not too long
 		return errStakeTooLong
-
-	case len(sTx.Creds) == 0:
-		// Ensure there is at least one credential for the subnet authorization
-		return errWrongNumberOfCredentials
 	}
 
 	if !backend.Bootstrapped.GetValue() {
@@ -205,30 +198,9 @@ func verifyAddSubnetValidatorTx(
 		return errValidatorSubset
 	}
 
-	baseTxCredsLen := len(sTx.Creds) - 1
-	baseTxCreds := sTx.Creds[:baseTxCredsLen]
-	subnetCred := sTx.Creds[baseTxCredsLen]
-
-	subnetIntf, _, err := chainState.GetTx(tx.Validator.Subnet)
+	baseTxCreds, err := verifySubnetAuthorization(backend, chainState, sTx, tx.Validator.Subnet, tx.SubnetAuth)
 	if err != nil {
-		return fmt.Errorf(
-			"%w %q: %s",
-			errCantFindSubnet,
-			tx.Validator.Subnet,
-			err,
-		)
-	}
-
-	subnet, ok := subnetIntf.Unsigned.(*txs.CreateSubnetTx)
-	if !ok {
-		return fmt.Errorf(
-			"%s is not a subnet",
-			tx.Validator.Subnet,
-		)
-	}
-
-	if err := backend.Fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
-		return fmt.Errorf("%w: %s", errUnauthorizedSubnetModification, err)
+		return err
 	}
 
 	// Verify the flowcheck
@@ -274,11 +246,6 @@ func removeSubnetValidatorValidation(
 		return nil, false, err
 	}
 
-	if len(sTx.Creds) == 0 {
-		// Ensure there is at least one credential for the subnet authorization
-		return nil, false, errWrongNumberOfCredentials
-	}
-
 	isCurrentValidator := true
 	vdr, err := chainState.GetCurrentValidator(tx.Subnet, tx.NodeID)
 	if err == database.ErrNotFound {
@@ -301,30 +268,9 @@ func removeSubnetValidatorValidation(
 		return vdr, isCurrentValidator, nil
 	}
 
-	baseTxCredsLen := len(sTx.Creds) - 1
-	baseTxCreds := sTx.Creds[:baseTxCredsLen]
-	subnetCred := sTx.Creds[baseTxCredsLen]
-
-	subnetIntf, _, err := chainState.GetTx(tx.Subnet)
+	baseTxCreds, err := verifySubnetAuthorization(backend, chainState, sTx, tx.Subnet, tx.SubnetAuth)
 	if err != nil {
-		return nil, false, fmt.Errorf(
-			"%w %q: %s",
-			errCantFindSubnet,
-			tx.Subnet,
-			err,
-		)
-	}
-
-	subnet, ok := subnetIntf.Unsigned.(*txs.CreateSubnetTx)
-	if !ok {
-		return nil, false, fmt.Errorf(
-			"%s is not a subnet",
-			tx.Subnet,
-		)
-	}
-
-	if err := backend.Fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
-		return nil, false, fmt.Errorf("%w: %s", errUnauthorizedSubnetModification, err)
+		return nil, false, err
 	}
 
 	// Verify the flowcheck
