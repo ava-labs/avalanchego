@@ -22,6 +22,10 @@ var (
 	errUnauthorizedSubnetModification = errors.New("unauthorized subnet modification")
 )
 
+// verifySubnetAuthorization carries out the validation for modifying a subnet.
+// The last credential in [sTx.Creds] is used as the subnet authorization.
+// Returns the remaining tx credentials that should be used to authorize the
+// other operations in the tx.
 func verifySubnetAuthorization(
 	backend *Backend,
 	chainState state.Chain,

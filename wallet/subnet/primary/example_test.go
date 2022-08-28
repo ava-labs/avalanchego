@@ -5,8 +5,7 @@ package primary
 
 import (
 	"context"
-	"fmt"
-	"testing"
+	"log"
 	"time"
 
 	"github.com/ava-labs/avalanchego/genesis"
@@ -20,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func TestWallet(t *testing.T) {
+func ExampleWallet() {
 	ctx := context.Background()
 	kc := secp256k1fx.NewKeychain(genesis.EWOQKey)
 
@@ -29,10 +28,10 @@ func TestWallet(t *testing.T) {
 	walletSyncStartTime := time.Now()
 	wallet, err := NewWalletFromURI(ctx, LocalAPIURI, kc)
 	if err != nil {
-		t.Fatalf("failed to initialize wallet with: %s\n", err)
+		log.Fatalf("failed to initialize wallet with: %s\n", err)
 		return
 	}
-	fmt.Printf("synced wallet in %s\n", time.Since(walletSyncStartTime))
+	log.Printf("synced wallet in %s\n", time.Since(walletSyncStartTime))
 
 	// Get the P-chain and the X-chain wallets
 	pWallet := wallet.P()
@@ -63,10 +62,10 @@ func TestWallet(t *testing.T) {
 		},
 	)
 	if err != nil {
-		t.Fatalf("failed to create new X-chain asset with: %s\n", err)
+		log.Fatalf("failed to create new X-chain asset with: %s\n", err)
 		return
 	}
-	fmt.Printf("created X-chain asset %s in %s\n", createAssetTxID, time.Since(createAssetStartTime))
+	log.Printf("created X-chain asset %s in %s\n", createAssetTxID, time.Since(createAssetStartTime))
 
 	// Send 100 schmeckles to the P-chain.
 	exportStartTime := time.Now()
@@ -85,27 +84,27 @@ func TestWallet(t *testing.T) {
 		},
 	)
 	if err != nil {
-		t.Fatalf("failed to issue X->P export transaction with: %s\n", err)
+		log.Fatalf("failed to issue X->P export transaction with: %s\n", err)
 		return
 	}
-	fmt.Printf("issued X->P export %s in %s\n", exportTxID, time.Since(exportStartTime))
+	log.Printf("issued X->P export %s in %s\n", exportTxID, time.Since(exportStartTime))
 
 	// Import the 100 schmeckles from the X-chain into the P-chain.
 	importStartTime := time.Now()
 	importTxID, err := pWallet.IssueImportTx(xChainID, owner)
 	if err != nil {
-		t.Fatalf("failed to issue X->P import transaction with: %s\n", err)
+		log.Fatalf("failed to issue X->P import transaction with: %s\n", err)
 		return
 	}
-	fmt.Printf("issued X->P import %s in %s\n", importTxID, time.Since(importStartTime))
+	log.Printf("issued X->P import %s in %s\n", importTxID, time.Since(importStartTime))
 
 	createSubnetStartTime := time.Now()
 	createSubnetTxID, err := pWallet.IssueCreateSubnetTx(owner)
 	if err != nil {
-		t.Fatalf("failed to issue create subnet transaction with: %s\n", err)
+		log.Fatalf("failed to issue create subnet transaction with: %s\n", err)
 		return
 	}
-	fmt.Printf("issued create subnet transaction %s in %s\n", createSubnetTxID, time.Since(createSubnetStartTime))
+	log.Printf("issued create subnet transaction %s in %s\n", createSubnetTxID, time.Since(createSubnetStartTime))
 
 	transformSubnetStartTime := time.Now()
 	transformSubnetTxID, err := pWallet.IssueTransformSubnetTx(
@@ -117,10 +116,10 @@ func TestWallet(t *testing.T) {
 		.10*reward.PercentDenominator,
 	)
 	if err != nil {
-		t.Fatalf("failed to issue transform subnet transaction with: %s\n", err)
+		log.Fatalf("failed to issue transform subnet transaction with: %s\n", err)
 		return
 	}
-	fmt.Printf("issued transform subnet transaction %s in %s\n", transformSubnetTxID, time.Since(transformSubnetStartTime))
+	log.Printf("issued transform subnet transaction %s in %s\n", transformSubnetTxID, time.Since(transformSubnetStartTime))
 
 	startTime := time.Now().Add(time.Minute)
 	_, err = pWallet.IssueAddSubnetValidatorTx(&validator.SubnetValidator{
@@ -133,7 +132,7 @@ func TestWallet(t *testing.T) {
 		Subnet: createSubnetTxID,
 	})
 	if err != nil {
-		t.Fatalf("failed to issue add permissioned subnet validator with: %s\n", err)
+		log.Fatalf("failed to issue add permissioned subnet validator with: %s\n", err)
 		return
 	}
 }
