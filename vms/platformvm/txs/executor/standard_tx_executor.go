@@ -443,16 +443,10 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		return err
 	}
 
-	// Make sure this transaction has at least one credential for the subnet
-	// authorization.
-	if len(e.Tx.Creds) == 0 {
-		return errWrongNumberOfCredentials
+	baseTxCreds, err := verifySubnetAuthorization(e.Backend, e.State, e.Tx, tx.Subnet, tx.SubnetAuth)
+	if err != nil {
+		return err
 	}
-
-	// Select the credentials for each purpose
-	baseTxCredsLen := len(e.Tx.Creds) - 1
-	baseTxCreds := e.Tx.Creds[:baseTxCredsLen]
-	subnetCred := e.Tx.Creds[baseTxCredsLen]
 
 	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
 	if err := e.Backend.FlowChecker.VerifySpend(
@@ -466,32 +460,6 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 			tx.AssetID:        totalRewardAmount,
 		},
 	); err != nil {
-		return err
-	}
-
-	_, err := e.State.GetSubnetTransformation(tx.Subnet)
-	if err == nil {
-		return fmt.Errorf("%s is immutable", tx.Subnet)
-	}
-	if err != database.ErrNotFound {
-		return err
-	}
-
-	subnetIntf, _, err := e.State.GetTx(tx.Subnet)
-	if err == database.ErrNotFound {
-		return fmt.Errorf("%s isn't a known subnet", tx.Subnet)
-	}
-	if err != nil {
-		return err
-	}
-
-	subnet, ok := subnetIntf.Unsigned.(*txs.CreateSubnetTx)
-	if !ok {
-		return fmt.Errorf("%s isn't a subnet", tx.Subnet)
-	}
-
-	// Verify that this chain is authorized by the subnet
-	if err := e.Fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
 		return err
 	}
 
