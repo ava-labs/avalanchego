@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -46,16 +45,10 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 		return err
 	}
 
-	// Make sure this transaction has at least one credential for the subnet
-	// authorization.
-	if len(e.Tx.Creds) == 0 {
-		return errWrongNumberOfCredentials
+	baseTxCreds, err := verifySubnetAuthorization(e.Backend, e.State, e.Tx, tx.SubnetID, tx.SubnetAuth)
+	if err != nil {
+		return err
 	}
-
-	// Select the credentials for each purpose
-	baseTxCredsLen := len(e.Tx.Creds) - 1
-	baseTxCreds := e.Tx.Creds[:baseTxCredsLen]
-	subnetCred := e.Tx.Creds[baseTxCredsLen]
 
 	// Verify the flowcheck
 	timestamp := e.State.GetTimestamp()
@@ -70,24 +63,6 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 			e.Ctx.AVAXAssetID: createBlockchainTxFee,
 		},
 	); err != nil {
-		return err
-	}
-
-	subnetIntf, _, err := e.State.GetTx(tx.SubnetID)
-	if err == database.ErrNotFound {
-		return fmt.Errorf("%s isn't a known subnet", tx.SubnetID)
-	}
-	if err != nil {
-		return err
-	}
-
-	subnet, ok := subnetIntf.Unsigned.(*txs.CreateSubnetTx)
-	if !ok {
-		return fmt.Errorf("%s isn't a subnet", tx.SubnetID)
-	}
-
-	// Verify that this chain is authorized by the subnet
-	if err := e.Fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
 		return err
 	}
 
