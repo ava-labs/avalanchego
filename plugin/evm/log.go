@@ -75,6 +75,8 @@ func CorethJSONFormat(alias string) log.Format {
 			if !ok {
 				props[errorKey] = fmt.Sprintf("%+v is not a string key", r.Ctx[i])
 			} else {
+				// The number of arguments is normalized from the geth logger
+				// to ensure that this will not cause an index out of bounds error
 				props[k] = formatJSONValue(r.Ctx[i+1])
 			}
 		}
