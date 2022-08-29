@@ -4,6 +4,8 @@
 package p
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -151,8 +153,16 @@ func (w *walletWithOptions) IssueTransformSubnetTx(
 	assetID ids.ID,
 	initialSupply uint64,
 	maxSupply uint64,
-	maxConsumptionRate uint64,
 	minConsumptionRate uint64,
+	maxConsumptionRate uint64,
+	minValidatorStake uint64,
+	maxValidatorStake uint64,
+	minStakeDuration time.Duration,
+	maxStakeDuration time.Duration,
+	minDelegationFee uint32,
+	minDelegatorStake uint64,
+	maxValidatorWeightFactor byte,
+	uptimeRequirement uint32,
 	options ...common.Option,
 ) (ids.ID, error) {
 	return w.Wallet.IssueTransformSubnetTx(
@@ -160,8 +170,16 @@ func (w *walletWithOptions) IssueTransformSubnetTx(
 		assetID,
 		initialSupply,
 		maxSupply,
-		maxConsumptionRate,
 		minConsumptionRate,
+		maxConsumptionRate,
+		minValidatorStake,
+		maxValidatorStake,
+		minStakeDuration,
+		maxStakeDuration,
+		minDelegationFee,
+		minDelegatorStake,
+		maxValidatorWeightFactor,
+		uptimeRequirement,
 		common.UnionOptions(w.options, options)...,
 	)
 }

@@ -6,6 +6,7 @@ package executor
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
@@ -24,6 +25,7 @@ var (
 	errCustomAssetBeforeBlueberry             = errors.New("custom assets can only be imported after Blueberry")
 	errRemoveSubnetValidatorTxBeforeBlueberry = errors.New("RemoveSubnetValidatorTx issued before Blueberry")
 	errTransformSubnetTxBeforeBlueberry       = errors.New("TransformSubnetTx issued before Blueberry")
+	errMaxStakeDurationTooLarge               = fmt.Errorf("max stake duration must be less than or equal to the global max stake duration")
 )
 
 type StandardTxExecutor struct {
@@ -441,6 +443,12 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 
 	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
 		return err
+	}
+
+	// Note: math.MaxInt32 * time.Second < math.MaxInt64 - so this can never
+	// overflow.
+	if time.Duration(tx.MaxStakeDuration)*time.Second > e.Backend.Config.MaxStakeDuration {
+		return errMaxStakeDurationTooLarge
 	}
 
 	baseTxCreds, err := verifySubnetAuthorization(e.Backend, e.State, e.Tx, tx.Subnet, tx.SubnetAuth)

@@ -4,6 +4,8 @@
 package p
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -22,10 +24,10 @@ type builderWithOptions struct {
 // NewBuilderWithOptions returns a new transaction builder that will use the
 // given options by default.
 //
-// - [builder] is the builder that will be called to perform the underlying
-//   opterations.
-// - [options] will be provided to the builder in addition to the options
-//   provided in the method calls.
+//   - [builder] is the builder that will be called to perform the underlying
+//     opterations.
+//   - [options] will be provided to the builder in addition to the options
+//     provided in the method calls.
 func NewBuilderWithOptions(builder Builder, options ...common.Option) Builder {
 	return &builderWithOptions{
 		Builder: builder,
@@ -156,8 +158,16 @@ func (b *builderWithOptions) NewTransformSubnetTx(
 	assetID ids.ID,
 	initialSupply uint64,
 	maxSupply uint64,
-	maxConsumptionRate uint64,
 	minConsumptionRate uint64,
+	maxConsumptionRate uint64,
+	minValidatorStake uint64,
+	maxValidatorStake uint64,
+	minStakeDuration time.Duration,
+	maxStakeDuration time.Duration,
+	minDelegationFee uint32,
+	minDelegatorStake uint64,
+	maxValidatorWeightFactor byte,
+	uptimeRequirement uint32,
 	options ...common.Option,
 ) (*txs.TransformSubnetTx, error) {
 	return b.Builder.NewTransformSubnetTx(
@@ -165,8 +175,16 @@ func (b *builderWithOptions) NewTransformSubnetTx(
 		assetID,
 		initialSupply,
 		maxSupply,
-		maxConsumptionRate,
 		minConsumptionRate,
+		maxConsumptionRate,
+		minValidatorStake,
+		maxValidatorStake,
+		minStakeDuration,
+		maxStakeDuration,
+		minDelegationFee,
+		minDelegatorStake,
+		maxValidatorWeightFactor,
+		uptimeRequirement,
 		common.UnionOptions(b.options, options)...,
 	)
 }

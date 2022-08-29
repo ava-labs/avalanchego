@@ -112,8 +112,16 @@ func ExampleWallet() {
 		createAssetTxID,
 		50*units.Schmeckle,
 		100*units.Schmeckle,
-		.12*reward.PercentDenominator,
 		.10*reward.PercentDenominator,
+		.12*reward.PercentDenominator,
+		1,
+		100*units.Schmeckle,
+		time.Second,
+		365*24*time.Hour,
+		0,
+		1,
+		5,
+		0,
 	)
 	if err != nil {
 		log.Fatalf("failed to issue transform subnet transaction with: %s\n", err)
