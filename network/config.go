@@ -107,6 +107,8 @@ type Config struct {
 	DialerConfig dialer.Config `json:"dialerConfig"`
 	TLSConfig    *tls.Config   `json:"-"`
 
+	TLSKeyLogFile string `json:"tlsKeyLogFile"`
+
 	Namespace          string            `json:"namespace"`
 	MyNodeID           ids.NodeID        `json:"myNodeID"`
 	MyIPPort           ips.DynamicIPPort `json:"myIP"`
