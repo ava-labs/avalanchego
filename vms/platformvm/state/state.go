@@ -202,9 +202,12 @@ type state struct {
 	currentHeight uint64
 
 	addedBlocks map[ids.ID]stateBlk // map of blockID -> Block
-	// TODO is it ok to use *stateBlk here?
-	blockCache cache.Cacher[ids.ID, *stateBlk] // cache of blockID -> Block, if the entry is nil, it is not in the database
-	blockDB    database.Database
+	// cache of blocks we don't know.
+	// Invariant: If a key is in [unknownBlockCache], it isn't in [blockCache],
+	// and vice versa.
+	unknownBlockCache cache.Cacher[ids.ID, struct{}]
+	blockCache        cache.Cacher[ids.ID, stateBlk] // cache of blockID -> Block
+	blockDB           database.Database
 
 	uptimes        map[ids.NodeID]*uptimeAndReward // nodeID -> uptimes
 	updatedUptimes map[ids.NodeID]struct{}         // nodeID -> nil
@@ -343,10 +346,18 @@ func new(
 	metricsReg prometheus.Registerer,
 	rewards reward.Calculator,
 ) (*state, error) {
-	blockCache, err := metercacher.New[ids.ID, *stateBlk](
+	blockCache, err := metercacher.New[ids.ID, stateBlk](
 		"block_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, *stateBlk]{Size: blockCacheSize},
+		&cache.LRU[ids.ID, stateBlk]{Size: blockCacheSize},
+	)
+	if err != nil {
+		return nil, err
+	}
+	unknownBlockCache, err := metercacher.New[ids.ID, struct{}](
+		"unknown_block_cache",
+		metricsReg,
+		&cache.LRU[ids.ID, struct{}]{Size: blockCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -429,9 +440,10 @@ func new(
 		rewards: rewards,
 		baseDB:  baseDB,
 
-		addedBlocks: make(map[ids.ID]stateBlk),
-		blockCache:  blockCache,
-		blockDB:     prefixdb.New(blockPrefix, baseDB),
+		addedBlocks:       make(map[ids.ID]stateBlk),
+		blockCache:        blockCache,
+		unknownBlockCache: unknownBlockCache,
+		blockDB:           prefixdb.New(blockPrefix, baseDB),
 
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
@@ -622,8 +634,8 @@ func (s *state) AddChain(createChainTxIntf *txs.Tx) {
 }
 
 func (s *state) getChainDB(subnetID ids.ID) linkeddb.LinkedDB {
-	if chainDBIntf, cached := s.chainDBCache.Get(subnetID); cached {
-		return chainDBIntf.(linkeddb.LinkedDB)
+	if chainDB, cached := s.chainDBCache.Get(subnetID); cached {
+		return chainDB
 	}
 	rawChainDB := prefixdb.New(subnetID[:], s.chainDB)
 	chainDB := linkeddb.NewDefault(rawChainDB)
@@ -1283,7 +1295,8 @@ func (s *state) writeBlocks() error {
 		}
 
 		delete(s.addedBlocks, blkID)
-		s.blockCache.Put(blkID, &stBlk)
+		s.blockCache.Put(blkID, stBlk)
+		s.unknownBlockCache.Evict(blkID)
 		if err = s.blockDB.Put(blkID[:], blockBytes); err != nil {
 			return fmt.Errorf("failed to write block %s: %w", blkID, err)
 		}
@@ -1292,20 +1305,19 @@ func (s *state) writeBlocks() error {
 }
 
 func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error) {
-	if blk, exists := s.addedBlocks[blockID]; exists {
+	if blk, ok := s.addedBlocks[blockID]; ok {
 		return blk.Blk, blk.Status, nil
 	}
-	if blkState, cached := s.blockCache.Get(blockID); cached {
-		if blkState == nil {
-			return nil, choices.Processing, database.ErrNotFound // status does not matter here
-		}
-
+	if blkState, ok := s.blockCache.Get(blockID); ok {
 		return blkState.Blk, blkState.Status, nil
+	}
+	if _, ok := s.unknownBlockCache.Get(blockID); ok {
+		return nil, choices.Processing, database.ErrNotFound // status does not matter here
 	}
 
 	blkBytes, err := s.blockDB.Get(blockID[:])
 	if err == database.ErrNotFound {
-		s.blockCache.Put(blockID, nil)
+		s.unknownBlockCache.Put(blockID, struct{}{})
 		return nil, choices.Processing, database.ErrNotFound // status does not matter here
 	} else if err != nil {
 		return nil, choices.Processing, err // status does not matter here
@@ -1322,7 +1334,8 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status,
 		return nil, choices.Processing, err
 	}
 
-	s.blockCache.Put(blockID, &blkState)
+	s.blockCache.Put(blockID, blkState)
+	s.unknownBlockCache.Evict(blockID)
 	return blkState.Blk, blkState.Status, nil
 }
 

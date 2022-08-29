@@ -214,7 +214,7 @@ func (s *utxoState) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, err
 func (s *utxoState) getIndexDB(addr []byte) linkeddb.LinkedDB {
 	addrStr := string(addr)
 	if indexList, exists := s.indexCache.Get(addrStr); exists {
-		return indexList.(linkeddb.LinkedDB)
+		return indexList
 	}
 
 	indexDB := prefixdb.NewNested(addr, s.indexDB)
