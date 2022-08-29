@@ -375,6 +375,13 @@ func (bc *BlockChain) GetFeeConfigAt(parent *types.Header) (commontype.FeeConfig
 	}
 
 	storedFeeConfig := precompile.GetStoredFeeConfig(stateDB)
+	// this should not return an invalid fee config since it's assumed that
+	// StoreFeeConfig returns an error when an invalid fee config is attempted to be stored.
+	// However an external stateDB call can modify the contract state.
+	// This check is added to add a defense in-depth.
+	if err := storedFeeConfig.Verify(); err != nil {
+		return commontype.EmptyFeeConfig, nil, err
+	}
 	lastChangedAt := precompile.GetFeeConfigLastChangedAt(stateDB)
 	cacheable := &cacheableFeeConfig{feeConfig: storedFeeConfig, lastChangedAt: lastChangedAt}
 	// add it to the cache
