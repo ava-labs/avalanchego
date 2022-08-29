@@ -7,6 +7,7 @@ import (
 	"crypto"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -62,6 +63,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
+	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/timer"
@@ -134,6 +136,10 @@ type Node struct {
 	// Net runs the networking stack
 	networkNamespace string
 	Net              network.Network
+
+	// tlsKeyLogWriterCloser is a debug file handle that writes all the TLS
+	// session keys. This value should only be non-nil during debugging.
+	tlsKeyLogWriterCloser io.WriteCloser
 
 	// this node's initial connections to the network
 	beacons validators.Set
@@ -219,7 +225,17 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		return errInvalidTLSKey
 	}
 
-	tlsConfig := peer.TLSConfig(n.Config.StakingTLSCert)
+	if n.Config.NetworkConfig.TLSKeyLogFile != "" {
+		n.tlsKeyLogWriterCloser, err = perms.Create(n.Config.NetworkConfig.TLSKeyLogFile, perms.ReadWrite)
+		if err != nil {
+			return err
+		}
+		n.Log.Warn("TLS key logging is enabled",
+			zap.String("filename", n.Config.NetworkConfig.TLSKeyLogFile),
+		)
+	}
+
+	tlsConfig := peer.TLSConfig(n.Config.StakingTLSCert, n.tlsKeyLogWriterCloser)
 
 	// Configure benchlist
 	n.Config.BenchlistConfig.Validators = n.vdrs
@@ -404,6 +420,16 @@ func (n *Node) Dispatch() error {
 	// If the P2P server isn't running, shut down the node.
 	// If node is already shutting down, this does nothing.
 	n.Shutdown(1)
+
+	if n.tlsKeyLogWriterCloser != nil {
+		err := n.tlsKeyLogWriterCloser.Close()
+		if err != nil {
+			n.Log.Error("closing TLS key log file failed",
+				zap.String("filename", n.Config.NetworkConfig.TLSKeyLogFile),
+				zap.Error(err),
+			)
+		}
+	}
 
 	// Wait until the node is done shutting down before returning
 	n.DoneShuttingDown.Wait()

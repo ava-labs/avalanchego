@@ -28,7 +28,7 @@ func getTLS(t *testing.T, index int) (ids.NodeID, *tls.Certificate, *tls.Config)
 		if err != nil {
 			t.Fatal(err)
 		}
-		tlsConfig := peer.TLSConfig(*cert)
+		tlsConfig := peer.TLSConfig(*cert, nil)
 
 		tlsCerts = append(tlsCerts, cert)
 		tlsConfigs = append(tlsConfigs, tlsConfig)

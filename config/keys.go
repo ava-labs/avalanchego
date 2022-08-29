@@ -95,6 +95,7 @@ const (
 	NetworkRequireValidatorToConnectKey                = "network-require-validator-to-connect"
 	NetworkPeerReadBufferSizeKey                       = "network-peer-read-buffer-size"
 	NetworkPeerWriteBufferSizeKey                      = "network-peer-write-buffer-size"
+	NetworkTLSKeyLogFileKey                            = "network-tls-key-log-file-unsafe"
 	BenchlistFailThresholdKey                          = "benchlist-fail-threshold"
 	BenchlistDurationKey                               = "benchlist-duration"
 	BenchlistMinFailingDurationKey                     = "benchlist-min-failing-duration"
