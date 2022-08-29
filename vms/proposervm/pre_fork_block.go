@@ -170,6 +170,7 @@ func (b *preForkBlock) buildChild() (Block, error) {
 
 		b.vm.ctx.Log.Info("built block",
 			zap.Stringer("blkID", innerBlock.ID()),
+			zap.Uint64("height", innerBlock.Height()),
 			zap.Time("parentTimestamp", parentTimestamp),
 		)
 
@@ -220,6 +221,7 @@ func (b *preForkBlock) buildChild() (Block, error) {
 
 	b.vm.ctx.Log.Info("built block",
 		zap.Stringer("blkID", blk.ID()),
+		zap.Uint64("height", blk.Height()),
 		zap.Time("parentTimestamp", parentTimestamp),
 		zap.Time("blockTimestamp", newTimestamp))
 	return blk, nil
