@@ -383,6 +383,8 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 			ConnectionTimeout: v.GetDuration(OutboundConnectionTimeout),
 		},
 
+		TLSKeyLogFile: v.GetString(NetworkTLSKeyLogFileKey),
+
 		TimeoutConfig: network.TimeoutConfig{
 			PingPongTimeout:      v.GetDuration(NetworkPingTimeoutKey),
 			ReadHandshakeTimeout: v.GetDuration(NetworkReadHandshakeTimeoutKey),
