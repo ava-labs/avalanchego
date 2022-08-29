@@ -51,7 +51,7 @@ type stateSyncClientConfig struct {
 	metadataDB      database.Database
 	acceptedBlockDB database.Database
 	db              *versiondb.Database
-	atomicTrie      AtomicTrie
+	atomicBackend   AtomicBackend
 
 	client syncclient.Client
 
@@ -274,11 +274,14 @@ func (client *stateSyncerClient) syncBlocks(ctx context.Context, fromHash common
 
 func (client *stateSyncerClient) syncAtomicTrie(ctx context.Context) error {
 	log.Info("atomic tx: sync starting", "root", client.syncSummary.AtomicRoot)
-	atomicSyncer := client.atomicTrie.Syncer(client.client, client.syncSummary.AtomicRoot, client.syncSummary.BlockNumber)
+	atomicSyncer, err := client.atomicBackend.Syncer(client.client, client.syncSummary.AtomicRoot, client.syncSummary.BlockNumber)
+	if err != nil {
+		return err
+	}
 	if err := atomicSyncer.Start(ctx); err != nil {
 		return err
 	}
-	err := <-atomicSyncer.Done()
+	err = <-atomicSyncer.Done()
 	log.Info("atomic tx: sync finished", "root", client.syncSummary.AtomicRoot, "err", err)
 	return err
 }
@@ -368,7 +371,7 @@ func (client *stateSyncerClient) finishSync() error {
 	// ApplyToSharedMemory does this, and even if the VM is stopped
 	// (gracefully or ungracefully), since MarkApplyToSharedMemoryCursor
 	// is called, VM will resume ApplyToSharedMemory on Initialize.
-	return client.atomicTrie.ApplyToSharedMemory(block.NumberU64())
+	return client.atomicBackend.ApplyToSharedMemory(block.NumberU64())
 }
 
 // updateVMMarkers updates the following markers in the VM's database
@@ -381,9 +384,10 @@ func (client *stateSyncerClient) updateVMMarkers() error {
 	// Mark the previously last accepted block for the shared memory cursor, so that we will execute shared
 	// memory operations from the previously last accepted block to [vm.syncSummary] when ApplyToSharedMemory
 	// is called.
-	if err := client.atomicTrie.MarkApplyToSharedMemoryCursor(client.lastAcceptedHeight); err != nil {
+	if err := client.atomicBackend.MarkApplyToSharedMemoryCursor(client.lastAcceptedHeight); err != nil {
 		return err
 	}
+	client.atomicBackend.SetLastAccepted(client.syncSummary.BlockHash)
 	if err := client.acceptedBlockDB.Put(lastAcceptedKey, client.syncSummary.BlockHash[:]); err != nil {
 		return err
 	}

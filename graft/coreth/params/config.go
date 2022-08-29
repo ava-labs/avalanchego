@@ -201,7 +201,7 @@ func (c *ChainConfig) String() string {
 	banner += fmt.Sprintf(" - Apricot Phase 3 Timestamp:   %-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.5.0)\n", c.ApricotPhase3BlockTimestamp)
 	banner += fmt.Sprintf(" - Apricot Phase 4 Timestamp:   %-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.6.0)\n", c.ApricotPhase4BlockTimestamp)
 	banner += fmt.Sprintf(" - Apricot Phase 5 Timestamp:   %-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0)\n", c.ApricotPhase5BlockTimestamp)
-	banner += fmt.Sprintf(" - Bluberry Timestamp:          %-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.8.0)\n", c.BlueberryBlockTimestamp)
+	banner += fmt.Sprintf(" - Blueberry Timestamp:          %-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.8.0)\n", c.BlueberryBlockTimestamp)
 	banner += "\n"
 	return banner
 }

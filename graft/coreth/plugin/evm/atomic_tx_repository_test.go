@@ -121,6 +121,8 @@ func verifyTxs(t testing.TB, repo AtomicTxRepository, txMap map[uint64][]*Tx) {
 // verifyOperations creates an iterator over the atomicTrie at [rootHash] and verifies that the all of the operations in the trie in the interval [from, to] are identical to
 // the atomic operations contained in [operationsMap] on the same interval.
 func verifyOperations(t testing.TB, atomicTrie AtomicTrie, codec codec.Manager, rootHash common.Hash, from, to uint64, operationsMap map[uint64]map[ids.ID]*atomic.Requests) {
+	t.Helper()
+
 	// Start the iterator at [from]
 	fromBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(fromBytes, from)
@@ -186,7 +188,7 @@ func verifyOperations(t testing.TB, atomicTrie AtomicTrie, codec codec.Manager, 
 func TestAtomicRepositoryReadWriteSingleTx(t *testing.T) {
 	db := versiondb.New(memdb.New())
 	codec := testTxCodec()
-	repo, err := NewAtomicTxRepository(db, codec, 0)
+	repo, err := NewAtomicTxRepository(db, codec, 0, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,7 +201,7 @@ func TestAtomicRepositoryReadWriteSingleTx(t *testing.T) {
 func TestAtomicRepositoryReadWriteMultipleTxs(t *testing.T) {
 	db := versiondb.New(memdb.New())
 	codec := testTxCodec()
-	repo, err := NewAtomicTxRepository(db, codec, 0)
+	repo, err := NewAtomicTxRepository(db, codec, 0, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,7 +224,7 @@ func TestAtomicRepositoryPreAP5Migration(t *testing.T) {
 
 	// Ensure the atomic repository can correctly migrate the transactions
 	// from the old accepted atomic tx DB to add the height index.
-	repo, err := NewAtomicTxRepository(db, codec, 100)
+	repo, err := NewAtomicTxRepository(db, codec, 100, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,7 +250,7 @@ func TestAtomicRepositoryPostAP5Migration(t *testing.T) {
 
 	// Ensure the atomic repository can correctly migrate the transactions
 	// from the old accepted atomic tx DB to add the height index.
-	repo, err := NewAtomicTxRepository(db, codec, 200)
+	repo, err := NewAtomicTxRepository(db, codec, 200, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -270,7 +272,7 @@ func benchAtomicRepositoryIndex10_000(b *testing.B, maxHeight uint64, txsPerHeig
 	if err := db.Commit(); err != nil {
 		b.Fatal(err)
 	}
-	repo, err := NewAtomicTxRepository(db, codec, maxHeight)
+	repo, err := NewAtomicTxRepository(db, codec, maxHeight, nil, nil, nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -292,15 +294,18 @@ func BenchmarkAtomicRepositoryIndex_10kBlocks_10Tx(b *testing.B) {
 
 func TestRepairAtomicRepositoryForBonusBlockTxs(t *testing.T) {
 	db := versiondb.New(memdb.New())
-	atomicTxRepository, err := NewAtomicTxRepository(db, testTxCodec(), 0)
+	atomicTxRepository, err := NewAtomicTxRepository(db, testTxCodec(), 0, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// check completion flag is not set
-	done, err := atomicTxRepository.IsBonusBlocksRepaired()
+	// check completion flag is set
+	done, err := atomicTxRepository.isBonusBlocksRepaired()
 	assert.NoError(t, err)
-	assert.False(t, done)
+	assert.True(t, done)
+
+	// delete the key so we can simulate an unrepaired repository
+	atomicTxRepository.atomicRepoMetadataDB.Delete(bonusBlocksRepairedKey)
 
 	tx := newTestTx()
 	// write the same tx to 3 heights.
@@ -315,9 +320,7 @@ func TestRepairAtomicRepositoryForBonusBlockTxs(t *testing.T) {
 	assert.Equal(t, bonus2, foundHeight)
 
 	allHeights := []uint64{canonical, bonus1, bonus2}
-	if err := repairAtomicRepositoryForBonusBlockTxs(
-		atomicTxRepository,
-		db,
+	if err := atomicTxRepository.RepairForBonusBlocks(
 		allHeights,
 		func(height uint64) (*Tx, error) {
 			if height == 10 || height == 20 || height == 30 {
@@ -345,7 +348,7 @@ func TestRepairAtomicRepositoryForBonusBlockTxs(t *testing.T) {
 	}
 
 	// check completion flag is set
-	done, err = atomicTxRepository.IsBonusBlocksRepaired()
+	done, err = atomicTxRepository.isBonusBlocksRepaired()
 	assert.NoError(t, err)
 	assert.True(t, done)
 }

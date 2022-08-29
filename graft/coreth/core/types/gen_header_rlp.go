@@ -5,11 +5,9 @@
 
 package types
 
-import (
-	"io"
-
-	"github.com/ethereum/go-ethereum/rlp"
-)
+import "github.com/ethereum/go-ethereum/common"
+import "github.com/ethereum/go-ethereum/rlp"
+import "io"
 
 func (obj *Header) EncodeRLP(_w io.Writer) error {
 	w := rlp.NewEncoderBuffer(_w)
@@ -47,7 +45,8 @@ func (obj *Header) EncodeRLP(_w io.Writer) error {
 	_tmp1 := obj.BaseFee != nil
 	_tmp2 := obj.ExtDataGasUsed != nil
 	_tmp3 := obj.BlockGasCost != nil
-	if _tmp1 || _tmp2 || _tmp3 {
+	_tmp4 := obj.ExtraStateRoot != (common.Hash{})
+	if _tmp1 || _tmp2 || _tmp3 || _tmp4 {
 		if obj.BaseFee == nil {
 			w.Write(rlp.EmptyString)
 		} else {
@@ -57,7 +56,7 @@ func (obj *Header) EncodeRLP(_w io.Writer) error {
 			w.WriteBigInt(obj.BaseFee)
 		}
 	}
-	if _tmp2 || _tmp3 {
+	if _tmp2 || _tmp3 || _tmp4 {
 		if obj.ExtDataGasUsed == nil {
 			w.Write(rlp.EmptyString)
 		} else {
@@ -67,7 +66,7 @@ func (obj *Header) EncodeRLP(_w io.Writer) error {
 			w.WriteBigInt(obj.ExtDataGasUsed)
 		}
 	}
-	if _tmp3 {
+	if _tmp3 || _tmp4 {
 		if obj.BlockGasCost == nil {
 			w.Write(rlp.EmptyString)
 		} else {
@@ -76,6 +75,9 @@ func (obj *Header) EncodeRLP(_w io.Writer) error {
 			}
 			w.WriteBigInt(obj.BlockGasCost)
 		}
+	}
+	if _tmp4 {
+		w.WriteBytes(obj.ExtraStateRoot[:])
 	}
 	w.ListEnd(_tmp0)
 	return w.Flush()

@@ -241,5 +241,16 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 		}
 	}
 
+	if rules.IsBlueberry {
+		// In Blueberry, ExtraStateRoot must not be empty (should contain the root of the atomic trie).
+		if ethHeader.ExtraStateRoot == (common.Hash{}) {
+			return fmt.Errorf("%w: ExtraStateRoot must not be empty", errInvalidExtraStateRoot)
+		}
+	} else {
+		// Before Blueberry, ExtraStateRoot must be empty.
+		if ethHeader.ExtraStateRoot != (common.Hash{}) {
+			return fmt.Errorf("%w: ExtraStateRoot must be empty", errInvalidExtraStateRoot)
+		}
+	}
 	return nil
 }
