@@ -94,7 +94,7 @@ func (ids *Set[T]) Overlaps(big Set[T]) bool {
 }
 
 // Len returns the number of ids in this set
-func (ids Set[T]) Len() int { return len(ids) }
+func (ids Set[_]) Len() int { return len(ids) }
 
 // Remove all the id from this set, if the id isn't in the set, nothing happens
 func (ids *Set[T]) Remove(elts ...T) {
@@ -104,7 +104,7 @@ func (ids *Set[T]) Remove(elts ...T) {
 }
 
 // Clear empties this set
-func (ids *Set[T]) Clear() {
+func (ids *Set[_]) Clear() {
 	if len(*ids) > clearSizeThreshold {
 		*ids = nil
 		return
@@ -160,7 +160,7 @@ func (ids Set[T]) Equals(other Set[T]) bool {
 }
 
 // String returns the string representation of a set
-func (ids Set[T]) String() string {
+func (ids Set[_]) String() string {
 	sb := strings.Builder{}
 	sb.WriteString("{")
 	first := true
@@ -185,7 +185,7 @@ func (ids *Set[T]) Pop() (T, bool) {
 	return *new(T), false //nolint:gocritic
 }
 
-func (ids *Set[T]) MarshalJSON() ([]byte, error) {
+func (ids *Set[_]) MarshalJSON() ([]byte, error) {
 	idsList := ids.List()
 
 	// Sort for determinism
