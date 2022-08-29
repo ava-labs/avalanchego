@@ -110,6 +110,9 @@ type Header struct {
 	// BlockGasCost was added by Apricot Phase 4 and is ignored in legacy
 	// headers.
 	BlockGasCost *big.Int `json:"blockGasCost" rlp:"optional"`
+
+	// ExtraStateRoot root was added by Blueberry and is ignored in legacy headers.
+	ExtraStateRoot common.Hash `json:"extraStateRoot" rlp:"optional"`
 }
 
 // field type overrides for gencodec

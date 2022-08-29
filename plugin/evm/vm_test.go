@@ -1471,7 +1471,8 @@ func TestBonusBlocksTxs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bonusBlocks.Add(blk.ID())
+	// Make [blk] a bonus block.
+	vm.atomicBackend.(*atomicBackend).bonusBlocks = map[uint64]ids.ID{blk.Height(): blk.ID()}
 
 	// Remove the UTXOs from shared memory, so that non-bonus blocks will fail verification
 	if err := vm.ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.XChainID: {RemoveRequests: [][]byte{inputID[:]}}}); err != nil {
@@ -2910,6 +2911,10 @@ func TestReissueAtomicTx(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
+	if err := blkA.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
 	if err := vm.SetPreference(blkA.ID()); err != nil {
 		t.Fatal(err)
 	}
@@ -3778,10 +3783,8 @@ func TestExtraStateChangeAtomicGasLimitExceeded(t *testing.T) {
 }
 
 func TestGetAtomicRepositoryRepairHeights(t *testing.T) {
-	mainnetHeights := getAtomicRepositoryRepairHeights(params.AvalancheMainnetChainID)
+	mainnetHeights := getAtomicRepositoryRepairHeights(bonusBlockMainnetHeights, canonicalBlockMainnetHeights)
 	assert.Len(t, mainnetHeights, 76)
 	sorted := sort.SliceIsSorted(mainnetHeights, func(i, j int) bool { return mainnetHeights[i] < mainnetHeights[j] })
 	assert.True(t, sorted)
-	testnetHeights := getAtomicRepositoryRepairHeights(params.AvalancheFujiChainID)
-	assert.Empty(t, testnetHeights)
 }

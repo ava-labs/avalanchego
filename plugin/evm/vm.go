@@ -13,7 +13,6 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -175,6 +174,7 @@ var (
 	errConflictingAtomicTx            = errors.New("conflicting atomic tx present")
 	errTooManyAtomicTx                = errors.New("too many atomic tx")
 	errMissingAtomicTxs               = errors.New("cannot build a block with non-empty extra data and zero atomic transactions")
+	errInvalidExtraStateRoot          = errors.New("invalid ExtraStateRoot")
 )
 
 var originalStderr *os.File
@@ -249,6 +249,8 @@ type VM struct {
 	atomicTxRepository AtomicTxRepository
 	// [atomicTrie] maintains a merkle forest of [height]=>[atomic txs].
 	atomicTrie AtomicTrie
+	// [atomicBackend] abstracts verification and processing of atomic transactions
+	atomicBackend AtomicBackend
 
 	builder *blockBuilder
 
@@ -464,28 +466,32 @@ func (vm *VM) Initialize(
 	if err := vm.initializeChain(lastAcceptedHash); err != nil {
 		return err
 	}
+	// initialize bonus blocks on mainnet
+	var (
+		bonusBlockHeights     map[uint64]ids.ID
+		canonicalBlockHeights []uint64
+	)
+	if vm.chainID.Cmp(params.AvalancheMainnetChainID) == 0 {
+		bonusBlockHeights = bonusBlockMainnetHeights
+		canonicalBlockHeights = canonicalBlockMainnetHeights
+	}
 
 	// initialize atomic repository
-	vm.atomicTxRepository, err = NewAtomicTxRepository(vm.db, vm.codec, lastAcceptedHeight)
+	vm.atomicTxRepository, err = NewAtomicTxRepository(
+		vm.db, vm.codec, lastAcceptedHeight,
+		bonusBlockHeights, canonicalBlockHeights,
+		vm.getAtomicTxFromPreApricot5BlockByHeight,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create atomic repository: %w", err)
 	}
-	bonusBlockHeights := make(map[uint64]ids.ID)
-	if vm.chainID.Cmp(params.AvalancheMainnetChainID) == 0 {
-		bonusBlockHeights = bonusBlockMainnetHeights
-	}
-	if err := repairAtomicRepositoryForBonusBlockTxs(
-		vm.atomicTxRepository,
-		vm.db,
-		getAtomicRepositoryRepairHeights(vm.chainID),
-		vm.getAtomicTxFromPreApricot5BlockByHeight,
-	); err != nil {
-		return fmt.Errorf("failed to repair atomic repository: %w", err)
-	}
-	vm.atomicTrie, err = NewAtomicTrie(vm.db, vm.ctx.SharedMemory, bonusBlockHeights, vm.atomicTxRepository, vm.codec, lastAcceptedHeight, vm.config.CommitInterval)
+	vm.atomicBackend, err = NewAtomicBackend(
+		vm.db, vm.ctx.SharedMemory, bonusBlockHeights, vm.atomicTxRepository, lastAcceptedHeight, lastAcceptedHash, vm.config.CommitInterval,
+	)
 	if err != nil {
-		return fmt.Errorf("failed to create atomic trie: %w", err)
+		return fmt.Errorf("failed to create atomic backend: %w", err)
 	}
+	vm.atomicTrie = vm.atomicBackend.AtomicTrie()
 
 	go vm.ctx.Log.RecoverAndPanic(vm.startContinuousProfiler)
 
@@ -592,7 +598,7 @@ func (vm *VM) initializeStateSyncClient(lastAcceptedHeight uint64) error {
 		metadataDB:         vm.metadataDB,
 		acceptedBlockDB:    vm.acceptedBlockDB,
 		db:                 vm.db,
-		atomicTrie:         vm.atomicTrie,
+		atomicBackend:      vm.atomicBackend,
 		toEngine:           vm.toEngine,
 	})
 
@@ -769,6 +775,19 @@ func (vm *VM) postBatchOnFinalizeAndAssemble(header *types.Header, state *state.
 		size += txSize
 	}
 
+	// In Blueberry the block header must include the atomic trie root.
+	if rules.IsBlueberry {
+		// Pass common.Hash{} as the current block's hash to the atomic backend, this avoids
+		// pinning changes to the atomic trie in memory, as we are still computing the header
+		// for this block and don't have its hash yet. Here we calculate the root of the atomic
+		// trie to store in the block header.
+		atomicTrieRoot, err := vm.atomicBackend.InsertTxs(common.Hash{}, header.Number.Uint64(), header.ParentHash, batchAtomicTxs)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		header.ExtraStateRoot = atomicTrieRoot
+	}
+
 	// If there is a non-zero number of transactions, marshal them and return the byte slice
 	// for the block's extra data along with the contribution and gas used.
 	if len(batchAtomicTxs) > 0 {
@@ -805,17 +824,41 @@ func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big
 	var (
 		batchContribution *big.Int = big.NewInt(0)
 		batchGasUsed      *big.Int = big.NewInt(0)
-		timestamp                  = new(big.Int).SetUint64(block.Time())
-		isApricotPhase4            = vm.chainConfig.IsApricotPhase4(timestamp)
-		isApricotPhase5            = vm.chainConfig.IsApricotPhase5(timestamp)
+		header                     = block.Header()
+		rules                      = vm.chainConfig.AvalancheRules(header.Number, new(big.Int).SetUint64(header.Time))
 	)
 
-	txs, err := ExtractAtomicTxs(block.ExtData(), isApricotPhase5, vm.codec)
+	txs, err := ExtractAtomicTxs(block.ExtData(), rules.IsApricotPhase5, vm.codec)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// If there are no transactions, we can return early
+	// If [atomicBackend] is nil, the VM is still initializing and is reprocessing accepted blocks.
+	if vm.atomicBackend != nil {
+		if vm.atomicBackend.IsBonus(block.NumberU64(), block.Hash()) {
+			log.Info("skipping atomic tx verification on bonus block", "block", block.Hash())
+		} else {
+			// Verify [txs] do not conflict with themselves or ancestor blocks.
+			if err := vm.verifyTxs(txs, block.ParentHash(), block.BaseFee(), block.NumberU64(), rules); err != nil {
+				return nil, nil, err
+			}
+		}
+		// Update the atomic backend with [txs] from this block.
+		atomicRoot, err := vm.atomicBackend.InsertTxs(block.Hash(), block.NumberU64(), block.ParentHash(), txs)
+		if err != nil {
+			return nil, nil, err
+		}
+		if rules.IsBlueberry {
+			// In Blueberry, the atomic trie root should be in ExtraStateRoot.
+			if header.ExtraStateRoot != atomicRoot {
+				return nil, nil, fmt.Errorf(
+					"%w: (expected %s) (got %s)", errInvalidExtraStateRoot, header.ExtraStateRoot, atomicRoot,
+				)
+			}
+		}
+	}
+
+	// If there are no transactions, we can return early.
 	if len(txs) == 0 {
 		return nil, nil, nil
 	}
@@ -825,8 +868,8 @@ func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big
 			return nil, nil, err
 		}
 		// If ApricotPhase4 is enabled, calculate the block fee contribution
-		if isApricotPhase4 {
-			contribution, gasUsed, err := tx.BlockFeeContribution(isApricotPhase5, vm.ctx.AVAXAssetID, block.BaseFee())
+		if rules.IsApricotPhase4 {
+			contribution, gasUsed, err := tx.BlockFeeContribution(rules.IsApricotPhase5, vm.ctx.AVAXAssetID, block.BaseFee())
 			if err != nil {
 				return nil, nil, err
 			}
@@ -837,7 +880,7 @@ func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big
 
 		// If ApricotPhase5 is enabled, enforce that the atomic gas used does not exceed the
 		// atomic gas limit.
-		if vm.chainConfig.IsApricotPhase5(timestamp) {
+		if rules.IsApricotPhase5 {
 			// Ensure that [tx] does not push [block] above the atomic gas limit.
 			if batchGasUsed.Cmp(params.AtomicGasLimit) == 1 {
 				return nil, nil, fmt.Errorf("atomic gas used (%d) by block (%s), exceeds atomic gas limit (%d)", batchGasUsed, block.Hash().Hex(), params.AtomicGasLimit)
@@ -996,7 +1039,7 @@ func (vm *VM) parseBlock(b []byte) (snowman.Block, error) {
 	}
 	// Performing syntactic verification in ParseBlock allows for
 	// short-circuiting bad blocks before they are processed by the VM.
-	if _, err := block.syntacticVerify(); err != nil {
+	if err := block.syntacticVerify(); err != nil {
 		return nil, fmt.Errorf("syntactic block verification failed: %w", err)
 	}
 	return block, nil
@@ -1320,6 +1363,48 @@ func (vm *VM) verifyTx(tx *Tx, parentHash common.Hash, baseFee *big.Int, state *
 	return tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state)
 }
 
+// verifyTxs verifies that [txs] are valid to be issued into a block with parent block [parentHash]
+// using [rules] as the current rule set.
+func (vm *VM) verifyTxs(txs []*Tx, parentHash common.Hash, baseFee *big.Int, height uint64, rules params.Rules) error {
+	// Ensure that the parent was verified and inserted correctly.
+	if !vm.blockChain.HasBlock(parentHash, height-1) {
+		return errRejectedParent
+	}
+
+	ancestorID := ids.ID(parentHash)
+	// If the ancestor is unknown, then the parent failed verification when
+	// it was called.
+	// If the ancestor is rejected, then this block shouldn't be inserted
+	// into the canonical chain because the parent will be missing.
+	ancestorInf, err := vm.GetBlockInternal(ancestorID)
+	if err != nil {
+		return errRejectedParent
+	}
+	if blkStatus := ancestorInf.Status(); blkStatus == choices.Unknown || blkStatus == choices.Rejected {
+		return errRejectedParent
+	}
+	ancestor, ok := ancestorInf.(*Block)
+	if !ok {
+		return fmt.Errorf("expected parent block %s, to be *Block but is %T", ancestor.ID(), ancestorInf)
+	}
+
+	// Ensure each tx in [txs] doesn't conflict with any other atomic tx in
+	// a processing ancestor block.
+	inputs := &ids.Set{}
+	for _, atomicTx := range txs {
+		utx := atomicTx.UnsignedAtomicTx
+		if err := utx.SemanticVerify(vm, atomicTx, ancestor, baseFee, rules); err != nil {
+			return fmt.Errorf("invalid block due to failed semanatic verify: %w at height %d", err, height)
+		}
+		txInputs := utx.InputUTXOs()
+		if inputs.Overlaps(txInputs) {
+			return errConflictingAtomicInputs
+		}
+		inputs.Union(txInputs)
+	}
+	return nil
+}
+
 // GetAtomicUTXOs returns the utxos that at least one of the provided addresses is
 // referenced in.
 func (vm *VM) GetAtomicUTXOs(
@@ -1588,86 +1673,12 @@ func (vm *VM) estimateBaseFee(ctx context.Context) (*big.Int, error) {
 	return baseFee, nil
 }
 
-func getAtomicRepositoryRepairHeights(chainID *big.Int) []uint64 {
-	if chainID.Cmp(params.AvalancheMainnetChainID) != 0 {
-		return nil
-	}
-	repairHeights := make([]uint64, 0, len(bonusBlockMainnetHeights)+len(canonicalBonusBlocks))
-	for height := range bonusBlockMainnetHeights {
-		repairHeights = append(repairHeights, height)
-	}
-	for _, height := range canonicalBonusBlocks {
-		if _, exists := bonusBlockMainnetHeights[height]; !exists {
-			repairHeights = append(repairHeights, height)
-		}
-	}
-	sort.Slice(repairHeights, func(i, j int) bool { return repairHeights[i] < repairHeights[j] })
-	return repairHeights
-}
-
 func (vm *VM) getAtomicTxFromPreApricot5BlockByHeight(height uint64) (*Tx, error) {
 	blk := vm.blockChain.GetBlockByNumber(height)
 	if blk == nil {
 		return nil, nil
 	}
 	return ExtractAtomicTx(blk.ExtData(), vm.codec)
-}
-
-// repairAtomicRepositoryForBonusBlockTxs ensures that atomic txs that were processed
-// on more than one block (canonical block + a number of bonus blocks) are indexed to
-// the first height they were processed on (canonical block).
-// [sortedHeights] should include all canonical block + bonus block heights in ascending
-// order, and will only be passed as non-empty on mainnet.
-func repairAtomicRepositoryForBonusBlockTxs(
-	atomicTxRepository AtomicTxRepository, db *versiondb.Database,
-	sortedHeights []uint64, getAtomicTxFromBlockByHeight func(height uint64) (*Tx, error),
-) error {
-	done, err := atomicTxRepository.IsBonusBlocksRepaired()
-	if err != nil {
-		return err
-	}
-	if done {
-		return nil
-	}
-	repairedEntries := uint64(0)
-	seenTxs := make(map[ids.ID][]uint64)
-	for _, height := range sortedHeights {
-		// get atomic tx from block
-		tx, err := getAtomicTxFromBlockByHeight(height)
-		if err != nil {
-			return err
-		}
-		if tx == nil {
-			continue
-		}
-
-		// get the tx by txID and update it, the first time we encounter
-		// a given [txID], overwrite the previous [txID] => [height]
-		// mapping. This provides a canonical mapping across nodes.
-		heights, seen := seenTxs[tx.ID()]
-		_, foundHeight, err := atomicTxRepository.GetByTxID(tx.ID())
-		if err != nil && !errors.Is(err, database.ErrNotFound) {
-			return err
-		}
-		if !seen {
-			if err := atomicTxRepository.Write(height, []*Tx{tx}); err != nil {
-				return err
-			}
-		} else {
-			if err := atomicTxRepository.WriteBonus(height, []*Tx{tx}); err != nil {
-				return err
-			}
-		}
-		if foundHeight != height && !seen {
-			repairedEntries++
-		}
-		seenTxs[tx.ID()] = append(heights, height)
-	}
-	if err := atomicTxRepository.MarkBonusBlocksRepaired(repairedEntries); err != nil {
-		return err
-	}
-	log.Info("repairAtomicRepositoryForBonusBlockTxs complete", "repairedEntries", repairedEntries)
-	return db.Commit()
 }
 
 // readLastAccepted reads the last accepted hash from [acceptedBlockDB] and returns the

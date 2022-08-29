@@ -24,7 +24,7 @@ func TestIteratorCanIterate(t *testing.T) {
 	lastAcceptedHeight := uint64(1000)
 	db := versiondb.New(memdb.New())
 	codec := testTxCodec()
-	repo, err := NewAtomicTxRepository(db, codec, lastAcceptedHeight)
+	repo, err := NewAtomicTxRepository(db, codec, lastAcceptedHeight, nil, nil, nil)
 	assert.NoError(t, err)
 
 	// create state with multiple transactions
@@ -35,8 +35,9 @@ func TestIteratorCanIterate(t *testing.T) {
 
 	// create an atomic trie
 	// on create it will initialize all the transactions from the above atomic repository
-	atomicTrie1, err := newAtomicTrie(db, testSharedMemory(), nil, repo, codec, lastAcceptedHeight, 100)
+	atomicBackend, err := NewAtomicBackend(db, testSharedMemory(), nil, repo, lastAcceptedHeight, common.Hash{}, 100)
 	assert.NoError(t, err)
+	atomicTrie1 := atomicBackend.AtomicTrie()
 
 	lastCommittedHash1, lastCommittedHeight1 := atomicTrie1.LastCommitted()
 	assert.NoError(t, err)
@@ -47,8 +48,9 @@ func TestIteratorCanIterate(t *testing.T) {
 
 	// iterate on a new atomic trie to make sure there is no resident state affecting the data and the
 	// iterator
-	atomicTrie2, err := newAtomicTrie(db, testSharedMemory(), nil, repo, codec, lastAcceptedHeight, 100)
+	atomicBackend2, err := NewAtomicBackend(db, testSharedMemory(), nil, repo, lastAcceptedHeight, common.Hash{}, 100)
 	assert.NoError(t, err)
+	atomicTrie2 := atomicBackend2.AtomicTrie()
 	lastCommittedHash2, lastCommittedHeight2 := atomicTrie2.LastCommitted()
 	assert.NoError(t, err)
 	assert.NotEqual(t, common.Hash{}, lastCommittedHash2)
@@ -61,7 +63,7 @@ func TestIteratorHandlesInvalidData(t *testing.T) {
 	lastAcceptedHeight := uint64(1000)
 	db := versiondb.New(memdb.New())
 	codec := testTxCodec()
-	repo, err := NewAtomicTxRepository(db, codec, lastAcceptedHeight)
+	repo, err := NewAtomicTxRepository(db, codec, lastAcceptedHeight, nil, nil, nil)
 	assert.NoError(t, err)
 
 	// create state with multiple transactions
@@ -72,8 +74,9 @@ func TestIteratorHandlesInvalidData(t *testing.T) {
 
 	// create an atomic trie
 	// on create it will initialize all the transactions from the above atomic repository
-	atomicTrie, err := newAtomicTrie(db, testSharedMemory(), nil, repo, codec, lastAcceptedHeight, 100)
+	atomicBackend, err := NewAtomicBackend(db, testSharedMemory(), nil, repo, lastAcceptedHeight, common.Hash{}, 100)
 	assert.NoError(t, err)
+	atomicTrie := atomicBackend.AtomicTrie().(*atomicTrie)
 
 	lastCommittedHash, lastCommittedHeight := atomicTrie.LastCommitted()
 	assert.NoError(t, err)
@@ -84,8 +87,18 @@ func TestIteratorHandlesInvalidData(t *testing.T) {
 
 	// Add a random key-value pair to the atomic trie in order to test that the iterator correctly
 	// handles an error when it runs into an unexpected key-value pair in the trie.
-	assert.NoError(t, atomicTrie.trie.TryUpdate(utils.RandomBytes(50), utils.RandomBytes(50)))
-	assert.NoError(t, atomicTrie.commit(lastCommittedHeight+1))
+	atomicTrieSnapshot, err := atomicTrie.OpenTrie(lastCommittedHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.NoError(t, atomicTrieSnapshot.TryUpdate(utils.RandomBytes(50), utils.RandomBytes(50)))
+
+	nextRoot, _, err := atomicTrieSnapshot.Commit(nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.NoError(t, atomicTrie.commit(lastCommittedHeight+1, nextRoot))
 	corruptedHash, _ := atomicTrie.LastCommitted()
 	iter, err := atomicTrie.Iterator(corruptedHash, nil)
 	assert.NoError(t, err)
