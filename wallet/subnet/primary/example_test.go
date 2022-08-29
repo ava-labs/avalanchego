@@ -129,8 +129,10 @@ func ExampleWallet() {
 	}
 	log.Printf("issued transform subnet transaction %s in %s\n", transformSubnetTxID, time.Since(transformSubnetStartTime))
 
+	// This is currently expected to fail because there is no support for
+	// permissionless validator addition yet.
 	startTime := time.Now().Add(time.Minute)
-	_, err = pWallet.IssueAddSubnetValidatorTx(&validator.SubnetValidator{
+	addSubnetValidatorTxID, err := pWallet.IssueAddSubnetValidatorTx(&validator.SubnetValidator{
 		Validator: validator.Validator{
 			NodeID: genesis.LocalConfig.InitialStakers[0].NodeID,
 			Start:  uint64(startTime.Unix()),
@@ -140,7 +142,8 @@ func ExampleWallet() {
 		Subnet: createSubnetTxID,
 	})
 	if err != nil {
-		log.Fatalf("failed to issue add permissioned subnet validator with: %s\n", err)
+		log.Fatalf("failed to issue add subnet validator with: %s\n", err)
 		return
 	}
+	log.Printf("issued add subnet validator transaction %s in %s\n", addSubnetValidatorTxID, time.Since(transformSubnetStartTime))
 }
