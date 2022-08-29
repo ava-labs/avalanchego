@@ -33,15 +33,15 @@ type diff struct {
 
 	timestamp time.Time
 
-	currentSupply  uint64
-        // Subnet ID --> supply of native asset of the subnet 
+	currentSupply uint64
+	// Subnet ID --> supply of native asset of the subnet
 	subnetSupplies map[ids.ID]uint64
 
 	currentStakerDiffs diffStakers
 	pendingStakerDiffs diffStakers
 
-	addedSubnets       []*txs.Tx
-        // Subnet ID --> Tx that transforms the subnet
+	addedSubnets []*txs.Tx
+	// Subnet ID --> Tx that transforms the subnet
 	transformedSubnets map[ids.ID]*txs.Tx
 	cachedSubnets      []*txs.Tx
 
