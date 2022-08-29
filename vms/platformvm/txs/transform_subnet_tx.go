@@ -22,11 +22,13 @@ var (
 	errCantTransformPrimaryNetwork       = errors.New("cannot transform primary network")
 	errEmptyAssetID                      = errors.New("empty asset ID is not valid")
 	errAssetIDCantBeAVAX                 = errors.New("asset ID can't be AVAX")
+	errInitialSupplyZero                 = errors.New("initial supply must be non-0")
 	errInitialSupplyGreaterThanMaxSupply = errors.New("initial supply can't be greater than maximum supply")
 	errMinConsumptionRateTooLarge        = errors.New("min consumption rate must be less than or equal to max consumption rate")
 	errMaxConsumptionRateTooLarge        = fmt.Errorf("max consumption rate must be less than or equal to %d", reward.PercentDenominator)
 	errMinValidatorStakeZero             = errors.New("min validator stake must be non-0")
-	errMinValidatorStakeTooLarge         = errors.New("min validator stake must be less than or equal to max validator stake")
+	errMinValidatorStakeAboveSupply      = errors.New("min validator stake must be less than or equal to initial supply")
+	errMinValidatorStakeAboveMax         = errors.New("min validator stake must be less than or equal to max validator stake")
 	errMaxValidatorStakeTooLarge         = errors.New("max validator stake must be less than or equal to max supply")
 	errMinStakeDurationZero              = errors.New("min stake duration must be non-0")
 	errMinStakeDurationTooLarge          = errors.New("min stake duration must be less than or equal to max stake duration")
@@ -45,6 +47,8 @@ type TransformSubnetTx struct {
 	// Asset to use when staking on the Subnet
 	AssetID ids.ID `serialize:"true" json:"assetID"`
 	// Amount to initially specify as the current supply
+	// Restrictions:
+	// - Must be > 0
 	InitialSupply uint64 `serialize:"true" json:"initialSupply"`
 	// Amount to specify as the maximum token supply
 	// Restrictions:
@@ -63,6 +67,7 @@ type TransformSubnetTx struct {
 	// validator.
 	// Restrictions:
 	// - Must be > 0
+	// - Must be <= [InitialSupply]
 	MinValidatorStake uint64 `serialize:"true" json:"minValidatorStake"`
 	// MaxValidatorStake is the maximum amount of funds a single validator can
 	// be allocated, including delegated funds.
@@ -116,6 +121,8 @@ func (tx *TransformSubnetTx) SyntacticVerify(ctx *snow.Context) error {
 		return errEmptyAssetID
 	case tx.AssetID == ctx.AVAXAssetID:
 		return errAssetIDCantBeAVAX
+	case tx.InitialSupply == 0:
+		return errInitialSupplyZero
 	case tx.InitialSupply > tx.MaximumSupply:
 		return errInitialSupplyGreaterThanMaxSupply
 	case tx.MinConsumptionRate > tx.MaxConsumptionRate:
@@ -124,8 +131,10 @@ func (tx *TransformSubnetTx) SyntacticVerify(ctx *snow.Context) error {
 		return errMaxConsumptionRateTooLarge
 	case tx.MinValidatorStake == 0:
 		return errMinValidatorStakeZero
+	case tx.MinValidatorStake > tx.InitialSupply:
+		return errMinValidatorStakeAboveSupply
 	case tx.MinValidatorStake > tx.MaxValidatorStake:
-		return errMinValidatorStakeTooLarge
+		return errMinValidatorStakeAboveMax
 	case tx.MaxValidatorStake > tx.MaximumSupply:
 		return errMaxValidatorStakeTooLarge
 	case tx.MinStakeDuration == 0:
