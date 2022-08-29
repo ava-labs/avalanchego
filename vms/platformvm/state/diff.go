@@ -34,12 +34,14 @@ type diff struct {
 	timestamp time.Time
 
 	currentSupply  uint64
+        // Subnet ID --> supply of native asset of the subnet 
 	subnetSupplies map[ids.ID]uint64
 
 	currentStakerDiffs diffStakers
 	pendingStakerDiffs diffStakers
 
 	addedSubnets       []*txs.Tx
+        // Subnet ID --> Tx that transforms the subnet
 	transformedSubnets map[ids.ID]*txs.Tx
 	cachedSubnets      []*txs.Tx
 
@@ -102,7 +104,7 @@ func (d *diff) GetCurrentSubnetSupply(subnetID ids.ID) (uint64, error) {
 	// If the subnet supply wasn't modified in this diff, ask the parent state.
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return 0, ErrMissingParentState
+		return 0, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 	return parentState.GetCurrentSubnetSupply(subnetID)
 }
