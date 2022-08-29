@@ -43,8 +43,13 @@ type TransformSubnetTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// ID of the Subnet to transform
+	// Restrictions:
+	// - Must not be the Primary Network ID
 	Subnet ids.ID `serialize:"true" json:"subnetID"`
 	// Asset to use when staking on the Subnet
+	// Restrictions:
+	// - Must not be the Empty ID
+	// - Must not be the AVAX ID
 	AssetID ids.ID `serialize:"true" json:"assetID"`
 	// Amount to initially specify as the current supply
 	// Restrictions:
