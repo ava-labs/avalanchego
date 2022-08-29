@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
@@ -20,8 +21,8 @@ import (
 
 var (
 	// TODO can we do type assertions with generics?
-	// _ cache.Evictable  = &uniqueVertex{}
-	_ avalanche.Vertex = &uniqueVertex{}
+	_ cache.Evictable[ids.ID] = &uniqueVertex{}
+	_ avalanche.Vertex        = &uniqueVertex{}
 )
 
 // uniqueVertex acts as a cache for vertices in the database.

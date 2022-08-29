@@ -10,8 +10,7 @@ import (
 
 const minCacheSize = 32
 
-// TODO can we do a type assertion with generics?
-// var _ Cacher = &LRU{}
+var _ Cacher[struct{}, struct{}] = &LRU[struct{}, struct{}]{}
 
 type entry[T comparable, K any] struct {
 	Key   T

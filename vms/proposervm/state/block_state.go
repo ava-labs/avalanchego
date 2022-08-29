@@ -67,7 +67,6 @@ func NewMeteredBlockState(db database.Database, namespace string, metrics promet
 	}, err
 }
 
-// TODO make sure this is right
 func (s *blockState) GetBlock(blkID ids.ID) (block.Block, choices.Status, error) {
 	if blk, found := s.blkCache.Get(blkID); found {
 		if blk == nil {

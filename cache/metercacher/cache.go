@@ -10,8 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
-// TODO can we do type assertions?
-// var _ cache.Cacher = &Cache{}
+var _ cache.Cacher[struct{}, struct{}] = &Cache[struct{}, struct{}]{}
 
 type Cache[T comparable, K any] struct {
 	metrics

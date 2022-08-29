@@ -8,8 +8,15 @@ import (
 	"sync"
 )
 
-// TODO can we do type assertions?
-// var _ Deduplicator = &EvictableLRU{}
+var _ Deduplicator[struct{}, testEvictable] = &EvictableLRU[struct{}, testEvictable]{}
+
+// Only used for the type assertion above
+type testEvictable struct{}
+
+func (testEvictable) Key() struct{} {
+	return struct{}{}
+}
+func (testEvictable) Evict() {}
 
 // EvictableLRU is an LRU cache that notifies the objects when they are evicted.
 type EvictableLRU[T comparable, K Evictable[T]] struct {
