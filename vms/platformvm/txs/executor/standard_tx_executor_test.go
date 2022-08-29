@@ -34,7 +34,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-// This tests that the math performed during TransformSubnetTx execution
+// This tests that the math performed during TransformSubnetTx execution can
+// never overflow
 const _ time.Duration = math.MaxUint32 * time.Second
 
 func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
