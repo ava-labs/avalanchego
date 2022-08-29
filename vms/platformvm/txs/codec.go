@@ -67,6 +67,8 @@ func RegisterUnsignedTxsTypes(targetCodec codec.Registry) error {
 
 		targetCodec.RegisterType(&stakeable.LockIn{}),
 		targetCodec.RegisterType(&stakeable.LockOut{}),
+
+		targetCodec.RegisterType(&RemoveSubnetValidatorTx{}),
 	)
 	return errs.Err
 }

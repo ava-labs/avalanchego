@@ -10,15 +10,15 @@ Apricot allows the following block types with the following content:
 
 * *Standard Blocks* may contain multiple transactions of the following types:
   * CreateChainTx
-  * CreateSubnetTx,
-  * ImportTx,
-  * ExportTx.
+  * CreateSubnetTx
+  * ImportTx
+  * ExportTx
 * *Proposal Blocks* may contain a single transaction of the following types:
-  * AddValidatorTx,
-  * AddDelegatorTx,
-  * AddSubnetValidatorTx,
-  * RewardValidatorTx,
-  * AdvanceTimeTx.
+  * AddValidatorTx
+  * AddDelegatorTx
+  * AddSubnetValidatorTx
+  * RewardValidatorTx
+  * AdvanceTimeTx
 * *Options blocks*, i.e. *Commit Block* and *Abort Block* do not contain any transactions.
 
 Note that *Atomic blocks* are deprecated as of Apricot phase 5 fork. They used to contain ImportTx and ExportTx which are now included into Standard Blocks.
@@ -61,14 +61,15 @@ Blueberry allows the following block types with the following content:
 
 * *Standard Blocks* may contain multiple transactions of the following types:
   * CreateChainTx
-  * CreateSubnetTx,
-  * ImportTx,
-  * ExportTx,
-  * AddValidatorTx,
-  * AddDelegatorTx,
-  * AddSubnetValidatorTx.
+  * CreateSubnetTx
+  * ImportTx
+  * ExportTx
+  * AddValidatorTx
+  * AddDelegatorTx
+  * AddSubnetValidatorTx
+  * RemoveSubnetValidatorTx
 * *Proposal Blocks* may contain a single transaction of the following types:
-  * RewardValidatorTx,
+  * RewardValidatorTx
 * *Options blocks*, i.e. *Commit Block* and *Abort Block* do not contain any transactions.
   
 Note that each block has an header containing:

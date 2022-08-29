@@ -4,9 +4,11 @@
 package txs
 
 import (
+	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -16,6 +18,8 @@ var (
 	_ UnsignedTx             = &AddSubnetValidatorTx{}
 	_ StakerTx               = &AddSubnetValidatorTx{}
 	_ secp256k1fx.UnsignedTx = &AddSubnetValidatorTx{}
+
+	errAddPrimaryNetworkValidator = errors.New("can't add primary network validator with AddSubnetValidatorTx")
 )
 
 // AddSubnetValidatorTx is an unsigned addSubnetValidatorTx
@@ -50,6 +54,8 @@ func (tx *AddSubnetValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 		return ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
+	case tx.Validator.Subnet == constants.PrimaryNetworkID:
+		return errAddPrimaryNetworkValidator
 	}
 
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {

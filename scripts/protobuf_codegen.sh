@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # any version changes here should also be bumped in Dockerfile.buf
-BUF_VERSION='1.5.0'
+BUF_VERSION='1.7.0'
 PROTOC_GEN_GO_VERSION='v1.28.0'
 PROTOC_GEN_GO_GRPC_VERSION='1.2.0'
 

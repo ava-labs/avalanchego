@@ -75,6 +75,18 @@ func (b *builderWithOptions) NewAddSubnetValidatorTx(
 	)
 }
 
+func (b *builderWithOptions) RemoveSubnetValidatorTx(
+	nodeID ids.NodeID,
+	subnetID ids.ID,
+	options ...common.Option,
+) (*txs.RemoveSubnetValidatorTx, error) {
+	return b.Builder.NewRemoveSubnetValidatorTx(
+		nodeID,
+		subnetID,
+		common.UnionOptions(b.options, options)...,
+	)
+}
+
 func (b *builderWithOptions) NewAddDelegatorTx(
 	vdr *validator.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
