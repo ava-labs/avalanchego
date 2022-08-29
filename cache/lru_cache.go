@@ -12,52 +12,52 @@ const minCacheSize = 32
 
 var _ Cacher[struct{}, struct{}] = &LRU[struct{}, struct{}]{}
 
-type entry[T comparable, K any] struct {
-	Key   T
-	Value K
+type entry[K comparable, V any] struct {
+	Key   K
+	Value V
 }
 
 // LRU is a key value store with bounded size. If the size is attempted to be
 // exceeded, then an element is removed from the cache before the insertion is
 // done, based on evicting the least recently used value.
-type LRU[T comparable, _ any] struct {
+type LRU[K comparable, _ any] struct {
 	lock      sync.Mutex
-	entryMap  map[T]*list.Element
+	entryMap  map[K]*list.Element
 	entryList *list.List
 	Size      int
 }
 
-func (c *LRU[T, K]) Put(key T, value K) {
+func (c *LRU[K, V]) Put(key K, value V) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.put(key, value)
 }
 
-func (c *LRU[T, K]) Get(key T) (K, bool) {
+func (c *LRU[K, V]) Get(key K) (V, bool) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	return c.get(key)
 }
 
-func (c *LRU[T, _]) Evict(key T) {
+func (c *LRU[K, _]) Evict(key K) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.evict(key)
 }
 
-func (c *LRU[T, _]) Flush() {
+func (c *LRU[K, _]) Flush() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.flush()
 }
 
-func (c *LRU[T, _]) init() {
+func (c *LRU[K, _]) init() {
 	if c.entryMap == nil {
-		c.entryMap = make(map[T]*list.Element, minCacheSize)
+		c.entryMap = make(map[K]*list.Element, minCacheSize)
 	}
 	if c.entryList == nil {
 		c.entryList = list.New()
@@ -67,17 +67,17 @@ func (c *LRU[T, _]) init() {
 	}
 }
 
-func (c *LRU[T, K]) resize() {
+func (c *LRU[K, V]) resize() {
 	for c.entryList.Len() > c.Size {
 		e := c.entryList.Front()
 		c.entryList.Remove(e)
 
-		val := e.Value.(*entry[T, K])
+		val := e.Value.(*entry[K, V])
 		delete(c.entryMap, val.Key)
 	}
 }
 
-func (c *LRU[T, K]) put(key T, value K) {
+func (c *LRU[K, V]) put(key K, value V) {
 	c.init()
 	c.resize()
 
@@ -86,12 +86,12 @@ func (c *LRU[T, K]) put(key T, value K) {
 			e = c.entryList.Front()
 			c.entryList.MoveToBack(e)
 
-			val := e.Value.(*entry[T, K])
+			val := e.Value.(*entry[K, V])
 			delete(c.entryMap, val.Key)
 			val.Key = key
 			val.Value = value
 		} else {
-			e = c.entryList.PushBack(&entry[T, K]{
+			e = c.entryList.PushBack(&entry[K, V]{
 				Key:   key,
 				Value: value,
 			})
@@ -100,25 +100,25 @@ func (c *LRU[T, K]) put(key T, value K) {
 	} else {
 		c.entryList.MoveToBack(e)
 
-		val := e.Value.(*entry[T, K])
+		val := e.Value.(*entry[K, V])
 		val.Value = value
 	}
 }
 
-func (c *LRU[T, K]) get(key T) (K, bool) {
+func (c *LRU[K, V]) get(key K) (V, bool) {
 	c.init()
 	c.resize()
 
 	if e, ok := c.entryMap[key]; ok {
 		c.entryList.MoveToBack(e)
 
-		val := e.Value.(*entry[T, K])
+		val := e.Value.(*entry[K, V])
 		return val.Value, true
 	}
-	return *new(K), false //nolint:gocritic
+	return *new(V), false //nolint:gocritic
 }
 
-func (c *LRU[T, _]) evict(key T) {
+func (c *LRU[K, _]) evict(key K) {
 	c.init()
 	c.resize()
 
@@ -128,9 +128,9 @@ func (c *LRU[T, _]) evict(key T) {
 	}
 }
 
-func (c *LRU[T, _]) flush() {
+func (c *LRU[K, _]) flush() {
 	c.init()
 
-	c.entryMap = make(map[T]*list.Element, minCacheSize)
+	c.entryMap = make(map[K]*list.Element, minCacheSize)
 	c.entryList = list.New()
 }

@@ -4,33 +4,33 @@
 package cache
 
 // Cacher acts as a best effort key value store.
-type Cacher[T comparable, K any] interface {
+type Cacher[K comparable, V any] interface {
 	// Put inserts an element into the cache. If space is required, elements will
 	// be evicted.
-	Put(key T, value K)
+	Put(key K, value V)
 
 	// Get returns the entry in the cache with the key specified, if no value
 	// exists, false is returned.
-	Get(key T) (K, bool)
+	Get(key K) (V, bool)
 
 	// Evict removes the specified entry from the cache
-	Evict(key T)
+	Evict(key K)
 
 	// Flush removes all entries from the cache
 	Flush()
 }
 
 // Evictable allows the object to be notified when it is evicted
-type Evictable[T comparable] interface {
-	Key() T
+type Evictable[K comparable] interface {
+	Key() K
 	Evict()
 }
 
 // Deduplicator acts as a best effort deduplication service
-type Deduplicator[T comparable, _ Evictable[T]] interface {
+type Deduplicator[K comparable, _ Evictable[K]] interface {
 	// Deduplicate returns either the provided value, or a previously provided
 	// value with the same ID that hasn't yet been evicted
-	Deduplicate(Evictable[T]) Evictable[T]
+	Deduplicate(Evictable[K]) Evictable[K]
 
 	// Flush removes all entries from the cache
 	Flush()
