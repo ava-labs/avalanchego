@@ -44,13 +44,11 @@ type diff struct {
 	addedChains  map[ids.ID][]*txs.Tx
 	cachedChains map[ids.ID][]*txs.Tx
 
-	// map of txID -> []*UTXO
 	addedRewardUTXOs map[ids.ID][]*avax.UTXO
 
-	// map of txID -> {*txs.Tx, Status}
 	addedTxs map[ids.ID]*txAndStatus
 
-	// map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
+	//If the *utxoModification is nil, it has been removed
 	modifiedUTXOs map[ids.ID]*utxoModification
 }
 

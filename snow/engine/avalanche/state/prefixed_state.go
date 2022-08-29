@@ -52,10 +52,10 @@ func (s *prefixedState) Vertex(id ids.ID) vertex.StatelessVertex {
 }
 
 func (s *prefixedState) SetVertex(vtx vertex.StatelessVertex) error {
-	rawVertexID := vtx.ID()
 	var (
-		vID ids.ID
-		ok  bool
+		rawVertexID = vtx.ID()
+		vID         ids.ID
+		ok          bool
 	)
 	if vID, ok = s.vtx.Get(rawVertexID); !ok {
 		vID = rawVertexID.Prefix(vtxID)

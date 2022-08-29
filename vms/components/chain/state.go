@@ -37,14 +37,11 @@ type State struct {
 	// therefore currently in consensus.
 	verifiedBlocks map[ids.ID]*BlockWrapper
 	// decidedBlocks is an LRU cache of decided blocks.
-	// Every value in [decidedBlocks] is a (*BlockWrapper)
 	decidedBlocks cache.Cacher[ids.ID, *BlockWrapper]
 	// unverifiedBlocks is an LRU cache of blocks with status processing
 	// that have not yet passed verification.
-	// Every value in [unverifiedBlocks] is a (*BlockWrapper)
 	unverifiedBlocks cache.Cacher[ids.ID, *BlockWrapper]
 	// missingBlocks is an LRU cache of missing blocks
-	// Every value in [missingBlocks] is an empty struct.
 	missingBlocks cache.Cacher[ids.ID, struct{}]
 	// string([byte repr. of block]) --> the block's ID
 	bytesToIDCache    cache.Cacher[string, ids.ID]

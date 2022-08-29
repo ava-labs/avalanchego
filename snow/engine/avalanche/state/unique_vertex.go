@@ -20,7 +20,6 @@ import (
 )
 
 var (
-	// TODO can we do type assertions with generics?
 	_ cache.Evictable[ids.ID] = &uniqueVertex{}
 	_ avalanche.Vertex        = &uniqueVertex{}
 )

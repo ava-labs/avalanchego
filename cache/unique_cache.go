@@ -19,7 +19,7 @@ func (testEvictable) Key() struct{} {
 func (testEvictable) Evict() {}
 
 // EvictableLRU is an LRU cache that notifies the objects when they are evicted.
-type EvictableLRU[T comparable, K Evictable[T]] struct {
+type EvictableLRU[T comparable, _ Evictable[T]] struct {
 	lock      sync.Mutex
 	entryMap  map[T]*list.Element
 	entryList *list.List

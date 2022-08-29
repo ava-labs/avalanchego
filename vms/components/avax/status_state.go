@@ -33,6 +33,7 @@ type StatusState interface {
 type statusState struct {
 	// ID -> Status of thing with that ID, or nil if StatusState doesn't have
 	// that status.
+	// TODO is it ok to use a pointer here?
 	statusCache cache.Cacher[ids.ID, *choices.Status]
 	statusDB    database.Database
 }

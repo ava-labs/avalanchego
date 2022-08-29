@@ -201,9 +201,10 @@ type state struct {
 
 	currentHeight uint64
 
-	addedBlocks map[ids.ID]stateBlk             // map of blockID -> Block
-	blockCache  cache.Cacher[ids.ID, *stateBlk] // cache of blockID -> Block, if the entry is nil, it is not in the database
-	blockDB     database.Database
+	addedBlocks map[ids.ID]stateBlk // map of blockID -> Block
+	// TODO is it ok to use *stateBlk here?
+	blockCache cache.Cacher[ids.ID, *stateBlk] // cache of blockID -> Block, if the entry is nil, it is not in the database
+	blockDB    database.Database
 
 	uptimes        map[ids.NodeID]*uptimeAndReward // nodeID -> uptimes
 	updatedUptimes map[ids.NodeID]struct{}         // nodeID -> nil
@@ -229,11 +230,11 @@ type state struct {
 	validatorDiffsDB    database.Database
 
 	addedTxs map[ids.ID]*txAndStatus            // map of txID -> {*txs.Tx, Status}
-	txCache  cache.Cacher[ids.ID, *txAndStatus] // cache of txID -> {*txs.Tx, Status} if the entry is nil, it is not in the database
+	txCache  cache.Cacher[ids.ID, *txAndStatus] // txID -> {*txs.Tx, Status}. If the entry is nil, it isn't in the database
 	txDB     database.Database
 
 	addedRewardUTXOs map[ids.ID][]*avax.UTXO            // map of txID -> []*UTXO
-	rewardUTXOsCache cache.Cacher[ids.ID, []*avax.UTXO] // cache of txID -> []*UTXO
+	rewardUTXOsCache cache.Cacher[ids.ID, []*avax.UTXO] // txID -> []*UTXO
 	rewardUTXODB     database.Database
 
 	modifiedUTXOs map[ids.ID]*avax.UTXO // map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
@@ -246,8 +247,8 @@ type state struct {
 	subnetDB      linkeddb.LinkedDB
 
 	addedChains  map[ids.ID][]*txs.Tx                    // maps subnetID -> the newly added chains to the subnet
-	chainCache   cache.Cacher[ids.ID, []*txs.Tx]         // cache of subnetID -> the chains after all local modifications []*txs.Tx
-	chainDBCache cache.Cacher[ids.ID, linkeddb.LinkedDB] // cache of subnetID -> linkedDB
+	chainCache   cache.Cacher[ids.ID, []*txs.Tx]         // subnetID -> the chains after all local modifications []*txs.Tx
+	chainDBCache cache.Cacher[ids.ID, linkeddb.LinkedDB] // subnetID -> linkedDB
 	chainDB      database.Database
 
 	// The persisted fields represent the current database value

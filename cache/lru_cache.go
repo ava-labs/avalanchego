@@ -20,7 +20,7 @@ type entry[T comparable, K any] struct {
 // LRU is a key value store with bounded size. If the size is attempted to be
 // exceeded, then an element is removed from the cache before the insertion is
 // done, based on evicting the least recently used value.
-type LRU[T comparable, K any] struct {
+type LRU[T comparable, _ any] struct {
 	lock      sync.Mutex
 	entryMap  map[T]*list.Element
 	entryList *list.List
