@@ -306,7 +306,7 @@ func (b *benchlist) bench(nodeID ids.NodeID) {
 		return
 	}
 
-	newBenchedStake, err := safemath.Add64(benchedStake, validatorStake)
+	newBenchedStake, err := safemath.Add(benchedStake, validatorStake)
 	if err != nil {
 		// This should never happen
 		b.log.Error("overflow calculating new benched stake",

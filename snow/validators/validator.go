@@ -34,7 +34,7 @@ func (v *validator) ID() ids.NodeID { return v.nodeID }
 func (v *validator) Weight() uint64 { return v.weight }
 
 func (v *validator) addWeight(weight uint64) {
-	newTotalWeight, err := safemath.Add64(weight, v.weight)
+	newTotalWeight, err := safemath.Add(weight, v.weight)
 	if err != nil {
 		newTotalWeight = math.MaxUint64
 	}
@@ -42,7 +42,7 @@ func (v *validator) addWeight(weight uint64) {
 }
 
 func (v *validator) removeWeight(weight uint64) {
-	newTotalWeight, err := safemath.Sub64(v.weight, weight)
+	newTotalWeight, err := safemath.Sub(v.weight, weight)
 	if err != nil {
 		newTotalWeight = 0
 	}

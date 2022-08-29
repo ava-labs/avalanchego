@@ -413,7 +413,7 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 		if !args.IncludePartial && (len(owners.Addrs) != 1 || owners.Locktime > now) {
 			continue
 		}
-		amt, err := safemath.Add64(transferable.Amount(), uint64(reply.Balance))
+		amt, err := safemath.Add(transferable.Amount(), uint64(reply.Balance))
 		if err != nil {
 			return err
 		}
@@ -478,7 +478,7 @@ func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs
 		assetID := utxo.AssetID()
 		assetIDs.Add(assetID)
 		balance := balances[assetID] // 0 if key doesn't exist
-		balance, err := safemath.Add64(transferable.Amount(), balance)
+		balance, err := safemath.Add(transferable.Amount(), balance)
 		if err != nil {
 			balances[assetID] = math.MaxUint64
 		} else {
@@ -1023,7 +1023,7 @@ func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 			assetIDs[output.AssetID] = assetID
 		}
 		currentAmount := amounts[assetID]
-		newAmount, err := safemath.Add64(currentAmount, uint64(output.Amount))
+		newAmount, err := safemath.Add(currentAmount, uint64(output.Amount))
 		if err != nil {
 			return fmt.Errorf("problem calculating required spend amount: %w", err)
 		}
@@ -1054,7 +1054,7 @@ func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 		amountsWithFee[assetID] = amount
 	}
 
-	amountWithFee, err := safemath.Add64(amounts[service.vm.feeAssetID], service.vm.TxFee)
+	amountWithFee, err := safemath.Add(amounts[service.vm.feeAssetID], service.vm.TxFee)
 	if err != nil {
 		return fmt.Errorf("problem calculating required spend amount: %w", err)
 	}
@@ -1518,7 +1518,7 @@ func (service *Service) Import(_ *http.Request, args *ImportArgs, reply *api.JSO
 			return err
 		}
 		for asset, amount := range localAmountsSpent {
-			newAmount, err := safemath.Add64(amountsSpent[asset], amount)
+			newAmount, err := safemath.Add(amountsSpent[asset], amount)
 			if err != nil {
 				return fmt.Errorf("problem calculating required spend amount: %w", err)
 			}
@@ -1644,7 +1644,7 @@ func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JSO
 
 	amounts := map[ids.ID]uint64{}
 	if assetID == service.vm.feeAssetID {
-		amountWithFee, err := safemath.Add64(uint64(args.Amount), service.vm.TxFee)
+		amountWithFee, err := safemath.Add(uint64(args.Amount), service.vm.TxFee)
 		if err != nil {
 			return fmt.Errorf("problem calculating required spend amount: %w", err)
 		}

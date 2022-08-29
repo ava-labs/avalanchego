@@ -196,7 +196,7 @@ func (b *builder) NewBaseTx(
 	}
 	for _, out := range outputs {
 		assetID := out.AssetID()
-		amountToBurn, err := math.Add64(toBurn[assetID], out.Out.Amount())
+		amountToBurn, err := math.Add(toBurn[assetID], out.Out.Amount())
 		if err != nil {
 			return nil, err
 		}
@@ -387,7 +387,7 @@ func (b *builder) NewImportTx(
 		})
 
 		assetID := utxo.AssetID()
-		newImportedAmount, err := math.Add64(importedAmounts[assetID], out.Amt)
+		newImportedAmount, err := math.Add(importedAmounts[assetID], out.Amt)
 		if err != nil {
 			return nil, err
 		}
@@ -457,7 +457,7 @@ func (b *builder) NewExportTx(
 	}
 	for _, out := range outputs {
 		assetID := out.AssetID()
-		amountToBurn, err := math.Add64(toBurn[assetID], out.Out.Amount())
+		amountToBurn, err := math.Add(toBurn[assetID], out.Out.Amount())
 		if err != nil {
 			return nil, err
 		}
@@ -516,7 +516,7 @@ func (b *builder) getBalance(
 		}
 
 		assetID := utxo.AssetID()
-		balance[assetID], err = math.Add64(balance[assetID], out.Amt)
+		balance[assetID], err = math.Add(balance[assetID], out.Amt)
 		if err != nil {
 			return nil, err
 		}
@@ -585,7 +585,7 @@ func (b *builder) spend(
 		})
 
 		// Burn any value that should be burned
-		amountToBurn := math.Min64(
+		amountToBurn := math.Min[uint64](
 			remainingAmountToBurn, // Amount we still need to burn
 			out.Amt,               // Amount available to burn
 		)

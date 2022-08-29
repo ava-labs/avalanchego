@@ -195,7 +195,7 @@ func (s *set) set(vdrs []Validator) error {
 		}
 		s.vdrMaskedWeights[len(s.vdrMaskedWeights)-1] = w
 
-		newTotalWeight, err := safemath.Add64(s.totalWeight, w)
+		newTotalWeight, err := safemath.Add(s.totalWeight, w)
 		if err != nil {
 			return err
 		}
@@ -244,7 +244,7 @@ func (s *set) addWeight(vdrID ids.NodeID, weight uint64) error {
 	}
 	s.vdrMaskedWeights[i] += weight
 
-	newTotalWeight, err := safemath.Add64(s.totalWeight, weight)
+	newTotalWeight, err := safemath.Add(s.totalWeight, weight)
 	if err != nil {
 		return nil
 	}
@@ -277,7 +277,7 @@ func (s *set) SubsetWeight(subset ids.NodeIDSet) (uint64, error) {
 		if !ok {
 			continue
 		}
-		newWeight, err := safemath.Add64(totalWeight, weight)
+		newWeight, err := safemath.Add(totalWeight, weight)
 		if err != nil {
 			return 0, err
 		}
@@ -306,7 +306,7 @@ func (s *set) removeWeight(vdrID ids.NodeID, weight uint64) error {
 	vdr := s.vdrSlice[i]
 
 	oldWeight := s.vdrWeights[i]
-	weight = safemath.Min64(oldWeight, weight)
+	weight = safemath.Min(oldWeight, weight)
 	s.vdrWeights[i] -= weight
 	vdr.removeWeight(weight)
 	if !s.maskedVdrs.Contains(vdrID) {
@@ -366,7 +366,7 @@ func (s *set) remove(vdrID ids.NodeID) error {
 	s.vdrMaskedWeights = s.vdrMaskedWeights[:e]
 
 	if !s.maskedVdrs.Contains(vdrID) {
-		newTotalWeight, err := safemath.Sub64(s.totalWeight, iElem.Weight())
+		newTotalWeight, err := safemath.Sub(s.totalWeight, iElem.Weight())
 		if err != nil {
 			return err
 		}
@@ -533,7 +533,7 @@ func (s *set) revealValidator(vdrID ids.NodeID) error {
 
 	weight := s.vdrWeights[i]
 	s.vdrMaskedWeights[i] = weight
-	newTotalWeight, err := safemath.Add64(s.totalWeight, weight)
+	newTotalWeight, err := safemath.Add(s.totalWeight, weight)
 	if err != nil {
 		return err
 	}

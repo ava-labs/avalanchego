@@ -721,5 +721,5 @@ func (vm *VM) optimalPChainHeight(minPChainHeight uint64) (uint64, error) {
 		return 0, err
 	}
 
-	return math.Max64(minimumHeight, minPChainHeight), nil
+	return math.Max[uint64](minimumHeight, minPChainHeight), nil
 }

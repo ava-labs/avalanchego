@@ -723,7 +723,7 @@ func (vm *VM) Spend(
 			// this input doesn't have an amount, so I don't care about it here
 			continue
 		}
-		newAmountSpent, err := safemath.Add64(amountSpent, input.Amount())
+		newAmountSpent, err := safemath.Add(amountSpent, input.Amount())
 		if err != nil {
 			// there was an error calculating the consumed amount, just error
 			return nil, nil, nil, errSpendOverflow
@@ -856,7 +856,7 @@ func (vm *VM) SpendAll(
 			// this input doesn't have an amount, so I don't care about it here
 			continue
 		}
-		newAmountSpent, err := safemath.Add64(amountSpent, input.Amount())
+		newAmountSpent, err := safemath.Add(amountSpent, input.Amount())
 		if err != nil {
 			// there was an error calculating the consumed amount, just error
 			return nil, nil, nil, errSpendOverflow

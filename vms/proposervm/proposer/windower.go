@@ -69,7 +69,7 @@ func (w *windower) Delay(chainHeight, pChainHeight uint64, validatorID ids.NodeI
 			id:     k,
 			weight: v,
 		})
-		newWeight, err := math.Add64(weight, v)
+		newWeight, err := math.Add(weight, v)
 		if err != nil {
 			return 0, err
 		}

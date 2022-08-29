@@ -127,7 +127,7 @@ func AdvanceTimeTo(parentState state.Chain, newChainTime time.Time, rewards rewa
 				stakerToRemove.Weight,
 				changes.supply,
 			)
-			changes.supply, err = math.Add64(changes.supply, potentialReward)
+			changes.supply, err = math.Add(changes.supply, potentialReward)
 			if err != nil {
 				pendingStakerIterator.Release()
 				return nil, err
@@ -143,7 +143,7 @@ func AdvanceTimeTo(parentState state.Chain, newChainTime time.Time, rewards rewa
 				stakerToRemove.Weight,
 				changes.supply,
 			)
-			changes.supply, err = math.Add64(changes.supply, potentialReward)
+			changes.supply, err = math.Add(changes.supply, potentialReward)
 			if err != nil {
 				pendingStakerIterator.Release()
 				return nil, err

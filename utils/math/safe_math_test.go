@@ -10,30 +10,30 @@ import (
 
 const maxUint64 uint64 = math.MaxUint64
 
-func TestMax64(t *testing.T) {
-	actual := Max64(0, maxUint64)
+func TestMax(t *testing.T) {
+	actual := Max(0, maxUint64)
 	if actual != maxUint64 {
 		t.Fatalf("Expected %d, got %d", maxUint64, actual)
 	}
-	actual = Max64(maxUint64, 0)
+	actual = Max(maxUint64, 0)
 	if actual != maxUint64 {
 		t.Fatalf("Expected %d, got %d", maxUint64, actual)
 	}
 }
 
-func TestMin64(t *testing.T) {
-	actual := Min64(0, maxUint64)
+func TestMin(t *testing.T) {
+	actual := Min(0, maxUint64)
 	if actual != 0 {
 		t.Fatalf("Expected %d, got %d", 0, actual)
 	}
-	actual = Min64(maxUint64, 0)
+	actual = Min(maxUint64, 0)
 	if actual != 0 {
 		t.Fatalf("Expected %d, got %d", 0, actual)
 	}
 }
 
 func TestAdd64(t *testing.T) {
-	sum, err := Add64(0, maxUint64)
+	sum, err := Add(0, maxUint64)
 	if err != nil {
 		t.Fatalf("Add64 failed unexpectedly")
 	}
@@ -41,7 +41,7 @@ func TestAdd64(t *testing.T) {
 		t.Fatalf("Expected %d, got %d", maxUint64, sum)
 	}
 
-	sum, err = Add64(maxUint64, 0)
+	sum, err = Add(maxUint64, 0)
 	if err != nil {
 		t.Fatalf("Add64 failed unexpectedly")
 	}
@@ -49,7 +49,7 @@ func TestAdd64(t *testing.T) {
 		t.Fatalf("Expected %d, got %d", maxUint64, sum)
 	}
 
-	sum, err = Add64(1<<62, 1<<62)
+	sum, err = Add(uint64(1<<62), uint64(1<<62))
 	if err != nil {
 		t.Fatalf("Add64 failed unexpectedly")
 	}
@@ -57,31 +57,31 @@ func TestAdd64(t *testing.T) {
 		t.Fatalf("Expected %d, got %d", uint64(1<<63), sum)
 	}
 
-	_, err = Add64(1, maxUint64)
+	_, err = Add(1, maxUint64)
 	if err == nil {
 		t.Fatalf("Add64 succeeded unexpectedly")
 	}
 
-	_, err = Add64(maxUint64, 1)
+	_, err = Add(maxUint64, 1)
 	if err == nil {
 		t.Fatalf("Add64 succeeded unexpectedly")
 	}
 
-	_, err = Add64(maxUint64, maxUint64)
+	_, err = Add(maxUint64, maxUint64)
 	if err == nil {
 		t.Fatalf("Add64 succeeded unexpectedly")
 	}
 }
 
-func TestSub64(t *testing.T) {
-	actual, err := Sub64(2, 1)
+func TestSub(t *testing.T) {
+	actual, err := Sub(uint64(2), uint64(1))
 	if err != nil {
 		t.Fatalf("Sub64 failed unexpectedly")
 	} else if actual != 1 {
 		t.Fatalf("Expected %d, got %d", 1, actual)
 	}
 
-	_, err = Sub64(1, 2)
+	_, err = Sub(uint64(1), uint64(2))
 	if err == nil {
 		t.Fatalf("Sub64 did not fail in the manner expected")
 	}

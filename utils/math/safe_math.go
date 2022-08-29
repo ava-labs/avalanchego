@@ -6,12 +6,13 @@ package math
 import (
 	"errors"
 	"math"
+
+	"golang.org/x/exp/constraints"
 )
 
 var errOverflow = errors.New("overflow occurred")
 
-// Max64 returns the maximum of the values provided
-func Max64(max uint64, nums ...uint64) uint64 {
+func Max[T constraints.Ordered](max T, nums ...T) T {
 	for _, num := range nums {
 		if num > max {
 			max = num
@@ -20,8 +21,7 @@ func Max64(max uint64, nums ...uint64) uint64 {
 	return max
 }
 
-// Min returns the minimum of the values provided
-func Min(min int, nums ...int) int {
+func Min[T constraints.Ordered](min T, nums ...T) T {
 	for _, num := range nums {
 		if num < min {
 			min = num
@@ -30,32 +30,22 @@ func Min(min int, nums ...int) int {
 	return min
 }
 
-// Min64 returns the minimum of the values provided
-func Min64(min uint64, nums ...uint64) uint64 {
-	for _, num := range nums {
-		if num < min {
-			min = num
-		}
-	}
-	return min
-}
-
-// Add64 returns:
+// Add returns:
 // 1) a + b
 // 2) If there is overflow, an error
-func Add64(a, b uint64) (uint64, error) {
-	if a > math.MaxUint64-b {
+func Add[T constraints.Unsigned](a, b T) (T, error) {
+	if uint64(a) > math.MaxUint64-uint64(b) {
 		return 0, errOverflow
 	}
 	return a + b, nil
 }
 
-// Sub64 returns:
+// Sub returns:
 // 1) a - b
 // 2) If there is underflow, an error
-func Sub64(a, b uint64) (uint64, error) {
+func Sub[T constraints.Unsigned](a, b T) (T, error) {
 	if a < b {
-		return 0, errOverflow
+		return *new(T), errOverflow //nolint:gocritic
 	}
 	return a - b, nil
 }
@@ -71,5 +61,5 @@ func Mul64(a, b uint64) (uint64, error) {
 }
 
 func Diff64(a, b uint64) uint64 {
-	return Max64(a, b) - Min64(a, b)
+	return Max(a, b) - Min(a, b)
 }

@@ -221,13 +221,13 @@ utxoFor:
 		switch out := utxo.Out.(type) {
 		case *secp256k1fx.TransferOutput:
 			if out.Locktime <= currentTime {
-				newBalance, err := math.Add64(unlocked, out.Amount())
+				newBalance, err := math.Add(unlocked, out.Amount())
 				if err != nil {
 					return errUnlockedOverflow
 				}
 				unlocked = newBalance
 			} else {
-				newBalance, err := math.Add64(lockedNotStakeable, out.Amount())
+				newBalance, err := math.Add(lockedNotStakeable, out.Amount())
 				if err != nil {
 					return errNotStakeableOverflow
 				}
@@ -242,19 +242,19 @@ utxoFor:
 				)
 				continue utxoFor
 			case innerOut.Locktime > currentTime:
-				newBalance, err := math.Add64(lockedNotStakeable, out.Amount())
+				newBalance, err := math.Add(lockedNotStakeable, out.Amount())
 				if err != nil {
 					return errLockedNotStakeableOverflow
 				}
 				lockedNotStakeable = newBalance
 			case out.Locktime <= currentTime:
-				newBalance, err := math.Add64(unlocked, out.Amount())
+				newBalance, err := math.Add(unlocked, out.Amount())
 				if err != nil {
 					return errUnlockedOverflow
 				}
 				unlocked = newBalance
 			default:
-				newBalance, err := math.Add64(lockedStakeable, out.Amount())
+				newBalance, err := math.Add(lockedStakeable, out.Amount())
 				if err != nil {
 					return errUnlockedStakeableOverflow
 				}
@@ -267,11 +267,11 @@ utxoFor:
 		response.UTXOIDs = append(response.UTXOIDs, &utxo.UTXOID)
 	}
 
-	lockedBalance, err := math.Add64(lockedStakeable, lockedNotStakeable)
+	lockedBalance, err := math.Add(lockedStakeable, lockedNotStakeable)
 	if err != nil {
 		return errLockedOverflow
 	}
-	balance, err := math.Add64(unlocked, lockedBalance)
+	balance, err := math.Add(unlocked, lockedBalance)
 	if err != nil {
 		return errTotalOverflow
 	}
@@ -2032,7 +2032,7 @@ func (service *Service) getStakeHelper(tx *txs.Tx, addrs ids.ShortSet) (uint64, 
 			// This output isn't owned by one of the given addresses. Ignore.
 			continue
 		}
-		totalAmountStaked, err = math.Add64(totalAmountStaked, stake.Out.Amount())
+		totalAmountStaked, err = math.Add(totalAmountStaked, stake.Out.Amount())
 		if err != nil {
 			return 0, stakedOuts, err
 		}
@@ -2086,7 +2086,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 		if err != nil {
 			return err
 		}
-		totalStake, err = math.Add64(totalStake, stakedAmt)
+		totalStake, err = math.Add(totalStake, stakedAmt)
 		if err != nil {
 			return err
 		}
@@ -2111,7 +2111,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 		if err != nil {
 			return err
 		}
-		totalStake, err = math.Add64(totalStake, stakedAmt)
+		totalStake, err = math.Add(totalStake, stakedAmt)
 		if err != nil {
 			return err
 		}
