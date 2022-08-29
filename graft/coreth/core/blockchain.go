@@ -535,6 +535,13 @@ func (bc *BlockChain) Export(w io.Writer) error {
 
 // ExportN writes a subset of the active chain to the given writer.
 func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
+	return bc.ExportCallback(func(block *types.Block) error {
+		return block.EncodeRLP(w)
+	}, first, last)
+}
+
+// ExportCallback invokes [callback] for every block from [first] to [last] in order.
+func (bc *BlockChain) ExportCallback(callback func(block *types.Block) error, first uint64, last uint64) error {
 	if first > last {
 		return fmt.Errorf("export failed: first (%d) is greater than last (%d)", first, last)
 	}
@@ -554,7 +561,7 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 			return fmt.Errorf("export failed: chain reorg during export")
 		}
 		parentHash = block.Hash()
-		if err := block.EncodeRLP(w); err != nil {
+		if err := callback(block); err != nil {
 			return err
 		}
 		if time.Since(reported) >= statsReportLimit {
