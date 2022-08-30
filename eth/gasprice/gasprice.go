@@ -298,9 +298,12 @@ func (oracle *Oracle) suggestDynamicFees(ctx context.Context) (*big.Int, *big.In
 		return nil, nil, err
 	}
 
-	var feeLastChangedAt *big.Int
+	var (
+		feeLastChangedAt *big.Int
+		feeConfig        commontype.FeeConfig
+	)
 	if oracle.backend.ChainConfig().IsFeeConfigManager(new(big.Int).SetUint64(head.Time)) {
-		_, feeLastChangedAt, err = oracle.backend.GetFeeConfigAt(head)
+		feeConfig, feeLastChangedAt, err = oracle.backend.GetFeeConfigAt(head)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -333,7 +336,13 @@ func (oracle *Oracle) suggestDynamicFees(ctx context.Context) (*big.Int, *big.In
 		tipResults     []*big.Int
 		baseFeeResults []*big.Int
 	)
-
+	// if the fee config has changed in this block, use the new base fee
+	// if it is higher than this block's base fee.
+	if feeLastChangedAt != nil && feeLastChangedAt.Uint64() == number {
+		if lastBaseFee.Cmp(feeConfig.MinBaseFee) < 0 {
+			lastBaseFee = feeConfig.MinBaseFee
+		}
+	}
 	// iterates backwards until enough blocks are sent or until the block number that fee last changed at
 	for sent < oracle.checkBlocks && number > 0 && (feeLastChangedAt == nil || feeLastChangedAt.Uint64() < number) {
 		go oracle.getBlockTips(ctx, number, result, quit)

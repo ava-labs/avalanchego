@@ -37,11 +37,14 @@ import (
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/core/vm"
+	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/stretchr/testify/require"
 )
 
 const testHead = 32
@@ -53,6 +56,7 @@ var (
 )
 
 type testBackend struct {
+	db      ethdb.Database
 	chain   *core.BlockChain
 	pending bool // pending block available
 }
@@ -148,7 +152,7 @@ func newTestBackend(t *testing.T, config *params.ChainConfig, numBlocks int, gen
 	if _, err := chain.InsertChain(blocks); err != nil {
 		t.Fatalf("Failed to insert chain, %v", err)
 	}
-	return &testBackend{chain: chain}
+	return &testBackend{chain: chain, db: db}
 }
 
 func (b *testBackend) MinRequiredTip(ctx context.Context, header *types.Header) (*big.Int, error) {
@@ -466,4 +470,64 @@ func TestSuggestGasPricePreAP3(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+// Regression test to ensure the last estimation of base fee is not used
+// for the block immediately following a fee configuration update.
+func TestSuggestGasPriceAfterFeeConfigUpdate(t *testing.T) {
+	require := require.New(t)
+	config := Config{
+		Blocks:     20,
+		Percentile: 60,
+	}
+
+	// create a chain config with fee manager enabled at genesis with [addr] as the admin
+	chainConfig := *params.TestChainConfig
+	chainConfig.FeeManagerConfig = precompile.NewFeeManagerConfig(big.NewInt(0), []common.Address{addr})
+
+	// create a fee config with higher MinBaseFee and prepare it for inclusion in a tx
+	signer := types.LatestSigner(params.TestChainConfig)
+	highFeeConfig := chainConfig.FeeConfig
+	highFeeConfig.MinBaseFee = big.NewInt(28_000_000_000)
+	data, err := precompile.PackSetFeeConfig(highFeeConfig)
+	require.NoError(err)
+
+	// before issuing the block changing the fee into the chain, the fee estimation should
+	// follow the fee config in genesis.
+	backend := newTestBackend(t, &chainConfig, 0, func(i int, b *core.BlockGen) {})
+	oracle, err := NewOracle(backend, config)
+	require.NoError(err)
+	got, err := oracle.SuggestPrice(context.Background())
+	require.NoError(err)
+	require.Equal(chainConfig.FeeConfig.MinBaseFee, got)
+
+	// issue the block with tx that changes the fee
+	genesis := backend.chain.Genesis()
+	engine := backend.chain.Engine()
+	blocks, _, err := core.GenerateChain(&chainConfig, genesis, engine, backend.db, 1, 0, func(i int, b *core.BlockGen) {
+		b.SetCoinbase(common.Address{1})
+
+		// admin issues tx to change fee config to higher MinBaseFee
+		tx := types.NewTx(&types.DynamicFeeTx{
+			ChainID:   chainConfig.ChainID,
+			Nonce:     b.TxNonce(addr),
+			To:        &precompile.FeeConfigManagerAddress,
+			Gas:       chainConfig.FeeConfig.GasLimit.Uint64(),
+			Value:     common.Big0,
+			GasFeeCap: chainConfig.FeeConfig.MinBaseFee, // give low fee, it should work since we still haven't applied high fees
+			GasTipCap: common.Big0,
+			Data:      data,
+		})
+		tx, err = types.SignTx(tx, signer, key)
+		require.NoError(err, "failed to create tx")
+		b.AddTx(tx)
+	})
+	require.NoError(err)
+	_, err = backend.chain.InsertChain(blocks)
+	require.NoError(err)
+
+	// verify the suggested price follows the new fee config.
+	got, err = oracle.SuggestPrice(context.Background())
+	require.NoError(err)
+	require.Equal(highFeeConfig.MinBaseFee, got)
 }
