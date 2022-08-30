@@ -59,6 +59,10 @@ func (v *MempoolTxVerifier) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 	return v.standardTx(tx)
 }
 
+func (v *MempoolTxVerifier) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+	return v.standardTx(tx)
+}
+
 // TODO: simplify this function after Blueberry is activated.
 func (v *MempoolTxVerifier) proposalTx(tx txs.StakerTx) error {
 	startTime := tx.StartTime()

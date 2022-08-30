@@ -38,6 +38,9 @@ func (*AtomicTxExecutor) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) e
 	return errWrongTxType
 }
 func (*AtomicTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error { return errWrongTxType }
+func (*AtomicTxExecutor) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
+	return errWrongTxType
+}
 
 func (e *AtomicTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	return e.atomicTx(tx)

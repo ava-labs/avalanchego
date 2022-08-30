@@ -57,6 +57,11 @@ func (r *remover) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 	return nil
 }
 
+func (r *remover) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+	r.m.removeStakerTx(r.tx)
+	return nil
+}
+
 func (r *remover) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
 	// this tx is never in mempool
 	return nil
