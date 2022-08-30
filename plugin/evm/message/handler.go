@@ -52,7 +52,6 @@ type ResponseHandler interface {
 	// OnResponse is invoked when the peer responded to a request
 	OnResponse(nodeID ids.NodeID, requestID uint32, response []byte) error
 	// OnFailure is invoked when there was a failure in processing a request
-	// The FailureReason outlines the underlying cause.
 	OnFailure(nodeID ids.NodeID, requestID uint32) error
 }
 
