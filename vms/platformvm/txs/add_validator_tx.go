@@ -106,7 +106,7 @@ func (tx *AddValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	case !avax.IsSortedTransferableOutputs(tx.Stake, Codec):
 		return errOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
-		return fmt.Errorf("validator weight %d is not equal to total stake weight %d", tx.Validator.Wght, totalStakeWeight)
+		return fmt.Errorf("%w: weight %d != stake %d", errValidatorWeightMismatch, tx.Validator.Wght, totalStakeWeight)
 	}
 
 	// cache that this is valid
