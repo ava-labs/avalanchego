@@ -171,14 +171,15 @@ func (b *blockBuilder) signalTxsReady() {
 // and notifies the VM when the tx pool has transactions to be
 // put into a new block.
 func (b *blockBuilder) awaitSubmittedTxs() {
+	// txSubmitChan is invoked when new transactions are issued as well as on re-orgs which
+	// may orphan transactions that were previously in a preferred block.
+	txSubmitChan := make(chan core.NewTxsEvent)
+	b.txPool.SubscribeNewTxsEvent(txSubmitChan)
+
 	b.shutdownWg.Add(1)
 	go b.ctx.Log.RecoverAndPanic(func() {
 		defer b.shutdownWg.Done()
 
-		// txSubmitChan is invoked when new transactions are issued as well as on re-orgs which
-		// may orphan transactions that were previously in a preferred block.
-		txSubmitChan := make(chan core.NewTxsEvent)
-		b.txPool.SubscribeNewTxsEvent(txSubmitChan)
 		for {
 			select {
 			case ethTxsEvent := <-txSubmitChan:
