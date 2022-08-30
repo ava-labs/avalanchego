@@ -137,6 +137,11 @@ func (s *EthereumAPI) Syncing() (interface{}, error) {
 	return false, nil
 }
 
+// GetChainConfig returns the chain config.
+func (s *EthereumAPI) GetChainConfig(ctx context.Context) *params.ChainConfig {
+	return s.b.ChainConfig()
+}
+
 // TxPoolAPI offers and API for the transaction pool. It only operates on data that is non confidential.
 type TxPoolAPI struct {
 	b Backend
