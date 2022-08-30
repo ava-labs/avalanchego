@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/subnet-evm/core"
@@ -89,6 +90,10 @@ func TestVMUpgradeBytesPrecompile(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
+	// Set the VM's state to NormalOp to initialize the tx pool.
+	if err := vm.SetState(snow.NormalOp); err != nil {
+		t.Fatal(err)
+	}
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
 	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 	vm.clock.Set(disableAllowListTimestamp)

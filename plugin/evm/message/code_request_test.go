@@ -16,22 +16,19 @@ import (
 // ensure compatibility with the network.
 func TestMarshalCodeRequest(t *testing.T) {
 	codeRequest := CodeRequest{
-		Hash: common.BytesToHash([]byte("some code pls")),
+		Hashes: []common.Hash{common.BytesToHash([]byte("some code pls"))},
 	}
 
-	base64CodeRequest := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAc29tZSBjb2RlIHBscw=="
+	base64CodeRequest := "AAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAHNvbWUgY29kZSBwbHM="
 
-	codec, err := BuildCodec()
-	assert.NoError(t, err)
-
-	codeRequestBytes, err := codec.Marshal(Version, codeRequest)
+	codeRequestBytes, err := Codec.Marshal(Version, codeRequest)
 	assert.NoError(t, err)
 	assert.Equal(t, base64CodeRequest, base64.StdEncoding.EncodeToString(codeRequestBytes))
 
 	var c CodeRequest
-	_, err = codec.Unmarshal(codeRequestBytes, &c)
+	_, err = Codec.Unmarshal(codeRequestBytes, &c)
 	assert.NoError(t, err)
-	assert.Equal(t, codeRequest.Hash, c.Hash)
+	assert.Equal(t, codeRequest.Hashes, c.Hashes)
 }
 
 // TestMarshalCodeResponse asserts that the structure or serialization logic hasn't changed, primarily to
@@ -45,20 +42,17 @@ func TestMarshalCodeResponse(t *testing.T) {
 	assert.NoError(t, err)
 
 	codeResponse := CodeResponse{
-		Data: codeData,
+		Data: [][]byte{codeData},
 	}
 
-	base64CodeResponse := "AAAAAAAyUv38ByGCZU8WP18PmmIdcpVmx00QA3xNe7sEB9HixkmBhVrYaB0NhtHpHgAWeTnLZpQ="
+	base64CodeResponse := "AAAAAAABAAAAMlL9/AchgmVPFj9fD5piHXKVZsdNEAN8TXu7BAfR4sZJgYVa2GgdDYbR6R4AFnk5y2aU"
 
-	codec, err := BuildCodec()
-	assert.NoError(t, err)
-
-	codeResponseBytes, err := codec.Marshal(Version, codeResponse)
+	codeResponseBytes, err := Codec.Marshal(Version, codeResponse)
 	assert.NoError(t, err)
 	assert.Equal(t, base64CodeResponse, base64.StdEncoding.EncodeToString(codeResponseBytes))
 
 	var c CodeResponse
-	_, err = codec.Unmarshal(codeResponseBytes, &c)
+	_, err = Codec.Unmarshal(codeResponseBytes, &c)
 	assert.NoError(t, err)
 	assert.Equal(t, codeResponse.Data, c.Data)
 }

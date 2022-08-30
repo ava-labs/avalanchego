@@ -11,21 +11,24 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+const MaxCodeHashesPerRequest = 5
+
 var _ Request = LeafsRequest{}
 
 // LeafsRequest is a request to receive trie leaves at specified Root within Start and End byte range
 // Limit outlines maximum number of leaves to returns starting at Start
 type LeafsRequest struct {
-	Root  common.Hash `serialize:"true"`
-	Start []byte      `serialize:"true"`
-	End   []byte      `serialize:"true"`
-	Limit uint16      `serialize:"true"`
+	Root    common.Hash `serialize:"true"`
+	Account common.Hash `serialize:"true"`
+	Start   []byte      `serialize:"true"`
+	End     []byte      `serialize:"true"`
+	Limit   uint16      `serialize:"true"`
 }
 
 func (l LeafsRequest) String() string {
 	return fmt.Sprintf(
-		"LeafsRequest(Root=%s, Start=%s, End %s, Limit=%d)",
-		l.Root, common.Bytes2Hex(l.Start), common.Bytes2Hex(l.End), l.Limit,
+		"LeafsRequest(Root=%s, Account=%s, Start=%s, End %s, Limit=%d)",
+		l.Root, l.Account, common.Bytes2Hex(l.Start), common.Bytes2Hex(l.End), l.Limit,
 	)
 }
 
@@ -55,8 +58,7 @@ type LeafsResponse struct {
 	// last value in this response.
 	More bool
 
-	// ProofKeys and ProofVals are the key-value pairs used in the range proof of the provided key-value
-	// pairs.
-	ProofKeys [][]byte `serialize:"true"`
+	// ProofVals contain the edge merkle-proofs for the range of keys included in the response.
+	// The keys for the proof are simply the keccak256 hashes of the values, so they are not included in the response to save bandwidth.
 	ProofVals [][]byte `serialize:"true"`
 }

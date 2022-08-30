@@ -130,6 +130,11 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		bloomBits       stat
 		cliqueSnaps     stat
 
+		// State sync statistics
+		codeToFetch  stat
+		syncProgress stat
+		syncSegments stat
+
 		// Les statistic
 		chtTrieNodes   stat
 		bloomTrieNodes stat
@@ -189,6 +194,12 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 			bytes.HasPrefix(key, []byte("bltIndex-")) ||
 			bytes.HasPrefix(key, []byte("bltRoot-")): // Bloomtrie sub
 			bloomTrieNodes.Add(size)
+		case bytes.HasPrefix(key, syncStorageTriesPrefix) && len(key) == syncStorageTriesKeyLength:
+			syncProgress.Add(size)
+		case bytes.HasPrefix(key, syncSegmentsPrefix) && len(key) == syncSegmentsKeyLength:
+			syncSegments.Add(size)
+		case bytes.HasPrefix(key, CodeToFetchPrefix) && len(key) == codeToFetchKeyLength:
+			codeToFetch.Add(size)
 		default:
 			var accounted bool
 			for _, meta := range [][]byte{
@@ -229,6 +240,9 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		{"Key-Value store", "Singleton metadata", metadata.Size(), metadata.Count()},
 		{"Light client", "CHT trie nodes", chtTrieNodes.Size(), chtTrieNodes.Count()},
 		{"Light client", "Bloom trie nodes", bloomTrieNodes.Size(), bloomTrieNodes.Count()},
+		{"State sync", "Trie segments", syncSegments.Size(), syncSegments.Count()},
+		{"State sync", "Storage tries to fetch", syncProgress.Size(), syncProgress.Count()},
+		{"State sync", "Code to fetch", codeToFetch.Size(), codeToFetch.Count()},
 	}
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"Database", "Category", "Size", "Items"})
@@ -241,4 +255,28 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 	}
 
 	return nil
+}
+
+// ClearPrefix removes all keys in db that begin with prefix
+func ClearPrefix(db ethdb.KeyValueStore, prefix []byte) error {
+	it := db.NewIterator(prefix, nil)
+	defer it.Release()
+
+	batch := db.NewBatch()
+	for it.Next() {
+		key := common.CopyBytes(it.Key())
+		if err := batch.Delete(key); err != nil {
+			return err
+		}
+		if batch.ValueSize() > ethdb.IdealBatchSize {
+			if err := batch.Write(); err != nil {
+				return err
+			}
+			batch.Reset()
+		}
+	}
+	if err := it.Error(); err != nil {
+		return err
+	}
+	return batch.Write()
 }

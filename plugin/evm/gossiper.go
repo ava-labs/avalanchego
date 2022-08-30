@@ -48,7 +48,7 @@ type pushGossiper struct {
 	gossipActivationTime time.Time
 	config               Config
 
-	client     peer.Client
+	client     peer.NetworkClient
 	blockchain *core.BlockChain
 	txPool     *core.TxPool
 
@@ -68,9 +68,9 @@ type pushGossiper struct {
 	signer types.Signer
 }
 
-// createGossipper constructs and returns a pushGossiper or noopGossiper
+// createGossiper constructs and returns a pushGossiper or noopGossiper
 // based on whether vm.chainConfig.SubnetEVMTimestamp is set
-func (vm *VM) createGossipper() Gossiper {
+func (vm *VM) createGossiper() Gossiper {
 	if vm.chainConfig.SubnetEVMTimestamp == nil {
 		return &noopGossiper{}
 	}

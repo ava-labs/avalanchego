@@ -14,14 +14,14 @@ import (
 	"github.com/ava-labs/subnet-evm/ethdb/memorydb"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
-	"github.com/ava-labs/subnet-evm/statesync/handlers/stats"
+	"github.com/ava-labs/subnet-evm/sync/handlers/stats"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBlockRequestHandler(t *testing.T) {
-	gspec := &core.Genesis{
+	var gspec = &core.Genesis{
 		Config: params.TestChainConfig,
 	}
 	memdb := memorydb.New()
@@ -40,18 +40,17 @@ func TestBlockRequestHandler(t *testing.T) {
 		blocksDB[blk.Hash()] = blk
 	}
 
-	codec, err := message.BuildCodec()
-	if err != nil {
-		t.Fatal("error building codec", err)
+	mockHandlerStats := &stats.MockHandlerStats{}
+	blockProvider := &TestBlockProvider{
+		GetBlockFn: func(hash common.Hash, height uint64) *types.Block {
+			blk, ok := blocksDB[hash]
+			if !ok || blk.NumberU64() != height {
+				return nil
+			}
+			return blk
+		},
 	}
-
-	blockRequestHandler := NewBlockRequestHandler(func(hash common.Hash, height uint64) *types.Block {
-		blk, ok := blocksDB[hash]
-		if !ok || blk.NumberU64() != height {
-			return nil
-		}
-		return blk
-	}, codec, stats.NewNoopHandlerStats())
+	blockRequestHandler := NewBlockRequestHandler(blockProvider, message.Codec, mockHandlerStats)
 
 	tests := []struct {
 		name string
@@ -64,6 +63,7 @@ func TestBlockRequestHandler(t *testing.T) {
 		requestedParents  uint16
 		expectedBlocks    int
 		expectNilResponse bool
+		assertResponse    func(t *testing.T, response []byte)
 	}{
 		{
 			name:             "handler_returns_blocks_as_requested",
@@ -89,6 +89,9 @@ func TestBlockRequestHandler(t *testing.T) {
 			startBlockHeight:  1_000_000,
 			requestedParents:  64,
 			expectNilResponse: true,
+			assertResponse: func(t *testing.T, _ []byte) {
+				assert.Equal(t, uint32(1), mockHandlerStats.MissingBlockHashCount)
+			},
 		},
 	}
 	for _, test := range tests {
@@ -108,6 +111,9 @@ func TestBlockRequestHandler(t *testing.T) {
 			if err != nil {
 				t.Fatal("unexpected error during block request", err)
 			}
+			if test.assertResponse != nil {
+				test.assertResponse(t, responseBytes)
+			}
 
 			if test.expectNilResponse {
 				assert.Nil(t, responseBytes)
@@ -117,7 +123,7 @@ func TestBlockRequestHandler(t *testing.T) {
 			assert.NotEmpty(t, responseBytes)
 
 			var response message.BlockResponse
-			if _, err = codec.Unmarshal(responseBytes, &response); err != nil {
+			if _, err = message.Codec.Unmarshal(responseBytes, &response); err != nil {
 				t.Fatal("error unmarshalling", err)
 			}
 			assert.Len(t, response.Blocks, test.expectedBlocks)
@@ -131,12 +137,13 @@ func TestBlockRequestHandler(t *testing.T) {
 				assert.Equal(t, blocks[test.startBlockIndex].Hash(), block.Hash())
 				test.startBlockIndex--
 			}
+			mockHandlerStats.Reset()
 		})
 	}
 }
 
 func TestBlockRequestHandlerCtxExpires(t *testing.T) {
-	gspec := &core.Genesis{
+	var gspec = &core.Genesis{
 		Config: params.TestChainConfig,
 	}
 	memdb := memorydb.New()
@@ -155,27 +162,25 @@ func TestBlockRequestHandlerCtxExpires(t *testing.T) {
 		blocksDB[blk.Hash()] = blk
 	}
 
-	codec, err := message.BuildCodec()
-	if err != nil {
-		t.Fatal("error building codec", err)
-	}
-
 	cancelAfterNumRequests := 2
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	blockRequestCallCount := 0
-	blockRequestHandler := NewBlockRequestHandler(func(hash common.Hash, height uint64) *types.Block {
-		blockRequestCallCount++
-		// cancel ctx after the 2nd call to simulate ctx expiring due to deadline exceeding
-		if blockRequestCallCount >= cancelAfterNumRequests {
-			cancel()
-		}
-		blk, ok := blocksDB[hash]
-		if !ok || blk.NumberU64() != height {
-			return nil
-		}
-		return blk
-	}, codec, stats.NewNoopHandlerStats())
+	blockProvider := &TestBlockProvider{
+		GetBlockFn: func(hash common.Hash, height uint64) *types.Block {
+			blockRequestCallCount++
+			// cancel ctx after the 2nd call to simulate ctx expiring due to deadline exceeding
+			if blockRequestCallCount >= cancelAfterNumRequests {
+				cancel()
+			}
+			blk, ok := blocksDB[hash]
+			if !ok || blk.NumberU64() != height {
+				return nil
+			}
+			return blk
+		},
+	}
+	blockRequestHandler := NewBlockRequestHandler(blockProvider, message.Codec, stats.NewNoopHandlerStats())
 
 	responseBytes, err := blockRequestHandler.OnBlockRequest(ctx, ids.GenerateTestNodeID(), 1, message.BlockRequest{
 		Hash:    blocks[10].Hash(),
@@ -188,7 +193,7 @@ func TestBlockRequestHandlerCtxExpires(t *testing.T) {
 	assert.NotEmpty(t, responseBytes)
 
 	var response message.BlockResponse
-	if _, err = codec.Unmarshal(responseBytes, &response); err != nil {
+	if _, err = message.Codec.Unmarshal(responseBytes, &response); err != nil {
 		t.Fatal("error unmarshalling", err)
 	}
 	// requested 8 blocks, received cancelAfterNumRequests because of timeout

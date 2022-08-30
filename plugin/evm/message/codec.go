@@ -15,8 +15,10 @@ const (
 	maxMessageSize = 1 * units.MiB
 )
 
-func BuildCodec() (codec.Manager, error) {
-	codecManager := codec.NewManager(maxMessageSize)
+var Codec codec.Manager
+
+func init() {
+	Codec = codec.NewManager(maxMessageSize)
 	c := linearcodec.NewDefault()
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -24,7 +26,7 @@ func BuildCodec() (codec.Manager, error) {
 		c.RegisterType(TxsGossip{}),
 
 		// Types for state sync frontier consensus
-		c.RegisterType(SyncableBlock{}),
+		c.RegisterType(SyncSummary{}),
 
 		// state sync types
 		c.RegisterType(BlockRequest{}),
@@ -34,7 +36,10 @@ func BuildCodec() (codec.Manager, error) {
 		c.RegisterType(CodeRequest{}),
 		c.RegisterType(CodeResponse{}),
 
-		codecManager.RegisterCodec(Version, c),
+		Codec.RegisterCodec(Version, c),
 	)
-	return codecManager, errs.Err
+
+	if errs.Errored() {
+		panic(errs.Err)
+	}
 }
