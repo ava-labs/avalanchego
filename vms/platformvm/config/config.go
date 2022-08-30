@@ -48,6 +48,9 @@ type Config struct {
 	// Fee that must be burned by every subnet creating transaction after AP3
 	CreateSubnetTxFee uint64
 
+	// Fee that must be burned by every transform subnet transaction
+	TransformSubnetTxFee uint64
+
 	// Fee that must be burned by every blockchain creating transaction after AP3
 	CreateBlockchainTxFee uint64
 

@@ -51,20 +51,22 @@ var (
 
 	ErrDelegatorSubset = errors.New("delegator's time range must be a subset of the validator's time range")
 
-	blockPrefix           = []byte("block")
-	validatorsPrefix      = []byte("validators")
-	currentPrefix         = []byte("current")
-	pendingPrefix         = []byte("pending")
-	validatorPrefix       = []byte("validator")
-	delegatorPrefix       = []byte("delegator")
-	subnetValidatorPrefix = []byte("subnetValidator")
-	validatorDiffsPrefix  = []byte("validatorDiffs")
-	txPrefix              = []byte("tx")
-	rewardUTXOsPrefix     = []byte("rewardUTXOs")
-	utxoPrefix            = []byte("utxo")
-	subnetPrefix          = []byte("subnet")
-	chainPrefix           = []byte("chain")
-	singletonPrefix       = []byte("singleton")
+	blockPrefix             = []byte("block")
+	validatorsPrefix        = []byte("validators")
+	currentPrefix           = []byte("current")
+	pendingPrefix           = []byte("pending")
+	validatorPrefix         = []byte("validator")
+	delegatorPrefix         = []byte("delegator")
+	subnetValidatorPrefix   = []byte("subnetValidator")
+	validatorDiffsPrefix    = []byte("validatorDiffs")
+	txPrefix                = []byte("tx")
+	rewardUTXOsPrefix       = []byte("rewardUTXOs")
+	utxoPrefix              = []byte("utxo")
+	subnetPrefix            = []byte("subnet")
+	transformedSubnetPrefix = []byte("transformedSubnet")
+	supplyPrefix            = []byte("supply")
+	chainPrefix             = []byte("chain")
+	singletonPrefix         = []byte("singleton")
 
 	timestampKey     = []byte("timestamp")
 	currentSupplyKey = []byte("current supply")
@@ -82,15 +84,25 @@ type Chain interface {
 
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)
+
 	GetCurrentSupply() uint64
 	SetCurrentSupply(cs uint64)
 
+	GetCurrentSubnetSupply(subnetID ids.ID) (uint64, error)
+	SetCurrentSubnetSupply(subnetID ids.ID, cs uint64)
+
 	GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error)
 	AddRewardUTXO(txID ids.ID, utxo *avax.UTXO)
+
 	GetSubnets() ([]*txs.Tx, error)
 	AddSubnet(createSubnetTx *txs.Tx)
+
+	GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error)
+	AddSubnetTransformation(transformSubnetTx *txs.Tx)
+
 	GetChains(subnetID ids.ID) ([]*txs.Tx, error)
 	AddChain(createChainTx *txs.Tx)
+
 	GetTx(txID ids.ID) (*txs.Tx, status.Status, error)
 	AddTx(tx *txs.Tx, status status.Status)
 }
@@ -243,6 +255,14 @@ type state struct {
 	addedSubnets  []*txs.Tx
 	subnetBaseDB  database.Database
 	subnetDB      linkeddb.LinkedDB
+
+	transformedSubnets     map[ids.ID]*txs.Tx // map of subnetID -> transformSubnetTx
+	transformedSubnetCache cache.Cacher       // cache of subnetID -> transformSubnetTx if the entry is nil, it is not in the database
+	transformedSubnetDB    database.Database
+
+	modifiedSupplies map[ids.ID]uint64 // map of subnetID -> current supply
+	supplyCache      cache.Cacher      // cache of subnetID -> current supply if the entry is nil, it is not in the database
+	supplyDB         database.Database
 
 	addedChains  map[ids.ID][]*txs.Tx // maps subnetID -> the newly added chains to the subnet
 	chainCache   cache.Cacher         // cache of subnetID -> the chains after all local modifications []*txs.Tx
@@ -402,6 +422,24 @@ func new(
 
 	subnetBaseDB := prefixdb.New(subnetPrefix, baseDB)
 
+	transformedSubnetCache, err := metercacher.New(
+		"transformed_subnet_cache",
+		metricsReg,
+		&cache.LRU{Size: chainCacheSize},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	supplyCache, err := metercacher.New(
+		"supply_cache",
+		metricsReg,
+		&cache.LRU{Size: chainCacheSize},
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	chainCache, err := metercacher.New(
 		"chain_cache",
 		metricsReg,
@@ -469,6 +507,14 @@ func new(
 
 		subnetBaseDB: subnetBaseDB,
 		subnetDB:     linkeddb.NewDefault(subnetBaseDB),
+
+		transformedSubnets:     make(map[ids.ID]*txs.Tx),
+		transformedSubnetCache: transformedSubnetCache,
+		transformedSubnetDB:    prefixdb.New(transformedSubnetPrefix, baseDB),
+
+		modifiedSupplies: make(map[ids.ID]uint64),
+		supplyCache:      supplyCache,
+		supplyDB:         prefixdb.New(supplyPrefix, baseDB),
 
 		addedChains:  make(map[ids.ID][]*txs.Tx),
 		chainDB:      prefixdb.New(chainPrefix, baseDB),
@@ -578,6 +624,40 @@ func (s *state) AddSubnet(createSubnetTx *txs.Tx) {
 	if s.cachedSubnets != nil {
 		s.cachedSubnets = append(s.cachedSubnets, createSubnetTx)
 	}
+}
+
+func (s *state) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
+	if tx, exists := s.transformedSubnets[subnetID]; exists {
+		return tx, nil
+	}
+
+	if txIntf, cached := s.transformedSubnetCache.Get(subnetID); cached {
+		if txIntf == nil {
+			return nil, database.ErrNotFound
+		}
+		return txIntf.(*txs.Tx), nil
+	}
+
+	transformSubnetTxID, err := database.GetID(s.transformedSubnetDB, subnetID[:])
+	if err == database.ErrNotFound {
+		s.transformedSubnetCache.Put(subnetID, nil)
+		return nil, database.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	transformSubnetTx, _, err := s.GetTx(transformSubnetTxID)
+	if err != nil {
+		return nil, err
+	}
+	s.transformedSubnetCache.Put(subnetID, transformSubnetTx)
+	return transformSubnetTx, nil
+}
+
+func (s *state) AddSubnetTransformation(transformSubnetTxIntf *txs.Tx) {
+	transformSubnetTx := transformSubnetTxIntf.Unsigned.(*txs.TransformSubnetTx)
+	s.transformedSubnets[transformSubnetTx.Subnet] = transformSubnetTxIntf
 }
 
 func (s *state) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
@@ -765,6 +845,37 @@ func (s *state) GetCurrentSupply() uint64            { return s.currentSupply }
 func (s *state) SetCurrentSupply(cs uint64)          { s.currentSupply = cs }
 func (s *state) GetLastAccepted() ids.ID             { return s.lastAccepted }
 func (s *state) SetLastAccepted(lastAccepted ids.ID) { s.lastAccepted = lastAccepted }
+
+func (s *state) GetCurrentSubnetSupply(subnetID ids.ID) (uint64, error) {
+	supply, ok := s.modifiedSupplies[subnetID]
+	if ok {
+		return supply, nil
+	}
+
+	supplyIntf, ok := s.supplyCache.Get(subnetID)
+	if ok {
+		if supplyIntf == nil {
+			return 0, database.ErrNotFound
+		}
+		return supplyIntf.(uint64), nil
+	}
+
+	supply, err := database.GetUInt64(s.supplyDB, subnetID[:])
+	if err == database.ErrNotFound {
+		s.supplyCache.Put(subnetID, nil)
+		return 0, database.ErrNotFound
+	}
+	if err != nil {
+		return 0, err
+	}
+
+	s.supplyCache.Put(subnetID, supply)
+	return supply, nil
+}
+
+func (s *state) SetCurrentSubnetSupply(subnetID ids.ID, cs uint64) {
+	s.modifiedSupplies[subnetID] = cs
+}
 
 func (s *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error) {
 	prefixStruct := heightWithSubnet{
@@ -1154,6 +1265,8 @@ func (s *state) write(height uint64) error {
 		s.writeRewardUTXOs(),
 		s.writeUTXOs(),
 		s.writeSubnets(),
+		s.writeTransformedSubnets(),
+		s.writeSubnetSupplies(),
 		s.writeChains(),
 		s.writeMetadata(),
 	)
@@ -1176,6 +1289,8 @@ func (s *state) Close() error {
 		s.rewardUTXODB.Close(),
 		s.utxoDB.Close(),
 		s.subnetBaseDB.Close(),
+		s.transformedSubnetDB.Close(),
+		s.supplyDB.Close(),
 		s.chainDB.Close(),
 		s.singletonDB.Close(),
 		s.blockDB.Close(),
@@ -1686,6 +1801,30 @@ func (s *state) writeSubnets() error {
 		}
 	}
 	s.addedSubnets = nil
+	return nil
+}
+
+func (s *state) writeTransformedSubnets() error {
+	for subnetID, tx := range s.transformedSubnets {
+		txID := tx.ID()
+
+		delete(s.transformedSubnets, subnetID)
+		s.transformedSubnetCache.Put(subnetID, tx)
+		if err := database.PutID(s.transformedSubnetDB, subnetID[:], txID); err != nil {
+			return fmt.Errorf("failed to write transformed subnet: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *state) writeSubnetSupplies() error {
+	for subnetID, supply := range s.modifiedSupplies {
+		delete(s.modifiedSupplies, subnetID)
+		s.supplyCache.Put(subnetID, supply)
+		if err := database.PutUInt64(s.supplyDB, subnetID[:], supply); err != nil {
+			return fmt.Errorf("failed to write subnet supply: %w", err)
+		}
+	}
 	return nil
 }
 

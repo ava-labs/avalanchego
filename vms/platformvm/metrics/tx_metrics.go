@@ -24,7 +24,8 @@ type txMetrics struct {
 	numExportTxs,
 	numImportTxs,
 	numRewardValidatorTxs,
-	numRemoveSubnetValidatorTxs prometheus.Counter
+	numRemoveSubnetValidatorTxs,
+	numTransformSubnetTxs prometheus.Counter
 }
 
 func newTxMetrics(
@@ -43,6 +44,7 @@ func newTxMetrics(
 		numImportTxs:                newTxMetric(namespace, "import", registerer, &errs),
 		numRewardValidatorTxs:       newTxMetric(namespace, "reward_validator", registerer, &errs),
 		numRemoveSubnetValidatorTxs: newTxMetric(namespace, "remove_subnet_validator", registerer, &errs),
+		numTransformSubnetTxs:       newTxMetric(namespace, "transform_subnet", registerer, &errs),
 	}
 	return m, errs.Err
 }
@@ -109,5 +111,10 @@ func (m *txMetrics) RewardValidatorTx(*txs.RewardValidatorTx) error {
 
 func (m *txMetrics) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
 	m.numRemoveSubnetValidatorTxs.Inc()
+	return nil
+}
+
+func (m *txMetrics) TransformSubnetTx(*txs.TransformSubnetTx) error {
+	m.numTransformSubnetTxs.Inc()
 	return nil
 }

@@ -68,3 +68,8 @@ func (i *issuer) ExportTx(tx *txs.ExportTx) error {
 	i.m.addDecisionTx(i.tx)
 	return nil
 }
+
+func (i *issuer) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
+	i.m.addDecisionTx(i.tx)
+	return nil
+}

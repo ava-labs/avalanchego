@@ -22,6 +22,7 @@ var (
 			TxFee:                 units.MilliAvax,
 			CreateAssetTxFee:      10 * units.MilliAvax,
 			CreateSubnetTxFee:     100 * units.MilliAvax,
+			TransformSubnetTxFee:  100 * units.MilliAvax,
 			CreateBlockchainTxFee: 100 * units.MilliAvax,
 		},
 		StakingConfig: StakingConfig{

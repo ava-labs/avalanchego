@@ -782,6 +782,7 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 			TxFee:                 v.GetUint64(TxFeeKey),
 			CreateAssetTxFee:      v.GetUint64(CreateAssetTxFeeKey),
 			CreateSubnetTxFee:     v.GetUint64(CreateSubnetTxFeeKey),
+			TransformSubnetTxFee:  v.GetUint64(TransformSubnetTxFeeKey),
 			CreateBlockchainTxFee: v.GetUint64(CreateBlockchainTxFeeKey),
 		}
 	}

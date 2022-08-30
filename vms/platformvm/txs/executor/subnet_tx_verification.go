@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -16,6 +17,8 @@ import (
 var (
 	errWrongNumberOfCredentials       = errors.New("should have the same number of credentials as inputs")
 	errCantFindSubnet                 = errors.New("couldn't find subnet")
+	errIsNotSubnet                    = errors.New("is not a subnet")
+	errIsImmutable                    = errors.New("is immutable")
 	errUnauthorizedSubnetModification = errors.New("unauthorized subnet modification")
 )
 
@@ -50,10 +53,15 @@ func verifySubnetAuthorization(
 
 	subnet, ok := subnetIntf.Unsigned.(*txs.CreateSubnetTx)
 	if !ok {
-		return nil, fmt.Errorf(
-			"%s is not a subnet",
-			subnetID,
-		)
+		return nil, fmt.Errorf("%q %w", subnetID, errIsNotSubnet)
+	}
+
+	_, err = chainState.GetSubnetTransformation(subnetID)
+	if err == nil {
+		return nil, fmt.Errorf("%q %w", subnetID, errIsImmutable)
+	}
+	if err != database.ErrNotFound {
+		return nil, err
 	}
 
 	if err := backend.Fx.VerifyPermission(sTx.Unsigned, subnetAuth, subnetCred, subnet.Owner); err != nil {

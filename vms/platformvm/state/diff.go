@@ -34,12 +34,16 @@ type diff struct {
 	timestamp time.Time
 
 	currentSupply uint64
+	// Subnet ID --> supply of native asset of the subnet
+	subnetSupplies map[ids.ID]uint64
 
 	currentStakerDiffs diffStakers
 	pendingStakerDiffs diffStakers
 
-	addedSubnets  []*txs.Tx
-	cachedSubnets []*txs.Tx
+	addedSubnets []*txs.Tx
+	// Subnet ID --> Tx that transforms the subnet
+	transformedSubnets map[ids.ID]*txs.Tx
+	cachedSubnets      []*txs.Tx
 
 	addedChains  map[ids.ID][]*txs.Tx
 	cachedChains map[ids.ID][]*txs.Tx
@@ -89,6 +93,30 @@ func (d *diff) GetCurrentSupply() uint64 {
 
 func (d *diff) SetCurrentSupply(currentSupply uint64) {
 	d.currentSupply = currentSupply
+}
+
+func (d *diff) GetCurrentSubnetSupply(subnetID ids.ID) (uint64, error) {
+	supply, ok := d.subnetSupplies[subnetID]
+	if ok {
+		return supply, nil
+	}
+
+	// If the subnet supply wasn't modified in this diff, ask the parent state.
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return 0, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+	return parentState.GetCurrentSubnetSupply(subnetID)
+}
+
+func (d *diff) SetCurrentSubnetSupply(subnetID ids.ID, currentSupply uint64) {
+	if d.subnetSupplies == nil {
+		d.subnetSupplies = map[ids.ID]uint64{
+			subnetID: currentSupply,
+		}
+	} else {
+		d.subnetSupplies[subnetID] = currentSupply
+	}
 }
 
 func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
@@ -254,6 +282,31 @@ func (d *diff) AddSubnet(createSubnetTx *txs.Tx) {
 	}
 }
 
+func (d *diff) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
+	tx, exists := d.transformedSubnets[subnetID]
+	if exists {
+		return tx, nil
+	}
+
+	// If the subnet wasn't transformed in this diff, ask the parent state.
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, ErrMissingParentState
+	}
+	return parentState.GetSubnetTransformation(subnetID)
+}
+
+func (d *diff) AddSubnetTransformation(transformSubnetTxIntf *txs.Tx) {
+	transformSubnetTx := transformSubnetTxIntf.Unsigned.(*txs.TransformSubnetTx)
+	if d.transformedSubnets == nil {
+		d.transformedSubnets = map[ids.ID]*txs.Tx{
+			transformSubnetTx.Subnet: transformSubnetTxIntf,
+		}
+	} else {
+		d.transformedSubnets[transformSubnetTx.Subnet] = transformSubnetTxIntf
+	}
+}
+
 func (d *diff) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
 	addedChains := d.addedChains[subnetID]
 	if len(addedChains) == 0 {
@@ -404,6 +457,9 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 func (d *diff) Apply(baseState State) {
 	baseState.SetTimestamp(d.timestamp)
 	baseState.SetCurrentSupply(d.currentSupply)
+	for subnetID, supply := range d.subnetSupplies {
+		baseState.SetCurrentSubnetSupply(subnetID, supply)
+	}
 	for _, subnetValidatorDiffs := range d.currentStakerDiffs.validatorDiffs {
 		for _, validatorDiff := range subnetValidatorDiffs {
 			if validatorDiff.validatorModified {
@@ -448,6 +504,9 @@ func (d *diff) Apply(baseState State) {
 	}
 	for _, subnet := range d.addedSubnets {
 		baseState.AddSubnet(subnet)
+	}
+	for _, tx := range d.transformedSubnets {
+		baseState.AddSubnetTransformation(tx)
 	}
 	for _, chains := range d.addedChains {
 		for _, chain := range chains {

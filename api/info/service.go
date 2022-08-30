@@ -49,6 +49,7 @@ type Parameters struct {
 	TxFee                 uint64
 	CreateAssetTxFee      uint64
 	CreateSubnetTxFee     uint64
+	TransformSubnetTxFee  uint64
 	CreateBlockchainTxFee uint64
 	VMManager             vms.Manager
 }
@@ -280,6 +281,7 @@ type GetTxFeeResponse struct {
 	CreationTxFee         json.Uint64 `json:"creationTxFee"`
 	CreateAssetTxFee      json.Uint64 `json:"createAssetTxFee"`
 	CreateSubnetTxFee     json.Uint64 `json:"createSubnetTxFee"`
+	TransformSubnetTxFee  json.Uint64 `json:"transformSubnetTxFee"`
 	CreateBlockchainTxFee json.Uint64 `json:"createBlockchainTxFee"`
 }
 
@@ -289,6 +291,7 @@ func (service *Info) GetTxFee(_ *http.Request, args *struct{}, reply *GetTxFeeRe
 	reply.CreationTxFee = json.Uint64(service.CreateAssetTxFee)
 	reply.CreateAssetTxFee = json.Uint64(service.CreateAssetTxFee)
 	reply.CreateSubnetTxFee = json.Uint64(service.CreateSubnetTxFee)
+	reply.TransformSubnetTxFee = json.Uint64(service.TransformSubnetTxFee)
 	reply.CreateBlockchainTxFee = json.Uint64(service.CreateBlockchainTxFee)
 	return nil
 }

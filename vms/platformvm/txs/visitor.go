@@ -15,4 +15,5 @@ type Visitor interface {
 	AdvanceTimeTx(*AdvanceTimeTx) error
 	RewardValidatorTx(*RewardValidatorTx) error
 	RemoveSubnetValidatorTx(*RemoveSubnetValidatorTx) error
+	TransformSubnetTx(*TransformSubnetTx) error
 }

@@ -320,6 +320,7 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 			Validators:             validators.NewManager(),
 			TxFee:                  defaultTxFee,
 			CreateSubnetTxFee:      100 * defaultTxFee,
+			TransformSubnetTxFee:   100 * defaultTxFee,
 			CreateBlockchainTxFee:  100 * defaultTxFee,
 			MinValidatorStake:      defaultMinValidatorStake,
 			MaxValidatorStake:      defaultMaxValidatorStake,

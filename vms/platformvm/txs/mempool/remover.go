@@ -52,6 +52,11 @@ func (r *remover) ExportTx(*txs.ExportTx) error {
 	return nil
 }
 
+func (r *remover) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
+	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
+	return nil
+}
+
 func (r *remover) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
 	// this tx is never in mempool
 	return nil
