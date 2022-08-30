@@ -35,8 +35,10 @@ type AddPermissionlessValidatorTx struct {
 	Validator validator.SubnetValidator `serialize:"true" json:"validator"`
 	// Where to send staked tokens when done validating
 	Stake []*avax.TransferableOutput `serialize:"true" json:"stake"`
-	// Where to send staking rewards when done validating
-	RewardsOwner fx.Owner `serialize:"true" json:"rewardsOwner"`
+	// Where to send validation rewards when done validating
+	ValidationRewardsOwner fx.Owner `serialize:"true" json:"validationRewardsOwner"`
+	// Where to send delegation rewards when done validating
+	DelegationRewardsOwner fx.Owner `serialize:"true" json:"delegationRewardsOwner"`
 	// Fee this validator charges delegators as a percentage, times 10,000
 	// For example, if this validator has Shares=300,000 then they take 30% of
 	// rewards from delegators
@@ -52,7 +54,8 @@ func (tx *AddPermissionlessValidatorTx) InitCtx(ctx *snow.Context) {
 		out.FxID = secp256k1fx.ID
 		out.InitCtx(ctx)
 	}
-	tx.RewardsOwner.InitCtx(ctx)
+	tx.ValidationRewardsOwner.InitCtx(ctx)
+	tx.DelegationRewardsOwner.InitCtx(ctx)
 }
 
 func (tx *AddPermissionlessValidatorTx) StartTime() time.Time { return tx.Validator.StartTime() }
@@ -75,8 +78,8 @@ func (tx *AddPermissionlessValidatorTx) SyntacticVerify(ctx *snow.Context) error
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
-	if err := verify.All(&tx.Validator, tx.RewardsOwner); err != nil {
-		return fmt.Errorf("failed to verify validator or rewards owner: %w", err)
+	if err := verify.All(&tx.Validator, tx.ValidationRewardsOwner, tx.DelegationRewardsOwner); err != nil {
+		return fmt.Errorf("failed to verify validator or rewards owners: %w", err)
 	}
 
 	for _, out := range tx.Stake {
