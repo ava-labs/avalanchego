@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -23,8 +24,9 @@ var (
 	_ StakerTx               = &AddPermissionlessValidatorTx{}
 	_ secp256k1fx.UnsignedTx = &AddPermissionlessValidatorTx{}
 
-	errNoStake              = errors.New("no stake")
-	errMultipleStakedAssets = errors.New("multiple staked assets")
+	errNoStake                 = errors.New("no stake")
+	errMultipleStakedAssets    = errors.New("multiple staked assets")
+	errValidatorWeightMismatch = errors.New("validator weight mismatch")
 )
 
 // AddPermissionlessValidatorTx is an unsigned addPermissionlessValidatorTx
@@ -32,7 +34,9 @@ type AddPermissionlessValidatorTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// Describes the validator
-	Validator validator.SubnetValidator `serialize:"true" json:"validator"`
+	Validator validator.Validator `serialize:"true" json:"validator"`
+	// ID of the subnet this validator is validating
+	Subnet ids.ID `serialize:"true" json:"subnet"`
 	// Where to send staked tokens when done validating
 	Stake []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send validation rewards when done validating
@@ -108,7 +112,7 @@ func (tx *AddPermissionlessValidatorTx) SyntacticVerify(ctx *snow.Context) error
 	case !avax.IsSortedTransferableOutputs(tx.Stake, Codec):
 		return errOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
-		return fmt.Errorf("validator weight %d is not equal to total stake weight %d", tx.Validator.Wght, totalStakeWeight)
+		return fmt.Errorf("%w: weight %d != stake %d", errValidatorWeightMismatch, tx.Validator.Wght, totalStakeWeight)
 	}
 
 	// cache that this is valid
