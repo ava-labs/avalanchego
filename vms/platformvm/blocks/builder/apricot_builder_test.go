@@ -201,8 +201,8 @@ func TestBuildApricotBlock(t *testing.T) {
 					currentStakerIter.EXPECT().Next().Return(true),
 					currentStakerIter.EXPECT().Value().Return(&state.Staker{
 						NextTime: now.Add(-1 * time.Second),
+						Priority: state.PrimaryNetworkValidatorCurrentPriority,
 					}),
-					currentStakerIter.EXPECT().Next().Return(false),
 					currentStakerIter.EXPECT().Release(),
 				)
 
@@ -258,8 +258,8 @@ func TestBuildApricotBlock(t *testing.T) {
 					currentStakerIter.EXPECT().Next().Return(true),
 					currentStakerIter.EXPECT().Value().Return(&state.Staker{
 						NextTime: now.Add(time.Second),
+						Priority: state.PrimaryNetworkValidatorCurrentPriority,
 					}),
-					currentStakerIter.EXPECT().Next().Return(false),
 					currentStakerIter.EXPECT().Release(),
 				)
 
@@ -314,8 +314,8 @@ func TestBuildApricotBlock(t *testing.T) {
 					currentStakerIter.EXPECT().Next().Return(true),
 					currentStakerIter.EXPECT().Value().Return(&state.Staker{
 						NextTime: now.Add(time.Second),
+						Priority: state.PrimaryNetworkValidatorCurrentPriority,
 					}),
-					currentStakerIter.EXPECT().Next().Return(false),
 					currentStakerIter.EXPECT().Release(),
 				)
 

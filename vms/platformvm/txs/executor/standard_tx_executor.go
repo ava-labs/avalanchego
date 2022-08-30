@@ -341,7 +341,7 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 
 	newStaker := state.NewSubnetStaker(txID, &tx.Validator)
 	newStaker.NextTime = tx.Validator.StartTime()
-	newStaker.Priority = state.SubnetValidatorPendingPriority
+	newStaker.Priority = state.SubnetPermissionedValidatorPendingPriority
 
 	e.State.PutPendingValidator(newStaker)
 	utxo.Consume(e.State, tx.Ins)

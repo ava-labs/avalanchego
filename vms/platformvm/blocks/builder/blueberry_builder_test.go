@@ -254,8 +254,8 @@ func TestBuildBlueberryBlock(t *testing.T) {
 					currentStakerIter.EXPECT().Next().Return(true),
 					currentStakerIter.EXPECT().Value().Return(&state.Staker{
 						NextTime: now.Add(time.Second),
+						Priority: state.PrimaryNetworkDelegatorCurrentPriority,
 					}),
-					currentStakerIter.EXPECT().Next().Return(false),
 					currentStakerIter.EXPECT().Release(),
 				)
 
@@ -309,8 +309,8 @@ func TestBuildBlueberryBlock(t *testing.T) {
 					currentStakerIter.EXPECT().Next().Return(true),
 					currentStakerIter.EXPECT().Value().Return(&state.Staker{
 						NextTime: now.Add(time.Second),
+						Priority: state.PrimaryNetworkDelegatorCurrentPriority,
 					}),
-					currentStakerIter.EXPECT().Next().Return(false),
 					currentStakerIter.EXPECT().Release(),
 				)
 
@@ -357,8 +357,8 @@ func TestBuildBlueberryBlock(t *testing.T) {
 					currentStakerIter.EXPECT().Next().Return(true),
 					currentStakerIter.EXPECT().Value().Return(&state.Staker{
 						NextTime: now.Add(-1 * time.Second),
+						Priority: state.PrimaryNetworkDelegatorCurrentPriority,
 					}),
-					currentStakerIter.EXPECT().Next().Return(false),
 					currentStakerIter.EXPECT().Release(),
 				)
 
@@ -410,8 +410,8 @@ func TestBuildBlueberryBlock(t *testing.T) {
 					currentStakerIter.EXPECT().Next().Return(true),
 					currentStakerIter.EXPECT().Value().Return(&state.Staker{
 						NextTime: now.Add(time.Second),
+						Priority: state.PrimaryNetworkDelegatorCurrentPriority,
 					}),
-					currentStakerIter.EXPECT().Next().Return(false),
 					currentStakerIter.EXPECT().Release(),
 				)
 
@@ -464,8 +464,8 @@ func TestBuildBlueberryBlock(t *testing.T) {
 					currentStakerIter.EXPECT().Next().Return(true),
 					currentStakerIter.EXPECT().Value().Return(&state.Staker{
 						NextTime: now.Add(time.Second),
+						Priority: state.PrimaryNetworkDelegatorCurrentPriority,
 					}),
-					currentStakerIter.EXPECT().Next().Return(false),
 					currentStakerIter.EXPECT().Release(),
 				)
 

@@ -271,11 +271,10 @@ func (b *builder) getNextStakerToReward(
 	for currentStakerIterator.Next() {
 		currentStaker := currentStakerIterator.Value()
 		priority := currentStaker.Priority
-		// If the staker is a primary network staker (not a subnet validator),
-		// it's the next staker we will want to remove with a RewardValidatorTx
-		// rather than an AdvanceTimeTx.
-		if priority == state.PrimaryNetworkDelegatorCurrentPriority ||
-			priority == state.PrimaryNetworkValidatorCurrentPriority {
+		// If the staker is a permissionless staker (not a permissioned subnet
+		// validator), it's the next staker we will want to remove with a
+		// RewardValidatorTx rather than an AdvanceTimeTx.
+		if priority != state.SubnetPermissionedValidatorCurrentPriority {
 			return currentStaker.TxID, chainTimestamp.Equal(currentStaker.EndTime), nil
 		}
 	}

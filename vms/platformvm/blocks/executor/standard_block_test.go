@@ -523,7 +523,7 @@ func TestBlueberryStandardBlockUpdateStakers(t *testing.T) {
 
 				staker := state.NewSubnetStaker(tx.ID(), &tx.Unsigned.(*txs.AddSubnetValidatorTx).Validator)
 				staker.NextTime = staker.StartTime
-				staker.Priority = state.SubnetValidatorPendingPriority
+				staker.Priority = state.SubnetPermissionedValidatorPendingPriority
 
 				env.state.PutPendingValidator(staker)
 				env.state.AddTx(tx, status.Committed)
@@ -611,7 +611,7 @@ func TestBlueberryStandardBlockRemoveSubnetValidator(t *testing.T) {
 
 	staker := state.NewSubnetStaker(tx.ID(), &tx.Unsigned.(*txs.AddSubnetValidatorTx).Validator)
 	staker.NextTime = staker.EndTime
-	staker.Priority = state.SubnetValidatorCurrentPriority
+	staker.Priority = state.SubnetPermissionedValidatorCurrentPriority
 
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(tx, status.Committed)
@@ -634,7 +634,7 @@ func TestBlueberryStandardBlockRemoveSubnetValidator(t *testing.T) {
 
 	staker = state.NewSubnetStaker(tx.ID(), &tx.Unsigned.(*txs.AddSubnetValidatorTx).Validator)
 	staker.NextTime = staker.StartTime
-	staker.Priority = state.SubnetValidatorPendingPriority
+	staker.Priority = state.SubnetPermissionedValidatorPendingPriority
 
 	env.state.PutPendingValidator(staker)
 	env.state.AddTx(tx, status.Committed)
@@ -705,7 +705,7 @@ func TestBlueberryStandardBlockWhitelistedSubnet(t *testing.T) {
 
 			staker := state.NewSubnetStaker(tx.ID(), &tx.Unsigned.(*txs.AddSubnetValidatorTx).Validator)
 			staker.NextTime = staker.StartTime
-			staker.Priority = state.SubnetValidatorPendingPriority
+			staker.Priority = state.SubnetPermissionedValidatorPendingPriority
 
 			env.state.PutPendingValidator(staker)
 			env.state.AddTx(tx, status.Committed)

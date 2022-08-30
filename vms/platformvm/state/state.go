@@ -1144,7 +1144,7 @@ func (s *state) loadCurrentValidators() error {
 
 		staker := NewSubnetStaker(txID, &addSubnetValidatorTx.Validator)
 		staker.NextTime = staker.EndTime
-		staker.Priority = SubnetValidatorCurrentPriority
+		staker.Priority = SubnetPermissionedValidatorCurrentPriority
 
 		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker
@@ -1242,7 +1242,7 @@ func (s *state) loadPendingValidators() error {
 
 		staker := NewSubnetStaker(txID, &addSubnetValidatorTx.Validator)
 		staker.NextTime = staker.StartTime
-		staker.Priority = SubnetValidatorPendingPriority
+		staker.Priority = SubnetPermissionedValidatorPendingPriority
 
 		validator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker

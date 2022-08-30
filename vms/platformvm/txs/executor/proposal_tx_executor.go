@@ -152,7 +152,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 
 	newStaker := state.NewSubnetStaker(txID, &tx.Validator)
 	newStaker.NextTime = newStaker.StartTime
-	newStaker.Priority = state.SubnetValidatorPendingPriority
+	newStaker.Priority = state.SubnetPermissionedValidatorPendingPriority
 	e.OnCommitState.PutPendingValidator(newStaker)
 
 	// Set up the state if this tx is aborted

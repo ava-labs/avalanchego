@@ -540,7 +540,7 @@ func TestBlueberryProposalBlockUpdateStakers(t *testing.T) {
 
 				staker := state.NewPrimaryNetworkStaker(tx.ID(), &tx.Unsigned.(*txs.AddValidatorTx).Validator)
 				staker.NextTime = staker.StartTime
-				staker.Priority = state.SubnetValidatorPendingPriority
+				staker.Priority = state.PrimaryNetworkValidatorPendingPriority
 
 				env.state.PutPendingValidator(staker)
 				env.state.AddTx(tx, status.Committed)
@@ -561,7 +561,7 @@ func TestBlueberryProposalBlockUpdateStakers(t *testing.T) {
 
 				subnetStaker := state.NewSubnetStaker(tx.ID(), &tx.Unsigned.(*txs.AddSubnetValidatorTx).Validator)
 				subnetStaker.NextTime = subStaker.startTime
-				subnetStaker.Priority = state.SubnetValidatorPendingPriority
+				subnetStaker.Priority = state.SubnetPermissionedValidatorPendingPriority
 
 				env.state.PutPendingValidator(subnetStaker)
 				env.state.AddTx(tx, status.Committed)
@@ -681,7 +681,7 @@ func TestBlueberryProposalBlockRemoveSubnetValidator(t *testing.T) {
 
 	staker := state.NewSubnetStaker(tx.ID(), &tx.Unsigned.(*txs.AddSubnetValidatorTx).Validator)
 	staker.NextTime = staker.EndTime
-	staker.Priority = state.SubnetValidatorCurrentPriority
+	staker.Priority = state.SubnetPermissionedValidatorCurrentPriority
 
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(tx, status.Committed)
@@ -704,7 +704,7 @@ func TestBlueberryProposalBlockRemoveSubnetValidator(t *testing.T) {
 
 	staker = state.NewSubnetStaker(tx.ID(), &tx.Unsigned.(*txs.AddSubnetValidatorTx).Validator)
 	staker.NextTime = staker.StartTime
-	staker.Priority = state.SubnetValidatorPendingPriority
+	staker.Priority = state.SubnetPermissionedValidatorPendingPriority
 
 	env.state.PutPendingValidator(staker)
 	env.state.AddTx(tx, status.Committed)
@@ -812,7 +812,7 @@ func TestBlueberryProposalBlockWhitelistedSubnet(t *testing.T) {
 
 			staker := state.NewSubnetStaker(tx.ID(), &tx.Unsigned.(*txs.AddSubnetValidatorTx).Validator)
 			staker.NextTime = staker.StartTime
-			staker.Priority = state.SubnetValidatorPendingPriority
+			staker.Priority = state.SubnetPermissionedValidatorPendingPriority
 
 			env.state.PutPendingValidator(staker)
 			env.state.AddTx(tx, status.Committed)

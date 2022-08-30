@@ -152,15 +152,15 @@ func TestGetNextStakerToReward(t *testing.T) {
 
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
-					Priority: state.SubnetValidatorCurrentPriority,
+					Priority: state.SubnetPermissionedValidatorCurrentPriority,
 					EndTime:  now,
 				})
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
-					Priority: state.SubnetDelegatorCurrentPriority,
+					TxID:     txID,
+					Priority: state.SubnetPermissionlessDelegatorCurrentPriority,
 					EndTime:  now,
 				})
-				currentStakerIter.EXPECT().Next().Return(false)
 				currentStakerIter.EXPECT().Release()
 
 				s := state.NewMockChain(ctrl)
@@ -168,6 +168,8 @@ func TestGetNextStakerToReward(t *testing.T) {
 
 				return s
 			},
+			expectedTxID:         txID,
+			expectedShouldReward: true,
 		},
 		{
 			name:      "expired primary network validator after subnet expired subnet validator",
@@ -177,7 +179,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
-					Priority: state.SubnetValidatorCurrentPriority,
+					Priority: state.SubnetPermissionedValidatorCurrentPriority,
 					EndTime:  now,
 				})
 				currentStakerIter.EXPECT().Next().Return(true)
@@ -204,7 +206,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
-					Priority: state.SubnetValidatorCurrentPriority,
+					Priority: state.SubnetPermissionedValidatorCurrentPriority,
 					EndTime:  now,
 				})
 				currentStakerIter.EXPECT().Next().Return(true)

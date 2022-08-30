@@ -673,7 +673,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		&subnetTx.Unsigned.(*txs.AddSubnetValidatorTx).Validator,
 	)
 	staker.NextTime = staker.EndTime
-	staker.Priority = state.SubnetValidatorCurrentPriority
+	staker.Priority = state.SubnetPermissionedValidatorCurrentPriority
 
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(subnetTx, status.Committed)
@@ -870,7 +870,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			&subnetTx.Unsigned.(*txs.AddSubnetValidatorTx).Validator,
 		)
 		staker.NextTime = staker.EndTime
-		staker.Priority = state.SubnetValidatorCurrentPriority
+		staker.Priority = state.SubnetPermissionedValidatorCurrentPriority
 
 		env.state.PutCurrentValidator(staker)
 		env.state.AddTx(tx, status.Committed)
