@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -48,6 +49,8 @@ func (b *ApricotCommitBlock) initialize(bytes []byte) error {
 	b.CommonBlock.initialize(bytes)
 	return nil
 }
+
+func (*ApricotCommitBlock) InitCtx(ctx *snow.Context) {}
 
 func (*ApricotCommitBlock) Txs() []*txs.Tx          { return nil }
 func (b *ApricotCommitBlock) Visit(v Visitor) error { return v.ApricotCommitBlock(b) }

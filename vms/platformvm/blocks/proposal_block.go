@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -25,6 +26,13 @@ type BlueberryProposalBlock struct {
 	//       changes.
 	Transactions         []*txs.Tx `serialize:"true" json:"-"`
 	ApricotProposalBlock `serialize:"true"`
+}
+
+func (b *BlueberryProposalBlock) InitCtx(ctx *snow.Context) {
+	for _, tx := range b.Transactions {
+		tx.Unsigned.InitCtx(ctx)
+	}
+	b.ApricotProposalBlock.InitCtx(ctx)
 }
 
 func (b *BlueberryProposalBlock) Timestamp() time.Time  { return time.Unix(int64(b.Time), 0) }
@@ -60,6 +68,10 @@ func (b *ApricotProposalBlock) initialize(bytes []byte) error {
 		return fmt.Errorf("failed to initialize tx: %w", err)
 	}
 	return nil
+}
+
+func (b *ApricotProposalBlock) InitCtx(ctx *snow.Context) {
+	b.Tx.Unsigned.InitCtx(ctx)
 }
 
 func (b *ApricotProposalBlock) Txs() []*txs.Tx        { return []*txs.Tx{b.Tx} }

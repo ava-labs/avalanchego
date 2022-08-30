@@ -161,7 +161,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 		res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.state, res.fx)
 		res.txBuilder = p_tx_builder.New(
 			res.ctx,
-			*res.config,
+			res.config,
 			res.clk,
 			res.fx,
 			res.state,
@@ -175,7 +175,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 		res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.mockedState, res.fx)
 		res.txBuilder = p_tx_builder.New(
 			res.ctx,
-			*res.config,
+			res.config,
 			res.clk,
 			res.fx,
 			res.mockedState,

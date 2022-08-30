@@ -170,7 +170,7 @@ type ProposalTxBuilder interface {
 
 func New(
 	ctx *snow.Context,
-	cfg config.Config,
+	cfg *config.Config,
 	clk *mockable.Clock,
 	fx fx.Fx,
 	state state.Chain,
@@ -193,7 +193,7 @@ type builder struct {
 	utxo.Spender
 	state state.Chain
 
-	cfg config.Config
+	cfg *config.Config
 	ctx *snow.Context
 	clk *mockable.Clock
 	fx  fx.Fx

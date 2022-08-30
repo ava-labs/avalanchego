@@ -786,6 +786,8 @@ func TestGetBlock(t *testing.T) {
 			service.vm.ctx.Lock.Lock()
 			defer service.vm.ctx.Lock.Unlock()
 
+			service.vm.Config.CreateAssetTxFee = 100 * defaultTxFee
+
 			// Make a block an accept it, then check we can get it.
 			tx, err := service.vm.txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks
 				testSubnet1.ID(),
@@ -830,7 +832,10 @@ func TestGetBlock(t *testing.T) {
 
 			switch {
 			case test.encoding == formatting.JSON:
-				require.Equal(t, block, response.Block)
+				require.Equal(t, statelessBlock, response.Block)
+
+				_, err = stdjson.Marshal(response)
+				require.NoError(t, err)
 			default:
 				decoded, _ := formatting.Decode(response.Encoding, response.Block.(string))
 				require.Equal(t, block.Bytes(), decoded)

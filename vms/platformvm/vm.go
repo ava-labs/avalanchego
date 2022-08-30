@@ -170,7 +170,7 @@ func (vm *VM) Initialize(
 
 	vm.txBuilder = txbuilder.New(
 		vm.ctx,
-		vm.Config,
+		&vm.Config,
 		&vm.clock,
 		vm.fx,
 		vm.state,

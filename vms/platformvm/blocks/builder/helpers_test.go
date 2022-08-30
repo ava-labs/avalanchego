@@ -143,7 +143,7 @@ func newEnvironment(t *testing.T) *environment {
 
 	res.txBuilder = txbuilder.New(
 		res.ctx,
-		*res.config,
+		res.config,
 		res.clk,
 		res.fx,
 		res.state,

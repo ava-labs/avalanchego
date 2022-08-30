@@ -143,7 +143,7 @@ func newEnvironment() *environment {
 
 	txBuilder := builder.New(
 		ctx,
-		config,
+		&config,
 		&clk,
 		fx,
 		baseState,

@@ -2311,13 +2311,14 @@ func (service *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, respon
 		zap.Stringer("encoding", args.Encoding),
 	)
 
-	block, err := service.vm.GetBlock(args.BlockID)
+	block, err := service.vm.manager.GetStatelessBlock(args.BlockID)
 	if err != nil {
 		return fmt.Errorf("couldn't get block with id %s: %w", args.BlockID, err)
 	}
 	response.Encoding = args.Encoding
 
 	if args.Encoding == formatting.JSON {
+		block.InitCtx(service.vm.ctx)
 		response.Block = block
 		return nil
 	}

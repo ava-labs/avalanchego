@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -56,6 +57,12 @@ func (b *ApricotStandardBlock) initialize(bytes []byte) error {
 		}
 	}
 	return nil
+}
+
+func (b *ApricotStandardBlock) InitCtx(ctx *snow.Context) {
+	for _, tx := range b.Transactions {
+		tx.Unsigned.InitCtx(ctx)
+	}
 }
 
 func (b *ApricotStandardBlock) Txs() []*txs.Tx        { return b.Transactions }
