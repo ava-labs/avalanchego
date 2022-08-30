@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -16,6 +16,7 @@ const (
 	TxFeeKey                                           = "tx-fee"
 	CreateAssetTxFeeKey                                = "create-asset-tx-fee"
 	CreateSubnetTxFeeKey                               = "create-subnet-tx-fee"
+	TransformSubnetTxFeeKey                            = "transform-subnet-tx-fee"
 	CreateBlockchainTxFeeKey                           = "create-blockchain-tx-fee"
 	UptimeRequirementKey                               = "uptime-requirement"
 	MinValidatorStakeKey                               = "min-validator-stake"

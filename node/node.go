@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package node
@@ -776,6 +776,7 @@ func (n *Node) initVMs() error {
 				TxFee:                  n.Config.TxFee,
 				CreateAssetTxFee:       n.Config.CreateAssetTxFee,
 				CreateSubnetTxFee:      n.Config.CreateSubnetTxFee,
+				TransformSubnetTxFee:   n.Config.TransformSubnetTxFee,
 				CreateBlockchainTxFee:  n.Config.CreateBlockchainTxFee,
 				UptimePercentage:       n.Config.UptimeRequirement,
 				MinValidatorStake:      n.Config.MinValidatorStake,
@@ -965,6 +966,7 @@ func (n *Node) initInfoAPI() error {
 			TxFee:                 n.Config.TxFee,
 			CreateAssetTxFee:      n.Config.CreateAssetTxFee,
 			CreateSubnetTxFee:     n.Config.CreateSubnetTxFee,
+			TransformSubnetTxFee:  n.Config.TransformSubnetTxFee,
 			CreateBlockchainTxFee: n.Config.CreateBlockchainTxFee,
 			VMManager:             n.Config.VMManager,
 		},

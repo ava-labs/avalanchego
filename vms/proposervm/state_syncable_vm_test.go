@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -6,7 +6,7 @@ package proposervm
 import (
 	"bytes"
 	"crypto"
-	"fmt"
+	"errors"
 	"testing"
 	"time"
 
@@ -593,7 +593,7 @@ func TestNoStateSummariesServedWhileRepairingHeightIndex(t *testing.T) {
 	}
 	coreVM.GetStateSummaryF = func(height uint64) (block.StateSummary, error) {
 		if height != summaryHeight {
-			return nil, fmt.Errorf("requested unexpected summary")
+			return nil, errors.New("requested unexpected summary")
 		}
 		return coreStateSummary, nil
 	}

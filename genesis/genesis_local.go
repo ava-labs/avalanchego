@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package genesis
@@ -40,6 +40,7 @@ var (
 			TxFee:                 units.MilliAvax,
 			CreateAssetTxFee:      units.MilliAvax,
 			CreateSubnetTxFee:     100 * units.MilliAvax,
+			TransformSubnetTxFee:  100 * units.MilliAvax,
 			CreateBlockchainTxFee: 100 * units.MilliAvax,
 		},
 		StakingConfig: StakingConfig{

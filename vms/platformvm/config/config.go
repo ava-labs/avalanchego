@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -47,6 +47,9 @@ type Config struct {
 
 	// Fee that must be burned by every subnet creating transaction after AP3
 	CreateSubnetTxFee uint64
+
+	// Fee that must be burned by every transform subnet transaction
+	TransformSubnetTxFee uint64
 
 	// Fee that must be burned by every blockchain creating transaction after AP3
 	CreateBlockchainTxFee uint64

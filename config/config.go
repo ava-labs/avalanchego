@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -782,6 +782,7 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 			TxFee:                 v.GetUint64(TxFeeKey),
 			CreateAssetTxFee:      v.GetUint64(CreateAssetTxFeeKey),
 			CreateSubnetTxFee:     v.GetUint64(CreateSubnetTxFeeKey),
+			TransformSubnetTxFee:  v.GetUint64(TransformSubnetTxFeeKey),
 			CreateBlockchainTxFee: v.GetUint64(CreateBlockchainTxFeeKey),
 		}
 	}

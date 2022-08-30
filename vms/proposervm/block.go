@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -249,6 +249,7 @@ func (p *postForkCommonComponents) buildChild(
 
 	p.vm.ctx.Log.Info("built block",
 		zap.Stringer("blkID", child.ID()),
+		zap.Uint64("height", child.Height()),
 		zap.Time("parentTimestamp", parentTimestamp),
 		zap.Time("blockTimestamp", newTimestamp),
 	)

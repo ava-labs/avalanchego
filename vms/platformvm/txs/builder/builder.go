@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -170,7 +170,7 @@ type ProposalTxBuilder interface {
 
 func New(
 	ctx *snow.Context,
-	cfg config.Config,
+	cfg *config.Config,
 	clk *mockable.Clock,
 	fx fx.Fx,
 	state state.Chain,
@@ -193,7 +193,7 @@ type builder struct {
 	utxo.Spender
 	state state.Chain
 
-	cfg config.Config
+	cfg *config.Config
 	ctx *snow.Context
 	clk *mockable.Clock
 	fx  fx.Fx

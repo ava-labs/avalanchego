@@ -1,10 +1,10 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpcchainvm
 
 import (
-	"fmt"
+	"errors"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -57,8 +57,8 @@ var (
 	}
 
 	// a fictitious error unrelated to state sync
-	errBrokenConnectionOrSomething = fmt.Errorf("brokenConnectionOrSomething")
-	errNothingToParse              = fmt.Errorf("nil summary bytes. Nothing to parse")
+	errBrokenConnectionOrSomething = errors.New("brokenConnectionOrSomething")
+	errNothingToParse              = errors.New("nil summary bytes. Nothing to parse")
 )
 
 type StateSyncEnabledMock struct {

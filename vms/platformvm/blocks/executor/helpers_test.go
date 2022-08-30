@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -161,7 +161,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 		res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.state, res.fx)
 		res.txBuilder = p_tx_builder.New(
 			res.ctx,
-			*res.config,
+			res.config,
 			res.clk,
 			res.fx,
 			res.state,
@@ -175,7 +175,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 		res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.mockedState, res.fx)
 		res.txBuilder = p_tx_builder.New(
 			res.ctx,
-			*res.config,
+			res.config,
 			res.clk,
 			res.fx,
 			res.mockedState,

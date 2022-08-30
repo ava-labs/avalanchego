@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -143,7 +143,7 @@ func newEnvironment(t *testing.T) *environment {
 
 	res.txBuilder = txbuilder.New(
 		res.ctx,
-		*res.config,
+		res.config,
 		res.clk,
 		res.fx,
 		res.state,
