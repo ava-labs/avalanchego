@@ -649,7 +649,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 		switch staker := tx.Unsigned.(type) {
 		case *txs.AddDelegatorTx:
 			var rewardOwner *platformapi.Owner
-			owner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
+			owner, ok := staker.DelegationRewardsOwner.(*secp256k1fx.OutputOwners)
 			if ok {
 				rewardOwner = &platformapi.Owner{
 					Locktime:  json.Uint64(owner.Locktime),
@@ -677,7 +677,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			}
 			vdrToDelegators[delegator.NodeID] = append(vdrToDelegators[delegator.NodeID], delegator)
 		case *txs.AddValidatorTx:
-			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(reward.PercentDenominator))
+			delegationFee := json.Float32(100 * float32(staker.DelegationShares) / float32(reward.PercentDenominator))
 			rawUptime, err := service.vm.uptimeManager.CalculateUptimePercentFrom(nodeID, staker.StartTime())
 			if err != nil {
 				return err
@@ -813,7 +813,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 				StakeAmount: &weight,
 			})
 		case *txs.AddValidatorTx:
-			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(reward.PercentDenominator))
+			delegationFee := json.Float32(100 * float32(staker.DelegationShares) / float32(reward.PercentDenominator))
 
 			connected := service.vm.uptimeManager.IsConnected(nodeID)
 			reply.Validators = append(reply.Validators, platformapi.PrimaryValidator{
@@ -1987,9 +1987,9 @@ func (service *Service) getStakeHelper(tx *txs.Tx, addrs ids.ShortSet) (uint64, 
 	var outs []*avax.TransferableOutput
 	switch staker := tx.Unsigned.(type) {
 	case *txs.AddDelegatorTx:
-		outs = staker.Stake
+		outs = staker.StakeOuts
 	case *txs.AddValidatorTx:
-		outs = staker.Stake
+		outs = staker.StakeOuts
 	case *txs.AddSubnetValidatorTx:
 		return 0, nil, nil
 	default:

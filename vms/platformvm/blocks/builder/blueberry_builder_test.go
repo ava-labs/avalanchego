@@ -157,7 +157,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 					// Shouldn't be dropped
 					Start: uint64(now.Add(2 * executor.SyncBound).Unix()),
 				},
-				Stake: []*avax.TransferableOutput{output},
+				StakeOuts: []*avax.TransferableOutput{output},
 				RewardsOwner: &secp256k1fx.OutputOwners{
 					Addrs: []ids.ShortID{ids.GenerateTestShortID()},
 				},

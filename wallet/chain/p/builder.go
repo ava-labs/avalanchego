@@ -306,10 +306,10 @@ func (b *builder) NewAddValidatorTx(
 			Outs:         baseOutputs,
 			Memo:         ops.Memo(),
 		}},
-		Validator:    *vdr,
-		Stake:        stakeOutputs,
-		RewardsOwner: rewardsOwner,
-		Shares:       shares,
+		Validator:        *vdr,
+		StakeOuts:        stakeOutputs,
+		RewardsOwner:     rewardsOwner,
+		DelegationShares: shares,
 	}, nil
 }
 
@@ -403,9 +403,9 @@ func (b *builder) NewAddDelegatorTx(
 			Outs:         baseOutputs,
 			Memo:         ops.Memo(),
 		}},
-		Validator:    *vdr,
-		Stake:        stakeOutputs,
-		RewardsOwner: rewardsOwner,
+		Validator:              *vdr,
+		StakeOuts:              stakeOutputs,
+		DelegationRewardsOwner: rewardsOwner,
 	}, nil
 }
 

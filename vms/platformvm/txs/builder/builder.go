@@ -453,13 +453,13 @@ func (b *builder) NewAddValidatorTx(
 			End:    endTime,
 			Wght:   stakeAmount,
 		},
-		Stake: stakedOuts,
+		StakeOuts: stakedOuts,
 		RewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,
 			Threshold: 1,
 			Addrs:     []ids.ShortID{rewardAddress},
 		},
-		Shares: shares,
+		DelegationShares: shares,
 	}
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)
 	if err != nil {
@@ -495,8 +495,8 @@ func (b *builder) NewAddDelegatorTx(
 			End:    endTime,
 			Wght:   stakeAmount,
 		},
-		Stake: lockedOuts,
-		RewardsOwner: &secp256k1fx.OutputOwners{
+		StakeOuts: lockedOuts,
+		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,
 			Threshold: 1,
 			Addrs:     []ids.ShortID{rewardAddress},

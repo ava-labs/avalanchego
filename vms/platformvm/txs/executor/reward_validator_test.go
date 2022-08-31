@@ -118,7 +118,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require.NotEqual(stakerToRemove.TxID, nextToRemove.TxID)
 
 	// check that stake/reward is given back
-	stakeOwners := stakerToRemoveTx.Stake[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
+	stakeOwners := stakerToRemoveTx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
 
 	// Get old balances
 	oldBalance, err := avax.GetBalance(env.state, stakeOwners)
@@ -220,7 +220,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require.NotEqual(stakerToRemove.TxID, nextToRemove.TxID)
 
 	// check that stake/reward isn't given back
-	stakeOwners := stakerToRemoveTx.Stake[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
+	stakeOwners := stakerToRemoveTx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
 
 	// Get old balances
 	oldBalance, err := avax.GetBalance(env.state, stakeOwners)

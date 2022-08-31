@@ -278,9 +278,9 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 				End:    uint64(vdr.EndTime),
 				Wght:   weight,
 			},
-			Stake:        stake,
-			RewardsOwner: owner,
-			Shares:       delegationFee,
+			StakeOuts:        stake,
+			RewardsOwner:     owner,
+			DelegationShares: delegationFee,
 		}}
 		if err := tx.Sign(genesis.Codec, nil); err != nil {
 			return err

@@ -89,8 +89,8 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 			End:    uint64(clk.Time().Add(time.Hour).Unix()),
 			Wght:   validatorWeight,
 		},
-		Stake: stakes,
-		RewardsOwner: &secp256k1fx.OutputOwners{
+		StakeOuts: stakes,
+		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
@@ -187,8 +187,8 @@ func TestAddDelegatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 			End:    uint64(clk.Time().Add(time.Hour).Unix()),
 			Wght:   validatorWeight,
 		},
-		Stake: stakes,
-		RewardsOwner: &secp256k1fx.OutputOwners{
+		StakeOuts: stakes,
+		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},

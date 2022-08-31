@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -64,11 +65,20 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 
 	// create a proposal transaction to be included into proposal block
 	utx := &txs.AddValidatorTx{
-		BaseTx:       txs.BaseTx{},
-		Validator:    validator.Validator{End: uint64(chainTime.Unix())},
-		Stake:        nil,
-		RewardsOwner: &secp256k1fx.OutputOwners{},
-		Shares:       uint32(defaultTxFee),
+		BaseTx:    txs.BaseTx{},
+		Validator: validator.Validator{End: uint64(chainTime.Unix())},
+		StakeOuts: []*avax.TransferableOutput{
+			{
+				Asset: avax.Asset{
+					ID: env.ctx.AVAXAssetID,
+				},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 1,
+				},
+			},
+		},
+		RewardsOwner:     &secp256k1fx.OutputOwners{},
+		DelegationShares: uint32(defaultTxFee),
 	}
 	addValTx := &txs.Tx{Unsigned: utx}
 	require.NoError(addValTx.Sign(txs.Codec, nil))
@@ -174,11 +184,20 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	nextStakerTime := chainTime.Add(executor.SyncBound).Add(-1 * time.Second)
 	nextStakerTx := &txs.Tx{
 		Unsigned: &txs.AddValidatorTx{
-			BaseTx:       txs.BaseTx{},
-			Validator:    validator.Validator{End: uint64(nextStakerTime.Unix())},
-			Stake:        nil,
-			RewardsOwner: &secp256k1fx.OutputOwners{},
-			Shares:       uint32(defaultTxFee),
+			BaseTx:    txs.BaseTx{},
+			Validator: validator.Validator{End: uint64(nextStakerTime.Unix())},
+			StakeOuts: []*avax.TransferableOutput{
+				{
+					Asset: avax.Asset{
+						ID: env.ctx.AVAXAssetID,
+					},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: 1,
+					},
+				},
+			},
+			RewardsOwner:     &secp256k1fx.OutputOwners{},
+			DelegationShares: uint32(defaultTxFee),
 		},
 	}
 	require.NoError(nextStakerTx.Sign(txs.Codec, nil))

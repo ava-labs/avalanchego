@@ -21,9 +21,7 @@ import (
 )
 
 var (
-	_ UnsignedTx             = &AddPermissionlessValidatorTx{}
-	_ StakerTx               = &AddPermissionlessValidatorTx{}
-	_ secp256k1fx.UnsignedTx = &AddPermissionlessValidatorTx{}
+	_ ValidatorTx = &AddPermissionlessValidatorTx{}
 
 	errEmptyNodeID             = errors.New("validator nodeID cannot be empty")
 	errNoStake                 = errors.New("no stake")
@@ -40,15 +38,15 @@ type AddPermissionlessValidatorTx struct {
 	// ID of the subnet this validator is validating
 	Subnet ids.ID `serialize:"true" json:"subnet"`
 	// Where to send staked tokens when done validating
-	Stake []*avax.TransferableOutput `serialize:"true" json:"stake"`
+	StakeOuts []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send validation rewards when done validating
-	ValidationRewardsOwner fx.Owner `serialize:"true" json:"validationRewardsOwner"`
+	ValidatorRewardsOwner fx.Owner `serialize:"true" json:"validationRewardsOwner"`
 	// Where to send delegation rewards when done validating
-	DelegationRewardsOwner fx.Owner `serialize:"true" json:"delegationRewardsOwner"`
+	DelegatorRewardsOwner fx.Owner `serialize:"true" json:"delegationRewardsOwner"`
 	// Fee this validator charges delegators as a percentage, times 10,000
-	// For example, if this validator has Shares=300,000 then they take 30% of
-	// rewards from delegators
-	Shares uint32 `serialize:"true" json:"shares"`
+	// For example, if this validator has DelegationShares=300,000 then they
+	// take 30% of rewards from delegators
+	DelegationShares uint32 `serialize:"true" json:"shares"`
 }
 
 // InitCtx sets the FxID fields in the inputs and outputs of this
@@ -56,12 +54,12 @@ type AddPermissionlessValidatorTx struct {
 // that the addresses can be json marshalled into human readable format
 func (tx *AddPermissionlessValidatorTx) InitCtx(ctx *snow.Context) {
 	tx.BaseTx.InitCtx(ctx)
-	for _, out := range tx.Stake {
+	for _, out := range tx.StakeOuts {
 		out.FxID = secp256k1fx.ID
 		out.InitCtx(ctx)
 	}
-	tx.ValidationRewardsOwner.InitCtx(ctx)
-	tx.DelegationRewardsOwner.InitCtx(ctx)
+	tx.ValidatorRewardsOwner.InitCtx(ctx)
+	tx.DelegatorRewardsOwner.InitCtx(ctx)
 }
 
 func (tx *AddPermissionlessValidatorTx) SubnetID() ids.ID     { return tx.Subnet }
@@ -84,6 +82,22 @@ func (tx *AddPermissionlessValidatorTx) CurrentPriority() Priority {
 	return SubnetPermissionlessValidatorCurrentPriority
 }
 
+func (tx *AddPermissionlessValidatorTx) Stake() []*avax.TransferableOutput {
+	return tx.StakeOuts
+}
+
+func (tx *AddPermissionlessValidatorTx) ValidationRewardsOwner() fx.Owner {
+	return tx.ValidatorRewardsOwner
+}
+
+func (tx *AddPermissionlessValidatorTx) DelegationRewardsOwner() fx.Owner {
+	return tx.DelegatorRewardsOwner
+}
+
+func (tx *AddPermissionlessValidatorTx) Shares() uint32 {
+	return tx.DelegationShares
+}
+
 // SyntacticVerify returns nil iff [tx] is valid
 func (tx *AddPermissionlessValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
@@ -93,29 +107,29 @@ func (tx *AddPermissionlessValidatorTx) SyntacticVerify(ctx *snow.Context) error
 		return nil
 	case tx.Validator.NodeID == ids.EmptyNodeID:
 		return errEmptyNodeID
-	case len(tx.Stake) == 0: // Ensure there is provided stake
+	case len(tx.StakeOuts) == 0: // Ensure there is provided stake
 		return errNoStake
-	case tx.Shares > reward.PercentDenominator:
+	case tx.DelegationShares > reward.PercentDenominator:
 		return errTooManyShares
 	}
 
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
-	if err := verify.All(&tx.Validator, tx.ValidationRewardsOwner, tx.DelegationRewardsOwner); err != nil {
+	if err := verify.All(&tx.Validator, tx.ValidatorRewardsOwner, tx.DelegatorRewardsOwner); err != nil {
 		return fmt.Errorf("failed to verify validator or rewards owners: %w", err)
 	}
 
-	for _, out := range tx.Stake {
+	for _, out := range tx.StakeOuts {
 		if err := out.Verify(); err != nil {
 			return fmt.Errorf("failed to verify output: %w", err)
 		}
 	}
 
-	firstStakeOutput := tx.Stake[0]
+	firstStakeOutput := tx.StakeOuts[0]
 	stakedAssetID := firstStakeOutput.AssetID()
 	totalStakeWeight := firstStakeOutput.Output().Amount()
-	for _, out := range tx.Stake[1:] {
+	for _, out := range tx.StakeOuts[1:] {
 		newWeight, err := math.Add64(totalStakeWeight, out.Output().Amount())
 		if err != nil {
 			return err
@@ -129,7 +143,7 @@ func (tx *AddPermissionlessValidatorTx) SyntacticVerify(ctx *snow.Context) error
 	}
 
 	switch {
-	case !avax.IsSortedTransferableOutputs(tx.Stake, Codec):
+	case !avax.IsSortedTransferableOutputs(tx.StakeOuts, Codec):
 		return errOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
 		return fmt.Errorf("%w: weight %d != stake %d", errValidatorWeightMismatch, tx.Validator.Wght, totalStakeWeight)

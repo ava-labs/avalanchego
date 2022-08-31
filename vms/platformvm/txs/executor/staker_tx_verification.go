@@ -58,7 +58,7 @@ func verifyAddValidatorTx(
 		// Ensure validator isn't staking too much
 		return nil, errWeightTooLarge
 
-	case tx.Shares < backend.Config.MinDelegationFee:
+	case tx.DelegationShares < backend.Config.MinDelegationFee:
 		// Ensure the validator fee is at least the minimum amount
 		return nil, errInsufficientDelegationFee
 
@@ -71,9 +71,9 @@ func verifyAddValidatorTx(
 		return nil, errStakeTooLong
 	}
 
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.Stake))
+	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
 	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.Stake)
+	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
 	if !backend.Bootstrapped.GetValue() {
 		return outs, nil
@@ -322,9 +322,9 @@ func verifyAddDelegatorTx(
 		return nil, errWeightTooSmall
 	}
 
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.Stake))
+	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
 	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.Stake)
+	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
 	if !backend.Bootstrapped.GetValue() {
 		return outs, nil

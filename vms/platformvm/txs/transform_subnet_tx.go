@@ -12,12 +12,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
-	_ UnsignedTx             = &TransformSubnetTx{}
-	_ secp256k1fx.UnsignedTx = &TransformSubnetTx{}
+	_ UnsignedTx = &TransformSubnetTx{}
 
 	errCantTransformPrimaryNetwork       = errors.New("cannot transform primary network")
 	errEmptyAssetID                      = errors.New("empty asset ID is not valid")

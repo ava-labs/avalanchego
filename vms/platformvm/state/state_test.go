@@ -263,7 +263,7 @@ func newInitializedState(require *require.Assertions) (State, database.Database)
 			End:    uint64(initialValidatorEndTime.Unix()),
 			Wght:   units.Avax,
 		},
-		Stake: []*avax.TransferableOutput{
+		StakeOuts: []*avax.TransferableOutput{
 			{
 				Asset: avax.Asset{ID: initialTxID},
 				Out: &secp256k1fx.TransferOutput{
@@ -271,8 +271,8 @@ func newInitializedState(require *require.Assertions) (State, database.Database)
 				},
 			},
 		},
-		RewardsOwner: &secp256k1fx.OutputOwners{},
-		Shares:       reward.PercentDenominator,
+		RewardsOwner:     &secp256k1fx.OutputOwners{},
+		DelegationShares: reward.PercentDenominator,
 	}
 	initialValidatorTx := &txs.Tx{Unsigned: initialValidator}
 	require.NoError(initialValidatorTx.Sign(txs.Codec, nil))

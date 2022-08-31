@@ -15,8 +15,7 @@ import (
 )
 
 var (
-	_ UnsignedTx             = &ExportTx{}
-	_ secp256k1fx.UnsignedTx = &ExportTx{}
+	_ UnsignedTx = &ExportTx{}
 
 	ErrWrongLocktime   = errors.New("wrong locktime reported")
 	errNoExportOutputs = errors.New("no export outputs")

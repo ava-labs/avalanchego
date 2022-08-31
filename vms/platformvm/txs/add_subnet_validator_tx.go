@@ -12,13 +12,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
-	_ UnsignedTx             = &AddSubnetValidatorTx{}
-	_ StakerTx               = &AddSubnetValidatorTx{}
-	_ secp256k1fx.UnsignedTx = &AddSubnetValidatorTx{}
+	_ StakerTx = &AddSubnetValidatorTx{}
 
 	errAddPrimaryNetworkValidator = errors.New("can't add primary network validator with AddSubnetValidatorTx")
 )

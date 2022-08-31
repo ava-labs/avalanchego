@@ -41,7 +41,7 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 		&txs.Tx{
 			Unsigned: &txs.AddDelegatorTx{
 				// Without the line below, this function will error.
-				RewardsOwner: &secp256k1fx.OutputOwners{},
+				DelegationRewardsOwner: &secp256k1fx.OutputOwners{},
 			},
 			Creds: []verify.Verifiable{},
 		},
@@ -112,7 +112,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 		&txs.Tx{
 			Unsigned: &txs.AddDelegatorTx{
 				// Without the line below, this function will error.
-				RewardsOwner: &secp256k1fx.OutputOwners{},
+				DelegationRewardsOwner: &secp256k1fx.OutputOwners{},
 			},
 			Creds: []verify.Verifiable{},
 		},
@@ -197,7 +197,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 			{
 				Unsigned: &txs.AddDelegatorTx{
 					// Without the line below, this function will error.
-					RewardsOwner: &secp256k1fx.OutputOwners{},
+					DelegationRewardsOwner: &secp256k1fx.OutputOwners{},
 				},
 				Creds: []verify.Verifiable{},
 			},
