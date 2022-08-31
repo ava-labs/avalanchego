@@ -122,7 +122,7 @@ func AdvanceTimeTo(parentState state.Chain, newChainTime time.Time, rewards rewa
 		stakerToAdd.Priority = txs.PendingToCurrentPriorities[stakerToRemove.Priority]
 
 		switch stakerToRemove.Priority {
-		case txs.PrimaryNetworkDelegatorPendingPriority:
+		case txs.PrimaryNetworkDelegatorApricotPendingPriority:
 			potentialReward := rewards.Calculate(
 				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
 				stakerToRemove.Weight,

@@ -29,14 +29,14 @@ func TestStakerDiffIterator(t *testing.T) {
 			StartTime: time.Unix(0, 0),
 			EndTime:   time.Unix(5, 0),
 			NextTime:  time.Unix(0, 0),
-			Priority:  txs.PrimaryNetworkDelegatorPendingPriority,
+			Priority:  txs.PrimaryNetworkDelegatorApricotPendingPriority,
 		},
 		{
 			TxID:      ids.GenerateTestID(),
 			StartTime: time.Unix(5, 0),
 			EndTime:   time.Unix(10, 0),
 			NextTime:  time.Unix(5, 0),
-			Priority:  txs.PrimaryNetworkDelegatorPendingPriority,
+			Priority:  txs.PrimaryNetworkDelegatorApricotPendingPriority,
 		},
 		{
 			TxID:      ids.GenerateTestID(),
@@ -50,7 +50,7 @@ func TestStakerDiffIterator(t *testing.T) {
 			StartTime: time.Unix(11, 0),
 			EndTime:   time.Unix(20, 0),
 			NextTime:  time.Unix(11, 0),
-			Priority:  txs.PrimaryNetworkDelegatorPendingPriority,
+			Priority:  txs.PrimaryNetworkDelegatorApricotPendingPriority,
 		},
 	}
 

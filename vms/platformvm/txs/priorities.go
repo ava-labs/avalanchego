@@ -4,17 +4,19 @@
 package txs
 
 const (
-	// First primary network delegators are moved from the pending to the
-	// current validator set,
-	PrimaryNetworkDelegatorPendingPriority Priority = iota + 1
+	// First primary network apricot delegators are moved from the pending to
+	// the current validator set,
+	PrimaryNetworkDelegatorApricotPendingPriority Priority = iota + 1
 	// then primary network validators,
 	PrimaryNetworkValidatorPendingPriority
-	// then permissioned subnet validators,
-	SubnetPermissionedValidatorPendingPriority
+	// then primary network blueberry delegators,
+	PrimaryNetworkBlueberryDelegatorPendingPriority
 	// then permissionless subnet validators,
 	SubnetPermissionlessValidatorPendingPriority
 	// then permissionless subnet delegators.
 	SubnetPermissionlessDelegatorPendingPriority
+	// then permissioned subnet validators,
+	SubnetPermissionedValidatorPendingPriority
 
 	// First permissioned subnet validators are removed from the current
 	// validator set,
@@ -33,11 +35,12 @@ const (
 )
 
 var PendingToCurrentPriorities = []Priority{
-	PrimaryNetworkValidatorPendingPriority:       PrimaryNetworkValidatorCurrentPriority,
-	PrimaryNetworkDelegatorPendingPriority:       PrimaryNetworkDelegatorCurrentPriority,
-	SubnetPermissionedValidatorPendingPriority:   SubnetPermissionedValidatorCurrentPriority,
-	SubnetPermissionlessValidatorPendingPriority: SubnetPermissionlessValidatorCurrentPriority,
-	SubnetPermissionlessDelegatorPendingPriority: SubnetPermissionlessDelegatorCurrentPriority,
+	PrimaryNetworkDelegatorApricotPendingPriority:   PrimaryNetworkDelegatorCurrentPriority,
+	PrimaryNetworkValidatorPendingPriority:          PrimaryNetworkValidatorCurrentPriority,
+	PrimaryNetworkBlueberryDelegatorPendingPriority: PrimaryNetworkDelegatorCurrentPriority,
+	SubnetPermissionlessValidatorPendingPriority:    SubnetPermissionlessValidatorCurrentPriority,
+	SubnetPermissionlessDelegatorPendingPriority:    SubnetPermissionlessDelegatorCurrentPriority,
+	SubnetPermissionedValidatorPendingPriority:      SubnetPermissionedValidatorCurrentPriority,
 }
 
 type Priority byte
