@@ -72,6 +72,7 @@ func RegisterUnsignedTxsTypes(targetCodec codec.Registry) error {
 		targetCodec.RegisterType(&RemoveSubnetValidatorTx{}),
 		targetCodec.RegisterType(&TransformSubnetTx{}),
 		targetCodec.RegisterType(&AddPermissionlessValidatorTx{}),
+		targetCodec.RegisterType(&AddPermissionlessDelegatorTx{}),
 	)
 	return errs.Err
 }
