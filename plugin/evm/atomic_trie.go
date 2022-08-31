@@ -70,9 +70,10 @@ type AtomicTrie interface {
 	// or the root it was initialized to if no new tries were accepted yet.
 	LastAcceptedRoot() common.Hash
 
-	// InsertTrie adds a reference for root in the trieDB. Once InsertTrie
-	// is called, it is expected either AcceptTrie or RejectTrie be called.
-	InsertTrie(root common.Hash) error
+	// InsertTrie updates the trieDB with the provided node set and adds a reference
+	// to root in the trieDB. Once InsertTrie is called, it is expected either
+	// AcceptTrie or RejectTrie be called for the same root.
+	InsertTrie(nodes *trie.NodeSet, root common.Hash) error
 
 	// AcceptTrie marks root as the last accepted atomic trie root, and
 	// commits the trie to persistent storage if height is divisible by
@@ -306,13 +307,17 @@ func (a *atomicTrie) LastAcceptedRoot() common.Hash {
 	return a.lastAcceptedRoot
 }
 
-func (a *atomicTrie) InsertTrie(root common.Hash) error {
-	a.trieDB.Reference(root, common.Hash{}, true)
+func (a *atomicTrie) InsertTrie(nodes *trie.NodeSet, root common.Hash) error {
+	if nodes != nil {
+		if err := a.trieDB.Update(trie.NewWithNodeSet(nodes)); err != nil {
+			return err
+		}
+	}
+	a.trieDB.Reference(root, common.Hash{})
 
 	// The use of [Cap] in [insertTrie] prevents exceeding the configured memory
 	// limit (and OOM) in case there is a large backlog of processing (unaccepted) blocks.
-	nodes, _ := a.trieDB.Size()
-	if nodes <= a.memoryCap {
+	if nodeSize, _ := a.trieDB.Size(); nodeSize <= a.memoryCap {
 		return nil
 	}
 	if err := a.trieDB.Cap(a.memoryCap - ethdb.IdealBatchSize); err != nil {

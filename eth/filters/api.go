@@ -47,7 +47,7 @@ import (
 // and associated subscription in the event system.
 type filter struct {
 	typ      Type
-	deadline *time.Timer // filter is inactiv when deadline triggers
+	deadline *time.Timer // filter is inactive when deadline triggers
 	hashes   []common.Hash
 	crit     FilterCriteria
 	logs     []*types.Log
@@ -57,7 +57,7 @@ type filter struct {
 // FilterAPI offers support to create and manage filters. This will allow external clients to retrieve various
 // information related to the Ethereum protocol such als blocks, transactions and logs.
 type FilterAPI struct {
-	backend   Backend
+	sys       *FilterSystem
 	events    *EventSystem
 	filtersMu sync.Mutex
 	filters   map[rpc.ID]*filter
@@ -65,14 +65,14 @@ type FilterAPI struct {
 }
 
 // NewFilterAPI returns a new PublicFilterAPI instance.
-func NewFilterAPI(backend Backend, lightMode bool, timeout time.Duration) *FilterAPI {
+func NewFilterAPI(system *FilterSystem, lightMode bool) *FilterAPI {
 	api := &FilterAPI{
-		backend: backend,
-		events:  NewEventSystem(backend, lightMode),
+		sys:     system,
+		events:  NewEventSystem(system, lightMode),
 		filters: make(map[rpc.ID]*filter),
-		timeout: timeout,
+		timeout: system.cfg.Timeout,
 	}
-	go api.timeoutLoop(timeout)
+	go api.timeoutLoop(system.cfg.Timeout)
 
 	return api
 }
@@ -218,7 +218,7 @@ func (api *FilterAPI) NewBlockFilter() rpc.ID {
 		headerSub *Subscription
 	)
 
-	if api.backend.GetVMConfig().AllowUnfinalizedQueries {
+	if api.sys.backend.GetVMConfig().AllowUnfinalizedQueries {
 		headerSub = api.events.SubscribeNewHeads(headers)
 	} else {
 		headerSub = api.events.SubscribeAcceptedHeads(headers)
@@ -264,7 +264,7 @@ func (api *FilterAPI) NewHeads(ctx context.Context) (*rpc.Subscription, error) {
 			headersSub event.Subscription
 		)
 
-		if api.backend.GetVMConfig().AllowUnfinalizedQueries {
+		if api.sys.backend.GetVMConfig().AllowUnfinalizedQueries {
 			headersSub = api.events.SubscribeNewHeads(headers)
 		} else {
 			headersSub = api.events.SubscribeAcceptedHeads(headers)
@@ -301,7 +301,7 @@ func (api *FilterAPI) Logs(ctx context.Context, crit FilterCriteria) (*rpc.Subsc
 		err         error
 	)
 
-	if api.backend.GetVMConfig().AllowUnfinalizedQueries {
+	if api.sys.backend.GetVMConfig().AllowUnfinalizedQueries {
 		logsSub, err = api.events.SubscribeLogs(interfaces.FilterQuery(crit), matchedLogs)
 		if err != nil {
 			return nil, err
@@ -356,7 +356,7 @@ func (api *FilterAPI) NewFilter(crit FilterCriteria) (rpc.ID, error) {
 		err     error
 	)
 
-	if api.backend.GetVMConfig().AllowUnfinalizedQueries {
+	if api.sys.backend.GetVMConfig().AllowUnfinalizedQueries {
 		logsSub, err = api.events.SubscribeLogs(interfaces.FilterQuery(crit), logs)
 		if err != nil {
 			return rpc.ID(""), err
@@ -398,7 +398,7 @@ func (api *FilterAPI) GetLogs(ctx context.Context, crit FilterCriteria) ([]*type
 	var filter *Filter
 	if crit.BlockHash != nil {
 		// Block filter requested, construct a single-shot filter
-		filter = NewBlockFilter(api.backend, *crit.BlockHash, crit.Addresses, crit.Topics)
+		filter = api.sys.NewBlockFilter(*crit.BlockHash, crit.Addresses, crit.Topics)
 	} else {
 		// Convert the RPC block numbers into internal representations
 		// LatestBlockNumber is left in place here to be handled
@@ -413,7 +413,7 @@ func (api *FilterAPI) GetLogs(ctx context.Context, crit FilterCriteria) ([]*type
 		}
 		// Construct the range filter
 		var err error
-		filter, err = NewRangeFilter(api.backend, begin, end, crit.Addresses, crit.Topics)
+		filter, err = api.sys.NewRangeFilter(begin, end, crit.Addresses, crit.Topics)
 		if err != nil {
 			return nil, err
 		}
@@ -455,7 +455,7 @@ func (api *FilterAPI) GetFilterLogs(ctx context.Context, id rpc.ID) ([]*types.Lo
 	var filter *Filter
 	if f.crit.BlockHash != nil {
 		// Block filter requested, construct a single-shot filter
-		filter = NewBlockFilter(api.backend, *f.crit.BlockHash, f.crit.Addresses, f.crit.Topics)
+		filter = api.sys.NewBlockFilter(*f.crit.BlockHash, f.crit.Addresses, f.crit.Topics)
 	} else {
 		// Convert the RPC block numbers into internal representations
 		// Leave LatestBlockNumber in place here as the defaults
@@ -471,7 +471,7 @@ func (api *FilterAPI) GetFilterLogs(ctx context.Context, id rpc.ID) ([]*types.Lo
 		}
 		// Construct the range filter
 		var err error
-		filter, err = NewRangeFilter(api.backend, begin, end, f.crit.Addresses, f.crit.Topics)
+		filter, err = api.sys.NewRangeFilter(begin, end, f.crit.Addresses, f.crit.Topics)
 		if err != nil {
 			return nil, err
 		}

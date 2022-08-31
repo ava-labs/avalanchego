@@ -35,14 +35,101 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/core/bloombits"
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/core/vm"
+	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/interfaces"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+	lru "github.com/hashicorp/golang-lru"
 )
+
+// Config represents the configuration of the filter system.
+type Config struct {
+	LogCacheSize int           // maximum number of cached blocks (default: 32)
+	Timeout      time.Duration // how long filters stay active (default: 5min)
+}
+
+func (cfg Config) withDefaults() Config {
+	if cfg.Timeout == 0 {
+		cfg.Timeout = 5 * time.Minute
+	}
+	if cfg.LogCacheSize == 0 {
+		cfg.LogCacheSize = 32
+	}
+	return cfg
+}
+
+type Backend interface {
+	ChainDb() ethdb.Database
+	HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error)
+	HeaderByHash(ctx context.Context, blockHash common.Hash) (*types.Header, error)
+	GetReceipts(ctx context.Context, blockHash common.Hash) (types.Receipts, error)
+	GetLogs(ctx context.Context, blockHash common.Hash, number uint64) ([][]*types.Log, error)
+
+	SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription
+	SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription
+	SubscribeChainAcceptedEvent(ch chan<- core.ChainEvent) event.Subscription
+	SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription
+	SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription
+	SubscribeAcceptedLogsEvent(ch chan<- []*types.Log) event.Subscription
+
+	SubscribePendingLogsEvent(ch chan<- []*types.Log) event.Subscription
+
+	SubscribeAcceptedTransactionEvent(ch chan<- core.NewTxsEvent) event.Subscription
+
+	BloomStatus() (uint64, uint64)
+	ServiceFilter(ctx context.Context, session *bloombits.MatcherSession)
+
+	// Added to the backend interface to support limiting of logs requests
+	GetVMConfig() *vm.Config
+	LastAcceptedBlock() *types.Block
+	GetMaxBlocksPerRequest() int64
+}
+
+// FilterSystem holds resources shared by all filters.
+type FilterSystem struct {
+	backend   Backend
+	logsCache *lru.Cache
+	cfg       *Config
+}
+
+// NewFilterSystem creates a filter system.
+func NewFilterSystem(backend Backend, config Config) *FilterSystem {
+	config = config.withDefaults()
+
+	cache, err := lru.New(config.LogCacheSize)
+	if err != nil {
+		panic(err)
+	}
+	return &FilterSystem{
+		backend:   backend,
+		logsCache: cache,
+		cfg:       &config,
+	}
+}
+
+// cachedGetLogs loads block logs from the backend and caches the result.
+func (sys *FilterSystem) cachedGetLogs(ctx context.Context, blockHash common.Hash, number uint64) ([][]*types.Log, error) {
+	cached, ok := sys.logsCache.Get(blockHash)
+	if ok {
+		return cached.([][]*types.Log), nil
+	}
+
+	logs, err := sys.backend.GetLogs(ctx, blockHash, number)
+	if err != nil {
+		return nil, err
+	}
+	if logs == nil {
+		return nil, fmt.Errorf("failed to get logs for block #%d (0x%s)", number, blockHash.TerminalString())
+	}
+	sys.logsCache.Add(blockHash, logs)
+	return logs, nil
+}
 
 // Type determines the kind of filter and is used to put the filter in to
 // the correct bucket when added.
@@ -100,6 +187,7 @@ type subscription struct {
 // subscription which match the subscription criteria.
 type EventSystem struct {
 	backend   Backend
+	sys       *FilterSystem
 	lightMode bool
 	lastHead  *types.Header
 
@@ -132,9 +220,10 @@ type EventSystem struct {
 //
 // The returned manager has a loop that needs to be stopped with the Stop function
 // or by stopping the given mux.
-func NewEventSystem(backend Backend, lightMode bool) *EventSystem {
+func NewEventSystem(sys *FilterSystem, lightMode bool) *EventSystem {
 	m := &EventSystem{
-		backend:         backend,
+		sys:             sys,
+		backend:         sys.backend,
 		lightMode:       lightMode,
 		install:         make(chan *subscription),
 		uninstall:       make(chan *subscription),
@@ -537,7 +626,7 @@ func (es *EventSystem) lightFilterLogs(header *types.Header, addresses []common.
 		// Get the logs of the block
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
-		logsList, err := es.backend.GetLogs(ctx, header.Hash())
+		logsList, err := es.sys.cachedGetLogs(ctx, header.Hash(), header.Number.Uint64())
 		if err != nil {
 			return nil
 		}

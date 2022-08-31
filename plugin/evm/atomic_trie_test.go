@@ -44,11 +44,11 @@ func indexAtomicTxs(tr AtomicTrie, height uint64, atomicOps map[ids.ID]*atomic.R
 	if err := tr.UpdateTrie(snapshot, height, atomicOps); err != nil {
 		return err
 	}
-	root, _, err := snapshot.Commit(nil, false)
+	root, nodes, err := snapshot.Commit(false)
 	if err != nil {
 		return err
 	}
-	if err := tr.InsertTrie(root); err != nil {
+	if err := tr.InsertTrie(nodes, root); err != nil {
 		return err
 	}
 	_, err = tr.AcceptTrie(height, root)

@@ -168,11 +168,11 @@ func (a *atomicBackend) initialize(lastAcceptedHeight uint64) error {
 		if err := a.atomicTrie.UpdateTrie(tr, height, combinedOps); err != nil {
 			return err
 		}
-		root, _, err := tr.Commit(nil, false)
+		root, nodes, err := tr.Commit(false)
 		if err != nil {
 			return err
 		}
-		if err := a.atomicTrie.InsertTrie(root); err != nil {
+		if err := a.atomicTrie.InsertTrie(nodes, root); err != nil {
 			return err
 		}
 		isCommit, err := a.atomicTrie.AcceptTrie(height, root)
@@ -198,7 +198,7 @@ func (a *atomicBackend) initialize(lastAcceptedHeight uint64) error {
 	// check if there are accepted blocks after the last block with accepted atomic txs.
 	if lastAcceptedHeight > height {
 		lastAcceptedRoot := a.atomicTrie.LastAcceptedRoot()
-		if err := a.atomicTrie.InsertTrie(lastAcceptedRoot); err != nil {
+		if err := a.atomicTrie.InsertTrie(nil, lastAcceptedRoot); err != nil {
 			return err
 		}
 		if _, err := a.atomicTrie.AcceptTrie(lastAcceptedHeight, lastAcceptedRoot); err != nil {
@@ -390,11 +390,11 @@ func (a *atomicBackend) InsertTxs(blockHash common.Hash, blockHeight uint64, par
 	}
 
 	// get the new root and pin the atomic trie changes in memory.
-	root, _, err := tr.Commit(nil, false)
+	root, nodes, err := tr.Commit(false)
 	if err != nil {
 		return common.Hash{}, err
 	}
-	if err := a.atomicTrie.InsertTrie(root); err != nil {
+	if err := a.atomicTrie.InsertTrie(nodes, root); err != nil {
 		return common.Hash{}, err
 	}
 	// track this block so further blocks can be inserted on top

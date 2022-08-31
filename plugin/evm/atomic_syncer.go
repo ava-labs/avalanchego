@@ -91,11 +91,11 @@ func (s *atomicSyncer) onLeafs(keys [][]byte, values [][]byte) error {
 		if height > lastHeight {
 			// If this key belongs to a new height, we commit
 			// the trie at the previous height before adding this key.
-			root, _, err := s.trie.Commit(nil, false)
+			root, nodes, err := s.trie.Commit(false)
 			if err != nil {
 				return err
 			}
-			if err := s.atomicTrie.InsertTrie(root); err != nil {
+			if err := s.atomicTrie.InsertTrie(nodes, root); err != nil {
 				return err
 			}
 			// AcceptTrie commits the trieDB and returns [isCommit] as true
@@ -125,11 +125,11 @@ func (s *atomicSyncer) onLeafs(keys [][]byte, values [][]byte) error {
 // commit the trie to disk and perform the final checks that we synced the target root correctly.
 func (s *atomicSyncer) onFinish() error {
 	// commit the trie on finish
-	root, _, err := s.trie.Commit(nil, false)
+	root, nodes, err := s.trie.Commit(false)
 	if err != nil {
 		return err
 	}
-	if err := s.atomicTrie.InsertTrie(root); err != nil {
+	if err := s.atomicTrie.InsertTrie(nodes, root); err != nil {
 		return err
 	}
 	if _, err := s.atomicTrie.AcceptTrie(s.targetHeight, root); err != nil {
