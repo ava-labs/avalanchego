@@ -24,6 +24,7 @@ var (
 	_ StakerTx               = &AddPermissionlessValidatorTx{}
 	_ secp256k1fx.UnsignedTx = &AddPermissionlessValidatorTx{}
 
+	errEmptyNodeID             = errors.New("validator nodeID cannot be empty")
 	errNoStake                 = errors.New("no stake")
 	errMultipleStakedAssets    = errors.New("multiple staked assets")
 	errValidatorWeightMismatch = errors.New("validator weight mismatch")
@@ -73,9 +74,11 @@ func (tx *AddPermissionlessValidatorTx) SyntacticVerify(ctx *snow.Context) error
 		return ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
+	case tx.Validator.NodeID == ids.EmptyNodeID:
+		return errEmptyNodeID
 	case len(tx.Stake) == 0: // Ensure there is provided stake
 		return errNoStake
-	case tx.Shares > reward.PercentDenominator: // Ensure delegators shares are in the allowed amount
+	case tx.Shares > reward.PercentDenominator:
 		return errTooManyShares
 	}
 

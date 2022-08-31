@@ -75,11 +75,26 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 			err: nil,
 		},
 		{
+			name: "empty nodeID",
+			txFunc: func(*gomock.Controller) *AddPermissionlessValidatorTx {
+				return &AddPermissionlessValidatorTx{
+					BaseTx: validBaseTx,
+					Validator: validator.Validator{
+						NodeID: ids.EmptyNodeID,
+					},
+				}
+			},
+			err: errEmptyNodeID,
+		},
+		{
 			name: "no provided stake",
 			txFunc: func(*gomock.Controller) *AddPermissionlessValidatorTx {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
-					Stake:  nil,
+					Validator: validator.Validator{
+						NodeID: ids.GenerateTestNodeID(),
+					},
+					Stake: nil,
 				}
 			},
 			err: errNoStake,
@@ -89,6 +104,9 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 			txFunc: func(*gomock.Controller) *AddPermissionlessValidatorTx {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
+					Validator: validator.Validator{
+						NodeID: ids.GenerateTestNodeID(),
+					},
 					Stake: []*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
@@ -112,7 +130,8 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
 					Validator: validator.Validator{
-						Wght: 1,
+						NodeID: ids.GenerateTestNodeID(),
+						Wght:   1,
 					},
 					Subnet: ids.GenerateTestID(),
 					Stake: []*avax.TransferableOutput{
@@ -143,7 +162,8 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
 					Validator: validator.Validator{
-						Wght: 1,
+						NodeID: ids.GenerateTestNodeID(),
+						Wght:   1,
 					},
 					Subnet: ids.GenerateTestID(),
 					Stake: []*avax.TransferableOutput{
@@ -169,7 +189,8 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
 					Validator: validator.Validator{
-						Wght: 1,
+						NodeID: ids.GenerateTestNodeID(),
+						Wght:   1,
 					},
 					Subnet: ids.GenerateTestID(),
 					Stake: []*avax.TransferableOutput{
@@ -206,7 +227,8 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
 					Validator: validator.Validator{
-						Wght: 1,
+						NodeID: ids.GenerateTestNodeID(),
+						Wght:   1,
 					},
 					Subnet: ids.GenerateTestID(),
 					Stake: []*avax.TransferableOutput{
@@ -243,7 +265,8 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
 					Validator: validator.Validator{
-						Wght: 1,
+						NodeID: ids.GenerateTestNodeID(),
+						Wght:   1,
 					},
 					Subnet: ids.GenerateTestID(),
 					Stake: []*avax.TransferableOutput{
@@ -280,7 +303,8 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
 					Validator: validator.Validator{
-						Wght: 2,
+						NodeID: ids.GenerateTestNodeID(),
+						Wght:   2,
 					},
 					Subnet: ids.GenerateTestID(),
 					Stake: []*avax.TransferableOutput{
@@ -317,7 +341,8 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				return &AddPermissionlessValidatorTx{
 					BaseTx: validBaseTx,
 					Validator: validator.Validator{
-						Wght: 2,
+						NodeID: ids.GenerateTestNodeID(),
+						Wght:   2,
 					},
 					Subnet: constants.PrimaryNetworkID,
 					Stake: []*avax.TransferableOutput{
@@ -363,6 +388,9 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 		require := require.New(t)
 		tx := &AddPermissionlessValidatorTx{
 			BaseTx: invalidBaseTx,
+			Validator: validator.Validator{
+				NodeID: ids.GenerateTestNodeID(),
+			},
 			Stake: []*avax.TransferableOutput{
 				{
 					Asset: avax.Asset{
@@ -390,7 +418,8 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 		tx := &AddPermissionlessValidatorTx{
 			BaseTx: validBaseTx,
 			Validator: validator.Validator{
-				Wght: 1,
+				NodeID: ids.GenerateTestNodeID(),
+				Wght:   1,
 			},
 			Subnet: ids.GenerateTestID(),
 			Stake: []*avax.TransferableOutput{
