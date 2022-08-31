@@ -329,7 +329,7 @@ func TestUpdatedKeyfileContents(t *testing.T) {
 	t.Skip("FLAKY")
 	t.Parallel()
 
-	// Create a temporary kesytore to test with
+	// Create a temporary keystore to test with
 	rand.Seed(time.Now().UnixNano())
 	dir := filepath.Join(os.TempDir(), fmt.Sprintf("eth-keystore-watch-test-%d-%d", os.Getpid(), rand.Int()))
 	ks := NewKeyStore(dir, LightScryptN, LightScryptP)

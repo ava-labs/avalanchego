@@ -283,6 +283,13 @@ func (s *Ethereum) APIs() []rpc.API {
 	// Add the APIs from the node
 	apis = append(apis, s.stackRPCs...)
 
+	// Create [filterSystem] with the log cache size set in the config.
+	ethcfg := s.APIBackend.eth.config
+	filterSystem := filters.NewFilterSystem(s.APIBackend, filters.Config{
+		LogCacheSize: ethcfg.FilterLogCacheSize,
+		Timeout:      5 * time.Minute,
+	})
+
 	// Append all the local APIs and return
 	return append(apis, []rpc.API{
 		{
@@ -291,7 +298,7 @@ func (s *Ethereum) APIs() []rpc.API {
 			Name:      "eth",
 		}, {
 			Namespace: "eth",
-			Service:   filters.NewFilterAPI(s.APIBackend, false, 5*time.Minute),
+			Service:   filters.NewFilterAPI(filterSystem, false /* isLightClient */),
 			Name:      "eth-filter",
 		}, {
 			Namespace: "admin",

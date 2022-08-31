@@ -27,15 +27,17 @@
 package trie
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/coreth/ethdb/memorydb"
 	"github.com/ethereum/go-ethereum/common"
 )
 
 // makeTestTrie create a sample test trie to test node-wise reconstruction.
-func makeTestTrie() (*Database, *SecureTrie, map[string][]byte) {
+func makeTestTrie() (*Database, *StateTrie, map[string][]byte) {
 	// Create an empty trie
 	triedb := NewDatabase(memorydb.New())
-	trie, _ := NewSecure(common.Hash{}, common.Hash{}, triedb)
+	trie, _ := NewStateTrie(common.Hash{}, common.Hash{}, triedb)
 
 	// Fill it with some arbitrary data
 	content := make(map[string][]byte)
@@ -56,8 +58,14 @@ func makeTestTrie() (*Database, *SecureTrie, map[string][]byte) {
 			trie.Update(key, val)
 		}
 	}
-	trie.Commit(nil, false)
-
-	// Return the generated trie
+	root, nodes, err := trie.Commit(false)
+	if err != nil {
+		panic(fmt.Errorf("failed to commit trie %v", err))
+	}
+	if err := triedb.Update(NewWithNodeSet(nodes)); err != nil {
+		panic(fmt.Errorf("failed to commit db %v", err))
+	}
+	// Re-create the trie based on the new state
+	trie, _ = NewSecure(common.Hash{}, root, triedb)
 	return triedb, trie, content
 }

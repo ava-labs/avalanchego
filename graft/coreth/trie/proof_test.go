@@ -215,7 +215,7 @@ func TestRangeProofWithNonExistentProof(t *testing.T) {
 		proof := memorydb.New()
 
 		// Short circuit if the decreased key is same with the previous key
-		first := decreseKey(common.CopyBytes(entries[start].k))
+		first := decreaseKey(common.CopyBytes(entries[start].k))
 		if start != 0 && bytes.Equal(first, entries[start-1].k) {
 			continue
 		}
@@ -224,7 +224,7 @@ func TestRangeProofWithNonExistentProof(t *testing.T) {
 			continue
 		}
 		// Short circuit if the increased key is same with the next key
-		last := increseKey(common.CopyBytes(entries[end-1].k))
+		last := increaseKey(common.CopyBytes(entries[end-1].k))
 		if end != len(entries) && bytes.Equal(last, entries[end].k) {
 			continue
 		}
@@ -284,7 +284,7 @@ func TestRangeProofWithInvalidNonExistentProof(t *testing.T) {
 
 	// Case 1
 	start, end := 100, 200
-	first := decreseKey(common.CopyBytes(entries[start].k))
+	first := decreaseKey(common.CopyBytes(entries[start].k))
 
 	proof := memorydb.New()
 	if err := trie.Prove(first, 0, proof); err != nil {
@@ -307,7 +307,7 @@ func TestRangeProofWithInvalidNonExistentProof(t *testing.T) {
 
 	// Case 2
 	start, end = 100, 200
-	last := increseKey(common.CopyBytes(entries[end-1].k))
+	last := increaseKey(common.CopyBytes(entries[end-1].k))
 	proof = memorydb.New()
 	if err := trie.Prove(entries[start].k, 0, proof); err != nil {
 		t.Fatalf("Failed to prove the first node %v", err)
@@ -353,7 +353,7 @@ func TestOneElementRangeProof(t *testing.T) {
 
 	// One element with left non-existent edge proof
 	start = 1000
-	first := decreseKey(common.CopyBytes(entries[start].k))
+	first := decreaseKey(common.CopyBytes(entries[start].k))
 	proof = memorydb.New()
 	if err := trie.Prove(first, 0, proof); err != nil {
 		t.Fatalf("Failed to prove the first node %v", err)
@@ -368,7 +368,7 @@ func TestOneElementRangeProof(t *testing.T) {
 
 	// One element with right non-existent edge proof
 	start = 1000
-	last := increseKey(common.CopyBytes(entries[start].k))
+	last := increaseKey(common.CopyBytes(entries[start].k))
 	proof = memorydb.New()
 	if err := trie.Prove(entries[start].k, 0, proof); err != nil {
 		t.Fatalf("Failed to prove the first node %v", err)
@@ -383,7 +383,7 @@ func TestOneElementRangeProof(t *testing.T) {
 
 	// One element with two non-existent edge proofs
 	start = 1000
-	first, last = decreseKey(common.CopyBytes(entries[start].k)), increseKey(common.CopyBytes(entries[start].k))
+	first, last = decreaseKey(common.CopyBytes(entries[start].k)), increaseKey(common.CopyBytes(entries[start].k))
 	proof = memorydb.New()
 	if err := trie.Prove(first, 0, proof); err != nil {
 		t.Fatalf("Failed to prove the first node %v", err)
@@ -651,9 +651,9 @@ func TestSameSideProofs(t *testing.T) {
 	sort.Sort(entries)
 
 	pos := 1000
-	first := decreseKey(common.CopyBytes(entries[pos].k))
-	first = decreseKey(first)
-	last := decreseKey(common.CopyBytes(entries[pos].k))
+	first := decreaseKey(common.CopyBytes(entries[pos].k))
+	first = decreaseKey(first)
+	last := decreaseKey(common.CopyBytes(entries[pos].k))
 
 	proof := memorydb.New()
 	if err := trie.Prove(first, 0, proof); err != nil {
@@ -667,9 +667,9 @@ func TestSameSideProofs(t *testing.T) {
 		t.Fatalf("Expected error, got nil")
 	}
 
-	first = increseKey(common.CopyBytes(entries[pos].k))
-	last = increseKey(common.CopyBytes(entries[pos].k))
-	last = increseKey(last)
+	first = increaseKey(common.CopyBytes(entries[pos].k))
+	last = increaseKey(common.CopyBytes(entries[pos].k))
+	last = increaseKey(last)
 
 	proof = memorydb.New()
 	if err := trie.Prove(first, 0, proof); err != nil {
@@ -775,7 +775,7 @@ func TestEmptyRangeProof(t *testing.T) {
 	}
 	for _, c := range cases {
 		proof := memorydb.New()
-		first := increseKey(common.CopyBytes(entries[c.pos].k))
+		first := increaseKey(common.CopyBytes(entries[c.pos].k))
 		if err := trie.Prove(first, 0, proof); err != nil {
 			t.Fatalf("Failed to prove the first node %v", err)
 		}
@@ -914,7 +914,7 @@ func mutateByte(b []byte) {
 	}
 }
 
-func increseKey(key []byte) []byte {
+func increaseKey(key []byte) []byte {
 	for i := len(key) - 1; i >= 0; i-- {
 		key[i]++
 		if key[i] != 0x0 {
@@ -924,7 +924,7 @@ func increseKey(key []byte) []byte {
 	return key
 }
 
-func decreseKey(key []byte) []byte {
+func decreaseKey(key []byte) []byte {
 	for i := len(key) - 1; i >= 0; i-- {
 		key[i]--
 		if key[i] != 0xff {

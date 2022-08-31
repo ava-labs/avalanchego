@@ -222,7 +222,7 @@ type subfetcher struct {
 
 	wake chan struct{}  // Wake channel if a new task is scheduled
 	stop chan struct{}  // Channel to interrupt processing
-	term chan struct{}  // Channel to signal iterruption
+	term chan struct{}  // Channel to signal interruption
 	copy chan chan Trie // Channel to request a copy of the current trie
 
 	seen map[string]struct{} // Tracks the entries already loaded
@@ -342,7 +342,12 @@ func (sf *subfetcher) loop() {
 					if _, ok := sf.seen[string(task)]; ok {
 						sf.dups++
 					} else {
-						_, err := sf.trie.TryGet(task)
+						var err error
+						if len(task) == len(common.Address{}) {
+							_, err = sf.trie.TryGetAccount(task)
+						} else {
+							_, err = sf.trie.TryGet(task)
+						}
 						if err != nil {
 							log.Error("Trie prefetcher failed fetching", "root", sf.root, "err", err)
 						}

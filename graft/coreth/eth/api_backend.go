@@ -29,7 +29,6 @@ package eth
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math/big"
 	"time"
 
@@ -246,23 +245,8 @@ func (b *EthAPIBackend) GetReceipts(ctx context.Context, hash common.Hash) (type
 	return b.eth.blockchain.GetReceiptsByHash(hash), nil
 }
 
-func (b *EthAPIBackend) GetLogs(ctx context.Context, hash common.Hash) ([][]*types.Log, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-
-	header, err := b.HeaderByHash(ctx, hash)
-	if header == nil || err != nil {
-		return nil, fmt.Errorf("failed to get block number for hash %#x", hash)
-	}
-
-	db := b.eth.ChainDb()
-	number := header.Number.Uint64()
-	logs := rawdb.ReadLogs(db, hash, number)
-	if logs == nil {
-		return nil, fmt.Errorf("failed to get logs for block #%d (0x%s)", number, hash.TerminalString())
-	}
-	return logs, nil
+func (b *EthAPIBackend) GetLogs(ctx context.Context, hash common.Hash, number uint64) ([][]*types.Log, error) {
+	return rawdb.ReadLogs(b.eth.chainDb, hash, number), nil
 }
 
 func (b *EthAPIBackend) GetEVM(ctx context.Context, msg core.Message, state *state.StateDB, header *types.Header, vmConfig *vm.Config) (*vm.EVM, func() error, error) {

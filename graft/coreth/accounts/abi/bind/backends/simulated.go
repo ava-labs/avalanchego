@@ -97,7 +97,8 @@ type SimulatedBackend struct {
 	acceptedBlock *types.Block   // Currently accepted block that will be imported on request
 	acceptedState *state.StateDB // Currently accepted state that will be the active on request
 
-	events *filters.EventSystem // Event system for filtering log events live
+	events       *filters.EventSystem  // for filtering log events live
+	filterSystem *filters.FilterSystem // for filtering database logs
 
 	config *params.ChainConfig
 }
@@ -118,7 +119,11 @@ func NewSimulatedBackendWithDatabase(database ethdb.Database, alloc core.Genesis
 		blockchain: blockchain,
 		config:     genesis.Config,
 	}
-	backend.events = filters.NewEventSystem(&filterBackend{database, blockchain, backend}, false)
+
+	filterBackend := &filterBackend{database, blockchain, backend}
+	backend.filterSystem = filters.NewFilterSystem(filterBackend, filters.Config{})
+	backend.events = filters.NewEventSystem(backend.filterSystem, false)
+
 	backend.rollback(blockchain.CurrentBlock())
 	return backend
 }
@@ -647,7 +652,7 @@ func (b *SimulatedBackend) callContract(ctx context.Context, call interfaces.Cal
 			// User specified the legacy gas field, convert to 1559 gas typing
 			call.GasFeeCap, call.GasTipCap = call.GasPrice, call.GasPrice
 		} else {
-			// User specified 1559 gas feilds (or none), use those
+			// User specified 1559 gas fields (or none), use those
 			if call.GasFeeCap == nil {
 				call.GasFeeCap = new(big.Int)
 			}
@@ -729,7 +734,7 @@ func (b *SimulatedBackend) FilterLogs(ctx context.Context, query interfaces.Filt
 	var filter *filters.Filter
 	if query.BlockHash != nil {
 		// Block filter requested, construct a single-shot filter
-		filter = filters.NewBlockFilter(&filterBackend{b.database, b.blockchain, b}, *query.BlockHash, query.Addresses, query.Topics)
+		filter = b.filterSystem.NewBlockFilter(*query.BlockHash, query.Addresses, query.Topics)
 	} else {
 		// Initialize unset filter boundaries to run from genesis to chain head
 		from := int64(0)
@@ -741,7 +746,7 @@ func (b *SimulatedBackend) FilterLogs(ctx context.Context, query interfaces.Filt
 			to = query.ToBlock.Int64()
 		}
 		// Construct the range filter
-		filter, _ = filters.NewRangeFilter(&filterBackend{b.database, b.blockchain, b}, from, to, query.Addresses, query.Topics)
+		filter, _ = b.filterSystem.NewRangeFilter(from, to, query.Addresses, query.Topics)
 	}
 	// Run the filter and return all the logs
 	logs, err := filter.Logs(ctx)
@@ -891,7 +896,8 @@ func (fb *filterBackend) GetMaxBlocksPerRequest() int64 {
 	return eth.DefaultSettings.MaxBlocksPerRequest
 }
 
-func (fb *filterBackend) ChainDb() ethdb.Database  { return fb.db }
+func (fb *filterBackend) ChainDb() ethdb.Database { return fb.db }
+
 func (fb *filterBackend) EventMux() *event.TypeMux { panic("not supported") }
 
 func (fb *filterBackend) HeaderByNumber(ctx context.Context, block rpc.BlockNumber) (*types.Header, error) {
@@ -913,19 +919,8 @@ func (fb *filterBackend) GetReceipts(ctx context.Context, hash common.Hash) (typ
 	return rawdb.ReadReceipts(fb.db, hash, *number, fb.bc.Config()), nil
 }
 
-func (fb *filterBackend) GetLogs(ctx context.Context, hash common.Hash) ([][]*types.Log, error) {
-	number := rawdb.ReadHeaderNumber(fb.db, hash)
-	if number == nil {
-		return nil, nil
-	}
-	receipts := rawdb.ReadReceipts(fb.db, hash, *number, fb.bc.Config())
-	if receipts == nil {
-		return nil, nil
-	}
-	logs := make([][]*types.Log, len(receipts))
-	for i, receipt := range receipts {
-		logs[i] = receipt.Logs
-	}
+func (fb *filterBackend) GetLogs(ctx context.Context, hash common.Hash, number uint64) ([][]*types.Log, error) {
+	logs := rawdb.ReadLogs(fb.db, hash, number)
 	return logs, nil
 }
 
