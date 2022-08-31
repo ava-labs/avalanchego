@@ -42,6 +42,10 @@ type StandardTxExecutor struct {
 
 func (*StandardTxExecutor) AdvanceTimeTx(*txs.AdvanceTimeTx) error         { return errWrongTxType }
 func (*StandardTxExecutor) RewardValidatorTx(*txs.RewardValidatorTx) error { return errWrongTxType }
+func (*StandardTxExecutor) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
+	// TODO: Implement this
+	return errWrongTxType
+}
 
 func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {

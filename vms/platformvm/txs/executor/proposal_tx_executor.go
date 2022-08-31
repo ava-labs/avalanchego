@@ -71,6 +71,9 @@ func (*ProposalTxExecutor) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx)
 	return errWrongTxType
 }
 func (*ProposalTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error { return errWrongTxType }
+func (*ProposalTxExecutor) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
+	return errWrongTxType
+}
 
 func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	// AddValidatorTx is a proposal transaction until the Blueberry fork

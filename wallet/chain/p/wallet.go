@@ -191,6 +191,8 @@ type Wallet interface {
 		options ...common.Option,
 	) (ids.ID, error)
 
+	// TODO: add support for AddPermissionlessValidatorTx
+
 	// IssueUnsignedTx signs and issues the unsigned tx.
 	IssueUnsignedTx(
 		utx txs.UnsignedTx,

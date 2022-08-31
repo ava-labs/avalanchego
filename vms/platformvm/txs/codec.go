@@ -71,6 +71,7 @@ func RegisterUnsignedTxsTypes(targetCodec codec.Registry) error {
 		// Blueberry additions:
 		targetCodec.RegisterType(&RemoveSubnetValidatorTx{}),
 		targetCodec.RegisterType(&TransformSubnetTx{}),
+		targetCodec.RegisterType(&AddPermissionlessValidatorTx{}),
 	)
 	return errs.Err
 }
