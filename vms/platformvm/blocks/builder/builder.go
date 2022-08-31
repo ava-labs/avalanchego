@@ -274,7 +274,7 @@ func (b *builder) getNextStakerToReward(
 		// If the staker is a permissionless staker (not a permissioned subnet
 		// validator), it's the next staker we will want to remove with a
 		// RewardValidatorTx rather than an AdvanceTimeTx.
-		if priority != state.SubnetPermissionedValidatorCurrentPriority {
+		if priority != txs.SubnetPermissionedValidatorCurrentPriority {
 			return currentStaker.TxID, chainTimestamp.Equal(currentStaker.EndTime), nil
 		}
 	}
@@ -288,7 +288,7 @@ func (b *builder) dropExpiredStakerTxs(timestamp time.Time) {
 	minStartTime := timestamp.Add(txexecutor.SyncBound)
 	for b.Mempool.HasStakerTx() {
 		tx := b.Mempool.PeekStakerTx()
-		startTime := tx.Unsigned.(txs.StakerTx).StartTime()
+		startTime := tx.Unsigned.(txs.Staker).StartTime()
 		if !startTime.Before(minStartTime) {
 			// The next proposal tx in the mempool starts sufficiently far in
 			// the future.

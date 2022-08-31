@@ -45,13 +45,11 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		staker := state.NewPrimaryNetworkStaker(
+		staker := state.NewCurrentStaker(
 			tx.ID(),
-			&tx.Unsigned.(*txs.AddValidatorTx).Validator,
+			tx.Unsigned.(*txs.AddValidatorTx),
+			0,
 		)
-		staker.PotentialReward = 0
-		staker.NextTime = staker.EndTime
-		staker.Priority = state.PrimaryNetworkValidatorCurrentPriority
 
 		target.state.PutCurrentValidator(staker)
 		target.state.AddTx(tx, status.Committed)
@@ -78,13 +76,11 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		staker := state.NewPrimaryNetworkStaker(
+		staker := state.NewCurrentStaker(
 			tx.ID(),
-			&tx.Unsigned.(*txs.AddValidatorTx).Validator,
+			tx.Unsigned.(*txs.AddValidatorTx),
+			0,
 		)
-		staker.PotentialReward = 0
-		staker.NextTime = staker.EndTime
-		staker.Priority = state.PrimaryNetworkValidatorCurrentPriority
 
 		target.state.PutCurrentValidator(staker)
 		target.state.AddTx(tx, status.Committed)
@@ -477,13 +473,11 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		}
 	}
 
-	staker := state.NewPrimaryNetworkStaker(
+	staker := state.NewCurrentStaker(
 		addDSTx.ID(),
-		&addDSTx.Unsigned.(*txs.AddValidatorTx).Validator,
+		addDSTx.Unsigned.(*txs.AddValidatorTx),
+		0,
 	)
-	staker.PotentialReward = 0
-	staker.NextTime = staker.EndTime
-	staker.Priority = state.PrimaryNetworkValidatorCurrentPriority
 
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(addDSTx, status.Committed)
@@ -668,12 +662,11 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	staker = state.NewSubnetStaker(
+	staker = state.NewCurrentStaker(
 		subnetTx.ID(),
-		&subnetTx.Unsigned.(*txs.AddSubnetValidatorTx).Validator,
+		subnetTx.Unsigned.(*txs.AddSubnetValidatorTx),
+		0,
 	)
-	staker.NextTime = staker.EndTime
-	staker.Priority = state.SubnetPermissionedValidatorCurrentPriority
 
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(subnetTx, status.Committed)
@@ -865,12 +858,11 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		staker = state.NewSubnetStaker(
+		staker = state.NewCurrentStaker(
 			subnetTx.ID(),
-			&subnetTx.Unsigned.(*txs.AddSubnetValidatorTx).Validator,
+			subnetTx.Unsigned.(*txs.AddSubnetValidatorTx),
+			0,
 		)
-		staker.NextTime = staker.EndTime
-		staker.Priority = state.SubnetPermissionedValidatorCurrentPriority
 
 		env.state.PutCurrentValidator(staker)
 		env.state.AddTx(tx, status.Committed)
@@ -1044,13 +1036,11 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		staker := state.NewPrimaryNetworkStaker(
+		staker := state.NewCurrentStaker(
 			tx.ID(),
-			&tx.Unsigned.(*txs.AddValidatorTx).Validator,
+			tx.Unsigned.(*txs.AddValidatorTx),
+			0,
 		)
-		staker.PotentialReward = 0
-		staker.NextTime = staker.EndTime
-		staker.Priority = state.PrimaryNetworkValidatorCurrentPriority
 
 		env.state.PutCurrentValidator(staker)
 		env.state.AddTx(tx, status.Committed)

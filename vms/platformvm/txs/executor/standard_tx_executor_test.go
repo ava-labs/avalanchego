@@ -30,7 +30,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -126,13 +125,11 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		staker := state.NewPrimaryNetworkStaker(
+		staker := state.NewCurrentStaker(
 			tx.ID(),
-			&tx.Unsigned.(*txs.AddValidatorTx).Validator,
+			tx.Unsigned.(*txs.AddValidatorTx),
+			0,
 		)
-		staker.PotentialReward = 0
-		staker.NextTime = staker.EndTime
-		staker.Priority = state.PrimaryNetworkValidatorCurrentPriority
 
 		target.state.PutCurrentValidator(staker)
 		target.state.AddTx(tx, status.Committed)
@@ -159,13 +156,11 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		staker := state.NewPrimaryNetworkStaker(
+		staker := state.NewCurrentStaker(
 			tx.ID(),
-			&tx.Unsigned.(*txs.AddValidatorTx).Validator,
+			tx.Unsigned.(*txs.AddValidatorTx),
+			0,
 		)
-		staker.PotentialReward = 0
-		staker.NextTime = staker.EndTime
-		staker.Priority = state.PrimaryNetworkValidatorCurrentPriority
 
 		target.state.PutCurrentValidator(staker)
 		target.state.AddTx(tx, status.Committed)
@@ -537,13 +532,11 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		}
 	}
 
-	staker := state.NewPrimaryNetworkStaker(
+	staker := state.NewCurrentStaker(
 		addDSTx.ID(),
-		&addDSTx.Unsigned.(*txs.AddValidatorTx).Validator,
+		addDSTx.Unsigned.(*txs.AddValidatorTx),
+		0,
 	)
-	staker.PotentialReward = 0
-	staker.NextTime = staker.EndTime
-	staker.Priority = state.PrimaryNetworkValidatorCurrentPriority
 
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(addDSTx, status.Committed)
@@ -704,12 +697,11 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	staker = state.NewSubnetStaker(
+	staker = state.NewCurrentStaker(
 		subnetTx.ID(),
-		&subnetTx.Unsigned.(*txs.AddSubnetValidatorTx).Validator,
+		subnetTx.Unsigned.(*txs.AddSubnetValidatorTx),
+		0,
 	)
-	staker.NextTime = staker.EndTime
-	staker.Priority = state.SubnetPermissionedValidatorCurrentPriority
 
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(subnetTx, status.Committed)
@@ -877,12 +869,11 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		staker = state.NewSubnetStaker(
+		staker = state.NewCurrentStaker(
 			subnetTx.ID(),
-			&subnetTx.Unsigned.(*txs.AddSubnetValidatorTx).Validator,
+			subnetTx.Unsigned.(*txs.AddSubnetValidatorTx),
+			0,
 		)
-		staker.NextTime = staker.EndTime
-		staker.Priority = state.SubnetPermissionedValidatorCurrentPriority
 
 		env.state.PutCurrentValidator(staker)
 		env.state.AddTx(tx, status.Committed)
@@ -1034,13 +1025,11 @@ func TestStandardTxExecutorAddValidator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		staker := state.NewPrimaryNetworkStaker(
+		staker := state.NewCurrentStaker(
 			tx.ID(),
-			&tx.Unsigned.(*txs.AddValidatorTx).Validator,
+			tx.Unsigned.(*txs.AddValidatorTx),
+			0,
 		)
-		staker.PotentialReward = 0
-		staker.NextTime = staker.EndTime
-		staker.Priority = state.PrimaryNetworkValidatorCurrentPriority
 
 		env.state.PutCurrentValidator(staker)
 		env.state.AddTx(tx, status.Committed)
@@ -1192,11 +1181,6 @@ func newValidRemoveSubnetValidatorTxVerifyEnv(t *testing.T, ctrl *gomock.Control
 	mockFlowChecker := utxo.NewMockVerifier(ctrl)
 	unsignedTx, tx := newRemoveSubnetValidatorTx(t)
 	mockState := state.NewMockDiff(ctrl)
-	staker := state.NewSubnetStaker(ids.GenerateTestID(), &validator.SubnetValidator{
-		Validator: validator.Validator{
-			NodeID: ids.GenerateTestNodeID(),
-		},
-	})
 	return removeSubnetValidatorTxVerifyEnv{
 		blueberryTime: now,
 		fx:            mockFx,
@@ -1204,7 +1188,10 @@ func newValidRemoveSubnetValidatorTxVerifyEnv(t *testing.T, ctrl *gomock.Control
 		unsignedTx:    unsignedTx,
 		tx:            tx,
 		state:         mockState,
-		staker:        staker,
+		staker: &state.Staker{
+			TxID:   ids.GenerateTestID(),
+			NodeID: ids.GenerateTestNodeID(),
+		},
 	}
 }
 
@@ -1613,11 +1600,6 @@ func newValidTransformSubnetTxVerifyEnv(t *testing.T, ctrl *gomock.Controller) t
 	mockFlowChecker := utxo.NewMockVerifier(ctrl)
 	unsignedTx, tx := newTransformSubnetTx(t)
 	mockState := state.NewMockDiff(ctrl)
-	staker := state.NewSubnetStaker(ids.GenerateTestID(), &validator.SubnetValidator{
-		Validator: validator.Validator{
-			NodeID: ids.GenerateTestNodeID(),
-		},
-	})
 	return transformSubnetTxVerifyEnv{
 		blueberryTime: now,
 		fx:            mockFx,
@@ -1625,7 +1607,10 @@ func newValidTransformSubnetTxVerifyEnv(t *testing.T, ctrl *gomock.Controller) t
 		unsignedTx:    unsignedTx,
 		tx:            tx,
 		state:         mockState,
-		staker:        staker,
+		staker: &state.Staker{
+			TxID:   ids.GenerateTestID(),
+			NodeID: ids.GenerateTestNodeID(),
+		},
 	}
 }
 

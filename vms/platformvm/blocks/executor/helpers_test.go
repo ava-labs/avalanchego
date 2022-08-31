@@ -513,12 +513,10 @@ func addPendingValidator(
 		return nil, err
 	}
 
-	staker := state.NewPrimaryNetworkStaker(
+	staker := state.NewPendingStaker(
 		addPendingValidatorTx.ID(),
-		&addPendingValidatorTx.Unsigned.(*txs.AddValidatorTx).Validator,
+		addPendingValidatorTx.Unsigned.(*txs.AddValidatorTx),
 	)
-	staker.NextTime = staker.StartTime
-	staker.Priority = state.PrimaryNetworkValidatorPendingPriority
 
 	env.state.PutPendingValidator(staker)
 	env.state.AddTx(addPendingValidatorTx, status.Committed)

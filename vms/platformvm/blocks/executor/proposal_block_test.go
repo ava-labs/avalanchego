@@ -191,7 +191,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 		TxID:     nextStakerTxID,
 		EndTime:  nextStakerTime,
 		NextTime: nextStakerTime,
-		Priority: state.PrimaryNetworkValidatorCurrentPriority,
+		Priority: txs.PrimaryNetworkValidatorCurrentPriority,
 	}).AnyTimes()
 	currentStakersIt.EXPECT().Release().AnyTimes()
 	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil).AnyTimes()
@@ -538,9 +538,10 @@ func TestBlueberryProposalBlockUpdateStakers(t *testing.T) {
 				)
 				require.NoError(err)
 
-				staker := state.NewPrimaryNetworkStaker(tx.ID(), &tx.Unsigned.(*txs.AddValidatorTx).Validator)
-				staker.NextTime = staker.StartTime
-				staker.Priority = state.PrimaryNetworkValidatorPendingPriority
+				staker := state.NewPendingStaker(
+					tx.ID(),
+					tx.Unsigned.(*txs.AddValidatorTx),
+				)
 
 				env.state.PutPendingValidator(staker)
 				env.state.AddTx(tx, status.Committed)
@@ -559,9 +560,10 @@ func TestBlueberryProposalBlockUpdateStakers(t *testing.T) {
 				)
 				require.NoError(err)
 
-				subnetStaker := state.NewSubnetStaker(tx.ID(), &tx.Unsigned.(*txs.AddSubnetValidatorTx).Validator)
-				subnetStaker.NextTime = subStaker.startTime
-				subnetStaker.Priority = state.SubnetPermissionedValidatorPendingPriority
+				subnetStaker := state.NewPendingStaker(
+					tx.ID(),
+					tx.Unsigned.(*txs.AddSubnetValidatorTx),
+				)
 
 				env.state.PutPendingValidator(subnetStaker)
 				env.state.AddTx(tx, status.Committed)
@@ -587,9 +589,11 @@ func TestBlueberryProposalBlockUpdateStakers(t *testing.T) {
 				require.NoError(err)
 
 				// store Staker0 to state
-				staker0 := state.NewPrimaryNetworkStaker(addStaker0.ID(), &addStaker0.Unsigned.(*txs.AddValidatorTx).Validator)
-				staker0.NextTime = staker0.EndTime
-				staker0.Priority = state.PrimaryNetworkValidatorCurrentPriority
+				staker0 := state.NewCurrentStaker(
+					addStaker0.ID(),
+					addStaker0.Unsigned.(*txs.AddValidatorTx),
+					0,
+				)
 				env.state.PutCurrentValidator(staker0)
 				env.state.AddTx(addStaker0, status.Committed)
 				require.NoError(env.state.Commit())
@@ -679,9 +683,11 @@ func TestBlueberryProposalBlockRemoveSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 
-	staker := state.NewSubnetStaker(tx.ID(), &tx.Unsigned.(*txs.AddSubnetValidatorTx).Validator)
-	staker.NextTime = staker.EndTime
-	staker.Priority = state.SubnetPermissionedValidatorCurrentPriority
+	staker := state.NewCurrentStaker(
+		tx.ID(),
+		tx.Unsigned.(*txs.AddSubnetValidatorTx),
+		0,
+	)
 
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(tx, status.Committed)
@@ -702,9 +708,10 @@ func TestBlueberryProposalBlockRemoveSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 
-	staker = state.NewSubnetStaker(tx.ID(), &tx.Unsigned.(*txs.AddSubnetValidatorTx).Validator)
-	staker.NextTime = staker.StartTime
-	staker.Priority = state.SubnetPermissionedValidatorPendingPriority
+	staker = state.NewPendingStaker(
+		tx.ID(),
+		tx.Unsigned.(*txs.AddSubnetValidatorTx),
+	)
 
 	env.state.PutPendingValidator(staker)
 	env.state.AddTx(tx, status.Committed)
@@ -732,9 +739,11 @@ func TestBlueberryProposalBlockRemoveSubnetValidator(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
-	staker = state.NewPrimaryNetworkStaker(addStaker0.ID(), &addStaker0.Unsigned.(*txs.AddValidatorTx).Validator)
-	staker.NextTime = staker.EndTime
-	staker.Priority = state.PrimaryNetworkValidatorCurrentPriority
+	staker = state.NewCurrentStaker(
+		addStaker0.ID(),
+		addStaker0.Unsigned.(*txs.AddValidatorTx),
+		0,
+	)
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(addStaker0, status.Committed)
 	require.NoError(env.state.Commit())
@@ -810,9 +819,10 @@ func TestBlueberryProposalBlockWhitelistedSubnet(t *testing.T) {
 			)
 			require.NoError(err)
 
-			staker := state.NewSubnetStaker(tx.ID(), &tx.Unsigned.(*txs.AddSubnetValidatorTx).Validator)
-			staker.NextTime = staker.StartTime
-			staker.Priority = state.SubnetPermissionedValidatorPendingPriority
+			staker := state.NewPendingStaker(
+				tx.ID(),
+				tx.Unsigned.(*txs.AddSubnetValidatorTx),
+			)
 
 			env.state.PutPendingValidator(staker)
 			env.state.AddTx(tx, status.Committed)
@@ -838,9 +848,11 @@ func TestBlueberryProposalBlockWhitelistedSubnet(t *testing.T) {
 			require.NoError(err)
 
 			// store Staker0 to state
-			staker = state.NewPrimaryNetworkStaker(addStaker0.ID(), &addStaker0.Unsigned.(*txs.AddValidatorTx).Validator)
-			staker.NextTime = staker.EndTime
-			staker.Priority = state.PrimaryNetworkValidatorCurrentPriority
+			staker = state.NewCurrentStaker(
+				addStaker0.ID(),
+				addStaker0.Unsigned.(*txs.AddValidatorTx),
+				0,
+			)
 			env.state.PutCurrentValidator(staker)
 			env.state.AddTx(addStaker0, status.Committed)
 			require.NoError(env.state.Commit())
@@ -921,9 +933,11 @@ func TestBlueberryProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
-	staker := state.NewPrimaryNetworkStaker(addStaker0.ID(), &addStaker0.Unsigned.(*txs.AddValidatorTx).Validator)
-	staker.NextTime = staker.EndTime
-	staker.Priority = state.PrimaryNetworkValidatorCurrentPriority
+	staker := state.NewCurrentStaker(
+		addStaker0.ID(),
+		addStaker0.Unsigned.(*txs.AddValidatorTx),
+		0,
+	)
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(addStaker0, status.Committed)
 	require.NoError(env.state.Commit())
@@ -983,9 +997,10 @@ func TestBlueberryProposalBlockDelegatorStakerWeight(t *testing.T) {
 	)
 	require.NoError(err)
 
-	staker = state.NewPrimaryNetworkStaker(addDelegatorTx.ID(), &addDelegatorTx.Unsigned.(*txs.AddDelegatorTx).Validator)
-	staker.NextTime = staker.StartTime
-	staker.Priority = state.PrimaryNetworkDelegatorPendingPriority
+	staker = state.NewPendingStaker(
+		addDelegatorTx.ID(),
+		addDelegatorTx.Unsigned.(*txs.AddDelegatorTx),
+	)
 
 	env.state.PutPendingDelegator(staker)
 	env.state.AddTx(addDelegatorTx, status.Committed)
@@ -1008,9 +1023,11 @@ func TestBlueberryProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
-	staker = state.NewPrimaryNetworkStaker(addStaker0.ID(), &addStaker0.Unsigned.(*txs.AddValidatorTx).Validator)
-	staker.NextTime = staker.EndTime
-	staker.Priority = state.PrimaryNetworkValidatorCurrentPriority
+	staker = state.NewCurrentStaker(
+		addStaker0.ID(),
+		addStaker0.Unsigned.(*txs.AddValidatorTx),
+		0,
+	)
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(addStaker0, status.Committed)
 	require.NoError(env.state.Commit())
@@ -1097,9 +1114,11 @@ func TestBlueberryProposalBlockDelegatorStakers(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
-	staker := state.NewPrimaryNetworkStaker(addStaker0.ID(), &addStaker0.Unsigned.(*txs.AddValidatorTx).Validator)
-	staker.NextTime = staker.EndTime
-	staker.Priority = state.PrimaryNetworkValidatorCurrentPriority
+	staker := state.NewCurrentStaker(
+		addStaker0.ID(),
+		addStaker0.Unsigned.(*txs.AddValidatorTx),
+		0,
+	)
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(addStaker0, status.Committed)
 	require.NoError(env.state.Commit())
@@ -1158,9 +1177,10 @@ func TestBlueberryProposalBlockDelegatorStakers(t *testing.T) {
 	)
 	require.NoError(err)
 
-	staker = state.NewPrimaryNetworkStaker(addDelegatorTx.ID(), &addDelegatorTx.Unsigned.(*txs.AddDelegatorTx).Validator)
-	staker.NextTime = staker.StartTime
-	staker.Priority = state.PrimaryNetworkDelegatorPendingPriority
+	staker = state.NewPendingStaker(
+		addDelegatorTx.ID(),
+		addDelegatorTx.Unsigned.(*txs.AddDelegatorTx),
+	)
 
 	env.state.PutPendingDelegator(staker)
 	env.state.AddTx(addDelegatorTx, status.Committed)
@@ -1183,9 +1203,11 @@ func TestBlueberryProposalBlockDelegatorStakers(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
-	staker = state.NewPrimaryNetworkStaker(addStaker0.ID(), &addStaker0.Unsigned.(*txs.AddValidatorTx).Validator)
-	staker.NextTime = staker.EndTime
-	staker.Priority = state.PrimaryNetworkValidatorCurrentPriority
+	staker = state.NewCurrentStaker(
+		addStaker0.ID(),
+		addStaker0.Unsigned.(*txs.AddValidatorTx),
+		0,
+	)
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(addStaker0, status.Committed)
 	require.NoError(env.state.Commit())

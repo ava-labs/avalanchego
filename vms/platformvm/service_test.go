@@ -542,10 +542,11 @@ func TestGetStake(t *testing.T) {
 	)
 	require.NoError(err)
 
-	staker := state.NewPrimaryNetworkStaker(tx.ID(), &tx.Unsigned.(*txs.AddDelegatorTx).Validator)
-	staker.PotentialReward = 0
-	staker.NextTime = staker.EndTime
-	staker.Priority = state.PrimaryNetworkDelegatorCurrentPriority
+	staker := state.NewCurrentStaker(
+		tx.ID(),
+		tx.Unsigned.(*txs.AddDelegatorTx),
+		0,
+	)
 
 	service.vm.state.PutCurrentDelegator(staker)
 	service.vm.state.AddTx(tx, status.Committed)
@@ -589,9 +590,10 @@ func TestGetStake(t *testing.T) {
 	)
 	require.NoError(err)
 
-	staker = state.NewPrimaryNetworkStaker(tx.ID(), &tx.Unsigned.(*txs.AddValidatorTx).Validator)
-	staker.NextTime = staker.StartTime
-	staker.Priority = state.PrimaryNetworkValidatorPendingPriority
+	staker = state.NewPendingStaker(
+		tx.ID(),
+		tx.Unsigned.(*txs.AddValidatorTx),
+	)
 
 	service.vm.state.PutPendingValidator(staker)
 	service.vm.state.AddTx(tx, status.Committed)
@@ -695,10 +697,11 @@ func TestGetCurrentValidators(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	staker := state.NewPrimaryNetworkStaker(tx.ID(), &tx.Unsigned.(*txs.AddDelegatorTx).Validator)
-	staker.PotentialReward = 0
-	staker.NextTime = staker.EndTime
-	staker.Priority = state.PrimaryNetworkDelegatorCurrentPriority
+	staker := state.NewCurrentStaker(
+		tx.ID(),
+		tx.Unsigned.(*txs.AddDelegatorTx),
+		0,
+	)
 
 	service.vm.state.PutCurrentDelegator(staker)
 	service.vm.state.AddTx(tx, status.Committed)

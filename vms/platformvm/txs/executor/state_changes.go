@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var (
@@ -118,10 +119,10 @@ func AdvanceTimeTo(parentState state.Chain, newChainTime time.Time, rewards rewa
 
 		stakerToAdd := *stakerToRemove
 		stakerToAdd.NextTime = stakerToRemove.EndTime
-		stakerToAdd.Priority = state.PendingToCurrentPriorities[stakerToRemove.Priority]
+		stakerToAdd.Priority = txs.PendingToCurrentPriorities[stakerToRemove.Priority]
 
 		switch stakerToRemove.Priority {
-		case state.PrimaryNetworkDelegatorPendingPriority:
+		case txs.PrimaryNetworkDelegatorPendingPriority:
 			potentialReward := rewards.Calculate(
 				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
 				stakerToRemove.Weight,
@@ -137,7 +138,7 @@ func AdvanceTimeTo(parentState state.Chain, newChainTime time.Time, rewards rewa
 
 			changes.currentDelegatorsToAdd = append(changes.currentDelegatorsToAdd, &stakerToAdd)
 			changes.pendingDelegatorsToRemove = append(changes.pendingDelegatorsToRemove, stakerToRemove)
-		case state.PrimaryNetworkValidatorPendingPriority:
+		case txs.PrimaryNetworkValidatorPendingPriority:
 			potentialReward := rewards.Calculate(
 				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
 				stakerToRemove.Weight,
@@ -153,7 +154,7 @@ func AdvanceTimeTo(parentState state.Chain, newChainTime time.Time, rewards rewa
 
 			changes.currentValidatorsToAdd = append(changes.currentValidatorsToAdd, &stakerToAdd)
 			changes.pendingValidatorsToRemove = append(changes.pendingValidatorsToRemove, stakerToRemove)
-		case state.SubnetPermissionedValidatorPendingPriority:
+		case txs.SubnetPermissionedValidatorPendingPriority:
 			// We require that the [txTimestamp] <= [nextStakerChangeTime].
 			// Additionally, the minimum stake duration is > 0. This means we
 			// know that the staker we are adding here should never be attempted
@@ -179,7 +180,7 @@ func AdvanceTimeTo(parentState state.Chain, newChainTime time.Time, rewards rewa
 			break
 		}
 
-		if stakerToRemove.Priority != state.SubnetPermissionedValidatorCurrentPriority {
+		if stakerToRemove.Priority != txs.SubnetPermissionedValidatorCurrentPriority {
 			// Permissionless stakers are removed by the RewardValidatorTx, not
 			// an AdvanceTimeTx.
 			break

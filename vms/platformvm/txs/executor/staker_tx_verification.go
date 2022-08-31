@@ -361,10 +361,7 @@ func verifyAddDelegatorTx(
 
 	txID := sTx.ID()
 
-	newStaker := state.NewPrimaryNetworkStaker(txID, &tx.Validator)
-	newStaker.NextTime = newStaker.StartTime
-	newStaker.Priority = state.PrimaryNetworkDelegatorPendingPriority
-
+	newStaker := state.NewPendingStaker(txID, tx)
 	canDelegate, err := canDelegate(chainState, primaryNetworkValidator, maximumWeight, newStaker)
 	if err != nil {
 		return nil, err

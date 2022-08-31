@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package state
+package txs
 
 const (
 	// First primary network delegators are moved from the pending to the

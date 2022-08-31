@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -32,19 +33,18 @@ type AddSubnetValidatorTx struct {
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
 
-// StartTime of this validator
-func (tx *AddSubnetValidatorTx) StartTime() time.Time {
-	return tx.Validator.StartTime()
+func (tx *AddSubnetValidatorTx) SubnetID() ids.ID     { return tx.Validator.Subnet }
+func (tx *AddSubnetValidatorTx) NodeID() ids.NodeID   { return tx.Validator.NodeID }
+func (tx *AddSubnetValidatorTx) StartTime() time.Time { return tx.Validator.StartTime() }
+func (tx *AddSubnetValidatorTx) EndTime() time.Time   { return tx.Validator.EndTime() }
+func (tx *AddSubnetValidatorTx) Weight() uint64       { return tx.Validator.Wght }
+
+func (tx *AddSubnetValidatorTx) PendingPriority() Priority {
+	return SubnetPermissionedValidatorPendingPriority
 }
 
-// EndTime of this validator
-func (tx *AddSubnetValidatorTx) EndTime() time.Time {
-	return tx.Validator.EndTime()
-}
-
-// Weight of this validator
-func (tx *AddSubnetValidatorTx) Weight() uint64 {
-	return tx.Validator.Weight()
+func (tx *AddSubnetValidatorTx) CurrentPriority() Priority {
+	return SubnetPermissionedValidatorCurrentPriority
 }
 
 // SyntacticVerify returns nil iff [tx] is valid

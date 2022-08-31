@@ -152,13 +152,13 @@ func TestGetNextStakerToReward(t *testing.T) {
 
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
-					Priority: state.SubnetPermissionedValidatorCurrentPriority,
+					Priority: txs.SubnetPermissionedValidatorCurrentPriority,
 					EndTime:  now,
 				})
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
 					TxID:     txID,
-					Priority: state.SubnetPermissionlessDelegatorCurrentPriority,
+					Priority: txs.SubnetPermissionlessDelegatorCurrentPriority,
 					EndTime:  now,
 				})
 				currentStakerIter.EXPECT().Release()
@@ -179,13 +179,13 @@ func TestGetNextStakerToReward(t *testing.T) {
 
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
-					Priority: state.SubnetPermissionedValidatorCurrentPriority,
+					Priority: txs.SubnetPermissionedValidatorCurrentPriority,
 					EndTime:  now,
 				})
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
 					TxID:     txID,
-					Priority: state.PrimaryNetworkValidatorCurrentPriority,
+					Priority: txs.PrimaryNetworkValidatorCurrentPriority,
 					EndTime:  now,
 				})
 				currentStakerIter.EXPECT().Release()
@@ -206,13 +206,13 @@ func TestGetNextStakerToReward(t *testing.T) {
 
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
-					Priority: state.SubnetPermissionedValidatorCurrentPriority,
+					Priority: txs.SubnetPermissionedValidatorCurrentPriority,
 					EndTime:  now,
 				})
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
 					TxID:     txID,
-					Priority: state.PrimaryNetworkDelegatorCurrentPriority,
+					Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
 					EndTime:  now,
 				})
 				currentStakerIter.EXPECT().Release()
@@ -234,7 +234,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
 					TxID:     txID,
-					Priority: state.PrimaryNetworkDelegatorCurrentPriority,
+					Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
 					EndTime:  now.Add(time.Second),
 				})
 				currentStakerIter.EXPECT().Release()
@@ -256,7 +256,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
 					TxID:     txID,
-					Priority: state.PrimaryNetworkValidatorCurrentPriority,
+					Priority: txs.PrimaryNetworkValidatorCurrentPriority,
 					EndTime:  now.Add(time.Second),
 				})
 				currentStakerIter.EXPECT().Release()

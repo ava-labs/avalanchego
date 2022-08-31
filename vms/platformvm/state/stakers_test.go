@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 func TestBaseStakersPruning(t *testing.T) {
@@ -208,7 +209,7 @@ func newTestStaker() *Staker {
 		PotentialReward: 1,
 
 		NextTime: endTime,
-		Priority: PrimaryNetworkDelegatorCurrentPriority,
+		Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
 	}
 }
 

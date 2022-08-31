@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -49,20 +51,13 @@ func (tx *AddDelegatorTx) InitCtx(ctx *snow.Context) {
 	tx.RewardsOwner.InitCtx(ctx)
 }
 
-// StartTime of this validator
-func (tx *AddDelegatorTx) StartTime() time.Time {
-	return tx.Validator.StartTime()
-}
-
-// EndTime of this validator
-func (tx *AddDelegatorTx) EndTime() time.Time {
-	return tx.Validator.EndTime()
-}
-
-// Weight of this validator
-func (tx *AddDelegatorTx) Weight() uint64 {
-	return tx.Validator.Weight()
-}
+func (tx *AddDelegatorTx) SubnetID() ids.ID          { return constants.PrimaryNetworkID }
+func (tx *AddDelegatorTx) NodeID() ids.NodeID        { return tx.Validator.NodeID }
+func (tx *AddDelegatorTx) StartTime() time.Time      { return tx.Validator.StartTime() }
+func (tx *AddDelegatorTx) EndTime() time.Time        { return tx.Validator.EndTime() }
+func (tx *AddDelegatorTx) Weight() uint64            { return tx.Validator.Wght }
+func (tx *AddDelegatorTx) PendingPriority() Priority { return PrimaryNetworkDelegatorPendingPriority }
+func (tx *AddDelegatorTx) CurrentPriority() Priority { return PrimaryNetworkDelegatorCurrentPriority }
 
 // SyntacticVerify returns nil iff [tx] is valid
 func (tx *AddDelegatorTx) SyntacticVerify(ctx *snow.Context) error {

@@ -5,6 +5,8 @@ package state
 
 import (
 	"container/heap"
+
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var (
@@ -104,7 +106,7 @@ func (it *stakerDiffIterator) advancePending() {
 
 	toRemove := *it.modifiedStaker
 	toRemove.NextTime = toRemove.EndTime
-	toRemove.Priority = PendingToCurrentPriorities[toRemove.Priority]
+	toRemove.Priority = txs.PendingToCurrentPriorities[toRemove.Priority]
 	it.currentIteratorExhausted = false
 	it.currentIterator.Add(&toRemove)
 }

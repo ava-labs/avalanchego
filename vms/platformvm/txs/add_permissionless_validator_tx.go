@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -63,9 +64,25 @@ func (tx *AddPermissionlessValidatorTx) InitCtx(ctx *snow.Context) {
 	tx.DelegationRewardsOwner.InitCtx(ctx)
 }
 
+func (tx *AddPermissionlessValidatorTx) SubnetID() ids.ID     { return tx.Subnet }
+func (tx *AddPermissionlessValidatorTx) NodeID() ids.NodeID   { return tx.Validator.NodeID }
 func (tx *AddPermissionlessValidatorTx) StartTime() time.Time { return tx.Validator.StartTime() }
 func (tx *AddPermissionlessValidatorTx) EndTime() time.Time   { return tx.Validator.EndTime() }
 func (tx *AddPermissionlessValidatorTx) Weight() uint64       { return tx.Validator.Wght }
+
+func (tx *AddPermissionlessValidatorTx) PendingPriority() Priority {
+	if tx.Subnet == constants.PrimaryNetworkID {
+		return PrimaryNetworkValidatorPendingPriority
+	}
+	return SubnetPermissionlessValidatorPendingPriority
+}
+
+func (tx *AddPermissionlessValidatorTx) CurrentPriority() Priority {
+	if tx.Subnet == constants.PrimaryNetworkID {
+		return PrimaryNetworkValidatorCurrentPriority
+	}
+	return SubnetPermissionlessValidatorCurrentPriority
+}
 
 // SyntacticVerify returns nil iff [tx] is valid
 func (tx *AddPermissionlessValidatorTx) SyntacticVerify(ctx *snow.Context) error {

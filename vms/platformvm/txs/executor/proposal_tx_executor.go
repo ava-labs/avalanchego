@@ -107,9 +107,7 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	// Produce the UTXOs
 	utxo.Produce(e.OnCommitState, txID, tx.Outs)
 
-	newStaker := state.NewPrimaryNetworkStaker(txID, &tx.Validator)
-	newStaker.NextTime = newStaker.StartTime
-	newStaker.Priority = state.PrimaryNetworkValidatorPendingPriority
+	newStaker := state.NewPendingStaker(txID, tx)
 	e.OnCommitState.PutPendingValidator(newStaker)
 
 	// Set up the state if this tx is aborted
@@ -153,9 +151,7 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	// Produce the UTXOs
 	utxo.Produce(e.OnCommitState, txID, tx.Outs)
 
-	newStaker := state.NewSubnetStaker(txID, &tx.Validator)
-	newStaker.NextTime = newStaker.StartTime
-	newStaker.Priority = state.SubnetPermissionedValidatorPendingPriority
+	newStaker := state.NewPendingStaker(txID, tx)
 	e.OnCommitState.PutPendingValidator(newStaker)
 
 	// Set up the state if this tx is aborted
@@ -200,9 +196,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	// Produce the UTXOs
 	utxo.Produce(e.OnCommitState, txID, tx.Outs)
 
-	newStaker := state.NewPrimaryNetworkStaker(txID, &tx.Validator)
-	newStaker.NextTime = newStaker.StartTime
-	newStaker.Priority = state.PrimaryNetworkDelegatorPendingPriority
+	newStaker := state.NewPendingStaker(txID, tx)
 	e.OnCommitState.PutPendingDelegator(newStaker)
 
 	// Set up the state if this tx is aborted

@@ -307,10 +307,7 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 
 	txID := e.Tx.ID()
 
-	newStaker := state.NewPrimaryNetworkStaker(txID, &tx.Validator)
-	newStaker.NextTime = tx.Validator.StartTime()
-	newStaker.Priority = state.PrimaryNetworkValidatorPendingPriority
-
+	newStaker := state.NewPendingStaker(txID, tx)
 	e.State.PutPendingValidator(newStaker)
 	utxo.Consume(e.State, tx.Ins)
 	utxo.Produce(e.State, txID, tx.Outs)
@@ -343,10 +340,7 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 
 	txID := e.Tx.ID()
 
-	newStaker := state.NewSubnetStaker(txID, &tx.Validator)
-	newStaker.NextTime = tx.Validator.StartTime()
-	newStaker.Priority = state.SubnetPermissionedValidatorPendingPriority
-
+	newStaker := state.NewPendingStaker(txID, tx)
 	e.State.PutPendingValidator(newStaker)
 	utxo.Consume(e.State, tx.Ins)
 	utxo.Produce(e.State, txID, tx.Outs)
@@ -378,10 +372,7 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	}
 
 	txID := e.Tx.ID()
-	newStaker := state.NewPrimaryNetworkStaker(txID, &tx.Validator)
-	newStaker.NextTime = tx.Validator.StartTime()
-	newStaker.Priority = state.PrimaryNetworkDelegatorPendingPriority
-
+	newStaker := state.NewPendingStaker(txID, tx)
 	e.State.PutPendingDelegator(newStaker)
 	utxo.Consume(e.State, tx.Ins)
 	utxo.Produce(e.State, txID, tx.Outs)
