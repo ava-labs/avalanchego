@@ -62,6 +62,11 @@ func (r *remover) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidato
 	return nil
 }
 
+func (r *remover) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+	r.m.removeStakerTx(r.tx)
+	return nil
+}
+
 func (r *remover) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
 	// this tx is never in mempool
 	return nil

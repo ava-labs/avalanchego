@@ -150,6 +150,14 @@ func (s *signerVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessVa
 	return s.sign(s.tx, txSigners)
 }
 
+func (s *signerVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return s.sign(s.tx, txSigners)
+}
+
 func (s *signerVisitor) getSigners(sourceChainID ids.ID, ins []*avax.TransferableInput) ([][]*crypto.PrivateKeySECP256K1R, error) {
 	txSigners := make([][]*crypto.PrivateKeySECP256K1R, len(ins))
 	for credIndex, transferInput := range ins {

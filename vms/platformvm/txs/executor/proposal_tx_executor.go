@@ -71,7 +71,12 @@ func (*ProposalTxExecutor) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx)
 	return errWrongTxType
 }
 func (*ProposalTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error { return errWrongTxType }
+
 func (*ProposalTxExecutor) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
+	return errWrongTxType
+}
+
+func (*ProposalTxExecutor) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
 	return errWrongTxType
 }
 

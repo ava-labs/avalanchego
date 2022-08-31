@@ -78,3 +78,8 @@ func (i *issuer) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidator
 	i.m.addStakerTx(i.tx)
 	return nil
 }
+
+func (i *issuer) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+	i.m.addStakerTx(i.tx)
+	return nil
+}
