@@ -435,7 +435,7 @@ func (b *builder) NewAddValidatorTx(
 	keys []*crypto.PrivateKeySECP256K1R,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	ins, unstakedOuts, stakedOuts, signers, err := b.Spend(keys, stakeAmount, b.cfg.AddStakerTxFee, changeAddr)
+	ins, unstakedOuts, stakedOuts, signers, err := b.Spend(keys, stakeAmount, b.cfg.AddPrimaryNetworkValidatorFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -477,7 +477,7 @@ func (b *builder) NewAddDelegatorTx(
 	keys []*crypto.PrivateKeySECP256K1R,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := b.Spend(keys, stakeAmount, b.cfg.AddStakerTxFee, changeAddr)
+	ins, unlockedOuts, lockedOuts, signers, err := b.Spend(keys, stakeAmount, b.cfg.AddPrimaryNetworkDelegatorFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}

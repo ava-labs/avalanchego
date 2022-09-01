@@ -114,7 +114,7 @@ func verifyAddValidatorTx(
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: backend.Config.AddStakerTxFee,
+			backend.Ctx.AVAXAssetID: backend.Config.AddPrimaryNetworkValidatorFee,
 		},
 	); err != nil {
 		return nil, fmt.Errorf("%w: %s", errFlowCheckFailed, err)
@@ -212,7 +212,7 @@ func verifyAddSubnetValidatorTx(
 		tx.Outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: backend.Config.TxFee,
+			backend.Ctx.AVAXAssetID: backend.Config.AddSubnetValidatorFee,
 		},
 	); err != nil {
 		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
@@ -379,7 +379,7 @@ func verifyAddDelegatorTx(
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: backend.Config.AddStakerTxFee,
+			backend.Ctx.AVAXAssetID: backend.Config.AddPrimaryNetworkDelegatorFee,
 		},
 	); err != nil {
 		return nil, fmt.Errorf("%w: %s", errFlowCheckFailed, err)

@@ -287,9 +287,12 @@ func (b *builder) NewAddValidatorTx(
 	shares uint32,
 	options ...common.Option,
 ) (*txs.AddValidatorTx, error) {
-	toBurn := map[ids.ID]uint64{}
+	avaxAssetID := b.backend.AVAXAssetID()
+	toBurn := map[ids.ID]uint64{
+		avaxAssetID: b.backend.AddPrimaryNetworkValidatorFee(),
+	}
 	toStake := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): vdr.Wght,
+		avaxAssetID: vdr.Wght,
 	}
 	ops := common.NewOptions(options)
 	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, ops)
@@ -318,7 +321,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 	options ...common.Option,
 ) (*txs.AddSubnetValidatorTx, error) {
 	toBurn := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): b.backend.BaseTxFee(),
+		b.backend.AVAXAssetID(): b.backend.AddSubnetValidatorFee(),
 	}
 	toStake := map[ids.ID]uint64{}
 	ops := common.NewOptions(options)
@@ -384,7 +387,10 @@ func (b *builder) NewAddDelegatorTx(
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.AddDelegatorTx, error) {
-	toBurn := map[ids.ID]uint64{}
+	avaxAssetID := b.backend.AVAXAssetID()
+	toBurn := map[ids.ID]uint64{
+		avaxAssetID: b.backend.AddPrimaryNetworkDelegatorFee(),
+	}
 	toStake := map[ids.ID]uint64{
 		b.backend.AVAXAssetID(): vdr.Wght,
 	}

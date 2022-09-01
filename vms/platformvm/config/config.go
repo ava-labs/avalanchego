@@ -36,9 +36,6 @@ type Config struct {
 	// Set of subnets that this node is validating
 	WhitelistedSubnets ids.Set
 
-	// Fee that must be burned by every create staker transaction
-	AddStakerTxFee uint64
-
 	// Fee that is burned by every non-state creating transaction
 	TxFee uint64
 
@@ -53,6 +50,18 @@ type Config struct {
 
 	// Fee that must be burned by every blockchain creating transaction after AP3
 	CreateBlockchainTxFee uint64
+
+	// Transaction fee for adding a primary network validator
+	AddPrimaryNetworkValidatorFee uint64
+
+	// Transaction fee for adding a primary network delegator
+	AddPrimaryNetworkDelegatorFee uint64
+
+	// Transaction fee for adding a subnet validator
+	AddSubnetValidatorFee uint64
+
+	// Transaction fee for adding a subnet delegator
+	AddSubnetDelegatorFee uint64
 
 	// The minimum amount of tokens one must bond to be a validator
 	MinValidatorStake uint64
