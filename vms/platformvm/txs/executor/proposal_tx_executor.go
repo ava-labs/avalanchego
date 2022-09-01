@@ -312,16 +312,21 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		)
 	}
 
+	primaryNetworkValidator, err := e.OnCommitState.GetCurrentValidator(
+		constants.PrimaryNetworkID,
+		stakerToRemove.NodeID,
+	)
+	if err != nil {
+		// This should never error because the staker set is in memory and
+		// primary network validators are removed last.
+		return err
+	}
+
 	stakerTx, _, err := e.OnCommitState.GetTx(stakerToRemove.TxID)
 	if err != nil {
 		return fmt.Errorf("failed to get next removed staker tx: %w", err)
 	}
 
-	var (
-		subnetID  ids.ID
-		nodeID    ids.NodeID
-		startTime time.Time
-	)
 	switch uStakerTx := stakerTx.Unsigned.(type) {
 	case txs.ValidatorTx:
 		e.OnCommitState.DeleteCurrentValidator(stakerToRemove)
@@ -369,11 +374,6 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 			e.OnCommitState.AddUTXO(utxo)
 			e.OnCommitState.AddRewardUTXO(tx.TxID, utxo)
 		}
-
-		// Handle reward preferences
-		subnetID = uStakerTx.SubnetID()
-		nodeID = uStakerTx.NodeID()
-		startTime = uStakerTx.StartTime()
 	case txs.DelegatorTx:
 		e.OnCommitState.DeleteCurrentDelegator(stakerToRemove)
 		e.OnAbortState.DeleteCurrentDelegator(stakerToRemove)
@@ -396,16 +396,16 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 			e.OnAbortState.AddUTXO(utxo)
 		}
 
-		subnetID = uStakerTx.SubnetID()
-		nodeID = uStakerTx.NodeID()
-
 		// We're removing a delegator, so we need to fetch the validator they
 		// are delegated to.
-		vdrStaker, err := e.OnCommitState.GetCurrentValidator(subnetID, nodeID)
+		vdrStaker, err := e.OnCommitState.GetCurrentValidator(
+			stakerToRemove.SubnetID,
+			stakerToRemove.NodeID,
+		)
 		if err != nil {
 			return fmt.Errorf(
 				"failed to get whether %s is a validator: %w",
-				nodeID,
+				stakerToRemove.NodeID,
 				err,
 			)
 		}
@@ -414,7 +414,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		if err != nil {
 			return fmt.Errorf(
 				"failed to get whether %s is a validator: %w",
-				nodeID,
+				stakerToRemove.NodeID,
 				err,
 			)
 		}
@@ -486,13 +486,12 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 			e.OnCommitState.AddUTXO(utxo)
 			e.OnCommitState.AddRewardUTXO(tx.TxID, utxo)
 		}
-
-		startTime = vdrTx.StartTime()
 	default:
 		return errShouldBePermissionlessStaker
 	}
 
-	if subnetID == constants.PrimaryNetworkID {
+	var expectedUptimePercentage float64
+	if stakerToRemove.SubnetID == constants.PrimaryNetworkID {
 		// If the reward is aborted, then the current supply should be decreased.
 		currentSupply := e.OnAbortState.GetCurrentSupply()
 		newSupply, err := math.Sub64(currentSupply, stakerToRemove.PotentialReward)
@@ -500,9 +499,11 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 			return err
 		}
 		e.OnAbortState.SetCurrentSupply(newSupply)
+
+		expectedUptimePercentage = e.Config.UptimePercentage
 	} else {
 		// If the reward is aborted, then the current supply should be decreased.
-		currentSupply, err := e.OnAbortState.GetCurrentSubnetSupply(subnetID)
+		currentSupply, err := e.OnAbortState.GetCurrentSubnetSupply(stakerToRemove.SubnetID)
 		if err != nil {
 			return err
 		}
@@ -510,15 +511,30 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		if err != nil {
 			return err
 		}
-		e.OnAbortState.SetCurrentSubnetSupply(subnetID, newSupply)
+		e.OnAbortState.SetCurrentSubnetSupply(stakerToRemove.SubnetID, newSupply)
+
+		transformSubnetIntf, err := e.OnCommitState.GetSubnetTransformation(stakerToRemove.SubnetID)
+		if err != nil {
+			return err
+		}
+		transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
+		if !ok {
+			return errIsNotTransformSubnetTx
+		}
+
+		expectedUptimePercentage = float64(transformSubnet.UptimeRequirement) / reward.PercentDenominator
 	}
 
-	uptime, err := e.Uptimes.CalculateUptimePercentFrom(nodeID, startTime)
+	// TODO: calculate subnet uptimes
+	uptime, err := e.Uptimes.CalculateUptimePercentFrom(
+		primaryNetworkValidator.NodeID,
+		primaryNetworkValidator.StartTime,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to calculate uptime: %w", err)
 	}
 
-	e.PrefersCommit = uptime >= e.Config.UptimePercentage
+	e.PrefersCommit = uptime >= expectedUptimePercentage
 	return nil
 }
 

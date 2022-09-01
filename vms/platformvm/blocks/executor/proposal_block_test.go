@@ -94,11 +94,21 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	currentStakersIt := state.NewMockStakerIterator(ctrl)
 	currentStakersIt.EXPECT().Next().Return(true)
 	currentStakersIt.EXPECT().Value().Return(&state.Staker{
-		TxID:    addValTx.ID(),
-		EndTime: chainTime,
+		TxID:      addValTx.ID(),
+		NodeID:    utx.NodeID(),
+		SubnetID:  utx.SubnetID(),
+		StartTime: utx.StartTime(),
+		EndTime:   chainTime,
 	}).Times(2)
 	currentStakersIt.EXPECT().Release()
 	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil)
+	onParentAccept.EXPECT().GetCurrentValidator(utx.SubnetID(), utx.NodeID()).Return(&state.Staker{
+		TxID:      addValTx.ID(),
+		NodeID:    utx.NodeID(),
+		SubnetID:  utx.SubnetID(),
+		StartTime: utx.StartTime(),
+		EndTime:   chainTime,
+	}, nil)
 	onParentAccept.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
 	onParentAccept.EXPECT().GetCurrentSupply().Return(uint64(1000)).AnyTimes()
 
@@ -182,26 +192,33 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 
 	// setup state to validate proposal block transaction
 	nextStakerTime := chainTime.Add(executor.SyncBound).Add(-1 * time.Second)
-	nextStakerTx := &txs.Tx{
-		Unsigned: &txs.AddValidatorTx{
-			BaseTx:    txs.BaseTx{},
-			Validator: validator.Validator{End: uint64(nextStakerTime.Unix())},
-			StakeOuts: []*avax.TransferableOutput{
-				{
-					Asset: avax.Asset{
-						ID: env.ctx.AVAXAssetID,
-					},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: 1,
-					},
+	unsignedNextStakerTx := &txs.AddValidatorTx{
+		BaseTx:    txs.BaseTx{},
+		Validator: validator.Validator{End: uint64(nextStakerTime.Unix())},
+		StakeOuts: []*avax.TransferableOutput{
+			{
+				Asset: avax.Asset{
+					ID: env.ctx.AVAXAssetID,
+				},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 1,
 				},
 			},
-			RewardsOwner:     &secp256k1fx.OutputOwners{},
-			DelegationShares: uint32(defaultTxFee),
 		},
+		RewardsOwner:     &secp256k1fx.OutputOwners{},
+		DelegationShares: uint32(defaultTxFee),
 	}
+	nextStakerTx := &txs.Tx{Unsigned: unsignedNextStakerTx}
 	require.NoError(nextStakerTx.Sign(txs.Codec, nil))
+
 	nextStakerTxID := nextStakerTx.ID()
+	onParentAccept.EXPECT().GetCurrentValidator(unsignedNextStakerTx.SubnetID(), unsignedNextStakerTx.NodeID()).Return(&state.Staker{
+		TxID:      nextStakerTxID,
+		NodeID:    unsignedNextStakerTx.NodeID(),
+		SubnetID:  unsignedNextStakerTx.SubnetID(),
+		StartTime: unsignedNextStakerTx.StartTime(),
+		EndTime:   chainTime,
+	}, nil)
 	onParentAccept.EXPECT().GetTx(nextStakerTxID).Return(nextStakerTx, status.Processing, nil)
 
 	currentStakersIt := state.NewMockStakerIterator(ctrl)
