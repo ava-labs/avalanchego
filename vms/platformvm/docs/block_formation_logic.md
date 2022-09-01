@@ -68,6 +68,8 @@ Blueberry allows the following block types with the following content:
   * AddDelegatorTx
   * AddSubnetValidatorTx
   * RemoveSubnetValidatorTx
+  * TransformSubnetTx
+  * AddPermissionlessValidatorTx
 * *Proposal Blocks* may contain a single transaction of the following types:
   * RewardValidatorTx
 * *Options blocks*, i.e. *Commit Block* and *Abort Block* do not contain any transactions.

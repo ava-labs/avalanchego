@@ -18,7 +18,8 @@ import (
 )
 
 var (
-	errNilSignedTx            = errors.New("nil signed tx is not valid")
+	ErrNilSignedTx = errors.New("nil signed tx is not valid")
+
 	errSignedTxNotInitialized = errors.New("signed tx was never initialized and is not valid")
 )
 
@@ -87,7 +88,7 @@ func (tx *Tx) UTXOs() []*avax.UTXO {
 func (tx *Tx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
-		return errNilSignedTx
+		return ErrNilSignedTx
 	case tx.id == ids.Empty:
 		return errSignedTxNotInitialized
 	default:
