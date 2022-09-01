@@ -47,7 +47,8 @@ func (c *calculator) Calculate(stakedDuration time.Duration, stakedAmount, curre
 	adjustedConsumptionRateNumerator.Add(adjustedConsumptionRateNumerator, adjustedMinConsumptionRateNumerator)
 	adjustedConsumptionRateDenominator := new(big.Int).Mul(c.mintingPeriod, consumptionRateDenominator)
 
-	reward := new(big.Int).SetUint64(c.supplyCap - currentSupply)
+	remainingSupply := c.supplyCap - currentSupply
+	reward := new(big.Int).SetUint64(remainingSupply)
 	reward.Mul(reward, adjustedConsumptionRateNumerator)
 	reward.Mul(reward, bigStakedAmount)
 	reward.Mul(reward, bigStakedDuration)
@@ -55,5 +56,14 @@ func (c *calculator) Calculate(stakedDuration time.Duration, stakedAmount, curre
 	reward.Div(reward, bigCurrentSupply)
 	reward.Div(reward, c.mintingPeriod)
 
-	return reward.Uint64()
+	if !reward.IsUint64() {
+		return remainingSupply
+	}
+
+	finalReward := reward.Uint64()
+	if finalReward > remainingSupply {
+		return remainingSupply
+	}
+
+	return finalReward
 }
