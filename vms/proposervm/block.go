@@ -249,6 +249,7 @@ func (p *postForkCommonComponents) buildChild(
 
 	p.vm.ctx.Log.Info("built block",
 		zap.Stringer("blkID", child.ID()),
+		zap.Stringer("innerBlkID", innerBlock.ID()),
 		zap.Uint64("height", child.Height()),
 		zap.Time("parentTimestamp", parentTimestamp),
 		zap.Time("blockTimestamp", newTimestamp),

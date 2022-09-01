@@ -184,6 +184,24 @@ func (w *walletWithOptions) IssueTransformSubnetTx(
 	)
 }
 
+func (w *walletWithOptions) IssueAddPermissionlessValidatorTx(
+	vdr *validator.SubnetValidator,
+	assetID ids.ID,
+	validationRewardsOwner *secp256k1fx.OutputOwners,
+	delegationRewardsOwner *secp256k1fx.OutputOwners,
+	shares uint32,
+	options ...common.Option,
+) (ids.ID, error) {
+	return w.Wallet.IssueAddPermissionlessValidatorTx(
+		vdr,
+		assetID,
+		validationRewardsOwner,
+		delegationRewardsOwner,
+		shares,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
 func (w *walletWithOptions) IssueUnsignedTx(
 	utx txs.UnsignedTx,
 	options ...common.Option,

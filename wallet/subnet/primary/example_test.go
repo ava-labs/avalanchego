@@ -55,7 +55,7 @@ func ExampleWallet() {
 		map[uint32][]verify.State{
 			0: {
 				&secp256k1fx.TransferOutput{
-					Amt:          100 * units.Schmeckle,
+					Amt:          100 * units.MegaAvax,
 					OutputOwners: *owner,
 				},
 			},
@@ -77,7 +77,7 @@ func ExampleWallet() {
 					ID: createAssetTxID,
 				},
 				Out: &secp256k1fx.TransferOutput{
-					Amt:          100 * units.Schmeckle,
+					Amt:          100 * units.MegaAvax,
 					OutputOwners: *owner,
 				},
 			},
@@ -110,18 +110,18 @@ func ExampleWallet() {
 	transformSubnetTxID, err := pWallet.IssueTransformSubnetTx(
 		createSubnetTxID,
 		createAssetTxID,
-		50*units.Schmeckle,
-		100*units.Schmeckle,
-		.10*reward.PercentDenominator,
-		.12*reward.PercentDenominator,
+		50*units.MegaAvax,
+		100*units.MegaAvax,
+		reward.PercentDenominator,
+		reward.PercentDenominator,
 		1,
-		100*units.Schmeckle,
+		100*units.MegaAvax,
 		time.Second,
 		365*24*time.Hour,
 		0,
 		1,
 		5,
-		0,
+		.80*reward.PercentDenominator,
 	)
 	if err != nil {
 		log.Fatalf("failed to issue transform subnet transaction with: %s\n", err)
@@ -132,15 +132,21 @@ func ExampleWallet() {
 	// This is currently expected to fail because there is no support for
 	// permissionless validator addition yet.
 	startTime := time.Now().Add(time.Minute)
-	addSubnetValidatorTxID, err := pWallet.IssueAddSubnetValidatorTx(&validator.SubnetValidator{
-		Validator: validator.Validator{
-			NodeID: genesis.LocalConfig.InitialStakers[0].NodeID,
-			Start:  uint64(startTime.Unix()),
-			End:    uint64(startTime.Add(24 * time.Hour).Unix()),
-			Wght:   1,
+	addSubnetValidatorTxID, err := pWallet.IssueAddPermissionlessValidatorTx(
+		&validator.SubnetValidator{
+			Validator: validator.Validator{
+				NodeID: genesis.LocalConfig.InitialStakers[0].NodeID,
+				Start:  uint64(startTime.Unix()),
+				End:    uint64(startTime.Add(5 * time.Second).Unix()),
+				Wght:   50 * units.MegaAvax,
+			},
+			Subnet: createSubnetTxID,
 		},
-		Subnet: createSubnetTxID,
-	})
+		createAssetTxID,
+		&secp256k1fx.OutputOwners{},
+		&secp256k1fx.OutputOwners{},
+		reward.PercentDenominator,
+	)
 	if err != nil {
 		log.Fatalf("failed to issue add subnet validator with: %s\n", err)
 		return

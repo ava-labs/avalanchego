@@ -191,7 +191,29 @@ type Wallet interface {
 		options ...common.Option,
 	) (ids.ID, error)
 
-	// TODO: add support for AddPermissionlessValidatorTx
+	// IssueAddPermissionlessValidatorTx creates, signs, and issues a new
+	// validator of the specified subnet.
+	//
+	// - [vdr] specifies all the details of the validation period such as the
+	//   subnetID, startTime, endTime, stake weight, and nodeID.
+	// - [assetID] specifies the asset to stake.
+	// - [validationRewardsOwner] specifies the owner of all the rewards this
+	//   validator earns for its validation period.
+	// - [delegationRewardsOwner] specifies the owner of all the rewards this
+	//   validator earns for delegations during its validation period.
+	// - [shares] specifies the fraction (out of 1,000,000) that this validator
+	//   will take from delegation rewards. If 1,000,000 is provided, 100% of
+	//   the delegation reward will be sent to the validator's [rewardsOwner].
+	IssueAddPermissionlessValidatorTx(
+		vdr *validator.SubnetValidator,
+		assetID ids.ID,
+		validationRewardsOwner *secp256k1fx.OutputOwners,
+		delegationRewardsOwner *secp256k1fx.OutputOwners,
+		shares uint32,
+		options ...common.Option,
+	) (ids.ID, error)
+
+	// TODO: add support for AddPermissionlessDelegatorTx
 
 	// IssueUnsignedTx signs and issues the unsigned tx.
 	IssueUnsignedTx(
@@ -372,6 +394,28 @@ func (w *wallet) IssueTransformSubnetTx(
 		minDelegatorStake,
 		maxValidatorWeightFactor,
 		uptimeRequirement,
+		options...,
+	)
+	if err != nil {
+		return ids.Empty, err
+	}
+	return w.IssueUnsignedTx(utx, options...)
+}
+
+func (w *wallet) IssueAddPermissionlessValidatorTx(
+	vdr *validator.SubnetValidator,
+	assetID ids.ID,
+	validationRewardsOwner *secp256k1fx.OutputOwners,
+	delegationRewardsOwner *secp256k1fx.OutputOwners,
+	shares uint32,
+	options ...common.Option,
+) (ids.ID, error) {
+	utx, err := w.builder.NewAddPermissionlessValidatorTx(
+		vdr,
+		assetID,
+		validationRewardsOwner,
+		delegationRewardsOwner,
+		shares,
 		options...,
 	)
 	if err != nil {
