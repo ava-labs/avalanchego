@@ -28,6 +28,7 @@ var (
 	errNotValidator              = errors.New("isn't a current or pending validator")
 	errStakeOverflow             = errors.New("validator stake exceeds limit")
 	errOverDelegated             = errors.New("validator would be over delegated")
+	errIsNotTransformSubnetTx    = errors.New("is not a transform subnet tx")
 )
 
 // verifyAddValidatorTx carries out the validation for an AddValidatorTx.

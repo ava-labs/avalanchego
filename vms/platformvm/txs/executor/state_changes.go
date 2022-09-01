@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -62,7 +64,7 @@ type StateChanges interface {
 }
 
 type stateChanges struct {
-	supply                    uint64
+	updatedSupplies           map[ids.ID]uint64
 	currentValidatorsToAdd    []*state.Staker
 	currentDelegatorsToAdd    []*state.Staker
 	pendingValidatorsToRemove []*state.Staker
@@ -71,7 +73,13 @@ type stateChanges struct {
 }
 
 func (s *stateChanges) Apply(stateDiff state.Diff) {
-	stateDiff.SetCurrentSupply(s.supply)
+	for subnetID, supply := range s.updatedSupplies {
+		if subnetID == constants.PrimaryNetworkID {
+			stateDiff.SetCurrentSupply(supply)
+		} else {
+			stateDiff.SetCurrentSubnetSupply(subnetID, supply)
+		}
+	}
 
 	for _, currentValidatorToAdd := range s.currentValidatorsToAdd {
 		stateDiff.PutCurrentValidator(currentValidatorToAdd)
@@ -99,14 +107,19 @@ func (s *stateChanges) Len() int {
 // AdvanceTimeTo does not modify [parentState].
 // Instead it returns all the StateChanges caused by advancing the chain time to
 // the [newChainTime].
-func AdvanceTimeTo(parentState state.Chain, newChainTime time.Time, rewards reward.Calculator) (StateChanges, error) {
+func AdvanceTimeTo(
+	backend *Backend,
+	parentState state.Chain,
+	newChainTime time.Time,
+) (StateChanges, error) {
 	pendingStakerIterator, err := parentState.GetPendingStakerIterator()
 	if err != nil {
 		return nil, err
 	}
+	defer pendingStakerIterator.Release()
 
 	changes := &stateChanges{
-		supply: parentState.GetCurrentSupply(),
+		updatedSupplies: make(map[ids.ID]uint64),
 	}
 
 	// Add to the staker set any pending stakers whose start time is at or
@@ -121,40 +134,7 @@ func AdvanceTimeTo(parentState state.Chain, newChainTime time.Time, rewards rewa
 		stakerToAdd.NextTime = stakerToRemove.EndTime
 		stakerToAdd.Priority = txs.PendingToCurrentPriorities[stakerToRemove.Priority]
 
-		switch stakerToRemove.Priority {
-		case txs.PrimaryNetworkDelegatorApricotPendingPriority:
-			potentialReward := rewards.Calculate(
-				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
-				stakerToRemove.Weight,
-				changes.supply,
-			)
-			changes.supply, err = math.Add64(changes.supply, potentialReward)
-			if err != nil {
-				pendingStakerIterator.Release()
-				return nil, err
-			}
-
-			stakerToAdd.PotentialReward = potentialReward
-
-			changes.currentDelegatorsToAdd = append(changes.currentDelegatorsToAdd, &stakerToAdd)
-			changes.pendingDelegatorsToRemove = append(changes.pendingDelegatorsToRemove, stakerToRemove)
-		case txs.PrimaryNetworkValidatorPendingPriority:
-			potentialReward := rewards.Calculate(
-				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
-				stakerToRemove.Weight,
-				changes.supply,
-			)
-			changes.supply, err = math.Add64(changes.supply, potentialReward)
-			if err != nil {
-				pendingStakerIterator.Release()
-				return nil, err
-			}
-
-			stakerToAdd.PotentialReward = potentialReward
-
-			changes.currentValidatorsToAdd = append(changes.currentValidatorsToAdd, &stakerToAdd)
-			changes.pendingValidatorsToRemove = append(changes.pendingValidatorsToRemove, stakerToRemove)
-		case txs.SubnetPermissionedValidatorPendingPriority:
+		if stakerToRemove.Priority == txs.SubnetPermissionedValidatorPendingPriority {
 			// We require that the [txTimestamp] <= [nextStakerChangeTime].
 			// Additionally, the minimum stake duration is > 0. This means we
 			// know that the staker we are adding here should never be attempted
@@ -162,17 +142,58 @@ func AdvanceTimeTo(parentState state.Chain, newChainTime time.Time, rewards rewa
 
 			changes.currentValidatorsToAdd = append(changes.currentValidatorsToAdd, &stakerToAdd)
 			changes.pendingValidatorsToRemove = append(changes.pendingValidatorsToRemove, stakerToRemove)
+			continue
+		}
+
+		supply, ok := changes.updatedSupplies[stakerToRemove.SubnetID]
+		if !ok {
+			if stakerToRemove.SubnetID == constants.PrimaryNetworkID {
+				supply = parentState.GetCurrentSupply()
+			} else {
+				supply, err = parentState.GetCurrentSubnetSupply(stakerToRemove.SubnetID)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+
+		rewards, err := GetRewardsCalculator(backend, parentState, stakerToRemove.SubnetID)
+		if err != nil {
+			return nil, err
+		}
+
+		potentialReward := rewards.Calculate(
+			stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
+			stakerToRemove.Weight,
+			supply,
+		)
+		stakerToAdd.PotentialReward = potentialReward
+
+		supply, err = math.Add64(supply, potentialReward)
+		if err != nil {
+			return nil, err
+		}
+		changes.updatedSupplies[stakerToRemove.SubnetID] = supply
+
+		switch stakerToRemove.Priority {
+		case txs.PrimaryNetworkValidatorPendingPriority, txs.SubnetPermissionlessValidatorPendingPriority:
+			changes.currentValidatorsToAdd = append(changes.currentValidatorsToAdd, &stakerToAdd)
+			changes.pendingValidatorsToRemove = append(changes.pendingValidatorsToRemove, stakerToRemove)
+
+		case txs.PrimaryNetworkDelegatorApricotPendingPriority, txs.PrimaryNetworkDelegatorBlueberryPendingPriority, txs.SubnetPermissionlessDelegatorPendingPriority:
+			changes.currentDelegatorsToAdd = append(changes.currentDelegatorsToAdd, &stakerToAdd)
+			changes.pendingDelegatorsToRemove = append(changes.pendingDelegatorsToRemove, stakerToRemove)
+
 		default:
-			pendingStakerIterator.Release()
 			return nil, fmt.Errorf("expected staker priority got %d", stakerToRemove.Priority)
 		}
 	}
-	pendingStakerIterator.Release()
 
 	currentStakerIterator, err := parentState.GetCurrentStakerIterator()
 	if err != nil {
 		return nil, err
 	}
+	defer currentStakerIterator.Release()
 
 	for currentStakerIterator.Next() {
 		stakerToRemove := currentStakerIterator.Value()
@@ -188,6 +209,31 @@ func AdvanceTimeTo(parentState state.Chain, newChainTime time.Time, rewards rewa
 
 		changes.currentValidatorsToRemove = append(changes.currentValidatorsToRemove, stakerToRemove)
 	}
-	currentStakerIterator.Release()
 	return changes, nil
+}
+
+func GetRewardsCalculator(
+	backend *Backend,
+	parentState state.Chain,
+	subnetID ids.ID,
+) (reward.Calculator, error) {
+	if subnetID == constants.PrimaryNetworkID {
+		return backend.Rewards, nil
+	}
+
+	transformSubnetIntf, err := parentState.GetSubnetTransformation(subnetID)
+	if err != nil {
+		return nil, err
+	}
+	transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
+	if !ok {
+		return nil, errIsNotTransformSubnetTx
+	}
+
+	return reward.NewCalculator(reward.Config{
+		MaxConsumptionRate: transformSubnet.MaxConsumptionRate,
+		MinConsumptionRate: transformSubnet.MinConsumptionRate,
+		MintingPeriod:      backend.Config.RewardConfig.MintingPeriod,
+		SupplyCap:          transformSubnet.MaximumSupply,
+	}), nil
 }

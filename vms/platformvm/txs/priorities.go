@@ -10,7 +10,7 @@ const (
 	// then primary network validators,
 	PrimaryNetworkValidatorPendingPriority
 	// then primary network blueberry delegators,
-	PrimaryNetworkBlueberryDelegatorPendingPriority
+	PrimaryNetworkDelegatorBlueberryPendingPriority
 	// then permissionless subnet validators,
 	SubnetPermissionlessValidatorPendingPriority
 	// then permissionless subnet delegators.
@@ -37,7 +37,7 @@ const (
 var PendingToCurrentPriorities = []Priority{
 	PrimaryNetworkDelegatorApricotPendingPriority:   PrimaryNetworkDelegatorCurrentPriority,
 	PrimaryNetworkValidatorPendingPriority:          PrimaryNetworkValidatorCurrentPriority,
-	PrimaryNetworkBlueberryDelegatorPendingPriority: PrimaryNetworkDelegatorCurrentPriority,
+	PrimaryNetworkDelegatorBlueberryPendingPriority: PrimaryNetworkDelegatorCurrentPriority,
 	SubnetPermissionlessValidatorPendingPriority:    SubnetPermissionlessValidatorCurrentPriority,
 	SubnetPermissionlessDelegatorPendingPriority:    SubnetPermissionlessDelegatorCurrentPriority,
 	SubnetPermissionedValidatorPendingPriority:      SubnetPermissionedValidatorCurrentPriority,

@@ -259,7 +259,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		return err
 	}
 
-	changes, err := AdvanceTimeTo(e.OnCommitState, newChainTime, e.Backend.Rewards)
+	changes, err := AdvanceTimeTo(e.Backend, e.OnCommitState, newChainTime)
 	if err != nil {
 		return err
 	}
