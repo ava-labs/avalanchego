@@ -12,7 +12,7 @@ import (
 
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/ethclient"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/ava-labs/subnet-evm/params"
 )
 
 const (
