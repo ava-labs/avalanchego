@@ -42,7 +42,7 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 		dummyPCH := uint64(2022)
 
 		// store postForkStatelessBlk in State ...
-		postForkStatelessBlk, err := block.BuildUnsigned(
+		postForkStatelessBlk, err := block.BuildUnsignedApricot(
 			lastBlkID,
 			dummyTS,
 			dummyPCH,
@@ -120,7 +120,7 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 		dummyPCH := uint64(2022)
 
 		// store postForkStatelessBlk in State ...
-		postForkStatelessBlk, err := block.BuildUnsigned(
+		postForkStatelessBlk, err := block.BuildUnsignedApricot(
 			lastBlkID,
 			dummyTS,
 			dummyPCH,
@@ -202,7 +202,7 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 		dummyPCH := uint64(2022)
 
 		// store postForkStatelessBlk in State ...
-		postForkStatelessBlk, err := block.BuildUnsigned(
+		postForkStatelessBlk, err := block.BuildUnsignedApricot(
 			lastBlkID,
 			dummyTS,
 			dummyPCH,

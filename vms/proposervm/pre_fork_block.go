@@ -200,7 +200,7 @@ func (b *preForkBlock) buildChild() (Block, error) {
 		return nil, err
 	}
 
-	statelessBlock, err := block.BuildUnsigned(
+	statelessBlock, err := block.BuildUnsignedApricot(
 		parentID,
 		newTimestamp,
 		pChainHeight,

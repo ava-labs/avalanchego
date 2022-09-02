@@ -9,12 +9,32 @@ import (
 	"crypto/x509"
 	"time"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-func BuildUnsigned(
+func BuildUnsignedApricot(
+	parentID ids.ID,
+	timestamp time.Time,
+	pChainHeight uint64,
+	blockBytes []byte,
+) (SignedBlock, error) {
+	return buildUnsigned(apricotCodec, parentID, timestamp, pChainHeight, blockBytes)
+}
+
+func BuildUnsignedBlueberry(
+	parentID ids.ID,
+	timestamp time.Time,
+	pChainHeight uint64,
+	blockBytes []byte,
+) (SignedBlock, error) {
+	return buildUnsigned(blueberryCodec, parentID, timestamp, pChainHeight, blockBytes)
+}
+
+func buildUnsigned(
+	cm codec.Manager,
 	parentID ids.ID,
 	timestamp time.Time,
 	pChainHeight uint64,
@@ -31,14 +51,39 @@ func BuildUnsigned(
 		timestamp: timestamp,
 	}
 
-	bytes, err := c.Marshal(version, &block)
+	bytes, err := cm.Marshal(codecVersion, &block)
 	if err != nil {
 		return nil, err
 	}
 	return block, block.initialize(bytes)
 }
 
-func Build(
+func BuildApricot(
+	parentID ids.ID,
+	timestamp time.Time,
+	pChainHeight uint64,
+	cert *x509.Certificate,
+	blockBytes []byte,
+	chainID ids.ID,
+	key crypto.Signer,
+) (SignedBlock, error) {
+	return build(apricotCodec, parentID, timestamp, pChainHeight, cert, blockBytes, chainID, key)
+}
+
+func BuildBlueberry(
+	parentID ids.ID,
+	timestamp time.Time,
+	pChainHeight uint64,
+	cert *x509.Certificate,
+	blockBytes []byte,
+	chainID ids.ID,
+	key crypto.Signer,
+) (SignedBlock, error) {
+	return build(blueberryCodec, parentID, timestamp, pChainHeight, cert, blockBytes, chainID, key)
+}
+
+func build(
+	cm codec.Manager,
 	parentID ids.ID,
 	timestamp time.Time,
 	pChainHeight uint64,
@@ -61,7 +106,7 @@ func Build(
 	}
 	var blockIntf SignedBlock = block
 
-	unsignedBytesWithEmptySignature, err := c.Marshal(version, &blockIntf)
+	unsignedBytesWithEmptySignature, err := cm.Marshal(codecVersion, &blockIntf)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +130,7 @@ func Build(
 		return nil, err
 	}
 
-	block.bytes, err = c.Marshal(version, &blockIntf)
+	block.bytes, err = cm.Marshal(codecVersion, &blockIntf)
 	return block, err
 }
 
@@ -100,7 +145,7 @@ func BuildHeader(
 		Body:   bodyID,
 	}
 
-	bytes, err := c.Marshal(version, &header)
+	bytes, err := blueberryCodec.Marshal(codecVersion, &header)
 	header.bytes = bytes
 	return &header, err
 }
@@ -117,7 +162,7 @@ func BuildOption(
 		InnerBytes: innerBytes,
 	}
 
-	bytes, err := c.Marshal(version, &block)
+	bytes, err := blueberryCodec.Marshal(codecVersion, &block)
 	if err != nil {
 		return nil, err
 	}

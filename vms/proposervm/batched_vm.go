@@ -92,11 +92,16 @@ func (vm *VM) BatchedParseBlock(blks [][]byte) ([]snowman.Block, error) {
 		innerBlocksIndex    int
 		statelessBlockDescs = make([]partialData, 0, len(blks))
 		innerBlockBytes     = make([][]byte, 0, len(blks))
+		blueberryActivated  = vm.Clock.Time().After(vm.activationTimeBlueberry)
 	)
 	for ; blocksIndex < len(blks); blocksIndex++ {
 		blkBytes := blks[blocksIndex]
-		statelessBlock, err := statelessblock.Parse(blkBytes)
+		statelessBlock, requireBlueberry, err := statelessblock.Parse(blkBytes)
 		if err != nil {
+			break
+		}
+
+		if requireBlueberry && !blueberryActivated {
 			break
 		}
 
