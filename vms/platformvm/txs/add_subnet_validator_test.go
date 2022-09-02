@@ -218,6 +218,12 @@ func TestAddSubnetValidatorTxNotValidatorTx(t *testing.T) {
 
 func TestAddSubnetValidatorTxNotDelegatorTx(t *testing.T) {
 	txIntf := any((*AddSubnetValidatorTx)(nil))
-	_, ok := txIntf.(ValidatorTx)
+	_, ok := txIntf.(DelegatorTx)
+	require.False(t, ok)
+}
+
+func TestAddSubnetValidatorTxNotPermissionlessStaker(t *testing.T) {
+	txIntf := any((*AddSubnetValidatorTx)(nil))
+	_, ok := txIntf.(PermissionlessStaker)
 	require.False(t, ok)
 }

@@ -183,14 +183,14 @@ func defaultGenesis() (*api.BuildGenesisArgs, []byte) {
 		}
 	}
 
-	genesisValidators := make([]api.PrimaryValidator, len(keys))
+	genesisValidators := make([]api.PermissionlessValidator, len(keys))
 	for i, key := range keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
 		addr, err := address.FormatBech32(hrp, nodeID.Bytes())
 		if err != nil {
 			panic(err)
 		}
-		genesisValidators[i] = api.PrimaryValidator{
+		genesisValidators[i] = api.PermissionlessValidator{
 			Staker: api.Staker{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
@@ -258,14 +258,14 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 		}
 	}
 
-	genesisValidators := make([]api.PrimaryValidator, len(keys))
+	genesisValidators := make([]api.PermissionlessValidator, len(keys))
 	for i, key := range keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
 		addr, err := address.FormatBech32(hrp, nodeID.Bytes())
 		if err != nil {
 			panic(err)
 		}
-		genesisValidators[i] = api.PrimaryValidator{
+		genesisValidators[i] = api.PermissionlessValidator{
 			Staker: api.Staker{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),

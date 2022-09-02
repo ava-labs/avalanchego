@@ -34,21 +34,22 @@ type ClientOwner struct {
 	Addresses []ids.ShortID
 }
 
-// ClientPrimaryValidator is the repr. of a primary network validator sent over client
-type ClientPrimaryValidator struct {
+// ClientPermissionlessValidator is the repr. of a permissionless validator sent
+// over client
+type ClientPermissionlessValidator struct {
 	ClientStaker
-	// The owner the staking reward, if applicable, will go to
-	RewardOwner     *ClientOwner
-	PotentialReward *uint64
-	DelegationFee   float32
-	Uptime          *float32
-	Connected       *bool
+	ValidationRewardOwner *ClientOwner
+	DelegationRewardOwner *ClientOwner
+	PotentialReward       *uint64
+	DelegationFee         float32
+	Uptime                *float32
+	Connected             *bool
 	// The delegators delegating to this validator
-	Delegators []ClientPrimaryDelegator
+	Delegators []ClientDelegator
 }
 
-// ClientPrimaryDelegator is the repr. of a primary network delegator sent over client
-type ClientPrimaryDelegator struct {
+// ClientDelegator is the repr. of a delegator sent over client
+type ClientDelegator struct {
 	ClientStaker
 	RewardOwner     *ClientOwner
 	PotentialReward *uint64
@@ -78,47 +79,53 @@ func apiOwnerToClientOwner(rewardOwner *api.Owner) (*ClientOwner, error) {
 	}, err
 }
 
-func getClientPrimaryValidators(validatorsSliceIntf []interface{}) ([]ClientPrimaryValidator, error) {
-	clientValidators := make([]ClientPrimaryValidator, len(validatorsSliceIntf))
+func getClientPermissionlessValidators(validatorsSliceIntf []interface{}) ([]ClientPermissionlessValidator, error) {
+	clientValidators := make([]ClientPermissionlessValidator, len(validatorsSliceIntf))
 	for i, validatorMapIntf := range validatorsSliceIntf {
 		validatorMapJSON, err := json.Marshal(validatorMapIntf)
 		if err != nil {
 			return nil, err
 		}
 
-		var apiValidator api.PrimaryValidator
+		var apiValidator api.PermissionlessValidator
 		err = json.Unmarshal(validatorMapJSON, &apiValidator)
 		if err != nil {
 			return nil, err
 		}
 
-		rewardOwner, err := apiOwnerToClientOwner(apiValidator.RewardOwner)
+		validationRewardOwner, err := apiOwnerToClientOwner(apiValidator.ValidationRewardOwner)
 		if err != nil {
 			return nil, err
 		}
 
-		clientDelegators := make([]ClientPrimaryDelegator, len(apiValidator.Delegators))
+		delegationRewardOwner, err := apiOwnerToClientOwner(apiValidator.DelegationRewardOwner)
+		if err != nil {
+			return nil, err
+		}
+
+		clientDelegators := make([]ClientDelegator, len(apiValidator.Delegators))
 		for j, apiDelegator := range apiValidator.Delegators {
 			rewardOwner, err := apiOwnerToClientOwner(apiDelegator.RewardOwner)
 			if err != nil {
 				return nil, err
 			}
 
-			clientDelegators[j] = ClientPrimaryDelegator{
+			clientDelegators[j] = ClientDelegator{
 				ClientStaker:    apiStakerToClientStaker(apiDelegator.Staker),
 				RewardOwner:     rewardOwner,
 				PotentialReward: (*uint64)(apiDelegator.PotentialReward),
 			}
 		}
 
-		clientValidators[i] = ClientPrimaryValidator{
-			ClientStaker:    apiStakerToClientStaker(apiValidator.Staker),
-			RewardOwner:     rewardOwner,
-			PotentialReward: (*uint64)(apiValidator.PotentialReward),
-			DelegationFee:   float32(apiValidator.DelegationFee),
-			Uptime:          (*float32)(apiValidator.Uptime),
-			Connected:       &apiValidator.Connected,
-			Delegators:      clientDelegators,
+		clientValidators[i] = ClientPermissionlessValidator{
+			ClientStaker:          apiStakerToClientStaker(apiValidator.Staker),
+			ValidationRewardOwner: validationRewardOwner,
+			DelegationRewardOwner: delegationRewardOwner,
+			PotentialReward:       (*uint64)(apiValidator.PotentialReward),
+			DelegationFee:         float32(apiValidator.DelegationFee),
+			Uptime:                (*float32)(apiValidator.Uptime),
+			Connected:             &apiValidator.Connected,
+			Delegators:            clientDelegators,
 		}
 	}
 	return clientValidators, nil
