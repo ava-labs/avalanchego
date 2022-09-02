@@ -18,10 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var (
-	_ StakerTx               = &AddPermissionlessValidatorTx{}
-	_ secp256k1fx.UnsignedTx = &AddPermissionlessValidatorTx{}
-)
+var _ DelegatorTx = &AddPermissionlessDelegatorTx{}
 
 // AddPermissionlessDelegatorTx is an unsigned addPermissionlessDelegatorTx
 type AddPermissionlessDelegatorTx struct {
@@ -32,9 +29,9 @@ type AddPermissionlessDelegatorTx struct {
 	// ID of the subnet this validator is validating
 	Subnet ids.ID `serialize:"true" json:"subnet"`
 	// Where to send staked tokens when done validating
-	Stake []*avax.TransferableOutput `serialize:"true" json:"stake"`
+	StakeOuts []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send staking rewards when done validating
-	RewardsOwner fx.Owner `serialize:"true" json:"rewardsOwner"`
+	DelegationRewardsOwner fx.Owner `serialize:"true" json:"rewardsOwner"`
 }
 
 // InitCtx sets the FxID fields in the inputs and outputs of this
@@ -42,11 +39,11 @@ type AddPermissionlessDelegatorTx struct {
 // that the addresses can be json marshalled into human readable format
 func (tx *AddPermissionlessDelegatorTx) InitCtx(ctx *snow.Context) {
 	tx.BaseTx.InitCtx(ctx)
-	for _, out := range tx.Stake {
+	for _, out := range tx.StakeOuts {
 		out.FxID = secp256k1fx.ID
 		out.InitCtx(ctx)
 	}
-	tx.RewardsOwner.InitCtx(ctx)
+	tx.DelegationRewardsOwner.InitCtx(ctx)
 }
 
 func (tx *AddPermissionlessDelegatorTx) SubnetID() ids.ID     { return tx.Subnet }
@@ -69,6 +66,14 @@ func (tx *AddPermissionlessDelegatorTx) CurrentPriority() Priority {
 	return SubnetPermissionlessDelegatorCurrentPriority
 }
 
+func (tx *AddPermissionlessDelegatorTx) Stake() []*avax.TransferableOutput {
+	return tx.StakeOuts
+}
+
+func (tx *AddPermissionlessDelegatorTx) RewardsOwner() fx.Owner {
+	return tx.DelegationRewardsOwner
+}
+
 // SyntacticVerify returns nil iff [tx] is valid
 func (tx *AddPermissionlessDelegatorTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
@@ -76,27 +81,27 @@ func (tx *AddPermissionlessDelegatorTx) SyntacticVerify(ctx *snow.Context) error
 		return ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
-	case len(tx.Stake) == 0: // Ensure there is provided stake
+	case len(tx.StakeOuts) == 0: // Ensure there is provided stake
 		return errNoStake
 	}
 
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
-	if err := verify.All(&tx.Validator, tx.RewardsOwner); err != nil {
+	if err := verify.All(&tx.Validator, tx.DelegationRewardsOwner); err != nil {
 		return fmt.Errorf("failed to verify validator or rewards owner: %w", err)
 	}
 
-	for _, out := range tx.Stake {
+	for _, out := range tx.StakeOuts {
 		if err := out.Verify(); err != nil {
 			return fmt.Errorf("failed to verify output: %w", err)
 		}
 	}
 
-	firstStakeOutput := tx.Stake[0]
+	firstStakeOutput := tx.StakeOuts[0]
 	stakedAssetID := firstStakeOutput.AssetID()
 	totalStakeWeight := firstStakeOutput.Output().Amount()
-	for _, out := range tx.Stake[1:] {
+	for _, out := range tx.StakeOuts[1:] {
 		newWeight, err := math.Add64(totalStakeWeight, out.Output().Amount())
 		if err != nil {
 			return err
@@ -110,7 +115,7 @@ func (tx *AddPermissionlessDelegatorTx) SyntacticVerify(ctx *snow.Context) error
 	}
 
 	switch {
-	case !avax.IsSortedTransferableOutputs(tx.Stake, Codec):
+	case !avax.IsSortedTransferableOutputs(tx.StakeOuts, Codec):
 		return errOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
 		return fmt.Errorf("%w, delegator weight %d total stake weight %d",

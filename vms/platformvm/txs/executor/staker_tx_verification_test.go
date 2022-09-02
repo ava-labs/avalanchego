@@ -587,3 +587,115 @@ func TestGetValidatorRules(t *testing.T) {
 		})
 	}
 }
+
+func TestGetDelegatorRules(t *testing.T) {
+	type test struct {
+		name          string
+		subnetID      ids.ID
+		backend       *Backend
+		chainStateF   func(*gomock.Controller) state.Chain
+		expectedRules *addDelegatorRules
+		expectedErr   error
+	}
+	var (
+		config = &config.Config{
+			MinDelegatorStake: 1,
+			MaxValidatorStake: 2,
+			MinStakeDuration:  time.Second,
+			MaxStakeDuration:  2 * time.Second,
+		}
+		subnetID = ids.GenerateTestID()
+		testErr  = errors.New("an error")
+	)
+	tests := []test{
+		{
+			name:     "primary network",
+			subnetID: constants.PrimaryNetworkID,
+			backend: &Backend{
+				Config: config,
+			},
+			chainStateF: func(*gomock.Controller) state.Chain {
+				return nil
+			},
+			expectedRules: &addDelegatorRules{
+				minDelegatorStake:        config.MinDelegatorStake,
+				maxValidatorStake:        config.MaxValidatorStake,
+				minStakeDuration:         config.MinStakeDuration,
+				maxStakeDuration:         config.MaxStakeDuration,
+				maxValidatorWeightFactor: MaxValidatorWeightFactor,
+			},
+		},
+		{
+			name:     "can't get subnet transformation",
+			subnetID: subnetID,
+			backend:  nil,
+			chainStateF: func(ctrl *gomock.Controller) state.Chain {
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetSubnetTransformation(subnetID).Return(nil, testErr)
+				return state
+			},
+			expectedRules: &addDelegatorRules{},
+			expectedErr:   testErr,
+		},
+		{
+			name:     "invalid transformation tx",
+			subnetID: subnetID,
+			backend:  nil,
+			chainStateF: func(ctrl *gomock.Controller) state.Chain {
+				state := state.NewMockChain(ctrl)
+				tx := &txs.Tx{
+					Unsigned: &txs.AddDelegatorTx{},
+				}
+				state.EXPECT().GetSubnetTransformation(subnetID).Return(tx, nil)
+				return state
+			},
+			expectedRules: &addDelegatorRules{},
+			expectedErr:   errIsNotTransformSubnetTx,
+		},
+		{
+			name:     "subnet",
+			subnetID: subnetID,
+			backend:  nil,
+			chainStateF: func(ctrl *gomock.Controller) state.Chain {
+				state := state.NewMockChain(ctrl)
+				tx := &txs.Tx{
+					Unsigned: &txs.TransformSubnetTx{
+						MinDelegatorStake:        config.MinDelegatorStake,
+						MinValidatorStake:        config.MinValidatorStake,
+						MaxValidatorStake:        config.MaxValidatorStake,
+						MinStakeDuration:         1337,
+						MaxStakeDuration:         42,
+						MinDelegationFee:         config.MinDelegationFee,
+						MaxValidatorWeightFactor: 21,
+					},
+				}
+				state.EXPECT().GetSubnetTransformation(subnetID).Return(tx, nil)
+				return state
+			},
+			expectedRules: &addDelegatorRules{
+				minDelegatorStake:        config.MinDelegatorStake,
+				maxValidatorStake:        config.MaxValidatorStake,
+				minStakeDuration:         time.Duration(1337) * time.Second,
+				maxStakeDuration:         time.Duration(42) * time.Second,
+				maxValidatorWeightFactor: 21,
+			},
+			expectedErr: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			chainState := tt.chainStateF(ctrl)
+			rules, err := getDelegatorRules(tt.backend, chainState, tt.subnetID)
+			if tt.expectedErr != nil {
+				require.ErrorIs(tt.expectedErr, err)
+				return
+			}
+			require.NoError(err)
+			require.Equal(tt.expectedRules, rules)
+		})
+	}
+}

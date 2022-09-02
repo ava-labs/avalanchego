@@ -77,8 +77,8 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 			name: "no provided stake",
 			txFunc: func(*gomock.Controller) *AddPermissionlessDelegatorTx {
 				return &AddPermissionlessDelegatorTx{
-					BaseTx: validBaseTx,
-					Stake:  nil,
+					BaseTx:    validBaseTx,
+					StakeOuts: nil,
 				}
 			},
 			err: errNoStake,
@@ -94,7 +94,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 						Wght: 1,
 					},
 					Subnet: ids.GenerateTestID(),
-					Stake: []*avax.TransferableOutput{
+					StakeOuts: []*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
 								ID: ids.GenerateTestID(),
@@ -104,7 +104,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 							},
 						},
 					},
-					RewardsOwner: rewardsOwner,
+					DelegationRewardsOwner: rewardsOwner,
 				}
 			},
 			err: errCustom,
@@ -123,7 +123,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 						Wght: 1,
 					},
 					Subnet: ids.GenerateTestID(),
-					Stake: []*avax.TransferableOutput{
+					StakeOuts: []*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
 								ID: ids.GenerateTestID(),
@@ -131,7 +131,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 							Out: stakeOut,
 						},
 					},
-					RewardsOwner: rewardsOwner,
+					DelegationRewardsOwner: rewardsOwner,
 				}
 			},
 			err: errCustom,
@@ -147,7 +147,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 						Wght: 1,
 					},
 					Subnet: ids.GenerateTestID(),
-					Stake: []*avax.TransferableOutput{
+					StakeOuts: []*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
 								ID: ids.GenerateTestID(),
@@ -165,7 +165,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 							},
 						},
 					},
-					RewardsOwner: rewardsOwner,
+					DelegationRewardsOwner: rewardsOwner,
 				}
 			},
 			err: errMultipleStakedAssets,
@@ -182,7 +182,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 						Wght: 1,
 					},
 					Subnet: ids.GenerateTestID(),
-					Stake: []*avax.TransferableOutput{
+					StakeOuts: []*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
 								ID: assetID,
@@ -200,7 +200,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 							},
 						},
 					},
-					RewardsOwner: rewardsOwner,
+					DelegationRewardsOwner: rewardsOwner,
 				}
 			},
 			err: errOutputsNotSorted,
@@ -217,7 +217,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 						Wght: 1,
 					},
 					Subnet: ids.GenerateTestID(),
-					Stake: []*avax.TransferableOutput{
+					StakeOuts: []*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
 								ID: assetID,
@@ -235,7 +235,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 							},
 						},
 					},
-					RewardsOwner: rewardsOwner,
+					DelegationRewardsOwner: rewardsOwner,
 				}
 			},
 			err: errDelegatorWeightMismatch,
@@ -252,7 +252,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 						Wght: 2,
 					},
 					Subnet: ids.GenerateTestID(),
-					Stake: []*avax.TransferableOutput{
+					StakeOuts: []*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
 								ID: assetID,
@@ -270,7 +270,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 							},
 						},
 					},
-					RewardsOwner: rewardsOwner,
+					DelegationRewardsOwner: rewardsOwner,
 				}
 			},
 			err: nil,
@@ -287,7 +287,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 						Wght: 2,
 					},
 					Subnet: constants.PrimaryNetworkID,
-					Stake: []*avax.TransferableOutput{
+					StakeOuts: []*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
 								ID: assetID,
@@ -305,7 +305,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 							},
 						},
 					},
-					RewardsOwner: rewardsOwner,
+					DelegationRewardsOwner: rewardsOwner,
 				}
 			},
 			err: nil,
@@ -331,7 +331,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 			Validator: validator.Validator{
 				NodeID: ids.GenerateTestNodeID(),
 			},
-			Stake: []*avax.TransferableOutput{
+			StakeOuts: []*avax.TransferableOutput{
 				{
 					Asset: avax.Asset{
 						ID: ids.GenerateTestID(),
@@ -361,7 +361,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 				Wght:   1,
 			},
 			Subnet: ids.GenerateTestID(),
-			Stake: []*avax.TransferableOutput{
+			StakeOuts: []*avax.TransferableOutput{
 				{
 					Asset: avax.Asset{
 						ID: assetID,
@@ -379,7 +379,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 					},
 				},
 			},
-			RewardsOwner: rewardsOwner,
+			DelegationRewardsOwner: rewardsOwner,
 		}
 		err := tx.SyntacticVerify(ctx)
 		require.Error(err)
