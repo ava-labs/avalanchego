@@ -129,8 +129,7 @@ func ExampleWallet() {
 	}
 	log.Printf("issued transform subnet transaction %s in %s\n", transformSubnetTxID, time.Since(transformSubnetStartTime))
 
-	// This is currently expected to fail because there is no support for
-	// permissionless validator addition yet.
+	addPermissionlessValidatorStartTime := time.Now()
 	startTime := time.Now().Add(time.Minute)
 	addSubnetValidatorTxID, err := pWallet.IssueAddPermissionlessValidatorTx(
 		&validator.SubnetValidator{
@@ -138,7 +137,7 @@ func ExampleWallet() {
 				NodeID: genesis.LocalConfig.InitialStakers[0].NodeID,
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(startTime.Add(5 * time.Second).Unix()),
-				Wght:   50 * units.MegaAvax,
+				Wght:   25 * units.MegaAvax,
 			},
 			Subnet: createSubnetTxID,
 		},
@@ -151,5 +150,25 @@ func ExampleWallet() {
 		log.Fatalf("failed to issue add subnet validator with: %s\n", err)
 		return
 	}
-	log.Printf("issued add subnet validator transaction %s in %s\n", addSubnetValidatorTxID, time.Since(transformSubnetStartTime))
+	log.Printf("issued add subnet validator transaction %s in %s\n", addSubnetValidatorTxID, time.Since(addPermissionlessValidatorStartTime))
+
+	addPermissionlessDelegatorStartTime := time.Now()
+	addSubnetDelegatorTxID, err := pWallet.IssueAddPermissionlessDelegatorTx(
+		&validator.SubnetValidator{
+			Validator: validator.Validator{
+				NodeID: genesis.LocalConfig.InitialStakers[0].NodeID,
+				Start:  uint64(startTime.Unix()),
+				End:    uint64(startTime.Add(5 * time.Second).Unix()),
+				Wght:   25 * units.MegaAvax,
+			},
+			Subnet: createSubnetTxID,
+		},
+		createAssetTxID,
+		&secp256k1fx.OutputOwners{},
+	)
+	if err != nil {
+		log.Fatalf("failed to issue add subnet delegator with: %s\n", err)
+		return
+	}
+	log.Printf("issued add subnet validator delegator %s in %s\n", addSubnetDelegatorTxID, time.Since(addPermissionlessDelegatorStartTime))
 }

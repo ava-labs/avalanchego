@@ -213,7 +213,20 @@ type Wallet interface {
 		options ...common.Option,
 	) (ids.ID, error)
 
-	// TODO: add support for AddPermissionlessDelegatorTx
+	// IssueAddPermissionlessDelegatorTx creates, signs, and issues a new
+	// delegator of the specified subnet on the specified nodeID.
+	//
+	// - [vdr] specifies all the details of the delegation period such as the
+	//   subnetID, startTime, endTime, stake weight, and nodeID.
+	// - [assetID] specifies the asset to stake.
+	// - [rewardsOwner] specifies the owner of all the rewards this delegator
+	//   earns during its delegation period.
+	IssueAddPermissionlessDelegatorTx(
+		vdr *validator.SubnetValidator,
+		assetID ids.ID,
+		rewardsOwner *secp256k1fx.OutputOwners,
+		options ...common.Option,
+	) (ids.ID, error)
 
 	// IssueUnsignedTx signs and issues the unsigned tx.
 	IssueUnsignedTx(
@@ -416,6 +429,24 @@ func (w *wallet) IssueAddPermissionlessValidatorTx(
 		validationRewardsOwner,
 		delegationRewardsOwner,
 		shares,
+		options...,
+	)
+	if err != nil {
+		return ids.Empty, err
+	}
+	return w.IssueUnsignedTx(utx, options...)
+}
+
+func (w *wallet) IssueAddPermissionlessDelegatorTx(
+	vdr *validator.SubnetValidator,
+	assetID ids.ID,
+	rewardsOwner *secp256k1fx.OutputOwners,
+	options ...common.Option,
+) (ids.ID, error) {
+	utx, err := w.builder.NewAddPermissionlessDelegatorTx(
+		vdr,
+		assetID,
+		rewardsOwner,
 		options...,
 	)
 	if err != nil {

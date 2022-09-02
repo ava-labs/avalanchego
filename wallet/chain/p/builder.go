@@ -223,6 +223,21 @@ type Builder interface {
 		shares uint32,
 		options ...common.Option,
 	) (*txs.AddPermissionlessValidatorTx, error)
+
+	// NewAddPermissionlessDelegatorTx creates a new delegator of the specified
+	// subnet on the specified nodeID.
+	//
+	// - [vdr] specifies all the details of the delegation period such as the
+	//   subnetID, startTime, endTime, stake weight, and nodeID.
+	// - [assetID] specifies the asset to stake.
+	// - [rewardsOwner] specifies the owner of all the rewards this delegator
+	//   earns during its delegation period.
+	NewAddPermissionlessDelegatorTx(
+		vdr *validator.SubnetValidator,
+		assetID ids.ID,
+		rewardsOwner *secp256k1fx.OutputOwners,
+		options ...common.Option,
+	) (*txs.AddPermissionlessDelegatorTx, error)
 }
 
 // BuilderBackend specifies the required information needed to build unsigned
@@ -748,6 +763,44 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 		ValidatorRewardsOwner: validationRewardsOwner,
 		DelegatorRewardsOwner: delegationRewardsOwner,
 		DelegationShares:      shares,
+	}, nil
+}
+
+func (b *builder) NewAddPermissionlessDelegatorTx(
+	vdr *validator.SubnetValidator,
+	assetID ids.ID,
+	rewardsOwner *secp256k1fx.OutputOwners,
+	options ...common.Option,
+) (*txs.AddPermissionlessDelegatorTx, error) {
+	avaxAssetID := b.backend.AVAXAssetID()
+	toBurn := map[ids.ID]uint64{}
+	if vdr.Subnet == constants.PrimaryNetworkID {
+		toBurn[avaxAssetID] = b.backend.AddPrimaryNetworkDelegatorFee()
+	} else {
+		toBurn[avaxAssetID] = b.backend.AddSubnetDelegatorFee()
+	}
+	toStake := map[ids.ID]uint64{
+		assetID: vdr.Wght,
+	}
+	ops := common.NewOptions(options)
+	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	ids.SortShortIDs(rewardsOwner.Addrs)
+	return &txs.AddPermissionlessDelegatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.backend.NetworkID(),
+			BlockchainID: constants.PlatformChainID,
+			Ins:          inputs,
+			Outs:         baseOutputs,
+			Memo:         ops.Memo(),
+		}},
+		Validator:              vdr.Validator,
+		Subnet:                 vdr.Subnet,
+		StakeOuts:              stakeOutputs,
+		DelegationRewardsOwner: rewardsOwner,
 	}, nil
 }
 

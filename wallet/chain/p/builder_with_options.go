@@ -206,3 +206,17 @@ func (b *builderWithOptions) NewAddPermissionlessValidatorTx(
 		common.UnionOptions(b.options, options)...,
 	)
 }
+
+func (b *builderWithOptions) NewAddPermissionlessDelegatorTx(
+	vdr *validator.SubnetValidator,
+	assetID ids.ID,
+	rewardsOwner *secp256k1fx.OutputOwners,
+	options ...common.Option,
+) (*txs.AddPermissionlessDelegatorTx, error) {
+	return b.Builder.NewAddPermissionlessDelegatorTx(
+		vdr,
+		assetID,
+		rewardsOwner,
+		common.UnionOptions(b.options, options)...,
+	)
+}
