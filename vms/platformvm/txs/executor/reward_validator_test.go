@@ -375,7 +375,8 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	}()
 	dummyHeight := uint64(1)
 
-	initialSupply := env.state.GetCurrentSupply()
+	initialSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(err)
 
 	vdrRewardAddress := ids.GenerateTestShortID()
 	delRewardAddress := ids.GenerateTestShortID()
@@ -480,6 +481,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require.NoError(err)
 	require.Zero(delReward, "expected delegator balance not to increase")
 
-	newSupply := env.state.GetCurrentSupply()
+	newSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(err)
 	require.Equal(initialSupply-expectedReward, newSupply, "should have removed un-rewarded tokens from the potential supply")
 }

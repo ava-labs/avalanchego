@@ -502,29 +502,19 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return errShouldBePermissionlessStaker
 	}
 
+	// If the reward is aborted, then the current supply should be decreased.
+	currentSupply, err := e.OnAbortState.GetCurrentSupply(stakerToRemove.SubnetID)
+	if err != nil {
+		return err
+	}
+	newSupply, err := math.Sub64(currentSupply, stakerToRemove.PotentialReward)
+	if err != nil {
+		return err
+	}
+	e.OnAbortState.SetCurrentSupply(stakerToRemove.SubnetID, newSupply)
+
 	var expectedUptimePercentage float64
-	if stakerToRemove.SubnetID == constants.PrimaryNetworkID {
-		// If the reward is aborted, then the current supply should be decreased.
-		currentSupply := e.OnAbortState.GetCurrentSupply()
-		newSupply, err := math.Sub64(currentSupply, stakerToRemove.PotentialReward)
-		if err != nil {
-			return err
-		}
-		e.OnAbortState.SetCurrentSupply(newSupply)
-
-		expectedUptimePercentage = e.Config.UptimePercentage
-	} else {
-		// If the reward is aborted, then the current supply should be decreased.
-		currentSupply, err := e.OnAbortState.GetCurrentSubnetSupply(stakerToRemove.SubnetID)
-		if err != nil {
-			return err
-		}
-		newSupply, err := math.Sub64(currentSupply, stakerToRemove.PotentialReward)
-		if err != nil {
-			return err
-		}
-		e.OnAbortState.SetCurrentSubnetSupply(stakerToRemove.SubnetID, newSupply)
-
+	if stakerToRemove.SubnetID != constants.PrimaryNetworkID {
 		transformSubnetIntf, err := e.OnCommitState.GetSubnetTransformation(stakerToRemove.SubnetID)
 		if err != nil {
 			return err
@@ -535,6 +525,8 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		}
 
 		expectedUptimePercentage = float64(transformSubnet.UptimeRequirement) / reward.PercentDenominator
+	} else {
+		expectedUptimePercentage = e.Config.UptimePercentage
 	}
 
 	// TODO: calculate subnet uptimes

@@ -33,9 +33,8 @@ type diff struct {
 
 	timestamp time.Time
 
-	currentSupply uint64
 	// Subnet ID --> supply of native asset of the subnet
-	subnetSupplies map[ids.ID]uint64
+	currentSupply map[ids.ID]uint64
 
 	currentStakerDiffs diffStakers
 	pendingStakerDiffs diffStakers
@@ -75,7 +74,6 @@ func NewDiff(
 		parentID:      parentID,
 		stateVersions: stateVersions,
 		timestamp:     parentState.GetTimestamp(),
-		currentSupply: parentState.GetCurrentSupply(),
 	}, nil
 }
 
@@ -87,16 +85,8 @@ func (d *diff) SetTimestamp(timestamp time.Time) {
 	d.timestamp = timestamp
 }
 
-func (d *diff) GetCurrentSupply() uint64 {
-	return d.currentSupply
-}
-
-func (d *diff) SetCurrentSupply(currentSupply uint64) {
-	d.currentSupply = currentSupply
-}
-
-func (d *diff) GetCurrentSubnetSupply(subnetID ids.ID) (uint64, error) {
-	supply, ok := d.subnetSupplies[subnetID]
+func (d *diff) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
+	supply, ok := d.currentSupply[subnetID]
 	if ok {
 		return supply, nil
 	}
@@ -106,16 +96,16 @@ func (d *diff) GetCurrentSubnetSupply(subnetID ids.ID) (uint64, error) {
 	if !ok {
 		return 0, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
-	return parentState.GetCurrentSubnetSupply(subnetID)
+	return parentState.GetCurrentSupply(subnetID)
 }
 
-func (d *diff) SetCurrentSubnetSupply(subnetID ids.ID, currentSupply uint64) {
-	if d.subnetSupplies == nil {
-		d.subnetSupplies = map[ids.ID]uint64{
+func (d *diff) SetCurrentSupply(subnetID ids.ID, currentSupply uint64) {
+	if d.currentSupply == nil {
+		d.currentSupply = map[ids.ID]uint64{
 			subnetID: currentSupply,
 		}
 	} else {
-		d.subnetSupplies[subnetID] = currentSupply
+		d.currentSupply[subnetID] = currentSupply
 	}
 }
 
@@ -456,9 +446,8 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 
 func (d *diff) Apply(baseState State) {
 	baseState.SetTimestamp(d.timestamp)
-	baseState.SetCurrentSupply(d.currentSupply)
-	for subnetID, supply := range d.subnetSupplies {
-		baseState.SetCurrentSubnetSupply(subnetID, supply)
+	for subnetID, supply := range d.currentSupply {
+		baseState.SetCurrentSupply(subnetID, supply)
 	}
 	for _, subnetValidatorDiffs := range d.currentStakerDiffs.validatorDiffs {
 		for _, validatorDiff := range subnetValidatorDiffs {

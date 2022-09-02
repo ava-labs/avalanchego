@@ -62,7 +62,6 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
 	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
-	onParentAccept.EXPECT().GetCurrentSupply().Return(uint64(1000)).AnyTimes()
 
 	// wrong height
 	apricotChildBlk, err := blocks.NewApricotStandardBlock(
@@ -146,7 +145,6 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 	pendingIt.EXPECT().Release().Return().AnyTimes()
 	onParentAccept.EXPECT().GetPendingStakerIterator().Return(pendingIt, nil).AnyTimes()
 
-	onParentAccept.EXPECT().GetCurrentSupply().Return(uint64(1000)).AnyTimes()
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 
 	txID := ids.GenerateTestID()

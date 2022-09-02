@@ -227,33 +227,19 @@ func (mr *MockDiffMockRecorder) GetCurrentStakerIterator() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentStakerIterator", reflect.TypeOf((*MockDiff)(nil).GetCurrentStakerIterator))
 }
 
-// GetCurrentSubnetSupply mocks base method.
-func (m *MockDiff) GetCurrentSubnetSupply(arg0 ids.ID) (uint64, error) {
+// GetCurrentSupply mocks base method.
+func (m *MockDiff) GetCurrentSupply(arg0 ids.ID) (uint64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetCurrentSubnetSupply", arg0)
+	ret := m.ctrl.Call(m, "GetCurrentSupply", arg0)
 	ret0, _ := ret[0].(uint64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetCurrentSubnetSupply indicates an expected call of GetCurrentSubnetSupply.
-func (mr *MockDiffMockRecorder) GetCurrentSubnetSupply(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentSubnetSupply", reflect.TypeOf((*MockDiff)(nil).GetCurrentSubnetSupply), arg0)
-}
-
-// GetCurrentSupply mocks base method.
-func (m *MockDiff) GetCurrentSupply() uint64 {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetCurrentSupply")
-	ret0, _ := ret[0].(uint64)
-	return ret0
-}
-
 // GetCurrentSupply indicates an expected call of GetCurrentSupply.
-func (mr *MockDiffMockRecorder) GetCurrentSupply() *gomock.Call {
+func (mr *MockDiffMockRecorder) GetCurrentSupply(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentSupply", reflect.TypeOf((*MockDiff)(nil).GetCurrentSupply))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentSupply", reflect.TypeOf((*MockDiff)(nil).GetCurrentSupply), arg0)
 }
 
 // GetCurrentValidator mocks base method.
@@ -454,28 +440,16 @@ func (mr *MockDiffMockRecorder) PutPendingValidator(arg0 interface{}) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutPendingValidator", reflect.TypeOf((*MockDiff)(nil).PutPendingValidator), arg0)
 }
 
-// SetCurrentSubnetSupply mocks base method.
-func (m *MockDiff) SetCurrentSubnetSupply(arg0 ids.ID, arg1 uint64) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetCurrentSubnetSupply", arg0, arg1)
-}
-
-// SetCurrentSubnetSupply indicates an expected call of SetCurrentSubnetSupply.
-func (mr *MockDiffMockRecorder) SetCurrentSubnetSupply(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentSubnetSupply", reflect.TypeOf((*MockDiff)(nil).SetCurrentSubnetSupply), arg0, arg1)
-}
-
 // SetCurrentSupply mocks base method.
-func (m *MockDiff) SetCurrentSupply(arg0 uint64) {
+func (m *MockDiff) SetCurrentSupply(arg0 ids.ID, arg1 uint64) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetCurrentSupply", arg0)
+	m.ctrl.Call(m, "SetCurrentSupply", arg0, arg1)
 }
 
 // SetCurrentSupply indicates an expected call of SetCurrentSupply.
-func (mr *MockDiffMockRecorder) SetCurrentSupply(arg0 interface{}) *gomock.Call {
+func (mr *MockDiffMockRecorder) SetCurrentSupply(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentSupply", reflect.TypeOf((*MockDiff)(nil).SetCurrentSupply), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCurrentSupply", reflect.TypeOf((*MockDiff)(nil).SetCurrentSupply), arg0, arg1)
 }
 
 // SetTimestamp mocks base method.

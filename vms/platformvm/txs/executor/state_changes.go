@@ -73,11 +73,7 @@ type stateChanges struct {
 
 func (s *stateChanges) Apply(stateDiff state.Diff) {
 	for subnetID, supply := range s.updatedSupplies {
-		if subnetID == constants.PrimaryNetworkID {
-			stateDiff.SetCurrentSupply(supply)
-		} else {
-			stateDiff.SetCurrentSubnetSupply(subnetID, supply)
-		}
+		stateDiff.SetCurrentSupply(subnetID, supply)
 	}
 
 	for _, currentValidatorToAdd := range s.currentValidatorsToAdd {
@@ -147,13 +143,9 @@ func AdvanceTimeTo(
 
 		supply, ok := changes.updatedSupplies[stakerToRemove.SubnetID]
 		if !ok {
-			if stakerToRemove.SubnetID == constants.PrimaryNetworkID {
-				supply = parentState.GetCurrentSupply()
-			} else {
-				supply, err = parentState.GetCurrentSubnetSupply(stakerToRemove.SubnetID)
-				if err != nil {
-					return nil, err
-				}
+			supply, err = parentState.GetCurrentSupply(stakerToRemove.SubnetID)
+			if err != nil {
+				return nil, err
 			}
 		}
 

@@ -110,7 +110,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 		EndTime:   chainTime,
 	}, nil)
 	onParentAccept.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
-	onParentAccept.EXPECT().GetCurrentSupply().Return(uint64(1000)).AnyTimes()
+	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
 
 	env.mockedState.EXPECT().GetUptime(gomock.Any()).Return(
 		time.Duration(1000), /*upDuration*/
@@ -173,7 +173,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 
 	onParentAccept := state.NewMockDiff(ctrl)
 	onParentAccept.EXPECT().GetTimestamp().Return(parentTime).AnyTimes()
-	onParentAccept.EXPECT().GetCurrentSupply().Return(uint64(1000)).AnyTimes()
+	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
 
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
 		statelessBlock: blueberryParentBlk,

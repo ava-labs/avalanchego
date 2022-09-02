@@ -847,17 +847,23 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 	return nil
 }
 
+// GetCurrentSupplyArgs are the arguments for calling GetCurrentSupply
+type GetCurrentSupplyArgs struct {
+	SubnetID ids.ID `json:"subnetID"`
+}
+
 // GetCurrentSupplyReply are the results from calling GetCurrentSupply
 type GetCurrentSupplyReply struct {
 	Supply json.Uint64 `json:"supply"`
 }
 
 // GetCurrentSupply returns an upper bound on the supply of AVAX in the system
-func (service *Service) GetCurrentSupply(_ *http.Request, _ *struct{}, reply *GetCurrentSupplyReply) error {
+func (service *Service) GetCurrentSupply(_ *http.Request, args *GetCurrentSupplyArgs, reply *GetCurrentSupplyReply) error {
 	service.vm.ctx.Log.Debug("Platform: GetCurrentSupply called")
 
-	reply.Supply = json.Uint64(service.vm.state.GetCurrentSupply())
-	return nil
+	supply, err := service.vm.state.GetCurrentSupply(args.SubnetID)
+	reply.Supply = json.Uint64(supply)
+	return err
 }
 
 // SampleValidatorsArgs are the arguments for calling SampleValidators

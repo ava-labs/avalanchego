@@ -1777,7 +1777,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 					env.unsignedTx, env.state, env.unsignedTx.Ins, env.unsignedTx.Outs, env.tx.Creds[:len(env.tx.Creds)-1], gomock.Any(),
 				).Return(nil).Times(1)
 				env.state.EXPECT().AddSubnetTransformation(env.tx)
-				env.state.EXPECT().SetCurrentSubnetSupply(env.unsignedTx.Subnet, env.unsignedTx.InitialSupply)
+				env.state.EXPECT().SetCurrentSupply(env.unsignedTx.Subnet, env.unsignedTx.InitialSupply)
 				env.state.EXPECT().DeleteUTXO(gomock.Any()).Times(len(env.unsignedTx.Ins))
 				env.state.EXPECT().AddUTXO(gomock.Any()).Times(len(env.unsignedTx.Outs))
 				e := &StandardTxExecutor{

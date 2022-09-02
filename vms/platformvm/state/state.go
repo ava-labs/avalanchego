@@ -86,11 +86,8 @@ type Chain interface {
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)
 
-	GetCurrentSupply() uint64
-	SetCurrentSupply(cs uint64)
-
-	GetCurrentSubnetSupply(subnetID ids.ID) (uint64, error)
-	SetCurrentSubnetSupply(subnetID ids.ID, cs uint64)
+	GetCurrentSupply(subnetID ids.ID) (uint64, error)
+	SetCurrentSupply(subnetID ids.ID, cs uint64)
 
 	GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error)
 	AddRewardUTXO(txID ids.ID, utxo *avax.UTXO)
@@ -858,12 +855,14 @@ func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 
 func (s *state) GetTimestamp() time.Time             { return s.timestamp }
 func (s *state) SetTimestamp(tm time.Time)           { s.timestamp = tm }
-func (s *state) GetCurrentSupply() uint64            { return s.currentSupply }
-func (s *state) SetCurrentSupply(cs uint64)          { s.currentSupply = cs }
 func (s *state) GetLastAccepted() ids.ID             { return s.lastAccepted }
 func (s *state) SetLastAccepted(lastAccepted ids.ID) { s.lastAccepted = lastAccepted }
 
-func (s *state) GetCurrentSubnetSupply(subnetID ids.ID) (uint64, error) {
+func (s *state) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
+	if subnetID == constants.PrimaryNetworkID {
+		return s.currentSupply, nil
+	}
+
 	supply, ok := s.modifiedSupplies[subnetID]
 	if ok {
 		return supply, nil
@@ -890,8 +889,12 @@ func (s *state) GetCurrentSubnetSupply(subnetID ids.ID) (uint64, error) {
 	return supply, nil
 }
 
-func (s *state) SetCurrentSubnetSupply(subnetID ids.ID, cs uint64) {
-	s.modifiedSupplies[subnetID] = cs
+func (s *state) SetCurrentSupply(subnetID ids.ID, cs uint64) {
+	if subnetID == constants.PrimaryNetworkID {
+		s.currentSupply = cs
+	} else {
+		s.modifiedSupplies[subnetID] = cs
+	}
 }
 
 func (s *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error) {
@@ -961,7 +964,7 @@ func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) err
 	genesisBlkID := genesisBlk.ID()
 	s.SetLastAccepted(genesisBlkID)
 	s.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
-	s.SetCurrentSupply(genesis.InitialSupply)
+	s.SetCurrentSupply(constants.PrimaryNetworkID, genesis.InitialSupply)
 	s.AddStatelessBlock(genesisBlk, choices.Accepted)
 
 	// Persist UTXOs that exist at genesis
@@ -978,7 +981,10 @@ func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) err
 
 		stakeAmount := tx.Validator.Wght
 		stakeDuration := tx.Validator.Duration()
-		currentSupply := s.GetCurrentSupply()
+		currentSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
+		if err != nil {
+			return err
+		}
 
 		potentialReward := s.rewards.Calculate(
 			stakeDuration,
@@ -993,7 +999,7 @@ func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) err
 		staker := NewCurrentStaker(vdrTx.ID(), tx, potentialReward)
 		s.PutCurrentValidator(staker)
 		s.AddTx(vdrTx, status.Committed)
-		s.SetCurrentSupply(newCurrentSupply)
+		s.SetCurrentSupply(constants.PrimaryNetworkID, newCurrentSupply)
 	}
 
 	for _, chain := range genesis.Chains {
@@ -1038,7 +1044,7 @@ func (s *state) loadMetadata() error {
 		return err
 	}
 	s.persistedCurrentSupply = currentSupply
-	s.SetCurrentSupply(currentSupply)
+	s.SetCurrentSupply(constants.PrimaryNetworkID, currentSupply)
 
 	lastAccepted, err := database.GetID(s.singletonDB, lastAcceptedKey)
 	if err != nil {
