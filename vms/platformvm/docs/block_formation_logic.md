@@ -75,15 +75,16 @@ Blueberry allows the following block types with the following content:
   - RewardValidatorTx
 - _Options blocks_, i.e. _Commit Block_ and _Abort Block_ do not contain any transactions.
 
-Note that each block has an header containing:
+Note that each block has a header containing:
 
 - ParentID
 - Height
 - Time
 
-So the two main differences with respect to Apricot are:
+So the main differences with respect to Apricot are:
 
 - _AddValidatorTx_, _AddDelegatorTx_, _AddSubnetValidatorTx_ are included into Standard Blocks rather than Proposal Blocks so that they don't need to be voted on (i.e. followed by a Commit/Abort Block).
+- New Transaction types: _RemoveSubnetValidatorTx_, _TransformSubnetTx_, _AddPermissionlessValidatorTx_, _AddPermissionlessDelegatorTx_ have been added into Standard Blocks.
 - Block timestamp is explicitly serialized into block header, to allow chain time update.
 
 ### Blueberry Block Formation Logic
