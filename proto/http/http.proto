@@ -63,8 +63,6 @@ message Certificates {
 
 // ConnectionState is tls.ConnectionState see: https://pkg.go.dev/crypto/tls#ConnectionState
 message ConnectionState {
-  // reserved fields ids have been removed and should not be reused
-  reserved 6, 12;
   // version is the TLS version used by the connection (e.g. VersionTLS12)
   uint32 version = 1;
   // handshake_complete is true if the handshake has concluded
@@ -78,20 +76,20 @@ message ConnectionState {
   string negotiated_protocol = 5;
   // server_name is the value of the Server Name Indication extension sent by
   // the client
-  string server_name = 7;
+  string server_name = 6;
   // peer_certificates are the parsed certificates sent by the peer, in the
   // order in which they were sent
-  Certificates peer_certificates = 8;
+  Certificates peer_certificates = 7;
   // verified_chains is a list of one or more chains where the first element is
   // PeerCertificates[0] and the last element is from Config.RootCAs (on the
   // client side) or Config.ClientCAs (on the server side).
-  repeated Certificates verified_chains = 9;
+  repeated Certificates verified_chains = 8;
   // signed_certificate_timestamps is a list of SCTs provided by the peer
   // through the TLS handshake for the leaf certificate, if any
-  repeated bytes signed_certificate_timestamps = 10;
+  repeated bytes signed_certificate_timestamps = 9;
   // ocsp_response is a stapled Online Certificate Status Protocol (OCSP)
   // response provided by the peer for the leaf certificate, if any.
-  bytes ocsp_response = 11;
+  bytes ocsp_response = 10;
 }
 
 // Request is an http.Request see: https://pkg.go.dev/net/http#Request
@@ -137,15 +135,11 @@ message Request {
 }
 
 message ResponseWriter {
-  // reserved for backward compatibility
-  // avalanchego <=v1.7.9 used the field "1" as an id to identify the gRPC server
-  // address which served the Writer service via the now removed service broker
-  reserved 1;
   // header returns the header map that will be sent by
   // WriteHeader.
-  repeated Element header = 2;
+  repeated Element header = 1;
   // server_addr is the address of the gRPC server hosting the Writer service
-  string server_addr = 3;
+  string server_addr = 2;
 }
 
 message HTTPRequest {
