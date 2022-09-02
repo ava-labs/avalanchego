@@ -24,7 +24,7 @@ type RemoveSubnetValidatorTx struct {
 	// The node to remove from the subnet.
 	NodeID ids.NodeID `serialize:"true" json:"nodeID"`
 	// The subnet to remove the node from.
-	Subnet ids.ID `serialize:"true" json:"subnet"`
+	Subnet ids.ID `serialize:"true" json:"subnetID"`
 	// Proves that the issuer has the right to remove the node from the subnet.
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }

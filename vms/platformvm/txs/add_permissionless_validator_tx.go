@@ -36,7 +36,7 @@ type AddPermissionlessValidatorTx struct {
 	// Describes the validator
 	Validator validator.Validator `serialize:"true" json:"validator"`
 	// ID of the subnet this validator is validating
-	Subnet ids.ID `serialize:"true" json:"subnet"`
+	Subnet ids.ID `serialize:"true" json:"subnetID"`
 	// Where to send staked tokens when done validating
 	StakeOuts []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send validation rewards when done validating
