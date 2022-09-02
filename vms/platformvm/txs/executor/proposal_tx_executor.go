@@ -334,6 +334,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 
 		stake := uStakerTx.Stake()
 		outputs := uStakerTx.Outputs()
+		// Invariant: The staked asset must be equal to the reward asset.
 		stakeAsset := stake[0].Asset
 
 		// Refund the stake here
@@ -374,6 +375,9 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 			e.OnCommitState.AddUTXO(utxo)
 			e.OnCommitState.AddRewardUTXO(tx.TxID, utxo)
 		}
+
+		// Invariant: A [txs.DelegatorTx] does not also implement the
+		//            [txs.ValidatorTx] interface.
 	case txs.DelegatorTx:
 		e.OnCommitState.DeleteCurrentDelegator(stakerToRemove)
 		e.OnAbortState.DeleteCurrentDelegator(stakerToRemove)
@@ -419,6 +423,10 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 			)
 		}
 
+		// Invariant: Delegators must only be able to reference validator
+		//            transactions that implement [txs.ValidatorTx]. All
+		//            validator transactions implement this interface except the
+		//            AddSubnetValidatorTx.
 		vdrTx, ok := vdrTxIntf.Unsigned.(txs.ValidatorTx)
 		if !ok {
 			return errWrongTxType
@@ -487,6 +495,10 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 			e.OnCommitState.AddRewardUTXO(tx.TxID, utxo)
 		}
 	default:
+		// Invariant: Permissioned stakers are removed by the advancement of
+		//            time and the current chain timestamp is == this staker's
+		//            EndTime. This means only permissionless stakers should be
+		//            left in the staker set.
 		return errShouldBePermissionlessStaker
 	}
 

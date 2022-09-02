@@ -385,3 +385,9 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 		require.Error(err)
 	})
 }
+
+func TestAddPermissionlessDelegatorTxNotValidatorTx(t *testing.T) {
+	txIntf := any((*AddPermissionlessDelegatorTx)(nil))
+	_, ok := txIntf.(ValidatorTx)
+	require.False(t, ok)
+}

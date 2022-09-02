@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -36,6 +35,7 @@ var (
 	errTimestampNotBeforeStartTime     = errors.New("chain timestamp not before start time")
 	errDuplicateValidator              = errors.New("duplicate validator")
 	errDelegateToPermissionedValidator = errors.New("delegation to permissioned validator")
+	errWrongStakedAssetID              = errors.New("incorrect staked assetID")
 )
 
 // verifyAddValidatorTx carries out the validation for an AddValidatorTx.
@@ -434,12 +434,13 @@ func verifyAddPermissionlessValidatorTx(
 		)
 	}
 
-	validatorRules, err := getValidatorRules(backend.Config, chainState, tx.Subnet)
+	validatorRules, err := getValidatorRules(backend, chainState, tx.Subnet)
 	if err != nil {
 		return err
 	}
 
 	duration := tx.Validator.Duration()
+	stakedAssetID := tx.StakeOuts[0].AssetID()
 	switch {
 	case tx.Validator.Wght < validatorRules.minValidatorStake:
 		// Ensure validator is staking at least the minimum amount
@@ -460,6 +461,15 @@ func verifyAddPermissionlessValidatorTx(
 	case duration > validatorRules.maxStakeDuration:
 		// Ensure staking length is not too long
 		return errStakeTooLong
+
+	case stakedAssetID != validatorRules.assetID:
+		// Wrong assetID used
+		return fmt.Errorf(
+			"%w: %s != %s",
+			errWrongStakedAssetID,
+			validatorRules.assetID,
+			stakedAssetID,
+		)
 	}
 
 	_, err = GetValidator(chainState, tx.Subnet, tx.Validator.NodeID)
@@ -531,6 +541,7 @@ func verifyAddPermissionlessValidatorTx(
 }
 
 type addValidatorRules struct {
+	assetID           ids.ID
 	minValidatorStake uint64
 	maxValidatorStake uint64
 	minStakeDuration  time.Duration
@@ -539,17 +550,18 @@ type addValidatorRules struct {
 }
 
 func getValidatorRules(
-	config *config.Config,
+	backend *Backend,
 	chainState state.Chain,
 	subnetID ids.ID,
 ) (*addValidatorRules, error) {
 	if subnetID == constants.PrimaryNetworkID {
 		return &addValidatorRules{
-			minValidatorStake: config.MinValidatorStake,
-			maxValidatorStake: config.MaxValidatorStake,
-			minStakeDuration:  config.MinStakeDuration,
-			maxStakeDuration:  config.MaxStakeDuration,
-			minDelegationFee:  config.MinDelegationFee,
+			assetID:           backend.Ctx.AVAXAssetID,
+			minValidatorStake: backend.Config.MinValidatorStake,
+			maxValidatorStake: backend.Config.MaxValidatorStake,
+			minStakeDuration:  backend.Config.MinStakeDuration,
+			maxStakeDuration:  backend.Config.MaxStakeDuration,
+			minDelegationFee:  backend.Config.MinDelegationFee,
 		}, nil
 	}
 
@@ -563,6 +575,7 @@ func getValidatorRules(
 	}
 
 	return &addValidatorRules{
+		assetID:           transformSubnet.AssetID,
 		minValidatorStake: transformSubnet.MinValidatorStake,
 		maxValidatorStake: transformSubnet.MaxValidatorStake,
 		minStakeDuration:  time.Duration(transformSubnet.MinStakeDuration) * time.Second,
@@ -605,6 +618,7 @@ func verifyAddPermissionlessDelegatorTx(
 	}
 
 	duration := tx.Validator.Duration()
+	stakedAssetID := tx.StakeOuts[0].AssetID()
 	switch {
 	case tx.Validator.Wght < delegatorRules.minDelegatorStake:
 		// Ensure delegator is staking at least the minimum amount
@@ -617,6 +631,15 @@ func verifyAddPermissionlessDelegatorTx(
 	case duration > delegatorRules.maxStakeDuration:
 		// Ensure staking length is not too long
 		return errStakeTooLong
+
+	case stakedAssetID != delegatorRules.assetID:
+		// Wrong assetID used
+		return fmt.Errorf(
+			"%w: %s != %s",
+			errWrongStakedAssetID,
+			delegatorRules.assetID,
+			stakedAssetID,
+		)
 	}
 
 	validator, err := GetValidator(chainState, tx.Subnet, tx.Validator.NodeID)
@@ -654,6 +677,12 @@ func verifyAddPermissionlessDelegatorTx(
 
 	var txFee uint64
 	if tx.Subnet != constants.PrimaryNetworkID {
+		// Invariant: Delegators must only be able to reference validator
+		//            transactions that implement [txs.ValidatorTx]. All
+		//            validator transactions implement this interface except the
+		//            AddSubnetValidatorTx. AddSubnetValidatorTx is the only
+		//            permissioned validator, so we verify this delegator is
+		//            pointing to a permissionless validator.
 		if validator.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
 			validator.Priority == txs.SubnetPermissionedValidatorPendingPriority {
 			return errDelegateToPermissionedValidator
@@ -689,6 +718,7 @@ func verifyAddPermissionlessDelegatorTx(
 }
 
 type addDelegatorRules struct {
+	assetID                  ids.ID
 	minDelegatorStake        uint64
 	maxValidatorStake        uint64
 	minStakeDuration         time.Duration
@@ -703,6 +733,7 @@ func getDelegatorRules(
 ) (*addDelegatorRules, error) {
 	if subnetID == constants.PrimaryNetworkID {
 		return &addDelegatorRules{
+			assetID:                  backend.Ctx.AVAXAssetID,
 			minDelegatorStake:        backend.Config.MinDelegatorStake,
 			maxValidatorStake:        backend.Config.MaxValidatorStake,
 			minStakeDuration:         backend.Config.MinStakeDuration,
@@ -721,6 +752,7 @@ func getDelegatorRules(
 	}
 
 	return &addDelegatorRules{
+		assetID:                  transformSubnet.AssetID,
 		minDelegatorStake:        transformSubnet.MinDelegatorStake,
 		maxValidatorStake:        transformSubnet.MaxValidatorStake,
 		minStakeDuration:         time.Duration(transformSubnet.MinStakeDuration) * time.Second,

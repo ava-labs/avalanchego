@@ -10,7 +10,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -135,10 +134,11 @@ func AdvanceTimeTo(
 		stakerToAdd.Priority = txs.PendingToCurrentPriorities[stakerToRemove.Priority]
 
 		if stakerToRemove.Priority == txs.SubnetPermissionedValidatorPendingPriority {
-			// We require that the [txTimestamp] <= [nextStakerChangeTime].
-			// Additionally, the minimum stake duration is > 0. This means we
-			// know that the staker we are adding here should never be attempted
-			// to be removed in the following loop.
+			// Invariant: [txTimestamp] <= [nextStakerChangeTime].
+			// Invariant: minimum stake duration is > 0.
+			//
+			// Both of the above invariants ensure the staker we are adding here
+			// should never be attempted to be removed in the following loop.
 
 			changes.currentValidatorsToAdd = append(changes.currentValidatorsToAdd, &stakerToAdd)
 			changes.pendingValidatorsToRemove = append(changes.pendingValidatorsToRemove, stakerToRemove)
@@ -169,11 +169,9 @@ func AdvanceTimeTo(
 		)
 		stakerToAdd.PotentialReward = potentialReward
 
-		supply, err = math.Add64(supply, potentialReward)
-		if err != nil {
-			return nil, err
-		}
-		changes.updatedSupplies[stakerToRemove.SubnetID] = supply
+		// Invariant: [rewards.Calculate] can never return a [potentialReward]
+		//            such that [supply + potentialReward > maximumSupply].
+		changes.updatedSupplies[stakerToRemove.SubnetID] = supply + potentialReward
 
 		switch stakerToRemove.Priority {
 		case txs.PrimaryNetworkValidatorPendingPriority, txs.SubnetPermissionlessValidatorPendingPriority:
@@ -201,6 +199,8 @@ func AdvanceTimeTo(
 			break
 		}
 
+		// Invariant: Permissioned stakers are encountered first for a given
+		//            timestamp because their priority is the smallest.
 		if stakerToRemove.Priority != txs.SubnetPermissionedValidatorCurrentPriority {
 			// Permissionless stakers are removed by the RewardValidatorTx, not
 			// an AdvanceTimeTx.

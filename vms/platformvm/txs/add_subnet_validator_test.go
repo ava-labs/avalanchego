@@ -209,3 +209,15 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 	require.NoError(parsedTx.SyntacticVerify(ctx))
 	require.Equal(stx, parsedTx)
 }
+
+func TestAddSubnetValidatorTxNotValidatorTx(t *testing.T) {
+	txIntf := any((*AddSubnetValidatorTx)(nil))
+	_, ok := txIntf.(ValidatorTx)
+	require.False(t, ok)
+}
+
+func TestAddSubnetValidatorTxNotDelegatorTx(t *testing.T) {
+	txIntf := any((*AddSubnetValidatorTx)(nil))
+	_, ok := txIntf.(ValidatorTx)
+	require.False(t, ok)
+}

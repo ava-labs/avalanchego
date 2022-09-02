@@ -454,6 +454,9 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		tx.Ins,
 		tx.Outs,
 		baseTxCreds,
+		// Invariant: [tx.AssetID != e.Ctx.AVAXAssetID]. This prevents the first
+		//            entry in this map literal from being overwritten by the
+		//            second entry.
 		map[ids.ID]uint64{
 			e.Ctx.AVAXAssetID: e.Config.TransformSubnetTxFee,
 			tx.AssetID:        totalRewardAmount,
