@@ -147,12 +147,15 @@ func (c *codec) Pack(
 	if p.Err != nil {
 		return nil, p.Err
 	}
-	msg := &outboundMessage{
-		op:               op,
-		bytes:            p.Bytes,
-		refs:             1,
-		c:                c,
-		bypassThrottling: bypassThrottling,
+	msg := &outboundMessageWithPacker{
+		outboundMessage: outboundMessage{
+			op:               op,
+			bytes:            p.Bytes,
+			bypassThrottling: bypassThrottling,
+		},
+
+		refs: 1,
+		c:    c,
 	}
 	if !compress {
 		return msg, nil
