@@ -10,24 +10,24 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
-func ExampleStartTestPeer() {
+func main() {
 	ctx := context.Background()
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
 	peerIP := ips.IPPort{
-		IP:   net.IPv6loopback,
+		IP:   net.ParseIP("54.94.43.49"),
 		Port: 9651,
 	}
-	peer, err := StartTestPeer(
+	peer, err := peer.StartTestPeer(
 		ctx,
 		peerIP,
-		constants.LocalID,
+		1,
 		router.InboundHandlerFunc(func(msg message.InboundMessage) {
 			fmt.Printf("handling %s\n", msg.Op())
 		}),
