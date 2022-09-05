@@ -1,11 +1,19 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
 
-import "crypto/tls"
+import (
+	"crypto/tls"
+	"io"
+)
 
-func TLSConfig(cert tls.Certificate) *tls.Config {
+// TLSConfig returns the TLS config that will allow secure connections to other
+// peers.
+//
+// It is safe, and typically expected, for [keyLogWriter] to be [nil].
+// [keyLogWriter] should only be enabled for debugging.
+func TLSConfig(cert tls.Certificate, keyLogWriter io.Writer) *tls.Config {
 	// #nosec G402
 	return &tls.Config{
 		Certificates: []tls.Certificate{cert},
@@ -18,5 +26,6 @@ func TLSConfig(cert tls.Certificate) *tls.Config {
 		// and confirmed to be safe and correct.
 		InsecureSkipVerify: true,
 		MinVersion:         tls.VersionTLS13,
+		KeyLogWriter:       keyLogWriter,
 	}
 }

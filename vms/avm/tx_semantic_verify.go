@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -98,7 +98,7 @@ func (t *txSemanticVerify) ExportTx(tx *txs.ExportTx) error {
 		}
 
 		assetID := out.AssetID()
-		if now.Before(t.vm.BlueberryTime) {
+		if !t.vm.IsBlueberryActivated(now) {
 			// TODO: Remove this check once the Blueberry network upgrade is
 			//       complete.
 			//

@@ -4,9 +4,10 @@
 package executor
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -28,8 +29,7 @@ type backend struct {
 	blkIDToState map[ids.ID]*blockState
 	state        state.State
 
-	ctx          *snow.Context
-	bootstrapped *utils.AtomicBool
+	ctx *snow.Context
 }
 
 func (b *backend) GetState(blkID ids.ID) (state.Chain, bool) {
@@ -45,6 +45,22 @@ func (b *backend) GetState(blkID ids.ID) (state.Chain, bool) {
 	// Note: If the last accepted block is a proposal block, we will have
 	//       returned in the above if statement.
 	return b.state, blkID == b.state.GetLastAccepted()
+}
+
+func (b *backend) getOnAbortState(blkID ids.ID) (state.Diff, bool) {
+	state, ok := b.blkIDToState[blkID]
+	if !ok || state.onAbortState == nil {
+		return nil, false
+	}
+	return state.onAbortState, true
+}
+
+func (b *backend) getOnCommitState(blkID ids.ID) (state.Diff, bool) {
+	state, ok := b.blkIDToState[blkID]
+	if !ok || state.onCommitState == nil {
+		return nil, false
+	}
+	return state.onCommitState, true
 }
 
 func (b *backend) GetBlock(blkID ids.ID) (blocks.Block, error) {
@@ -63,4 +79,19 @@ func (b *backend) LastAccepted() ids.ID {
 
 func (b *backend) free(blkID ids.ID) {
 	delete(b.blkIDToState, blkID)
+}
+
+func (b *backend) getTimestamp(blkID ids.ID) time.Time {
+	// Check if the block is processing.
+	// If the block is processing, then we are guaranteed to have populated its
+	// timestamp in its state.
+	if blkState, ok := b.blkIDToState[blkID]; ok {
+		return blkState.timestamp
+	}
+
+	// The block isn't processing.
+	// According to the snowman.Block interface, the last accepted
+	// block is the only accepted block that must return a correct timestamp,
+	// so we just return the chain time.
+	return b.state.GetTimestamp()
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -143,7 +143,7 @@ func newEnvironment() *environment {
 
 	txBuilder := builder.New(
 		ctx,
-		config,
+		&config,
 		&clk,
 		fx,
 		baseState,
@@ -253,7 +253,7 @@ func defaultState(
 	if err := state.Commit(); err != nil {
 		panic(err)
 	}
-
+	lastAcceptedID = state.GetLastAccepted()
 	return state
 }
 
@@ -303,6 +303,7 @@ func defaultConfig() config.Config {
 		},
 		ApricotPhase3Time: defaultValidateEndTime,
 		ApricotPhase5Time: defaultValidateEndTime,
+		BlueberryTime:     mockable.MaxTime,
 	}
 }
 
@@ -355,14 +356,14 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 		}
 	}
 
-	genesisValidators := make([]api.PrimaryValidator, len(preFundedKeys))
+	genesisValidators := make([]api.PermissionlessValidator, len(preFundedKeys))
 	for i, key := range preFundedKeys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
 		addr, err := address.FormatBech32(hrp, nodeID.Bytes())
 		if err != nil {
 			panic(err)
 		}
-		genesisValidators[i] = api.PrimaryValidator{
+		genesisValidators[i] = api.PermissionlessValidator{
 			Staker: api.Staker{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),

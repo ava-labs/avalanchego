@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package x
@@ -161,10 +161,10 @@ type builder struct {
 
 // NewBuilder returns a new transaction builder.
 //
-// - [addrs] is the set of addresses that the builder assumes can be used when
-//   signing the transactions in the future.
-// - [backend] provides the required access to the chain's context and state to
-//   build out the transactions.
+//   - [addrs] is the set of addresses that the builder assumes can be used when
+//     signing the transactions in the future.
+//   - [backend] provides the required access to the chain's context and state
+//     to build out the transactions.
 func NewBuilder(addrs ids.ShortSet, backend BuilderBackend) Builder {
 	return &builder{
 		addrs:   addrs,
@@ -269,7 +269,7 @@ func (b *builder) NewOperationTx(
 	options ...common.Option,
 ) (*txs.OperationTx, error) {
 	toBurn := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): b.backend.CreateAssetTxFee(),
+		b.backend.AVAXAssetID(): b.backend.BaseTxFee(),
 	}
 	ops := common.NewOptions(options)
 	inputs, outputs, err := b.spend(toBurn, ops)

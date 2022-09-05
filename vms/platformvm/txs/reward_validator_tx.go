@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -26,7 +26,7 @@ type RewardValidatorTx struct {
 	TxID ids.ID `serialize:"true" json:"txID"`
 
 	// Marks if this validator should be rewarded according to this node.
-	ShouldPreferCommit bool
+	ShouldPreferCommit bool `json:"-"`
 
 	unsignedBytes []byte // Unsigned byte representation of this data
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -34,7 +34,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	)
 
 	// Case : signed tx is nil
-	require.ErrorIs(stx.SyntacticVerify(ctx), errNilSignedTx)
+	require.ErrorIs(stx.SyntacticVerify(ctx), ErrNilSignedTx)
 
 	// Case : unsigned tx is nil
 	require.ErrorIs(addValidatorTx.SyntacticVerify(ctx), ErrNilTx)
@@ -88,13 +88,13 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 			End:    uint64(clk.Time().Add(time.Hour).Unix()),
 			Wght:   validatorWeight,
 		},
-		Stake: stakes,
+		StakeOuts: stakes,
 		RewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,
 			Threshold: 1,
 			Addrs:     []ids.ShortID{rewardAddress},
 		},
-		Shares: reward.PercentDenominator,
+		DelegationShares: reward.PercentDenominator,
 	}
 
 	// Case: valid tx
@@ -113,7 +113,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: Stake owner has no addresses
 	addValidatorTx.SyntacticallyVerified = false
-	addValidatorTx.Stake[0].
+	addValidatorTx.StakeOuts[0].
 		Out.(*stakeable.LockOut).
 		TransferableOut.(*secp256k1fx.TransferOutput).
 		Addrs = nil
@@ -121,7 +121,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
 	require.Error(err)
-	addValidatorTx.Stake = stakes
+	addValidatorTx.StakeOuts = stakes
 
 	// Case: Rewards owner has no addresses
 	addValidatorTx.SyntacticallyVerified = false
@@ -134,12 +134,12 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: Too many shares
 	addValidatorTx.SyntacticallyVerified = false
-	addValidatorTx.Shares++ // 1 more than max amount
+	addValidatorTx.DelegationShares++ // 1 more than max amount
 	stx, err = NewSigned(addValidatorTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
 	require.Error(err)
-	addValidatorTx.Shares--
+	addValidatorTx.DelegationShares--
 }
 
 func TestAddValidatorTxSyntacticVerifyNotAVAX(t *testing.T) {
@@ -205,16 +205,22 @@ func TestAddValidatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 			End:    uint64(clk.Time().Add(time.Hour).Unix()),
 			Wght:   validatorWeight,
 		},
-		Stake: stakes,
+		StakeOuts: stakes,
 		RewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,
 			Threshold: 1,
 			Addrs:     []ids.ShortID{rewardAddress},
 		},
-		Shares: reward.PercentDenominator,
+		DelegationShares: reward.PercentDenominator,
 	}
 
 	stx, err = NewSigned(addValidatorTx, Codec, signers)
 	require.NoError(err)
 	require.Error(stx.SyntacticVerify(ctx))
+}
+
+func TestAddValidatorTxNotDelegatorTx(t *testing.T) {
+	txIntf := any((*AddValidatorTx)(nil))
+	_, ok := txIntf.(DelegatorTx)
+	require.False(t, ok)
 }

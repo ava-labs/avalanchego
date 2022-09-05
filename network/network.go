@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -505,11 +505,20 @@ func (n *network) Dispatch() error {
 	for { // Continuously accept new connections
 		conn, err := n.listener.Accept() // Returns error when n.Close() is called
 		if err != nil {
-			if netErr, ok := err.(net.Error); ok && netErr.Temporary() {
-				// Sleep for a small amount of time to try to wait for the
-				// temporary error to go away.
-				time.Sleep(time.Millisecond)
-				continue
+			if netErr, ok := err.(net.Error); ok {
+				if netErr.Timeout() {
+					n.metrics.acceptFailed.WithLabelValues("timeout").Inc()
+				}
+
+				// TODO: deprecate "Temporary" and use "Timeout"
+				if netErr.Temporary() {
+					n.metrics.acceptFailed.WithLabelValues("temporary").Inc()
+
+					// Sleep for a small amount of time to try to wait for the
+					// temporary error to go away.
+					time.Sleep(time.Millisecond)
+					continue
+				}
 			}
 
 			n.peerConfig.Log.Debug("error during server accept",

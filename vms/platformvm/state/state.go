@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -51,20 +51,23 @@ var (
 
 	ErrDelegatorSubset = errors.New("delegator's time range must be a subset of the validator's time range")
 
-	blockPrefix           = []byte("block")
-	validatorsPrefix      = []byte("validators")
-	currentPrefix         = []byte("current")
-	pendingPrefix         = []byte("pending")
-	validatorPrefix       = []byte("validator")
-	delegatorPrefix       = []byte("delegator")
-	subnetValidatorPrefix = []byte("subnetValidator")
-	validatorDiffsPrefix  = []byte("validatorDiffs")
-	txPrefix              = []byte("tx")
-	rewardUTXOsPrefix     = []byte("rewardUTXOs")
-	utxoPrefix            = []byte("utxo")
-	subnetPrefix          = []byte("subnet")
-	chainPrefix           = []byte("chain")
-	singletonPrefix       = []byte("singleton")
+	blockPrefix             = []byte("block")
+	validatorsPrefix        = []byte("validators")
+	currentPrefix           = []byte("current")
+	pendingPrefix           = []byte("pending")
+	validatorPrefix         = []byte("validator")
+	delegatorPrefix         = []byte("delegator")
+	subnetValidatorPrefix   = []byte("subnetValidator")
+	subnetDelegatorPrefix   = []byte("subnetDelegator")
+	validatorDiffsPrefix    = []byte("validatorDiffs")
+	txPrefix                = []byte("tx")
+	rewardUTXOsPrefix       = []byte("rewardUTXOs")
+	utxoPrefix              = []byte("utxo")
+	subnetPrefix            = []byte("subnet")
+	transformedSubnetPrefix = []byte("transformedSubnet")
+	supplyPrefix            = []byte("supply")
+	chainPrefix             = []byte("chain")
+	singletonPrefix         = []byte("singleton")
 
 	timestampKey     = []byte("timestamp")
 	currentSupplyKey = []byte("current supply")
@@ -82,15 +85,22 @@ type Chain interface {
 
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)
-	GetCurrentSupply() uint64
-	SetCurrentSupply(cs uint64)
+
+	GetCurrentSupply(subnetID ids.ID) (uint64, error)
+	SetCurrentSupply(subnetID ids.ID, cs uint64)
 
 	GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error)
 	AddRewardUTXO(txID ids.ID, utxo *avax.UTXO)
+
 	GetSubnets() ([]*txs.Tx, error)
 	AddSubnet(createSubnetTx *txs.Tx)
+
+	GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error)
+	AddSubnetTransformation(transformSubnetTx *txs.Tx)
+
 	GetChains(subnetID ids.ID) ([]*txs.Tx, error)
 	AddChain(createChainTx *txs.Tx)
+
 	GetTx(txID ids.ID) (*txs.Tx, status.Status, error)
 	AddTx(tx *txs.Tx, status status.Status)
 }
@@ -148,9 +158,12 @@ type stateBlk struct {
  * | | |-. delegator
  * | | | '-. list
  * | | |   '-- txID -> potential reward
- * | | '-. subnetValidator
+ * | | |-. subnetValidator
+ * | | | '-. list
+ * | | |   '-- txID -> potential reward or nil
+ * | | '-. subnetDelegator
  * | |   '-. list
- * | |     '-- txID -> nil
+ * | |     '-- txID -> potential reward
  * | |-. pending
  * | | |-. validator
  * | | | '-. list
@@ -158,7 +171,10 @@ type stateBlk struct {
  * | | |-. delegator
  * | | | '-. list
  * | | |   '-- txID -> nil
- * | | '-. subnetValidator
+ * | | |-. subnetValidator
+ * | | | '-. list
+ * | | |   '-- txID -> nil
+ * | | '-. subnetDelegator
  * | |   '-. list
  * | |     '-- txID -> nil
  * | '-. diffs
@@ -216,6 +232,8 @@ type state struct {
 	currentDelegatorList         linkeddb.LinkedDB
 	currentSubnetValidatorBaseDB database.Database
 	currentSubnetValidatorList   linkeddb.LinkedDB
+	currentSubnetDelegatorBaseDB database.Database
+	currentSubnetDelegatorList   linkeddb.LinkedDB
 	pendingValidatorsDB          database.Database
 	pendingValidatorBaseDB       database.Database
 	pendingValidatorList         linkeddb.LinkedDB
@@ -223,6 +241,8 @@ type state struct {
 	pendingDelegatorList         linkeddb.LinkedDB
 	pendingSubnetValidatorBaseDB database.Database
 	pendingSubnetValidatorList   linkeddb.LinkedDB
+	pendingSubnetDelegatorBaseDB database.Database
+	pendingSubnetDelegatorList   linkeddb.LinkedDB
 
 	validatorDiffsCache cache.Cacher // cache of heightWithSubnet -> map[ids.ShortID]*ValidatorWeightDiff
 	validatorDiffsDB    database.Database
@@ -243,6 +263,14 @@ type state struct {
 	addedSubnets  []*txs.Tx
 	subnetBaseDB  database.Database
 	subnetDB      linkeddb.LinkedDB
+
+	transformedSubnets     map[ids.ID]*txs.Tx // map of subnetID -> transformSubnetTx
+	transformedSubnetCache cache.Cacher       // cache of subnetID -> transformSubnetTx if the entry is nil, it is not in the database
+	transformedSubnetDB    database.Database
+
+	modifiedSupplies map[ids.ID]uint64 // map of subnetID -> current supply
+	supplyCache      cache.Cacher      // cache of subnetID -> current supply if the entry is nil, it is not in the database
+	supplyDB         database.Database
 
 	addedChains  map[ids.ID][]*txs.Tx // maps subnetID -> the newly added chains to the subnet
 	chainCache   cache.Cacher         // cache of subnetID -> the chains after all local modifications []*txs.Tx
@@ -358,11 +386,13 @@ func new(
 	currentValidatorBaseDB := prefixdb.New(validatorPrefix, currentValidatorsDB)
 	currentDelegatorBaseDB := prefixdb.New(delegatorPrefix, currentValidatorsDB)
 	currentSubnetValidatorBaseDB := prefixdb.New(subnetValidatorPrefix, currentValidatorsDB)
+	currentSubnetDelegatorBaseDB := prefixdb.New(subnetDelegatorPrefix, currentValidatorsDB)
 
 	pendingValidatorsDB := prefixdb.New(pendingPrefix, validatorsDB)
 	pendingValidatorBaseDB := prefixdb.New(validatorPrefix, pendingValidatorsDB)
 	pendingDelegatorBaseDB := prefixdb.New(delegatorPrefix, pendingValidatorsDB)
 	pendingSubnetValidatorBaseDB := prefixdb.New(subnetValidatorPrefix, pendingValidatorsDB)
+	pendingSubnetDelegatorBaseDB := prefixdb.New(subnetDelegatorPrefix, pendingValidatorsDB)
 
 	validatorDiffsDB := prefixdb.New(validatorDiffsPrefix, validatorsDB)
 
@@ -401,6 +431,24 @@ func new(
 	}
 
 	subnetBaseDB := prefixdb.New(subnetPrefix, baseDB)
+
+	transformedSubnetCache, err := metercacher.New(
+		"transformed_subnet_cache",
+		metricsReg,
+		&cache.LRU{Size: chainCacheSize},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	supplyCache, err := metercacher.New(
+		"supply_cache",
+		metricsReg,
+		&cache.LRU{Size: chainCacheSize},
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	chainCache, err := metercacher.New(
 		"chain_cache",
@@ -445,6 +493,8 @@ func new(
 		currentDelegatorList:         linkeddb.NewDefault(currentDelegatorBaseDB),
 		currentSubnetValidatorBaseDB: currentSubnetValidatorBaseDB,
 		currentSubnetValidatorList:   linkeddb.NewDefault(currentSubnetValidatorBaseDB),
+		currentSubnetDelegatorBaseDB: currentSubnetDelegatorBaseDB,
+		currentSubnetDelegatorList:   linkeddb.NewDefault(currentSubnetDelegatorBaseDB),
 		pendingValidatorsDB:          pendingValidatorsDB,
 		pendingValidatorBaseDB:       pendingValidatorBaseDB,
 		pendingValidatorList:         linkeddb.NewDefault(pendingValidatorBaseDB),
@@ -452,6 +502,8 @@ func new(
 		pendingDelegatorList:         linkeddb.NewDefault(pendingDelegatorBaseDB),
 		pendingSubnetValidatorBaseDB: pendingSubnetValidatorBaseDB,
 		pendingSubnetValidatorList:   linkeddb.NewDefault(pendingSubnetValidatorBaseDB),
+		pendingSubnetDelegatorBaseDB: pendingSubnetDelegatorBaseDB,
+		pendingSubnetDelegatorList:   linkeddb.NewDefault(pendingSubnetDelegatorBaseDB),
 		validatorDiffsDB:             validatorDiffsDB,
 		validatorDiffsCache:          validatorDiffsCache,
 
@@ -469,6 +521,14 @@ func new(
 
 		subnetBaseDB: subnetBaseDB,
 		subnetDB:     linkeddb.NewDefault(subnetBaseDB),
+
+		transformedSubnets:     make(map[ids.ID]*txs.Tx),
+		transformedSubnetCache: transformedSubnetCache,
+		transformedSubnetDB:    prefixdb.New(transformedSubnetPrefix, baseDB),
+
+		modifiedSupplies: make(map[ids.ID]uint64),
+		supplyCache:      supplyCache,
+		supplyDB:         prefixdb.New(supplyPrefix, baseDB),
 
 		addedChains:  make(map[ids.ID][]*txs.Tx),
 		chainDB:      prefixdb.New(chainPrefix, baseDB),
@@ -578,6 +638,40 @@ func (s *state) AddSubnet(createSubnetTx *txs.Tx) {
 	if s.cachedSubnets != nil {
 		s.cachedSubnets = append(s.cachedSubnets, createSubnetTx)
 	}
+}
+
+func (s *state) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
+	if tx, exists := s.transformedSubnets[subnetID]; exists {
+		return tx, nil
+	}
+
+	if txIntf, cached := s.transformedSubnetCache.Get(subnetID); cached {
+		if txIntf == nil {
+			return nil, database.ErrNotFound
+		}
+		return txIntf.(*txs.Tx), nil
+	}
+
+	transformSubnetTxID, err := database.GetID(s.transformedSubnetDB, subnetID[:])
+	if err == database.ErrNotFound {
+		s.transformedSubnetCache.Put(subnetID, nil)
+		return nil, database.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	transformSubnetTx, _, err := s.GetTx(transformSubnetTxID)
+	if err != nil {
+		return nil, err
+	}
+	s.transformedSubnetCache.Put(subnetID, transformSubnetTx)
+	return transformSubnetTx, nil
+}
+
+func (s *state) AddSubnetTransformation(transformSubnetTxIntf *txs.Tx) {
+	transformSubnetTx := transformSubnetTxIntf.Unsigned.(*txs.TransformSubnetTx)
+	s.transformedSubnets[transformSubnetTx.Subnet] = transformSubnetTxIntf
 }
 
 func (s *state) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
@@ -761,10 +855,47 @@ func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 
 func (s *state) GetTimestamp() time.Time             { return s.timestamp }
 func (s *state) SetTimestamp(tm time.Time)           { s.timestamp = tm }
-func (s *state) GetCurrentSupply() uint64            { return s.currentSupply }
-func (s *state) SetCurrentSupply(cs uint64)          { s.currentSupply = cs }
 func (s *state) GetLastAccepted() ids.ID             { return s.lastAccepted }
 func (s *state) SetLastAccepted(lastAccepted ids.ID) { s.lastAccepted = lastAccepted }
+
+func (s *state) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
+	if subnetID == constants.PrimaryNetworkID {
+		return s.currentSupply, nil
+	}
+
+	supply, ok := s.modifiedSupplies[subnetID]
+	if ok {
+		return supply, nil
+	}
+
+	supplyIntf, ok := s.supplyCache.Get(subnetID)
+	if ok {
+		if supplyIntf == nil {
+			return 0, database.ErrNotFound
+		}
+		return supplyIntf.(uint64), nil
+	}
+
+	supply, err := database.GetUInt64(s.supplyDB, subnetID[:])
+	if err == database.ErrNotFound {
+		s.supplyCache.Put(subnetID, nil)
+		return 0, database.ErrNotFound
+	}
+	if err != nil {
+		return 0, err
+	}
+
+	s.supplyCache.Put(subnetID, supply)
+	return supply, nil
+}
+
+func (s *state) SetCurrentSupply(subnetID ids.ID, cs uint64) {
+	if subnetID == constants.PrimaryNetworkID {
+		s.currentSupply = cs
+	} else {
+		s.modifiedSupplies[subnetID] = cs
+	}
+}
 
 func (s *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error) {
 	prefixStruct := heightWithSubnet{
@@ -829,11 +960,11 @@ func (s *state) ValidatorSet(subnetID ids.ID) (validators.Set, error) {
 	return vdrs, nil
 }
 
-func (s *state) syncGenesis(genesisBlk *blocks.CommitBlock, genesis *genesis.State) error {
+func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) error {
 	genesisBlkID := genesisBlk.ID()
 	s.SetLastAccepted(genesisBlkID)
 	s.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
-	s.SetCurrentSupply(genesis.InitialSupply)
+	s.SetCurrentSupply(constants.PrimaryNetworkID, genesis.InitialSupply)
 	s.AddStatelessBlock(genesisBlk, choices.Accepted)
 
 	// Persist UTXOs that exist at genesis
@@ -850,7 +981,10 @@ func (s *state) syncGenesis(genesisBlk *blocks.CommitBlock, genesis *genesis.Sta
 
 		stakeAmount := tx.Validator.Wght
 		stakeDuration := tx.Validator.Duration()
-		currentSupply := s.GetCurrentSupply()
+		currentSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
+		if err != nil {
+			return err
+		}
 
 		potentialReward := s.rewards.Calculate(
 			stakeDuration,
@@ -862,14 +996,10 @@ func (s *state) syncGenesis(genesisBlk *blocks.CommitBlock, genesis *genesis.Sta
 			return err
 		}
 
-		staker := NewPrimaryNetworkStaker(vdrTx.ID(), &tx.Validator)
-		staker.PotentialReward = potentialReward
-		staker.NextTime = staker.EndTime
-		staker.Priority = PrimaryNetworkValidatorCurrentPriority
-
+		staker := NewCurrentStaker(vdrTx.ID(), tx, potentialReward)
 		s.PutCurrentValidator(staker)
 		s.AddTx(vdrTx, status.Committed)
-		s.SetCurrentSupply(newCurrentSupply)
+		s.SetCurrentSupply(constants.PrimaryNetworkID, newCurrentSupply)
 	}
 
 	for _, chain := range genesis.Chains {
@@ -914,7 +1044,7 @@ func (s *state) loadMetadata() error {
 		return err
 	}
 	s.persistedCurrentSupply = currentSupply
-	s.SetCurrentSupply(currentSupply)
+	s.SetCurrentSupply(constants.PrimaryNetworkID, currentSupply)
 
 	lastAccepted, err := database.GetID(s.singletonDB, lastAcceptedKey)
 	if err != nil {
@@ -950,67 +1080,18 @@ func (s *state) loadCurrentValidators() error {
 		}
 		uptime.lastUpdated = time.Unix(int64(uptime.LastUpdated), 0)
 
-		addValidatorTx, ok := tx.Unsigned.(*txs.AddValidatorTx)
+		stakerTx, ok := tx.Unsigned.(txs.Staker)
 		if !ok {
-			return fmt.Errorf("expected tx type *txs.AddValidatorTx but got %T", tx.Unsigned)
+			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 		}
 
-		staker := NewPrimaryNetworkStaker(txID, &addValidatorTx.Validator)
-		staker.PotentialReward = uptime.PotentialReward
-		staker.NextTime = staker.EndTime
-		staker.Priority = PrimaryNetworkValidatorCurrentPriority
-
+		staker := NewCurrentStaker(txID, stakerTx, uptime.PotentialReward)
 		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker
 
 		s.currentStakers.stakers.ReplaceOrInsert(staker)
 
-		s.uptimes[addValidatorTx.Validator.NodeID] = uptime
-	}
-
-	if err := validatorIt.Error(); err != nil {
-		return err
-	}
-
-	delegatorIt := s.currentDelegatorList.NewIterator()
-	defer delegatorIt.Release()
-	for delegatorIt.Next() {
-		txIDBytes := delegatorIt.Key()
-		txID, err := ids.ToID(txIDBytes)
-		if err != nil {
-			return err
-		}
-		tx, _, err := s.GetTx(txID)
-		if err != nil {
-			return err
-		}
-
-		potentialRewardBytes := delegatorIt.Value()
-		potentialReward, err := database.ParseUInt64(potentialRewardBytes)
-		if err != nil {
-			return err
-		}
-
-		addDelegatorTx, ok := tx.Unsigned.(*txs.AddDelegatorTx)
-		if !ok {
-			return fmt.Errorf("expected tx type *txs.AddDelegatorTx but got %T", tx.Unsigned)
-		}
-
-		staker := NewPrimaryNetworkStaker(txID, &addDelegatorTx.Validator)
-		staker.PotentialReward = potentialReward
-		staker.NextTime = staker.EndTime
-		staker.Priority = PrimaryNetworkDelegatorCurrentPriority
-
-		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
-		if validator.delegators == nil {
-			validator.delegators = btree.New(defaultTreeDegree)
-		}
-		validator.delegators.ReplaceOrInsert(staker)
-
-		s.currentStakers.stakers.ReplaceOrInsert(staker)
-	}
-	if err := delegatorIt.Error(); err != nil {
-		return err
+		s.uptimes[staker.NodeID] = uptime
 	}
 
 	subnetValidatorIt := s.currentSubnetValidatorList.NewIterator()
@@ -1026,21 +1107,77 @@ func (s *state) loadCurrentValidators() error {
 			return err
 		}
 
-		addSubnetValidatorTx, ok := tx.Unsigned.(*txs.AddSubnetValidatorTx)
-		if !ok {
-			return fmt.Errorf("expected tx type *txs.AddSubnetValidatorTx but got %T", tx.Unsigned)
+		// Because permissioned validators originally wrote their values as nil,
+		// we handle empty [potentialRewardBytes] as 0.
+		var potentialReward uint64
+		potentialRewardBytes := subnetValidatorIt.Value()
+		if len(potentialRewardBytes) > 0 {
+			potentialReward, err = database.ParseUInt64(potentialRewardBytes)
+			if err != nil {
+				return err
+			}
 		}
 
-		staker := NewSubnetStaker(txID, &addSubnetValidatorTx.Validator)
-		staker.NextTime = staker.EndTime
-		staker.Priority = SubnetValidatorCurrentPriority
+		stakerTx, ok := tx.Unsigned.(txs.Staker)
+		if !ok {
+			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
+		}
 
+		staker := NewCurrentStaker(txID, stakerTx, potentialReward)
 		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker
 
 		s.currentStakers.stakers.ReplaceOrInsert(staker)
 	}
-	return subnetValidatorIt.Error()
+
+	delegatorIt := s.currentDelegatorList.NewIterator()
+	defer delegatorIt.Release()
+
+	subnetDelegatorIt := s.currentSubnetDelegatorList.NewIterator()
+	defer subnetDelegatorIt.Release()
+
+	for _, delegatorIt := range []database.Iterator{delegatorIt, subnetDelegatorIt} {
+		for delegatorIt.Next() {
+			txIDBytes := delegatorIt.Key()
+			txID, err := ids.ToID(txIDBytes)
+			if err != nil {
+				return err
+			}
+			tx, _, err := s.GetTx(txID)
+			if err != nil {
+				return err
+			}
+
+			potentialRewardBytes := delegatorIt.Value()
+			potentialReward, err := database.ParseUInt64(potentialRewardBytes)
+			if err != nil {
+				return err
+			}
+
+			stakerTx, ok := tx.Unsigned.(txs.Staker)
+			if !ok {
+				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
+			}
+
+			staker := NewCurrentStaker(txID, stakerTx, potentialReward)
+			validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+			if validator.delegators == nil {
+				validator.delegators = btree.New(defaultTreeDegree)
+			}
+			validator.delegators.ReplaceOrInsert(staker)
+
+			s.currentStakers.stakers.ReplaceOrInsert(staker)
+		}
+	}
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		validatorIt.Error(),
+		subnetValidatorIt.Error(),
+		delegatorIt.Error(),
+		subnetDelegatorIt.Error(),
+	)
+	return errs.Err
 }
 
 func (s *state) loadPendingValidators() error {
@@ -1048,97 +1185,77 @@ func (s *state) loadPendingValidators() error {
 
 	validatorIt := s.pendingValidatorList.NewIterator()
 	defer validatorIt.Release()
-	for validatorIt.Next() {
-		txIDBytes := validatorIt.Key()
-		txID, err := ids.ToID(txIDBytes)
-		if err != nil {
-			return err
+
+	subnetValidatorIt := s.pendingSubnetValidatorList.NewIterator()
+	defer subnetValidatorIt.Release()
+
+	for _, validatorIt := range []database.Iterator{validatorIt, subnetValidatorIt} {
+		for validatorIt.Next() {
+			txIDBytes := validatorIt.Key()
+			txID, err := ids.ToID(txIDBytes)
+			if err != nil {
+				return err
+			}
+			tx, _, err := s.GetTx(txID)
+			if err != nil {
+				return err
+			}
+
+			stakerTx, ok := tx.Unsigned.(txs.Staker)
+			if !ok {
+				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
+			}
+
+			staker := NewPendingStaker(txID, stakerTx)
+			validator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+			validator.validator = staker
+
+			s.pendingStakers.stakers.ReplaceOrInsert(staker)
 		}
-		tx, _, err := s.GetTx(txID)
-		if err != nil {
-			return err
-		}
-
-		addValidatorTx, ok := tx.Unsigned.(*txs.AddValidatorTx)
-		if !ok {
-			return fmt.Errorf("expected tx type *txs.AddValidatorTx but got %T", tx.Unsigned)
-		}
-
-		staker := NewPrimaryNetworkStaker(txID, &addValidatorTx.Validator)
-		staker.NextTime = staker.StartTime
-		staker.Priority = PrimaryNetworkValidatorPendingPriority
-
-		validator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
-		validator.validator = staker
-
-		s.pendingStakers.stakers.ReplaceOrInsert(staker)
-	}
-	if err := validatorIt.Error(); err != nil {
-		return err
 	}
 
 	delegatorIt := s.pendingDelegatorList.NewIterator()
 	defer delegatorIt.Release()
-	for delegatorIt.Next() {
-		txIDBytes := delegatorIt.Key()
-		txID, err := ids.ToID(txIDBytes)
-		if err != nil {
-			return err
-		}
-		tx, _, err := s.GetTx(txID)
-		if err != nil {
-			return err
-		}
 
-		addDelegatorTx, ok := tx.Unsigned.(*txs.AddDelegatorTx)
-		if !ok {
-			return fmt.Errorf("expected tx type *txs.AddDelegatorTx but got %T", tx.Unsigned)
+	subnetDelegatorIt := s.pendingSubnetDelegatorList.NewIterator()
+	defer subnetDelegatorIt.Release()
+
+	for _, delegatorIt := range []database.Iterator{delegatorIt, subnetDelegatorIt} {
+		for delegatorIt.Next() {
+			txIDBytes := delegatorIt.Key()
+			txID, err := ids.ToID(txIDBytes)
+			if err != nil {
+				return err
+			}
+			tx, _, err := s.GetTx(txID)
+			if err != nil {
+				return err
+			}
+
+			stakerTx, ok := tx.Unsigned.(txs.Staker)
+			if !ok {
+				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
+			}
+
+			staker := NewPendingStaker(txID, stakerTx)
+			validator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
+			if validator.delegators == nil {
+				validator.delegators = btree.New(defaultTreeDegree)
+			}
+			validator.delegators.ReplaceOrInsert(staker)
+
+			s.pendingStakers.stakers.ReplaceOrInsert(staker)
 		}
-
-		staker := NewPrimaryNetworkStaker(txID, &addDelegatorTx.Validator)
-		staker.NextTime = staker.StartTime
-		staker.Priority = PrimaryNetworkDelegatorPendingPriority
-
-		validator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
-		if validator.delegators == nil {
-			validator.delegators = btree.New(defaultTreeDegree)
-		}
-		validator.delegators.ReplaceOrInsert(staker)
-
-		s.pendingStakers.stakers.ReplaceOrInsert(staker)
 	}
-	if err := delegatorIt.Error(); err != nil {
-		return err
-	}
 
-	subnetValidatorIt := s.pendingSubnetValidatorList.NewIterator()
-	defer subnetValidatorIt.Release()
-	for subnetValidatorIt.Next() {
-		txIDBytes := subnetValidatorIt.Key()
-		txID, err := ids.ToID(txIDBytes)
-		if err != nil {
-			return err
-		}
-		tx, _, err := s.GetTx(txID)
-		if err != nil {
-			return err
-		}
-
-		addSubnetValidatorTx, ok := tx.Unsigned.(*txs.AddSubnetValidatorTx)
-		if !ok {
-			return fmt.Errorf("expected tx type *txs.AddSubnetValidatorTx but got %T", tx.Unsigned)
-		}
-
-		staker := NewSubnetStaker(txID, &addSubnetValidatorTx.Validator)
-		staker.NextTime = staker.StartTime
-		staker.Priority = SubnetValidatorPendingPriority
-
-		validator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
-		validator.validator = staker
-
-		s.pendingStakers.stakers.ReplaceOrInsert(staker)
-	}
-	return subnetValidatorIt.Error()
+	errs := wrappers.Errs{}
+	errs.Add(
+		validatorIt.Error(),
+		subnetValidatorIt.Error(),
+		delegatorIt.Error(),
+		subnetDelegatorIt.Error(),
+	)
+	return errs.Err
 }
 
 func (s *state) write(height uint64) error {
@@ -1154,6 +1271,8 @@ func (s *state) write(height uint64) error {
 		s.writeRewardUTXOs(),
 		s.writeUTXOs(),
 		s.writeSubnets(),
+		s.writeTransformedSubnets(),
+		s.writeSubnetSupplies(),
 		s.writeChains(),
 		s.writeMetadata(),
 	)
@@ -1164,10 +1283,12 @@ func (s *state) Close() error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		s.pendingSubnetValidatorBaseDB.Close(),
+		s.pendingSubnetDelegatorBaseDB.Close(),
 		s.pendingDelegatorBaseDB.Close(),
 		s.pendingValidatorBaseDB.Close(),
 		s.pendingValidatorsDB.Close(),
 		s.currentSubnetValidatorBaseDB.Close(),
+		s.currentSubnetDelegatorBaseDB.Close(),
 		s.currentDelegatorBaseDB.Close(),
 		s.currentValidatorBaseDB.Close(),
 		s.currentValidatorsDB.Close(),
@@ -1176,6 +1297,8 @@ func (s *state) Close() error {
 		s.rewardUTXODB.Close(),
 		s.utxoDB.Close(),
 		s.subnetBaseDB.Close(),
+		s.transformedSubnetDB.Close(),
+		s.supplyDB.Close(),
 		s.chainDB.Close(),
 		s.singletonDB.Close(),
 		s.blockDB.Close(),
@@ -1217,10 +1340,7 @@ func (s *state) init(genesisBytes []byte) error {
 	// genesisBlock.Accept() because then it'd look for genesisBlock's
 	// non-existent parent)
 	genesisID := hashing.ComputeHash256Array(genesisBytes)
-	genesisBlock, err := blocks.NewCommitBlock(
-		genesisID,
-		0,
-	)
+	genesisBlock, err := blocks.NewApricotCommitBlock(genesisID, 0 /*height*/)
 	if err != nil {
 		return err
 	}
@@ -1387,30 +1507,13 @@ func (s *state) writeCurrentPrimaryNetworkStakers(height uint64) error {
 			}
 		}
 
-		addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
-		for addedDelegatorIterator.Next() {
-			staker := addedDelegatorIterator.Value()
-
-			if err := weightDiff.Add(false, staker.Weight); err != nil {
-				addedDelegatorIterator.Release()
-				return fmt.Errorf("failed to increase node weight diff: %w", err)
-			}
-
-			if err := database.PutUInt64(s.currentDelegatorList, staker.TxID[:], staker.PotentialReward); err != nil {
-				addedDelegatorIterator.Release()
-				return fmt.Errorf("failed to write current delegator to list: %w", err)
-			}
-		}
-		addedDelegatorIterator.Release()
-
-		for _, staker := range validatorDiff.deletedDelegators {
-			if err := weightDiff.Add(true, staker.Weight); err != nil {
-				return fmt.Errorf("failed to decrease node weight diff: %w", err)
-			}
-
-			if err := s.currentDelegatorList.Delete(staker.TxID[:]); err != nil {
-				return fmt.Errorf("failed to delete current staker: %w", err)
-			}
+		err := writeCurrentDelegatorDiff(
+			s.currentDelegatorList,
+			weightDiff,
+			validatorDiff,
+		)
+		if err != nil {
+			return err
 		}
 
 		if weightDiff.Amount == 0 {
@@ -1488,14 +1591,21 @@ func (s *state) writeCurrentSubnetStakers(height uint64) error {
 				if validatorDiff.validatorDeleted {
 					err = s.currentSubnetValidatorList.Delete(staker.TxID[:])
 				} else {
-					err = s.currentSubnetValidatorList.Put(staker.TxID[:], nil)
+					err = database.PutUInt64(s.currentSubnetValidatorList, staker.TxID[:], staker.PotentialReward)
 				}
 				if err != nil {
 					return fmt.Errorf("failed to update current subnet staker: %w", err)
 				}
 			}
 
-			// TODO: manage subnet delegators here
+			err := writeCurrentDelegatorDiff(
+				s.currentSubnetDelegatorList,
+				weightDiff,
+				validatorDiff,
+			)
+			if err != nil {
+				return err
+			}
 
 			if weightDiff.Amount == 0 {
 				continue
@@ -1531,37 +1641,46 @@ func (s *state) writeCurrentSubnetStakers(height uint64) error {
 	return nil
 }
 
+func writeCurrentDelegatorDiff(
+	currentDelegatorList linkeddb.LinkedDB,
+	weightDiff *ValidatorWeightDiff,
+	validatorDiff *diffValidator,
+) error {
+	addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
+	defer addedDelegatorIterator.Release()
+	for addedDelegatorIterator.Next() {
+		staker := addedDelegatorIterator.Value()
+
+		if err := weightDiff.Add(false, staker.Weight); err != nil {
+			return fmt.Errorf("failed to increase node weight diff: %w", err)
+		}
+
+		if err := database.PutUInt64(currentDelegatorList, staker.TxID[:], staker.PotentialReward); err != nil {
+			return fmt.Errorf("failed to write current delegator to list: %w", err)
+		}
+	}
+
+	for _, staker := range validatorDiff.deletedDelegators {
+		if err := weightDiff.Add(true, staker.Weight); err != nil {
+			return fmt.Errorf("failed to decrease node weight diff: %w", err)
+		}
+
+		if err := currentDelegatorList.Delete(staker.TxID[:]); err != nil {
+			return fmt.Errorf("failed to delete current staker: %w", err)
+		}
+	}
+	return nil
+}
+
 func (s *state) writePendingPrimaryNetworkStakers() error {
 	for _, validatorDiff := range s.pendingStakers.validatorDiffs[constants.PrimaryNetworkID] {
-		if validatorDiff.validatorModified {
-			staker := validatorDiff.validator
-
-			var err error
-			if validatorDiff.validatorDeleted {
-				err = s.pendingValidatorList.Delete(staker.TxID[:])
-			} else {
-				err = s.pendingValidatorList.Put(staker.TxID[:], nil)
-			}
-			if err != nil {
-				return fmt.Errorf("failed to update pending primary network staker: %w", err)
-			}
-		}
-
-		addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
-		for addedDelegatorIterator.Next() {
-			staker := addedDelegatorIterator.Value()
-
-			if err := s.pendingDelegatorList.Put(staker.TxID[:], nil); err != nil {
-				addedDelegatorIterator.Release()
-				return fmt.Errorf("failed to write pending delegator to list: %w", err)
-			}
-		}
-		addedDelegatorIterator.Release()
-
-		for _, staker := range validatorDiff.deletedDelegators {
-			if err := s.pendingDelegatorList.Delete(staker.TxID[:]); err != nil {
-				return fmt.Errorf("failed to delete pending delegator: %w", err)
-			}
+		err := writePendingDiff(
+			s.pendingValidatorList,
+			s.pendingDelegatorList,
+			validatorDiff,
+		)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
@@ -1578,21 +1697,51 @@ func (s *state) writePendingSubnetStakers() error {
 		}
 
 		for _, validatorDiff := range subnetValidatorDiffs {
-			if validatorDiff.validatorModified {
-				staker := validatorDiff.validator
-
-				var err error
-				if validatorDiff.validatorDeleted {
-					err = s.pendingSubnetValidatorList.Delete(staker.TxID[:])
-				} else {
-					err = s.pendingSubnetValidatorList.Put(staker.TxID[:], nil)
-				}
-				if err != nil {
-					return fmt.Errorf("failed to update pending subnet staker: %w", err)
-				}
+			err := writePendingDiff(
+				s.pendingSubnetValidatorList,
+				s.pendingSubnetDelegatorList,
+				validatorDiff,
+			)
+			if err != nil {
+				return err
 			}
+		}
+	}
+	return nil
+}
 
-			// TODO: manage subnet delegators here
+func writePendingDiff(
+	pendingValidatorList linkeddb.LinkedDB,
+	pendingDelegatorList linkeddb.LinkedDB,
+	validatorDiff *diffValidator,
+) error {
+	if validatorDiff.validatorModified {
+		staker := validatorDiff.validator
+
+		var err error
+		if validatorDiff.validatorDeleted {
+			err = pendingValidatorList.Delete(staker.TxID[:])
+		} else {
+			err = pendingValidatorList.Put(staker.TxID[:], nil)
+		}
+		if err != nil {
+			return fmt.Errorf("failed to update pending validator: %w", err)
+		}
+	}
+
+	addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
+	defer addedDelegatorIterator.Release()
+	for addedDelegatorIterator.Next() {
+		staker := addedDelegatorIterator.Value()
+
+		if err := pendingDelegatorList.Put(staker.TxID[:], nil); err != nil {
+			return fmt.Errorf("failed to write pending delegator to list: %w", err)
+		}
+	}
+
+	for _, staker := range validatorDiff.deletedDelegators {
+		if err := pendingDelegatorList.Delete(staker.TxID[:]); err != nil {
+			return fmt.Errorf("failed to delete pending delegator: %w", err)
 		}
 	}
 	return nil
@@ -1626,6 +1775,8 @@ func (s *state) writeTXs() error {
 			Status: txStatus.status,
 		}
 
+		// Note that we're serializing a [txBytesAndStatus] here, not a
+		// *txs.Tx, so we don't use [txs.Codec].
 		txBytes, err := genesis.Codec.Marshal(txs.Version, &stx)
 		if err != nil {
 			return fmt.Errorf("failed to serialize tx: %w", err)
@@ -1687,6 +1838,30 @@ func (s *state) writeSubnets() error {
 		}
 	}
 	s.addedSubnets = nil
+	return nil
+}
+
+func (s *state) writeTransformedSubnets() error {
+	for subnetID, tx := range s.transformedSubnets {
+		txID := tx.ID()
+
+		delete(s.transformedSubnets, subnetID)
+		s.transformedSubnetCache.Put(subnetID, tx)
+		if err := database.PutID(s.transformedSubnetDB, subnetID[:], txID); err != nil {
+			return fmt.Errorf("failed to write transformed subnet: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *state) writeSubnetSupplies() error {
+	for subnetID, supply := range s.modifiedSupplies {
+		delete(s.modifiedSupplies, subnetID)
+		s.supplyCache.Put(subnetID, supply)
+		if err := database.PutUInt64(s.supplyDB, subnetID[:], supply); err != nil {
+			return fmt.Errorf("failed to write subnet supply: %w", err)
+		}
+	}
 	return nil
 }
 

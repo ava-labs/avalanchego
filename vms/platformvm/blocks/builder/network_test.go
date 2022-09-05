@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -148,7 +148,7 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 
 	// show that transaction is not re-gossiped is recently added to mempool
 	gossipedBytes = nil
-	env.Builder.RemoveDecisionTxs([]*txs.Tx{tx})
+	env.Builder.Remove([]*txs.Tx{tx})
 	err = env.Builder.Add(tx)
 	require.NoError(err, "could not reintroduce tx to mempool")
 

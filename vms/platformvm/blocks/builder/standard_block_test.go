@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -78,8 +78,8 @@ func TestAtomicTxImports(t *testing.T) {
 
 	env.state.SetTimestamp(env.config.ApricotPhase5Time.Add(100 * time.Second))
 
-	env.Builder.AddDecisionTx(tx)
-	b, err := env.BuildBlock()
+	require.NoError(env.Builder.Add(tx))
+	b, err := env.Builder.BuildBlock()
 	require.NoError(err)
 	// Test multiple verify calls work
 	require.NoError(b.Verify())

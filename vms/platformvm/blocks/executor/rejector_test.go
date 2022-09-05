@@ -33,52 +33,52 @@ func TestRejectBlock(t *testing.T) {
 		{
 			name: "proposal block",
 			newBlockFunc: func() (blocks.Block, error) {
-				return blocks.NewProposalBlock(
+				return blocks.NewApricotProposalBlock(
 					ids.GenerateTestID(),
 					1,
 					&txs.Tx{
 						Unsigned: &txs.AddDelegatorTx{
 							// Without the line below, this function will error.
-							RewardsOwner: &secp256k1fx.OutputOwners{},
+							DelegationRewardsOwner: &secp256k1fx.OutputOwners{},
 						},
 						Creds: []verify.Verifiable{},
 					},
 				)
 			},
 			rejectFunc: func(r *rejector, b blocks.Block) error {
-				return r.ProposalBlock(b.(*blocks.ProposalBlock))
+				return r.ApricotProposalBlock(b.(*blocks.ApricotProposalBlock))
 			},
 		},
 		{
 			name: "atomic block",
 			newBlockFunc: func() (blocks.Block, error) {
-				return blocks.NewAtomicBlock(
+				return blocks.NewApricotAtomicBlock(
 					ids.GenerateTestID(),
 					1,
 					&txs.Tx{
 						Unsigned: &txs.AddDelegatorTx{
 							// Without the line below, this function will error.
-							RewardsOwner: &secp256k1fx.OutputOwners{},
+							DelegationRewardsOwner: &secp256k1fx.OutputOwners{},
 						},
 						Creds: []verify.Verifiable{},
 					},
 				)
 			},
 			rejectFunc: func(r *rejector, b blocks.Block) error {
-				return r.AtomicBlock(b.(*blocks.AtomicBlock))
+				return r.ApricotAtomicBlock(b.(*blocks.ApricotAtomicBlock))
 			},
 		},
 		{
 			name: "standard block",
 			newBlockFunc: func() (blocks.Block, error) {
-				return blocks.NewStandardBlock(
+				return blocks.NewApricotStandardBlock(
 					ids.GenerateTestID(),
 					1,
 					[]*txs.Tx{
 						{
 							Unsigned: &txs.AddDelegatorTx{
 								// Without the line below, this function will error.
-								RewardsOwner: &secp256k1fx.OutputOwners{},
+								DelegationRewardsOwner: &secp256k1fx.OutputOwners{},
 							},
 							Creds: []verify.Verifiable{},
 						},
@@ -86,31 +86,25 @@ func TestRejectBlock(t *testing.T) {
 				)
 			},
 			rejectFunc: func(r *rejector, b blocks.Block) error {
-				return r.StandardBlock(b.(*blocks.StandardBlock))
+				return r.ApricotStandardBlock(b.(*blocks.ApricotStandardBlock))
 			},
 		},
 		{
 			name: "commit",
 			newBlockFunc: func() (blocks.Block, error) {
-				return blocks.NewCommitBlock(
-					ids.GenerateTestID(),
-					1,
-				)
+				return blocks.NewApricotCommitBlock(ids.GenerateTestID() /*parent*/, 1 /*height*/)
 			},
 			rejectFunc: func(r *rejector, blk blocks.Block) error {
-				return r.CommitBlock(blk.(*blocks.CommitBlock))
+				return r.ApricotCommitBlock(blk.(*blocks.ApricotCommitBlock))
 			},
 		},
 		{
 			name: "abort",
 			newBlockFunc: func() (blocks.Block, error) {
-				return blocks.NewAbortBlock(
-					ids.GenerateTestID(),
-					1,
-				)
+				return blocks.NewApricotAbortBlock(ids.GenerateTestID() /*parent*/, 1 /*height*/)
 			},
 			rejectFunc: func(r *rejector, blk blocks.Block) error {
-				return r.AbortBlock(blk.(*blocks.AbortBlock))
+				return r.ApricotAbortBlock(blk.(*blocks.ApricotAbortBlock))
 			},
 		},
 	}

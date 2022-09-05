@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -118,16 +118,12 @@ func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
 }
 
 func newEnvironment(t *testing.T) *environment {
-	var (
-		res = &environment{}
-		err error
-	)
-
-	res.isBootstrapped = &utils.AtomicBool{}
+	res := &environment{
+		isBootstrapped: &utils.AtomicBool{},
+		config:         defaultConfig(),
+		clk:            defaultClock(),
+	}
 	res.isBootstrapped.SetValue(true)
-
-	res.config = defaultConfig()
-	res.clk = defaultClock()
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	res.baseDB = versiondb.New(baseDBManager.Current().Database)
@@ -147,7 +143,7 @@ func newEnvironment(t *testing.T) *environment {
 
 	res.txBuilder = txbuilder.New(
 		res.ctx,
-		*res.config,
+		res.config,
 		res.clk,
 		res.fx,
 		res.state,
@@ -209,9 +205,7 @@ func newEnvironment(t *testing.T) *environment {
 	return res
 }
 
-func addSubnet(
-	env *environment,
-) {
+func addSubnet(env *environment) {
 	// Create a subnet
 	var err error
 	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
@@ -328,6 +322,7 @@ func defaultConfig() *config.Config {
 		},
 		ApricotPhase3Time: defaultValidateEndTime,
 		ApricotPhase5Time: defaultValidateEndTime,
+		BlueberryTime:     mockable.MaxTime,
 	}
 }
 
@@ -380,14 +375,14 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 		}
 	}
 
-	genesisValidators := make([]api.PrimaryValidator, len(preFundedKeys))
+	genesisValidators := make([]api.PermissionlessValidator, len(preFundedKeys))
 	for i, key := range preFundedKeys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
 		addr, err := address.FormatBech32(hrp, nodeID.Bytes())
 		if err != nil {
 			panic(err)
 		}
-		genesisValidators[i] = api.PrimaryValidator{
+		genesisValidators[i] = api.PermissionlessValidator{
 			Staker: api.Staker{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),

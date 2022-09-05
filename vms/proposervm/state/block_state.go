@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -98,7 +98,7 @@ func (s *blockState) GetBlock(blkID ids.ID) (block.Block, choices.Status, error)
 	}
 
 	// The key was in the database
-	blk, err := block.Parse(blkWrapper.Block)
+	blk, _, err := block.Parse(blkWrapper.Block)
 	if err != nil {
 		return nil, choices.Unknown, err
 	}

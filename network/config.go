@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -106,6 +106,8 @@ type Config struct {
 
 	DialerConfig dialer.Config `json:"dialerConfig"`
 	TLSConfig    *tls.Config   `json:"-"`
+
+	TLSKeyLogFile string `json:"tlsKeyLogFile"`
 
 	Namespace          string            `json:"namespace"`
 	MyNodeID           ids.NodeID        `json:"myNodeID"`

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package node
@@ -148,9 +148,6 @@ type Config struct {
 
 	// Assertions configuration
 	EnableAssertions bool `json:"enableAssertions"`
-
-	// Crypto configuration
-	EnableCrypto bool `json:"enableCrypto"`
 
 	// Health
 	HealthCheckFreq time.Duration `json:"healthCheckFreq"`

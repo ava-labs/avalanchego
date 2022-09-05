@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -57,7 +57,7 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 		},
 	}
 
-	slb, err := block.Build(
+	slb, err := block.BuildApricot(
 		ids.Empty, // refer unknown parent
 		time.Time{},
 		0, // pChainHeight,
@@ -142,7 +142,7 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 		BytesV:     []byte{2},
 		TimestampV: prntCoreBlk.Timestamp(),
 	}
-	childSlb, err := block.Build(
+	childSlb, err := block.BuildApricot(
 		ids.Empty, // refer unknown parent
 		childCoreBlk.Timestamp(),
 		pChainHeight,
@@ -170,7 +170,7 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 	}
 
 	// child block referring known parent does verify
-	childSlb, err = block.BuildUnsigned(
+	childSlb, err = block.BuildUnsignedApricot(
 		prntProBlk.ID(), // refer known parent
 		prntProBlk.Timestamp().Add(proposer.MaxDelay),
 		pChainHeight,
@@ -253,7 +253,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	// child block timestamp cannot be lower than parent timestamp
 	childCoreBlk.TimestampV = prntTimestamp.Add(-1 * time.Second)
 	proVM.Clock.Set(childCoreBlk.TimestampV)
-	childSlb, err := block.Build(
+	childSlb, err := block.BuildApricot(
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
 		pChainHeight,
@@ -286,7 +286,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	}
 	beforeWinStart := prntTimestamp.Add(blkWinDelay).Add(-1 * time.Second)
 	proVM.Clock.Set(beforeWinStart)
-	childSlb, err = block.Build(
+	childSlb, err = block.BuildApricot(
 		prntProBlk.ID(),
 		beforeWinStart,
 		pChainHeight,
@@ -307,7 +307,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	// block can arrive at its creator window starts
 	atWindowStart := prntTimestamp.Add(blkWinDelay)
 	proVM.Clock.Set(atWindowStart)
-	childSlb, err = block.Build(
+	childSlb, err = block.BuildApricot(
 		prntProBlk.ID(),
 		atWindowStart,
 		pChainHeight,
@@ -328,7 +328,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	// block can arrive after its creator window starts
 	afterWindowStart := prntTimestamp.Add(blkWinDelay).Add(5 * time.Second)
 	proVM.Clock.Set(afterWindowStart)
-	childSlb, err = block.Build(
+	childSlb, err = block.BuildApricot(
 		prntProBlk.ID(),
 		afterWindowStart,
 		pChainHeight,
@@ -348,7 +348,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	// block can arrive within submission window
 	AtSubWindowEnd := proVM.Time().Add(proposer.MaxDelay)
 	proVM.Clock.Set(AtSubWindowEnd)
-	childSlb, err = block.BuildUnsigned(
+	childSlb, err = block.BuildUnsignedApricot(
 		prntProBlk.ID(),
 		AtSubWindowEnd,
 		pChainHeight,
@@ -364,7 +364,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 
 	// block timestamp cannot be too much in the future
 	afterSubWinEnd := proVM.Time().Add(maxSkew).Add(time.Second)
-	childSlb, err = block.Build(
+	childSlb, err = block.BuildApricot(
 		prntProBlk.ID(),
 		afterSubWinEnd,
 		pChainHeight,
@@ -446,7 +446,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	}
 
 	// child P-Chain height must not precede parent P-Chain height
-	childSlb, err := block.Build(
+	childSlb, err := block.BuildApricot(
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
 		prntBlkPChainHeight-1,
@@ -474,7 +474,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	}
 
 	// child P-Chain height can be equal to parent P-Chain height
-	childSlb, err = block.BuildUnsigned(
+	childSlb, err = block.BuildUnsignedApricot(
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
 		prntBlkPChainHeight,
@@ -492,7 +492,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 
 	// child P-Chain height may follow parent P-Chain height
 	pChainHeight = prntBlkPChainHeight * 2 // move ahead pChainHeight
-	childSlb, err = block.BuildUnsigned(
+	childSlb, err = block.BuildUnsignedApricot(
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
 		prntBlkPChainHeight+1,
@@ -508,7 +508,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 
 	// block P-Chain height can be equal to current P-Chain height
 	currPChainHeight, _ := proVM.ctx.ValidatorState.GetCurrentHeight()
-	childSlb, err = block.BuildUnsigned(
+	childSlb, err = block.BuildUnsignedApricot(
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
 		currPChainHeight,
@@ -523,7 +523,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	}
 
 	// block P-Chain height cannot be at higher than current P-Chain height
-	childSlb, err = block.BuildUnsigned(
+	childSlb, err = block.BuildUnsignedApricot(
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
 		currPChainHeight*2,
@@ -650,7 +650,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 	}
 
 	// child P-Chain height must not precede parent P-Chain height
-	childSlb, err := block.Build(
+	childSlb, err := block.BuildApricot(
 		parentBlk.ID(),
 		childCoreBlk.Timestamp(),
 		prntBlkPChainHeight-1,
@@ -676,7 +676,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 	}
 
 	// child P-Chain height can be equal to parent P-Chain height
-	childSlb, err = block.BuildUnsigned(
+	childSlb, err = block.BuildUnsignedApricot(
 		parentBlk.ID(),
 		childCoreBlk.Timestamp(),
 		prntBlkPChainHeight,
@@ -694,7 +694,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 
 	// child P-Chain height may follow parent P-Chain height
 	pChainHeight = prntBlkPChainHeight * 2 // move ahead pChainHeight
-	childSlb, err = block.BuildUnsigned(
+	childSlb, err = block.BuildUnsignedApricot(
 		parentBlk.ID(),
 		childCoreBlk.Timestamp(),
 		prntBlkPChainHeight+1,
@@ -710,7 +710,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 
 	// block P-Chain height can be equal to current P-Chain height
 	currPChainHeight, _ := proVM.ctx.ValidatorState.GetCurrentHeight()
-	childSlb, err = block.BuildUnsigned(
+	childSlb, err = block.BuildUnsignedApricot(
 		parentBlk.ID(),
 		childCoreBlk.Timestamp(),
 		currPChainHeight,
@@ -725,7 +725,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 	}
 
 	// block P-Chain height cannot be at higher than current P-Chain height
-	childSlb, err = block.BuildUnsigned(
+	childSlb, err = block.BuildUnsignedApricot(
 		parentBlk.ID(),
 		childCoreBlk.Timestamp(),
 		currPChainHeight*2,
@@ -1050,7 +1050,7 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 	}
 
 	// Build the child
-	statelessChild, err := block.Build(
+	statelessChild, err := block.BuildApricot(
 		postForkOracleBlk.ID(),
 		postForkOracleBlk.Timestamp().Add(proposer.WindowDuration),
 		postForkOracleBlk.PChainHeight(),
@@ -1110,7 +1110,7 @@ func TestBlockVerify_PostForkBlock_PChainTooLow(t *testing.T) {
 		}
 	}
 
-	statelessChild, err := block.BuildUnsigned(
+	statelessChild, err := block.BuildUnsignedApricot(
 		coreGenBlk.ID(),
 		coreGenBlk.Timestamp(),
 		4,

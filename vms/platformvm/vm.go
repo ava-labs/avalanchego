@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -170,7 +170,7 @@ func (vm *VM) Initialize(
 
 	vm.txBuilder = txbuilder.New(
 		vm.ctx,
-		vm.Config,
+		&vm.Config,
 		&vm.clock,
 		vm.fx,
 		vm.state,
