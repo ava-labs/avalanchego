@@ -267,11 +267,10 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		timer := timer.NewTimer(func() {
 			// If the timeout fires and we're already shutting down, nothing to do.
 			if !n.shuttingDown.GetValue() {
-				n.Log.Debug("failed to connect to bootstrap nodes in time",
+				n.Log.Warn("failed to connect to bootstrap nodes",
 					zap.Stringer("beacons", n.beacons),
+					zap.Duration("duration", n.Config.BootstrapBeaconConnectionTimeout),
 				)
-				n.Log.Fatal("failed to connect to bootstrap nodes. Node shutting down...")
-				go n.Shutdown(1)
 			}
 		})
 
