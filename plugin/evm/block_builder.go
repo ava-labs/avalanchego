@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -67,7 +66,7 @@ type blockBuilder struct {
 	// [buildBlockTimer] is a two stage timer handling block production.
 	// Stage1 build a block if the batch size has been reached.
 	// Stage2 build a block regardless of the size.
-	buildBlockTimer *timer.Timer
+	buildBlockTimer *Timer
 
 	// buildStatus signals the phase of block building the VM is currently in.
 	// [dontBuild] indicates there's no need to build a block.
@@ -99,7 +98,7 @@ func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *bl
 }
 
 func (b *blockBuilder) handleBlockBuilding() {
-	b.buildBlockTimer = timer.NewStagedTimer(b.buildBlockTwoStageTimer)
+	b.buildBlockTimer = NewStagedTimer(b.buildBlockTwoStageTimer)
 	go b.ctx.Log.RecoverAndPanic(b.buildBlockTimer.Dispatch)
 
 	if !b.chainConfig.IsSubnetEVM(big.NewInt(time.Now().Unix())) {
