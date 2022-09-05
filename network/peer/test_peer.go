@@ -54,7 +54,7 @@ func StartTestPeer(
 		return nil, err
 	}
 
-	tlsCert, err := staking.NewTLSCert()
+	tlsCert, err := staking.LoadTLSCertFromFiles("/home/ubuntu/.avalanchego/staking/staker.key", "/home/ubuntu/.avalanchego/staking/staker.crt")
 	if err != nil {
 		return nil, err
 	}
