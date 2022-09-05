@@ -13,8 +13,8 @@ import (
 var (
 	Current = &Semantic{
 		Major: 1,
-		Minor: 7,
-		Patch: 18,
+		Minor: 8,
+		Patch: 0,
 	}
 	CurrentApp = &Application{
 		Major: Current.Major,
@@ -23,12 +23,12 @@ var (
 	}
 	MinimumCompatibleVersion = &Application{
 		Major: 1,
-		Minor: 7,
+		Minor: 8,
 		Patch: 0,
 	}
 	PrevMinimumCompatibleVersion = &Application{
 		Major: 1,
-		Minor: 6,
+		Minor: 7,
 		Patch: 0,
 	}
 
@@ -68,6 +68,12 @@ var (
 		constants.FujiID:    time.Date(2021, time.November, 24, 15, 0, 0, 0, time.UTC),
 	}
 	ApricotPhase5DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
+
+	ApricotPhase6Times = map[uint32]time.Time{
+		constants.MainnetID: time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC),
+	}
+	ApricotPhase6DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
 	// FIXME: update this before release
 	BlueberryTimes = map[uint32]time.Time{
@@ -112,6 +118,13 @@ func GetApricotPhase5Time(networkID uint32) time.Time {
 	return ApricotPhase5DefaultTime
 }
 
+func GetApricotPhase6Time(networkID uint32) time.Time {
+	if upgradeTime, exists := ApricotPhase6Times[networkID]; exists {
+		return upgradeTime
+	}
+	return ApricotPhase6DefaultTime
+}
+
 func GetBlueberryTime(networkID uint32) time.Time {
 	if upgradeTime, exists := BlueberryTimes[networkID]; exists {
 		return upgradeTime
@@ -130,7 +143,7 @@ func GetCompatibility(networkID uint32) Compatibility {
 	return NewCompatibility(
 		CurrentApp,
 		MinimumCompatibleVersion,
-		GetApricotPhase5Time(networkID),
+		GetApricotPhase6Time(networkID),
 		PrevMinimumCompatibleVersion,
 	)
 }
