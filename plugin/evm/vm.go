@@ -1089,10 +1089,12 @@ func (vm *VM) VerifyHeightIndex() error {
 // GetBlockIDAtHeight retrieves the blkID of the canonical block at [blkHeight]
 // if [blkHeight] is less than the height of the last accepted block, this will return
 // a canonical block. Otherwise, it may return a blkID that has not yet been accepted.
+// Note: Engine's interface requires this function returns database.ErrNotFound
+// if a block is not found.
 func (vm *VM) GetBlockIDAtHeight(blkHeight uint64) (ids.ID, error) {
 	ethBlock := vm.blockChain.GetBlockByNumber(blkHeight)
 	if ethBlock == nil {
-		return ids.ID{}, fmt.Errorf("could not find block at height: %d", blkHeight)
+		return ids.ID{}, database.ErrNotFound
 	}
 
 	return ids.ID(ethBlock.Hash()), nil
