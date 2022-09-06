@@ -104,7 +104,7 @@ func produceGetStatus(s *State, getBlockIDAtHeight func(uint64) (ids.ID, error))
 			internalBlk.SetStatus(choices.Processing)
 			return choices.Processing, nil
 		default:
-			return choices.Unknown, fmt.Errorf("failed to get accepted blkID at height %d", blkHeight)
+			return choices.Unknown, fmt.Errorf("%w: failed to get accepted blkID at height %d", err, blkHeight)
 		}
 	}
 }
