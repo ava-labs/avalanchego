@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -71,9 +71,9 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 	// Apply the changes, if any, from advancing the chain time.
 	nextChainTime := b.Timestamp()
 	changes, err := executor.AdvanceTimeTo(
+		v.txExecutorBackend,
 		onCommitState,
 		nextChainTime,
-		v.txExecutorBackend.Rewards,
 	)
 	if err != nil {
 		return err
@@ -102,9 +102,9 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 	// Apply the changes, if any, from advancing the chain time.
 	nextChainTime := b.Timestamp()
 	changes, err := executor.AdvanceTimeTo(
+		v.txExecutorBackend,
 		onAcceptState,
 		nextChainTime,
-		v.txExecutorBackend.Rewards,
 	)
 	if err != nil {
 		return err

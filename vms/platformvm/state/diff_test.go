@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -61,11 +62,19 @@ func TestDiffCurrentSupply(t *testing.T) {
 	d, err := NewDiff(lastAcceptedID, versions)
 	require.NoError(err)
 
-	initialCurrentSupply := d.GetCurrentSupply()
+	initialCurrentSupply, err := d.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(err)
+
 	newCurrentSupply := initialCurrentSupply + 1
-	d.SetCurrentSupply(newCurrentSupply)
-	require.Equal(newCurrentSupply, d.GetCurrentSupply())
-	require.Equal(initialCurrentSupply, state.GetCurrentSupply())
+	d.SetCurrentSupply(constants.PrimaryNetworkID, newCurrentSupply)
+
+	returnedNewCurrentSupply, err := d.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(err)
+	require.Equal(newCurrentSupply, returnedNewCurrentSupply)
+
+	returnedBaseCurrentSupply, err := state.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(err)
+	require.Equal(initialCurrentSupply, returnedBaseCurrentSupply)
 }
 
 func TestDiffCurrentValidator(t *testing.T) {
@@ -77,7 +86,6 @@ func TestDiffCurrentValidator(t *testing.T) {
 	state := NewMockState(ctrl)
 	// Called in NewDiff
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetCurrentSupply().Return(uint64(1337)).Times(1)
 
 	states := NewMockVersions(ctrl)
 	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
@@ -115,7 +123,6 @@ func TestDiffPendingValidator(t *testing.T) {
 	state := NewMockState(ctrl)
 	// Called in NewDiff
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetCurrentSupply().Return(uint64(1337)).Times(1)
 
 	states := NewMockVersions(ctrl)
 	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
@@ -158,7 +165,6 @@ func TestDiffCurrentDelegator(t *testing.T) {
 	state := NewMockState(ctrl)
 	// Called in NewDiff
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetCurrentSupply().Return(uint64(1337)).Times(1)
 
 	states := NewMockVersions(ctrl)
 	lastAcceptedID := ids.GenerateTestID()
@@ -209,7 +215,6 @@ func TestDiffPendingDelegator(t *testing.T) {
 	state := NewMockState(ctrl)
 	// Called in NewDiff
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetCurrentSupply().Return(uint64(1337)).Times(1)
 
 	states := NewMockVersions(ctrl)
 	lastAcceptedID := ids.GenerateTestID()
@@ -254,7 +259,6 @@ func TestDiffSubnet(t *testing.T) {
 	state := NewMockState(ctrl)
 	// Called in NewDiff
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetCurrentSupply().Return(uint64(1337)).Times(1)
 
 	states := NewMockVersions(ctrl)
 	lastAcceptedID := ids.GenerateTestID()
@@ -286,7 +290,6 @@ func TestDiffChain(t *testing.T) {
 	state := NewMockState(ctrl)
 	// Called in NewDiff
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetCurrentSupply().Return(uint64(1337)).Times(1)
 
 	states := NewMockVersions(ctrl)
 	lastAcceptedID := ids.GenerateTestID()
@@ -327,7 +330,6 @@ func TestDiffTx(t *testing.T) {
 	state := NewMockState(ctrl)
 	// Called in NewDiff
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetCurrentSupply().Return(uint64(1337)).Times(1)
 
 	states := NewMockVersions(ctrl)
 	lastAcceptedID := ids.GenerateTestID()
@@ -379,7 +381,6 @@ func TestDiffRewardUTXO(t *testing.T) {
 	state := NewMockState(ctrl)
 	// Called in NewDiff
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetCurrentSupply().Return(uint64(1337)).Times(1)
 
 	states := NewMockVersions(ctrl)
 	lastAcceptedID := ids.GenerateTestID()
@@ -426,7 +427,6 @@ func TestDiffUTXO(t *testing.T) {
 	state := NewMockState(ctrl)
 	// Called in NewDiff
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetCurrentSupply().Return(uint64(1337)).Times(1)
 
 	states := NewMockVersions(ctrl)
 	lastAcceptedID := ids.GenerateTestID()
@@ -488,7 +488,14 @@ func assertChainsEqual(t *testing.T, expected, actual Chain) {
 	}
 
 	require.Equal(t, expected.GetTimestamp(), actual.GetTimestamp())
-	require.Equal(t, expected.GetCurrentSupply(), actual.GetCurrentSupply())
+
+	expectedCurrentSupply, err := expected.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(t, err)
+
+	actualCurrentSupply, err := actual.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(t, err)
+
+	require.Equal(t, expectedCurrentSupply, actualCurrentSupply)
 
 	expectedSubnets, expectedErr := expected.GetSubnets()
 	actualSubnets, actualErr := actual.GetSubnets()

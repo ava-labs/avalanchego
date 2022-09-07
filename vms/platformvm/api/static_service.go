@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package api
@@ -74,7 +74,8 @@ func (utxo UTXO) Less(other UTXO) bool {
 	return bytes.Compare(utxoAddr.Bytes(), otherAddr.Bytes()) == -1
 }
 
-// TODO: refactor APIStaker, APIValidators and merge them together for SubnetValidators + PrimaryValidators
+// TODO: Refactor APIStaker, APIValidators and merge them together for
+//       PermissionedValidators + PermissionlessValidators.=======
 
 // APIStaker is the representation of a staker sent via APIs.
 // [TxID] is the txID of the transaction that added this staker.
@@ -98,23 +99,30 @@ type Owner struct {
 	Addresses []string    `json:"addresses"`
 }
 
-// PrimaryValidator is the repr. of a primary network validator sent over APIs.
-type PrimaryValidator struct {
+// PermissionlessValidator is the repr. of a permissionless validator sent over
+// APIs.
+type PermissionlessValidator struct {
 	Staker
-	// The owner the staking reward, if applicable, will go to
-	RewardOwner        *Owner        `json:"rewardOwner,omitempty"`
-	PotentialReward    *json.Uint64  `json:"potentialReward,omitempty"`
-	DelegationFee      json.Float32  `json:"delegationFee"`
-	ExactDelegationFee *json.Uint32  `json:"exactDelegationFee,omitempty"`
-	Uptime             *json.Float32 `json:"uptime,omitempty"`
-	Connected          bool          `json:"connected"`
-	Staked             []UTXO        `json:"staked,omitempty"`
+	// Deprecated: RewardOwner has been replaced by ValidationRewardOwner and
+	//             DelegationRewardOwner.
+	RewardOwner *Owner `json:"rewardOwner,omitempty"`
+	// The owner of the rewards from the validation period, if applicable.
+	ValidationRewardOwner *Owner `json:"validationRewardOwner,omitempty"`
+	// The owner of the rewards from delegations during the validation period,
+	// if applicable.
+	DelegationRewardOwner *Owner        `json:"delegationRewardOwner,omitempty"`
+	PotentialReward       *json.Uint64  `json:"potentialReward,omitempty"`
+	DelegationFee         json.Float32  `json:"delegationFee"`
+	ExactDelegationFee    *json.Uint32  `json:"exactDelegationFee,omitempty"`
+	Uptime                *json.Float32 `json:"uptime,omitempty"`
+	Connected             bool          `json:"connected"`
+	Staked                []UTXO        `json:"staked,omitempty"`
 	// The delegators delegating to this validator
 	Delegators []PrimaryDelegator `json:"delegators"`
 }
 
-// APISubnetValidator is the repr. of a subnet validator sent over APIs.
-type SubnetValidator struct {
+// PermissionedValidator is the repr. of a permissioned validator sent over APIs.
+type PermissionedValidator struct {
 	Staker
 	// The owner the staking reward, if applicable, will go to
 	Connected bool `json:"connected"`
@@ -161,15 +169,15 @@ type Chain struct {
 // [Chains] are the chains that exist at genesis.
 // [Time] is the Platform Chain's time at network genesis.
 type BuildGenesisArgs struct {
-	AvaxAssetID   ids.ID              `json:"avaxAssetID"`
-	NetworkID     json.Uint32         `json:"networkID"`
-	UTXOs         []UTXO              `json:"utxos"`
-	Validators    []PrimaryValidator  `json:"validators"`
-	Chains        []Chain             `json:"chains"`
-	Time          json.Uint64         `json:"time"`
-	InitialSupply json.Uint64         `json:"initialSupply"`
-	Message       string              `json:"message"`
-	Encoding      formatting.Encoding `json:"encoding"`
+	AvaxAssetID   ids.ID                    `json:"avaxAssetID"`
+	NetworkID     json.Uint32               `json:"networkID"`
+	UTXOs         []UTXO                    `json:"utxos"`
+	Validators    []PermissionlessValidator `json:"validators"`
+	Chains        []Chain                   `json:"chains"`
+	Time          json.Uint64               `json:"time"`
+	InitialSupply json.Uint64               `json:"initialSupply"`
+	Message       string                    `json:"message"`
+	Encoding      formatting.Encoding       `json:"encoding"`
 }
 
 // BuildGenesisReply is the reply from BuildGenesis
@@ -305,9 +313,9 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 				End:    uint64(vdr.EndTime),
 				Wght:   weight,
 			},
-			Stake:        stake,
-			RewardsOwner: owner,
-			Shares:       delegationFee,
+			StakeOuts:        stake,
+			RewardsOwner:     owner,
+			DelegationShares: delegationFee,
 		}}
 		if err := tx.Sign(genesis.Codec, nil); err != nil {
 			return err

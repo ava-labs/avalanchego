@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package api
@@ -29,7 +29,7 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 		Amount:  0,
 	}
 	weight := json.Uint64(987654321)
-	validator := PrimaryValidator{
+	validator := PermissionlessValidator{
 		Staker: Staker{
 			EndTime: 15,
 			Weight:  &weight,
@@ -49,7 +49,7 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 		UTXOs: []UTXO{
 			utxo,
 		},
-		Validators: []PrimaryValidator{
+		Validators: []PermissionlessValidator{
 			validator,
 		},
 		Time:     5,
@@ -75,7 +75,7 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 		Amount:  123456789,
 	}
 	weight := json.Uint64(0)
-	validator := PrimaryValidator{
+	validator := PermissionlessValidator{
 		Staker: Staker{
 			StartTime: 0,
 			EndTime:   15,
@@ -95,7 +95,7 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 		UTXOs: []UTXO{
 			utxo,
 		},
-		Validators: []PrimaryValidator{
+		Validators: []PermissionlessValidator{
 			validator,
 		},
 		Time:     5,
@@ -122,7 +122,7 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 	}
 
 	weight := json.Uint64(987654321)
-	validator := PrimaryValidator{
+	validator := PermissionlessValidator{
 		Staker: Staker{
 			StartTime: 0,
 			EndTime:   5,
@@ -142,7 +142,7 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 		UTXOs: []UTXO{
 			utxo,
 		},
-		Validators: []PrimaryValidator{
+		Validators: []PermissionlessValidator{
 			validator,
 		},
 		Time:     5,
@@ -169,7 +169,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	}
 
 	weight := json.Uint64(987654321)
-	validator1 := PrimaryValidator{
+	validator1 := PermissionlessValidator{
 		Staker: Staker{
 			StartTime: 0,
 			EndTime:   20,
@@ -185,7 +185,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 		}},
 	}
 
-	validator2 := PrimaryValidator{
+	validator2 := PermissionlessValidator{
 		Staker: Staker{
 			StartTime: 3,
 			EndTime:   15,
@@ -201,7 +201,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 		}},
 	}
 
-	validator3 := PrimaryValidator{
+	validator3 := PermissionlessValidator{
 		Staker: Staker{
 			StartTime: 1,
 			EndTime:   10,
@@ -222,7 +222,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 		UTXOs: []UTXO{
 			utxo,
 		},
-		Validators: []PrimaryValidator{
+		Validators: []PermissionlessValidator{
 			validator1,
 			validator2,
 			validator3,

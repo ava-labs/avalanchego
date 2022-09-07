@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	stdmath "math"
 
 	"go.uber.org/zap"
 
@@ -49,30 +51,24 @@ const (
 )
 
 var (
-	errMissingDecisionBlock       = errors.New("should have a decision block within the past two blocks")
-	errNoSubnetID                 = errors.New("argument 'subnetID' not provided")
-	errNoRewardAddress            = errors.New("argument 'rewardAddress' not provided")
-	errInvalidDelegationRate      = errors.New("argument 'delegationFeeRate' must be between 0 and 100, inclusive")
-	errNoAddresses                = errors.New("no addresses provided")
-	errNoKeys                     = errors.New("user has no keys or funds")
-	errNoPrimaryValidators        = errors.New("no default subnet validators")
-	errNoValidators               = errors.New("no subnet validators")
-	errStartTimeTooSoon           = fmt.Errorf("start time must be at least %s in the future", minAddStakerDelay)
-	errStartTimeTooLate           = errors.New("start time is too far in the future")
-	errTotalOverflow              = errors.New("overflow while calculating total balance")
-	errUnlockedOverflow           = errors.New("overflow while calculating unlocked balance")
-	errLockedOverflow             = errors.New("overflow while calculating locked balance")
-	errNotStakeableOverflow       = errors.New("overflow while calculating locked not stakeable balance")
-	errLockedNotStakeableOverflow = errors.New("overflow while calculating locked not stakeable balance")
-	errUnlockedStakeableOverflow  = errors.New("overflow while calculating unlocked stakeable balance")
-	errNamedSubnetCantBePrimary   = errors.New("subnet validator attempts to validate primary network")
-	errNoAmount                   = errors.New("argument 'amount' must be > 0")
-	errMissingName                = errors.New("argument 'name' not given")
-	errMissingVMID                = errors.New("argument 'vmID' not given")
-	errMissingBlockchainID        = errors.New("argument 'blockchainID' not given")
-	errMissingPrivateKey          = errors.New("argument 'privateKey' not given")
-	errStartAfterEndTime          = errors.New("start time must be before end time")
-	errStartTimeInThePast         = errors.New("start time in the past")
+	errMissingDecisionBlock     = errors.New("should have a decision block within the past two blocks")
+	errNoSubnetID               = errors.New("argument 'subnetID' not provided")
+	errNoRewardAddress          = errors.New("argument 'rewardAddress' not provided")
+	errInvalidDelegationRate    = errors.New("argument 'delegationFeeRate' must be between 0 and 100, inclusive")
+	errNoAddresses              = errors.New("no addresses provided")
+	errNoKeys                   = errors.New("user has no keys or funds")
+	errNoPrimaryValidators      = errors.New("no default subnet validators")
+	errNoValidators             = errors.New("no subnet validators")
+	errStartTimeTooSoon         = fmt.Errorf("start time must be at least %s in the future", minAddStakerDelay)
+	errStartTimeTooLate         = errors.New("start time is too far in the future")
+	errNamedSubnetCantBePrimary = errors.New("subnet validator attempts to validate primary network")
+	errNoAmount                 = errors.New("argument 'amount' must be > 0")
+	errMissingName              = errors.New("argument 'name' not given")
+	errMissingVMID              = errors.New("argument 'vmID' not given")
+	errMissingBlockchainID      = errors.New("argument 'blockchainID' not given")
+	errMissingPrivateKey        = errors.New("argument 'privateKey' not given")
+	errStartAfterEndTime        = errors.New("start time must be before end time")
+	errStartTimeInThePast       = errors.New("start time in the past")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -181,13 +177,19 @@ type GetBalanceRequest struct {
 	Addresses []string `json:"addresses"`
 }
 
+// Note: We explicitly duplicate AVAX out of the maps to ensure backwards
+// compatibility.
 type GetBalanceResponse struct {
 	// Balance, in nAVAX, of the address
-	Balance            json.Uint64    `json:"balance"`
-	Unlocked           json.Uint64    `json:"unlocked"`
-	LockedStakeable    json.Uint64    `json:"lockedStakeable"`
-	LockedNotStakeable json.Uint64    `json:"lockedNotStakeable"`
-	UTXOIDs            []*avax.UTXOID `json:"utxoIDs"`
+	Balance             json.Uint64            `json:"balance"`
+	Unlocked            json.Uint64            `json:"unlocked"`
+	LockedStakeable     json.Uint64            `json:"lockedStakeable"`
+	LockedNotStakeable  json.Uint64            `json:"lockedNotStakeable"`
+	Balances            map[ids.ID]json.Uint64 `json:"balances"`
+	Unlockeds           map[ids.ID]json.Uint64 `json:"unlockeds"`
+	LockedStakeables    map[ids.ID]json.Uint64 `json:"lockedStakeables"`
+	LockedNotStakeables map[ids.ID]json.Uint64 `json:"lockedNotStakeables"`
+	UTXOIDs             []*avax.UTXOID         `json:"utxoIDs"`
 }
 
 // GetBalance gets the balance of an address
@@ -213,26 +215,29 @@ func (service *Service) GetBalance(_ *http.Request, args *GetBalanceRequest, res
 
 	currentTime := service.vm.clock.Unix()
 
-	unlocked := uint64(0)
-	lockedStakeable := uint64(0)
-	lockedNotStakeable := uint64(0)
+	unlockeds := map[ids.ID]uint64{}
+	lockedStakeables := map[ids.ID]uint64{}
+	lockedNotStakeables := map[ids.ID]uint64{}
 
 utxoFor:
 	for _, utxo := range utxos {
+		assetID := utxo.AssetID()
 		switch out := utxo.Out.(type) {
 		case *secp256k1fx.TransferOutput:
 			if out.Locktime <= currentTime {
-				newBalance, err := math.Add64(unlocked, out.Amount())
+				newBalance, err := math.Add64(unlockeds[assetID], out.Amount())
 				if err != nil {
-					return errUnlockedOverflow
+					unlockeds[assetID] = stdmath.MaxUint64
+				} else {
+					unlockeds[assetID] = newBalance
 				}
-				unlocked = newBalance
 			} else {
-				newBalance, err := math.Add64(lockedNotStakeable, out.Amount())
+				newBalance, err := math.Add64(lockedNotStakeables[assetID], out.Amount())
 				if err != nil {
-					return errNotStakeableOverflow
+					lockedNotStakeables[assetID] = stdmath.MaxUint64
+				} else {
+					lockedNotStakeables[assetID] = newBalance
 				}
-				lockedNotStakeable = newBalance
 			}
 		case *stakeable.LockOut:
 			innerOut, ok := out.TransferableOut.(*secp256k1fx.TransferOutput)
@@ -243,23 +248,26 @@ utxoFor:
 				)
 				continue utxoFor
 			case innerOut.Locktime > currentTime:
-				newBalance, err := math.Add64(lockedNotStakeable, out.Amount())
+				newBalance, err := math.Add64(lockedNotStakeables[assetID], out.Amount())
 				if err != nil {
-					return errLockedNotStakeableOverflow
+					lockedNotStakeables[assetID] = stdmath.MaxUint64
+				} else {
+					lockedNotStakeables[assetID] = newBalance
 				}
-				lockedNotStakeable = newBalance
 			case out.Locktime <= currentTime:
-				newBalance, err := math.Add64(unlocked, out.Amount())
+				newBalance, err := math.Add64(unlockeds[assetID], out.Amount())
 				if err != nil {
-					return errUnlockedOverflow
+					unlockeds[assetID] = stdmath.MaxUint64
+				} else {
+					unlockeds[assetID] = newBalance
 				}
-				unlocked = newBalance
 			default:
-				newBalance, err := math.Add64(lockedStakeable, out.Amount())
+				newBalance, err := math.Add64(lockedStakeables[assetID], out.Amount())
 				if err != nil {
-					return errUnlockedStakeableOverflow
+					lockedStakeables[assetID] = stdmath.MaxUint64
+				} else {
+					lockedStakeables[assetID] = newBalance
 				}
-				lockedStakeable = newBalance
 			}
 		default:
 			continue utxoFor
@@ -268,20 +276,44 @@ utxoFor:
 		response.UTXOIDs = append(response.UTXOIDs, &utxo.UTXOID)
 	}
 
-	lockedBalance, err := math.Add64(lockedStakeable, lockedNotStakeable)
-	if err != nil {
-		return errLockedOverflow
+	balances := map[ids.ID]uint64{}
+	for assetID, amount := range lockedStakeables {
+		balances[assetID] = amount
 	}
-	balance, err := math.Add64(unlocked, lockedBalance)
-	if err != nil {
-		return errTotalOverflow
+	for assetID, amount := range lockedNotStakeables {
+		newBalance, err := math.Add64(balances[assetID], amount)
+		if err != nil {
+			balances[assetID] = stdmath.MaxUint64
+		} else {
+			balances[assetID] = newBalance
+		}
+	}
+	for assetID, amount := range unlockeds {
+		newBalance, err := math.Add64(balances[assetID], amount)
+		if err != nil {
+			balances[assetID] = stdmath.MaxUint64
+		} else {
+			balances[assetID] = newBalance
+		}
 	}
 
-	response.Balance = json.Uint64(balance)
-	response.Unlocked = json.Uint64(unlocked)
-	response.LockedStakeable = json.Uint64(lockedStakeable)
-	response.LockedNotStakeable = json.Uint64(lockedNotStakeable)
+	response.Balances = newJSONBalanceMap(balances)
+	response.Unlockeds = newJSONBalanceMap(unlockeds)
+	response.LockedStakeables = newJSONBalanceMap(lockedStakeables)
+	response.LockedNotStakeables = newJSONBalanceMap(lockedNotStakeables)
+	response.Balance = response.Balances[service.vm.ctx.AVAXAssetID]
+	response.Unlocked = response.Unlockeds[service.vm.ctx.AVAXAssetID]
+	response.LockedStakeable = response.LockedStakeables[service.vm.ctx.AVAXAssetID]
+	response.LockedNotStakeable = response.LockedNotStakeables[service.vm.ctx.AVAXAssetID]
 	return nil
+}
+
+func newJSONBalanceMap(balanceMap map[ids.ID]uint64) map[ids.ID]json.Uint64 {
+	jsonBalanceMap := make(map[ids.ID]json.Uint64, len(balanceMap))
+	for assetID, amount := range balanceMap {
+		jsonBalanceMap[assetID] = json.Uint64(amount)
+	}
+	return jsonBalanceMap
 }
 
 // CreateAddress creates an address controlled by [args.Username]
@@ -478,6 +510,16 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 
 		response.Subnets = make([]APISubnet, len(subnets)+1)
 		for i, subnet := range subnets {
+			subnetID := subnet.ID()
+			if _, err := service.vm.state.GetSubnetTransformation(subnetID); err == nil {
+				response.Subnets[i] = APISubnet{
+					ID:          subnetID,
+					ControlKeys: []string{},
+					Threshold:   json.Uint32(0),
+				}
+				continue
+			}
+
 			unsignedTx := subnet.Unsigned.(*txs.CreateSubnetTx)
 			owner := unsignedTx.Owner.(*secp256k1fx.OutputOwners)
 			controlAddrs := []string{}
@@ -489,7 +531,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 				controlAddrs = append(controlAddrs, addr)
 			}
 			response.Subnets[i] = APISubnet{
-				ID:          subnet.ID(),
+				ID:          subnetID,
 				ControlKeys: controlAddrs,
 				Threshold:   json.Uint32(owner.Threshold),
 			}
@@ -521,6 +563,15 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 			continue
 		}
 
+		if _, err := service.vm.state.GetSubnetTransformation(subnetID); err == nil {
+			response.Subnets = append(response.Subnets, APISubnet{
+				ID:          subnetID,
+				ControlKeys: []string{},
+				Threshold:   json.Uint32(0),
+			})
+			continue
+		}
+
 		subnetTx, _, err := service.vm.state.GetTx(subnetID)
 		if err == database.ErrNotFound {
 			continue
@@ -547,13 +598,11 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 			controlAddrs[i] = addr
 		}
 
-		response.Subnets = append(response.Subnets,
-			APISubnet{
-				ID:          subnetID,
-				ControlKeys: controlAddrs,
-				Threshold:   json.Uint32(owner.Threshold),
-			},
-		)
+		response.Subnets = append(response.Subnets, APISubnet{
+			ID:          subnetID,
+			ControlKeys: controlAddrs,
+			Threshold:   json.Uint32(owner.Threshold),
+		})
 	}
 	return nil
 }
@@ -573,11 +622,28 @@ type GetStakingAssetIDResponse struct {
 func (service *Service) GetStakingAssetID(_ *http.Request, args *GetStakingAssetIDArgs, response *GetStakingAssetIDResponse) error {
 	service.vm.ctx.Log.Debug("Platform: GetStakingAssetID called")
 
-	if args.SubnetID != constants.PrimaryNetworkID {
-		return fmt.Errorf("subnet %s doesn't have a valid staking token", args.SubnetID)
+	if args.SubnetID == constants.PrimaryNetworkID {
+		response.AssetID = service.vm.ctx.AVAXAssetID
+		return nil
 	}
 
-	response.AssetID = service.vm.ctx.AVAXAssetID
+	transformSubnetIntf, err := service.vm.state.GetSubnetTransformation(args.SubnetID)
+	if err != nil {
+		return fmt.Errorf(
+			"failed fetching subnet transformation for %s: %w",
+			args.SubnetID,
+			err,
+		)
+	}
+	transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
+	if !ok {
+		return fmt.Errorf(
+			"unexpected subnet transformation tx type fetched %T",
+			transformSubnetIntf.Unsigned,
+		)
+	}
+
+	response.AssetID = transformSubnet.AssetID
 	return nil
 }
 
@@ -648,9 +714,77 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 		potentialReward := json.Uint64(staker.PotentialReward)
 
 		switch staker := tx.Unsigned.(type) {
-		case *txs.AddDelegatorTx:
+		case txs.ValidatorTx:
+			shares := staker.Shares()
+			delegationFee := json.Float32(100 * float32(shares) / float32(reward.PercentDenominator))
+
+			primaryNetworkStaker, err := service.vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+			if err != nil {
+				return err
+			}
+
+			// TODO: calculate subnet uptimes
+			rawUptime, err := service.vm.uptimeManager.CalculateUptimePercentFrom(nodeID, primaryNetworkStaker.StartTime)
+			if err != nil {
+				return err
+			}
+			uptime := json.Float32(rawUptime)
+
+			connected := service.vm.uptimeManager.IsConnected(nodeID)
+			tracksSubnet := args.SubnetID == constants.PrimaryNetworkID || service.vm.SubnetTracker.TracksSubnet(nodeID, args.SubnetID)
+
+			var (
+				validationRewardOwner *platformapi.Owner
+				delegationRewardOwner *platformapi.Owner
+			)
+			validationOwner, ok := staker.ValidationRewardsOwner().(*secp256k1fx.OutputOwners)
+			if ok {
+				validationRewardOwner = &platformapi.Owner{
+					Locktime:  json.Uint64(validationOwner.Locktime),
+					Threshold: json.Uint32(validationOwner.Threshold),
+				}
+				for _, addr := range validationOwner.Addrs {
+					addrStr, err := service.addrManager.FormatLocalAddress(addr)
+					if err != nil {
+						return err
+					}
+					validationRewardOwner.Addresses = append(validationRewardOwner.Addresses, addrStr)
+				}
+			}
+			delegationOwner, ok := staker.DelegationRewardsOwner().(*secp256k1fx.OutputOwners)
+			if ok {
+				delegationRewardOwner = &platformapi.Owner{
+					Locktime:  json.Uint64(delegationOwner.Locktime),
+					Threshold: json.Uint32(delegationOwner.Threshold),
+				}
+				for _, addr := range delegationOwner.Addrs {
+					addrStr, err := service.addrManager.FormatLocalAddress(addr)
+					if err != nil {
+						return err
+					}
+					delegationRewardOwner.Addresses = append(delegationRewardOwner.Addresses, addrStr)
+				}
+			}
+
+			reply.Validators = append(reply.Validators, platformapi.PermissionlessValidator{
+				Staker: platformapi.Staker{
+					TxID:        txID,
+					NodeID:      nodeID,
+					StartTime:   startTime,
+					EndTime:     endTime,
+					StakeAmount: &weight,
+				},
+				Uptime:                &uptime,
+				Connected:             connected && tracksSubnet,
+				PotentialReward:       &potentialReward,
+				RewardOwner:           validationRewardOwner,
+				ValidationRewardOwner: validationRewardOwner,
+				DelegationRewardOwner: delegationRewardOwner,
+				DelegationFee:         delegationFee,
+			})
+		case txs.DelegatorTx:
 			var rewardOwner *platformapi.Owner
-			owner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
+			owner, ok := staker.RewardsOwner().(*secp256k1fx.OutputOwners)
 			if ok {
 				rewardOwner = &platformapi.Owner{
 					Locktime:  json.Uint64(owner.Locktime),
@@ -677,50 +811,10 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				PotentialReward: &potentialReward,
 			}
 			vdrToDelegators[delegator.NodeID] = append(vdrToDelegators[delegator.NodeID], delegator)
-		case *txs.AddValidatorTx:
-			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(reward.PercentDenominator))
-			rawUptime, err := service.vm.uptimeManager.CalculateUptimePercentFrom(nodeID, staker.StartTime())
-			if err != nil {
-				return err
-			}
-			uptime := json.Float32(rawUptime)
-
-			connected := service.vm.uptimeManager.IsConnected(nodeID)
-
-			var rewardOwner *platformapi.Owner
-			owner, ok := staker.RewardsOwner.(*secp256k1fx.OutputOwners)
-			if ok {
-				rewardOwner = &platformapi.Owner{
-					Locktime:  json.Uint64(owner.Locktime),
-					Threshold: json.Uint32(owner.Threshold),
-				}
-				for _, addr := range owner.Addrs {
-					addrStr, err := service.addrManager.FormatLocalAddress(addr)
-					if err != nil {
-						return err
-					}
-					rewardOwner.Addresses = append(rewardOwner.Addresses, addrStr)
-				}
-			}
-
-			reply.Validators = append(reply.Validators, platformapi.PrimaryValidator{
-				Staker: platformapi.Staker{
-					TxID:        txID,
-					NodeID:      nodeID,
-					StartTime:   startTime,
-					EndTime:     endTime,
-					StakeAmount: &weight,
-				},
-				Uptime:          &uptime,
-				Connected:       connected,
-				PotentialReward: &potentialReward,
-				RewardOwner:     rewardOwner,
-				DelegationFee:   delegationFee,
-			})
 		case *txs.AddSubnetValidatorTx:
 			connected := service.vm.uptimeManager.IsConnected(nodeID)
 			tracksSubnet := service.vm.SubnetTracker.TracksSubnet(nodeID, args.SubnetID)
-			reply.Validators = append(reply.Validators, platformapi.SubnetValidator{
+			reply.Validators = append(reply.Validators, platformapi.PermissionedValidator{
 				Staker: platformapi.Staker{
 					NodeID:    nodeID,
 					TxID:      txID,
@@ -736,7 +830,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 	}
 
 	for i, vdrIntf := range reply.Validators {
-		vdr, ok := vdrIntf.(platformapi.PrimaryValidator)
+		vdr, ok := vdrIntf.(platformapi.PermissionlessValidator)
 		if !ok {
 			continue
 		}
@@ -805,19 +899,13 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 		endTime := json.Uint64(staker.EndTime.Unix())
 
 		switch staker := tx.Unsigned.(type) {
-		case *txs.AddDelegatorTx:
-			reply.Delegators = append(reply.Delegators, platformapi.Staker{
-				TxID:        txID,
-				NodeID:      nodeID,
-				StartTime:   startTime,
-				EndTime:     endTime,
-				StakeAmount: &weight,
-			})
-		case *txs.AddValidatorTx:
-			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(reward.PercentDenominator))
+		case txs.ValidatorTx:
+			shares := staker.Shares()
+			delegationFee := json.Float32(100 * float32(shares) / float32(reward.PercentDenominator))
 
 			connected := service.vm.uptimeManager.IsConnected(nodeID)
-			reply.Validators = append(reply.Validators, platformapi.PrimaryValidator{
+			tracksSubnet := args.SubnetID == constants.PrimaryNetworkID || service.vm.SubnetTracker.TracksSubnet(nodeID, args.SubnetID)
+			reply.Validators = append(reply.Validators, platformapi.PermissionlessValidator{
 				Staker: platformapi.Staker{
 					TxID:        txID,
 					NodeID:      nodeID,
@@ -826,12 +914,22 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 					StakeAmount: &weight,
 				},
 				DelegationFee: delegationFee,
-				Connected:     connected,
+				Connected:     connected && tracksSubnet,
 			})
+
+		case txs.DelegatorTx:
+			reply.Delegators = append(reply.Delegators, platformapi.Staker{
+				TxID:        txID,
+				NodeID:      nodeID,
+				StartTime:   startTime,
+				EndTime:     endTime,
+				StakeAmount: &weight,
+			})
+
 		case *txs.AddSubnetValidatorTx:
 			connected := service.vm.uptimeManager.IsConnected(nodeID)
 			tracksSubnet := service.vm.SubnetTracker.TracksSubnet(nodeID, args.SubnetID)
-			reply.Validators = append(reply.Validators, platformapi.SubnetValidator{
+			reply.Validators = append(reply.Validators, platformapi.PermissionedValidator{
 				Staker: platformapi.Staker{
 					NodeID:    nodeID,
 					TxID:      txID,
@@ -848,17 +946,23 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 	return nil
 }
 
+// GetCurrentSupplyArgs are the arguments for calling GetCurrentSupply
+type GetCurrentSupplyArgs struct {
+	SubnetID ids.ID `json:"subnetID"`
+}
+
 // GetCurrentSupplyReply are the results from calling GetCurrentSupply
 type GetCurrentSupplyReply struct {
 	Supply json.Uint64 `json:"supply"`
 }
 
 // GetCurrentSupply returns an upper bound on the supply of AVAX in the system
-func (service *Service) GetCurrentSupply(_ *http.Request, _ *struct{}, reply *GetCurrentSupplyReply) error {
+func (service *Service) GetCurrentSupply(_ *http.Request, args *GetCurrentSupplyArgs, reply *GetCurrentSupplyReply) error {
 	service.vm.ctx.Log.Debug("Platform: GetCurrentSupply called")
 
-	reply.Supply = json.Uint64(service.vm.state.GetCurrentSupply())
-	return nil
+	supply, err := service.vm.state.GetCurrentSupply(args.SubnetID)
+	reply.Supply = json.Uint64(supply)
+	return err
 }
 
 // SampleValidatorsArgs are the arguments for calling SampleValidators
@@ -1972,7 +2076,8 @@ type GetStakeArgs struct {
 
 // GetStakeReply is the response from calling GetStake.
 type GetStakeReply struct {
-	Staked json.Uint64 `json:"staked"`
+	Staked  json.Uint64            `json:"staked"`
+	Stakeds map[ids.ID]json.Uint64 `json:"stakeds"`
 	// String representation of staked outputs
 	// Each is of type avax.TransferableOutput
 	Outputs []string `json:"stakedOutputs"`
@@ -1984,35 +2089,17 @@ type GetStakeReply struct {
 // Returns:
 // 1) The total amount staked by addresses in [addrs]
 // 2) The staked outputs
-func (service *Service) getStakeHelper(tx *txs.Tx, addrs ids.ShortSet) (uint64, []avax.TransferableOutput, error) {
-	var outs []*avax.TransferableOutput
-	switch staker := tx.Unsigned.(type) {
-	case *txs.AddDelegatorTx:
-		outs = staker.Stake
-	case *txs.AddValidatorTx:
-		outs = staker.Stake
-	case *txs.AddSubnetValidatorTx:
-		return 0, nil, nil
-	default:
-		err := fmt.Errorf("expected *txs.AddDelegatorTx, *txs.AddValidatorTx or *txs.AddSubnetValidatorTx but got %T", tx.Unsigned)
-		service.vm.ctx.Log.Error("invalid tx type provided from validator set",
-			zap.Error(err),
-		)
-		return 0, nil, err
+func (service *Service) getStakeHelper(tx *txs.Tx, addrs ids.ShortSet, totalAmountStaked map[ids.ID]uint64) []avax.TransferableOutput {
+	staker, ok := tx.Unsigned.(txs.PermissionlessStaker)
+	if !ok {
+		return nil
 	}
 
-	var (
-		totalAmountStaked uint64
-		err               error
-		stakedOuts        = make([]avax.TransferableOutput, 0, len(outs))
-	)
+	stake := staker.Stake()
+	stakedOuts := make([]avax.TransferableOutput, 0, len(stake))
 	// Go through all of the staked outputs
-	for _, stake := range outs {
-		// This output isn't AVAX. Ignore.
-		if stake.AssetID() != service.vm.ctx.AVAXAssetID {
-			continue
-		}
-		out := stake.Out
+	for _, output := range stake {
+		out := output.Out
 		if lockedOut, ok := out.(*stakeable.LockOut); ok {
 			// This output can only be used for staking until [stakeOnlyUntil]
 			out = lockedOut.TransferableOut
@@ -2021,6 +2108,7 @@ func (service *Service) getStakeHelper(tx *txs.Tx, addrs ids.ShortSet) (uint64, 
 		if !ok {
 			continue
 		}
+
 		// Check whether this output is owned by one of the given addresses
 		contains := false
 		for _, addr := range secpOut.Addrs {
@@ -2033,16 +2121,20 @@ func (service *Service) getStakeHelper(tx *txs.Tx, addrs ids.ShortSet) (uint64, 
 			// This output isn't owned by one of the given addresses. Ignore.
 			continue
 		}
-		totalAmountStaked, err = math.Add64(totalAmountStaked, stake.Out.Amount())
+
+		assetID := output.AssetID()
+		newAmount, err := math.Add64(totalAmountStaked[assetID], secpOut.Amt)
 		if err != nil {
-			return 0, stakedOuts, err
+			newAmount = stdmath.MaxUint64
 		}
+		totalAmountStaked[assetID] = newAmount
+
 		stakedOuts = append(
 			stakedOuts,
-			*stake,
+			*output,
 		)
 	}
-	return totalAmountStaked, stakedOuts, nil
+	return stakedOuts
 }
 
 // GetStake returns the amount of nAVAX that [args.Addresses] have cumulatively
@@ -2072,8 +2164,8 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 	defer currentStakerIterator.Release()
 
 	var (
-		totalStake uint64
-		stakedOuts []avax.TransferableOutput
+		totalAmountStaked = make(map[ids.ID]uint64)
+		stakedOuts        []avax.TransferableOutput
 	)
 	for currentStakerIterator.Next() { // Iterates over current stakers
 		staker := currentStakerIterator.Value()
@@ -2083,15 +2175,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 			return err
 		}
 
-		stakedAmt, outs, err := service.getStakeHelper(tx, addrs)
-		if err != nil {
-			return err
-		}
-		totalStake, err = math.Add64(totalStake, stakedAmt)
-		if err != nil {
-			return err
-		}
-		stakedOuts = append(stakedOuts, outs...)
+		stakedOuts = append(stakedOuts, service.getStakeHelper(tx, addrs, totalAmountStaked)...)
 	}
 
 	pendingStakerIterator, err := service.vm.state.GetPendingStakerIterator()
@@ -2108,18 +2192,11 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 			return err
 		}
 
-		stakedAmt, outs, err := service.getStakeHelper(tx, addrs)
-		if err != nil {
-			return err
-		}
-		totalStake, err = math.Add64(totalStake, stakedAmt)
-		if err != nil {
-			return err
-		}
-		stakedOuts = append(stakedOuts, outs...)
+		stakedOuts = append(stakedOuts, service.getStakeHelper(tx, addrs, totalAmountStaked)...)
 	}
 
-	response.Staked = json.Uint64(totalStake)
+	response.Stakeds = newJSONBalanceMap(totalAmountStaked)
+	response.Staked = response.Stakeds[service.vm.ctx.AVAXAssetID]
 	response.Outputs = make([]string, len(stakedOuts))
 	for i, output := range stakedOuts {
 		bytes, err := txs.Codec.Marshal(txs.Version, output)
@@ -2136,6 +2213,11 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 	return nil
 }
 
+// GetMinStakeArgs are the arguments for calling GetMinStake.
+type GetMinStakeArgs struct {
+	SubnetID ids.ID `json:"subnetID"`
+}
+
 // GetMinStakeReply is the response from calling GetMinStake.
 type GetMinStakeReply struct {
 	//  The minimum amount of tokens one must bond to be a validator
@@ -2145,9 +2227,32 @@ type GetMinStakeReply struct {
 }
 
 // GetMinStake returns the minimum staking amount in nAVAX.
-func (service *Service) GetMinStake(_ *http.Request, _ *struct{}, reply *GetMinStakeReply) error {
-	reply.MinValidatorStake = json.Uint64(service.vm.MinValidatorStake)
-	reply.MinDelegatorStake = json.Uint64(service.vm.MinDelegatorStake)
+func (service *Service) GetMinStake(_ *http.Request, args *GetMinStakeArgs, reply *GetMinStakeReply) error {
+	if args.SubnetID == constants.PrimaryNetworkID {
+		reply.MinValidatorStake = json.Uint64(service.vm.MinValidatorStake)
+		reply.MinDelegatorStake = json.Uint64(service.vm.MinDelegatorStake)
+		return nil
+	}
+
+	transformSubnetIntf, err := service.vm.state.GetSubnetTransformation(args.SubnetID)
+	if err != nil {
+		return fmt.Errorf(
+			"failed fetching subnet transformation for %s: %w",
+			args.SubnetID,
+			err,
+		)
+	}
+	transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
+	if !ok {
+		return fmt.Errorf(
+			"unexpected subnet transformation tx type fetched %T",
+			transformSubnetIntf.Unsigned,
+		)
+	}
+
+	reply.MinValidatorStake = json.Uint64(transformSubnet.MinValidatorStake)
+	reply.MinDelegatorStake = json.Uint64(transformSubnet.MinDelegatorStake)
+
 	return nil
 }
 
@@ -2160,8 +2265,9 @@ type GetTotalStakeArgs struct {
 
 // GetTotalStakeReply is the response from calling GetTotalStake.
 type GetTotalStakeReply struct {
-	Stake  json.Uint64 `json:"stake,omitempty"`
-	Weight json.Uint64 `json:"weight,omitempty"`
+	// TODO: deprecate one of these fields
+	Stake  json.Uint64 `json:"stake"`
+	Weight json.Uint64 `json:"weight"`
 }
 
 // GetTotalStake returns the total amount staked on the Primary Network
@@ -2171,11 +2277,8 @@ func (service *Service) GetTotalStake(_ *http.Request, args *GetTotalStakeArgs, 
 		return errNoValidators
 	}
 	weight := json.Uint64(vdrs.Weight())
-	if args.SubnetID == constants.PrimaryNetworkID {
-		reply.Stake = weight
-	} else {
-		reply.Weight = weight
-	}
+	reply.Weight = weight
+	reply.Stake = weight
 	return nil
 }
 
@@ -2312,13 +2415,14 @@ func (service *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, respon
 		zap.Stringer("encoding", args.Encoding),
 	)
 
-	block, err := service.vm.GetBlock(args.BlockID)
+	block, err := service.vm.manager.GetStatelessBlock(args.BlockID)
 	if err != nil {
 		return fmt.Errorf("couldn't get block with id %s: %w", args.BlockID, err)
 	}
 	response.Encoding = args.Encoding
 
 	if args.Encoding == formatting.JSON {
+		block.InitCtx(service.vm.ctx)
 		response.Block = block
 		return nil
 	}

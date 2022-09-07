@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -157,7 +157,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 					// Shouldn't be dropped
 					Start: uint64(now.Add(2 * executor.SyncBound).Unix()),
 				},
-				Stake: []*avax.TransferableOutput{output},
+				StakeOuts: []*avax.TransferableOutput{output},
 				RewardsOwner: &secp256k1fx.OutputOwners{
 					Addrs: []ids.ShortID{ids.GenerateTestShortID()},
 				},
@@ -207,7 +207,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
 					TxID:     stakerTxID,
-					Priority: state.PrimaryNetworkDelegatorCurrentPriority,
+					Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
 					EndTime:  parentTimestamp,
 				})
 				currentStakerIter.EXPECT().Release()
@@ -254,8 +254,8 @@ func TestBuildBlueberryBlock(t *testing.T) {
 					currentStakerIter.EXPECT().Next().Return(true),
 					currentStakerIter.EXPECT().Value().Return(&state.Staker{
 						NextTime: now.Add(time.Second),
+						Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
 					}),
-					currentStakerIter.EXPECT().Next().Return(false),
 					currentStakerIter.EXPECT().Release(),
 				)
 
@@ -309,8 +309,8 @@ func TestBuildBlueberryBlock(t *testing.T) {
 					currentStakerIter.EXPECT().Next().Return(true),
 					currentStakerIter.EXPECT().Value().Return(&state.Staker{
 						NextTime: now.Add(time.Second),
+						Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
 					}),
-					currentStakerIter.EXPECT().Next().Return(false),
 					currentStakerIter.EXPECT().Release(),
 				)
 
@@ -357,8 +357,8 @@ func TestBuildBlueberryBlock(t *testing.T) {
 					currentStakerIter.EXPECT().Next().Return(true),
 					currentStakerIter.EXPECT().Value().Return(&state.Staker{
 						NextTime: now.Add(-1 * time.Second),
+						Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
 					}),
-					currentStakerIter.EXPECT().Next().Return(false),
 					currentStakerIter.EXPECT().Release(),
 				)
 
@@ -410,8 +410,8 @@ func TestBuildBlueberryBlock(t *testing.T) {
 					currentStakerIter.EXPECT().Next().Return(true),
 					currentStakerIter.EXPECT().Value().Return(&state.Staker{
 						NextTime: now.Add(time.Second),
+						Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
 					}),
-					currentStakerIter.EXPECT().Next().Return(false),
 					currentStakerIter.EXPECT().Release(),
 				)
 
@@ -464,8 +464,8 @@ func TestBuildBlueberryBlock(t *testing.T) {
 					currentStakerIter.EXPECT().Next().Return(true),
 					currentStakerIter.EXPECT().Value().Return(&state.Staker{
 						NextTime: now.Add(time.Second),
+						Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
 					}),
-					currentStakerIter.EXPECT().Next().Return(false),
 					currentStakerIter.EXPECT().Release(),
 				)
 

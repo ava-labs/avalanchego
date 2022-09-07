@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -6,7 +6,7 @@ package proposervm
 import (
 	"bytes"
 	"crypto"
-	"fmt"
+	"errors"
 	"testing"
 	"time"
 
@@ -86,7 +86,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	innerVM.GetBlockF = func(i ids.ID) (snowman.Block, error) { return innerGenesisBlk, nil }
 
 	// createVM
-	vm := New(innerVM, time.Time{}, uint64(0))
+	vm := New(innerVM, time.Time{}, uint64(0), time.Time{})
 
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
@@ -176,7 +176,7 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 		return innerBlk, nil
 	}
 
-	slb, err := statelessblock.Build(
+	slb, err := statelessblock.BuildApricot(
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
@@ -258,7 +258,7 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 		return innerBlk, nil
 	}
 
-	slb, err := statelessblock.Build(
+	slb, err := statelessblock.BuildApricot(
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
@@ -343,7 +343,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 		return innerBlk, nil
 	}
 
-	slb, err := statelessblock.Build(
+	slb, err := statelessblock.BuildApricot(
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
@@ -413,7 +413,7 @@ func TestParseStateSummary(t *testing.T) {
 		return innerBlk, nil
 	}
 
-	slb, err := statelessblock.Build(
+	slb, err := statelessblock.BuildApricot(
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
@@ -473,7 +473,7 @@ func TestStateSummaryAccept(t *testing.T) {
 		return innerBlk, nil
 	}
 
-	slb, err := statelessblock.Build(
+	slb, err := statelessblock.BuildApricot(
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
@@ -543,7 +543,7 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 		return innerBlk, nil
 	}
 
-	slb, err := statelessblock.Build(
+	slb, err := statelessblock.BuildApricot(
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
@@ -593,7 +593,7 @@ func TestNoStateSummariesServedWhileRepairingHeightIndex(t *testing.T) {
 	}
 	coreVM.GetStateSummaryF = func(height uint64) (block.StateSummary, error) {
 		if height != summaryHeight {
-			return nil, fmt.Errorf("requested unexpected summary")
+			return nil, errors.New("requested unexpected summary")
 		}
 		return coreStateSummary, nil
 	}

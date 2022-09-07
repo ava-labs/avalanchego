@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -94,7 +94,7 @@ func buildApricotBlock(
 // Any returned error is unexpected.
 func nextApricotProposalTx(builder *builder, timestamp time.Time, parentState state.Chain) (*txs.Tx, error) {
 	tx := builder.Mempool.PeekStakerTx()
-	startTime := tx.Unsigned.(txs.StakerTx).StartTime()
+	startTime := tx.Unsigned.(txs.Staker).StartTime()
 
 	// Check whether this staker starts within at most [MaxFutureStartTime].
 	// If it does, issue the staking tx.

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -35,7 +35,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	)
 
 	// Case : signed tx is nil
-	require.ErrorIs(stx.SyntacticVerify(ctx), errNilSignedTx)
+	require.ErrorIs(stx.SyntacticVerify(ctx), ErrNilSignedTx)
 
 	// Case : unsigned tx is nil
 	require.ErrorIs(addDelegatorTx.SyntacticVerify(ctx), ErrNilTx)
@@ -89,8 +89,8 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 			End:    uint64(clk.Time().Add(time.Hour).Unix()),
 			Wght:   validatorWeight,
 		},
-		Stake: stakes,
-		RewardsOwner: &secp256k1fx.OutputOwners{
+		StakeOuts: stakes,
+		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
@@ -187,8 +187,8 @@ func TestAddDelegatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 			End:    uint64(clk.Time().Add(time.Hour).Unix()),
 			Wght:   validatorWeight,
 		},
-		Stake: stakes,
-		RewardsOwner: &secp256k1fx.OutputOwners{
+		StakeOuts: stakes,
+		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,
 			Threshold: 1,
 			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
@@ -198,4 +198,10 @@ func TestAddDelegatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 	stx, err = NewSigned(addDelegatorTx, Codec, signers)
 	require.NoError(err)
 	require.Error(stx.SyntacticVerify(ctx))
+}
+
+func TestAddDelegatorTxNotValidatorTx(t *testing.T) {
+	txIntf := any((*AddDelegatorTx)(nil))
+	_, ok := txIntf.(ValidatorTx)
+	require.False(t, ok)
 }

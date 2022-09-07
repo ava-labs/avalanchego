@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -118,7 +118,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require.NotEqual(stakerToRemove.TxID, nextToRemove.TxID)
 
 	// check that stake/reward is given back
-	stakeOwners := stakerToRemoveTx.Stake[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
+	stakeOwners := stakerToRemoveTx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
 
 	// Get old balances
 	oldBalance, err := avax.GetBalance(env.state, stakeOwners)
@@ -220,7 +220,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require.NotEqual(stakerToRemove.TxID, nextToRemove.TxID)
 
 	// check that stake/reward isn't given back
-	stakeOwners := stakerToRemoveTx.Stake[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
+	stakeOwners := stakerToRemoveTx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
 
 	// Get old balances
 	oldBalance, err := avax.GetBalance(env.state, stakeOwners)
@@ -278,21 +278,17 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	)
 	require.NoError(err)
 
-	vdrStaker := state.NewPrimaryNetworkStaker(
+	vdrStaker := state.NewCurrentStaker(
 		vdrTx.ID(),
-		&vdrTx.Unsigned.(*txs.AddValidatorTx).Validator,
+		vdrTx.Unsigned.(*txs.AddValidatorTx),
+		0,
 	)
-	vdrStaker.PotentialReward = 0
-	vdrStaker.NextTime = vdrStaker.EndTime
-	vdrStaker.Priority = state.PrimaryNetworkValidatorCurrentPriority
 
-	delStaker := state.NewPrimaryNetworkStaker(
+	delStaker := state.NewCurrentStaker(
 		delTx.ID(),
-		&delTx.Unsigned.(*txs.AddDelegatorTx).Validator,
+		delTx.Unsigned.(*txs.AddDelegatorTx),
+		1000000,
 	)
-	delStaker.PotentialReward = 1000000
-	delStaker.NextTime = delStaker.EndTime
-	delStaker.Priority = state.PrimaryNetworkDelegatorCurrentPriority
 
 	env.state.PutCurrentValidator(vdrStaker)
 	env.state.AddTx(vdrTx, status.Committed)
@@ -379,7 +375,8 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	}()
 	dummyHeight := uint64(1)
 
-	initialSupply := env.state.GetCurrentSupply()
+	initialSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(err)
 
 	vdrRewardAddress := ids.GenerateTestShortID()
 	delRewardAddress := ids.GenerateTestShortID()
@@ -413,21 +410,17 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	)
 	require.NoError(err)
 
-	vdrStaker := state.NewPrimaryNetworkStaker(
+	vdrStaker := state.NewCurrentStaker(
 		vdrTx.ID(),
-		&vdrTx.Unsigned.(*txs.AddValidatorTx).Validator,
+		vdrTx.Unsigned.(*txs.AddValidatorTx),
+		0,
 	)
-	vdrStaker.PotentialReward = 0
-	vdrStaker.NextTime = vdrStaker.EndTime
-	vdrStaker.Priority = state.PrimaryNetworkValidatorCurrentPriority
 
-	delStaker := state.NewPrimaryNetworkStaker(
+	delStaker := state.NewCurrentStaker(
 		delTx.ID(),
-		&delTx.Unsigned.(*txs.AddDelegatorTx).Validator,
+		delTx.Unsigned.(*txs.AddDelegatorTx),
+		1000000,
 	)
-	delStaker.PotentialReward = 1000000
-	delStaker.NextTime = delStaker.EndTime
-	delStaker.Priority = state.PrimaryNetworkDelegatorCurrentPriority
 
 	env.state.PutCurrentValidator(vdrStaker)
 	env.state.AddTx(vdrTx, status.Committed)
@@ -488,6 +481,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require.NoError(err)
 	require.Zero(delReward, "expected delegator balance not to increase")
 
-	newSupply := env.state.GetCurrentSupply()
+	newSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(err)
 	require.Equal(initialSupply-expectedReward, newSupply, "should have removed un-rewarded tokens from the potential supply")
 }
