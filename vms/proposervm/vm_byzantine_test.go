@@ -736,6 +736,7 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 
 	// GetBlock shouldn't really be able to succeed, as we don't have a valid
 	// representation of [blkID]
+	proVM.innerBlkCache.Flush() // So we don't get from the cache
 	fetchedBlk, err := proVM.GetBlock(blkID)
 	if err != nil {
 		t.Skip(err)

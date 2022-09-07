@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/manager"
@@ -20,11 +22,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
+	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -2110,4 +2114,97 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	blkID, err = proVM.GetBlockIDAtHeight(cBlock.Height())
 	require.NoError(err)
 	require.Equal(bBlock.ID(), blkID)
+}
+
+func TestVMInnerBlkCache(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Create a VM
+	innerVM := mocks.NewMockChainVM(ctrl)
+	vm := New(
+		innerVM,
+		time.Time{}, // fork is active
+		0,           // minimum P-Chain height
+		time.Time{}, // fork is active
+	)
+
+	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
+	// make sure that DBs are compressed correctly
+	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
+
+	innerVM.EXPECT().Initialize(
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+	).Return(nil)
+
+	ctx := snow.DefaultContextTest()
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
+	ctx.StakingCertLeaf = pTestCert.Leaf
+	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
+
+	err := vm.Initialize(
+		ctx,
+		dummyDBManager,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+	require.NoError(err)
+	state := state.NewMockState(ctrl) // mock state
+	vm.State = state
+
+	// Create a block near the tip (0).
+	blkNearTipInnerBytes := []byte{1}
+	blkNearTip, err := statelessblock.BuildBlueberry(
+		ids.GenerateTestID(),     // parent
+		time.Time{},              // timestamp
+		1,                        // pChainHeight,
+		vm.ctx.StakingCertLeaf,   // cert
+		blkNearTipInnerBytes,     // inner blk bytes
+		vm.ctx.ChainID,           // chain ID
+		vm.ctx.StakingLeafSigner, // key
+	)
+	require.NoError(err)
+
+	// Parse a block.
+	// Not in the VM's state so need to parse it.
+	state.EXPECT().GetBlock(blkNearTip.ID()).Return(blkNearTip, choices.Accepted, nil).Times(2)
+	// We will ask the inner VM to parse.
+	mockInnerBlkNearTip := snowman.NewMockBlock(ctrl)
+	mockInnerBlkNearTip.EXPECT().Height().Return(uint64(1)).Times(2)
+	innerVM.EXPECT().ParseBlock(blkNearTipInnerBytes).Return(mockInnerBlkNearTip, nil).Times(2)
+	_, err = vm.ParseBlock(blkNearTip.Bytes())
+	require.NoError(err)
+
+	// Block should now be in cache because it's a post-fork block
+	// and close to the tip.
+	gotBlk, ok := vm.innerBlkCache.Get(blkNearTip.ID())
+	require.True(ok)
+	require.Equal(mockInnerBlkNearTip, gotBlk)
+	require.Equal(uint64(0), vm.lastAcceptedHeight)
+
+	// Clear the cache
+	vm.innerBlkCache.Flush()
+
+	// Advance the tip height
+	vm.lastAcceptedHeight = innerBlkCacheSize + 1
+
+	// Parse the block again. This time it shouldn't be cached
+	// because it's not close to the tip.
+	_, err = vm.ParseBlock(blkNearTip.Bytes())
+	require.NoError(err)
+
+	_, ok = vm.innerBlkCache.Get(blkNearTip.ID())
+	require.False(ok)
 }

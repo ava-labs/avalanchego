@@ -9,8 +9,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
+	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -38,6 +43,7 @@ const (
 	// are only specific to the second.
 	minBlockDelay         = time.Second
 	checkIndexedFrequency = 10 * time.Second
+	innerBlkCacheSize     = 512
 )
 
 var (
@@ -79,6 +85,11 @@ type VM struct {
 	// Each element is a block that passed verification but
 	// hasn't yet been accepted/rejected
 	verifiedBlocks map[ids.ID]PostForkBlock
+	// Stateless block ID --> inner block.
+	// Only contains post-fork blocks near the tip so that the cache doesn't get
+	// filled with random blocks every time this node parses blocks while
+	// processing a GetAncestors message from a bootstrapping node.
+	innerBlkCache  cache.Cacher
 	preferred      ids.ID
 	consensusState snow.State
 	context        context.Context
@@ -127,6 +138,23 @@ func (vm *VM) Initialize(
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
+	// TODO: Add a helper for this metrics override, it is performed in multiple
+	//       places.
+	multiGatherer := metrics.NewMultiGatherer()
+	registerer := prometheus.NewRegistry()
+	if err := multiGatherer.Register("proposervm", registerer); err != nil {
+		return err
+	}
+
+	optionalGatherer := metrics.NewOptionalGatherer()
+	if err := multiGatherer.Register("", optionalGatherer); err != nil {
+		return err
+	}
+	if err := ctx.Metrics.Register(multiGatherer); err != nil {
+		return err
+	}
+	ctx.Metrics = optionalGatherer
+
 	vm.ctx = ctx
 	rawDB := dbManager.Current().Database
 	prefixDB := prefixdb.New(dbPrefix, rawDB)
@@ -134,8 +162,18 @@ func (vm *VM) Initialize(
 	vm.State = state.New(vm.db)
 	vm.Windower = proposer.New(ctx.ValidatorState, ctx.SubnetID, ctx.ChainID)
 	vm.Tree = tree.New()
+	innerBlkCache, err := metercacher.New(
+		"inner_block_cache",
+		registerer,
+		&cache.LRU{Size: innerBlkCacheSize},
+	)
+	if err != nil {
+		return err
+	}
+	vm.innerBlkCache = innerBlkCache
 
 	indexerDB := versiondb.New(vm.db)
+	// TODO: Use [state.NewMetered] here to populate additional metrics.
 	indexerState := state.New(indexerDB)
 	vm.hIndexer = indexer.NewHeightIndexer(vm, vm.ctx.Log, indexerState)
 
@@ -152,7 +190,7 @@ func (vm *VM) Initialize(
 	vm.context = context
 	vm.onShutdown = cancel
 
-	err := vm.ChainVM.Initialize(
+	err = vm.ChainVM.Initialize(
 		ctx,
 		dbManager,
 		genesisBytes,
@@ -603,7 +641,7 @@ func (vm *VM) parsePostForkBlock(b []byte) (PostForkBlock, error) {
 	}
 
 	innerBlkBytes := statelessBlock.Block()
-	innerBlk, err := vm.ChainVM.ParseBlock(innerBlkBytes)
+	innerBlk, err := vm.parseInnerBlock(blkID, innerBlkBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -657,7 +695,7 @@ func (vm *VM) getPostForkBlock(blkID ids.ID) (PostForkBlock, error) {
 	}
 
 	innerBlkBytes := statelessBlock.Block()
-	innerBlk, err := vm.ChainVM.ParseBlock(innerBlkBytes)
+	innerBlk, err := vm.parseInnerBlock(blkID, innerBlkBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -739,4 +777,29 @@ func (vm *VM) optimalPChainHeight(minPChainHeight uint64) (uint64, error) {
 	}
 
 	return math.Max64(minimumHeight, minPChainHeight), nil
+}
+
+// parseInnerBlock attempts to parse the provided bytes as an inner block. If
+// the inner block happens to be cached, then the inner block will not be
+// parsed.
+func (vm *VM) parseInnerBlock(outerBlkID ids.ID, innerBlkBytes []byte) (snowman.Block, error) {
+	if innerBlkIntf, ok := vm.innerBlkCache.Get(outerBlkID); ok {
+		return innerBlkIntf.(snowman.Block), nil
+	}
+
+	innerBlk, err := vm.ChainVM.ParseBlock(innerBlkBytes)
+	if err != nil {
+		return nil, err
+	}
+	vm.cacheInnerBlock(outerBlkID, innerBlk)
+	return innerBlk, nil
+}
+
+// Caches proposervm block ID --> inner block if the inner block's height
+// is within [innerBlkCacheSize] of the last accepted block's height.
+func (vm *VM) cacheInnerBlock(outerBlkID ids.ID, innerBlk snowman.Block) {
+	diff := math.Diff64(innerBlk.Height(), vm.lastAcceptedHeight)
+	if diff < innerBlkCacheSize {
+		vm.innerBlkCache.Put(outerBlkID, innerBlk)
+	}
 }
