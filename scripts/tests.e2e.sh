@@ -27,7 +27,7 @@ ENABLE_WHITELIST_VTX_TESTS=${ENABLE_WHITELIST_VTX_TESTS:-false}
 # TODO: migrate to upstream avalanche-network-runner
 GOARCH=$(go env GOARCH)
 GOOS=$(go env GOOS)
-NETWORK_RUNNER_VERSION=1.1.0
+NETWORK_RUNNER_VERSION=1.2.2
 DOWNLOAD_PATH=/tmp/avalanche-network-runner.tar.gz
 DOWNLOAD_URL="https://github.com/ava-labs/avalanche-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/avalanche-network-runner_${NETWORK_RUNNER_VERSION}_${GOOS}_${GOARCH}.tar.gz"
 
