@@ -75,7 +75,7 @@ func (utxo UTXO) Less(other UTXO) bool {
 }
 
 // TODO: Refactor APIStaker, APIValidators and merge them together for
-//       PermissionedValidators + PermissionlessValidators.=======
+//       PermissionedValidators + PermissionlessValidators.
 
 // APIStaker is the representation of a staker sent via APIs.
 // [TxID] is the txID of the transaction that added this staker.
