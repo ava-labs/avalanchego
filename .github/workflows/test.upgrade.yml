@@ -25,4 +25,4 @@ jobs:
         run: ./scripts/build.sh
       - name: Run upgrade tests
         shell: bash
-        run: scripts/tests.upgrade.sh 1.7.16 ./build/avalanchego
+        run: scripts/tests.upgrade.sh 1.8.2 ./build/avalanchego

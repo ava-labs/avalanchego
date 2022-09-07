@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package mempool
@@ -66,5 +66,20 @@ func (i *issuer) ImportTx(tx *txs.ImportTx) error {
 
 func (i *issuer) ExportTx(tx *txs.ExportTx) error {
 	i.m.addDecisionTx(i.tx)
+	return nil
+}
+
+func (i *issuer) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
+	i.m.addDecisionTx(i.tx)
+	return nil
+}
+
+func (i *issuer) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+	i.m.addStakerTx(i.tx)
+	return nil
+}
+
+func (i *issuer) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+	i.m.addStakerTx(i.tx)
 	return nil
 }

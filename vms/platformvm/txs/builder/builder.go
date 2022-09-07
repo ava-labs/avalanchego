@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -170,7 +170,7 @@ type ProposalTxBuilder interface {
 
 func New(
 	ctx *snow.Context,
-	cfg config.Config,
+	cfg *config.Config,
 	clk *mockable.Clock,
 	fx fx.Fx,
 	state state.Chain,
@@ -193,7 +193,7 @@ type builder struct {
 	utxo.Spender
 	state state.Chain
 
-	cfg config.Config
+	cfg *config.Config
 	ctx *snow.Context
 	clk *mockable.Clock
 	fx  fx.Fx
@@ -435,7 +435,7 @@ func (b *builder) NewAddValidatorTx(
 	keys []*crypto.PrivateKeySECP256K1R,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	ins, unstakedOuts, stakedOuts, signers, err := b.Spend(keys, stakeAmount, b.cfg.AddStakerTxFee, changeAddr)
+	ins, unstakedOuts, stakedOuts, signers, err := b.Spend(keys, stakeAmount, b.cfg.AddPrimaryNetworkValidatorFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -453,13 +453,13 @@ func (b *builder) NewAddValidatorTx(
 			End:    endTime,
 			Wght:   stakeAmount,
 		},
-		Stake: stakedOuts,
+		StakeOuts: stakedOuts,
 		RewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,
 			Threshold: 1,
 			Addrs:     []ids.ShortID{rewardAddress},
 		},
-		Shares: shares,
+		DelegationShares: shares,
 	}
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)
 	if err != nil {
@@ -477,7 +477,7 @@ func (b *builder) NewAddDelegatorTx(
 	keys []*crypto.PrivateKeySECP256K1R,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := b.Spend(keys, stakeAmount, b.cfg.AddStakerTxFee, changeAddr)
+	ins, unlockedOuts, lockedOuts, signers, err := b.Spend(keys, stakeAmount, b.cfg.AddPrimaryNetworkDelegatorFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -495,8 +495,8 @@ func (b *builder) NewAddDelegatorTx(
 			End:    endTime,
 			Wght:   stakeAmount,
 		},
-		Stake: lockedOuts,
-		RewardsOwner: &secp256k1fx.OutputOwners{
+		StakeOuts: lockedOuts,
+		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,
 			Threshold: 1,
 			Addrs:     []ids.ShortID{rewardAddress},

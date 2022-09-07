@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -15,4 +15,7 @@ type Visitor interface {
 	AdvanceTimeTx(*AdvanceTimeTx) error
 	RewardValidatorTx(*RewardValidatorTx) error
 	RemoveSubnetValidatorTx(*RemoveSubnetValidatorTx) error
+	TransformSubnetTx(*TransformSubnetTx) error
+	AddPermissionlessValidatorTx(*AddPermissionlessValidatorTx) error
+	AddPermissionlessDelegatorTx(*AddPermissionlessDelegatorTx) error
 }

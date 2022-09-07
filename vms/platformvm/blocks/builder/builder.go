@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -271,11 +271,10 @@ func (b *builder) getNextStakerToReward(
 	for currentStakerIterator.Next() {
 		currentStaker := currentStakerIterator.Value()
 		priority := currentStaker.Priority
-		// If the staker is a primary network staker (not a subnet validator),
-		// it's the next staker we will want to remove with a RewardValidatorTx
-		// rather than an AdvanceTimeTx.
-		if priority == state.PrimaryNetworkDelegatorCurrentPriority ||
-			priority == state.PrimaryNetworkValidatorCurrentPriority {
+		// If the staker is a permissionless staker (not a permissioned subnet
+		// validator), it's the next staker we will want to remove with a
+		// RewardValidatorTx rather than an AdvanceTimeTx.
+		if priority != txs.SubnetPermissionedValidatorCurrentPriority {
 			return currentStaker.TxID, chainTimestamp.Equal(currentStaker.EndTime), nil
 		}
 	}
@@ -289,7 +288,7 @@ func (b *builder) dropExpiredStakerTxs(timestamp time.Time) {
 	minStartTime := timestamp.Add(txexecutor.SyncBound)
 	for b.Mempool.HasStakerTx() {
 		tx := b.Mempool.PeekStakerTx()
-		startTime := tx.Unsigned.(txs.StakerTx).StartTime()
+		startTime := tx.Unsigned.(txs.Staker).StartTime()
 		if !startTime.Before(minStartTime) {
 			// The next proposal tx in the mempool starts sufficiently far in
 			// the future.

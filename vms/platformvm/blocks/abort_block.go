@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blocks
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -48,6 +49,8 @@ func (b *ApricotAbortBlock) initialize(bytes []byte) error {
 	b.CommonBlock.initialize(bytes)
 	return nil
 }
+
+func (*ApricotAbortBlock) InitCtx(ctx *snow.Context) {}
 
 func (*ApricotAbortBlock) Txs() []*txs.Tx          { return nil }
 func (b *ApricotAbortBlock) Visit(v Visitor) error { return v.ApricotAbortBlock(b) }

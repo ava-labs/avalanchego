@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p
 
 import (
 	"errors"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -139,6 +140,91 @@ type Wallet interface {
 	IssueExportTx(
 		chainID ids.ID,
 		outputs []*avax.TransferableOutput,
+		options ...common.Option,
+	) (ids.ID, error)
+
+	// IssueTransformSubnetTx creates a transform subnet transaction that attempts
+	// to convert the provided [subnetID] from a permissioned subnet to a
+	// permissionless subnet. This transaction will convert
+	// [maxSupply] - [initialSupply] of [assetID] to staking rewards.
+	//
+	// - [subnetID] specifies the subnet to transform.
+	// - [assetID] specifies the asset to use to reward stakers on the subnet.
+	// - [initialSupply] is the amount of [assetID] that will be in circulation
+	//   after this transaction is accepted.
+	// - [maxSupply] is the maximum total amount of [assetID] that should ever
+	//   exist.
+	// - [minConsumptionRate] is the rate that a staker will receive rewards
+	//   if they stake with a duration of 0.
+	// - [maxConsumptionRate] is the maximum rate that staking rewards should be
+	//   consumed from the reward pool per year.
+	// - [minValidatorStake] is the minimum amount of funds required to become a
+	//   validator.
+	// - [maxValidatorStake] is the maximum amount of funds a single validator
+	//   can be allocated, including delegated funds.
+	// - [minStakeDuration] is the minimum number of seconds a staker can stake
+	//   for.
+	// - [maxStakeDuration] is the maximum number of seconds a staker can stake
+	//   for.
+	// - [minValidatorStake] is the minimum amount of funds required to become a
+	//   delegator.
+	// - [maxValidatorWeightFactor] is the factor which calculates the maximum
+	//   amount of delegation a validator can receive. A value of 1 effectively
+	//   disables delegation.
+	// - [uptimeRequirement] is the minimum percentage a validator must be
+	//   online and responsive to receive a reward.
+	IssueTransformSubnetTx(
+		subnetID ids.ID,
+		assetID ids.ID,
+		initialSupply uint64,
+		maxSupply uint64,
+		minConsumptionRate uint64,
+		maxConsumptionRate uint64,
+		minValidatorStake uint64,
+		maxValidatorStake uint64,
+		minStakeDuration time.Duration,
+		maxStakeDuration time.Duration,
+		minDelegationFee uint32,
+		minDelegatorStake uint64,
+		maxValidatorWeightFactor byte,
+		uptimeRequirement uint32,
+		options ...common.Option,
+	) (ids.ID, error)
+
+	// IssueAddPermissionlessValidatorTx creates, signs, and issues a new
+	// validator of the specified subnet.
+	//
+	// - [vdr] specifies all the details of the validation period such as the
+	//   subnetID, startTime, endTime, stake weight, and nodeID.
+	// - [assetID] specifies the asset to stake.
+	// - [validationRewardsOwner] specifies the owner of all the rewards this
+	//   validator earns for its validation period.
+	// - [delegationRewardsOwner] specifies the owner of all the rewards this
+	//   validator earns for delegations during its validation period.
+	// - [shares] specifies the fraction (out of 1,000,000) that this validator
+	//   will take from delegation rewards. If 1,000,000 is provided, 100% of
+	//   the delegation reward will be sent to the validator's [rewardsOwner].
+	IssueAddPermissionlessValidatorTx(
+		vdr *validator.SubnetValidator,
+		assetID ids.ID,
+		validationRewardsOwner *secp256k1fx.OutputOwners,
+		delegationRewardsOwner *secp256k1fx.OutputOwners,
+		shares uint32,
+		options ...common.Option,
+	) (ids.ID, error)
+
+	// IssueAddPermissionlessDelegatorTx creates, signs, and issues a new
+	// delegator of the specified subnet on the specified nodeID.
+	//
+	// - [vdr] specifies all the details of the delegation period such as the
+	//   subnetID, startTime, endTime, stake weight, and nodeID.
+	// - [assetID] specifies the asset to stake.
+	// - [rewardsOwner] specifies the owner of all the rewards this delegator
+	//   earns during its delegation period.
+	IssueAddPermissionlessDelegatorTx(
+		vdr *validator.SubnetValidator,
+		assetID ids.ID,
+		rewardsOwner *secp256k1fx.OutputOwners,
 		options ...common.Option,
 	) (ids.ID, error)
 
@@ -283,6 +369,86 @@ func (w *wallet) IssueExportTx(
 	options ...common.Option,
 ) (ids.ID, error) {
 	utx, err := w.builder.NewExportTx(chainID, outputs, options...)
+	if err != nil {
+		return ids.Empty, err
+	}
+	return w.IssueUnsignedTx(utx, options...)
+}
+
+func (w *wallet) IssueTransformSubnetTx(
+	subnetID ids.ID,
+	assetID ids.ID,
+	initialSupply uint64,
+	maxSupply uint64,
+	minConsumptionRate uint64,
+	maxConsumptionRate uint64,
+	minValidatorStake uint64,
+	maxValidatorStake uint64,
+	minStakeDuration time.Duration,
+	maxStakeDuration time.Duration,
+	minDelegationFee uint32,
+	minDelegatorStake uint64,
+	maxValidatorWeightFactor byte,
+	uptimeRequirement uint32,
+	options ...common.Option,
+) (ids.ID, error) {
+	utx, err := w.builder.NewTransformSubnetTx(
+		subnetID,
+		assetID,
+		initialSupply,
+		maxSupply,
+		minConsumptionRate,
+		maxConsumptionRate,
+		minValidatorStake,
+		maxValidatorStake,
+		minStakeDuration,
+		maxStakeDuration,
+		minDelegationFee,
+		minDelegatorStake,
+		maxValidatorWeightFactor,
+		uptimeRequirement,
+		options...,
+	)
+	if err != nil {
+		return ids.Empty, err
+	}
+	return w.IssueUnsignedTx(utx, options...)
+}
+
+func (w *wallet) IssueAddPermissionlessValidatorTx(
+	vdr *validator.SubnetValidator,
+	assetID ids.ID,
+	validationRewardsOwner *secp256k1fx.OutputOwners,
+	delegationRewardsOwner *secp256k1fx.OutputOwners,
+	shares uint32,
+	options ...common.Option,
+) (ids.ID, error) {
+	utx, err := w.builder.NewAddPermissionlessValidatorTx(
+		vdr,
+		assetID,
+		validationRewardsOwner,
+		delegationRewardsOwner,
+		shares,
+		options...,
+	)
+	if err != nil {
+		return ids.Empty, err
+	}
+	return w.IssueUnsignedTx(utx, options...)
+}
+
+func (w *wallet) IssueAddPermissionlessDelegatorTx(
+	vdr *validator.SubnetValidator,
+	assetID ids.ID,
+	rewardsOwner *secp256k1fx.OutputOwners,
+	options ...common.Option,
+) (ids.ID, error) {
+	utx, err := w.builder.NewAddPermissionlessDelegatorTx(
+		vdr,
+		assetID,
+		rewardsOwner,
+		options...,
+	)
 	if err != nil {
 		return ids.Empty, err
 	}

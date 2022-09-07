@@ -29,7 +29,7 @@ type acceptor struct {
 }
 
 func (a *acceptor) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
-	a.ctx.Log.Verbo(
+	a.ctx.Log.Debug(
 		"accepting block",
 		zap.String("blockType", "blueberry abort"),
 		zap.Stringer("blkID", b.ID()),
@@ -41,7 +41,7 @@ func (a *acceptor) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
 }
 
 func (a *acceptor) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
-	a.ctx.Log.Verbo(
+	a.ctx.Log.Debug(
 		"accepting block",
 		zap.String("blockType", "blueberry commit"),
 		zap.Stringer("blkID", b.ID()),
@@ -53,7 +53,7 @@ func (a *acceptor) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
 }
 
 func (a *acceptor) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) error {
-	a.ctx.Log.Verbo(
+	a.ctx.Log.Debug(
 		"accepting block",
 		zap.String("blockType", "blueberry proposal"),
 		zap.Stringer("blkID", b.ID()),
@@ -66,7 +66,7 @@ func (a *acceptor) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 }
 
 func (a *acceptor) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) error {
-	a.ctx.Log.Verbo(
+	a.ctx.Log.Debug(
 		"accepting block",
 		zap.String("blockType", "blueberry standard"),
 		zap.Stringer("blkID", b.ID()),
@@ -78,7 +78,7 @@ func (a *acceptor) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 }
 
 func (a *acceptor) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
-	a.ctx.Log.Verbo(
+	a.ctx.Log.Debug(
 		"accepting block",
 		zap.String("blockType", "apricot abort"),
 		zap.Stringer("blkID", b.ID()),
@@ -90,7 +90,7 @@ func (a *acceptor) ApricotAbortBlock(b *blocks.ApricotAbortBlock) error {
 }
 
 func (a *acceptor) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
-	a.ctx.Log.Verbo(
+	a.ctx.Log.Debug(
 		"accepting block",
 		zap.String("blockType", "apricot commit"),
 		zap.Stringer("blkID", b.ID()),
@@ -102,7 +102,7 @@ func (a *acceptor) ApricotCommitBlock(b *blocks.ApricotCommitBlock) error {
 }
 
 func (a *acceptor) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
-	a.ctx.Log.Verbo(
+	a.ctx.Log.Debug(
 		"accepting block",
 		zap.String("blockType", "apricot proposal"),
 		zap.Stringer("blkID", b.ID()),
@@ -115,7 +115,7 @@ func (a *acceptor) ApricotProposalBlock(b *blocks.ApricotProposalBlock) error {
 }
 
 func (a *acceptor) ApricotStandardBlock(b *blocks.ApricotStandardBlock) error {
-	a.ctx.Log.Verbo(
+	a.ctx.Log.Debug(
 		"accepting block",
 		zap.String("blockType", "apricot standard"),
 		zap.Stringer("blkID", b.ID()),
@@ -130,7 +130,7 @@ func (a *acceptor) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 	blkID := b.ID()
 	defer a.free(blkID)
 
-	a.ctx.Log.Verbo(
+	a.ctx.Log.Debug(
 		"accepting block",
 		zap.String("blockType", "apricot atomic"),
 		zap.Stringer("blkID", blkID),

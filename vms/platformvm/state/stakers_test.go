@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 func TestBaseStakersPruning(t *testing.T) {
@@ -208,7 +209,7 @@ func newTestStaker() *Staker {
 		PotentialReward: 1,
 
 		NextTime: endTime,
-		Priority: PrimaryNetworkDelegatorCurrentPriority,
+		Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
 	}
 }
 

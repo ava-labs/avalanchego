@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p
@@ -126,6 +126,35 @@ func (s *signerVisitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx)
 		return err
 	}
 	txSigners = append(txSigners, subnetAuthSigners)
+	return s.sign(s.tx, txSigners)
+}
+
+func (s *signerVisitor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	subnetAuthSigners, err := s.getSubnetSigners(tx.Subnet, tx.SubnetAuth)
+	if err != nil {
+		return err
+	}
+	txSigners = append(txSigners, subnetAuthSigners)
+	return s.sign(s.tx, txSigners)
+}
+
+func (s *signerVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return s.sign(s.tx, txSigners)
+}
+
+func (s *signerVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
 	return s.sign(s.tx, txSigners)
 }
 

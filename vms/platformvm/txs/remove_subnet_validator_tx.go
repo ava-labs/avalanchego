@@ -10,12 +10,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
-	_ UnsignedTx             = &RemoveSubnetValidatorTx{}
-	_ secp256k1fx.UnsignedTx = &ImportTx{}
+	_ UnsignedTx = &RemoveSubnetValidatorTx{}
 
 	errRemovePrimaryNetworkValidator = errors.New("can't remove primary network validator with RemoveSubnetValidatorTx")
 )
@@ -26,7 +24,7 @@ type RemoveSubnetValidatorTx struct {
 	// The node to remove from the subnet.
 	NodeID ids.NodeID `serialize:"true" json:"nodeID"`
 	// The subnet to remove the node from.
-	Subnet ids.ID `serialize:"true" json:"subnet"`
+	Subnet ids.ID `serialize:"true" json:"subnetID"`
 	// Proves that the issuer has the right to remove the node from the subnet.
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }

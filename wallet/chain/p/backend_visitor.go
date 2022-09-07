@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p
@@ -78,6 +78,18 @@ func (b *backendVisitor) ExportTx(tx *txs.ExportTx) error {
 			return err
 		}
 	}
+	return b.baseTx(&tx.BaseTx)
+}
+
+func (b *backendVisitor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
+func (b *backendVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
+func (b *backendVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
