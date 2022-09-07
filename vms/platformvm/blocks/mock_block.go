@@ -8,6 +8,7 @@ import (
 	reflect "reflect"
 
 	ids "github.com/ava-labs/avalanchego/ids"
+	snow "github.com/ava-labs/avalanchego/snow"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	gomock "github.com/golang/mock/gomock"
 )
@@ -75,6 +76,18 @@ func (m *MockBlock) ID() ids.ID {
 func (mr *MockBlockMockRecorder) ID() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ID", reflect.TypeOf((*MockBlock)(nil).ID))
+}
+
+// InitCtx mocks base method.
+func (m *MockBlock) InitCtx(arg0 *snow.Context) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "InitCtx", arg0)
+}
+
+// InitCtx indicates an expected call of InitCtx.
+func (mr *MockBlockMockRecorder) InitCtx(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InitCtx", reflect.TypeOf((*MockBlock)(nil).InitCtx), arg0)
 }
 
 // Parent mocks base method.

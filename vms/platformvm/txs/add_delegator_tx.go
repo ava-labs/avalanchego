@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -18,9 +20,7 @@ import (
 )
 
 var (
-	_ UnsignedTx             = &AddDelegatorTx{}
-	_ StakerTx               = &AddDelegatorTx{}
-	_ secp256k1fx.UnsignedTx = &AddDelegatorTx{}
+	_ DelegatorTx = &AddDelegatorTx{}
 
 	errDelegatorWeightMismatch = errors.New("delegator weight is not equal to total stake weight")
 )
@@ -32,9 +32,9 @@ type AddDelegatorTx struct {
 	// Describes the delegatee
 	Validator validator.Validator `serialize:"true" json:"validator"`
 	// Where to send staked tokens when done validating
-	Stake []*avax.TransferableOutput `serialize:"true" json:"stake"`
+	StakeOuts []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send staking rewards when done validating
-	RewardsOwner fx.Owner `serialize:"true" json:"rewardsOwner"`
+	DelegationRewardsOwner fx.Owner `serialize:"true" json:"rewardsOwner"`
 }
 
 // InitCtx sets the FxID fields in the inputs and outputs of this
@@ -42,27 +42,24 @@ type AddDelegatorTx struct {
 // the addresses can be json marshalled into human readable format
 func (tx *AddDelegatorTx) InitCtx(ctx *snow.Context) {
 	tx.BaseTx.InitCtx(ctx)
-	for _, out := range tx.Stake {
+	for _, out := range tx.StakeOuts {
 		out.FxID = secp256k1fx.ID
 		out.InitCtx(ctx)
 	}
-	tx.RewardsOwner.InitCtx(ctx)
+	tx.DelegationRewardsOwner.InitCtx(ctx)
 }
 
-// StartTime of this validator
-func (tx *AddDelegatorTx) StartTime() time.Time {
-	return tx.Validator.StartTime()
+func (tx *AddDelegatorTx) SubnetID() ids.ID     { return constants.PrimaryNetworkID }
+func (tx *AddDelegatorTx) NodeID() ids.NodeID   { return tx.Validator.NodeID }
+func (tx *AddDelegatorTx) StartTime() time.Time { return tx.Validator.StartTime() }
+func (tx *AddDelegatorTx) EndTime() time.Time   { return tx.Validator.EndTime() }
+func (tx *AddDelegatorTx) Weight() uint64       { return tx.Validator.Wght }
+func (tx *AddDelegatorTx) PendingPriority() Priority {
+	return PrimaryNetworkDelegatorApricotPendingPriority
 }
-
-// EndTime of this validator
-func (tx *AddDelegatorTx) EndTime() time.Time {
-	return tx.Validator.EndTime()
-}
-
-// Weight of this validator
-func (tx *AddDelegatorTx) Weight() uint64 {
-	return tx.Validator.Weight()
-}
+func (tx *AddDelegatorTx) CurrentPriority() Priority         { return PrimaryNetworkDelegatorCurrentPriority }
+func (tx *AddDelegatorTx) Stake() []*avax.TransferableOutput { return tx.StakeOuts }
+func (tx *AddDelegatorTx) RewardsOwner() fx.Owner            { return tx.DelegationRewardsOwner }
 
 // SyntacticVerify returns nil iff [tx] is valid
 func (tx *AddDelegatorTx) SyntacticVerify(ctx *snow.Context) error {
@@ -76,12 +73,12 @@ func (tx *AddDelegatorTx) SyntacticVerify(ctx *snow.Context) error {
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return err
 	}
-	if err := verify.All(&tx.Validator, tx.RewardsOwner); err != nil {
+	if err := verify.All(&tx.Validator, tx.DelegationRewardsOwner); err != nil {
 		return fmt.Errorf("failed to verify validator or rewards owner: %w", err)
 	}
 
 	totalStakeWeight := uint64(0)
-	for _, out := range tx.Stake {
+	for _, out := range tx.StakeOuts {
 		if err := out.Verify(); err != nil {
 			return fmt.Errorf("output verification failed: %w", err)
 		}
@@ -98,7 +95,7 @@ func (tx *AddDelegatorTx) SyntacticVerify(ctx *snow.Context) error {
 	}
 
 	switch {
-	case !avax.IsSortedTransferableOutputs(tx.Stake, Codec):
+	case !avax.IsSortedTransferableOutputs(tx.StakeOuts, Codec):
 		return errOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
 		return fmt.Errorf("%w, delegator weight %d total stake weight %d",

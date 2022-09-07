@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package genesis
@@ -37,10 +37,15 @@ var (
 	// LocalParams are the params used for local networks
 	LocalParams = Params{
 		TxFeeConfig: TxFeeConfig{
-			TxFee:                 units.MilliAvax,
-			CreateAssetTxFee:      units.MilliAvax,
-			CreateSubnetTxFee:     100 * units.MilliAvax,
-			CreateBlockchainTxFee: 100 * units.MilliAvax,
+			TxFee:                         units.MilliAvax,
+			CreateAssetTxFee:              units.MilliAvax,
+			CreateSubnetTxFee:             100 * units.MilliAvax,
+			TransformSubnetTxFee:          100 * units.MilliAvax,
+			CreateBlockchainTxFee:         100 * units.MilliAvax,
+			AddPrimaryNetworkValidatorFee: 0,
+			AddPrimaryNetworkDelegatorFee: 0,
+			AddSubnetValidatorFee:         units.MilliAvax,
+			AddSubnetDelegatorFee:         units.MilliAvax,
 		},
 		StakingConfig: StakingConfig{
 			UptimeRequirement: .8, // 80%

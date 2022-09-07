@@ -42,7 +42,6 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	timestamp := time.Now()
 	// One call for each of onCommitState and onAbortState.
 	parentOnAcceptState.EXPECT().GetTimestamp().Return(timestamp).Times(2)
-	parentOnAcceptState.EXPECT().GetCurrentSupply().Return(uint64(10000)).Times(2)
 
 	backend := &backend{
 		lastAccepted: parentID,
@@ -293,7 +292,6 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	// Set expectations for dependencies.
 	timestamp := time.Now()
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
-	parentState.EXPECT().GetCurrentSupply().Return(uint64(10000)).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	mempool.EXPECT().Remove(apricotBlk.Txs()).Times(1)
 
@@ -568,10 +566,8 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 
 			// setup parent state
 			parentTime := defaultGenesisTime
-			parentSupply := uint64(2022)
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(2)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(2)
-			s.EXPECT().GetCurrentSupply().Return(parentSupply).Times(2)
 
 			onCommitState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
@@ -664,10 +660,8 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 
 			// setup parent state
 			parentTime := defaultGenesisTime
-			parentSupply := uint64(2022)
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(2)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(2)
-			s.EXPECT().GetCurrentSupply().Return(parentSupply).Times(2)
 
 			onCommitState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
@@ -785,7 +779,6 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	timestamp := time.Now()
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
-	parentState.EXPECT().GetCurrentSupply().Return(uint64(10000)).Times(1)
 	parentStatelessBlk.EXPECT().Parent().Return(grandParentID).Times(1)
 
 	err = verifier.ApricotStandardBlock(blk)

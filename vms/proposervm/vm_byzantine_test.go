@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -91,6 +91,7 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 // Ensure that a byzantine node issuing an invalid PreForkBlock (Y or Z) when
 // the parent block (X) is issued into a PostForkBlock (A) will be marked as
 // invalid correctly.
+//
 //     G
 //   / |
 // A - X
@@ -209,6 +210,7 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 // Ensure that a byzantine node issuing an invalid PostForkBlock (B) when the
 // parent block (X) is issued into a PostForkBlock (A) will be marked as invalid
 // correctly.
+//
 //     G
 //   / |
 // A - X
@@ -274,7 +276,7 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 		}
 	}
 
-	bStatelessBlock, err := block.BuildUnsigned(
+	bStatelessBlock, err := block.BuildUnsignedApricot(
 		xBlock.ID(),
 		yBlock.Timestamp(),
 		0,
@@ -312,6 +314,7 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 // Ensure that a byzantine node issuing an invalid OptionBlock (B) which
 // contains core block (Y) whose parent (G) doesn't match (B)'s parent (A)'s
 // inner block (X) will be marked as invalid correctly.
+//
 //     G
 //   / | \
 // A - X  |
@@ -475,7 +478,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		TimestampV: coreGenBlk.Timestamp(),
 	}
 
-	ySlb, err := block.BuildUnsigned(
+	ySlb, err := block.BuildUnsignedApricot(
 		coreGenBlk.ID(),
 		coreGenBlk.Timestamp(),
 		uint64(2000),
@@ -733,6 +736,7 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 
 	// GetBlock shouldn't really be able to succeed, as we don't have a valid
 	// representation of [blkID]
+	proVM.innerBlkCache.Flush() // So we don't get from the cache
 	fetchedBlk, err := proVM.GetBlock(blkID)
 	if err != nil {
 		t.Skip(err)

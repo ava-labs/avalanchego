@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -18,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+// TODO use table tests here
 func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	require := require.New(t)
 	clk := mockable.Clock{}
@@ -31,7 +33,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	)
 
 	// Case : signed tx is nil
-	require.ErrorIs(stx.SyntacticVerify(ctx), errNilSignedTx)
+	require.ErrorIs(stx.SyntacticVerify(ctx), ErrNilSignedTx)
 
 	// Case : unsigned tx is nil
 	require.ErrorIs(addSubnetValidatorTx.SyntacticVerify(ctx), ErrNilTx)
@@ -117,11 +119,21 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	// Case: Subnet auth indices not unique
 	addSubnetValidatorTx.SyntacticallyVerified = false
 	input := addSubnetValidatorTx.SubnetAuth.(*secp256k1fx.Input)
+	oldInput := *input
 	input.SigIndices[0] = input.SigIndices[1]
 	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
 	require.Error(err)
+	*input = oldInput
+
+	// Case: adding to Primary Network
+	addSubnetValidatorTx.SyntacticallyVerified = false
+	addSubnetValidatorTx.Validator.Subnet = constants.PrimaryNetworkID
+	stx, err = NewSigned(addSubnetValidatorTx, Codec, signers)
+	require.NoError(err)
+	err = stx.SyntacticVerify(ctx)
+	require.ErrorIs(err, errAddPrimaryNetworkValidator)
 }
 
 func TestAddSubnetValidatorMarshal(t *testing.T) {
@@ -196,4 +208,22 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 
 	require.NoError(parsedTx.SyntacticVerify(ctx))
 	require.Equal(stx, parsedTx)
+}
+
+func TestAddSubnetValidatorTxNotValidatorTx(t *testing.T) {
+	txIntf := any((*AddSubnetValidatorTx)(nil))
+	_, ok := txIntf.(ValidatorTx)
+	require.False(t, ok)
+}
+
+func TestAddSubnetValidatorTxNotDelegatorTx(t *testing.T) {
+	txIntf := any((*AddSubnetValidatorTx)(nil))
+	_, ok := txIntf.(DelegatorTx)
+	require.False(t, ok)
+}
+
+func TestAddSubnetValidatorTxNotPermissionlessStaker(t *testing.T) {
+	txIntf := any((*AddSubnetValidatorTx)(nil))
+	_, ok := txIntf.(PermissionlessStaker)
+	require.False(t, ok)
 }

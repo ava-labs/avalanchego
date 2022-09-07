@@ -32,7 +32,7 @@ func TestNewBlueberryProposalBlock(t *testing.T) {
 					Outs: []*avax.TransferableOutput{},
 				},
 			},
-			Stake:     []*avax.TransferableOutput{},
+			StakeOuts: []*avax.TransferableOutput{},
 			Validator: validator.Validator{},
 			RewardsOwner: &secp256k1fx.OutputOwners{
 				Addrs: []ids.ShortID{},
@@ -74,7 +74,7 @@ func TestNewApricotProposalBlock(t *testing.T) {
 					Outs: []*avax.TransferableOutput{},
 				},
 			},
-			Stake:     []*avax.TransferableOutput{},
+			StakeOuts: []*avax.TransferableOutput{},
 			Validator: validator.Validator{},
 			RewardsOwner: &secp256k1fx.OutputOwners{
 				Addrs: []ids.ShortID{},

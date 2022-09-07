@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package chain
@@ -104,7 +104,7 @@ func produceGetStatus(s *State, getBlockIDAtHeight func(uint64) (ids.ID, error))
 			internalBlk.SetStatus(choices.Processing)
 			return choices.Processing, nil
 		default:
-			return choices.Unknown, fmt.Errorf("failed to get accepted blkID at height %d", blkHeight)
+			return choices.Unknown, fmt.Errorf("%w: failed to get accepted blkID at height %d", err, blkHeight)
 		}
 	}
 }

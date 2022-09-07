@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -161,7 +161,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 		res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.state, res.fx)
 		res.txBuilder = p_tx_builder.New(
 			res.ctx,
-			*res.config,
+			res.config,
 			res.clk,
 			res.fx,
 			res.state,
@@ -175,7 +175,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 		res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.mockedState, res.fx)
 		res.txBuilder = p_tx_builder.New(
 			res.ctx,
-			*res.config,
+			res.config,
 			res.clk,
 			res.fx,
 			res.mockedState,
@@ -407,14 +407,14 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 		}
 	}
 
-	genesisValidators := make([]api.PrimaryValidator, len(preFundedKeys))
+	genesisValidators := make([]api.PermissionlessValidator, len(preFundedKeys))
 	for i, key := range preFundedKeys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
 		addr, err := address.FormatBech32(hrp, nodeID.Bytes())
 		if err != nil {
 			panic(err)
 		}
-		genesisValidators[i] = api.PrimaryValidator{
+		genesisValidators[i] = api.PermissionlessValidator{
 			Staker: api.Staker{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
@@ -513,12 +513,10 @@ func addPendingValidator(
 		return nil, err
 	}
 
-	staker := state.NewPrimaryNetworkStaker(
+	staker := state.NewPendingStaker(
 		addPendingValidatorTx.ID(),
-		&addPendingValidatorTx.Unsigned.(*txs.AddValidatorTx).Validator,
+		addPendingValidatorTx.Unsigned.(*txs.AddValidatorTx),
 	)
-	staker.NextTime = staker.StartTime
-	staker.Priority = state.PrimaryNetworkValidatorPendingPriority
 
 	env.state.PutPendingValidator(staker)
 	env.state.AddTx(addPendingValidatorTx, status.Committed)

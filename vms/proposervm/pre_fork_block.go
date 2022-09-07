@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -170,6 +170,7 @@ func (b *preForkBlock) buildChild() (Block, error) {
 
 		b.vm.ctx.Log.Info("built block",
 			zap.Stringer("blkID", innerBlock.ID()),
+			zap.Uint64("height", innerBlock.Height()),
 			zap.Time("parentTimestamp", parentTimestamp),
 		)
 
@@ -199,7 +200,7 @@ func (b *preForkBlock) buildChild() (Block, error) {
 		return nil, err
 	}
 
-	statelessBlock, err := block.BuildUnsigned(
+	statelessBlock, err := block.BuildUnsignedApricot(
 		parentID,
 		newTimestamp,
 		pChainHeight,
@@ -220,6 +221,8 @@ func (b *preForkBlock) buildChild() (Block, error) {
 
 	b.vm.ctx.Log.Info("built block",
 		zap.Stringer("blkID", blk.ID()),
+		zap.Stringer("innerBlkID", innerBlock.ID()),
+		zap.Uint64("height", blk.Height()),
 		zap.Time("parentTimestamp", parentTimestamp),
 		zap.Time("blockTimestamp", newTimestamp))
 	return blk, nil

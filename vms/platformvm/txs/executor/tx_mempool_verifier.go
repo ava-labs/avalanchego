@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -48,6 +48,22 @@ func (v *MempoolTxVerifier) ImportTx(tx *txs.ImportTx) error {
 }
 
 func (v *MempoolTxVerifier) ExportTx(tx *txs.ExportTx) error {
+	return v.standardTx(tx)
+}
+
+func (v *MempoolTxVerifier) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
+	return v.standardTx(tx)
+}
+
+func (v *MempoolTxVerifier) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
+	return v.standardTx(tx)
+}
+
+func (v *MempoolTxVerifier) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+	return v.standardTx(tx)
+}
+
+func (v *MempoolTxVerifier) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
 	return v.standardTx(tx)
 }
 

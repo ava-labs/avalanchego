@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -638,7 +638,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 			},
 		},
 	}
-	statelessBlock, err := block.BuildUnsigned(
+	statelessBlock, err := block.BuildUnsignedApricot(
 		coreGenBlk.ID(),
 		coreGenBlk.Timestamp(),
 		0,
@@ -726,7 +726,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 	// Restart the node.
 
 	ctx := proVM.ctx
-	proVM = New(coreVM, time.Time{}, 0)
+	proVM = New(coreVM, time.Time{}, 0, time.Time{})
 
 	coreVM.InitializeF = func(
 		*snow.Context,
