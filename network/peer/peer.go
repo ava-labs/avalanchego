@@ -850,7 +850,7 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 
 	p.gotVersion.SetValue(true)
 
-	peerlistMsg, err := p.Network.Peers()
+	peerlistMsg, err := p.Network.Peers(p)
 	if err != nil {
 		p.Log.Error("failed to create message",
 			zap.Stringer("messageOp", message.PeerList),
