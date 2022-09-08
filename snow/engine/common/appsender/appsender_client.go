@@ -23,7 +23,8 @@ func NewClient(client appsenderpb.AppSenderClient) *Client {
 	return &Client{client: client}
 }
 
-func (c *Client) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, request []byte) error {
+// TODO use ctx
+func (c *Client) SendAppRequest(_ context.Context, nodeIDs ids.NodeIDSet, requestID uint32, request []byte) error {
 	nodeIDsBytes := make([][]byte, nodeIDs.Len())
 	i := 0
 	for nodeID := range nodeIDs {
@@ -42,7 +43,8 @@ func (c *Client) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, request
 	return err
 }
 
-func (c *Client) SendAppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
+// TODO use ctx
+func (c *Client) SendAppResponse(_ context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 	_, err := c.client.SendAppResponse(
 		context.Background(),
 		&appsenderpb.SendAppResponseMsg{
@@ -54,7 +56,8 @@ func (c *Client) SendAppResponse(nodeID ids.NodeID, requestID uint32, response [
 	return err
 }
 
-func (c *Client) SendAppGossip(msg []byte) error {
+// TODO use ctx
+func (c *Client) SendAppGossip(_ context.Context, msg []byte) error {
 	_, err := c.client.SendAppGossip(
 		context.Background(),
 		&appsenderpb.SendAppGossipMsg{
@@ -64,7 +67,8 @@ func (c *Client) SendAppGossip(msg []byte) error {
 	return err
 }
 
-func (c *Client) SendAppGossipSpecific(nodeIDs ids.NodeIDSet, msg []byte) error {
+// TODO use ctx
+func (c *Client) SendAppGossipSpecific(_ context.Context, nodeIDs ids.NodeIDSet, msg []byte) error {
 	nodeIDsBytes := make([][]byte, nodeIDs.Len())
 	i := 0
 	for nodeID := range nodeIDs {
