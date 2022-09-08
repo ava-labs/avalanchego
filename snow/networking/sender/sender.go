@@ -88,7 +88,7 @@ func New(
 }
 
 func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32) {
-	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendGetStateSummaryFrontier")
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendGetStateSummaryFrontier")
 	defer span.End()
 	// TODO add attributes
 
@@ -110,7 +110,7 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs ids.No
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := s.msgCreator.InboundGetStateSummaryFrontier(s.ctx.ChainID, requestID, deadline, s.ctx.NodeID)
-		go s.router.HandleInbound(context.TODO(), inMsg)
+		go s.router.HandleInbound(newCtx, inMsg)
 	}
 
 	// Create the outbound message.
@@ -132,14 +132,14 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs ids.No
 }
 
 func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) {
-	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendStateSummaryFrontier")
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendStateSummaryFrontier")
 	defer span.End()
 	// TODO add attributes
 
 	// Sending this message to myself.
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundStateSummaryFrontier(s.ctx.ChainID, requestID, summary, nodeID)
-		go s.router.HandleInbound(context.TODO(), inMsg)
+		go s.router.HandleInbound(newCtx, inMsg)
 		return
 	}
 
@@ -177,7 +177,7 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 }
 
 func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, heights []uint64) {
-	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendGetAcceptedStateSummary")
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendGetAcceptedStateSummary")
 	defer span.End()
 	// TODO add attributes
 
@@ -199,7 +199,7 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs ids.No
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := s.msgCreator.InboundGetAcceptedStateSummary(s.ctx.ChainID, requestID, heights, deadline, s.ctx.NodeID)
-		go s.router.HandleInbound(context.TODO(), inMsg)
+		go s.router.HandleInbound(newCtx, inMsg)
 	}
 
 	// Create the outbound message.
@@ -233,13 +233,13 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs ids.No
 }
 
 func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) {
-	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendAcceptedStateSummary")
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendAcceptedStateSummary")
 	defer span.End()
 	// TODO add attributes
 
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundAcceptedStateSummary(s.ctx.ChainID, requestID, summaryIDs, nodeID)
-		go s.router.HandleInbound(context.TODO(), inMsg)
+		go s.router.HandleInbound(newCtx, inMsg)
 		return
 	}
 
@@ -271,7 +271,7 @@ func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 }
 
 func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32) {
-	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendGetAcceptedFrontier")
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendGetAcceptedFrontier")
 	defer span.End()
 	// TODO add attributes
 
@@ -293,7 +293,7 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs ids.NodeID
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := s.msgCreator.InboundGetAcceptedFrontier(s.ctx.ChainID, requestID, deadline, s.ctx.NodeID)
-		go s.router.HandleInbound(context.TODO(), inMsg)
+		go s.router.HandleInbound(newCtx, inMsg)
 	}
 
 	// Create the outbound message.
@@ -315,14 +315,14 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs ids.NodeID
 }
 
 func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
-	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendAcceptedFrontier")
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendAcceptedFrontier")
 	defer span.End()
 	// TODO add attributes
 
 	// Sending this message to myself.
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundAcceptedFrontier(s.ctx.ChainID, requestID, containerIDs, nodeID)
-		go s.router.HandleInbound(context.TODO(), inMsg)
+		go s.router.HandleInbound(newCtx, inMsg)
 		return
 	}
 
@@ -354,7 +354,7 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 }
 
 func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, containerIDs []ids.ID) {
-	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendGetAccepted")
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendGetAccepted")
 	defer span.End()
 	// TODO add attributes
 
@@ -376,7 +376,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs ids.NodeIDSet, req
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := s.msgCreator.InboundGetAccepted(s.ctx.ChainID, requestID, deadline, containerIDs, s.ctx.NodeID)
-		go s.router.HandleInbound(context.TODO(), inMsg)
+		go s.router.HandleInbound(newCtx, inMsg)
 	}
 
 	// Create the outbound message.
@@ -410,13 +410,13 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs ids.NodeIDSet, req
 }
 
 func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
-	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendAccepted")
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendAccepted")
 	defer span.End()
 	// TODO add attributes
 
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundAccepted(s.ctx.ChainID, requestID, containerIDs, nodeID)
-		go s.router.HandleInbound(context.TODO(), inMsg)
+		go s.router.HandleInbound(newCtx, inMsg)
 		return
 	}
 
