@@ -43,7 +43,6 @@ func NewBigBitSet() BigBitSet {
 
 // Add sets the [i]'th bit to 1
 func (b BigBitSet) Add(i int) {
-	b.bits.Bits()
 	b.bits.SetBit(b.bits, i, 1)
 }
 
