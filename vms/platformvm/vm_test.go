@@ -2144,7 +2144,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	frontier := []ids.ID{advanceTimeBlkID}
-	if err := bootstrapper.AcceptedFrontier(peerID, reqID, frontier); err != nil {
+	if err := bootstrapper.AcceptedFrontier(context.Background(), peerID, reqID, frontier); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2167,14 +2167,14 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return res
 	}
 
-	if err := bootstrapper.Accepted(peerID, reqID, frontier); err != nil {
+	if err := bootstrapper.Accepted(context.Background(), peerID, reqID, frontier); err != nil {
 		t.Fatal(err)
 	}
 
 	externalSender.SendF = nil
 	externalSender.CantSend = false
 
-	if err := bootstrapper.Ancestors(peerID, reqID, [][]byte{advanceTimeBlkBytes}); err != nil {
+	if err := bootstrapper.Ancestors(context.Background(), peerID, reqID, [][]byte{advanceTimeBlkBytes}); err != nil {
 		t.Fatal(err)
 	}
 

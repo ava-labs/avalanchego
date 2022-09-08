@@ -194,7 +194,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.NodeID, nodeVersion *version.Application) error { return nil }
 	bootstrapper.HaltF = func() {}
-	bootstrapper.AncestorsF = func(nodeID ids.NodeID, requestID uint32, containers [][]byte) error {
+	bootstrapper.AncestorsF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) error {
 		// Ancestors blocks for two seconds
 		time.Sleep(2 * time.Second)
 		bootstrapFinished <- struct{}{}
@@ -305,13 +305,17 @@ func TestRouterTimeout(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.NodeID, nodeVersion *version.Application) error { return nil }
 	bootstrapper.HaltF = func() {}
-	bootstrapper.GetFailedF = func(nodeID ids.NodeID, requestID uint32) error { wg.Done(); calledGetFailed = true; return nil }
-	bootstrapper.GetAncestorsFailedF = func(nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.GetFailedF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+		wg.Done()
+		calledGetFailed = true
+		return nil
+	}
+	bootstrapper.GetAncestorsFailedF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 		defer wg.Done()
 		calledGetAncestorsFailed = true
 		return nil
 	}
-	bootstrapper.QueryFailedF = func(nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.QueryFailedF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 		defer wg.Done()
 		if !calledQueryFailed {
 			calledQueryFailed = true
@@ -320,12 +324,12 @@ func TestRouterTimeout(t *testing.T) {
 		calledQueryFailed2 = true
 		return nil
 	}
-	bootstrapper.GetAcceptedFailedF = func(nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.GetAcceptedFailedF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 		defer wg.Done()
 		calledGetAcceptedFailed = true
 		return nil
 	}
-	bootstrapper.GetAcceptedFrontierFailedF = func(nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.GetAcceptedFrontierFailedF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 		defer wg.Done()
 		calledGetAcceptedFrontierFailed = true
 		return nil
@@ -534,7 +538,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	}
 	bootstrapper.Default(false)
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
-	bootstrapper.PullQueryF = func(nodeID ids.NodeID, requestID uint32, containerID ids.ID) error {
+	bootstrapper.PullQueryF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error {
 		defer wg.Done()
 		calledF = true
 		return nil

@@ -62,7 +62,7 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	// Free lock because [AppGossip] waits for the context lock
 	env.ctx.Lock.Unlock()
 	// show that unknown tx is added to mempool
-	err = env.AppGossip(nodeID, msgBytes)
+	err = env.AppGossip(context.Background(), nodeID, msgBytes)
 	require.NoError(err, "error in reception of gossiped tx")
 	require.True(env.Builder.Has(txID))
 	// Grab lock back
@@ -105,7 +105,7 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 	msgBytes, err := message.Build(&msg)
 	require.NoError(err)
 	env.ctx.Lock.Unlock()
-	err = env.AppGossip(nodeID, msgBytes)
+	err = env.AppGossip(context.Background(), nodeID, msgBytes)
 	env.ctx.Lock.Lock()
 	require.NoError(err, "error in reception of gossiped tx")
 	require.False(env.Builder.Has(txID))

@@ -3,7 +3,7 @@
 package mocks
 
 import (
-	consensusavalanche "github.com/ava-labs/avalanchego/snow/consensus/avalanche"
+	consensussnowman "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	common "github.com/ava-labs/avalanchego/snow/engine/common"
 
 	context "context"
@@ -334,6 +334,29 @@ func (_m *Engine) GetAncestorsFailed(ctx context.Context, validatorID ids.NodeID
 	return r0
 }
 
+// GetBlock provides a mock function with given fields: _a0
+func (_m *Engine) GetBlock(_a0 ids.ID) (consensussnowman.Block, error) {
+	ret := _m.Called(_a0)
+
+	var r0 consensussnowman.Block
+	if rf, ok := ret.Get(0).(func(ids.ID) consensussnowman.Block); ok {
+		r0 = rf(_a0)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(consensussnowman.Block)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(ids.ID) error); ok {
+		r1 = rf(_a0)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetFailed provides a mock function with given fields: ctx, validatorID, requestID
 func (_m *Engine) GetFailed(ctx context.Context, validatorID ids.NodeID, requestID uint32) error {
 	ret := _m.Called(ctx, validatorID, requestID)
@@ -390,29 +413,6 @@ func (_m *Engine) GetVM() common.VM {
 	}
 
 	return r0
-}
-
-// GetVtx provides a mock function with given fields: vtxID
-func (_m *Engine) GetVtx(vtxID ids.ID) (consensusavalanche.Vertex, error) {
-	ret := _m.Called(vtxID)
-
-	var r0 consensusavalanche.Vertex
-	if rf, ok := ret.Get(0).(func(ids.ID) consensusavalanche.Vertex); ok {
-		r0 = rf(vtxID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(consensusavalanche.Vertex)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(ids.ID) error); ok {
-		r1 = rf(vtxID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
 }
 
 // Gossip provides a mock function with given fields:

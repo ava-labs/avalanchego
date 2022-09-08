@@ -103,7 +103,7 @@ func TestTimeout(t *testing.T) {
 	bootstrapper.CantGossip = false
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.NodeID, nodeVersion *version.Application) error { return nil }
-	bootstrapper.QueryFailedF = func(nodeID ids.NodeID, _ uint32) error {
+	bootstrapper.QueryFailedF = func(ctx context.Context, nodeID ids.NodeID, _ uint32) error {
 		failedVDRs.Add(nodeID)
 		wg.Done()
 		return nil
@@ -197,7 +197,7 @@ func TestReliableMessages(t *testing.T) {
 	for i := 0; i < queriesToSend; i++ {
 		awaiting[i] = make(chan struct{}, 1)
 	}
-	bootstrapper.QueryFailedF = func(nodeID ids.NodeID, reqID uint32) error {
+	bootstrapper.QueryFailedF = func(ctx context.Context, nodeID ids.NodeID, reqID uint32) error {
 		close(awaiting[int(reqID)])
 		return nil
 	}
@@ -293,7 +293,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	for i := 0; i < queriesToSend; i++ {
 		awaiting[i] = make(chan struct{}, 1)
 	}
-	bootstrapper.QueryFailedF = func(nodeID ids.NodeID, reqID uint32) error {
+	bootstrapper.QueryFailedF = func(ctx context.Context, nodeID ids.NodeID, reqID uint32) error {
 		close(awaiting[int(reqID)])
 		return nil
 	}

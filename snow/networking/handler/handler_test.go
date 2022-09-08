@@ -4,6 +4,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -60,11 +61,11 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	}
 	bootstrapper.Default(false)
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
-	bootstrapper.GetAcceptedFrontierF = func(nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.GetAcceptedFrontierF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 		t.Fatalf("GetAcceptedFrontier message should have timed out")
 		return nil
 	}
-	bootstrapper.GetAcceptedF = func(nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
+	bootstrapper.GetAcceptedF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
 		called <- struct{}{}
 		return nil
 	}
@@ -143,7 +144,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	}
 	bootstrapper.Default(false)
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
-	bootstrapper.GetAcceptedFrontierF = func(nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.GetAcceptedFrontierF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 		return errors.New("Engine error should cause handler to close")
 	}
 	handler.SetBootstrapper(bootstrapper)
@@ -211,7 +212,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	}
 	bootstrapper.Default(false)
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
-	bootstrapper.GetFailedF = func(nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.GetFailedF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 		closed <- struct{}{}
 		return nil
 	}

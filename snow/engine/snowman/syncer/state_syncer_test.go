@@ -300,6 +300,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 
 	// check a response with wrong request ID is dropped
 	require.NoError(syncer.StateSummaryFrontier(
+		context.Background(),
 		responsiveBeaconID,
 		math.MaxInt32,
 		summaryBytes,
@@ -310,6 +311,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	// check a response from unsolicited node is dropped
 	unsolicitedNodeID := ids.GenerateTestNodeID()
 	require.NoError(syncer.StateSummaryFrontier(
+		context.Background(),
 		unsolicitedNodeID,
 		responsiveBeaconReqID,
 		summaryBytes,
@@ -318,6 +320,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 
 	// check a valid response is duly recorded
 	require.NoError(syncer.StateSummaryFrontier(
+		context.Background(),
 		responsiveBeaconID,
 		responsiveBeaconReqID,
 		summaryBytes,
@@ -389,6 +392,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 
 	// response is valid, but invalid summary is not recorded
 	require.NoError(syncer.StateSummaryFrontier(
+		context.Background(),
 		responsiveBeaconID,
 		responsiveBeaconReqID,
 		summary,
@@ -457,6 +461,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 
 	// assume timeout is reached and vdrs is marked as unresponsive
 	require.NoError(syncer.GetStateSummaryFrontierFailed(
+		context.Background(),
 		unresponsiveBeaconID,
 		unresponsiveBeaconReqID,
 	))
@@ -483,6 +488,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 
 	// check a valid but late response is not recorded
 	require.NoError(syncer.StateSummaryFrontier(
+		context.Background(),
 		unresponsiveBeaconID,
 		unresponsiveBeaconReqID,
 		summaryBytes,
@@ -563,12 +569,14 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 
 		if maxResponses > 0 {
 			require.NoError(syncer.StateSummaryFrontier(
+				context.Background(),
 				beaconID,
 				reqID,
 				summaryBytes,
 			))
 		} else {
 			require.NoError(syncer.GetStateSummaryFrontierFailed(
+				context.Background(),
 				beaconID,
 				reqID,
 			))
@@ -644,6 +652,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 		reqID := contactedFrontiersProviders[beaconID]
 
 		require.NoError(syncer.StateSummaryFrontier(
+			context.Background(),
 			beaconID,
 			reqID,
 			summaryBytes,
@@ -716,6 +725,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 		reqID := contactedFrontiersProviders[beaconID]
 
 		require.NoError(syncer.StateSummaryFrontier(
+			context.Background(),
 			beaconID,
 			reqID,
 			summaryBytes,
@@ -737,6 +747,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 
 	// check a response with wrong request ID is dropped
 	require.NoError(syncer.AcceptedStateSummary(
+		context.Background(),
 		responsiveVoterID,
 		math.MaxInt32,
 		[]ids.ID{summaryID},
@@ -749,6 +760,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	// check a response from unsolicited node is dropped
 	unsolicitedVoterID := ids.GenerateTestNodeID()
 	require.NoError(syncer.AcceptedStateSummary(
+		context.Background(),
 		unsolicitedVoterID,
 		responsiveVoterReqID,
 		[]ids.ID{summaryID},
@@ -757,6 +769,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 
 	// check a valid response is duly recorded
 	require.NoError(syncer.AcceptedStateSummary(
+		context.Background(),
 		responsiveVoterID,
 		responsiveVoterReqID,
 		[]ids.ID{summaryID},
@@ -833,6 +846,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 		reqID := contactedFrontiersProviders[beaconID]
 
 		require.NoError(syncer.StateSummaryFrontier(
+			context.Background(),
 			beaconID,
 			reqID,
 			summaryBytes,
@@ -854,6 +868,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 
 	// check a response for unRequested summary is dropped
 	require.NoError(syncer.AcceptedStateSummary(
+		context.Background(),
 		responsiveVoterID,
 		responsiveVoterReqID,
 		[]ids.ID{unknownSummaryID},
@@ -864,6 +879,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	// check that responsiveVoter cannot cast another vote
 	require.False(syncer.pendingSeeders.Contains(responsiveVoterID))
 	require.NoError(syncer.AcceptedStateSummary(
+		context.Background(),
 		responsiveVoterID,
 		responsiveVoterReqID,
 		[]ids.ID{summaryID},
@@ -957,12 +973,14 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 
 		if reachedSeeders%2 == 0 {
 			require.NoError(syncer.StateSummaryFrontier(
+				context.Background(),
 				beaconID,
 				reqID,
 				summaryBytes,
 			))
 		} else {
 			require.NoError(syncer.StateSummaryFrontier(
+				context.Background(),
 				beaconID,
 				reqID,
 				minoritySummaryBytes,
@@ -992,6 +1010,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 		switch {
 		case cumulatedWeight < commonCfg.Alpha/2:
 			require.NoError(syncer.AcceptedStateSummary(
+				context.Background(),
 				voterID,
 				reqID,
 				[]ids.ID{summaryID, minoritySummaryID},
@@ -1001,6 +1020,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 
 		case cumulatedWeight < commonCfg.Alpha:
 			require.NoError(syncer.AcceptedStateSummary(
+				context.Background(),
 				voterID,
 				reqID,
 				[]ids.ID{summaryID},
@@ -1010,6 +1030,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 
 		default:
 			require.NoError(syncer.GetAcceptedStateSummaryFailed(
+				context.Background(),
 				voterID,
 				reqID,
 			))
@@ -1084,6 +1105,7 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 		reqID := contactedFrontiersProviders[beaconID]
 
 		require.NoError(syncer.StateSummaryFrontier(
+			context.Background(),
 			beaconID,
 			reqID,
 			summaryBytes,
@@ -1107,6 +1129,7 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 		// vdr carries the largest weight by far. Make sure it fails
 		if timedOutWeight <= commonCfg.Alpha {
 			require.NoError(syncer.GetAcceptedStateSummaryFailed(
+				context.Background(),
 				voterID,
 				reqID,
 			))
@@ -1114,6 +1137,7 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 			timedOutWeight += bw
 		} else {
 			require.NoError(syncer.AcceptedStateSummary(
+				context.Background(),
 				voterID,
 				reqID,
 				[]ids.ID{summaryID},
@@ -1209,12 +1233,14 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 
 		if reachedSeeders%2 == 0 {
 			require.NoError(syncer.StateSummaryFrontier(
+				context.Background(),
 				beaconID,
 				reqID,
 				summaryBytes,
 			))
 		} else {
 			require.NoError(syncer.StateSummaryFrontier(
+				context.Background(),
 				beaconID,
 				reqID,
 				minoritySummaryBytes,
@@ -1251,6 +1277,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 		switch {
 		case votingWeightStake < commonCfg.Alpha/2:
 			require.NoError(syncer.AcceptedStateSummary(
+				context.Background(),
 				voterID,
 				reqID,
 				[]ids.ID{minoritySummary1.ID(), minoritySummary2.ID()},
@@ -1260,6 +1287,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 
 		default:
 			require.NoError(syncer.AcceptedStateSummary(
+				context.Background(),
 				voterID,
 				reqID,
 				[]ids.ID{{'u', 'n', 'k', 'n', 'o', 'w', 'n', 'I', 'D'}},

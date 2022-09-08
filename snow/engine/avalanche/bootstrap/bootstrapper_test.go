@@ -301,7 +301,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	}
 
 	oldReqID := *requestID
-	err = bs.Ancestors(peerID, *requestID, [][]byte{vtxBytes2})
+	err = bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{vtxBytes2})
 	switch {
 	case err != nil: // send unexpected vertex
 		t.Fatal(err)
@@ -324,7 +324,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		}
 	}
 
-	if err := bs.Ancestors(peerID, *requestID, [][]byte{vtxBytes0, vtxBytes2}); err != nil { // send expected vertex and vertex that should not be accepted
+	if err := bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{vtxBytes0, vtxBytes2}); err != nil { // send expected vertex and vertex that should not be accepted
 		t.Fatal(err)
 	}
 
@@ -478,7 +478,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		return nil, errParsedUnknownVertex
 	}
 
-	if err := bs.Ancestors(peerID, *reqIDPtr, [][]byte{vtxBytes0}); err != nil {
+	if err := bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes0}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -607,7 +607,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := bs.Ancestors(peerID, *reqIDPtr, [][]byte{vtxBytes0}); err != nil {
+	if err := bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes0}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -732,7 +732,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 		t.Fatal("requested wrong vtx")
 	}
 
-	err = bs.Ancestors(peerID, *reqIDPtr, [][]byte{vtxBytes1})
+	err = bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes1})
 	switch {
 	case err != nil: // Provide vtx1; should request vtx0
 		t.Fatal(err)
@@ -742,7 +742,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 		t.Fatal("should hae requested vtx0")
 	}
 
-	err = bs.Ancestors(peerID, *reqIDPtr, [][]byte{vtxBytes0})
+	err = bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes0})
 	switch {
 	case err != nil: // Provide vtx0; can finish now
 		t.Fatal(err)
@@ -850,7 +850,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		t.Fatalf("should have requested vtx1")
 	}
 
-	if err := bs.Ancestors(peerID, reqID, [][]byte{vtxBytes1, vtxBytes0}); err != nil {
+	if err := bs.Ancestors(context.Background(), peerID, reqID, [][]byte{vtxBytes1, vtxBytes0}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -859,7 +859,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		t.Fatalf("should have requested vtx0")
 	}
 
-	err = bs.GetAncestorsFailed(peerID, reqID)
+	err = bs.GetAncestorsFailed(context.Background(), peerID, reqID)
 	switch {
 	case err != nil:
 		t.Fatal(err)
@@ -987,7 +987,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 		t.Fatalf("should have requested vtx2")
 	}
 
-	if err := bs.Ancestors(peerID, reqID, [][]byte{vtxBytes2, vtxBytes1, vtxBytes0}); err != nil {
+	if err := bs.Ancestors(context.Background(), peerID, reqID, [][]byte{vtxBytes2, vtxBytes1, vtxBytes0}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1183,7 +1183,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		t.Fatal("should have requested vtx4")
 	}
 
-	if err := bs.Ancestors(peerID, vtx3ReqID, [][]byte{vtxBytes3, vtxBytes2}); err != nil {
+	if err := bs.Ancestors(context.Background(), peerID, vtx3ReqID, [][]byte{vtxBytes3, vtxBytes2}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1222,7 +1222,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		t.Fatal("should not have re-requested vtx3 since it has been processed")
 	}
 
-	if err := bs.Ancestors(peerID, vtx5ReqID, [][]byte{vtxBytes5, vtxBytes4, vtxBytes2, vtxBytes1}); err != nil {
+	if err := bs.Ancestors(context.Background(), peerID, vtx5ReqID, [][]byte{vtxBytes5, vtxBytes4, vtxBytes2, vtxBytes1}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1231,7 +1231,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		t.Fatal("should have requested vtx0 after ancestors ended prior to it")
 	}
 
-	if err := bs.Ancestors(peerID, vtx1ReqID, [][]byte{vtxBytes1, vtxBytes0}); err != nil {
+	if err := bs.Ancestors(context.Background(), peerID, vtx1ReqID, [][]byte{vtxBytes1, vtxBytes0}); err != nil {
 		t.Fatal(err)
 	}
 

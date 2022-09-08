@@ -391,25 +391,25 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	}
 
 	oldReqID := *requestID
-	if err := bs.Ancestors(peerID, *requestID+1, [][]byte{blkBytes1}); err != nil { // respond with wrong request ID
+	if err := bs.Ancestors(context.Background(), peerID, *requestID+1, [][]byte{blkBytes1}); err != nil { // respond with wrong request ID
 		t.Fatal(err)
 	} else if oldReqID != *requestID {
 		t.Fatal("should not have sent new request")
 	}
 
-	if err := bs.Ancestors(ids.NodeID{1, 2, 3}, *requestID, [][]byte{blkBytes1}); err != nil { // respond from wrong peer
+	if err := bs.Ancestors(context.Background(), ids.NodeID{1, 2, 3}, *requestID, [][]byte{blkBytes1}); err != nil { // respond from wrong peer
 		t.Fatal(err)
 	} else if oldReqID != *requestID {
 		t.Fatal("should not have sent new request")
 	}
 
-	if err := bs.Ancestors(peerID, *requestID, [][]byte{blkBytes0}); err != nil { // respond with wrong block
+	if err := bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{blkBytes0}); err != nil { // respond with wrong block
 		t.Fatal(err)
 	} else if oldReqID == *requestID {
 		t.Fatal("should have sent new request")
 	}
 
-	err = bs.Ancestors(peerID, *requestID, [][]byte{blkBytes1})
+	err = bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{blkBytes1})
 	switch {
 	case err != nil: // respond with right block
 		t.Fatal(err)
@@ -557,13 +557,13 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := bs.Ancestors(peerID, *requestID, [][]byte{blkBytes2}); err != nil { // respond with blk2
+	if err := bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{blkBytes2}); err != nil { // respond with blk2
 		t.Fatal(err)
 	} else if requested != blkID1 {
 		t.Fatal("should have requested blk1")
 	}
 
-	if err := bs.Ancestors(peerID, *requestID, [][]byte{blkBytes1}); err != nil { // respond with blk1
+	if err := bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{blkBytes1}); err != nil { // respond with blk1
 		t.Fatal(err)
 	} else if requested != blkID1 {
 		t.Fatal("should not have requested another block")
@@ -723,7 +723,7 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	newPeerID = ids.GenerateTestNodeID()
 	bs.(*bootstrapper).fetchFrom.Add(newPeerID)
 
-	if err := bs.Ancestors(peerID, requestID, [][]byte{blkBytes2}); err != nil { // respond with blk2
+	if err := bs.Ancestors(context.Background(), peerID, requestID, [][]byte{blkBytes2}); err != nil { // respond with blk2
 		t.Fatal(err)
 	} else if requestedBlock != blkID1 {
 		t.Fatal("should have requested blk1")
@@ -732,7 +732,7 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	peerToBlacklist := requestedVdr
 
 	// respond with empty
-	err = bs.Ancestors(peerToBlacklist, requestID, nil)
+	err = bs.Ancestors(context.Background(), peerToBlacklist, requestID, nil)
 	switch {
 	case err != nil:
 		t.Fatal(err)
@@ -742,7 +742,7 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 		t.Fatal("should have requested blk1")
 	}
 
-	if err := bs.Ancestors(requestedVdr, requestID, [][]byte{blkBytes1}); err != nil { // respond with blk1
+	if err := bs.Ancestors(context.Background(), requestedVdr, requestID, [][]byte{blkBytes1}); err != nil { // respond with blk1
 		t.Fatal(err)
 	}
 
@@ -894,7 +894,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := bs.Ancestors(peerID, *requestID, [][]byte{blkBytes2, blkBytes1}); err != nil { // respond with blk2 and blk1
+	if err := bs.Ancestors(context.Background(), peerID, *requestID, [][]byte{blkBytes2, blkBytes1}); err != nil { // respond with blk2 and blk1
 		t.Fatal(err)
 	} else if requested != blkID2 {
 		t.Fatal("should not have requested another block")
@@ -1024,7 +1024,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		t.Fatalf("should have requested blk2")
 	}
 
-	if err := bs.Ancestors(peerID, reqIDBlk2, [][]byte{blkBytes2, blkBytes1}); err != nil {
+	if err := bs.Ancestors(context.Background(), peerID, reqIDBlk2, [][]byte{blkBytes2, blkBytes1}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1195,7 +1195,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		t.Fatalf("should have requested blk3")
 	}
 
-	if err := bs.Ancestors(peerID, reqID, [][]byte{blkBytes3, blkBytes2}); err != nil {
+	if err := bs.Ancestors(context.Background(), peerID, reqID, [][]byte{blkBytes3, blkBytes2}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1222,7 +1222,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		t.Fatal("should have requested blk4 as new accepted frontier")
 	}
 
-	if err := bs.Ancestors(peerID, blk1RequestID, [][]byte{blkBytes1}); err != nil {
+	if err := bs.Ancestors(context.Background(), peerID, blk1RequestID, [][]byte{blkBytes1}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1230,7 +1230,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		t.Fatal("Bootstrapping should not have finished with outstanding request for blk4")
 	}
 
-	if err := bs.Ancestors(peerID, blk4RequestID, [][]byte{blkBytes4}); err != nil {
+	if err := bs.Ancestors(context.Background(), peerID, blk4RequestID, [][]byte{blkBytes4}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1329,7 +1329,7 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 		t.Fatalf("should have requested blk0")
 	}
 
-	if err := bs.Ancestors(peerID, reqID, [][]byte{blk0.Bytes()}); err != nil {
+	if err := bs.Ancestors(context.Background(), peerID, reqID, [][]byte{blk0.Bytes()}); err != nil {
 		t.Fatal(err)
 	}
 

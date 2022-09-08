@@ -85,7 +85,7 @@ func TestAcceptedFrontier(t *testing.T) {
 		accepted = frontier
 	}
 
-	if err := bs.GetAcceptedFrontier(ids.EmptyNodeID, 0); err != nil {
+	if err := bs.GetAcceptedFrontier(context.Background(), ids.EmptyNodeID, 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -150,7 +150,7 @@ func TestFilterAccepted(t *testing.T) {
 		accepted = frontier
 	}
 
-	if err := bs.GetAccepted(ids.EmptyNodeID, 0, vtxIDs); err != nil {
+	if err := bs.GetAccepted(context.Background(), ids.EmptyNodeID, 0, vtxIDs); err != nil {
 		t.Fatal(err)
 	}
 

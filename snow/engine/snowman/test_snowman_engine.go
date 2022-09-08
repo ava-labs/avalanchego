@@ -4,7 +4,6 @@
 package snowman
 
 import (
-	"context"
 	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -23,7 +22,7 @@ type EngineTest struct {
 	common.EngineTest
 
 	CantGetBlock bool
-	GetBlockF    func(context.Context, ids.ID) (snowman.Block, error)
+	GetBlockF    func(ids.ID) (snowman.Block, error)
 }
 
 func (e *EngineTest) Default(cant bool) {
@@ -31,9 +30,9 @@ func (e *EngineTest) Default(cant bool) {
 	e.CantGetBlock = false
 }
 
-func (e *EngineTest) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
+func (e *EngineTest) GetBlock(blkID ids.ID) (snowman.Block, error) {
 	if e.GetBlockF != nil {
-		return e.GetBlockF(ctx, blkID)
+		return e.GetBlockF(blkID)
 	}
 	if e.CantGetBlock && e.T != nil {
 		e.T.Fatalf("Unexpectedly called GetBlock")
