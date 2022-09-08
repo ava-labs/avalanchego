@@ -12,7 +12,7 @@ require (
 	github.com/Microsoft/go-winio v0.5.2
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/ava-labs/avalanche-network-runner-sdk v0.2.0
-	github.com/ava-labs/coreth v0.9.0-rc.12
+	github.com/ava-labs/coreth v0.9.0-rc.13
 	github.com/btcsuite/btcd v0.23.1
 	github.com/btcsuite/btcd/btcutil v1.1.1
 	github.com/decred/dcrd/dcrec/secp256k1/v3 v3.0.0-20200627015759-01fd2de07837
