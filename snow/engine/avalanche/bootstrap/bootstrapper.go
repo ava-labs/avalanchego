@@ -10,6 +10,7 @@ import (
 	"math"
 	"time"
 
+	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -128,14 +129,18 @@ func (b *bootstrapper) Clear() error {
 // Ancestors handles the receipt of multiple containers. Should be received in
 // response to a GetAncestors message to [nodeID] with request ID [requestID].
 // Expects vtxs[0] to be the vertex requested in the corresponding GetAncestors.
-func (b *bootstrapper) Ancestors(_ context.Context, nodeID ids.NodeID, requestID uint32, vtxs [][]byte) error {
+func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxs [][]byte) error {
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "bootstrapper.Ancestors")
+	defer span.End()
+	// TODO add attributes
+
 	lenVtxs := len(vtxs)
 	if lenVtxs == 0 {
 		b.Ctx.Log.Debug("Ancestors contains no vertices",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 		)
-		return b.GetAncestorsFailed(context.TODO(), nodeID, requestID)
+		return b.GetAncestorsFailed(newCtx, nodeID, requestID)
 	}
 	if lenVtxs > b.Config.AncestorsMaxContainersReceived {
 		b.Ctx.Log.Debug("ignoring containers in Ancestors",

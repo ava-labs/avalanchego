@@ -10,6 +10,7 @@ import (
 
 	stdmath "math"
 
+	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -353,6 +354,9 @@ func (ss *stateSyncer) selectSyncableStateSummary() block.StateSummary {
 }
 
 func (ss *stateSyncer) GetAcceptedStateSummaryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "stateSyncer.GetAcceptedStateSummaryFailed")
+	defer span.End()
+
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync GetAcceptedStateSummaryFailed message",
@@ -368,7 +372,7 @@ func (ss *stateSyncer) GetAcceptedStateSummaryFailed(ctx context.Context, nodeID
 	// accepted
 	ss.failedVoters.Add(nodeID)
 
-	return ss.AcceptedStateSummary(context.TODO(), nodeID, requestID, nil)
+	return ss.AcceptedStateSummary(newCtx, nodeID, requestID, nil)
 }
 
 func (ss *stateSyncer) Start(startReqID uint32) error {
@@ -510,15 +514,15 @@ func (ss *stateSyncer) sendGetAcceptedStateSummaries() {
 }
 
 func (ss *stateSyncer) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
-	return ss.VM.AppRequest(context.TODO(), nodeID, requestID, deadline, request)
+	return ss.VM.AppRequest(ctx, nodeID, requestID, deadline, request)
 }
 
 func (ss *stateSyncer) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
-	return ss.VM.AppResponse(context.TODO(), nodeID, requestID, response)
+	return ss.VM.AppResponse(ctx, nodeID, requestID, response)
 }
 
 func (ss *stateSyncer) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	return ss.VM.AppRequestFailed(context.TODO(), nodeID, requestID)
+	return ss.VM.AppRequestFailed(ctx, nodeID, requestID)
 }
 
 func (ss *stateSyncer) Notify(msg common.Message) error {

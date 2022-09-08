@@ -7,6 +7,7 @@ import (
 	"context"
 	"time"
 
+	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -71,24 +72,33 @@ func (gh *getter) GetAcceptedStateSummary(_ context.Context, nodeID ids.NodeID, 
 	return nil
 }
 
-func (gh *getter) GetAcceptedFrontier(_ context.Context, validatorID ids.NodeID, requestID uint32) error {
+func (gh *getter) GetAcceptedFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32) error {
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "getter.GetAcceptedFrontier")
+	defer span.End()
+
 	acceptedFrontier := gh.storage.Edge()
-	gh.sender.SendAcceptedFrontier(context.TODO(), validatorID, requestID, acceptedFrontier)
+	gh.sender.SendAcceptedFrontier(newCtx, validatorID, requestID, acceptedFrontier)
 	return nil
 }
 
-func (gh *getter) GetAccepted(_ context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
+func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "getter.GetAccepted")
+	defer span.End()
+
 	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, vtxID := range containerIDs {
 		if vtx, err := gh.storage.GetVtx(vtxID); err == nil && vtx.Status() == choices.Accepted {
 			acceptedVtxIDs = append(acceptedVtxIDs, vtxID)
 		}
 	}
-	gh.sender.SendAccepted(context.TODO(), nodeID, requestID, acceptedVtxIDs)
+	gh.sender.SendAccepted(newCtx, nodeID, requestID, acceptedVtxIDs)
 	return nil
 }
 
-func (gh *getter) GetAncestors(_ context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
+func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "getter.GetAncestors")
+	defer span.End()
+
 	startTime := time.Now()
 	gh.log.Verbo("called GetAncestors",
 		zap.Stringer("nodeID", nodeID),
@@ -136,14 +146,14 @@ func (gh *getter) GetAncestors(_ context.Context, nodeID ids.NodeID, requestID u
 	}
 
 	gh.getAncestorsVtxs.Observe(float64(len(ancestorsBytes)))
-	gh.sender.SendAncestors(context.TODO(), nodeID, requestID, ancestorsBytes)
+	gh.sender.SendAncestors(newCtx, nodeID, requestID, ancestorsBytes)
 	return nil
 }
 
-func (gh *getter) Get(_ context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
+func (gh *getter) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
 	// If this engine has access to the requested vertex, provide it
 	if vtx, err := gh.storage.GetVtx(vtxID); err == nil {
-		gh.sender.SendPut(context.TODO(), nodeID, requestID, vtxID, vtx.Bytes())
+		gh.sender.SendPut(ctx, nodeID, requestID, vtxID, vtx.Bytes())
 	}
 	return nil
 }

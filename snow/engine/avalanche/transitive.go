@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -95,6 +96,10 @@ func newTransitive(config Config) (*Transitive, error) {
 }
 
 func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "Transitive.Put")
+	defer span.End()
+	// TODO add attributes
+
 	t.Ctx.Log.Verbo("called Put",
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
@@ -112,7 +117,7 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 			zap.Binary("vertex", vtxBytes),
 			zap.Error(err),
 		)
-		return t.GetFailed(context.TODO(), nodeID, requestID)
+		return t.GetFailed(newCtx, nodeID, requestID)
 	}
 
 	if t.Consensus.VertexIssued(vtx) || t.pending.Contains(vtx.ID()) {
@@ -126,6 +131,10 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 }
 
 func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	_, span := otel.Tracer("TODO").Start(ctx, "Transitive.GetFailed")
+	defer span.End()
+	// TODO add attributes
+
 	vtxID, ok := t.outstandingVtxReqs.Remove(nodeID, requestID)
 	if !ok {
 		t.Ctx.Log.Debug("unexpected GetFailed",
@@ -153,8 +162,12 @@ func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "Transitive.PullQuery")
+	defer span.End()
+	// TODO add attributes
+
 	// Immediately respond to the query with the current consensus preferences.
-	t.Sender.SendChits(context.TODO(), nodeID, requestID, t.Consensus.Preferences().List())
+	t.Sender.SendChits(newCtx, nodeID, requestID, t.Consensus.Preferences().List())
 
 	// If we have [vtxID], attempt to put it into consensus, if we haven't
 	// already. If we don't not have [vtxID], fetch it from [nodeID].
@@ -166,8 +179,12 @@ func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "Transitive.PushQuery")
+	defer span.End()
+	// TODO add attributes
+
 	// Immediately respond to the query with the current consensus preferences.
-	t.Sender.SendChits(context.TODO(), nodeID, requestID, t.Consensus.Preferences().List())
+	t.Sender.SendChits(newCtx, nodeID, requestID, t.Consensus.Preferences().List())
 
 	vtx, err := t.Manager.ParseVtx(vtxBytes)
 	if err != nil {
@@ -197,6 +214,10 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) error {
+	_, span := otel.Tracer("TODO").Start(ctx, "Transitive.Chits")
+	defer span.End()
+	// TODO add attributes
+
 	v := &voter{
 		t:         t,
 		vdr:       nodeID,

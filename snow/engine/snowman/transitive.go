@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -110,6 +111,9 @@ func newTransitive(config Config) (*Transitive, error) {
 }
 
 func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "Transitive.Put")
+	defer span.End()
+
 	blk, err := t.VM.ParseBlock(blkBytes)
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse block",
@@ -126,7 +130,7 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		// because GetFailed doesn't utilize the assumption that we actually
 		// sent a Get message, we can safely call GetFailed here to potentially
 		// abandon the request.
-		return t.GetFailed(context.TODO(), nodeID, requestID)
+		return t.GetFailed(newCtx, nodeID, requestID)
 	}
 
 	if t.wasIssued(blk) {
@@ -163,9 +167,12 @@ func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "Transitive.PullQuery")
+	defer span.End()
+
 	// TODO: once everyone supports ChitsV2 - we should be sending that message
 	// type here.
-	t.Sender.SendChits(context.TODO(), nodeID, requestID, []ids.ID{t.Consensus.Preference()})
+	t.Sender.SendChits(newCtx, nodeID, requestID, []ids.ID{t.Consensus.Preference()})
 
 	// Try to issue [blkID] to consensus.
 	// If we're missing an ancestor, request it from [vdr]
@@ -177,9 +184,12 @@ func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "Transitive.PushQuery")
+	defer span.End()
+
 	// TODO: once everyone supports ChitsV2 - we should be sending that message
 	// type here.
-	t.Sender.SendChits(context.TODO(), nodeID, requestID, []ids.ID{t.Consensus.Preference()})
+	t.Sender.SendChits(newCtx, nodeID, requestID, []ids.ID{t.Consensus.Preference()})
 
 	blk, err := t.VM.ParseBlock(blkBytes)
 	// If parsing fails, we just drop the request, as we didn't ask for it
@@ -215,6 +225,9 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) error {
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "Transitive.Chits")
+	defer span.End()
+
 	// Since this is a linear chain, there should only be one ID in the vote set
 	if len(votes) != 1 {
 		t.Ctx.Log.Debug("failing Chits",
@@ -226,7 +239,7 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		// because QueryFailed doesn't utilize the assumption that we actually
 		// sent a Query message, we can safely call QueryFailed here to
 		// potentially abandon the request.
-		return t.QueryFailed(context.TODO(), nodeID, requestID)
+		return t.QueryFailed(newCtx, nodeID, requestID)
 	}
 	blkID := votes[0]
 
@@ -258,7 +271,7 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 }
 
 func (t *Transitive) ChitsV2(ctx context.Context, vdr ids.NodeID, requestID uint32, _ []ids.ID, vote ids.ID) error {
-	return t.Chits(context.TODO(), vdr, requestID, []ids.ID{vote})
+	return t.Chits(ctx, vdr, requestID, []ids.ID{vote})
 }
 
 func (t *Transitive) QueryFailed(ctx context.Context, vdr ids.NodeID, requestID uint32) error {
@@ -273,22 +286,22 @@ func (t *Transitive) QueryFailed(ctx context.Context, vdr ids.NodeID, requestID 
 
 func (t *Transitive) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	// Notify the VM of this request
-	return t.VM.AppRequest(context.TODO(), nodeID, requestID, deadline, request)
+	return t.VM.AppRequest(ctx, nodeID, requestID, deadline, request)
 }
 
 func (t *Transitive) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	// Notify the VM that a request it made failed
-	return t.VM.AppRequestFailed(context.TODO(), nodeID, requestID)
+	return t.VM.AppRequestFailed(ctx, nodeID, requestID)
 }
 
 func (t *Transitive) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 	// Notify the VM of a response to its request
-	return t.VM.AppResponse(context.TODO(), nodeID, requestID, response)
+	return t.VM.AppResponse(ctx, nodeID, requestID, response)
 }
 
 func (t *Transitive) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error {
 	// Notify the VM of this message which has been gossiped to it
-	return t.VM.AppGossip(context.TODO(), nodeID, msg)
+	return t.VM.AppGossip(ctx, nodeID, msg)
 }
 
 func (t *Transitive) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
