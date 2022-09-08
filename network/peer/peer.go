@@ -15,6 +15,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -557,10 +559,16 @@ func (p *peer) sendPings() {
 }
 
 func (p *peer) handle(msg message.InboundMessage) {
+	ctx, span := otel.Tracer("TODO").Start(context.Background(), "handle")
+	defer span.End()
+
+	span.SetAttributes(attribute.String("sender", p.id.String()))
 	op := msg.Op()
+	span.SetAttributes(attribute.String("op", op.String()))
+
 	switch op { // Network-related message types
 	case message.Ping:
-		p.handlePing(msg)
+		p.handlePing(ctx, msg)
 		msg.OnFinishedHandling()
 		return
 	case message.Pong:
@@ -591,8 +599,11 @@ func (p *peer) handle(msg message.InboundMessage) {
 	p.Router.HandleInbound(msg)
 }
 
-func (p *peer) handlePing(_ message.InboundMessage) {
-	msg, err := p.Network.Pong(p.id)
+func (p *peer) handlePing(ctx context.Context, _ message.InboundMessage) {
+	pongCtx, span := otel.Tracer("TODO").Start(ctx, "handlePing")
+	defer span.End()
+
+	msg, err := p.Network.Pong(pongCtx, p.id)
 	p.Log.AssertNoError(err)
 	p.Send(p.onClosingCtx, msg)
 }

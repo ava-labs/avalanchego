@@ -4,6 +4,8 @@
 package peer
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/utils/ips"
@@ -43,5 +45,5 @@ type Network interface {
 
 	// Pong provides the peer with a Pong message to send to the peer in
 	// response to a Ping message.
-	Pong(ids.NodeID) (message.OutboundMessage, error)
+	Pong(context.Context, ids.NodeID) (message.OutboundMessage, error)
 }
