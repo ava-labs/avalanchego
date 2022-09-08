@@ -4,6 +4,7 @@
 package common
 
 import (
+	"context"
 	stdmath "math"
 
 	"go.uber.org/zap"
@@ -352,7 +353,7 @@ func (b *bootstrapper) sendGetAcceptedFrontiers() {
 	}
 
 	if vdrs.Len() > 0 {
-		b.Sender.SendGetAcceptedFrontier(vdrs, b.Config.SharedCfg.RequestID)
+		b.Sender.SendGetAcceptedFrontier(context.TODO(), vdrs, b.Config.SharedCfg.RequestID)
 	}
 }
 
@@ -373,6 +374,6 @@ func (b *bootstrapper) sendGetAccepted() {
 			zap.Int("numSent", vdrs.Len()),
 			zap.Int("numPending", b.pendingSendAccepted.Len()),
 		)
-		b.Sender.SendGetAccepted(vdrs, b.Config.SharedCfg.RequestID, b.acceptedFrontier)
+		b.Sender.SendGetAccepted(context.TODO(), vdrs, b.Config.SharedCfg.RequestID, b.acceptedFrontier)
 	}
 }

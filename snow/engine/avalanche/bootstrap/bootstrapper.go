@@ -4,6 +4,7 @@
 package bootstrap
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -366,7 +367,7 @@ func (b *bootstrapper) fetch(vtxIDs ...ids.ID) error {
 		b.Config.SharedCfg.RequestID++
 
 		b.OutstandingRequests.Add(validatorID, b.Config.SharedCfg.RequestID, vtxID)
-		b.Config.Sender.SendGetAncestors(validatorID, b.Config.SharedCfg.RequestID, vtxID) // request vertex and ancestors
+		b.Config.Sender.SendGetAncestors(context.TODO(), validatorID, b.Config.SharedCfg.RequestID, vtxID) // request vertex and ancestors
 	}
 	return b.checkFinish()
 }

@@ -4,6 +4,7 @@
 package router
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -450,23 +451,23 @@ func TestRouterClearTimeouts(t *testing.T) {
 
 	// Put
 	inMsg = mc.InboundPut(ctx.ChainID, 0, ids.GenerateTestID(), nil, vID)
-	chainRouter.HandleInbound(inMsg)
+	chainRouter.HandleInbound(context.Background(), inMsg)
 
 	// Ancestors
 	inMsg = mc.InboundAncestors(ctx.ChainID, 1, nil, vID)
-	chainRouter.HandleInbound(inMsg)
+	chainRouter.HandleInbound(context.Background(), inMsg)
 
 	// Chits
 	inMsg = mc.InboundChits(ctx.ChainID, 2, nil, vID)
-	chainRouter.HandleInbound(inMsg)
+	chainRouter.HandleInbound(context.Background(), inMsg)
 
 	// Accepted
 	inMsg = mc.InboundAccepted(ctx.ChainID, 3, nil, vID)
-	chainRouter.HandleInbound(inMsg)
+	chainRouter.HandleInbound(context.Background(), inMsg)
 
 	// Accepted Frontier
 	inMsg = mc.InboundAcceptedFrontier(ctx.ChainID, 4, nil, vID)
-	chainRouter.HandleInbound(inMsg)
+	chainRouter.HandleInbound(context.Background(), inMsg)
 
 	require.Equal(t, chainRouter.timedRequests.Len(), 0)
 }
@@ -562,7 +563,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	inMsg = mc.InboundPullQuery(ctx.ChainID, reqID, time.Hour, dummyContainerID,
 		nID,
 	)
-	chainRouter.HandleInbound(inMsg)
+	chainRouter.HandleInbound(context.Background(), inMsg)
 
 	require.False(t, calledF) // should not be called
 
@@ -573,7 +574,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		vID,
 	)
 	wg.Add(1)
-	chainRouter.HandleInbound(inMsg)
+	chainRouter.HandleInbound(context.Background(), inMsg)
 
 	wg.Wait()
 	require.True(t, calledF) // should be called since this is a validator request
@@ -588,7 +589,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	require.NoError(t, err)
 
 	inMsg = mc.InboundPut(ctx.ChainID, reqID, ids.GenerateTestID(), nil, nID)
-	chainRouter.HandleInbound(inMsg)
+	chainRouter.HandleInbound(context.Background(), inMsg)
 
 	// shouldn't clear out timed request, as the request should be cleared when
 	// the GetFailed message is sent

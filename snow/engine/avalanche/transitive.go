@@ -4,6 +4,7 @@
 package avalanche
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -153,7 +154,7 @@ func (t *Transitive) GetFailed(nodeID ids.NodeID, requestID uint32) error {
 
 func (t *Transitive) PullQuery(nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
 	// Immediately respond to the query with the current consensus preferences.
-	t.Sender.SendChits(nodeID, requestID, t.Consensus.Preferences().List())
+	t.Sender.SendChits(context.TODO(), nodeID, requestID, t.Consensus.Preferences().List())
 
 	// If we have [vtxID], attempt to put it into consensus, if we haven't
 	// already. If we don't not have [vtxID], fetch it from [nodeID].
@@ -166,7 +167,7 @@ func (t *Transitive) PullQuery(nodeID ids.NodeID, requestID uint32, vtxID ids.ID
 
 func (t *Transitive) PushQuery(nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
 	// Immediately respond to the query with the current consensus preferences.
-	t.Sender.SendChits(nodeID, requestID, t.Consensus.Preferences().List())
+	t.Sender.SendChits(context.TODO(), nodeID, requestID, t.Consensus.Preferences().List())
 
 	vtx, err := t.Manager.ParseVtx(vtxBytes)
 	if err != nil {
@@ -281,7 +282,7 @@ func (t *Transitive) Gossip() error {
 	t.Ctx.Log.Verbo("gossiping accepted vertex to the network",
 		zap.Stringer("vtxID", vtxID),
 	)
-	t.Sender.SendGossip(vtxID, vtx.Bytes())
+	t.Sender.SendGossip(context.TODO(), vtxID, vtx.Bytes())
 	return nil
 }
 
@@ -619,7 +620,7 @@ func (t *Transitive) issueRepoll() {
 	// Poll the network
 	t.RequestID++
 	if t.polls.Add(t.RequestID, vdrBag) {
-		t.Sender.SendPullQuery(vdrSet, t.RequestID, vtxID)
+		t.Sender.SendPullQuery(context.TODO(), vdrSet, t.RequestID, vtxID)
 	}
 }
 
@@ -685,6 +686,6 @@ func (t *Transitive) sendRequest(nodeID ids.NodeID, vtxID ids.ID) {
 	}
 	t.RequestID++
 	t.outstandingVtxReqs.Add(nodeID, t.RequestID, vtxID) // Mark that there is an outstanding request for this vertex
-	t.Sender.SendGet(nodeID, t.RequestID, vtxID)
+	t.Sender.SendGet(context.TODO(), nodeID, t.RequestID, vtxID)
 	t.metrics.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len())) // Tracks performance statistics
 }

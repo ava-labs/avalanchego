@@ -4,6 +4,7 @@
 package builder
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -44,7 +45,7 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	}()
 
 	var gossipedBytes []byte
-	env.sender.SendAppGossipF = func(b []byte) error {
+	env.sender.SendAppGossipF = func(_ context.Context, b []byte) error {
 		gossipedBytes = b
 		return nil
 	}
@@ -121,7 +122,7 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	}()
 
 	var gossipedBytes []byte
-	env.sender.SendAppGossipF = func(b []byte) error {
+	env.sender.SendAppGossipF = func(_ context.Context, b []byte) error {
 		gossipedBytes = b
 		return nil
 	}

@@ -4,6 +4,7 @@
 package snowman
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -164,7 +165,7 @@ func (t *Transitive) GetFailed(nodeID ids.NodeID, requestID uint32) error {
 func (t *Transitive) PullQuery(nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
 	// TODO: once everyone supports ChitsV2 - we should be sending that message
 	// type here.
-	t.Sender.SendChits(nodeID, requestID, []ids.ID{t.Consensus.Preference()})
+	t.Sender.SendChits(context.TODO(), nodeID, requestID, []ids.ID{t.Consensus.Preference()})
 
 	// Try to issue [blkID] to consensus.
 	// If we're missing an ancestor, request it from [vdr]
@@ -178,7 +179,7 @@ func (t *Transitive) PullQuery(nodeID ids.NodeID, requestID uint32, blkID ids.ID
 func (t *Transitive) PushQuery(nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
 	// TODO: once everyone supports ChitsV2 - we should be sending that message
 	// type here.
-	t.Sender.SendChits(nodeID, requestID, []ids.ID{t.Consensus.Preference()})
+	t.Sender.SendChits(context.TODO(), nodeID, requestID, []ids.ID{t.Consensus.Preference()})
 
 	blk, err := t.VM.ParseBlock(blkBytes)
 	// If parsing fails, we just drop the request, as we didn't ask for it
@@ -317,7 +318,7 @@ func (t *Transitive) Gossip() error {
 	t.Ctx.Log.Verbo("gossiping accepted block to the network",
 		zap.Stringer("blkID", blkID),
 	)
-	t.Sender.SendGossip(blkID, blk.Bytes())
+	t.Sender.SendGossip(context.TODO(), blkID, blk.Bytes())
 	return nil
 }
 
@@ -643,7 +644,7 @@ func (t *Transitive) sendRequest(nodeID ids.NodeID, blkID ids.ID) {
 		zap.Uint32("requestID", t.RequestID),
 		zap.Stringer("blkID", blkID),
 	)
-	t.Sender.SendGet(nodeID, t.RequestID, blkID)
+	t.Sender.SendGet(context.TODO(), nodeID, t.RequestID, blkID)
 
 	// Tracks performance statistics
 	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
@@ -674,7 +675,7 @@ func (t *Transitive) pullQuery(blkID ids.ID) {
 		vdrList := vdrBag.List()
 		vdrSet := ids.NewNodeIDSet(len(vdrList))
 		vdrSet.Add(vdrList...)
-		t.Sender.SendPullQuery(vdrSet, t.RequestID, blkID)
+		t.Sender.SendPullQuery(context.TODO(), vdrSet, t.RequestID, blkID)
 	}
 }
 

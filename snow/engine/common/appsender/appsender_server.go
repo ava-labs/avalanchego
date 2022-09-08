@@ -35,7 +35,7 @@ func (s *Server) SendAppRequest(_ context.Context, req *appsenderpb.SendAppReque
 		}
 		nodeIDs.Add(nodeID)
 	}
-	err := s.appSender.SendAppRequest(nodeIDs, req.RequestId, req.Request)
+	err := s.appSender.SendAppRequest(context.TODO(), nodeIDs, req.RequestId, req.Request)
 	return &emptypb.Empty{}, err
 }
 
@@ -44,12 +44,12 @@ func (s *Server) SendAppResponse(_ context.Context, req *appsenderpb.SendAppResp
 	if err != nil {
 		return nil, err
 	}
-	err = s.appSender.SendAppResponse(nodeID, req.RequestId, req.Response)
+	err = s.appSender.SendAppResponse(context.TODO(), nodeID, req.RequestId, req.Response)
 	return &emptypb.Empty{}, err
 }
 
 func (s *Server) SendAppGossip(_ context.Context, req *appsenderpb.SendAppGossipMsg) (*emptypb.Empty, error) {
-	err := s.appSender.SendAppGossip(req.Msg)
+	err := s.appSender.SendAppGossip(context.TODO(), req.Msg)
 	return &emptypb.Empty{}, err
 }
 
@@ -62,6 +62,6 @@ func (s *Server) SendAppGossipSpecific(_ context.Context, req *appsenderpb.SendA
 		}
 		nodeIDs.Add(nodeID)
 	}
-	err := s.appSender.SendAppGossipSpecific(nodeIDs, req.Msg)
+	err := s.appSender.SendAppGossipSpecific(context.TODO(), nodeIDs, req.Msg)
 	return &emptypb.Empty{}, err
 }

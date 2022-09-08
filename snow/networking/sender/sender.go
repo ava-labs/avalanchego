@@ -4,9 +4,11 @@
 package sender
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/otel"
 
 	"go.uber.org/zap"
 
@@ -85,7 +87,11 @@ func New(
 	return s, nil
 }
 
-func (s *sender) SendGetStateSummaryFrontier(nodeIDs ids.NodeIDSet, requestID uint32) {
+func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32) {
+	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendGetStateSummaryFrontier")
+	defer span.End()
+	// TODO add attributes
+
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -104,7 +110,7 @@ func (s *sender) SendGetStateSummaryFrontier(nodeIDs ids.NodeIDSet, requestID ui
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := s.msgCreator.InboundGetStateSummaryFrontier(s.ctx.ChainID, requestID, deadline, s.ctx.NodeID)
-		go s.router.HandleInbound(inMsg)
+		go s.router.HandleInbound(context.TODO(), inMsg)
 	}
 
 	// Create the outbound message.
@@ -125,11 +131,15 @@ func (s *sender) SendGetStateSummaryFrontier(nodeIDs ids.NodeIDSet, requestID ui
 	}
 }
 
-func (s *sender) SendStateSummaryFrontier(nodeID ids.NodeID, requestID uint32, summary []byte) {
+func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) {
+	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendStateSummaryFrontier")
+	defer span.End()
+	// TODO add attributes
+
 	// Sending this message to myself.
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundStateSummaryFrontier(s.ctx.ChainID, requestID, summary, nodeID)
-		go s.router.HandleInbound(inMsg)
+		go s.router.HandleInbound(context.TODO(), inMsg)
 		return
 	}
 
@@ -166,7 +176,11 @@ func (s *sender) SendStateSummaryFrontier(nodeID ids.NodeID, requestID uint32, s
 	}
 }
 
-func (s *sender) SendGetAcceptedStateSummary(nodeIDs ids.NodeIDSet, requestID uint32, heights []uint64) {
+func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, heights []uint64) {
+	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendGetAcceptedStateSummary")
+	defer span.End()
+	// TODO add attributes
+
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -185,7 +199,7 @@ func (s *sender) SendGetAcceptedStateSummary(nodeIDs ids.NodeIDSet, requestID ui
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := s.msgCreator.InboundGetAcceptedStateSummary(s.ctx.ChainID, requestID, heights, deadline, s.ctx.NodeID)
-		go s.router.HandleInbound(inMsg)
+		go s.router.HandleInbound(context.TODO(), inMsg)
 	}
 
 	// Create the outbound message.
@@ -218,10 +232,14 @@ func (s *sender) SendGetAcceptedStateSummary(nodeIDs ids.NodeIDSet, requestID ui
 	}
 }
 
-func (s *sender) SendAcceptedStateSummary(nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) {
+func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) {
+	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendAcceptedStateSummary")
+	defer span.End()
+	// TODO add attributes
+
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundAcceptedStateSummary(s.ctx.ChainID, requestID, summaryIDs, nodeID)
-		go s.router.HandleInbound(inMsg)
+		go s.router.HandleInbound(context.TODO(), inMsg)
 		return
 	}
 
@@ -252,7 +270,11 @@ func (s *sender) SendAcceptedStateSummary(nodeID ids.NodeID, requestID uint32, s
 	}
 }
 
-func (s *sender) SendGetAcceptedFrontier(nodeIDs ids.NodeIDSet, requestID uint32) {
+func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32) {
+	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendGetAcceptedFrontier")
+	defer span.End()
+	// TODO add attributes
+
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -271,7 +293,7 @@ func (s *sender) SendGetAcceptedFrontier(nodeIDs ids.NodeIDSet, requestID uint32
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := s.msgCreator.InboundGetAcceptedFrontier(s.ctx.ChainID, requestID, deadline, s.ctx.NodeID)
-		go s.router.HandleInbound(inMsg)
+		go s.router.HandleInbound(context.TODO(), inMsg)
 	}
 
 	// Create the outbound message.
@@ -292,11 +314,15 @@ func (s *sender) SendGetAcceptedFrontier(nodeIDs ids.NodeIDSet, requestID uint32
 	}
 }
 
-func (s *sender) SendAcceptedFrontier(nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
+func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
+	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendAcceptedFrontier")
+	defer span.End()
+	// TODO add attributes
+
 	// Sending this message to myself.
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundAcceptedFrontier(s.ctx.ChainID, requestID, containerIDs, nodeID)
-		go s.router.HandleInbound(inMsg)
+		go s.router.HandleInbound(context.TODO(), inMsg)
 		return
 	}
 
@@ -327,7 +353,11 @@ func (s *sender) SendAcceptedFrontier(nodeID ids.NodeID, requestID uint32, conta
 	}
 }
 
-func (s *sender) SendGetAccepted(nodeIDs ids.NodeIDSet, requestID uint32, containerIDs []ids.ID) {
+func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, containerIDs []ids.ID) {
+	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendGetAccepted")
+	defer span.End()
+	// TODO add attributes
+
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -346,7 +376,7 @@ func (s *sender) SendGetAccepted(nodeIDs ids.NodeIDSet, requestID uint32, contai
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := s.msgCreator.InboundGetAccepted(s.ctx.ChainID, requestID, deadline, containerIDs, s.ctx.NodeID)
-		go s.router.HandleInbound(inMsg)
+		go s.router.HandleInbound(context.TODO(), inMsg)
 	}
 
 	// Create the outbound message.
@@ -379,10 +409,14 @@ func (s *sender) SendGetAccepted(nodeIDs ids.NodeIDSet, requestID uint32, contai
 	}
 }
 
-func (s *sender) SendAccepted(nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
+func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
+	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendAccepted")
+	defer span.End()
+	// TODO add attributes
+
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundAccepted(s.ctx.ChainID, requestID, containerIDs, nodeID)
-		go s.router.HandleInbound(inMsg)
+		go s.router.HandleInbound(context.TODO(), inMsg)
 		return
 	}
 
@@ -413,7 +447,11 @@ func (s *sender) SendAccepted(nodeID ids.NodeID, requestID uint32, containerIDs 
 	}
 }
 
-func (s *sender) SendGetAncestors(nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
+func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendGetAncestors")
+	defer span.End()
+	// TODO add attributes
+
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from this node.
 	s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Ancestors)
@@ -421,7 +459,7 @@ func (s *sender) SendGetAncestors(nodeID ids.NodeID, requestID uint32, container
 	// Sending a GetAncestors to myself always fails.
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, s.ctx.ChainID, requestID)
-		go s.router.HandleInbound(inMsg)
+		go s.router.HandleInbound(newCtx, inMsg)
 		return
 	}
 
@@ -431,7 +469,7 @@ func (s *sender) SendGetAncestors(nodeID ids.NodeID, requestID uint32, container
 		s.failedDueToBench[message.GetAncestors].Inc() // update metric
 		s.timeouts.RegisterRequestToUnreachableValidator()
 		inMsg := s.msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, s.ctx.ChainID, requestID)
-		go s.router.HandleInbound(inMsg)
+		go s.router.HandleInbound(newCtx, inMsg)
 		return
 	}
 
@@ -450,7 +488,7 @@ func (s *sender) SendGetAncestors(nodeID ids.NodeID, requestID uint32, container
 		)
 
 		inMsg := s.msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, s.ctx.ChainID, requestID)
-		go s.router.HandleInbound(inMsg)
+		go s.router.HandleInbound(newCtx, inMsg)
 		return
 	}
 
@@ -468,14 +506,18 @@ func (s *sender) SendGetAncestors(nodeID ids.NodeID, requestID uint32, container
 
 		s.timeouts.RegisterRequestToUnreachableValidator()
 		inMsg := s.msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, s.ctx.ChainID, requestID)
-		go s.router.HandleInbound(inMsg)
+		go s.router.HandleInbound(newCtx, inMsg)
 	}
 }
 
 // SendAncestors sends an Ancestors message to the consensus engine running on the specified chain
 // on the specified node.
 // The Ancestors message gives the recipient the contents of several containers.
-func (s *sender) SendAncestors(nodeID ids.NodeID, requestID uint32, containers [][]byte) {
+func (s *sender) SendAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) {
+	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendAncestors")
+	defer span.End()
+	// TODO add attributes
+
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.Ancestors(s.ctx.ChainID, requestID, containers)
 	if err != nil {
@@ -507,7 +549,11 @@ func (s *sender) SendAncestors(nodeID ids.NodeID, requestID uint32, containers [
 // chain to the specified node. The Get message signifies that this
 // consensus engine would like the recipient to send this consensus engine the
 // specified container.
-func (s *sender) SendGet(nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
+func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendGet")
+	defer span.End()
+	// TODO add attributes
+
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from this node.
 	s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Put)
@@ -515,7 +561,7 @@ func (s *sender) SendGet(nodeID ids.NodeID, requestID uint32, containerID ids.ID
 	// Sending a Get to myself always fails.
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InternalFailedRequest(message.GetFailed, nodeID, s.ctx.ChainID, requestID)
-		go s.router.HandleInbound(inMsg)
+		go s.router.HandleInbound(newCtx, inMsg)
 		return
 	}
 
@@ -525,7 +571,7 @@ func (s *sender) SendGet(nodeID ids.NodeID, requestID uint32, containerID ids.ID
 		s.failedDueToBench[message.Get].Inc() // update metric
 		s.timeouts.RegisterRequestToUnreachableValidator()
 		inMsg := s.msgCreator.InternalFailedRequest(message.GetFailed, nodeID, s.ctx.ChainID, requestID)
-		go s.router.HandleInbound(inMsg)
+		go s.router.HandleInbound(newCtx, inMsg)
 		return
 	}
 
@@ -550,7 +596,7 @@ func (s *sender) SendGet(nodeID ids.NodeID, requestID uint32, containerID ids.ID
 
 		s.timeouts.RegisterRequestToUnreachableValidator()
 		inMsg := s.msgCreator.InternalFailedRequest(message.GetFailed, nodeID, s.ctx.ChainID, requestID)
-		go s.router.HandleInbound(inMsg)
+		go s.router.HandleInbound(newCtx, inMsg)
 	}
 }
 
@@ -558,7 +604,11 @@ func (s *sender) SendGet(nodeID ids.NodeID, requestID uint32, containerID ids.ID
 // on the specified node.
 // The Put message signifies that this consensus engine is giving to the recipient
 // the contents of the specified container.
-func (s *sender) SendPut(nodeID ids.NodeID, requestID uint32, containerID ids.ID, container []byte) {
+func (s *sender) SendPut(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID, container []byte) {
+	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendPut")
+	defer span.End()
+	// TODO add attributes
+
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.Put(s.ctx.ChainID, requestID, containerID, container)
 	if err != nil {
@@ -599,7 +649,11 @@ func (s *sender) SendPut(nodeID ids.NodeID, requestID uint32, containerID ids.ID
 // on the specified nodes.
 // The PushQuery message signifies that this consensus engine would like each node to send
 // their preferred frontier given the existence of the specified container.
-func (s *sender) SendPushQuery(nodeIDs ids.NodeIDSet, requestID uint32, containerID ids.ID, container []byte) {
+func (s *sender) SendPushQuery(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, containerID ids.ID, container []byte) {
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendPushQuery")
+	defer span.End()
+	// TODO add attributes
+
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
 	// We register timeouts for all nodes, regardless of whether we fail
@@ -618,7 +672,7 @@ func (s *sender) SendPushQuery(nodeIDs ids.NodeIDSet, requestID uint32, containe
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := s.msgCreator.InboundPushQuery(s.ctx.ChainID, requestID, deadline, containerID, container, s.ctx.NodeID)
-		go s.router.HandleInbound(inMsg)
+		go s.router.HandleInbound(newCtx, inMsg)
 	}
 
 	// Some of [nodeIDs] may be benched. That is, they've been unresponsive
@@ -631,7 +685,7 @@ func (s *sender) SendPushQuery(nodeIDs ids.NodeIDSet, requestID uint32, containe
 
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
 			inMsg := s.msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, requestID)
-			go s.router.HandleInbound(inMsg)
+			go s.router.HandleInbound(newCtx, inMsg)
 		}
 	}
 
@@ -675,7 +729,7 @@ func (s *sender) SendPushQuery(nodeIDs ids.NodeIDSet, requestID uint32, containe
 			// Register failures for nodes we didn't send a request to.
 			s.timeouts.RegisterRequestToUnreachableValidator()
 			inMsg := s.msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, requestID)
-			go s.router.HandleInbound(inMsg)
+			go s.router.HandleInbound(newCtx, inMsg)
 		}
 	}
 }
@@ -684,7 +738,11 @@ func (s *sender) SendPushQuery(nodeIDs ids.NodeIDSet, requestID uint32, containe
 // on the specified nodes.
 // The PullQuery message signifies that this consensus engine would like each node to send
 // their preferred frontier.
-func (s *sender) SendPullQuery(nodeIDs ids.NodeIDSet, requestID uint32, containerID ids.ID) {
+func (s *sender) SendPullQuery(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, containerID ids.ID) {
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendPullQuery")
+	defer span.End()
+	// TODO add attributes
+
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
 	// We register timeouts for all nodes, regardless of whether we fail
@@ -703,7 +761,7 @@ func (s *sender) SendPullQuery(nodeIDs ids.NodeIDSet, requestID uint32, containe
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := s.msgCreator.InboundPullQuery(s.ctx.ChainID, requestID, deadline, containerID, s.ctx.NodeID)
-		go s.router.HandleInbound(inMsg)
+		go s.router.HandleInbound(newCtx, inMsg)
 	}
 
 	// Some of the nodes in [nodeIDs] may be benched. That is, they've been unresponsive
@@ -715,7 +773,7 @@ func (s *sender) SendPullQuery(nodeIDs ids.NodeIDSet, requestID uint32, containe
 			s.timeouts.RegisterRequestToUnreachableValidator()
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
 			inMsg := s.msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, requestID)
-			go s.router.HandleInbound(inMsg)
+			go s.router.HandleInbound(newCtx, inMsg)
 		}
 	}
 
@@ -739,18 +797,22 @@ func (s *sender) SendPullQuery(nodeIDs ids.NodeIDSet, requestID uint32, containe
 			// Register failures for nodes we didn't send a request to.
 			s.timeouts.RegisterRequestToUnreachableValidator()
 			inMsg := s.msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, requestID)
-			go s.router.HandleInbound(inMsg)
+			go s.router.HandleInbound(newCtx, inMsg)
 		}
 	}
 }
 
 // SendChits sends chits
-func (s *sender) SendChits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) {
+func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) {
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendChits")
+	defer span.End()
+	// TODO add attributes
+
 	// If [nodeID] is myself, send this message directly
 	// to my own router rather than sending it over the network
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundChits(s.ctx.ChainID, requestID, votes, nodeID)
-		go s.router.HandleInbound(inMsg)
+		go s.router.HandleInbound(newCtx, inMsg)
 		return
 	}
 
@@ -782,12 +844,16 @@ func (s *sender) SendChits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) 
 }
 
 // SendChitsV2 sends chits V2
-func (s *sender) SendChitsV2(nodeID ids.NodeID, requestID uint32, votes []ids.ID, vote ids.ID) {
+func (s *sender) SendChitsV2(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID, vote ids.ID) {
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendChitsV2")
+	defer span.End()
+	// TODO add attributes
+
 	// If [nodeID] is myself, send this message directly
 	// to my own router rather than sending it over the network
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundChitsV2(s.ctx.ChainID, requestID, votes, vote, nodeID)
-		go s.router.HandleInbound(inMsg)
+		go s.router.HandleInbound(newCtx, inMsg)
 		return
 	}
 
@@ -822,7 +888,11 @@ func (s *sender) SendChitsV2(nodeID ids.NodeID, requestID uint32, votes []ids.ID
 
 // SendAppRequest sends an application-level request to the given nodes.
 // The meaning of this request, and how it should be handled, is defined by the VM.
-func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, appRequestBytes []byte) error {
+func (s *sender) SendAppRequest(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, appRequestBytes []byte) error {
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendAppRequest")
+	defer span.End()
+	// TODO add attributes
+
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
 	// We register timeouts for all nodes, regardless of whether we fail
@@ -841,7 +911,7 @@ func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, appRequ
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := s.msgCreator.InboundAppRequest(s.ctx.ChainID, requestID, deadline, appRequestBytes, s.ctx.NodeID)
-		go s.router.HandleInbound(inMsg)
+		go s.router.HandleInbound(newCtx, inMsg)
 	}
 
 	// Some of the nodes in [nodeIDs] may be benched. That is, they've been unresponsive
@@ -854,7 +924,7 @@ func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, appRequ
 
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
 			inMsg := s.msgCreator.InternalFailedRequest(message.AppRequestFailed, nodeID, s.ctx.ChainID, requestID)
-			go s.router.HandleInbound(inMsg)
+			go s.router.HandleInbound(newCtx, inMsg)
 		}
 	}
 
@@ -895,7 +965,7 @@ func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, appRequ
 			// Register failures for nodes we didn't send a request to.
 			s.timeouts.RegisterRequestToUnreachableValidator()
 			inMsg := s.msgCreator.InternalFailedRequest(message.AppRequestFailed, nodeID, s.ctx.ChainID, requestID)
-			go s.router.HandleInbound(inMsg)
+			go s.router.HandleInbound(newCtx, inMsg)
 		}
 	}
 	return nil
@@ -903,10 +973,14 @@ func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, appRequ
 
 // SendAppResponse sends a response to an application-level request from the
 // given node
-func (s *sender) SendAppResponse(nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
+func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendAppResponse")
+	defer span.End()
+	// TODO add attributes
+
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundAppResponse(s.ctx.ChainID, requestID, appResponseBytes, nodeID)
-		go s.router.HandleInbound(inMsg)
+		go s.router.HandleInbound(newCtx, inMsg)
 		return nil
 	}
 
@@ -944,7 +1018,11 @@ func (s *sender) SendAppResponse(nodeID ids.NodeID, requestID uint32, appRespons
 	return nil
 }
 
-func (s *sender) SendAppGossipSpecific(nodeIDs ids.NodeIDSet, appGossipBytes []byte) error {
+func (s *sender) SendAppGossipSpecific(ctx context.Context, nodeIDs ids.NodeIDSet, appGossipBytes []byte) error {
+	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendAppGossipSpecific")
+	defer span.End()
+	// TODO add attributes
+
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
 	if err != nil {
@@ -979,7 +1057,7 @@ func (s *sender) SendAppGossipSpecific(nodeIDs ids.NodeIDSet, appGossipBytes []b
 }
 
 // SendAppGossip sends an application-level gossip message.
-func (s *sender) SendAppGossip(appGossipBytes []byte) error {
+func (s *sender) SendAppGossip(ctx context.Context, appGossipBytes []byte) error {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
 	if err != nil {
@@ -1012,7 +1090,11 @@ func (s *sender) SendAppGossip(appGossipBytes []byte) error {
 }
 
 // SendGossip gossips the provided container
-func (s *sender) SendGossip(containerID ids.ID, container []byte) {
+func (s *sender) SendGossip(ctx context.Context, containerID ids.ID, container []byte) {
+	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendGossip")
+	defer span.End()
+	// TODO add attributes
+
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.Put(s.ctx.ChainID, constants.GossipMsgRequestID, containerID, container)
 	if err != nil {

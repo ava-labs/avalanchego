@@ -4,6 +4,7 @@
 package getter
 
 import (
+	"context"
 	"time"
 
 	"go.uber.org/zap"
@@ -72,7 +73,7 @@ func (gh *getter) GetAcceptedStateSummary(nodeID ids.NodeID, requestID uint32, _
 
 func (gh *getter) GetAcceptedFrontier(validatorID ids.NodeID, requestID uint32) error {
 	acceptedFrontier := gh.storage.Edge()
-	gh.sender.SendAcceptedFrontier(validatorID, requestID, acceptedFrontier)
+	gh.sender.SendAcceptedFrontier(context.TODO(), validatorID, requestID, acceptedFrontier)
 	return nil
 }
 
@@ -83,7 +84,7 @@ func (gh *getter) GetAccepted(nodeID ids.NodeID, requestID uint32, containerIDs 
 			acceptedVtxIDs = append(acceptedVtxIDs, vtxID)
 		}
 	}
-	gh.sender.SendAccepted(nodeID, requestID, acceptedVtxIDs)
+	gh.sender.SendAccepted(context.TODO(), nodeID, requestID, acceptedVtxIDs)
 	return nil
 }
 
@@ -135,14 +136,14 @@ func (gh *getter) GetAncestors(nodeID ids.NodeID, requestID uint32, vtxID ids.ID
 	}
 
 	gh.getAncestorsVtxs.Observe(float64(len(ancestorsBytes)))
-	gh.sender.SendAncestors(nodeID, requestID, ancestorsBytes)
+	gh.sender.SendAncestors(context.TODO(), nodeID, requestID, ancestorsBytes)
 	return nil
 }
 
 func (gh *getter) Get(nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
 	// If this engine has access to the requested vertex, provide it
 	if vtx, err := gh.storage.GetVtx(vtxID); err == nil {
-		gh.sender.SendPut(nodeID, requestID, vtxID, vtx.Bytes())
+		gh.sender.SendPut(context.TODO(), nodeID, requestID, vtxID, vtx.Bytes())
 	}
 	return nil
 }

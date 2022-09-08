@@ -4,6 +4,7 @@
 package sender
 
 import (
+	"context"
 	"math/rand"
 	"sync"
 	"testing"
@@ -66,22 +67,22 @@ func TestTimeout(t *testing.T) {
 	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	require.NoError(t, err)
 
-	context := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(context, mc, externalSender, &chainRouter, tm, defaultGossipConfig)
+	sender, err := New(ctx, mc, externalSender, &chainRouter, tm, defaultGossipConfig)
 	require.NoError(t, err)
 
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 	failedVDRs := ids.NodeIDSet{}
-	ctx := snow.DefaultConsensusContextTest()
+	ctx2 := snow.DefaultConsensusContextTest()
 	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
 	require.NoError(t, err)
 	handler, err := handler.New(
 		mc,
-		ctx,
+		ctx2,
 		vdrs,
 		nil,
 		nil,
@@ -119,7 +120,7 @@ func TestTimeout(t *testing.T) {
 	vdrIDs.Add(ids.NodeID{255})
 	vdrIDs.Add(ids.NodeID{254})
 
-	sender.SendPullQuery(vdrIDs, 0, ids.Empty)
+	sender.SendPullQuery(context.Background(), vdrIDs, 0, ids.Empty)
 
 	wg.Wait()
 
@@ -157,20 +158,20 @@ func TestReliableMessages(t *testing.T) {
 	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	require.NoError(t, err)
 
-	context := snow.DefaultConsensusContextTest()
+	snowCtx := snow.DefaultConsensusContextTest()
 
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(context, mc, externalSender, &chainRouter, tm, defaultGossipConfig)
+	sender, err := New(snowCtx, mc, externalSender, &chainRouter, tm, defaultGossipConfig)
 	require.NoError(t, err)
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx2 := snow.DefaultConsensusContextTest()
 	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
 	require.NoError(t, err)
 	handler, err := handler.New(
 		mc,
-		ctx,
+		snowCtx2,
 		vdrs,
 		nil,
 		nil,
@@ -189,7 +190,7 @@ func TestReliableMessages(t *testing.T) {
 	}
 	bootstrapper.Default(true)
 	bootstrapper.CantGossip = false
-	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
+	bootstrapper.ContextF = func() *snow.ConsensusContext { return snowCtx2 }
 	bootstrapper.ConnectedF = func(nodeID ids.NodeID, nodeVersion *version.Application) error { return nil }
 	queriesToSend := 1000
 	awaiting := make([]chan struct{}, queriesToSend)
@@ -202,7 +203,7 @@ func TestReliableMessages(t *testing.T) {
 	}
 	bootstrapper.CantGossip = false
 	handler.SetBootstrapper(bootstrapper)
-	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
+	snowCtx2.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
 	chainRouter.AddChain(handler)
 
@@ -214,7 +215,7 @@ func TestReliableMessages(t *testing.T) {
 			vdrIDs := ids.NodeIDSet{}
 			vdrIDs.Add(ids.NodeID{1})
 
-			sender.SendPullQuery(vdrIDs, uint32(i), ids.Empty)
+			sender.SendPullQuery(context.Background(), vdrIDs, uint32(i), ids.Empty)
 			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
 		}
 	}()
@@ -253,20 +254,20 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	require.NoError(t, err)
 
-	context := snow.DefaultConsensusContextTest()
+	snowCtx := snow.DefaultConsensusContextTest()
 
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(context, mc, externalSender, &chainRouter, tm, defaultGossipConfig)
+	sender, err := New(snowCtx, mc, externalSender, &chainRouter, tm, defaultGossipConfig)
 	require.NoError(t, err)
 
-	ctx := snow.DefaultConsensusContextTest()
+	snowCtx2 := snow.DefaultConsensusContextTest()
 	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
 	require.NoError(t, err)
 	handler, err := handler.New(
 		mc,
-		ctx,
+		snowCtx2,
 		vdrs,
 		nil,
 		nil,
@@ -285,7 +286,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	}
 	bootstrapper.Default(true)
 	bootstrapper.CantGossip = false
-	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
+	bootstrapper.ContextF = func() *snow.ConsensusContext { return snowCtx2 }
 	bootstrapper.ConnectedF = func(nodeID ids.NodeID, nodeVersion *version.Application) error { return nil }
 	queriesToSend := 2
 	awaiting := make([]chan struct{}, queriesToSend)
@@ -297,7 +298,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		return nil
 	}
 	handler.SetBootstrapper(bootstrapper)
-	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
+	snowCtx2.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
 	chainRouter.AddChain(handler)
 
@@ -311,7 +312,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			// a query failed message
 			vdrIDs := ids.NodeIDSet{}
 			vdrIDs.Add(ids.GenerateTestNodeID())
-			sender.SendPullQuery(vdrIDs, uint32(i), ids.Empty)
+			sender.SendPullQuery(context.Background(), vdrIDs, uint32(i), ids.Empty)
 		}
 	}()
 

@@ -117,7 +117,7 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 		uptime: 100,
 	}
 	inboundMsgChan0 := make(chan message.InboundMessage)
-	peerConfig0.Router = router.InboundHandlerFunc(func(msg message.InboundMessage) {
+	peerConfig0.Router = router.InboundHandlerFunc(func(ctx context.Context, msg message.InboundMessage) {
 		inboundMsgChan0 <- msg
 	})
 
@@ -136,7 +136,7 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 		uptime: 100,
 	}
 	inboundMsgChan1 := make(chan message.InboundMessage)
-	peerConfig1.Router = router.InboundHandlerFunc(func(msg message.InboundMessage) {
+	peerConfig1.Router = router.InboundHandlerFunc(func(cts context.Context, msg message.InboundMessage) {
 		inboundMsgChan1 <- msg
 	})
 

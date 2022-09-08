@@ -5,6 +5,7 @@ package avalanche
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -120,7 +121,7 @@ func TestEngineAdd(t *testing.T) {
 
 	asked := new(bool)
 	reqID := new(uint32)
-	sender.SendGetF = func(inVdr ids.NodeID, requestID uint32, vtxID ids.ID) {
+	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, vtxID ids.ID) {
 		*reqID = requestID
 		if *asked {
 			t.Fatalf("Asked multiple times")
@@ -254,7 +255,7 @@ func TestEngineQuery(t *testing.T) {
 	}
 
 	chitted := new(bool)
-	sender.SendChitsF = func(inVdr ids.NodeID, _ uint32, prefs []ids.ID) {
+	sender.SendChitsF = func(_ context.Context, inVdr ids.NodeID, _ uint32, prefs []ids.ID) {
 		if *chitted {
 			t.Fatalf("Sent multiple chits")
 		}
@@ -265,7 +266,7 @@ func TestEngineQuery(t *testing.T) {
 	}
 
 	asked := new(bool)
-	sender.SendGetF = func(inVdr ids.NodeID, _ uint32, vtxID ids.ID) {
+	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, _ uint32, vtxID ids.ID) {
 		if *asked {
 			t.Fatalf("Asked multiple times")
 		}
@@ -293,7 +294,7 @@ func TestEngineQuery(t *testing.T) {
 
 	queried := new(bool)
 	queryRequestID := new(uint32)
-	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, vtxID ids.ID, vtx []byte) {
+	sender.SendPushQueryF = func(_ context.Context, inVdrs ids.NodeIDSet, requestID uint32, vtxID ids.ID, vtx []byte) {
 		if *queried {
 			t.Fatalf("Asked multiple times")
 		}
@@ -357,7 +358,7 @@ func TestEngineQuery(t *testing.T) {
 	}
 
 	*asked = false
-	sender.SendGetF = func(inVdr ids.NodeID, _ uint32, vtxID ids.ID) {
+	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, _ uint32, vtxID ids.ID) {
 		if *asked {
 			t.Fatalf("Asked multiple times")
 		}
@@ -377,7 +378,7 @@ func TestEngineQuery(t *testing.T) {
 	}
 
 	*queried = false
-	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, vtxID ids.ID, vtx []byte) {
+	sender.SendPushQueryF = func(_ context.Context, inVdrs ids.NodeIDSet, requestID uint32, vtxID ids.ID, vtx []byte) {
 		if *queried {
 			t.Fatalf("Asked multiple times")
 		}
@@ -549,7 +550,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	queried := new(bool)
 	queryRequestID := new(uint32)
-	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, vtxID ids.ID, vtx []byte) {
+	sender.SendPushQueryF = func(_ context.Context, inVdrs ids.NodeIDSet, requestID uint32, vtxID ids.ID, vtx []byte) {
 		if *queried {
 			t.Fatalf("Asked multiple times")
 		}
@@ -596,7 +597,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	asked := new(bool)
 	reqID := new(uint32)
-	sender.SendGetF = func(inVdr ids.NodeID, requestID uint32, vtxID ids.ID) {
+	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, vtxID ids.ID) {
 		*reqID = requestID
 		if *asked {
 			t.Fatalf("Asked multiple times")
@@ -780,7 +781,7 @@ func TestEngineAbandonResponse(t *testing.T) {
 	}
 
 	reqID := new(uint32)
-	sender.SendGetF = func(vID ids.NodeID, requestID uint32, vtxID ids.ID) {
+	sender.SendGetF = func(_ context.Context, vID ids.NodeID, requestID uint32, vtxID ids.ID) {
 		*reqID = requestID
 	}
 	sender.CantSendChits = false
@@ -858,7 +859,7 @@ func TestEngineScheduleRepoll(t *testing.T) {
 	}
 
 	requestID := new(uint32)
-	sender.SendPushQueryF = func(_ ids.NodeIDSet, reqID uint32, _ ids.ID, _ []byte) {
+	sender.SendPushQueryF = func(_ context.Context, _ ids.NodeIDSet, reqID uint32, _ ids.ID, _ []byte) {
 		*requestID = reqID
 	}
 
@@ -869,7 +870,7 @@ func TestEngineScheduleRepoll(t *testing.T) {
 	sender.SendPushQueryF = nil
 
 	repolled := new(bool)
-	sender.SendPullQueryF = func(_ ids.NodeIDSet, _ uint32, vtxID ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, _ ids.NodeIDSet, _ uint32, vtxID ids.ID) {
 		*repolled = true
 		if vtxID != vtx.ID() {
 			t.Fatalf("Wrong vertex queried")
@@ -1149,7 +1150,7 @@ func TestEngineIssueRepoll(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sender.SendPullQueryF = func(vdrs ids.NodeIDSet, _ uint32, vtxID ids.ID) {
+	sender.SendPullQueryF = func(_ context.Context, vdrs ids.NodeIDSet, _ uint32, vtxID ids.ID) {
 		vdrSet := ids.NodeIDSet{}
 		vdrSet.Add(vdr)
 		if !vdrs.Equals(vdrSet) {
@@ -1305,7 +1306,7 @@ func TestEngineReissue(t *testing.T) {
 	}
 
 	queryRequestID := new(uint32)
-	sender.SendPushQueryF = func(_ ids.NodeIDSet, requestID uint32, _ ids.ID, _ []byte) {
+	sender.SendPushQueryF = func(_ context.Context, _ ids.NodeIDSet, requestID uint32, _ ids.ID, _ []byte) {
 		*queryRequestID = requestID
 	}
 
@@ -1509,7 +1510,7 @@ func TestEngineGetVertex(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sender.SendPutF = func(v ids.NodeID, _ uint32, vtxID ids.ID, vtx []byte) {
+	sender.SendPutF = func(_ context.Context, v ids.NodeID, _ uint32, vtxID ids.ID, vtx []byte) {
 		if v != vdr.ID() {
 			t.Fatalf("Wrong validator")
 		}
@@ -1581,7 +1582,7 @@ func TestEngineInsufficientValidators(t *testing.T) {
 	}
 
 	queried := new(bool)
-	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, _ uint32, vtxID ids.ID, vtx []byte) {
+	sender.SendPushQueryF = func(_ context.Context, inVdrs ids.NodeIDSet, _ uint32, vtxID ids.ID, vtx []byte) {
 		*queried = true
 	}
 
@@ -1659,7 +1660,7 @@ func TestEnginePushGossip(t *testing.T) {
 	}
 
 	requested := new(bool)
-	sender.SendGetF = func(vdr ids.NodeID, _ uint32, vtxID ids.ID) {
+	sender.SendGetF = func(_ context.Context, vdr ids.NodeID, _ uint32, vtxID ids.ID) {
 		*requested = true
 	}
 
@@ -2068,7 +2069,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	}
 
 	queryRequestID := new(uint32)
-	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, vtxID ids.ID, vtx []byte) {
+	sender.SendPushQueryF = func(_ context.Context, inVdrs ids.NodeIDSet, requestID uint32, vtxID ids.ID, vtx []byte) {
 		*queryRequestID = requestID
 		vdrSet := ids.NodeIDSet{}
 		vdrSet.Add(vdr)
@@ -2201,7 +2202,7 @@ func TestEngineMissingTx(t *testing.T) {
 	}
 
 	queryRequestID := new(uint32)
-	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, vtxID ids.ID, vtx []byte) {
+	sender.SendPushQueryF = func(_ context.Context, inVdrs ids.NodeIDSet, requestID uint32, vtxID ids.ID, vtx []byte) {
 		*queryRequestID = requestID
 		vdrSet := ids.NodeIDSet{}
 		vdrSet.Add(vdr)
@@ -2389,7 +2390,7 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 	manager.GetVtxF = nil
 
 	requestID := new(uint32)
-	sender.SendGetF = func(vID ids.NodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetF = func(_ context.Context, vID ids.NodeID, reqID uint32, vtxID ids.ID) {
 		*requestID = reqID
 	}
 	sender.CantSendChits = false
@@ -2420,7 +2421,7 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 	}
 
 	requested := new(bool)
-	sender.SendGetF = func(_ ids.NodeID, _ uint32, vtxID ids.ID) {
+	sender.SendGetF = func(_ context.Context, _ ids.NodeID, _ uint32, vtxID ids.ID) {
 		if vtxID == vtxID0 {
 			*requested = true
 		}
@@ -2535,7 +2536,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 
 	requested := new(bool)
 	requestID := new(uint32)
-	sender.SendGetAcceptedFrontierF = func(vdrs ids.NodeIDSet, reqID uint32) {
+	sender.SendGetAcceptedFrontierF = func(_ context.Context, vdrs ids.NodeIDSet, reqID uint32) {
 		if vdrs.Len() != 1 {
 			t.Fatalf("Should have requested from the validators")
 		}
@@ -2578,7 +2579,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	acceptedFrontier := []ids.ID{vtxID0}
 
 	*requested = false
-	sender.SendGetAcceptedF = func(vdrs ids.NodeIDSet, reqID uint32, proposedAccepted []ids.ID) {
+	sender.SendGetAcceptedF = func(_ context.Context, vdrs ids.NodeIDSet, reqID uint32, proposedAccepted []ids.ID) {
 		if vdrs.Len() != 1 {
 			t.Fatalf("Should have requested from the validators")
 		}
@@ -2608,7 +2609,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		panic("Unknown vertex requested")
 	}
 
-	sender.SendGetAncestorsF = func(inVdr ids.NodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, inVdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != inVdr {
 			t.Fatalf("Asking wrong validator for vertex")
 		}
@@ -2673,7 +2674,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		t.Fatalf("Unknown bytes provided")
 		panic("Unknown bytes provided")
 	}
-	sender.SendChitsF = func(inVdr ids.NodeID, _ uint32, chits []ids.ID) {
+	sender.SendChitsF = func(_ context.Context, inVdr ids.NodeID, _ uint32, chits []ids.ID) {
 		if inVdr != vdr {
 			t.Fatalf("Sent to the wrong validator")
 		}
@@ -2684,7 +2685,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 			t.Fatalf("Returned wrong chits")
 		}
 	}
-	sender.SendPushQueryF = func(vdrs ids.NodeIDSet, _ uint32, vtxID ids.ID, vtx []byte) {
+	sender.SendPushQueryF = func(_ context.Context, vdrs ids.NodeIDSet, _ uint32, vtxID ids.ID, vtx []byte) {
 		if vdrs.Len() != 1 {
 			t.Fatalf("Should have requested from the validators")
 		}
@@ -2786,7 +2787,7 @@ func TestEngineReBootstrapFails(t *testing.T) {
 
 	requested := new(bool)
 	requestID := new(uint32)
-	sender.SendGetAcceptedFrontierF = func(vdrs ids.NodeIDSet, reqID uint32) {
+	sender.SendGetAcceptedFrontierF = func(_ context.Context, vdrs ids.NodeIDSet, reqID uint32) {
 		// instead of triggering the timeout here, we'll just invoke the GetAcceptedFrontierFailed func
 		//
 		// s.router.GetAcceptedFrontierFailed(vID, s.ctx.ChainID, requestID)
@@ -2829,7 +2830,7 @@ func TestEngineReBootstrapFails(t *testing.T) {
 
 	// reset requested
 	*requested = false
-	sender.SendGetAcceptedF = func(vdrs ids.NodeIDSet, reqID uint32, proposedAccepted []ids.ID) {
+	sender.SendGetAcceptedF = func(_ context.Context, vdrs ids.NodeIDSet, reqID uint32, proposedAccepted []ids.ID) {
 		if vdrs.Len() != 1 {
 			t.Fatalf("Should have requested from the validators")
 		}
@@ -2976,7 +2977,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 
 	requested := new(bool)
 	requestID := new(uint32)
-	sender.SendGetAcceptedFrontierF = func(vdrs ids.NodeIDSet, reqID uint32) {
+	sender.SendGetAcceptedFrontierF = func(_ context.Context, vdrs ids.NodeIDSet, reqID uint32) {
 		if vdrs.Len() != 1 {
 			t.Fatalf("Should have requested from the validators")
 		}
@@ -3027,7 +3028,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 	acceptedFrontier := []ids.ID{vtxID0}
 
 	*requested = false
-	sender.SendGetAcceptedF = func(vdrs ids.NodeIDSet, reqID uint32, proposedAccepted []ids.ID) {
+	sender.SendGetAcceptedF = func(_ context.Context, vdrs ids.NodeIDSet, reqID uint32, proposedAccepted []ids.ID) {
 		if vdrs.Len() != 1 {
 			t.Fatalf("Should have requested from the validators")
 		}
@@ -3057,7 +3058,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 		panic("Unknown vertex requested")
 	}
 
-	sender.SendGetAncestorsF = func(inVdr ids.NodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, inVdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != inVdr {
 			t.Fatalf("Asking wrong validator for vertex")
 		}
@@ -3123,7 +3124,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 		t.Fatalf("Unknown bytes provided")
 		panic("Unknown bytes provided")
 	}
-	sender.SendChitsF = func(inVdr ids.NodeID, _ uint32, chits []ids.ID) {
+	sender.SendChitsF = func(_ context.Context, inVdr ids.NodeID, _ uint32, chits []ids.ID) {
 		if inVdr != vdr {
 			t.Fatalf("Sent to the wrong validator")
 		}
@@ -3134,7 +3135,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 			t.Fatalf("Returned wrong chits")
 		}
 	}
-	sender.SendPushQueryF = func(vdrs ids.NodeIDSet, _ uint32, vtxID ids.ID, vtx []byte) {
+	sender.SendPushQueryF = func(_ context.Context, vdrs ids.NodeIDSet, _ uint32, vtxID ids.ID, vtx []byte) {
 		if vdrs.Len() != 1 {
 			t.Fatalf("Should have requested from the validators")
 		}
@@ -3236,7 +3237,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 	te.Sender = sender
 
 	reqID := new(uint32)
-	sender.SendPushQueryF = func(_ ids.NodeIDSet, requestID uint32, _ ids.ID, _ []byte) {
+	sender.SendPushQueryF = func(_ context.Context, _ ids.NodeIDSet, requestID uint32, _ ids.ID, _ []byte) {
 		*reqID = requestID
 	}
 
@@ -3244,7 +3245,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sender.SendPushQueryF = func(ids.NodeIDSet, uint32, ids.ID, []byte) {
+	sender.SendPushQueryF = func(context.Context, ids.NodeIDSet, uint32, ids.ID, []byte) {
 		t.Fatalf("should have failed verification")
 	}
 
@@ -3344,7 +3345,7 @@ func TestEnginePartiallyValidVertex(t *testing.T) {
 	sender := &common.SenderTest{T: t}
 	te.Sender = sender
 
-	sender.SendPushQueryF = func(_ ids.NodeIDSet, _ uint32, vtxID ids.ID, _ []byte) {
+	sender.SendPushQueryF = func(_ context.Context, _ ids.NodeIDSet, _ uint32, vtxID ids.ID, _ []byte) {
 		if expectedVtxID != vtxID {
 			t.Fatalf("wrong vertex queried")
 		}
@@ -3389,7 +3390,7 @@ func TestEngineGossip(t *testing.T) {
 	}
 
 	called := new(bool)
-	sender.SendGossipF = func(vtxID ids.ID, vtxBytes []byte) {
+	sender.SendGossipF = func(_ context.Context, vtxID ids.ID, vtxBytes []byte) {
 		*called = true
 		if vtxID != gVtx.ID() {
 			t.Fatal(errUnknownVertex)
@@ -3504,7 +3505,7 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 	}
 
 	reqID := new(uint32)
-	sender.SendGetF = func(reqVdr ids.NodeID, requestID uint32, vtxID ids.ID) {
+	sender.SendGetF = func(_ context.Context, reqVdr ids.NodeID, requestID uint32, vtxID ids.ID) {
 		*reqID = requestID
 		if reqVdr != vdr {
 			t.Fatalf("Wrong validator requested")
@@ -3648,7 +3649,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	}
 
 	reqID := new(uint32)
-	sender.SendGetF = func(reqVdr ids.NodeID, requestID uint32, vtxID ids.ID) {
+	sender.SendGetF = func(_ context.Context, reqVdr ids.NodeID, requestID uint32, vtxID ids.ID) {
 		*reqID = requestID
 		if reqVdr != vdr {
 			t.Fatalf("Wrong validator requested")
@@ -3793,10 +3794,10 @@ func TestEngineAggressivePolling(t *testing.T) {
 	}
 
 	numPushQueries := new(int)
-	sender.SendPushQueryF = func(ids.NodeIDSet, uint32, ids.ID, []byte) { *numPushQueries++ }
+	sender.SendPushQueryF = func(context.Context, ids.NodeIDSet, uint32, ids.ID, []byte) { *numPushQueries++ }
 
 	numPullQueries := new(int)
-	sender.SendPullQueryF = func(ids.NodeIDSet, uint32, ids.ID) { *numPullQueries++ }
+	sender.SendPullQueryF = func(context.Context, ids.NodeIDSet, uint32, ids.ID) { *numPullQueries++ }
 
 	vm.CantPendingTxs = false
 
@@ -4004,7 +4005,7 @@ func TestEngineDoubleChit(t *testing.T) {
 	}
 
 	reqID := new(uint32)
-	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, vtxID ids.ID, _ []byte) {
+	sender.SendPushQueryF = func(_ context.Context, inVdrs ids.NodeIDSet, requestID uint32, vtxID ids.ID, _ []byte) {
 		*reqID = requestID
 		if inVdrs.Len() != 2 {
 			t.Fatalf("Wrong number of validators")
@@ -4167,7 +4168,7 @@ func TestEngineBubbleVotes(t *testing.T) {
 
 	queryReqID := new(uint32)
 	queried := new(bool)
-	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, vtxID ids.ID, _ []byte) {
+	sender.SendPushQueryF = func(_ context.Context, inVdrs ids.NodeIDSet, requestID uint32, vtxID ids.ID, _ []byte) {
 		require.Len(t, inVdrs, 1, "wrong number of validators")
 		*queryReqID = requestID
 		require.Equal(t, vtx.ID(), vtxID, "wrong vertex requested")
@@ -4176,7 +4177,7 @@ func TestEngineBubbleVotes(t *testing.T) {
 
 	getReqID := new(uint32)
 	fetched := new(bool)
-	sender.SendGetF = func(inVdr ids.NodeID, requestID uint32, vtxID ids.ID) {
+	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, vtxID ids.ID) {
 		require.Equal(t, vdr, inVdr, "wrong validator")
 		*getReqID = requestID
 		require.Equal(t, missingVtx.ID(), vtxID, "wrong vertex requested")
@@ -4321,7 +4322,7 @@ func TestEngineIssue(t *testing.T) {
 		vtxID          ids.ID
 		queryRequestID uint32
 	)
-	sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, vID ids.ID, vtx []byte) {
+	sender.SendPushQueryF = func(_ context.Context, inVdrs ids.NodeIDSet, requestID uint32, vID ids.ID, vtx []byte) {
 		vtxID = vID
 		queryRequestID = requestID
 	}
@@ -4565,7 +4566,7 @@ func TestSendMixedQuery(t *testing.T) {
 				pullQuerySent := new(bool)
 				pullQueryReqID := new(uint32)
 				pullQueriedVdrs := ids.NodeIDSet{}
-				sender.SendPullQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, vtxID ids.ID) {
+				sender.SendPullQueryF = func(_ context.Context, inVdrs ids.NodeIDSet, requestID uint32, vtxID ids.ID) {
 					switch {
 					case *pullQuerySent:
 						t.Fatalf("Asked multiple times")
@@ -4580,7 +4581,7 @@ func TestSendMixedQuery(t *testing.T) {
 				pushQuerySent := new(bool)
 				pushQueryReqID := new(uint32)
 				pushQueriedVdrs := ids.NodeIDSet{}
-				sender.SendPushQueryF = func(inVdrs ids.NodeIDSet, requestID uint32, vtxID ids.ID, vtx []byte) {
+				sender.SendPushQueryF = func(_ context.Context, inVdrs ids.NodeIDSet, requestID uint32, vtxID ids.ID, vtx []byte) {
 					switch {
 					case *pushQuerySent:
 						t.Fatal("Asked multiple times")
@@ -4631,7 +4632,7 @@ func TestHandleChitsV2(t *testing.T) {
 	sender := &common.SenderTest{T: t}
 
 	asked := new(bool)
-	sender.SendGetF = func(inVdr ids.NodeID, _ uint32, vtxID ids.ID) {
+	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, _ uint32, vtxID ids.ID) {
 		if *asked {
 			t.Fatal("asked multiple times")
 		}

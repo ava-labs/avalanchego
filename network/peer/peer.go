@@ -572,15 +572,15 @@ func (p *peer) handle(msg message.InboundMessage) {
 		msg.OnFinishedHandling()
 		return
 	case message.Pong:
-		p.handlePong(msg)
+		p.handlePong(ctx, msg)
 		msg.OnFinishedHandling()
 		return
 	case message.Version:
-		p.handleVersion(msg)
+		p.handleVersion(ctx, msg)
 		msg.OnFinishedHandling()
 		return
 	case message.PeerList:
-		p.handlePeerList(msg)
+		p.handlePeerList(ctx, msg)
 		msg.OnFinishedHandling()
 		return
 	}
@@ -596,11 +596,11 @@ func (p *peer) handle(msg message.InboundMessage) {
 	}
 
 	// Consensus and app-level messages
-	p.Router.HandleInbound(msg)
+	p.Router.HandleInbound(ctx, msg)
 }
 
 func (p *peer) handlePing(ctx context.Context, _ message.InboundMessage) {
-	pongCtx, span := otel.Tracer("TODO").Start(ctx, "handlePing")
+	pongCtx, span := otel.Tracer("TODO").Start(ctx, "peer.handlePing")
 	defer span.End()
 
 	msg, err := p.Network.Pong(pongCtx, p.id)
@@ -608,7 +608,10 @@ func (p *peer) handlePing(ctx context.Context, _ message.InboundMessage) {
 	p.Send(p.onClosingCtx, msg)
 }
 
-func (p *peer) handlePong(msg message.InboundMessage) {
+func (p *peer) handlePong(ctx context.Context, msg message.InboundMessage) {
+	_, span := otel.Tracer("TODO").Start(ctx, "peer.handlePong")
+	defer span.End()
+
 	uptime := msg.Get(message.Uptime).(uint8)
 	if uptime > 100 {
 		return
@@ -619,7 +622,10 @@ func (p *peer) handlePong(msg message.InboundMessage) {
 	p.observedUptimeLock.Unlock()
 }
 
-func (p *peer) handleVersion(msg message.InboundMessage) {
+func (p *peer) handleVersion(ctx context.Context, msg message.InboundMessage) {
+	_, span := otel.Tracer("TODO").Start(ctx, "peer.handleVersion")
+	defer span.End()
+
 	if p.gotVersion.GetValue() {
 		p.Log.Verbo("dropping duplicated version message",
 			zap.Stringer("nodeID", p.id),
@@ -749,7 +755,10 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 	p.Send(p.onClosingCtx, peerlistMsg)
 }
 
-func (p *peer) handlePeerList(msg message.InboundMessage) {
+func (p *peer) handlePeerList(ctx context.Context, msg message.InboundMessage) {
+	_, span := otel.Tracer("TODO").Start(ctx, "peer.handlePeerList")
+	defer span.End()
+
 	if !p.finishedHandshake.GetValue() {
 		if !p.gotVersion.GetValue() {
 			return

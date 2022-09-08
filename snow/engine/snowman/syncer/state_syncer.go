@@ -4,6 +4,7 @@
 package syncer
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -484,7 +485,7 @@ func (ss *stateSyncer) sendGetStateSummaryFrontiers() {
 	}
 
 	if vdrs.Len() > 0 {
-		ss.Sender.SendGetStateSummaryFrontier(vdrs, ss.requestID)
+		ss.Sender.SendGetStateSummaryFrontier(context.TODO(), vdrs, ss.requestID)
 	}
 }
 
@@ -500,7 +501,7 @@ func (ss *stateSyncer) sendGetAcceptedStateSummaries() {
 	}
 
 	if len(vdrs) > 0 {
-		ss.Sender.SendGetAcceptedStateSummary(vdrs, ss.requestID, ss.uniqueSummariesHeights)
+		ss.Sender.SendGetAcceptedStateSummary(context.TODO(), vdrs, ss.requestID, ss.uniqueSummariesHeights)
 		ss.Ctx.Log.Debug("sent GetAcceptedStateSummary messages",
 			zap.Int("numSent", vdrs.Len()),
 			zap.Int("numPending", ss.targetVoters.Len()),

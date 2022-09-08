@@ -4,6 +4,8 @@
 package getter
 
 import (
+	"context"
+
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -75,7 +77,7 @@ func (gh *getter) GetStateSummaryFrontier(nodeID ids.NodeID, requestID uint32) e
 		return nil
 	}
 
-	gh.sender.SendStateSummaryFrontier(nodeID, requestID, summary.Bytes())
+	gh.sender.SendStateSummaryFrontier(context.TODO(), nodeID, requestID, summary.Bytes())
 	return nil
 }
 
@@ -83,7 +85,7 @@ func (gh *getter) GetAcceptedStateSummary(nodeID ids.NodeID, requestID uint32, h
 	// If there are no requested heights, then we can return the result
 	// immediately, regardless of if the underlying VM implements state sync.
 	if len(heights) == 0 {
-		gh.sender.SendAcceptedStateSummary(nodeID, requestID, nil)
+		gh.sender.SendAcceptedStateSummary(context.TODO(), nodeID, requestID, nil)
 		return nil
 	}
 
@@ -120,7 +122,7 @@ func (gh *getter) GetAcceptedStateSummary(nodeID ids.NodeID, requestID uint32, h
 		summaryIDs = append(summaryIDs, summary.ID())
 	}
 
-	gh.sender.SendAcceptedStateSummary(nodeID, requestID, summaryIDs)
+	gh.sender.SendAcceptedStateSummary(context.TODO(), nodeID, requestID, summaryIDs)
 	return nil
 }
 
@@ -129,7 +131,7 @@ func (gh *getter) GetAcceptedFrontier(nodeID ids.NodeID, requestID uint32) error
 	if err != nil {
 		return err
 	}
-	gh.sender.SendAcceptedFrontier(nodeID, requestID, []ids.ID{lastAccepted})
+	gh.sender.SendAcceptedFrontier(context.TODO(), nodeID, requestID, []ids.ID{lastAccepted})
 	return nil
 }
 
@@ -140,7 +142,7 @@ func (gh *getter) GetAccepted(nodeID ids.NodeID, requestID uint32, containerIDs 
 			acceptedIDs = append(acceptedIDs, blkID)
 		}
 	}
-	gh.sender.SendAccepted(nodeID, requestID, acceptedIDs)
+	gh.sender.SendAccepted(context.TODO(), nodeID, requestID, acceptedIDs)
 	return nil
 }
 
@@ -164,7 +166,7 @@ func (gh *getter) GetAncestors(nodeID ids.NodeID, requestID uint32, blkID ids.ID
 	}
 
 	gh.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
-	gh.sender.SendAncestors(nodeID, requestID, ancestorsBytes)
+	gh.sender.SendAncestors(context.TODO(), nodeID, requestID, ancestorsBytes)
 	return nil
 }
 
@@ -184,6 +186,6 @@ func (gh *getter) Get(nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
 	}
 
 	// Respond to the validator with the fetched block and the same requestID.
-	gh.sender.SendPut(nodeID, requestID, blkID, blk.Bytes())
+	gh.sender.SendPut(context.TODO(), nodeID, requestID, blkID, blk.Bytes())
 	return nil
 }

@@ -5,6 +5,7 @@ package bootstrap
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"testing"
 
@@ -265,7 +266,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 
 	requestID := new(uint32)
 	reqVtxID := ids.Empty
-	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		switch {
 		case vdr != peerID:
 			t.Fatalf("Should have requested vertex from %s, requested from %s",
@@ -448,7 +449,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	}
 
 	reqIDPtr := new(uint32)
-	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested vertex from %s, requested from %s", peerID, vdr)
 		}
@@ -589,7 +590,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 	}
 
 	reqIDPtr := new(uint32)
-	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested vertex from %s, requested from %s", peerID, vdr)
 		}
@@ -712,7 +713,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	}
 	reqIDPtr := new(uint32)
 	requested := ids.Empty
-	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested vertex from %s, requested from %s", peerID, vdr)
 		}
@@ -833,7 +834,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	}
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
 		}
@@ -970,7 +971,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	}
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
 		}
@@ -1162,7 +1163,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.SendGetAncestorsF = func(vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(_ context.Context, vdr ids.NodeID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
 		}

@@ -4,6 +4,7 @@
 package router
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/otel"
 
 	"go.uber.org/zap"
 
@@ -168,11 +170,14 @@ func (cr *ChainRouter) RegisterRequest(
 	// Register a timeout to fire if we don't get a reply in time.
 	cr.timeoutManager.RegisterRequest(nodeID, chainID, op, uniqueRequestID, func() {
 		msg := cr.msgCreator.InternalFailedRequest(failedOp, nodeID, chainID, requestID)
-		cr.HandleInbound(msg)
+		cr.HandleInbound(context.TODO(), msg) // TODO add context
 	})
 }
 
-func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
+func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMessage) {
+	_, span := otel.Tracer("TODO").Start(ctx, "router.HandleInbound")
+	defer span.End()
+
 	nodeID := msg.NodeID()
 	op := msg.Op()
 	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
@@ -205,11 +210,11 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 		return
 	}
 
-	ctx := chain.Context()
+	chainCtx := chain.Context()
 
 	if _, notRequested := message.UnrequestedOps[op]; notRequested ||
 		(op == message.Put && requestID == constants.GossipMsgRequestID) {
-		if ctx.IsExecuting() {
+		if chainCtx.IsExecuting() {
 			cr.log.Debug("dropping message and skipping queue",
 				zap.String("reason", "the chain is currently executing"),
 				zap.Stringer("messageOp", op),
@@ -241,7 +246,7 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 		return
 	}
 
-	if ctx.IsExecuting() {
+	if chainCtx.IsExecuting() {
 		cr.log.Debug("dropping message and skipping queue",
 			zap.String("reason", "the chain is currently executing"),
 			zap.Stringer("messageOp", op),

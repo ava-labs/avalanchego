@@ -6,6 +6,7 @@
 package builder
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -145,5 +146,5 @@ func (n *network) GossipTx(tx *txs.Tx) error {
 	if err != nil {
 		return fmt.Errorf("GossipTx: failed to build Tx message: %w", err)
 	}
-	return n.appSender.SendAppGossip(msgBytes)
+	return n.appSender.SendAppGossip(context.TODO(), msgBytes)
 }
