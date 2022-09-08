@@ -4,6 +4,7 @@
 package handler
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -401,16 +402,16 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 	switch op {
 	case message.GetStateSummaryFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return engine.GetStateSummaryFrontier(nodeID, reqID)
+		return engine.GetStateSummaryFrontier(context.TODO(), nodeID, reqID)
 
 	case message.StateSummaryFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
 		summary := msg.Get(message.SummaryBytes).([]byte)
-		return engine.StateSummaryFrontier(nodeID, reqID, summary)
+		return engine.StateSummaryFrontier(context.TODO(), nodeID, reqID, summary)
 
 	case message.GetStateSummaryFrontierFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return engine.GetStateSummaryFrontierFailed(nodeID, reqID)
+		return engine.GetStateSummaryFrontierFailed(context.TODO(), nodeID, reqID)
 
 	case message.GetAcceptedStateSummary:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -424,7 +425,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 			)
 			return nil
 		}
-		return engine.GetAcceptedStateSummary(nodeID, reqID, summaryHeights)
+		return engine.GetAcceptedStateSummary(context.TODO(), nodeID, reqID, summaryHeights)
 
 	case message.AcceptedStateSummary:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -436,17 +437,17 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 				zap.Uint32("requestID", reqID),
 				zap.Error(err),
 			)
-			return engine.GetAcceptedStateSummaryFailed(nodeID, reqID)
+			return engine.GetAcceptedStateSummaryFailed(context.TODO(), nodeID, reqID)
 		}
-		return engine.AcceptedStateSummary(nodeID, reqID, summaryIDs)
+		return engine.AcceptedStateSummary(context.TODO(), nodeID, reqID, summaryIDs)
 
 	case message.GetAcceptedStateSummaryFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return engine.GetAcceptedStateSummaryFailed(nodeID, reqID)
+		return engine.GetAcceptedStateSummaryFailed(context.TODO(), nodeID, reqID)
 
 	case message.GetAcceptedFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return engine.GetAcceptedFrontier(nodeID, reqID)
+		return engine.GetAcceptedFrontier(context.TODO(), nodeID, reqID)
 
 	case message.AcceptedFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -458,13 +459,13 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 				zap.Uint32("requestID", reqID),
 				zap.Error(err),
 			)
-			return engine.GetAcceptedFrontierFailed(nodeID, reqID)
+			return engine.GetAcceptedFrontierFailed(context.TODO(), nodeID, reqID)
 		}
-		return engine.AcceptedFrontier(nodeID, reqID, containerIDs)
+		return engine.AcceptedFrontier(context.TODO(), nodeID, reqID, containerIDs)
 
 	case message.GetAcceptedFrontierFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return engine.GetAcceptedFrontierFailed(nodeID, reqID)
+		return engine.GetAcceptedFrontierFailed(context.TODO(), nodeID, reqID)
 
 	case message.GetAccepted:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -478,7 +479,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 			)
 			return nil
 		}
-		return engine.GetAccepted(nodeID, reqID, containerIDs)
+		return engine.GetAccepted(context.TODO(), nodeID, reqID, containerIDs)
 
 	case message.Accepted:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -490,54 +491,54 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 				zap.Uint32("requestID", reqID),
 				zap.Error(err),
 			)
-			return engine.GetAcceptedFailed(nodeID, reqID)
+			return engine.GetAcceptedFailed(context.TODO(), nodeID, reqID)
 		}
-		return engine.Accepted(nodeID, reqID, containerIDs)
+		return engine.Accepted(context.TODO(), nodeID, reqID, containerIDs)
 
 	case message.GetAcceptedFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return engine.GetAcceptedFailed(nodeID, reqID)
+		return engine.GetAcceptedFailed(context.TODO(), nodeID, reqID)
 
 	case message.GetAncestors:
 		reqID := msg.Get(message.RequestID).(uint32)
 		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
 		h.ctx.Log.AssertNoError(err)
-		return engine.GetAncestors(nodeID, reqID, containerID)
+		return engine.GetAncestors(context.TODO(), nodeID, reqID, containerID)
 
 	case message.GetAncestorsFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return engine.GetAncestorsFailed(nodeID, reqID)
+		return engine.GetAncestorsFailed(context.TODO(), nodeID, reqID)
 
 	case message.Ancestors:
 		reqID := msg.Get(message.RequestID).(uint32)
 		containers := msg.Get(message.MultiContainerBytes).([][]byte)
-		return engine.Ancestors(nodeID, reqID, containers)
+		return engine.Ancestors(context.TODO(), nodeID, reqID, containers)
 
 	case message.Get:
 		reqID := msg.Get(message.RequestID).(uint32)
 		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
 		h.ctx.Log.AssertNoError(err)
-		return engine.Get(nodeID, reqID, containerID)
+		return engine.Get(context.TODO(), nodeID, reqID, containerID)
 
 	case message.GetFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return engine.GetFailed(nodeID, reqID)
+		return engine.GetFailed(context.TODO(), nodeID, reqID)
 
 	case message.Put:
 		reqID := msg.Get(message.RequestID).(uint32)
 		container := msg.Get(message.ContainerBytes).([]byte)
-		return engine.Put(nodeID, reqID, container)
+		return engine.Put(context.TODO(), nodeID, reqID, container)
 
 	case message.PushQuery:
 		reqID := msg.Get(message.RequestID).(uint32)
 		container := msg.Get(message.ContainerBytes).([]byte)
-		return engine.PushQuery(nodeID, reqID, container)
+		return engine.PushQuery(context.TODO(), nodeID, reqID, container)
 
 	case message.PullQuery:
 		reqID := msg.Get(message.RequestID).(uint32)
 		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
 		h.ctx.Log.AssertNoError(err)
-		return engine.PullQuery(nodeID, reqID, containerID)
+		return engine.PullQuery(context.TODO(), nodeID, reqID, containerID)
 
 	case message.Chits:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -549,9 +550,9 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 				zap.Uint32("requestID", reqID),
 				zap.Error(err),
 			)
-			return engine.QueryFailed(nodeID, reqID)
+			return engine.QueryFailed(context.TODO(), nodeID, reqID)
 		}
-		return engine.Chits(nodeID, reqID, votes)
+		return engine.Chits(context.TODO(), nodeID, reqID, votes)
 
 	case message.ChitsV2:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -563,15 +564,15 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 				zap.Uint32("requestID", reqID),
 				zap.Error(err),
 			)
-			return engine.QueryFailed(nodeID, reqID)
+			return engine.QueryFailed(context.TODO(), nodeID, reqID)
 		}
 		vote, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
 		h.ctx.Log.AssertNoError(err)
-		return engine.ChitsV2(nodeID, reqID, votes, vote)
+		return engine.ChitsV2(context.TODO(), nodeID, reqID, votes, vote)
 
 	case message.QueryFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return engine.QueryFailed(nodeID, reqID)
+		return engine.QueryFailed(context.TODO(), nodeID, reqID)
 
 	case message.Connected:
 		peerVersion := msg.Get(message.VersionStruct).(*version.Application)
@@ -633,20 +634,20 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 	case message.AppRequest:
 		reqID := msg.Get(message.RequestID).(uint32)
 		appBytes := msg.Get(message.AppBytes).([]byte)
-		return engine.AppRequest(nodeID, reqID, msg.ExpirationTime(), appBytes)
+		return engine.AppRequest(context.TODO(), nodeID, reqID, msg.ExpirationTime(), appBytes)
 
 	case message.AppResponse:
 		reqID := msg.Get(message.RequestID).(uint32)
 		appBytes := msg.Get(message.AppBytes).([]byte)
-		return engine.AppResponse(nodeID, reqID, appBytes)
+		return engine.AppResponse(context.TODO(), nodeID, reqID, appBytes)
 
 	case message.AppRequestFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return engine.AppRequestFailed(nodeID, reqID)
+		return engine.AppRequestFailed(context.TODO(), nodeID, reqID)
 
 	case message.AppGossip:
 		appBytes := msg.Get(message.AppBytes).([]byte)
-		return engine.AppGossip(nodeID, appBytes)
+		return engine.AppGossip(context.TODO(), nodeID, appBytes)
 
 	default:
 		return fmt.Errorf(

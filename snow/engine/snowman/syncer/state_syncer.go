@@ -106,7 +106,7 @@ func New(
 	}
 }
 
-func (ss *stateSyncer) StateSummaryFrontier(nodeID ids.NodeID, requestID uint32, summaryBytes []byte) error {
+func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryBytes []byte) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync StateSummaryFrontier message",
@@ -153,7 +153,7 @@ func (ss *stateSyncer) StateSummaryFrontier(nodeID ids.NodeID, requestID uint32,
 	return ss.receivedStateSummaryFrontier()
 }
 
-func (ss *stateSyncer) GetStateSummaryFrontierFailed(nodeID ids.NodeID, requestID uint32) error {
+func (ss *stateSyncer) GetStateSummaryFrontierFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync GetStateSummaryFrontierFailed message",
@@ -210,7 +210,7 @@ func (ss *stateSyncer) receivedStateSummaryFrontier() error {
 	return nil
 }
 
-func (ss *stateSyncer) AcceptedStateSummary(nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error {
+func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync AcceptedStateSummary message",
@@ -352,7 +352,7 @@ func (ss *stateSyncer) selectSyncableStateSummary() block.StateSummary {
 	return preferredStateSummary
 }
 
-func (ss *stateSyncer) GetAcceptedStateSummaryFailed(nodeID ids.NodeID, requestID uint32) error {
+func (ss *stateSyncer) GetAcceptedStateSummaryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync GetAcceptedStateSummaryFailed message",
@@ -368,7 +368,7 @@ func (ss *stateSyncer) GetAcceptedStateSummaryFailed(nodeID ids.NodeID, requestI
 	// accepted
 	ss.failedVoters.Add(nodeID)
 
-	return ss.AcceptedStateSummary(nodeID, requestID, nil)
+	return ss.AcceptedStateSummary(context.TODO(), nodeID, requestID, nil)
 }
 
 func (ss *stateSyncer) Start(startReqID uint32) error {
@@ -509,16 +509,16 @@ func (ss *stateSyncer) sendGetAcceptedStateSummaries() {
 	}
 }
 
-func (ss *stateSyncer) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
-	return ss.VM.AppRequest(nodeID, requestID, deadline, request)
+func (ss *stateSyncer) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
+	return ss.VM.AppRequest(context.TODO(), nodeID, requestID, deadline, request)
 }
 
-func (ss *stateSyncer) AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
-	return ss.VM.AppResponse(nodeID, requestID, response)
+func (ss *stateSyncer) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
+	return ss.VM.AppResponse(context.TODO(), nodeID, requestID, response)
 }
 
-func (ss *stateSyncer) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
-	return ss.VM.AppRequestFailed(nodeID, requestID)
+func (ss *stateSyncer) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	return ss.VM.AppRequestFailed(context.TODO(), nodeID, requestID)
 }
 
 func (ss *stateSyncer) Notify(msg common.Message) error {

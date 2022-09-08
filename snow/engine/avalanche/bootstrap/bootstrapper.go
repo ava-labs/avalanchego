@@ -128,14 +128,14 @@ func (b *bootstrapper) Clear() error {
 // Ancestors handles the receipt of multiple containers. Should be received in
 // response to a GetAncestors message to [nodeID] with request ID [requestID].
 // Expects vtxs[0] to be the vertex requested in the corresponding GetAncestors.
-func (b *bootstrapper) Ancestors(nodeID ids.NodeID, requestID uint32, vtxs [][]byte) error {
+func (b *bootstrapper) Ancestors(_ context.Context, nodeID ids.NodeID, requestID uint32, vtxs [][]byte) error {
 	lenVtxs := len(vtxs)
 	if lenVtxs == 0 {
 		b.Ctx.Log.Debug("Ancestors contains no vertices",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 		)
-		return b.GetAncestorsFailed(nodeID, requestID)
+		return b.GetAncestorsFailed(context.TODO(), nodeID, requestID)
 	}
 	if lenVtxs > b.Config.AncestorsMaxContainersReceived {
 		b.Ctx.Log.Debug("ignoring containers in Ancestors",
@@ -250,7 +250,7 @@ func (b *bootstrapper) Ancestors(nodeID ids.NodeID, requestID uint32, vtxs [][]b
 	return b.process(processVertices...)
 }
 
-func (b *bootstrapper) GetAncestorsFailed(nodeID ids.NodeID, requestID uint32) error {
+func (b *bootstrapper) GetAncestorsFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
 	vtxID, ok := b.OutstandingRequests.Remove(nodeID, requestID)
 	if !ok {
 		b.Ctx.Log.Debug("skipping GetAncestorsFailed call",

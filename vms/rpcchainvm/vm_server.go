@@ -485,7 +485,7 @@ func (vm *VMServer) AppRequest(_ context.Context, req *vmpb.AppRequestMsg) (*emp
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.AppRequest(nodeID, req.RequestId, deadline, req.Request)
+	return &emptypb.Empty{}, vm.vm.AppRequest(context.TODO(), nodeID, req.RequestId, deadline, req.Request)
 }
 
 func (vm *VMServer) AppRequestFailed(_ context.Context, req *vmpb.AppRequestFailedMsg) (*emptypb.Empty, error) {
@@ -493,7 +493,7 @@ func (vm *VMServer) AppRequestFailed(_ context.Context, req *vmpb.AppRequestFail
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.AppRequestFailed(nodeID, req.RequestId)
+	return &emptypb.Empty{}, vm.vm.AppRequestFailed(context.TODO(), nodeID, req.RequestId)
 }
 
 func (vm *VMServer) AppResponse(_ context.Context, req *vmpb.AppResponseMsg) (*emptypb.Empty, error) {
@@ -501,7 +501,7 @@ func (vm *VMServer) AppResponse(_ context.Context, req *vmpb.AppResponseMsg) (*e
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.AppResponse(nodeID, req.RequestId, req.Response)
+	return &emptypb.Empty{}, vm.vm.AppResponse(context.TODO(), nodeID, req.RequestId, req.Response)
 }
 
 func (vm *VMServer) AppGossip(_ context.Context, req *vmpb.AppGossipMsg) (*emptypb.Empty, error) {
@@ -509,7 +509,7 @@ func (vm *VMServer) AppGossip(_ context.Context, req *vmpb.AppGossipMsg) (*empty
 	if err != nil {
 		return nil, err
 	}
-	return &emptypb.Empty{}, vm.vm.AppGossip(nodeID, req.Msg)
+	return &emptypb.Empty{}, vm.vm.AppGossip(context.TODO(), nodeID, req.Msg)
 }
 
 func (vm *VMServer) Gather(context.Context, *emptypb.Empty) (*vmpb.GatherResponse, error) {

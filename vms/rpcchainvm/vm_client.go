@@ -558,7 +558,7 @@ func (vm *VMClient) Version() (string, error) {
 	return resp.Version, nil
 }
 
-func (vm *VMClient) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
+func (vm *VMClient) AppRequest(_ context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	_, err := vm.client.AppRequest(
 		context.Background(),
 		&vmpb.AppRequestMsg{
@@ -571,7 +571,7 @@ func (vm *VMClient) AppRequest(nodeID ids.NodeID, requestID uint32, deadline tim
 	return err
 }
 
-func (vm *VMClient) AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
+func (vm *VMClient) AppResponse(_ context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 	_, err := vm.client.AppResponse(
 		context.Background(),
 		&vmpb.AppResponseMsg{
@@ -583,7 +583,7 @@ func (vm *VMClient) AppResponse(nodeID ids.NodeID, requestID uint32, response []
 	return err
 }
 
-func (vm *VMClient) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
+func (vm *VMClient) AppRequestFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
 	_, err := vm.client.AppRequestFailed(
 		context.Background(),
 		&vmpb.AppRequestFailedMsg{
@@ -594,7 +594,7 @@ func (vm *VMClient) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error 
 	return err
 }
 
-func (vm *VMClient) AppGossip(nodeID ids.NodeID, msg []byte) error {
+func (vm *VMClient) AppGossip(_ context.Context, nodeID ids.NodeID, msg []byte) error {
 	_, err := vm.client.AppGossip(
 		context.Background(),
 		&vmpb.AppGossipMsg{

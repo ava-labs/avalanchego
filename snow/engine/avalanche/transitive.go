@@ -94,7 +94,7 @@ func newTransitive(config Config) (*Transitive, error) {
 	return t, t.metrics.Initialize("", config.Ctx.Registerer)
 }
 
-func (t *Transitive) Put(nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
+func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
 	t.Ctx.Log.Verbo("called Put",
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
@@ -112,7 +112,7 @@ func (t *Transitive) Put(nodeID ids.NodeID, requestID uint32, vtxBytes []byte) e
 			zap.Binary("vertex", vtxBytes),
 			zap.Error(err),
 		)
-		return t.GetFailed(nodeID, requestID)
+		return t.GetFailed(context.TODO(), nodeID, requestID)
 	}
 
 	if t.Consensus.VertexIssued(vtx) || t.pending.Contains(vtx.ID()) {
@@ -125,7 +125,7 @@ func (t *Transitive) Put(nodeID ids.NodeID, requestID uint32, vtxBytes []byte) e
 	return t.attemptToIssueTxs()
 }
 
-func (t *Transitive) GetFailed(nodeID ids.NodeID, requestID uint32) error {
+func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	vtxID, ok := t.outstandingVtxReqs.Remove(nodeID, requestID)
 	if !ok {
 		t.Ctx.Log.Debug("unexpected GetFailed",
@@ -152,7 +152,7 @@ func (t *Transitive) GetFailed(nodeID ids.NodeID, requestID uint32) error {
 	return t.attemptToIssueTxs()
 }
 
-func (t *Transitive) PullQuery(nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
+func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
 	// Immediately respond to the query with the current consensus preferences.
 	t.Sender.SendChits(context.TODO(), nodeID, requestID, t.Consensus.Preferences().List())
 
@@ -165,7 +165,7 @@ func (t *Transitive) PullQuery(nodeID ids.NodeID, requestID uint32, vtxID ids.ID
 	return t.attemptToIssueTxs()
 }
 
-func (t *Transitive) PushQuery(nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
+func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
 	// Immediately respond to the query with the current consensus preferences.
 	t.Sender.SendChits(context.TODO(), nodeID, requestID, t.Consensus.Preferences().List())
 
@@ -196,7 +196,7 @@ func (t *Transitive) PushQuery(nodeID ids.NodeID, requestID uint32, vtxBytes []b
 	return t.attemptToIssueTxs()
 }
 
-func (t *Transitive) Chits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) error {
+func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) error {
 	v := &voter{
 		t:         t,
 		vdr:       nodeID,
@@ -216,32 +216,32 @@ func (t *Transitive) Chits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) 
 	return t.attemptToIssueTxs()
 }
 
-func (t *Transitive) ChitsV2(nodeID ids.NodeID, requestID uint32, votes []ids.ID, _ ids.ID) error {
-	return t.Chits(nodeID, requestID, votes)
+func (t *Transitive) ChitsV2(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID, _ ids.ID) error {
+	return t.Chits(ctx, nodeID, requestID, votes)
 }
 
-func (t *Transitive) QueryFailed(nodeID ids.NodeID, requestID uint32) error {
-	return t.Chits(nodeID, requestID, nil)
+func (t *Transitive) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	return t.Chits(ctx, nodeID, requestID, nil)
 }
 
-func (t *Transitive) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
+func (t *Transitive) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	// Notify the VM of this request
-	return t.VM.AppRequest(nodeID, requestID, deadline, request)
+	return t.VM.AppRequest(ctx, nodeID, requestID, deadline, request)
 }
 
-func (t *Transitive) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
+func (t *Transitive) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	// Notify the VM that a request it made failed
-	return t.VM.AppRequestFailed(nodeID, requestID)
+	return t.VM.AppRequestFailed(ctx, nodeID, requestID)
 }
 
-func (t *Transitive) AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
+func (t *Transitive) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 	// Notify the VM of a response to its request
-	return t.VM.AppResponse(nodeID, requestID, response)
+	return t.VM.AppResponse(ctx, nodeID, requestID, response)
 }
 
-func (t *Transitive) AppGossip(nodeID ids.NodeID, msg []byte) error {
+func (t *Transitive) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error {
 	// Notify the VM of this message which has been gossiped to it
-	return t.VM.AppGossip(nodeID, msg)
+	return t.VM.AppGossip(ctx, nodeID, msg)
 }
 
 func (t *Transitive) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {

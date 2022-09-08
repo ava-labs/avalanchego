@@ -57,25 +57,25 @@ func NewNetwork(
 	}
 }
 
-func (n *network) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
+func (n *network) AppRequestFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (n *network) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, msgBytes []byte) error {
+func (n *network) AppRequest(_ context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msgBytes []byte) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (n *network) AppResponse(nodeID ids.NodeID, requestID uint32, msgBytes []byte) error {
+func (n *network) AppResponse(_ context.Context, nodeID ids.NodeID, requestID uint32, msgBytes []byte) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
+func (n *network) AppGossip(_ context.Context, nodeID ids.NodeID, msgBytes []byte) error {
 	n.ctx.Log.Debug("called AppGossip message handler",
 		zap.Stringer("nodeID", nodeID),
 		zap.Int("messageLen", len(msgBytes)),

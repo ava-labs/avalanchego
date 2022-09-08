@@ -143,7 +143,7 @@ func (b *bootstrapper) Start(startReqID uint32) error {
 
 // Ancestors handles the receipt of multiple containers. Should be received in
 // response to a GetAncestors message to [nodeID] with request ID [requestID]
-func (b *bootstrapper) Ancestors(nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
+func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
 	// Make sure this is in response to a request we made
 	wantedBlkID, ok := b.OutstandingRequests.Remove(nodeID, requestID)
 	if !ok { // this message isn't in response to a request we made
@@ -213,7 +213,7 @@ func (b *bootstrapper) Ancestors(nodeID ids.NodeID, requestID uint32, blks [][]b
 	return b.process(requestedBlock, blockSet)
 }
 
-func (b *bootstrapper) GetAncestorsFailed(nodeID ids.NodeID, requestID uint32) error {
+func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	blkID, ok := b.OutstandingRequests.Remove(nodeID, requestID)
 	if !ok {
 		b.Ctx.Log.Debug("unexpectedly called GetAncestorsFailed",

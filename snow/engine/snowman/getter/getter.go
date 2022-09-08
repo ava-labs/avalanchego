@@ -53,7 +53,7 @@ type getter struct {
 	getAncestorsBlks metric.Averager
 }
 
-func (gh *getter) GetStateSummaryFrontier(nodeID ids.NodeID, requestID uint32) error {
+func (gh *getter) GetStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	// Note: we do not check if gh.ssVM.StateSyncEnabled since we want all
 	// nodes, including those disabling state sync to serve state summaries if
 	// these are available
@@ -81,7 +81,7 @@ func (gh *getter) GetStateSummaryFrontier(nodeID ids.NodeID, requestID uint32) e
 	return nil
 }
 
-func (gh *getter) GetAcceptedStateSummary(nodeID ids.NodeID, requestID uint32, heights []uint64) error {
+func (gh *getter) GetAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, heights []uint64) error {
 	// If there are no requested heights, then we can return the result
 	// immediately, regardless of if the underlying VM implements state sync.
 	if len(heights) == 0 {
@@ -126,7 +126,7 @@ func (gh *getter) GetAcceptedStateSummary(nodeID ids.NodeID, requestID uint32, h
 	return nil
 }
 
-func (gh *getter) GetAcceptedFrontier(nodeID ids.NodeID, requestID uint32) error {
+func (gh *getter) GetAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	lastAccepted, err := gh.vm.LastAccepted()
 	if err != nil {
 		return err
@@ -135,7 +135,7 @@ func (gh *getter) GetAcceptedFrontier(nodeID ids.NodeID, requestID uint32) error
 	return nil
 }
 
-func (gh *getter) GetAccepted(nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
+func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
 	acceptedIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, blkID := range containerIDs {
 		if blk, err := gh.vm.GetBlock(blkID); err == nil && blk.Status() == choices.Accepted {
@@ -146,7 +146,7 @@ func (gh *getter) GetAccepted(nodeID ids.NodeID, requestID uint32, containerIDs 
 	return nil
 }
 
-func (gh *getter) GetAncestors(nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
+func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
 	ancestorsBytes, err := block.GetAncestors(
 		gh.vm,
 		blkID,
@@ -170,7 +170,7 @@ func (gh *getter) GetAncestors(nodeID ids.NodeID, requestID uint32, blkID ids.ID
 	return nil
 }
 
-func (gh *getter) Get(nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
+func (gh *getter) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
 	blk, err := gh.vm.GetBlock(blkID)
 	if err != nil {
 		// If we failed to get the block, that means either an unexpected error

@@ -109,7 +109,7 @@ func newTransitive(config Config) (*Transitive, error) {
 	return t, t.metrics.Initialize("", config.Ctx.Registerer)
 }
 
-func (t *Transitive) Put(nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
+func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
 	blk, err := t.VM.ParseBlock(blkBytes)
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse block",
@@ -126,7 +126,7 @@ func (t *Transitive) Put(nodeID ids.NodeID, requestID uint32, blkBytes []byte) e
 		// because GetFailed doesn't utilize the assumption that we actually
 		// sent a Get message, we can safely call GetFailed here to potentially
 		// abandon the request.
-		return t.GetFailed(nodeID, requestID)
+		return t.GetFailed(context.TODO(), nodeID, requestID)
 	}
 
 	if t.wasIssued(blk) {
@@ -144,7 +144,7 @@ func (t *Transitive) Put(nodeID ids.NodeID, requestID uint32, blkBytes []byte) e
 	return t.buildBlocks()
 }
 
-func (t *Transitive) GetFailed(nodeID ids.NodeID, requestID uint32) error {
+func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	// We don't assume that this function is called after a failed Get message.
 	// Check to see if we have an outstanding request and also get what the request was for if it exists.
 	blkID, ok := t.blkReqs.Remove(nodeID, requestID)
@@ -162,7 +162,7 @@ func (t *Transitive) GetFailed(nodeID ids.NodeID, requestID uint32) error {
 	return t.buildBlocks()
 }
 
-func (t *Transitive) PullQuery(nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
+func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
 	// TODO: once everyone supports ChitsV2 - we should be sending that message
 	// type here.
 	t.Sender.SendChits(context.TODO(), nodeID, requestID, []ids.ID{t.Consensus.Preference()})
@@ -176,7 +176,7 @@ func (t *Transitive) PullQuery(nodeID ids.NodeID, requestID uint32, blkID ids.ID
 	return t.buildBlocks()
 }
 
-func (t *Transitive) PushQuery(nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
+func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
 	// TODO: once everyone supports ChitsV2 - we should be sending that message
 	// type here.
 	t.Sender.SendChits(context.TODO(), nodeID, requestID, []ids.ID{t.Consensus.Preference()})
@@ -214,7 +214,7 @@ func (t *Transitive) PushQuery(nodeID ids.NodeID, requestID uint32, blkBytes []b
 	return t.buildBlocks()
 }
 
-func (t *Transitive) Chits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) error {
+func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) error {
 	// Since this is a linear chain, there should only be one ID in the vote set
 	if len(votes) != 1 {
 		t.Ctx.Log.Debug("failing Chits",
@@ -226,7 +226,7 @@ func (t *Transitive) Chits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) 
 		// because QueryFailed doesn't utilize the assumption that we actually
 		// sent a Query message, we can safely call QueryFailed here to
 		// potentially abandon the request.
-		return t.QueryFailed(nodeID, requestID)
+		return t.QueryFailed(context.TODO(), nodeID, requestID)
 	}
 	blkID := votes[0]
 
@@ -257,11 +257,11 @@ func (t *Transitive) Chits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) 
 	return t.buildBlocks()
 }
 
-func (t *Transitive) ChitsV2(vdr ids.NodeID, requestID uint32, _ []ids.ID, vote ids.ID) error {
-	return t.Chits(vdr, requestID, []ids.ID{vote})
+func (t *Transitive) ChitsV2(ctx context.Context, vdr ids.NodeID, requestID uint32, _ []ids.ID, vote ids.ID) error {
+	return t.Chits(context.TODO(), vdr, requestID, []ids.ID{vote})
 }
 
-func (t *Transitive) QueryFailed(vdr ids.NodeID, requestID uint32) error {
+func (t *Transitive) QueryFailed(ctx context.Context, vdr ids.NodeID, requestID uint32) error {
 	t.blocked.Register(&voter{
 		t:         t,
 		vdr:       vdr,
@@ -271,24 +271,24 @@ func (t *Transitive) QueryFailed(vdr ids.NodeID, requestID uint32) error {
 	return t.buildBlocks()
 }
 
-func (t *Transitive) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
+func (t *Transitive) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	// Notify the VM of this request
-	return t.VM.AppRequest(nodeID, requestID, deadline, request)
+	return t.VM.AppRequest(context.TODO(), nodeID, requestID, deadline, request)
 }
 
-func (t *Transitive) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
+func (t *Transitive) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	// Notify the VM that a request it made failed
-	return t.VM.AppRequestFailed(nodeID, requestID)
+	return t.VM.AppRequestFailed(context.TODO(), nodeID, requestID)
 }
 
-func (t *Transitive) AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
+func (t *Transitive) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 	// Notify the VM of a response to its request
-	return t.VM.AppResponse(nodeID, requestID, response)
+	return t.VM.AppResponse(context.TODO(), nodeID, requestID, response)
 }
 
-func (t *Transitive) AppGossip(nodeID ids.NodeID, msg []byte) error {
+func (t *Transitive) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error {
 	// Notify the VM of this message which has been gossiped to it
-	return t.VM.AppGossip(nodeID, msg)
+	return t.VM.AppGossip(context.TODO(), nodeID, msg)
 }
 
 func (t *Transitive) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {

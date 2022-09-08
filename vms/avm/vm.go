@@ -5,6 +5,7 @@ package avm
 
 import (
 	"container/list"
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -1047,22 +1048,22 @@ func (vm *VM) lookupAssetID(asset string) (ids.ID, error) {
 }
 
 // This VM doesn't (currently) have any app-specific messages
-func (vm *VM) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
+func (vm *VM) AppRequest(_ context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	return nil
 }
 
 // This VM doesn't (currently) have any app-specific messages
-func (vm *VM) AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
+func (vm *VM) AppResponse(_ context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 	return nil
 }
 
 // This VM doesn't (currently) have any app-specific messages
-func (vm *VM) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
+func (vm *VM) AppRequestFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
 	return nil
 }
 
 // This VM doesn't (currently) have any app-specific messages
-func (vm *VM) AppGossip(nodeID ids.NodeID, msg []byte) error {
+func (vm *VM) AppGossip(_ context.Context, nodeID ids.NodeID, msg []byte) error {
 	return nil
 }
 
