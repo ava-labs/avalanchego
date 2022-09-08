@@ -32,9 +32,6 @@ func NewBigBitSetFromBits(bits ...int) BigBitSet {
 }
 
 // NewBigBitSet returns a new instance of BigBitSet
-//
-// Invariants:
-// 1. Negative bits will cause a panic.
 func NewBigBitSet() BigBitSet {
 	return BigBitSet{
 		bits: big.NewInt(int64(0)),
