@@ -776,6 +776,8 @@ func (p *peer) handlePeerList(ctx context.Context, msg message.InboundMessage) {
 	}
 
 	ips := msg.Get(message.Peers).([]ips.ClaimedIPPort)
+	span.SetAttributes(attribute.Int("numPeers", len(ips)))
+
 	for _, ip := range ips {
 		if !p.Network.Track(ip) {
 			p.Metrics.NumUselessPeerListBytes.Add(float64(ip.BytesLen()))
