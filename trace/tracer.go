@@ -19,9 +19,11 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-var errUnknownExporterType = errors.New("unknown exporter type")
+var (
+	errUnknownExporterType = errors.New("unknown exporter type")
 
-var tracer trace.Tracer = trace.NewNoopTracerProvider().Tracer(constants.AppName)
+	tracer trace.Tracer = trace.NewNoopTracerProvider().Tracer(constants.AppName)
+)
 
 func newResource() *resource.Resource {
 	return resource.NewWithAttributes(semconv.SchemaURL,
