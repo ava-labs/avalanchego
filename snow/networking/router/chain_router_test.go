@@ -220,7 +220,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	go func() {
 		chainID := ids.ID{}
 		msg := mc.InboundAncestors(chainID, 1, nil, nodeID)
-		handler.Push(msg)
+		handler.Push(context.Background(), msg)
 
 		time.Sleep(50 * time.Millisecond) // Pause to ensure message gets processed
 

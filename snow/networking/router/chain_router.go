@@ -175,7 +175,7 @@ func (cr *ChainRouter) RegisterRequest(
 }
 
 func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMessage) {
-	_, span := otel.Tracer("TODO").Start(ctx, "router.HandleInbound")
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "router.HandleInbound")
 	defer span.End()
 
 	nodeID := msg.NodeID()
@@ -224,7 +224,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 			msg.OnFinishedHandling()
 			return
 		}
-		chain.Push(msg)
+		chain.Push(newCtx, msg)
 		return
 	}
 
@@ -242,7 +242,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		cr.timeoutManager.RemoveRequest(uniqueRequestID)
 
 		// Pass the failure to the chain
-		chain.Push(msg)
+		chain.Push(newCtx, msg)
 		return
 	}
 
@@ -271,7 +271,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, req.op, latency)
 
 	// Pass the response to the chain
-	chain.Push(msg)
+	chain.Push(newCtx, msg)
 }
 
 // Shutdown shuts down this router
@@ -320,7 +320,7 @@ func (cr *ChainRouter) AddChain(chain handler.Handler) {
 		// If this validator is benched on any chain, treat them as disconnected on all chains
 		if _, benched := cr.benched[validatorID]; !benched && peer.trackedSubnets.Contains(subnetID) {
 			msg := cr.msgCreator.InternalConnected(validatorID, peer.version)
-			chain.Push(msg)
+			chain.Push(context.TODO(), msg)
 		}
 	}
 }
@@ -350,7 +350,7 @@ func (cr *ChainRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Applica
 	// we cannot put a subnet-only validator check here since Disconnected would not be handled properly.
 	for _, chain := range cr.chains {
 		if subnetID == chain.Context().SubnetID {
-			chain.Push(msg)
+			chain.Push(context.TODO(), msg)
 		}
 	}
 }
@@ -372,7 +372,7 @@ func (cr *ChainRouter) Disconnected(nodeID ids.NodeID) {
 	// we cannot put a subnet-only validator check here since if a validator connects then it leaves validator-set, it would not be disconnected properly.
 	for _, chain := range cr.chains {
 		if peer.trackedSubnets.Contains(chain.Context().SubnetID) {
-			chain.Push(msg)
+			chain.Push(context.TODO(), msg)
 		}
 	}
 }
@@ -395,7 +395,7 @@ func (cr *ChainRouter) Benched(chainID ids.ID, nodeID ids.NodeID) {
 
 	for _, chain := range cr.chains {
 		if peer.trackedSubnets.Contains(chain.Context().SubnetID) {
-			chain.Push(msg)
+			chain.Push(context.TODO(), msg)
 		}
 	}
 }
@@ -423,7 +423,7 @@ func (cr *ChainRouter) Unbenched(chainID ids.ID, nodeID ids.NodeID) {
 
 	for _, chain := range cr.chains {
 		if peer.trackedSubnets.Contains(chain.Context().SubnetID) {
-			chain.Push(msg)
+			chain.Push(context.TODO(), msg)
 		}
 	}
 }

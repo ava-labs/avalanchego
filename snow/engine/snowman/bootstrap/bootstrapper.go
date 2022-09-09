@@ -10,6 +10,7 @@ import (
 	"math"
 	"time"
 
+	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -144,6 +145,9 @@ func (b *bootstrapper) Start(startReqID uint32) error {
 // Ancestors handles the receipt of multiple containers. Should be received in
 // response to a GetAncestors message to [nodeID] with request ID [requestID]
 func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
+	_, span := otel.Tracer("TODO").Start(ctx, "bootstrapper.Ancestors")
+	defer span.End()
+
 	// Make sure this is in response to a request we made
 	wantedBlkID, ok := b.OutstandingRequests.Remove(nodeID, requestID)
 	if !ok { // this message isn't in response to a request we made

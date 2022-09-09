@@ -48,7 +48,7 @@ type Handler interface {
 
 	SetOnStopped(onStopped func())
 	Start(recoverPanic bool)
-	Push(msg message.InboundMessage)
+	Push(ctx context.Context, msg message.InboundMessage)
 	Stop()
 	StopWithError(err error)
 	Stopped() chan struct{}
@@ -229,12 +229,12 @@ func (h *handler) HealthCheck() (interface{}, error) {
 }
 
 // Push the message onto the handler's queue
-func (h *handler) Push(msg message.InboundMessage) {
+func (h *handler) Push(ctx context.Context, msg message.InboundMessage) {
 	switch msg.Op() {
 	case message.AppRequest, message.AppGossip, message.AppRequestFailed, message.AppResponse:
-		h.asyncMessageQueue.Push(msg)
+		h.asyncMessageQueue.Push(ctx, msg)
 	default:
-		h.syncMessageQueue.Push(msg)
+		h.syncMessageQueue.Push(ctx, msg)
 	}
 }
 
@@ -296,13 +296,13 @@ func (h *handler) dispatchSync() {
 	for {
 		// Get the next message we should process. If the handler is shutting
 		// down, we may fail to pop a message.
-		msg, ok := h.popUnexpiredMsg(h.syncMessageQueue, h.metrics.expired)
+		ctx, msg, ok := h.popUnexpiredMsg(h.syncMessageQueue, h.metrics.expired)
 		if !ok {
 			return
 		}
 
 		// If there is an error handling the message, shut down the chain
-		if err := h.handleSyncMsg(msg); err != nil {
+		if err := h.handleSyncMsg(ctx, msg); err != nil {
 			h.StopWithError(fmt.Errorf(
 				"%w while processing sync message: %s",
 				err,
@@ -323,12 +323,12 @@ func (h *handler) dispatchAsync() {
 	for {
 		// Get the next message we should process. If the handler is shutting
 		// down, we may fail to pop a message.
-		msg, ok := h.popUnexpiredMsg(h.asyncMessageQueue, h.metrics.asyncExpired)
+		ctx, msg, ok := h.popUnexpiredMsg(h.asyncMessageQueue, h.metrics.asyncExpired)
 		if !ok {
 			return
 		}
 
-		h.handleAsyncMsg(msg)
+		h.handleAsyncMsg(ctx, msg)
 	}
 }
 
@@ -367,7 +367,7 @@ func (h *handler) dispatchChans() {
 	}
 }
 
-func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
+func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage) error {
 	h.ctx.Log.Debug("forwarding sync message to consensus",
 		zap.Stringer("message", msg),
 	)
@@ -402,16 +402,16 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 	switch op {
 	case message.GetStateSummaryFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return engine.GetStateSummaryFrontier(context.TODO(), nodeID, reqID)
+		return engine.GetStateSummaryFrontier(ctx, nodeID, reqID)
 
 	case message.StateSummaryFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
 		summary := msg.Get(message.SummaryBytes).([]byte)
-		return engine.StateSummaryFrontier(context.TODO(), nodeID, reqID, summary)
+		return engine.StateSummaryFrontier(ctx, nodeID, reqID, summary)
 
 	case message.GetStateSummaryFrontierFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return engine.GetStateSummaryFrontierFailed(context.TODO(), nodeID, reqID)
+		return engine.GetStateSummaryFrontierFailed(ctx, nodeID, reqID)
 
 	case message.GetAcceptedStateSummary:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -425,7 +425,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 			)
 			return nil
 		}
-		return engine.GetAcceptedStateSummary(context.TODO(), nodeID, reqID, summaryHeights)
+		return engine.GetAcceptedStateSummary(ctx, nodeID, reqID, summaryHeights)
 
 	case message.AcceptedStateSummary:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -437,17 +437,17 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 				zap.Uint32("requestID", reqID),
 				zap.Error(err),
 			)
-			return engine.GetAcceptedStateSummaryFailed(context.TODO(), nodeID, reqID)
+			return engine.GetAcceptedStateSummaryFailed(ctx, nodeID, reqID)
 		}
-		return engine.AcceptedStateSummary(context.TODO(), nodeID, reqID, summaryIDs)
+		return engine.AcceptedStateSummary(ctx, nodeID, reqID, summaryIDs)
 
 	case message.GetAcceptedStateSummaryFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return engine.GetAcceptedStateSummaryFailed(context.TODO(), nodeID, reqID)
+		return engine.GetAcceptedStateSummaryFailed(ctx, nodeID, reqID)
 
 	case message.GetAcceptedFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return engine.GetAcceptedFrontier(context.TODO(), nodeID, reqID)
+		return engine.GetAcceptedFrontier(ctx, nodeID, reqID)
 
 	case message.AcceptedFrontier:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -459,13 +459,13 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 				zap.Uint32("requestID", reqID),
 				zap.Error(err),
 			)
-			return engine.GetAcceptedFrontierFailed(context.TODO(), nodeID, reqID)
+			return engine.GetAcceptedFrontierFailed(ctx, nodeID, reqID)
 		}
-		return engine.AcceptedFrontier(context.TODO(), nodeID, reqID, containerIDs)
+		return engine.AcceptedFrontier(ctx, nodeID, reqID, containerIDs)
 
 	case message.GetAcceptedFrontierFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return engine.GetAcceptedFrontierFailed(context.TODO(), nodeID, reqID)
+		return engine.GetAcceptedFrontierFailed(ctx, nodeID, reqID)
 
 	case message.GetAccepted:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -479,7 +479,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 			)
 			return nil
 		}
-		return engine.GetAccepted(context.TODO(), nodeID, reqID, containerIDs)
+		return engine.GetAccepted(ctx, nodeID, reqID, containerIDs)
 
 	case message.Accepted:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -491,54 +491,54 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 				zap.Uint32("requestID", reqID),
 				zap.Error(err),
 			)
-			return engine.GetAcceptedFailed(context.TODO(), nodeID, reqID)
+			return engine.GetAcceptedFailed(ctx, nodeID, reqID)
 		}
-		return engine.Accepted(context.TODO(), nodeID, reqID, containerIDs)
+		return engine.Accepted(ctx, nodeID, reqID, containerIDs)
 
 	case message.GetAcceptedFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return engine.GetAcceptedFailed(context.TODO(), nodeID, reqID)
+		return engine.GetAcceptedFailed(ctx, nodeID, reqID)
 
 	case message.GetAncestors:
 		reqID := msg.Get(message.RequestID).(uint32)
 		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
 		h.ctx.Log.AssertNoError(err)
-		return engine.GetAncestors(context.TODO(), nodeID, reqID, containerID)
+		return engine.GetAncestors(ctx, nodeID, reqID, containerID)
 
 	case message.GetAncestorsFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return engine.GetAncestorsFailed(context.TODO(), nodeID, reqID)
+		return engine.GetAncestorsFailed(ctx, nodeID, reqID)
 
 	case message.Ancestors:
 		reqID := msg.Get(message.RequestID).(uint32)
 		containers := msg.Get(message.MultiContainerBytes).([][]byte)
-		return engine.Ancestors(context.TODO(), nodeID, reqID, containers)
+		return engine.Ancestors(ctx, nodeID, reqID, containers)
 
 	case message.Get:
 		reqID := msg.Get(message.RequestID).(uint32)
 		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
 		h.ctx.Log.AssertNoError(err)
-		return engine.Get(context.TODO(), nodeID, reqID, containerID)
+		return engine.Get(ctx, nodeID, reqID, containerID)
 
 	case message.GetFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return engine.GetFailed(context.TODO(), nodeID, reqID)
+		return engine.GetFailed(ctx, nodeID, reqID)
 
 	case message.Put:
 		reqID := msg.Get(message.RequestID).(uint32)
 		container := msg.Get(message.ContainerBytes).([]byte)
-		return engine.Put(context.TODO(), nodeID, reqID, container)
+		return engine.Put(ctx, nodeID, reqID, container)
 
 	case message.PushQuery:
 		reqID := msg.Get(message.RequestID).(uint32)
 		container := msg.Get(message.ContainerBytes).([]byte)
-		return engine.PushQuery(context.TODO(), nodeID, reqID, container)
+		return engine.PushQuery(ctx, nodeID, reqID, container)
 
 	case message.PullQuery:
 		reqID := msg.Get(message.RequestID).(uint32)
 		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
 		h.ctx.Log.AssertNoError(err)
-		return engine.PullQuery(context.TODO(), nodeID, reqID, containerID)
+		return engine.PullQuery(ctx, nodeID, reqID, containerID)
 
 	case message.Chits:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -550,9 +550,9 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 				zap.Uint32("requestID", reqID),
 				zap.Error(err),
 			)
-			return engine.QueryFailed(context.TODO(), nodeID, reqID)
+			return engine.QueryFailed(ctx, nodeID, reqID)
 		}
-		return engine.Chits(context.TODO(), nodeID, reqID, votes)
+		return engine.Chits(ctx, nodeID, reqID, votes)
 
 	case message.ChitsV2:
 		reqID := msg.Get(message.RequestID).(uint32)
@@ -564,15 +564,15 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 				zap.Uint32("requestID", reqID),
 				zap.Error(err),
 			)
-			return engine.QueryFailed(context.TODO(), nodeID, reqID)
+			return engine.QueryFailed(ctx, nodeID, reqID)
 		}
 		vote, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
 		h.ctx.Log.AssertNoError(err)
-		return engine.ChitsV2(context.TODO(), nodeID, reqID, votes, vote)
+		return engine.ChitsV2(ctx, nodeID, reqID, votes, vote)
 
 	case message.QueryFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return engine.QueryFailed(context.TODO(), nodeID, reqID)
+		return engine.QueryFailed(ctx, nodeID, reqID)
 
 	case message.Connected:
 		peerVersion := msg.Get(message.VersionStruct).(*version.Application)
@@ -589,9 +589,9 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 	}
 }
 
-func (h *handler) handleAsyncMsg(msg message.InboundMessage) {
+func (h *handler) handleAsyncMsg(ctx context.Context, msg message.InboundMessage) {
 	h.asyncMessagePool.Send(func() {
-		if err := h.executeAsyncMsg(msg); err != nil {
+		if err := h.executeAsyncMsg(ctx, msg); err != nil {
 			h.StopWithError(fmt.Errorf(
 				"%w while processing async message: %s",
 				err,
@@ -601,7 +601,7 @@ func (h *handler) handleAsyncMsg(msg message.InboundMessage) {
 	})
 }
 
-func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
+func (h *handler) executeAsyncMsg(ctx context.Context, msg message.InboundMessage) error {
 	h.ctx.Log.Debug("forwarding async message to consensus",
 		zap.Stringer("message", msg),
 	)
@@ -634,20 +634,20 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 	case message.AppRequest:
 		reqID := msg.Get(message.RequestID).(uint32)
 		appBytes := msg.Get(message.AppBytes).([]byte)
-		return engine.AppRequest(context.TODO(), nodeID, reqID, msg.ExpirationTime(), appBytes)
+		return engine.AppRequest(ctx, nodeID, reqID, msg.ExpirationTime(), appBytes)
 
 	case message.AppResponse:
 		reqID := msg.Get(message.RequestID).(uint32)
 		appBytes := msg.Get(message.AppBytes).([]byte)
-		return engine.AppResponse(context.TODO(), nodeID, reqID, appBytes)
+		return engine.AppResponse(ctx, nodeID, reqID, appBytes)
 
 	case message.AppRequestFailed:
 		reqID := msg.Get(message.RequestID).(uint32)
-		return engine.AppRequestFailed(context.TODO(), nodeID, reqID)
+		return engine.AppRequestFailed(ctx, nodeID, reqID)
 
 	case message.AppGossip:
 		appBytes := msg.Get(message.AppBytes).([]byte)
-		return engine.AppGossip(context.TODO(), nodeID, appBytes)
+		return engine.AppGossip(ctx, nodeID, appBytes)
 
 	default:
 		return fmt.Errorf(
@@ -719,13 +719,13 @@ func (h *handler) getEngine() (common.Engine, error) {
 	}
 }
 
-func (h *handler) popUnexpiredMsg(queue MessageQueue, expired prometheus.Counter) (message.InboundMessage, bool) {
+func (h *handler) popUnexpiredMsg(queue MessageQueue, expired prometheus.Counter) (context.Context, message.InboundMessage, bool) {
 	for {
 		// Get the next message we should process. If the handler is shutting
 		// down, we may fail to pop a message.
-		msg, ok := queue.Pop()
+		ctx, msg, ok := queue.Pop()
 		if !ok {
-			return nil, false
+			return context.Background(), nil, false
 		}
 
 		// If this message's deadline has passed, don't process it.
@@ -740,7 +740,7 @@ func (h *handler) popUnexpiredMsg(queue MessageQueue, expired prometheus.Counter
 			continue
 		}
 
-		return msg, true
+		return ctx, msg, true
 	}
 }
 
