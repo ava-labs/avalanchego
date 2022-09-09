@@ -477,6 +477,14 @@ func (p *peer) writeMessages() {
 }
 
 func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
+	_, span := otel.Tracer("TODO").Start(context.Background(), "peer.writeMessage",
+		trace.WithAttributes(
+			attribute.String("recipient", p.id.String()),
+			attribute.Int("msgSize", len(msg.Bytes())),
+		),
+	)
+	defer span.End()
+
 	msgBytes := msg.Bytes()
 	p.Log.Verbo("sending message",
 		zap.Stringer("nodeID", p.id),
