@@ -147,7 +147,7 @@ func (b *bootstrapper) Start(startReqID uint32) error {
 // Ancestors handles the receipt of multiple containers. Should be received in
 // response to a GetAncestors message to [nodeID] with request ID [requestID]
 func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
-	_, span := otel.Tracer("TODO").Start(ctx, "bootstrapper.Ancestors",
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "bootstrapper.Ancestors",
 		trace.WithAttributes(
 			attribute.Int64("requestID", int64(requestID)),
 			attribute.Int("num blocks", len(blks)),
@@ -175,7 +175,7 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 		b.markUnavailable(nodeID)
 
 		// Send another request for this
-		return b.fetch(wantedBlkID)
+		return b.fetch(newCtx, wantedBlkID)
 	}
 
 	// This node has responded - so add it back into the set
@@ -197,7 +197,7 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 			zap.Uint32("requestID", requestID),
 			zap.Error(err),
 		)
-		return b.fetch(wantedBlkID)
+		return b.fetch(newCtx, wantedBlkID)
 	}
 
 	if len(blocks) == 0 {
@@ -205,7 +205,7 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 		)
-		return b.fetch(wantedBlkID)
+		return b.fetch(newCtx, wantedBlkID)
 	}
 
 	requestedBlock := blocks[0]
@@ -214,14 +214,14 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 			zap.Stringer("expectedBlkID", wantedBlkID),
 			zap.Stringer("blkID", actualID),
 		)
-		return b.fetch(wantedBlkID)
+		return b.fetch(newCtx, wantedBlkID)
 	}
 
 	blockSet := make(map[ids.ID]snowman.Block, len(blocks))
 	for _, block := range blocks[1:] {
 		blockSet[block.ID()] = block
 	}
-	return b.process(requestedBlock, blockSet)
+	return b.process(newCtx, requestedBlock, blockSet)
 }
 
 func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
@@ -238,7 +238,7 @@ func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID
 	b.fetchFrom.Add(nodeID)
 
 	// Send another request for this
-	return b.fetch(blkID)
+	return b.fetch(ctx, blkID)
 }
 
 func (b *bootstrapper) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
@@ -329,7 +329,7 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 		// `database.ErrNotFound`, then the error should be propagated.
 		blk, err := b.VM.GetBlock(blkID)
 		if err != nil {
-			if err := b.fetch(blkID); err != nil {
+			if err := b.fetch(context.Background(), blkID); err != nil {
 				return err
 			}
 			continue
@@ -342,7 +342,7 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 
 	// Process received blocks
 	for _, blk := range toProcess {
-		if err := b.process(blk, nil); err != nil {
+		if err := b.process(context.TODO(), blk, nil); err != nil {
 			return err
 		}
 	}
@@ -351,7 +351,7 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 }
 
 // Get block [blkID] and its ancestors from a validator
-func (b *bootstrapper) fetch(blkID ids.ID) error {
+func (b *bootstrapper) fetch(ctx context.Context, blkID ids.ID) error {
 	// Make sure we haven't already requested this block
 	if b.OutstandingRequests.Contains(blkID) {
 		return nil
@@ -373,7 +373,7 @@ func (b *bootstrapper) fetch(blkID ids.ID) error {
 	b.Config.SharedCfg.RequestID++
 
 	b.OutstandingRequests.Add(validatorID, b.Config.SharedCfg.RequestID, blkID)
-	b.Config.Sender.SendGetAncestors(context.TODO(), validatorID, b.Config.SharedCfg.RequestID, blkID) // request block and ancestors
+	b.Config.Sender.SendGetAncestors(ctx, validatorID, b.Config.SharedCfg.RequestID, blkID) // request block and ancestors
 	return nil
 }
 
@@ -407,7 +407,10 @@ func (b *bootstrapper) Clear() error {
 //
 // If [blk]'s height is <= the last accepted height, then it will be removed
 // from the missingIDs set.
-func (b *bootstrapper) process(blk snowman.Block, processingBlocks map[ids.ID]snowman.Block) error {
+func (b *bootstrapper) process(ctx context.Context, blk snowman.Block, processingBlocks map[ids.ID]snowman.Block) error {
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "bootstrapper.process")
+	defer span.End()
+
 	for {
 		blkID := blk.ID()
 		if b.Halted() {
@@ -514,7 +517,7 @@ func (b *bootstrapper) process(blk snowman.Block, processingBlocks map[ids.ID]sn
 		// If the block wasn't able to be acquired immediately, attempt to fetch
 		// it
 		b.Blocked.AddMissingID(parentID)
-		if err := b.fetch(parentID); err != nil {
+		if err := b.fetch(newCtx, parentID); err != nil {
 			return err
 		}
 

@@ -176,7 +176,7 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 			zap.Binary("vtxBytes", vtxs[0]),
 			zap.Error(err),
 		)
-		return b.fetch(requestedVtxID)
+		return b.fetch(ctx, requestedVtxID)
 	}
 
 	vtxID := vtx.ID()
@@ -187,7 +187,7 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 			zap.Uint32("requestID", requestID),
 			zap.Stringer("vtxID", vtxID),
 		)
-		return b.fetch(requestedVtxID)
+		return b.fetch(ctx, requestedVtxID)
 	}
 	if !requested && !b.OutstandingRequests.Contains(vtxID) && !b.needToFetch.Contains(vtxID) {
 		b.Ctx.Log.Debug("received un-needed vertex",
@@ -252,10 +252,10 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 		b.needToFetch.Remove(vtxID) // No need to fetch this vertex since we have it now
 	}
 
-	return b.process(processVertices...)
+	return b.process(ctx, processVertices...)
 }
 
-func (b *bootstrapper) GetAncestorsFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	vtxID, ok := b.OutstandingRequests.Remove(nodeID, requestID)
 	if !ok {
 		b.Ctx.Log.Debug("skipping GetAncestorsFailed call",
@@ -266,7 +266,7 @@ func (b *bootstrapper) GetAncestorsFailed(_ context.Context, nodeID ids.NodeID, 
 		return nil
 	}
 	// Send another request for the vertex
-	return b.fetch(vtxID)
+	return b.fetch(ctx, vtxID)
 }
 
 func (b *bootstrapper) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
@@ -348,7 +348,7 @@ func (b *bootstrapper) GetVM() common.VM { return b.VM }
 // Add the vertices in [vtxIDs] to the set of vertices that we need to fetch,
 // and then fetch vertices (and their ancestors) until either there are no more
 // to fetch or we are at the maximum number of outstanding requests.
-func (b *bootstrapper) fetch(vtxIDs ...ids.ID) error {
+func (b *bootstrapper) fetch(ctx context.Context, vtxIDs ...ids.ID) error {
 	b.needToFetch.Add(vtxIDs...)
 	for b.needToFetch.Len() > 0 && b.OutstandingRequests.Len() < common.MaxOutstandingGetAncestorsRequests {
 		vtxID := b.needToFetch.CappedList(1)[0]
@@ -372,13 +372,13 @@ func (b *bootstrapper) fetch(vtxIDs ...ids.ID) error {
 		b.Config.SharedCfg.RequestID++
 
 		b.OutstandingRequests.Add(validatorID, b.Config.SharedCfg.RequestID, vtxID)
-		b.Config.Sender.SendGetAncestors(context.TODO(), validatorID, b.Config.SharedCfg.RequestID, vtxID) // request vertex and ancestors
+		b.Config.Sender.SendGetAncestors(ctx, validatorID, b.Config.SharedCfg.RequestID, vtxID) // request vertex and ancestors
 	}
 	return b.checkFinish()
 }
 
 // Process the vertices in [vtxs].
-func (b *bootstrapper) process(vtxs ...avalanche.Vertex) error {
+func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) error {
 	// Vertices that we need to process. Store them in a heap for deduplication
 	// and so we always process vertices further down in the DAG first. This helps
 	// to reduce the number of repeated DAG traversals.
@@ -497,7 +497,7 @@ func (b *bootstrapper) process(vtxs ...avalanche.Vertex) error {
 		return err
 	}
 
-	return b.fetch()
+	return b.fetch(ctx)
 }
 
 // ForceAccepted starts bootstrapping. Process the vertices in [accepterContainerIDs].
@@ -523,7 +523,7 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 			b.needToFetch.Add(vtxID) // We don't have this vertex. Mark that we have to fetch it.
 		}
 	}
-	return b.process(toProcess...)
+	return b.process(context.TODO(), toProcess...)
 }
 
 // checkFinish repeatedly executes pending transactions and requests new frontier blocks until there aren't any new ones
