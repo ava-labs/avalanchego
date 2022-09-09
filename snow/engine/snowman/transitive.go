@@ -264,7 +264,7 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		response:  blkID,
 	}
 
-	added, err := t.issueFromByID(ctx, nodeID, blkID)
+	added, err := t.issueFromByID(newCtx, nodeID, blkID)
 	if err != nil {
 		return err
 	}

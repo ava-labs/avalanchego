@@ -316,20 +316,12 @@ func (p *peer) readMessages() {
 	reader := bufio.NewReaderSize(p.conn, p.Config.ReadBufferSize)
 	msgLenBytes := make([]byte, wrappers.IntLen)
 	for {
-		ctx, span := otel.Tracer("TODO").Start(context.Background(), "peer.readMessages",
-			trace.WithAttributes(
-				attribute.String("sender", p.id.String()),
-			),
-		)
-
 		// Time out and close connection if we can't read the message length
 		if err := p.conn.SetReadDeadline(p.nextTimeout()); err != nil {
 			p.Log.Verbo("error setting the connection read timeout",
 				zap.Stringer("nodeID", p.id),
 				zap.Error(err),
 			)
-			span.RecordError(err)
-			span.End()
 			return
 		}
 
@@ -339,8 +331,6 @@ func (p *peer) readMessages() {
 				zap.Stringer("nodeID", p.id),
 				zap.Error(err),
 			)
-			span.RecordError(err)
-			span.End()
 			return
 		}
 
@@ -351,13 +341,10 @@ func (p *peer) readMessages() {
 				zap.Stringer("nodeID", p.id),
 				zap.Error(err),
 			)
-			span.RecordError(err)
-			span.End()
 			return
 		}
 		if isProto {
 			p.Log.Debug("unexpected isProto=true from 'readMsgLen' (not implemented yet)")
-			span.End()
 			return
 		}
 
@@ -383,8 +370,6 @@ func (p *peer) readMessages() {
 		// If the peer is shutting down, there's no need to read the message.
 		if err := p.onClosingCtx.Err(); err != nil {
 			onFinishedHandling()
-			span.RecordError(err)
-			span.End()
 			return
 		}
 
@@ -395,10 +380,15 @@ func (p *peer) readMessages() {
 				zap.Error(err),
 			)
 			onFinishedHandling()
-			span.RecordError(err)
-			span.End()
 			return
 		}
+
+		_, span := otel.Tracer("TODO").Start(context.Background(), "peer.readMessages",
+			trace.WithAttributes(
+				attribute.String("sender", p.id.String()),
+				attribute.Int64("msgSize", int64(msgLen)),
+			),
+		)
 
 		// Read the message
 		msgBytes := make([]byte, msgLen)
@@ -412,6 +402,7 @@ func (p *peer) readMessages() {
 			span.End()
 			return
 		}
+		span.End()
 
 		// Track the time it takes from now until the time the message is
 		// handled (in the event this message is handled at the network level)
@@ -444,11 +435,7 @@ func (p *peer) readMessages() {
 			p.ResourceTracker.StopProcessing(p.id, p.Clock.Time())
 			continue
 		}
-		span.SetAttributes(
-			attribute.String("expiration", msg.ExpirationTime().String()),
-			attribute.Int64("msgSize", int64(msgLen)),
-			attribute.String("op", msg.Op().String()),
-		)
+		span.SetAttributes(attribute.Int64("msgSize", int64(msgLen)))
 
 		now := p.Clock.Time().Unix()
 		atomic.StoreInt64(&p.Config.LastReceived, now)
@@ -457,7 +444,7 @@ func (p *peer) readMessages() {
 
 		// Handle the message. Note that when we are done handling this message,
 		// we must call [msg.OnFinishedHandling()].
-		p.handle(ctx, msg)
+		p.handle(msg)
 		p.ResourceTracker.StopProcessing(p.id, p.Clock.Time())
 		span.End()
 	}
@@ -595,7 +582,16 @@ func (p *peer) sendPings() {
 	}
 }
 
-func (p *peer) handle(ctx context.Context, msg message.InboundMessage) {
+func (p *peer) handle(msg message.InboundMessage) {
+	ctx, span := otel.Tracer("TODO").Start(context.Background(), "peer.handle",
+		trace.WithAttributes(
+			attribute.String("sender", p.id.String()),
+			attribute.String("expiration", msg.ExpirationTime().String()),
+			attribute.String("op", msg.Op().String()),
+		),
+	)
+	defer span.End()
+
 	op := msg.Op()
 	switch op { // Network-related message types
 	case message.Ping:
