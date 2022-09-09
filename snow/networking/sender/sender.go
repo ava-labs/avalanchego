@@ -1058,6 +1058,10 @@ func (s *sender) SendAppGossipSpecific(ctx context.Context, nodeIDs ids.NodeIDSe
 
 // SendAppGossip sends an application-level gossip message.
 func (s *sender) SendAppGossip(ctx context.Context, appGossipBytes []byte) error {
+	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendAppGossip")
+	defer span.End()
+	// TODO add attributes
+
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
 	if err != nil {
