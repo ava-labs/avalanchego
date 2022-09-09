@@ -195,4 +195,8 @@ const (
 	UptimeMetricFreqKey                                = "uptime-metric-freq"
 	VMAliasesFileKey                                   = "vm-aliases-file"
 	VMAliasesContentKey                                = "vm-aliases-file-content"
+	TracingEnabledKey                                  = "tracing-enabled"
+	TracingEndpointKey                                 = "tracing-endpoint"
+	TracingSampleRateKey                               = "tracing-sample-rate"
+	TracingExporterTypeKey                             = "tracing-exporter-type"
 )

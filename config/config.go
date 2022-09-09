@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/ips"
@@ -1154,6 +1155,43 @@ func getDiskTargeterConfig(v *viper.Viper) (tracker.TargeterConfig, error) {
 	}
 }
 
+func getTraceConfig(v *viper.Viper) (trace.TraceConfig, error) {
+	enabled := v.GetBool(TracingEnabledKey)
+	if !enabled {
+		return trace.TraceConfig{
+			Enabled: false,
+		}, nil
+	}
+
+	var (
+		exporterTypeStr = v.GetString(TracingExporterTypeKey)
+		exporterType    trace.ExporterType
+	)
+	switch strings.ToLower(exporterTypeStr) {
+	case trace.GRPC.String():
+		exporterType = trace.GRPC
+	case trace.HTTP.String():
+		exporterType = trace.HTTP
+	default:
+		return trace.TraceConfig{}, fmt.Errorf("unknown exporter type %q", exporterTypeStr)
+	}
+
+	endpoint := v.GetString(TracingEndpointKey)
+	if endpoint == "" {
+		return trace.TraceConfig{}, fmt.Errorf("endpoint cannot be empty")
+	}
+
+	return trace.TraceConfig{
+		ExporterConfig: trace.ExporterConfig{
+			Type:     exporterType,
+			Endpoint: endpoint,
+			// TODO add support for headers
+		},
+		Enabled:         true,
+		TraceSampleRate: v.GetFloat64(TracingSampleRateKey),
+	}, nil
+}
+
 func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig := node.Config{}
 
@@ -1328,5 +1366,10 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	}
 
 	nodeConfig.DiskTargeterConfig, err = getDiskTargeterConfig(v)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	nodeConfig.TraceConfig, err = getTraceConfig(v)
 	return nodeConfig, err
 }

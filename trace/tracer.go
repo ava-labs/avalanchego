@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/version"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -34,13 +35,15 @@ func newExporter(config ExporterConfig) (oteltrace.SpanExporter, error) {
 	case GRPC:
 		client := otlptracegrpc.NewClient(
 			otlptracegrpc.WithEndpoint(config.Endpoint),
+			otlptracegrpc.WithHeaders(config.Headers),
 		)
-		return otlptracegrpc.New(context.Background(), client)
+		return otlptrace.New(context.Background(), client)
 	case HTTP:
 		client := otlptracehttp.NewClient(
 			otlptracehttp.WithEndpoint(config.Endpoint),
+			otlptracehttp.WithHeaders(config.Headers),
 		)
-		return otlptracehttp.New(context.Background(), client)
+		return otlptrace.New(context.Background(), client)
 	default:
 		return nil, errUnknownExporterType
 	}
@@ -74,7 +77,7 @@ type ExporterConfig struct {
 	Headers map[string]string `json:"headers"`
 }
 
-type TracerConfig struct {
+type TraceConfig struct {
 	ExporterConfig
 
 	// If false, use a no-op tracer.
@@ -84,12 +87,12 @@ type TracerConfig struct {
 	// The fraction of traces to sample.
 	// If >= 1, always samples.
 	// If <= 0, never samples.
-	TraceFraction float64 `json:"alwaysSample"`
+	TraceSampleRate float64 `json:"alwaysSample"`
 }
 
 // Initialize the tracer.
 // If this is never called, we use a no-op tracer.
-func InitTracer(config TracerConfig) error {
+func InitTracer(config TraceConfig) error {
 	if !config.Enabled {
 		// Use a no-op tracer, which is the default values of [tracer]
 		return nil
@@ -103,7 +106,7 @@ func InitTracer(config TracerConfig) error {
 	tracerProviderOpts := []oteltrace.TracerProviderOption{
 		oteltrace.WithBatcher(exporter),
 		oteltrace.WithResource(newResource()),
-		oteltrace.WithSampler(oteltrace.TraceIDRatioBased(config.TraceFraction)),
+		oteltrace.WithSampler(oteltrace.TraceIDRatioBased(config.TraceSampleRate)),
 	}
 
 	tracerProvider := oteltrace.NewTracerProvider(tracerProviderOpts...)

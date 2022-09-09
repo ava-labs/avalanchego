@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -222,4 +223,6 @@ type Config struct {
 
 	RequiredAvailableDiskSpace         uint64 `json:"requiredAvailableDiskSpace"`
 	WarningThresholdAvailableDiskSpace uint64 `json:"warningThresholdAvailableDiskSpace"`
+
+	TraceConfig trace.TraceConfig `json:"traceConfig"`
 }
