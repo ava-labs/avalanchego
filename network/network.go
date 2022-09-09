@@ -18,6 +18,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	"go.uber.org/zap"
 
@@ -489,10 +490,10 @@ func (n *network) Peers() (message.OutboundMessage, error) {
 }
 
 func (n *network) Pong(ctx context.Context, nodeID ids.NodeID) (message.OutboundMessage, error) {
-	_, span := otel.Tracer("TODO").Start(ctx, "network.Pong")
+	_, span := otel.Tracer("TODO").Start(ctx, "network.Pong", trace.WithAttributes(
+		attribute.String("recipient", nodeID.String()),
+	))
 	defer span.End()
-
-	span.SetAttributes(attribute.String("recipient", nodeID.String()))
 
 	uptimePercentFloat, err := n.config.UptimeCalculator.CalculateUptimePercent(nodeID)
 	if err != nil {

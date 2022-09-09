@@ -16,6 +16,7 @@ import (
 // [containerID] and [container] are the ID and body of the container being queried.
 // [sender] is used to actually send the queries.
 func SendMixedQuery(
+	ctx context.Context,
 	sender Sender,
 	vdrs []ids.NodeID,
 	numPushTo int,
@@ -29,11 +30,11 @@ func SendMixedQuery(
 	if numPushTo > 0 {
 		sendPushQueryTo := ids.NewNodeIDSet(numPushTo)
 		sendPushQueryTo.Add(vdrs[:numPushTo]...)
-		sender.SendPushQuery(context.TODO(), sendPushQueryTo, reqID, containerID, container)
+		sender.SendPushQuery(ctx, sendPushQueryTo, reqID, containerID, container)
 	}
 	if numPullTo := len(vdrs) - numPushTo; numPullTo > 0 {
 		sendPullQueryTo := ids.NewNodeIDSet(numPullTo)
 		sendPullQueryTo.Add(vdrs[numPushTo:]...)
-		sender.SendPullQuery(context.TODO(), sendPullQueryTo, reqID, containerID)
+		sender.SendPullQuery(ctx, sendPullQueryTo, reqID, containerID)
 	}
 }

@@ -4,6 +4,8 @@
 package avalanche
 
 import (
+	"context"
+
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -146,6 +148,7 @@ func (i *issuer) Update() {
 			numPushTo = i.t.Params.MixedQueryNumPushNonVdr
 		}
 		common.SendMixedQuery(
+			context.TODO(),
 			i.t.Sender,
 			vdrBag.List(), // Note that this doesn't contain duplicates; length may be < k
 			numPushTo,

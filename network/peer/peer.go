@@ -17,6 +17,7 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -559,10 +560,14 @@ func (p *peer) sendPings() {
 }
 
 func (p *peer) handle(msg message.InboundMessage) {
-	ctx, span := otel.Tracer("TODO").Start(context.Background(), "handle")
+	ctx, span := otel.Tracer("TODO").Start(context.Background(), "handle",
+		trace.WithAttributes(
+			attribute.String("sender", p.id.String()),
+			attribute.String("expiration", msg.ExpirationTime().String()),
+		),
+	)
 	defer span.End()
 
-	span.SetAttributes(attribute.String("sender", p.id.String()))
 	op := msg.Op()
 	span.SetAttributes(attribute.String("op", op.String()))
 
@@ -591,6 +596,7 @@ func (p *peer) handle(msg message.InboundMessage) {
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", op),
 		)
+		span.AddEvent("dropping message", trace.WithAttributes(attribute.String("reason", "handshake isn't finished")))
 		msg.OnFinishedHandling()
 		return
 	}

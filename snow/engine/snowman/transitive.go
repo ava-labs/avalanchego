@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -111,7 +113,12 @@ func newTransitive(config Config) (*Transitive, error) {
 }
 
 func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "Transitive.Put")
+	newCtx, span := otel.Tracer("TODO").Start(ctx, "Transitive.Put",
+		trace.WithAttributes(
+			attribute.Int64("requestID", int64(requestID)),
+			attribute.Int("block size", len(blkBytes)),
+		),
+	)
 	defer span.End()
 
 	blk, err := t.VM.ParseBlock(blkBytes)
@@ -127,6 +134,7 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 			zap.Binary("block", blkBytes),
 			zap.Error(err),
 		)
+		span.AddEvent("failed to parse block")
 		// because GetFailed doesn't utilize the assumption that we actually
 		// sent a Get message, we can safely call GetFailed here to potentially
 		// abandon the request.
@@ -142,7 +150,7 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	// receive requests to fill the ancestry. dependencies that have already
 	// been fetched, but with missing dependencies themselves won't be requested
 	// from the vdr.
-	if _, err := t.issueFrom(nodeID, blk); err != nil {
+	if _, err := t.issueFrom(ctx, nodeID, blk); err != nil {
 		return err
 	}
 	return t.buildBlocks()
@@ -176,7 +184,7 @@ func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 
 	// Try to issue [blkID] to consensus.
 	// If we're missing an ancestor, request it from [vdr]
-	if _, err := t.issueFromByID(nodeID, blkID); err != nil {
+	if _, err := t.issueFromByID(ctx, nodeID, blkID); err != nil {
 		return err
 	}
 
@@ -217,7 +225,7 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 	// receive requests to fill the ancestry. dependencies that have already
 	// been fetched, but with missing dependencies themselves won't be requested
 	// from the vdr.
-	if _, err := t.issueFrom(nodeID, blk); err != nil {
+	if _, err := t.issueFrom(ctx, nodeID, blk); err != nil {
 		return err
 	}
 
@@ -256,7 +264,7 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		response:  blkID,
 	}
 
-	added, err := t.issueFromByID(nodeID, blkID)
+	added, err := t.issueFromByID(ctx, nodeID, blkID)
 	if err != nil {
 		return err
 	}
@@ -315,6 +323,9 @@ func (t *Transitive) Disconnected(nodeID ids.NodeID) error {
 func (t *Transitive) Timeout() error { return nil }
 
 func (t *Transitive) Gossip() error {
+	ctx, span := otel.Tracer("TODO").Start(context.Background(), "Transitive.Gossip")
+	defer span.End()
+
 	blkID, err := t.VM.LastAccepted()
 	if err != nil {
 		return err
@@ -331,7 +342,9 @@ func (t *Transitive) Gossip() error {
 	t.Ctx.Log.Verbo("gossiping accepted block to the network",
 		zap.Stringer("blkID", blkID),
 	)
-	t.Sender.SendGossip(context.TODO(), blkID, blk.Bytes())
+	span.SetAttributes(attribute.String("blkID", blkID.String()))
+
+	t.Sender.SendGossip(ctx, blkID, blk.Bytes())
 	return nil
 }
 
@@ -502,31 +515,34 @@ func (t *Transitive) buildBlocks() error {
 // Issue another poll to the network, asking what it prefers given the block we prefer.
 // Helps move consensus along.
 func (t *Transitive) repoll() {
+	ctx, span := otel.Tracer("TODO").Start(context.Background(), "Transitive.repoll")
+	defer span.End()
+
 	// if we are issuing a repoll, we should gossip our current preferences to
 	// propagate the most likely branch as quickly as possible
 	prefID := t.Consensus.Preference()
 
 	for i := t.polls.Len(); i < t.Params.ConcurrentRepolls; i++ {
-		t.pullQuery(prefID)
+		t.pullQuery(ctx, prefID)
 	}
 }
 
 // issueFromByID attempts to issue the branch ending with a block [blkID] into consensus.
 // If we do not have [blkID], request it.
 // Returns true if the block is processing in consensus or is decided.
-func (t *Transitive) issueFromByID(nodeID ids.NodeID, blkID ids.ID) (bool, error) {
+func (t *Transitive) issueFromByID(ctx context.Context, nodeID ids.NodeID, blkID ids.ID) (bool, error) {
 	blk, err := t.GetBlock(blkID)
 	if err != nil {
-		t.sendRequest(nodeID, blkID)
+		t.sendRequest(ctx, nodeID, blkID)
 		return false, nil
 	}
-	return t.issueFrom(nodeID, blk)
+	return t.issueFrom(ctx, nodeID, blk)
 }
 
 // issueFrom attempts to issue the branch ending with block [blkID] to consensus.
 // Returns true if the block is processing in consensus or is decided.
 // If a dependency is missing, request it from [vdr].
-func (t *Transitive) issueFrom(nodeID ids.NodeID, blk snowman.Block) (bool, error) {
+func (t *Transitive) issueFrom(ctx context.Context, nodeID ids.NodeID, blk snowman.Block) (bool, error) {
 	blkID := blk.ID()
 	// issue [blk] and its ancestors to consensus.
 	for !t.wasIssued(blk) {
@@ -540,7 +556,7 @@ func (t *Transitive) issueFrom(nodeID ids.NodeID, blk snowman.Block) (bool, erro
 
 		// If we don't have this ancestor, request it from [vdr]
 		if err != nil || !blk.Status().Fetched() {
-			t.sendRequest(nodeID, blkID)
+			t.sendRequest(ctx, nodeID, blkID)
 			return false, nil
 		}
 	}
@@ -644,7 +660,7 @@ func (t *Transitive) issue(blk snowman.Block) error {
 }
 
 // Request that [vdr] send us block [blkID]
-func (t *Transitive) sendRequest(nodeID ids.NodeID, blkID ids.ID) {
+func (t *Transitive) sendRequest(ctx context.Context, nodeID ids.NodeID, blkID ids.ID) {
 	// There is already an outstanding request for this block
 	if t.blkReqs.Contains(blkID) {
 		return
@@ -657,14 +673,14 @@ func (t *Transitive) sendRequest(nodeID ids.NodeID, blkID ids.ID) {
 		zap.Uint32("requestID", t.RequestID),
 		zap.Stringer("blkID", blkID),
 	)
-	t.Sender.SendGet(context.TODO(), nodeID, t.RequestID, blkID)
+	t.Sender.SendGet(ctx, nodeID, t.RequestID, blkID)
 
 	// Tracks performance statistics
 	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
 }
 
 // send a pull query for this block ID
-func (t *Transitive) pullQuery(blkID ids.ID) {
+func (t *Transitive) pullQuery(ctx context.Context, blkID ids.ID) {
 	t.Ctx.Log.Verbo("sampling from validators",
 		zap.Stringer("validators", t.Validators),
 	)
@@ -688,13 +704,13 @@ func (t *Transitive) pullQuery(blkID ids.ID) {
 		vdrList := vdrBag.List()
 		vdrSet := ids.NewNodeIDSet(len(vdrList))
 		vdrSet.Add(vdrList...)
-		t.Sender.SendPullQuery(context.TODO(), vdrSet, t.RequestID, blkID)
+		t.Sender.SendPullQuery(ctx, vdrSet, t.RequestID, blkID)
 	}
 }
 
 // Send a query for this block. Some validators will be sent
 // a Push Query and some will be sent a Pull Query.
-func (t *Transitive) sendMixedQuery(blk snowman.Block) {
+func (t *Transitive) sendMixedQuery(ctx context.Context, blk snowman.Block) {
 	t.Ctx.Log.Verbo("sampling from validators",
 		zap.Stringer("validators", t.Validators),
 	)
@@ -720,6 +736,7 @@ func (t *Transitive) sendMixedQuery(blk snowman.Block) {
 			numPushTo = t.Params.MixedQueryNumPushNonVdr
 		}
 		common.SendMixedQuery(
+			ctx,
 			t.Sender,
 			vdrBag.List(), // Note that this doesn't contain duplicates; length may be < k
 			numPushTo,
@@ -732,6 +749,9 @@ func (t *Transitive) sendMixedQuery(blk snowman.Block) {
 
 // issue [blk] to consensus
 func (t *Transitive) deliver(blk snowman.Block) error {
+	ctx, span := otel.Tracer("TODO").Start(context.Background(), "Transitive.deliver")
+	defer span.End()
+
 	blkID := blk.ID()
 	if t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) {
 		return nil
@@ -834,13 +854,13 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	// If the block is now preferred, query the network for its preferences
 	// with this new block.
 	if t.Consensus.IsPreferred(blk) {
-		t.sendMixedQuery(blk)
+		t.sendMixedQuery(ctx, blk)
 	}
 
 	t.blocked.Fulfill(blkID)
 	for _, blk := range added {
 		if t.Consensus.IsPreferred(blk) {
-			t.sendMixedQuery(blk)
+			t.sendMixedQuery(ctx, blk)
 		}
 
 		blkID := blk.ID()

@@ -4,6 +4,7 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -138,6 +139,7 @@ func TestSendMixedQuery(t *testing.T) {
 			func(t *testing.T) {
 				sender := tt.senderF()
 				SendMixedQuery(
+					context.Background(),
 					sender,
 					tt.vdrs,
 					tt.numPushTo,
