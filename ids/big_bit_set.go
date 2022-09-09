@@ -70,7 +70,7 @@ func (b BigBitSet) Clear() {
 	b.bits.SetUint64(0)
 }
 
-// Contains returns true if the [i]'th bit is 0, and false otherwise
+// Contains returns true if the [i]'th bit is 1, and false otherwise
 func (b BigBitSet) Contains(i int) bool {
 	return b.bits.Bit(i) == 1
 }
