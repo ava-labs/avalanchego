@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/app"
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/node"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
@@ -65,6 +66,11 @@ func (p *process) Start() error {
 	log, err := logFactory.Make("main")
 	if err != nil {
 		logFactory.Close()
+		return err
+	}
+
+	// Set up tracer
+	if err := trace.InitTracer(p.config.TraceConfig); err != nil {
 		return err
 	}
 

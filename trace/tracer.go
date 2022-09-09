@@ -31,22 +31,23 @@ func newResource() *resource.Resource {
 }
 
 func newExporter(config ExporterConfig) (oteltrace.SpanExporter, error) {
+	var client otlptrace.Client
 	switch config.Type {
 	case GRPC:
-		client := otlptracegrpc.NewClient(
+		client = otlptracegrpc.NewClient(
 			otlptracegrpc.WithEndpoint(config.Endpoint),
 			otlptracegrpc.WithHeaders(config.Headers),
 		)
-		return otlptrace.New(context.Background(), client)
 	case HTTP:
-		client := otlptracehttp.NewClient(
+		client = otlptracehttp.NewClient(
 			otlptracehttp.WithEndpoint(config.Endpoint),
 			otlptracehttp.WithHeaders(config.Headers),
 		)
-		return otlptrace.New(context.Background(), client)
 	default:
 		return nil, errUnknownExporterType
 	}
+	return otlptrace.New(context.Background(), client)
+
 }
 
 type ExporterType byte
