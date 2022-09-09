@@ -102,7 +102,7 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs ids.No
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.StateSummaryFrontier)
+		s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, requestID, message.StateSummaryFrontier)
 	}
 
 	// Sending a message to myself. No need to send it over the network.
@@ -191,7 +191,7 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs ids.No
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.AcceptedStateSummary)
+		s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, requestID, message.AcceptedStateSummary)
 	}
 
 	// Sending a message to myself. No need to send it over the network.
@@ -285,7 +285,7 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs ids.NodeID
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.AcceptedFrontier)
+		s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, requestID, message.AcceptedFrontier)
 	}
 
 	// Sending a message to myself. No need to send it over the network.
@@ -368,7 +368,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs ids.NodeIDSet, req
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Accepted)
+		s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, requestID, message.Accepted)
 	}
 
 	// Sending a message to myself. No need to send it over the network.
@@ -454,7 +454,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from this node.
-	s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Ancestors)
+	s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, requestID, message.Ancestors)
 
 	// Sending a GetAncestors to myself always fails.
 	if nodeID == s.ctx.NodeID {
@@ -556,7 +556,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from this node.
-	s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Put)
+	s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, requestID, message.Put)
 
 	// Sending a Get to myself always fails.
 	if nodeID == s.ctx.NodeID {
@@ -660,7 +660,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs ids.NodeIDSet, reque
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Chits)
+		s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, requestID, message.Chits)
 	}
 
 	// Note that this timeout duration won't exactly match the one that gets
@@ -749,7 +749,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs ids.NodeIDSet, reque
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Chits)
+		s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, requestID, message.Chits)
 	}
 
 	// Note that this timeout duration won't exactly match the one that gets
@@ -899,7 +899,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs ids.NodeIDSet, requ
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.AppResponse)
+		s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, requestID, message.AppResponse)
 	}
 
 	// Note that this timeout duration won't exactly match the one that gets

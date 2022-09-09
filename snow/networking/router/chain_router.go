@@ -142,6 +142,7 @@ func (cr *ChainRouter) Initialize(
 // This method registers a timeout that calls such methods if we don't get a
 // reply in time.
 func (cr *ChainRouter) RegisterRequest(
+	ctx context.Context,
 	nodeID ids.NodeID,
 	chainID ids.ID,
 	requestID uint32,
@@ -172,7 +173,7 @@ func (cr *ChainRouter) RegisterRequest(
 	// Register a timeout to fire if we don't get a reply in time.
 	cr.timeoutManager.RegisterRequest(nodeID, chainID, op, uniqueRequestID, func() {
 		msg := cr.msgCreator.InternalFailedRequest(failedOp, nodeID, chainID, requestID)
-		cr.HandleInbound(context.TODO(), msg) // TODO add context
+		cr.HandleInbound(ctx, msg)
 	})
 }
 

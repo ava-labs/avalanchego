@@ -355,7 +355,7 @@ func TestRouterTimeout(t *testing.T) {
 	wg.Add(len(msgs))
 
 	for i, msg := range msgs {
-		chainRouter.RegisterRequest(ids.GenerateTestNodeID(), ctx.ChainID, uint32(i), msg)
+		chainRouter.RegisterRequest(context.Background(), ids.GenerateTestNodeID(), ctx.ChainID, uint32(i), msg)
 	}
 
 	wg.Wait()
@@ -446,7 +446,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 
 	vID := ids.GenerateTestNodeID()
 	for i, op := range ops {
-		chainRouter.RegisterRequest(vID, ctx.ChainID, uint32(i), op)
+		chainRouter.RegisterRequest(context.Background(), vID, ctx.ChainID, uint32(i), op)
 	}
 
 	// Clear each timeout by simulating responses to the queries
@@ -585,7 +585,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 
 	// register a validator request
 	reqID++
-	chainRouter.RegisterRequest(vID, ctx.ChainID, reqID, message.Get)
+	chainRouter.RegisterRequest(context.Background(), vID, ctx.ChainID, reqID, message.Get)
 	require.Equal(t, 1, chainRouter.timedRequests.Len())
 
 	// remove it from validators
