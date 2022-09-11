@@ -16,9 +16,8 @@ import (
 	gomath "math"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
+	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"go.uber.org/zap"
 
@@ -31,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -490,7 +490,7 @@ func (n *network) Peers() (message.OutboundMessage, error) {
 }
 
 func (n *network) Pong(ctx context.Context, nodeID ids.NodeID) (message.OutboundMessage, error) {
-	_, span := otel.Tracer("TODO").Start(ctx, "network.Pong", trace.WithAttributes(
+	_, span := trace.Tracer().Start(ctx, "network.Pong", oteltrace.WithAttributes(
 		attribute.String("recipient", nodeID.String()),
 	))
 	defer span.End()

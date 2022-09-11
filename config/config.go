@@ -1166,6 +1166,7 @@ func getTraceConfig(v *viper.Viper) (trace.TraceConfig, error) {
 	var (
 		exporterTypeStr = v.GetString(TracingExporterTypeKey)
 		exporterType    trace.ExporterType
+		endpoint        = v.GetString(TracingEndpointKey)
 	)
 	switch strings.ToLower(exporterTypeStr) {
 	case trace.GRPC.String():
@@ -1176,7 +1177,6 @@ func getTraceConfig(v *viper.Viper) (trace.TraceConfig, error) {
 		return trace.TraceConfig{}, fmt.Errorf("unknown exporter type %q", exporterTypeStr)
 	}
 
-	endpoint := v.GetString(TracingEndpointKey)
 	if endpoint == "" {
 		return trace.TraceConfig{}, fmt.Errorf("endpoint cannot be empty")
 	}

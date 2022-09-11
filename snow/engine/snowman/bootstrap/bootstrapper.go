@@ -10,9 +10,8 @@ import (
 	"math"
 	"time"
 
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -21,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -147,8 +147,8 @@ func (b *bootstrapper) Start(startReqID uint32) error {
 // Ancestors handles the receipt of multiple containers. Should be received in
 // response to a GetAncestors message to [nodeID] with request ID [requestID]
 func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "bootstrapper.Ancestors",
-		trace.WithAttributes(
+	newCtx, span := trace.Tracer().Start(ctx, "bootstrapper.Ancestors",
+		oteltrace.WithAttributes(
 			attribute.Int64("requestID", int64(requestID)),
 			attribute.Int("num blocks", len(blks)),
 		),
@@ -408,7 +408,7 @@ func (b *bootstrapper) Clear() error {
 // If [blk]'s height is <= the last accepted height, then it will be removed
 // from the missingIDs set.
 func (b *bootstrapper) process(ctx context.Context, blk snowman.Block, processingBlocks map[ids.ID]snowman.Block) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "bootstrapper.process")
+	newCtx, span := trace.Tracer().Start(ctx, "bootstrapper.process")
 	defer span.End()
 
 	for {

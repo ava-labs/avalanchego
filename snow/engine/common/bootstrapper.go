@@ -7,11 +7,11 @@ import (
 	"context"
 	stdmath "math"
 
-	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/math"
 )
 
@@ -154,7 +154,7 @@ func (b *bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, 
 }
 
 func (b *bootstrapper) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "bootstrapper.GetAcceptedFrontierFailed")
+	newCtx, span := trace.Tracer().Start(ctx, "bootstrapper.GetAcceptedFrontierFailed")
 	defer span.End()
 
 	// ignores any late responses
@@ -263,7 +263,7 @@ func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 }
 
 func (b *bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "bootstrapper.GetAcceptedFailed")
+	newCtx, span := trace.Tracer().Start(ctx, "bootstrapper.GetAcceptedFailed")
 	defer span.End()
 
 	// ignores any late responses

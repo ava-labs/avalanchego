@@ -6,13 +6,13 @@ package getter
 import (
 	"context"
 
-	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
@@ -55,7 +55,7 @@ type getter struct {
 }
 
 func (gh *getter) GetStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "getter.GetStateSummaryFrontier")
+	newCtx, span := trace.Tracer().Start(ctx, "getter.GetStateSummaryFrontier")
 	defer span.End()
 
 	// Note: we do not check if gh.ssVM.StateSyncEnabled since we want all
@@ -86,7 +86,7 @@ func (gh *getter) GetStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 }
 
 func (gh *getter) GetAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, heights []uint64) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "getter.GetAcceptedStateSummary")
+	newCtx, span := trace.Tracer().Start(ctx, "getter.GetAcceptedStateSummary")
 	defer span.End()
 
 	// If there are no requested heights, then we can return the result
@@ -134,7 +134,7 @@ func (gh *getter) GetAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 }
 
 func (gh *getter) GetAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "getter.GetAcceptedFrontier")
+	newCtx, span := trace.Tracer().Start(ctx, "getter.GetAcceptedFrontier")
 	defer span.End()
 
 	lastAccepted, err := gh.vm.LastAccepted()
@@ -146,7 +146,7 @@ func (gh *getter) GetAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 }
 
 func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "getter.GetAccepted")
+	newCtx, span := trace.Tracer().Start(ctx, "getter.GetAccepted")
 	defer span.End()
 
 	acceptedIDs := make([]ids.ID, 0, len(containerIDs))
@@ -160,7 +160,7 @@ func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 }
 
 func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "getter.GetAncestors")
+	newCtx, span := trace.Tracer().Start(ctx, "getter.GetAncestors")
 	defer span.End()
 
 	ancestorsBytes, err := block.GetAncestors(
@@ -187,7 +187,7 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (gh *getter) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "getter.Get")
+	newCtx, span := trace.Tracer().Start(ctx, "getter.Get")
 	defer span.End()
 
 	blk, err := gh.vm.GetBlock(blkID)

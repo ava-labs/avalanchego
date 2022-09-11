@@ -8,9 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -22,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/poll"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/events"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -113,8 +113,8 @@ func newTransitive(config Config) (*Transitive, error) {
 }
 
 func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "Transitive.Put",
-		trace.WithAttributes(
+	newCtx, span := trace.Tracer().Start(ctx, "Transitive.Put",
+		oteltrace.WithAttributes(
 			attribute.Int64("requestID", int64(requestID)),
 			attribute.Int("block size", len(blkBytes)),
 		),
@@ -175,7 +175,7 @@ func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "Transitive.PullQuery")
+	newCtx, span := trace.Tracer().Start(ctx, "Transitive.PullQuery")
 	defer span.End()
 
 	// TODO: once everyone supports ChitsV2 - we should be sending that message
@@ -192,7 +192,7 @@ func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "Transitive.PushQuery")
+	newCtx, span := trace.Tracer().Start(ctx, "Transitive.PushQuery")
 	defer span.End()
 
 	// TODO: once everyone supports ChitsV2 - we should be sending that message
@@ -233,7 +233,7 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "Transitive.Chits")
+	newCtx, span := trace.Tracer().Start(ctx, "Transitive.Chits")
 	defer span.End()
 
 	// Since this is a linear chain, there should only be one ID in the vote set
@@ -323,7 +323,7 @@ func (t *Transitive) Disconnected(nodeID ids.NodeID) error {
 func (t *Transitive) Timeout() error { return nil }
 
 func (t *Transitive) Gossip() error {
-	ctx, span := otel.Tracer("TODO").Start(context.Background(), "Transitive.Gossip")
+	ctx, span := trace.Tracer().Start(context.Background(), "Transitive.Gossip")
 	defer span.End()
 
 	blkID, err := t.VM.LastAccepted()
@@ -515,7 +515,7 @@ func (t *Transitive) buildBlocks() error {
 // Issue another poll to the network, asking what it prefers given the block we prefer.
 // Helps move consensus along.
 func (t *Transitive) repoll() {
-	ctx, span := otel.Tracer("TODO").Start(context.Background(), "Transitive.repoll")
+	ctx, span := trace.Tracer().Start(context.Background(), "Transitive.repoll")
 	defer span.End()
 
 	// if we are issuing a repoll, we should gossip our current preferences to
@@ -749,7 +749,7 @@ func (t *Transitive) sendMixedQuery(ctx context.Context, blk snowman.Block) {
 
 // issue [blk] to consensus
 func (t *Transitive) deliver(blk snowman.Block) error {
-	ctx, span := otel.Tracer("TODO").Start(context.Background(), "Transitive.deliver")
+	ctx, span := trace.Tracer().Start(context.Background(), "Transitive.deliver")
 	defer span.End()
 
 	blkID := blk.ID()

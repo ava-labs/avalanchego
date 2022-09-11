@@ -10,7 +10,6 @@ import (
 	"math"
 	"time"
 
-	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -20,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -130,7 +130,7 @@ func (b *bootstrapper) Clear() error {
 // response to a GetAncestors message to [nodeID] with request ID [requestID].
 // Expects vtxs[0] to be the vertex requested in the corresponding GetAncestors.
 func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxs [][]byte) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "bootstrapper.Ancestors")
+	newCtx, span := trace.Tracer().Start(ctx, "bootstrapper.Ancestors")
 	defer span.End()
 	// TODO add attributes
 

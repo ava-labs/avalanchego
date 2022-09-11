@@ -16,13 +16,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
@@ -383,8 +383,8 @@ func (p *peer) readMessages() {
 			return
 		}
 
-		_, span := otel.Tracer("TODO").Start(context.Background(), "peer.readMessages",
-			trace.WithAttributes(
+		_, span := trace.Tracer().Start(context.Background(), "peer.readMessages",
+			oteltrace.WithAttributes(
 				attribute.String("sender", p.id.String()),
 				attribute.Int64("msgSize", int64(msgLen)),
 			),
@@ -492,8 +492,8 @@ func (p *peer) writeMessages() {
 }
 
 func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
-	_, span := otel.Tracer("TODO").Start(context.Background(), "peer.writeMessage",
-		trace.WithAttributes(
+	_, span := trace.Tracer().Start(context.Background(), "peer.writeMessage",
+		oteltrace.WithAttributes(
 			attribute.String("recipient", p.id.String()),
 			attribute.Int("msgSize", len(msg.Bytes())),
 		),
@@ -583,8 +583,8 @@ func (p *peer) sendPings() {
 }
 
 func (p *peer) handle(msg message.InboundMessage) {
-	ctx, span := otel.Tracer("TODO").Start(context.Background(), "peer.handle",
-		trace.WithAttributes(
+	ctx, span := trace.Tracer().Start(context.Background(), "peer.handle",
+		oteltrace.WithAttributes(
 			attribute.String("sender", p.id.String()),
 			attribute.String("expiration", msg.ExpirationTime().String()),
 			attribute.String("op", msg.Op().String()),
@@ -627,7 +627,7 @@ func (p *peer) handle(msg message.InboundMessage) {
 }
 
 func (p *peer) handlePing(ctx context.Context, _ message.InboundMessage) {
-	pongCtx, span := otel.Tracer("TODO").Start(ctx, "peer.handlePing")
+	pongCtx, span := trace.Tracer().Start(ctx, "peer.handlePing")
 	defer span.End()
 
 	msg, err := p.Network.Pong(pongCtx, p.id)
@@ -636,7 +636,7 @@ func (p *peer) handlePing(ctx context.Context, _ message.InboundMessage) {
 }
 
 func (p *peer) handlePong(ctx context.Context, msg message.InboundMessage) {
-	_, span := otel.Tracer("TODO").Start(ctx, "peer.handlePong")
+	_, span := trace.Tracer().Start(ctx, "peer.handlePong")
 	defer span.End()
 
 	uptime := msg.Get(message.Uptime).(uint8)
@@ -650,7 +650,7 @@ func (p *peer) handlePong(ctx context.Context, msg message.InboundMessage) {
 }
 
 func (p *peer) handleVersion(ctx context.Context, msg message.InboundMessage) {
-	_, span := otel.Tracer("TODO").Start(ctx, "peer.handleVersion")
+	_, span := trace.Tracer().Start(ctx, "peer.handleVersion")
 	defer span.End()
 
 	if p.gotVersion.GetValue() {
@@ -783,7 +783,7 @@ func (p *peer) handleVersion(ctx context.Context, msg message.InboundMessage) {
 }
 
 func (p *peer) handlePeerList(ctx context.Context, msg message.InboundMessage) {
-	_, span := otel.Tracer("TODO").Start(ctx, "peer.handlePeerList")
+	_, span := trace.Tracer().Start(ctx, "peer.handlePeerList")
 	defer span.End()
 
 	if !p.finishedHandshake.GetValue() {

@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"go.opentelemetry.io/otel"
 
 	"go.uber.org/zap"
 
@@ -18,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
@@ -88,7 +88,7 @@ func New(
 }
 
 func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32) {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendGetStateSummaryFrontier")
+	newCtx, span := trace.Tracer().Start(ctx, "sender.SendGetStateSummaryFrontier")
 	defer span.End()
 	// TODO add attributes
 
@@ -132,7 +132,7 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs ids.No
 }
 
 func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendStateSummaryFrontier")
+	newCtx, span := trace.Tracer().Start(ctx, "sender.SendStateSummaryFrontier")
 	defer span.End()
 	// TODO add attributes
 
@@ -177,7 +177,7 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 }
 
 func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, heights []uint64) {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendGetAcceptedStateSummary")
+	newCtx, span := trace.Tracer().Start(ctx, "sender.SendGetAcceptedStateSummary")
 	defer span.End()
 	// TODO add attributes
 
@@ -233,7 +233,7 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs ids.No
 }
 
 func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendAcceptedStateSummary")
+	newCtx, span := trace.Tracer().Start(ctx, "sender.SendAcceptedStateSummary")
 	defer span.End()
 	// TODO add attributes
 
@@ -271,7 +271,7 @@ func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 }
 
 func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32) {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendGetAcceptedFrontier")
+	newCtx, span := trace.Tracer().Start(ctx, "sender.SendGetAcceptedFrontier")
 	defer span.End()
 	// TODO add attributes
 
@@ -315,7 +315,7 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs ids.NodeID
 }
 
 func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendAcceptedFrontier")
+	newCtx, span := trace.Tracer().Start(ctx, "sender.SendAcceptedFrontier")
 	defer span.End()
 	// TODO add attributes
 
@@ -354,7 +354,7 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 }
 
 func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, containerIDs []ids.ID) {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendGetAccepted")
+	newCtx, span := trace.Tracer().Start(ctx, "sender.SendGetAccepted")
 	defer span.End()
 	// TODO add attributes
 
@@ -410,7 +410,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs ids.NodeIDSet, req
 }
 
 func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendAccepted")
+	newCtx, span := trace.Tracer().Start(ctx, "sender.SendAccepted")
 	defer span.End()
 	// TODO add attributes
 
@@ -448,7 +448,7 @@ func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 }
 
 func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendGetAncestors")
+	newCtx, span := trace.Tracer().Start(ctx, "sender.SendGetAncestors")
 	defer span.End()
 	// TODO add attributes
 
@@ -514,7 +514,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 // on the specified node.
 // The Ancestors message gives the recipient the contents of several containers.
 func (s *sender) SendAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) {
-	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendAncestors")
+	_, span := trace.Tracer().Start(ctx, "sender.SendAncestors")
 	defer span.End()
 	// TODO add attributes
 
@@ -550,7 +550,7 @@ func (s *sender) SendAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 // consensus engine would like the recipient to send this consensus engine the
 // specified container.
 func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendGet")
+	newCtx, span := trace.Tracer().Start(ctx, "sender.SendGet")
 	defer span.End()
 	// TODO add attributes
 
@@ -605,7 +605,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 // The Put message signifies that this consensus engine is giving to the recipient
 // the contents of the specified container.
 func (s *sender) SendPut(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID, container []byte) {
-	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendPut")
+	_, span := trace.Tracer().Start(ctx, "sender.SendPut")
 	defer span.End()
 	// TODO add attributes
 
@@ -650,7 +650,7 @@ func (s *sender) SendPut(ctx context.Context, nodeID ids.NodeID, requestID uint3
 // The PushQuery message signifies that this consensus engine would like each node to send
 // their preferred frontier given the existence of the specified container.
 func (s *sender) SendPushQuery(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, containerID ids.ID, container []byte) {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendPushQuery")
+	newCtx, span := trace.Tracer().Start(ctx, "sender.SendPushQuery")
 	defer span.End()
 	// TODO add attributes
 
@@ -739,7 +739,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs ids.NodeIDSet, reque
 // The PullQuery message signifies that this consensus engine would like each node to send
 // their preferred frontier.
 func (s *sender) SendPullQuery(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, containerID ids.ID) {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendPullQuery")
+	newCtx, span := trace.Tracer().Start(ctx, "sender.SendPullQuery")
 	defer span.End()
 	// TODO add attributes
 
@@ -804,7 +804,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs ids.NodeIDSet, reque
 
 // SendChits sends chits
 func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendChits")
+	newCtx, span := trace.Tracer().Start(ctx, "sender.SendChits")
 	defer span.End()
 	// TODO add attributes
 
@@ -845,7 +845,7 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 
 // SendChitsV2 sends chits V2
 func (s *sender) SendChitsV2(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID, vote ids.ID) {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendChitsV2")
+	newCtx, span := trace.Tracer().Start(ctx, "sender.SendChitsV2")
 	defer span.End()
 	// TODO add attributes
 
@@ -889,7 +889,7 @@ func (s *sender) SendChitsV2(ctx context.Context, nodeID ids.NodeID, requestID u
 // SendAppRequest sends an application-level request to the given nodes.
 // The meaning of this request, and how it should be handled, is defined by the VM.
 func (s *sender) SendAppRequest(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, appRequestBytes []byte) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendAppRequest")
+	newCtx, span := trace.Tracer().Start(ctx, "sender.SendAppRequest")
 	defer span.End()
 	// TODO add attributes
 
@@ -974,7 +974,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs ids.NodeIDSet, requ
 // SendAppResponse sends a response to an application-level request from the
 // given node
 func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "sender.SendAppResponse")
+	newCtx, span := trace.Tracer().Start(ctx, "sender.SendAppResponse")
 	defer span.End()
 	// TODO add attributes
 
@@ -1019,7 +1019,7 @@ func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, request
 }
 
 func (s *sender) SendAppGossipSpecific(ctx context.Context, nodeIDs ids.NodeIDSet, appGossipBytes []byte) error {
-	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendAppGossipSpecific")
+	_, span := trace.Tracer().Start(ctx, "sender.SendAppGossipSpecific")
 	defer span.End()
 	// TODO add attributes
 
@@ -1058,7 +1058,7 @@ func (s *sender) SendAppGossipSpecific(ctx context.Context, nodeIDs ids.NodeIDSe
 
 // SendAppGossip sends an application-level gossip message.
 func (s *sender) SendAppGossip(ctx context.Context, appGossipBytes []byte) error {
-	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendAppGossip")
+	_, span := trace.Tracer().Start(ctx, "sender.SendAppGossip")
 	defer span.End()
 	// TODO add attributes
 
@@ -1095,7 +1095,7 @@ func (s *sender) SendAppGossip(ctx context.Context, appGossipBytes []byte) error
 
 // SendGossip gossips the provided container
 func (s *sender) SendGossip(ctx context.Context, containerID ids.ID, container []byte) {
-	_, span := otel.Tracer("TODO").Start(ctx, "sender.SendGossip")
+	_, span := trace.Tracer().Start(ctx, "sender.SendGossip")
 	defer span.End()
 	// TODO add attributes
 

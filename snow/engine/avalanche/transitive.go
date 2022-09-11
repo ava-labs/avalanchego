@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -19,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/events"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -96,7 +96,7 @@ func newTransitive(config Config) (*Transitive, error) {
 }
 
 func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "Transitive.Put")
+	newCtx, span := trace.Tracer().Start(ctx, "Transitive.Put")
 	defer span.End()
 	// TODO add attributes
 
@@ -131,7 +131,7 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 }
 
 func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	_, span := otel.Tracer("TODO").Start(ctx, "Transitive.GetFailed")
+	_, span := trace.Tracer().Start(ctx, "Transitive.GetFailed")
 	defer span.End()
 	// TODO add attributes
 
@@ -162,7 +162,7 @@ func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "Transitive.PullQuery")
+	newCtx, span := trace.Tracer().Start(ctx, "Transitive.PullQuery")
 	defer span.End()
 	// TODO add attributes
 
@@ -179,7 +179,7 @@ func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "Transitive.PushQuery")
+	newCtx, span := trace.Tracer().Start(ctx, "Transitive.PushQuery")
 	defer span.End()
 	// TODO add attributes
 
@@ -214,7 +214,7 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) error {
-	_, span := otel.Tracer("TODO").Start(ctx, "Transitive.Chits")
+	_, span := trace.Tracer().Start(ctx, "Transitive.Chits")
 	defer span.End()
 	// TODO add attributes
 

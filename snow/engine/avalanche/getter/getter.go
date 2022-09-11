@@ -7,7 +7,6 @@ import (
 	"context"
 	"time"
 
-	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -16,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
@@ -73,7 +73,7 @@ func (gh *getter) GetAcceptedStateSummary(_ context.Context, nodeID ids.NodeID, 
 }
 
 func (gh *getter) GetAcceptedFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "getter.GetAcceptedFrontier")
+	newCtx, span := trace.Tracer().Start(ctx, "getter.GetAcceptedFrontier")
 	defer span.End()
 
 	acceptedFrontier := gh.storage.Edge()
@@ -82,7 +82,7 @@ func (gh *getter) GetAcceptedFrontier(ctx context.Context, validatorID ids.NodeI
 }
 
 func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "getter.GetAccepted")
+	newCtx, span := trace.Tracer().Start(ctx, "getter.GetAccepted")
 	defer span.End()
 
 	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
@@ -96,7 +96,7 @@ func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 }
 
 func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "getter.GetAncestors")
+	newCtx, span := trace.Tracer().Start(ctx, "getter.GetAncestors")
 	defer span.End()
 
 	startTime := time.Now()

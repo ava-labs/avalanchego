@@ -22,7 +22,7 @@ import (
 var (
 	errUnknownExporterType = errors.New("unknown exporter type")
 
-	tracer trace.Tracer = trace.NewNoopTracerProvider().Tracer(constants.AppName)
+	tracerProvider trace.TracerProvider = trace.NewNoopTracerProvider()
 )
 
 func newResource() *resource.Resource {
@@ -90,7 +90,7 @@ type TraceConfig struct {
 	// The fraction of traces to sample.
 	// If >= 1, always samples.
 	// If <= 0, never samples.
-	TraceSampleRate float64 `json:"alwaysSample"`
+	TraceSampleRate float64 `json:"traceSampleRate"`
 }
 
 // Initialize the tracer.
@@ -112,11 +112,11 @@ func InitTracer(config TraceConfig) error {
 		oteltrace.WithSampler(oteltrace.TraceIDRatioBased(config.TraceSampleRate)),
 	}
 
-	tracerProvider := oteltrace.NewTracerProvider(tracerProviderOpts...)
-	tracer = tracerProvider.Tracer(constants.AppName)
+	// TODO handle shutting down tracerProvider
+	tracerProvider = oteltrace.NewTracerProvider(tracerProviderOpts...)
 	return nil
 }
 
 func Tracer() trace.Tracer {
-	return tracer
+	return tracerProvider.Tracer(constants.AppName)
 }

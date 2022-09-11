@@ -6,11 +6,11 @@ package appsender
 import (
 	"context"
 
-	"go.opentelemetry.io/otel"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/trace"
 
 	appsenderpb "github.com/ava-labs/avalanchego/proto/pb/appsender"
 )
@@ -28,7 +28,7 @@ func NewServer(appSender common.AppSender) *Server {
 }
 
 func (s *Server) SendAppRequest(ctx context.Context, req *appsenderpb.SendAppRequestMsg) (*emptypb.Empty, error) {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "Server.SendAppRequest")
+	newCtx, span := trace.Tracer().Start(ctx, "Server.SendAppRequest")
 	defer span.End()
 
 	nodeIDs := ids.NewNodeIDSet(len(req.NodeIds))
@@ -44,7 +44,7 @@ func (s *Server) SendAppRequest(ctx context.Context, req *appsenderpb.SendAppReq
 }
 
 func (s *Server) SendAppResponse(ctx context.Context, req *appsenderpb.SendAppResponseMsg) (*emptypb.Empty, error) {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "Server.SendAppResponse")
+	newCtx, span := trace.Tracer().Start(ctx, "Server.SendAppResponse")
 	defer span.End()
 
 	nodeID, err := ids.ToNodeID(req.NodeId)
@@ -56,7 +56,7 @@ func (s *Server) SendAppResponse(ctx context.Context, req *appsenderpb.SendAppRe
 }
 
 func (s *Server) SendAppGossip(ctx context.Context, req *appsenderpb.SendAppGossipMsg) (*emptypb.Empty, error) {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "Server.SendAppGossip")
+	newCtx, span := trace.Tracer().Start(ctx, "Server.SendAppGossip")
 	defer span.End()
 
 	err := s.appSender.SendAppGossip(newCtx, req.Msg)
@@ -64,7 +64,7 @@ func (s *Server) SendAppGossip(ctx context.Context, req *appsenderpb.SendAppGoss
 }
 
 func (s *Server) SendAppGossipSpecific(ctx context.Context, req *appsenderpb.SendAppGossipSpecificMsg) (*emptypb.Empty, error) {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "Server.SendAppGossipSpecific")
+	newCtx, span := trace.Tracer().Start(ctx, "Server.SendAppGossipSpecific")
 	defer span.End()
 
 	nodeIDs := ids.NewNodeIDSet(len(req.NodeIds))

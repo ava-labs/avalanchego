@@ -10,7 +10,6 @@ import (
 
 	stdmath "math"
 
-	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -19,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -354,7 +354,7 @@ func (ss *stateSyncer) selectSyncableStateSummary() block.StateSummary {
 }
 
 func (ss *stateSyncer) GetAcceptedStateSummaryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "stateSyncer.GetAcceptedStateSummaryFailed")
+	newCtx, span := trace.Tracer().Start(ctx, "stateSyncer.GetAcceptedStateSummaryFailed")
 	defer span.End()
 
 	// ignores any late responses

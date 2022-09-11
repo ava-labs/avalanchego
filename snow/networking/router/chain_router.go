@@ -13,9 +13,8 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
+	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"go.uber.org/zap"
 
@@ -24,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
@@ -178,7 +178,7 @@ func (cr *ChainRouter) RegisterRequest(
 }
 
 func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMessage) {
-	newCtx, span := otel.Tracer("TODO").Start(ctx, "router.HandleInbound")
+	newCtx, span := trace.Tracer().Start(ctx, "router.HandleInbound")
 	defer span.End()
 
 	nodeID := msg.NodeID()
@@ -209,7 +209,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 			zap.Stringer("chainID", chainID),
 			zap.Error(errUnknownChain),
 		)
-		span.AddEvent("dropping message", trace.WithAttributes(attribute.String("reason", "unknown chain")))
+		span.AddEvent("dropping message", oteltrace.WithAttributes(attribute.String("reason", "unknown chain")))
 		msg.OnFinishedHandling()
 		return
 	}
@@ -225,7 +225,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 			)
 			cr.metrics.droppedRequests.Inc()
 
-			span.AddEvent("dropping message", trace.WithAttributes(attribute.String("reason", "chain executing")))
+			span.AddEvent("dropping message", oteltrace.WithAttributes(attribute.String("reason", "chain executing")))
 			msg.OnFinishedHandling()
 			return
 		}
@@ -239,7 +239,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		uniqueRequestID, req := cr.clearRequest(expectedResponse, nodeID, chainID, requestID)
 		if req == nil {
 			// This was a duplicated response.
-			span.AddEvent("dropping message", trace.WithAttributes(attribute.String("reason", "duplicate response")))
+			span.AddEvent("dropping message", oteltrace.WithAttributes(attribute.String("reason", "duplicate response")))
 			msg.OnFinishedHandling()
 			return
 		}
@@ -259,7 +259,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		)
 		cr.metrics.droppedRequests.Inc()
 
-		span.AddEvent("dropping message", trace.WithAttributes(attribute.String("reason", "chain executing")))
+		span.AddEvent("dropping message", oteltrace.WithAttributes(attribute.String("reason", "chain executing")))
 		msg.OnFinishedHandling()
 		return
 	}
@@ -267,7 +267,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	uniqueRequestID, req := cr.clearRequest(op, nodeID, chainID, requestID)
 	if req == nil {
 		// We didn't request this message.
-		span.AddEvent("dropping message", trace.WithAttributes(attribute.String("reason", "unrequest message")))
+		span.AddEvent("dropping message", oteltrace.WithAttributes(attribute.String("reason", "unrequest message")))
 		msg.OnFinishedHandling()
 		return
 	}
