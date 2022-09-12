@@ -107,7 +107,7 @@ func TestMul64(t *testing.T) {
 	}
 }
 
-func TestDiff64(t *testing.T) {
+func TestDiff(t *testing.T) {
 	require := require.New(t)
 
 	require.Equal(maxUint64, Diff(0, maxUint64))
