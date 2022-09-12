@@ -78,10 +78,7 @@ func newExporter(config ExporterConfig) (sdktrace.SpanExporter, error) {
 	case GRPC:
 		client = otlptracegrpc.NewClient(
 			otlptracegrpc.WithEndpoint(config.Endpoint),
-			// TODO put back otlptracegrpc.WithHeaders(config.Headers),
-			otlptracegrpc.WithHeaders(map[string]string{ // TODO remove
-				"x-honeycomb-team": "Zs3weeSHPjrD4QRiAOEqrP",
-			}),
+			otlptracegrpc.WithHeaders(config.Headers),
 		)
 	case HTTP:
 		client = otlptracehttp.NewClient(
