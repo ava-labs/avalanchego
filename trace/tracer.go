@@ -22,8 +22,9 @@ import (
 )
 
 const (
-	tracerProviderFlushTimeout    = 5 * time.Second
-	tracerProviderShutdownTimeout = 10 * time.Second
+	tracerProviderExportCreationTimeout = 5 * time.Second
+	tracerProviderFlushTimeout          = 5 * time.Second
+	tracerProviderShutdownTimeout       = 10 * time.Second
 )
 
 var (
@@ -88,7 +89,10 @@ func newExporter(config ExporterConfig) (sdktrace.SpanExporter, error) {
 	default:
 		return nil, errUnknownExporterType
 	}
-	return otlptrace.New(context.Background(), client)
+
+	ctx, cancel := context.WithTimeout(context.Background(), tracerProviderExportCreationTimeout)
+	defer cancel()
+	return otlptrace.New(ctx, client)
 
 }
 
