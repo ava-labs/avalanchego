@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"math"
 	"net"
 	"testing"
 	"time"
@@ -120,8 +119,10 @@ func TestProtoMarshalSizeAncestors(t *testing.T) {
 		},
 	}
 
-	mc := newMsgBuilderProtobuf(2 * units.MiB)
-	b, _, err := mc.marshal(&protoMsg, compressible)
+	mb, err := newMsgBuilderProtobuf(2 * units.MiB)
+	require.NoError(err)
+
+	b, _, err := mb.marshal(&protoMsg, compressible)
 	require.NoError(err)
 
 	protoMsgN := len(b)
@@ -134,7 +135,9 @@ func TestNewOutboundMessageWithProto(t *testing.T) {
 	t.Parallel()
 
 	require := require.New(t)
-	mc := newMsgBuilderProtobuf(math.MaxInt64)
+
+	mb, err := newMsgBuilderProtobuf(2 * units.MiB)
+	require.NoError(err)
 
 	id := ids.GenerateTestID()
 	tt := []struct {
@@ -700,14 +703,15 @@ func TestNewOutboundMessageWithProto(t *testing.T) {
 		},
 	}
 
-	decompressor := compression.NewGzipCompressor(2 * units.MiB)
+	decompressor, err := compression.NewGzipCompressor(2 * units.MiB)
+	require.NoError(err)
 
 	for _, tv := range tt {
 		require.True(t.Run(tv.desc, func(tt *testing.T) {
 			// copy before we in-place update via marshal
 			oldProtoMsg := tv.msg.String()
 
-			out, err := mc.createOutbound(tv.op, tv.msg, tv.gzipCompress, tv.bypassThrottling)
+			out, err := mb.createOutbound(tv.op, tv.msg, tv.gzipCompress, tv.bypassThrottling)
 			require.True(errors.Is(err, tv.expectedErr), fmt.Errorf("unexpected error %v (%T)", err, err))
 			require.Equal(out.BypassThrottling(), tv.bypassThrottling)
 

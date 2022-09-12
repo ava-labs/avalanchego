@@ -173,10 +173,9 @@ type msgBuilderProtobuf struct {
 	gzipCompressor compression.Compressor
 }
 
-func newMsgBuilderProtobuf(maxCompressSize int64) *msgBuilderProtobuf {
-	return &msgBuilderProtobuf{
-		gzipCompressor: compression.NewGzipCompressor(maxCompressSize),
-	}
+func newMsgBuilderProtobuf(maxCompressSize int64) (*msgBuilderProtobuf, error) {
+	cpr, err := compression.NewGzipCompressor(maxCompressSize)
+	return &msgBuilderProtobuf{gzipCompressor: cpr}, err
 }
 
 // TODO: semantically verify ids.Id fields, etc.

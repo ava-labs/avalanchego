@@ -65,6 +65,10 @@ type codec struct {
 }
 
 func NewCodecWithMemoryPool(namespace string, metrics prometheus.Registerer, maxMessageSize int64, maxMessageTimeout time.Duration) (Codec, error) {
+	cpr, err := compression.NewGzipCompressor(maxMessageSize)
+	if err != nil {
+		return nil, err
+	}
 	c := &codec{
 		byteSlicePool: sync.Pool{
 			New: func() interface{} {
@@ -73,7 +77,7 @@ func NewCodecWithMemoryPool(namespace string, metrics prometheus.Registerer, max
 		},
 		compressTimeMetrics:   make(map[Op]metric.Averager, len(ExternalOps)),
 		decompressTimeMetrics: make(map[Op]metric.Averager, len(ExternalOps)),
-		compressor:            compression.NewGzipCompressor(maxMessageSize),
+		compressor:            cpr,
 		maxMessageTimeout:     maxMessageTimeout,
 	}
 
