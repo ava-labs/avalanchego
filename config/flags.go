@@ -358,7 +358,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	// Opentelemetry tracing
 	fs.Bool(TracingEnabledKey, false, "If true, enable opentelemetry tracing. If false, uses no-op tracer")
 	fs.String(TracingExporterTypeKey, "grpc", "Type of exporter to use for tracing. Options are [grpc, http]")
-	fs.String(TracingEndpointKey, "http://localhost:4317", "The endpoint to send trace data to")
+	fs.String(TracingEndpointKey, "localhost:4317", "The endpoint to send trace data to")
 	fs.Float64(TracingSampleRateKey, 0.1, "The fraction of traces to sample. If >= 1, always sample. If <= 0, never sample")
 	// TODO add flag to take in headers to send from exporter
 
