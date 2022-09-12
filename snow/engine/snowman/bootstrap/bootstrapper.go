@@ -151,7 +151,7 @@ func (b *bootstrapper) Ancestors(parentCtx context.Context, nodeID ids.NodeID, r
 	ctx, span := trace.Tracer().Start(parentCtx, "bootstrapper.Ancestors",
 		oteltrace.WithAttributes(
 			attribute.Int64("requestID", int64(requestID)),
-			attribute.Int("num blocks", len(blks)),
+			attribute.Int("numBlocks", len(blks)),
 		),
 	)
 	defer span.End()
