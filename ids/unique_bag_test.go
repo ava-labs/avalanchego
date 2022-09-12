@@ -32,7 +32,7 @@ func TestUniqueBag(t *testing.T) {
 		t.Fatalf("Set missing element")
 	}
 
-	var bs1 BitSet
+	var bs1 BitSet64
 	bs1.Add(2)
 	bs1.Add(4)
 
@@ -94,7 +94,7 @@ func TestUniqueBag(t *testing.T) {
 	ub6.Add(2, id1)
 	ub6.Add(7, id1)
 
-	diffBitSet := BitSet(0)
+	diffBitSet := BitSet64(0)
 	diffBitSet.Add(1)
 	diffBitSet.Add(7)
 
