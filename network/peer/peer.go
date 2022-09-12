@@ -495,6 +495,7 @@ func (p *peer) writeMessages() {
 func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 	_, span := trace.Tracer().Start(context.Background(), "peer.writeMessage",
 		oteltrace.WithAttributes(
+			attribute.String("op", msg.Op().String()),
 			attribute.String("recipient", p.id.String()),
 			attribute.Int("msgSize", len(msg.Bytes())),
 		),
@@ -627,11 +628,11 @@ func (p *peer) handle(msg message.InboundMessage) {
 	p.Router.HandleInbound(ctx, msg)
 }
 
-func (p *peer) handlePing(ctx context.Context, _ message.InboundMessage) {
-	pongCtx, span := trace.Tracer().Start(ctx, "peer.handlePing")
+func (p *peer) handlePing(parentCtx context.Context, _ message.InboundMessage) {
+	ctx, span := trace.Tracer().Start(parentCtx, "peer.handlePing")
 	defer span.End()
 
-	msg, err := p.Network.Pong(pongCtx, p.id)
+	msg, err := p.Network.Pong(ctx, p.id)
 	p.Log.AssertNoError(err)
 	p.Send(p.onClosingCtx, msg)
 }

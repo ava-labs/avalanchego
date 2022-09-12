@@ -87,8 +87,8 @@ func New(
 	return s, nil
 }
 
-func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32) {
-	newCtx, span := trace.Tracer().Start(ctx, "sender.SendGetStateSummaryFrontier")
+func (s *sender) SendGetStateSummaryFrontier(parentCtx context.Context, nodeIDs ids.NodeIDSet, requestID uint32) {
+	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendGetStateSummaryFrontier")
 	defer span.End()
 	// TODO add attributes
 
@@ -110,7 +110,7 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs ids.No
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := s.msgCreator.InboundGetStateSummaryFrontier(s.ctx.ChainID, requestID, deadline, s.ctx.NodeID)
-		go s.router.HandleInbound(newCtx, inMsg)
+		go s.router.HandleInbound(ctx, inMsg)
 	}
 
 	// Create the outbound message.
@@ -131,15 +131,15 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs ids.No
 	}
 }
 
-func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) {
-	newCtx, span := trace.Tracer().Start(ctx, "sender.SendStateSummaryFrontier")
+func (s *sender) SendStateSummaryFrontier(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) {
+	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendStateSummaryFrontier")
 	defer span.End()
 	// TODO add attributes
 
 	// Sending this message to myself.
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundStateSummaryFrontier(s.ctx.ChainID, requestID, summary, nodeID)
-		go s.router.HandleInbound(newCtx, inMsg)
+		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
 
@@ -176,8 +176,8 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 	}
 }
 
-func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, heights []uint64) {
-	newCtx, span := trace.Tracer().Start(ctx, "sender.SendGetAcceptedStateSummary")
+func (s *sender) SendGetAcceptedStateSummary(parentCtx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, heights []uint64) {
+	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendGetAcceptedStateSummary")
 	defer span.End()
 	// TODO add attributes
 
@@ -199,7 +199,7 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs ids.No
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := s.msgCreator.InboundGetAcceptedStateSummary(s.ctx.ChainID, requestID, heights, deadline, s.ctx.NodeID)
-		go s.router.HandleInbound(newCtx, inMsg)
+		go s.router.HandleInbound(ctx, inMsg)
 	}
 
 	// Create the outbound message.
@@ -232,14 +232,14 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs ids.No
 	}
 }
 
-func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) {
-	newCtx, span := trace.Tracer().Start(ctx, "sender.SendAcceptedStateSummary")
+func (s *sender) SendAcceptedStateSummary(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) {
+	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendAcceptedStateSummary")
 	defer span.End()
 	// TODO add attributes
 
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundAcceptedStateSummary(s.ctx.ChainID, requestID, summaryIDs, nodeID)
-		go s.router.HandleInbound(newCtx, inMsg)
+		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
 
@@ -270,8 +270,8 @@ func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 	}
 }
 
-func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32) {
-	newCtx, span := trace.Tracer().Start(ctx, "sender.SendGetAcceptedFrontier")
+func (s *sender) SendGetAcceptedFrontier(parentCtx context.Context, nodeIDs ids.NodeIDSet, requestID uint32) {
+	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendGetAcceptedFrontier")
 	defer span.End()
 	// TODO add attributes
 
@@ -293,7 +293,7 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs ids.NodeID
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := s.msgCreator.InboundGetAcceptedFrontier(s.ctx.ChainID, requestID, deadline, s.ctx.NodeID)
-		go s.router.HandleInbound(newCtx, inMsg)
+		go s.router.HandleInbound(ctx, inMsg)
 	}
 
 	// Create the outbound message.
@@ -314,15 +314,15 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs ids.NodeID
 	}
 }
 
-func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
-	newCtx, span := trace.Tracer().Start(ctx, "sender.SendAcceptedFrontier")
+func (s *sender) SendAcceptedFrontier(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
+	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendAcceptedFrontier")
 	defer span.End()
 	// TODO add attributes
 
 	// Sending this message to myself.
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundAcceptedFrontier(s.ctx.ChainID, requestID, containerIDs, nodeID)
-		go s.router.HandleInbound(newCtx, inMsg)
+		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
 
@@ -353,8 +353,8 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 	}
 }
 
-func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, containerIDs []ids.ID) {
-	newCtx, span := trace.Tracer().Start(ctx, "sender.SendGetAccepted")
+func (s *sender) SendGetAccepted(parentCtx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, containerIDs []ids.ID) {
+	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendGetAccepted")
 	defer span.End()
 	// TODO add attributes
 
@@ -376,7 +376,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs ids.NodeIDSet, req
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := s.msgCreator.InboundGetAccepted(s.ctx.ChainID, requestID, deadline, containerIDs, s.ctx.NodeID)
-		go s.router.HandleInbound(newCtx, inMsg)
+		go s.router.HandleInbound(ctx, inMsg)
 	}
 
 	// Create the outbound message.
@@ -409,14 +409,14 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs ids.NodeIDSet, req
 	}
 }
 
-func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
-	newCtx, span := trace.Tracer().Start(ctx, "sender.SendAccepted")
+func (s *sender) SendAccepted(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
+	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendAccepted")
 	defer span.End()
 	// TODO add attributes
 
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundAccepted(s.ctx.ChainID, requestID, containerIDs, nodeID)
-		go s.router.HandleInbound(newCtx, inMsg)
+		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
 
@@ -447,8 +447,8 @@ func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 	}
 }
 
-func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
-	newCtx, span := trace.Tracer().Start(ctx, "sender.SendGetAncestors")
+func (s *sender) SendGetAncestors(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
+	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendGetAncestors")
 	defer span.End()
 	// TODO add attributes
 
@@ -459,7 +459,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 	// Sending a GetAncestors to myself always fails.
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, s.ctx.ChainID, requestID)
-		go s.router.HandleInbound(newCtx, inMsg)
+		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
 
@@ -469,7 +469,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 		s.failedDueToBench[message.GetAncestors].Inc() // update metric
 		s.timeouts.RegisterRequestToUnreachableValidator()
 		inMsg := s.msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, s.ctx.ChainID, requestID)
-		go s.router.HandleInbound(newCtx, inMsg)
+		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
 
@@ -488,7 +488,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 		)
 
 		inMsg := s.msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, s.ctx.ChainID, requestID)
-		go s.router.HandleInbound(newCtx, inMsg)
+		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
 
@@ -506,7 +506,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 
 		s.timeouts.RegisterRequestToUnreachableValidator()
 		inMsg := s.msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, s.ctx.ChainID, requestID)
-		go s.router.HandleInbound(newCtx, inMsg)
+		go s.router.HandleInbound(ctx, inMsg)
 	}
 }
 
@@ -549,8 +549,8 @@ func (s *sender) SendAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 // chain to the specified node. The Get message signifies that this
 // consensus engine would like the recipient to send this consensus engine the
 // specified container.
-func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
-	newCtx, span := trace.Tracer().Start(ctx, "sender.SendGet")
+func (s *sender) SendGet(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
+	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendGet")
 	defer span.End()
 	// TODO add attributes
 
@@ -561,7 +561,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	// Sending a Get to myself always fails.
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InternalFailedRequest(message.GetFailed, nodeID, s.ctx.ChainID, requestID)
-		go s.router.HandleInbound(newCtx, inMsg)
+		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
 
@@ -571,7 +571,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		s.failedDueToBench[message.Get].Inc() // update metric
 		s.timeouts.RegisterRequestToUnreachableValidator()
 		inMsg := s.msgCreator.InternalFailedRequest(message.GetFailed, nodeID, s.ctx.ChainID, requestID)
-		go s.router.HandleInbound(newCtx, inMsg)
+		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
 
@@ -596,7 +596,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 
 		s.timeouts.RegisterRequestToUnreachableValidator()
 		inMsg := s.msgCreator.InternalFailedRequest(message.GetFailed, nodeID, s.ctx.ChainID, requestID)
-		go s.router.HandleInbound(newCtx, inMsg)
+		go s.router.HandleInbound(ctx, inMsg)
 	}
 }
 
@@ -649,8 +649,8 @@ func (s *sender) SendPut(ctx context.Context, nodeID ids.NodeID, requestID uint3
 // on the specified nodes.
 // The PushQuery message signifies that this consensus engine would like each node to send
 // their preferred frontier given the existence of the specified container.
-func (s *sender) SendPushQuery(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, containerID ids.ID, container []byte) {
-	newCtx, span := trace.Tracer().Start(ctx, "sender.SendPushQuery")
+func (s *sender) SendPushQuery(parentCtx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, containerID ids.ID, container []byte) {
+	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendPushQuery")
 	defer span.End()
 	// TODO add attributes
 
@@ -672,7 +672,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs ids.NodeIDSet, reque
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := s.msgCreator.InboundPushQuery(s.ctx.ChainID, requestID, deadline, containerID, container, s.ctx.NodeID)
-		go s.router.HandleInbound(newCtx, inMsg)
+		go s.router.HandleInbound(ctx, inMsg)
 	}
 
 	// Some of [nodeIDs] may be benched. That is, they've been unresponsive
@@ -685,7 +685,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs ids.NodeIDSet, reque
 
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
 			inMsg := s.msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, requestID)
-			go s.router.HandleInbound(newCtx, inMsg)
+			go s.router.HandleInbound(ctx, inMsg)
 		}
 	}
 
@@ -729,7 +729,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs ids.NodeIDSet, reque
 			// Register failures for nodes we didn't send a request to.
 			s.timeouts.RegisterRequestToUnreachableValidator()
 			inMsg := s.msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, requestID)
-			go s.router.HandleInbound(newCtx, inMsg)
+			go s.router.HandleInbound(ctx, inMsg)
 		}
 	}
 }
@@ -738,8 +738,8 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs ids.NodeIDSet, reque
 // on the specified nodes.
 // The PullQuery message signifies that this consensus engine would like each node to send
 // their preferred frontier.
-func (s *sender) SendPullQuery(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, containerID ids.ID) {
-	newCtx, span := trace.Tracer().Start(ctx, "sender.SendPullQuery")
+func (s *sender) SendPullQuery(parentCtx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, containerID ids.ID) {
+	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendPullQuery")
 	defer span.End()
 	// TODO add attributes
 
@@ -761,7 +761,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs ids.NodeIDSet, reque
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := s.msgCreator.InboundPullQuery(s.ctx.ChainID, requestID, deadline, containerID, s.ctx.NodeID)
-		go s.router.HandleInbound(newCtx, inMsg)
+		go s.router.HandleInbound(ctx, inMsg)
 	}
 
 	// Some of the nodes in [nodeIDs] may be benched. That is, they've been unresponsive
@@ -773,7 +773,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs ids.NodeIDSet, reque
 			s.timeouts.RegisterRequestToUnreachableValidator()
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
 			inMsg := s.msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, requestID)
-			go s.router.HandleInbound(newCtx, inMsg)
+			go s.router.HandleInbound(ctx, inMsg)
 		}
 	}
 
@@ -797,14 +797,14 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs ids.NodeIDSet, reque
 			// Register failures for nodes we didn't send a request to.
 			s.timeouts.RegisterRequestToUnreachableValidator()
 			inMsg := s.msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, requestID)
-			go s.router.HandleInbound(newCtx, inMsg)
+			go s.router.HandleInbound(ctx, inMsg)
 		}
 	}
 }
 
 // SendChits sends chits
-func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) {
-	newCtx, span := trace.Tracer().Start(ctx, "sender.SendChits")
+func (s *sender) SendChits(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) {
+	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendChits")
 	defer span.End()
 	// TODO add attributes
 
@@ -812,7 +812,7 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 	// to my own router rather than sending it over the network
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundChits(s.ctx.ChainID, requestID, votes, nodeID)
-		go s.router.HandleInbound(newCtx, inMsg)
+		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
 
@@ -844,8 +844,8 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 }
 
 // SendChitsV2 sends chits V2
-func (s *sender) SendChitsV2(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID, vote ids.ID) {
-	newCtx, span := trace.Tracer().Start(ctx, "sender.SendChitsV2")
+func (s *sender) SendChitsV2(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID, vote ids.ID) {
+	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendChitsV2")
 	defer span.End()
 	// TODO add attributes
 
@@ -853,7 +853,7 @@ func (s *sender) SendChitsV2(ctx context.Context, nodeID ids.NodeID, requestID u
 	// to my own router rather than sending it over the network
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundChitsV2(s.ctx.ChainID, requestID, votes, vote, nodeID)
-		go s.router.HandleInbound(newCtx, inMsg)
+		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
 
@@ -888,8 +888,8 @@ func (s *sender) SendChitsV2(ctx context.Context, nodeID ids.NodeID, requestID u
 
 // SendAppRequest sends an application-level request to the given nodes.
 // The meaning of this request, and how it should be handled, is defined by the VM.
-func (s *sender) SendAppRequest(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, appRequestBytes []byte) error {
-	newCtx, span := trace.Tracer().Start(ctx, "sender.SendAppRequest")
+func (s *sender) SendAppRequest(parentCtx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, appRequestBytes []byte) error {
+	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendAppRequest")
 	defer span.End()
 	// TODO add attributes
 
@@ -911,7 +911,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs ids.NodeIDSet, requ
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 		inMsg := s.msgCreator.InboundAppRequest(s.ctx.ChainID, requestID, deadline, appRequestBytes, s.ctx.NodeID)
-		go s.router.HandleInbound(newCtx, inMsg)
+		go s.router.HandleInbound(ctx, inMsg)
 	}
 
 	// Some of the nodes in [nodeIDs] may be benched. That is, they've been unresponsive
@@ -924,7 +924,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs ids.NodeIDSet, requ
 
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
 			inMsg := s.msgCreator.InternalFailedRequest(message.AppRequestFailed, nodeID, s.ctx.ChainID, requestID)
-			go s.router.HandleInbound(newCtx, inMsg)
+			go s.router.HandleInbound(ctx, inMsg)
 		}
 	}
 
@@ -965,7 +965,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs ids.NodeIDSet, requ
 			// Register failures for nodes we didn't send a request to.
 			s.timeouts.RegisterRequestToUnreachableValidator()
 			inMsg := s.msgCreator.InternalFailedRequest(message.AppRequestFailed, nodeID, s.ctx.ChainID, requestID)
-			go s.router.HandleInbound(newCtx, inMsg)
+			go s.router.HandleInbound(ctx, inMsg)
 		}
 	}
 	return nil
@@ -973,14 +973,14 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs ids.NodeIDSet, requ
 
 // SendAppResponse sends a response to an application-level request from the
 // given node
-func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
-	newCtx, span := trace.Tracer().Start(ctx, "sender.SendAppResponse")
+func (s *sender) SendAppResponse(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
+	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendAppResponse")
 	defer span.End()
 	// TODO add attributes
 
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundAppResponse(s.ctx.ChainID, requestID, appResponseBytes, nodeID)
-		go s.router.HandleInbound(newCtx, inMsg)
+		go s.router.HandleInbound(ctx, inMsg)
 		return nil
 	}
 

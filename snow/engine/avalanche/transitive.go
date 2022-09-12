@@ -95,8 +95,8 @@ func newTransitive(config Config) (*Transitive, error) {
 	return t, t.metrics.Initialize("", config.Ctx.Registerer)
 }
 
-func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
-	newCtx, span := trace.Tracer().Start(ctx, "Transitive.Put")
+func (t *Transitive) Put(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
+	ctx, span := trace.Tracer().Start(parentCtx, "Transitive.Put")
 	defer span.End()
 	// TODO add attributes
 
@@ -117,7 +117,7 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 			zap.Binary("vertex", vtxBytes),
 			zap.Error(err),
 		)
-		return t.GetFailed(newCtx, nodeID, requestID)
+		return t.GetFailed(ctx, nodeID, requestID)
 	}
 
 	if t.Consensus.VertexIssued(vtx) || t.pending.Contains(vtx.ID()) {
@@ -161,13 +161,13 @@ func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 	return t.attemptToIssueTxs()
 }
 
-func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
-	newCtx, span := trace.Tracer().Start(ctx, "Transitive.PullQuery")
+func (t *Transitive) PullQuery(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
+	ctx, span := trace.Tracer().Start(parentCtx, "Transitive.PullQuery")
 	defer span.End()
 	// TODO add attributes
 
 	// Immediately respond to the query with the current consensus preferences.
-	t.Sender.SendChits(newCtx, nodeID, requestID, t.Consensus.Preferences().List())
+	t.Sender.SendChits(ctx, nodeID, requestID, t.Consensus.Preferences().List())
 
 	// If we have [vtxID], attempt to put it into consensus, if we haven't
 	// already. If we don't not have [vtxID], fetch it from [nodeID].
@@ -178,13 +178,13 @@ func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 	return t.attemptToIssueTxs()
 }
 
-func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
-	newCtx, span := trace.Tracer().Start(ctx, "Transitive.PushQuery")
+func (t *Transitive) PushQuery(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
+	ctx, span := trace.Tracer().Start(parentCtx, "Transitive.PushQuery")
 	defer span.End()
 	// TODO add attributes
 
 	// Immediately respond to the query with the current consensus preferences.
-	t.Sender.SendChits(newCtx, nodeID, requestID, t.Consensus.Preferences().List())
+	t.Sender.SendChits(ctx, nodeID, requestID, t.Consensus.Preferences().List())
 
 	vtx, err := t.Manager.ParseVtx(vtxBytes)
 	if err != nil {

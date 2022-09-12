@@ -178,8 +178,8 @@ func (cr *ChainRouter) RegisterRequest(
 	})
 }
 
-func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMessage) {
-	newCtx, span := trace.Tracer().Start(ctx, "router.HandleInbound")
+func (cr *ChainRouter) HandleInbound(parentCtx context.Context, msg message.InboundMessage) {
+	ctx, span := trace.Tracer().Start(parentCtx, "router.HandleInbound")
 	defer span.End()
 
 	nodeID := msg.NodeID()
@@ -230,7 +230,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 			msg.OnFinishedHandling()
 			return
 		}
-		chain.Push(newCtx, msg)
+		chain.Push(ctx, msg)
 		return
 	}
 
@@ -249,7 +249,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		cr.timeoutManager.RemoveRequest(uniqueRequestID)
 
 		// Pass the failure to the chain
-		chain.Push(newCtx, msg)
+		chain.Push(ctx, msg)
 		return
 	}
 
@@ -281,7 +281,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, req.op, latency)
 
 	// Pass the response to the chain
-	chain.Push(newCtx, msg)
+	chain.Push(ctx, msg)
 }
 
 // Shutdown shuts down this router

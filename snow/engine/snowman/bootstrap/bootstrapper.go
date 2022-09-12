@@ -147,8 +147,8 @@ func (b *bootstrapper) Start(startReqID uint32) error {
 
 // Ancestors handles the receipt of multiple containers. Should be received in
 // response to a GetAncestors message to [nodeID] with request ID [requestID]
-func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
-	newCtx, span := trace.Tracer().Start(ctx, "bootstrapper.Ancestors",
+func (b *bootstrapper) Ancestors(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
+	ctx, span := trace.Tracer().Start(parentCtx, "bootstrapper.Ancestors",
 		oteltrace.WithAttributes(
 			attribute.Int64("requestID", int64(requestID)),
 			attribute.Int("num blocks", len(blks)),
@@ -176,7 +176,7 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 		b.markUnavailable(nodeID)
 
 		// Send another request for this
-		return b.fetch(newCtx, wantedBlkID)
+		return b.fetch(ctx, wantedBlkID)
 	}
 
 	// This node has responded - so add it back into the set
@@ -198,7 +198,7 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 			zap.Uint32("requestID", requestID),
 			zap.Error(err),
 		)
-		return b.fetch(newCtx, wantedBlkID)
+		return b.fetch(ctx, wantedBlkID)
 	}
 
 	if len(blocks) == 0 {
@@ -206,7 +206,7 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 		)
-		return b.fetch(newCtx, wantedBlkID)
+		return b.fetch(ctx, wantedBlkID)
 	}
 
 	requestedBlock := blocks[0]
@@ -215,14 +215,14 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 			zap.Stringer("expectedBlkID", wantedBlkID),
 			zap.Stringer("blkID", actualID),
 		)
-		return b.fetch(newCtx, wantedBlkID)
+		return b.fetch(ctx, wantedBlkID)
 	}
 
 	blockSet := make(map[ids.ID]snowman.Block, len(blocks))
 	for _, block := range blocks[1:] {
 		blockSet[block.ID()] = block
 	}
-	return b.process(newCtx, requestedBlock, blockSet)
+	return b.process(ctx, requestedBlock, blockSet)
 }
 
 func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
@@ -408,8 +408,8 @@ func (b *bootstrapper) Clear() error {
 //
 // If [blk]'s height is <= the last accepted height, then it will be removed
 // from the missingIDs set.
-func (b *bootstrapper) process(ctx context.Context, blk snowman.Block, processingBlocks map[ids.ID]snowman.Block) error {
-	newCtx, span := trace.Tracer().Start(ctx, "bootstrapper.process")
+func (b *bootstrapper) process(parentCtx context.Context, blk snowman.Block, processingBlocks map[ids.ID]snowman.Block) error {
+	ctx, span := trace.Tracer().Start(parentCtx, "bootstrapper.process")
 	defer span.End()
 
 	for {
@@ -518,7 +518,7 @@ func (b *bootstrapper) process(ctx context.Context, blk snowman.Block, processin
 		// If the block wasn't able to be acquired immediately, attempt to fetch
 		// it
 		b.Blocked.AddMissingID(parentID)
-		if err := b.fetch(newCtx, parentID); err != nil {
+		if err := b.fetch(ctx, parentID); err != nil {
 			return err
 		}
 

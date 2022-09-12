@@ -27,8 +27,8 @@ func NewServer(appSender common.AppSender) *Server {
 	return &Server{appSender: appSender}
 }
 
-func (s *Server) SendAppRequest(ctx context.Context, req *appsenderpb.SendAppRequestMsg) (*emptypb.Empty, error) {
-	newCtx, span := trace.Tracer().Start(ctx, "Server.SendAppRequest")
+func (s *Server) SendAppRequest(parentCtx context.Context, req *appsenderpb.SendAppRequestMsg) (*emptypb.Empty, error) {
+	ctx, span := trace.Tracer().Start(parentCtx, "Server.SendAppRequest")
 	defer span.End()
 
 	nodeIDs := ids.NewNodeIDSet(len(req.NodeIds))
@@ -39,32 +39,32 @@ func (s *Server) SendAppRequest(ctx context.Context, req *appsenderpb.SendAppReq
 		}
 		nodeIDs.Add(nodeID)
 	}
-	err := s.appSender.SendAppRequest(newCtx, nodeIDs, req.RequestId, req.Request)
+	err := s.appSender.SendAppRequest(ctx, nodeIDs, req.RequestId, req.Request)
 	return &emptypb.Empty{}, err
 }
 
-func (s *Server) SendAppResponse(ctx context.Context, req *appsenderpb.SendAppResponseMsg) (*emptypb.Empty, error) {
-	newCtx, span := trace.Tracer().Start(ctx, "Server.SendAppResponse")
+func (s *Server) SendAppResponse(parentCtx context.Context, req *appsenderpb.SendAppResponseMsg) (*emptypb.Empty, error) {
+	ctx, span := trace.Tracer().Start(parentCtx, "Server.SendAppResponse")
 	defer span.End()
 
 	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}
-	err = s.appSender.SendAppResponse(newCtx, nodeID, req.RequestId, req.Response)
+	err = s.appSender.SendAppResponse(ctx, nodeID, req.RequestId, req.Response)
 	return &emptypb.Empty{}, err
 }
 
-func (s *Server) SendAppGossip(ctx context.Context, req *appsenderpb.SendAppGossipMsg) (*emptypb.Empty, error) {
-	newCtx, span := trace.Tracer().Start(ctx, "Server.SendAppGossip")
+func (s *Server) SendAppGossip(parentCtx context.Context, req *appsenderpb.SendAppGossipMsg) (*emptypb.Empty, error) {
+	ctx, span := trace.Tracer().Start(parentCtx, "Server.SendAppGossip")
 	defer span.End()
 
-	err := s.appSender.SendAppGossip(newCtx, req.Msg)
+	err := s.appSender.SendAppGossip(ctx, req.Msg)
 	return &emptypb.Empty{}, err
 }
 
-func (s *Server) SendAppGossipSpecific(ctx context.Context, req *appsenderpb.SendAppGossipSpecificMsg) (*emptypb.Empty, error) {
-	newCtx, span := trace.Tracer().Start(ctx, "Server.SendAppGossipSpecific")
+func (s *Server) SendAppGossipSpecific(parentCtx context.Context, req *appsenderpb.SendAppGossipSpecificMsg) (*emptypb.Empty, error) {
+	ctx, span := trace.Tracer().Start(parentCtx, "Server.SendAppGossipSpecific")
 	defer span.End()
 
 	nodeIDs := ids.NewNodeIDSet(len(req.NodeIds))
@@ -75,6 +75,6 @@ func (s *Server) SendAppGossipSpecific(ctx context.Context, req *appsenderpb.Sen
 		}
 		nodeIDs.Add(nodeID)
 	}
-	err := s.appSender.SendAppGossipSpecific(newCtx, nodeIDs, req.Msg)
+	err := s.appSender.SendAppGossipSpecific(ctx, nodeIDs, req.Msg)
 	return &emptypb.Empty{}, err
 }

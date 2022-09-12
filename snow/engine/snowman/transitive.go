@@ -113,8 +113,8 @@ func newTransitive(config Config) (*Transitive, error) {
 	return t, t.metrics.Initialize("", config.Ctx.Registerer)
 }
 
-func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
-	newCtx, span := trace.Tracer().Start(ctx, "Transitive.Put",
+func (t *Transitive) Put(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
+	ctx, span := trace.Tracer().Start(parentCtx, "Transitive.Put",
 		oteltrace.WithAttributes(
 			attribute.Int64("requestID", int64(requestID)),
 			attribute.Int("block size", len(blkBytes)),
@@ -139,7 +139,7 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		// because GetFailed doesn't utilize the assumption that we actually
 		// sent a Get message, we can safely call GetFailed here to potentially
 		// abandon the request.
-		return t.GetFailed(newCtx, nodeID, requestID)
+		return t.GetFailed(ctx, nodeID, requestID)
 	}
 
 	if t.wasIssued(blk) {
@@ -175,13 +175,13 @@ func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 	return t.buildBlocks()
 }
 
-func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
-	newCtx, span := trace.Tracer().Start(ctx, "Transitive.PullQuery")
+func (t *Transitive) PullQuery(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
+	ctx, span := trace.Tracer().Start(parentCtx, "Transitive.PullQuery")
 	defer span.End()
 
 	// TODO: once everyone supports ChitsV2 - we should be sending that message
 	// type here.
-	t.Sender.SendChits(newCtx, nodeID, requestID, []ids.ID{t.Consensus.Preference()})
+	t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{t.Consensus.Preference()})
 
 	// Try to issue [blkID] to consensus.
 	// If we're missing an ancestor, request it from [vdr]
@@ -192,13 +192,13 @@ func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 	return t.buildBlocks()
 }
 
-func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
-	newCtx, span := trace.Tracer().Start(ctx, "Transitive.PushQuery")
+func (t *Transitive) PushQuery(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
+	ctx, span := trace.Tracer().Start(parentCtx, "Transitive.PushQuery")
 	defer span.End()
 
 	// TODO: once everyone supports ChitsV2 - we should be sending that message
 	// type here.
-	t.Sender.SendChits(newCtx, nodeID, requestID, []ids.ID{t.Consensus.Preference()})
+	t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{t.Consensus.Preference()})
 
 	blk, err := t.VM.ParseBlock(blkBytes)
 	// If parsing fails, we just drop the request, as we didn't ask for it
@@ -233,8 +233,8 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 	return t.buildBlocks()
 }
 
-func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) error {
-	newCtx, span := trace.Tracer().Start(ctx, "Transitive.Chits")
+func (t *Transitive) Chits(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) error {
+	ctx, span := trace.Tracer().Start(parentCtx, "Transitive.Chits")
 	defer span.End()
 
 	// Since this is a linear chain, there should only be one ID in the vote set
@@ -248,7 +248,7 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		// because QueryFailed doesn't utilize the assumption that we actually
 		// sent a Query message, we can safely call QueryFailed here to
 		// potentially abandon the request.
-		return t.QueryFailed(newCtx, nodeID, requestID)
+		return t.QueryFailed(ctx, nodeID, requestID)
 	}
 	blkID := votes[0]
 
@@ -265,7 +265,7 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		response:  blkID,
 	}
 
-	added, err := t.issueFromByID(newCtx, nodeID, blkID)
+	added, err := t.issueFromByID(ctx, nodeID, blkID)
 	if err != nil {
 		return err
 	}

@@ -72,17 +72,17 @@ func (gh *getter) GetAcceptedStateSummary(_ context.Context, nodeID ids.NodeID, 
 	return nil
 }
 
-func (gh *getter) GetAcceptedFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32) error {
-	newCtx, span := trace.Tracer().Start(ctx, "getter.GetAcceptedFrontier")
+func (gh *getter) GetAcceptedFrontier(parentCtx context.Context, validatorID ids.NodeID, requestID uint32) error {
+	ctx, span := trace.Tracer().Start(parentCtx, "getter.GetAcceptedFrontier")
 	defer span.End()
 
 	acceptedFrontier := gh.storage.Edge()
-	gh.sender.SendAcceptedFrontier(newCtx, validatorID, requestID, acceptedFrontier)
+	gh.sender.SendAcceptedFrontier(ctx, validatorID, requestID, acceptedFrontier)
 	return nil
 }
 
-func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
-	newCtx, span := trace.Tracer().Start(ctx, "getter.GetAccepted")
+func (gh *getter) GetAccepted(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
+	ctx, span := trace.Tracer().Start(parentCtx, "getter.GetAccepted")
 	defer span.End()
 
 	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
@@ -91,12 +91,12 @@ func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 			acceptedVtxIDs = append(acceptedVtxIDs, vtxID)
 		}
 	}
-	gh.sender.SendAccepted(newCtx, nodeID, requestID, acceptedVtxIDs)
+	gh.sender.SendAccepted(ctx, nodeID, requestID, acceptedVtxIDs)
 	return nil
 }
 
-func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
-	newCtx, span := trace.Tracer().Start(ctx, "getter.GetAncestors")
+func (gh *getter) GetAncestors(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
+	ctx, span := trace.Tracer().Start(parentCtx, "getter.GetAncestors")
 	defer span.End()
 
 	startTime := time.Now()
@@ -146,7 +146,7 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 	}
 
 	gh.getAncestorsVtxs.Observe(float64(len(ancestorsBytes)))
-	gh.sender.SendAncestors(newCtx, nodeID, requestID, ancestorsBytes)
+	gh.sender.SendAncestors(ctx, nodeID, requestID, ancestorsBytes)
 	return nil
 }
 

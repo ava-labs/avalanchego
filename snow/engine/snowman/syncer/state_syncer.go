@@ -353,8 +353,8 @@ func (ss *stateSyncer) selectSyncableStateSummary() block.StateSummary {
 	return preferredStateSummary
 }
 
-func (ss *stateSyncer) GetAcceptedStateSummaryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	newCtx, span := trace.Tracer().Start(ctx, "stateSyncer.GetAcceptedStateSummaryFailed")
+func (ss *stateSyncer) GetAcceptedStateSummaryFailed(parentCtx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	ctx, span := trace.Tracer().Start(parentCtx, "stateSyncer.GetAcceptedStateSummaryFailed")
 	defer span.End()
 
 	// ignores any late responses
@@ -372,7 +372,7 @@ func (ss *stateSyncer) GetAcceptedStateSummaryFailed(ctx context.Context, nodeID
 	// accepted
 	ss.failedVoters.Add(nodeID)
 
-	return ss.AcceptedStateSummary(newCtx, nodeID, requestID, nil)
+	return ss.AcceptedStateSummary(ctx, nodeID, requestID, nil)
 }
 
 func (ss *stateSyncer) Start(startReqID uint32) error {

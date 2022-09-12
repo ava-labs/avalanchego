@@ -12,6 +12,9 @@ import (
 
 	"go.uber.org/zap"
 
+	"go.opentelemetry.io/otel/attribute"
+	oteltrace "go.opentelemetry.io/otel/trace"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -38,7 +41,9 @@ const (
 var (
 	_ common.BootstrapableEngine = &bootstrapper{}
 
-	errUnexpectedTimeout = errors.New("unexpected timeout fired")
+	errParseFailedUnrequestedVtx = errors.New("failed to parse unrequested vertex")
+	errParseFailedRequestedVtx   = errors.New("failed to parse requested vertex")
+	errUnexpectedTimeout         = errors.New("unexpected timeout fired")
 )
 
 func New(config Config, onFinished func(lastReqID uint32) error) (common.BootstrapableEngine, error) {
@@ -129,10 +134,12 @@ func (b *bootstrapper) Clear() error {
 // Ancestors handles the receipt of multiple containers. Should be received in
 // response to a GetAncestors message to [nodeID] with request ID [requestID].
 // Expects vtxs[0] to be the vertex requested in the corresponding GetAncestors.
-func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxs [][]byte) error {
-	newCtx, span := trace.Tracer().Start(ctx, "bootstrapper.Ancestors")
+func (b *bootstrapper) Ancestors(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, vtxs [][]byte) error {
+	ctx, span := trace.Tracer().Start(parentCtx, "bootstrapper.Ancestors", oteltrace.WithAttributes(
+		attribute.Int("numVtxs", len(vtxs)),
+		attribute.Int64("requestID", int64(requestID)),
+	))
 	defer span.End()
-	// TODO add attributes
 
 	lenVtxs := len(vtxs)
 	if lenVtxs == 0 {
@@ -140,7 +147,7 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 		)
-		return b.GetAncestorsFailed(newCtx, nodeID, requestID)
+		return b.GetAncestorsFailed(ctx, nodeID, requestID)
 	}
 	if lenVtxs > b.Config.AncestorsMaxContainersReceived {
 		b.Ctx.Log.Debug("ignoring containers in Ancestors",
@@ -163,13 +170,13 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 			)
 			return nil
 		}
-		b.Ctx.Log.Debug("failed to parse requested vertex",
+		b.Ctx.Log.Debug(errParseFailedRequestedVtx.Error(),
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 			zap.Stringer("vtxID", requestedVtxID),
 			zap.Error(err),
 		)
-		b.Ctx.Log.Verbo("failed to parse requested vertex",
+		b.Ctx.Log.Verbo(errParseFailedRequestedVtx.Error(),
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 			zap.Stringer("vtxID", requestedVtxID),

@@ -153,8 +153,8 @@ func (b *bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, 
 	return nil
 }
 
-func (b *bootstrapper) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	newCtx, span := trace.Tracer().Start(ctx, "bootstrapper.GetAcceptedFrontierFailed")
+func (b *bootstrapper) GetAcceptedFrontierFailed(parentCtx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	ctx, span := trace.Tracer().Start(parentCtx, "bootstrapper.GetAcceptedFrontierFailed")
 	defer span.End()
 
 	// ignores any late responses
@@ -170,7 +170,7 @@ func (b *bootstrapper) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids
 	// If we can't get a response from [nodeID], act as though they said their
 	// accepted frontier is empty and we add the validator to the failed list
 	b.failedAcceptedFrontier.Add(nodeID)
-	return b.AcceptedFrontier(newCtx, nodeID, requestID, nil)
+	return b.AcceptedFrontier(ctx, nodeID, requestID, nil)
 }
 
 func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
@@ -262,8 +262,8 @@ func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 	return b.Bootstrapable.ForceAccepted(accepted)
 }
 
-func (b *bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	newCtx, span := trace.Tracer().Start(ctx, "bootstrapper.GetAcceptedFailed")
+func (b *bootstrapper) GetAcceptedFailed(parentCtx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	ctx, span := trace.Tracer().Start(parentCtx, "bootstrapper.GetAcceptedFailed")
 	defer span.End()
 
 	// ignores any late responses
@@ -280,7 +280,7 @@ func (b *bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID,
 	// they think none of the containers we sent them in GetAccepted are
 	// accepted
 	b.failedAccepted.Add(nodeID)
-	return b.Accepted(newCtx, nodeID, requestID, nil)
+	return b.Accepted(ctx, nodeID, requestID, nil)
 }
 
 func (b *bootstrapper) Startup() error {
