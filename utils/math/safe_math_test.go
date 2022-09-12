@@ -6,6 +6,8 @@ package math
 import (
 	"math"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 const maxUint64 uint64 = math.MaxUint64
@@ -106,13 +108,12 @@ func TestMul64(t *testing.T) {
 }
 
 func TestDiff64(t *testing.T) {
-	actual := Diff64(0, maxUint64)
-	if actual != maxUint64 {
-		t.Fatalf("Expected %d, got %d", maxUint64, actual)
-	}
+	require := require.New(t)
 
-	actual = Diff64(maxUint64, 0)
-	if actual != maxUint64 {
-		t.Fatalf("Expected %d, got %d", maxUint64, actual)
-	}
+	require.Equal(maxUint64, Diff(0, maxUint64))
+	require.Equal(maxUint64, Diff(maxUint64, 0))
+	require.Equal(uint64(2), Diff(uint64(3), uint64(1)))
+	require.Equal(uint64(2), Diff(uint64(1), uint64(3)))
+	require.Equal(uint64(0), Diff(uint64(1), uint64(1)))
+	require.Equal(uint64(0), Diff(uint64(0), uint64(0)))
 }

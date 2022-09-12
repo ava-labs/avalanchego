@@ -61,6 +61,6 @@ func Mul64(a, b uint64) (uint64, error) {
 	return a * b, nil
 }
 
-func Diff64(a, b uint64) uint64 {
+func Diff[T constraints.Unsigned](a, b T) T {
 	return Max(a, b) - Min(a, b)
 }
