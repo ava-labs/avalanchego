@@ -65,8 +65,10 @@ func TestDeadlineOverride(t *testing.T) {
 	require.NoError(t, err)
 
 	id := ids.GenerateTestID()
-	m := inboundMessage{
-		op: PushQuery,
+	m := inboundMessageWithPacker{
+		inboundMessage: inboundMessage{
+			op: PushQuery,
+		},
 		fields: map[Field]interface{}{
 			ChainID:        id[:],
 			RequestID:      uint32(1337),
@@ -82,7 +84,7 @@ func TestDeadlineOverride(t *testing.T) {
 	unpackedIntf, err := c.Parse(packedIntf.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 	require.NoError(t, err, "failed to parse w/ compression on operation %s", m.op)
 
-	unpacked := unpackedIntf.(*inboundMessage)
+	unpacked := unpackedIntf.(*inboundMessageWithPacker)
 	require.NotEqual(t, unpacked.ExpirationTime(), time.Now().Add(1337*time.Hour))
 	require.True(t, time.Since(unpacked.ExpirationTime()) <= 10*time.Second)
 }
@@ -98,9 +100,11 @@ func TestCodecPackParseGzip(t *testing.T) {
 	require.NoError(t, err)
 	cert := tlsCert.Leaf
 
-	msgs := []inboundMessage{
+	msgs := []inboundMessageWithPacker{
 		{
-			op: Version,
+			inboundMessage: inboundMessage{
+				op: Version,
+			},
 			fields: map[Field]interface{}{
 				NetworkID:      uint32(0),
 				NodeID:         uint32(1337),
@@ -113,7 +117,9 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op: PeerList,
+			inboundMessage: inboundMessage{
+				op: PeerList,
+			},
 			fields: map[Field]interface{}{
 				Peers: []ips.ClaimedIPPort{
 					{
@@ -126,17 +132,23 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op:     Ping,
+			inboundMessage: inboundMessage{
+				op: Ping,
+			},
 			fields: map[Field]interface{}{},
 		},
 		{
-			op: Pong,
+			inboundMessage: inboundMessage{
+				op: Pong,
+			},
 			fields: map[Field]interface{}{
 				Uptime: uint8(80),
 			},
 		},
 		{
-			op: GetAcceptedFrontier,
+			inboundMessage: inboundMessage{
+				op: GetAcceptedFrontier,
+			},
 			fields: map[Field]interface{}{
 				ChainID:   id[:],
 				RequestID: uint32(1337),
@@ -144,7 +156,9 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op: AcceptedFrontier,
+			inboundMessage: inboundMessage{
+				op: AcceptedFrontier,
+			},
 			fields: map[Field]interface{}{
 				ChainID:      id[:],
 				RequestID:    uint32(1337),
@@ -152,7 +166,9 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op: GetAccepted,
+			inboundMessage: inboundMessage{
+				op: GetAccepted,
+			},
 			fields: map[Field]interface{}{
 				ChainID:      id[:],
 				RequestID:    uint32(1337),
@@ -161,7 +177,9 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op: Accepted,
+			inboundMessage: inboundMessage{
+				op: Accepted,
+			},
 			fields: map[Field]interface{}{
 				ChainID:      id[:],
 				RequestID:    uint32(1337),
@@ -169,7 +187,9 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op: Ancestors,
+			inboundMessage: inboundMessage{
+				op: Ancestors,
+			},
 			fields: map[Field]interface{}{
 				ChainID:             id[:],
 				RequestID:           uint32(1337),
@@ -177,7 +197,9 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op: Get,
+			inboundMessage: inboundMessage{
+				op: Get,
+			},
 			fields: map[Field]interface{}{
 				ChainID:     id[:],
 				RequestID:   uint32(1337),
@@ -186,7 +208,9 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op: Put,
+			inboundMessage: inboundMessage{
+				op: Put,
+			},
 			fields: map[Field]interface{}{
 				ChainID:        id[:],
 				RequestID:      uint32(1337),
@@ -195,7 +219,9 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op: PushQuery,
+			inboundMessage: inboundMessage{
+				op: PushQuery,
+			},
 			fields: map[Field]interface{}{
 				ChainID:        id[:],
 				RequestID:      uint32(1337),
@@ -205,7 +231,9 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op: PullQuery,
+			inboundMessage: inboundMessage{
+				op: PullQuery,
+			},
 			fields: map[Field]interface{}{
 				ChainID:     id[:],
 				RequestID:   uint32(1337),
@@ -214,7 +242,9 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op: Chits,
+			inboundMessage: inboundMessage{
+				op: Chits,
+			},
 			fields: map[Field]interface{}{
 				ChainID:      id[:],
 				RequestID:    uint32(1337),
@@ -222,7 +252,9 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op: ChitsV2,
+			inboundMessage: inboundMessage{
+				op: ChitsV2,
+			},
 			fields: map[Field]interface{}{
 				ChainID:      id[:],
 				RequestID:    uint32(1337),
@@ -238,7 +270,7 @@ func TestCodecPackParseGzip(t *testing.T) {
 		unpackedIntf, err := c.Parse(packedIntf.Bytes(), dummyNodeID, dummyOnFinishedHandling)
 		require.NoError(t, err, "failed to parse w/ compression on operation %s", m.op)
 
-		unpacked := unpackedIntf.(*inboundMessage)
+		unpacked := unpackedIntf.(*inboundMessageWithPacker)
 
 		require.EqualValues(t, len(m.fields), len(unpacked.fields))
 	}

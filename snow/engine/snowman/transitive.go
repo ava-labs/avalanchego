@@ -758,6 +758,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		return t.errs.Err
 	}
 	t.nonVerifieds.Remove(blkID)
+	t.nonVerifiedCache.Evict(blkID)
 	t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
 	t.Ctx.Log.Verbo("adding block to consensus",
 		zap.Stringer("blkID", blkID),
@@ -792,9 +793,11 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 					// block fails verification, hold this in memory for bubbling
 					t.addToNonVerifieds(blk)
 				} else {
+					blkID := blk.ID()
 					// correctly verified will be passed to consensus as processing block
 					// no need to keep it anymore
-					t.nonVerifieds.Remove(blk.ID())
+					t.nonVerifieds.Remove(blkID)
+					t.nonVerifiedCache.Evict(blkID)
 					t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
 					wrappedBlk := &memoryBlock{
 						Block:   blk,

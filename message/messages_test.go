@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"math"
 	"net"
 	"testing"
 	"time"
@@ -32,8 +31,10 @@ func TestProtoMarshalSizeVersion(t *testing.T) {
 	require := require.New(t)
 
 	id := ids.GenerateTestID()
-	inboundMsg := inboundMessage{
-		op: Version,
+	inboundMsg := inboundMessageWithPacker{
+		inboundMessage: inboundMessage{
+			op: Version,
+		},
 		fields: map[Field]interface{}{
 			NetworkID:      uint32(1337),
 			NodeID:         uint32(0),
@@ -79,8 +80,10 @@ func TestProtoMarshalSizeAncestors(t *testing.T) {
 	require := require.New(t)
 
 	id := ids.GenerateTestID()
-	inboundMsg := inboundMessage{
-		op: Ancestors,
+	inboundMsg := inboundMessageWithPacker{
+		inboundMessage: inboundMessage{
+			op: Ancestors,
+		},
 		fields: map[Field]interface{}{
 			ChainID:   id[:],
 			RequestID: uint32(12345),
@@ -116,8 +119,10 @@ func TestProtoMarshalSizeAncestors(t *testing.T) {
 		},
 	}
 
-	mc := newMsgCreatorProtobuf(2 * units.MiB)
-	b, _, err := mc.marshal(&protoMsg, compressible)
+	mb, err := newMsgBuilderProtobuf(2 * units.MiB)
+	require.NoError(err)
+
+	b, _, err := mb.marshal(&protoMsg, compressible)
 	require.NoError(err)
 
 	protoMsgN := len(b)
@@ -130,7 +135,9 @@ func TestNewOutboundMessageWithProto(t *testing.T) {
 	t.Parallel()
 
 	require := require.New(t)
-	mc := newMsgCreatorProtobuf(math.MaxInt64)
+
+	mb, err := newMsgBuilderProtobuf(2 * units.MiB)
+	require.NoError(err)
 
 	id := ids.GenerateTestID()
 	tt := []struct {
@@ -696,14 +703,15 @@ func TestNewOutboundMessageWithProto(t *testing.T) {
 		},
 	}
 
-	decompressor := compression.NewGzipCompressor(2 * units.MiB)
+	decompressor, err := compression.NewGzipCompressor(2 * units.MiB)
+	require.NoError(err)
 
 	for _, tv := range tt {
 		require.True(t.Run(tv.desc, func(tt *testing.T) {
 			// copy before we in-place update via marshal
 			oldProtoMsg := tv.msg.String()
 
-			out, err := mc.createOutbound(tv.op, tv.msg, tv.gzipCompress, tv.bypassThrottling)
+			out, err := mb.createOutbound(tv.op, tv.msg, tv.gzipCompress, tv.bypassThrottling)
 			require.True(errors.Is(err, tv.expectedErr), fmt.Errorf("unexpected error %v (%T)", err, err))
 			require.Equal(out.BypassThrottling(), tv.bypassThrottling)
 
