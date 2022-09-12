@@ -16,4 +16,6 @@ type Visitor interface {
 	RewardValidatorTx(*RewardValidatorTx) error
 	RemoveSubnetValidatorTx(*RemoveSubnetValidatorTx) error
 	TransformSubnetTx(*TransformSubnetTx) error
+	AddPermissionlessValidatorTx(*AddPermissionlessValidatorTx) error
+	AddPermissionlessDelegatorTx(*AddPermissionlessDelegatorTx) error
 }

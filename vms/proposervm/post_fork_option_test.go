@@ -638,7 +638,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 			},
 		},
 	}
-	statelessBlock, err := block.BuildUnsigned(
+	statelessBlock, err := block.BuildUnsignedApricot(
 		coreGenBlk.ID(),
 		coreGenBlk.Timestamp(),
 		0,
@@ -726,7 +726,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 	// Restart the node.
 
 	ctx := proVM.ctx
-	proVM = New(coreVM, time.Time{}, 0)
+	proVM = New(coreVM, time.Time{}, 0, time.Time{})
 
 	coreVM.InitializeF = func(
 		*snow.Context,

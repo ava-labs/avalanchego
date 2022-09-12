@@ -7,6 +7,7 @@ import (
 	"errors"
 	"math"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"golang.org/x/exp/constraints"
 )
 
@@ -30,11 +31,11 @@ func Min[T constraints.Ordered](min T, nums ...T) T {
 	return min
 }
 
-// Add returns:
+// Add64 returns:
 // 1) a + b
 // 2) If there is overflow, an error
-func Add[T constraints.Unsigned](a, b T) (T, error) {
-	if uint64(a) > math.MaxUint64-uint64(b) {
+func Add64(a, b uint64) (uint64, error) {
+	if a > math.MaxUint64-b {
 		return 0, errOverflow
 	}
 	return a + b, nil
@@ -45,7 +46,7 @@ func Add[T constraints.Unsigned](a, b T) (T, error) {
 // 2) If there is underflow, an error
 func Sub[T constraints.Unsigned](a, b T) (T, error) {
 	if a < b {
-		return *new(T), errOverflow //nolint:gocritic
+		return utils.Zero[T](), errOverflow
 	}
 	return a - b, nil
 }

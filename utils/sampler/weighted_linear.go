@@ -46,7 +46,7 @@ func (s *weightedLinear) Initialize(weights []uint64) error {
 	sortWeightedLinear(s.arr)
 
 	for i := 1; i < len(s.arr); i++ {
-		newWeight, err := safemath.Add(
+		newWeight, err := safemath.Add64(
 			s.arr[i-1].cumulativeWeight,
 			s.arr[i].cumulativeWeight,
 		)

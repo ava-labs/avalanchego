@@ -44,6 +44,14 @@ type TxFeeConfig struct {
 	TransformSubnetTxFee uint64 `json:"transformSubnetTxFee"`
 	// Transaction fee for create blockchain transactions
 	CreateBlockchainTxFee uint64 `json:"createBlockchainTxFee"`
+	// Transaction fee for adding a primary network validator
+	AddPrimaryNetworkValidatorFee uint64 `json:"addPrimaryNetworkValidatorFee"`
+	// Transaction fee for adding a primary network delegator
+	AddPrimaryNetworkDelegatorFee uint64 `json:"addPrimaryNetworkDelegatorFee"`
+	// Transaction fee for adding a subnet validator
+	AddSubnetValidatorFee uint64 `json:"addSubnetValidatorFee"`
+	// Transaction fee for adding a subnet delegator
+	AddSubnetDelegatorFee uint64 `json:"addSubnetDelegatorFee"`
 }
 
 type Params struct {

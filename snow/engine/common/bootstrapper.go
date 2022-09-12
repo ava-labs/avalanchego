@@ -195,7 +195,7 @@ func (b *bootstrapper) Accepted(nodeID ids.NodeID, requestID uint32, containerID
 
 	for _, containerID := range containerIDs {
 		previousWeight := b.acceptedVotes[containerID]
-		newWeight, err := math.Add(weight, previousWeight)
+		newWeight, err := math.Add64(weight, previousWeight)
 		if err != nil {
 			b.Ctx.Log.Error("failed calculating the Accepted votes",
 				zap.Uint64("weight", weight),

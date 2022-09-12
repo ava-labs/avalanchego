@@ -201,8 +201,10 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 				)
 			}
 		}
-		j.etaMetric.Set(0)
 	}
+
+	// Now that executing has finished, zero out the ETA.
+	j.etaMetric.Set(0)
 
 	if !restarted {
 		ctx.Log.Info("executed operations",

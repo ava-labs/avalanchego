@@ -6,6 +6,13 @@ import "google/protobuf/empty.proto";
 
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/appsender";
 
+service AppSender {
+  rpc SendAppRequest(SendAppRequestMsg) returns (google.protobuf.Empty);
+  rpc SendAppResponse(SendAppResponseMsg) returns (google.protobuf.Empty);
+  rpc SendAppGossip(SendAppGossipMsg) returns (google.protobuf.Empty);
+  rpc SendAppGossipSpecific(SendAppGossipSpecificMsg) returns (google.protobuf.Empty);
+}
+
 message SendAppRequestMsg {
   // The nodes to send this request to
   repeated bytes node_ids = 1;
@@ -34,11 +41,4 @@ message SendAppGossipSpecificMsg {
   repeated bytes node_ids = 1;
   // The message body
   bytes msg = 2;
-}
-
-service AppSender {
-  rpc SendAppRequest(SendAppRequestMsg) returns (google.protobuf.Empty);
-  rpc SendAppResponse(SendAppResponseMsg) returns (google.protobuf.Empty);
-  rpc SendAppGossip(SendAppGossipMsg) returns (google.protobuf.Empty);
-  rpc SendAppGossipSpecific(SendAppGossipSpecificMsg) returns (google.protobuf.Empty);
 }

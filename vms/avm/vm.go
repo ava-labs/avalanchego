@@ -568,7 +568,7 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	// Check cache to see whether this asset supports this fx
 	fxIDsIntf, assetInCache := vm.assetToFxCache.Get(assetID)
 	if assetInCache {
-		return fxIDsIntf.(ids.BitSet).Contains(uint(fxID))
+		return fxIDsIntf.(ids.BitSet64).Contains(uint(fxID))
 	}
 	// Caches doesn't say whether this asset support this fx.
 	// Get the tx that created the asset and check.
@@ -584,7 +584,7 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 		// This transaction was not an asset creation tx
 		return false
 	}
-	fxIDs := ids.BitSet(0)
+	fxIDs := ids.BitSet64(0)
 	for _, state := range createAssetTx.States {
 		if state.FxIndex == uint32(fxID) {
 			// Cache that this asset supports this fx
@@ -723,7 +723,7 @@ func (vm *VM) Spend(
 			// this input doesn't have an amount, so I don't care about it here
 			continue
 		}
-		newAmountSpent, err := safemath.Add(amountSpent, input.Amount())
+		newAmountSpent, err := safemath.Add64(amountSpent, input.Amount())
 		if err != nil {
 			// there was an error calculating the consumed amount, just error
 			return nil, nil, nil, errSpendOverflow
@@ -856,7 +856,7 @@ func (vm *VM) SpendAll(
 			// this input doesn't have an amount, so I don't care about it here
 			continue
 		}
-		newAmountSpent, err := safemath.Add(amountSpent, input.Amount())
+		newAmountSpent, err := safemath.Add64(amountSpent, input.Amount())
 		if err != nil {
 			// there was an error calculating the consumed amount, just error
 			return nil, nil, nil, errSpendOverflow

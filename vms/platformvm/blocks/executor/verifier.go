@@ -71,9 +71,9 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 	// Apply the changes, if any, from advancing the chain time.
 	nextChainTime := b.Timestamp()
 	changes, err := executor.AdvanceTimeTo(
+		v.txExecutorBackend,
 		onCommitState,
 		nextChainTime,
-		v.txExecutorBackend.Rewards,
 	)
 	if err != nil {
 		return err
@@ -102,9 +102,9 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 	// Apply the changes, if any, from advancing the chain time.
 	nextChainTime := b.Timestamp()
 	changes, err := executor.AdvanceTimeTo(
+		v.txExecutorBackend,
 		onAcceptState,
 		nextChainTime,
-		v.txExecutorBackend.Rewards,
 	)
 	if err != nil {
 		return err

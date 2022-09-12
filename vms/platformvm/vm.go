@@ -499,7 +499,7 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.NodeID]ui
 			if diff.Decrease {
 				// The validator's weight was decreased at this block, so in the
 				// prior block it was higher.
-				op = math.Add[uint64]
+				op = math.Add64
 			} else {
 				// The validator's weight was increased at this block, so in the
 				// prior block it was lower.
@@ -616,7 +616,7 @@ func (vm *VM) getPercentConnected(subnetID ids.ID) (float64, error) {
 		if !vm.uptimeManager.IsConnected(vdr.ID()) {
 			continue // not connected to us --> don't include
 		}
-		connectedStake, err = math.Add(connectedStake, vdr.Weight())
+		connectedStake, err = math.Add64(connectedStake, vdr.Weight())
 		if err != nil {
 			return 0, err
 		}

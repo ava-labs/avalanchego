@@ -242,7 +242,7 @@ func (ss *stateSyncer) AcceptedStateSummary(nodeID ids.NodeID, requestID uint32,
 			continue
 		}
 
-		newWeight, err := math.Add(weight, ws.weight)
+		newWeight, err := math.Add64(weight, ws.weight)
 		if err != nil {
 			ss.Ctx.Log.Error("failed to calculate the Accepted votes",
 				zap.Uint64("weight", weight),

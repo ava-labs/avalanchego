@@ -33,7 +33,7 @@ func TestMin(t *testing.T) {
 }
 
 func TestAdd64(t *testing.T) {
-	sum, err := Add(0, maxUint64)
+	sum, err := Add64(0, maxUint64)
 	if err != nil {
 		t.Fatalf("Add64 failed unexpectedly")
 	}
@@ -41,7 +41,7 @@ func TestAdd64(t *testing.T) {
 		t.Fatalf("Expected %d, got %d", maxUint64, sum)
 	}
 
-	sum, err = Add(maxUint64, 0)
+	sum, err = Add64(maxUint64, 0)
 	if err != nil {
 		t.Fatalf("Add64 failed unexpectedly")
 	}
@@ -49,7 +49,7 @@ func TestAdd64(t *testing.T) {
 		t.Fatalf("Expected %d, got %d", maxUint64, sum)
 	}
 
-	sum, err = Add(uint64(1<<62), uint64(1<<62))
+	sum, err = Add64(uint64(1<<62), uint64(1<<62))
 	if err != nil {
 		t.Fatalf("Add64 failed unexpectedly")
 	}
@@ -57,17 +57,17 @@ func TestAdd64(t *testing.T) {
 		t.Fatalf("Expected %d, got %d", uint64(1<<63), sum)
 	}
 
-	_, err = Add(1, maxUint64)
+	_, err = Add64(1, maxUint64)
 	if err == nil {
 		t.Fatalf("Add64 succeeded unexpectedly")
 	}
 
-	_, err = Add(maxUint64, 1)
+	_, err = Add64(maxUint64, 1)
 	if err == nil {
 		t.Fatalf("Add64 succeeded unexpectedly")
 	}
 
-	_, err = Add(maxUint64, maxUint64)
+	_, err = Add64(maxUint64, maxUint64)
 	if err == nil {
 		t.Fatalf("Add64 succeeded unexpectedly")
 	}

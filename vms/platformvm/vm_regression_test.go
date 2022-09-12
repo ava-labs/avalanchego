@@ -723,7 +723,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	vm.state.SetCurrentSupply(defaultRewardConfig.SupplyCap / 2)
+	vm.state.SetCurrentSupply(constants.PrimaryNetworkID, defaultRewardConfig.SupplyCap/2)
 
 	newValidatorStartTime0 := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime0 := newValidatorStartTime0.Add(defaultMaxStakingDuration)

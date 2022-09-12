@@ -33,7 +33,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	)
 
 	// Case : signed tx is nil
-	require.ErrorIs(stx.SyntacticVerify(ctx), errNilSignedTx)
+	require.ErrorIs(stx.SyntacticVerify(ctx), ErrNilSignedTx)
 
 	// Case : unsigned tx is nil
 	require.ErrorIs(addSubnetValidatorTx.SyntacticVerify(ctx), ErrNilTx)
@@ -208,4 +208,22 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 
 	require.NoError(parsedTx.SyntacticVerify(ctx))
 	require.Equal(stx, parsedTx)
+}
+
+func TestAddSubnetValidatorTxNotValidatorTx(t *testing.T) {
+	txIntf := any((*AddSubnetValidatorTx)(nil))
+	_, ok := txIntf.(ValidatorTx)
+	require.False(t, ok)
+}
+
+func TestAddSubnetValidatorTxNotDelegatorTx(t *testing.T) {
+	txIntf := any((*AddSubnetValidatorTx)(nil))
+	_, ok := txIntf.(DelegatorTx)
+	require.False(t, ok)
+}
+
+func TestAddSubnetValidatorTxNotPermissionlessStaker(t *testing.T) {
+	txIntf := any((*AddSubnetValidatorTx)(nil))
+	_, ok := txIntf.(PermissionlessStaker)
+	require.False(t, ok)
 }

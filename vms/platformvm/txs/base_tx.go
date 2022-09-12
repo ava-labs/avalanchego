@@ -26,7 +26,7 @@ type BaseTx struct {
 	avax.BaseTx `serialize:"true"`
 
 	// true iff this transaction has already passed syntactic verification
-	SyntacticallyVerified bool
+	SyntacticallyVerified bool `json:"-"`
 
 	unsignedBytes []byte // Unsigned byte representation of this data
 }

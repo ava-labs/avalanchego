@@ -267,11 +267,10 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		timer := timer.NewTimer(func() {
 			// If the timeout fires and we're already shutting down, nothing to do.
 			if !n.shuttingDown.GetValue() {
-				n.Log.Debug("failed to connect to bootstrap nodes in time",
+				n.Log.Warn("failed to connect to bootstrap nodes",
 					zap.Stringer("beacons", n.beacons),
+					zap.Duration("duration", n.Config.BootstrapBeaconConnectionTimeout),
 				)
-				n.Log.Fatal("failed to connect to bootstrap nodes. Node shutting down...")
-				go n.Shutdown(1)
 			}
 		})
 
@@ -351,7 +350,7 @@ func (b *beaconManager) Connected(vdrID ids.NodeID, nodeVersion *version.Applica
 			b.Router.Connected(vdrID, nodeVersion, subnetID)
 			return
 		}
-		weight, err := math.Add(weight, b.totalWeight)
+		weight, err := math.Add64(weight, b.totalWeight)
 		if err != nil {
 			b.timer.Cancel()
 			b.Router.Connected(vdrID, nodeVersion, subnetID)
@@ -734,6 +733,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
 		ApricotPhase4Time:                       version.GetApricotPhase4Time(n.Config.NetworkID),
 		ApricotPhase4MinPChainHeight:            version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
+		BlueberryTime:                           version.GetBlueberryTime(n.Config.NetworkID),
 		ResourceTracker:                         n.resourceTracker,
 		StateSyncBeacons:                        n.Config.StateSyncIDs,
 	})
@@ -767,28 +767,32 @@ func (n *Node) initVMs() error {
 	errs.Add(
 		vmRegisterer.Register(constants.PlatformVMID, &platformvm.Factory{
 			Config: config.Config{
-				Chains:                 n.chainManager,
-				Validators:             vdrs,
-				SubnetTracker:          n.Net,
-				UptimeLockedCalculator: n.uptimeCalculator,
-				StakingEnabled:         n.Config.EnableStaking,
-				WhitelistedSubnets:     n.Config.WhitelistedSubnets,
-				TxFee:                  n.Config.TxFee,
-				CreateAssetTxFee:       n.Config.CreateAssetTxFee,
-				CreateSubnetTxFee:      n.Config.CreateSubnetTxFee,
-				TransformSubnetTxFee:   n.Config.TransformSubnetTxFee,
-				CreateBlockchainTxFee:  n.Config.CreateBlockchainTxFee,
-				UptimePercentage:       n.Config.UptimeRequirement,
-				MinValidatorStake:      n.Config.MinValidatorStake,
-				MaxValidatorStake:      n.Config.MaxValidatorStake,
-				MinDelegatorStake:      n.Config.MinDelegatorStake,
-				MinDelegationFee:       n.Config.MinDelegationFee,
-				MinStakeDuration:       n.Config.MinStakeDuration,
-				MaxStakeDuration:       n.Config.MaxStakeDuration,
-				RewardConfig:           n.Config.RewardConfig,
-				ApricotPhase3Time:      version.GetApricotPhase3Time(n.Config.NetworkID),
-				ApricotPhase5Time:      version.GetApricotPhase5Time(n.Config.NetworkID),
-				BlueberryTime:          version.GetBlueberryTime(n.Config.NetworkID),
+				Chains:                        n.chainManager,
+				Validators:                    vdrs,
+				SubnetTracker:                 n.Net,
+				UptimeLockedCalculator:        n.uptimeCalculator,
+				StakingEnabled:                n.Config.EnableStaking,
+				WhitelistedSubnets:            n.Config.WhitelistedSubnets,
+				TxFee:                         n.Config.TxFee,
+				CreateAssetTxFee:              n.Config.CreateAssetTxFee,
+				CreateSubnetTxFee:             n.Config.CreateSubnetTxFee,
+				TransformSubnetTxFee:          n.Config.TransformSubnetTxFee,
+				CreateBlockchainTxFee:         n.Config.CreateBlockchainTxFee,
+				AddPrimaryNetworkValidatorFee: n.Config.AddPrimaryNetworkValidatorFee,
+				AddPrimaryNetworkDelegatorFee: n.Config.AddPrimaryNetworkDelegatorFee,
+				AddSubnetValidatorFee:         n.Config.AddSubnetValidatorFee,
+				AddSubnetDelegatorFee:         n.Config.AddSubnetDelegatorFee,
+				UptimePercentage:              n.Config.UptimeRequirement,
+				MinValidatorStake:             n.Config.MinValidatorStake,
+				MaxValidatorStake:             n.Config.MaxValidatorStake,
+				MinDelegatorStake:             n.Config.MinDelegatorStake,
+				MinDelegationFee:              n.Config.MinDelegationFee,
+				MinStakeDuration:              n.Config.MinStakeDuration,
+				MaxStakeDuration:              n.Config.MaxStakeDuration,
+				RewardConfig:                  n.Config.RewardConfig,
+				ApricotPhase3Time:             version.GetApricotPhase3Time(n.Config.NetworkID),
+				ApricotPhase5Time:             version.GetApricotPhase5Time(n.Config.NetworkID),
+				BlueberryTime:                 version.GetBlueberryTime(n.Config.NetworkID),
 			},
 		}),
 		vmRegisterer.Register(constants.AVMID, &avm.Factory{
@@ -960,15 +964,19 @@ func (n *Node) initInfoAPI() error {
 	primaryValidators, _ := n.vdrs.GetValidators(constants.PrimaryNetworkID)
 	service, err := info.NewService(
 		info.Parameters{
-			Version:               version.CurrentApp,
-			NodeID:                n.ID,
-			NetworkID:             n.Config.NetworkID,
-			TxFee:                 n.Config.TxFee,
-			CreateAssetTxFee:      n.Config.CreateAssetTxFee,
-			CreateSubnetTxFee:     n.Config.CreateSubnetTxFee,
-			TransformSubnetTxFee:  n.Config.TransformSubnetTxFee,
-			CreateBlockchainTxFee: n.Config.CreateBlockchainTxFee,
-			VMManager:             n.Config.VMManager,
+			Version:                       version.CurrentApp,
+			NodeID:                        n.ID,
+			NetworkID:                     n.Config.NetworkID,
+			TxFee:                         n.Config.TxFee,
+			CreateAssetTxFee:              n.Config.CreateAssetTxFee,
+			CreateSubnetTxFee:             n.Config.CreateSubnetTxFee,
+			TransformSubnetTxFee:          n.Config.TransformSubnetTxFee,
+			CreateBlockchainTxFee:         n.Config.CreateBlockchainTxFee,
+			AddPrimaryNetworkValidatorFee: n.Config.AddPrimaryNetworkValidatorFee,
+			AddPrimaryNetworkDelegatorFee: n.Config.AddPrimaryNetworkDelegatorFee,
+			AddSubnetValidatorFee:         n.Config.AddSubnetValidatorFee,
+			AddSubnetDelegatorFee:         n.Config.AddSubnetDelegatorFee,
+			VMManager:                     n.Config.VMManager,
 		},
 		n.Log,
 		n.chainManager,

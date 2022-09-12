@@ -542,10 +542,11 @@ func TestGetStake(t *testing.T) {
 	)
 	require.NoError(err)
 
-	staker := state.NewPrimaryNetworkStaker(tx.ID(), &tx.Unsigned.(*txs.AddDelegatorTx).Validator)
-	staker.PotentialReward = 0
-	staker.NextTime = staker.EndTime
-	staker.Priority = state.PrimaryNetworkDelegatorCurrentPriority
+	staker := state.NewCurrentStaker(
+		tx.ID(),
+		tx.Unsigned.(*txs.AddDelegatorTx),
+		0,
+	)
 
 	service.vm.state.PutCurrentDelegator(staker)
 	service.vm.state.AddTx(tx, status.Committed)
@@ -589,9 +590,10 @@ func TestGetStake(t *testing.T) {
 	)
 	require.NoError(err)
 
-	staker = state.NewPrimaryNetworkStaker(tx.ID(), &tx.Unsigned.(*txs.AddValidatorTx).Validator)
-	staker.NextTime = staker.StartTime
-	staker.Priority = state.PrimaryNetworkValidatorPendingPriority
+	staker = state.NewPendingStaker(
+		tx.ID(),
+		tx.Unsigned.(*txs.AddValidatorTx),
+	)
 
 	service.vm.state.PutPendingValidator(staker)
 	service.vm.state.AddTx(tx, status.Committed)
@@ -644,10 +646,10 @@ func TestGetCurrentValidators(t *testing.T) {
 	for _, vdr := range genesis.Validators {
 		found := false
 		for i := 0; i < len(response.Validators) && !found; i++ {
-			gotVdr, ok := response.Validators[i].(pchainapi.PrimaryValidator)
+			gotVdr, ok := response.Validators[i].(pchainapi.PermissionlessValidator)
 			switch {
 			case !ok:
-				t.Fatal("expected pchainapi.PrimaryValidator")
+				t.Fatal("expected pchainapi.PermissionlessValidator")
 			case gotVdr.NodeID != vdr.NodeID:
 			case gotVdr.EndTime != vdr.EndTime:
 				t.Fatalf("expected end time of %s to be %v but got %v",
@@ -695,10 +697,11 @@ func TestGetCurrentValidators(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	staker := state.NewPrimaryNetworkStaker(tx.ID(), &tx.Unsigned.(*txs.AddDelegatorTx).Validator)
-	staker.PotentialReward = 0
-	staker.NextTime = staker.EndTime
-	staker.Priority = state.PrimaryNetworkDelegatorCurrentPriority
+	staker := state.NewCurrentStaker(
+		tx.ID(),
+		tx.Unsigned.(*txs.AddDelegatorTx),
+		0,
+	)
 
 	service.vm.state.PutCurrentDelegator(staker)
 	service.vm.state.AddTx(tx, status.Committed)
@@ -720,7 +723,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	// Make sure the delegator is there
 	found := false
 	for i := 0; i < len(response.Validators) && !found; i++ {
-		vdr := response.Validators[i].(pchainapi.PrimaryValidator)
+		vdr := response.Validators[i].(pchainapi.PermissionlessValidator)
 		if vdr.NodeID != validatorNodeID {
 			continue
 		}

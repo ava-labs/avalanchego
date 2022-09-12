@@ -30,7 +30,7 @@ func TestParse(t *testing.T) {
 	cert := tlsCert.Leaf
 	key := tlsCert.PrivateKey.(crypto.Signer)
 
-	builtBlock, err := Build(
+	builtBlock, err := BuildApricot(
 		parentID,
 		timestamp,
 		pChainHeight,
@@ -43,8 +43,9 @@ func TestParse(t *testing.T) {
 
 	builtBlockBytes := builtBlock.Bytes()
 
-	parsedBlockIntf, err := Parse(builtBlockBytes)
+	parsedBlockIntf, requireBlueberry, err := Parse(builtBlockBytes)
 	require.NoError(err)
+	require.False(requireBlueberry)
 
 	parsedBlock, ok := parsedBlockIntf.(SignedBlock)
 	require.True(ok)
@@ -59,7 +60,7 @@ func TestParseDuplicateExtension(t *testing.T) {
 	blockBytes, err := hex.DecodeString(blockHex)
 	require.NoError(err)
 
-	_, err = Parse(blockBytes)
+	_, _, err = Parse(blockBytes)
 	require.Error(err) // Do not check for errDuplicateExtension to support g1.19
 }
 
@@ -96,8 +97,9 @@ func TestParseOption(t *testing.T) {
 
 	builtOptionBytes := builtOption.Bytes()
 
-	parsedOption, err := Parse(builtOptionBytes)
+	parsedOption, requireBlueberry, err := Parse(builtOptionBytes)
 	require.NoError(err)
+	require.False(requireBlueberry)
 
 	equalOption(require, builtOption, parsedOption)
 }
@@ -110,13 +112,14 @@ func TestParseUnsigned(t *testing.T) {
 	pChainHeight := uint64(2)
 	innerBlockBytes := []byte{3}
 
-	builtBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes)
+	builtBlock, err := BuildUnsignedApricot(parentID, timestamp, pChainHeight, innerBlockBytes)
 	require.NoError(err)
 
 	builtBlockBytes := builtBlock.Bytes()
 
-	parsedBlockIntf, err := Parse(builtBlockBytes)
+	parsedBlockIntf, requireBlueberry, err := Parse(builtBlockBytes)
 	require.NoError(err)
+	require.False(requireBlueberry)
 
 	parsedBlock, ok := parsedBlockIntf.(SignedBlock)
 	require.True(ok)
@@ -129,6 +132,6 @@ func TestParseGibberish(t *testing.T) {
 
 	bytes := []byte{0, 1, 2, 3, 4, 5}
 
-	_, err := Parse(bytes)
+	_, _, err := Parse(bytes)
 	require.Error(err)
 }

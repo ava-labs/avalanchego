@@ -188,3 +188,35 @@ func (b *builderWithOptions) NewTransformSubnetTx(
 		common.UnionOptions(b.options, options)...,
 	)
 }
+
+func (b *builderWithOptions) NewAddPermissionlessValidatorTx(
+	vdr *validator.SubnetValidator,
+	assetID ids.ID,
+	validationRewardsOwner *secp256k1fx.OutputOwners,
+	delegationRewardsOwner *secp256k1fx.OutputOwners,
+	shares uint32,
+	options ...common.Option,
+) (*txs.AddPermissionlessValidatorTx, error) {
+	return b.Builder.NewAddPermissionlessValidatorTx(
+		vdr,
+		assetID,
+		validationRewardsOwner,
+		delegationRewardsOwner,
+		shares,
+		common.UnionOptions(b.options, options)...,
+	)
+}
+
+func (b *builderWithOptions) NewAddPermissionlessDelegatorTx(
+	vdr *validator.SubnetValidator,
+	assetID ids.ID,
+	rewardsOwner *secp256k1fx.OutputOwners,
+	options ...common.Option,
+) (*txs.AddPermissionlessDelegatorTx, error) {
+	return b.Builder.NewAddPermissionlessDelegatorTx(
+		vdr,
+		assetID,
+		rewardsOwner,
+		common.UnionOptions(b.options, options)...,
+	)
+}

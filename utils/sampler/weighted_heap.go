@@ -51,7 +51,7 @@ func (s *weightedHeap) Initialize(weights []uint64) error {
 		// Explicitly performing a shift here allows the compiler to avoid
 		// checking for negative numbers, which saves a couple cycles
 		parentIndex := (i - 1) >> 1
-		newWeight, err := safemath.Add(
+		newWeight, err := safemath.Add64(
 			s.heap[parentIndex].cumulativeWeight,
 			s.heap[i].cumulativeWeight,
 		)

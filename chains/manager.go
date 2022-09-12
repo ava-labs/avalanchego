@@ -72,10 +72,10 @@ var (
 
 // Manager manages the chains running on this node.
 // It can:
-//   * Create a chain
-//   * Add a registrant. When a chain is created, each registrant calls
+//   - Create a chain
+//   - Add a registrant. When a chain is created, each registrant calls
 //     RegisterChain with the new chain as the argument.
-//   * Manage the aliases of chains
+//   - Manage the aliases of chains
 type Manager interface {
 	ids.Aliaser
 
@@ -187,6 +187,7 @@ type ManagerConfig struct {
 
 	ApricotPhase4Time            time.Time
 	ApricotPhase4MinPChainHeight uint64
+	BlueberryTime                time.Time
 
 	// Tracks CPU/disk usage caused by each peer.
 	ResourceTracker timetracker.ResourceTracker
@@ -795,8 +796,12 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("error while fetching chain config: %w", err)
 	}
 
-	// enable ProposerVM on this VM
-	vm = proposervm.New(vm, m.ApricotPhase4Time, m.ApricotPhase4MinPChainHeight)
+	vm = proposervm.New(
+		vm,
+		m.ApricotPhase4Time,
+		m.ApricotPhase4MinPChainHeight,
+		m.BlueberryTime,
+	)
 
 	if m.MeterVMEnabled {
 		vm = metervm.NewBlockVM(vm)

@@ -559,7 +559,7 @@ func (h *handler) VerifySpendUTXOs(
 		amount := in.Amount()
 
 		if now >= locktime {
-			newUnlockedConsumed, err := math.Add(unlockedConsumed[realAssetID], amount)
+			newUnlockedConsumed, err := math.Add64(unlockedConsumed[realAssetID], amount)
 			if err != nil {
 				return err
 			}
@@ -587,7 +587,7 @@ func (h *handler) VerifySpendUTXOs(
 			owners = make(map[ids.ID]uint64)
 			lockedConsumedAsset[locktime] = owners
 		}
-		newAmount, err := math.Add(owners[ownerID], amount)
+		newAmount, err := math.Add64(owners[ownerID], amount)
 		if err != nil {
 			return err
 		}
@@ -608,7 +608,7 @@ func (h *handler) VerifySpendUTXOs(
 		amount := output.Amount()
 
 		if locktime == 0 {
-			newUnlockedProduced, err := math.Add(unlockedProduced[assetID], amount)
+			newUnlockedProduced, err := math.Add64(unlockedProduced[assetID], amount)
 			if err != nil {
 				return err
 			}
@@ -636,7 +636,7 @@ func (h *handler) VerifySpendUTXOs(
 			owners = make(map[ids.ID]uint64)
 			lockedProducedAsset[locktime] = owners
 		}
-		newAmount, err := math.Add(owners[ownerID], amount)
+		newAmount, err := math.Add64(owners[ownerID], amount)
 		if err != nil {
 			return err
 		}

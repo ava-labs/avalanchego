@@ -229,9 +229,9 @@ func createTestProposalTxs(count int) ([]*txs.Tx, error) {
 			Validator: validator.Validator{
 				Start: uint64(clk.Time().Add(time.Duration(count-i) * time.Second).Unix()),
 			},
-			Stake:        nil,
-			RewardsOwner: &secp256k1fx.OutputOwners{},
-			Shares:       100,
+			StakeOuts:        nil,
+			RewardsOwner:     &secp256k1fx.OutputOwners{},
+			DelegationShares: 100,
 		}
 
 		tx, err := txs.NewSigned(utx, txs.Codec, nil)

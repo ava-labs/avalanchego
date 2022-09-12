@@ -3152,3 +3152,150 @@ func TestSendMixedQuery(t *testing.T) {
 			})
 	}
 }
+
+func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
+	require := require.New(t)
+	vdr, _, sender, vm, te, gBlk := setupDefaultConfig(t)
+
+	sender.Default(true)
+
+	grandParentBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: gBlk.ID(),
+		HeightV: 1,
+		BytesV:  []byte{1},
+	}
+
+	parentBlkA := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: grandParentBlk.ID(),
+		HeightV: 2,
+		VerifyV: errors.New(""), // Reports as invalid
+		BytesV:  []byte{2},
+	}
+
+	// Note that [parentBlkB] has the same [ID()] as [parentBlkA];
+	// it's a different instantiation of the same block.
+	parentBlkB := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     parentBlkA.IDV,
+			StatusV: choices.Processing,
+		},
+		ParentV: parentBlkA.ParentV,
+		HeightV: parentBlkA.HeightV,
+		BytesV:  parentBlkA.BytesV,
+	}
+
+	// Child of [parentBlkA]/[parentBlkB]
+	childBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: parentBlkA.ID(),
+		HeightV: 3,
+		BytesV:  []byte{3},
+	}
+
+	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		require.Equal(grandParentBlk.BytesV, b)
+		return grandParentBlk, nil
+	}
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case gBlk.ID():
+			return gBlk, nil
+		case grandParentBlk.IDV:
+			return grandParentBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	queryRequestGPID := new(uint32)
+	sender.SendPushQueryF = func(_ ids.NodeIDSet, requestID uint32, blkID ids.ID, _ []byte) {
+		require.Equal(grandParentBlk.IDV, blkID)
+		*queryRequestGPID = requestID
+	}
+
+	// Give the engine the grandparent
+	err := te.Put(vdr, 0, grandParentBlk.BytesV)
+	require.NoError(err)
+
+	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		require.Equal(parentBlkA.BytesV, b)
+		return parentBlkA, nil
+	}
+
+	// Give the node [parentBlkA]/[parentBlkB].
+	// When it's parsed we get [parentBlkA] (not [parentBlkB]).
+	// [parentBlkA] fails verification and gets put into [te.nonVerifiedCache].
+	err = te.Put(vdr, 0, parentBlkA.BytesV)
+	require.NoError(err)
+
+	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		require.Equal(parentBlkB.BytesV, b)
+		return parentBlkB, nil
+	}
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case gBlk.ID():
+			return gBlk, nil
+		case grandParentBlk.IDV:
+			return grandParentBlk, nil
+		case parentBlkB.IDV:
+			return parentBlkB, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	queryRequestAID := new(uint32)
+	sender.SendPushQueryF = func(_ ids.NodeIDSet, requestID uint32, blkID ids.ID, _ []byte) {
+		require.Equal(parentBlkA.IDV, blkID)
+		*queryRequestAID = requestID
+	}
+	sender.CantSendPullQuery = false
+
+	// Give the engine [parentBlkA]/[parentBlkB] again.
+	// This time when we parse it we get [parentBlkB] (not [parentBlkA]).
+	// When we fetch it using [GetBlockF] we get [parentBlkB].
+	// Note that [parentBlkB] doesn't fail verification and is issued into consensus.
+	// This evicts [parentBlkA] from [te.nonVerifiedCache].
+	err = te.Put(vdr, 0, parentBlkA.BytesV)
+	require.NoError(err)
+
+	// Give 2 chits for [parentBlkA]/[parentBlkB]
+	err = te.Chits(vdr, *queryRequestAID, []ids.ID{parentBlkB.IDV})
+	require.NoError(err)
+
+	err = te.Chits(vdr, *queryRequestGPID, []ids.ID{parentBlkB.IDV})
+	require.NoError(err)
+
+	// Assert that the blocks' statuses are correct.
+	// The evicted [parentBlkA] shouldn't be changed.
+	require.Equal(choices.Processing, parentBlkA.Status())
+	require.Equal(choices.Accepted, parentBlkB.Status())
+
+	vm.BuildBlockF = func() (snowman.Block, error) {
+		return childBlk, nil
+	}
+
+	sentQuery := new(bool)
+	sender.SendPushQueryF = func(ids.NodeIDSet, uint32, ids.ID, []byte) {
+		*sentQuery = true
+	}
+
+	// Should issue a new block and send a query for it.
+	err = te.Notify(common.PendingTxs)
+	require.NoError(err)
+	require.True(*sentQuery)
+}

@@ -7,26 +7,33 @@ import (
 	"fmt"
 )
 
-func Parse(bytes []byte) (Block, error) {
-	var block Block
-	parsedVersion, err := c.Unmarshal(bytes, &block)
+func Parse(bytes []byte) (Block, bool, error) {
+	var (
+		block            Block
+		requireBlueberry bool
+	)
+	parsedVersion, err := apricotCodec.Unmarshal(bytes, &block)
 	if err != nil {
-		return nil, err
+		parsedVersion, err = blueberryCodec.Unmarshal(bytes, &block)
+		requireBlueberry = true
 	}
-	if parsedVersion != version {
-		return nil, fmt.Errorf("expected codec version %d but got %d", version, parsedVersion)
+	if err != nil {
+		return nil, false, err
 	}
-	return block, block.initialize(bytes)
+	if parsedVersion != codecVersion {
+		return nil, false, fmt.Errorf("expected codec version %d but got %d", codecVersion, parsedVersion)
+	}
+	return block, requireBlueberry, block.initialize(bytes)
 }
 
 func ParseHeader(bytes []byte) (Header, error) {
 	header := statelessHeader{}
-	parsedVersion, err := c.Unmarshal(bytes, &header)
+	parsedVersion, err := blueberryCodec.Unmarshal(bytes, &header)
 	if err != nil {
 		return nil, err
 	}
-	if parsedVersion != version {
-		return nil, fmt.Errorf("expected codec version %d but got %d", version, parsedVersion)
+	if parsedVersion != codecVersion {
+		return nil, fmt.Errorf("expected codec version %d but got %d", codecVersion, parsedVersion)
 	}
 	header.bytes = bytes
 	return &header, nil

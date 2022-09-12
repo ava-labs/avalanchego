@@ -22,11 +22,11 @@ func NewByEndTime() TimedHeap {
 }
 
 func (h *byEndTime) Less(i, j int) bool {
-	iTime := h.txs[i].tx.Unsigned.(txs.StakerTx).EndTime()
-	jTime := h.txs[j].tx.Unsigned.(txs.StakerTx).EndTime()
+	iTime := h.txs[i].tx.Unsigned.(txs.Staker).EndTime()
+	jTime := h.txs[j].tx.Unsigned.(txs.Staker).EndTime()
 	return iTime.Before(jTime)
 }
 
 func (h *byEndTime) Timestamp() time.Time {
-	return h.Peek().Unsigned.(txs.StakerTx).EndTime()
+	return h.Peek().Unsigned.(txs.Staker).EndTime()
 }

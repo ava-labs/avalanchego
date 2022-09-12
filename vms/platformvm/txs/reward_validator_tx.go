@@ -26,7 +26,7 @@ type RewardValidatorTx struct {
 	TxID ids.ID `serialize:"true" json:"txID"`
 
 	// Marks if this validator should be rewarded according to this node.
-	ShouldPreferCommit bool
+	ShouldPreferCommit bool `json:"-"`
 
 	unsignedBytes []byte // Unsigned byte representation of this data
 }

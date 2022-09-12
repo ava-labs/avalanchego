@@ -9,6 +9,8 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -19,6 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 )
+
+const nonVerifiedCacheSize = 128
 
 var _ Engine = &Transitive{}
 
@@ -54,6 +58,12 @@ type Transitive struct {
 	// Block ID --> Parent ID
 	nonVerifieds AncestorTree
 
+	// Block ID --> Block.
+	// A block is put into this cache if it was not able to be issued. A block
+	// fails to be issued if verification on the block or one of its ancestors
+	// occurs.
+	nonVerifiedCache cache.Cacher
+
 	// operations that are blocked on a block being issued. This could be
 	// issuing another block, responding to a query, or applying votes to consensus
 	blocked events.Blocker
@@ -69,6 +79,14 @@ type Transitive struct {
 func newTransitive(config Config) (*Transitive, error) {
 	config.Ctx.Log.Info("initializing consensus engine")
 
+	nonVerifiedCache, err := metercacher.New(
+		"non_verified_cache",
+		config.Ctx.Registerer,
+		&cache.LRU{Size: nonVerifiedCacheSize},
+	)
+	if err != nil {
+		return nil, err
+	}
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t := &Transitive{
 		Config:                      config,
@@ -79,6 +97,7 @@ func newTransitive(config Config) (*Transitive, error) {
 		AncestorsHandler:            common.NewNoOpAncestorsHandler(config.Ctx.Log),
 		pending:                     make(map[ids.ID]snowman.Block),
 		nonVerifieds:                NewAncestorTree(),
+		nonVerifiedCache:            nonVerifiedCache,
 		polls: poll.NewSet(factory,
 			config.Ctx.Log,
 			"",
@@ -406,6 +425,9 @@ func (t *Transitive) GetVM() common.VM {
 func (t *Transitive) GetBlock(blkID ids.ID) (snowman.Block, error) {
 	if blk, ok := t.pending[blkID]; ok {
 		return blk, nil
+	}
+	if blk, ok := t.nonVerifiedCache.Get(blkID); ok {
+		return blk.(snowman.Block), nil
 	}
 	return t.VM.GetBlock(blkID)
 }
@@ -736,6 +758,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		return t.errs.Err
 	}
 	t.nonVerifieds.Remove(blkID)
+	t.nonVerifiedCache.Evict(blkID)
 	t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
 	t.Ctx.Log.Verbo("adding block to consensus",
 		zap.Stringer("blkID", blkID),
@@ -770,9 +793,11 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 					// block fails verification, hold this in memory for bubbling
 					t.addToNonVerifieds(blk)
 				} else {
+					blkID := blk.ID()
 					// correctly verified will be passed to consensus as processing block
 					// no need to keep it anymore
-					t.nonVerifieds.Remove(blk.ID())
+					t.nonVerifieds.Remove(blkID)
+					t.nonVerifiedCache.Evict(blkID)
 					t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
 					wrappedBlk := &memoryBlock{
 						Block:   blk,
@@ -848,6 +873,7 @@ func (t *Transitive) addToNonVerifieds(blk snowman.Block) {
 	// decided parents should not be in this map.
 	if t.nonVerifieds.Has(parentID) || t.Consensus.Processing(parentID) {
 		t.nonVerifieds.Add(blkID, parentID)
+		t.nonVerifiedCache.Put(blkID, blk)
 		t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
 	}
 }

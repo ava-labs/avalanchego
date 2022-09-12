@@ -303,10 +303,7 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 
 	txID := e.Tx.ID()
 
-	newStaker := state.NewPrimaryNetworkStaker(txID, &tx.Validator)
-	newStaker.NextTime = tx.Validator.StartTime()
-	newStaker.Priority = state.PrimaryNetworkValidatorPendingPriority
-
+	newStaker := state.NewPendingStaker(txID, tx)
 	e.State.PutPendingValidator(newStaker)
 	utxo.Consume(e.State, tx.Ins)
 	utxo.Produce(e.State, txID, tx.Outs)
@@ -339,10 +336,7 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 
 	txID := e.Tx.ID()
 
-	newStaker := state.NewSubnetStaker(txID, &tx.Validator)
-	newStaker.NextTime = tx.Validator.StartTime()
-	newStaker.Priority = state.SubnetValidatorPendingPriority
-
+	newStaker := state.NewPendingStaker(txID, tx)
 	e.State.PutPendingValidator(newStaker)
 	utxo.Consume(e.State, tx.Ins)
 	utxo.Produce(e.State, txID, tx.Outs)
@@ -374,10 +368,7 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	}
 
 	txID := e.Tx.ID()
-	newStaker := state.NewPrimaryNetworkStaker(txID, &tx.Validator)
-	newStaker.NextTime = tx.Validator.StartTime()
-	newStaker.Priority = state.PrimaryNetworkDelegatorPendingPriority
-
+	newStaker := state.NewPendingStaker(txID, tx)
 	e.State.PutPendingDelegator(newStaker)
 	utxo.Consume(e.State, tx.Ins)
 	utxo.Produce(e.State, txID, tx.Outs)
@@ -463,6 +454,9 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		tx.Ins,
 		tx.Outs,
 		baseTxCreds,
+		// Invariant: [tx.AssetID != e.Ctx.AVAXAssetID]. This prevents the first
+		//            entry in this map literal from being overwritten by the
+		//            second entry.
 		map[ids.ID]uint64{
 			e.Ctx.AVAXAssetID: e.Config.TransformSubnetTxFee,
 			tx.AssetID:        totalRewardAmount,
@@ -479,6 +473,68 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	utxo.Produce(e.State, txID, tx.Outs)
 	// Transform the new subnet in the database
 	e.State.AddSubnetTransformation(e.Tx)
-	e.State.SetCurrentSubnetSupply(tx.Subnet, tx.InitialSupply)
+	e.State.SetCurrentSupply(tx.Subnet, tx.InitialSupply)
+	return nil
+}
+
+func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+	// TODO: Remove this check once the Blueberry network upgrade is complete.
+	currentTimestamp := e.State.GetTimestamp()
+	if !e.Config.IsBlueberryActivated(currentTimestamp) {
+		return fmt.Errorf(
+			"%w: timestamp (%s) < Blueberry fork time (%s)",
+			errIssuedAddStakerTxBeforeBlueberry,
+			currentTimestamp,
+			e.Config.BlueberryTime,
+		)
+	}
+
+	if err := verifyAddPermissionlessValidatorTx(
+		e.Backend,
+		e.State,
+		e.Tx,
+		tx,
+	); err != nil {
+		return err
+	}
+
+	txID := e.Tx.ID()
+
+	newStaker := state.NewPendingStaker(txID, tx)
+	e.State.PutPendingValidator(newStaker)
+	utxo.Consume(e.State, tx.Ins)
+	utxo.Produce(e.State, txID, tx.Outs)
+
+	return nil
+}
+
+func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+	// TODO: Remove this check once the Blueberry network upgrade is complete.
+	currentTimestamp := e.State.GetTimestamp()
+	if !e.Config.IsBlueberryActivated(currentTimestamp) {
+		return fmt.Errorf(
+			"%w: timestamp (%s) < Blueberry fork time (%s)",
+			errIssuedAddStakerTxBeforeBlueberry,
+			currentTimestamp,
+			e.Config.BlueberryTime,
+		)
+	}
+
+	if err := verifyAddPermissionlessDelegatorTx(
+		e.Backend,
+		e.State,
+		e.Tx,
+		tx,
+	); err != nil {
+		return err
+	}
+
+	txID := e.Tx.ID()
+
+	newStaker := state.NewPendingStaker(txID, tx)
+	e.State.PutPendingDelegator(newStaker)
+	utxo.Consume(e.State, tx.Ins)
+	utxo.Produce(e.State, txID, tx.Outs)
+
 	return nil
 }
