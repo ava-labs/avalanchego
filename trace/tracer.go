@@ -6,22 +6,34 @@ package trace
 import (
 	"context"
 	"errors"
+	"time"
 
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/version"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/sdk/resource"
-	oteltrace "go.opentelemetry.io/otel/sdk/trace"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/version"
+)
+
+const (
+	tracerProviderFlushTimeout    = 5 * time.Second
+	tracerProviderShutdownTimeout = 10 * time.Second
 )
 
 var (
 	errUnknownExporterType = errors.New("unknown exporter type")
 
+	// [tracerProvider] shares the same lifetime as a [node.Node].
+	// [InitTracer] is called when the node executes Dispatch()
+	// and [ShutdownTracer] is called when the node executes Shutdown().
+	// The default value is a no-op tracer provider so it's safe
+	// to use even if [InitTracer] is never called.
 	tracerProvider trace.TracerProvider = trace.NewNoopTracerProvider()
 )
 
@@ -30,26 +42,6 @@ func newResource() *resource.Resource {
 		attribute.String("version", version.Current.String()),
 		semconv.ServiceNameKey.String(constants.AppName),
 	)
-}
-
-func newExporter(config ExporterConfig) (oteltrace.SpanExporter, error) {
-	var client otlptrace.Client
-	switch config.Type {
-	case GRPC:
-		client = otlptracegrpc.NewClient(
-			otlptracegrpc.WithEndpoint(config.Endpoint),
-			otlptracegrpc.WithHeaders(config.Headers),
-		)
-	case HTTP:
-		client = otlptracehttp.NewClient(
-			otlptracehttp.WithEndpoint(config.Endpoint),
-			otlptracehttp.WithHeaders(config.Headers),
-		)
-	default:
-		return nil, errUnknownExporterType
-	}
-	return otlptrace.New(context.Background(), client)
-
 }
 
 type ExporterType byte
@@ -80,16 +72,38 @@ type ExporterConfig struct {
 	Headers map[string]string `json:"headers"`
 }
 
+func newExporter(config ExporterConfig) (sdktrace.SpanExporter, error) {
+	var client otlptrace.Client
+	switch config.Type {
+	case GRPC:
+		client = otlptracegrpc.NewClient(
+			otlptracegrpc.WithEndpoint(config.Endpoint),
+			// TODO put back otlptracegrpc.WithHeaders(config.Headers),
+			otlptracegrpc.WithHeaders(map[string]string{ // TODO remove
+				"x-honeycomb-team": "Zs3weeSHPjrD4QRiAOEqrP",
+			}),
+		)
+	case HTTP:
+		client = otlptracehttp.NewClient(
+			otlptracehttp.WithEndpoint(config.Endpoint),
+			otlptracehttp.WithHeaders(config.Headers),
+		)
+	default:
+		return nil, errUnknownExporterType
+	}
+	return otlptrace.New(context.Background(), client)
+
+}
+
 type TraceConfig struct {
 	ExporterConfig
 
-	// If false, use a no-op tracer.
-	// In this case, all other fields are ignored.
+	// If false, use a no-op tracer. All other fields are ignored.
 	Enabled bool `json:"enabled"`
 
 	// The fraction of traces to sample.
-	// If >= 1, always samples.
-	// If <= 0, never samples.
+	// If >= 1 always samples.
+	// If <= 0 never samples.
 	TraceSampleRate float64 `json:"traceSampleRate"`
 }
 
@@ -97,7 +111,7 @@ type TraceConfig struct {
 // If this is never called, we use a no-op tracer.
 func InitTracer(config TraceConfig) error {
 	if !config.Enabled {
-		// Use a no-op tracer, which is the default values of [tracer]
+		// [tracerProvider] is a no-op tracer provider by default.
 		return nil
 	}
 
@@ -106,15 +120,31 @@ func InitTracer(config TraceConfig) error {
 		return err
 	}
 
-	tracerProviderOpts := []oteltrace.TracerProviderOption{
-		oteltrace.WithBatcher(exporter),
-		oteltrace.WithResource(newResource()),
-		oteltrace.WithSampler(oteltrace.TraceIDRatioBased(config.TraceSampleRate)),
+	tracerProviderOpts := []sdktrace.TracerProviderOption{
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(newResource()),
+		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(config.TraceSampleRate)),
 	}
 
-	// TODO handle shutting down tracerProvider
-	tracerProvider = oteltrace.NewTracerProvider(tracerProviderOpts...)
+	tracerProvider = sdktrace.NewTracerProvider(tracerProviderOpts...)
 	return nil
+}
+
+// This should be called before AvalancheGo exits.
+// If [tracerProvider] is a no-op tracer provider, this is a no-op.
+func ShutdownTracer() error {
+	tp, ok := tracerProvider.(*sdktrace.TracerProvider)
+	if !ok {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), tracerProviderFlushTimeout)
+	_ = tp.ForceFlush(ctx)
+	cancel()
+
+	ctx, cancel = context.WithTimeout(context.Background(), tracerProviderShutdownTimeout)
+	defer cancel()
+	return tp.Shutdown(ctx)
 }
 
 func Tracer() trace.Tracer {

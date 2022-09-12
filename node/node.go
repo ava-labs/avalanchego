@@ -55,6 +55,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
@@ -380,6 +381,11 @@ func (b *beaconManager) Disconnected(vdrID ids.NodeID) {
 // Dispatch starts the node's servers.
 // Returns when the node exits.
 func (n *Node) Dispatch() error {
+	// Set up tracer
+	if err := trace.InitTracer(n.Config.TraceConfig); err != nil {
+		n.Log.Error("failed to initialize tracer", zap.Error(err))
+	}
+
 	// Start the HTTP API server
 	go n.Log.RecoverAndPanic(func() {
 		var err error
@@ -1393,6 +1399,12 @@ func (n *Node) shutdown() {
 				zap.Error(err),
 			)
 		}
+	}
+
+	if err := trace.ShutdownTracer(); err != nil {
+		n.Log.Warn("error during tracer shutdown",
+			zap.Error(err),
+		)
 	}
 
 	n.DoneShuttingDown.Done()
