@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
-var _ OutboundMsgBuilder = &outMsgBuilder{}
+var _ OutboundMsgBuilder = &outMsgBuilderWithPacker{}
 
 // OutboundMsgBuilder builds outbound messages. Outbound messages are returned
 // with a reference count of 1. Once the reference count hits 0, the message
@@ -159,19 +159,19 @@ type OutboundMsgBuilder interface {
 	) (OutboundMessage, error)
 }
 
-type outMsgBuilder struct {
+type outMsgBuilderWithPacker struct {
 	c        Codec
 	compress bool
 }
 
-func NewOutboundBuilder(c Codec, enableCompression bool) OutboundMsgBuilder {
-	return &outMsgBuilder{
+func NewOutboundBuilderWithPacker(c Codec, enableCompression bool) OutboundMsgBuilder {
+	return &outMsgBuilderWithPacker{
 		c:        c,
 		compress: enableCompression,
 	}
 }
 
-func (b *outMsgBuilder) Version(
+func (b *outMsgBuilderWithPacker) Version(
 	networkID uint32,
 	myTime uint64,
 	ip ips.IPPort,
@@ -202,7 +202,7 @@ func (b *outMsgBuilder) Version(
 	)
 }
 
-func (b *outMsgBuilder) PeerList(peers []ips.ClaimedIPPort, bypassThrottling bool) (OutboundMessage, error) {
+func (b *outMsgBuilderWithPacker) PeerList(peers []ips.ClaimedIPPort, bypassThrottling bool) (OutboundMessage, error) {
 	return b.c.Pack(
 		PeerList,
 		map[Field]interface{}{
@@ -213,7 +213,7 @@ func (b *outMsgBuilder) PeerList(peers []ips.ClaimedIPPort, bypassThrottling boo
 	)
 }
 
-func (b *outMsgBuilder) Ping() (OutboundMessage, error) {
+func (b *outMsgBuilderWithPacker) Ping() (OutboundMessage, error) {
 	return b.c.Pack(
 		Ping,
 		nil,
@@ -222,7 +222,7 @@ func (b *outMsgBuilder) Ping() (OutboundMessage, error) {
 	)
 }
 
-func (b *outMsgBuilder) Pong(uptimePercentage uint8) (OutboundMessage, error) {
+func (b *outMsgBuilderWithPacker) Pong(uptimePercentage uint8) (OutboundMessage, error) {
 	return b.c.Pack(
 		Pong,
 		map[Field]interface{}{
@@ -233,7 +233,7 @@ func (b *outMsgBuilder) Pong(uptimePercentage uint8) (OutboundMessage, error) {
 	)
 }
 
-func (b *outMsgBuilder) GetStateSummaryFrontier(
+func (b *outMsgBuilderWithPacker) GetStateSummaryFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
@@ -250,7 +250,7 @@ func (b *outMsgBuilder) GetStateSummaryFrontier(
 	)
 }
 
-func (b *outMsgBuilder) StateSummaryFrontier(
+func (b *outMsgBuilderWithPacker) StateSummaryFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	summary []byte,
@@ -267,7 +267,7 @@ func (b *outMsgBuilder) StateSummaryFrontier(
 	)
 }
 
-func (b *outMsgBuilder) GetAcceptedStateSummary(
+func (b *outMsgBuilderWithPacker) GetAcceptedStateSummary(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
@@ -286,7 +286,7 @@ func (b *outMsgBuilder) GetAcceptedStateSummary(
 	)
 }
 
-func (b *outMsgBuilder) AcceptedStateSummary(
+func (b *outMsgBuilderWithPacker) AcceptedStateSummary(
 	chainID ids.ID,
 	requestID uint32,
 	summaryIDs []ids.ID,
@@ -305,7 +305,7 @@ func (b *outMsgBuilder) AcceptedStateSummary(
 	)
 }
 
-func (b *outMsgBuilder) GetAcceptedFrontier(
+func (b *outMsgBuilderWithPacker) GetAcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
@@ -322,7 +322,7 @@ func (b *outMsgBuilder) GetAcceptedFrontier(
 	)
 }
 
-func (b *outMsgBuilder) AcceptedFrontier(
+func (b *outMsgBuilderWithPacker) AcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
@@ -341,7 +341,7 @@ func (b *outMsgBuilder) AcceptedFrontier(
 	)
 }
 
-func (b *outMsgBuilder) GetAccepted(
+func (b *outMsgBuilderWithPacker) GetAccepted(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
@@ -362,7 +362,7 @@ func (b *outMsgBuilder) GetAccepted(
 	)
 }
 
-func (b *outMsgBuilder) Accepted(
+func (b *outMsgBuilderWithPacker) Accepted(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
@@ -381,7 +381,7 @@ func (b *outMsgBuilder) Accepted(
 	)
 }
 
-func (b *outMsgBuilder) GetAncestors(
+func (b *outMsgBuilderWithPacker) GetAncestors(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
@@ -400,7 +400,7 @@ func (b *outMsgBuilder) GetAncestors(
 	)
 }
 
-func (b *outMsgBuilder) Ancestors(
+func (b *outMsgBuilderWithPacker) Ancestors(
 	chainID ids.ID,
 	requestID uint32,
 	containers [][]byte,
@@ -417,7 +417,7 @@ func (b *outMsgBuilder) Ancestors(
 	)
 }
 
-func (b *outMsgBuilder) Get(
+func (b *outMsgBuilderWithPacker) Get(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
@@ -436,7 +436,7 @@ func (b *outMsgBuilder) Get(
 	)
 }
 
-func (b *outMsgBuilder) Put(
+func (b *outMsgBuilderWithPacker) Put(
 	chainID ids.ID,
 	requestID uint32,
 	containerID ids.ID,
@@ -455,7 +455,7 @@ func (b *outMsgBuilder) Put(
 	)
 }
 
-func (b *outMsgBuilder) PushQuery(
+func (b *outMsgBuilderWithPacker) PushQuery(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
@@ -476,7 +476,7 @@ func (b *outMsgBuilder) PushQuery(
 	)
 }
 
-func (b *outMsgBuilder) PullQuery(
+func (b *outMsgBuilderWithPacker) PullQuery(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
@@ -495,7 +495,7 @@ func (b *outMsgBuilder) PullQuery(
 	)
 }
 
-func (b *outMsgBuilder) Chits(
+func (b *outMsgBuilderWithPacker) Chits(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
@@ -514,7 +514,7 @@ func (b *outMsgBuilder) Chits(
 	)
 }
 
-func (b *outMsgBuilder) ChitsV2(
+func (b *outMsgBuilderWithPacker) ChitsV2(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
@@ -537,7 +537,7 @@ func (b *outMsgBuilder) ChitsV2(
 }
 
 // Application level request
-func (b *outMsgBuilder) AppRequest(
+func (b *outMsgBuilderWithPacker) AppRequest(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
@@ -557,7 +557,7 @@ func (b *outMsgBuilder) AppRequest(
 }
 
 // Application level response
-func (b *outMsgBuilder) AppResponse(chainID ids.ID, requestID uint32, msg []byte) (OutboundMessage, error) {
+func (b *outMsgBuilderWithPacker) AppResponse(chainID ids.ID, requestID uint32, msg []byte) (OutboundMessage, error) {
 	return b.c.Pack(
 		AppResponse,
 		map[Field]interface{}{
@@ -571,7 +571,7 @@ func (b *outMsgBuilder) AppResponse(chainID ids.ID, requestID uint32, msg []byte
 }
 
 // Application level gossiped message
-func (b *outMsgBuilder) AppGossip(chainID ids.ID, msg []byte) (OutboundMessage, error) {
+func (b *outMsgBuilderWithPacker) AppGossip(chainID ids.ID, msg []byte) (OutboundMessage, error) {
 	return b.c.Pack(
 		AppGossip,
 		map[Field]interface{}{

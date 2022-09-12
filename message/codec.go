@@ -247,12 +247,14 @@ func (c *codec) Parse(bytes []byte, nodeID ids.NodeID, onFinishedHandling func()
 		expirationTime = c.clock.Time().Add(deadlineDuration)
 	}
 
-	return &inboundMessage{
-		op:                    op,
-		fields:                fieldValues,
-		bytesSavedCompression: bytesSaved,
-		nodeID:                nodeID,
-		expirationTime:        expirationTime,
-		onFinishedHandling:    onFinishedHandling,
+	return &inboundMessageWithPacker{
+		inboundMessage: inboundMessage{
+			op:                    op,
+			bytesSavedCompression: bytesSaved,
+			nodeID:                nodeID,
+			expirationTime:        expirationTime,
+			onFinishedHandling:    onFinishedHandling,
+		},
+		fields: fieldValues,
 	}, nil
 }

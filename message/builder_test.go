@@ -33,8 +33,8 @@ func init() {
 		panic(err)
 	}
 	TestCodec = codec
-	UncompressingBuilder = NewOutboundBuilder(codec, false /*compress*/)
-	TestInboundMsgBuilder = NewInboundBuilder(codec)
+	UncompressingBuilder = NewOutboundBuilderWithPacker(codec, false /*compress*/)
+	TestInboundMsgBuilder = NewInboundBuilderWithPacker(codec)
 }
 
 func TestBuildVersion(t *testing.T) {
@@ -190,7 +190,7 @@ func TestBuildPut(t *testing.T) {
 	container := []byte{2}
 
 	for _, compress := range []bool{false, true} {
-		builder := NewOutboundBuilder(TestCodec, compress)
+		builder := NewOutboundBuilderWithPacker(TestCodec, compress)
 		msg, err := builder.Put(chainID, requestID, containerID, container)
 		require.NoError(t, err)
 		require.NotNil(t, msg)
@@ -215,7 +215,7 @@ func TestBuildPushQuery(t *testing.T) {
 	container := []byte{2}
 
 	for _, compress := range []bool{false, true} {
-		builder := NewOutboundBuilder(TestCodec, compress)
+		builder := NewOutboundBuilderWithPacker(TestCodec, compress)
 		msg, err := builder.PushQuery(chainID, requestID, time.Duration(deadline), containerID, container)
 		require.NoError(t, err)
 		require.NotNil(t, msg)
@@ -311,7 +311,7 @@ func TestBuildAncestors(t *testing.T) {
 	containers := [][]byte{container[:], container2[:]}
 
 	for _, compress := range []bool{false, true} {
-		builder := NewOutboundBuilder(TestCodec, compress)
+		builder := NewOutboundBuilderWithPacker(TestCodec, compress)
 		msg, err := builder.Ancestors(chainID, requestID, containers)
 		require.NoError(t, err)
 		require.NotNil(t, msg)
@@ -335,7 +335,7 @@ func TestBuildAppRequestMsg(t *testing.T) {
 	deadline := uint64(time.Now().Unix())
 
 	for _, compress := range []bool{false, true} {
-		builder := NewOutboundBuilder(TestCodec, compress)
+		builder := NewOutboundBuilderWithPacker(TestCodec, compress)
 		msg, err := builder.AppRequest(chainID, 1, time.Duration(deadline), appRequestBytes)
 		require.NoError(t, err)
 		require.NotNil(t, msg)
@@ -355,7 +355,7 @@ func TestBuildAppResponseMsg(t *testing.T) {
 	appResponseBytes[len(appResponseBytes)-1] = 1
 
 	for _, compress := range []bool{false, true} {
-		builder := NewOutboundBuilder(TestCodec, compress)
+		builder := NewOutboundBuilderWithPacker(TestCodec, compress)
 		msg, err := builder.AppResponse(chainID, 1, appResponseBytes)
 		require.NoError(t, err)
 		require.NotNil(t, msg)
@@ -378,7 +378,7 @@ func TestBuildAppGossipMsg(t *testing.T) {
 	appGossipBytes[len(appGossipBytes)-1] = 1
 
 	for _, compress := range []bool{false, true} {
-		testBuilder := NewOutboundBuilder(TestCodec, compress)
+		testBuilder := NewOutboundBuilderWithPacker(TestCodec, compress)
 		msg, err := testBuilder.AppGossip(chainID, appGossipBytes)
 		require.NoError(t, err)
 		require.NotNil(t, msg)

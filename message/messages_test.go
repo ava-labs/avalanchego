@@ -32,8 +32,10 @@ func TestProtoMarshalSizeVersion(t *testing.T) {
 	require := require.New(t)
 
 	id := ids.GenerateTestID()
-	inboundMsg := inboundMessage{
-		op: Version,
+	inboundMsg := inboundMessageWithPacker{
+		inboundMessage: inboundMessage{
+			op: Version,
+		},
 		fields: map[Field]interface{}{
 			NetworkID:      uint32(1337),
 			NodeID:         uint32(0),
@@ -79,8 +81,10 @@ func TestProtoMarshalSizeAncestors(t *testing.T) {
 	require := require.New(t)
 
 	id := ids.GenerateTestID()
-	inboundMsg := inboundMessage{
-		op: Ancestors,
+	inboundMsg := inboundMessageWithPacker{
+		inboundMessage: inboundMessage{
+			op: Ancestors,
+		},
 		fields: map[Field]interface{}{
 			ChainID:   id[:],
 			RequestID: uint32(12345),
@@ -116,7 +120,7 @@ func TestProtoMarshalSizeAncestors(t *testing.T) {
 		},
 	}
 
-	mc := newMsgCreatorProtobuf(2 * units.MiB)
+	mc := newMsgBuilderProtobuf(2 * units.MiB)
 	b, _, err := mc.marshal(&protoMsg, compressible)
 	require.NoError(err)
 
@@ -130,7 +134,7 @@ func TestNewOutboundMessageWithProto(t *testing.T) {
 	t.Parallel()
 
 	require := require.New(t)
-	mc := newMsgCreatorProtobuf(math.MaxInt64)
+	mc := newMsgBuilderProtobuf(math.MaxInt64)
 
 	id := ids.GenerateTestID()
 	tt := []struct {

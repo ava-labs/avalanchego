@@ -40,8 +40,10 @@ func BenchmarkMarshalVersion(b *testing.B) {
 	b.StopTimer()
 
 	id := ids.GenerateTestID()
-	inboundMsg := inboundMessage{
-		op: Version,
+	inboundMsg := inboundMessageWithPacker{
+		inboundMessage: inboundMessage{
+			op: Version,
+		},
 		fields: map[Field]interface{}{
 			NetworkID:      uint32(1337),
 			NodeID:         uint32(0),
@@ -119,8 +121,10 @@ func BenchmarkUnmarshalVersion(b *testing.B) {
 	b.StopTimer()
 
 	id := ids.GenerateTestID()
-	inboundMsg := inboundMessage{
-		op: Version,
+	inboundMsg := inboundMessageWithPacker{
+		inboundMessage: inboundMessage{
+			op: Version,
+		},
 		fields: map[Field]interface{}{
 			NetworkID:      uint32(1337),
 			NodeID:         uint32(0),

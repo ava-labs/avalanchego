@@ -33,8 +33,8 @@ func NewCreator(metrics prometheus.Registerer, compressionEnabled bool, parentNa
 		return nil, err
 	}
 	return &creator{
-		OutboundMsgBuilder: NewOutboundBuilder(codec, compressionEnabled),
-		InboundMsgBuilder:  NewInboundBuilder(codec),
+		OutboundMsgBuilder: NewOutboundBuilderWithPacker(codec, compressionEnabled),
+		InboundMsgBuilder:  NewInboundBuilderWithPacker(codec),
 		InternalMsgBuilder: NewInternalBuilder(),
 	}, nil
 }
