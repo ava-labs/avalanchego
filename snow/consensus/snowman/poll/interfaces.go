@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package poll
@@ -14,9 +14,9 @@ import (
 type Set interface {
 	fmt.Stringer
 
-	Add(requestID uint32, vdrs ids.ShortBag) bool
-	Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) []ids.Bag
-	Drop(requestID uint32, vdr ids.ShortID) []ids.Bag
+	Add(requestID uint32, vdrs ids.NodeIDBag) bool
+	Vote(requestID uint32, vdr ids.NodeID, vote ids.ID) []ids.Bag
+	Drop(requestID uint32, vdr ids.NodeID) []ids.Bag
 	Len() int
 }
 
@@ -24,13 +24,13 @@ type Set interface {
 type Poll interface {
 	formatting.PrefixedStringer
 
-	Vote(vdr ids.ShortID, vote ids.ID)
-	Drop(vdr ids.ShortID)
+	Vote(vdr ids.NodeID, vote ids.ID)
+	Drop(vdr ids.NodeID)
 	Finished() bool
 	Result() ids.Bag
 }
 
 // Factory creates a new Poll
 type Factory interface {
-	New(vdrs ids.ShortBag) Poll
+	New(vdrs ids.NodeIDBag) Poll
 }

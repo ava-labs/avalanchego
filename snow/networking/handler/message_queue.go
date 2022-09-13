@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package handler
@@ -7,6 +7,8 @@ import (
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -50,12 +52,12 @@ type messageQueue struct {
 	// Validator set for the chain associated with this
 	vdrs validators.Set
 	// Tracks CPU utilization of each node
-	cpuTracker tracker.TimeTracker
+	cpuTracker tracker.Tracker
 
 	cond   *sync.Cond
 	closed bool
 	// Node ID --> Messages this node has in [msgs]
-	nodeToUnprocessedMsgs map[ids.ShortID]int
+	nodeToUnprocessedMsgs map[ids.NodeID]int
 	// Unprocessed messages
 	msgs []message.InboundMessage
 }
@@ -63,18 +65,19 @@ type messageQueue struct {
 func NewMessageQueue(
 	log logging.Logger,
 	vdrs validators.Set,
-	cpuTracker tracker.TimeTracker,
+	cpuTracker tracker.Tracker,
 	metricsNamespace string,
 	metricsRegisterer prometheus.Registerer,
+	ops []message.Op,
 ) (MessageQueue, error) {
 	m := &messageQueue{
 		log:                   log,
 		vdrs:                  vdrs,
 		cpuTracker:            cpuTracker,
 		cond:                  sync.NewCond(&sync.Mutex{}),
-		nodeToUnprocessedMsgs: make(map[ids.ShortID]int),
+		nodeToUnprocessedMsgs: make(map[ids.NodeID]int),
 	}
-	return m, m.metrics.initialize(metricsNamespace, metricsRegisterer)
+	return m, m.metrics.initialize(metricsNamespace, metricsRegisterer, ops)
 }
 
 func (m *messageQueue) Push(msg message.InboundMessage) {
@@ -93,6 +96,7 @@ func (m *messageQueue) Push(msg message.InboundMessage) {
 	// Update metrics
 	m.metrics.nodesWithMessages.Set(float64(len(m.nodeToUnprocessedMsgs)))
 	m.metrics.len.Inc()
+	m.metrics.ops[msg.Op()].Inc()
 
 	// Signal a waiting thread
 	m.cond.Signal()
@@ -118,9 +122,12 @@ func (m *messageQueue) Pop() (message.InboundMessage, bool) {
 	i := 0
 	for {
 		if i == n {
-			m.log.Debug("canPop is false for all %d unprocessed messages", n)
+			m.log.Debug("canPop is false for all unprocessed messages",
+				zap.Int("numMessages", n),
+			)
 		}
 		msg := m.msgs[0]
+		m.msgs[0] = nil
 		nodeID := msg.NodeID()
 		// See if it's OK to process [msg] next
 		if m.canPop(msg) || i == n { // i should never == n but handle anyway as a fail-safe
@@ -135,6 +142,7 @@ func (m *messageQueue) Pop() (message.InboundMessage, bool) {
 			}
 			m.metrics.nodesWithMessages.Set(float64(len(m.nodeToUnprocessedMsgs)))
 			m.metrics.len.Dec()
+			m.metrics.ops[msg.Op()].Dec()
 			return msg, true
 		}
 		// [msg.nodeID] is causing excessive CPU usage.
@@ -200,8 +208,8 @@ func (m *messageQueue) canPop(msg message.InboundMessage) bool {
 	if totalVdrsWeight != 0 {
 		portionWeight = float64(weight) / float64(totalVdrsWeight)
 	}
-	// Validators are allowed to use more CPm. More weight --> more CPU use allowed.
-	recentCPUUtilized := m.cpuTracker.Utilization(nodeID, m.clock.Time())
+	// Validators are allowed to use more CPU. More weight --> more CPU use allowed.
+	recentCPUUsage := m.cpuTracker.Usage(nodeID, m.clock.Time())
 	maxCPU := baseMaxCPU + (1.0-baseMaxCPU)*portionWeight
-	return recentCPUUtilized <= maxCPU
+	return recentCPUUsage <= maxCPU
 }

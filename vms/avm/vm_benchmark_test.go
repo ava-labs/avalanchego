@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -94,7 +94,7 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 			},
 		}
 
-		if err := vm.state.PutUTXO(utxo.InputID(), utxo); err != nil {
+		if err := vm.state.PutUTXO(utxo); err != nil {
 			b.Fatal(err)
 		}
 	}

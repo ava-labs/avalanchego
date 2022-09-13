@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpcchainvm
@@ -6,44 +6,43 @@ package rpcchainvm
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"path/filepath"
-
-	"google.golang.org/grpc"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/subprocess"
 	"github.com/ava-labs/avalanchego/vms"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )
 
 var (
 	errWrongVM = errors.New("wrong vm type")
 
-	serverOptions = []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(math.MaxInt),
-		grpc.MaxSendMsgSize(math.MaxInt),
-	}
-	dialOptions = []grpc.DialOption{
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(math.MaxInt)),
-		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(math.MaxInt)),
-	}
+	_ vms.Factory = &factory{}
 )
 
-type Factory struct {
-	Path string
+type factory struct {
+	path           string
+	processTracker resource.ProcessTracker
 }
 
-func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
+func NewFactory(path string, processTracker resource.ProcessTracker) vms.Factory {
+	return &factory{
+		path:           path,
+		processTracker: processTracker,
+	}
+}
+
+func (f *factory) New(ctx *snow.Context) (interface{}, error) {
 	config := &plugin.ClientConfig{
 		HandshakeConfig: Handshake,
 		Plugins:         PluginMap,
-		Cmd:             subprocess.New(f.Path),
+		Cmd:             subprocess.New(f.path),
 		AllowedProtocols: []plugin.Protocol{
 			plugin.ProtocolGRPC,
 		},
@@ -58,7 +57,7 @@ func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
 		// We set managed to true so that we can call plugin.CleanupClients on
 		// node shutdown to ensure every plugin subprocess is killed.
 		Managed:         true,
-		GRPCDialOptions: dialOptions,
+		GRPCDialOptions: grpcutils.DefaultDialOptions,
 	}
 	if ctx != nil {
 		log.SetOutput(ctx.Log)
@@ -68,90 +67,37 @@ func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
 			Level:  hclog.Info,
 		})
 	} else {
-		log.SetOutput(ioutil.Discard)
-		config.Stderr = ioutil.Discard
+		log.SetOutput(io.Discard)
+		config.Stderr = io.Discard
 		config.Logger = hclog.New(&hclog.LoggerOptions{
-			Output: ioutil.Discard,
+			Output: io.Discard,
 		})
 	}
 	client := plugin.NewClient(config)
 
+	pluginName := filepath.Base(f.path)
+	pluginErr := func(err error) error {
+		return fmt.Errorf("plugin: %q: %w", pluginName, err)
+	}
+
 	rpcClient, err := client.Client()
 	if err != nil {
 		client.Kill()
-		return nil, err
+		return nil, pluginErr(err)
 	}
 
 	raw, err := rpcClient.Dispense("vm")
 	if err != nil {
 		client.Kill()
-		return nil, err
+		return nil, pluginErr(err)
 	}
 
 	vm, ok := raw.(*VMClient)
 	if !ok {
 		client.Kill()
-		return nil, errWrongVM
+		return nil, pluginErr(errWrongVM)
 	}
 
-	vm.SetProcess(client)
-	vm.ctx = ctx
+	vm.SetProcess(ctx, client, f.processTracker)
 	return vm, nil
-}
-
-// RegisterPlugins iterates over a given plugin dir and registers rpcchain VMs
-// for each of the discovered plugins.
-func RegisterPlugins(pluginDir string, manager vms.Manager) error {
-	files, err := ioutil.ReadDir(pluginDir)
-	if err != nil {
-		return err
-	}
-
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		}
-
-		nameWithExtension := file.Name()
-		// Strip any extension from the file. This is to support windows .exe
-		// files.
-		name := nameWithExtension[:len(nameWithExtension)-len(filepath.Ext(nameWithExtension))]
-
-		// Skip hidden files.
-		if len(name) == 0 {
-			continue
-		}
-
-		vmID, err := manager.Lookup(name)
-		if err != nil {
-			// there is no alias with plugin name, try to use full vmID.
-			vmID, err = ids.FromString(name)
-			if err != nil {
-				return fmt.Errorf("invalid vmID %s", name)
-			}
-		}
-
-		_, err = manager.GetFactory(vmID)
-		if err == nil {
-			// If we already have the VM registered, we shouldn't attempt to
-			// register it again.
-			continue
-		}
-
-		// If the error isn't "not found", then we should report the error.
-		if !errors.Is(err, vms.ErrNotFound) {
-			return err
-		}
-
-		err = manager.RegisterFactory(
-			vmID,
-			&Factory{
-				Path: filepath.Join(pluginDir, file.Name()),
-			},
-		)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }

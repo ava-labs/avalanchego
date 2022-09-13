@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -8,10 +8,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/spf13/pflag"
+
 	"github.com/ava-labs/avalanchego/app/runner"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/spf13/pflag"
 )
 
 func main() {

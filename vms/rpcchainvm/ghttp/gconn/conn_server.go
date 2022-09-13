@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gconn
@@ -8,15 +8,18 @@ import (
 	"net"
 	"time"
 
-	"github.com/ava-labs/avalanchego/api/proto/gconnproto"
+	"google.golang.org/protobuf/types/known/emptypb"
+
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
+
+	connpb "github.com/ava-labs/avalanchego/proto/pb/net/conn"
 )
 
-var _ gconnproto.ConnServer = &Server{}
+var _ connpb.ConnServer = &Server{}
 
 // Server is an http.Conn that is managed over RPC.
 type Server struct {
-	gconnproto.UnimplementedConnServer
+	connpb.UnsafeConnServer
 	conn   net.Conn
 	closer *grpcutils.ServerCloser
 }
@@ -29,10 +32,10 @@ func NewServer(conn net.Conn, closer *grpcutils.ServerCloser) *Server {
 	}
 }
 
-func (s *Server) Read(ctx context.Context, req *gconnproto.ReadRequest) (*gconnproto.ReadResponse, error) {
+func (s *Server) Read(ctx context.Context, req *connpb.ReadRequest) (*connpb.ReadResponse, error) {
 	buf := make([]byte, int(req.Length))
 	n, err := s.conn.Read(buf)
-	resp := &gconnproto.ReadResponse{
+	resp := &connpb.ReadResponse{
 		Read: buf[:n],
 	}
 	if err != nil {
@@ -42,45 +45,45 @@ func (s *Server) Read(ctx context.Context, req *gconnproto.ReadRequest) (*gconnp
 	return resp, nil
 }
 
-func (s *Server) Write(ctx context.Context, req *gconnproto.WriteRequest) (*gconnproto.WriteResponse, error) {
+func (s *Server) Write(ctx context.Context, req *connpb.WriteRequest) (*connpb.WriteResponse, error) {
 	n, err := s.conn.Write(req.Payload)
 	if err != nil {
 		return nil, err
 	}
-	return &gconnproto.WriteResponse{
+	return &connpb.WriteResponse{
 		Length: int32(n),
 	}, nil
 }
 
-func (s *Server) Close(ctx context.Context, req *gconnproto.CloseRequest) (*gconnproto.CloseResponse, error) {
+func (s *Server) Close(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
 	err := s.conn.Close()
 	s.closer.Stop()
-	return &gconnproto.CloseResponse{}, err
+	return &emptypb.Empty{}, err
 }
 
-func (s *Server) SetDeadline(ctx context.Context, req *gconnproto.SetDeadlineRequest) (*gconnproto.SetDeadlineResponse, error) {
+func (s *Server) SetDeadline(ctx context.Context, req *connpb.SetDeadlineRequest) (*emptypb.Empty, error) {
 	deadline := time.Time{}
 	err := deadline.UnmarshalBinary(req.Time)
 	if err != nil {
 		return nil, err
 	}
-	return &gconnproto.SetDeadlineResponse{}, s.conn.SetDeadline(deadline)
+	return &emptypb.Empty{}, s.conn.SetDeadline(deadline)
 }
 
-func (s *Server) SetReadDeadline(ctx context.Context, req *gconnproto.SetReadDeadlineRequest) (*gconnproto.SetReadDeadlineResponse, error) {
+func (s *Server) SetReadDeadline(ctx context.Context, req *connpb.SetDeadlineRequest) (*emptypb.Empty, error) {
 	deadline := time.Time{}
 	err := deadline.UnmarshalBinary(req.Time)
 	if err != nil {
 		return nil, err
 	}
-	return &gconnproto.SetReadDeadlineResponse{}, s.conn.SetReadDeadline(deadline)
+	return &emptypb.Empty{}, s.conn.SetReadDeadline(deadline)
 }
 
-func (s *Server) SetWriteDeadline(ctx context.Context, req *gconnproto.SetWriteDeadlineRequest) (*gconnproto.SetWriteDeadlineResponse, error) {
+func (s *Server) SetWriteDeadline(ctx context.Context, req *connpb.SetDeadlineRequest) (*emptypb.Empty, error) {
 	deadline := time.Time{}
 	err := deadline.UnmarshalBinary(req.Time)
 	if err != nil {
 		return nil, err
 	}
-	return &gconnproto.SetWriteDeadlineResponse{}, s.conn.SetWriteDeadline(deadline)
+	return &emptypb.Empty{}, s.conn.SetWriteDeadline(deadline)
 }

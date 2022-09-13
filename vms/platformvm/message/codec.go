@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -6,7 +6,6 @@ package message
 import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -22,7 +21,7 @@ var c codec.Manager
 
 func init() {
 	c = codec.NewManager(maxMessageSize)
-	lc := linearcodec.New(reflectcodec.DefaultTagName, maxSliceLen)
+	lc := linearcodec.NewCustomMaxLength(maxSliceLen)
 
 	errs := wrappers.Errs{}
 	errs.Add(

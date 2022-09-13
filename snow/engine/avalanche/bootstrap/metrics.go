@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bootstrap
@@ -14,7 +14,6 @@ type metrics struct {
 	numFetchedTxs, numDroppedTxs, numAcceptedTxs prometheus.Counter
 }
 
-// Initialize implements the Engine interface
 func (m *metrics) Initialize(
 	namespace string,
 	registerer prometheus.Registerer,

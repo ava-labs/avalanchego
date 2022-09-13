@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package throttling
@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
@@ -35,7 +35,7 @@ type InboundConnUpgradeThrottler interface {
 	// Must only be called after [Dispatch] has been called.
 	// If [ip] is a local IP, this method always returns true.
 	// Must not be called after [Stop] has been called.
-	ShouldUpgrade(ip utils.IPDesc) bool
+	ShouldUpgrade(ip ips.IPPort) bool
 }
 
 type InboundConnUpgradeThrottlerConfig struct {
@@ -69,16 +69,15 @@ func NewInboundConnUpgradeThrottler(log logging.Logger, config InboundConnUpgrad
 // noInboundConnUpgradeThrottler upgrades all inbound connections
 type noInboundConnUpgradeThrottler struct{}
 
-func (*noInboundConnUpgradeThrottler) Dispatch()                       {}
-func (*noInboundConnUpgradeThrottler) Stop()                           {}
-func (*noInboundConnUpgradeThrottler) ShouldUpgrade(utils.IPDesc) bool { return true }
+func (*noInboundConnUpgradeThrottler) Dispatch()                     {}
+func (*noInboundConnUpgradeThrottler) Stop()                         {}
+func (*noInboundConnUpgradeThrottler) ShouldUpgrade(ips.IPPort) bool { return true }
 
 type ipAndTime struct {
 	ip                string
 	cooldownElapsedAt time.Time
 }
 
-// inboundConnUpgradeThrottler implements InboundConnUpgradeThrottler
 type inboundConnUpgradeThrottler struct {
 	InboundConnUpgradeThrottlerConfig
 	log  logging.Logger
@@ -98,9 +97,9 @@ type inboundConnUpgradeThrottler struct {
 }
 
 // Returns whether we should upgrade an inbound connection from [ipStr].
-func (n *inboundConnUpgradeThrottler) ShouldUpgrade(ip utils.IPDesc) bool {
-	if ip.IsPrivate() {
-		// Don't rate-limit private (local) IPs
+func (n *inboundConnUpgradeThrottler) ShouldUpgrade(ip ips.IPPort) bool {
+	if ip.IP.IsLoopback() {
+		// Don't rate-limit loopback IPs
 		return true
 	}
 	// Only use IP (not port). This mitigates DoS
@@ -128,17 +127,29 @@ func (n *inboundConnUpgradeThrottler) ShouldUpgrade(ip utils.IPDesc) bool {
 }
 
 func (n *inboundConnUpgradeThrottler) Dispatch() {
+	timer := time.NewTimer(0)
+	if !timer.Stop() {
+		<-timer.C
+	}
+
+	defer timer.Stop()
 	for {
 		select {
-		case <-n.done:
-			return
 		case next := <-n.recentIPsAndTimes:
 			// Sleep until it's time to remove the next IP
-			time.Sleep(next.cooldownElapsedAt.Sub(n.clock.Time()))
-			// Remove the next IP (we'd upgrade another inbound connection from it)
-			n.lock.Lock()
-			delete(n.recentIPs, next.ip)
-			n.lock.Unlock()
+			timer.Reset(next.cooldownElapsedAt.Sub(n.clock.Time()))
+
+			select {
+			case <-timer.C:
+				// Remove the next IP (we'd upgrade another inbound connection from it)
+				n.lock.Lock()
+				delete(n.recentIPs, next.ip)
+				n.lock.Unlock()
+			case <-n.done:
+				return
+			}
+		case <-n.done:
+			return
 		}
 	}
 }

@@ -1,20 +1,18 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package wrappers
 
 import (
 	"bytes"
-	"crypto/x509"
 	"net"
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/staking"
-
-	"github.com/ava-labs/avalanchego/utils"
-
-	"github.com/stretchr/testify/assert"
+	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 const (
@@ -209,7 +207,8 @@ func TestPackerUnpackInt(t *testing.T) {
 }
 
 func TestPackerPackLong(t *testing.T) {
-	p := Packer{MaxSize: 8}
+	maxSize := 8
+	p := Packer{MaxSize: maxSize}
 
 	p.PackLong(0x0102030405060708)
 
@@ -217,8 +216,8 @@ func TestPackerPackLong(t *testing.T) {
 		t.Fatal(p.Err)
 	}
 
-	if size := len(p.Bytes); size != 8 {
-		t.Fatalf("Packer.PackLong wrote %d byte(s) but expected %d byte(s)", size, 8)
+	if size := len(p.Bytes); size != maxSize {
+		t.Fatalf("Packer.PackLong wrote %d byte(s) but expected %d byte(s)", size, maxSize)
 	}
 
 	expected := []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}
@@ -316,7 +315,7 @@ func TestPackerPackBytes(t *testing.T) {
 	}
 
 	if size := len(p.Bytes); size != 8 {
-		t.Fatalf("Packer.PackBytes wrote %d byte(s) but expected %d byte(s)", size, 7)
+		t.Fatalf("Packer.PackBytes wrote %d byte(s) but expected %d byte(s)", size, 8)
 	}
 
 	expected := []byte("\x00\x00\x00\x04Avax")
@@ -592,64 +591,61 @@ func TestPacker2DByteSlice(t *testing.T) {
 
 func TestPackX509Certificate(t *testing.T) {
 	cert, err := staking.NewTLSCert()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	p := Packer{MaxSize: 10000}
-	TryPackX509Certificate(&p, cert.Leaf)
-	assert.NoError(t, p.Err)
+	p.PackX509Certificate(cert.Leaf)
+	require.NoError(t, p.Err)
 
 	p.Offset = 0
-	unpackedCert := TryUnpackX509Certificate(&p)
+	unpackedCert := p.UnpackX509Certificate()
 
-	x509unpackedCert := unpackedCert.(*x509.Certificate)
-
-	assert.Equal(t, cert.Leaf.Raw, x509unpackedCert.Raw)
+	require.Equal(t, cert.Leaf.Raw, unpackedCert.Raw)
 }
 
-func TestPackIPCert(t *testing.T) {
+func TestPackClaimedIPPort(t *testing.T) {
 	cert, err := staking.NewTLSCert()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	ipCert := utils.IPCertDesc{
-		IPDesc:    utils.IPDesc{IP: net.IPv4(1, 2, 3, 4), Port: 5},
+	ip := ips.ClaimedIPPort{
+		IPPort:    ips.IPPort{IP: net.IPv4(1, 2, 3, 4), Port: 5},
 		Cert:      cert.Leaf,
 		Signature: []byte("signature"),
 	}
 
 	p := Packer{MaxSize: 10000}
-	TryPackIPCert(&p, ipCert)
-	assert.NoError(t, p.Err)
+	p.PackClaimedIPPort(ip)
+	require.NoError(t, p.Err)
 
 	p.Offset = 0
-	unpackedIPCert := TryUnpackIPCert(&p)
-	resolvedUnpackedIPCert := unpackedIPCert.(utils.IPCertDesc)
+	unpackedIPCert := p.UnpackClaimedIPPort()
 
-	assert.Equal(t, ipCert.IPDesc, resolvedUnpackedIPCert.IPDesc)
-	assert.Equal(t, ipCert.Cert.Raw, resolvedUnpackedIPCert.Cert.Raw)
-	assert.Equal(t, ipCert.Signature, resolvedUnpackedIPCert.Signature)
+	require.Equal(t, ip.IPPort, unpackedIPCert.IPPort)
+	require.Equal(t, ip.Cert.Raw, unpackedIPCert.Cert.Raw)
+	require.Equal(t, ip.Signature, unpackedIPCert.Signature)
 }
 
-func TestPackIPCertList(t *testing.T) {
+func TestPackClaimedIPPortList(t *testing.T) {
 	cert, err := staking.NewTLSCert()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	ipCert := utils.IPCertDesc{
-		IPDesc:    utils.IPDesc{IP: net.IPv4(1, 2, 3, 4), Port: 5},
+	ip := ips.ClaimedIPPort{
+		IPPort:    ips.IPPort{IP: net.IPv4(1, 2, 3, 4), Port: 5},
 		Cert:      cert.Leaf,
 		Signature: []byte("signature"),
-		Time:      2,
+		Timestamp: 2,
 	}
 
 	p := Packer{MaxSize: 10000}
-	TryPackIPCertList(&p, []utils.IPCertDesc{ipCert})
-	assert.NoError(t, p.Err)
+	TryPackClaimedIPPortList(&p, []ips.ClaimedIPPort{ip})
+	require.NoError(t, p.Err)
 
 	p.Offset = 0
-	unpackedIPCertList := TryUnpackIPCertList(&p)
-	resolvedUnpackedIPCertList := unpackedIPCertList.([]utils.IPCertDesc)
-	assert.NotEmpty(t, resolvedUnpackedIPCertList)
-	assert.Equal(t, ipCert.IPDesc, resolvedUnpackedIPCertList[0].IPDesc)
-	assert.Equal(t, ipCert.Cert.Raw, resolvedUnpackedIPCertList[0].Cert.Raw)
-	assert.Equal(t, ipCert.Signature, resolvedUnpackedIPCertList[0].Signature)
-	assert.Equal(t, ipCert.Time, resolvedUnpackedIPCertList[0].Time)
+	unpackedIPCertList := TryUnpackClaimedIPPortList(&p)
+	resolvedUnpackedIPCertList := unpackedIPCertList.([]ips.ClaimedIPPort)
+	require.NotEmpty(t, resolvedUnpackedIPCertList)
+	require.Equal(t, ip.IPPort, resolvedUnpackedIPCertList[0].IPPort)
+	require.Equal(t, ip.Cert.Raw, resolvedUnpackedIPCertList[0].Cert.Raw)
+	require.Equal(t, ip.Signature, resolvedUnpackedIPCertList[0].Signature)
+	require.Equal(t, ip.Timestamp, resolvedUnpackedIPCertList[0].Timestamp)
 }

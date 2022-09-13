@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
@@ -16,6 +16,8 @@ type Network struct {
 	nodes, running []Consensus
 }
 
+// Initialize sets the parameters for the network and adds [numColors] different
+// possible colors to the network configuration.
 func (n *Network) Initialize(params Parameters, numColors int) {
 	n.params = params
 	for i := 0; i < numColors; i++ {
@@ -38,9 +40,12 @@ func (n *Network) AddNode(sb Consensus) {
 	}
 }
 
-func (n *Network) AddNodeSpecificColor(sb Consensus, indices []int) {
-	sb.Initialize(n.params, n.colors[indices[0]])
-	for _, i := range indices[1:] {
+// AddNodeSpecificColor adds [sb] to the network which will initially prefer
+// [initialPreference] and additionally adds each of the specified [options] to
+// consensus.
+func (n *Network) AddNodeSpecificColor(sb Consensus, initialPreference int, options []int) {
+	sb.Initialize(n.params, n.colors[initialPreference])
+	for _, i := range options {
 		sb.Add(n.colors[i])
 	}
 
@@ -50,10 +55,14 @@ func (n *Network) AddNodeSpecificColor(sb Consensus, indices []int) {
 	}
 }
 
+// Finalized returns true iff every node added to the network has finished
+// running.
 func (n *Network) Finalized() bool {
 	return len(n.running) == 0
 }
 
+// Round simulates a round of consensus by randomly selecting a running node and
+// performing an unbiased poll of the nodes in the network for that node.
 func (n *Network) Round() {
 	if len(n.running) > 0 {
 		runningInd := rand.Intn(len(n.running)) // #nosec G404
@@ -83,21 +92,30 @@ func (n *Network) Round() {
 	}
 }
 
+// Disagreement returns true iff there are any two nodes in the network that
+// have finalized two different preferences.
 func (n *Network) Disagreement() bool {
+	// Iterate [i] to the index of the first node that has finalized.
 	i := 0
 	for ; i < len(n.nodes) && !n.nodes[i].Finalized(); i++ {
 	}
-	if i < len(n.nodes) {
-		pref := n.nodes[i].Preference()
-		for ; i < len(n.nodes); i++ {
-			if node := n.nodes[i]; node.Finalized() && pref != node.Preference() {
-				return true
-			}
+	// If none of the nodes have finalized, then there is no disagreement.
+	if i >= len(n.nodes) {
+		return false
+	}
+
+	// Return true if any other finalized node has finalized a different
+	// preference.
+	pref := n.nodes[i].Preference()
+	for ; i < len(n.nodes); i++ {
+		if node := n.nodes[i]; node.Finalized() && pref != node.Preference() {
+			return true
 		}
 	}
 	return false
 }
 
+// Agreement returns true iff every node in the network prefers the same value.
 func (n *Network) Agreement() bool {
 	if len(n.nodes) == 0 {
 		return true

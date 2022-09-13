@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -48,8 +49,9 @@ func TestSetsAndGets(t *testing.T) {
 		Asset: avax.Asset{ID: ids.Empty},
 		Out:   &avax.TestVerifiable{},
 	}
+	utxoID := utxo.InputID()
 
-	tx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+	tx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    networkID,
 		BlockchainID: chainID,
 		Ins: []*avax.TransferableInput{{
@@ -68,11 +70,11 @@ func TestSetsAndGets(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}}); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := state.PutUTXO(ids.Empty, utxo); err != nil {
+	if err := state.PutUTXO(utxo); err != nil {
 		t.Fatal(err)
 	}
 	if err := state.PutTx(ids.Empty, tx); err != nil {
@@ -82,7 +84,7 @@ func TestSetsAndGets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resultUTXO, err := state.GetUTXO(ids.Empty)
+	resultUTXO, err := state.GetUTXO(utxoID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +141,7 @@ func TestFundingNoAddresses(t *testing.T) {
 		Out:   &avax.TestVerifiable{},
 	}
 
-	if err := state.PutUTXO(utxo.InputID(), utxo); err != nil {
+	if err := state.PutUTXO(utxo); err != nil {
 		t.Fatal(err)
 	}
 	if err := state.DeleteUTXO(utxo.InputID()); err != nil {
@@ -182,7 +184,7 @@ func TestFundingAddresses(t *testing.T) {
 		},
 	}
 
-	if err := state.PutUTXO(utxo.InputID(), utxo); err != nil {
+	if err := state.PutUTXO(utxo); err != nil {
 		t.Fatal(err)
 	}
 	utxos, err := state.UTXOIDs([]byte{0}, ids.Empty, math.MaxInt32)

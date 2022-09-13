@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
@@ -6,7 +6,7 @@ package avax
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -15,37 +15,37 @@ import (
 )
 
 func TestStatusState(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	id0 := ids.GenerateTestID()
 
 	db := memdb.New()
 	s := NewStatusState(db)
 
 	_, err := s.GetStatus(id0)
-	assert.Equal(database.ErrNotFound, err)
+	require.Equal(database.ErrNotFound, err)
 
 	_, err = s.GetStatus(id0)
-	assert.Equal(database.ErrNotFound, err)
+	require.Equal(database.ErrNotFound, err)
 
 	err = s.PutStatus(id0, choices.Accepted)
-	assert.NoError(err)
+	require.NoError(err)
 
 	status, err := s.GetStatus(id0)
-	assert.NoError(err)
-	assert.Equal(choices.Accepted, status)
+	require.NoError(err)
+	require.Equal(choices.Accepted, status)
 
 	err = s.DeleteStatus(id0)
-	assert.NoError(err)
+	require.NoError(err)
 
 	_, err = s.GetStatus(id0)
-	assert.Equal(database.ErrNotFound, err)
+	require.Equal(database.ErrNotFound, err)
 
 	err = s.PutStatus(id0, choices.Accepted)
-	assert.NoError(err)
+	require.NoError(err)
 
 	s = NewStatusState(db)
 
 	status, err = s.GetStatus(id0)
-	assert.NoError(err)
-	assert.Equal(choices.Accepted, status)
+	require.NoError(err)
+	require.Equal(choices.Accepted, status)
 }

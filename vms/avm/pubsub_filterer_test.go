@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -7,12 +7,13 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/pubsub"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/pubsub"
+	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 type mockFilter struct {
@@ -24,10 +25,10 @@ func (f *mockFilter) Check(addr []byte) bool {
 }
 
 func TestFilter(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	addrID := ids.ShortID{1}
-	tx := Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+	tx := txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
 		Outs: []*avax.TransferableOutput{
 			{
 				Out: &secp256k1fx.TransferOutput{
@@ -42,9 +43,9 @@ func TestFilter(t *testing.T) {
 
 	fp := pubsub.NewFilterParam()
 	err := fp.Add(addrBytes)
-	assert.NoError(err)
+	require.NoError(err)
 
 	parser := NewPubSubFilterer(&tx)
 	fr, _ := parser.Filter([]pubsub.Filter{&mockFilter{addr: addrBytes}})
-	assert.Equal([]bool{true}, fr)
+	require.Equal([]bool{true}, fr)
 }

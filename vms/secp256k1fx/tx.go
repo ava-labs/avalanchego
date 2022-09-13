@@ -1,17 +1,17 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
 
-// Tx that this Fx is supporting
-type Tx interface {
-	UnsignedBytes() []byte
+// UnsignedTx that this Fx is supporting
+type UnsignedTx interface {
+	Bytes() []byte
 }
 
-var _ Tx = &TestTx{}
+var _ UnsignedTx = &TestTx{}
 
 // TestTx is a minimal implementation of a Tx
-type TestTx struct{ Bytes []byte }
+type TestTx struct{ UnsignedBytes []byte }
 
 // UnsignedBytes returns Bytes
-func (tx *TestTx) UnsignedBytes() []byte { return tx.Bytes }
+func (tx *TestTx) Bytes() []byte { return tx.UnsignedBytes }

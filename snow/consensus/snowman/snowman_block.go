@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -21,7 +21,7 @@ type snowmanBlock struct {
 	// less than Alpha votes
 	shouldFalter bool
 
-	// sb is the snowball instance used to decided which child is the canonical
+	// sb is the snowball instance used to decide which child is the canonical
 	// child of this block. If this node has not had a child issued under it,
 	// this value will be nil
 	sb snowball.Consensus

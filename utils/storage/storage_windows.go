@@ -1,7 +1,7 @@
 //go:build windows
 // +build windows
 
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package storage
@@ -19,7 +19,7 @@ const (
 
 var errNonzeroErrorCode = errors.New("nonzero return from win32 call for disk space")
 
-func OsDiskStat(path string) (uint64, error) {
+func AvailableBytes(path string) (uint64, error) {
 	h, err := syscall.LoadDLL(KERNEL32DLL)
 	if err != nil {
 		return 0, err

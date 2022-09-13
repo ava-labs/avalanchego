@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
@@ -15,14 +15,14 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var (
-	utxoPrefix  = []byte("utxo")
-	indexPrefix = []byte("index")
-)
-
 const (
 	utxoCacheSize  = 8192
 	indexCacheSize = 64
+)
+
+var (
+	utxoPrefix  = []byte("utxo")
+	indexPrefix = []byte("index")
 )
 
 // UTXOState is a thin wrapper around a database to provide, caching,
@@ -34,8 +34,7 @@ type UTXOState interface {
 
 // UTXOReader is a thin wrapper around a database to provide fetching of UTXOs.
 type UTXOReader interface {
-	// GetUTXO attempts to load a utxo from storage.
-	GetUTXO(utxoID ids.ID) (*UTXO, error)
+	UTXOGetter
 
 	// UTXOIDs returns the slice of IDs associated with [addr], starting after
 	// [previous].
@@ -44,13 +43,19 @@ type UTXOReader interface {
 	UTXOIDs(addr []byte, previous ids.ID, limit int) ([]ids.ID, error)
 }
 
+// UTXOGetter is a thin wrapper around a database to provide fetching of a UTXO.
+type UTXOGetter interface {
+	// GetUTXO attempts to load a utxo.
+	GetUTXO(utxoID ids.ID) (*UTXO, error)
+}
+
 // UTXOWriter is a thin wrapper around a database to provide storage and
 // deletion of UTXOs.
 type UTXOWriter interface {
 	// PutUTXO saves the provided utxo to storage.
-	PutUTXO(utxoID ids.ID, utxo *UTXO) error
+	PutUTXO(utxo *UTXO) error
 
-	// DeleteUTXO deletes the provided utxo from storage.
+	// DeleteUTXO deletes the provided utxo.
 	DeleteUTXO(utxoID ids.ID) error
 }
 
@@ -132,12 +137,13 @@ func (s *utxoState) GetUTXO(utxoID ids.ID) (*UTXO, error) {
 	return utxo, nil
 }
 
-func (s *utxoState) PutUTXO(utxoID ids.ID, utxo *UTXO) error {
+func (s *utxoState) PutUTXO(utxo *UTXO) error {
 	utxoBytes, err := s.codec.Marshal(codecVersion, utxo)
 	if err != nil {
 		return err
 	}
 
+	utxoID := utxo.InputID()
 	s.utxoCache.Put(utxoID, utxo)
 	if err := s.utxoDB.Put(utxoID[:], utxoBytes); err != nil {
 		return err

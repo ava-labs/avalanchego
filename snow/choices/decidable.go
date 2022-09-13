@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package choices
@@ -36,5 +36,7 @@ type Decidable interface {
 	// ID, Rejected should be returned. If the contents of this element are
 	// unknown, then Unknown should be returned. Otherwise, Processing should be
 	// returned.
+	//
+	// TODO: Consider allowing Status to return an error.
 	Status() Status
 }

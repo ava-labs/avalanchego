@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package consistent
@@ -278,7 +278,4 @@ type ringItem struct {
 	value Hashable
 }
 
-// Less implements btree.Item
-func (r ringItem) Less(than btree.Item) bool {
-	return r.hash < than.(ringItem).hash
-}
+func (r ringItem) Less(than btree.Item) bool { return r.hash < than.(ringItem).hash }

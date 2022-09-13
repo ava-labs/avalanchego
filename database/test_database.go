@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package database
@@ -8,8 +8,11 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"golang.org/x/sync/errgroup"
+
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
@@ -35,12 +38,16 @@ var Tests = []func(t *testing.T, db Database){
 	TestIteratorClosed,
 	TestIteratorError,
 	TestIteratorErrorAfterRelease,
-	TestStatNoPanic,
 	TestCompactNoPanic,
 	TestMemorySafetyDatabase,
 	TestMemorySafetyBatch,
 	TestClear,
 	TestClearPrefix,
+	TestModifyValueAfterPut,
+	TestModifyValueAfterBatchPut,
+	TestModifyValueAfterBatchPutReplay,
+	TestConcurrentBatches,
+	TestManySmallConcurrentKVPairBatches,
 }
 
 // TestSimpleKeyValue tests to make sure that simple Put + Get + Delete + Has
@@ -89,20 +96,20 @@ func TestSimpleKeyValue(t *testing.T, db Database) {
 }
 
 func TestKeyEmptyValue(t *testing.T, db Database) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	key := []byte("hello")
 	val := []byte(nil)
 
 	_, err := db.Get(key)
-	assert.Equal(ErrNotFound, err)
+	require.Equal(ErrNotFound, err)
 
 	err = db.Put(key, val)
-	assert.NoError(err)
+	require.NoError(err)
 
 	value, err := db.Get(key)
-	assert.NoError(err)
-	assert.Len(value, len(val))
+	require.NoError(err)
+	require.Len(value, len(val))
 }
 
 // TestSimpleKeyValueClosed tests to make sure that Put + Get + Delete + Has
@@ -576,7 +583,6 @@ func TestBatchInner(t *testing.T, db Database) {
 
 // TestBatchLargeSize tests to make sure that the batch can support a large
 // amount of entries.
-//nolint:interfacer // This function must match the test function definition
 func TestBatchLargeSize(t *testing.T, db Database) {
 	totalSize := 8 * units.MiB   // 8 MiB
 	elementSize := 4 * units.KiB // 4 KiB
@@ -1053,38 +1059,6 @@ func TestIteratorErrorAfterRelease(t *testing.T, db Database) {
 	}
 }
 
-// TestStatNoPanic tests to make sure that Stat never panics.
-func TestStatNoPanic(t *testing.T, db Database) {
-	key1 := []byte("hello1")
-	value1 := []byte("world1")
-
-	key2 := []byte("z")
-	value2 := []byte("world2")
-
-	key3 := []byte("hello3")
-	value3 := []byte("world3")
-
-	if err := db.Put(key1, value1); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	} else if err := db.Put(key2, value2); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	} else if err := db.Put(key3, value3); err != nil {
-		t.Fatalf("Unexpected error on batch.Put: %s", err)
-	}
-
-	// Stat could error or not redpending on the implementation, but it
-	// shouldn't panic
-	_, _ = db.Stat("")
-
-	if err := db.Close(); err != nil {
-		t.Fatalf("Unexpected error on db.Close: %s", err)
-	}
-
-	// Stat could error or not redpending on the implementation, but it
-	// shouldn't panic
-	_, _ = db.Stat("")
-}
-
 // TestCompactNoPanic tests to make sure compact never panics.
 func TestCompactNoPanic(t *testing.T, db Database) {
 	key1 := []byte("hello1")
@@ -1119,7 +1093,7 @@ func TestCompactNoPanic(t *testing.T, db Database) {
 
 // TestClear tests to make sure the deletion helper works as expected.
 func TestClear(t *testing.T, db Database) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	key1 := []byte("hello1")
 	value1 := []byte("world1")
@@ -1131,32 +1105,32 @@ func TestClear(t *testing.T, db Database) {
 	value3 := []byte("world3")
 
 	err := db.Put(key1, value1)
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = db.Put(key2, value2)
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = db.Put(key3, value3)
-	assert.NoError(err)
+	require.NoError(err)
 
 	count, err := Count(db)
-	assert.NoError(err)
-	assert.Equal(3, count)
+	require.NoError(err)
+	require.Equal(3, count)
 
 	err = Clear(db, db)
-	assert.NoError(err)
+	require.NoError(err)
 
 	count, err = Count(db)
-	assert.NoError(err)
-	assert.Equal(0, count)
+	require.NoError(err)
+	require.Equal(0, count)
 
 	err = db.Close()
-	assert.NoError(err)
+	require.NoError(err)
 }
 
 // TestClearPrefix tests to make sure prefix deletion works as expected.
 func TestClearPrefix(t *testing.T, db Database) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	key1 := []byte("hello1")
 	value1 := []byte("world1")
@@ -1168,37 +1142,167 @@ func TestClearPrefix(t *testing.T, db Database) {
 	value3 := []byte("world3")
 
 	err := db.Put(key1, value1)
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = db.Put(key2, value2)
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = db.Put(key3, value3)
-	assert.NoError(err)
+	require.NoError(err)
 
 	count, err := Count(db)
-	assert.NoError(err)
-	assert.Equal(3, count)
+	require.NoError(err)
+	require.Equal(3, count)
 
 	err = ClearPrefix(db, db, []byte("hello"))
-	assert.NoError(err)
+	require.NoError(err)
 
 	count, err = Count(db)
-	assert.NoError(err)
-	assert.Equal(1, count)
+	require.NoError(err)
+	require.Equal(1, count)
 
 	has, err := db.Has(key1)
-	assert.NoError(err)
-	assert.False(has)
+	require.NoError(err)
+	require.False(has)
 
 	has, err = db.Has(key2)
-	assert.NoError(err)
-	assert.True(has)
+	require.NoError(err)
+	require.True(has)
 
 	has, err = db.Has(key3)
-	assert.NoError(err)
-	assert.False(has)
+	require.NoError(err)
+	require.False(has)
 
 	err = db.Close()
-	assert.NoError(err)
+	require.NoError(err)
+}
+
+func TestModifyValueAfterPut(t *testing.T, db Database) {
+	require := require.New(t)
+
+	key := []byte{1}
+	value := []byte{1, 2}
+	originalValue := utils.CopyBytes(value)
+
+	err := db.Put(key, value)
+	require.NoError(err)
+
+	// Modify the value that was Put into the database
+	// to see if the database copied the value correctly.
+	value[0] = 2
+	retrievedValue, err := db.Get(key)
+	require.NoError(err)
+	require.Equal(originalValue, retrievedValue)
+}
+
+func TestModifyValueAfterBatchPut(t *testing.T, db Database) {
+	require := require.New(t)
+
+	key := []byte{1}
+	value := []byte{1, 2}
+	originalValue := utils.CopyBytes(value)
+
+	batch := db.NewBatch()
+	err := batch.Put(key, value)
+	require.NoError(err)
+
+	// Modify the value that was Put into the Batch and then Write the
+	// batch to the database.
+	value[0] = 2
+	err = batch.Write()
+	require.NoError(err)
+
+	// Verify that the value written to the database contains matches the original
+	// value of the byte slice when Put was called.
+	retrievedValue, err := db.Get(key)
+	require.NoError(err)
+	require.Equal(originalValue, retrievedValue)
+}
+
+func TestModifyValueAfterBatchPutReplay(t *testing.T, db Database) {
+	require := require.New(t)
+
+	key := []byte{1}
+	value := []byte{1, 2}
+	originalValue := utils.CopyBytes(value)
+
+	batch := db.NewBatch()
+	err := batch.Put(key, value)
+	require.NoError(err)
+
+	// Modify the value that was Put into the Batch and then Write the
+	// batch to the database.
+	value[0] = 2
+
+	// Create a new batch and replay the batch onto this one before writing it to the DB.
+	replayBatch := db.NewBatch()
+	err = batch.Replay(replayBatch)
+	require.NoError(err)
+	err = replayBatch.Write()
+	require.NoError(err)
+
+	// Verify that the value written to the database contains matches the original
+	// value of the byte slice when Put was called.
+	retrievedValue, err := db.Get(key)
+	require.NoError(err)
+	require.Equal(originalValue, retrievedValue)
+}
+
+func TestConcurrentBatches(t *testing.T, db Database) {
+	numBatches := 10
+	keysPerBatch := 50
+	keySize := 32
+	valueSize := units.KiB
+
+	require.NoError(t, runConcurrentBatches(
+		db,
+		numBatches,
+		keysPerBatch,
+		keySize,
+		valueSize,
+	))
+}
+
+func TestManySmallConcurrentKVPairBatches(t *testing.T, db Database) {
+	numBatches := 100
+	keysPerBatch := 10
+	keySize := 10
+	valueSize := 10
+
+	require.NoError(t, runConcurrentBatches(
+		db,
+		numBatches,
+		keysPerBatch,
+		keySize,
+		valueSize,
+	))
+}
+
+func runConcurrentBatches(
+	db Database,
+	numBatches,
+	keysPerBatch,
+	keySize,
+	valueSize int,
+) error {
+	batches := make([]Batch, 0, numBatches)
+	for i := 0; i < numBatches; i++ {
+		batches = append(batches, db.NewBatch())
+	}
+
+	for _, batch := range batches {
+		for i := 0; i < keysPerBatch; i++ {
+			key := utils.RandomBytes(keySize)
+			value := utils.RandomBytes(valueSize)
+			if err := batch.Put(key, value); err != nil {
+				return err
+			}
+		}
+	}
+
+	var eg errgroup.Group
+	for _, batch := range batches {
+		eg.Go(batch.Write)
+	}
+	return eg.Wait()
 }

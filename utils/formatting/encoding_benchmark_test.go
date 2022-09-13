@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package formatting
@@ -16,30 +16,6 @@ func BenchmarkEncodings(b *testing.B) {
 		encoding Encoding
 		size     int
 	}{
-		{
-			encoding: CB58,
-			size:     1 * units.KiB, // 1kb
-		},
-		{
-			encoding: CB58,
-			size:     2 * units.KiB, // 2kb
-		},
-		{
-			encoding: CB58,
-			size:     4 * units.KiB, // 4kb
-		},
-		{
-			encoding: CB58,
-			size:     8 * units.KiB, // 8kb
-		},
-		{
-			encoding: CB58,
-			size:     16 * units.KiB, // 16kb
-		},
-		{
-			encoding: CB58,
-			size:     32 * units.KiB, // 32kb
-		},
 		{
 			encoding: Hex,
 			size:     1 * units.KiB, // 1kb
@@ -82,7 +58,7 @@ func BenchmarkEncodings(b *testing.B) {
 		_, _ = rand.Read(bytes) // #nosec G404
 		b.Run(fmt.Sprintf("%s-%d bytes", benchmark.encoding, benchmark.size), func(b *testing.B) {
 			for n := 0; n < b.N; n++ {
-				if _, err := EncodeWithChecksum(benchmark.encoding, bytes); err != nil {
+				if _, err := Encode(benchmark.encoding, bytes); err != nil {
 					b.Fatal(err)
 				}
 			}

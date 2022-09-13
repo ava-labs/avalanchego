@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package auth
@@ -45,10 +45,9 @@ type RevokeTokenArgs struct {
 	Token
 }
 
-func (s *Service) RevokeToken(_ *http.Request, args *RevokeTokenArgs, reply *api.SuccessResponse) error {
+func (s *Service) RevokeToken(_ *http.Request, args *RevokeTokenArgs, _ *api.EmptyReply) error {
 	s.auth.log.Debug("Auth: RevokeToken called")
 
-	reply.Success = true
 	return s.auth.RevokeToken(args.Token.Token, args.Password.Password)
 }
 
@@ -57,9 +56,8 @@ type ChangePasswordArgs struct {
 	NewPassword string `json:"newPassword"` // New authorization password
 }
 
-func (s *Service) ChangePassword(_ *http.Request, args *ChangePasswordArgs, reply *api.SuccessResponse) error {
+func (s *Service) ChangePassword(_ *http.Request, args *ChangePasswordArgs, _ *api.EmptyReply) error {
 	s.auth.log.Debug("Auth: ChangePassword called")
 
-	reply.Success = true
 	return s.auth.ChangePassword(args.OldPassword, args.NewPassword)
 }

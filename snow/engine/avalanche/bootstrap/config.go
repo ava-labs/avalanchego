@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bootstrap
@@ -7,7 +7,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
-	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 )
 
 type Config struct {
@@ -19,7 +18,6 @@ type Config struct {
 	// TxBlocked tracks operations that are blocked on transactions
 	TxBlocked *queue.Jobs
 
-	Manager       vertex.Manager
-	VM            vertex.DAGVM
-	WeightTracker tracker.WeightTracker
+	Manager vertex.Manager
+	VM      vertex.DAGVM
 }

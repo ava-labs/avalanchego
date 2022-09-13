@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package index
@@ -10,6 +10,8 @@ import (
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -24,6 +26,9 @@ var (
 	idxCompleteKey                 = []byte("complete")
 	errIndexingRequiredFromGenesis = errors.New("running would create incomplete index. Allow incomplete indices or re-sync from genesis with indexing enabled")
 	errCausesIncompleteIndex       = errors.New("running would create incomplete index. Allow incomplete indices or enable indexing")
+
+	_ AddressTxsIndexer = &indexer{}
+	_ AddressTxsIndexer = &noIndexer{}
 )
 
 // AddressTxsIndexer maintains information about which transactions changed
@@ -51,14 +56,13 @@ type AddressTxsIndexer interface {
 	Read(address []byte, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error)
 }
 
-// indexer implements AddressTxsIndexer
 type indexer struct {
 	log     logging.Logger
 	metrics metrics
 	db      database.Database
 }
 
-// NewIndexer Returns a new AddressTxsIndexer.
+// NewIndexer returns a new AddressTxsIndexer.
 // The returned indexer ignores UTXOs that are not type secp256k1fx.TransferOutput.
 func NewIndexer(
 	db database.Database,
@@ -105,7 +109,9 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOs []*avax.UTXO, outputUTXOs []*av
 	for _, utxo := range utxos {
 		out, ok := utxo.Out.(avax.Addressable)
 		if !ok {
-			i.log.Verbo("skipping UTXO %s for indexing", utxo.InputID())
+			i.log.Verbo("skipping UTXO for indexing",
+				zap.Stringer("utxoID", utxo.InputID()),
+			)
 			continue
 		}
 
@@ -142,7 +148,12 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOs []*avax.UTXO, outputUTXOs []*av
 			}
 
 			// write the [txID] at the index
-			i.log.Verbo("writing address/assetID/index/txID %s/%s/%d/%s", address, assetID, idx, txID)
+			i.log.Verbo("writing indexed tx to DB",
+				zap.String("address", address),
+				zap.Stringer("assetID", assetID),
+				zap.Uint64("index", idx),
+				zap.Stringer("txID", txID),
+			)
 			if err := assetPrefixDB.Put(idxBytes, txID[:]); err != nil {
 				return fmt.Errorf("failed to write txID while indexing %s: %w", txID, err)
 			}

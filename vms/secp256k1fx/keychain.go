@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
@@ -120,7 +120,7 @@ func (kc *Keychain) PrefixedString(prefix string) string {
 	for i, key := range kc.Keys {
 		// We assume that the maximum size of a byte slice that
 		// can be stringified is at least the length of a SECP256K1 private key
-		keyStr, _ := formatting.EncodeWithChecksum(defaultEncoding, key.Bytes())
+		keyStr, _ := formatting.Encode(formatting.HexNC, key.Bytes())
 		s.WriteString(fmt.Sprintf(format,
 			prefix,
 			i,

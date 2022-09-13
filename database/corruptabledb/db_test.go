@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package corruptabledb
@@ -7,9 +7,10 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestInterface(t *testing.T) {
@@ -41,12 +42,16 @@ func TestCorruption(t *testing.T) {
 		},
 		"corrupted batch": func(db database.Database) error {
 			corruptableBatch := db.NewBatch()
-			assert.NotNil(t, corruptableBatch)
+			require.NotNil(t, corruptableBatch)
 
 			err := corruptableBatch.Put(key, value)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			return corruptableBatch.Write()
+		},
+		"corrupted healthcheck": func(db database.Database) error {
+			_, err := db.HealthCheck()
+			return err
 		},
 	}
 	baseDB := memdb.New()
@@ -57,7 +62,7 @@ func TestCorruption(t *testing.T) {
 	for name, testFn := range tests {
 		t.Run(name, func(tt *testing.T) {
 			err := testFn(corruptableDB)
-			assert.ErrorIsf(tt, err, initError, "not received the corruption error")
+			require.ErrorIsf(tt, err, initError, "not received the corruption error")
 		})
 	}
 }

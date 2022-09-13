@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ids
@@ -142,6 +142,14 @@ func (ids ShortSet) String() string {
 	}
 	sb.WriteString("}")
 	return sb.String()
+}
+
+// Returns an element. If the set is empty, returns false
+func (ids *ShortSet) Peek() (ShortID, bool) {
+	for id := range *ids {
+		return id, true
+	}
+	return ShortID{}, false
 }
 
 // Removes and returns an element. If the set is empty, does nothing and returns

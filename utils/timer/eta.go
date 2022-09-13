@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package timer
@@ -14,5 +14,6 @@ func EstimateETA(startTime time.Time, progress, end uint64) time.Duration {
 
 	percentExecuted := float64(progress) / float64(end)
 	estimatedTotalDuration := time.Duration(float64(timeSpent) / percentExecuted)
-	return estimatedTotalDuration - timeSpent
+	eta := estimatedTotalDuration - timeSpent
+	return eta.Round(time.Second)
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package status
@@ -8,13 +8,14 @@ import (
 	"math"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBlockchainStatusJSON(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	statuses := []BlockchainStatus{
+		UnknownChain,
 		Validating,
 		Created,
 		Preferred,
@@ -22,38 +23,39 @@ func TestBlockchainStatusJSON(t *testing.T) {
 	}
 	for _, status := range statuses {
 		statusJSON, err := json.Marshal(status)
-		assert.NoError(err)
+		require.NoError(err)
 
 		var parsedStatus BlockchainStatus
 		err = json.Unmarshal(statusJSON, &parsedStatus)
-		assert.NoError(err)
-		assert.Equal(status, parsedStatus)
+		require.NoError(err)
+		require.Equal(status, parsedStatus)
 	}
 
 	{
 		status := BlockchainStatus(math.MaxInt32)
 		_, err := json.Marshal(status)
-		assert.Error(err)
+		require.Error(err)
 	}
 
 	{
 		status := Validating
 		err := json.Unmarshal([]byte("null"), &status)
-		assert.NoError(err)
-		assert.Equal(Validating, status)
+		require.NoError(err)
+		require.Equal(Validating, status)
 	}
 
 	{
 		var status BlockchainStatus
 		err := json.Unmarshal([]byte(`"not a status"`), &status)
-		assert.Error(err)
+		require.Error(err)
 	}
 }
 
 func TestBlockchainStatusVerify(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	statuses := []BlockchainStatus{
+		UnknownChain,
 		Validating,
 		Created,
 		Preferred,
@@ -61,23 +63,24 @@ func TestBlockchainStatusVerify(t *testing.T) {
 	}
 	for _, status := range statuses {
 		err := status.Verify()
-		assert.NoError(err, "%s failed verification", status)
+		require.NoError(err, "%s failed verification", status)
 	}
 
 	badStatus := BlockchainStatus(math.MaxInt32)
 	err := badStatus.Verify()
-	assert.Error(err, "%s passed verification", badStatus)
+	require.Error(err, "%s passed verification", badStatus)
 }
 
 func TestBlockchainStatusString(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
-	assert.Equal("Validating", Validating.String())
-	assert.Equal("Created", Created.String())
-	assert.Equal("Preferred", Preferred.String())
-	assert.Equal("Syncing", Syncing.String())
-	assert.Equal("Dropped", Dropped.String())
+	require.Equal("Unknown", UnknownChain.String())
+	require.Equal("Validating", Validating.String())
+	require.Equal("Created", Created.String())
+	require.Equal("Preferred", Preferred.String())
+	require.Equal("Syncing", Syncing.String())
+	require.Equal("Dropped", Dropped.String())
 
 	badStatus := BlockchainStatus(math.MaxInt32)
-	assert.Equal("Invalid blockchain status", badStatus.String())
+	require.Equal("Invalid blockchain status", badStatus.String())
 }

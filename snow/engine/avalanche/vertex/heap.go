@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package vertex
@@ -15,7 +15,6 @@ var (
 	_ heap.Interface = &priorityQueue{}
 )
 
-// A priorityQueue implements heap.Interface and holds vertexItems.
 type priorityQueue []avalanche.Vertex
 
 func (pq priorityQueue) Len() int { return len(pq) }

@@ -16,13 +16,13 @@ The minimum recommended hardware specification for nodes connected to Mainnet is
 
 - CPU: Equivalent of 8 AWS vCPU
 - RAM: 16 GiB
-- Storage: 512 GiB
+- Storage: 1 TiB
 - OS: Ubuntu 18.04/20.04 or macOS >= 10.15 (Catalina)
 - Network: Reliable IPv4 or IPv6 network connection, with an open public port.
 
 If you plan to build AvalancheGo from source, you will also need the following software:
 
-- [Go](https://golang.org/doc/install) version >= 1.16.8
+- [Go](https://golang.org/doc/install) version >= 1.18.1
 - [gcc](https://gcc.gnu.org/)
 - g++
 
@@ -39,13 +39,17 @@ This will clone and checkout to `master` branch.
 
 #### Building the Avalanche Executable
 
-Build Avalanche using the build script:
+Build Avalanche by running the build script:
 
 ```sh
 ./scripts/build.sh
 ```
 
-The Avalanche binary, named `avalanchego`, is in the `build` directory.
+The output of the script will be the Avalanche binary named `avalanchego`. It is located in the build directory:
+
+```sh
+./build/avalanchego
+```
 
 ### Binary Repository
 
@@ -156,12 +160,12 @@ To regenerate the protobuf go code, run `scripts/protobuf_codegen.sh` from the r
 
 This should only be necessary when upgrading protobuf versions or modifying .proto definition files.
 
-To use this script, you must have [buf](https://docs.buf.build/installation) (v1.0.0-rc12), protoc-gen-go (v1.27.1) and protoc-gen-go-grpc (v1.2.0) installed.
+To use this script, you must have [buf](https://docs.buf.build/installation) (v1.7.0), protoc-gen-go (v1.28.0) and protoc-gen-go-grpc (v1.2.0) installed.
 
 To install the buf dependencies:
 
 ```sh
-go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.27.1
+go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.0
 go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2.0
 ```
 
@@ -188,6 +192,20 @@ For more information, refer to the [GRPC Golang Quick Start Guide](https://grpc.
 docker build -t avalanche:protobuf_codegen -f api/Dockerfile.buf .
 docker run -t -i -v $(pwd):/opt/avalanche -w/opt/avalanche avalanche:protobuf_codegen bash -c "scripts/protobuf_codegen.sh"
 ```
+
+### Running mock codegen
+
+Going forward, AvalancheGo will use [gomock](https://github.com/golang/mock) for mocking in unit tests.
+
+Example usage:
+
+```sh
+mockgen -destination vms/platformvm/state/mock_diff.go -package state github.com/ava-labs/avalanchego/vms/platformvm/state Diff
+```
+
+This makes a mock implementation of the `Diff` interface from `github.com/ava-labs/avalanchego/vms/platformvm/state`and puts it at `vms/platformvm/state/mock_diff.go`. The struct implementing the mock will be in the `state` package.
+
+See `gomock` documentation for more information.
 
 ## Supported Platforms
 

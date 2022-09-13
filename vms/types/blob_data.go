@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package types
@@ -13,7 +13,7 @@ import (
 type JSONByteSlice []byte
 
 func (b JSONByteSlice) MarshalJSON() ([]byte, error) {
-	hexData, err := formatting.EncodeWithoutChecksum(formatting.Hex, b)
+	hexData, err := formatting.Encode(formatting.HexNC, b)
 	if err != nil {
 		return nil, err
 	}

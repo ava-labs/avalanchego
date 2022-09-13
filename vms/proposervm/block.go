@@ -1,13 +1,17 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -36,6 +40,13 @@ type Block interface {
 	snowman.Block
 
 	getInnerBlk() snowman.Block
+
+	// After a state sync, we may need to update last accepted block data
+	// without propagating any changes to the innerVM.
+	// acceptOuterBlk and acceptInnerBlk allow controlling acceptance of outer
+	// and inner blocks.
+	acceptOuterBlk() error
+	acceptInnerBlk() error
 
 	verifyPreForkChild(child *preForkBlock) error
 	verifyPostForkChild(child *postForkBlock) error
@@ -102,14 +113,17 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 		return errTimeTooAdvanced
 	}
 
-	// If the node is currently bootstrapping - we don't assume that the P-chain
-	// has been synced up to this point yet.
-	if p.vm.bootstrapped {
+	// If the node is currently syncing - we don't assume that the P-chain has
+	// been synced up to this point yet.
+	if p.vm.consensusState == snow.NormalOp {
 		childID := child.ID()
 		currentPChainHeight, err := p.vm.ctx.ValidatorState.GetCurrentHeight()
 		if err != nil {
-			p.vm.ctx.Log.Error("failed to get current P-Chain height while processing %s: %s",
-				childID, err)
+			p.vm.ctx.Log.Error("block verification failed",
+				zap.String("reason", "failed to get current P-Chain height"),
+				zap.Stringer("blkID", childID),
+				zap.Error(err),
+			)
 			return err
 		}
 		if childPChainHeight > currentPChainHeight {
@@ -134,8 +148,12 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 			return err
 		}
 
-		p.vm.ctx.Log.Debug("verified post-fork block %s - parent timestamp %v, expected delay %v, block timestamp %v",
-			childID, parentTimestamp, minDelay, childTimestamp)
+		p.vm.ctx.Log.Debug("verified post-fork block",
+			zap.Stringer("blkID", childID),
+			zap.Time("parentTimestamp", parentTimestamp),
+			zap.Duration("minDelay", minDelay),
+			zap.Time("blockTimestamp", childTimestamp),
+		)
 	}
 
 	return p.vm.verifyAndRecordInnerBlk(child)
@@ -174,8 +192,11 @@ func (p *postForkCommonComponents) buildChild(
 			// by having previously notified the consensus engine to attempt to
 			// build a block on top of a block that is no longer the preferred
 			// block.
-			p.vm.ctx.Log.Debug("build block dropped; parent timestamp %s, expected delay %s, block timestamp %s",
-				parentTimestamp, minDelay, newTimestamp)
+			p.vm.ctx.Log.Debug("build block dropped",
+				zap.Time("parentTimestamp", parentTimestamp),
+				zap.Duration("minDelay", minDelay),
+				zap.Time("blockTimestamp", newTimestamp),
+			)
 
 			// In case the inner VM only issued one pendingTxs message, we
 			// should attempt to re-handle that once it is our turn to build the
@@ -190,28 +211,51 @@ func (p *postForkCommonComponents) buildChild(
 		return nil, err
 	}
 
+	blueberryActivated := newTimestamp.After(p.vm.activationTimeBlueberry)
+
 	// Build the child
 	var statelessChild block.SignedBlock
 	if delay >= proposer.MaxDelay {
-		statelessChild, err = block.BuildUnsigned(
-			parentID,
-			newTimestamp,
-			pChainHeight,
-			innerBlock.Bytes(),
-		)
+		if blueberryActivated {
+			statelessChild, err = block.BuildUnsignedBlueberry(
+				parentID,
+				newTimestamp,
+				pChainHeight,
+				innerBlock.Bytes(),
+			)
+		} else {
+			statelessChild, err = block.BuildUnsignedApricot(
+				parentID,
+				newTimestamp,
+				pChainHeight,
+				innerBlock.Bytes(),
+			)
+		}
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		statelessChild, err = block.Build(
-			parentID,
-			newTimestamp,
-			pChainHeight,
-			p.vm.ctx.StakingCertLeaf,
-			innerBlock.Bytes(),
-			p.vm.ctx.ChainID,
-			p.vm.ctx.StakingLeafSigner,
-		)
+		if blueberryActivated {
+			statelessChild, err = block.BuildBlueberry(
+				parentID,
+				newTimestamp,
+				pChainHeight,
+				p.vm.ctx.StakingCertLeaf,
+				innerBlock.Bytes(),
+				p.vm.ctx.ChainID,
+				p.vm.ctx.StakingLeafSigner,
+			)
+		} else {
+			statelessChild, err = block.BuildApricot(
+				parentID,
+				newTimestamp,
+				pChainHeight,
+				p.vm.ctx.StakingCertLeaf,
+				innerBlock.Bytes(),
+				p.vm.ctx.ChainID,
+				p.vm.ctx.StakingLeafSigner,
+			)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -226,8 +270,13 @@ func (p *postForkCommonComponents) buildChild(
 		},
 	}
 
-	p.vm.ctx.Log.Info("built block %s - parent timestamp %v, block timestamp %v",
-		child.ID(), parentTimestamp, newTimestamp)
+	p.vm.ctx.Log.Info("built block",
+		zap.Stringer("blkID", child.ID()),
+		zap.Stringer("innerBlkID", innerBlock.ID()),
+		zap.Uint64("height", child.Height()),
+		zap.Time("parentTimestamp", parentTimestamp),
+		zap.Time("blockTimestamp", newTimestamp),
+	)
 	return child, nil
 }
 
@@ -242,7 +291,10 @@ func (p *postForkCommonComponents) setInnerBlk(innerBlk snowman.Block) {
 func verifyIsOracleBlock(b snowman.Block) error {
 	oracle, ok := b.(snowman.OracleBlock)
 	if !ok {
-		return errUnexpectedBlockType
+		return fmt.Errorf(
+			"%w: expected block %s to be a snowman.OracleBlock but it's a %T",
+			errUnexpectedBlockType, b.ID(), b,
+		)
 	}
 	_, err := oracle.Options()
 	return err
@@ -256,7 +308,10 @@ func verifyIsNotOracleBlock(b snowman.Block) error {
 	_, err := oracle.Options()
 	switch err {
 	case nil:
-		return errUnexpectedBlockType
+		return fmt.Errorf(
+			"%w: expected block %s not to be an oracle block but it's a %T",
+			errUnexpectedBlockType, b.ID(), b,
+		)
 	case snowman.ErrNotOracle:
 		return nil
 	default:

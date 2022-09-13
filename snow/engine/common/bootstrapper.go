@@ -1,12 +1,12 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
 
 import (
-	"time"
-
 	stdmath "math"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -22,14 +22,9 @@ const (
 	// sent but not responded to/failed
 	MaxOutstandingGetAncestorsRequests = 10
 
-	// MaxOutstandingBootstrapRequests is the maximum number of
-	// GetAcceptedFrontier and GetAccepted messages sent but not responded
-	// to/failed
-	MaxOutstandingBootstrapRequests = 50
-
-	// MaxTimeFetchingAncestors is the maximum amount of time to spend fetching
-	// vertices during a call to GetAncestors
-	MaxTimeFetchingAncestors = 50 * time.Millisecond
+	// MaxOutstandingBroadcastRequests is the maximum number of requests to have
+	// outstanding when broadcasting.
+	MaxOutstandingBroadcastRequests = 50
 )
 
 var _ Bootstrapper = &bootstrapper{}
@@ -42,7 +37,6 @@ type Bootstrapper interface {
 	Restart(reset bool) error
 }
 
-// bootstrapper implements the Handler interface.
 // It collects mechanisms common to both snowman and avalanche bootstrappers
 type bootstrapper struct {
 	Config
@@ -51,23 +45,23 @@ type bootstrapper struct {
 	// Holds the beacons that were sampled for the accepted frontier
 	sampledBeacons validators.Set
 	// IDs of validators we should request an accepted frontier from
-	pendingSendAcceptedFrontier ids.ShortSet
+	pendingSendAcceptedFrontier ids.NodeIDSet
 	// IDs of validators we requested an accepted frontier from but haven't
 	// received a reply yet
-	pendingReceiveAcceptedFrontier ids.ShortSet
+	pendingReceiveAcceptedFrontier ids.NodeIDSet
 	// IDs of validators that failed to respond with their accepted frontier
-	failedAcceptedFrontier ids.ShortSet
+	failedAcceptedFrontier ids.NodeIDSet
 	// IDs of all the returned accepted frontiers
 	acceptedFrontierSet ids.Set
 
 	// IDs of validators we should request filtering the accepted frontier from
-	pendingSendAccepted ids.ShortSet
+	pendingSendAccepted ids.NodeIDSet
 	// IDs of validators we requested filtering the accepted frontier from but
 	// haven't received a reply yet
-	pendingReceiveAccepted ids.ShortSet
+	pendingReceiveAccepted ids.NodeIDSet
 	// IDs of validators that failed to respond with their filtered accepted
 	// frontier
-	failedAccepted ids.ShortSet
+	failedAccepted ids.NodeIDSet
 	// IDs of the returned accepted containers and the stake weight that has
 	// marked them as accepted
 	acceptedVotes    map[ids.ID]uint64
@@ -83,26 +77,29 @@ func NewCommonBootstrapper(config Config) Bootstrapper {
 	}
 }
 
-// AcceptedFrontier implements the AcceptedFrontierHandler interface.
-func (b *bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+func (b *bootstrapper) AcceptedFrontier(nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
 	// ignores any late responses
 	if requestID != b.Config.SharedCfg.RequestID {
-		b.Ctx.Log.Debug("Received an Out-of-Sync AcceptedFrontier - validator: %v - expectedRequestID: %v, requestID: %v",
-			validatorID,
-			b.Config.SharedCfg.RequestID,
-			requestID)
+		b.Ctx.Log.Debug("received out-of-sync AcceptedFrontier message",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("expectedRequestID", b.Config.SharedCfg.RequestID),
+			zap.Uint32("requestID", requestID),
+		)
 		return nil
 	}
 
-	if !b.pendingReceiveAcceptedFrontier.Contains(validatorID) {
-		b.Ctx.Log.Debug("Received an AcceptedFrontier message from %s unexpectedly", validatorID)
+	if !b.pendingReceiveAcceptedFrontier.Contains(nodeID) {
+		b.Ctx.Log.Debug("received unexpected AcceptedFrontier message",
+			zap.Stringer("nodeID", nodeID),
+		)
 		return nil
 	}
 
-	// Mark that we received a response from [validatorID]
-	b.pendingReceiveAcceptedFrontier.Remove(validatorID)
+	// Mark that we received a response from [nodeID]
+	b.pendingReceiveAcceptedFrontier.Remove(nodeID)
 
-	// Union the reported accepted frontier from [validatorID] with the accepted frontier we got from others
+	// Union the reported accepted frontier from [nodeID] with the accepted
+	// frontier we got from others
 	b.acceptedFrontierSet.Add(containerIDs...)
 
 	b.sendGetAcceptedFrontiers()
@@ -132,13 +129,19 @@ func (b *bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 	// fail the bootstrap if the weight is not enough to bootstrap
 	if float64(b.sampledBeacons.Weight())-newAlpha < float64(failedBeaconWeight) {
 		if b.Config.RetryBootstrap {
-			b.Ctx.Log.Debug("Not enough frontiers received, restarting bootstrap... - Beacons: %d - Failed Bootstrappers: %d "+
-				"- bootstrap attempt: %d", b.Beacons.Len(), b.failedAcceptedFrontier.Len(), b.bootstrapAttempts)
+			b.Ctx.Log.Debug("restarting bootstrap",
+				zap.String("reason", "not enough frontiers received"),
+				zap.Int("numBeacons", b.Beacons.Len()),
+				zap.Int("numFailedBootstrappers", b.failedAcceptedFrontier.Len()),
+				zap.Int("numBootstrapAttemps", b.bootstrapAttempts),
+			)
 			return b.Restart(false)
 		}
 
-		b.Ctx.Log.Debug("Didn't receive enough frontiers - failed validators: %d, "+
-			"bootstrap attempt: %d", b.failedAcceptedFrontier.Len(), b.bootstrapAttempts)
+		b.Ctx.Log.Debug("didn't receive enough frontiers",
+			zap.Int("numFailedValidators", b.failedAcceptedFrontier.Len()),
+			zap.Int("numBootstrapAttempts", b.bootstrapAttempts),
+		)
 	}
 
 	b.Config.SharedCfg.RequestID++
@@ -148,43 +151,45 @@ func (b *bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 	return nil
 }
 
-// GetAcceptedFrontierFailed implements the AcceptedFrontierHandler interface.
-func (b *bootstrapper) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
+func (b *bootstrapper) GetAcceptedFrontierFailed(nodeID ids.NodeID, requestID uint32) error {
 	// ignores any late responses
 	if requestID != b.Config.SharedCfg.RequestID {
-		b.Ctx.Log.Debug("Received an Out-of-Sync GetAcceptedFrontierFailed - validator: %v - expectedRequestID: %v, requestID: %v",
-			validatorID,
-			b.Config.SharedCfg.RequestID,
-			requestID)
+		b.Ctx.Log.Debug("received out-of-sync GetAcceptedFrontierFailed message",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("expectedRequestID", b.Config.SharedCfg.RequestID),
+			zap.Uint32("requestID", requestID),
+		)
 		return nil
 	}
 
-	// If we can't get a response from [validatorID], act as though they said their accepted frontier is empty
-	// and we add the validator to the failed list
-	b.failedAcceptedFrontier.Add(validatorID)
-	return b.AcceptedFrontier(validatorID, requestID, nil)
+	// If we can't get a response from [nodeID], act as though they said their
+	// accepted frontier is empty and we add the validator to the failed list
+	b.failedAcceptedFrontier.Add(nodeID)
+	return b.AcceptedFrontier(nodeID, requestID, nil)
 }
 
-// Accepted implements the AcceptedHandler interface.
-func (b *bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+func (b *bootstrapper) Accepted(nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
 	// ignores any late responses
 	if requestID != b.Config.SharedCfg.RequestID {
-		b.Ctx.Log.Debug("Received an Out-of-Sync Accepted - validator: %v - expectedRequestID: %v, requestID: %v",
-			validatorID,
-			b.Config.SharedCfg.RequestID,
-			requestID)
+		b.Ctx.Log.Debug("received out-of-sync Accepted message",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("expectedRequestID", b.Config.SharedCfg.RequestID),
+			zap.Uint32("requestID", requestID),
+		)
 		return nil
 	}
 
-	if !b.pendingReceiveAccepted.Contains(validatorID) {
-		b.Ctx.Log.Debug("Received an Accepted message from %s unexpectedly", validatorID)
+	if !b.pendingReceiveAccepted.Contains(nodeID) {
+		b.Ctx.Log.Debug("received unexpected Accepted message",
+			zap.Stringer("nodeID", nodeID),
+		)
 		return nil
 	}
-	// Mark that we received a response from [validatorID]
-	b.pendingReceiveAccepted.Remove(validatorID)
+	// Mark that we received a response from [nodeID]
+	b.pendingReceiveAccepted.Remove(nodeID)
 
 	weight := uint64(0)
-	if w, ok := b.Beacons.GetWeight(validatorID); ok {
+	if w, ok := b.Beacons.GetWeight(nodeID); ok {
 		weight = w
 	}
 
@@ -192,7 +197,11 @@ func (b *bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 		previousWeight := b.acceptedVotes[containerID]
 		newWeight, err := math.Add64(weight, previousWeight)
 		if err != nil {
-			b.Ctx.Log.Error("Error calculating the Accepted votes - weight: %v, previousWeight: %v", weight, previousWeight)
+			b.Ctx.Log.Error("failed calculating the Accepted votes",
+				zap.Uint64("weight", weight),
+				zap.Uint64("previousWeight", previousWeight),
+				zap.Error(err),
+			)
 			newWeight = stdmath.MaxUint64
 		}
 		b.acceptedVotes[containerID] = newWeight
@@ -225,36 +234,45 @@ func (b *bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 
 		// in a zero network there will be no accepted votes but the voting weight will be greater than the failed weight
 		if b.Config.RetryBootstrap && b.Beacons.Weight()-b.Alpha < failedBeaconWeight {
-			b.Ctx.Log.Debug("Not enough votes received, restarting bootstrap... - Beacons: %d - Failed Bootstrappers: %d "+
-				"- bootstrap attempt: %d", b.Beacons.Len(), b.failedAccepted.Len(), b.bootstrapAttempts)
+			b.Ctx.Log.Debug("restarting bootstrap",
+				zap.String("reason", "not enough votes received"),
+				zap.Int("numBeacons", b.Beacons.Len()),
+				zap.Int("numFailedBootstrappers", b.failedAccepted.Len()),
+				zap.Int("numBootstrapAttempts", b.bootstrapAttempts),
+			)
 			return b.Restart(false)
 		}
 	}
 
 	if !b.Config.SharedCfg.Restarted {
-		b.Ctx.Log.Info("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
+		b.Ctx.Log.Info("bootstrapping started syncing",
+			zap.Int("numVerticesInFrontier", size),
+		)
 	} else {
-		b.Ctx.Log.Debug("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
+		b.Ctx.Log.Debug("bootstrapping started syncing",
+			zap.Int("numVerticesInFrontier", size),
+		)
 	}
 
 	return b.Bootstrapable.ForceAccepted(accepted)
 }
 
-// GetAcceptedFailed implements the AcceptedHandler interface.
-func (b *bootstrapper) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error {
+func (b *bootstrapper) GetAcceptedFailed(nodeID ids.NodeID, requestID uint32) error {
 	// ignores any late responses
 	if requestID != b.Config.SharedCfg.RequestID {
-		b.Ctx.Log.Debug("Received an Out-of-Sync GetAcceptedFailed - validator: %v - expectedRequestID: %v, requestID: %v",
-			validatorID,
-			b.Config.SharedCfg.RequestID,
-			requestID)
+		b.Ctx.Log.Debug("received out-of-sync GetAcceptedFailed message",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("expectedRequestID", b.Config.SharedCfg.RequestID),
+			zap.Uint32("requestID", requestID),
+		)
 		return nil
 	}
 
-	// If we can't get a response from [validatorID], act as though they said
-	// that they think none of the containers we sent them in GetAccepted are accepted
-	b.failedAccepted.Add(validatorID)
-	return b.Accepted(validatorID, requestID, nil)
+	// If we can't get a response from [nodeID], act as though they said that
+	// they think none of the containers we sent them in GetAccepted are
+	// accepted
+	b.failedAccepted.Add(nodeID)
+	return b.Accepted(nodeID, requestID, nil)
 }
 
 func (b *bootstrapper) Startup() error {
@@ -291,7 +309,9 @@ func (b *bootstrapper) Startup() error {
 
 	b.bootstrapAttempts++
 	if b.pendingSendAcceptedFrontier.Len() == 0 {
-		b.Ctx.Log.Info("Bootstrapping skipped due to no provided bootstraps")
+		b.Ctx.Log.Info("bootstrapping skipped",
+			zap.String("reason", "no provided bootstraps"),
+		)
 		return b.Bootstrapable.ForceAccepted(nil)
 	}
 
@@ -311,18 +331,19 @@ func (b *bootstrapper) Restart(reset bool) error {
 	}
 
 	if b.bootstrapAttempts > 0 && b.bootstrapAttempts%b.RetryBootstrapWarnFrequency == 0 {
-		b.Ctx.Log.Debug("continuing to attempt to bootstrap after %d failed attempts. Is this node connected to the internet?",
-			b.bootstrapAttempts)
+		b.Ctx.Log.Debug("check internet connection",
+			zap.Int("numBootstrapAttempts", b.bootstrapAttempts),
+		)
 	}
 
 	return b.Startup()
 }
 
-// Ask up to [MaxOutstandingBootstrapRequests] bootstrap validators to send
+// Ask up to [MaxOutstandingBroadcastRequests] bootstrap validators to send
 // their accepted frontier with the current accepted frontier
 func (b *bootstrapper) sendGetAcceptedFrontiers() {
-	vdrs := ids.NewShortSet(1)
-	for b.pendingSendAcceptedFrontier.Len() > 0 && b.pendingReceiveAcceptedFrontier.Len() < MaxOutstandingBootstrapRequests {
+	vdrs := ids.NewNodeIDSet(1)
+	for b.pendingSendAcceptedFrontier.Len() > 0 && b.pendingReceiveAcceptedFrontier.Len() < MaxOutstandingBroadcastRequests {
 		vdr, _ := b.pendingSendAcceptedFrontier.Pop()
 		// Add the validator to the set to send the messages to
 		vdrs.Add(vdr)
@@ -335,11 +356,11 @@ func (b *bootstrapper) sendGetAcceptedFrontiers() {
 	}
 }
 
-// Ask up to [MaxOutstandingBootstrapRequests] bootstrap validators to send
+// Ask up to [MaxOutstandingBroadcastRequests] bootstrap validators to send
 // their filtered accepted frontier
 func (b *bootstrapper) sendGetAccepted() {
-	vdrs := ids.NewShortSet(1)
-	for b.pendingSendAccepted.Len() > 0 && b.pendingReceiveAccepted.Len() < MaxOutstandingBootstrapRequests {
+	vdrs := ids.NewNodeIDSet(1)
+	for b.pendingSendAccepted.Len() > 0 && b.pendingReceiveAccepted.Len() < MaxOutstandingBroadcastRequests {
 		vdr, _ := b.pendingSendAccepted.Pop()
 		// Add the validator to the set to send the messages to
 		vdrs.Add(vdr)
@@ -348,9 +369,9 @@ func (b *bootstrapper) sendGetAccepted() {
 	}
 
 	if vdrs.Len() > 0 {
-		b.Ctx.Log.Debug("sent %d more GetAccepted messages with %d more to send",
-			vdrs.Len(),
-			b.pendingSendAccepted.Len(),
+		b.Ctx.Log.Debug("sent GetAccepted messages",
+			zap.Int("numSent", vdrs.Len()),
+			zap.Int("numPending", b.pendingSendAccepted.Len()),
 		)
 		b.Sender.SendGetAccepted(vdrs, b.Config.SharedCfg.RequestID, b.acceptedFrontier)
 	}

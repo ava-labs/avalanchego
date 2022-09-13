@@ -1,13 +1,14 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ipcs
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/gorilla/rpc/v2"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/server"
@@ -21,14 +22,14 @@ import (
 
 // IPCServer maintains the IPCs
 type IPCServer struct {
-	httpServer   *server.Server
+	httpServer   server.Server
 	chainManager chains.Manager
 	log          logging.Logger
 	ipcs         *ipcs.ChainIPCs
 }
 
 // NewService returns a new IPCs API service
-func NewService(log logging.Logger, chainManager chains.Manager, httpServer *server.Server, ipcs *ipcs.ChainIPCs) (*common.HTTPHandler, error) {
+func NewService(log logging.Logger, chainManager chains.Manager, httpServer server.Server, ipcs *ipcs.ChainIPCs) (*common.HTTPHandler, error) {
 	ipcServer := &IPCServer{
 		log:          log,
 		chainManager: chainManager,
@@ -58,17 +59,25 @@ type PublishBlockchainReply struct {
 
 // PublishBlockchain publishes the finalized accepted transactions from the blockchainID over the IPC
 func (ipc *IPCServer) PublishBlockchain(r *http.Request, args *PublishBlockchainArgs, reply *PublishBlockchainReply) error {
-	ipc.log.Debug("IPCs: PublishBlockchain called with BlockchainID: %s", args.BlockchainID)
+	ipc.log.Debug("IPCs: PublishBlockchain called",
+		logging.UserString("blockchainID", args.BlockchainID),
+	)
 
 	chainID, err := ipc.chainManager.Lookup(args.BlockchainID)
 	if err != nil {
-		ipc.log.Error("unknown blockchainID: %s", err)
+		ipc.log.Error("chain lookup failed",
+			logging.UserString("blockchainID", args.BlockchainID),
+			zap.Error(err),
+		)
 		return err
 	}
 
 	ipcs, err := ipc.ipcs.Publish(chainID)
 	if err != nil {
-		ipc.log.Error("couldn't publish blockchainID: %s", err)
+		ipc.log.Error("couldn't publish chain",
+			logging.UserString("blockchainID", args.BlockchainID),
+			zap.Error(err),
+		)
 		return err
 	}
 
@@ -84,21 +93,28 @@ type UnpublishBlockchainArgs struct {
 }
 
 // UnpublishBlockchain closes publishing of a blockchainID
-func (ipc *IPCServer) UnpublishBlockchain(r *http.Request, args *UnpublishBlockchainArgs, reply *api.SuccessResponse) error {
-	ipc.log.Debug("IPCs: UnpublishBlockchain called with BlockchainID: %s", args.BlockchainID)
+func (ipc *IPCServer) UnpublishBlockchain(r *http.Request, args *UnpublishBlockchainArgs, _ *api.EmptyReply) error {
+	ipc.log.Debug("IPCs: UnpublishBlockchain called",
+		logging.UserString("blockchainID", args.BlockchainID),
+	)
 
 	chainID, err := ipc.chainManager.Lookup(args.BlockchainID)
 	if err != nil {
-		ipc.log.Error("unknown blockchainID %s: %s", args.BlockchainID, err)
+		ipc.log.Error("chain lookup failed",
+			logging.UserString("blockchainID", args.BlockchainID),
+			zap.Error(err),
+		)
 		return err
 	}
 
 	ok, err := ipc.ipcs.Unpublish(chainID)
 	if !ok {
-		return fmt.Errorf("blockchainID not publishing: %s", chainID)
+		ipc.log.Error("couldn't publish chain",
+			logging.UserString("blockchainID", args.BlockchainID),
+			zap.Error(err),
+		)
 	}
 
-	reply.Success = true
 	return err
 }
 

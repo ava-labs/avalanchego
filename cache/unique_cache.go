@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package cache
@@ -18,7 +18,6 @@ type EvictableLRU struct {
 	Size      int
 }
 
-// Deduplicate implements the Deduplicator interface
 func (c *EvictableLRU) Deduplicate(value Evictable) Evictable {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -26,7 +25,6 @@ func (c *EvictableLRU) Deduplicate(value Evictable) Evictable {
 	return c.deduplicate(value)
 }
 
-// Flush implements the Deduplicator interface
 func (c *EvictableLRU) Flush() {
 	c.lock.Lock()
 	defer c.lock.Unlock()

@@ -1,13 +1,12 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package poll
 
 import (
-	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -50,10 +49,10 @@ func TestCreateAndFinishPoll(t *testing.T) {
 	vtxID := ids.ID{1}
 	votes := []ids.ID{vtxID}
 
-	vdr1 := ids.ShortID{1}
-	vdr2 := ids.ShortID{2} // k = 2
+	vdr1 := ids.NodeID{1}
+	vdr2 := ids.NodeID{2} // k = 2
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -96,23 +95,23 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 	s := NewSet(factory, log, namespace, registerer)
 
 	// create validators
-	vdr1 := ids.ShortID{1}
-	vdr2 := ids.ShortID{2}
-	vdr3 := ids.ShortID{3}
+	vdr1 := ids.NodeID{1}
+	vdr2 := ids.NodeID{2}
+	vdr3 := ids.NodeID{3}
 
-	vdrs := []ids.ShortID{vdr1, vdr2, vdr3}
+	vdrs := []ids.NodeID{vdr1, vdr2, vdr3}
 
 	// create two polls for the two vtxs
-	vdrBag := ids.ShortBag{}
+	vdrBag := ids.NodeIDBag{}
 	vdrBag.Add(vdrs...)
 	added := s.Add(1, vdrBag)
-	assert.True(t, added)
+	require.True(t, added)
 
-	vdrBag = ids.ShortBag{}
+	vdrBag = ids.NodeIDBag{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(2, vdrBag)
-	assert.True(t, added)
-	assert.Equal(t, s.Len(), 2)
+	require.True(t, added)
+	require.Equal(t, s.Len(), 2)
 
 	// vote vtx1 for poll 1
 	// vote vtx2 for poll 2
@@ -123,22 +122,22 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 
 	// vote out of order
 	results = s.Vote(1, vdr1, []ids.ID{vtx1})
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(2, vdr2, []ids.ID{vtx2})
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(2, vdr3, []ids.ID{vtx2})
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 
 	results = s.Vote(1, vdr2, []ids.ID{vtx1})
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 
 	results = s.Vote(1, vdr3, []ids.ID{vtx1}) // poll 1 finished, poll 2 still remaining
-	assert.Len(t, results, 1)                 // because 1 is the oldest
-	assert.Equal(t, vtx1, results[0].List()[0])
+	require.Len(t, results, 1)                // because 1 is the oldest
+	require.Equal(t, vtx1, results[0].List()[0])
 
 	results = s.Vote(2, vdr1, []ids.ID{vtx2}) // poll 2 finished
-	assert.Len(t, results, 1)                 // because 2 is the oldest now
-	assert.Equal(t, vtx2, results[0].List()[0])
+	require.Len(t, results, 1)                // because 2 is the oldest now
+	require.Equal(t, vtx2, results[0].List()[0])
 }
 
 func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
@@ -149,28 +148,28 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 	s := NewSet(factory, log, namespace, registerer)
 
 	// create validators
-	vdr1 := ids.ShortID{1}
-	vdr2 := ids.ShortID{2}
-	vdr3 := ids.ShortID{3}
+	vdr1 := ids.NodeID{1}
+	vdr2 := ids.NodeID{2}
+	vdr3 := ids.NodeID{3}
 
-	vdrs := []ids.ShortID{vdr1, vdr2, vdr3}
+	vdrs := []ids.NodeID{vdr1, vdr2, vdr3}
 
 	// create three polls for the two vtxs
-	vdrBag := ids.ShortBag{}
+	vdrBag := ids.NodeIDBag{}
 	vdrBag.Add(vdrs...)
 	added := s.Add(1, vdrBag)
-	assert.True(t, added)
+	require.True(t, added)
 
-	vdrBag = ids.ShortBag{}
+	vdrBag = ids.NodeIDBag{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(2, vdrBag)
-	assert.True(t, added)
+	require.True(t, added)
 
-	vdrBag = ids.ShortBag{}
+	vdrBag = ids.NodeIDBag{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(3, vdrBag)
-	assert.True(t, added)
-	assert.Equal(t, s.Len(), 3)
+	require.True(t, added)
+	require.Equal(t, s.Len(), 3)
 
 	// vote vtx1 for poll 1
 	// vote vtx2 for poll 2
@@ -184,36 +183,30 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 	// vote out of order
 	// 2 finishes first to create a gap of finished poll between two unfinished polls 1 and 3
 	results = s.Vote(2, vdr3, []ids.ID{vtx2})
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(2, vdr2, []ids.ID{vtx2})
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(2, vdr1, []ids.ID{vtx2})
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 
 	// 3 finishes now, 2 has already finished but 1 is not finished so we expect to receive no results still
 	results = s.Vote(3, vdr2, []ids.ID{vtx3})
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(3, vdr3, []ids.ID{vtx3})
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(3, vdr1, []ids.ID{vtx3})
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 
 	// 1 finishes now, 2 and 3 have already finished so we expect 3 items in results
 	results = s.Vote(1, vdr1, []ids.ID{vtx1})
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(1, vdr2, []ids.ID{vtx1})
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(1, vdr3, []ids.ID{vtx1})
-	assert.Len(t, results, 3)
-	fmt.Println("vtx1", vtx1.String())
-	fmt.Println("vtx2", vtx2.String())
-	fmt.Println("vtx3", vtx3.String())
-	for i, result := range results {
-		fmt.Println("result[", i, "]=", result.List()[0].String())
-	}
-	assert.Equal(t, vtx1.String(), results[0].List()[0].String())
-	assert.Equal(t, vtx2.String(), results[1].List()[0].String())
-	assert.Equal(t, vtx3.String(), results[2].List()[0].String())
+	require.Len(t, results, 3)
+	require.Equal(t, vtx1.String(), results[0].List()[0].String())
+	require.Equal(t, vtx2.String(), results[1].List()[0].String())
+	require.Equal(t, vtx3.String(), results[2].List()[0].String())
 }
 
 func TestSetString(t *testing.T) {
@@ -223,15 +216,15 @@ func TestSetString(t *testing.T) {
 	registerer := prometheus.NewRegistry()
 	s := NewSet(factory, log, namespace, registerer)
 
-	vdr1 := ids.ShortID{1} // k = 1
+	vdr1 := ids.NodeID{1} // k = 1
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(vdr1)
 
 	expected := `current polls: (Size = 1)
     RequestID 0:
         waiting on Bag: (Size = 1)
-            ID[6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt]: Count = 1
+            ID[NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt]: Count = 1
         received UniqueBag: (Size = 0)`
 	if !s.Add(0, vdrs) {
 		t.Fatalf("Should have been able to add a new poll")

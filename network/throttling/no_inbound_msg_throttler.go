@@ -1,9 +1,13 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package throttling
 
-import "github.com/ava-labs/avalanchego/ids"
+import (
+	"context"
+
+	"github.com/ava-labs/avalanchego/ids"
+)
 
 var _ InboundMsgThrottler = &noInboundMsgThrottler{}
 
@@ -12,14 +16,13 @@ func NewNoInboundThrottler() InboundMsgThrottler {
 	return &noInboundMsgThrottler{}
 }
 
-// noMsgThrottler implements MsgThrottler.
 // [Acquire] always returns immediately.
 type noInboundMsgThrottler struct{}
 
-func (*noInboundMsgThrottler) Acquire(uint64, ids.ShortID) {}
+func (*noInboundMsgThrottler) Acquire(context.Context, uint64, ids.NodeID) ReleaseFunc {
+	return noopRelease
+}
 
-func (*noInboundMsgThrottler) Release(uint64, ids.ShortID) {}
+func (*noInboundMsgThrottler) AddNode(ids.NodeID) {}
 
-func (*noInboundMsgThrottler) AddNode(ids.ShortID) {}
-
-func (*noInboundMsgThrottler) RemoveNode(ids.ShortID) {}
+func (*noInboundMsgThrottler) RemoveNode(ids.NodeID) {}

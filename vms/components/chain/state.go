@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package chain
@@ -6,13 +6,14 @@ package chain
 import (
 	"fmt"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // State implements an efficient caching layer used to wrap a VM
@@ -88,16 +89,23 @@ func produceGetStatus(s *State, getBlockIDAtHeight func(uint64) (ids.ID, error))
 		}
 
 		acceptedID, err := getBlockIDAtHeight(blkHeight)
-		if err != nil {
-			return choices.Unknown, fmt.Errorf("failed to get accepted blkID at height %d", blkHeight)
+		switch err {
+		case nil:
+			if acceptedID == blk.ID() {
+				internalBlk.SetStatus(choices.Accepted)
+				return choices.Accepted, nil
+			}
+			internalBlk.SetStatus(choices.Rejected)
+			return choices.Rejected, nil
+		case database.ErrNotFound:
+			// Not found can happen if chain history is missing. In this case,
+			// the block may have been accepted or rejected, it isn't possible
+			// to know here.
+			internalBlk.SetStatus(choices.Processing)
+			return choices.Processing, nil
+		default:
+			return choices.Unknown, fmt.Errorf("%w: failed to get accepted blkID at height %d", err, blkHeight)
 		}
-		if acceptedID == blk.ID() {
-			internalBlk.SetStatus(choices.Accepted)
-			return choices.Accepted, nil
-		}
-
-		internalBlk.SetStatus(choices.Rejected)
-		return choices.Rejected, nil
 	}
 }
 
@@ -177,11 +185,39 @@ func NewMeteredState(
 	return c, nil
 }
 
+// SetLastAcceptedBlock sets the last accepted block to [lastAcceptedBlock]. This should be called
+// with an internal block - not a wrapped block returned from state.
+//
+// This also flushes [lastAcceptedBlock] from missingBlocks and unverifiedBlocks to
+// ensure that their contents stay valid.
+func (s *State) SetLastAcceptedBlock(lastAcceptedBlock snowman.Block) error {
+	if len(s.verifiedBlocks) != 0 {
+		return fmt.Errorf("cannot set chain state last accepted block with non-zero number of verified blocks in processing: %d", len(s.verifiedBlocks))
+	}
+
+	// [lastAcceptedBlock] is no longer missing or unverified, so we evict it from the corresponding
+	// caches.
+	//
+	// Note: there's no need to evict from the decided blocks cache or bytesToIDCache since their
+	// contents will still be valid.
+	lastAcceptedBlockID := lastAcceptedBlock.ID()
+	s.missingBlocks.Evict(lastAcceptedBlockID)
+	s.unverifiedBlocks.Evict(lastAcceptedBlockID)
+	s.lastAcceptedBlock = &BlockWrapper{
+		Block: lastAcceptedBlock,
+		state: s,
+	}
+	s.decidedBlocks.Put(lastAcceptedBlockID, s.lastAcceptedBlock)
+
+	return nil
+}
+
 // Flush each block cache
 func (s *State) Flush() {
 	s.decidedBlocks.Flush()
 	s.missingBlocks.Flush()
 	s.unverifiedBlocks.Flush()
+	s.bytesToIDCache.Flush()
 }
 
 // GetBlock returns the BlockWrapper as snowman.Block corresponding to [blkID]

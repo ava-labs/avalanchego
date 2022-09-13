@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package runner
@@ -10,9 +10,12 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 
+	"golang.org/x/term"
+
 	"github.com/ava-labs/avalanchego/app"
 	"github.com/ava-labs/avalanchego/app/process"
 	"github.com/ava-labs/avalanchego/node"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
 	appplugin "github.com/ava-labs/avalanchego/app/plugin"
 )
@@ -28,7 +31,7 @@ func Run(config Config, nodeConfig node.Config) {
 			Plugins: map[string]plugin.Plugin{
 				appplugin.Name: appplugin.New(nodeApp),
 			},
-			GRPCServer: plugin.DefaultGRPCServer, // A non-nil value here enables gRPC serving for this plugin
+			GRPCServer: grpcutils.NewDefaultServer, // A non-nil value here enables gRPC serving for this plugin
 			Logger: hclog.New(&hclog.LoggerOptions{
 				Level: hclog.Error,
 			}),
@@ -36,7 +39,9 @@ func Run(config Config, nodeConfig node.Config) {
 		return
 	}
 
-	fmt.Println(process.Header)
+	if term.IsTerminal(int(os.Stdout.Fd())) {
+		fmt.Println(process.Header)
+	}
 
 	exitCode := app.Run(nodeApp)
 	os.Exit(exitCode)

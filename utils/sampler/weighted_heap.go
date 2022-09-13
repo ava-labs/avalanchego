@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sampler
@@ -9,14 +9,14 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
+var _ Weighted = &weightedHeap{}
+
 type weightedHeapElement struct {
 	weight           uint64
 	cumulativeWeight uint64
 	index            int
 }
 
-// weightedHeap implements the Weighted interface.
-//
 // Sampling is performed by executing a search over a tree of elements in the
 // order of their probabilistic occurrence.
 //

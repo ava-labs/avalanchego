@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package nodb
@@ -45,14 +45,14 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	return &Iterator{}
 }
 
-// Stat returns an error
-func (*Database) Stat(string) (string, error) { return "", database.ErrClosed }
-
 // Compact returns nil
 func (*Database) Compact(_, _ []byte) error { return database.ErrClosed }
 
 // Close returns nil
 func (*Database) Close() error { return database.ErrClosed }
+
+// HealthCheck returns error
+func (*Database) HealthCheck() (interface{}, error) { return nil, database.ErrClosed }
 
 // Batch does nothing
 type Batch struct{}

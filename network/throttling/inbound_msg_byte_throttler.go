@@ -1,20 +1,23 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package throttling
 
 import (
+	"context"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // See inbound_msg_throttler.go
@@ -34,11 +37,11 @@ func newInboundMsgByteThrottler(
 			remainingVdrBytes:      config.VdrAllocSize,
 			remainingAtLargeBytes:  config.AtLargeAllocSize,
 			nodeMaxAtLargeBytes:    config.NodeMaxAtLargeBytes,
-			nodeToVdrBytesUsed:     make(map[ids.ShortID]uint64),
-			nodeToAtLargeBytesUsed: make(map[ids.ShortID]uint64),
+			nodeToVdrBytesUsed:     make(map[ids.NodeID]uint64),
+			nodeToAtLargeBytesUsed: make(map[ids.NodeID]uint64),
 		},
-		waitingToAcquire:    linkedhashmap.New(),
-		nodeToWaitingMsgIDs: make(map[ids.ShortID][]uint64),
+		waitingToAcquire:   linkedhashmap.New(),
+		nodeToWaitingMsgID: make(map[ids.NodeID]uint64),
 	}
 	return t, t.metrics.initialize(namespace, registerer)
 }
@@ -47,13 +50,14 @@ func newInboundMsgByteThrottler(
 type msgMetadata struct {
 	// Need this many more bytes before Acquire returns
 	bytesNeeded uint64
+	// The number of bytes that were attempted to be acquired
+	msgSize uint64
 	// The sender of this incoming message
-	nodeID ids.ShortID
+	nodeID ids.NodeID
 	// Closed when the message can be read.
 	closeOnAcquireChan chan struct{}
 }
 
-// msgThrottler implements MsgThrottler.
 // It gives more space to validators with more stake.
 // Messages are guaranteed to make progress toward
 // acquiring enough bytes to be read.
@@ -61,41 +65,51 @@ type inboundMsgByteThrottler struct {
 	commonMsgThrottler
 	metrics   inboundMsgByteThrottlerMetrics
 	nextMsgID uint64
-	// Node ID --> IDs of messages this node is waiting to acquire,
-	// order from oldest to most recent.
-	nodeToWaitingMsgIDs map[ids.ShortID][]uint64
+	// Node ID --> Msg ID for a message this node is waiting to acquire
+	nodeToWaitingMsgID map[ids.NodeID]uint64
 	// Msg ID --> *msgMetadata
 	waitingToAcquire linkedhashmap.LinkedHashmap
-	// Invariant: The relative order of messages from a given node
-	// are the same in nodeToWaitingMsgIDs[nodeID] and waitingToAcquire.
-	// That is, if nodeToAtLargeBytesUsed[nodeID] is [msg0, msg1, msg2]
-	// then	waitingToAcquire is [..., msg0, ..., msg1, ..., msg2, ...]
-	// where each ... is 0 or more messages.
+	// Invariant: The node is only waiting on a single message at a time
 	//
-	// Invariant: waitingToAcquire.Get(nodeToWaitingMsgIDs[nodeID][0])
+	// Invariant: waitingToAcquire.Get(nodeToWaitingMsgIDs[nodeID])
 	// is the info about the message [nodeID] that has been blocking
-	// on reading longest
+	// on reading.
 	//
-	// Invariant: len(nodeToWaitingMsgIDs[nodeID]) >= 1 for some nodeID
+	// Invariant: len(nodeToWaitingMsgIDs) >= 1
 	// implies waitingToAcquire.Len() >= 1, and vice versa.
 }
 
 // Returns when we can read a message of size [msgSize] from node [nodeID].
-// Release([msgSize], [nodeID]) must be called (!) when done with the message
+// The returned ReleaseFunc must be called (!) when done with the message
 // or when we give up trying to read the message, if applicable.
-func (t *inboundMsgByteThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
+func (t *inboundMsgByteThrottler) Acquire(ctx context.Context, msgSize uint64, nodeID ids.NodeID) ReleaseFunc {
 	startTime := time.Now()
 	defer func() {
 		t.metrics.awaitingRelease.Inc()
 		t.metrics.acquireLatency.Observe(float64(time.Since(startTime)))
 	}()
+	metadata := &msgMetadata{
+		bytesNeeded: msgSize,
+		msgSize:     msgSize,
+		nodeID:      nodeID,
+	}
 
-	bytesNeeded := msgSize
 	t.lock.Lock()
+
+	// If there is already a message waiting, log the error but continue
+	if existingID, exists := t.nodeToWaitingMsgID[nodeID]; exists {
+		t.log.Error("node already waiting on message",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint64("messageID", existingID),
+		)
+		t.lock.Unlock()
+		return t.metrics.awaitingRelease.Dec
+	}
+
 	// Take as many bytes as we can from the at-large allocation.
 	atLargeBytesUsed := math.Min64(
 		// only give as many bytes as needed
-		bytesNeeded,
+		metadata.bytesNeeded,
 		// don't exceed per-node limit
 		t.nodeMaxAtLargeBytes-t.nodeToAtLargeBytesUsed[nodeID],
 		// don't give more bytes than are in the allocation
@@ -104,11 +118,11 @@ func (t *inboundMsgByteThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 	if atLargeBytesUsed > 0 {
 		t.remainingAtLargeBytes -= atLargeBytesUsed
 		t.metrics.remainingAtLargeBytes.Set(float64(t.remainingAtLargeBytes))
-		bytesNeeded -= atLargeBytesUsed
+		metadata.bytesNeeded -= atLargeBytesUsed
 		t.nodeToAtLargeBytesUsed[nodeID] += atLargeBytesUsed
-		if bytesNeeded == 0 { // If we acquired enough bytes, return
+		if metadata.bytesNeeded == 0 { // If we acquired enough bytes, return
 			t.lock.Unlock()
-			return
+			return func() { t.release(metadata, nodeID) }
 		}
 	}
 
@@ -129,16 +143,16 @@ func (t *inboundMsgByteThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 	} else {
 		vdrBytesAllowed -= vdrBytesAlreadyUsed
 	}
-	vdrBytesUsed := math.Min64(t.remainingVdrBytes, bytesNeeded, vdrBytesAllowed)
+	vdrBytesUsed := math.Min64(t.remainingVdrBytes, metadata.bytesNeeded, vdrBytesAllowed)
 	if vdrBytesUsed > 0 {
 		// Mark that [nodeID] used [vdrBytesUsed] from its validator allocation
 		t.nodeToVdrBytesUsed[nodeID] += vdrBytesUsed
 		t.remainingVdrBytes -= vdrBytesUsed
 		t.metrics.remainingVdrBytes.Set(float64(t.remainingVdrBytes))
-		bytesNeeded -= vdrBytesUsed
-		if bytesNeeded == 0 { // If we acquired enough bytes, return
+		metadata.bytesNeeded -= vdrBytesUsed
+		if metadata.bytesNeeded == 0 { // If we acquired enough bytes, return
 			t.lock.Unlock()
-			return
+			return func() { t.release(metadata, nodeID) }
 		}
 	}
 
@@ -147,27 +161,36 @@ func (t *inboundMsgByteThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 
 	// [closeOnAcquireChan] is closed when [msgSize] bytes have
 	// been acquired and the message can be read.
-	closeOnAcquireChan := make(chan struct{})
+	metadata.closeOnAcquireChan = make(chan struct{})
 	t.nextMsgID++
 	msgID := t.nextMsgID
 	t.waitingToAcquire.Put(
 		msgID,
-		&msgMetadata{
-			bytesNeeded:        bytesNeeded,
-			nodeID:             nodeID,
-			closeOnAcquireChan: closeOnAcquireChan,
-		},
+		metadata,
 	)
-	t.nodeToWaitingMsgIDs[nodeID] = append(t.nodeToWaitingMsgIDs[nodeID], msgID)
+
+	t.nodeToWaitingMsgID[nodeID] = msgID
 	t.lock.Unlock()
 
 	t.metrics.awaitingAcquire.Inc()
-	<-closeOnAcquireChan // We've acquired enough bytes
-	t.metrics.awaitingAcquire.Dec()
+	defer t.metrics.awaitingAcquire.Dec()
+
+	select {
+	case <-metadata.closeOnAcquireChan:
+	case <-ctx.Done():
+		t.lock.Lock()
+		t.waitingToAcquire.Delete(msgID)
+		delete(t.nodeToWaitingMsgID, nodeID)
+		t.lock.Unlock()
+	}
+
+	return func() {
+		t.release(metadata, nodeID)
+	}
 }
 
 // Must correspond to a previous call of Acquire([msgSize], [nodeID])
-func (t *inboundMsgByteThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
+func (t *inboundMsgByteThrottler) release(metadata *msgMetadata, nodeID ids.NodeID) {
 	t.lock.Lock()
 	defer func() {
 		t.metrics.remainingAtLargeBytes.Set(float64(t.remainingAtLargeBytes))
@@ -180,12 +203,13 @@ func (t *inboundMsgByteThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
 	// that will be given back to [nodeID]'s validator allocation
 	// or messages from [nodeID] currently waiting to acquire bytes.
 	vdrBytesUsed := t.nodeToVdrBytesUsed[nodeID]
-	vdrBytesToReturn := math.Min64(msgSize, vdrBytesUsed)
+	releasedBytes := metadata.msgSize - metadata.bytesNeeded
+	vdrBytesToReturn := math.Min64(releasedBytes, vdrBytesUsed)
 
 	// [atLargeBytesToReturn] is the number of bytes from [msgSize]
 	// that will be given to the at-large allocation or a message
 	// from any node currently waiting to acquire bytes.
-	atLargeBytesToReturn := msgSize - vdrBytesToReturn
+	atLargeBytesToReturn := releasedBytes - vdrBytesToReturn
 	if atLargeBytesToReturn > 0 {
 		// Mark that [nodeID] has released these bytes.
 		t.remainingAtLargeBytes += atLargeBytesToReturn
@@ -223,38 +247,35 @@ func (t *inboundMsgByteThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
 				// Unblock the corresponding thread in Acquire
 				close(msg.closeOnAcquireChan)
 				// Mark that this message is no longer waiting to acquire bytes
-				t.nodeToWaitingMsgIDs[msg.nodeID] = t.nodeToWaitingMsgIDs[msg.nodeID][1:]
-				if len(t.nodeToWaitingMsgIDs[msg.nodeID]) == 0 {
-					delete(t.nodeToWaitingMsgIDs, msg.nodeID)
-				}
+				delete(t.nodeToWaitingMsgID, msg.nodeID)
+
 				t.waitingToAcquire.Delete(iter.Key())
 			}
 		}
 	}
 
-	for vdrBytesToReturn > 0 && len(t.nodeToWaitingMsgIDs[nodeID]) > 0 {
-		// Get the next message from [nodeID] waiting to acquire
-		msgID := t.nodeToWaitingMsgIDs[nodeID][0]
+	// Get the message from [nodeID], if any, waiting to acquire
+	msgID, ok := t.nodeToWaitingMsgID[nodeID]
+	if vdrBytesToReturn > 0 && ok {
 		msgIntf, exists := t.waitingToAcquire.Get(msgID)
-		if !exists {
-			// This should never happen
-			t.log.Warn("couldn't find message %s from %s%s", msgID, constants.NodeIDPrefix, nodeID)
-			break
-		}
-		// Give [msg] all the bytes we can
-		msg := msgIntf.(*msgMetadata)
-		bytesToGive := math.Min64(msg.bytesNeeded, vdrBytesToReturn)
-		msg.bytesNeeded -= bytesToGive
-		vdrBytesToReturn -= bytesToGive
-		if msg.bytesNeeded == 0 {
-			// Unblock the corresponding thread in Acquire
-			close(msg.closeOnAcquireChan)
-			// Mark that this message is no longer waiting to acquire bytes
-			t.nodeToWaitingMsgIDs[nodeID] = t.nodeToWaitingMsgIDs[nodeID][1:]
-			if len(t.nodeToWaitingMsgIDs[nodeID]) == 0 {
-				delete(t.nodeToWaitingMsgIDs, nodeID)
+		if exists {
+			// Give [msg] all the bytes we can
+			msg := msgIntf.(*msgMetadata)
+			bytesToGive := math.Min64(msg.bytesNeeded, vdrBytesToReturn)
+			msg.bytesNeeded -= bytesToGive
+			vdrBytesToReturn -= bytesToGive
+			if msg.bytesNeeded == 0 {
+				// Unblock the corresponding thread in Acquire
+				close(msg.closeOnAcquireChan)
+				delete(t.nodeToWaitingMsgID, nodeID)
+				t.waitingToAcquire.Delete(msgID)
 			}
-			t.waitingToAcquire.Delete(msgID)
+		} else {
+			// This should never happen
+			t.log.Warn("couldn't find message",
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint64("messageID", msgID),
+			)
 		}
 	}
 	if vdrBytesToReturn > 0 {

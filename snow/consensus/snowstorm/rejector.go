@@ -1,14 +1,16 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowstorm
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/events"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-// rejector implements Blockable
+var _ events.Blockable = &rejector{}
+
 type rejector struct {
 	g        *Directed
 	errs     *wrappers.Errs

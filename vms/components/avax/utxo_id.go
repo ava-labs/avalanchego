@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
@@ -11,9 +11,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
-var errNilUTXOID = errors.New("nil utxo ID is not valid")
+var (
+	errNilUTXOID = errors.New("nil utxo ID is not valid")
+
+	_ verify.Verifiable = &UTXOID{}
+)
 
 type UTXOID struct {
 	// Serialized:
@@ -45,7 +50,6 @@ func (utxo *UTXOID) String() string {
 	return fmt.Sprintf("%s:%d", utxo.TxID, utxo.OutputIndex)
 }
 
-// Verify implements the verify.Verifiable interface
 func (utxo *UTXOID) Verify() error {
 	switch {
 	case utxo == nil:

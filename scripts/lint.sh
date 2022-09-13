@@ -24,7 +24,7 @@ fi
 TESTS=${TESTS:-"golangci_lint license_header"}
 
 function test_golangci_lint {
-  go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.43.0
+  go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.47.2
   golangci-lint run --config .golangci.yml
 }
 
@@ -45,14 +45,9 @@ function test_license_header {
   local files=()
   while IFS= read -r line; do files+=("$line"); done < <(find_go_files "${target}")
 
-  # ignore 3rd party code
   addlicense \
   -f ./LICENSE.header \
   ${_addlicense_flags} \
-  --ignore 'utils/ip_test.go' \
-  --ignore 'utils/logging/highlight.go' \
-  --ignore 'utils/ulimit/ulimit_non_unix.go.go' \
-  --ignore 'utils/ulimit/ulimit_unix.go' \
   "${files[@]}"
 }
 

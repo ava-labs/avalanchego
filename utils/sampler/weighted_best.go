@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sampler
@@ -8,14 +8,17 @@ import (
 	"math"
 	"time"
 
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var errNoValidWeightedSamplers = errors.New("no valid weighted samplers found")
+var (
+	errNoValidWeightedSamplers = errors.New("no valid weighted samplers found")
 
-// weightedBest implements the Weighted interface.
-//
+	_ Weighted = &weightedBest{}
+)
+
 // Sampling is performed by using another implementation of the Weighted
 // interface.
 //

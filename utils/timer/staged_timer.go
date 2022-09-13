@@ -8,6 +8,9 @@ import "time"
 // NewStagedTimer returns a timer that will execute [f]
 // when a timeout occurs and execute an additional timeout after
 // the returned duration if [f] returns true and some duration.
+//
+// Deprecated: NewStagedTimer exists for historical compatibility
+// and should not be used.
 func NewStagedTimer(f func() (time.Duration, bool)) *Timer {
 	t := NewTimer(nil)
 	t.handler = func() {

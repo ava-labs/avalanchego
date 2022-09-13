@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
@@ -17,13 +18,13 @@ type Config struct {
 	Validators validators.Set
 	Beacons    validators.Set
 
-	SampleK       int
-	StartupAlpha  uint64
-	Alpha         uint64
-	Sender        Sender
-	Bootstrapable Bootstrapable
-	Subnet        Subnet
-	Timer         Timer
+	SampleK        int
+	Alpha          uint64
+	StartupTracker tracker.Startup
+	Sender         Sender
+	Bootstrapable  Bootstrapable
+	Subnet         Subnet
+	Timer          Timer
 
 	// Should Bootstrap be retried
 	RetryBootstrap bool
@@ -45,7 +46,6 @@ type Config struct {
 	SharedCfg *SharedConfig
 }
 
-// Context implements the Engine interface
 func (c *Config) Context() *snow.ConsensusContext { return c.Ctx }
 
 // IsBootstrapped returns true iff this chain is done bootstrapping

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avalanche
@@ -43,7 +43,7 @@ type Consensus interface {
 	// VertexIssued returns true iff Vertex has been added
 	VertexIssued(Vertex) bool
 
-	// TxIssued returns true if a vertex containing this transanction has been added
+	// TxIssued returns true if a vertex containing this transaction has been added
 	TxIssued(snowstorm.Tx) bool
 
 	// Returns the set of transaction IDs that are virtuous but not contained in

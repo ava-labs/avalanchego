@@ -6,21 +6,21 @@ package bls
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-func TestT(t *testing.T) {
-	assert := assert.New(t)
+func TestAggregation(t *testing.T) {
+	require := require.New(t)
 
 	// People in the network would privately generate their secret keys
 	sk0, err := NewSecretKey()
-	assert.NoError(err)
+	require.NoError(err)
 	sk1, err := NewSecretKey()
-	assert.NoError(err)
+	require.NoError(err)
 	sk2, err := NewSecretKey()
-	assert.NoError(err)
+	require.NoError(err)
 
 	// All the public keys would be registered on chain
 	pks := []*PublicKey{
@@ -54,29 +54,19 @@ func TestT(t *testing.T) {
 		filteredSigs[i] = sig
 
 		valid := Verify(pk, sig, msg)
-		assert.True(valid)
+		require.True(valid)
 	}
 
 	// Once the aggregator has the required threshold of signatures, it can
 	// aggregate the signatures.
 	aggregatedSig, ok := AggregateSignatures(filteredSigs)
-	assert.True(ok)
+	require.True(ok)
 
 	// For anyone looking for a proof of the aggregated signature's correctness,
 	// they can aggregate the public keys and verify the aggregated signature.
 	aggregatedPK, ok := AggregatePublicKeys(filteredPKs)
-	assert.True(ok)
+	require.True(ok)
 
 	valid := Verify(aggregatedPK, aggregatedSig, msg)
-	assert.True(valid)
-
-	pkBytes := PublicKeyToBytes(aggregatedPK)
-	sigBytes := SignatureToBytes(aggregatedSig)
-
-	t.Fatalf(
-		"\n%d: %v"+
-			"\n%d: %v",
-		len(pkBytes), pkBytes,
-		len(sigBytes), sigBytes,
-	)
+	require.True(valid)
 }

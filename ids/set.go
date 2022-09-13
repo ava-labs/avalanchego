@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ids
@@ -73,8 +73,7 @@ func (ids *Set) Contains(id ID) bool {
 func (ids *Set) Overlaps(big Set) bool {
 	small := *ids
 	if small.Len() > big.Len() {
-		small = big
-		big = *ids
+		small, big = big, small
 	}
 
 	for id := range small {

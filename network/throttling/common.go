@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package throttling
@@ -33,9 +33,9 @@ type commonMsgThrottler struct {
 	// Number of bytes left in the at-large byte allocation
 	remainingAtLargeBytes uint64
 	// Node ID --> Bytes they've taken from the validator allocation
-	nodeToVdrBytesUsed map[ids.ShortID]uint64
+	nodeToVdrBytesUsed map[ids.NodeID]uint64
 	// Node ID --> Bytes they've taken from the at-large allocation
-	nodeToAtLargeBytesUsed map[ids.ShortID]uint64
+	nodeToAtLargeBytesUsed map[ids.NodeID]uint64
 	// Max number of unprocessed bytes from validators
 	maxVdrBytes uint64
 }

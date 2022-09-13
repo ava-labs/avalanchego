@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
@@ -6,6 +6,8 @@ package snowball
 import (
 	"fmt"
 )
+
+var _ UnarySnowball = &unarySnowball{}
 
 // unarySnowball is the implementation of a unary snowball instance
 type unarySnowball struct {
@@ -16,13 +18,11 @@ type unarySnowball struct {
 	numSuccessfulPolls int
 }
 
-// RecordSuccessfulPoll implements the UnarySnowball interface
 func (sb *unarySnowball) RecordSuccessfulPoll() {
 	sb.numSuccessfulPolls++
 	sb.unarySnowflake.RecordSuccessfulPoll()
 }
 
-// Extend implements the UnarySnowball interface
 func (sb *unarySnowball) Extend(beta int, choice int) BinarySnowball {
 	bs := &binarySnowball{
 		binarySnowflake: binarySnowflake{
@@ -37,7 +37,6 @@ func (sb *unarySnowball) Extend(beta int, choice int) BinarySnowball {
 	return bs
 }
 
-// Clone implements the UnarySnowball interface
 func (sb *unarySnowball) Clone() UnarySnowball {
 	newSnowball := *sb
 	return &newSnowball

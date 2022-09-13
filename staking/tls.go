@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package staking
@@ -10,6 +10,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"math/big"
 	"os"
@@ -18,6 +19,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
+
+var errDuplicateExtension = errors.New("duplicate certificate extension")
 
 // InitNodeStakingKeyPair generates a self-signed TLS key/cert pair to use in
 // staking. The key and files will be placed at [keyPath] and [certPath],
@@ -80,7 +83,10 @@ func LoadTLSCertFromBytes(keyBytes, certBytes []byte) (*tls.Certificate, error) 
 	}
 
 	cert.Leaf, err = x509.ParseCertificate(cert.Certificate[0])
-	return &cert, err
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing cert: %w", err)
+	}
+	return &cert, VerifyCertificate(cert.Leaf)
 }
 
 func LoadTLSCertFromFiles(keyPath, certPath string) (*tls.Certificate, error) {
@@ -89,7 +95,10 @@ func LoadTLSCertFromFiles(keyPath, certPath string) (*tls.Certificate, error) {
 		return nil, err
 	}
 	cert.Leaf, err = x509.ParseCertificate(cert.Certificate[0])
-	return &cert, err
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing cert: %w", err)
+	}
+	return &cert, VerifyCertificate(cert.Leaf)
 }
 
 func NewTLSCert() (*tls.Certificate, error) {
@@ -141,4 +150,16 @@ func NewCertAndKeyBytes() ([]byte, []byte, error) {
 		return nil, nil, fmt.Errorf("couldn't write private key: %w", err)
 	}
 	return certBuff.Bytes(), keyBuff.Bytes(), nil
+}
+
+func VerifyCertificate(cert *x509.Certificate) error {
+	extensionSet := make(map[string]struct{}, len(cert.Extensions))
+	for _, extension := range cert.Extensions {
+		idStr := extension.Id.String()
+		if _, ok := extensionSet[idStr]; ok {
+			return errDuplicateExtension
+		}
+		extensionSet[idStr] = struct{}{}
+	}
+	return nil
 }

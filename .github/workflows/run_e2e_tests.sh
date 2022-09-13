@@ -10,7 +10,7 @@ avalanchego_byzantine_repo="avaplatform/avalanche-byzantine"
 
 # Define avalanche-testing and avalanche-byzantine versions to use
 avalanche_testing_image="avaplatform/avalanche-testing:master"
-avalanchego_byzantine_image="avaplatform/avalanche-byzantine:update-avalanchego-v1.7.0"
+avalanchego_byzantine_image="avaplatform/avalanche-byzantine:master"
 
 # Fetch the images
 # If Docker Credentials are not available fail
@@ -59,16 +59,17 @@ echo "Running Avalanche Byzantine Image: ${avalanchego_byzantine_image}"
 echo "Git Commit ID : ${git_commit_id}"
 echo ""
 
-# >>>>>>>> avalanche-testing custom parameters <<<<<<<<<<<<<
-custom_params_json="{
-    \"isKurtosisCoreDevMode\": false,
-    \"avalanchegoImage\":\"${avalanche_image}\",
-    \"avalanchegoByzantineImage\":\"${avalanchego_byzantine_image}\",
-    \"testBatch\":\"${testBatch}\"
-}"
-# >>>>>>>> avalanche-testing custom parameters <<<<<<<<<<<<<
-
-bash "$AVALANCHE_PATH/.kurtosis/kurtosis.sh" \
-    --custom-params "${custom_params_json}" \
-    ${1+"${@}"} \
-    "${avalanche_testing_image}" 
+# TODO: restore
+# # >>>>>>>> avalanche-testing custom parameters <<<<<<<<<<<<<
+# custom_params_json="{
+#     \"isKurtosisCoreDevMode\": false,
+#     \"avalanchegoImage\":\"${avalanche_image}\",
+#     \"avalanchegoByzantineImage\":\"${avalanchego_byzantine_image}\",
+#     \"testBatch\":\"${testBatch}\"
+# }"
+# # >>>>>>>> avalanche-testing custom parameters <<<<<<<<<<<<<
+#
+# bash "$AVALANCHE_PATH/.kurtosis/kurtosis.sh" \
+#     --custom-params "${custom_params_json}" \
+#     ${1+"${@}"} \
+#     "${avalanche_testing_image}"

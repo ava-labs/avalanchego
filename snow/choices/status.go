@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package choices
@@ -14,7 +14,7 @@ var errUnknownStatus = errors.New("unknown status")
 type Status uint32
 
 // List of possible status values
-// [Unknown] Zero value, means the status is not known
+// [Unknown] Zero value, means the operation is not known
 // [Processing] means the operation is known, but hasn't been decided yet
 // [Rejected] means the operation will never be accepted
 // [Accepted] means the operation was accepted

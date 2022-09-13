@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -10,11 +10,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	"github.com/ava-labs/avalanchego/utils/formatting"
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 type WalletService struct {
@@ -34,7 +35,7 @@ func (w *WalletService) decided(txID ids.ID) {
 }
 
 func (w *WalletService) issue(txBytes []byte) (ids.ID, error) {
-	tx, err := w.vm.parsePrivateTx(txBytes)
+	tx, err := w.vm.parser.Parse(txBytes)
 	if err != nil {
 		return ids.ID{}, err
 	}
@@ -59,8 +60,8 @@ func (w *WalletService) update(utxos []*avax.UTXO) ([]*avax.UTXO, error) {
 	}
 
 	for e := w.pendingTxOrdering.Front(); e != nil; e = e.Next() {
-		tx := e.Value.(*Tx)
-		for _, inputUTXO := range tx.InputUTXOs() {
+		tx := e.Value.(*txs.Tx)
+		for _, inputUTXO := range tx.Unsigned.InputUTXOs() {
 			if inputUTXO.Symbolic() {
 				continue
 			}
@@ -87,7 +88,9 @@ func (w *WalletService) update(utxos []*avax.UTXO) ([]*avax.UTXO, error) {
 
 // IssueTx attempts to issue a transaction into consensus
 func (w *WalletService) IssueTx(r *http.Request, args *api.FormattedTx, reply *api.JSONTxID) error {
-	w.vm.ctx.Log.Debug("AVM Wallet: IssueTx called with %s", args.Tx)
+	w.vm.ctx.Log.Debug("AVM Wallet: IssueTx called",
+		logging.UserString("tx", args.Tx),
+	)
 
 	txBytes, err := formatting.Decode(args.Encoding, args.Tx)
 	if err != nil {
@@ -109,7 +112,9 @@ func (w *WalletService) Send(r *http.Request, args *SendArgs, reply *api.JSONTxI
 
 // SendMultiple sends a transaction with multiple outputs.
 func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, reply *api.JSONTxIDChangeAddr) error {
-	w.vm.ctx.Log.Debug("AVM Wallet: SendMultiple called with username: %s", args.Username)
+	w.vm.ctx.Log.Debug("AVM Wallet: SendMultiple",
+		logging.UserString("username", args.Username),
+	)
 
 	// Validate the memo field
 	memoBytes := []byte(args.Memo)
@@ -122,13 +127,9 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 	}
 
 	// Parse the from addresses
-	fromAddrs := ids.NewShortSet(len(args.From))
-	for _, addrStr := range args.From {
-		addr, err := w.vm.ParseLocalAddress(addrStr)
-		if err != nil {
-			return fmt.Errorf("couldn't parse 'From' address %s: %w", addrStr, err)
-		}
-		fromAddrs.Add(addr)
+	fromAddrs, err := avax.ParseServiceAddresses(w.vm, args.From)
+	if err != nil {
+		return fmt.Errorf("couldn't parse 'From' addresses: %w", err)
 	}
 
 	// Load user's UTXOs/keys
@@ -171,14 +172,14 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 			assetIDs[output.AssetID] = assetID
 		}
 		currentAmount := amounts[assetID]
-		newAmount, err := safemath.Add64(currentAmount, uint64(output.Amount))
+		newAmount, err := math.Add64(currentAmount, uint64(output.Amount))
 		if err != nil {
 			return fmt.Errorf("problem calculating required spend amount: %w", err)
 		}
 		amounts[assetID] = newAmount
 
 		// Parse the to address
-		to, err := w.vm.ParseLocalAddress(output.To)
+		to, err := avax.ParseServiceAddress(w.vm, output.To)
 		if err != nil {
 			return fmt.Errorf("problem parsing to address %q: %w", output.To, err)
 		}
@@ -202,7 +203,7 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 		amountsWithFee[assetKey] = amount
 	}
 
-	amountWithFee, err := safemath.Add64(amounts[w.vm.feeAssetID], w.vm.TxFee)
+	amountWithFee, err := math.Add64(amounts[w.vm.feeAssetID], w.vm.TxFee)
 	if err != nil {
 		return fmt.Errorf("problem calculating required spend amount: %w", err)
 	}
@@ -235,16 +236,18 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 			})
 		}
 	}
-	avax.SortTransferableOutputs(outs, w.vm.codec)
 
-	tx := Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+	codec := w.vm.parser.Codec()
+	avax.SortTransferableOutputs(outs, codec)
+
+	tx := txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    w.vm.ctx.NetworkID,
 		BlockchainID: w.vm.ctx.ChainID,
 		Outs:         outs,
 		Ins:          ins,
 		Memo:         memoBytes,
 	}}}
-	if err := tx.SignSECP256K1Fx(w.vm.codec, keys); err != nil {
+	if err := tx.SignSECP256K1Fx(codec, keys); err != nil {
 		return err
 	}
 

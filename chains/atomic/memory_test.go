@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package atomic
@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var (
@@ -17,11 +16,7 @@ var (
 )
 
 func TestMemorySharedID(t *testing.T) {
-	m := Memory{}
-	err := m.Initialize(logging.NoLog{}, memdb.New())
-	if err != nil {
-		t.Fatal(err)
-	}
+	m := NewMemory(memdb.New())
 
 	sharedID0 := m.sharedID(blockchainID0, blockchainID1)
 	sharedID1 := m.sharedID(blockchainID1, blockchainID0)
@@ -32,11 +27,7 @@ func TestMemorySharedID(t *testing.T) {
 }
 
 func TestMemoryMakeReleaseLock(t *testing.T) {
-	m := Memory{}
-	err := m.Initialize(logging.NoLog{}, memdb.New())
-	if err != nil {
-		t.Fatal(err)
-	}
+	m := NewMemory(memdb.New())
 
 	sharedID := m.sharedID(blockchainID0, blockchainID1)
 
@@ -60,11 +51,7 @@ func TestMemoryMakeReleaseLock(t *testing.T) {
 }
 
 func TestMemoryUnknownFree(t *testing.T) {
-	m := Memory{}
-	err := m.Initialize(logging.NoLog{}, memdb.New())
-	if err != nil {
-		t.Fatal(err)
-	}
+	m := NewMemory(memdb.New())
 
 	sharedID := m.sharedID(blockchainID0, blockchainID1)
 

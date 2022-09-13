@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowstorm
@@ -13,7 +13,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -628,16 +628,13 @@ func AddNonEmptyWhitelistTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
+	ctx := snow.DefaultConsensusContextTest()
+	reg := prometheus.NewRegistry()
+	ctx.Registerer = reg
+	err := graph.Initialize(ctx, params)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	inputA := ids.Empty.Prefix(1000)
-	inputB := ids.Empty.Prefix(2000)
-	inputC := ids.Empty.Prefix(3000)
-	inputD := ids.Empty.Prefix(4000)
-	inputE := ids.Empty.Prefix(5000)
 
 	/*
 	                    [tx1]
@@ -653,63 +650,110 @@ func AddNonEmptyWhitelistTest(t *testing.T, factory Factory) {
 	               stx5 conflicts with stx7
 	               stx7 conflicts with tx3
 	               stx7 conflicts with tx4
-	               stx7 conflicts with stx5
 	*/
-	tx1 := createTestTx(1, inputA, inputB)
-
-	// tx1 is prev tx that spends A, so tx2.out = tx1
-	// tx1 is prev tx that spends B, so tx3.out = tx1
-	tx2 := createTestTx(2, inputA, inputD)
-	tx3 := createTestTx(3, inputB)
-
-	// tx2 is prev tx that spends A, so tx4.out = tx2
-	// tx3 is prev tx that spends B, so tx4.out = tx3
-	tx4 := createTestTx(4, inputA, inputB, inputC)
-
-	// stx5 as stop vertex
-	// when added, no conflict
-	stx5 := createTestTx(5)
-	stx5.InputIDsV = []ids.ID{stx5.IDV}
-	stx5.WhitelistIsV = true
-	stx5.WhitelistV = ids.Set{
-		tx1.IDV: struct{}{},
-		tx2.IDV: struct{}{},
-		tx3.IDV: struct{}{},
-		tx4.IDV: struct{}{},
+	tx1 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(1),
+			StatusV: choices.Processing,
+		},
+		InputIDsV: []ids.ID{ids.GenerateTestID()},
+		BytesV:    []byte{1},
 	}
-
-	// tx2 is prev tx that spends D, so tx6.out = tx2
-	tx6 := createTestTx(6, inputD, inputE)
-
-	// stx7 as stop vertex
-	// tx6 is prev tx that spends E, so stx7.out = tx6
-	stx7 := createTestTx(7)
-	stx7.InputIDsV = []ids.ID{stx7.IDV}
-	stx7.WhitelistIsV = true
-	stx7.WhitelistV = ids.Set{
-		tx1.IDV: struct{}{},
-		tx2.IDV: struct{}{},
-		tx6.IDV: struct{}{},
+	tx2 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(2),
+			StatusV: choices.Processing,
+		},
+		InputIDsV:     []ids.ID{ids.GenerateTestID()},
+		DependenciesV: []Tx{tx1},
+		BytesV:        []byte{2},
+	}
+	tx3 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(3),
+			StatusV: choices.Processing,
+		},
+		InputIDsV:     []ids.ID{ids.GenerateTestID()},
+		DependenciesV: []Tx{tx1},
+		BytesV:        []byte{3},
+	}
+	tx4 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(4),
+			StatusV: choices.Processing,
+		},
+		InputIDsV:     []ids.ID{ids.GenerateTestID()},
+		DependenciesV: []Tx{tx2, tx3},
+		BytesV:        []byte{4},
+	}
+	stx5 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(5),
+			StatusV: choices.Processing,
+		},
+		InputIDsV:     []ids.ID{ids.GenerateTestID()},
+		DependenciesV: []Tx{tx1, tx2, tx3, tx4},
+		HasWhitelistV: true,
+		WhitelistV: ids.Set{
+			tx1.IDV: struct{}{},
+			tx2.IDV: struct{}{},
+			tx3.IDV: struct{}{},
+			tx4.IDV: struct{}{},
+		},
+		BytesV: []byte{5},
+	}
+	tx6 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(6),
+			StatusV: choices.Processing,
+		},
+		InputIDsV:     []ids.ID{ids.GenerateTestID()},
+		DependenciesV: []Tx{tx2},
+		BytesV:        []byte{6},
+	}
+	stx7 := &TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(7),
+			StatusV: choices.Processing,
+		},
+		InputIDsV:     []ids.ID{ids.GenerateTestID()},
+		DependenciesV: []Tx{tx1, tx2, tx6},
+		HasWhitelistV: true,
+		WhitelistV: ids.Set{
+			tx1.IDV: struct{}{},
+			tx2.IDV: struct{}{},
+			tx6.IDV: struct{}{},
+		},
+		BytesV: []byte{7},
 	}
 
 	txs := []*TestTx{tx1, tx2, tx3, tx4, stx5, tx6, stx7}
-	for i, tx := range txs {
-		t.Logf("adding transaction[%02d]: %v", i+1, tx.IDV)
-		if err := tx.Verify(); err != nil {
-			t.Fatal(err)
-		}
+	for _, tx := range txs {
 		if err := graph.Add(tx); err != nil {
 			t.Fatal(err)
 		}
 	}
 
+	// check if stop vertex has been issued but not accepted
+	mss := gatherCounterGauge(t, reg)
+	require.Equal(t, 5., mss["rogue_tx_processing"])
+	require.Equal(t, 2., mss["virtuous_tx_processing"])
+	require.Equal(t, 0., mss["whitelist_tx_accepted_count"])
+	require.Equal(t, 2., mss["whitelist_tx_processing"])
+
 	vset1 := graph.Virtuous()
-	if !vset1.Equals(ids.Set{}) {
+	if !vset1.Equals(ids.Set{
+		tx1.IDV: struct{}{},
+		tx2.IDV: struct{}{},
+	}) {
 		t.Fatalf("unexpected virtuous %v", vset1)
 	}
 	pset1 := graph.Preferences()
 	if !pset1.Equals(ids.Set{
 		tx1.IDV:  struct{}{},
+		tx2.IDV:  struct{}{},
+		tx3.IDV:  struct{}{},
+		tx4.IDV:  struct{}{},
 		stx5.IDV: struct{}{},
 	}) {
 		t.Fatalf("unexpected preferences %v", pset1)
@@ -731,15 +775,50 @@ func AddNonEmptyWhitelistTest(t *testing.T, factory Factory) {
 	}
 
 	vset2 := graph.Virtuous()
-	if !vset2.Equals(ids.Set{}) {
+	if !vset2.Equals(ids.Set{
+		tx2.IDV: struct{}{},
+	}) {
 		t.Fatalf("unexpected virtuous %v", vset2)
 	}
 	pset2 := graph.Preferences()
 	if !pset2.Equals(ids.Set{
+		tx2.IDV:  struct{}{},
+		tx3.IDV:  struct{}{},
+		tx4.IDV:  struct{}{},
 		stx5.IDV: struct{}{},
 	}) {
 		t.Fatalf("unexpected preferences %v", pset2)
 	}
+
+	mss = gatherCounterGauge(t, reg)
+	require.Equal(t, 5., mss["rogue_tx_processing"])
+	require.Equal(t, 1., mss["virtuous_tx_processing"])
+	require.Equal(t, 0., mss["whitelist_tx_accepted_count"])
+	require.Equal(t, 2., mss["whitelist_tx_processing"])
+}
+
+func gatherCounterGauge(t *testing.T, reg *prometheus.Registry) map[string]float64 {
+	ms, err := reg.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	mss := make(map[string]float64)
+	for _, mf := range ms {
+		name := mf.GetName()
+		for _, m := range mf.GetMetric() {
+			cnt := m.GetCounter()
+			if cnt != nil {
+				mss[name] = cnt.GetValue()
+				break
+			}
+			gg := m.GetGauge()
+			if gg != nil {
+				mss[name] = gg.GetValue()
+				break
+			}
+		}
+	}
+	return mss
 }
 
 func AddWhitelistedVirtuousTest(t *testing.T, factory Factory) {
@@ -773,9 +852,9 @@ func AddWhitelistedVirtuousTest(t *testing.T, factory Factory) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		InputIDsV:    []ids.ID{ids.GenerateTestID()},
-		BytesV:       utils.RandomBytes(32),
-		WhitelistIsV: true,
+		InputIDsV:     []ids.ID{ids.GenerateTestID()},
+		BytesV:        utils.RandomBytes(32),
+		HasWhitelistV: true,
 	}
 
 	txs := []*TestTx{tx0, tx1}
@@ -828,9 +907,9 @@ func WhitelistConflictsTest(t *testing.T, factory Factory) {
 				AcceptV: nil,
 				StatusV: choices.Processing,
 			},
-			InputIDsV:    []ids.ID{txID},
-			WhitelistV:   nil,
-			WhitelistIsV: false,
+			InputIDsV:     []ids.ID{txID},
+			HasWhitelistV: false,
+			WhitelistV:    nil,
 		}
 		allTxs[i] = tx
 		if err := graph.Add(tx); err != nil {
@@ -851,8 +930,8 @@ func WhitelistConflictsTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		InputIDsV:     []ids.ID{wlTxID},
+		HasWhitelistV: true,
 		WhitelistV:    whitelist,
-		WhitelistIsV:  true,
 		WhitelistErrV: nil,
 	}
 	if err := graph.Add(wlTx); err != nil {
@@ -873,17 +952,6 @@ func WhitelistConflictsTest(t *testing.T, factory Factory) {
 	conflicts := graph.Conflicts(wlTx)
 	if !allTxIDs.Equals(conflicts) {
 		t.Fatal("transitive vertex outs != all txs")
-	}
-}
-
-func createTestTx(id uint64, inputIDs ...ids.ID) *TestTx {
-	return &TestTx{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(id),
-			StatusV: choices.Processing,
-		},
-		InputIDsV: inputIDs,
-		BytesV:    []byte{byte(id)},
 	}
 }
 
@@ -1601,37 +1669,37 @@ func UTXOCleanupTest(t *testing.T, factory Factory) {
 		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = graph.Add(Red)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = graph.Add(Green)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	redVotes := ids.Bag{}
 	redVotes.Add(Red.ID())
 	changed, err := graph.RecordPoll(redVotes)
-	assert.NoError(t, err)
-	assert.False(t, changed, "shouldn't have accepted the red tx")
+	require.NoError(t, err)
+	require.False(t, changed, "shouldn't have accepted the red tx")
 
 	changed, err = graph.RecordPoll(redVotes)
-	assert.NoError(t, err)
-	assert.True(t, changed, "should have accepted the red tx")
+	require.NoError(t, err)
+	require.True(t, changed, "should have accepted the red tx")
 
-	assert.Equal(t, choices.Accepted, Red.Status())
-	assert.Equal(t, choices.Rejected, Green.Status())
+	require.Equal(t, choices.Accepted, Red.Status())
+	require.Equal(t, choices.Rejected, Green.Status())
 
 	err = graph.Add(Blue)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	blueVotes := ids.Bag{}
 	blueVotes.Add(Blue.ID())
 	changed, err = graph.RecordPoll(blueVotes)
-	assert.NoError(t, err)
-	assert.True(t, changed, "should have accepted the blue tx")
+	require.NoError(t, err)
+	require.True(t, changed, "should have accepted the blue tx")
 
-	assert.Equal(t, choices.Accepted, Blue.Status())
+	require.Equal(t, choices.Accepted, Blue.Status())
 }
 
 func RemoveVirtuousTest(t *testing.T, factory Factory) {
@@ -1648,19 +1716,19 @@ func RemoveVirtuousTest(t *testing.T, factory Factory) {
 		MaxItemProcessingTime: 1,
 	}
 	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = graph.Add(Red)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	virtuous := graph.Virtuous()
-	assert.NotEmpty(t, virtuous, "a virtuous transaction was added but not tracked")
+	require.NotEmpty(t, virtuous, "a virtuous transaction was added but not tracked")
 
 	err = graph.Remove(Red.ID())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	virtuous = graph.Virtuous()
-	assert.Empty(t, virtuous, "removal of a virtuous transaction should have emptied the virtuous set")
+	require.Empty(t, virtuous, "removal of a virtuous transaction should have emptied the virtuous set")
 }
 
 func StringTest(t *testing.T, factory Factory, prefix string) {

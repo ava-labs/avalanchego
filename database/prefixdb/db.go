@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package prefixdb
@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/nodb"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
@@ -61,7 +62,6 @@ func NewNested(prefix []byte, db database.Database) *Database {
 	}
 }
 
-// Has implements the Database interface
 // Assumes that it is OK for the argument to db.db.Has
 // to be modified after db.db.Has returns
 // [key] may be modified after this method returns.
@@ -78,7 +78,6 @@ func (db *Database) Has(key []byte) (bool, error) {
 	return has, err
 }
 
-// Get implements the Database interface
 // Assumes that it is OK for the argument to db.db.Get
 // to be modified after db.db.Get returns.
 // [key] may be modified after this method returns.
@@ -95,7 +94,6 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	return val, err
 }
 
-// Put implements the Database interface
 // Assumes that it is OK for the argument to db.db.Put
 // to be modified after db.db.Put returns.
 // [key] can be modified after this method returns.
@@ -113,7 +111,6 @@ func (db *Database) Put(key, value []byte) error {
 	return err
 }
 
-// Delete implements the Database interface.
 // Assumes that it is OK for the argument to db.db.Delete
 // to be modified after db.db.Delete returns.
 // [key] may be modified after this method returns.
@@ -130,7 +127,6 @@ func (db *Database) Delete(key []byte) error {
 	return err
 }
 
-// NewBatch implements the Database interface
 func (db *Database) NewBatch() database.Batch {
 	return &batch{
 		Batch: db.db.NewBatch(),
@@ -138,22 +134,18 @@ func (db *Database) NewBatch() database.Batch {
 	}
 }
 
-// NewIterator implements the Database interface
 func (db *Database) NewIterator() database.Iterator {
 	return db.NewIteratorWithStartAndPrefix(nil, nil)
 }
 
-// NewIteratorWithStart implements the Database interface
 func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
 	return db.NewIteratorWithStartAndPrefix(start, nil)
 }
 
-// NewIteratorWithPrefix implements the Database interface
 func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 	return db.NewIteratorWithStartAndPrefix(nil, prefix)
 }
 
-// NewIteratorWithStartAndPrefix implements the Database interface.
 // Assumes it is safe to modify the arguments to db.db.NewIteratorWithStartAndPrefix after it returns.
 // It is safe to modify [start] and [prefix] after this method returns.
 func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
@@ -174,18 +166,6 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	return it
 }
 
-// Stat implements the Database interface
-func (db *Database) Stat(stat string) (string, error) {
-	db.lock.RLock()
-	defer db.lock.RUnlock()
-
-	if db.db == nil {
-		return "", database.ErrClosed
-	}
-	return db.db.Stat(stat)
-}
-
-// Compact implements the Database interface
 func (db *Database) Compact(start, limit []byte) error {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
@@ -196,7 +176,6 @@ func (db *Database) Compact(start, limit []byte) error {
 	return db.db.Compact(db.prefix(start), db.prefix(limit))
 }
 
-// Close implements the Database interface
 func (db *Database) Close() error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
@@ -213,6 +192,16 @@ func (db *Database) isClosed() bool {
 	defer db.lock.RUnlock()
 
 	return db.db == nil
+}
+
+func (db *Database) HealthCheck() (interface{}, error) {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	if db.db == nil {
+		return nil, database.ErrClosed
+	}
+	return db.db.HealthCheck()
 }
 
 // Return a copy of [key], prepended with this db's prefix.
@@ -253,18 +242,17 @@ type batch struct {
 	writes []keyValue
 }
 
-// Put implements the Batch interface
 // Assumes that it is OK for the argument to b.Batch.Put
 // to be modified after b.Batch.Put returns
 // [key] may be modified after this method returns.
-// [value] may not be modified after this method returns.
+// [value] may be modified after this method returns.
 func (b *batch) Put(key, value []byte) error {
 	prefixedKey := b.db.prefix(key)
-	b.writes = append(b.writes, keyValue{prefixedKey, value, false})
-	return b.Batch.Put(prefixedKey, value)
+	copiedValue := utils.CopyBytes(value)
+	b.writes = append(b.writes, keyValue{prefixedKey, copiedValue, false})
+	return b.Batch.Put(prefixedKey, copiedValue)
 }
 
-// Delete implements the Batch interface
 // Assumes that it is OK for the argument to b.Batch.Delete
 // to be modified after b.Batch.Delete returns
 // [key] may be modified after this method returns.
@@ -307,8 +295,6 @@ func (b *batch) Reset() {
 // Replay replays the batch contents.
 // Assumes it's safe to modify the key argument to w.Delete and w.Put
 // after those methods return.
-// Assumes it's not safe to modify the value argument to w.Put after calling that method.
-// Assumes [keyvalue.value] will not be modified because we assume that in batch.Put.
 func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
 	for _, keyvalue := range b.writes {
 		keyWithoutPrefix := keyvalue.key[len(b.db.dbPrefix):]

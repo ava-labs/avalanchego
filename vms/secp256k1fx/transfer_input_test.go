@@ -1,11 +1,12 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
 
 import (
-	"bytes"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -13,83 +14,71 @@ import (
 )
 
 func TestTransferInputAmount(t *testing.T) {
+	require := require.New(t)
 	in := TransferInput{
 		Amt: 1,
 		Input: Input{
 			SigIndices: []uint32{0, 1},
 		},
 	}
-	if amount := in.Amount(); amount != 1 {
-		t.Fatalf("Input.Amount returned the wrong amount. Result: %d ; Expected: %d", amount, 1)
-	}
+	require.Equal(uint64(1), in.Amount())
 }
 
 func TestTransferInputVerify(t *testing.T) {
+	require := require.New(t)
 	in := TransferInput{
 		Amt: 1,
 		Input: Input{
 			SigIndices: []uint32{0, 1},
 		},
 	}
-	err := in.Verify()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(in.Verify())
 }
 
 func TestTransferInputVerifyNil(t *testing.T) {
+	require := require.New(t)
 	in := (*TransferInput)(nil)
-	err := in.Verify()
-	if err == nil {
-		t.Fatalf("Should have errored with a nil input")
-	}
+	require.ErrorIs(in.Verify(), errNilInput)
 }
 
 func TestTransferInputVerifyNoValue(t *testing.T) {
+	require := require.New(t)
 	in := TransferInput{
 		Amt: 0,
 		Input: Input{
 			SigIndices: []uint32{0, 1},
 		},
 	}
-	err := in.Verify()
-	if err == nil {
-		t.Fatalf("Should have errored with a no value input")
-	}
+	require.ErrorIs(in.Verify(), errNoValueInput)
 }
 
 func TestTransferInputVerifyDuplicated(t *testing.T) {
+	require := require.New(t)
 	in := TransferInput{
 		Amt: 1,
 		Input: Input{
 			SigIndices: []uint32{0, 0},
 		},
 	}
-	err := in.Verify()
-	if err == nil {
-		t.Fatalf("Should have errored with duplicated indices")
-	}
+	require.ErrorIs(in.Verify(), errNotSortedUnique)
 }
 
 func TestTransferInputVerifyUnsorted(t *testing.T) {
+	require := require.New(t)
 	in := TransferInput{
 		Amt: 1,
 		Input: Input{
 			SigIndices: []uint32{1, 0},
 		},
 	}
-	err := in.Verify()
-	if err == nil {
-		t.Fatalf("Should have errored with unsorted indices")
-	}
+	require.ErrorIs(in.Verify(), errNotSortedUnique)
 }
 
 func TestTransferInputSerialize(t *testing.T) {
+	require := require.New(t)
 	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
-	if err := m.RegisterCodec(0, c); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(m.RegisterCodec(0, c))
 
 	expected := []byte{
 		// Codec version
@@ -109,24 +98,16 @@ func TestTransferInputSerialize(t *testing.T) {
 			SigIndices: []uint32{3, 7},
 		},
 	}
-	err := in.Verify()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(in.Verify())
 
 	result, err := m.Marshal(0, &in)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !bytes.Equal(expected, result) {
-		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
-	}
+	require.NoError(err)
+	require.Equal(expected, result)
 }
 
 func TestTransferInputNotState(t *testing.T) {
+	require := require.New(t)
 	intf := interface{}(&TransferInput{})
-	if _, ok := intf.(verify.State); ok {
-		t.Fatalf("shouldn't be marked as state")
-	}
+	_, ok := intf.(verify.State)
+	require.False(ok)
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
@@ -18,6 +18,6 @@ type Bootstrapable interface {
 	// if they occur.
 	ForceAccepted(acceptedContainerIDs []ids.ID) error
 
-	// Clear remove all containers to be processed upon bootstrapping
+	// Clear removes all containers to be processed upon bootstrapping
 	Clear() error
 }

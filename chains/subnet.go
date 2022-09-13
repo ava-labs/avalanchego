@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package chains
@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/networking/sender"
 )
 
 var _ Subnet = &subnet{}
@@ -26,9 +27,11 @@ type Subnet interface {
 }
 
 type SubnetConfig struct {
+	sender.GossipConfig
+
 	// ValidatorOnly indicates that this Subnet's Chains are available to only subnet validators.
-	ValidatorOnly       bool                 `json:"validatorOnly"`
-	ConsensusParameters avalanche.Parameters `json:"consensusParameters"`
+	ValidatorOnly       bool                 `json:"validatorOnly" yaml:"validatorOnly"`
+	ConsensusParameters avalanche.Parameters `json:"consensusParameters" yaml:"consensusParameters"`
 }
 
 type subnet struct {

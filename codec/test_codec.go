@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package codec
@@ -8,6 +8,8 @@ import (
 	"math"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -39,14 +41,22 @@ var Tests = []func(c GeneralCodec, t testing.TB){
 	TestSliceLengthOverflow,
 }
 
+var MultipleTagsTests = []func(c GeneralCodec, t testing.TB){
+	TestMultipleTags,
+}
+
 // The below structs and interfaces exist
 // for the sake of testing
+
+var (
+	_ Foo = &MyInnerStruct{}
+	_ Foo = &MyInnerStruct2{}
+)
 
 type Foo interface {
 	Foo() int
 }
 
-// *MyInnerStruct implements Foo
 type MyInnerStruct struct {
 	Str string `serialize:"true"`
 }
@@ -55,7 +65,6 @@ func (m *MyInnerStruct) Foo() int {
 	return 1
 }
 
-// *MyInnerStruct2 implements Foo
 type MyInnerStruct2 struct {
 	Bool bool `serialize:"true"`
 }
@@ -991,5 +1000,49 @@ func TestSliceLengthOverflow(codec GeneralCodec, t testing.TB) {
 	s := inner{}
 	if _, err := manager.Unmarshal(bytes, &s); err == nil {
 		t.Fatalf("Should have errored due to large of a slice")
+	}
+}
+
+type MultipleVersionsStruct struct {
+	BothTags    string `tag1:"true" tag2:"true"`
+	SingleTag1  string `tag1:"true"`
+	SingleTag2  string `tag2:"true"`
+	EitherTags1 string `tag1:"false" tag2:"true"`
+	EitherTags2 string `tag1:"true" tag2:"false"`
+	NoTags      string `tag1:"false" tag2:"false"`
+}
+
+func TestMultipleTags(codec GeneralCodec, t testing.TB) {
+	var _ GeneralCodec = codec
+
+	// received codec is expected to have both v1 and v2 registered as tags
+	inputs := MultipleVersionsStruct{
+		BothTags:    "both Tags",
+		SingleTag1:  "Only Tag1",
+		SingleTag2:  "Only Tag2",
+		EitherTags1: "Tag2 is false",
+		EitherTags2: "Tag1 is false",
+		NoTags:      "Neither Tag",
+	}
+
+	manager := NewDefaultManager()
+	for _, codecVersion := range []uint16{0, 1, 2022} {
+		require := require.New(t)
+		err := manager.RegisterCodec(codecVersion, codec)
+		require.NoError(err)
+
+		bytes, err := manager.Marshal(codecVersion, inputs)
+		require.NoError(err)
+
+		output := MultipleVersionsStruct{}
+		_, err = manager.Unmarshal(bytes, &output)
+		require.NoError(err)
+
+		require.Equal(inputs.BothTags, output.BothTags)
+		require.Equal(inputs.SingleTag1, output.SingleTag1)
+		require.Equal(inputs.SingleTag2, output.SingleTag2)
+		require.Equal(inputs.EitherTags1, output.EitherTags1)
+		require.Equal(inputs.EitherTags2, output.EitherTags2)
+		require.Empty(output.NoTags)
 	}
 }

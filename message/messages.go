@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -9,13 +9,18 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/protobuf/proto"
+
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/compression"
+
+	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
 var (
-	_ InboundMessage  = &inboundMessage{}
-	_ OutboundMessage = &outboundMessage{}
+	_ InboundMessage  = &inboundMessageWithPacker{}
+	_ OutboundMessage = &outboundMessageWithPacker{}
+	_ OutboundMessage = &outboundMessageWithProto{}
 )
 
 // InboundMessage represents a set of fields for an inbound message that can be serialized into a byte stream
@@ -25,7 +30,7 @@ type InboundMessage interface {
 	BytesSavedCompression() int
 	Op() Op
 	Get(Field) interface{}
-	NodeID() ids.ShortID
+	NodeID() ids.NodeID
 	ExpirationTime() time.Time
 	OnFinishedHandling()
 }
@@ -33,8 +38,7 @@ type InboundMessage interface {
 type inboundMessage struct {
 	op                    Op
 	bytesSavedCompression int
-	fields                map[Field]interface{}
-	nodeID                ids.ShortID
+	nodeID                ids.NodeID
 	expirationTime        time.Time
 	onFinishedHandling    func()
 }
@@ -46,13 +50,12 @@ func (inMsg *inboundMessage) Op() Op { return inMsg.op }
 // compression. That is, the number of bytes we did not receive over the
 // network due to the message being compressed. 0 for messages that were not
 // compressed.
-func (inMsg *inboundMessage) BytesSavedCompression() int { return inMsg.bytesSavedCompression }
-
-// Field returns the value of the specified field in this message
-func (inMsg *inboundMessage) Get(field Field) interface{} { return inMsg.fields[field] }
+func (inMsg *inboundMessage) BytesSavedCompression() int {
+	return inMsg.bytesSavedCompression
+}
 
 // NodeID returns the node that the msg was sent by.
-func (inMsg *inboundMessage) NodeID() ids.ShortID { return inMsg.nodeID }
+func (inMsg *inboundMessage) NodeID() ids.NodeID { return inMsg.nodeID }
 
 // ExpirationTime returns the time this message doesn't need to be responded to.
 // A zero time means message does not expire.
@@ -66,9 +69,18 @@ func (inMsg *inboundMessage) OnFinishedHandling() {
 	}
 }
 
-func (inMsg *inboundMessage) String() string {
+type inboundMessageWithPacker struct {
+	inboundMessage
+
+	fields map[Field]interface{}
+}
+
+// Field returns the value of the specified field in this message
+func (inMsg *inboundMessageWithPacker) Get(field Field) interface{} { return inMsg.fields[field] }
+
+func (inMsg *inboundMessageWithPacker) String() string {
 	sb := strings.Builder{}
-	sb.WriteString(fmt.Sprintf("(Op: %s, NodeID: %s%s", inMsg.op, constants.NodeIDPrefix, inMsg.nodeID))
+	sb.WriteString(fmt.Sprintf("(Op: %s, NodeID: %s", inMsg.op, inMsg.nodeID))
 	if requestIDIntf, exists := inMsg.fields[RequestID]; exists {
 		sb.WriteString(fmt.Sprintf(", RequestID: %d", requestIDIntf.(uint32)))
 	}
@@ -85,7 +97,7 @@ func (inMsg *inboundMessage) String() string {
 	case Notify:
 		sb.WriteString(fmt.Sprintf(", Notification: %d)", inMsg.fields[VMMessage].(uint32)))
 	case AppRequest, AppResponse, AppGossip:
-		sb.WriteString(fmt.Sprintf(", len(AppMsg): %d)", inMsg.fields[AppBytes].([]byte)))
+		sb.WriteString(fmt.Sprintf(", len(AppMsg): %d)", len(inMsg.fields[AppBytes].([]byte))))
 	default:
 		sb.WriteString(")")
 	}
@@ -93,24 +105,23 @@ func (inMsg *inboundMessage) String() string {
 	return sb.String()
 }
 
-// OutboundMessage represents a set of fields for an outbound message that can be serialized into a byte stream
+// OutboundMessage represents a set of fields for an outbound message that can
+// be serialized into a byte stream
 type OutboundMessage interface {
 	BytesSavedCompression() int
 	Bytes() []byte
 	Op() Op
+	BypassThrottling() bool
 
 	AddRef()
 	DecRef()
 }
 
 type outboundMessage struct {
+	op                    Op
 	bytes                 []byte
 	bytesSavedCompression int
-	op                    Op
-
-	refLock sync.Mutex
-	refs    int
-	c       *codec
+	bypassThrottling      bool
 }
 
 // Op returns the value of the specified operation in this message
@@ -123,9 +134,22 @@ func (outMsg *outboundMessage) Bytes() []byte { return outMsg.bytes }
 // compression. That is, the number of bytes we did not send over the
 // network due to the message being compressed. 0 for messages that were not
 // compressed.
-func (outMsg *outboundMessage) BytesSavedCompression() int { return outMsg.bytesSavedCompression }
+func (outMsg *outboundMessage) BytesSavedCompression() int {
+	return outMsg.bytesSavedCompression
+}
 
-func (outMsg *outboundMessage) AddRef() {
+// BypassThrottling when attempting to send this message
+func (outMsg *outboundMessage) BypassThrottling() bool { return outMsg.bypassThrottling }
+
+type outboundMessageWithPacker struct {
+	outboundMessage
+
+	refLock sync.Mutex
+	refs    int
+	c       *codec
+}
+
+func (outMsg *outboundMessageWithPacker) AddRef() {
 	outMsg.refLock.Lock()
 	defer outMsg.refLock.Unlock()
 
@@ -134,7 +158,7 @@ func (outMsg *outboundMessage) AddRef() {
 
 // Once the reference count of this message goes to 0, the byte slice should not
 // be inspected.
-func (outMsg *outboundMessage) DecRef() {
+func (outMsg *outboundMessageWithPacker) DecRef() {
 	outMsg.refLock.Lock()
 	defer outMsg.refLock.Unlock()
 
@@ -143,3 +167,81 @@ func (outMsg *outboundMessage) DecRef() {
 		outMsg.c.byteSlicePool.Put(outMsg.bytes)
 	}
 }
+
+// TODO: add other compression algorithms with extended interface
+type msgBuilderProtobuf struct {
+	gzipCompressor compression.Compressor
+}
+
+func newMsgBuilderProtobuf(maxCompressSize int64) (*msgBuilderProtobuf, error) {
+	cpr, err := compression.NewGzipCompressor(maxCompressSize)
+	return &msgBuilderProtobuf{gzipCompressor: cpr}, err
+}
+
+// TODO: semantically verify ids.Id fields, etc.
+// e.g., ancestors chain Id should be ids.ID format
+
+// NOTE THAT the passed message must be verified beforehand.
+// NOTE THAT the passed message will be modified if compression is enabled.
+// TODO: find a way to not in-place modify the message
+// TODO: implement parsing tests for inbound messages
+func (mc *msgBuilderProtobuf) marshal(m *p2ppb.Message, gzipCompress bool) ([]byte, int, error) {
+	b, err := proto.Marshal(m)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	before := len(b)
+	if gzipCompress {
+		// If compression is enabled, we marshal twice:
+		// 1. the original message
+		// 2. the message with compressed bytes
+		//
+		// This recursive packing allows us to avoid an extra compression on/off
+		// field in the message.
+		compressed, err := mc.gzipCompressor.Compress(b)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		// Original message can be discarded for the compressed message.
+		m.Message = &p2ppb.Message_CompressedGzip{
+			CompressedGzip: compressed,
+		}
+		b, err = proto.Marshal(m)
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+
+	after := len(b)
+	bytesSaved := before - after
+	return b, bytesSaved, err
+}
+
+// NOTE THAT the passed message will be updated if compression is enabled.
+// TODO: find a way to not in-place modify the message
+func (mc *msgBuilderProtobuf) createOutbound(op Op, msg *p2ppb.Message, gzipCompress bool, bypassThrottling bool) (*outboundMessageWithProto, error) {
+	b, saved, err := mc.marshal(msg, gzipCompress)
+	if err != nil {
+		return nil, err
+	}
+	return &outboundMessageWithProto{
+		outboundMessage: outboundMessage{
+			op:                    op,
+			bytes:                 b,
+			bytesSavedCompression: saved,
+			bypassThrottling:      bypassThrottling,
+		},
+		msg: msg,
+	}, nil
+}
+
+type outboundMessageWithProto struct {
+	outboundMessage
+
+	msg *p2ppb.Message
+}
+
+func (outMsg *outboundMessageWithProto) AddRef() {}
+func (outMsg *outboundMessageWithProto) DecRef() {}

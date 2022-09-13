@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package poll
@@ -24,7 +24,7 @@ func NewEarlyTermNoTraversalFactory(alpha int) Factory {
 	return &earlyTermNoTraversalFactory{alpha: alpha}
 }
 
-func (f *earlyTermNoTraversalFactory) New(vdrs ids.ShortBag) Poll {
+func (f *earlyTermNoTraversalFactory) New(vdrs ids.NodeIDBag) Poll {
 	return &earlyTermNoTraversalPoll{
 		polled: vdrs,
 		alpha:  f.alpha,
@@ -36,12 +36,12 @@ func (f *earlyTermNoTraversalFactory) New(vdrs ids.ShortBag) Poll {
 // It terminates as quickly as it can without performing any DAG traversals.
 type earlyTermNoTraversalPoll struct {
 	votes  ids.UniqueBag
-	polled ids.ShortBag
+	polled ids.NodeIDBag
 	alpha  int
 }
 
 // Vote registers a response for this poll
-func (p *earlyTermNoTraversalPoll) Vote(vdr ids.ShortID, votes []ids.ID) {
+func (p *earlyTermNoTraversalPoll) Vote(vdr ids.NodeID, votes []ids.ID) {
 	count := p.polled.Count(vdr)
 	// make sure that a validator can't respond multiple times
 	p.polled.Remove(vdr)
@@ -70,7 +70,7 @@ func (p *earlyTermNoTraversalPoll) Finished() bool {
 	// votes will be applied to a single shared ancestor. In this case, the poll
 	// can terminate early, iff there are not enough pending votes for this
 	// ancestor to receive alpha votes.
-	partialVotes := ids.BitSet(0)
+	partialVotes := ids.BitSet64(0)
 	for _, vote := range p.votes.List() {
 		if voters := p.votes.GetSet(vote); voters.Len() < p.alpha {
 			partialVotes.Union(voters)

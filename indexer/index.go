@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package indexer
@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"sync"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
@@ -39,7 +41,6 @@ var (
 )
 
 // Index indexes containers in their order of acceptance
-// Index implements triggers.Acceptor
 // Index is thread-safe.
 // Index assumes that Accept is called before the container is committed to the
 // database of the VM that the container exists in.
@@ -48,8 +49,8 @@ type Index interface {
 	GetContainerByIndex(index uint64) (Container, error)
 	GetContainerRange(startIndex uint64, numToFetch uint64) ([]Container, error)
 	GetLastAccepted() (Container, error)
-	GetIndex(containerID ids.ID) (uint64, error)
-	GetContainerByID(containerID ids.ID) (Container, error)
+	GetIndex(id ids.ID) (uint64, error)
+	GetContainerByID(id ids.ID) (Container, error)
 	io.Closer
 }
 
@@ -97,14 +98,18 @@ func newIndex(
 	nextAcceptedIndex, err := database.GetUInt64(i.vDB, nextAcceptedIndexKey)
 	if err == database.ErrNotFound {
 		// Couldn't find it in the database. Must not have accepted any containers in previous runs.
-		i.log.Info("next accepted index %d", i.nextAcceptedIndex)
+		i.log.Info("created new index",
+			zap.Uint64("nextAcceptedIndex", i.nextAcceptedIndex),
+		)
 		return i, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get next accepted index from database: %w", err)
 	}
 	i.nextAcceptedIndex = nextAcceptedIndex
-	i.log.Info("next accepted index %d", i.nextAcceptedIndex)
+	i.log.Info("created new index",
+		zap.Uint64("nextAcceptedIndex", i.nextAcceptedIndex),
+	)
 	return i, nil
 }
 
@@ -133,14 +138,19 @@ func (i *index) Accept(ctx *snow.ConsensusContext, containerID ids.ID, container
 	// Make sure we don't index the same container twice in that event.
 	_, err := i.containerToIndex.Get(containerID[:])
 	if err == nil {
-		ctx.Log.Debug("not indexing already accepted container %s", containerID)
+		ctx.Log.Debug("not indexing already accepted container",
+			zap.Stringer("containerID", containerID),
+		)
 		return nil
 	}
 	if err != database.ErrNotFound {
 		return fmt.Errorf("couldn't get whether %s is accepted: %w", containerID, err)
 	}
 
-	ctx.Log.Debug("indexing %d --> container %s", i.nextAcceptedIndex, containerID)
+	ctx.Log.Debug("indexing container",
+		zap.Uint64("nextAcceptedIndex", i.nextAcceptedIndex),
+		zap.Stringer("containerID", containerID),
+	)
 	// Persist index --> Container
 	nextAcceptedIndexBytes := database.PackUInt64(i.nextAcceptedIndex)
 	bytes, err := i.codec.Marshal(codecVersion, Container{
@@ -196,7 +206,9 @@ func (i *index) getContainerByIndex(index uint64) (Container, error) {
 func (i *index) getContainerByIndexBytes(indexBytes []byte) (Container, error) {
 	containerBytes, err := i.indexToContainer.Get(indexBytes)
 	if err != nil {
-		i.log.Error("couldn't read container from database: %s", err)
+		i.log.Error("couldn't read container from database",
+			zap.Error(err),
+		)
 		return Container{}, fmt.Errorf("couldn't read from database: %w", err)
 	}
 	var container Container
@@ -247,19 +259,19 @@ func (i *index) GetContainerRange(startIndex, numToFetch uint64) ([]Container, e
 }
 
 // Returns database.ErrNotFound if the container is not indexed as accepted
-func (i *index) GetIndex(containerID ids.ID) (uint64, error) {
+func (i *index) GetIndex(id ids.ID) (uint64, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
-	return database.GetUInt64(i.containerToIndex, containerID[:])
+	return database.GetUInt64(i.containerToIndex, id[:])
 }
 
-func (i *index) GetContainerByID(containerID ids.ID) (Container, error) {
+func (i *index) GetContainerByID(id ids.ID) (Container, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
 	// Read index from database
-	indexBytes, err := i.containerToIndex.Get(containerID[:])
+	indexBytes, err := i.containerToIndex.Get(id[:])
 	if err != nil {
 		return Container{}, err
 	}

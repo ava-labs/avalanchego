@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -9,7 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -49,7 +48,7 @@ func BuildViper(fs *flag.FlagSet, args []string) (*viper.Viper, error) {
 		}
 
 	case v.IsSet(ConfigFileKey):
-		filename := os.ExpandEnv(v.GetString(ConfigFileKey))
+		filename := GetExpandedArg(v, ConfigFileKey)
 		v.SetConfigFile(filename)
 		if err := v.ReadInConfig(); err != nil {
 			return nil, err

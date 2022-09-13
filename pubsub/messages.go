@@ -1,11 +1,11 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package pubsub
 
 import (
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 )
 
@@ -59,7 +59,7 @@ func (c *AddAddresses) parseAddresses() error {
 		c.addressIds = make([][]byte, len(c.Addresses))
 	}
 	for i, addrStr := range c.Addresses {
-		_, _, addrBytes, err := formatting.ParseAddress(addrStr)
+		_, _, addrBytes, err := address.Parse(addrStr)
 		if err != nil {
 			return err
 		}

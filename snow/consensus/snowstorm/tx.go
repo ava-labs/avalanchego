@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowstorm
@@ -10,13 +10,14 @@ import (
 
 // Whitelister defines the interface for specifying whitelisted operations.
 type Whitelister interface {
+	// Returns [true] if the underlying instance does implement whitelisted
+	// conflicts.
+	HasWhitelist() bool
+
 	// Whitelist returns the set of transaction IDs that are explicitly
 	// whitelisted. Transactions that are not explicitly whitelisted are
 	// considered conflicting.
-	//
-	// Returns [false] if the underlying instance does not implement whitelisted
-	// conflicts.
-	Whitelist() (ids.Set, bool, error)
+	Whitelist() (ids.Set, error)
 }
 
 // Tx consumes state.

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avalanche
@@ -6,28 +6,26 @@ package avalanche
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
-
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 )
 
 func TestVotingFinishesWithAbandonedDep(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 	mngr := vertex.NewTestManager(t)
-	bootCfg.Manager = mngr
 	engCfg.Manager = mngr
 	transitive, err := newTransitive(engCfg)
-	assert.NoError(t, err)
-	assert.NoError(t, transitive.Start( /*startReqID*/ 0))
+	require.NoError(t, err)
+	require.NoError(t, transitive.Start( /*startReqID*/ 0))
 
 	// prepare 3 validators
-	vdr1 := ids.ShortID{1}
-	vdr2 := ids.ShortID{2}
-	vdr3 := ids.ShortID{3}
+	vdr1 := ids.NodeID{1}
+	vdr2 := ids.NodeID{2}
+	vdr3 := ids.NodeID{3}
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -36,7 +34,7 @@ func TestVotingFinishesWithAbandonedDep(t *testing.T) {
 	// add poll for request 1
 	transitive.polls.Add(1, vdrs)
 
-	vdrs = ids.ShortBag{}
+	vdrs = ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr3,
@@ -46,7 +44,7 @@ func TestVotingFinishesWithAbandonedDep(t *testing.T) {
 	transitive.polls.Add(2, vdrs)
 
 	// expect 2 pending polls
-	assert.Equal(t, 2, transitive.polls.Len())
+	require.Equal(t, 2, transitive.polls.Len())
 
 	// vote on request 2 first
 	vote1 := ids.GenerateTestID()
@@ -72,7 +70,7 @@ func TestVotingFinishesWithAbandonedDep(t *testing.T) {
 	voter3.Update()
 
 	// still expect 2 pending polls since request 1 voting is still pending
-	assert.Equal(t, 2, transitive.polls.Len())
+	require.Equal(t, 2, transitive.polls.Len())
 
 	// vote on request 1
 	// add dependency to voter1's vote which has to be fulfilled prior to finishing
@@ -102,24 +100,23 @@ func TestVotingFinishesWithAbandonedDep(t *testing.T) {
 	voter1.Abandon(voter1Dep) // voter1 abandons dep1
 
 	// expect all polls to have finished
-	assert.Equal(t, 0, transitive.polls.Len())
+	require.Equal(t, 0, transitive.polls.Len())
 }
 
 func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 	mngr := vertex.NewTestManager(t)
-	bootCfg.Manager = mngr
 	engCfg.Manager = mngr
 	transitive, err := newTransitive(engCfg)
-	assert.NoError(t, err)
-	assert.NoError(t, transitive.Start( /*startReqID*/ 0))
+	require.NoError(t, err)
+	require.NoError(t, transitive.Start( /*startReqID*/ 0))
 
 	// prepare 3 validators
-	vdr1 := ids.ShortID{1}
-	vdr2 := ids.ShortID{2}
-	vdr3 := ids.ShortID{3}
+	vdr1 := ids.NodeID{1}
+	vdr2 := ids.NodeID{2}
+	vdr3 := ids.NodeID{3}
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -128,7 +125,7 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 	// add poll for request 1
 	transitive.polls.Add(1, vdrs)
 
-	vdrs = ids.ShortBag{}
+	vdrs = ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr3,
@@ -137,7 +134,7 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 	// add poll for request 2
 	transitive.polls.Add(2, vdrs)
 
-	vdrs = ids.ShortBag{}
+	vdrs = ids.NodeIDBag{}
 	vdrs.Add(
 		vdr2,
 		vdr3,
@@ -147,7 +144,7 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 	transitive.polls.Add(3, vdrs)
 
 	// expect 3 pending polls
-	assert.Equal(t, 3, transitive.polls.Len())
+	require.Equal(t, 3, transitive.polls.Len())
 
 	vote1 := ids.GenerateTestID()
 	vote2 := ids.GenerateTestID()
@@ -174,7 +171,7 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 	req3Voter2.Update()
 
 	// expect 3 pending polls since 2 and 1 are still pending
-	assert.Equal(t, 3, transitive.polls.Len())
+	require.Equal(t, 3, transitive.polls.Len())
 
 	// vote on request 2
 	// add dependency to req2/voter3's vote which has to be fulfilled prior to finishing
@@ -202,7 +199,7 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 	req2Voter2.Update()
 
 	// still expect 3 pending polls since request 1 voting is still pending
-	assert.Equal(t, 3, transitive.polls.Len())
+	require.Equal(t, 3, transitive.polls.Len())
 
 	// vote on request 1
 	// add dependency to voter1's vote which has to be fulfilled prior to finishing
@@ -232,29 +229,28 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 	req2Voter2.Abandon(req2Voter2Dep) // voter3 abandons dep1
 
 	// expect polls to be pending as req1/voter1's dep is still unfulfilled
-	assert.Equal(t, 3, transitive.polls.Len())
+	require.Equal(t, 3, transitive.polls.Len())
 
 	req1Voter1.Abandon(req1Voter1Dep)
 
 	// expect all polls to have finished
-	assert.Equal(t, 0, transitive.polls.Len())
+	require.Equal(t, 0, transitive.polls.Len())
 }
 
 func TestSharedDependency(t *testing.T) {
-	_, bootCfg, engCfg := DefaultConfig()
+	_, _, engCfg := DefaultConfig()
 	mngr := vertex.NewTestManager(t)
-	bootCfg.Manager = mngr
 	engCfg.Manager = mngr
 	transitive, err := newTransitive(engCfg)
-	assert.NoError(t, err)
-	assert.NoError(t, transitive.Start( /*startReqID*/ 0))
+	require.NoError(t, err)
+	require.NoError(t, transitive.Start( /*startReqID*/ 0))
 
 	// prepare 3 validators
-	vdr1 := ids.ShortID{1}
-	vdr2 := ids.ShortID{2}
-	vdr3 := ids.ShortID{3}
+	vdr1 := ids.NodeID{1}
+	vdr2 := ids.NodeID{2}
+	vdr3 := ids.NodeID{3}
 
-	vdrs := ids.ShortBag{}
+	vdrs := ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr2,
@@ -263,7 +259,7 @@ func TestSharedDependency(t *testing.T) {
 	// add poll for request 1
 	transitive.polls.Add(1, vdrs)
 
-	vdrs = ids.ShortBag{}
+	vdrs = ids.NodeIDBag{}
 	vdrs.Add(
 		vdr1,
 		vdr3,
@@ -272,7 +268,7 @@ func TestSharedDependency(t *testing.T) {
 	// add poll for request 2
 	transitive.polls.Add(2, vdrs)
 
-	vdrs = ids.ShortBag{}
+	vdrs = ids.NodeIDBag{}
 	vdrs.Add(
 		vdr2,
 		vdr3,
@@ -282,7 +278,7 @@ func TestSharedDependency(t *testing.T) {
 	transitive.polls.Add(3, vdrs)
 
 	// expect 3 pending polls
-	assert.Equal(t, 3, transitive.polls.Len())
+	require.Equal(t, 3, transitive.polls.Len())
 
 	vote1 := ids.GenerateTestID()
 	vote2 := ids.GenerateTestID()
@@ -311,7 +307,7 @@ func TestSharedDependency(t *testing.T) {
 	req3Voter2.Update()
 
 	// 3 polls pending because req 2 and 1 have not voted
-	assert.Equal(t, 3, transitive.polls.Len())
+	require.Equal(t, 3, transitive.polls.Len())
 
 	// setup common dependency
 	dep := ids.GenerateTestID()
@@ -340,7 +336,7 @@ func TestSharedDependency(t *testing.T) {
 	req2Voter2.Update()
 
 	// 3 polls pending as req 2 dependency is unfulfilled and 1 has not voted
-	assert.Equal(t, 3, transitive.polls.Len())
+	require.Equal(t, 3, transitive.polls.Len())
 
 	req1Voter1 := &voter{
 		t:         transitive,
@@ -364,12 +360,12 @@ func TestSharedDependency(t *testing.T) {
 	req1Voter2.Update()
 
 	// 3 polls pending as req2 and req 1 dependencies are unfulfilled
-	assert.Equal(t, 3, transitive.polls.Len())
+	require.Equal(t, 3, transitive.polls.Len())
 
 	// abandon dependency
 	req1Voter1.Abandon(dep)
 	req2Voter1.Abandon(dep)
 
 	// expect no pending polls
-	assert.Equal(t, 0, transitive.polls.Len())
+	require.Equal(t, 0, transitive.polls.Len())
 }

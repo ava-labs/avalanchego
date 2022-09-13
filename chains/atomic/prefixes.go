@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package atomic
@@ -17,13 +17,19 @@ var (
 	inboundLargerValuePrefix  = []byte{2}
 	inboundLargerIndexPrefix  = []byte{3}
 
-	// inbound and outbound have their smaller and larger values swapped
+	// note that inbound and outbound have their smaller and larger values
+	// swapped
+
+	// inbound specifies the prefixes to use for inbound shared memory
+	// ie. reading and deleting a message received from another chain.
 	inbound = prefixes{
 		smallerValuePrefix: inboundSmallerValuePrefix,
 		smallerIndexPrefix: inboundSmallerIndexPrefix,
 		largerValuePrefix:  inboundLargerValuePrefix,
 		largerIndexPrefix:  inboundLargerIndexPrefix,
 	}
+	// outbound specifies the prefixes to use for outbound shared memory
+	// ie. writing a message to another chain.
 	outbound = prefixes{
 		smallerValuePrefix: inboundLargerValuePrefix,
 		smallerIndexPrefix: inboundLargerIndexPrefix,

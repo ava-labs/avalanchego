@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package version
@@ -6,15 +6,15 @@ package version
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestNewDefaultVersion(t *testing.T) {
-	v := NewDefaultVersion(1, 2, 3)
+func TestSemanticString(t *testing.T) {
+	v := Semantic{
+		Major: 1,
+		Minor: 2,
+		Patch: 3,
+	}
 
-	assert.NotNil(t, v)
-	assert.Equal(t, "v1.2.3", v.String())
-	assert.Equal(t, 1, v.Major())
-	assert.Equal(t, 2, v.Minor())
-	assert.Equal(t, 3, v.Patch())
+	require.Equal(t, "v1.2.3", v.String())
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package benchlist
@@ -13,7 +13,6 @@ type metrics struct {
 	numBenched, weightBenched prometheus.Gauge
 }
 
-// Initialize implements the Engine interface
 func (m *metrics) Initialize(registerer prometheus.Registerer) error {
 	m.numBenched = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "benchlist",

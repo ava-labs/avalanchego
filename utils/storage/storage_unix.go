@@ -1,14 +1,14 @@
 //go:build !windows
 // +build !windows
 
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package storage
 
 import "syscall"
 
-func OsDiskStat(storagePath string) (uint64, error) {
+func AvailableBytes(storagePath string) (uint64, error) {
 	var stat syscall.Statfs_t
 	err := syscall.Statfs(storagePath, &stat)
 	if err != nil {

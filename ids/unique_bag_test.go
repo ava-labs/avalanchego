@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ids
@@ -6,7 +6,7 @@ package ids
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUniqueBag(t *testing.T) {
@@ -32,7 +32,7 @@ func TestUniqueBag(t *testing.T) {
 		t.Fatalf("Set missing element")
 	}
 
-	var bs1 BitSet
+	var bs1 BitSet64
 	bs1.Add(2)
 	bs1.Add(4)
 
@@ -94,7 +94,7 @@ func TestUniqueBag(t *testing.T) {
 	ub6.Add(2, id1)
 	ub6.Add(7, id1)
 
-	diffBitSet := BitSet(0)
+	diffBitSet := BitSet64(0)
 	diffBitSet.Add(1)
 	diffBitSet.Add(7)
 
@@ -116,11 +116,11 @@ func TestUniqueBagClear(t *testing.T) {
 	b.Add(1, id1, id2)
 
 	b.Clear()
-	assert.Len(t, b.List(), 0)
+	require.Len(t, b.List(), 0)
 
 	bs := b.GetSet(id1)
-	assert.EqualValues(t, 0, bs.Len())
+	require.EqualValues(t, 0, bs.Len())
 
 	bs = b.GetSet(id2)
-	assert.EqualValues(t, 0, bs.Len())
+	require.EqualValues(t, 0, bs.Len())
 }

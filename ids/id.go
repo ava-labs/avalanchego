@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ids
@@ -9,21 +9,20 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-const (
-	// The encoding used to convert IDs from bytes to string and vice versa
-	defaultEncoding = formatting.CB58
-)
+const nullStr = "null"
 
 var (
 	// Empty is a useful all zero value
-	Empty            = ID{}
+	Empty = ID{}
+
 	errMissingQuotes = errors.New("first and last characters should be quotes")
 )
 
@@ -37,7 +36,7 @@ func ToID(bytes []byte) (ID, error) {
 
 // FromString is the inverse of ID.String()
 func FromString(idStr string) (ID, error) {
-	bytes, err := formatting.Decode(defaultEncoding, idStr)
+	bytes, err := cb58.Decode(idStr)
 	if err != nil {
 		return ID{}, err
 	}
@@ -45,7 +44,7 @@ func FromString(idStr string) (ID, error) {
 }
 
 func (id ID) MarshalJSON() ([]byte, error) {
-	str, err := formatting.EncodeWithChecksum(defaultEncoding, id[:])
+	str, err := cb58.Encode(id[:])
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +53,7 @@ func (id ID) MarshalJSON() ([]byte, error) {
 
 func (id *ID) UnmarshalJSON(b []byte) error {
 	str := string(b)
-	if str == "null" { // If "null", do nothing
+	if str == nullStr { // If "null", do nothing
 		return nil
 	} else if len(str) < 2 {
 		return errMissingQuotes
@@ -66,7 +65,7 @@ func (id *ID) UnmarshalJSON(b []byte) error {
 	}
 
 	// Parse CB58 formatted string to bytes
-	bytes, err := formatting.Decode(defaultEncoding, str[1:lastIndex])
+	bytes, err := cb58.Decode(str[1:lastIndex])
 	if err != nil {
 		return fmt.Errorf("couldn't decode ID to bytes: %w", err)
 	}
@@ -123,12 +122,25 @@ func (id ID) Hex() string { return hex.EncodeToString(id[:]) }
 func (id ID) String() string {
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of an ID
-	s, _ := formatting.EncodeWithChecksum(defaultEncoding, id[:])
+	s, _ := cb58.Encode(id[:])
 	return s
 }
 
 func (id ID) MarshalText() ([]byte, error) {
 	return []byte(id.String()), nil
+}
+
+type SliceStringer []ID
+
+func (s SliceStringer) String() string {
+	var strs strings.Builder
+	for i, id := range s {
+		if i != 0 {
+			_, _ = strs.WriteString(", ")
+		}
+		_, _ = strs.WriteString(id.String())
+	}
+	return strs.String()
 }
 
 type sortIDData []ID

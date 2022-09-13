@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avalanche
@@ -37,14 +37,16 @@ func DefaultConfig() (common.Config, bootstrap.Config, Config) {
 		Validators: bootstrapConfig.Validators,
 		Params: avalanche.Parameters{
 			Parameters: snowball.Parameters{
-				K:                     1,
-				Alpha:                 1,
-				BetaVirtuous:          1,
-				BetaRogue:             2,
-				ConcurrentRepolls:     1,
-				OptimalProcessing:     100,
-				MaxOutstandingItems:   1,
-				MaxItemProcessingTime: 1,
+				K:                       1,
+				Alpha:                   1,
+				BetaVirtuous:            1,
+				BetaRogue:               2,
+				ConcurrentRepolls:       1,
+				OptimalProcessing:       100,
+				MaxOutstandingItems:     1,
+				MaxItemProcessingTime:   1,
+				MixedQueryNumPushVdr:    1,
+				MixedQueryNumPushNonVdr: 1,
 			},
 			Parents:   2,
 			BatchSize: 1,

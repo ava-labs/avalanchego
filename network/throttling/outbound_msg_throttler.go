@@ -1,15 +1,17 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package throttling
 
 import (
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -19,17 +21,17 @@ var (
 
 // Rate-limits outgoing messages
 type OutboundMsgThrottler interface {
-	// Returns true if we can queue a message of size [msgSize] to be sent to node [nodeID].
+	// Returns true if we can queue the message [msg] to be sent to node [nodeID].
 	// Returns false if the message should be dropped (not sent to [nodeID]).
-	// If this method returns true, Release([msgSize], [nodeID]) must be called (!) when
+	// If this method returns true, Release([msg], [nodeID]) must be called (!) when
 	// the message is sent (or when we give up trying to send the message, if applicable.)
 	// If this method returns false, do not make a corresponding call to Release.
-	Acquire(msgSize uint64, nodeID ids.ShortID) bool
+	Acquire(msg message.OutboundMessage, nodeID ids.NodeID) bool
 
-	// Mark that a message of size [msgSize] has been sent to [nodeID] or we have
-	// given up sending the message. Must correspond to a previous call to
-	// Acquire([msgSize], [nodeID]) that returned true.
-	Release(msgSize uint64, nodeID ids.ShortID)
+	// Mark that a message [msg] has been sent to [nodeID] or we have given up
+	// sending the message. Must correspond to a previous call to
+	// Acquire([msg], [nodeID]) that returned true.
+	Release(msg message.OutboundMessage, nodeID ids.NodeID)
 }
 
 type outboundMsgThrottler struct {
@@ -52,20 +54,24 @@ func NewSybilOutboundMsgThrottler(
 			remainingVdrBytes:      config.VdrAllocSize,
 			remainingAtLargeBytes:  config.AtLargeAllocSize,
 			nodeMaxAtLargeBytes:    config.NodeMaxAtLargeBytes,
-			nodeToVdrBytesUsed:     make(map[ids.ShortID]uint64),
-			nodeToAtLargeBytesUsed: make(map[ids.ShortID]uint64),
+			nodeToVdrBytesUsed:     make(map[ids.NodeID]uint64),
+			nodeToAtLargeBytesUsed: make(map[ids.NodeID]uint64),
 		},
 	}
 	return t, t.metrics.initialize(namespace, registerer)
 }
 
-// See OutboundMsgThrottler
-func (t *outboundMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) bool {
+func (t *outboundMsgThrottler) Acquire(msg message.OutboundMessage, nodeID ids.NodeID) bool {
+	// no need to acquire for this message
+	if msg.BypassThrottling() {
+		return true
+	}
+
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
 	// Take as many bytes as we can from the at-large allocation.
-	bytesNeeded := msgSize
+	bytesNeeded := uint64(len(msg.Bytes()))
 	atLargeBytesUsed := math.Min64(
 		// only give as many bytes as needed
 		bytesNeeded,
@@ -118,8 +124,12 @@ func (t *outboundMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) bool 
 	return true
 }
 
-// See OutboundMsgThrottler
-func (t *outboundMsgThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
+func (t *outboundMsgThrottler) Release(msg message.OutboundMessage, nodeID ids.NodeID) {
+	// no need to release for this message
+	if msg.BypassThrottling() {
+		return
+	}
+
 	t.lock.Lock()
 	defer func() {
 		t.metrics.remainingAtLargeBytes.Set(float64(t.remainingAtLargeBytes))
@@ -131,6 +141,7 @@ func (t *outboundMsgThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
 	// [vdrBytesToReturn] is the number of bytes from [msgSize]
 	// that will be given back to [nodeID]'s validator allocation.
 	vdrBytesUsed := t.nodeToVdrBytesUsed[nodeID]
+	msgSize := uint64(len(msg.Bytes()))
 	vdrBytesToReturn := math.Min64(msgSize, vdrBytesUsed)
 	t.nodeToVdrBytesUsed[nodeID] -= vdrBytesToReturn
 	if t.nodeToVdrBytesUsed[nodeID] == 0 {
@@ -198,10 +209,9 @@ func NewNoOutboundThrottler() OutboundMsgThrottler {
 	return &noOutboundMsgThrottler{}
 }
 
-// noOutboundMsgThrottler implements OutboundMsgThrottler.
 // [Acquire] always returns true. [Release] does nothing.
 type noOutboundMsgThrottler struct{}
 
-func (*noOutboundMsgThrottler) Acquire(uint64, ids.ShortID) bool { return true }
+func (*noOutboundMsgThrottler) Acquire(message.OutboundMessage, ids.NodeID) bool { return true }
 
-func (*noOutboundMsgThrottler) Release(uint64, ids.ShortID) {}
+func (*noOutboundMsgThrottler) Release(message.OutboundMessage, ids.NodeID) {}

@@ -1,40 +1,49 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package logging
 
 import (
 	"errors"
-	"sync"
+	"io"
+
+	"go.uber.org/zap"
 )
 
-var errNoLoggerWrite = errors.New("NoLogger can't write")
+var (
+	// Discard is a mock WriterCloser that drops all writes and close requests
+	Discard io.WriteCloser = discard{}
+
+	errNoLoggerWrite = errors.New("NoLogger can't write")
+
+	_ Logger = NoLog{}
+)
 
 type NoLog struct{}
 
 func (NoLog) Write([]byte) (int, error) { return 0, errNoLoggerWrite }
 
-func (NoLog) Fatal(format string, args ...interface{}) {}
+func (NoLog) Fatal(string, ...zap.Field) {}
 
-func (NoLog) Error(format string, args ...interface{}) {}
+func (NoLog) Error(string, ...zap.Field) {}
 
-func (NoLog) Warn(format string, args ...interface{}) {}
+func (NoLog) Warn(string, ...zap.Field) {}
 
-func (NoLog) Info(format string, args ...interface{}) {}
+func (NoLog) Info(string, ...zap.Field) {}
 
-func (NoLog) Trace(format string, args ...interface{}) {}
+func (NoLog) Trace(string, ...zap.Field) {}
 
-func (NoLog) Debug(format string, args ...interface{}) {}
+func (NoLog) Debug(string, ...zap.Field) {}
 
-func (NoLog) Verbo(format string, args ...interface{}) {}
+func (NoLog) Verbo(string, ...zap.Field) {}
 
 func (NoLog) AssertNoError(error) {}
 
-func (NoLog) AssertTrue(b bool, format string, args ...interface{}) {}
+func (NoLog) AssertTrue(bool, string, ...zap.Field) {}
 
-func (NoLog) AssertDeferredTrue(f func() bool, format string, args ...interface{}) {}
+func (NoLog) AssertDeferredTrue(func() bool, string, ...zap.Field) {}
 
-func (NoLog) AssertDeferredNoError(f func() error) {}
+func (NoLog) AssertDeferredNoError(func() error) {}
 
 func (NoLog) StopOnPanic() {}
 
@@ -44,50 +53,15 @@ func (NoLog) RecoverAndExit(f, exit func()) { defer exit(); f() }
 
 func (NoLog) Stop() {}
 
-func (NoLog) SetLogLevel(Level) {}
+type NoWarn struct{ NoLog }
 
-func (NoLog) SetDisplayLevel(Level) {}
+func (NoWarn) Fatal(string, ...zap.Field) { panic("unexpected Fatal") }
 
-// GetLogLevel ...
-func (NoLog) GetLogLevel() Level { return Off }
+func (NoWarn) Error(string, ...zap.Field) { panic("unexpected Error") }
 
-// GetDisplayLevel ...
-func (NoLog) GetDisplayLevel() Level { return Off }
+func (NoWarn) Warn(string, ...zap.Field) { panic("unexpected Warn") }
 
-// SetPrefix ...
-func (NoLog) SetPrefix(string) {}
+type discard struct{}
 
-func (NoLog) SetLoggingEnabled(bool) {}
-
-func (NoLog) SetDisplayingEnabled(bool) {}
-
-func (NoLog) SetContextualDisplayingEnabled(bool) {}
-
-// NoIOWriter is a mock Writer that does not write to any underlying source
-type NoIOWriter struct{}
-
-func (nw *NoIOWriter) Initialize(Config) (int, error) { return 0, nil }
-
-func (nw *NoIOWriter) Flush() error { return nil }
-
-func (nw *NoIOWriter) Write(p []byte) (int, error) { return len(p), nil }
-
-func (nw *NoIOWriter) WriteString(s string) (int, error) { return len(s), nil }
-
-func (nw *NoIOWriter) Close() error { return nil }
-
-func (nw *NoIOWriter) Rotate() error { return nil }
-
-func NewTestLog(config Config) (*Log, error) {
-	l := &Log{
-		config: config,
-		writer: &NoIOWriter{},
-	}
-	l.needsFlush = sync.NewCond(&l.flushLock)
-
-	l.wg.Add(1)
-
-	go l.RecoverAndPanic(l.run)
-
-	return l, nil
-}
+func (discard) Write(p []byte) (int, error) { return len(p), nil }
+func (discard) Close() error                { return nil }

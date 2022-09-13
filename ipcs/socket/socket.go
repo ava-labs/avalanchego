@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package socket
@@ -14,13 +14,19 @@ import (
 	"sync/atomic"
 	"syscall"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-// ErrMessageTooLarge is returned when reading a message that is larger than
-// our max size
-var ErrMessageTooLarge = errors.New("message too large")
+var (
+	// ErrMessageTooLarge is returned when reading a message that is larger than
+	// our max size
+	ErrMessageTooLarge = errors.New("message too large")
+
+	_ error = errReadTimeout{}
+)
 
 // Socket manages sending messages over a socket to many subscribed clients
 type Socket struct {
@@ -100,7 +106,10 @@ func (s *Socket) Send(msg []byte) {
 		for _, byteSlice := range [][]byte{lenBytes[:], msg} {
 			if _, err := conn.Write(byteSlice); err != nil {
 				s.removeConn(conn)
-				s.log.Debug("failed to write message to %s: %s", conn.RemoteAddr(), err)
+				s.log.Debug("failed to write message",
+					zap.Stringer("remoteAddress", conn.RemoteAddr()),
+					zap.Error(err),
+				)
 			}
 		}
 	}
@@ -195,7 +204,6 @@ type errReadTimeout struct {
 	addr net.Addr
 }
 
-// Error implements the error interface
 func (e errReadTimeout) Error() string {
 	return fmt.Sprintf("read from %s timed out", e.addr)
 }
@@ -211,14 +219,20 @@ func accept(s *Socket, l net.Listener) {
 		if !s.Running() {
 			return
 		}
-		s.log.Error("socket accept error: %s", err.Error())
+		s.log.Error("socket accept error",
+			zap.Error(err),
+		)
 	}
 	if conn, ok := conn.(*net.TCPConn); ok {
 		if err := conn.SetLinger(0); err != nil {
-			s.log.Warn("failed to set no linger due to: %s", err)
+			s.log.Warn("failed to set no linger",
+				zap.Error(err),
+			)
 		}
 		if err := conn.SetNoDelay(true); err != nil {
-			s.log.Warn("failed to set socket nodelay due to: %s", err)
+			s.log.Warn("failed to set socket nodelay",
+				zap.Error(err),
+			)
 		}
 	}
 	s.connLock.Lock()

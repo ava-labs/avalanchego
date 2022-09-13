@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package getter
@@ -7,30 +7,43 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/golang/mock/gomock"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"gotest.tools/assert"
 )
 
 var errUnknownBlock = errors.New("unknown block")
 
-func testSetup(t *testing.T) (*block.TestVM, *common.SenderTest, common.Config) {
+type StateSyncEnabledMock struct {
+	*block.TestVM
+	*mocks.MockStateSyncableVM
+}
+
+func testSetup(
+	t *testing.T,
+	ctrl *gomock.Controller,
+) (StateSyncEnabledMock, *common.SenderTest, common.Config) {
 	ctx := snow.DefaultConsensusContextTest()
 
 	peers := validators.NewSet()
 	sender := &common.SenderTest{}
-	vm := &block.TestVM{}
+	vm := StateSyncEnabledMock{
+		TestVM:              &block.TestVM{},
+		MockStateSyncableVM: mocks.NewMockStateSyncableVM(ctrl),
+	}
 
 	sender.T = t
-	vm.T = t
 
 	sender.Default(true)
-	vm.Default(true)
 
 	isBootstrapped := false
 	subnet := &common.SubnetTest{
@@ -41,7 +54,7 @@ func testSetup(t *testing.T) (*block.TestVM, *common.SenderTest, common.Config) 
 
 	sender.CantSendGetAcceptedFrontier = false
 
-	peer := ids.GenerateTestShortID()
+	peer := ids.GenerateTestNodeID()
 	if err := peers.AddWeight(peer, 1); err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +77,10 @@ func testSetup(t *testing.T) (*block.TestVM, *common.SenderTest, common.Config) 
 }
 
 func TestAcceptedFrontier(t *testing.T) {
-	vm, sender, config := testSetup(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	vm, sender, config := testSetup(t, ctrl)
 
 	blkID := ids.GenerateTestID()
 
@@ -79,7 +95,7 @@ func TestAcceptedFrontier(t *testing.T) {
 	vm.CantLastAccepted = false
 	vm.LastAcceptedF = func() (ids.ID, error) { return blkID, nil }
 	vm.GetBlockF = func(bID ids.ID) (snowman.Block, error) {
-		assert.Equal(t, blkID, bID)
+		require.Equal(t, blkID, bID)
 		return dummyBlk, nil
 	}
 
@@ -93,11 +109,11 @@ func TestAcceptedFrontier(t *testing.T) {
 	}
 
 	var accepted []ids.ID
-	sender.SendAcceptedFrontierF = func(_ ids.ShortID, _ uint32, frontier []ids.ID) {
+	sender.SendAcceptedFrontierF = func(_ ids.NodeID, _ uint32, frontier []ids.ID) {
 		accepted = frontier
 	}
 
-	if err := bs.GetAcceptedFrontier(ids.ShortEmpty, 0); err != nil {
+	if err := bs.GetAcceptedFrontier(ids.EmptyNodeID, 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -110,7 +126,10 @@ func TestAcceptedFrontier(t *testing.T) {
 }
 
 func TestFilterAccepted(t *testing.T) {
-	vm, sender, config := testSetup(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	vm, sender, config := testSetup(t, ctrl)
 
 	blkID0 := ids.GenerateTestID()
 	blkID1 := ids.GenerateTestID()
@@ -128,7 +147,7 @@ func TestFilterAccepted(t *testing.T) {
 	vm.CantLastAccepted = false
 	vm.LastAcceptedF = func() (ids.ID, error) { return blk1.ID(), nil }
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		assert.Equal(t, blk1.ID(), blkID)
+		require.Equal(t, blk1.ID(), blkID)
 		return blk1, nil
 	}
 
@@ -156,11 +175,11 @@ func TestFilterAccepted(t *testing.T) {
 	}
 
 	var accepted []ids.ID
-	sender.SendAcceptedF = func(_ ids.ShortID, _ uint32, frontier []ids.ID) {
+	sender.SendAcceptedF = func(_ ids.NodeID, _ uint32, frontier []ids.ID) {
 		accepted = frontier
 	}
 
-	if err := bs.GetAccepted(ids.ShortEmpty, 0, blkIDs); err != nil {
+	if err := bs.GetAccepted(ids.EmptyNodeID, 0, blkIDs); err != nil {
 		t.Fatal(err)
 	}
 

@@ -1,11 +1,12 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
 
 import (
-	"bytes"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -14,27 +15,22 @@ import (
 )
 
 func TestCredentialVerify(t *testing.T) {
+	require := require.New(t)
 	cred := Credential{}
-	err := cred.Verify()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(cred.Verify())
 }
 
 func TestCredentialVerifyNil(t *testing.T) {
+	require := require.New(t)
 	cred := (*Credential)(nil)
-	err := cred.Verify()
-	if err == nil {
-		t.Fatalf("Should have errored with a nil credential")
-	}
+	require.ErrorIs(cred.Verify(), errNilCredential)
 }
 
 func TestCredentialSerialize(t *testing.T) {
+	require := require.New(t)
 	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
-	if err := m.RegisterCodec(0, c); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(m.RegisterCodec(0, c))
 
 	expected := []byte{
 		// Codec version
@@ -86,24 +82,16 @@ func TestCredentialSerialize(t *testing.T) {
 			0x00,
 		},
 	}}
-	err := cred.Verify()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(cred.Verify())
 
 	result, err := m.Marshal(0, &cred)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !bytes.Equal(expected, result) {
-		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
-	}
+	require.NoError(err)
+	require.Equal(expected, result)
 }
 
 func TestCredentialNotState(t *testing.T) {
+	require := require.New(t)
 	intf := interface{}(&Credential{})
-	if _, ok := intf.(verify.State); ok {
-		t.Fatalf("shouldn't be marked as state")
-	}
+	_, ok := intf.(verify.State)
+	require.False(ok)
 }

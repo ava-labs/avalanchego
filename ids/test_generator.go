@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ids
@@ -19,4 +19,9 @@ func GenerateTestShortID() ShortID {
 	newID := GenerateTestID()
 	newShortID, _ := ToShortID(newID[:20])
 	return newShortID
+}
+
+// GenerateTestNodeID returns a new ID that should only be used for testing
+func GenerateTestNodeID() NodeID {
+	return NodeID(GenerateTestShortID())
 }

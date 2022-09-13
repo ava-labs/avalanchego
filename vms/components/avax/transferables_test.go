@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -165,9 +164,9 @@ func TestTransferableOutputSerialization(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(outBytes, expected) {
-		t.Fatalf("Expected:\n%s\nResult:\n%s",
-			formatting.DumpBytes(expected),
-			formatting.DumpBytes(outBytes),
+		t.Fatalf("Expected:\n0x%x\nResult:\n0x%x",
+			expected,
+			outBytes,
 		)
 	}
 }
@@ -329,9 +328,9 @@ func TestTransferableInputSerialization(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(inBytes, expected) {
-		t.Fatalf("Expected:\n%s\nResult:\n%s",
-			formatting.DumpBytes(expected),
-			formatting.DumpBytes(inBytes),
+		t.Fatalf("Expected:\n0x%x\nResult:\n0x%x",
+			expected,
+			inBytes,
 		)
 	}
 }

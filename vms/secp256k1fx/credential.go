@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
@@ -14,10 +14,6 @@ import (
 
 var errNilCredential = errors.New("nil credential")
 
-const (
-	defaultEncoding = formatting.Hex
-)
-
 type Credential struct {
 	Sigs [][crypto.SECP256K1RSigLen]byte `serialize:"true" json:"signatures"`
 }
@@ -27,7 +23,7 @@ type Credential struct {
 func (cr *Credential) MarshalJSON() ([]byte, error) {
 	signatures := make([]string, len(cr.Sigs))
 	for i, sig := range cr.Sigs {
-		sigStr, err := formatting.EncodeWithoutChecksum(defaultEncoding, sig[:])
+		sigStr, err := formatting.Encode(formatting.HexNC, sig[:])
 		if err != nil {
 			return nil, fmt.Errorf("couldn't convert signature to string: %w", err)
 		}

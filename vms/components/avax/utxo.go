@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
@@ -12,6 +12,8 @@ import (
 var (
 	errNilUTXO   = errors.New("nil utxo is not valid")
 	errEmptyUTXO = errors.New("empty utxo is not valid")
+
+	_ verify.Verifiable = &UTXO{}
 )
 
 type UTXO struct {
@@ -21,7 +23,6 @@ type UTXO struct {
 	Out verify.State `serialize:"true" json:"output"`
 }
 
-// Verify implements the verify.Verifiable interface
 func (utxo *UTXO) Verify() error {
 	switch {
 	case utxo == nil:

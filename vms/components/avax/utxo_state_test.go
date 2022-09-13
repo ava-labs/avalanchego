@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
@@ -6,7 +6,7 @@ package avax
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -18,12 +18,11 @@ import (
 )
 
 func TestUTXOState(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	txID := ids.GenerateTestID()
 	assetID := ids.GenerateTestID()
 	addr := ids.GenerateTestShortID()
-	utxoID := ids.GenerateTestID()
 	utxo := &UTXO{
 		UTXOID: UTXOID{
 			TxID:        txID,
@@ -39,6 +38,7 @@ func TestUTXOState(t *testing.T) {
 			},
 		},
 	}
+	utxoID := utxo.InputID()
 
 	c := linearcodec.NewDefault()
 	manager := codec.NewDefaultManager()
@@ -52,47 +52,48 @@ func TestUTXOState(t *testing.T) {
 		c.RegisterType(&secp256k1fx.Credential{}),
 		manager.RegisterCodec(codecVersion, c),
 	)
-	assert.NoError(errs.Err)
+	require.NoError(errs.Err)
 
 	db := memdb.New()
 	s := NewUTXOState(db, manager)
 
 	_, err := s.GetUTXO(utxoID)
-	assert.Equal(database.ErrNotFound, err)
+	require.Equal(database.ErrNotFound, err)
 
 	_, err = s.GetUTXO(utxoID)
-	assert.Equal(database.ErrNotFound, err)
+	require.Equal(database.ErrNotFound, err)
 
 	err = s.DeleteUTXO(utxoID)
-	assert.Equal(database.ErrNotFound, err)
+	require.Equal(database.ErrNotFound, err)
 
-	err = s.PutUTXO(utxoID, utxo)
-	assert.NoError(err)
+	err = s.PutUTXO(utxo)
+	require.NoError(err)
 
 	utxoIDs, err := s.UTXOIDs(addr[:], ids.Empty, 5)
-	assert.NoError(err)
-	assert.Equal([]ids.ID{utxoID}, utxoIDs)
+	require.NoError(err)
+	require.Equal([]ids.ID{utxoID}, utxoIDs)
 
 	readUTXO, err := s.GetUTXO(utxoID)
-	assert.NoError(err)
-	assert.Equal(utxo, readUTXO)
+	require.NoError(err)
+	require.Equal(utxo, readUTXO)
 
 	err = s.DeleteUTXO(utxoID)
-	assert.NoError(err)
+	require.NoError(err)
 
 	_, err = s.GetUTXO(utxoID)
-	assert.Equal(database.ErrNotFound, err)
+	require.Equal(database.ErrNotFound, err)
 
-	err = s.PutUTXO(utxoID, utxo)
-	assert.NoError(err)
+	err = s.PutUTXO(utxo)
+	require.NoError(err)
 
 	s = NewUTXOState(db, manager)
 
 	readUTXO, err = s.GetUTXO(utxoID)
-	assert.NoError(err)
-	assert.Equal(utxo, readUTXO)
+	require.NoError(err)
+	require.Equal(utxoID, readUTXO.InputID())
+	require.Equal(utxo, readUTXO)
 
 	utxoIDs, err = s.UTXOIDs(addr[:], ids.Empty, 5)
-	assert.NoError(err)
-	assert.Equal([]ids.ID{utxoID}, utxoIDs)
+	require.NoError(err)
+	require.Equal([]ids.ID{utxoID}, utxoIDs)
 }

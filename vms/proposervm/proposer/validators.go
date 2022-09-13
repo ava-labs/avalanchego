@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposer
@@ -10,7 +10,7 @@ import (
 )
 
 type validatorData struct {
-	id     ids.ShortID
+	id     ids.NodeID
 	weight uint64
 }
 

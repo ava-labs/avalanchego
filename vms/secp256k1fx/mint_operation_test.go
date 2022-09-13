@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
@@ -6,18 +6,20 @@ package secp256k1fx
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 func TestMintOperationVerifyNil(t *testing.T) {
+	require := require.New(t)
 	op := (*MintOperation)(nil)
-	if err := op.Verify(); err == nil {
-		t.Fatalf("MintOperation.Verify should have returned an error due to an nil operation")
-	}
+	require.ErrorIs(op.Verify(), errNilMintOperation)
 }
 
 func TestMintOperationOuts(t *testing.T) {
+	require := require.New(t)
 	op := &MintOperation{
 		MintInput: Input{
 			SigIndices: []uint32{0},
@@ -39,15 +41,12 @@ func TestMintOperationOuts(t *testing.T) {
 		},
 	}
 
-	outs := op.Outs()
-	if len(outs) != 2 {
-		t.Fatalf("Wrong number of outputs")
-	}
+	require.Len(op.Outs(), 2)
 }
 
 func TestMintOperationState(t *testing.T) {
+	require := require.New(t)
 	intf := interface{}(&MintOperation{})
-	if _, ok := intf.(verify.State); ok {
-		t.Fatalf("shouldn't be marked as state")
-	}
+	_, ok := intf.(verify.State)
+	require.False(ok)
 }

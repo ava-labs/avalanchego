@@ -1,0 +1,28 @@
+name: Test upgrade
+
+on:
+  push:
+    branches:
+      - dev
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test_upgrade:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.18'
+          check-latest: true
+      - name: Build the avalanchego binaries
+        shell: bash
+        run: ./scripts/build.sh
+      - name: Run upgrade tests
+        shell: bash
+        run: scripts/tests.upgrade.sh 1.8.2 ./build/avalanchego

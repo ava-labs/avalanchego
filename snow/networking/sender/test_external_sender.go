@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sender
@@ -22,8 +22,8 @@ type ExternalSenderTest struct {
 
 	CantSend, CantGossip bool
 
-	SendF   func(msg message.OutboundMessage, nodeIDs ids.ShortSet, subnetID ids.ID, validatorOnly bool) ids.ShortSet
-	GossipF func(msg message.OutboundMessage, subnetID ids.ID, validatorOnly bool, numValidatorsToSend, numNonValidatorsToSend int) ids.ShortSet
+	SendF   func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, subnetID ids.ID, validatorOnly bool) ids.NodeIDSet
+	GossipF func(msg message.OutboundMessage, subnetID ids.ID, validatorOnly bool, numValidatorsToSend, numNonValidatorsToSend, numPeersToSend int) ids.NodeIDSet
 }
 
 // Default set the default callable value to [cant]
@@ -34,10 +34,10 @@ func (s *ExternalSenderTest) Default(cant bool) {
 
 func (s *ExternalSenderTest) Send(
 	msg message.OutboundMessage,
-	nodeIDs ids.ShortSet,
+	nodeIDs ids.NodeIDSet,
 	subnetID ids.ID,
 	validatorOnly bool,
-) ids.ShortSet {
+) ids.NodeIDSet {
 	if s.SendF != nil {
 		return s.SendF(msg, nodeIDs, subnetID, validatorOnly)
 	}
@@ -59,9 +59,10 @@ func (s *ExternalSenderTest) Gossip(
 	validatorOnly bool,
 	numValidatorsToSend int,
 	numNonValidatorsToSend int,
-) ids.ShortSet {
+	numPeersToSend int,
+) ids.NodeIDSet {
 	if s.GossipF != nil {
-		return s.GossipF(msg, subnetID, validatorOnly, numValidatorsToSend, numNonValidatorsToSend)
+		return s.GossipF(msg, subnetID, validatorOnly, numValidatorsToSend, numNonValidatorsToSend, numPeersToSend)
 	}
 	if s.CantGossip {
 		if s.TB != nil {

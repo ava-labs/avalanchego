@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package version
@@ -7,95 +7,125 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewDefaultApplication(t *testing.T) {
-	v := NewDefaultApplication("avalanche", 1, 2, 3)
+	v := &Application{
+		Major: 1,
+		Minor: 2,
+		Patch: 3,
+	}
 
-	assert.NotNil(t, v)
-	assert.Equal(t, "avalanche/1.2.3", v.String())
-	assert.Equal(t, "avalanche", v.App())
-	assert.Equal(t, 1, v.Major())
-	assert.Equal(t, 2, v.Minor())
-	assert.Equal(t, 3, v.Patch())
-	assert.NoError(t, v.Compatible(v))
-	assert.False(t, v.Before(v))
-}
-
-func TestNewApplication(t *testing.T) {
-	v := NewApplication("avalanche", ":", ",", 1, 2, 3)
-
-	assert.NotNil(t, v)
-	assert.Equal(t, "avalanche:1,2,3", v.String())
-	assert.Equal(t, "avalanche", v.App())
-	assert.Equal(t, 1, v.Major())
-	assert.Equal(t, 2, v.Minor())
-	assert.Equal(t, 3, v.Patch())
-	assert.NoError(t, v.Compatible(v))
-	assert.False(t, v.Before(v))
+	require.Equal(t, "avalanche/1.2.3", v.String())
+	require.NoError(t, v.Compatible(v))
+	require.False(t, v.Before(v))
 }
 
 func TestComparingVersions(t *testing.T) {
 	tests := []struct {
-		myVersion   Application
-		peerVersion Application
+		myVersion   *Application
+		peerVersion *Application
 		compatible  bool
 		before      bool
 	}{
 		{
-			myVersion:   NewDefaultApplication("avalanche", 1, 2, 3),
-			peerVersion: NewDefaultApplication("avalanche", 1, 2, 3),
-			compatible:  true,
-			before:      false,
+			myVersion: &Application{
+				Major: 1,
+				Minor: 2,
+				Patch: 3,
+			},
+			peerVersion: &Application{
+				Major: 1,
+				Minor: 2,
+				Patch: 3,
+			},
+			compatible: true,
+			before:     false,
 		},
 		{
-			myVersion:   NewDefaultApplication("avalanche", 1, 2, 4),
-			peerVersion: NewDefaultApplication("avalanche", 1, 2, 3),
-			compatible:  true,
-			before:      false,
+			myVersion: &Application{
+				Major: 1,
+				Minor: 2,
+				Patch: 4,
+			},
+			peerVersion: &Application{
+				Major: 1,
+				Minor: 2,
+				Patch: 3,
+			},
+			compatible: true,
+			before:     false,
 		},
 		{
-			myVersion:   NewDefaultApplication("avalanche", 1, 2, 3),
-			peerVersion: NewDefaultApplication("avalanche", 1, 2, 4),
-			compatible:  true,
-			before:      true,
+			myVersion: &Application{
+				Major: 1,
+				Minor: 2,
+				Patch: 3,
+			},
+			peerVersion: &Application{
+				Major: 1,
+				Minor: 2,
+				Patch: 4,
+			},
+			compatible: true,
+			before:     true,
 		},
 		{
-			myVersion:   NewDefaultApplication("avalanche", 1, 3, 3),
-			peerVersion: NewDefaultApplication("avalanche", 1, 2, 3),
-			compatible:  true,
-			before:      false,
+			myVersion: &Application{
+				Major: 1,
+				Minor: 3,
+				Patch: 3,
+			},
+			peerVersion: &Application{
+				Major: 1,
+				Minor: 2,
+				Patch: 3,
+			},
+			compatible: true,
+			before:     false,
 		},
 		{
-			myVersion:   NewDefaultApplication("avalanche", 1, 2, 3),
-			peerVersion: NewDefaultApplication("avalanche", 1, 3, 3),
-			compatible:  true,
-			before:      true,
+			myVersion: &Application{
+				Major: 1,
+				Minor: 2,
+				Patch: 3,
+			},
+			peerVersion: &Application{
+				Major: 1,
+				Minor: 3,
+				Patch: 3,
+			},
+			compatible: true,
+			before:     true,
 		},
 		{
-			myVersion:   NewDefaultApplication("avalanche", 2, 2, 3),
-			peerVersion: NewDefaultApplication("avalanche", 1, 2, 3),
-			compatible:  false,
-			before:      false,
+			myVersion: &Application{
+				Major: 2,
+				Minor: 2,
+				Patch: 3,
+			},
+			peerVersion: &Application{
+				Major: 1,
+				Minor: 2,
+				Patch: 3,
+			},
+			compatible: false,
+			before:     false,
 		},
 		{
-			myVersion:   NewDefaultApplication("avalanche", 1, 2, 3),
-			peerVersion: NewDefaultApplication("avalanche", 2, 2, 3),
-			compatible:  true,
-			before:      true,
-		},
-		{
-			myVersion:   NewDefaultApplication("avax", 1, 2, 4),
-			peerVersion: NewDefaultApplication("avalanche", 1, 2, 3),
-			compatible:  false,
-			before:      false,
-		},
-		{
-			myVersion:   NewDefaultApplication("avalanche", 1, 2, 3),
-			peerVersion: NewDefaultApplication("avax", 1, 2, 3),
-			compatible:  false,
-			before:      false,
+			myVersion: &Application{
+				Major: 1,
+				Minor: 2,
+				Patch: 3,
+			},
+			peerVersion: &Application{
+				Major: 2,
+				Minor: 2,
+				Patch: 3,
+			},
+			compatible: true,
+			before:     true,
 		},
 	}
 	for _, test := range tests {

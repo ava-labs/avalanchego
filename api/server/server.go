@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package server
@@ -8,41 +8,93 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/url"
+	"path"
 	"sync"
 	"time"
 
 	"github.com/NYTimes/gziphandler"
 
-	"github.com/gorilla/handlers"
-
 	"github.com/rs/cors"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-const baseURL = "/ext"
+const (
+	baseURL           = "/ext"
+	readHeaderTimeout = 10 * time.Second
+)
 
 var (
 	errUnknownLockOption = errors.New("invalid lock options")
 
-	_ RouteAdder = &Server{}
+	_ PathAdder = readPathAdder{}
+	_ Server    = &server{}
 )
 
-type RouteAdder interface {
-	AddRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string, loggingWriter io.Writer) error
+type PathAdder interface {
+	// AddRoute registers a route to a handler.
+	AddRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string) error
+
+	// AddAliases registers aliases to the server
+	AddAliases(endpoint string, aliases ...string) error
+}
+
+type PathAdderWithReadLock interface {
+	// AddRouteWithReadLock registers a route to a handler assuming the http
+	// read lock is currently held.
+	AddRouteWithReadLock(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string) error
+
+	// AddAliasesWithReadLock registers aliases to the server assuming the http read
+	// lock is currently held.
+	AddAliasesWithReadLock(endpoint string, aliases ...string) error
 }
 
 // Server maintains the HTTP router
-type Server struct {
+type Server interface {
+	PathAdder
+	PathAdderWithReadLock
+	// Initialize creates the API server at the provided host and port
+	Initialize(log logging.Logger,
+		factory logging.Factory,
+		host string,
+		port uint16,
+		allowedOrigins []string,
+		shutdownTimeout time.Duration,
+		nodeID ids.NodeID,
+		wrappers ...Wrapper)
+	// Dispatch starts the API server
+	Dispatch() error
+	// DispatchTLS starts the API server with the provided TLS certificate
+	DispatchTLS(certBytes, keyBytes []byte) error
+	// RegisterChain registers the API endpoints associated with this chain. That is,
+	// add <route, handler> pairs to server so that API calls can be made to the VM.
+	// This method runs in a goroutine to avoid a deadlock in the event that the caller
+	// holds the engine's context lock. Namely, this could happen when the P-Chain is
+	// creating a new chain and holds the P-Chain's lock when this function is held,
+	// and at the same time the server's lock is held due to an API call and is trying
+	// to grab the P-Chain's lock.
+	RegisterChain(chainName string, engine common.Engine)
+	// AddChainRoute registers a route to a chain's handler
+	AddChainRoute(
+		handler *common.HTTPHandler,
+		ctx *snow.ConsensusContext,
+		base, endpoint string,
+	) error
+	// Shutdown this server
+	Shutdown() error
+}
+
+type server struct {
 	// log this server writes to
 	log logging.Logger
 	// generates new logs for chains to write to
@@ -61,15 +113,19 @@ type Server struct {
 	srv *http.Server
 }
 
-// Initialize creates the API server at the provided host and port
-func (s *Server) Initialize(
+// New returns an instance of a Server.
+func New() Server {
+	return &server{}
+}
+
+func (s *server) Initialize(
 	log logging.Logger,
 	factory logging.Factory,
 	host string,
 	port uint16,
 	allowedOrigins []string,
 	shutdownTimeout time.Duration,
-	nodeID ids.ShortID,
+	nodeID ids.NodeID,
 	wrappers ...Wrapper,
 ) {
 	s.log = log
@@ -79,7 +135,9 @@ func (s *Server) Initialize(
 	s.shutdownTimeout = shutdownTimeout
 	s.router = newRouter()
 
-	s.log.Info("API created with allowed origins: %v", allowedOrigins)
+	s.log.Info("API created",
+		zap.Strings("allowedOrigins", allowedOrigins),
+	)
 
 	corsHandler := cors.New(cors.Options{
 		AllowedOrigins:   allowedOrigins,
@@ -89,7 +147,7 @@ func (s *Server) Initialize(
 	s.handler = http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			// Attach this node's ID as a header
-			w.Header().Set("node-id", nodeID.PrefixedString(constants.NodeIDPrefix))
+			w.Header().Set("node-id", nodeID.String())
 			gzipHandler.ServeHTTP(w, r)
 		},
 	)
@@ -99,27 +157,33 @@ func (s *Server) Initialize(
 	}
 }
 
-// Dispatch starts the API server
-func (s *Server) Dispatch() error {
+func (s *server) Dispatch() error {
 	listenAddress := fmt.Sprintf("%s:%d", s.listenHost, s.listenPort)
 	listener, err := net.Listen("tcp", listenAddress)
 	if err != nil {
 		return err
 	}
 
-	ipDesc, err := utils.ToIPDesc(listener.Addr().String())
+	ipPort, err := ips.ToIPPort(listener.Addr().String())
 	if err != nil {
-		s.log.Info("HTTP API server listening on %q", listenAddress)
+		s.log.Info("HTTP API server listening",
+			zap.String("address", listenAddress),
+		)
 	} else {
-		s.log.Info("HTTP API server listening on \"%s:%d\"", s.listenHost, ipDesc.Port)
+		s.log.Info("HTTP API server listening",
+			zap.String("host", s.listenHost),
+			zap.Uint16("port", ipPort.Port),
+		)
 	}
 
-	s.srv = &http.Server{Handler: s.handler}
+	s.srv = &http.Server{
+		Handler:           s.handler,
+		ReadHeaderTimeout: readHeaderTimeout,
+	}
 	return s.srv.Serve(listener)
 }
 
-// DispatchTLS starts the API server with the provided TLS certificate
-func (s *Server) DispatchTLS(certBytes, keyBytes []byte) error {
+func (s *server) DispatchTLS(certBytes, keyBytes []byte) error {
 	listenAddress := fmt.Sprintf("%s:%d", s.listenHost, s.listenPort)
 	cert, err := tls.X509KeyPair(certBytes, keyBytes)
 	if err != nil {
@@ -135,29 +199,31 @@ func (s *Server) DispatchTLS(certBytes, keyBytes []byte) error {
 		return err
 	}
 
-	ipDesc, err := utils.ToIPDesc(listener.Addr().String())
+	ipPort, err := ips.ToIPPort(listener.Addr().String())
 	if err != nil {
-		s.log.Info("HTTPS API server listening on %q", listenAddress)
+		s.log.Info("HTTPS API server listening",
+			zap.String("address", listenAddress),
+		)
 	} else {
-		s.log.Info("HTTPS API server listening on \"%s:%d\"", s.listenHost, ipDesc.Port)
+		s.log.Info("HTTPS API server listening",
+			zap.String("host", s.listenHost),
+			zap.Uint16("port", ipPort.Port),
+		)
 	}
 
-	s.srv = &http.Server{Addr: listenAddress, Handler: s.handler}
+	s.srv = &http.Server{
+		Addr:              listenAddress,
+		Handler:           s.handler,
+		ReadHeaderTimeout: readHeaderTimeout,
+	}
 	return s.srv.Serve(listener)
 }
 
-// RegisterChain registers the API endpoints associated with this chain. That is,
-// add <route, handler> pairs to server so that API calls can be made to the VM.
-// This method runs in a goroutine to avoid a deadlock in the event that the caller
-// holds the engine's context lock. Namely, this could happen when the P-Chain is
-// creating a new chain and holds the P-Chain's lock when this function is held,
-// and at the same time the server's lock is held due to an API call and is trying
-// to grab the P-Chain's lock.
-func (s *Server) RegisterChain(chainName string, engine common.Engine) {
+func (s *server) RegisterChain(chainName string, engine common.Engine) {
 	go s.registerChain(chainName, engine)
 }
 
-func (s *Server) registerChain(chainName string, engine common.Engine) {
+func (s *server) registerChain(chainName string, engine common.Engine) {
 	var (
 		handlers map[string]*common.HTTPHandler
 		err      error
@@ -168,19 +234,18 @@ func (s *Server) registerChain(chainName string, engine common.Engine) {
 	handlers, err = engine.GetVM().CreateHandlers()
 	ctx.Lock.Unlock()
 	if err != nil {
-		s.log.Error("failed to create %s handlers: %s", chainName, err)
+		s.log.Error("failed to create handlers",
+			zap.String("chainName", chainName),
+			zap.Error(err),
+		)
 		return
 	}
 
-	httpLogger, err := s.factory.MakeChainChild(chainName, "http")
-	if err != nil {
-		s.log.Error("failed to create new http logger: %s", err)
-		return
-	}
-
-	s.log.Verbo("About to add API endpoints for chain with ID %s", ctx.ChainID)
+	s.log.Verbo("about to add API endpoints",
+		zap.Stringer("chainID", ctx.ChainID),
+	)
 	// all subroutes to a chain begin with "bc/<the chain's ID>"
-	defaultEndpoint := constants.ChainAliasPrefix + ctx.ChainID.String()
+	defaultEndpoint := path.Join(constants.ChainAliasPrefix, ctx.ChainID.String())
 
 	// Register each endpoint
 	for extension, handler := range handlers {
@@ -188,23 +253,28 @@ func (s *Server) registerChain(chainName string, engine common.Engine) {
 		// e.g. "/foo" and "" are ok but "\n" is not
 		_, err := url.ParseRequestURI(extension)
 		if extension != "" && err != nil {
-			s.log.Error("could not add route to chain's API handler because route is malformed: %s", err)
+			s.log.Error("could not add route to chain's API handler",
+				zap.String("reason", "route is malformed"),
+				zap.Error(err),
+			)
 			continue
 		}
-		if err := s.AddChainRoute(handler, ctx, defaultEndpoint, extension, httpLogger); err != nil {
-			s.log.Error("error adding route: %s", err)
+		if err := s.AddChainRoute(handler, ctx, defaultEndpoint, extension); err != nil {
+			s.log.Error("error adding route",
+				zap.Error(err),
+			)
 		}
 	}
 }
 
-// AddChainRoute registers a route to a chain's handler
-func (s *Server) AddChainRoute(handler *common.HTTPHandler, ctx *snow.ConsensusContext, base, endpoint string, loggingWriter io.Writer) error {
+func (s *server) AddChainRoute(handler *common.HTTPHandler, ctx *snow.ConsensusContext, base, endpoint string) error {
 	url := fmt.Sprintf("%s/%s", baseURL, base)
-	s.log.Info("adding route %s%s", url, endpoint)
-	// Apply logging middleware
-	h := handlers.CombinedLoggingHandler(loggingWriter, handler.Handler)
+	s.log.Info("adding route",
+		zap.String("url", url),
+		zap.String("endpoint", endpoint),
+	)
 	// Apply middleware to grab/release chain's lock before/after calling API method
-	h, err := lockMiddleware(h, handler.LockOptions, &ctx.Lock)
+	h, err := lockMiddleware(handler.Handler, handler.LockOptions, &ctx.Lock)
 	if err != nil {
 		return err
 	}
@@ -213,14 +283,24 @@ func (s *Server) AddChainRoute(handler *common.HTTPHandler, ctx *snow.ConsensusC
 	return s.router.AddRouter(url, endpoint, h)
 }
 
-// AddRoute registers a route to a handler.
-func (s *Server) AddRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string, loggingWriter io.Writer) error {
+func (s *server) AddRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string) error {
+	return s.addRoute(handler, lock, base, endpoint)
+}
+
+func (s *server) AddRouteWithReadLock(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string) error {
+	s.router.lock.RUnlock()
+	defer s.router.lock.RLock()
+	return s.addRoute(handler, lock, base, endpoint)
+}
+
+func (s *server) addRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string) error {
 	url := fmt.Sprintf("%s/%s", baseURL, base)
-	s.log.Info("adding route %s%s", url, endpoint)
-	// Apply logging middleware
-	h := handlers.CombinedLoggingHandler(loggingWriter, handler.Handler)
+	s.log.Info("adding route",
+		zap.String("url", url),
+		zap.String("endpoint", endpoint),
+	)
 	// Apply middleware to grab/release chain's lock before/after calling API method
-	h, err := lockMiddleware(h, handler.LockOptions, lock)
+	h, err := lockMiddleware(handler.Handler, handler.LockOptions, lock)
 	if err != nil {
 		return err
 	}
@@ -250,7 +330,7 @@ func lockMiddleware(handler http.Handler, lockOption common.LockOption, lock *sy
 }
 
 // Reject middleware wraps a handler. If the chain that the context describes is
-// not done bootstrapping, writes back an error.
+// not done state-syncing/bootstrapping, writes back an error.
 func rejectMiddleware(handler http.Handler, ctx *snow.ConsensusContext) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { // If chain isn't done bootstrapping, ignore API calls
 		if ctx.GetState() != snow.NormalOp {
@@ -263,8 +343,7 @@ func rejectMiddleware(handler http.Handler, ctx *snow.ConsensusContext) http.Han
 	})
 }
 
-// AddAliases registers aliases to the server
-func (s *Server) AddAliases(endpoint string, aliases ...string) error {
+func (s *server) AddAliases(endpoint string, aliases ...string) error {
 	url := fmt.Sprintf("%s/%s", baseURL, endpoint)
 	endpoints := make([]string, len(aliases))
 	for i, alias := range aliases {
@@ -273,9 +352,7 @@ func (s *Server) AddAliases(endpoint string, aliases ...string) error {
 	return s.router.AddAlias(url, endpoints...)
 }
 
-// AddAliasesWithReadLock registers aliases to the server assuming the http read
-// lock is currently held.
-func (s *Server) AddAliasesWithReadLock(endpoint string, aliases ...string) error {
+func (s *server) AddAliasesWithReadLock(endpoint string, aliases ...string) error {
 	// This is safe, as the read lock doesn't actually need to be held once the
 	// http handler is called. However, it is unlocked later, so this function
 	// must end with the lock held.
@@ -285,8 +362,7 @@ func (s *Server) AddAliasesWithReadLock(endpoint string, aliases ...string) erro
 	return s.AddAliases(endpoint, aliases...)
 }
 
-// Shutdown this server
-func (s *Server) Shutdown() error {
+func (s *server) Shutdown() error {
 	if s.srv == nil {
 		return nil
 	}
@@ -298,4 +374,22 @@ func (s *Server) Shutdown() error {
 	// If shutdown times out, make sure the server is still shutdown.
 	_ = s.srv.Close()
 	return err
+}
+
+type readPathAdder struct {
+	pather PathAdderWithReadLock
+}
+
+func PathWriterFromWithReadLock(pather PathAdderWithReadLock) PathAdder {
+	return readPathAdder{
+		pather: pather,
+	}
+}
+
+func (a readPathAdder) AddRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string) error {
+	return a.pather.AddRouteWithReadLock(handler, lock, base, endpoint)
+}
+
+func (a readPathAdder) AddAliases(endpoint string, aliases ...string) error {
+	return a.pather.AddAliasesWithReadLock(endpoint, aliases...)
 }

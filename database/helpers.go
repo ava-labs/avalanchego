@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package database
@@ -12,12 +12,12 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var errWrongSize = errors.New("value has unexpected size")
-
 const (
 	// kvPairOverhead is an estimated overhead for a kv pair in a database.
 	kvPairOverhead = 8 // bytes
 )
+
+var errWrongSize = errors.New("value has unexpected size")
 
 func PutID(db KeyValueWriter, key []byte, val ids.ID) error {
 	return db.Put(key, val[:])
@@ -151,6 +151,13 @@ func Size(db Iteratee) (int, error) {
 		size += len(iterator.Key()) + len(iterator.Value()) + kvPairOverhead
 	}
 	return size, iterator.Error()
+}
+
+func IsEmpty(db Iteratee) (bool, error) {
+	iterator := db.NewIterator()
+	defer iterator.Release()
+
+	return !iterator.Next(), iterator.Error()
 }
 
 func Clear(readerDB Iteratee, deleterDB KeyValueDeleter) error {

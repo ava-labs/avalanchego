@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
@@ -6,6 +6,8 @@ package snowball
 import (
 	"fmt"
 )
+
+var _ BinarySnowflake = &binarySnowflake{}
 
 // binarySnowflake is the implementation of a binary snowflake instance
 type binarySnowflake struct {
@@ -25,13 +27,11 @@ type binarySnowflake struct {
 	finalized bool
 }
 
-// Initialize implements the BinarySnowflake interface
 func (sf *binarySnowflake) Initialize(beta, choice int) {
 	sf.binarySlush.Initialize(choice)
 	sf.beta = beta
 }
 
-// RecordSuccessfulPoll implements the BinarySnowflake interface
 func (sf *binarySnowflake) RecordSuccessfulPoll(choice int) {
 	if sf.finalized {
 		return // This instace is already decided.
@@ -49,10 +49,8 @@ func (sf *binarySnowflake) RecordSuccessfulPoll(choice int) {
 	sf.binarySlush.RecordSuccessfulPoll(choice)
 }
 
-// RecordUnsuccessfulPoll implements the BinarySnowflake interface
 func (sf *binarySnowflake) RecordUnsuccessfulPoll() { sf.confidence = 0 }
 
-// Finalized implements the BinarySnowflake interface
 func (sf *binarySnowflake) Finalized() bool { return sf.finalized }
 
 func (sf *binarySnowflake) String() string {

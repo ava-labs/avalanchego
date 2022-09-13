@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bootstrap
@@ -8,6 +8,8 @@ import (
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -91,16 +93,22 @@ func (t *txJob) Execute() error {
 	case choices.Processing:
 		txID := t.tx.ID()
 		if err := t.tx.Verify(); err != nil {
-			t.log.Error("transaction %s failed verification during bootstrapping due to %s",
-				txID, err)
+			t.log.Error("transaction failed verification during bootstrapping",
+				zap.Stringer("txID", txID),
+				zap.Error(err),
+			)
 			return fmt.Errorf("failed to verify transaction in bootstrapping: %w", err)
 		}
 
 		t.numAccepted.Inc()
-		t.log.Trace("accepting transaction %s in bootstrapping", txID)
+		t.log.Trace("accepting transaction in bootstrapping",
+			zap.Stringer("txID", txID),
+		)
 		if err := t.tx.Accept(); err != nil {
-			t.log.Error("transaction %s failed to accept during bootstrapping due to %s",
-				txID, err)
+			t.log.Error("transaction failed to accept during bootstrapping",
+				zap.Stringer("txID", txID),
+				zap.Error(err),
+			)
 			return fmt.Errorf("failed to accept transaction in bootstrapping: %w", err)
 		}
 	}

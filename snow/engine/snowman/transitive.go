@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -7,6 +7,10 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/zap"
+
+	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -14,10 +18,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/poll"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/events"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 )
+
+const nonVerifiedCacheSize = 128
 
 var _ Engine = &Transitive{}
 
@@ -32,6 +37,8 @@ type Transitive struct {
 	metrics
 
 	// list of NoOpsHandler for messages dropped by engine
+	common.StateSummaryFrontierHandler
+	common.AcceptedStateSummaryHandler
 	common.AcceptedFrontierHandler
 	common.AcceptedHandler
 	common.AncestorsHandler
@@ -51,6 +58,12 @@ type Transitive struct {
 	// Block ID --> Parent ID
 	nonVerifieds AncestorTree
 
+	// Block ID --> Block.
+	// A block is put into this cache if it was not able to be issued. A block
+	// fails to be issued if verification on the block or one of its ancestors
+	// occurs.
+	nonVerifiedCache cache.Cacher
+
 	// operations that are blocked on a block being issued. This could be
 	// issuing another block, responding to a query, or applying votes to consensus
 	blocked events.Blocker
@@ -66,14 +79,25 @@ type Transitive struct {
 func newTransitive(config Config) (*Transitive, error) {
 	config.Ctx.Log.Info("initializing consensus engine")
 
+	nonVerifiedCache, err := metercacher.New(
+		"non_verified_cache",
+		config.Ctx.Registerer,
+		&cache.LRU{Size: nonVerifiedCacheSize},
+	)
+	if err != nil {
+		return nil, err
+	}
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t := &Transitive{
-		Config:                  config,
-		AcceptedFrontierHandler: common.NewNoOpAcceptedFrontierHandler(config.Ctx.Log),
-		AcceptedHandler:         common.NewNoOpAcceptedHandler(config.Ctx.Log),
-		AncestorsHandler:        common.NewNoOpAncestorsHandler(config.Ctx.Log),
-		pending:                 make(map[ids.ID]snowman.Block),
-		nonVerifieds:            NewAncestorTree(),
+		Config:                      config,
+		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Ctx.Log),
+		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Ctx.Log),
+		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Ctx.Log),
+		AcceptedHandler:             common.NewNoOpAcceptedHandler(config.Ctx.Log),
+		AncestorsHandler:            common.NewNoOpAncestorsHandler(config.Ctx.Log),
+		pending:                     make(map[ids.ID]snowman.Block),
+		nonVerifieds:                NewAncestorTree(),
+		nonVerifiedCache:            nonVerifiedCache,
 		polls: poll.NewSet(factory,
 			config.Ctx.Log,
 			"",
@@ -84,16 +108,28 @@ func newTransitive(config Config) (*Transitive, error) {
 	return t, t.metrics.Initialize("", config.Ctx.Registerer)
 }
 
-// Put implements the PutHandler interface
-func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkBytes []byte) error {
+func (t *Transitive) Put(nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
 	blk, err := t.VM.ParseBlock(blkBytes)
 	if err != nil {
-		t.Ctx.Log.Debug("failed to parse block: %s", err)
-		t.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes(blkBytes))
+		t.Ctx.Log.Debug("failed to parse block",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+			zap.Error(err),
+		)
+		t.Ctx.Log.Verbo("failed to parse block",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+			zap.Binary("block", blkBytes),
+			zap.Error(err),
+		)
 		// because GetFailed doesn't utilize the assumption that we actually
 		// sent a Get message, we can safely call GetFailed here to potentially
 		// abandon the request.
-		return t.GetFailed(vdr, requestID)
+		return t.GetFailed(nodeID, requestID)
+	}
+
+	if t.wasIssued(blk) {
+		t.metrics.numUselessPutBytes.Add(float64(len(blkBytes)))
 	}
 
 	// issue the block into consensus. If the block has already been issued,
@@ -101,19 +137,21 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkBytes []byte) err
 	// receive requests to fill the ancestry. dependencies that have already
 	// been fetched, but with missing dependencies themselves won't be requested
 	// from the vdr.
-	if _, err := t.issueFrom(vdr, blk); err != nil {
+	if _, err := t.issueFrom(nodeID, blk); err != nil {
 		return err
 	}
 	return t.buildBlocks()
 }
 
-// GetFailed implements the PutHandler interface
-func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
+func (t *Transitive) GetFailed(nodeID ids.NodeID, requestID uint32) error {
 	// We don't assume that this function is called after a failed Get message.
 	// Check to see if we have an outstanding request and also get what the request was for if it exists.
-	blkID, ok := t.blkReqs.Remove(vdr, requestID)
+	blkID, ok := t.blkReqs.Remove(nodeID, requestID)
 	if !ok {
-		t.Ctx.Log.Debug("getFailed(%s, %d) called without having sent corresponding Get", vdr, requestID)
+		t.Ctx.Log.Debug("unexpected GetFailed",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+		)
 		return nil
 	}
 
@@ -123,80 +161,88 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 	return t.buildBlocks()
 }
 
-// PullQuery implements the QueryHandler interface
-func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
-	// Will send chits once we've issued block [blkID] into consensus
-	c := &convincer{
-		consensus: t.Consensus,
-		sender:    t.Sender,
-		vdr:       vdr,
-		requestID: requestID,
-		errs:      &t.errs,
-	}
+func (t *Transitive) PullQuery(nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
+	// TODO: once everyone supports ChitsV2 - we should be sending that message
+	// type here.
+	t.Sender.SendChits(nodeID, requestID, []ids.ID{t.Consensus.Preference()})
 
 	// Try to issue [blkID] to consensus.
 	// If we're missing an ancestor, request it from [vdr]
-	added, err := t.issueFromByID(vdr, blkID)
-	if err != nil {
+	if _, err := t.issueFromByID(nodeID, blkID); err != nil {
 		return err
 	}
 
-	// Wait until we've issued block [blkID] before sending chits.
-	if !added {
-		c.deps.Add(blkID)
-	}
-
-	t.blocked.Register(c)
-	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 	return t.buildBlocks()
 }
 
-// PushQuery implements the QueryHandler interface
-func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkBytes []byte) error {
+func (t *Transitive) PushQuery(nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
+	// TODO: once everyone supports ChitsV2 - we should be sending that message
+	// type here.
+	t.Sender.SendChits(nodeID, requestID, []ids.ID{t.Consensus.Preference()})
+
 	blk, err := t.VM.ParseBlock(blkBytes)
 	// If parsing fails, we just drop the request, as we didn't ask for it
 	if err != nil {
-		t.Ctx.Log.Debug("failed to parse block: %s", err)
-		t.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes(blkBytes))
+		t.Ctx.Log.Debug("failed to parse block",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+			zap.Error(err),
+		)
+		t.Ctx.Log.Verbo("failed to parse block",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+			zap.Binary("block", blkBytes),
+			zap.Error(err),
+		)
 		return nil
 	}
 
+	if t.wasIssued(blk) {
+		t.metrics.numUselessPushQueryBytes.Add(float64(len(blkBytes)))
+	}
+
 	// issue the block into consensus. If the block has already been issued,
-	// this will be a noop. If this block has missing dependencies, vdr will
+	// this will be a noop. If this block has missing dependencies, nodeID will
 	// receive requests to fill the ancestry. dependencies that have already
 	// been fetched, but with missing dependencies themselves won't be requested
 	// from the vdr.
-	if _, err := t.issueFrom(vdr, blk); err != nil {
+	if _, err := t.issueFrom(nodeID, blk); err != nil {
 		return err
 	}
 
-	// register the chit request
-	return t.PullQuery(vdr, requestID, blk.ID())
+	return t.buildBlocks()
 }
 
-// Chits implements the ChitsHandler interface
-func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) error {
+func (t *Transitive) Chits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) error {
 	// Since this is a linear chain, there should only be one ID in the vote set
 	if len(votes) != 1 {
-		t.Ctx.Log.Debug("Chits(%s, %d) was called with %d votes (expected 1)", vdr, requestID, len(votes))
+		t.Ctx.Log.Debug("failing Chits",
+			zap.String("reason", "expected only 1 vote"),
+			zap.Int("numVotes", len(votes)),
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+		)
 		// because QueryFailed doesn't utilize the assumption that we actually
 		// sent a Query message, we can safely call QueryFailed here to
 		// potentially abandon the request.
-		return t.QueryFailed(vdr, requestID)
+		return t.QueryFailed(nodeID, requestID)
 	}
 	blkID := votes[0]
 
-	t.Ctx.Log.Verbo("Chits(%s, %d) contains vote for %s", vdr, requestID, blkID)
+	t.Ctx.Log.Verbo("called Chits for the block",
+		zap.Stringer("blkID", blkID),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID))
 
 	// Will record chits once [blkID] has been issued into consensus
 	v := &voter{
 		t:         t,
-		vdr:       vdr,
+		vdr:       nodeID,
 		requestID: requestID,
 		response:  blkID,
 	}
 
-	added, err := t.issueFromByID(vdr, blkID)
+	added, err := t.issueFromByID(nodeID, blkID)
 	if err != nil {
 		return err
 	}
@@ -210,8 +256,11 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) er
 	return t.buildBlocks()
 }
 
-// QueryFailed implements the ChitsHandler interface
-func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
+func (t *Transitive) ChitsV2(vdr ids.NodeID, requestID uint32, _ []ids.ID, vote ids.ID) error {
+	return t.Chits(vdr, requestID, []ids.ID{vote})
+}
+
+func (t *Transitive) QueryFailed(vdr ids.NodeID, requestID uint32) error {
 	t.blocked.Register(&voter{
 		t:         t,
 		vdr:       vdr,
@@ -221,44 +270,36 @@ func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
 	return t.buildBlocks()
 }
 
-// AppRequest implements the AppHandler interface
-func (t *Transitive) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, request []byte) error {
+func (t *Transitive) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	// Notify the VM of this request
 	return t.VM.AppRequest(nodeID, requestID, deadline, request)
 }
 
-// AppRequestFailed implements the AppHandler interface
-func (t *Transitive) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+func (t *Transitive) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
 	// Notify the VM that a request it made failed
 	return t.VM.AppRequestFailed(nodeID, requestID)
 }
 
-// AppResponse implements the AppHandler interface
-func (t *Transitive) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+func (t *Transitive) AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
 	// Notify the VM of a response to its request
 	return t.VM.AppResponse(nodeID, requestID, response)
 }
 
-// AppGossip implements the AppHandler interface
-func (t *Transitive) AppGossip(nodeID ids.ShortID, msg []byte) error {
+func (t *Transitive) AppGossip(nodeID ids.NodeID, msg []byte) error {
 	// Notify the VM of this message which has been gossiped to it
 	return t.VM.AppGossip(nodeID, msg)
 }
 
-// Connected implements the InternalHandler interface.
-func (t *Transitive) Connected(nodeID ids.ShortID, nodeVersion version.Application) error {
+func (t *Transitive) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
 	return t.VM.Connected(nodeID, nodeVersion)
 }
 
-// Disconnected implements the InternalHandler interface.
-func (t *Transitive) Disconnected(nodeID ids.ShortID) error {
+func (t *Transitive) Disconnected(nodeID ids.NodeID) error {
 	return t.VM.Disconnected(nodeID)
 }
 
-// Timeout implements the InternalHandler interface
 func (t *Transitive) Timeout() error { return nil }
 
-// Gossip implements the InternalHandler interface
 func (t *Transitive) Gossip() error {
 	blkID, err := t.VM.LastAccepted()
 	if err != nil {
@@ -266,43 +307,44 @@ func (t *Transitive) Gossip() error {
 	}
 	blk, err := t.GetBlock(blkID)
 	if err != nil {
-		t.Ctx.Log.Warn("dropping gossip request as %s couldn't be loaded due to %s", blkID, err)
+		t.Ctx.Log.Warn("dropping gossip request",
+			zap.String("reason", "block couldn't be loaded"),
+			zap.Stringer("blkID", blkID),
+			zap.Error(err),
+		)
 		return nil
 	}
-	t.Ctx.Log.Verbo("gossiping %s as accepted to the network", blkID)
+	t.Ctx.Log.Verbo("gossiping accepted block to the network",
+		zap.Stringer("blkID", blkID),
+	)
 	t.Sender.SendGossip(blkID, blk.Bytes())
 	return nil
 }
 
-// Halt implements the InternalHandler interface
 func (t *Transitive) Halt() {}
 
-// Shutdown implements the InternalHandler interface
 func (t *Transitive) Shutdown() error {
 	t.Ctx.Log.Info("shutting down consensus engine")
 	return t.VM.Shutdown()
 }
 
-// Notify implements the InternalHandler interface
 func (t *Transitive) Notify(msg common.Message) error {
-	t.Ctx.Log.Verbo("snowman engine notified of %s from the vm", msg)
-	switch msg {
-	case common.PendingTxs:
-		// the pending txs message means we should attempt to build a block.
-		t.pendingBuildBlocks++
-		return t.buildBlocks()
-	default:
-		t.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
+	if msg != common.PendingTxs {
+		t.Ctx.Log.Warn("received an unexpected message from the VM",
+			zap.Stringer("message", msg),
+		)
+		return nil
 	}
-	return nil
+
+	// the pending txs message means we should attempt to build a block.
+	t.pendingBuildBlocks++
+	return t.buildBlocks()
 }
 
-// Context implements the common.Engine interface.
 func (t *Transitive) Context() *snow.ConsensusContext {
 	return t.Ctx
 }
 
-// Start implements the common.Engine interface.
 func (t *Transitive) Start(startReqID uint32) error {
 	t.RequestID = startReqID
 	lastAcceptedID, err := t.VM.LastAccepted()
@@ -311,7 +353,9 @@ func (t *Transitive) Start(startReqID uint32) error {
 	}
 	lastAccepted, err := t.GetBlock(lastAcceptedID)
 	if err != nil {
-		t.Ctx.Log.Error("failed to get last accepted block due to: %s", err)
+		t.Ctx.Log.Error("failed to get last accepted block",
+			zap.Error(err),
+		)
 		return err
 	}
 
@@ -345,13 +389,19 @@ func (t *Transitive) Start(startReqID uint32) error {
 		return err
 	}
 
-	t.Ctx.Log.Info("bootstrapping finished with %s as the last accepted block", lastAcceptedID)
+	t.Ctx.Log.Info("consensus starting",
+		zap.Stringer("lastAcceptedBlock", lastAcceptedID),
+	)
 	t.metrics.bootstrapFinished.Set(1)
+
 	t.Ctx.SetState(snow.NormalOp)
+	if err := t.VM.SetState(snow.NormalOp); err != nil {
+		return fmt.Errorf("failed to notify VM that consensus is starting: %w",
+			err)
+	}
 	return nil
 }
 
-// HealthCheck implements the common.Engine interface.
 func (t *Transitive) HealthCheck() (interface{}, error) {
 	consensusIntf, consensusErr := t.Consensus.HealthCheck()
 	vmIntf, vmErr := t.VM.HealthCheck()
@@ -368,15 +418,16 @@ func (t *Transitive) HealthCheck() (interface{}, error) {
 	return intf, fmt.Errorf("vm: %s ; consensus: %s", vmErr, consensusErr)
 }
 
-// GetVM implements the common.Engine interface.
 func (t *Transitive) GetVM() common.VM {
 	return t.VM
 }
 
-// GetBlock implements the snowman.Getter interface.
 func (t *Transitive) GetBlock(blkID ids.ID) (snowman.Block, error) {
 	if blk, ok := t.pending[blkID]; ok {
 		return blk, nil
+	}
+	if blk, ok := t.nonVerifiedCache.Get(blkID); ok {
+		return blk.(snowman.Block), nil
 	}
 	return t.VM.GetBlock(blkID)
 }
@@ -392,7 +443,9 @@ func (t *Transitive) buildBlocks() error {
 
 		blk, err := t.VM.BuildBlock()
 		if err != nil {
-			t.Ctx.Log.Debug("VM.BuildBlock errored with: %s", err)
+			t.Ctx.Log.Debug("failed building block",
+				zap.Error(err),
+			)
 			t.numBuildsFailed.Inc()
 			return nil
 		}
@@ -401,14 +454,20 @@ func (t *Transitive) buildBlocks() error {
 		// a newly created block is expected to be processing. If this check
 		// fails, there is potentially an error in the VM this engine is running
 		if status := blk.Status(); status != choices.Processing {
-			t.Ctx.Log.Warn("attempting to issue a block with status: %s, expected Processing", status)
+			t.Ctx.Log.Warn("attempting to issue block with unexpected status",
+				zap.Stringer("expectedStatus", choices.Processing),
+				zap.Stringer("status", status),
+			)
 		}
 
 		// The newly created block should be built on top of the preferred block.
 		// Otherwise, the new block doesn't have the best chance of being confirmed.
 		parentID := blk.Parent()
 		if pref := t.Consensus.Preference(); parentID != pref {
-			t.Ctx.Log.Warn("built block with parent: %s, expected %s", parentID, pref)
+			t.Ctx.Log.Warn("built block with unexpected parent",
+				zap.Stringer("expectedParentID", pref),
+				zap.Stringer("parentID", parentID),
+			)
 		}
 
 		added, err := t.issueWithAncestors(blk)
@@ -420,7 +479,7 @@ func (t *Transitive) buildBlocks() error {
 		if added {
 			t.Ctx.Log.Verbo("successfully issued new block from the VM")
 		} else {
-			t.Ctx.Log.Warn("VM.BuildBlock returned a block with unissued ancestors")
+			t.Ctx.Log.Warn("built block with unissued ancestors")
 		}
 	}
 	return nil
@@ -441,25 +500,22 @@ func (t *Transitive) repoll() {
 // issueFromByID attempts to issue the branch ending with a block [blkID] into consensus.
 // If we do not have [blkID], request it.
 // Returns true if the block is processing in consensus or is decided.
-func (t *Transitive) issueFromByID(vdr ids.ShortID, blkID ids.ID) (bool, error) {
+func (t *Transitive) issueFromByID(nodeID ids.NodeID, blkID ids.ID) (bool, error) {
 	blk, err := t.GetBlock(blkID)
 	if err != nil {
-		t.sendRequest(vdr, blkID)
+		t.sendRequest(nodeID, blkID)
 		return false, nil
 	}
-	return t.issueFrom(vdr, blk)
+	return t.issueFrom(nodeID, blk)
 }
 
 // issueFrom attempts to issue the branch ending with block [blkID] to consensus.
 // Returns true if the block is processing in consensus or is decided.
 // If a dependency is missing, request it from [vdr].
-func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error) {
+func (t *Transitive) issueFrom(nodeID ids.NodeID, blk snowman.Block) (bool, error) {
 	blkID := blk.ID()
 	// issue [blk] and its ancestors to consensus.
-	// If the block has been decided, we don't need to issue it.
-	// If the block is processing, we don't need to issue it.
-	// If the block is queued to be issued, we don't need to issue it.
-	for !(t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) || t.pendingContains(blkID)) {
+	for !t.wasIssued(blk) {
 		if err := t.issue(blk); err != nil {
 			return false, err
 		}
@@ -470,7 +526,7 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error)
 
 		// If we don't have this ancestor, request it from [vdr]
 		if err != nil || !blk.Status().Fetched() {
-			t.sendRequest(vdr, blkID)
+			t.sendRequest(nodeID, blkID)
 			return false, nil
 		}
 	}
@@ -499,7 +555,7 @@ func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
 	blkID := blk.ID()
 	// issue [blk] and its ancestors into consensus
 	status := blk.Status()
-	for status.Fetched() && !(t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) || t.pendingContains(blkID)) {
+	for status.Fetched() && !t.wasIssued(blk) {
 		if err := t.issue(blk); err != nil {
 			return false, err
 		}
@@ -530,6 +586,14 @@ func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
 	return false, t.errs.Err
 }
 
+// If the block has been decided, then it is marked as having been issued.
+// If the block is processing, then it was issued.
+// If the block is queued to be added to consensus, then it was issued.
+func (t *Transitive) wasIssued(blk snowman.Block) bool {
+	blkID := blk.ID()
+	return t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) || t.pendingContains(blkID)
+}
+
 // Issue [blk] to consensus once its ancestors have been issued.
 func (t *Transitive) issue(blk snowman.Block) error {
 	blkID := blk.ID()
@@ -549,7 +613,10 @@ func (t *Transitive) issue(blk snowman.Block) error {
 	// block on the parent if needed
 	parentID := blk.Parent()
 	if parent, err := t.GetBlock(parentID); err != nil || !(t.Consensus.Decided(parent) || t.Consensus.Processing(parentID)) {
-		t.Ctx.Log.Verbo("block %s waiting for parent %s to be issued", blkID, parentID)
+		t.Ctx.Log.Verbo("block waiting for parent to be issued",
+			zap.Stringer("blkID", blkID),
+			zap.Stringer("parentID", parentID),
+		)
 		i.deps.Add(parentID)
 	}
 
@@ -563,16 +630,20 @@ func (t *Transitive) issue(blk snowman.Block) error {
 }
 
 // Request that [vdr] send us block [blkID]
-func (t *Transitive) sendRequest(vdr ids.ShortID, blkID ids.ID) {
+func (t *Transitive) sendRequest(nodeID ids.NodeID, blkID ids.ID) {
 	// There is already an outstanding request for this block
 	if t.blkReqs.Contains(blkID) {
 		return
 	}
 
 	t.RequestID++
-	t.blkReqs.Add(vdr, t.RequestID, blkID)
-	t.Ctx.Log.Verbo("sending Get(%s, %d, %s)", vdr, t.RequestID, blkID)
-	t.Sender.SendGet(vdr, t.RequestID, blkID)
+	t.blkReqs.Add(nodeID, t.RequestID, blkID)
+	t.Ctx.Log.Verbo("sending Get request",
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", t.RequestID),
+		zap.Stringer("blkID", blkID),
+	)
+	t.Sender.SendGet(nodeID, t.RequestID, blkID)
 
 	// Tracks performance statistics
 	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
@@ -580,15 +651,20 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, blkID ids.ID) {
 
 // send a pull query for this block ID
 func (t *Transitive) pullQuery(blkID ids.ID) {
-	t.Ctx.Log.Verbo("about to sample from: %s", t.Validators)
+	t.Ctx.Log.Verbo("sampling from validators",
+		zap.Stringer("validators", t.Validators),
+	)
 	// The validators we will query
 	vdrs, err := t.Validators.Sample(t.Params.K)
 	if err != nil {
-		t.Ctx.Log.Error("query for %s was dropped due to an insufficient number of validators", blkID)
+		t.Ctx.Log.Error("dropped query for block",
+			zap.String("reason", "insufficient number of validators"),
+			zap.Stringer("blkID", blkID),
+		)
 		return
 	}
 
-	vdrBag := ids.ShortBag{}
+	vdrBag := ids.NodeIDBag{}
 	for _, vdr := range vdrs {
 		vdrBag.Add(vdr.ID())
 	}
@@ -596,33 +672,47 @@ func (t *Transitive) pullQuery(blkID ids.ID) {
 	t.RequestID++
 	if t.polls.Add(t.RequestID, vdrBag) {
 		vdrList := vdrBag.List()
-		vdrSet := ids.NewShortSet(len(vdrList))
+		vdrSet := ids.NewNodeIDSet(len(vdrList))
 		vdrSet.Add(vdrList...)
 		t.Sender.SendPullQuery(vdrSet, t.RequestID, blkID)
 	}
 }
 
-// send a push query for this block
-func (t *Transitive) pushQuery(blk snowman.Block) {
-	t.Ctx.Log.Verbo("about to sample from: %s", t.Validators)
+// Send a query for this block. Some validators will be sent
+// a Push Query and some will be sent a Pull Query.
+func (t *Transitive) sendMixedQuery(blk snowman.Block) {
+	t.Ctx.Log.Verbo("sampling from validators",
+		zap.Stringer("validators", t.Validators),
+	)
 	vdrs, err := t.Validators.Sample(t.Params.K)
 	if err != nil {
-		t.Ctx.Log.Error("query for %s was dropped due to an insufficient number of validators", blk.ID())
+		t.Ctx.Log.Error("dropped query for block",
+			zap.String("reason", "insufficient number of validators"),
+			zap.Stringer("blkID", blk.ID()),
+		)
 		return
 	}
 
-	vdrBag := ids.ShortBag{}
+	vdrBag := ids.NodeIDBag{}
 	for _, vdr := range vdrs {
 		vdrBag.Add(vdr.ID())
 	}
 
 	t.RequestID++
 	if t.polls.Add(t.RequestID, vdrBag) {
-		vdrList := vdrBag.List()
-		vdrSet := ids.NewShortSet(len(vdrList))
-		vdrSet.Add(vdrList...)
-
-		t.Sender.SendPushQuery(vdrSet, t.RequestID, blk.ID(), blk.Bytes())
+		// Send a push query to some of the validators, and a pull query to the rest.
+		numPushTo := t.Params.MixedQueryNumPushVdr
+		if !t.Validators.Contains(t.Ctx.NodeID) {
+			numPushTo = t.Params.MixedQueryNumPushNonVdr
+		}
+		common.SendMixedQuery(
+			t.Sender,
+			vdrBag.List(), // Note that this doesn't contain duplicates; length may be < k
+			numPushTo,
+			t.RequestID,
+			blk.ID(),
+			blk.Bytes(),
+		)
 	}
 }
 
@@ -656,7 +746,9 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 
 	// make sure this block is valid
 	if err := blk.Verify(); err != nil {
-		t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
+		t.Ctx.Log.Debug("block verification failed",
+			zap.Error(err),
+		)
 
 		// if verify fails, then all descendants are also invalid
 		t.addToNonVerifieds(blk)
@@ -666,8 +758,11 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		return t.errs.Err
 	}
 	t.nonVerifieds.Remove(blkID)
+	t.nonVerifiedCache.Evict(blkID)
 	t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
-	t.Ctx.Log.Verbo("adding block to consensus: %s", blkID)
+	t.Ctx.Log.Verbo("adding block to consensus",
+		zap.Stringer("blkID", blkID),
+	)
 	wrappedBlk := &memoryBlock{
 		Block:   blk,
 		metrics: &t.metrics,
@@ -691,14 +786,18 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 
 			for _, blk := range options {
 				if err := blk.Verify(); err != nil {
-					t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
+					t.Ctx.Log.Debug("block verification failed",
+						zap.Error(err),
+					)
 					dropped = append(dropped, blk)
 					// block fails verification, hold this in memory for bubbling
 					t.addToNonVerifieds(blk)
 				} else {
+					blkID := blk.ID()
 					// correctly verified will be passed to consensus as processing block
 					// no need to keep it anymore
-					t.nonVerifieds.Remove(blk.ID())
+					t.nonVerifieds.Remove(blkID)
+					t.nonVerifiedCache.Evict(blkID)
 					t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
 					wrappedBlk := &memoryBlock{
 						Block:   blk,
@@ -721,13 +820,13 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	// If the block is now preferred, query the network for its preferences
 	// with this new block.
 	if t.Consensus.IsPreferred(blk) {
-		t.pushQuery(blk)
+		t.sendMixedQuery(blk)
 	}
 
 	t.blocked.Fulfill(blkID)
 	for _, blk := range added {
 		if t.Consensus.IsPreferred(blk) {
-			t.pushQuery(blk)
+			t.sendMixedQuery(blk)
 		}
 
 		blkID := blk.ID()
@@ -774,6 +873,7 @@ func (t *Transitive) addToNonVerifieds(blk snowman.Block) {
 	// decided parents should not be in this map.
 	if t.nonVerifieds.Has(parentID) || t.Consensus.Processing(parentID) {
 		t.nonVerifieds.Add(blkID, parentID)
+		t.nonVerifiedCache.Put(blkID, blk)
 		t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
 	}
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package vertex
@@ -21,8 +21,8 @@ const (
 var c codec.Manager
 
 func init() {
-	lc := linearcodec.New(reflectcodec.DefaultTagName+"V0", maxSize)
-	lc2 := linearcodec.New(reflectcodec.DefaultTagName+"V1", maxSize)
+	lc := linearcodec.New([]string{reflectcodec.DefaultTagName + "V0"}, maxSize)
+	lc2 := linearcodec.New([]string{reflectcodec.DefaultTagName + "V1"}, maxSize)
 
 	c = codec.NewManager(maxSize)
 	// for backward compatibility, still register the initial codec version

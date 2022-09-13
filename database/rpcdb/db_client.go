@@ -1,19 +1,22 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpcdb
 
 import (
+	"context"
+	"encoding/json"
 	"sync/atomic"
 
-	"golang.org/x/net/context"
+	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/ava-labs/avalanchego/api/proto/rpcdbproto"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/nodb"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+
+	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
 )
 
 const (
@@ -32,20 +35,20 @@ var (
 
 // DatabaseClient is an implementation of database that talks over RPC.
 type DatabaseClient struct {
-	client rpcdbproto.DatabaseClient
+	client rpcdbpb.DatabaseClient
 
 	closed     utils.AtomicBool
 	batchIndex int64
 }
 
 // NewClient returns a database instance connected to a remote database instance
-func NewClient(client rpcdbproto.DatabaseClient) *DatabaseClient {
+func NewClient(client rpcdbpb.DatabaseClient) *DatabaseClient {
 	return &DatabaseClient{client: client}
 }
 
 // Has attempts to return if the database has a key with the provided value.
 func (db *DatabaseClient) Has(key []byte) (bool, error) {
-	resp, err := db.client.Has(context.Background(), &rpcdbproto.HasRequest{
+	resp, err := db.client.Has(context.Background(), &rpcdbpb.HasRequest{
 		Key: key,
 	})
 	if err != nil {
@@ -56,7 +59,7 @@ func (db *DatabaseClient) Has(key []byte) (bool, error) {
 
 // Get attempts to return the value that was mapped to the key that was provided
 func (db *DatabaseClient) Get(key []byte) ([]byte, error) {
-	resp, err := db.client.Get(context.Background(), &rpcdbproto.GetRequest{
+	resp, err := db.client.Get(context.Background(), &rpcdbpb.GetRequest{
 		Key: key,
 	})
 	if err != nil {
@@ -67,7 +70,7 @@ func (db *DatabaseClient) Get(key []byte) ([]byte, error) {
 
 // Put attempts to set the value this key maps to
 func (db *DatabaseClient) Put(key, value []byte) error {
-	resp, err := db.client.Put(context.Background(), &rpcdbproto.PutRequest{
+	resp, err := db.client.Put(context.Background(), &rpcdbpb.PutRequest{
 		Key:   key,
 		Value: value,
 	})
@@ -79,7 +82,7 @@ func (db *DatabaseClient) Put(key, value []byte) error {
 
 // Delete attempts to remove any mapping from the key
 func (db *DatabaseClient) Delete(key []byte) error {
-	resp, err := db.client.Delete(context.Background(), &rpcdbproto.DeleteRequest{
+	resp, err := db.client.Delete(context.Background(), &rpcdbpb.DeleteRequest{
 		Key: key,
 	})
 	if err != nil {
@@ -91,24 +94,21 @@ func (db *DatabaseClient) Delete(key []byte) error {
 // NewBatch returns a new batch
 func (db *DatabaseClient) NewBatch() database.Batch { return &batch{db: db} }
 
-// NewIterator implements the Database interface
 func (db *DatabaseClient) NewIterator() database.Iterator {
 	return db.NewIteratorWithStartAndPrefix(nil, nil)
 }
 
-// NewIteratorWithStart implements the Database interface
 func (db *DatabaseClient) NewIteratorWithStart(start []byte) database.Iterator {
 	return db.NewIteratorWithStartAndPrefix(start, nil)
 }
 
-// NewIteratorWithPrefix implements the Database interface
 func (db *DatabaseClient) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 	return db.NewIteratorWithStartAndPrefix(nil, prefix)
 }
 
 // NewIteratorWithStartAndPrefix returns a new empty iterator
 func (db *DatabaseClient) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
-	resp, err := db.client.NewIteratorWithStartAndPrefix(context.Background(), &rpcdbproto.NewIteratorWithStartAndPrefixRequest{
+	resp, err := db.client.NewIteratorWithStartAndPrefix(context.Background(), &rpcdbpb.NewIteratorWithStartAndPrefixRequest{
 		Start:  start,
 		Prefix: prefix,
 	})
@@ -121,20 +121,9 @@ func (db *DatabaseClient) NewIteratorWithStartAndPrefix(start, prefix []byte) da
 	}
 }
 
-// Stat attempts to return the statistic of this database
-func (db *DatabaseClient) Stat(property string) (string, error) {
-	resp, err := db.client.Stat(context.Background(), &rpcdbproto.StatRequest{
-		Property: property,
-	})
-	if err != nil {
-		return "", err
-	}
-	return resp.Stat, errCodeToError[resp.Err]
-}
-
 // Compact attempts to optimize the space utilization in the provided range
 func (db *DatabaseClient) Compact(start, limit []byte) error {
-	resp, err := db.client.Compact(context.Background(), &rpcdbproto.CompactRequest{
+	resp, err := db.client.Compact(context.Background(), &rpcdbpb.CompactRequest{
 		Start: start,
 		Limit: limit,
 	})
@@ -147,11 +136,20 @@ func (db *DatabaseClient) Compact(start, limit []byte) error {
 // Close attempts to close the database
 func (db *DatabaseClient) Close() error {
 	db.closed.SetValue(true)
-	resp, err := db.client.Close(context.Background(), &rpcdbproto.CloseRequest{})
+	resp, err := db.client.Close(context.Background(), &rpcdbpb.CloseRequest{})
 	if err != nil {
 		return err
 	}
 	return errCodeToError[resp.Err]
+}
+
+func (db *DatabaseClient) HealthCheck() (interface{}, error) {
+	health, err := db.client.HealthCheck(context.Background(), &emptypb.Empty{})
+	if err != nil {
+		return nil, err
+	}
+
+	return json.RawMessage(health.Details), nil
 }
 
 type keyValue struct {
@@ -181,7 +179,7 @@ func (b *batch) Delete(key []byte) error {
 func (b *batch) Size() int { return b.size }
 
 func (b *batch) Write() error {
-	request := &rpcdbproto.WriteBatchRequest{
+	request := &rpcdbpb.WriteBatchRequest{
 		Id:        atomic.AddInt64(&b.db.batchIndex, 1),
 		Continues: true,
 	}
@@ -211,11 +209,11 @@ func (b *batch) Write() error {
 		currentSize += sizeChange
 
 		if kv.delete {
-			request.Deletes = append(request.Deletes, &rpcdbproto.DeleteRequest{
+			request.Deletes = append(request.Deletes, &rpcdbpb.DeleteRequest{
 				Key: kv.key,
 			})
 		} else {
-			request.Puts = append(request.Puts, &rpcdbproto.PutRequest{
+			request.Puts = append(request.Puts, &rpcdbpb.PutRequest{
 				Key:   kv.key,
 				Value: kv.value,
 			})
@@ -258,7 +256,7 @@ type iterator struct {
 	db *DatabaseClient
 	id uint64
 
-	data []*rpcdbproto.PutRequest
+	data []*rpcdbpb.PutRequest
 	errs wrappers.Errs
 }
 
@@ -271,11 +269,12 @@ func (it *iterator) Next() bool {
 		return false
 	}
 	if len(it.data) > 1 {
+		it.data[0] = nil
 		it.data = it.data[1:]
 		return true
 	}
 
-	resp, err := it.db.client.IteratorNext(context.Background(), &rpcdbproto.IteratorNextRequest{
+	resp, err := it.db.client.IteratorNext(context.Background(), &rpcdbpb.IteratorNextRequest{
 		Id: it.id,
 	})
 	if err != nil {
@@ -292,7 +291,7 @@ func (it *iterator) Error() error {
 		return it.errs.Err
 	}
 
-	resp, err := it.db.client.IteratorError(context.Background(), &rpcdbproto.IteratorErrorRequest{
+	resp, err := it.db.client.IteratorError(context.Background(), &rpcdbpb.IteratorErrorRequest{
 		Id: it.id,
 	})
 	if err != nil {
@@ -321,7 +320,7 @@ func (it *iterator) Value() []byte {
 
 // Release frees any resources held by the iterator
 func (it *iterator) Release() {
-	resp, err := it.db.client.IteratorRelease(context.Background(), &rpcdbproto.IteratorReleaseRequest{
+	resp, err := it.db.client.IteratorRelease(context.Background(), &rpcdbpb.IteratorReleaseRequest{
 		Id: it.id,
 	})
 	if err != nil {

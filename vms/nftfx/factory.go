@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package nftfx
@@ -6,10 +6,13 @@ package nftfx
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/vms"
 )
 
-// ID that this Fx uses when labeled
 var (
+	_ vms.Factory = &Factory{}
+
+	// ID that this Fx uses when labeled
 	ID = ids.ID{'n', 'f', 't', 'f', 'x'}
 )
 

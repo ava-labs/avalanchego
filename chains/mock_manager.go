@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package chains
@@ -20,6 +20,7 @@ func (mm MockManager) ForceCreateChain(ChainParameters)    {}
 func (mm MockManager) AddRegistrant(Registrant)            {}
 func (mm MockManager) Aliases(ids.ID) ([]string, error)    { return nil, nil }
 func (mm MockManager) PrimaryAlias(ids.ID) (string, error) { return "", nil }
+func (mm MockManager) PrimaryAliasOrDefault(ids.ID) string { return "" }
 func (mm MockManager) Alias(ids.ID, string) error          { return nil }
 func (mm MockManager) RemoveAliases(ids.ID)                {}
 func (mm MockManager) Shutdown()                           {}

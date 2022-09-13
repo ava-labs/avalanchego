@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package status
@@ -12,12 +12,14 @@ import (
 )
 
 // List of possible blockchain status values:
+// - [UnknownChain] This node is not aware of the existence of this blockchain
 // - [Created] This node is not currently validating this blockchain
 // - [Preferred] This blockchain is currently in the preferred tip
 // - [Validating] This node is currently validating this blockchain
 // - [Syncing] This node is syncing up to the preferred block height
 const (
-	Created BlockchainStatus = iota
+	UnknownChain BlockchainStatus = iota
+	Created
 	Preferred
 	Validating
 	Syncing
@@ -39,6 +41,8 @@ func (s BlockchainStatus) MarshalJSON() ([]byte, error) {
 
 func (s *BlockchainStatus) UnmarshalJSON(b []byte) error {
 	switch string(b) {
+	case `"Unknown"`:
+		*s = UnknownChain
 	case `"Created"`:
 		*s = Created
 	case `"Preferred"`:
@@ -57,7 +61,7 @@ func (s *BlockchainStatus) UnmarshalJSON(b []byte) error {
 // Verify that this is a valid status.
 func (s BlockchainStatus) Verify() error {
 	switch s {
-	case Created, Preferred, Validating, Syncing:
+	case UnknownChain, Created, Preferred, Validating, Syncing:
 		return nil
 	default:
 		return errUnknownBlockchainStatus
@@ -66,6 +70,8 @@ func (s BlockchainStatus) Verify() error {
 
 func (s BlockchainStatus) String() string {
 	switch s {
+	case UnknownChain:
+		return "Unknown"
 	case Created:
 		return "Created"
 	case Preferred:

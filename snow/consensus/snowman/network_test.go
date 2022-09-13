@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -40,7 +40,7 @@ func (n *Network) Initialize(params snowball.Parameters, numColors int) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
-		HeightV: 0,
+		HeightV: 1,
 	})
 
 	for i := 1; i < numColors; i++ {

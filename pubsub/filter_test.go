@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package pubsub
@@ -6,24 +6,24 @@ package pubsub
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 )
 
 func TestAddAddressesParseAddresses(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	chainAlias := "X"
 	hrp := constants.GetHRP(5)
 
 	addrID := ids.ShortID{1}
-	addrStr, err := formatting.FormatAddress(chainAlias, hrp, addrID[:])
-	assert.NoError(err)
+	addrStr, err := address.Format(chainAlias, hrp, addrID[:])
+	require.NoError(err)
 
 	msg := &AddAddresses{JSONAddresses: api.JSONAddresses{
 		Addresses: []string{
@@ -32,10 +32,10 @@ func TestAddAddressesParseAddresses(t *testing.T) {
 	}}
 
 	err = msg.parseAddresses()
-	assert.NoError(err)
+	require.NoError(err)
 
-	assert.Len(msg.addressIds, 1)
-	assert.Equal(addrID[:], msg.addressIds[0])
+	require.Len(msg.addressIds, 1)
+	require.Equal(addrID[:], msg.addressIds[0])
 }
 
 func TestFilterParamUpdateMulti(t *testing.T) {

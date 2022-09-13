@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -6,8 +6,10 @@ package avm
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 )
 
@@ -24,11 +26,11 @@ func TestBuildGenesis(t *testing.T) {
 	ss := CreateStaticService()
 	addrMap := map[string]string{}
 	for _, addrStr := range addrStrArray {
-		b, err := formatting.Decode(formatting.CB58, addrStr)
+		addr, err := ids.ShortFromString(addrStr)
 		if err != nil {
 			t.Fatal(err)
 		}
-		addrMap[addrStr], err = formatting.FormatBech32(testHRP, b)
+		addrMap[addrStr], err = address.FormatBech32(testHRP, addr[:])
 		if err != nil {
 			t.Fatal(err)
 		}

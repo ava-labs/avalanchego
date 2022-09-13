@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package meterdb
@@ -35,72 +35,62 @@ func newTimeMetric(namespace, name string, reg prometheus.Registerer, errs *wrap
 type metrics struct {
 	readSize,
 	writeSize,
-	has,
-	hasSize,
-	get,
-	getSize,
-	put,
-	putSize,
-	delete,
-	deleteSize,
+	has, hasSize,
+	get, getSize,
+	put, putSize,
+	delete, deleteSize,
 	newBatch,
 	newIterator,
-	stat,
 	compact,
 	close,
-	bPut,
-	bPutSize,
-	bDelete,
-	bDeleteSize,
+	healthCheck,
+	bPut, bPutSize,
+	bDelete, bDeleteSize,
 	bSize,
-	bWrite,
-	bWriteSize,
+	bWrite, bWriteSize,
 	bReset,
 	bReplay,
 	bInner,
-	iNext,
-	iNextSize,
+	iNext, iNextSize,
 	iError,
 	iKey,
 	iValue,
 	iRelease metric.Averager
 }
 
-func (m *metrics) Initialize(
-	namespace string,
-	reg prometheus.Registerer,
-) error {
+func newMetrics(namespace string, reg prometheus.Registerer) (metrics, error) {
 	errs := wrappers.Errs{}
-	m.readSize = newSizeMetric(namespace, "read", reg, &errs)
-	m.writeSize = newSizeMetric(namespace, "write", reg, &errs)
-	m.has = newTimeMetric(namespace, "has", reg, &errs)
-	m.hasSize = newSizeMetric(namespace, "has", reg, &errs)
-	m.get = newTimeMetric(namespace, "get", reg, &errs)
-	m.getSize = newSizeMetric(namespace, "get", reg, &errs)
-	m.put = newTimeMetric(namespace, "put", reg, &errs)
-	m.putSize = newSizeMetric(namespace, "put", reg, &errs)
-	m.delete = newTimeMetric(namespace, "delete", reg, &errs)
-	m.deleteSize = newSizeMetric(namespace, "delete", reg, &errs)
-	m.newBatch = newTimeMetric(namespace, "new_batch", reg, &errs)
-	m.newIterator = newTimeMetric(namespace, "new_iterator", reg, &errs)
-	m.stat = newTimeMetric(namespace, "stat", reg, &errs)
-	m.compact = newTimeMetric(namespace, "compact", reg, &errs)
-	m.close = newTimeMetric(namespace, "close", reg, &errs)
-	m.bPut = newTimeMetric(namespace, "batch_put", reg, &errs)
-	m.bPutSize = newSizeMetric(namespace, "batch_put", reg, &errs)
-	m.bDelete = newTimeMetric(namespace, "batch_delete", reg, &errs)
-	m.bDeleteSize = newSizeMetric(namespace, "batch_delete", reg, &errs)
-	m.bSize = newTimeMetric(namespace, "batch_size", reg, &errs)
-	m.bWrite = newTimeMetric(namespace, "batch_write", reg, &errs)
-	m.bWriteSize = newSizeMetric(namespace, "batch_write", reg, &errs)
-	m.bReset = newTimeMetric(namespace, "batch_reset", reg, &errs)
-	m.bReplay = newTimeMetric(namespace, "batch_replay", reg, &errs)
-	m.bInner = newTimeMetric(namespace, "batch_inner", reg, &errs)
-	m.iNext = newTimeMetric(namespace, "iterator_next", reg, &errs)
-	m.iNextSize = newSizeMetric(namespace, "iterator_next", reg, &errs)
-	m.iError = newTimeMetric(namespace, "iterator_error", reg, &errs)
-	m.iKey = newTimeMetric(namespace, "iterator_key", reg, &errs)
-	m.iValue = newTimeMetric(namespace, "iterator_value", reg, &errs)
-	m.iRelease = newTimeMetric(namespace, "iterator_release", reg, &errs)
-	return errs.Err
+	return metrics{
+		readSize:    newSizeMetric(namespace, "read", reg, &errs),
+		writeSize:   newSizeMetric(namespace, "write", reg, &errs),
+		has:         newTimeMetric(namespace, "has", reg, &errs),
+		hasSize:     newSizeMetric(namespace, "has", reg, &errs),
+		get:         newTimeMetric(namespace, "get", reg, &errs),
+		getSize:     newSizeMetric(namespace, "get", reg, &errs),
+		put:         newTimeMetric(namespace, "put", reg, &errs),
+		putSize:     newSizeMetric(namespace, "put", reg, &errs),
+		delete:      newTimeMetric(namespace, "delete", reg, &errs),
+		deleteSize:  newSizeMetric(namespace, "delete", reg, &errs),
+		newBatch:    newTimeMetric(namespace, "new_batch", reg, &errs),
+		newIterator: newTimeMetric(namespace, "new_iterator", reg, &errs),
+		compact:     newTimeMetric(namespace, "compact", reg, &errs),
+		close:       newTimeMetric(namespace, "close", reg, &errs),
+		healthCheck: newTimeMetric(namespace, "health_check", reg, &errs),
+		bPut:        newTimeMetric(namespace, "batch_put", reg, &errs),
+		bPutSize:    newSizeMetric(namespace, "batch_put", reg, &errs),
+		bDelete:     newTimeMetric(namespace, "batch_delete", reg, &errs),
+		bDeleteSize: newSizeMetric(namespace, "batch_delete", reg, &errs),
+		bSize:       newTimeMetric(namespace, "batch_size", reg, &errs),
+		bWrite:      newTimeMetric(namespace, "batch_write", reg, &errs),
+		bWriteSize:  newSizeMetric(namespace, "batch_write", reg, &errs),
+		bReset:      newTimeMetric(namespace, "batch_reset", reg, &errs),
+		bReplay:     newTimeMetric(namespace, "batch_replay", reg, &errs),
+		bInner:      newTimeMetric(namespace, "batch_inner", reg, &errs),
+		iNext:       newTimeMetric(namespace, "iterator_next", reg, &errs),
+		iNextSize:   newSizeMetric(namespace, "iterator_next", reg, &errs),
+		iError:      newTimeMetric(namespace, "iterator_error", reg, &errs),
+		iKey:        newTimeMetric(namespace, "iterator_key", reg, &errs),
+		iValue:      newTimeMetric(namespace, "iterator_value", reg, &errs),
+		iRelease:    newTimeMetric(namespace, "iterator_release", reg, &errs),
+	}, errs.Err
 }

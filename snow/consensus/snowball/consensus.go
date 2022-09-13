@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
@@ -28,7 +28,14 @@ type Consensus interface {
 
 	// RecordPoll records the results of a network poll. Assumes all choices
 	// have been previously added.
-	RecordPoll(votes ids.Bag)
+	//
+	// If the consensus instance was not previously finalized, this function
+	// will return true if the poll was successful and false if the poll was
+	// unsuccessful.
+	//
+	// If the consensus instance was previously finalized, the function may
+	// return true or false.
+	RecordPoll(votes ids.Bag) bool
 
 	// RecordUnsuccessfulPoll resets the snowflake counters of this consensus
 	// instance

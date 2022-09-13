@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package genesis
@@ -8,8 +8,7 @@ import (
 	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 )
 
 var errInvalidETHAddress = errors.New("invalid eth address")
@@ -41,7 +40,7 @@ func (ua UnparsedAllocation) Parse() (Allocation, error) {
 	}
 	a.ETHAddr = ethAddr
 
-	_, _, avaxAddrBytes, err := formatting.ParseAddress(ua.AVAXAddr)
+	_, _, avaxAddrBytes, err := address.Parse(ua.AVAXAddr)
 	if err != nil {
 		return a, err
 	}
@@ -55,23 +54,18 @@ func (ua UnparsedAllocation) Parse() (Allocation, error) {
 }
 
 type UnparsedStaker struct {
-	NodeID        string `json:"nodeID"`
-	RewardAddress string `json:"rewardAddress"`
-	DelegationFee uint32 `json:"delegationFee"`
+	NodeID        ids.NodeID `json:"nodeID"`
+	RewardAddress string     `json:"rewardAddress"`
+	DelegationFee uint32     `json:"delegationFee"`
 }
 
 func (us UnparsedStaker) Parse() (Staker, error) {
 	s := Staker{
+		NodeID:        us.NodeID,
 		DelegationFee: us.DelegationFee,
 	}
 
-	nodeID, err := ids.ShortFromPrefixedString(us.NodeID, constants.NodeIDPrefix)
-	if err != nil {
-		return s, err
-	}
-	s.NodeID = nodeID
-
-	_, _, avaxAddrBytes, err := formatting.ParseAddress(us.RewardAddress)
+	_, _, avaxAddrBytes, err := address.Parse(us.RewardAddress)
 	if err != nil {
 		return s, err
 	}
@@ -120,7 +114,7 @@ func (uc UnparsedConfig) Parse() (Config, error) {
 		c.Allocations[i] = a
 	}
 	for i, isa := range uc.InitialStakedFunds {
-		_, _, avaxAddrBytes, err := formatting.ParseAddress(isa)
+		_, _, avaxAddrBytes, err := address.Parse(isa)
 		if err != nil {
 			return c, err
 		}

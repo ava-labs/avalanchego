@@ -1,10 +1,12 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package queue
 
 import (
 	"fmt"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
@@ -13,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -305,7 +306,7 @@ func (s *state) MissingJobIDs() ([]ids.ID, error) {
 		}
 		missingIDs = append(missingIDs, missingID)
 	}
-	return missingIDs, nil
+	return missingIDs, iterator.Error()
 }
 
 func (s *state) getDependentsDB(dependency ids.ID) linkeddb.LinkedDB {

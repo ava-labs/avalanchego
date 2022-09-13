@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package compression
@@ -6,15 +6,21 @@ package compression
 import (
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"math"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-// gzipCompressor implements Compressor
+var (
+	_ Compressor = &gzipCompressor{}
+
+	ErrInvalidMaxSizeGzipCompressor = errors.New("invalid gzip compressor max size")
+)
+
 type gzipCompressor struct {
 	maxSize int64
 
@@ -65,7 +71,7 @@ func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
 	// will return the appropriate error instead of an incomplete byte slice.
 	limitedReader := io.LimitReader(g.gzipReader, g.maxSize+1)
 
-	decompressed, err := ioutil.ReadAll(limitedReader)
+	decompressed, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +82,15 @@ func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
 }
 
 // NewGzipCompressor returns a new gzip Compressor that compresses
-func NewGzipCompressor(maxSize int64) Compressor {
+func NewGzipCompressor(maxSize int64) (Compressor, error) {
+	if maxSize == math.MaxInt64 {
+		// "Decompress" creates "io.LimitReader" with max size + 1:
+		// if the max size + 1 overflows, "io.LimitReader" reads nothing
+		// returning 0 byte for the decompress call
+		// require max size <math.MaxInt64 to prevent int64 overflows
+		return nil, ErrInvalidMaxSizeGzipCompressor
+	}
+
 	var buf bytes.Buffer
 	return &gzipCompressor{
 		maxSize: maxSize,
@@ -86,5 +100,5 @@ func NewGzipCompressor(maxSize int64) Compressor {
 
 		bytesReader: &bytes.Reader{},
 		gzipReader:  &gzip.Reader{},
-	}
+	}, nil
 }

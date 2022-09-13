@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package handler
@@ -14,8 +14,9 @@ import (
 )
 
 type metrics struct {
-	expired  prometheus.Counter
-	messages map[message.Op]metric.Averager
+	expired      prometheus.Counter
+	asyncExpired prometheus.Counter
+	messages     map[message.Op]metric.Averager
 }
 
 func newMetrics(namespace string, reg prometheus.Registerer) (*metrics, error) {
@@ -24,9 +25,17 @@ func newMetrics(namespace string, reg prometheus.Registerer) (*metrics, error) {
 	expired := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      "expired",
-		Help:      "Incoming messages dropped because the message deadline expired",
+		Help:      "Incoming sync messages dropped because the message deadline expired",
 	})
-	errs.Add(reg.Register(expired))
+	asyncExpired := prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "async_expired",
+		Help:      "Incoming async messages dropped because the message deadline expired",
+	})
+	errs.Add(
+		reg.Register(expired),
+		reg.Register(asyncExpired),
+	)
 
 	messages := make(map[message.Op]metric.Averager, len(message.ConsensusOps))
 	for _, op := range message.ConsensusOps {
@@ -41,7 +50,8 @@ func newMetrics(namespace string, reg prometheus.Registerer) (*metrics, error) {
 	}
 
 	return &metrics{
-		expired:  expired,
-		messages: messages,
+		expired:      expired,
+		asyncExpired: asyncExpired,
+		messages:     messages,
 	}, errs.Err
 }

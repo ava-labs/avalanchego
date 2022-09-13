@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package consistent
@@ -6,11 +6,11 @@ package consistent
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/hashing"
-
-	"github.com/stretchr/testify/assert"
-
 	"github.com/golang/mock/gomock"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 var (
@@ -30,10 +30,7 @@ type testKey struct {
 	hash uint64
 }
 
-// ConsistentHashKey implements Hashable
-func (t testKey) ConsistentHashKey() []byte {
-	return []byte(t.key)
-}
+func (t testKey) ConsistentHashKey() []byte { return []byte(t.key) }
 
 // Tests that a key routes to its closest clockwise node.
 // Test cases are described in greater detail below; see diagrams for Ring.
@@ -197,8 +194,8 @@ func TestGetMapsToClockwiseNode(t *testing.T) {
 			}
 
 			node, err := ring.Get(test.key)
-			assert.Equal(t, test.expectedNode, node)
-			assert.Nil(t, err)
+			require.Equal(t, test.expectedNode, node)
+			require.Nil(t, err)
 		})
 	}
 }
@@ -215,8 +212,8 @@ func TestGetOnEmptyRingReturnsError(t *testing.T) {
 
 	node, err := ring.Get(foo)
 
-	assert.Equal(t, nil, node)
-	assert.Equal(t, errEmptyRing, err)
+	require.Equal(t, nil, node)
+	require.Equal(t, errEmptyRing, err)
 }
 
 // Tests that trying to call Remove on a node that doesn't exist should return false.
@@ -229,7 +226,7 @@ func TestRemoveNonExistentKeyReturnsFalse(t *testing.T) {
 	)
 
 	// try to remove something from an empty ring.
-	assert.False(t, ring.Remove(node1))
+	require.False(t, ring.Remove(node1))
 }
 
 // Tests that trying to call Remove on a node that doesn't exist should return true.
@@ -255,7 +252,7 @@ func TestRemoveExistingKeyReturnsTrue(t *testing.T) {
 	//
 	// Ring:
 	// ... -> (empty) -> ...
-	assert.True(t, ring.Remove(node1))
+	require.True(t, ring.Remove(node1))
 }
 
 // Tests that if we have a collision, the node is replaced.
@@ -285,8 +282,8 @@ func TestAddCollisionReplacement(t *testing.T) {
 
 	ringMember, err := ring.Get(foo)
 
-	assert.Equal(t, node2, ringMember)
-	assert.Nil(t, err)
+	require.Equal(t, node2, ringMember)
+	require.Nil(t, err)
 }
 
 // Tests that virtual nodes are replicated on Add.
@@ -332,25 +329,25 @@ func TestAddVirtualNodes(t *testing.T) {
 
 	// Gets that should route to node-1
 	node, err := ring.Get(testKey{key: "foo1"})
-	assert.Equal(t, node1, node)
-	assert.Nil(t, err)
+	require.Equal(t, node1, node)
+	require.Nil(t, err)
 	node, err = ring.Get(testKey{key: "foo3"})
-	assert.Equal(t, node1, node)
-	assert.Nil(t, err)
+	require.Equal(t, node1, node)
+	require.Nil(t, err)
 	node, err = ring.Get(testKey{key: "foo5"})
-	assert.Equal(t, node1, node)
-	assert.Nil(t, err)
+	require.Equal(t, node1, node)
+	require.Nil(t, err)
 
 	// Gets that should route to node-2
 	node, err = ring.Get(testKey{key: "foo0"})
-	assert.Equal(t, node2, node)
-	assert.Nil(t, err)
+	require.Equal(t, node2, node)
+	require.Nil(t, err)
 	node, err = ring.Get(testKey{key: "foo2"})
-	assert.Equal(t, node2, node)
-	assert.Nil(t, err)
+	require.Equal(t, node2, node)
+	require.Nil(t, err)
 	node, err = ring.Get(testKey{key: "foo4"})
-	assert.Equal(t, node2, node)
-	assert.Nil(t, err)
+	require.Equal(t, node2, node)
+	require.Nil(t, err)
 }
 
 // Tests that the node routed to changes if an Add results in a key shuffle.
@@ -383,8 +380,8 @@ func TestGetShuffleOnAdd(t *testing.T) {
 	// ... -> node-1 -> foo -> ...
 	node, err := ring.Get(foo)
 
-	assert.Equal(t, node1, node)
-	assert.Nil(t, err)
+	require.Equal(t, node1, node)
+	require.Nil(t, err)
 
 	// Add node-2, which results in foo being shuffled from node-1 to node-2.
 	//
@@ -398,8 +395,8 @@ func TestGetShuffleOnAdd(t *testing.T) {
 	// ... -> node-1 -> foo -> node-2 -> ...
 	node, err = ring.Get(foo)
 
-	assert.Equal(t, node2, node)
-	assert.Nil(t, err)
+	require.Equal(t, node2, node)
+	require.Nil(t, err)
 }
 
 // Tests that we can iterate around the ring.
@@ -437,13 +434,13 @@ func TestIteration(t *testing.T) {
 	// Ring:
 	// ... -> foo -> node-1 -> node-2 -> ...
 	node, err := ring.Get(foo)
-	assert.Equal(t, node1, node)
-	assert.Nil(t, err)
+	require.Equal(t, node1, node)
+	require.Nil(t, err)
 
 	// iterate by re-using node-1 to get node-2
 	node, err = ring.Get(node)
-	assert.Equal(t, node2, node)
-	assert.Nil(t, err)
+	require.Equal(t, node2, node)
+	require.Nil(t, err)
 }
 
 func setupTest(t *testing.T, virtualNodes int) (Ring, *hashing.MockHasher, *gomock.Controller) {

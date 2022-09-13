@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package logging
@@ -29,6 +29,29 @@ const (
 	Reverse Color = "\033[;7m"
 )
 
+var (
+	levelToColor = map[Level]Color{
+		Fatal: Red,
+		Error: Orange,
+		Warn:  Yellow,
+		// Rather than using white, use the default to better support terminals
+		// with a white background.
+		Info:  Reset,
+		Trace: LightPurple,
+		Debug: LightBlue,
+		Verbo: LightGreen,
+	}
+
+	levelToCapitalColorString = make(map[Level]string, len(levelToColor))
+	unknownLevelColor         = Reset
+)
+
 func (lc Color) Wrap(text string) string {
 	return string(lc) + text + string(Reset)
+}
+
+func init() {
+	for level, color := range levelToColor {
+		levelToCapitalColorString[level] = color.Wrap(level.String())
+	}
 }
