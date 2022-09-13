@@ -618,6 +618,10 @@ func opCreate(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 	}
 
 	res, addr, returnGas, suberr := interpreter.evm.Create(scope.Contract, input, gas, bigVal)
+	// Special case the error in the op code. TODO remove.
+	if errors.Is(suberr, vmerrs.ErrToAddrProhibitedSoft) {
+		return nil, suberr
+	}
 	// Push item on the stack based on the returned error. If the ruleset is
 	// homestead we must check for CodeStoreOutOfGasError (homestead only
 	// rule) and treat as an error, if the ruleset is frontier we must
@@ -664,6 +668,10 @@ func opCreate2(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]
 	}
 	res, addr, returnGas, suberr := interpreter.evm.Create2(scope.Contract, input, gas,
 		bigEndowment, &salt)
+	// Special case the error in the op code. TODO remove.
+	if errors.Is(suberr, vmerrs.ErrToAddrProhibitedSoft) {
+		return nil, suberr
+	}
 	// Push item on the stack based on the returned error.
 	if suberr != nil {
 		stackvalue.Clear()
@@ -706,7 +714,10 @@ func opCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byt
 	}
 
 	ret, returnGas, err := interpreter.evm.Call(scope.Contract, toAddr, args, gas, bigVal)
-
+	// Special case the error in the op code. TODO remove.
+	if errors.Is(err, vmerrs.ErrToAddrProhibitedSoft) {
+		return nil, err
+	}
 	if err != nil {
 		temp.Clear()
 	} else {
@@ -757,7 +768,10 @@ func opCallExpert(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) 
 	}
 
 	ret, returnGas, err := interpreter.evm.CallExpert(scope.Contract, toAddr, args, gas, bigVal, coinID, bigVal2)
-
+	// Special case the error in the op code. TODO remove.
+	if errors.Is(err, vmerrs.ErrToAddrProhibitedSoft) {
+		return nil, err
+	}
 	if err != nil {
 		temp.Clear()
 	} else {
@@ -793,6 +807,10 @@ func opCallCode(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([
 	}
 
 	ret, returnGas, err := interpreter.evm.CallCode(scope.Contract, toAddr, args, gas, bigVal)
+	// Special case the error in the op code. TODO remove.
+	if errors.Is(err, vmerrs.ErrToAddrProhibitedSoft) {
+		return nil, err
+	}
 	if err != nil {
 		temp.Clear()
 	} else {
@@ -822,6 +840,10 @@ func opDelegateCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext
 	args := scope.Memory.GetPtr(int64(inOffset.Uint64()), int64(inSize.Uint64()))
 
 	ret, returnGas, err := interpreter.evm.DelegateCall(scope.Contract, toAddr, args, gas)
+	// Special case the error in the op code. TODO remove.
+	if errors.Is(err, vmerrs.ErrToAddrProhibitedSoft) {
+		return nil, err
+	}
 	if err != nil {
 		temp.Clear()
 	} else {
@@ -851,6 +873,10 @@ func opStaticCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) 
 	args := scope.Memory.GetPtr(int64(inOffset.Uint64()), int64(inSize.Uint64()))
 
 	ret, returnGas, err := interpreter.evm.StaticCall(scope.Contract, toAddr, args, gas)
+	// Special case the error in the op code. TODO remove.
+	if errors.Is(err, vmerrs.ErrToAddrProhibitedSoft) {
+		return nil, err
+	}
 	if err != nil {
 		temp.Clear()
 	} else {
