@@ -901,3 +901,181 @@ func TestVerifierVisitBlueberryStandardBlockWithProposalBlockParent(t *testing.T
 	err = verifier.BlueberryStandardBlock(blk)
 	require.ErrorIs(err, state.ErrMissingParentState)
 }
+
+func TestVerifierVisitApricotCommitBlockUnexpectedParentState(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Create mocked dependencies.
+	s := state.NewMockState(ctrl)
+	parentID := ids.GenerateTestID()
+	parentStatelessBlk := blocks.NewMockBlock(ctrl)
+	verifier := &verifier{
+		txExecutorBackend: &executor.Backend{
+			Config: &config.Config{
+				BlueberryTime: mockable.MaxTime, // blueberry is not activated
+			},
+			Clk: &mockable.Clock{},
+		},
+		backend: &backend{
+			blkIDToState: map[ids.ID]*blockState{
+				parentID: {
+					statelessBlock: parentStatelessBlk,
+				},
+			},
+			state: s,
+			ctx: &snow.Context{
+				Log: logging.NoLog{},
+			},
+		},
+	}
+
+	blk, err := blocks.NewApricotCommitBlock(
+		parentID,
+		2,
+	)
+	require.NoError(err)
+
+	// Set expectations for dependencies.
+	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
+
+	// Verify the block.
+	err = verifier.ApricotCommitBlock(blk)
+	require.ErrorIs(err, state.ErrMissingParentState)
+}
+
+func TestVerifierVisitBlueberryCommitBlockUnexpectedParentState(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Create mocked dependencies.
+	s := state.NewMockState(ctrl)
+	parentID := ids.GenerateTestID()
+	parentStatelessBlk := blocks.NewMockBlock(ctrl)
+	timestamp := time.Unix(12345, 0)
+	verifier := &verifier{
+		txExecutorBackend: &executor.Backend{
+			Config: &config.Config{
+				BlueberryTime: time.Time{}, // blueberry is activated
+			},
+			Clk: &mockable.Clock{},
+		},
+		backend: &backend{
+			blkIDToState: map[ids.ID]*blockState{
+				parentID: {
+					statelessBlock: parentStatelessBlk,
+					timestamp:      timestamp,
+				},
+			},
+			state: s,
+			ctx: &snow.Context{
+				Log: logging.NoLog{},
+			},
+		},
+	}
+
+	blk, err := blocks.NewBlueberryCommitBlock(
+		timestamp,
+		parentID,
+		2,
+	)
+	require.NoError(err)
+
+	// Set expectations for dependencies.
+	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
+
+	// Verify the block.
+	err = verifier.BlueberryCommitBlock(blk)
+	require.ErrorIs(err, state.ErrMissingParentState)
+}
+
+func TestVerifierVisitApricotAbortBlockUnexpectedParentState(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Create mocked dependencies.
+	s := state.NewMockState(ctrl)
+	parentID := ids.GenerateTestID()
+	parentStatelessBlk := blocks.NewMockBlock(ctrl)
+	verifier := &verifier{
+		txExecutorBackend: &executor.Backend{
+			Config: &config.Config{
+				BlueberryTime: mockable.MaxTime, // blueberry is not activated
+			},
+			Clk: &mockable.Clock{},
+		},
+		backend: &backend{
+			blkIDToState: map[ids.ID]*blockState{
+				parentID: {
+					statelessBlock: parentStatelessBlk,
+				},
+			},
+			state: s,
+			ctx: &snow.Context{
+				Log: logging.NoLog{},
+			},
+		},
+	}
+
+	blk, err := blocks.NewApricotAbortBlock(
+		parentID,
+		2,
+	)
+	require.NoError(err)
+
+	// Set expectations for dependencies.
+	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
+
+	// Verify the block.
+	err = verifier.ApricotAbortBlock(blk)
+	require.ErrorIs(err, state.ErrMissingParentState)
+}
+
+func TestVerifierVisitBlueberryAbortBlockUnexpectedParentState(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Create mocked dependencies.
+	s := state.NewMockState(ctrl)
+	parentID := ids.GenerateTestID()
+	parentStatelessBlk := blocks.NewMockBlock(ctrl)
+	timestamp := time.Unix(12345, 0)
+	verifier := &verifier{
+		txExecutorBackend: &executor.Backend{
+			Config: &config.Config{
+				BlueberryTime: time.Time{}, // blueberry is activated
+			},
+			Clk: &mockable.Clock{},
+		},
+		backend: &backend{
+			blkIDToState: map[ids.ID]*blockState{
+				parentID: {
+					statelessBlock: parentStatelessBlk,
+					timestamp:      timestamp,
+				},
+			},
+			state: s,
+			ctx: &snow.Context{
+				Log: logging.NoLog{},
+			},
+		},
+	}
+
+	blk, err := blocks.NewBlueberryAbortBlock(
+		timestamp,
+		parentID,
+		2,
+	)
+	require.NoError(err)
+
+	// Set expectations for dependencies.
+	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
+
+	// Verify the block.
+	err = verifier.BlueberryAbortBlock(blk)
+	require.ErrorIs(err, state.ErrMissingParentState)
+}
