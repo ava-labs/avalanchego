@@ -798,7 +798,7 @@ func (vm *VM) parseInnerBlock(outerBlkID ids.ID, innerBlkBytes []byte) (snowman.
 // Caches proposervm block ID --> inner block if the inner block's height
 // is within [innerBlkCacheSize] of the last accepted block's height.
 func (vm *VM) cacheInnerBlock(outerBlkID ids.ID, innerBlk snowman.Block) {
-	diff := math.Diff(innerBlk.Height(), vm.lastAcceptedHeight)
+	diff := math.AbsDiff(innerBlk.Height(), vm.lastAcceptedHeight)
 	if diff < innerBlkCacheSize {
 		vm.innerBlkCache.Put(outerBlkID, innerBlk)
 	}

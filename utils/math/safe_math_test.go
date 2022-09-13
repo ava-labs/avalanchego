@@ -13,14 +13,14 @@ import (
 const maxUint64 uint64 = math.MaxUint64
 
 func TestMax(t *testing.T) {
-	actual := Max(0, maxUint64)
-	if actual != maxUint64 {
-		t.Fatalf("Expected %d, got %d", maxUint64, actual)
-	}
-	actual = Max(maxUint64, 0)
-	if actual != maxUint64 {
-		t.Fatalf("Expected %d, got %d", maxUint64, actual)
-	}
+	require := require.New(t)
+
+	require.Equal(maxUint64, Max(0, maxUint64))
+	require.Equal(maxUint64, Max(maxUint64, 0))
+	require.Equal(1, Max(1, 0))
+	require.Equal(1, Max(0, 1))
+	require.Equal(0, Max(0, 0))
+	require.Equal(2, Max(2, 2))
 }
 
 func TestMin(t *testing.T) {
@@ -110,10 +110,10 @@ func TestMul64(t *testing.T) {
 func TestDiff(t *testing.T) {
 	require := require.New(t)
 
-	require.Equal(maxUint64, Diff(0, maxUint64))
-	require.Equal(maxUint64, Diff(maxUint64, 0))
-	require.Equal(uint64(2), Diff(uint64(3), uint64(1)))
-	require.Equal(uint64(2), Diff(uint64(1), uint64(3)))
-	require.Equal(uint64(0), Diff(uint64(1), uint64(1)))
-	require.Equal(uint64(0), Diff(uint64(0), uint64(0)))
+	require.Equal(maxUint64, AbsDiff(0, maxUint64))
+	require.Equal(maxUint64, AbsDiff(maxUint64, 0))
+	require.Equal(uint64(2), AbsDiff(uint64(3), uint64(1)))
+	require.Equal(uint64(2), AbsDiff(uint64(1), uint64(3)))
+	require.Equal(uint64(0), AbsDiff(uint64(1), uint64(1)))
+	require.Equal(uint64(0), AbsDiff(uint64(0), uint64(0)))
 }
