@@ -24,14 +24,15 @@ func TestMax(t *testing.T) {
 }
 
 func TestMin(t *testing.T) {
-	actual := Min(0, maxUint64)
-	if actual != 0 {
-		t.Fatalf("Expected %d, got %d", 0, actual)
-	}
-	actual = Min(maxUint64, 0)
-	if actual != 0 {
-		t.Fatalf("Expected %d, got %d", 0, actual)
-	}
+	require := require.New(t)
+
+	require.Equal(uint64(0), Min(uint64(0), maxUint64))
+	require.Equal(uint64(0), Min(maxUint64, uint64(0)))
+	require.Equal(0, Min(1, 0))
+	require.Equal(0, Min(0, 1))
+	require.Equal(0, Min(0, 0))
+	require.Equal(2, Min(2, 2))
+	require.Equal(1, Min(1, 2))
 }
 
 func TestAdd64(t *testing.T) {
