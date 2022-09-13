@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-x86_64-binaries-tarball:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v3
@@ -42,10 +42,10 @@ jobs:
           TAG: ${{ steps.get_version.outputs.VERSION }}
           BUCKET: ${{ secrets.BUCKET }}
           ARCH: "amd64"
-          RELEASE: "focal"
+          RELEASE: "jammy"
 
   build-arm64-binaries-tarball:
-    runs-on: [self-hosted, linux, ARM64, bionic]
+    runs-on: [self-hosted, linux, ARM64, jammy]
 
     steps:
       - uses: actions/checkout@v3

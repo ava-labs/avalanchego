@@ -6,8 +6,8 @@ on:
       - "*"
 
 jobs:
-  build-bionic-amd64-package:
-    runs-on: ubuntu-18.04
+  build-jammy-amd64-package:
+    runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v3
@@ -42,7 +42,7 @@ jobs:
           TAG: ${{ steps.get_version.outputs.VERSION }}
           BUCKET: ${{ secrets.BUCKET }}
           ARCH: "amd64"
-          RELEASE: "bionic"
+          RELEASE: "jammy"
 
   build-focal-amd64-package:
     runs-on: ubuntu-20.04
