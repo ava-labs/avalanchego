@@ -348,7 +348,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
 		ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value)
 	}
-	if errors.Is(vmerr, vmerrs.ErrToAddrProhibited) {
+	if errors.Is(vmerr, vmerrs.ErrToAddrProhibitedSoft) { // Only invalidate soft error here
 		return &ExecutionResult{
 			UsedGas:    st.gasUsed(),
 			Err:        vmerr,
