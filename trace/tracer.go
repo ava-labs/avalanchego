@@ -8,6 +8,7 @@ import (
 	"errors"
 	"time"
 
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -17,14 +18,19 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 	"go.opentelemetry.io/otel/trace"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 )
 
 const (
 	tracerProviderExportCreationTimeout = 5 * time.Second
-	tracerProviderFlushTimeout          = 5 * time.Second
-	tracerProviderShutdownTimeout       = 10 * time.Second
+	tracerExportTimeout                 = 10 * time.Second
+	// [tracerProviderShutdownTimeout] is longer than [tracerExportTimeout] so
+	// in-flight exports can finish before the tracer provider shuts down.
+	tracerProviderShutdownTimeout = 15 * time.Second
 )
 
 var (
@@ -80,11 +86,13 @@ func newExporter(config ExporterConfig) (sdktrace.SpanExporter, error) {
 		client = otlptracegrpc.NewClient(
 			otlptracegrpc.WithEndpoint(config.Endpoint),
 			otlptracegrpc.WithHeaders(config.Headers),
+			otlptracegrpc.WithTimeout(tracerExportTimeout),
 		)
 	case HTTP:
 		client = otlptracehttp.NewClient(
 			otlptracehttp.WithEndpoint(config.Endpoint),
 			otlptracehttp.WithHeaders(config.Headers),
+			otlptracehttp.WithTimeout(tracerExportTimeout),
 		)
 	default:
 		return nil, errUnknownExporterType
@@ -108,13 +116,26 @@ type TraceConfig struct {
 	TraceSampleRate float64 `json:"traceSampleRate"`
 }
 
+// Logs an error with [log] when opentelemetry encounters an error
+// (e.g. when the exporter fails to send a span).
+type otelErrHandler struct {
+	log logging.Logger
+}
+
+func (h otelErrHandler) Handle(err error) {
+	h.log.Info("opentelemetry error", zap.Error(err))
+}
+
 // Initialize the tracer.
 // If this is never called, we use a no-op tracer.
-func InitTracer(config TraceConfig) error {
+func InitTracer(log logging.Logger, config TraceConfig) error {
 	if !config.Enabled {
 		// [tracerProvider] is a no-op tracer provider by default.
 		return nil
 	}
+
+	// Handle opentelemetry errors by logging them
+	otel.SetErrorHandler(otelErrHandler{log: log})
 
 	exporter, err := newExporter(config.ExporterConfig)
 	if err != nil {
@@ -122,7 +143,7 @@ func InitTracer(config TraceConfig) error {
 	}
 
 	tracerProviderOpts := []sdktrace.TracerProviderOption{
-		sdktrace.WithBatcher(exporter),
+		sdktrace.WithBatcher(exporter, sdktrace.WithExportTimeout(tracerExportTimeout)),
 		sdktrace.WithResource(newResource()),
 		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(config.TraceSampleRate)),
 	}
@@ -139,11 +160,7 @@ func ShutdownTracer() error {
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), tracerProviderFlushTimeout)
-	_ = tp.ForceFlush(ctx)
-	cancel()
-
-	ctx, cancel = context.WithTimeout(context.Background(), tracerProviderShutdownTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), tracerProviderShutdownTimeout)
 	defer cancel()
 	return tp.Shutdown(ctx)
 }

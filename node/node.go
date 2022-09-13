@@ -382,7 +382,7 @@ func (b *beaconManager) Disconnected(vdrID ids.NodeID) {
 // Returns when the node exits.
 func (n *Node) Dispatch() error {
 	// Set up tracer
-	if err := trace.InitTracer(n.Config.TraceConfig); err != nil {
+	if err := trace.InitTracer(n.Log, n.Config.TraceConfig); err != nil {
 		n.Log.Error("failed to initialize tracer", zap.Error(err))
 	}
 
@@ -1401,6 +1401,7 @@ func (n *Node) shutdown() {
 		}
 	}
 
+	n.Log.Info("shutting down tracing")
 	if err := trace.ShutdownTracer(); err != nil {
 		n.Log.Warn("error during tracer shutdown",
 			zap.Error(err),
