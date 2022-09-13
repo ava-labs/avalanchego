@@ -157,7 +157,14 @@ func (t *Transitive) Put(parentCtx context.Context, nodeID ids.NodeID, requestID
 	return t.buildBlocks()
 }
 
-func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (t *Transitive) GetFailed(parentCtx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	_, span := trace.Tracer().Start(parentCtx, "Transitive.GetFailed",
+		oteltrace.WithAttributes(
+			attribute.Int64("requestID", int64(requestID)),
+		),
+	)
+	defer span.End()
+
 	// We don't assume that this function is called after a failed Get message.
 	// Check to see if we have an outstanding request and also get what the request was for if it exists.
 	blkID, ok := t.blkReqs.Remove(nodeID, requestID)
@@ -176,7 +183,10 @@ func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) PullQuery(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
-	ctx, span := trace.Tracer().Start(parentCtx, "Transitive.PullQuery")
+	ctx, span := trace.Tracer().Start(parentCtx, "Transitive.PullQuery", oteltrace.WithAttributes(
+		attribute.Int64("requestID", int64(requestID)),
+		attribute.Stringer("blockID", blkID),
+	))
 	defer span.End()
 
 	// TODO: once everyone supports ChitsV2 - we should be sending that message
@@ -193,7 +203,12 @@ func (t *Transitive) PullQuery(parentCtx context.Context, nodeID ids.NodeID, req
 }
 
 func (t *Transitive) PushQuery(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
-	ctx, span := trace.Tracer().Start(parentCtx, "Transitive.PushQuery")
+	ctx, span := trace.Tracer().Start(parentCtx, "Transitive.PushQuery",
+		oteltrace.WithAttributes(
+			attribute.Int64("requestID", int64(requestID)),
+			attribute.Int("blkSize", len(blkBytes)),
+		),
+	)
 	defer span.End()
 
 	// TODO: once everyone supports ChitsV2 - we should be sending that message
@@ -234,7 +249,12 @@ func (t *Transitive) PushQuery(parentCtx context.Context, nodeID ids.NodeID, req
 }
 
 func (t *Transitive) Chits(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) error {
-	ctx, span := trace.Tracer().Start(parentCtx, "Transitive.Chits")
+	ctx, span := trace.Tracer().Start(parentCtx, "Transitive.Chits",
+		oteltrace.WithAttributes(
+			attribute.Int64("requestID", int64(requestID)),
+			attribute.String("votes", fmt.Sprintf("%s", votes)),
+		),
+	)
 	defer span.End()
 
 	// Since this is a linear chain, there should only be one ID in the vote set
@@ -283,7 +303,12 @@ func (t *Transitive) ChitsV2(ctx context.Context, vdr ids.NodeID, requestID uint
 	return t.Chits(ctx, vdr, requestID, []ids.ID{vote})
 }
 
-func (t *Transitive) QueryFailed(ctx context.Context, vdr ids.NodeID, requestID uint32) error {
+func (t *Transitive) QueryFailed(parentCtx context.Context, vdr ids.NodeID, requestID uint32) error {
+	_, span := trace.Tracer().Start(parentCtx, "Transitive.PullQuery", oteltrace.WithAttributes(
+		attribute.Int64("requestID", int64(requestID)),
+	))
+	defer span.End()
+
 	t.blocked.Register(&voter{
 		t:         t,
 		vdr:       vdr,
@@ -531,7 +556,12 @@ func (t *Transitive) repoll() {
 // issueFromByID attempts to issue the branch ending with a block [blkID] into consensus.
 // If we do not have [blkID], request it.
 // Returns true if the block is processing in consensus or is decided.
-func (t *Transitive) issueFromByID(ctx context.Context, nodeID ids.NodeID, blkID ids.ID) (bool, error) {
+func (t *Transitive) issueFromByID(parentCtx context.Context, nodeID ids.NodeID, blkID ids.ID) (bool, error) {
+	ctx, span := trace.Tracer().Start(parentCtx, "Transitive.issueFromByID", oteltrace.WithAttributes(
+		attribute.Stringer("blkID", blkID),
+	))
+	defer span.End()
+
 	blk, err := t.GetBlock(blkID)
 	if err != nil {
 		t.sendRequest(ctx, nodeID, blkID)
@@ -543,7 +573,12 @@ func (t *Transitive) issueFromByID(ctx context.Context, nodeID ids.NodeID, blkID
 // issueFrom attempts to issue the branch ending with block [blkID] to consensus.
 // Returns true if the block is processing in consensus or is decided.
 // If a dependency is missing, request it from [vdr].
-func (t *Transitive) issueFrom(ctx context.Context, nodeID ids.NodeID, blk snowman.Block) (bool, error) {
+func (t *Transitive) issueFrom(parentCtx context.Context, nodeID ids.NodeID, blk snowman.Block) (bool, error) {
+	ctx, span := trace.Tracer().Start(parentCtx, "Transitive.issueFrom", oteltrace.WithAttributes(
+		attribute.Stringer("blkID", blk.ID()),
+	))
+	defer span.End()
+
 	blkID := blk.ID()
 	// issue [blk] and its ancestors to consensus.
 	for !t.wasIssued(blk) {
@@ -661,7 +696,12 @@ func (t *Transitive) issue(blk snowman.Block) error {
 }
 
 // Request that [vdr] send us block [blkID]
-func (t *Transitive) sendRequest(ctx context.Context, nodeID ids.NodeID, blkID ids.ID) {
+func (t *Transitive) sendRequest(parentCtx context.Context, nodeID ids.NodeID, blkID ids.ID) {
+	ctx, span := trace.Tracer().Start(parentCtx, "Transitive.sendRequest", oteltrace.WithAttributes(
+		attribute.Stringer("blkID", blkID),
+	))
+	defer span.End()
+
 	// There is already an outstanding request for this block
 	if t.blkReqs.Contains(blkID) {
 		return
@@ -681,7 +721,12 @@ func (t *Transitive) sendRequest(ctx context.Context, nodeID ids.NodeID, blkID i
 }
 
 // send a pull query for this block ID
-func (t *Transitive) pullQuery(ctx context.Context, blkID ids.ID) {
+func (t *Transitive) pullQuery(parentCtx context.Context, blkID ids.ID) {
+	ctx, span := trace.Tracer().Start(parentCtx, "Transitive.pullQuery", oteltrace.WithAttributes(
+		attribute.Stringer("blkID", blkID),
+	))
+	defer span.End()
+
 	t.Ctx.Log.Verbo("sampling from validators",
 		zap.Stringer("validators", t.Validators),
 	)
@@ -711,7 +756,12 @@ func (t *Transitive) pullQuery(ctx context.Context, blkID ids.ID) {
 
 // Send a query for this block. Some validators will be sent
 // a Push Query and some will be sent a Pull Query.
-func (t *Transitive) sendMixedQuery(ctx context.Context, blk snowman.Block) {
+func (t *Transitive) sendMixedQuery(parentCtx context.Context, blk snowman.Block) {
+	ctx, span := trace.Tracer().Start(parentCtx, "Transitive.sendMixedQuery", oteltrace.WithAttributes(
+		attribute.Stringer("blkID", blk.ID()),
+	))
+	defer span.End()
+
 	t.Ctx.Log.Verbo("sampling from validators",
 		zap.Stringer("validators", t.Validators),
 	)
