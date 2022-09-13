@@ -9,9 +9,11 @@ import (
 	blst "github.com/supranational/blst/bindings/go"
 )
 
-type PublicKey = blst.P1Affine
+const PublicKeyLen = blst.BLST_P1_COMPRESS_BYTES
 
 var errInvalidPublicKey = errors.New("invalid public key")
+
+type PublicKey = blst.P1Affine
 
 func PublicKeyToBytes(pk *PublicKey) []byte {
 	return pk.Compress()

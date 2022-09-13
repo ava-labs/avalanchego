@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -81,11 +82,14 @@ type IPConfig struct {
 
 type StakingConfig struct {
 	genesis.StakingConfig
-	EnableStaking         bool            `json:"enableStaking"`
-	StakingTLSCert        tls.Certificate `json:"-"`
-	DisabledStakingWeight uint64          `json:"disabledStakingWeight"`
-	StakingKeyPath        string          `json:"stakingKeyPath"`
-	StakingCertPath       string          `json:"stakingCertPath"`
+	EnableStaking          bool            `json:"enableStaking"`
+	StakingTLSCert         tls.Certificate `json:"-"`
+	StakingSigningKey      *bls.SecretKey  `json:"-"`
+	DisabledStakingWeight  uint64          `json:"disabledStakingWeight"`
+	StakingKeyPath         string          `json:"stakingKeyPath"`
+	StakingCertPath        string          `json:"stakingCertPath"`
+	StakingSignerPath      string          `json:"stakingSignerPath"`
+	StakingSignerProofPath string          `json:"stakingSignerProofPath"`
 }
 
 type StateSyncConfig struct {

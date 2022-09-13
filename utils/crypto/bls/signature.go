@@ -9,9 +9,11 @@ import (
 	blst "github.com/supranational/blst/bindings/go"
 )
 
-type Signature = blst.P2Affine
+const SignatureLen = blst.BLST_P2_COMPRESS_BYTES
 
 var errInvalidSignature = errors.New("invalid signature")
+
+type Signature = blst.P2Affine
 
 func SignatureToBytes(sig *Signature) []byte {
 	return sig.Compress()
