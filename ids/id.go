@@ -26,8 +26,10 @@ var (
 	errMissingQuotes = errors.New("first and last characters should be quotes")
 )
 
+const IDLen = 32
+
 // ID wraps a 32 byte hash used as an identifier
-type ID [32]byte
+type ID [IDLen]byte
 
 // ToID attempt to convert a byte slice into an id
 func ToID(bytes []byte) (ID, error) {

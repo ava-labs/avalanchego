@@ -72,13 +72,34 @@ func TestBuildVersion(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, parsedMsg)
 	require.Equal(t, Version, parsedMsg.Op())
-	require.EqualValues(t, networkID, parsedMsg.Get(NetworkID))
-	require.EqualValues(t, myTime, parsedMsg.Get(MyTime))
-	require.EqualValues(t, ip, parsedMsg.Get(IP))
-	require.EqualValues(t, myVersionStr, parsedMsg.Get(VersionStr))
-	require.EqualValues(t, myVersionTime, parsedMsg.Get(VersionTime))
-	require.EqualValues(t, sig, parsedMsg.Get(SigBytes))
-	require.EqualValues(t, subnetIDs, parsedMsg.Get(TrackedSubnets))
+
+	networkIDInf, err := parsedMsg.Get(NetworkID)
+	require.NoError(t, err)
+	require.EqualValues(t, networkID, networkIDInf)
+
+	myTimeInf, err := parsedMsg.Get(MyTime)
+	require.NoError(t, err)
+	require.EqualValues(t, myTime, myTimeInf)
+
+	ipInf, err := parsedMsg.Get(IP)
+	require.NoError(t, err)
+	require.EqualValues(t, ip, ipInf)
+
+	versionStrInf, err := parsedMsg.Get(VersionStr)
+	require.NoError(t, err)
+	require.EqualValues(t, myVersionStr, versionStrInf)
+
+	versionTimeInf, err := parsedMsg.Get(VersionTime)
+	require.NoError(t, err)
+	require.EqualValues(t, myVersionTime, versionTimeInf)
+
+	sigBytesInf, err := parsedMsg.Get(SigBytes)
+	require.NoError(t, err)
+	require.EqualValues(t, sig, sigBytesInf)
+
+	trackedSubnetsInf, err := parsedMsg.Get(TrackedSubnets)
+	require.NoError(t, err)
+	require.EqualValues(t, subnetIDs, trackedSubnetsInf)
 }
 
 func TestBuildGetAcceptedFrontier(t *testing.T) {
@@ -95,9 +116,18 @@ func TestBuildGetAcceptedFrontier(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, parsedMsg)
 	require.Equal(t, GetAcceptedFrontier, parsedMsg.Op())
-	require.Equal(t, chainID[:], parsedMsg.Get(ChainID))
-	require.Equal(t, requestID, parsedMsg.Get(RequestID))
-	require.Equal(t, deadline, parsedMsg.Get(Deadline))
+
+	chainIDInf, err := parsedMsg.Get(ChainID)
+	require.NoError(t, err)
+	require.Equal(t, chainID[:], chainIDInf)
+
+	requestIDInf, err := parsedMsg.Get(RequestID)
+	require.NoError(t, err)
+	require.Equal(t, requestID, requestIDInf)
+
+	deadlineInf, err := parsedMsg.Get(Deadline)
+	require.NoError(t, err)
+	require.Equal(t, deadline, deadlineInf)
 }
 
 func TestBuildAcceptedFrontier(t *testing.T) {
@@ -115,9 +145,18 @@ func TestBuildAcceptedFrontier(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, parsedMsg)
 	require.Equal(t, AcceptedFrontier, parsedMsg.Op())
-	require.Equal(t, chainID[:], parsedMsg.Get(ChainID))
-	require.Equal(t, requestID, parsedMsg.Get(RequestID))
-	require.Equal(t, containerIDs, parsedMsg.Get(ContainerIDs))
+
+	chainIDInf, err := parsedMsg.Get(ChainID)
+	require.NoError(t, err)
+	require.Equal(t, chainID[:], chainIDInf)
+
+	requestIDInf, err := parsedMsg.Get(RequestID)
+	require.NoError(t, err)
+	require.Equal(t, requestID, requestIDInf)
+
+	containerIDsInf, err := parsedMsg.Get(ContainerIDs)
+	require.NoError(t, err)
+	require.Equal(t, containerIDs, containerIDsInf)
 }
 
 func TestBuildGetAccepted(t *testing.T) {
@@ -136,10 +175,22 @@ func TestBuildGetAccepted(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, parsedMsg)
 	require.Equal(t, GetAccepted, parsedMsg.Op())
-	require.Equal(t, chainID[:], parsedMsg.Get(ChainID))
-	require.Equal(t, requestID, parsedMsg.Get(RequestID))
-	require.Equal(t, deadline, parsedMsg.Get(Deadline))
-	require.Equal(t, containerIDs, parsedMsg.Get(ContainerIDs))
+
+	chainIDInf, err := parsedMsg.Get(ChainID)
+	require.NoError(t, err)
+	require.Equal(t, chainID[:], chainIDInf)
+
+	requestIDInf, err := parsedMsg.Get(RequestID)
+	require.NoError(t, err)
+	require.Equal(t, requestID, requestIDInf)
+
+	deadlineInf, err := parsedMsg.Get(Deadline)
+	require.NoError(t, err)
+	require.Equal(t, deadline, deadlineInf)
+
+	containerIDsInf, err := parsedMsg.Get(ContainerIDs)
+	require.NoError(t, err)
+	require.Equal(t, containerIDs, containerIDsInf)
 }
 
 func TestBuildAccepted(t *testing.T) {
@@ -157,9 +208,18 @@ func TestBuildAccepted(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, parsedMsg)
 	require.Equal(t, Accepted, parsedMsg.Op())
-	require.Equal(t, chainID[:], parsedMsg.Get(ChainID))
-	require.Equal(t, requestID, parsedMsg.Get(RequestID))
-	require.Equal(t, containerIDs, parsedMsg.Get(ContainerIDs))
+
+	chainIDInf, err := parsedMsg.Get(ChainID)
+	require.NoError(t, err)
+	require.Equal(t, chainID[:], chainIDInf)
+
+	requestIDInf, err := parsedMsg.Get(RequestID)
+	require.NoError(t, err)
+	require.Equal(t, requestID, requestIDInf)
+
+	containerIDsInf, err := parsedMsg.Get(ContainerIDs)
+	require.NoError(t, err)
+	require.Equal(t, containerIDs, containerIDsInf)
 }
 
 func TestBuildGet(t *testing.T) {
@@ -177,10 +237,22 @@ func TestBuildGet(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, parsedMsg)
 	require.Equal(t, Get, parsedMsg.Op())
-	require.Equal(t, chainID[:], parsedMsg.Get(ChainID))
-	require.Equal(t, requestID, parsedMsg.Get(RequestID))
-	require.Equal(t, deadline, parsedMsg.Get(Deadline))
-	require.Equal(t, containerID[:], parsedMsg.Get(ContainerID))
+
+	chainIDInf, err := parsedMsg.Get(ChainID)
+	require.NoError(t, err)
+	require.Equal(t, chainID[:], chainIDInf)
+
+	requestIDInf, err := parsedMsg.Get(RequestID)
+	require.NoError(t, err)
+	require.Equal(t, requestID, requestIDInf)
+
+	deadlineInf, err := parsedMsg.Get(Deadline)
+	require.NoError(t, err)
+	require.Equal(t, deadline, deadlineInf)
+
+	containerIDInf, err := parsedMsg.Get(ContainerID)
+	require.NoError(t, err)
+	require.Equal(t, containerID[:], containerIDInf)
 }
 
 func TestBuildPut(t *testing.T) {
@@ -200,10 +272,22 @@ func TestBuildPut(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, parsedMsg)
 		require.Equal(t, Put, parsedMsg.Op())
-		require.Equal(t, chainID[:], parsedMsg.Get(ChainID))
-		require.Equal(t, requestID, parsedMsg.Get(RequestID))
-		require.Equal(t, containerID[:], parsedMsg.Get(ContainerID))
-		require.Equal(t, container, parsedMsg.Get(ContainerBytes))
+
+		chainIDInf, err := parsedMsg.Get(ChainID)
+		require.NoError(t, err)
+		require.Equal(t, chainID[:], chainIDInf)
+
+		requestIDInf, err := parsedMsg.Get(RequestID)
+		require.NoError(t, err)
+		require.Equal(t, requestID, requestIDInf)
+
+		containerIDInf, err := parsedMsg.Get(ContainerID)
+		require.NoError(t, err)
+		require.Equal(t, containerID[:], containerIDInf)
+
+		containerInf, err := parsedMsg.Get(ContainerBytes)
+		require.NoError(t, err)
+		require.Equal(t, container, containerInf)
 	}
 }
 
@@ -225,11 +309,26 @@ func TestBuildPushQuery(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, parsedMsg)
 		require.Equal(t, PushQuery, parsedMsg.Op())
-		require.Equal(t, chainID[:], parsedMsg.Get(ChainID))
-		require.Equal(t, requestID, parsedMsg.Get(RequestID))
-		require.Equal(t, deadline, parsedMsg.Get(Deadline))
-		require.Equal(t, containerID[:], parsedMsg.Get(ContainerID))
-		require.Equal(t, container, parsedMsg.Get(ContainerBytes))
+
+		chainIDInf, err := parsedMsg.Get(ChainID)
+		require.NoError(t, err)
+		require.Equal(t, chainID[:], chainIDInf)
+
+		requestIDInf, err := parsedMsg.Get(RequestID)
+		require.NoError(t, err)
+		require.Equal(t, requestID, requestIDInf)
+
+		deadlineInf, err := parsedMsg.Get(Deadline)
+		require.NoError(t, err)
+		require.Equal(t, deadline, deadlineInf)
+
+		containerIDInf, err := parsedMsg.Get(ContainerID)
+		require.NoError(t, err)
+		require.Equal(t, containerID[:], containerIDInf)
+
+		containerInf, err := parsedMsg.Get(ContainerBytes)
+		require.NoError(t, err)
+		require.Equal(t, container, containerInf)
 	}
 }
 
@@ -248,10 +347,22 @@ func TestBuildPullQuery(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, parsedMsg)
 	require.Equal(t, PullQuery, parsedMsg.Op())
-	require.Equal(t, chainID[:], parsedMsg.Get(ChainID))
-	require.Equal(t, requestID, parsedMsg.Get(RequestID))
-	require.Equal(t, deadline, parsedMsg.Get(Deadline))
-	require.Equal(t, containerID[:], parsedMsg.Get(ContainerID))
+
+	chainIDInf, err := parsedMsg.Get(ChainID)
+	require.NoError(t, err)
+	require.Equal(t, chainID[:], chainIDInf)
+
+	requestIDInf, err := parsedMsg.Get(RequestID)
+	require.NoError(t, err)
+	require.Equal(t, requestID, requestIDInf)
+
+	deadlineInf, err := parsedMsg.Get(Deadline)
+	require.NoError(t, err)
+	require.Equal(t, deadline, deadlineInf)
+
+	containerIDInf, err := parsedMsg.Get(ContainerID)
+	require.NoError(t, err)
+	require.Equal(t, containerID[:], containerIDInf)
 }
 
 func TestBuildChits(t *testing.T) {
@@ -269,9 +380,18 @@ func TestBuildChits(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, parsedMsg)
 	require.Equal(t, Chits, parsedMsg.Op())
-	require.Equal(t, chainID[:], parsedMsg.Get(ChainID))
-	require.Equal(t, requestID, parsedMsg.Get(RequestID))
-	require.Equal(t, containerIDs, parsedMsg.Get(ContainerIDs))
+
+	chainIDInf, err := parsedMsg.Get(ChainID)
+	require.NoError(t, err)
+	require.Equal(t, chainID[:], chainIDInf)
+
+	requestIDInf, err := parsedMsg.Get(RequestID)
+	require.NoError(t, err)
+	require.Equal(t, requestID, requestIDInf)
+
+	containerIDsInf, err := parsedMsg.Get(ContainerIDs)
+	require.NoError(t, err)
+	require.Equal(t, containerIDs, containerIDsInf)
 }
 
 func TestBuildChitsV2(t *testing.T) {
@@ -283,10 +403,22 @@ func TestBuildChitsV2(t *testing.T) {
 	msg := TestInboundMsgBuilder.InboundChitsV2(chainID, requestID, []ids.ID{containerID}, containerID, dummyNodeID)
 	require.NotNil(t, msg)
 	require.Equal(t, ChitsV2, msg.Op())
-	require.Equal(t, chainID[:], msg.Get(ChainID))
-	require.Equal(t, requestID, msg.Get(RequestID))
-	require.Equal(t, containerIDs, msg.Get(ContainerIDs))
-	require.Equal(t, containerID[:], msg.Get(ContainerID))
+
+	chainIDInf, err := msg.Get(ChainID)
+	require.NoError(t, err)
+	require.Equal(t, chainID[:], chainIDInf)
+
+	requestIDInf, err := msg.Get(RequestID)
+	require.NoError(t, err)
+	require.Equal(t, requestID, requestIDInf)
+
+	containerIDsInf, err := msg.Get(ContainerIDs)
+	require.NoError(t, err)
+	require.Equal(t, containerIDs, containerIDsInf)
+
+	containerIDInf, err := msg.Get(ContainerID)
+	require.NoError(t, err)
+	require.Equal(t, containerID[:], containerIDInf)
 
 	outboundMsg, err := UncompressingBuilder.ChitsV2(chainID, requestID, []ids.ID{containerID}, containerID)
 	require.NoError(t, err)
@@ -297,10 +429,22 @@ func TestBuildChitsV2(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, parsedMsg)
 	require.Equal(t, ChitsV2, parsedMsg.Op())
-	require.Equal(t, chainID[:], parsedMsg.Get(ChainID))
-	require.Equal(t, requestID, parsedMsg.Get(RequestID))
-	require.Equal(t, containerIDs, parsedMsg.Get(ContainerIDs))
-	require.Equal(t, containerID[:], parsedMsg.Get(ContainerID))
+
+	chainIDInf, err = parsedMsg.Get(ChainID)
+	require.NoError(t, err)
+	require.Equal(t, chainID[:], chainIDInf)
+
+	requestIDInf, err = parsedMsg.Get(RequestID)
+	require.NoError(t, err)
+	require.Equal(t, requestID, requestIDInf)
+
+	containerIDsInf, err = parsedMsg.Get(ContainerIDs)
+	require.NoError(t, err)
+	require.Equal(t, containerIDs, containerIDsInf)
+
+	containerIDInf, err = parsedMsg.Get(ContainerID)
+	require.NoError(t, err)
+	require.Equal(t, containerID[:], containerIDInf)
 }
 
 func TestBuildAncestors(t *testing.T) {
@@ -321,9 +465,18 @@ func TestBuildAncestors(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, parsedMsg)
 		require.Equal(t, Ancestors, parsedMsg.Op())
-		require.Equal(t, chainID[:], parsedMsg.Get(ChainID))
-		require.Equal(t, requestID, parsedMsg.Get(RequestID))
-		require.Equal(t, containers, parsedMsg.Get(MultiContainerBytes))
+
+		chainIDInf, err := parsedMsg.Get(ChainID)
+		require.NoError(t, err)
+		require.Equal(t, chainID[:], chainIDInf)
+
+		requestIDInf, err := parsedMsg.Get(RequestID)
+		require.NoError(t, err)
+		require.Equal(t, requestID, requestIDInf)
+
+		multiContainerBytesInf, err := parsedMsg.Get(MultiContainerBytes)
+		require.NoError(t, err)
+		require.Equal(t, containers, multiContainerBytesInf)
 	}
 }
 
@@ -365,9 +518,18 @@ func TestBuildAppResponseMsg(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, msg)
 		require.Equal(t, AppResponse, msg.Op())
-		require.EqualValues(t, 1, parsedMsg.Get(RequestID))
-		require.Equal(t, appResponseBytes, parsedMsg.Get(AppBytes))
-		require.Equal(t, chainID[:], parsedMsg.Get(ChainID))
+
+		requestIDInf, err := parsedMsg.Get(RequestID)
+		require.NoError(t, err)
+		require.EqualValues(t, 1, requestIDInf)
+
+		appBytesInf, err := parsedMsg.Get(AppBytes)
+		require.NoError(t, err)
+		require.Equal(t, appResponseBytes, appBytesInf)
+
+		chainIDInf, err := parsedMsg.Get(ChainID)
+		require.NoError(t, err)
+		require.Equal(t, chainID[:], chainIDInf)
 	}
 }
 
@@ -388,7 +550,13 @@ func TestBuildAppGossipMsg(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, msg)
 		require.Equal(t, AppGossip, msg.Op())
-		require.Equal(t, appGossipBytes, parsedMsg.Get(AppBytes))
-		require.Equal(t, chainID[:], parsedMsg.Get(ChainID))
+
+		appBytesInf, err := parsedMsg.Get(AppBytes)
+		require.NoError(t, err)
+		require.Equal(t, appGossipBytes, appBytesInf)
+
+		chainIDInf, err := parsedMsg.Get(ChainID)
+		require.NoError(t, err)
+		require.Equal(t, chainID[:], chainIDInf)
 	}
 }

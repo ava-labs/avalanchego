@@ -2027,7 +2027,10 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		require.Equal(t, message.GetAcceptedFrontier, inMsg.Op())
 
 		res := nodeIDs
-		requestID, ok := inMsg.Get(message.RequestID).(uint32)
+
+		inf, err := inMsg.Get(message.RequestID)
+		require.NoError(t, err)
+		requestID, ok := inf.(uint32)
 		require.True(t, ok)
 
 		reqID = requestID
@@ -2135,7 +2138,10 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		require.Equal(t, message.GetAccepted, inMsg.Op())
 
 		res := nodeIDs
-		requestID, ok := inMsg.Get(message.RequestID).(uint32)
+
+		inf, err := inMsg.Get(message.RequestID)
+		require.NoError(t, err)
+		requestID, ok := inf.(uint32)
 		require.True(t, ok)
 
 		reqID = requestID
@@ -2153,11 +2159,20 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		require.Equal(t, message.GetAncestors, inMsg.Op())
 
 		res := nodeIDs
-		requestID, ok := inMsg.Get(message.RequestID).(uint32)
+
+		inf, err := inMsg.Get(message.RequestID)
+		require.NoError(t, err)
+		requestID, ok := inf.(uint32)
 		require.True(t, ok)
+
 		reqID = requestID
 
-		containerID, err := ids.ToID(inMsg.Get(message.ContainerID).([]byte))
+		inf, err = inMsg.Get(message.ContainerID)
+		require.NoError(t, err)
+		containerIDBytes, ok := inf.([]byte)
+		require.True(t, ok)
+
+		containerID, err := ids.ToID(containerIDBytes)
 		require.NoError(t, err)
 		if containerID != advanceTimeBlkID {
 			t.Fatalf("wrong block requested")

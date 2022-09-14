@@ -400,20 +400,44 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	switch op {
 	case message.GetStateSummaryFrontier:
-		reqID := msg.Get(message.RequestID).(uint32)
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
 		return engine.GetStateSummaryFrontier(nodeID, reqID)
 
 	case message.StateSummaryFrontier:
-		reqID := msg.Get(message.RequestID).(uint32)
-		summary := msg.Get(message.SummaryBytes).([]byte)
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
+		inf, err = msg.Get(message.SummaryBytes)
+		if err != nil {
+			return err
+		}
+		summary, _ := inf.([]byte)
+
 		return engine.StateSummaryFrontier(nodeID, reqID, summary)
 
 	case message.GetStateSummaryFrontierFailed:
-		reqID := msg.Get(message.RequestID).(uint32)
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
 		return engine.GetStateSummaryFrontierFailed(nodeID, reqID)
 
 	case message.GetAcceptedStateSummary:
-		reqID := msg.Get(message.RequestID).(uint32)
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
 		summaryHeights, err := getSummaryHeights(msg)
 		if err != nil {
 			h.ctx.Log.Debug("malformed message",
@@ -427,7 +451,12 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		return engine.GetAcceptedStateSummary(nodeID, reqID, summaryHeights)
 
 	case message.AcceptedStateSummary:
-		reqID := msg.Get(message.RequestID).(uint32)
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
 		summaryIDs, err := getIDs(message.SummaryIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug("malformed message",
@@ -441,15 +470,30 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		return engine.AcceptedStateSummary(nodeID, reqID, summaryIDs)
 
 	case message.GetAcceptedStateSummaryFailed:
-		reqID := msg.Get(message.RequestID).(uint32)
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
 		return engine.GetAcceptedStateSummaryFailed(nodeID, reqID)
 
 	case message.GetAcceptedFrontier:
-		reqID := msg.Get(message.RequestID).(uint32)
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
 		return engine.GetAcceptedFrontier(nodeID, reqID)
 
 	case message.AcceptedFrontier:
-		reqID := msg.Get(message.RequestID).(uint32)
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
 		containerIDs, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug("malformed message",
@@ -463,11 +507,21 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		return engine.AcceptedFrontier(nodeID, reqID, containerIDs)
 
 	case message.GetAcceptedFrontierFailed:
-		reqID := msg.Get(message.RequestID).(uint32)
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
 		return engine.GetAcceptedFrontierFailed(nodeID, reqID)
 
 	case message.GetAccepted:
-		reqID := msg.Get(message.RequestID).(uint32)
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
 		containerIDs, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug("malformed message",
@@ -481,7 +535,12 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		return engine.GetAccepted(nodeID, reqID, containerIDs)
 
 	case message.Accepted:
-		reqID := msg.Get(message.RequestID).(uint32)
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
 		containerIDs, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug("malformed message",
@@ -495,52 +554,135 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		return engine.Accepted(nodeID, reqID, containerIDs)
 
 	case message.GetAcceptedFailed:
-		reqID := msg.Get(message.RequestID).(uint32)
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
 		return engine.GetAcceptedFailed(nodeID, reqID)
 
 	case message.GetAncestors:
-		reqID := msg.Get(message.RequestID).(uint32)
-		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
+		inf, err = msg.Get(message.ContainerID)
+		if err != nil {
+			return err
+		}
+		containerIDBytes, _ := inf.([]byte)
+
+		containerID, err := ids.ToID(containerIDBytes)
 		h.ctx.Log.AssertNoError(err)
 		return engine.GetAncestors(nodeID, reqID, containerID)
 
 	case message.GetAncestorsFailed:
-		reqID := msg.Get(message.RequestID).(uint32)
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
 		return engine.GetAncestorsFailed(nodeID, reqID)
 
 	case message.Ancestors:
-		reqID := msg.Get(message.RequestID).(uint32)
-		containers := msg.Get(message.MultiContainerBytes).([][]byte)
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
+		inf, err = msg.Get(message.MultiContainerBytes)
+		if err != nil {
+			return err
+		}
+		containers, _ := inf.([][]byte)
+
 		return engine.Ancestors(nodeID, reqID, containers)
 
 	case message.Get:
-		reqID := msg.Get(message.RequestID).(uint32)
-		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
+		inf, err = msg.Get(message.ContainerID)
+		if err != nil {
+			return err
+		}
+		containerIDBytes, _ := inf.([]byte)
+
+		containerID, err := ids.ToID(containerIDBytes)
 		h.ctx.Log.AssertNoError(err)
 		return engine.Get(nodeID, reqID, containerID)
 
 	case message.GetFailed:
-		reqID := msg.Get(message.RequestID).(uint32)
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
 		return engine.GetFailed(nodeID, reqID)
 
 	case message.Put:
-		reqID := msg.Get(message.RequestID).(uint32)
-		container := msg.Get(message.ContainerBytes).([]byte)
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
+		inf, err = msg.Get(message.ContainerBytes)
+		if err != nil {
+			return err
+		}
+		container, _ := inf.([]byte)
+
 		return engine.Put(nodeID, reqID, container)
 
 	case message.PushQuery:
-		reqID := msg.Get(message.RequestID).(uint32)
-		container := msg.Get(message.ContainerBytes).([]byte)
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
+		inf, err = msg.Get(message.ContainerBytes)
+		if err != nil {
+			return err
+		}
+		container, _ := inf.([]byte)
+
 		return engine.PushQuery(nodeID, reqID, container)
 
 	case message.PullQuery:
-		reqID := msg.Get(message.RequestID).(uint32)
-		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
+		inf, err = msg.Get(message.ContainerID)
+		if err != nil {
+			return err
+		}
+		containerIDBytes, _ := inf.([]byte)
+
+		containerID, err := ids.ToID(containerIDBytes)
 		h.ctx.Log.AssertNoError(err)
 		return engine.PullQuery(nodeID, reqID, containerID)
 
 	case message.Chits:
-		reqID := msg.Get(message.RequestID).(uint32)
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
 		votes, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug("malformed message",
@@ -554,7 +696,12 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		return engine.Chits(nodeID, reqID, votes)
 
 	case message.ChitsV2:
-		reqID := msg.Get(message.RequestID).(uint32)
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
 		votes, err := getIDs(message.ContainerIDs, msg)
 		if err != nil {
 			h.ctx.Log.Debug("malformed message",
@@ -565,16 +712,33 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 			)
 			return engine.QueryFailed(nodeID, reqID)
 		}
-		vote, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
+
+		inf, err = msg.Get(message.ContainerID)
+		if err != nil {
+			return err
+		}
+		containerIDBytes, _ := inf.([]byte)
+
+		vote, err := ids.ToID(containerIDBytes)
 		h.ctx.Log.AssertNoError(err)
 		return engine.ChitsV2(nodeID, reqID, votes, vote)
 
 	case message.QueryFailed:
-		reqID := msg.Get(message.RequestID).(uint32)
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
 		return engine.QueryFailed(nodeID, reqID)
 
 	case message.Connected:
-		peerVersion := msg.Get(message.VersionStruct).(*version.Application)
+		inf, err := msg.Get(message.VersionStruct)
+		if err != nil {
+			return err
+		}
+		peerVersion, _ := inf.(*version.Application)
+
 		return engine.Connected(nodeID, peerVersion)
 
 	case message.Disconnected:
@@ -631,21 +795,51 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 
 	switch op {
 	case message.AppRequest:
-		reqID := msg.Get(message.RequestID).(uint32)
-		appBytes := msg.Get(message.AppBytes).([]byte)
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
+		inf, err = msg.Get(message.AppBytes)
+		if err != nil {
+			return err
+		}
+		appBytes, _ := inf.([]byte)
+
 		return engine.AppRequest(nodeID, reqID, msg.ExpirationTime(), appBytes)
 
 	case message.AppResponse:
-		reqID := msg.Get(message.RequestID).(uint32)
-		appBytes := msg.Get(message.AppBytes).([]byte)
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
+		inf, err = msg.Get(message.AppBytes)
+		if err != nil {
+			return err
+		}
+		appBytes, _ := inf.([]byte)
+
 		return engine.AppResponse(nodeID, reqID, appBytes)
 
 	case message.AppRequestFailed:
-		reqID := msg.Get(message.RequestID).(uint32)
+		inf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		reqID, _ := inf.(uint32)
+
 		return engine.AppRequestFailed(nodeID, reqID)
 
 	case message.AppGossip:
-		appBytes := msg.Get(message.AppBytes).([]byte)
+		inf, err := msg.Get(message.AppBytes)
+		if err != nil {
+			return err
+		}
+		appBytes, _ := inf.([]byte)
+
 		return engine.AppGossip(nodeID, appBytes)
 
 	default:
@@ -687,7 +881,12 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 
 	switch op := msg.Op(); op {
 	case message.Notify:
-		vmMsg := msg.Get(message.VMMessage).(uint32)
+		inf, err := msg.Get(message.VMMessage)
+		if err != nil {
+			return err
+		}
+		vmMsg, _ := inf.(uint32)
+
 		return engine.Notify(common.Message(vmMsg))
 
 	case message.GossipRequest:

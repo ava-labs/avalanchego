@@ -175,7 +175,17 @@ func (cr *ChainRouter) RegisterRequest(
 func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	nodeID := msg.NodeID()
 	op := msg.Op()
-	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
+
+	inf, err := msg.Get(message.ChainID)
+	if err != nil {
+		cr.log.Error("failed to get ChainID from inbound message",
+			zap.Error(err),
+		)
+		return
+	}
+	chainIDBytes, _ := inf.([]byte)
+
+	chainID, err := ids.ToID(chainIDBytes)
 	cr.log.AssertNoError(err)
 
 	// AppGossip is the only message currently not containing a requestID
@@ -185,7 +195,14 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	if op == message.AppGossip {
 		requestID = constants.GossipMsgRequestID
 	} else {
-		requestID = msg.Get(message.RequestID).(uint32)
+		inf, err = msg.Get(message.RequestID)
+		if err != nil {
+			cr.log.Error("failed to get RequestID from inbound message",
+				zap.Error(err),
+			)
+			return
+		}
+		requestID, _ = inf.(uint32)
 	}
 
 	cr.lock.Lock()

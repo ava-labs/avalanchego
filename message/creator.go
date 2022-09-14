@@ -38,3 +38,5 @@ func NewCreator(metrics prometheus.Registerer, compressionEnabled bool, parentNa
 		InternalMsgBuilder: NewInternalBuilder(),
 	}, nil
 }
+
+// TODO: support creator with protobufs

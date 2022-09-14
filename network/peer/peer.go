@@ -598,7 +598,13 @@ func (p *peer) handlePing(_ message.InboundMessage) {
 }
 
 func (p *peer) handlePong(msg message.InboundMessage) {
-	uptime := msg.Get(message.Uptime).(uint8)
+	inf, err := msg.Get(message.Uptime)
+	if err != nil {
+		p.Log.Warn("failed to get Uptime field", zap.Error(err))
+		return
+	}
+
+	uptime, _ := inf.(uint8)
 	if uptime > 100 {
 		return
 	}
@@ -616,7 +622,13 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 		return
 	}
 
-	if peerNetworkID := msg.Get(message.NetworkID).(uint32); peerNetworkID != p.NetworkID {
+	inf, err := msg.Get(message.NetworkID)
+	if err != nil {
+		p.Log.Warn("failed to get NetworkID field", zap.Error(err))
+		return
+	}
+
+	if peerNetworkID, _ := inf.(uint32); peerNetworkID != p.NetworkID {
 		p.Log.Debug("networkID mismatch",
 			zap.Stringer("nodeID", p.id),
 			zap.Uint32("peerNetworkID", peerNetworkID),
@@ -626,27 +638,39 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 		return
 	}
 
-	myTime := float64(p.Clock.Unix())
-	peerTime := float64(msg.Get(message.MyTime).(uint64))
-	if math.Abs(peerTime-myTime) > p.MaxClockDifference.Seconds() {
+	inf, err = msg.Get(message.MyTime)
+	if err != nil {
+		p.Log.Warn("failed to get MyTime field", zap.Error(err))
+		return
+	}
+	peerTime, _ := inf.(uint64)
+
+	myTime := p.Clock.Unix()
+	if math.Abs(float64(peerTime)-float64(myTime)) > p.MaxClockDifference.Seconds() {
 		if p.Beacons.Contains(p.id) {
 			p.Log.Warn("beacon reports out of sync time",
 				zap.Stringer("beaconID", p.id),
-				zap.Uint64("beaconTime", uint64(peerTime)),
-				zap.Uint64("ourTime", uint64(myTime)),
+				zap.Uint64("beaconTime", peerTime),
+				zap.Uint64("ourTime", myTime),
 			)
 		} else {
 			p.Log.Debug("peer reports out of sync time",
 				zap.Stringer("beaconID", p.id),
-				zap.Uint64("beaconTime", uint64(peerTime)),
-				zap.Uint64("ourTime", uint64(myTime)),
+				zap.Uint64("beaconTime", peerTime),
+				zap.Uint64("ourTime", myTime),
 			)
 		}
 		p.StartClose()
 		return
 	}
 
-	peerVersionStr := msg.Get(message.VersionStr).(string)
+	inf, err = msg.Get(message.VersionStr)
+	if err != nil {
+		p.Log.Warn("failed to get VersionStr field", zap.Error(err))
+		return
+	}
+	peerVersionStr, _ := inf.(string)
+
 	peerVersion, err := version.ParseApplication(peerVersionStr)
 	if err != nil {
 		p.Log.Debug("failed to parse peer version",
@@ -685,8 +709,13 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 	// Note that it is expected that the [versionTime] can be in the past. We
 	// are just verifying that the claimed signing time isn't too far in the
 	// future here.
-	versionTime := msg.Get(message.VersionTime).(uint64)
-	if float64(versionTime)-myTime > p.MaxClockDifference.Seconds() {
+	inf, err = msg.Get(message.VersionTime)
+	if err != nil {
+		p.Log.Warn("failed to get VersionTime field", zap.Error(err))
+		return
+	}
+	versionTime, _ := inf.(uint64)
+	if float64(versionTime)-float64(myTime) > p.MaxClockDifference.Seconds() {
 		p.Log.Debug("peer attempting to connect with version timestamp too far in the future",
 			zap.Stringer("nodeID", p.id),
 			zap.Uint64("versionTime", versionTime),
@@ -695,10 +724,21 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 		return
 	}
 
-	peerIP := msg.Get(message.IP).(ips.IPPort)
+	inf, err = msg.Get(message.IP)
+	if err != nil {
+		p.Log.Warn("failed to get IP field", zap.Error(err))
+		return
+	}
+	peerIP, _ := inf.(ips.IPPort)
+
+	inf, err = msg.Get(message.TrackedSubnets)
+	if err != nil {
+		p.Log.Warn("failed to get TrackedSubnets field", zap.Error(err))
+		return
+	}
+	subnetIDsBytes, _ := inf.([][]byte)
 
 	// handle subnet IDs
-	subnetIDsBytes := msg.Get(message.TrackedSubnets).([][]byte)
 	for _, subnetIDBytes := range subnetIDsBytes {
 		subnetID, err := ids.ToID(subnetIDBytes)
 		if err != nil {
@@ -715,12 +755,19 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 		}
 	}
 
+	inf, err = msg.Get(message.SigBytes)
+	if err != nil {
+		p.Log.Warn("failed to get SigBytes field", zap.Error(err))
+		return
+	}
+	sig, _ := inf.([]byte)
+
 	p.ip = &SignedIP{
 		IP: UnsignedIP{
 			IP:        peerIP,
 			Timestamp: versionTime,
 		},
-		Signature: msg.Get(message.SigBytes).([]byte),
+		Signature: sig,
 	}
 	if err := p.ip.Verify(p.cert); err != nil {
 		p.Log.Debug("signature verification failed",
@@ -749,7 +796,13 @@ func (p *peer) handlePeerList(msg message.InboundMessage) {
 		close(p.onFinishHandshake)
 	}
 
-	ips := msg.Get(message.Peers).([]ips.ClaimedIPPort)
+	inf, err := msg.Get(message.Peers)
+	if err != nil {
+		p.Log.Warn("failed to get Peers field", zap.Error(err))
+		return
+	}
+	ips, _ := inf.([]ips.ClaimedIPPort)
+
 	for _, ip := range ips {
 		if !p.Network.Track(ip) {
 			p.Metrics.NumUselessPeerListBytes.Add(float64(ip.BytesLen()))

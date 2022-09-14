@@ -16,7 +16,12 @@ var (
 )
 
 func getIDs(field message.Field, msg message.InboundMessage) ([]ids.ID, error) {
-	idsBytes := msg.Get(field).([][]byte)
+	inf, err := msg.Get(field)
+	if err != nil {
+		return nil, err
+	}
+	idsBytes, _ := inf.([][]byte)
+
 	res := make([]ids.ID, len(idsBytes))
 	idSet := ids.NewSet(len(idsBytes))
 
@@ -35,7 +40,11 @@ func getIDs(field message.Field, msg message.InboundMessage) ([]ids.ID, error) {
 }
 
 func getSummaryHeights(msg message.InboundMessage) ([]uint64, error) {
-	heights := msg.Get(message.SummaryHeights).([]uint64)
+	inf, err := msg.Get(message.SummaryHeights)
+	if err != nil {
+		return nil, err
+	}
+	heights, _ := inf.([]uint64)
 	heightsSet := make(map[uint64]struct{}, len(heights))
 
 	for _, height := range heights {
