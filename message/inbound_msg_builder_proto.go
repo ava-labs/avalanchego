@@ -238,7 +238,6 @@ func (b *inMsgBuilderWithProto) InboundPushQuery(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
-	containerID ids.ID,
 	container []byte,
 	nodeID ids.NodeID,
 ) InboundMessage {
@@ -374,7 +373,7 @@ func (b *inMsgBuilderWithProto) InboundGet(
 	received := b.protoBuilder.clock.Time()
 	return &inboundMessageWithProto{
 		inboundMessage: inboundMessage{
-			op:             Put,
+			op:             Get,
 			nodeID:         nodeID,
 			expirationTime: received.Add(deadline),
 		},
@@ -394,7 +393,6 @@ func (b *inMsgBuilderWithProto) InboundGet(
 func (b *inMsgBuilderWithProto) InboundPut(
 	chainID ids.ID,
 	requestID uint32,
-	_ ids.ID,
 	container []byte,
 	nodeID ids.NodeID,
 ) InboundMessage { // used in UTs only

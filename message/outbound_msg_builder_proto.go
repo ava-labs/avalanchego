@@ -431,7 +431,6 @@ func (b *outMsgBuilderWithProto) Get(
 func (b *outMsgBuilderWithProto) Put(
 	chainID ids.ID,
 	requestID uint32,
-	containerID ids.ID,
 	container []byte,
 ) (OutboundMessage, error) {
 	// Put messages may be compressed
@@ -458,7 +457,6 @@ func (b *outMsgBuilderWithProto) PushQuery(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
-	containerID ids.ID,
 	container []byte,
 ) (OutboundMessage, error) {
 	// PushQuery messages "may" be compressed
