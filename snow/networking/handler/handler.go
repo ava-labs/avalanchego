@@ -367,6 +367,7 @@ func (h *handler) dispatchChans() {
 	}
 }
 
+// Any returned error is treated as fatal
 func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 	h.ctx.Log.Debug("forwarding sync message to consensus",
 		zap.Stringer("message", msg),
@@ -403,6 +404,10 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 	//            verification performed by the message, it is expected to have
 	//            already been performed when reading the [RequestID] in the
 	//            [ChainRouter].
+	// Invariant: Response messages can never be dropped here. This is because
+	//            the timeout has already been cleared. This means the engine
+	//            should be invoked with a failure message if parsing of the
+	//            response fails.
 	switch op {
 	case message.GetStateSummaryFrontier:
 		requestIDIntf, err := msg.Get(message.RequestID)
@@ -834,6 +839,7 @@ func (h *handler) handleAsyncMsg(msg message.InboundMessage) {
 	})
 }
 
+// Any returned error is treated as fatal
 func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 	h.ctx.Log.Debug("forwarding async message to consensus",
 		zap.Stringer("message", msg),
@@ -934,6 +940,7 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 	}
 }
 
+// Any returned error is treated as fatal
 func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 	h.ctx.Log.Debug("forwarding chan message to consensus",
 		zap.Stringer("message", msg),
