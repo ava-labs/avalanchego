@@ -104,7 +104,7 @@ type QuerySender interface {
 	// Request from the specified nodes their preferred frontier, given the
 	// existence of the specified container.
 	// This is the same as PullQuery, except that this message includes the body
-	// of the container rather than it's ID.
+	// of the container rather than its ID.
 	SendPushQuery(nodeIDs ids.NodeIDSet, requestID uint32, container []byte)
 
 	// Request from the specified nodes their preferred frontier, given the
