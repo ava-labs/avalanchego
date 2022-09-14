@@ -564,75 +564,68 @@ func newMsgBuilderProtobuf(namespace string, metrics prometheus.Registerer, maxM
 // NOTE THAT the passed message will be modified if compression is enabled.
 // TODO: find a way to not in-place modify the message
 func (mb *msgBuilderProtobuf) marshal(m *p2ppb.Message, gzipCompress bool) ([]byte, int, time.Duration, error) {
-	b, err := proto.Marshal(m)
+	uncompressedMsgBytes, err := proto.Marshal(m)
 	if err != nil {
-		return nil, 0, time.Duration(0), err
+		return nil, 0, 0, err
 	}
 
-	before := len(b)
-	compressTook := time.Duration(0)
-
-	if gzipCompress {
-		// If compression is enabled, we marshal twice:
-		// 1. the original message
-		// 2. the message with compressed bytes
-		//
-		// This recursive packing allows us to avoid an extra compression on/off
-		// field in the message.
-		//
-		// TODO: track compression time with metrics
-		startTime := time.Now()
-		compressed, err := mb.gzipCompressor.Compress(b)
-		if err != nil {
-			return nil, 0, time.Duration(0), err
-		}
-		compressTook = time.Since(startTime)
-
-		// Original message can be discarded for the compressed message.
-		m.Message = &p2ppb.Message_CompressedGzip{
-			CompressedGzip: compressed,
-		}
-		b, err = proto.Marshal(m)
-		if err != nil {
-			return nil, 0, time.Duration(0), err
-		}
+	if !gzipCompress {
+		return uncompressedMsgBytes, 0, 0, nil
 	}
 
-	after := len(b)
-	bytesSaved := before - after
-	return b, bytesSaved, compressTook, nil
+	// If compression is enabled, we marshal twice:
+	// 1. the original message
+	// 2. the message with compressed bytes
+	//
+	// This recursive packing allows us to avoid an extra compression on/off
+	// field in the message.
+	startTime := time.Now()
+	compressedBytes, err := mb.gzipCompressor.Compress(uncompressedMsgBytes)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	compressTook := time.Since(startTime)
+
+	// Original message can be discarded for the compressed message.
+	m.Message = &p2ppb.Message_CompressedGzip{
+		CompressedGzip: compressedBytes,
+	}
+	compressedMsgBytes, err := proto.Marshal(m)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+
+	bytesSaved := len(uncompressedMsgBytes) - len(compressedMsgBytes)
+	return compressedMsgBytes, bytesSaved, compressTook, nil
 }
 
 func (mb *msgBuilderProtobuf) unmarshal(b []byte) (Op, *p2ppb.Message, bool, int, time.Duration, error) {
 	m := new(p2ppb.Message)
 	if err := proto.Unmarshal(b, m); err != nil {
-		return Op(0), nil, false, 0, time.Duration(0), err
+		return 0, nil, false, 0, 0, err
 	}
 
-	wasCompressed := false
-	bytesSavedCompression := 0
-	decompressTook := time.Duration(0)
+	compressed := m.GetCompressedGzip()
+	if len(compressed) == 0 {
+		// The message wasn't compressed
+		op, err := msgToOp(m)
+		return op, m, false, 0, 0, err
+	}
 
-	// check if compressed
-	if compressed := m.GetCompressedGzip(); len(compressed) > 0 {
-		wasCompressed = true
+	startTime := time.Now()
+	decompressed, err := mb.gzipCompressor.Decompress(compressed)
+	if err != nil {
+		return 0, nil, true, 0, 0, err
+	}
+	decompressTook := time.Since(startTime)
 
-		startTime := time.Now()
-		decompressed, err := mb.gzipCompressor.Decompress(compressed)
-		if err != nil {
-			return Op(0), nil, true, 0, time.Duration(0), err
-		}
-		decompressTook = time.Since(startTime)
-
-		if err := proto.Unmarshal(decompressed, m); err != nil {
-			return Op(0), nil, true, 0, time.Duration(0), err
-		}
-
-		bytesSavedCompression = len(decompressed) - len(compressed)
+	if err := proto.Unmarshal(decompressed, m); err != nil {
+		return 0, nil, true, 0, 0, err
 	}
 
 	op, err := msgToOp(m)
-	return op, m, wasCompressed, bytesSavedCompression, decompressTook, err
+	bytesSavedCompression := len(decompressed) - len(compressed)
+	return op, m, true, bytesSavedCompression, decompressTook, err
 }
 
 func msgToOp(m *p2ppb.Message) (Op, error) {
@@ -682,7 +675,7 @@ func msgToOp(m *p2ppb.Message) (Op, error) {
 	case *p2ppb.Message_AppGossip:
 		return AppGossip, nil
 	default:
-		return Op(0), fmt.Errorf("%w: unknown message %T", errUnknownMessageTypeForOp, m.GetMessage())
+		return 0, fmt.Errorf("%w: unknown message %T", errUnknownMessageTypeForOp, m.GetMessage())
 	}
 }
 
