@@ -80,4 +80,4 @@ jobs:
           TAG: ${{ steps.get_version.outputs.VERSION }}
           BUCKET: ${{ secrets.BUCKET }}
           ARCH: "arm64"
-          RELEASE: "focal"
+          RELEASE: "jammy"
