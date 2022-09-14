@@ -157,7 +157,7 @@ func (q *throttledMessageQueue) PopNow() (message.OutboundMessage, bool) {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 
-	if q.queue.Len() == 0 {
+	if q.closed || q.queue.Len() == 0 {
 		// There isn't a message
 		return nil, false
 	}
@@ -175,6 +175,10 @@ func (q *throttledMessageQueue) pop() message.OutboundMessage {
 func (q *throttledMessageQueue) Close() {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
+
+	if q.closed {
+		return
+	}
 
 	q.closed = true
 
