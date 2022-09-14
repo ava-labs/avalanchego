@@ -96,7 +96,7 @@ func (inMsg *inboundMessageWithPacker) String() string {
 	switch inMsg.op {
 	case GetAccepted, Accepted, Chits, AcceptedFrontier:
 		sb.WriteString(fmt.Sprintf(", NumContainerIDs: %d)", len(inMsg.fields[ContainerIDs].([][]byte))))
-	case Get, GetAncestors, Put, PushQuery, PullQuery:
+	case Get, GetAncestors, PullQuery:
 		sb.WriteString(fmt.Sprintf(", ContainerID: 0x%x)", inMsg.fields[ContainerID].([]byte)))
 	case Ancestors:
 		sb.WriteString(fmt.Sprintf(", NumContainers: %d)", len(inMsg.fields[MultiContainerBytes].([][]byte))))

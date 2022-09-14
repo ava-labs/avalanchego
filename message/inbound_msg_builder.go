@@ -84,7 +84,6 @@ type InboundMsgBuilder interface {
 		chainID ids.ID,
 		requestID uint32,
 		deadline time.Duration,
-		containerID ids.ID,
 		container []byte,
 		nodeID ids.NodeID,
 	) InboundMessage
@@ -130,7 +129,6 @@ type InboundMsgBuilder interface {
 	InboundPut(
 		chainID ids.ID,
 		requestID uint32,
-		containerID ids.ID,
 		container []byte,
 		nodeID ids.NodeID,
 	) InboundMessage // used in UTs only
@@ -328,7 +326,6 @@ func (b *inMsgBuilderWithPacker) InboundPushQuery(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
-	containerID ids.ID,
 	container []byte,
 	nodeID ids.NodeID,
 ) InboundMessage {
@@ -343,7 +340,6 @@ func (b *inMsgBuilderWithPacker) InboundPushQuery(
 			ChainID:        chainID[:],
 			RequestID:      requestID,
 			Deadline:       uint64(deadline),
-			ContainerID:    containerID[:],
 			ContainerBytes: container,
 		},
 	}
@@ -461,7 +457,6 @@ func (b *inMsgBuilderWithPacker) InboundGet(
 func (b *inMsgBuilderWithPacker) InboundPut(
 	chainID ids.ID,
 	requestID uint32,
-	containerID ids.ID,
 	container []byte,
 	nodeID ids.NodeID,
 ) InboundMessage { // used in UTs only
@@ -473,7 +468,6 @@ func (b *inMsgBuilderWithPacker) InboundPut(
 		fields: map[Field]interface{}{
 			ChainID:        chainID[:],
 			RequestID:      requestID,
-			ContainerID:    containerID[:],
 			ContainerBytes: container,
 		},
 	}

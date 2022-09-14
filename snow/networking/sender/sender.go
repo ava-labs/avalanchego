@@ -558,15 +558,14 @@ func (s *sender) SendGet(nodeID ids.NodeID, requestID uint32, containerID ids.ID
 // on the specified node.
 // The Put message signifies that this consensus engine is giving to the recipient
 // the contents of the specified container.
-func (s *sender) SendPut(nodeID ids.NodeID, requestID uint32, containerID ids.ID, container []byte) {
+func (s *sender) SendPut(nodeID ids.NodeID, requestID uint32, container []byte) {
 	// Create the outbound message.
-	outMsg, err := s.msgCreator.Put(s.ctx.ChainID, requestID, containerID, container)
+	outMsg, err := s.msgCreator.Put(s.ctx.ChainID, requestID, container)
 	if err != nil {
 		s.ctx.Log.Error("failed to build message",
 			zap.Stringer("messageOp", message.Put),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
-			zap.Stringer("containerID", containerID),
 			zap.Binary("container", container),
 			zap.Error(err),
 		)
@@ -582,14 +581,12 @@ func (s *sender) SendPut(nodeID ids.NodeID, requestID uint32, containerID ids.ID
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
-			zap.Stringer("containerID", containerID),
 		)
 		s.ctx.Log.Verbo("failed to send message",
 			zap.Stringer("messageOp", outMsg.Op()),
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
-			zap.Stringer("containerID", containerID),
 			zap.Binary("container", container),
 		)
 	}
@@ -599,7 +596,7 @@ func (s *sender) SendPut(nodeID ids.NodeID, requestID uint32, containerID ids.ID
 // on the specified nodes.
 // The PushQuery message signifies that this consensus engine would like each node to send
 // their preferred frontier given the existence of the specified container.
-func (s *sender) SendPushQuery(nodeIDs ids.NodeIDSet, requestID uint32, containerID ids.ID, container []byte) {
+func (s *sender) SendPushQuery(nodeIDs ids.NodeIDSet, requestID uint32, container []byte) {
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
 	// We register timeouts for all nodes, regardless of whether we fail
@@ -617,7 +614,7 @@ func (s *sender) SendPushQuery(nodeIDs ids.NodeIDSet, requestID uint32, containe
 	// Just put it right into the router. Do so asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
-		inMsg := s.msgCreator.InboundPushQuery(s.ctx.ChainID, requestID, deadline, containerID, container, s.ctx.NodeID)
+		inMsg := s.msgCreator.InboundPushQuery(s.ctx.ChainID, requestID, deadline, container, s.ctx.NodeID)
 		go s.router.HandleInbound(inMsg)
 	}
 
@@ -637,7 +634,7 @@ func (s *sender) SendPushQuery(nodeIDs ids.NodeIDSet, requestID uint32, containe
 
 	// Create the outbound message.
 	// [sentTo] are the IDs of validators who may receive the message.
-	outMsg, err := s.msgCreator.PushQuery(s.ctx.ChainID, requestID, deadline, containerID, container)
+	outMsg, err := s.msgCreator.PushQuery(s.ctx.ChainID, requestID, deadline, container)
 
 	// Send the message over the network.
 	var sentTo ids.NodeIDSet
@@ -648,7 +645,6 @@ func (s *sender) SendPushQuery(nodeIDs ids.NodeIDSet, requestID uint32, containe
 			zap.Stringer("messageOp", message.PushQuery),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
-			zap.Stringer("containerID", containerID),
 			zap.Binary("container", container),
 			zap.Error(err),
 		)
@@ -661,14 +657,12 @@ func (s *sender) SendPushQuery(nodeIDs ids.NodeIDSet, requestID uint32, containe
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("chainID", s.ctx.ChainID),
 				zap.Uint32("requestID", requestID),
-				zap.Stringer("containerID", containerID),
 			)
 			s.ctx.Log.Verbo("failed to send message",
 				zap.Stringer("messageOp", message.PushQuery),
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("chainID", s.ctx.ChainID),
 				zap.Uint32("requestID", requestID),
-				zap.Stringer("containerID", containerID),
 				zap.Binary("container", container),
 			)
 
@@ -973,14 +967,13 @@ func (s *sender) SendAppGossip(appGossipBytes []byte) error {
 }
 
 // SendGossip gossips the provided container
-func (s *sender) SendGossip(containerID ids.ID, container []byte) {
+func (s *sender) SendGossip(container []byte) {
 	// Create the outbound message.
-	outMsg, err := s.msgCreator.Put(s.ctx.ChainID, constants.GossipMsgRequestID, containerID, container)
+	outMsg, err := s.msgCreator.Put(s.ctx.ChainID, constants.GossipMsgRequestID, container)
 	if err != nil {
 		s.ctx.Log.Error("failed to build message",
 			zap.Stringer("messageOp", message.Put),
 			zap.Stringer("chainID", s.ctx.ChainID),
-			zap.Stringer("containerID", containerID),
 			zap.Binary("container", container),
 			zap.Error(err),
 		)
@@ -999,31 +992,28 @@ func (s *sender) SendGossip(containerID ids.ID, container []byte) {
 		s.ctx.Log.Debug("failed to send message",
 			zap.Stringer("messageOp", outMsg.Op()),
 			zap.Stringer("chainID", s.ctx.ChainID),
-			zap.Stringer("containerID", containerID),
 		)
 		s.ctx.Log.Verbo("failed to send message",
 			zap.Stringer("messageOp", outMsg.Op()),
 			zap.Stringer("chainID", s.ctx.ChainID),
-			zap.Stringer("containerID", containerID),
 			zap.Binary("container", container),
 		)
 	}
 }
 
 // Accept is called after every consensus decision
-func (s *sender) Accept(ctx *snow.ConsensusContext, containerID ids.ID, container []byte) error {
+func (s *sender) Accept(ctx *snow.ConsensusContext, _ ids.ID, container []byte) error {
 	if ctx.GetState() != snow.NormalOp {
 		// don't gossip during bootstrapping
 		return nil
 	}
 
 	// Create the outbound message.
-	outMsg, err := s.msgCreator.Put(s.ctx.ChainID, constants.GossipMsgRequestID, containerID, container)
+	outMsg, err := s.msgCreator.Put(s.ctx.ChainID, constants.GossipMsgRequestID, container)
 	if err != nil {
 		s.ctx.Log.Error("failed to build message",
 			zap.Stringer("messageOp", message.Put),
 			zap.Stringer("chainID", s.ctx.ChainID),
-			zap.Stringer("containerID", containerID),
 			zap.Binary("container", container),
 			zap.Error(err),
 		)
@@ -1042,12 +1032,10 @@ func (s *sender) Accept(ctx *snow.ConsensusContext, containerID ids.ID, containe
 		s.ctx.Log.Debug("failed to send message",
 			zap.Stringer("messageOp", outMsg.Op()),
 			zap.Stringer("chainID", s.ctx.ChainID),
-			zap.Stringer("containerID", containerID),
 		)
 		s.ctx.Log.Verbo("failed to send message",
 			zap.Stringer("messageOp", outMsg.Op()),
 			zap.Stringer("chainID", s.ctx.ChainID),
-			zap.Stringer("containerID", containerID),
 			zap.Binary("container", container),
 		)
 	}

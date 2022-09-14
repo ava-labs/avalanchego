@@ -39,9 +39,9 @@ func TestQueue(t *testing.T) {
 	mc, err := message.NewCreator(prometheus.NewRegistry(), true, "dummyNamespace", 10*time.Second)
 	require.NoError(err)
 	mc.SetTime(currentTime)
-	msg1 := mc.InboundPut(ids.Empty,
+	msg1 := mc.InboundPut(
+		ids.Empty,
 		0,
-		ids.GenerateTestID(),
 		nil,
 		vdr1ID,
 	)
@@ -117,7 +117,7 @@ func TestQueue(t *testing.T) {
 	// Non-validators should be able to put messages onto [u]
 	nonVdrNodeID1, nonVdrNodeID2 := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 	msg3 := mc.InboundPullQuery(ids.Empty, 0, 0, ids.Empty, nonVdrNodeID1)
-	msg4 := mc.InboundPushQuery(ids.Empty, 0, 0, ids.Empty, nil, nonVdrNodeID2)
+	msg4 := mc.InboundPushQuery(ids.Empty, 0, 0, nil, nonVdrNodeID2)
 	u.Push(msg3)
 	u.Push(msg4)
 	u.Push(msg1)

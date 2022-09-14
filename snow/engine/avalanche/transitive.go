@@ -277,7 +277,7 @@ func (t *Transitive) Gossip() error {
 	t.Ctx.Log.Verbo("gossiping accepted vertex to the network",
 		zap.Stringer("vtxID", vtxID),
 	)
-	t.Sender.SendGossip(vtxID, vtx.Bytes())
+	t.Sender.SendGossip(vtx.Bytes())
 	return nil
 }
 

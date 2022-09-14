@@ -258,12 +258,11 @@ func TestBuildGet(t *testing.T) {
 func TestBuildPut(t *testing.T) {
 	chainID := ids.Empty.Prefix(0)
 	requestID := uint32(5)
-	containerID := ids.Empty.Prefix(1)
 	container := []byte{2}
 
 	for _, compress := range []bool{false, true} {
 		builder := NewOutboundBuilderWithPacker(TestCodec, compress)
-		msg, err := builder.Put(chainID, requestID, containerID, container)
+		msg, err := builder.Put(chainID, requestID, container)
 		require.NoError(t, err)
 		require.NotNil(t, msg)
 		require.Equal(t, Put, msg.Op())
@@ -283,7 +282,7 @@ func TestBuildPut(t *testing.T) {
 
 		containerIDIntf, err := parsedMsg.Get(ContainerID)
 		require.NoError(t, err)
-		require.Equal(t, containerID[:], containerIDIntf)
+		require.Equal(t, ids.Empty[:], containerIDIntf)
 
 		containerIntf, err := parsedMsg.Get(ContainerBytes)
 		require.NoError(t, err)
@@ -295,12 +294,11 @@ func TestBuildPushQuery(t *testing.T) {
 	chainID := ids.Empty.Prefix(0)
 	requestID := uint32(5)
 	deadline := uint64(15)
-	containerID := ids.Empty.Prefix(1)
 	container := []byte{2}
 
 	for _, compress := range []bool{false, true} {
 		builder := NewOutboundBuilderWithPacker(TestCodec, compress)
-		msg, err := builder.PushQuery(chainID, requestID, time.Duration(deadline), containerID, container)
+		msg, err := builder.PushQuery(chainID, requestID, time.Duration(deadline), container)
 		require.NoError(t, err)
 		require.NotNil(t, msg)
 		require.Equal(t, PushQuery, msg.Op())
@@ -324,7 +322,7 @@ func TestBuildPushQuery(t *testing.T) {
 
 		containerIDIntf, err := parsedMsg.Get(ContainerID)
 		require.NoError(t, err)
-		require.Equal(t, containerID[:], containerIDIntf)
+		require.Equal(t, ids.Empty[:], containerIDIntf)
 
 		containerIntf, err := parsedMsg.Get(ContainerBytes)
 		require.NoError(t, err)
