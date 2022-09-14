@@ -16,15 +16,14 @@ var (
 )
 
 func getIDs(field message.Field, msg message.InboundMessage) ([]ids.ID, error) {
-	inf, err := msg.Get(field)
+	idsBytesIntf, err := msg.Get(field)
 	if err != nil {
 		return nil, err
 	}
-	idsBytes, _ := inf.([][]byte)
+	idsBytes := idsBytesIntf.([][]byte)
 
 	res := make([]ids.ID, len(idsBytes))
 	idSet := ids.NewSet(len(idsBytes))
-
 	for i, bytes := range idsBytes {
 		id, err := ids.ToID(bytes)
 		if err != nil {
@@ -40,13 +39,13 @@ func getIDs(field message.Field, msg message.InboundMessage) ([]ids.ID, error) {
 }
 
 func getSummaryHeights(msg message.InboundMessage) ([]uint64, error) {
-	inf, err := msg.Get(message.SummaryHeights)
+	heightsIntf, err := msg.Get(message.SummaryHeights)
 	if err != nil {
 		return nil, err
 	}
-	heights, _ := inf.([]uint64)
-	heightsSet := make(map[uint64]struct{}, len(heights))
+	heights := heightsIntf.([]uint64)
 
+	heightsSet := make(map[uint64]struct{}, len(heights))
 	for _, height := range heights {
 		if _, found := heightsSet[height]; found {
 			return nil, errDuplicatedHeight

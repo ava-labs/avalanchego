@@ -176,17 +176,31 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	nodeID := msg.NodeID()
 	op := msg.Op()
 
-	inf, err := msg.Get(message.ChainID)
+	chainIDIntf, err := msg.Get(message.ChainID)
 	if err != nil {
-		cr.log.Error("failed to get ChainID from inbound message",
+		cr.log.Debug("dropping message with invalid field",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("messageOp", op),
+			zap.Stringer("field", message.ChainID),
 			zap.Error(err),
 		)
+
+		msg.OnFinishedHandling()
 		return
 	}
-	chainIDBytes, _ := inf.([]byte)
-
+	chainIDBytes := chainIDIntf.([]byte)
 	chainID, err := ids.ToID(chainIDBytes)
-	cr.log.AssertNoError(err)
+	if err != nil {
+		cr.log.Debug("dropping message with invalid field",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("messageOp", op),
+			zap.Stringer("field", message.ChainID),
+			zap.Error(err),
+		)
+
+		msg.OnFinishedHandling()
+		return
+	}
 
 	// AppGossip is the only message currently not containing a requestID
 	// Here we assign the requestID already in use for gossiped containers
@@ -195,14 +209,21 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	if op == message.AppGossip {
 		requestID = constants.GossipMsgRequestID
 	} else {
-		inf, err = msg.Get(message.RequestID)
+		// Invariant: Getting a [RequestID] must never error in the handler. Any
+		//            verification performed by the message is done here.
+		requestIDIntf, err := msg.Get(message.RequestID)
 		if err != nil {
-			cr.log.Error("failed to get RequestID from inbound message",
+			cr.log.Debug("dropping message with invalid field",
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("messageOp", op),
+				zap.Stringer("field", message.RequestID),
 				zap.Error(err),
 			)
+
+			msg.OnFinishedHandling()
 			return
 		}
-		requestID, _ = inf.(uint32)
+		requestID = requestIDIntf.(uint32)
 	}
 
 	cr.lock.Lock()
@@ -224,6 +245,8 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 
 	ctx := chain.Context()
 
+	// TODO: [requestID] can overflow, which means a timeout on the request
+	//       before the overflow may not be handled properly.
 	if _, notRequested := message.UnrequestedOps[op]; notRequested ||
 		(op == message.Put && requestID == constants.GossipMsgRequestID) {
 		if ctx.IsExecuting() {

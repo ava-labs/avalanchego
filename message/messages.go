@@ -92,7 +92,11 @@ type inboundMessageWithPacker struct {
 
 // Field returns the value of the specified field in this message
 func (inMsg *inboundMessageWithPacker) Get(field Field) (interface{}, error) {
-	return inMsg.fields[field], nil
+	value, ok := inMsg.fields[field]
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", errMissingField, field)
+	}
+	return value, nil
 }
 
 func (inMsg *inboundMessageWithPacker) String() string {

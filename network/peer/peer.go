@@ -598,14 +598,25 @@ func (p *peer) handlePing(_ message.InboundMessage) {
 }
 
 func (p *peer) handlePong(msg message.InboundMessage) {
-	inf, err := msg.Get(message.Uptime)
+	uptimeIntf, err := msg.Get(message.Uptime)
 	if err != nil {
-		p.Log.Warn("failed to get Uptime field", zap.Error(err))
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.Pong),
+			zap.Stringer("field", message.Uptime),
+			zap.Error(err),
+		)
+		p.StartClose()
 		return
 	}
 
-	uptime, _ := inf.(uint8)
+	uptime := uptimeIntf.(uint8)
 	if uptime > 100 {
+		p.Log.Debug("dropping pong message with invalid uptime",
+			zap.Stringer("nodeID", p.id),
+			zap.Uint8("uptime", uptime),
+		)
+		p.StartClose()
 		return
 	}
 
@@ -616,19 +627,27 @@ func (p *peer) handlePong(msg message.InboundMessage) {
 
 func (p *peer) handleVersion(msg message.InboundMessage) {
 	if p.gotVersion.GetValue() {
+		// TODO: this should never happen, should we close the connection here?
 		p.Log.Verbo("dropping duplicated version message",
 			zap.Stringer("nodeID", p.id),
 		)
 		return
 	}
 
-	inf, err := msg.Get(message.NetworkID)
+	peerNetworkIDIntf, err := msg.Get(message.NetworkID)
 	if err != nil {
-		p.Log.Warn("failed to get NetworkID field", zap.Error(err))
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.Version),
+			zap.Stringer("field", message.NetworkID),
+			zap.Error(err),
+		)
+		p.StartClose()
 		return
 	}
+	peerNetworkID := peerNetworkIDIntf.(uint32)
 
-	if peerNetworkID, _ := inf.(uint32); peerNetworkID != p.NetworkID {
+	if peerNetworkID != p.NetworkID {
 		p.Log.Debug("networkID mismatch",
 			zap.Stringer("nodeID", p.id),
 			zap.Uint32("peerNetworkID", peerNetworkID),
@@ -638,12 +657,18 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 		return
 	}
 
-	inf, err = msg.Get(message.MyTime)
+	peerTimeIntf, err := msg.Get(message.MyTime)
 	if err != nil {
-		p.Log.Warn("failed to get MyTime field", zap.Error(err))
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.Version),
+			zap.Stringer("field", message.MyTime),
+			zap.Error(err),
+		)
+		p.StartClose()
 		return
 	}
-	peerTime, _ := inf.(uint64)
+	peerTime := peerTimeIntf.(uint64)
 
 	myTime := p.Clock.Unix()
 	if math.Abs(float64(peerTime)-float64(myTime)) > p.MaxClockDifference.Seconds() {
@@ -664,12 +689,18 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 		return
 	}
 
-	inf, err = msg.Get(message.VersionStr)
+	peerVersionStrIntf, err := msg.Get(message.VersionStr)
 	if err != nil {
-		p.Log.Warn("failed to get VersionStr field", zap.Error(err))
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.Version),
+			zap.Stringer("field", message.VersionStr),
+			zap.Error(err),
+		)
+		p.StartClose()
 		return
 	}
-	peerVersionStr, _ := inf.(string)
+	peerVersionStr := peerVersionStrIntf.(string)
 
 	peerVersion, err := version.ParseApplication(peerVersionStr)
 	if err != nil {
@@ -706,15 +737,22 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 		return
 	}
 
+	versionTimeIntf, err := msg.Get(message.VersionTime)
+	if err != nil {
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.Version),
+			zap.Stringer("field", message.VersionTime),
+			zap.Error(err),
+		)
+		p.StartClose()
+		return
+	}
+	versionTime := versionTimeIntf.(uint64)
+
 	// Note that it is expected that the [versionTime] can be in the past. We
 	// are just verifying that the claimed signing time isn't too far in the
 	// future here.
-	inf, err = msg.Get(message.VersionTime)
-	if err != nil {
-		p.Log.Warn("failed to get VersionTime field", zap.Error(err))
-		return
-	}
-	versionTime, _ := inf.(uint64)
 	if float64(versionTime)-float64(myTime) > p.MaxClockDifference.Seconds() {
 		p.Log.Debug("peer attempting to connect with version timestamp too far in the future",
 			zap.Stringer("nodeID", p.id),
@@ -724,21 +762,20 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 		return
 	}
 
-	inf, err = msg.Get(message.IP)
-	if err != nil {
-		p.Log.Warn("failed to get IP field", zap.Error(err))
-		return
-	}
-	peerIP, _ := inf.(ips.IPPort)
-
-	inf, err = msg.Get(message.TrackedSubnets)
-	if err != nil {
-		p.Log.Warn("failed to get TrackedSubnets field", zap.Error(err))
-		return
-	}
-	subnetIDsBytes, _ := inf.([][]byte)
-
 	// handle subnet IDs
+	subnetIDsBytesIntf, err := msg.Get(message.TrackedSubnets)
+	if err != nil {
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.Version),
+			zap.Stringer("field", message.TrackedSubnets),
+			zap.Error(err),
+		)
+		p.StartClose()
+		return
+	}
+	subnetIDsBytes := subnetIDsBytesIntf.([][]byte)
+
 	for _, subnetIDBytes := range subnetIDsBytes {
 		subnetID, err := ids.ToID(subnetIDBytes)
 		if err != nil {
@@ -755,19 +792,38 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 		}
 	}
 
-	inf, err = msg.Get(message.SigBytes)
+	peerIPIntf, err := msg.Get(message.IP)
 	if err != nil {
-		p.Log.Warn("failed to get SigBytes field", zap.Error(err))
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.Version),
+			zap.Stringer("field", message.IP),
+			zap.Error(err),
+		)
+		p.StartClose()
 		return
 	}
-	sig, _ := inf.([]byte)
+	peerIP := peerIPIntf.(ips.IPPort)
+
+	signatureIntf, err := msg.Get(message.SigBytes)
+	if err != nil {
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.Version),
+			zap.Stringer("field", message.SigBytes),
+			zap.Error(err),
+		)
+		p.StartClose()
+		return
+	}
+	signature := signatureIntf.([]byte)
 
 	p.ip = &SignedIP{
 		IP: UnsignedIP{
 			IP:        peerIP,
 			Timestamp: versionTime,
 		},
-		Signature: sig,
+		Signature: signature,
 	}
 	if err := p.ip.Verify(p.cert); err != nil {
 		p.Log.Debug("signature verification failed",
@@ -796,12 +852,18 @@ func (p *peer) handlePeerList(msg message.InboundMessage) {
 		close(p.onFinishHandshake)
 	}
 
-	inf, err := msg.Get(message.Peers)
+	ipsIntf, err := msg.Get(message.Peers)
 	if err != nil {
-		p.Log.Warn("failed to get Peers field", zap.Error(err))
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.PeerList),
+			zap.Stringer("field", message.Peers),
+			zap.Error(err),
+		)
+		p.StartClose()
 		return
 	}
-	ips, _ := inf.([]ips.ClaimedIPPort)
+	ips := ipsIntf.([]ips.ClaimedIPPort)
 
 	for _, ip := range ips {
 		if !p.Network.Track(ip) {
