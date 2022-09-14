@@ -10,15 +10,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/stretchr/testify/require"
+
+	"google.golang.org/protobuf/proto"
+
 	"github.com/ava-labs/avalanchego/ids"
-	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/units"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
+	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
 // Ensures the message size with proto not blow up compared to packer.
@@ -42,10 +45,20 @@ func TestProtoMarshalSizeVersion(t *testing.T) {
 			TrackedSubnets: [][]byte{id[:]},
 		},
 	}
-	packerCodec, err := NewCodecWithMemoryPool("", prometheus.NewRegistry(), 2*units.MiB, 10*time.Second)
+	packerCodec, err := NewCodecWithMemoryPool(
+		"",
+		prometheus.NewRegistry(),
+		2*units.MiB,
+		10*time.Second,
+	)
 	require.NoError(err)
 
-	packerMsg, err := packerCodec.Pack(inboundMsg.op, inboundMsg.fields, inboundMsg.op.Compressible(), false)
+	packerMsg, err := packerCodec.Pack(
+		inboundMsg.op,
+		inboundMsg.fields,
+		inboundMsg.op.Compressible(),
+		false,
+	)
 	require.NoError(err)
 
 	packerMsgN := len(packerMsg.Bytes())
@@ -90,13 +103,23 @@ func TestProtoMarshalSizeAncestors(t *testing.T) {
 			},
 		},
 	}
-	packerCodec, err := NewCodecWithMemoryPool("", prometheus.NewRegistry(), 2*units.MiB, 10*time.Second)
+	packerCodec, err := NewCodecWithMemoryPool(
+		"",
+		prometheus.NewRegistry(),
+		2*units.MiB,
+		10*time.Second,
+	)
 	require.NoError(err)
 
 	compressible := inboundMsg.op.Compressible()
 	require.True(compressible)
 
-	packerMsg, err := packerCodec.Pack(inboundMsg.op, inboundMsg.fields, compressible, false)
+	packerMsg, err := packerCodec.Pack(
+		inboundMsg.op,
+		inboundMsg.fields,
+		compressible,
+		false,
+	)
 	require.NoError(err)
 
 	packerMsgN := len(packerMsg.Bytes())
@@ -115,7 +138,12 @@ func TestProtoMarshalSizeAncestors(t *testing.T) {
 		},
 	}
 
-	mb, err := newMsgBuilderProtobuf("test", prometheus.NewRegistry(), units.MiB, 5*time.Second)
+	mb, err := newMsgBuilderProtobuf(
+		"test",
+		prometheus.NewRegistry(),
+		units.MiB,
+		5*time.Second,
+	)
 	require.NoError(err)
 
 	b, _, _, err := mb.marshal(&protoMsg, compressible)
@@ -132,7 +160,12 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 
 	require := require.New(t)
 
-	mb, err := newMsgBuilderProtobuf("test", prometheus.NewRegistry(), units.MiB, 5*time.Second)
+	mb, err := newMsgBuilderProtobuf(
+		"test",
+		prometheus.NewRegistry(),
+		units.MiB,
+		5*time.Second,
+	)
 	require.NoError(err)
 
 	testID := ids.GenerateTestID()
@@ -219,29 +252,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 			expectedGetFieldErr: nil,
 		},
 		{
-			desc: "invalid get_accepted_frontier inbound message due to invalid chain id",
-			op:   GetAcceptedFrontier,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_GetAcceptedFrontier{
-					GetAcceptedFrontier: &p2ppb.GetAcceptedFrontier{
-						ChainId:   testID[10:],
-						RequestId: 1,
-						Deadline:  1,
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:   nil,
-				RequestID: uint32(1),
-				Deadline:  uint64(1),
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
-		},
-		{
 			desc: "valid accepted_frontier outbound message with no compression",
 			op:   AcceptedFrontier,
 			msg: &p2ppb.Message{
@@ -265,37 +275,15 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 			expectedGetFieldErr: nil,
 		},
 		{
-			desc: "invalid accepted_frontier inbound message due to invalid chain id",
-			op:   AcceptedFrontier,
+			desc: "valid get_accepted outbound message with no compression",
+			op:   GetAccepted,
 			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AcceptedFrontier_{
-					AcceptedFrontier_: &p2ppb.AcceptedFrontier{
-						ChainId:      testID[1:],
-						RequestId:    1,
-						ContainerIds: [][]byte{testID[:], testID[:]},
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:      nil,
-				RequestID:    uint32(1),
-				ContainerIDs: [][]byte{testID[:], testID[:]},
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
-		},
-		{
-			desc: "invalid accepted_frontier inbound message due to invalid container id",
-			op:   AcceptedFrontier,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AcceptedFrontier_{
-					AcceptedFrontier_: &p2ppb.AcceptedFrontier{
+				Message: &p2ppb.Message_GetAccepted{
+					GetAccepted: &p2ppb.GetAccepted{
 						ChainId:      testID[:],
 						RequestId:    1,
-						ContainerIds: [][]byte{testID[2:], testID[:]},
+						Deadline:     1,
+						ContainerIds: [][]byte{testID[:], testID[:]},
 					},
 				},
 			},
@@ -306,9 +294,10 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 			fields: map[Field]interface{}{
 				ChainID:      testID[:],
 				RequestID:    uint32(1),
-				ContainerIDs: nil,
+				Deadline:     uint64(1),
+				ContainerIDs: [][]byte{testID[:], testID[:]},
 			},
-			expectedGetFieldErr: map[Field]error{ContainerIDs: errInvalidIDLen},
+			expectedGetFieldErr: nil,
 		},
 		{
 			desc: "valid accepted outbound message with no compression",
@@ -332,52 +321,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 				ContainerIDs: [][]byte{testID[:], testID[:]},
 			},
 			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "invalid accepted inbound message with invalid chain id",
-			op:   Accepted,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Accepted_{
-					Accepted_: &p2ppb.Accepted{
-						ChainId:      testID[2:],
-						RequestId:    1,
-						ContainerIds: [][]byte{testID[:], testID[:]},
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:      nil,
-				RequestID:    uint32(1),
-				ContainerIDs: [][]byte{testID[:], testID[:]},
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
-		},
-		{
-			desc: "invalid accepted inbound message with invalid container id",
-			op:   Accepted,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Accepted_{
-					Accepted_: &p2ppb.Accepted{
-						ChainId:      testID[:],
-						RequestId:    1,
-						ContainerIds: [][]byte{testID[4:], testID[:]},
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:      testID[:],
-				RequestID:    uint32(1),
-				ContainerIDs: nil,
-			},
-			expectedGetFieldErr: map[Field]error{ContainerIDs: errInvalidIDLen},
 		},
 		{
 			desc: "valid get_ancestors outbound message with no compression",
@@ -405,56 +348,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 			expectedGetFieldErr: nil,
 		},
 		{
-			desc: "invalid get_ancestors inbound message with invalid chain id",
-			op:   GetAncestors,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_GetAncestors{
-					GetAncestors: &p2ppb.GetAncestors{
-						ChainId:     testID[1:],
-						RequestId:   1,
-						Deadline:    1,
-						ContainerId: testID[:],
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:     nil,
-				RequestID:   uint32(1),
-				Deadline:    uint64(1),
-				ContainerID: testID[:],
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
-		},
-		{
-			desc: "invalid get_ancestors inbound message with invalid container id",
-			op:   GetAncestors,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_GetAncestors{
-					GetAncestors: &p2ppb.GetAncestors{
-						ChainId:     testID[:],
-						RequestId:   1,
-						Deadline:    1,
-						ContainerId: testID[1:],
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:     testID[:],
-				RequestID:   uint32(1),
-				Deadline:    uint64(1),
-				ContainerID: nil,
-			},
-			expectedGetFieldErr: map[Field]error{ContainerID: errInvalidIDLen},
-		},
-		{
 			desc: "valid ancestor outbound message with no compression",
 			op:   Ancestors,
 			msg: &p2ppb.Message{
@@ -478,29 +371,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 			expectedGetFieldErr: nil,
 		},
 		{
-			desc: "invalid ancestor inbound message with invalid chain id",
-			op:   Ancestors,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Ancestors_{
-					Ancestors_: &p2ppb.Ancestors{
-						ChainId:    testID[1:],
-						RequestId:  12345,
-						Containers: compressibleContainers,
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:             nil,
-				RequestID:           uint32(12345),
-				MultiContainerBytes: compressibleContainers,
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
-		},
-		{
 			desc: "valid ancestor outbound message with compression",
 			op:   Ancestors,
 			msg: &p2ppb.Message{
@@ -522,29 +392,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 				MultiContainerBytes: compressibleContainers,
 			},
 			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "invalid ancestor inbound message with compression and invalid chain id",
-			op:   Ancestors,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Ancestors_{
-					Ancestors_: &p2ppb.Ancestors{
-						ChainId:    testID[10:],
-						RequestId:  12345,
-						Containers: compressibleContainers,
-					},
-				},
-			},
-			gzipCompress:        true,
-			bypassThrottling:    true,
-			bytesSaved:          true,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:             nil,
-				RequestID:           uint32(12345),
-				MultiContainerBytes: compressibleContainers,
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
 		},
 		{
 			desc: "valid get outbound message with no compression",
@@ -572,56 +419,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 			expectedGetFieldErr: nil,
 		},
 		{
-			desc: "invalid get inbound message with invalid chain id",
-			op:   Get,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Get{
-					Get: &p2ppb.Get{
-						ChainId:     testID[1:],
-						RequestId:   1,
-						Deadline:    1,
-						ContainerId: testID[:],
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:     nil,
-				RequestID:   uint32(1),
-				Deadline:    uint64(1),
-				ContainerID: testID[:],
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
-		},
-		{
-			desc: "invalid get inbound message with invalid container id",
-			op:   Get,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Get{
-					Get: &p2ppb.Get{
-						ChainId:     testID[:],
-						RequestId:   1,
-						Deadline:    1,
-						ContainerId: testID[10:],
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:     testID[:],
-				RequestID:   uint32(1),
-				Deadline:    uint64(1),
-				ContainerID: nil,
-			},
-			expectedGetFieldErr: map[Field]error{ContainerID: errInvalidIDLen},
-		},
-		{
 			desc: "valid put outbound message with no compression",
 			op:   Put,
 			msg: &p2ppb.Message{
@@ -645,29 +442,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 			expectedGetFieldErr: nil,
 		},
 		{
-			desc: "invalid put inbound message with invalid chain id",
-			op:   Put,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Put{
-					Put: &p2ppb.Put{
-						ChainId:   testID[1:],
-						RequestId: 1,
-						Container: []byte{0},
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:        nil,
-				RequestID:      uint32(1),
-				ContainerBytes: []byte{0},
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
-		},
-		{
 			desc: "valid put outbound message with compression",
 			op:   Put,
 			msg: &p2ppb.Message{
@@ -689,29 +463,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 				ContainerBytes: compressibleContainers[0],
 			},
 			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "invalid put inbound message with compression and invalid chain id",
-			op:   Put,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Put{
-					Put: &p2ppb.Put{
-						ChainId:   testID[3:],
-						RequestId: 1,
-						Container: compressibleContainers[0],
-					},
-				},
-			},
-			gzipCompress:        true,
-			bypassThrottling:    true,
-			bytesSaved:          true,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:        nil,
-				RequestID:      uint32(1),
-				ContainerBytes: compressibleContainers[0],
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
 		},
 		{
 			desc: "valid push_query outbound message with no compression",
@@ -739,31 +490,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 			expectedGetFieldErr: nil,
 		},
 		{
-			desc: "invalid push_query inbound message with invalid chain id",
-			op:   PushQuery,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_PushQuery{
-					PushQuery: &p2ppb.PushQuery{
-						ChainId:   testID[3:],
-						RequestId: 1,
-						Deadline:  1,
-						Container: []byte{0},
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:        nil,
-				RequestID:      uint32(1),
-				Deadline:       uint64(1),
-				ContainerBytes: []byte{0},
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
-		},
-		{
 			desc: "valid push_query outbound message with compression",
 			op:   PushQuery,
 			msg: &p2ppb.Message{
@@ -787,31 +513,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 				ContainerBytes: compressibleContainers[0],
 			},
 			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "invalid push_query inbound message with compression and invalid chain id",
-			op:   PushQuery,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_PushQuery{
-					PushQuery: &p2ppb.PushQuery{
-						ChainId:   testID[1:],
-						RequestId: 1,
-						Deadline:  1,
-						Container: compressibleContainers[0],
-					},
-				},
-			},
-			gzipCompress:        true,
-			bypassThrottling:    true,
-			bytesSaved:          true,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:        nil,
-				RequestID:      uint32(1),
-				Deadline:       uint64(1),
-				ContainerBytes: compressibleContainers[0],
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
 		},
 		{
 			desc: "valid pull_query outbound message with no compression",
@@ -839,56 +540,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 			expectedGetFieldErr: nil,
 		},
 		{
-			desc: "invalid pull_query inbound message with invalid chain id",
-			op:   PullQuery,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_PullQuery{
-					PullQuery: &p2ppb.PullQuery{
-						ChainId:     testID[1:],
-						RequestId:   1,
-						Deadline:    1,
-						ContainerId: testID[:],
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:     nil,
-				RequestID:   uint32(1),
-				Deadline:    uint64(1),
-				ContainerID: testID[:],
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
-		},
-		{
-			desc: "invalid pull_query inbound message with invalid container id",
-			op:   PullQuery,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_PullQuery{
-					PullQuery: &p2ppb.PullQuery{
-						ChainId:     testID[:],
-						RequestId:   1,
-						Deadline:    1,
-						ContainerId: testID[2:],
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:     testID[:],
-				RequestID:   uint32(1),
-				Deadline:    uint64(1),
-				ContainerID: nil,
-			},
-			expectedGetFieldErr: map[Field]error{ContainerID: errInvalidIDLen},
-		},
-		{
 			desc: "valid chits outbound message with no compression",
 			op:   Chits,
 			msg: &p2ppb.Message{
@@ -910,52 +561,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 				ContainerIDs: [][]byte{testID[:], testID[:]},
 			},
 			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "invalid chits inbound message with invalid chain id",
-			op:   Chits,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Chits{
-					Chits: &p2ppb.Chits{
-						ChainId:      testID[1:],
-						RequestId:    1,
-						ContainerIds: [][]byte{testID[:], testID[:]},
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:      nil,
-				RequestID:    uint32(1),
-				ContainerIDs: [][]byte{testID[:], testID[:]},
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
-		},
-		{
-			desc: "invalid chits inbound message with invalid container id",
-			op:   Chits,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Chits{
-					Chits: &p2ppb.Chits{
-						ChainId:      testID[:],
-						RequestId:    1,
-						ContainerIds: [][]byte{testID[:], testID[:5]},
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:      testID[:],
-				RequestID:    uint32(1),
-				ContainerIDs: nil,
-			},
-			expectedGetFieldErr: map[Field]error{ContainerIDs: errInvalidIDLen},
 		},
 		{
 			desc: "valid peer_list outbound message with no compression",
@@ -1196,37 +801,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 			expectedGetFieldErr: map[Field]error{IP: errInvalidIPAddrLen},
 		},
 		{
-			desc: "invalid version inbound message with invalid tracked subnet id",
-			op:   Version,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Version{
-					Version: &p2ppb.Version{
-						NetworkId:      uint32(1337),
-						MyTime:         uint64(nowUnix),
-						IpAddr:         []byte(net.IPv6zero),
-						IpPort:         9651,
-						MyVersion:      "v1.2.3",
-						MyVersionTime:  uint64(nowUnix),
-						Sig:            []byte{'y', 'e', 'e', 't'},
-						TrackedSubnets: [][]byte{testID[:], testID[1:]},
-					},
-				},
-			},
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				NetworkID:      uint32(1337),
-				MyTime:         uint64(nowUnix),
-				IP:             ips.IPPort{IP: net.IPv6zero, Port: uint16(9651)},
-				VersionStr:     "v1.2.3",
-				VersionTime:    uint64(nowUnix),
-				SigBytes:       []byte{'y', 'e', 'e', 't'},
-				TrackedSubnets: nil,
-			},
-			expectedGetFieldErr: map[Field]error{TrackedSubnets: errInvalidIDLen},
-		},
-		{
 			desc: "valid app_request outbound message with no compression",
 			op:   AppRequest,
 			msg: &p2ppb.Message{
@@ -1250,31 +824,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 				AppBytes:  compressibleContainers[0],
 			},
 			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "invalid app_request inbound message with invalid chain id",
-			op:   AppRequest,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AppRequest{
-					AppRequest: &p2ppb.AppRequest{
-						ChainId:   testID[1:],
-						RequestId: 1,
-						Deadline:  1,
-						AppBytes:  compressibleContainers[0],
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:   nil,
-				RequestID: uint32(1),
-				Deadline:  uint64(1),
-				AppBytes:  compressibleContainers[0],
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
 		},
 		{
 			desc: "valid app_request outbound message with compression",
@@ -1302,31 +851,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 			expectedGetFieldErr: nil,
 		},
 		{
-			desc: "invalid app_request inbound message with compression and invalid chain id",
-			op:   AppRequest,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AppRequest{
-					AppRequest: &p2ppb.AppRequest{
-						ChainId:   testID[5:],
-						RequestId: 1,
-						Deadline:  1,
-						AppBytes:  compressibleContainers[0],
-					},
-				},
-			},
-			gzipCompress:        true,
-			bypassThrottling:    true,
-			bytesSaved:          true,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:   nil,
-				RequestID: uint32(1),
-				Deadline:  uint64(1),
-				AppBytes:  compressibleContainers[0],
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
-		},
-		{
 			desc: "valid app_response outbound message with no compression",
 			op:   AppResponse,
 			msg: &p2ppb.Message{
@@ -1348,29 +872,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 				AppBytes:  compressibleContainers[0],
 			},
 			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "invalid app_response inbound message with invalid chain id",
-			op:   AppResponse,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AppResponse{
-					AppResponse: &p2ppb.AppResponse{
-						ChainId:   testID[1:],
-						RequestId: 1,
-						AppBytes:  compressibleContainers[0],
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:   nil,
-				RequestID: uint32(1),
-				AppBytes:  compressibleContainers[0],
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
 		},
 		{
 			desc: "valid app_response outbound message with compression",
@@ -1396,29 +897,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 			expectedGetFieldErr: nil,
 		},
 		{
-			desc: "invalid app_response inbound message with compression and invalid chain id",
-			op:   AppResponse,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AppResponse{
-					AppResponse: &p2ppb.AppResponse{
-						ChainId:   testID[1:],
-						RequestId: 1,
-						AppBytes:  compressibleContainers[0],
-					},
-				},
-			},
-			gzipCompress:        true,
-			bypassThrottling:    true,
-			bytesSaved:          true,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:   nil,
-				RequestID: uint32(1),
-				AppBytes:  compressibleContainers[0],
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
-		},
-		{
 			desc: "valid app_gossip outbound message with no compression",
 			op:   AppGossip,
 			msg: &p2ppb.Message{
@@ -1440,27 +918,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 			expectedGetFieldErr: nil,
 		},
 		{
-			desc: "invalid app_gossip inbound message with invalid chain id",
-			op:   AppGossip,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AppGossip{
-					AppGossip: &p2ppb.AppGossip{
-						ChainId:  testID[1:],
-						AppBytes: compressibleContainers[0],
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:  nil,
-				AppBytes: compressibleContainers[0],
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
-		},
-		{
 			desc: "valid app_gossip outbound message with compression",
 			op:   AppGossip,
 			msg: &p2ppb.Message{
@@ -1480,27 +937,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 				AppBytes: compressibleContainers[0],
 			},
 			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "invalid app_gossip inbound message with compression and invalid chain id",
-			op:   AppGossip,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AppGossip{
-					AppGossip: &p2ppb.AppGossip{
-						ChainId:  testID[1:],
-						AppBytes: compressibleContainers[0],
-					},
-				},
-			},
-			gzipCompress:        true,
-			bypassThrottling:    true,
-			bytesSaved:          true,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:  nil,
-				AppBytes: compressibleContainers[0],
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
 		},
 		{
 			desc: "valid get_state_summary_frontier outbound message with no compression",
@@ -1526,29 +962,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 			expectedGetFieldErr: nil,
 		},
 		{
-			desc: "invalid get_state_summary_frontier inbound message with invalid chain id",
-			op:   GetStateSummaryFrontier,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_GetStateSummaryFrontier{
-					GetStateSummaryFrontier: &p2ppb.GetStateSummaryFrontier{
-						ChainId:   testID[2:],
-						RequestId: 1,
-						Deadline:  1,
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:   testID[:],
-				RequestID: uint32(1),
-				Deadline:  uint64(1),
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
-		},
-		{
 			desc: "valid state_summary_frontier outbound message with no compression",
 			op:   StateSummaryFrontier,
 			msg: &p2ppb.Message{
@@ -1572,29 +985,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 			expectedGetFieldErr: nil,
 		},
 		{
-			desc: "invalid state_summary_frontier inbound message with invalid chain id",
-			op:   StateSummaryFrontier,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_StateSummaryFrontier_{
-					StateSummaryFrontier_: &p2ppb.StateSummaryFrontier{
-						ChainId:   testID[5:],
-						RequestId: 1,
-						Summary:   []byte{0},
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:      nil,
-				RequestID:    uint32(1),
-				SummaryBytes: []byte{0},
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
-		},
-		{
 			desc: "valid state_summary_frontier outbound message with compression",
 			op:   StateSummaryFrontier,
 			msg: &p2ppb.Message{
@@ -1616,29 +1006,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 				SummaryBytes: compressibleContainers[0],
 			},
 			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "invalid state_summary_frontier inbound message with compression and invalid chain id",
-			op:   StateSummaryFrontier,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_StateSummaryFrontier_{
-					StateSummaryFrontier_: &p2ppb.StateSummaryFrontier{
-						ChainId:   testID[1:],
-						RequestId: 1,
-						Summary:   compressibleContainers[0],
-					},
-				},
-			},
-			gzipCompress:        true,
-			bypassThrottling:    true,
-			bytesSaved:          true,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:      nil,
-				RequestID:    uint32(1),
-				SummaryBytes: compressibleContainers[0],
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
 		},
 		{
 			desc: "valid get_accepted_state_summary_frontier outbound message with no compression",
@@ -1666,31 +1033,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 			expectedGetFieldErr: nil,
 		},
 		{
-			desc: "invalid get_accepted_state_summary_frontier inbound message with invalid chain id",
-			op:   GetAcceptedStateSummary,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_GetAcceptedStateSummary{
-					GetAcceptedStateSummary: &p2ppb.GetAcceptedStateSummary{
-						ChainId:   testID[1:],
-						RequestId: 1,
-						Deadline:  1,
-						Heights:   []uint64{0},
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:        nil,
-				RequestID:      uint32(1),
-				Deadline:       uint64(1),
-				SummaryHeights: []uint64{0},
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
-		},
-		{
 			desc: "valid get_accepted_state_summary_frontier outbound message with compression",
 			op:   GetAcceptedStateSummary,
 			msg: &p2ppb.Message{
@@ -1716,31 +1058,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 			expectedGetFieldErr: nil,
 		},
 		{
-			desc: "invalid get_accepted_state_summary_frontier inbound message with compression and invalid chain id",
-			op:   GetAcceptedStateSummary,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_GetAcceptedStateSummary{
-					GetAcceptedStateSummary: &p2ppb.GetAcceptedStateSummary{
-						ChainId:   testID[:4],
-						RequestId: 1,
-						Deadline:  1,
-						Heights:   []uint64{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-					},
-				},
-			},
-			gzipCompress:        true,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:        nil,
-				RequestID:      uint32(1),
-				Deadline:       uint64(1),
-				SummaryHeights: []uint64{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
-		},
-		{
 			desc: "valid accepted_state_summary_frontier outbound message with no compression",
 			op:   AcceptedStateSummary,
 			msg: &p2ppb.Message{
@@ -1764,52 +1081,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 			expectedGetFieldErr: nil,
 		},
 		{
-			desc: "invalid accepted_state_summary_frontier inbound message with invalid chain id",
-			op:   AcceptedStateSummary,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AcceptedStateSummary_{
-					AcceptedStateSummary_: &p2ppb.AcceptedStateSummary{
-						ChainId:    testID[1:],
-						RequestId:  1,
-						SummaryIds: [][]byte{testID[:], testID[:]},
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:    nil,
-				RequestID:  uint32(1),
-				SummaryIDs: [][]byte{testID[:], testID[:]},
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
-		},
-		{
-			desc: "invalid accepted_state_summary_frontier inbound message with invalid summary id",
-			op:   AcceptedStateSummary,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AcceptedStateSummary_{
-					AcceptedStateSummary_: &p2ppb.AcceptedStateSummary{
-						ChainId:    testID[:],
-						RequestId:  1,
-						SummaryIds: [][]byte{testID[:], testID[2:]},
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:    testID[:],
-				RequestID:  uint32(1),
-				SummaryIDs: nil,
-			},
-			expectedGetFieldErr: map[Field]error{SummaryIDs: errInvalidIDLen},
-		},
-		{
 			desc: "valid accepted_state_summary_frontier outbound message with compression",
 			op:   AcceptedStateSummary,
 			msg: &p2ppb.Message{
@@ -1830,52 +1101,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 				RequestID:  uint32(1),
 				SummaryIDs: [][]byte{testID[:], testID[:], testID[:], testID[:], testID[:], testID[:], testID[:], testID[:], testID[:]},
 			},
-		},
-		{
-			desc: "invalid accepted_state_summary_frontier inbound message with compression and invalid chain id",
-			op:   AcceptedStateSummary,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AcceptedStateSummary_{
-					AcceptedStateSummary_: &p2ppb.AcceptedStateSummary{
-						ChainId:    testID[5:],
-						RequestId:  1,
-						SummaryIds: [][]byte{testID[:], testID[:], testID[:], testID[:], testID[:], testID[:], testID[:], testID[:], testID[:]},
-					},
-				},
-			},
-			gzipCompress:        true,
-			bypassThrottling:    true,
-			bytesSaved:          true,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:    nil,
-				RequestID:  uint32(1),
-				SummaryIDs: [][]byte{testID[:], testID[:], testID[:], testID[:], testID[:], testID[:], testID[:], testID[:], testID[:]},
-			},
-			expectedGetFieldErr: map[Field]error{ChainID: errInvalidIDLen},
-		},
-		{
-			desc: "invalid accepted_state_summary_frontier inbound message with compression and invalid summary id",
-			op:   AcceptedStateSummary,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AcceptedStateSummary_{
-					AcceptedStateSummary_: &p2ppb.AcceptedStateSummary{
-						ChainId:    testID[:],
-						RequestId:  1,
-						SummaryIds: [][]byte{testID[:], testID[:], testID[:], testID[:], testID[:5], testID[:], testID[:], testID[:], testID[:]},
-					},
-				},
-			},
-			gzipCompress:        true,
-			bypassThrottling:    true,
-			bytesSaved:          true,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:    testID[:],
-				RequestID:  uint32(1),
-				SummaryIDs: nil,
-			},
-			expectedGetFieldErr: map[Field]error{SummaryIDs: errInvalidIDLen},
 		},
 	}
 
@@ -1911,7 +1136,7 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 			require.Equal(parsedMsg.msg.String(), oldProtoMsgS)
 
 			for field, v1 := range tv.fields {
-				v2, ok, err := getField(parsedMsg.msg, field)
+				v2, err := getField(parsedMsg.msg, field)
 
 				// expects "getField" error
 				if expectedGetFieldErr, ok := tv.expectedGetFieldErr[field]; ok {
@@ -1920,7 +1145,6 @@ func TestNewOutboundInboundMessageWithProto(t *testing.T) {
 				}
 
 				require.NoError(err)
-				require.True(ok, fmt.Errorf("field %v not found in parsed inbound message", field))
 				require.Equal(v1, v2)
 			}
 		}))

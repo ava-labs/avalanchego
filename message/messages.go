@@ -34,7 +34,6 @@ var (
 
 	errUnknownMessageTypeForOp = errors.New("unknown message type for Op")
 
-	errInvalidIDLen     = errors.New("invalid ID field length (expected 32-byte)")
 	errInvalidIPAddrLen = errors.New("invalid IP address field length (expected 16-byte)")
 	errInvalidCert      = errors.New("invalid TLS certificate field")
 )
@@ -137,33 +136,28 @@ func (inMsg *inboundMessageWithProto) String() string {
 	return inMsg.msg.String()
 }
 
-func (inMsg *inboundMessageWithProto) Get(field Field) (interface{}, error) {
-	// e.g., x509 certificate parsing error
-	v, _, err := getField(inMsg.msg, field)
-	return v, err
-}
-
 // TODO: once we migrate to proto, do this without interface...
 // TODO: once we migrate to proto, move this semantic checks out of this package
-func getField(m *p2ppb.Message, field Field) (interface{}, bool, error) {
+func (inMsg *inboundMessageWithProto) Get(field Field) (interface{}, error) {
+	return getField(inMsg.msg, field)
+}
+
+func getField(m *p2ppb.Message, field Field) (interface{}, error) {
 	switch m.GetMessage().(type) {
 	case *p2ppb.Message_Pong:
 		msg := m.GetPong()
-		switch field {
-		case Uptime:
+		if field == Uptime {
 			// the original packer-based pong base uses uint8
-			return uint8(msg.UptimePct), true, nil
-		default:
-			return nil, false, nil
+			return uint8(msg.UptimePct), nil
 		}
 
 	case *p2ppb.Message_Version:
 		msg := m.GetVersion()
 		switch field {
 		case NetworkID:
-			return msg.NetworkId, true, nil
+			return msg.NetworkId, nil
 		case MyTime:
-			return msg.MyTime, true, nil
+			return msg.MyTime, nil
 		case IP:
 			// "net.IP" type in Golang is 16-byte
 			// regardless of whether it's IPV4 or 6 (see net.IPv6len)
@@ -172,46 +166,49 @@ func getField(m *p2ppb.Message, field Field) (interface{}, bool, error) {
 			// TODO: once we complete the migration
 			// move this semantic verification outside of this package
 			if len(msg.IpAddr) != net.IPv6len {
-				return nil, true, errInvalidIPAddrLen
+				return nil, fmt.Errorf(
+					"%w: invalid IP address length %d in version message",
+					errInvalidIPAddrLen,
+					len(msg.IpAddr),
+				)
 			}
 			return ips.IPPort{
 				IP:   net.IP(msg.IpAddr),
 				Port: uint16(msg.IpPort),
-			}, true, nil
+			}, nil
 		case VersionStr:
-			return msg.MyVersion, true, nil
+			return msg.MyVersion, nil
 		case VersionTime:
-			return msg.MyVersionTime, true, nil
+			return msg.MyVersionTime, nil
 		case SigBytes:
-			return msg.Sig, true, nil
+			return msg.Sig, nil
 		case TrackedSubnets:
-			for _, sid := range msg.TrackedSubnets {
-				// must assert that this is 32 bytes long to prevent crash from invalid IDs
-				if len(sid) != ids.IDLen {
-					return nil, true, fmt.Errorf("%w: invalid tracked subnet ID", errInvalidIDLen)
-				}
-			}
-			return msg.TrackedSubnets, true, nil
-		default:
-			return nil, false, nil
+			return msg.TrackedSubnets, nil
 		}
 
 	case *p2ppb.Message_PeerList:
 		msg := m.GetPeerList()
-		switch field {
-		case Peers:
+		if field == Peers {
 			peers := make([]ips.ClaimedIPPort, len(msg.GetClaimedIpPorts()))
 			for i, p := range msg.GetClaimedIpPorts() {
 				tlsCert, err := x509.ParseCertificate(p.X509Certificate)
 				if err != nil {
 					// this certificate is different than the certificate received
 					// during the TLS handshake (and so this error can occur)
-					return nil, true, fmt.Errorf("%w: failed to parse peer certificate for peer_list message (%v)", errInvalidCert, err)
+					return nil, fmt.Errorf(
+						"%w: failed to parse peer certificate for peer_list message (%v)",
+						errInvalidCert,
+						err,
+					)
 				}
 				// TODO: once we complete the migration
 				// move this semantic verification outside of this package
 				if len(p.IpAddr) != net.IPv6len {
-					return nil, true, fmt.Errorf("%w: invalid IP address length %d in peer_list message", errInvalidIPAddrLen, len(p.IpAddr))
+					return nil, fmt.Errorf(
+						"%w: invalid IP address length %d in peer_list message",
+						errInvalidIPAddrLen,
+						len(p.IpAddr),
+					)
 				}
 				peers[i] = ips.ClaimedIPPort{
 					Cert: tlsCert,
@@ -223,374 +220,220 @@ func getField(m *p2ppb.Message, field Field) (interface{}, bool, error) {
 					Signature: p.Signature,
 				}
 			}
-			return peers, true, nil
-		default:
-			return nil, false, nil
+			return peers, nil
 		}
 
 	case *p2ppb.Message_GetStateSummaryFrontier:
 		msg := m.GetGetStateSummaryFrontier()
 		switch field {
 		case ChainID:
-			// must assert that this is 32 bytes long to prevent crash from invalid IDs
-			if len(msg.ChainId) != ids.IDLen {
-				return nil, true, fmt.Errorf("%w: invalid chain ID", errInvalidIDLen)
-			}
-			return msg.ChainId, true, nil
+			return msg.ChainId, nil
 		case RequestID:
-			return msg.RequestId, true, nil
+			return msg.RequestId, nil
 		case Deadline:
-			return msg.Deadline, true, nil
-		default:
-			return nil, false, nil
+			return msg.Deadline, nil
 		}
 
 	case *p2ppb.Message_StateSummaryFrontier_:
 		msg := m.GetStateSummaryFrontier_()
 		switch field {
 		case ChainID:
-			// must assert that this is 32 bytes long to prevent crash from invalid IDs
-			if len(msg.ChainId) != ids.IDLen {
-				return nil, true, fmt.Errorf("%w: invalid chain ID", errInvalidIDLen)
-			}
-			return msg.ChainId, true, nil
+			return msg.ChainId, nil
 		case RequestID:
-			return msg.RequestId, true, nil
+			return msg.RequestId, nil
 		case SummaryBytes:
-			return msg.Summary, true, nil
-		default:
-			return nil, false, nil
+			return msg.Summary, nil
 		}
 
 	case *p2ppb.Message_GetAcceptedStateSummary:
 		msg := m.GetGetAcceptedStateSummary()
 		switch field {
 		case ChainID:
-			// must assert that this is 32 bytes long to prevent crash from invalid IDs
-			if len(msg.ChainId) != ids.IDLen {
-				return nil, true, fmt.Errorf("%w: invalid chain ID", errInvalidIDLen)
-			}
-			return msg.ChainId, true, nil
+			return msg.ChainId, nil
 		case RequestID:
-			return msg.RequestId, true, nil
+			return msg.RequestId, nil
 		case Deadline:
-			return msg.Deadline, true, nil
+			return msg.Deadline, nil
 		case SummaryHeights:
-			return msg.Heights, true, nil
-		default:
-			return nil, false, nil
+			return msg.Heights, nil
 		}
 
 	case *p2ppb.Message_AcceptedStateSummary_:
 		msg := m.GetAcceptedStateSummary_()
 		switch field {
 		case ChainID:
-			// must assert that this is 32 bytes long to prevent crash from invalid IDs
-			if len(msg.ChainId) != ids.IDLen {
-				return nil, true, fmt.Errorf("%w: invalid chain ID", errInvalidIDLen)
-			}
-			return msg.ChainId, true, nil
+			return msg.ChainId, nil
 		case RequestID:
-			return msg.RequestId, true, nil
+			return msg.RequestId, nil
 		case SummaryIDs:
-			for _, sid := range msg.SummaryIds {
-				// must assert that this is 32 bytes long to prevent crash from invalid IDs
-				if len(sid) != ids.IDLen {
-					return nil, true, fmt.Errorf("%w: invalid tracked summary ID", errInvalidIDLen)
-				}
-			}
-			return msg.SummaryIds, true, nil
-		default:
-			return nil, false, nil
+			return msg.SummaryIds, nil
 		}
 
 	case *p2ppb.Message_GetAcceptedFrontier:
 		msg := m.GetGetAcceptedFrontier()
 		switch field {
 		case ChainID:
-			// must assert that this is 32 bytes long to prevent crash from invalid IDs
-			if len(msg.ChainId) != ids.IDLen {
-				return nil, true, fmt.Errorf("%w: invalid chain ID", errInvalidIDLen)
-			}
-			return msg.ChainId, true, nil
+			return msg.ChainId, nil
 		case RequestID:
-			return msg.RequestId, true, nil
+			return msg.RequestId, nil
 		case Deadline:
-			return msg.Deadline, true, nil
-		default:
-			return nil, false, nil
+			return msg.Deadline, nil
 		}
 
 	case *p2ppb.Message_AcceptedFrontier_:
 		msg := m.GetAcceptedFrontier_()
 		switch field {
 		case ChainID:
-			// must assert that this is 32 bytes long to prevent crash from invalid IDs
-			if len(msg.ChainId) != ids.IDLen {
-				return nil, true, fmt.Errorf("%w: invalid chain ID", errInvalidIDLen)
-			}
-			return msg.ChainId, true, nil
+			return msg.ChainId, nil
 		case RequestID:
-			return msg.RequestId, true, nil
+			return msg.RequestId, nil
 		case ContainerIDs:
-			for _, cid := range msg.ContainerIds {
-				// must assert that this is 32 bytes long to prevent crash from invalid IDs
-				if len(cid) != ids.IDLen {
-					return nil, true, fmt.Errorf("%w: invalid container ID", errInvalidIDLen)
-				}
-			}
-			return msg.ContainerIds, true, nil
-		default:
-			return nil, false, nil
+			return msg.ContainerIds, nil
 		}
 
 	case *p2ppb.Message_GetAccepted:
 		msg := m.GetGetAccepted()
 		switch field {
 		case ChainID:
-			// must assert that this is 32 bytes long to prevent crash from invalid IDs
-			if len(msg.ChainId) != ids.IDLen {
-				return nil, true, fmt.Errorf("%w: invalid chain ID", errInvalidIDLen)
-			}
-			return msg.ChainId, true, nil
+			return msg.ChainId, nil
 		case RequestID:
-			return msg.RequestId, true, nil
+			return msg.RequestId, nil
 		case Deadline:
-			return msg.Deadline, true, nil
+			return msg.Deadline, nil
 		case ContainerIDs:
-			for _, cid := range msg.ContainerIds {
-				// must assert that this is 32 bytes long to prevent crash from invalid IDs
-				if len(cid) != ids.IDLen {
-					return nil, true, fmt.Errorf("%w: invalid container ID", errInvalidIDLen)
-				}
-			}
-			return msg.ContainerIds, true, nil
-		default:
-			return nil, false, nil
+			return msg.ContainerIds, nil
 		}
 
 	case *p2ppb.Message_Accepted_:
 		msg := m.GetAccepted_()
 		switch field {
 		case ChainID:
-			// must assert that this is 32 bytes long to prevent crash from invalid IDs
-			if len(msg.ChainId) != ids.IDLen {
-				return nil, true, fmt.Errorf("%w: invalid chain ID", errInvalidIDLen)
-			}
-			return msg.ChainId, true, nil
+			return msg.ChainId, nil
 		case RequestID:
-			return msg.RequestId, true, nil
+			return msg.RequestId, nil
 		case ContainerIDs:
-			for _, cid := range msg.ContainerIds {
-				// must assert that this is 32 bytes long to prevent crash from invalid IDs
-				if len(cid) != ids.IDLen {
-					return nil, true, fmt.Errorf("%w: invalid container ID", errInvalidIDLen)
-				}
-			}
-			return msg.ContainerIds, true, nil
-		default:
-			return nil, false, nil
+			return msg.ContainerIds, nil
 		}
 
 	case *p2ppb.Message_GetAncestors:
 		msg := m.GetGetAncestors()
 		switch field {
 		case ChainID:
-			// must assert that this is 32 bytes long to prevent crash from invalid IDs
-			if len(msg.ChainId) != ids.IDLen {
-				return nil, true, fmt.Errorf("%w: invalid chain ID", errInvalidIDLen)
-			}
-			return msg.ChainId, true, nil
+			return msg.ChainId, nil
 		case RequestID:
-			return msg.RequestId, true, nil
+			return msg.RequestId, nil
 		case Deadline:
-			return msg.Deadline, true, nil
+			return msg.Deadline, nil
 		case ContainerID:
-			// must assert that this is 32 bytes long to prevent crash from invalid IDs
-			if len(msg.ContainerId) != ids.IDLen {
-				return nil, true, fmt.Errorf("%w: invalid container ID", errInvalidIDLen)
-			}
-			return msg.ContainerId, true, nil
-		default:
-			return nil, false, nil
+			return msg.ContainerId, nil
 		}
 
 	case *p2ppb.Message_Ancestors_:
 		msg := m.GetAncestors_()
 		switch field {
 		case ChainID:
-			// must assert that this is 32 bytes long to prevent crash from invalid IDs
-			if len(msg.ChainId) != ids.IDLen {
-				return nil, true, fmt.Errorf("%w: invalid chain ID", errInvalidIDLen)
-			}
-			return msg.ChainId, true, nil
+			return msg.ChainId, nil
 		case RequestID:
-			return msg.RequestId, true, nil
+			return msg.RequestId, nil
 		case MultiContainerBytes:
-			return msg.Containers, true, nil
-		default:
-			return nil, false, nil
+			return msg.Containers, nil
 		}
 
 	case *p2ppb.Message_Get:
 		msg := m.GetGet()
 		switch field {
 		case ChainID:
-			// must assert that this is 32 bytes long to prevent crash from invalid IDs
-			if len(msg.ChainId) != ids.IDLen {
-				return nil, true, fmt.Errorf("%w: invalid chain ID", errInvalidIDLen)
-			}
-			return msg.ChainId, true, nil
+			return msg.ChainId, nil
 		case RequestID:
-			return msg.RequestId, true, nil
+			return msg.RequestId, nil
 		case Deadline:
-			return msg.Deadline, true, nil
+			return msg.Deadline, nil
 		case ContainerID:
-			// must assert that this is 32 bytes long to prevent crash from invalid IDs
-			if len(msg.ContainerId) != ids.IDLen {
-				return nil, true, fmt.Errorf("%w: invalid container ID", errInvalidIDLen)
-			}
-			return msg.ContainerId, true, nil
-		default:
-			return nil, false, nil
+			return msg.ContainerId, nil
 		}
 
 	case *p2ppb.Message_Put:
 		msg := m.GetPut()
 		switch field {
 		case ChainID:
-			// must assert that this is 32 bytes long to prevent crash from invalid IDs
-			if len(msg.ChainId) != ids.IDLen {
-				return nil, true, fmt.Errorf("%w: invalid chain ID", errInvalidIDLen)
-			}
-			return msg.ChainId, true, nil
+			return msg.ChainId, nil
 		case RequestID:
-			return msg.RequestId, true, nil
+			return msg.RequestId, nil
 		case ContainerBytes:
-			return msg.Container, true, nil
-		default:
-			return nil, false, nil
+			return msg.Container, nil
 		}
 
 	case *p2ppb.Message_PushQuery:
 		msg := m.GetPushQuery()
 		switch field {
 		case ChainID:
-			// must assert that this is 32 bytes long to prevent crash from invalid IDs
-			if len(msg.ChainId) != ids.IDLen {
-				return nil, true, fmt.Errorf("%w: invalid chain ID", errInvalidIDLen)
-			}
-			return msg.ChainId, true, nil
+			return msg.ChainId, nil
 		case RequestID:
-			return msg.RequestId, true, nil
+			return msg.RequestId, nil
 		case Deadline:
-			return msg.Deadline, true, nil
+			return msg.Deadline, nil
 		case ContainerBytes:
-			return msg.Container, true, nil
-		default:
-			return nil, false, nil
+			return msg.Container, nil
 		}
 
 	case *p2ppb.Message_PullQuery:
 		msg := m.GetPullQuery()
 		switch field {
 		case ChainID:
-			// must assert that this is 32 bytes long to prevent crash from invalid IDs
-			if len(msg.ChainId) != ids.IDLen {
-				return nil, true, fmt.Errorf("%w: invalid chain ID", errInvalidIDLen)
-			}
-			return msg.ChainId, true, nil
+			return msg.ChainId, nil
 		case RequestID:
-			return msg.RequestId, true, nil
+			return msg.RequestId, nil
 		case Deadline:
-			return msg.Deadline, true, nil
+			return msg.Deadline, nil
 		case ContainerID:
-			// must assert that this is 32 bytes long to prevent crash from invalid IDs
-			if len(msg.ContainerId) != ids.IDLen {
-				return nil, true, fmt.Errorf("%w: invalid container ID", errInvalidIDLen)
-			}
-			return msg.ContainerId, true, nil
-		default:
-			return nil, false, nil
+			return msg.ContainerId, nil
 		}
 
 	case *p2ppb.Message_Chits:
 		msg := m.GetChits()
 		switch field {
 		case ChainID:
-			// must assert that this is 32 bytes long to prevent crash from invalid IDs
-			if len(msg.ChainId) != ids.IDLen {
-				return nil, true, fmt.Errorf("%w: invalid chain ID", errInvalidIDLen)
-			}
-			return msg.ChainId, true, nil
+			return msg.ChainId, nil
 		case RequestID:
-			return msg.RequestId, true, nil
+			return msg.RequestId, nil
 		case ContainerIDs:
-			for _, cid := range msg.ContainerIds {
-				// must assert that this is 32 bytes long to prevent crash from invalid IDs
-				if len(cid) != ids.IDLen {
-					return nil, true, fmt.Errorf("%w: invalid container ID", errInvalidIDLen)
-				}
-			}
-			return msg.ContainerIds, true, nil
-		default:
-			return nil, false, nil
+			return msg.ContainerIds, nil
 		}
 
 	case *p2ppb.Message_AppRequest:
 		msg := m.GetAppRequest()
 		switch field {
 		case ChainID:
-			// must assert that this is 32 bytes long to prevent crash from invalid IDs
-			if len(msg.ChainId) != ids.IDLen {
-				return nil, true, fmt.Errorf("%w: invalid chain ID", errInvalidIDLen)
-			}
-			return msg.ChainId, true, nil
+			return msg.ChainId, nil
 		case RequestID:
-			return msg.RequestId, true, nil
+			return msg.RequestId, nil
 		case Deadline:
-			return msg.Deadline, true, nil
+			return msg.Deadline, nil
 		case AppBytes:
-			return msg.AppBytes, true, nil
-		default:
-			return nil, false, nil
+			return msg.AppBytes, nil
 		}
 
 	case *p2ppb.Message_AppResponse:
 		msg := m.GetAppResponse()
 		switch field {
 		case ChainID:
-			// must assert that this is 32 bytes long to prevent crash from invalid IDs
-			if len(msg.ChainId) != ids.IDLen {
-				return nil, true, fmt.Errorf("%w: invalid chain ID", errInvalidIDLen)
-			}
-			return msg.ChainId, true, nil
+			return msg.ChainId, nil
 		case RequestID:
-			return msg.RequestId, true, nil
+			return msg.RequestId, nil
 		case AppBytes:
-			return msg.AppBytes, true, nil
-		default:
-			return nil, false, nil
+			return msg.AppBytes, nil
 		}
 
 	case *p2ppb.Message_AppGossip:
 		msg := m.GetAppGossip()
 		switch field {
 		case ChainID:
-			// must assert that this is 32 bytes long to prevent crash from invalid IDs
-			if len(msg.ChainId) != ids.IDLen {
-				return nil, true, fmt.Errorf("%w: invalid chain ID", errInvalidIDLen)
-			}
-			return msg.ChainId, true, nil
+			return msg.ChainId, nil
 		case AppBytes:
-			return msg.AppBytes, true, nil
-		default:
-			return nil, false, nil
+			return msg.AppBytes, nil
 		}
-
-	default:
-		return nil, false, nil
 	}
+	return nil, fmt.Errorf("%w: %s", errMissingField, field)
 }
 
 // OutboundMessage represents a set of fields for an outbound message that can
@@ -875,7 +718,7 @@ func (mb *msgBuilderProtobuf) parseInbound(bytes []byte, nodeID ids.NodeID, onFi
 	}
 
 	var expirationTime time.Time
-	if deadline, hasDeadline, err := getField(m, Deadline); hasDeadline && err == nil {
+	if deadline, err := getField(m, Deadline); err == nil {
 		deadlineDuration := time.Duration(deadline.(uint64))
 		if deadlineDuration > mb.maxMessageTimeout {
 			deadlineDuration = mb.maxMessageTimeout
