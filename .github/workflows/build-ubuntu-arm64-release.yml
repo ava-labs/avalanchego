@@ -6,8 +6,8 @@ on:
       - "*"
 
 jobs:
-  build-bionic-arm64-package:
-    runs-on: [self-hosted, linux, ARM64, bionic]
+  build-jammy-arm64-package:
+    runs-on: [self-hosted, linux, ARM64, jammy]
 
     steps:
       - uses: actions/checkout@v3
@@ -42,7 +42,7 @@ jobs:
           TAG: ${{ steps.get_version.outputs.VERSION }}
           BUCKET: ${{ secrets.BUCKET }}
           ARCH: "arm64"
-          RELEASE: "bionic"
+          RELEASE: "jammy"
 
   build-focal-arm64-package:
     runs-on: [self-hosted, linux, ARM64, focal]
