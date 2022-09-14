@@ -209,6 +209,8 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	if op == message.AppGossip {
 		requestID = constants.GossipMsgRequestID
 	} else {
+		// Invariant: Getting a [RequestID] must never error in the handler. Any
+		//            verification performed by the message is done here.
 		requestIDIntf, err := msg.Get(message.RequestID)
 		if err != nil {
 			cr.log.Debug("dropping message with invalid field",

@@ -399,6 +399,10 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		return err
 	}
 
+	// Invariant: Getting a [RequestID] must never error. If there is any
+	//            verification performed by the message, it is expected to have
+	//            already been performed when reading the [RequestID] in the
+	//            [ChainRouter].
 	switch op {
 	case message.GetStateSummaryFrontier:
 		requestIDIntf, err := msg.Get(message.RequestID)
