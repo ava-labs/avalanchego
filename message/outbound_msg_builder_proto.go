@@ -4,8 +4,6 @@
 package message
 
 import (
-	"errors"
-	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -537,18 +535,6 @@ func (b *outMsgBuilderWithProto) Chits(
 		compress,
 		bypassThrottling,
 	)
-}
-
-var errUnsupportedOutboundMsg = errors.New("outbound message not supported")
-
-func (b *outMsgBuilderWithProto) ChitsV2(
-	chainID ids.ID,
-	requestID uint32,
-	containerIDs []ids.ID,
-	containerID ids.ID,
-) (OutboundMessage, error) {
-	// TODO: deprecate ChitsV2
-	return nil, fmt.Errorf("%w: chits v2 not supported for proto", errUnsupportedOutboundMsg)
 }
 
 // Application level request

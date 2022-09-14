@@ -314,22 +314,6 @@ func (b *inMsgBuilderWithProto) InboundChits(
 	}
 }
 
-// The first "containerIDs" is always populated for backward compatibilities with old "Chits"
-// Only after the DAG is linearized, the second "containerID" will be populated
-// with the new snowman chain containers.
-func (b *inMsgBuilderWithProto) InboundChitsV2(
-	chainID ids.ID,
-	requestID uint32,
-	containerIDs []ids.ID,
-	containerID ids.ID,
-	nodeID ids.NodeID,
-) InboundMessage {
-	// TODO: remove this from interface before we migrate to proto
-	// which will help us add a new field to the existing "chits" message
-	// in more compatible ways
-	panic("unimplemented")
-}
-
 func (b *inMsgBuilderWithProto) InboundAppRequest(
 	chainID ids.ID,
 	requestID uint32,
