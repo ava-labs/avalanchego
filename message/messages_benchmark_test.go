@@ -11,6 +11,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/stretchr/testify/require"
+
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -39,6 +41,8 @@ import (
 //	$ benchcmp /tmp/mem.before.txt /tmp/mem.after.txt
 //	$ benchstat -alpha 0.03 -geomean /tmp/mem.before.txt /tmp/mem.after.txt
 func BenchmarkMarshalVersion(b *testing.B) {
+	require := require.New(b)
+
 	b.StopTimer()
 
 	id := ids.GenerateTestID()
@@ -64,13 +68,11 @@ func BenchmarkMarshalVersion(b *testing.B) {
 		},
 	}
 	packerCodec, err := NewCodecWithMemoryPool("", prometheus.NewRegistry(), 2*units.MiB, 10*time.Second)
-	if err != nil {
-		b.Fatal(err)
-	}
+	require.NoError(err)
+
 	packerMsg, err := packerCodec.Pack(inboundMsg.op, inboundMsg.fields, inboundMsg.op.Compressible(), false)
-	if err != nil {
-		b.Fatal(err)
-	}
+	require.NoError(err)
+
 	packerMsgN := len(packerMsg.Bytes())
 
 	protoMsg := p2ppb.Message{
@@ -93,9 +95,7 @@ func BenchmarkMarshalVersion(b *testing.B) {
 	useProtoBuilder := os.Getenv("USE_PROTO_BUILDER") != ""
 
 	protoCodec, err := newMsgBuilderProtobuf("", prometheus.NewRegistry(), 2*units.MiB, 10*time.Second)
-	if err != nil {
-		b.Fatal(err)
-	}
+	require.NoError(err)
 
 	b.Logf("marshaling packer %d-byte, proto %d-byte (use proto %v, use proto builder %v)", packerMsgN, protoMsgN, useProto, useProtoBuilder)
 
@@ -104,9 +104,7 @@ func BenchmarkMarshalVersion(b *testing.B) {
 		if !useProto {
 			// version does not compress message
 			_, err := packerCodec.Pack(inboundMsg.op, inboundMsg.fields, false, false)
-			if err != nil {
-				b.Fatal(err)
-			}
+			require.NoError(err)
 			continue
 		}
 
@@ -115,10 +113,7 @@ func BenchmarkMarshalVersion(b *testing.B) {
 		} else {
 			_, err = proto.Marshal(&protoMsg)
 		}
-
-		if err != nil {
-			b.Fatal(err)
-		}
+		require.NoError(err)
 	}
 }
 
@@ -141,6 +136,8 @@ func BenchmarkMarshalVersion(b *testing.B) {
 //	$ benchcmp /tmp/mem.before.txt /tmp/mem.after.txt
 //	$ benchstat -alpha 0.03 -geomean /tmp/mem.before.txt /tmp/mem.after.txt
 func BenchmarkUnmarshalVersion(b *testing.B) {
+	require := require.New(b)
+
 	b.StopTimer()
 
 	id := ids.GenerateTestID()
@@ -160,9 +157,7 @@ func BenchmarkUnmarshalVersion(b *testing.B) {
 		},
 	}
 	packerCodec, err := NewCodecWithMemoryPool("", prometheus.NewRegistry(), 2*units.MiB, 10*time.Second)
-	if err != nil {
-		b.Fatal(err)
-	}
+	require.NoError(err)
 
 	protoMsg := p2ppb.Message{
 		Message: &p2ppb.Message_Version{
@@ -180,32 +175,24 @@ func BenchmarkUnmarshalVersion(b *testing.B) {
 	}
 
 	rawMsg, err := proto.Marshal(&protoMsg)
-	if err != nil {
-		b.Fatal(err)
-	}
+	require.NoError(err)
 
 	useProto := os.Getenv("USE_PROTO") != ""
 	if !useProto {
 		msgInf, err := packerCodec.Pack(inboundMsg.op, inboundMsg.fields, inboundMsg.op.Compressible(), false)
-		if err != nil {
-			b.Fatal(err)
-		}
+		require.NoError(err)
 		rawMsg = msgInf.Bytes()
 	}
 
 	useProtoBuilder := os.Getenv("USE_PROTO_BUILDER") != ""
 	protoCodec, err := newMsgBuilderProtobuf("", prometheus.NewRegistry(), 2*units.MiB, 10*time.Second)
-	if err != nil {
-		b.Fatal(err)
-	}
+	require.NoError(err)
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		if !useProto {
 			_, err := packerCodec.Parse(rawMsg, dummyNodeID, dummyOnFinishedHandling)
-			if err != nil {
-				b.Fatal(err)
-			}
+			require.NoError(err)
 			continue
 		}
 
@@ -215,9 +202,6 @@ func BenchmarkUnmarshalVersion(b *testing.B) {
 			var protoMsg p2ppb.Message
 			err = proto.Unmarshal(rawMsg, &protoMsg)
 		}
-
-		if err != nil {
-			b.Fatal(err)
-		}
+		require.NoError(err)
 	}
 }
