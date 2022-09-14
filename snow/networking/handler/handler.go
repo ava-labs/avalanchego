@@ -459,6 +459,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 			)
 			return nil
 		}
+
 		return engine.GetAcceptedStateSummary(nodeID, requestID, summaryHeights)
 
 	case message.AcceptedStateSummary:
@@ -477,6 +478,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 			)
 			return engine.GetAcceptedStateSummaryFailed(nodeID, requestID)
 		}
+
 		return engine.AcceptedStateSummary(nodeID, requestID, summaryIDs)
 
 	case message.GetAcceptedStateSummaryFailed:
@@ -509,6 +511,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 			)
 			return engine.GetAcceptedFrontierFailed(nodeID, requestID)
 		}
+
 		return engine.AcceptedFrontier(nodeID, requestID, containerIDs)
 
 	case message.GetAcceptedFrontierFailed:
@@ -534,6 +537,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 			)
 			return nil
 		}
+
 		return engine.GetAccepted(nodeID, requestID, containerIDs)
 
 	case message.Accepted:
@@ -552,6 +556,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 			)
 			return engine.GetAcceptedFailed(nodeID, requestID)
 		}
+
 		return engine.Accepted(nodeID, requestID, containerIDs)
 
 	case message.GetAcceptedFailed:
@@ -757,6 +762,7 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 			)
 			return engine.QueryFailed(nodeID, requestID)
 		}
+
 		return engine.Chits(nodeID, requestID, votes)
 
 	case message.ChitsV2:
