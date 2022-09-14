@@ -4623,34 +4623,3 @@ func TestSendMixedQuery(t *testing.T) {
 			})
 	}
 }
-
-func TestHandleChitsV2(t *testing.T) {
-	require := require.New(t)
-	_, _, engCfg := DefaultConfig()
-
-	sender := &common.SenderTest{T: t}
-
-	asked := new(bool)
-	sender.SendGetF = func(inVdr ids.NodeID, _ uint32, vtxID ids.ID) {
-		if *asked {
-			t.Fatal("asked multiple times")
-		}
-		*asked = true
-	}
-
-	engCfg.Sender = sender
-	sender.Default(true)
-	manager := vertex.NewTestManager(t)
-	engCfg.Manager = manager
-
-	reg := prometheus.NewRegistry()
-	engCfg.Ctx.Registerer = reg
-
-	te, err := newTransitive(engCfg)
-	require.NoError(err)
-	require.NoError(te.Start(0))
-
-	// expects chits v2 to v1 conversion
-	require.NoError(te.ChitsV2(ids.GenerateTestNodeID(), 0, []ids.ID{ids.GenerateTestID()}, ids.Empty))
-	require.True(*asked)
-}

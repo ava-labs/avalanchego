@@ -31,7 +31,7 @@ type SenderTest struct {
 	CantSendGetAcceptedFrontier, CantSendAcceptedFrontier,
 	CantSendGetAccepted, CantSendAccepted,
 	CantSendGet, CantSendGetAncestors, CantSendPut, CantSendAncestors,
-	CantSendPullQuery, CantSendPushQuery, CantSendChits, CantSendChitsV2,
+	CantSendPullQuery, CantSendPushQuery, CantSendChits,
 	CantSendGossip,
 	CantSendAppRequest, CantSendAppResponse, CantSendAppGossip, CantSendAppGossipSpecific bool
 
@@ -51,7 +51,6 @@ type SenderTest struct {
 	SendPushQueryF               func(ids.NodeIDSet, uint32, ids.ID, []byte)
 	SendPullQueryF               func(ids.NodeIDSet, uint32, ids.ID)
 	SendChitsF                   func(ids.NodeID, uint32, []ids.ID)
-	SendChitsV2F                 func(ids.NodeID, uint32, []ids.ID, ids.ID)
 	SendGossipF                  func(ids.ID, []byte)
 	SendAppRequestF              func(ids.NodeIDSet, uint32, []byte) error
 	SendAppResponseF             func(ids.NodeID, uint32, []byte) error
@@ -262,17 +261,6 @@ func (s *SenderTest) SendChits(vdr ids.NodeID, requestID uint32, votes []ids.ID)
 		s.SendChitsF(vdr, requestID, votes)
 	} else if s.CantSendChits && s.T != nil {
 		s.T.Fatalf("Unexpectedly called SendChits")
-	}
-}
-
-// SendChitsV2 calls SendChitsV2F if it was initialized. If it wasn't initialized
-// and this function shouldn't be called and testing was initialized, then
-// testing will fail.
-func (s *SenderTest) SendChitsV2(vdr ids.NodeID, requestID uint32, votes []ids.ID, vote ids.ID) {
-	if s.SendChitsV2F != nil {
-		s.SendChitsV2F(vdr, requestID, votes, vote)
-	} else if s.CantSendChitsV2 && s.T != nil {
-		s.T.Fatalf("Unexpectedly called SendChitsV2")
 	}
 }
 

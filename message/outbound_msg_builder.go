@@ -133,13 +133,6 @@ type OutboundMsgBuilder interface {
 		containerIDs []ids.ID,
 	) (OutboundMessage, error)
 
-	ChitsV2(
-		chainID ids.ID,
-		requestID uint32,
-		containerIDs []ids.ID,
-		containerID ids.ID,
-	) (OutboundMessage, error)
-
 	AppRequest(
 		chainID ids.ID,
 		requestID uint32,
@@ -510,28 +503,6 @@ func (b *outMsgBuilderWithPacker) Chits(
 			ContainerIDs: containerIDBytes,
 		},
 		Chits.Compressible(), // Chits messages can't be compressed
-		false,
-	)
-}
-
-func (b *outMsgBuilderWithPacker) ChitsV2(
-	chainID ids.ID,
-	requestID uint32,
-	containerIDs []ids.ID,
-	containerID ids.ID,
-) (OutboundMessage, error) {
-	containerIDBytes := make([][]byte, len(containerIDs))
-	encodeIDs(containerIDs, containerIDBytes)
-
-	return b.c.Pack(
-		ChitsV2,
-		map[Field]interface{}{
-			ChainID:      chainID[:],
-			RequestID:    requestID,
-			ContainerIDs: containerIDBytes,
-			ContainerID:  containerID[:],
-		},
-		ChitsV2.Compressible(), // ChitsV2 messages can't be compressed
 		false,
 	)
 }

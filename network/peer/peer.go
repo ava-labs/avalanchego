@@ -674,15 +674,15 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 	if math.Abs(float64(peerTime)-float64(myTime)) > p.MaxClockDifference.Seconds() {
 		if p.Beacons.Contains(p.id) {
 			p.Log.Warn("beacon reports out of sync time",
-				zap.Stringer("beaconID", p.id),
-				zap.Uint64("beaconTime", peerTime),
-				zap.Uint64("ourTime", myTime),
+				zap.Stringer("nodeID", p.id),
+				zap.Uint64("peerTime", peerTime),
+				zap.Uint64("myTime", myTime),
 			)
 		} else {
 			p.Log.Debug("peer reports out of sync time",
-				zap.Stringer("beaconID", p.id),
-				zap.Uint64("beaconTime", peerTime),
-				zap.Uint64("ourTime", myTime),
+				zap.Stringer("nodeID", p.id),
+				zap.Uint64("peerTime", peerTime),
+				zap.Uint64("myTime", myTime),
 			)
 		}
 		p.StartClose()

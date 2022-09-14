@@ -400,10 +400,8 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 		return err
 	}
 
-	// Invariant: Getting a [RequestID] must never error. If there is any
-	//            verification performed by the message, it is expected to have
-	//            already been performed when reading the [RequestID] in the
-	//            [ChainRouter].
+	// Invariant: msg.Get(message.RequestID) must never error. The [ChainRouter]
+	//            should have already successfully called this function.
 	// Invariant: Response messages can never be dropped here. This is because
 	//            the timeout has already been cleared. This means the engine
 	//            should be invoked with a failure message if parsing of the
@@ -411,14 +409,18 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 	switch op {
 	case message.GetStateSummaryFrontier:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		return engine.GetStateSummaryFrontier(nodeID, requestID)
 
 	case message.StateSummaryFrontier:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		summaryIntf, err := msg.Get(message.SummaryBytes)
@@ -438,14 +440,18 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.GetStateSummaryFrontierFailed:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		return engine.GetStateSummaryFrontierFailed(nodeID, requestID)
 
 	case message.GetAcceptedStateSummary:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		summaryHeights, err := getSummaryHeights(msg)
@@ -464,7 +470,9 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.AcceptedStateSummary:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		summaryIDs, err := getIDs(message.SummaryIDs, msg)
@@ -483,21 +491,27 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.GetAcceptedStateSummaryFailed:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		return engine.GetAcceptedStateSummaryFailed(nodeID, requestID)
 
 	case message.GetAcceptedFrontier:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		return engine.GetAcceptedFrontier(nodeID, requestID)
 
 	case message.AcceptedFrontier:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		containerIDs, err := getIDs(message.ContainerIDs, msg)
@@ -516,14 +530,18 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.GetAcceptedFrontierFailed:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		return engine.GetAcceptedFrontierFailed(nodeID, requestID)
 
 	case message.GetAccepted:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		containerIDs, err := getIDs(message.ContainerIDs, msg)
@@ -542,7 +560,9 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.Accepted:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		containerIDs, err := getIDs(message.ContainerIDs, msg)
@@ -561,14 +581,18 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.GetAcceptedFailed:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		return engine.GetAcceptedFailed(nodeID, requestID)
 
 	case message.GetAncestors:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		containerIDIntf, err := msg.Get(message.ContainerID)
@@ -599,14 +623,18 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.GetAncestorsFailed:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		return engine.GetAncestorsFailed(nodeID, requestID)
 
 	case message.Ancestors:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		containersIntf, err := msg.Get(message.MultiContainerBytes)
@@ -626,7 +654,9 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.Get:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		containerIDIntf, err := msg.Get(message.ContainerID)
@@ -657,14 +687,18 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.GetFailed:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		return engine.GetFailed(nodeID, requestID)
 
 	case message.Put:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		containerIntf, err := msg.Get(message.ContainerBytes)
@@ -697,7 +731,9 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.PushQuery:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		containerIntf, err := msg.Get(message.ContainerBytes)
@@ -717,7 +753,9 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.PullQuery:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		containerIDIntf, err := msg.Get(message.ContainerID)
@@ -748,7 +786,9 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 	case message.Chits:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		votes, err := getIDs(message.ContainerIDs, msg)
@@ -765,59 +805,20 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 		return engine.Chits(nodeID, requestID, votes)
 
-	case message.ChitsV2:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
-		requestID := requestIDIntf.(uint32)
-
-		votes, err := getIDs(message.ContainerIDs, msg)
-		if err != nil {
-			h.ctx.Log.Debug("message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.ContainerIDs),
-				zap.Error(err),
-			)
-			return engine.QueryFailed(nodeID, requestID)
-		}
-
-		containerIDIntf, err := msg.Get(message.ContainerID)
-		if err != nil {
-			h.ctx.Log.Debug("message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.ContainerID),
-				zap.Error(err),
-			)
-			return engine.QueryFailed(nodeID, requestID)
-		}
-		containerIDBytes := containerIDIntf.([]byte)
-		vote, err := ids.ToID(containerIDBytes)
-		if err != nil {
-			h.ctx.Log.Debug("message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.ContainerID),
-				zap.Error(err),
-			)
-			return engine.QueryFailed(nodeID, requestID)
-		}
-
-		return engine.ChitsV2(nodeID, requestID, votes, vote)
-
 	case message.QueryFailed:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		return engine.QueryFailed(nodeID, requestID)
 
 	case message.Connected:
 		peerVersionIntf, err := msg.Get(message.VersionStruct)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		peerVersion := peerVersionIntf.(*version.Application)
 
 		return engine.Connected(nodeID, peerVersion)
@@ -878,7 +879,9 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 	switch op {
 	case message.AppRequest:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		appBytesIntf, err := msg.Get(message.AppBytes)
@@ -898,7 +901,9 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 
 	case message.AppResponse:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		appBytesIntf, err := msg.Get(message.AppBytes)
@@ -918,7 +923,9 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 
 	case message.AppRequestFailed:
 		requestIDIntf, err := msg.Get(message.RequestID)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		requestID := requestIDIntf.(uint32)
 
 		return engine.AppRequestFailed(nodeID, requestID)
@@ -979,7 +986,9 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 	switch op := msg.Op(); op {
 	case message.Notify:
 		vmMsgIntf, err := msg.Get(message.VMMessage)
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			return err
+		}
 		vmMsg := vmMsgIntf.(uint32)
 
 		return engine.Notify(common.Message(vmMsg))
