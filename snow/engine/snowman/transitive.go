@@ -309,7 +309,7 @@ func (t *Transitive) Gossip() error {
 	t.Ctx.Log.Verbo("gossiping accepted block to the network",
 		zap.Stringer("blkID", blkID),
 	)
-	t.Sender.SendGossip(blkID, blk.Bytes())
+	t.Sender.SendGossip(blk.Bytes())
 	return nil
 }
 

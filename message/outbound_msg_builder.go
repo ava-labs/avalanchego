@@ -108,7 +108,6 @@ type OutboundMsgBuilder interface {
 	Put(
 		chainID ids.ID,
 		requestID uint32,
-		containerID ids.ID,
 		container []byte,
 	) (OutboundMessage, error)
 
@@ -116,7 +115,6 @@ type OutboundMsgBuilder interface {
 		chainID ids.ID,
 		requestID uint32,
 		deadline time.Duration,
-		containerID ids.ID,
 		container []byte,
 	) (OutboundMessage, error)
 
@@ -432,7 +430,6 @@ func (b *outMsgBuilderWithPacker) Get(
 func (b *outMsgBuilderWithPacker) Put(
 	chainID ids.ID,
 	requestID uint32,
-	containerID ids.ID,
 	container []byte,
 ) (OutboundMessage, error) {
 	return b.c.Pack(
@@ -440,7 +437,7 @@ func (b *outMsgBuilderWithPacker) Put(
 		map[Field]interface{}{
 			ChainID:        chainID[:],
 			RequestID:      requestID,
-			ContainerID:    containerID[:],
+			ContainerID:    ids.Empty[:], // Populated for backwards compatibility
 			ContainerBytes: container,
 		},
 		b.compress && Put.Compressible(), // Put messages may be compressed
@@ -452,7 +449,6 @@ func (b *outMsgBuilderWithPacker) PushQuery(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
-	containerID ids.ID,
 	container []byte,
 ) (OutboundMessage, error) {
 	return b.c.Pack(
@@ -461,7 +457,7 @@ func (b *outMsgBuilderWithPacker) PushQuery(
 			ChainID:        chainID[:],
 			RequestID:      requestID,
 			Deadline:       uint64(deadline),
-			ContainerID:    containerID[:],
+			ContainerID:    ids.Empty[:], // Populated for backwards compatibility
 			ContainerBytes: container,
 		},
 		b.compress && PushQuery.Compressible(), // PushQuery messages may be compressed
