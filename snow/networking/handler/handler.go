@@ -805,51 +805,6 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 
 		return engine.Chits(nodeID, requestID, votes)
 
-	case message.ChitsV2:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
-
-		votes, err := getIDs(message.ContainerIDs, msg)
-		if err != nil {
-			h.ctx.Log.Debug("message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.ContainerIDs),
-				zap.Error(err),
-			)
-			return engine.QueryFailed(nodeID, requestID)
-		}
-
-		containerIDIntf, err := msg.Get(message.ContainerID)
-		if err != nil {
-			h.ctx.Log.Debug("message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.ContainerID),
-				zap.Error(err),
-			)
-			return engine.QueryFailed(nodeID, requestID)
-		}
-		containerIDBytes := containerIDIntf.([]byte)
-		vote, err := ids.ToID(containerIDBytes)
-		if err != nil {
-			h.ctx.Log.Debug("message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.ContainerID),
-				zap.Error(err),
-			)
-			return engine.QueryFailed(nodeID, requestID)
-		}
-
-		return engine.ChitsV2(nodeID, requestID, votes, vote)
-
 	case message.QueryFailed:
 		requestIDIntf, err := msg.Get(message.RequestID)
 		if err != nil {

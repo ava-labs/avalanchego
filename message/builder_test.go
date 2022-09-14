@@ -394,59 +394,6 @@ func TestBuildChits(t *testing.T) {
 	require.Equal(t, containerIDs, containerIDsIntf)
 }
 
-func TestBuildChitsV2(t *testing.T) {
-	chainID := ids.Empty.Prefix(0)
-	requestID := uint32(5)
-	containerID := ids.Empty.Prefix(1)
-	containerIDs := [][]byte{containerID[:]}
-
-	msg := TestInboundMsgBuilder.InboundChitsV2(chainID, requestID, []ids.ID{containerID}, containerID, dummyNodeID)
-	require.NotNil(t, msg)
-	require.Equal(t, ChitsV2, msg.Op())
-
-	chainIDIntf, err := msg.Get(ChainID)
-	require.NoError(t, err)
-	require.Equal(t, chainID[:], chainIDIntf)
-
-	requestIDIntf, err := msg.Get(RequestID)
-	require.NoError(t, err)
-	require.Equal(t, requestID, requestIDIntf)
-
-	containerIDsIntf, err := msg.Get(ContainerIDs)
-	require.NoError(t, err)
-	require.Equal(t, containerIDs, containerIDsIntf)
-
-	containerIDIntf, err := msg.Get(ContainerID)
-	require.NoError(t, err)
-	require.Equal(t, containerID[:], containerIDIntf)
-
-	outboundMsg, err := UncompressingBuilder.ChitsV2(chainID, requestID, []ids.ID{containerID}, containerID)
-	require.NoError(t, err)
-	require.NotNil(t, outboundMsg)
-	require.Equal(t, ChitsV2, outboundMsg.Op())
-
-	parsedMsg, err := TestCodec.Parse(outboundMsg.Bytes(), dummyNodeID, dummyOnFinishedHandling)
-	require.NoError(t, err)
-	require.NotNil(t, parsedMsg)
-	require.Equal(t, ChitsV2, parsedMsg.Op())
-
-	chainIDIntf, err = parsedMsg.Get(ChainID)
-	require.NoError(t, err)
-	require.Equal(t, chainID[:], chainIDIntf)
-
-	requestIDIntf, err = parsedMsg.Get(RequestID)
-	require.NoError(t, err)
-	require.Equal(t, requestID, requestIDIntf)
-
-	containerIDsIntf, err = parsedMsg.Get(ContainerIDs)
-	require.NoError(t, err)
-	require.Equal(t, containerIDs, containerIDsIntf)
-
-	containerIDIntf, err = parsedMsg.Get(ContainerID)
-	require.NoError(t, err)
-	require.Equal(t, containerID[:], containerIDIntf)
-}
-
 func TestBuildAncestors(t *testing.T) {
 	chainID := ids.Empty.Prefix(0)
 	requestID := uint32(5)

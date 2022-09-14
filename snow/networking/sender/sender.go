@@ -781,45 +781,6 @@ func (s *sender) SendChits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) 
 	}
 }
 
-// SendChitsV2 sends chits V2
-func (s *sender) SendChitsV2(nodeID ids.NodeID, requestID uint32, votes []ids.ID, vote ids.ID) {
-	// If [nodeID] is myself, send this message directly
-	// to my own router rather than sending it over the network
-	if nodeID == s.ctx.NodeID {
-		inMsg := s.msgCreator.InboundChitsV2(s.ctx.ChainID, requestID, votes, vote, nodeID)
-		go s.router.HandleInbound(inMsg)
-		return
-	}
-
-	// Create the outbound message.
-	outMsg, err := s.msgCreator.ChitsV2(s.ctx.ChainID, requestID, votes, vote)
-	if err != nil {
-		s.ctx.Log.Error("failed to build message",
-			zap.Stringer("messageOp", message.ChitsV2),
-			zap.Stringer("chainID", s.ctx.ChainID),
-			zap.Uint32("requestID", requestID),
-			zap.Stringer("containerID", vote),
-			zap.Stringer("containerIDs", ids.SliceStringer(votes)),
-			zap.Error(err),
-		)
-		return
-	}
-
-	// Send the message over the network.
-	nodeIDs := ids.NewNodeIDSet(1)
-	nodeIDs.Add(nodeID)
-	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
-		s.ctx.Log.Debug("failed to send message",
-			zap.Stringer("messageOp", outMsg.Op()),
-			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("chainID", s.ctx.ChainID),
-			zap.Uint32("requestID", requestID),
-			zap.Stringer("containerID", vote),
-			zap.Stringer("containerIDs", ids.SliceStringer(votes)),
-		)
-	}
-}
-
 // SendAppRequest sends an application-level request to the given nodes.
 // The meaning of this request, and how it should be handled, is defined by the VM.
 func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, appRequestBytes []byte) error {

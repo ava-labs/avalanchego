@@ -124,9 +124,6 @@ type QuerySender interface {
 
 	// Send chits to the specified node
 	SendChits(nodeID ids.NodeID, requestID uint32, votes []ids.ID)
-
-	// Send chits v2 to the specified node
-	SendChitsV2(nodeID ids.NodeID, requestID uint32, votes []ids.ID, vote ids.ID)
 }
 
 // Gossiper defines how a consensus engine gossips a container on the accepted

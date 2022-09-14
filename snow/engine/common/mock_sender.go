@@ -164,18 +164,6 @@ func (mr *MockSenderMockRecorder) SendChits(nodeID, requestID, votes interface{}
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendChits", reflect.TypeOf((*MockSender)(nil).SendChits), nodeID, requestID, votes)
 }
 
-// SendChitsV2 mocks base method.
-func (m *MockSender) SendChitsV2(nodeID ids.NodeID, requestID uint32, votes []ids.ID, vote ids.ID) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SendChitsV2", nodeID, requestID, votes, vote)
-}
-
-// SendChitsV2 indicates an expected call of SendChitsV2.
-func (mr *MockSenderMockRecorder) SendChitsV2(nodeID, requestID, votes, vote interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendChitsV2", reflect.TypeOf((*MockSender)(nil).SendChitsV2), nodeID, requestID, votes, vote)
-}
-
 // SendGet mocks base method.
 func (m *MockSender) SendGet(nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
 	m.ctrl.T.Helper()
@@ -600,18 +588,6 @@ func (m *MockQuerySender) SendChits(nodeID ids.NodeID, requestID uint32, votes [
 func (mr *MockQuerySenderMockRecorder) SendChits(nodeID, requestID, votes interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendChits", reflect.TypeOf((*MockQuerySender)(nil).SendChits), nodeID, requestID, votes)
-}
-
-// SendChitsV2 mocks base method.
-func (m *MockQuerySender) SendChitsV2(nodeID ids.NodeID, requestID uint32, votes []ids.ID, vote ids.ID) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SendChitsV2", nodeID, requestID, votes, vote)
-}
-
-// SendChitsV2 indicates an expected call of SendChitsV2.
-func (mr *MockQuerySenderMockRecorder) SendChitsV2(nodeID, requestID, votes, vote interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendChitsV2", reflect.TypeOf((*MockQuerySender)(nil).SendChitsV2), nodeID, requestID, votes, vote)
 }
 
 // SendPullQuery mocks base method.

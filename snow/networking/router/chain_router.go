@@ -557,10 +557,6 @@ func (cr *ChainRouter) clearRequest(
 // Assumes [cr.lock] is held.
 // Assumes [message.Op] is an alias of byte.
 func (cr *ChainRouter) createRequestID(nodeID ids.NodeID, chainID ids.ID, requestID uint32, op message.Op) ids.ID {
-	// Make sure to standardize chits messages.
-	if op == message.ChitsV2 {
-		op = message.Chits
-	}
 	copy(cr.requestIDBytes, nodeID[:])
 	copy(cr.requestIDBytes[hashing.AddrLen:], chainID[:])
 	binary.BigEndian.PutUint32(cr.requestIDBytes[hashing.AddrLen+hashing.HashLen:], requestID)
