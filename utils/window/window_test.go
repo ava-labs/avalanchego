@@ -163,7 +163,7 @@ func TestTTLOldest(t *testing.T) {
 	oldest, ok := window.Oldest()
 	require.Equal(t, 1, oldest.(int))
 	require.True(t, ok)
-	require.Equal(t, 3, window.size)
+	require.Equal(t, 3, window.elements.Len())
 
 	// Now we're one second past the ttl of 10 seconds as defined in testTTL,
 	// so all existing elements need to be evicted.
@@ -173,7 +173,7 @@ func TestTTLOldest(t *testing.T) {
 	oldest, ok = window.Oldest()
 	require.Nil(t, oldest)
 	require.False(t, ok)
-	require.Equal(t, 0, window.size)
+	require.Equal(t, 0, window.elements.Len())
 }
 
 // Tests that we bound the amount of elements in the window

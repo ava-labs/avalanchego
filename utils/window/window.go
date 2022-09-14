@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
@@ -22,11 +23,7 @@ type Window struct {
 	// mutex for synchronization
 	lock sync.Mutex
 	// elements in the window
-	window []node
-	// head/tail pointers to mark occupied parts of the window
-	head, tail int
-	// how many elements are currently in the window
-	size int
+	elements buffer.UnboundedQueue[node]
 }
 
 // Config exposes parameters for Window
@@ -39,10 +36,10 @@ type Config struct {
 // New returns an instance of window
 func New(config Config) *Window {
 	return &Window{
-		clock:   config.Clock,
-		ttl:     config.TTL,
-		maxSize: config.MaxSize,
-		window:  make([]node, config.MaxSize),
+		clock:    config.Clock,
+		ttl:      config.TTL,
+		maxSize:  config.MaxSize,
+		elements: buffer.NewUnboundedSliceQueue[node](config.MaxSize + 1),
 	}
 }
 
@@ -53,17 +50,15 @@ func (w *Window) Add(value interface{}) {
 	defer w.lock.Unlock()
 
 	w.removeStaleNodes()
-	if w.size >= w.maxSize {
-		w.removeOldestNode()
+	if w.elements.Len() >= w.maxSize {
+		_, _ = w.elements.Dequeue()
 	}
 
 	// add the new block id
-	w.window[w.tail] = node{
+	w.elements.Enqueue(node{
 		value:     value,
 		entryTime: w.clock.Time(),
-	}
-	w.tail = (w.tail + 1) % len(w.window)
-	w.size++
+	})
 }
 
 // Oldest returns the oldest element in the window.
@@ -72,12 +67,12 @@ func (w *Window) Oldest() (interface{}, bool) {
 	defer w.lock.Unlock()
 
 	w.removeStaleNodes()
-	if w.size == 0 {
+
+	oldest, ok := w.elements.PeekHead()
+	if !ok {
 		return nil, false
 	}
-
-	// fetch the oldest element
-	return w.window[w.head].value, true
+	return oldest.value, true
 }
 
 // Length returns the number of elements in the window.
@@ -86,7 +81,7 @@ func (w *Window) Length() int {
 	defer w.lock.Unlock()
 
 	w.removeStaleNodes()
-	return w.size
+	return w.elements.Len()
 }
 
 // removeStaleNodes removes any nodes beyond the configured ttl of a window node.
@@ -94,22 +89,13 @@ func (w *Window) removeStaleNodes() {
 	// If we're beyond the expiry threshold, removeStaleNodes this node from our
 	// window. Nodes are guaranteed to be strictly increasing in entry time,
 	// so we can break this loop once we find the first non-stale one.
-	for w.size > 0 {
-		if w.clock.Time().Sub(w.window[w.head].entryTime) <= w.ttl {
-			break
+	for {
+		oldest, ok := w.elements.PeekHead()
+		if !ok || w.clock.Time().Sub(oldest.entryTime) <= w.ttl {
+			return
 		}
-
-		w.removeOldestNode()
+		_, _ = w.elements.Dequeue()
 	}
-}
-
-// Removes the oldest element.
-// Doesn't actually remove anything, just marks that location in memory
-// as available to overwrite.
-func (w *Window) removeOldestNode() {
-	w.window[w.head].value = nil // mark for garbage collection
-	w.head = (w.head + 1) % len(w.window)
-	w.size--
 }
 
 // helper struct to represent elements in the window
