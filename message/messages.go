@@ -29,7 +29,7 @@ type InboundMessage interface {
 
 	BytesSavedCompression() int
 	Op() Op
-	Get(Field) interface{}
+	Get(Field) (interface{}, error)
 	NodeID() ids.NodeID
 	ExpirationTime() time.Time
 	OnFinishedHandling()
@@ -76,7 +76,13 @@ type inboundMessageWithPacker struct {
 }
 
 // Field returns the value of the specified field in this message
-func (inMsg *inboundMessageWithPacker) Get(field Field) interface{} { return inMsg.fields[field] }
+func (inMsg *inboundMessageWithPacker) Get(field Field) (interface{}, error) {
+	value, ok := inMsg.fields[field]
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", errMissingField, field)
+	}
+	return value, nil
+}
 
 func (inMsg *inboundMessageWithPacker) String() string {
 	sb := strings.Builder{}
