@@ -600,8 +600,9 @@ func (p *peer) handlePing(_ message.InboundMessage) {
 func (p *peer) handlePong(msg message.InboundMessage) {
 	uptimeIntf, err := msg.Get(message.Uptime)
 	if err != nil {
-		p.Log.Debug("dropping pong message with invalid field",
+		p.Log.Debug("message with invalid field",
 			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.Pong),
 			zap.Stringer("field", message.Uptime),
 			zap.Error(err),
 		)
