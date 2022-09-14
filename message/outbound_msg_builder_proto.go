@@ -7,8 +7,9 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/utils/ips"
+
+	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
 var _ OutboundMsgBuilder = &outMsgBuilderWithProto{}
