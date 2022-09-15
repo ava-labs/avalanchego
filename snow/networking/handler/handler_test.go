@@ -44,7 +44,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	handlerIntf, err := New(
 		mc,
 		mcProto,
-		time.Time{},
+		time.Now().Add(time.Hour), // TODO: test with blueberry accepted
 		ctx,
 		vdrs,
 		nil,
@@ -127,7 +127,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	handlerIntf, err := New(
 		mc,
 		mcProto,
-		time.Time{},
+		time.Now().Add(time.Hour), // TODO: test with blueberry accepted
 		ctx,
 		vdrs,
 		nil,
@@ -203,7 +203,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	handlerIntf, err := New(
 		mc,
 		mcProto,
-		time.Time{},
+		time.Now().Add(time.Hour), // TODO: test with blueberry accepted
 		ctx,
 		vdrs,
 		nil,

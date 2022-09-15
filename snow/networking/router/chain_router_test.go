@@ -67,7 +67,7 @@ func TestShutdown(t *testing.T) {
 	handler, err := handler.New(
 		mc,
 		mcProto,
-		time.Time{},
+		time.Now().Add(time.Hour), // TODO: test with blueberry accepted
 		ctx,
 		vdrs,
 		nil,
@@ -175,7 +175,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	handler, err := handler.New(
 		mc,
 		mcProto,
-		time.Time{},
+		time.Now().Add(time.Hour), // TODO: test with blueberry accepted
 		ctx,
 		vdrs,
 		nil,
@@ -290,7 +290,7 @@ func TestRouterTimeout(t *testing.T) {
 	handler, err := handler.New(
 		mc,
 		mcProto,
-		time.Time{},
+		time.Now().Add(time.Hour), // TODO: test with blueberry accepted
 		ctx,
 		vdrs,
 		nil,
@@ -409,7 +409,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 	handler, err := handler.New(
 		mc,
 		mcProto,
-		time.Time{},
+		time.Now().Add(time.Hour), // TODO: test with blueberry accepted
 		ctx,
 		vdrs,
 		nil,
@@ -528,7 +528,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	handler, err := handler.New(
 		mc,
 		mcProto,
-		time.Time{},
+		time.Now().Add(time.Hour), // TODO: test with blueberry accepted
 		ctx,
 		vdrs,
 		nil,
