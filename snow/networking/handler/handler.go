@@ -148,8 +148,7 @@ func New(
 	return h, nil
 }
 
-// TODO: add metrics to track which codec is used?
-func (h *handler) selectMsgCreator(time time.Time) message.Creator {
+func (h *handler) getMsgCreator(time time.Time) message.Creator {
 	if time.Before(h.blueberryTime) {
 		return h.mc
 	}
@@ -364,13 +363,13 @@ func (h *handler) dispatchChans() {
 			return
 
 		case vmMSG := <-h.msgFromVMChan:
-			msg = h.selectMsgCreator(time).InternalVMMessage(h.ctx.NodeID, uint32(vmMSG))
+			msg = h.getMsgCreator(time).InternalVMMessage(h.ctx.NodeID, uint32(vmMSG))
 
 		case <-gossiper.C:
-			msg = h.selectMsgCreator(time).InternalGossipRequest(h.ctx.NodeID)
+			msg = h.getMsgCreator(time).InternalGossipRequest(h.ctx.NodeID)
 
 		case <-h.timeouts:
-			msg = h.selectMsgCreator(time).InternalTimeout(h.ctx.NodeID)
+			msg = h.getMsgCreator(time).InternalTimeout(h.ctx.NodeID)
 		}
 
 		if err := h.handleChanMsg(msg); err != nil {
