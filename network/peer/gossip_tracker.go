@@ -114,8 +114,9 @@ func (d *GossipTracker) Remove(id ids.NodeID) bool {
 
 // UpdateKnown adds to the peers that a peer knows about
 // invariants:
-// 1. nodeIDs must not contain duplicates
-// 2. nodeIDs must only contain nodeIDs that have been tracked with Add()
+// 1. [id] and [learned] should only contain nodeIDs that have been tracked with
+// 	  Add(). Trying to add nodeIDs that aren't tracked yet will result in a noop
+// 	  and this will return [false].
 func (d *GossipTracker) UpdateKnown(id ids.NodeID, learned []ids.NodeID) bool {
 	d.lock.Lock()
 	defer d.lock.Unlock()
