@@ -47,12 +47,11 @@ type Config struct {
 	ResourceTracker tracker.ResourceTracker
 }
 
-// TODO: add metrics to track which codec is used?
-func (c Config) SelectMessageCreator(time time.Time) message.Creator {
-	if time.Before(c.BlueberryTime) {
-		return c.MessageCreator
+func (c Config) GetMessageCreator(time time.Time) message.Creator {
+	if c.IsBlueberryActivated(time) {
+		return c.MessageCreatorWithProto
 	}
-	return c.MessageCreatorWithProto
+	return c.MessageCreator
 }
 
 func (c Config) IsBlueberryActivated(time time.Time) bool {
