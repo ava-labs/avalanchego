@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto"
 	"crypto/x509"
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -43,19 +44,32 @@ type rawTestPeer struct {
 	inboundMsgChan <-chan message.InboundMessage
 }
 
-func newMessageCreator(t *testing.T) message.Creator {
+func newMessageCreator(t *testing.T, useProto bool) message.Creator {
 	t.Helper()
-	mc, err := message.NewCreator(
-		prometheus.NewRegistry(),
-		true,
-		"",
-		10*time.Second,
+	var (
+		mc  message.Creator
+		err error
 	)
+	if useProto {
+		mc, err = message.NewCreatorWithProto(
+			prometheus.NewRegistry(),
+			true,
+			"",
+			10*time.Second,
+		)
+	} else {
+		mc, err = message.NewCreator(
+			prometheus.NewRegistry(),
+			true,
+			"",
+			10*time.Second,
+		)
+	}
 	require.NoError(t, err)
 	return mc
 }
 
-func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
+func makeRawTestPeers(t *testing.T, useProto bool) (*rawTestPeer, *rawTestPeer) {
 	t.Helper()
 	require := require.New(t)
 
@@ -70,7 +84,7 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 	nodeID0 := ids.NodeIDFromCert(tlsCert0.Leaf)
 	nodeID1 := ids.NodeIDFromCert(tlsCert1.Leaf)
 
-	mc := newMessageCreator(t)
+	mc := newMessageCreator(t, useProto)
 
 	pingMessage, err := mc.Ping()
 	require.NoError(err)
@@ -157,8 +171,8 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 	return peer0, peer1
 }
 
-func makeTestPeers(t *testing.T) (*testPeer, *testPeer) {
-	rawPeer0, rawPeer1 := makeRawTestPeers(t)
+func makeTestPeers(t *testing.T, useProto bool) (*testPeer, *testPeer) {
+	rawPeer0, rawPeer1 := makeRawTestPeers(t, useProto)
 
 	peer0 := &testPeer{
 		Peer: Start(
@@ -193,11 +207,11 @@ func makeTestPeers(t *testing.T) (*testPeer, *testPeer) {
 	return peer0, peer1
 }
 
-func makeReadyTestPeers(t *testing.T) (*testPeer, *testPeer) {
+func makeReadyTestPeers(t *testing.T, useProto bool) (*testPeer, *testPeer) {
 	t.Helper()
 	require := require.New(t)
 
-	peer0, peer1 := makeTestPeers(t)
+	peer0, peer1 := makeTestPeers(t, useProto)
 
 	err := peer0.AwaitReady(context.Background())
 	require.NoError(err)
@@ -215,72 +229,80 @@ func makeReadyTestPeers(t *testing.T) (*testPeer, *testPeer) {
 func TestReady(t *testing.T) {
 	require := require.New(t)
 
-	rawPeer0, rawPeer1 := makeRawTestPeers(t)
+	for _, useProto := range []bool{false, true} {
+		t.Run(fmt.Sprintf("use proto buf message creator %v", useProto), func(tt *testing.T) {
+			rawPeer0, rawPeer1 := makeRawTestPeers(tt, useProto)
 
-	peer0 := Start(
-		rawPeer0.config,
-		rawPeer0.conn,
-		rawPeer1.cert,
-		rawPeer1.nodeID,
-		NewThrottledMessageQueue(
-			rawPeer0.config.Metrics,
-			rawPeer1.nodeID,
-			logging.NoLog{},
-			throttling.NewNoOutboundThrottler(),
-		),
-	)
+			peer0 := Start(
+				rawPeer0.config,
+				rawPeer0.conn,
+				rawPeer1.cert,
+				rawPeer1.nodeID,
+				NewThrottledMessageQueue(
+					rawPeer0.config.Metrics,
+					rawPeer1.nodeID,
+					logging.NoLog{},
+					throttling.NewNoOutboundThrottler(),
+				),
+			)
 
-	isReady := peer0.Ready()
-	require.False(isReady)
+			isReady := peer0.Ready()
+			require.False(isReady)
 
-	peer1 := Start(
-		rawPeer1.config,
-		rawPeer1.conn,
-		rawPeer0.cert,
-		rawPeer0.nodeID,
-		NewThrottledMessageQueue(
-			rawPeer1.config.Metrics,
-			rawPeer0.nodeID,
-			logging.NoLog{},
-			throttling.NewNoOutboundThrottler(),
-		),
-	)
+			peer1 := Start(
+				rawPeer1.config,
+				rawPeer1.conn,
+				rawPeer0.cert,
+				rawPeer0.nodeID,
+				NewThrottledMessageQueue(
+					rawPeer1.config.Metrics,
+					rawPeer0.nodeID,
+					logging.NoLog{},
+					throttling.NewNoOutboundThrottler(),
+				),
+			)
 
-	err := peer0.AwaitReady(context.Background())
-	require.NoError(err)
-	isReady = peer0.Ready()
-	require.True(isReady)
+			err := peer0.AwaitReady(context.Background())
+			require.NoError(err)
+			isReady = peer0.Ready()
+			require.True(isReady)
 
-	err = peer1.AwaitReady(context.Background())
-	require.NoError(err)
-	isReady = peer1.Ready()
-	require.True(isReady)
+			err = peer1.AwaitReady(context.Background())
+			require.NoError(err)
+			isReady = peer1.Ready()
+			require.True(isReady)
 
-	peer0.StartClose()
-	err = peer0.AwaitClosed(context.Background())
-	require.NoError(err)
-	err = peer1.AwaitClosed(context.Background())
-	require.NoError(err)
+			peer0.StartClose()
+			err = peer0.AwaitClosed(context.Background())
+			require.NoError(err)
+			err = peer1.AwaitClosed(context.Background())
+			require.NoError(err)
+		})
+	}
 }
 
 func TestSend(t *testing.T) {
 	require := require.New(t)
 
-	peer0, peer1 := makeReadyTestPeers(t)
-	mc := newMessageCreator(t)
+	for _, useProto := range []bool{false, true} {
+		t.Run(fmt.Sprintf("use proto buf message creator %v", useProto), func(tt *testing.T) {
+			peer0, peer1 := makeReadyTestPeers(tt, useProto)
+			mc := newMessageCreator(tt, useProto)
 
-	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
-	require.NoError(err)
+			outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
+			require.NoError(err)
 
-	sent := peer0.Send(context.Background(), outboundGetMsg)
-	require.True(sent)
+			sent := peer0.Send(context.Background(), outboundGetMsg)
+			require.True(sent)
 
-	inboundGetMsg := <-peer1.inboundMsgChan
-	require.Equal(message.Get, inboundGetMsg.Op())
+			inboundGetMsg := <-peer1.inboundMsgChan
+			require.Equal(message.Get, inboundGetMsg.Op())
 
-	peer1.StartClose()
-	err = peer0.AwaitClosed(context.Background())
-	require.NoError(err)
-	err = peer1.AwaitClosed(context.Background())
-	require.NoError(err)
+			peer1.StartClose()
+			err = peer0.AwaitClosed(context.Background())
+			require.NoError(err)
+			err = peer1.AwaitClosed(context.Background())
+			require.NoError(err)
+		})
+	}
 }

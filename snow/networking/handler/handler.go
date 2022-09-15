@@ -62,8 +62,9 @@ type handler struct {
 	// Useful for faking time in tests
 	clock mockable.Clock
 
-	ctx *snow.ConsensusContext
-	mc  message.Creator
+	ctx     *snow.ConsensusContext
+	mc      message.Creator
+	mcProto message.Creator
 	// The validator set that validates this chain
 	validators validators.Set
 	// Receives messages from the VM
@@ -102,6 +103,7 @@ type handler struct {
 // [engine] must be initialized before initializing this handler
 func New(
 	mc message.Creator,
+	mcProto message.Creator,
 	ctx *snow.ConsensusContext,
 	validators validators.Set,
 	msgFromVMChan <-chan common.Message,
@@ -112,6 +114,7 @@ func New(
 	h := &handler{
 		ctx:              ctx,
 		mc:               mc,
+		mcProto:          mcProto,
 		validators:       validators,
 		msgFromVMChan:    msgFromVMChan,
 		preemptTimeouts:  preemptTimeouts,

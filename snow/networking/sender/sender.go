@@ -39,11 +39,12 @@ type GossipConfig struct {
 // sender registers outbound requests with [router] so that [router]
 // fires a timeout if we don't get a response to the request.
 type sender struct {
-	ctx        *snow.ConsensusContext
-	msgCreator message.Creator
-	sender     ExternalSender // Actually does the sending over the network
-	router     router.Router
-	timeouts   timeout.Manager
+	ctx                 *snow.ConsensusContext
+	msgCreator          message.Creator
+	msgCreatorWithProto message.Creator
+	sender              ExternalSender // Actually does the sending over the network
+	router              router.Router
+	timeouts            timeout.Manager
 
 	gossipConfig GossipConfig
 
@@ -55,19 +56,21 @@ type sender struct {
 func New(
 	ctx *snow.ConsensusContext,
 	msgCreator message.Creator,
+	msgCreatorWithProto message.Creator,
 	externalSender ExternalSender,
 	router router.Router,
 	timeouts timeout.Manager,
 	gossipConfig GossipConfig,
 ) (common.Sender, error) {
 	s := &sender{
-		ctx:              ctx,
-		msgCreator:       msgCreator,
-		sender:           externalSender,
-		router:           router,
-		timeouts:         timeouts,
-		gossipConfig:     gossipConfig,
-		failedDueToBench: make(map[message.Op]prometheus.Counter, len(message.ConsensusRequestOps)),
+		ctx:                 ctx,
+		msgCreator:          msgCreator,
+		msgCreatorWithProto: msgCreatorWithProto,
+		sender:              externalSender,
+		router:              router,
+		timeouts:            timeouts,
+		gossipConfig:        gossipConfig,
+		failedDueToBench:    make(map[message.Op]prometheus.Counter, len(message.ConsensusRequestOps)),
 	}
 
 	for _, op := range message.ConsensusRequestOps {

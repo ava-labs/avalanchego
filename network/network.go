@@ -153,6 +153,7 @@ type network struct {
 func NewNetwork(
 	config *Config,
 	msgCreator message.Creator,
+	msgCreatorWithProto message.Creator,
 	metricsRegisterer prometheus.Registerer,
 	log logging.Logger,
 	listener net.Listener,

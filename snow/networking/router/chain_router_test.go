@@ -45,17 +45,18 @@ func TestShutdown(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
+
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	require.NoError(t, err)
+	mcProto, err := message.NewCreatorWithProto(metrics, true, "dummyNamespace", 10*time.Second)
+	require.NoError(t, err)
 
-	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, mcProto, tm, time.Second, ids.Set{}, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	require.NoError(t, err)
 
 	shutdownCalled := make(chan struct{}, 1)
@@ -65,6 +66,7 @@ func TestShutdown(t *testing.T) {
 	require.NoError(t, err)
 	handler, err := handler.New(
 		mc,
+		mcProto,
 		ctx,
 		vdrs,
 		nil,
@@ -141,19 +143,20 @@ func TestShutdownTimesOut(t *testing.T) {
 		"",
 		metrics,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
 
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	require.NoError(t, err)
+	mcProto, err := message.NewCreatorWithProto(metrics, true, "dummyNamespace", 10*time.Second)
+	require.NoError(t, err)
 
 	err = chainRouter.Initialize(ids.EmptyNodeID,
 		logging.NoLog{},
 		mc,
+		mcProto,
 		tm,
 		time.Millisecond,
 		ids.Set{},
@@ -170,6 +173,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	require.NoError(t, err)
 	handler, err := handler.New(
 		mc,
+		mcProto,
 		ctx,
 		vdrs,
 		nil,
@@ -250,18 +254,19 @@ func TestRouterTimeout(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	go tm.Dispatch()
 
 	// Create a router
 	chainRouter := ChainRouter{}
+
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	require.NoError(t, err)
+	mcProto, err := message.NewCreatorWithProto(metrics, true, "dummyNamespace", 10*time.Second)
+	require.NoError(t, err)
 
-	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Millisecond, ids.Set{}, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, mcProto, tm, time.Millisecond, ids.Set{}, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	require.NoError(t, err)
 
 	// Create bootstrapper, engine and handler
@@ -282,6 +287,7 @@ func TestRouterTimeout(t *testing.T) {
 	require.NoError(t, err)
 	handler, err := handler.New(
 		mc,
+		mcProto,
 		ctx,
 		vdrs,
 		nil,
@@ -374,18 +380,19 @@ func TestRouterClearTimeouts(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	go tm.Dispatch()
 
 	// Create a router
 	chainRouter := ChainRouter{}
+
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	require.NoError(t, err)
+	mcProto, err := message.NewCreatorWithProto(metrics, true, "dummyNamespace", 10*time.Second)
+	require.NoError(t, err)
 
-	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Millisecond, ids.Set{}, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, mcProto, tm, time.Millisecond, ids.Set{}, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	require.NoError(t, err)
 
 	// Create bootstrapper, engine and handler
@@ -398,6 +405,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 	require.NoError(t, err)
 	handler, err := handler.New(
 		mc,
+		mcProto,
 		ctx,
 		vdrs,
 		nil,
@@ -486,18 +494,19 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	go tm.Dispatch()
 
 	// Create a router
 	chainRouter := ChainRouter{}
+
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	require.NoError(t, err)
+	mcProto, err := message.NewCreatorWithProto(metrics, true, "dummyNamespace", 10*time.Second)
+	require.NoError(t, err)
 
-	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Millisecond, ids.Set{}, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, mcProto, tm, time.Millisecond, ids.Set{}, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	require.NoError(t, err)
 
 	// Create bootstrapper, engine and handler
@@ -514,6 +523,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	require.NoError(t, err)
 	handler, err := handler.New(
 		mc,
+		mcProto,
 		ctx,
 		vdrs,
 		nil,
