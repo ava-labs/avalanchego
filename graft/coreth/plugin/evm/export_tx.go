@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -25,8 +26,10 @@ import (
 )
 
 var (
-	_ UnsignedAtomicTx       = &UnsignedExportTx{}
-	_ secp256k1fx.UnsignedTx = &UnsignedExportTx{}
+	_                               UnsignedAtomicTx       = &UnsignedExportTx{}
+	_                               secp256k1fx.UnsignedTx = &UnsignedExportTx{}
+	errExportNonAVAXInputBlueberry                         = errors.New("export input cannot contain non-AVAX in Blueberry")
+	errExportNonAVAXOutputBlueberry                        = errors.New("export output cannot contain non-AVAX in Blueberry")
 )
 
 // UnsignedExportTx is an unsigned ExportTx
@@ -92,6 +95,9 @@ func (utx *UnsignedExportTx) Verify(
 		if err := in.Verify(); err != nil {
 			return err
 		}
+		if rules.IsBlueberry && in.AssetID != ctx.AVAXAssetID {
+			return errExportNonAVAXInputBlueberry
+		}
 	}
 
 	for _, out := range utx.ExportedOutputs {
@@ -101,6 +107,9 @@ func (utx *UnsignedExportTx) Verify(
 		assetID := out.AssetID()
 		if assetID != ctx.AVAXAssetID && utx.DestinationChain == constants.PlatformChainID {
 			return errWrongChainID
+		}
+		if rules.IsBlueberry && assetID != ctx.AVAXAssetID {
+			return errExportNonAVAXOutputBlueberry
 		}
 	}
 	if !avax.IsSortedTransferableOutputs(utx.ExportedOutputs, Codec) {

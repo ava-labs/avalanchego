@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -23,8 +24,10 @@ import (
 )
 
 var (
-	_ UnsignedAtomicTx       = &UnsignedImportTx{}
-	_ secp256k1fx.UnsignedTx = &UnsignedImportTx{}
+	_                               UnsignedAtomicTx       = &UnsignedImportTx{}
+	_                               secp256k1fx.UnsignedTx = &UnsignedImportTx{}
+	errImportNonAVAXInputBlueberry                         = errors.New("import input cannot contain non-AVAX in Blueberry")
+	errImportNonAVAXOutputBlueberry                        = errors.New("import output cannot contain non-AVAX in Blueberry")
 )
 
 // UnsignedImportTx is an unsigned ImportTx
@@ -86,11 +89,17 @@ func (utx *UnsignedImportTx) Verify(
 		if err := out.Verify(); err != nil {
 			return fmt.Errorf("EVM Output failed verification: %w", err)
 		}
+		if rules.IsBlueberry && out.AssetID != ctx.AVAXAssetID {
+			return errImportNonAVAXOutputBlueberry
+		}
 	}
 
 	for _, in := range utx.ImportedInputs {
 		if err := in.Verify(); err != nil {
 			return fmt.Errorf("atomic input failed verification: %w", err)
+		}
+		if rules.IsBlueberry && in.AssetID() != ctx.AVAXAssetID {
+			return errImportNonAVAXInputBlueberry
 		}
 	}
 	if !avax.IsSortedAndUniqueTransferableInputs(utx.ImportedInputs) {
