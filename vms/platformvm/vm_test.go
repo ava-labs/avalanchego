@@ -2083,8 +2083,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 			handler, err := handler.New(
 				mc,
-				mcProto,
-				time.Time{},
 				bootstrapConfig.Ctx,
 				vdrs,
 				msgChan,

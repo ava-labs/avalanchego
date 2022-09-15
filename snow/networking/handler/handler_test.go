@@ -5,7 +5,6 @@ package handler
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -29,8 +28,6 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	require.NoError(t, err)
-	mcProto, err := message.NewCreatorWithProto(metrics, true, "dummyNamespace", 10*time.Second)
-	require.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
 
@@ -43,8 +40,6 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	require.NoError(t, err)
 	handlerIntf, err := New(
 		mc,
-		mcProto,
-		time.Now().Add(time.Hour), // TODO: test with blueberry accepted
 		ctx,
 		vdrs,
 		nil,
@@ -119,15 +114,11 @@ func TestHandlerClosesOnError(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	require.NoError(t, err)
-	mcProto, err := message.NewCreatorWithProto(metrics, true, "dummyNamespace", 10*time.Second)
-	require.NoError(t, err)
 
 	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
 	require.NoError(t, err)
 	handlerIntf, err := New(
 		mc,
-		mcProto,
-		time.Now().Add(time.Hour), // TODO: test with blueberry accepted
 		ctx,
 		vdrs,
 		nil,
@@ -192,18 +183,11 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	err := vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
 	require.NoError(t, err)
 
-	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
-	require.NoError(t, err)
-	mcProto, err := message.NewCreatorWithProto(metrics, true, "dummyNamespace", 10*time.Second)
-	require.NoError(t, err)
-
+	mc := message.NewInternalBuilder()
 	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
 	require.NoError(t, err)
 	handlerIntf, err := New(
 		mc,
-		mcProto,
-		time.Now().Add(time.Hour), // TODO: test with blueberry accepted
 		ctx,
 		vdrs,
 		nil,
@@ -253,67 +237,56 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 
 // Test that messages from the VM are handled
 func TestHandlerDispatchInternal(t *testing.T) {
-	for _, useProto := range []bool{false, true} {
-		t.Run(fmt.Sprintf("use proto buf message creator %v", useProto), func(tt *testing.T) {
-			calledNotify := make(chan struct{}, 1)
-			ctx := snow.DefaultConsensusContextTest()
-			msgFromVMChan := make(chan common.Message)
-			vdrs := validators.NewSet()
-			err := vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
-			require.NoError(tt, err)
+	calledNotify := make(chan struct{}, 1)
+	ctx := snow.DefaultConsensusContextTest()
+	msgFromVMChan := make(chan common.Message)
+	vdrs := validators.NewSet()
+	err := vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
+	require.NoError(t, err)
 
-			metrics := prometheus.NewRegistry()
-			mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
-			require.NoError(tt, err)
-			mcProto, err := message.NewCreatorWithProto(metrics, true, "dummyNamespace", 10*time.Second)
-			require.NoError(tt, err)
+	mc := message.NewInternalBuilder()
+	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	require.NoError(t, err)
+	handler, err := New(
+		mc,
+		ctx,
+		vdrs,
+		msgFromVMChan,
+		nil,
+		time.Second,
+		resourceTracker,
+	)
+	require.NoError(t, err)
 
-			resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
-			require.NoError(tt, err)
-			handler, err := New(
-				mc,
-				mcProto,
-				time.Time{},
-				ctx,
-				vdrs,
-				msgFromVMChan,
-				nil,
-				time.Second,
-				resourceTracker,
-			)
-			require.NoError(tt, err)
+	bootstrapper := &common.BootstrapperTest{
+		BootstrapableTest: common.BootstrapableTest{
+			T: t,
+		},
+		EngineTest: common.EngineTest{
+			T: t,
+		},
+	}
+	bootstrapper.Default(false)
+	handler.SetBootstrapper(bootstrapper)
 
-			bootstrapper := &common.BootstrapperTest{
-				BootstrapableTest: common.BootstrapableTest{
-					T: tt,
-				},
-				EngineTest: common.EngineTest{
-					T: tt,
-				},
-			}
-			bootstrapper.Default(false)
-			handler.SetBootstrapper(bootstrapper)
+	engine := &common.EngineTest{T: t}
+	engine.Default(false)
+	engine.ContextF = func() *snow.ConsensusContext { return ctx }
+	engine.NotifyF = func(common.Message) error {
+		calledNotify <- struct{}{}
+		return nil
+	}
+	handler.SetConsensus(engine)
+	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
 
-			engine := &common.EngineTest{T: tt}
-			engine.Default(false)
-			engine.ContextF = func() *snow.ConsensusContext { return ctx }
-			engine.NotifyF = func(common.Message) error {
-				calledNotify <- struct{}{}
-				return nil
-			}
-			handler.SetConsensus(engine)
-			ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
+	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 
-			bootstrapper.StartF = func(startReqID uint32) error { return nil }
+	handler.Start(false)
+	msgFromVMChan <- 0
 
-			handler.Start(false)
-			msgFromVMChan <- 0
-
-			select {
-			case <-time.After(20 * time.Millisecond):
-				t.Fatalf("should have called notify")
-			case <-calledNotify:
-			}
-		})
+	select {
+	case <-time.After(20 * time.Millisecond):
+		t.Fatalf("should have called notify")
+	case <-calledNotify:
 	}
 }

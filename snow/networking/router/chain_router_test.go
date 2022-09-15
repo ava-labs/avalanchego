@@ -50,12 +50,7 @@ func TestShutdown(t *testing.T) {
 
 	chainRouter := ChainRouter{}
 
-	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
-	require.NoError(t, err)
-	mcProto, err := message.NewCreatorWithProto(metrics, true, "dummyNamespace", 10*time.Second)
-	require.NoError(t, err)
-
+	mc := message.NewInternalBuilder()
 	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	require.NoError(t, err)
 
@@ -66,8 +61,6 @@ func TestShutdown(t *testing.T) {
 	require.NoError(t, err)
 	handler, err := handler.New(
 		mc,
-		mcProto,
-		time.Now().Add(time.Hour), // TODO: test with blueberry accepted
 		ctx,
 		vdrs,
 		nil,
@@ -151,8 +144,6 @@ func TestShutdownTimesOut(t *testing.T) {
 
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	require.NoError(t, err)
-	mcProto, err := message.NewCreatorWithProto(metrics, true, "dummyNamespace", 10*time.Second)
-	require.NoError(t, err)
 
 	err = chainRouter.Initialize(ids.EmptyNodeID,
 		logging.NoLog{},
@@ -173,8 +164,6 @@ func TestShutdownTimesOut(t *testing.T) {
 	require.NoError(t, err)
 	handler, err := handler.New(
 		mc,
-		mcProto,
-		time.Now().Add(time.Hour), // TODO: test with blueberry accepted
 		ctx,
 		vdrs,
 		nil,
@@ -261,12 +250,7 @@ func TestRouterTimeout(t *testing.T) {
 	// Create a router
 	chainRouter := ChainRouter{}
 
-	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
-	require.NoError(t, err)
-	mcProto, err := message.NewCreatorWithProto(metrics, true, "dummyNamespace", 10*time.Second)
-	require.NoError(t, err)
-
+	mc := message.NewInternalBuilder()
 	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Millisecond, ids.Set{}, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	require.NoError(t, err)
 
@@ -288,8 +272,6 @@ func TestRouterTimeout(t *testing.T) {
 	require.NoError(t, err)
 	handler, err := handler.New(
 		mc,
-		mcProto,
-		time.Now().Add(time.Hour), // TODO: test with blueberry accepted
 		ctx,
 		vdrs,
 		nil,
@@ -391,8 +373,6 @@ func TestRouterClearTimeouts(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	require.NoError(t, err)
-	mcProto, err := message.NewCreatorWithProto(metrics, true, "dummyNamespace", 10*time.Second)
-	require.NoError(t, err)
 
 	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Millisecond, ids.Set{}, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	require.NoError(t, err)
@@ -407,8 +387,6 @@ func TestRouterClearTimeouts(t *testing.T) {
 	require.NoError(t, err)
 	handler, err := handler.New(
 		mc,
-		mcProto,
-		time.Now().Add(time.Hour), // TODO: test with blueberry accepted
 		ctx,
 		vdrs,
 		nil,
@@ -506,8 +484,6 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	require.NoError(t, err)
-	mcProto, err := message.NewCreatorWithProto(metrics, true, "dummyNamespace", 10*time.Second)
-	require.NoError(t, err)
 
 	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Millisecond, ids.Set{}, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	require.NoError(t, err)
@@ -526,8 +502,6 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	require.NoError(t, err)
 	handler, err := handler.New(
 		mc,
-		mcProto,
-		time.Now().Add(time.Hour), // TODO: test with blueberry accepted
 		ctx,
 		vdrs,
 		nil,

@@ -83,8 +83,6 @@ func TestTimeout(t *testing.T) {
 	require.NoError(t, err)
 	handler, err := handler.New(
 		mc,
-		mcProto,
-		time.Now().Add(time.Hour), /* TODO: test with blueberry accepted */
 		ctx,
 		vdrs,
 		nil,
@@ -177,8 +175,6 @@ func TestReliableMessages(t *testing.T) {
 	require.NoError(t, err)
 	handler, err := handler.New(
 		mc,
-		mcProto,
-		time.Now().Add(time.Hour), /* TODO: test with blueberry accepted */
 		ctx,
 		vdrs,
 		nil,
@@ -278,8 +274,6 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	require.NoError(t, err)
 	handler, err := handler.New(
 		mc,
-		mcProto,
-		time.Now().Add(time.Hour), /* TODO: test with blueberry accepted */
 		ctx,
 		vdrs,
 		nil,

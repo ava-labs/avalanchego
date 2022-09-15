@@ -62,10 +62,8 @@ type handler struct {
 	// Useful for faking time in tests
 	clock mockable.Clock
 
-	ctx           *snow.ConsensusContext
-	mc            message.Creator
-	mcProto       message.Creator
-	blueberryTime time.Time
+	ctx *snow.ConsensusContext
+	mc  message.InternalMsgBuilder
 
 	// The validator set that validates this chain
 	validators validators.Set
@@ -104,9 +102,7 @@ type handler struct {
 // Initialize this consensus handler
 // [engine] must be initialized before initializing this handler
 func New(
-	mc message.Creator,
-	mcProto message.Creator,
-	blueberryTime time.Time,
+	mc message.InternalMsgBuilder,
 	ctx *snow.ConsensusContext,
 	validators validators.Set,
 	msgFromVMChan <-chan common.Message,
@@ -117,8 +113,6 @@ func New(
 	h := &handler{
 		ctx:              ctx,
 		mc:               mc,
-		mcProto:          mcProto,
-		blueberryTime:    blueberryTime,
 		validators:       validators,
 		msgFromVMChan:    msgFromVMChan,
 		preemptTimeouts:  preemptTimeouts,
@@ -146,13 +140,6 @@ func New(
 		return nil, fmt.Errorf("initializing async message queue errored with: %w", err)
 	}
 	return h, nil
-}
-
-func (h *handler) getMsgCreator(time time.Time) message.Creator {
-	if time.Before(h.blueberryTime) {
-		return h.mc
-	}
-	return h.mcProto
 }
 
 func (h *handler) Context() *snow.ConsensusContext { return h.ctx }
@@ -361,13 +348,13 @@ func (h *handler) dispatchChans() {
 			return
 
 		case vmMSG := <-h.msgFromVMChan:
-			msg = h.getMsgCreator(h.clock.Time()).InternalVMMessage(h.ctx.NodeID, uint32(vmMSG))
+			msg = h.mc.InternalVMMessage(h.ctx.NodeID, uint32(vmMSG))
 
 		case <-gossiper.C:
-			msg = h.getMsgCreator(h.clock.Time()).InternalGossipRequest(h.ctx.NodeID)
+			msg = h.mc.InternalGossipRequest(h.ctx.NodeID)
 
 		case <-h.timeouts:
-			msg = h.getMsgCreator(h.clock.Time()).InternalTimeout(h.ctx.NodeID)
+			msg = h.mc.InternalTimeout(h.ctx.NodeID)
 		}
 
 		if err := h.handleChanMsg(msg); err != nil {
