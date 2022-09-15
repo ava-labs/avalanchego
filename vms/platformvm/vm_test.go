@@ -2007,7 +2007,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 				consensusCtx,
 				mc,
 				mcProto,
-				time.Time{},
+				time.Now().Add(time.Hour),
 				externalSender,
 				chainRouter,
 				timeoutManager,
