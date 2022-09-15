@@ -86,9 +86,6 @@ func makeRawTestPeers(t *testing.T, useProto bool) (*rawTestPeer, *rawTestPeer) 
 
 	mc := newMessageCreator(t, useProto)
 
-	pingMessage, err := mc.Ping()
-	require.NoError(err)
-
 	metrics, err := NewMetrics(
 		logging.NoLog{},
 		"",
@@ -111,7 +108,6 @@ func makeRawTestPeers(t *testing.T, useProto bool) (*rawTestPeer, *rawTestPeer) 
 		PongTimeout:          constants.DefaultPingPongTimeout,
 		MaxClockDifference:   time.Minute,
 		ResourceTracker:      resourceTracker,
-		PingMessage:          pingMessage,
 	}
 	peerConfig0 := sharedConfig
 	peerConfig1 := sharedConfig

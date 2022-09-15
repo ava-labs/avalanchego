@@ -146,11 +146,6 @@ func Start(ctx context.Context, ip ips.IPPort, router router.InboundHandler, opt
 		return nil, err
 	}
 
-	pingMessage, err := mc.Ping()
-	if err != nil {
-		return nil, err
-	}
-
 	peer := network_peer.Start(
 		&network_peer.Config{
 			Metrics:             metrics,
@@ -175,7 +170,6 @@ func Start(ctx context.Context, ip ips.IPPort, router router.InboundHandler, opt
 			PongTimeout:          constants.DefaultPingPongTimeout,
 			MaxClockDifference:   time.Minute,
 			ResourceTracker:      resourceTracker,
-			PingMessage:          pingMessage,
 		},
 		conn,
 		cert,
