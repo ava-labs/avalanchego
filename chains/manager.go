@@ -570,6 +570,7 @@ func (m *manager) createAvalancheChain(
 		ctx,
 		m.MsgCreator,
 		m.MsgCreatorWithProto,
+		m.BlueberryTime,
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
@@ -625,6 +626,7 @@ func (m *manager) createAvalancheChain(
 	handler, err := handler.New(
 		m.MsgCreator,
 		m.MsgCreatorWithProto,
+		m.BlueberryTime,
 		ctx,
 		vdrs,
 		msgChan,
@@ -758,6 +760,7 @@ func (m *manager) createSnowmanChain(
 		ctx,
 		m.MsgCreator,
 		m.MsgCreatorWithProto,
+		m.BlueberryTime,
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
@@ -832,6 +835,7 @@ func (m *manager) createSnowmanChain(
 	handler, err := handler.New(
 		m.MsgCreator,
 		m.MsgCreatorWithProto,
+		m.BlueberryTime,
 		ctx,
 		vdrs,
 		msgChan,

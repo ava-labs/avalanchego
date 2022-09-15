@@ -67,6 +67,7 @@ func TestShutdown(t *testing.T) {
 	handler, err := handler.New(
 		mc,
 		mcProto,
+		time.Time{},
 		ctx,
 		vdrs,
 		nil,
@@ -174,6 +175,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	handler, err := handler.New(
 		mc,
 		mcProto,
+		time.Time{},
 		ctx,
 		vdrs,
 		nil,
@@ -288,6 +290,7 @@ func TestRouterTimeout(t *testing.T) {
 	handler, err := handler.New(
 		mc,
 		mcProto,
+		time.Time{},
 		ctx,
 		vdrs,
 		nil,
@@ -406,6 +409,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 	handler, err := handler.New(
 		mc,
 		mcProto,
+		time.Time{},
 		ctx,
 		vdrs,
 		nil,
@@ -524,6 +528,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	handler, err := handler.New(
 		mc,
 		mcProto,
+		time.Time{},
 		ctx,
 		vdrs,
 		nil,

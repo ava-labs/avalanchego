@@ -44,6 +44,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	handlerIntf, err := New(
 		mc,
 		mcProto,
+		time.Time{},
 		ctx,
 		vdrs,
 		nil,
@@ -126,6 +127,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	handlerIntf, err := New(
 		mc,
 		mcProto,
+		time.Time{},
 		ctx,
 		vdrs,
 		nil,
@@ -201,6 +203,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	handlerIntf, err := New(
 		mc,
 		mcProto,
+		time.Time{},
 		ctx,
 		vdrs,
 		nil,
@@ -270,6 +273,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 			handler, err := New(
 				mc,
 				mcProto,
+				time.Time{},
 				ctx,
 				vdrs,
 				msgFromVMChan,

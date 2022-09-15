@@ -228,6 +228,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 			config,
 			msgCreator,
 			msgCreatorWithProto,
+			time.Time{},
 			prometheus.NewRegistry(),
 			logging.NoLog{},
 			listeners[i],

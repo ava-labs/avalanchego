@@ -72,7 +72,7 @@ func TestTimeout(t *testing.T) {
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(context, mc, mcProto, externalSender, &chainRouter, tm, defaultGossipConfig)
+	sender, err := New(context, mc, mcProto, time.Time{}, externalSender, &chainRouter, tm, defaultGossipConfig)
 	require.NoError(t, err)
 
 	wg := sync.WaitGroup{}
@@ -84,6 +84,7 @@ func TestTimeout(t *testing.T) {
 	handler, err := handler.New(
 		mc,
 		mcProto,
+		time.Time{},
 		ctx,
 		vdrs,
 		nil,
@@ -168,7 +169,7 @@ func TestReliableMessages(t *testing.T) {
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(context, mc, mcProto, externalSender, &chainRouter, tm, defaultGossipConfig)
+	sender, err := New(context, mc, mcProto, time.Time{}, externalSender, &chainRouter, tm, defaultGossipConfig)
 	require.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
@@ -177,6 +178,7 @@ func TestReliableMessages(t *testing.T) {
 	handler, err := handler.New(
 		mc,
 		mcProto,
+		time.Time{},
 		ctx,
 		vdrs,
 		nil,
@@ -268,7 +270,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(context, mc, mcProto, externalSender, &chainRouter, tm, defaultGossipConfig)
+	sender, err := New(context, mc, mcProto, time.Time{}, externalSender, &chainRouter, tm, defaultGossipConfig)
 	require.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
@@ -277,6 +279,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	handler, err := handler.New(
 		mc,
 		mcProto,
+		time.Time{},
 		ctx,
 		vdrs,
 		nil,

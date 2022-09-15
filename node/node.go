@@ -306,6 +306,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		&n.Config.NetworkConfig,
 		n.msgCreator,
 		n.msgCreatorWithProto,
+		version.GetBlueberryTime(n.Config.NetworkID),
 		n.MetricsRegisterer,
 		n.Log,
 		listener,
