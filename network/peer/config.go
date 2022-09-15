@@ -26,18 +26,21 @@ type Config struct {
 	Metrics                 *Metrics
 	MessageCreator          message.Creator
 	MessageCreatorWithProto message.Creator
-	BlueberryTime           time.Time
-	Log                     logging.Logger
-	InboundMsgThrottler     throttling.InboundMsgThrottler
-	Network                 Network
-	Router                  router.InboundHandler
-	VersionCompatibility    version.Compatibility
-	MySubnets               ids.Set
-	Beacons                 validators.Set
-	NetworkID               uint32
-	PingFrequency           time.Duration
-	PongTimeout             time.Duration
-	MaxClockDifference      time.Duration
+
+	// TODO: remove this once we complete blueberry migration
+	BlueberryTime time.Time
+
+	Log                  logging.Logger
+	InboundMsgThrottler  throttling.InboundMsgThrottler
+	Network              Network
+	Router               router.InboundHandler
+	VersionCompatibility version.Compatibility
+	MySubnets            ids.Set
+	Beacons              validators.Set
+	NetworkID            uint32
+	PingFrequency        time.Duration
+	PongTimeout          time.Duration
+	MaxClockDifference   time.Duration
 
 	// Unix time of the last message sent and received respectively
 	// Must only be accessed atomically

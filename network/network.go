@@ -154,7 +154,7 @@ func NewNetwork(
 	config *Config,
 	msgCreator message.Creator,
 	msgCreatorWithProto message.Creator,
-	blueberryTime time.Time,
+	blueberryTime time.Time, // TODO: remove this once we complete blueberry migration
 	metricsRegisterer prometheus.Registerer,
 	log logging.Logger,
 	listener net.Listener,
@@ -207,19 +207,22 @@ func NewNetwork(
 		Metrics:                 peerMetrics,
 		MessageCreator:          msgCreator,
 		MessageCreatorWithProto: msgCreatorWithProto,
-		BlueberryTime:           blueberryTime,
-		Log:                     log,
-		InboundMsgThrottler:     inboundMsgThrottler,
-		Network:                 nil, // This is set below.
-		Router:                  router,
-		VersionCompatibility:    version.GetCompatibility(config.NetworkID),
-		MySubnets:               config.WhitelistedSubnets,
-		Beacons:                 config.Beacons,
-		NetworkID:               config.NetworkID,
-		PingFrequency:           config.PingFrequency,
-		PongTimeout:             config.PingPongTimeout,
-		MaxClockDifference:      config.MaxClockDifference,
-		ResourceTracker:         config.ResourceTracker,
+
+		// TODO: remove this once we complete blueberry migration
+		BlueberryTime: blueberryTime,
+
+		Log:                  log,
+		InboundMsgThrottler:  inboundMsgThrottler,
+		Network:              nil, // This is set below.
+		Router:               router,
+		VersionCompatibility: version.GetCompatibility(config.NetworkID),
+		MySubnets:            config.WhitelistedSubnets,
+		Beacons:              config.Beacons,
+		NetworkID:            config.NetworkID,
+		PingFrequency:        config.PingFrequency,
+		PongTimeout:          config.PingPongTimeout,
+		MaxClockDifference:   config.MaxClockDifference,
+		ResourceTracker:      config.ResourceTracker,
 	}
 
 	onCloseCtx, cancel := context.WithCancel(context.Background())

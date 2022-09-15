@@ -44,8 +44,11 @@ type sender struct {
 	ctx                 *snow.ConsensusContext
 	msgCreator          message.Creator
 	msgCreatorWithProto message.Creator
-	blueberryTime       time.Time
-	clock               mockable.Clock
+
+	// TODO: remove this once we complete blueberry migration
+	blueberryTime time.Time
+
+	clock mockable.Clock
 
 	sender   ExternalSender // Actually does the sending over the network
 	router   router.Router
