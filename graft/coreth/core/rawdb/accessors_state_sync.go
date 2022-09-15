@@ -6,7 +6,6 @@ package rawdb
 import (
 	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -47,7 +46,7 @@ func DeleteCodeToFetch(db ethdb.KeyValueWriter, hash common.Hash) {
 // hashes that are pending syncing. It is the caller's responsibility to
 // unpack the key and call Release on the returned iterator.
 func NewCodeToFetchIterator(db ethdb.Iteratee) ethdb.Iterator {
-	return rawdb.NewKeyLengthIterator(
+	return NewKeyLengthIterator(
 		db.NewIterator(CodeToFetchPrefix, nil),
 		codeToFetchKeyLength,
 	)
@@ -68,7 +67,7 @@ func NewSyncSegmentsIterator(db ethdb.Iteratee, root common.Hash) ethdb.Iterator
 	copy(segmentsPrefix, syncSegmentsPrefix)
 	copy(segmentsPrefix[len(syncSegmentsPrefix):], root[:])
 
-	return rawdb.NewKeyLengthIterator(
+	return NewKeyLengthIterator(
 		db.NewIterator(segmentsPrefix, nil),
 		syncSegmentsKeyLength,
 	)
@@ -115,7 +114,7 @@ func packSyncSegmentKey(root common.Hash, start []byte) []byte {
 // added for syncing (beginning at seek). It is the caller's responsibility to unpack
 // the key and call Release on the returned iterator.
 func NewSyncStorageTriesIterator(db ethdb.Iteratee, seek []byte) ethdb.Iterator {
-	return rawdb.NewKeyLengthIterator(db.NewIterator(syncStorageTriesPrefix, seek), syncStorageTriesKeyLength)
+	return NewKeyLengthIterator(db.NewIterator(syncStorageTriesPrefix, seek), syncStorageTriesKeyLength)
 }
 
 // WriteSyncStorageTrie adds a storage trie for account (with the given root) to be synced.

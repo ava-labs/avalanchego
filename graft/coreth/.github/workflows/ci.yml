@@ -38,6 +38,8 @@ jobs:
           go mod edit -replace github.com/ava-labs/avalanchego=./avalanchego
           go mod tidy
           go clean -modcache # avoid conflicts with the golangci-lint-action cache
+      - run: ./scripts/lint_allowed_geth_imports.sh
+        shell: bash
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
         with:
