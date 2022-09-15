@@ -304,23 +304,23 @@ func TestSend(t *testing.T) {
 		t.Run(fmt.Sprintf("use proto buf message creator %v", useProto), func(tt *testing.T) {
 			received := make(chan message.InboundMessage)
 			nodeIDs, networks, wg := newFullyConnectedTestNetwork(
-				t,
+				tt,
 				[]router.InboundHandler{
 					router.InboundHandlerFunc(func(message.InboundMessage) {
-						t.Fatal("unexpected message received")
+						tt.Fatal("unexpected message received")
 					}),
 					router.InboundHandlerFunc(func(msg message.InboundMessage) {
 						received <- msg
 					}),
 					router.InboundHandlerFunc(func(message.InboundMessage) {
-						t.Fatal("unexpected message received")
+						tt.Fatal("unexpected message received")
 					}),
 				},
 			)
 
 			net0 := networks[0]
 
-			mc, mcProto := newMessageCreator(t)
+			mc, mcProto := newMessageCreator(tt)
 			var (
 				outboundGetMsg message.OutboundMessage
 				err            error
