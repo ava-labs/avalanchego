@@ -136,12 +136,12 @@ func (inMsg *inboundMessageWithProto) String() string {
 	return inMsg.msg.String()
 }
 
-// TODO: once we migrate to proto, do this without interface...
-// TODO: once we migrate to proto, move this semantic checks out of this package
 func (inMsg *inboundMessageWithProto) Get(field Field) (interface{}, error) {
 	return getField(inMsg.msg, field)
 }
 
+// TODO: once protobuf-based p2p messaging is fully activated,
+// move this semantic checks out of this package
 func getField(m *p2ppb.Message, field Field) (interface{}, error) {
 	switch m.GetMessage().(type) {
 	case *p2ppb.Message_Pong:
