@@ -65,7 +65,7 @@ func TestTimeout(t *testing.T) {
 	mcProto, err := message.NewCreatorWithProto(metrics, true, "dummyNamespace", 10*time.Second)
 	require.NoError(t, err)
 
-	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, mcProto, tm, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	require.NoError(t, err)
 
 	context := snow.DefaultConsensusContextTest()
@@ -161,7 +161,7 @@ func TestReliableMessages(t *testing.T) {
 	mcProto, err := message.NewCreatorWithProto(metrics, true, "dummyNamespace", 10*time.Second)
 	require.NoError(t, err)
 
-	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, mcProto, tm, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	require.NoError(t, err)
 
 	context := snow.DefaultConsensusContextTest()
@@ -262,7 +262,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	mcProto, err := message.NewCreatorWithProto(metrics, true, "dummyNamespace", 10*time.Second)
 	require.NoError(t, err)
 
-	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, mcProto, tm, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	require.NoError(t, err)
 
 	context := snow.DefaultConsensusContextTest()

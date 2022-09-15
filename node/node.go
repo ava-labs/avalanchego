@@ -684,7 +684,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		n.ID,
 		n.Log,
 		n.msgCreator,
-		n.msgCreatorWithProto,
 		timeoutManager,
 		n.Config.ConsensusShutdownTimeout,
 		criticalChains,

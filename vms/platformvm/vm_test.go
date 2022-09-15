@@ -1996,7 +1996,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			mcProto, err := message.NewCreatorWithProto(metrics, true, "dummyNamespace", 10*time.Second)
 			require.NoError(err)
 
-			err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, mcProto, timeoutManager, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+			err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, timeoutManager, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 			require.NoError(err)
 
 			externalSender := &sender.ExternalSenderTest{TB: t}
