@@ -21,21 +21,23 @@ type Config struct {
 	// Size, in bytes, of the buffer this peer reads messages into
 	ReadBufferSize int
 	// Size, in bytes, of the buffer this peer writes messages into
-	WriteBufferSize      int
-	Clock                mockable.Clock
-	Metrics              *Metrics
-	MessageCreator       message.Creator
-	Log                  logging.Logger
-	InboundMsgThrottler  throttling.InboundMsgThrottler
-	Network              Network
-	Router               router.InboundHandler
-	VersionCompatibility version.Compatibility
-	MySubnets            ids.Set
-	Beacons              validators.Set
-	NetworkID            uint32
-	PingFrequency        time.Duration
-	PongTimeout          time.Duration
-	MaxClockDifference   time.Duration
+	WriteBufferSize         int
+	Clock                   mockable.Clock
+	Metrics                 *Metrics
+	MessageCreator          message.Creator
+	MessageCreatorWithProto message.Creator
+	BlueberryTime           time.Time
+	Log                     logging.Logger
+	InboundMsgThrottler     throttling.InboundMsgThrottler
+	Network                 Network
+	Router                  router.InboundHandler
+	VersionCompatibility    version.Compatibility
+	MySubnets               ids.Set
+	Beacons                 validators.Set
+	NetworkID               uint32
+	PingFrequency           time.Duration
+	PongTimeout             time.Duration
+	MaxClockDifference      time.Duration
 
 	// Unix time of the last message sent and received respectively
 	// Must only be accessed atomically
@@ -45,4 +47,12 @@ type Config struct {
 	ResourceTracker tracker.ResourceTracker
 
 	PingMessage message.OutboundMessage
+}
+
+// TODO: add metrics to track which codec is used?
+func (c Config) SelectMessageCreator(time time.Time) message.Creator {
+	if time.Before(c.BlueberryTime) {
+		return c.MessageCreator
+	}
+	return c.MessageCreatorWithProto
 }

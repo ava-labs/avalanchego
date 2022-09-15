@@ -154,6 +154,7 @@ func NewNetwork(
 	config *Config,
 	msgCreator message.Creator,
 	msgCreatorWithProto message.Creator,
+	blueberryTime time.Time,
 	metricsRegisterer prometheus.Registerer,
 	log logging.Logger,
 	listener net.Listener,
@@ -206,23 +207,25 @@ func NewNetwork(
 	}
 
 	peerConfig := &peer.Config{
-		ReadBufferSize:       config.PeerReadBufferSize,
-		WriteBufferSize:      config.PeerWriteBufferSize,
-		Metrics:              peerMetrics,
-		MessageCreator:       msgCreator,
-		Log:                  log,
-		InboundMsgThrottler:  inboundMsgThrottler,
-		Network:              nil, // This is set below.
-		Router:               router,
-		VersionCompatibility: version.GetCompatibility(config.NetworkID),
-		MySubnets:            config.WhitelistedSubnets,
-		Beacons:              config.Beacons,
-		NetworkID:            config.NetworkID,
-		PingFrequency:        config.PingFrequency,
-		PongTimeout:          config.PingPongTimeout,
-		MaxClockDifference:   config.MaxClockDifference,
-		ResourceTracker:      config.ResourceTracker,
-		PingMessage:          pingMessge,
+		ReadBufferSize:          config.PeerReadBufferSize,
+		WriteBufferSize:         config.PeerWriteBufferSize,
+		Metrics:                 peerMetrics,
+		MessageCreator:          msgCreator,
+		MessageCreatorWithProto: msgCreatorWithProto,
+		BlueberryTime:           blueberryTime,
+		Log:                     log,
+		InboundMsgThrottler:     inboundMsgThrottler,
+		Network:                 nil, // This is set below.
+		Router:                  router,
+		VersionCompatibility:    version.GetCompatibility(config.NetworkID),
+		MySubnets:               config.WhitelistedSubnets,
+		Beacons:                 config.Beacons,
+		NetworkID:               config.NetworkID,
+		PingFrequency:           config.PingFrequency,
+		PongTimeout:             config.PingPongTimeout,
+		MaxClockDifference:      config.MaxClockDifference,
+		ResourceTracker:         config.ResourceTracker,
+		PingMessage:             pingMessge,
 	}
 	onCloseCtx, cancel := context.WithCancel(context.Background())
 	n := &network{
@@ -471,7 +474,7 @@ func (n *network) Version() (message.OutboundMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	return n.peerConfig.MessageCreator.Version(
+	return n.peerConfig.SelectMessageCreator(n.peerConfig.Clock.Time()).Version(
 		n.peerConfig.NetworkID,
 		n.peerConfig.Clock.Unix(),
 		mySignedIP.IP.IP,
@@ -484,7 +487,7 @@ func (n *network) Version() (message.OutboundMessage, error) {
 
 func (n *network) Peers() (message.OutboundMessage, error) {
 	peers := n.sampleValidatorIPs()
-	return n.peerConfig.MessageCreator.PeerList(peers, true)
+	return n.peerConfig.SelectMessageCreator(n.peerConfig.Clock.Time()).PeerList(peers, true)
 }
 
 func (n *network) Pong(nodeID ids.NodeID) (message.OutboundMessage, error) {
@@ -494,7 +497,7 @@ func (n *network) Pong(nodeID ids.NodeID) (message.OutboundMessage, error) {
 	}
 
 	uptimePercentInt := uint8(uptimePercentFloat * 100)
-	return n.peerConfig.MessageCreator.Pong(uptimePercentInt)
+	return n.peerConfig.SelectMessageCreator(n.peerConfig.Clock.Time()).Pong(uptimePercentInt)
 }
 
 // Dispatch starts accepting connections from other nodes attempting to connect
@@ -1159,7 +1162,7 @@ func (n *network) runTimers() {
 				continue
 			}
 
-			msg, err := n.peerConfig.MessageCreator.PeerList(validatorIPs, false)
+			msg, err := n.peerConfig.SelectMessageCreator(n.peerConfig.Clock.Time()).PeerList(validatorIPs, false)
 			if err != nil {
 				n.peerConfig.Log.Error(
 					"failed to gossip",
