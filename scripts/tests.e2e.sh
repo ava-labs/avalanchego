@@ -85,7 +85,7 @@ echo "running e2e tests against the local cluster with ${AVALANCHEGO_PATH}"
 --log-level debug \
 --network-runner-grpc-endpoint="0.0.0.0:12342" \
 --network-runner-avalanchego-path=${AVALANCHEGO_PATH} \
---network-runner-avalanchego-log-level="INFO" \
+--network-runner-avalanchego-log-level="WARN" \
 --test-keys-file=tests/test.insecure.secp256k1.keys \
 --enable-whitelist-vtx-tests=${ENABLE_WHITELIST_VTX_TESTS} \
 && EXIT_CODE=$? || EXIT_CODE=$?
