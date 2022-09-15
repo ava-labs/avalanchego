@@ -1909,7 +1909,9 @@ func TestRestartFullyAccepted(t *testing.T) {
 // test bootstrapping the node
 func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require := require.New(t)
-	for _, useProto := range []bool{false, true} {
+
+	// TODO: add "useProto=true" once handler supports proto
+	for _, useProto := range []bool{false} {
 		t.Run(fmt.Sprintf("use proto buf message creator %v", useProto), func(tt *testing.T) {
 			_, genesisBytes := defaultGenesis()
 
@@ -2153,7 +2155,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			}
 
 			externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
-				inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+				var inMsg message.InboundMessage
+				if !useProto {
+					inMsg, err = mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+				} else {
+					inMsg, err = mcProto.Parse(msg.Bytes(), ctx.NodeID, func() {})
+				}
 				require.NoError(err)
 				require.Equal(message.GetAncestors, inMsg.Op())
 
