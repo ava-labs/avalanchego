@@ -95,8 +95,9 @@ func New(
 	return s, nil
 }
 
-func (s *sender) getMsgCreator(time time.Time) message.Creator {
-	if time.Before(s.blueberryTime) {
+func (s *sender) getMsgCreator() message.Creator {
+	now := s.clock.Time()
+	if now.Before(s.blueberryTime) {
 		return s.msgCreator
 	}
 	return s.msgCreatorWithProto
@@ -116,8 +117,7 @@ func (s *sender) SendGetStateSummaryFrontier(nodeIDs ids.NodeIDSet, requestID ui
 		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.StateSummaryFrontier)
 	}
 
-	now := s.clock.Time()
-	msgCreator := s.getMsgCreator(now)
+	msgCreator := s.getMsgCreator()
 
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Asynchronously to avoid deadlock.
@@ -146,8 +146,7 @@ func (s *sender) SendGetStateSummaryFrontier(nodeIDs ids.NodeIDSet, requestID ui
 }
 
 func (s *sender) SendStateSummaryFrontier(nodeID ids.NodeID, requestID uint32, summary []byte) {
-	now := s.clock.Time()
-	msgCreator := s.getMsgCreator(now)
+	msgCreator := s.getMsgCreator()
 
 	// Sending this message to myself.
 	if nodeID == s.ctx.NodeID {
@@ -203,8 +202,7 @@ func (s *sender) SendGetAcceptedStateSummary(nodeIDs ids.NodeIDSet, requestID ui
 		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.AcceptedStateSummary)
 	}
 
-	now := s.clock.Time()
-	msgCreator := s.getMsgCreator(now)
+	msgCreator := s.getMsgCreator()
 
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Asynchronously to avoid deadlock.
@@ -245,8 +243,7 @@ func (s *sender) SendGetAcceptedStateSummary(nodeIDs ids.NodeIDSet, requestID ui
 }
 
 func (s *sender) SendAcceptedStateSummary(nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) {
-	now := s.clock.Time()
-	msgCreator := s.getMsgCreator(now)
+	msgCreator := s.getMsgCreator()
 
 	if nodeID == s.ctx.NodeID {
 		inMsg := msgCreator.InboundAcceptedStateSummary(s.ctx.ChainID, requestID, summaryIDs, nodeID)
@@ -295,8 +292,7 @@ func (s *sender) SendGetAcceptedFrontier(nodeIDs ids.NodeIDSet, requestID uint32
 		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.AcceptedFrontier)
 	}
 
-	now := s.clock.Time()
-	msgCreator := s.getMsgCreator(now)
+	msgCreator := s.getMsgCreator()
 
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Asynchronously to avoid deadlock.
@@ -325,8 +321,7 @@ func (s *sender) SendGetAcceptedFrontier(nodeIDs ids.NodeIDSet, requestID uint32
 }
 
 func (s *sender) SendAcceptedFrontier(nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
-	now := s.clock.Time()
-	msgCreator := s.getMsgCreator(now)
+	msgCreator := s.getMsgCreator()
 
 	// Sending this message to myself.
 	if nodeID == s.ctx.NodeID {
@@ -376,8 +371,7 @@ func (s *sender) SendGetAccepted(nodeIDs ids.NodeIDSet, requestID uint32, contai
 		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Accepted)
 	}
 
-	now := s.clock.Time()
-	msgCreator := s.getMsgCreator(now)
+	msgCreator := s.getMsgCreator()
 
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Asynchronously to avoid deadlock.
@@ -418,8 +412,7 @@ func (s *sender) SendGetAccepted(nodeIDs ids.NodeIDSet, requestID uint32, contai
 }
 
 func (s *sender) SendAccepted(nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
-	now := s.clock.Time()
-	msgCreator := s.getMsgCreator(now)
+	msgCreator := s.getMsgCreator()
 
 	if nodeID == s.ctx.NodeID {
 		inMsg := msgCreator.InboundAccepted(s.ctx.ChainID, requestID, containerIDs, nodeID)
@@ -459,8 +452,7 @@ func (s *sender) SendGetAncestors(nodeID ids.NodeID, requestID uint32, container
 	// that we won't get a response from this node.
 	s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Ancestors)
 
-	now := s.clock.Time()
-	msgCreator := s.getMsgCreator(now)
+	msgCreator := s.getMsgCreator()
 
 	// Sending a GetAncestors to myself always fails.
 	if nodeID == s.ctx.NodeID {
@@ -520,8 +512,7 @@ func (s *sender) SendGetAncestors(nodeID ids.NodeID, requestID uint32, container
 // on the specified node.
 // The Ancestors message gives the recipient the contents of several containers.
 func (s *sender) SendAncestors(nodeID ids.NodeID, requestID uint32, containers [][]byte) {
-	now := s.clock.Time()
-	msgCreator := s.getMsgCreator(now)
+	msgCreator := s.getMsgCreator()
 
 	// Create the outbound message.
 	outMsg, err := msgCreator.Ancestors(s.ctx.ChainID, requestID, containers)
@@ -559,8 +550,7 @@ func (s *sender) SendGet(nodeID ids.NodeID, requestID uint32, containerID ids.ID
 	// that we won't get a response from this node.
 	s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, message.Put)
 
-	now := s.clock.Time()
-	msgCreator := s.getMsgCreator(now)
+	msgCreator := s.getMsgCreator()
 
 	// Sending a Get to myself always fails.
 	if nodeID == s.ctx.NodeID {
@@ -609,8 +599,7 @@ func (s *sender) SendGet(nodeID ids.NodeID, requestID uint32, containerID ids.ID
 // The Put message signifies that this consensus engine is giving to the recipient
 // the contents of the specified container.
 func (s *sender) SendPut(nodeID ids.NodeID, requestID uint32, container []byte) {
-	now := s.clock.Time()
-	msgCreator := s.getMsgCreator(now)
+	msgCreator := s.getMsgCreator()
 
 	// Create the outbound message.
 	outMsg, err := msgCreator.Put(s.ctx.ChainID, requestID, container)
@@ -663,8 +652,7 @@ func (s *sender) SendPushQuery(nodeIDs ids.NodeIDSet, requestID uint32, containe
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
 
-	now := s.clock.Time()
-	msgCreator := s.getMsgCreator(now)
+	msgCreator := s.getMsgCreator()
 
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Do so asynchronously to avoid deadlock.
@@ -748,8 +736,7 @@ func (s *sender) SendPullQuery(nodeIDs ids.NodeIDSet, requestID uint32, containe
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
 
-	now := s.clock.Time()
-	msgCreator := s.getMsgCreator(now)
+	msgCreator := s.getMsgCreator()
 
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Do so asynchronously to avoid deadlock.
@@ -799,8 +786,7 @@ func (s *sender) SendPullQuery(nodeIDs ids.NodeIDSet, requestID uint32, containe
 
 // SendChits sends chits
 func (s *sender) SendChits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) {
-	now := s.clock.Time()
-	msgCreator := s.getMsgCreator(now)
+	msgCreator := s.getMsgCreator()
 
 	// If [nodeID] is myself, send this message directly
 	// to my own router rather than sending it over the network
@@ -853,8 +839,7 @@ func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, appRequ
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
 
-	now := s.clock.Time()
-	msgCreator := s.getMsgCreator(now)
+	msgCreator := s.getMsgCreator()
 
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Do so asynchronously to avoid deadlock.
@@ -924,8 +909,7 @@ func (s *sender) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, appRequ
 // SendAppResponse sends a response to an application-level request from the
 // given node
 func (s *sender) SendAppResponse(nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
-	now := s.clock.Time()
-	msgCreator := s.getMsgCreator(now)
+	msgCreator := s.getMsgCreator()
 
 	if nodeID == s.ctx.NodeID {
 		inMsg := msgCreator.InboundAppResponse(s.ctx.ChainID, requestID, appResponseBytes, nodeID)
@@ -968,8 +952,7 @@ func (s *sender) SendAppResponse(nodeID ids.NodeID, requestID uint32, appRespons
 }
 
 func (s *sender) SendAppGossipSpecific(nodeIDs ids.NodeIDSet, appGossipBytes []byte) error {
-	now := s.clock.Time()
-	msgCreator := s.getMsgCreator(now)
+	msgCreator := s.getMsgCreator()
 
 	// Create the outbound message.
 	outMsg, err := msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
@@ -1006,8 +989,7 @@ func (s *sender) SendAppGossipSpecific(nodeIDs ids.NodeIDSet, appGossipBytes []b
 
 // SendAppGossip sends an application-level gossip message.
 func (s *sender) SendAppGossip(appGossipBytes []byte) error {
-	now := s.clock.Time()
-	msgCreator := s.getMsgCreator(now)
+	msgCreator := s.getMsgCreator()
 
 	// Create the outbound message.
 	outMsg, err := msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
@@ -1042,8 +1024,7 @@ func (s *sender) SendAppGossip(appGossipBytes []byte) error {
 
 // SendGossip gossips the provided container
 func (s *sender) SendGossip(container []byte) {
-	now := s.clock.Time()
-	msgCreator := s.getMsgCreator(now)
+	msgCreator := s.getMsgCreator()
 
 	// Create the outbound message.
 	outMsg, err := msgCreator.Put(s.ctx.ChainID, constants.GossipMsgRequestID, container)
@@ -1085,8 +1066,7 @@ func (s *sender) Accept(ctx *snow.ConsensusContext, _ ids.ID, container []byte) 
 		return nil
 	}
 
-	now := s.clock.Time()
-	msgCreator := s.getMsgCreator(now)
+	msgCreator := s.getMsgCreator()
 
 	// Create the outbound message.
 	outMsg, err := msgCreator.Put(s.ctx.ChainID, constants.GossipMsgRequestID, container)
