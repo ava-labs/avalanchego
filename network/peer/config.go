@@ -47,13 +47,13 @@ type Config struct {
 	ResourceTracker tracker.ResourceTracker
 }
 
-func (c Config) GetMessageCreator(time time.Time) message.Creator {
+func (c *Config) GetMessageCreator(time time.Time) message.Creator {
 	if c.IsBlueberryActivated(time) {
 		return c.MessageCreatorWithProto
 	}
 	return c.MessageCreator
 }
 
-func (c Config) IsBlueberryActivated(time time.Time) bool {
+func (c *Config) IsBlueberryActivated(time time.Time) bool {
 	return !time.Before(c.BlueberryTime)
 }
