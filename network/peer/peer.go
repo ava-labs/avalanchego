@@ -525,10 +525,6 @@ func (p *peer) sendPings() {
 		p.close()
 	}()
 
-	pingMessage, err := p.Config.GetMessageCreator(p.Config.Clock.Time()).Ping()
-	p.Log.AssertNoError(err)
-	wasBlueberryActivated := p.Config.IsBlueberryActivated(p.Config.Clock.Time())
-
 	for {
 		select {
 		case <-sendPingsTicker.C:
@@ -552,14 +548,9 @@ func (p *peer) sendPings() {
 				}
 			}
 
-			// only create ping message if blueberry just got activated
-			// if blueberry was activated to start with, don't create again
-			if !wasBlueberryActivated && p.Config.IsBlueberryActivated(p.Config.Clock.Time()) {
-				pingMessage, err = p.Config.GetMessageCreator(p.Config.Clock.Time()).Ping()
-				p.Log.AssertNoError(err)
-			} else {
-				pingMessage.AddRef()
-			}
+			pingMessage, err := p.Config.GetMessageCreator(p.Config.Clock.Time()).Ping()
+			p.Log.AssertNoError(err)
+
 			p.Send(p.onClosingCtx, pingMessage)
 		case <-p.onClosingCtx.Done():
 			return
