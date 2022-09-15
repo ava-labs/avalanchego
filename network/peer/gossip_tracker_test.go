@@ -165,7 +165,21 @@ func TestGossipTracker_UpdateKnown(t *testing.T) {
 			expected: false,
 		},
 		{
-			// We should be able to update tracked peer
+			// We shouldn't be able to know about peers that aren't tracked
+			name:     "update untracked peer - unknown peer",
+			add:      []ids.NodeID{},
+			args:     args{id0, []ids.NodeID{id1}},
+			expected: false,
+		},
+		{
+			// We shouldn't be able to know about peers that aren't tracked
+			name:     "update tracked peer - unknown peer",
+			add:      []ids.NodeID{id0},
+			args:     args{id0, []ids.NodeID{id1}},
+			expected: false,
+		},
+		{
+			// We should be able to update a tracked peer
 			name:     "update tracked peer",
 			add:      []ids.NodeID{id0, id1, id2},
 			args:     args{id0, []ids.NodeID{}},

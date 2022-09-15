@@ -127,7 +127,12 @@ func (d *GossipTracker) UpdateKnown(id ids.NodeID, learned []ids.NodeID) bool {
 
 	bs := ids.NewBigBitSetFromBits()
 	for _, nodeID := range learned {
-		bs.Add(d.peersToIndices[nodeID])
+		idx, ok := d.peersToIndices[nodeID]
+		if !ok {
+			return false
+		}
+
+		bs.Add(idx)
 	}
 
 	known.Union(bs)
@@ -140,6 +145,10 @@ func (d *GossipTracker) GetUnknown(id ids.NodeID) (map[ids.NodeID]struct{}, bool
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 
+	// Calculate the unsent information we need to send to this peer.
+	// We do this by computing the [local] information we know,
+	// computing what the peer knows in its [knownPeers], and sending over
+	// the difference.
 	unsent := ids.NewBigBitSet()
 	unsent.Union(d.local)
 
