@@ -98,6 +98,7 @@ func (d *GossipTracker) Remove(id ids.NodeID) bool {
 		if idx != d.tail {
 			knownPeers.Add(d.tail)
 		}
+
 		knownPeers.Remove(idx)
 	}
 
@@ -144,24 +145,24 @@ func (d *GossipTracker) GetUnknown(id ids.NodeID) (map[ids.NodeID]struct{}, bool
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 
-	// Calculate the unsent information we need to send to this peer.
+	// Calculate the unknown information we need to send to this peer.
 	// We do this by computing the [local] information we know,
 	// computing what the peer knows in its [knownPeers], and sending over
 	// the difference.
-	unsent := ids.NewBigBitSet()
-	unsent.Union(d.local)
+	unknown := ids.NewBigBitSet()
+	unknown.Union(d.local)
 
 	knownPeers, ok := d.knownPeers[id]
 	if !ok {
 		return nil, false
 	}
 
-	unsent.Difference(knownPeers)
+	unknown.Difference(knownPeers)
 
-	result := make(map[ids.NodeID]struct{}, unsent.Len())
+	result := make(map[ids.NodeID]struct{}, unknown.Len())
 
-	for i := 0; i < unsent.Len(); i++ {
-		if !unsent.Contains(i) {
+	for i := 0; i < unknown.Len(); i++ {
+		if !unknown.Contains(i) {
 			continue
 		}
 
