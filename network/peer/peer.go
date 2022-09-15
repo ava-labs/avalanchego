@@ -491,7 +491,8 @@ func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 	}
 
 	msgLen := uint32(len(msgBytes))
-	msgLenBytes, err := writeMsgLen(msgLen, false /* true to use protobufs */, constants.DefaultMaxMessageSize)
+	isProto := msg.IsProto()
+	msgLenBytes, err := writeMsgLen(msgLen, isProto, constants.DefaultMaxMessageSize)
 	if err != nil {
 		p.Log.Verbo("error writing message length",
 			zap.Stringer("nodeID", p.id),
