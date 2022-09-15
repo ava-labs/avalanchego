@@ -43,21 +43,21 @@ func (b BigBitSet) Add(i int) {
 	b.bits.SetBit(b.bits, i, 1)
 }
 
-// Union performs the set union with another set, which is [b] OR [other]
+// Union performs the set union with another set.
+// This adds all elements in [other] to [b]
 func (b BigBitSet) Union(other BigBitSet) {
 	b.bits.Or(b.bits, other.bits)
 }
 
-// Intersection performs the set intersection with another set,
-// which is [b] AND [other]
+// Intersection performs the set intersection with another set
+// This sets [b] to include only elements in both [b] and [other]
 func (b BigBitSet) Intersection(other BigBitSet) {
 	b.bits.And(b.bits, other.bits)
 }
 
-// Difference performs the set difference with another set,
-// which is [b] XOR [other]
+// Difference removes all the elements in [other] from this set
 func (b BigBitSet) Difference(other BigBitSet) {
-	b.bits.Xor(b.bits, other.bits)
+	b.bits.AndNot(b.bits, other.bits)
 }
 
 // Remove sets the [i]'th bit to 0

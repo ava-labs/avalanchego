@@ -311,22 +311,22 @@ func Test_BigBitSet_Difference(t *testing.T) {
 			name:        "right and no left",
 			left:        []int{},
 			right:       []int{2, 1, 0},
-			expected:    []int{2, 1, 0}, // [1, 1, 1]
+			expected:    []int{}, // []
 			expectedLen: 3,
 		},
 		{
 			name:        "left and right overlap",
 			left:        []int{2, 1},
 			right:       []int{1, 0},
-			expected:    []int{2, 0}, // [1, 0, 1]
+			expected:    []int{2}, // [1, 0, 0]
 			expectedLen: 3,
 		},
 		{
 			name:        "left and right overlap different sizes",
 			left:        []int{5, 3, 1},
 			right:       []int{8, 6, 4, 2, 0},
-			expected:    []int{8, 6, 5, 4, 3, 2, 1, 0}, // [1, 0, 1, 1, 1, 1, 1, 1, 1]
-			expectedLen: 9,
+			expected:    []int{5, 3, 1}, // [1, 0, 1, 0, 1, 0]
+			expectedLen: 6,
 		},
 	}
 
