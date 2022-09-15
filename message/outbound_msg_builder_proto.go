@@ -20,6 +20,8 @@ type outMsgBuilderWithProto struct {
 	protoBuilder *msgBuilderProtobuf
 }
 
+// Use "message.NewCreatorWithProto" to import this function
+// since we do not expose "msgBuilderProtobuf" yet
 func newOutboundBuilderWithProto(enableCompression bool, protoBuilder *msgBuilderProtobuf) OutboundMsgBuilder {
 	return &outMsgBuilderWithProto{
 		compress:     enableCompression,

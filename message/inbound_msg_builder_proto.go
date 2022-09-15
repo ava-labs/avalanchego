@@ -16,6 +16,8 @@ type inMsgBuilderWithProto struct {
 	protoBuilder *msgBuilderProtobuf
 }
 
+// Use "message.NewCreatorWithProto" to import this function
+// since we do not expose "msgBuilderProtobuf" yet
 func newInboundBuilderWithProto(protoBuilder *msgBuilderProtobuf) InboundMsgBuilder {
 	return &inMsgBuilderWithProto{
 		protoBuilder: protoBuilder,
