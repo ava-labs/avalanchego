@@ -461,6 +461,11 @@ func (n *network) Disconnected(nodeID ids.NodeID) {
 	if connected {
 		n.disconnectedFromConnected(peer, nodeID)
 	}
+
+	n.peersLock.Lock()
+	defer n.peersLock.Unlock()
+
+	n.gossipTracker.Remove(nodeID)
 }
 
 func (n *network) Version() (message.OutboundMessage, error) {
@@ -795,7 +800,6 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.NodeID) {
 	defer n.peersLock.Unlock()
 
 	n.connectedPeers.Remove(nodeID)
-	n.gossipTracker.Remove(nodeID)
 
 	// The peer that is disconnecting from us finished the handshake
 	if n.wantsConnection(nodeID) {
