@@ -64,7 +64,6 @@ type handler struct {
 
 	ctx *snow.ConsensusContext
 	mc  message.InternalMsgBuilder
-
 	// The validator set that validates this chain
 	validators validators.Set
 	// Receives messages from the VM
