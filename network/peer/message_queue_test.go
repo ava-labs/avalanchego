@@ -17,7 +17,8 @@ import (
 func TestBlockingMessageQueue(t *testing.T) {
 	require := require.New(t)
 
-	for _, useProto := range []bool{false, true} {
+	// TODO: add "true" to test with protobuf
+	for _, useProto := range []bool{false} {
 		t.Run(fmt.Sprintf("use proto buf message creator %v", useProto), func(tt *testing.T) {
 			q := NewBlockingMessageQueue(
 				SendFailedFunc(func(msg message.OutboundMessage) {
@@ -27,7 +28,7 @@ func TestBlockingMessageQueue(t *testing.T) {
 				0,
 			)
 
-			mc := newMessageCreator(t, useProto)
+			mc, _ := newMessageCreator(tt)
 			msg, err := mc.Ping()
 			require.NoError(err)
 
