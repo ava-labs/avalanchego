@@ -110,7 +110,6 @@ func TestHandlerClosesOnError(t *testing.T) {
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
 	require.NoError(t, err)
-
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
 	require.NoError(t, err)
