@@ -2007,6 +2007,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 				consensusCtx,
 				mc,
 				mcProto,
+				time.Time{},
 				externalSender,
 				chainRouter,
 				timeoutManager,
@@ -2083,6 +2084,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			handler, err := handler.New(
 				mc,
 				mcProto,
+				time.Time{},
 				bootstrapConfig.Ctx,
 				vdrs,
 				msgChan,
