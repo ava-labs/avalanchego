@@ -45,8 +45,6 @@ type Config struct {
 
 	// Tracks CPU/disk usage caused by each peer.
 	ResourceTracker tracker.ResourceTracker
-
-	PingMessage message.OutboundMessage
 }
 
 // TODO: add metrics to track which codec is used?
@@ -55,4 +53,8 @@ func (c Config) SelectMessageCreator(time time.Time) message.Creator {
 		return c.MessageCreator
 	}
 	return c.MessageCreatorWithProto
+}
+
+func (c Config) IsBlueberryActivated(time time.Time) bool {
+	return !time.Before(c.BlueberryTime)
 }
