@@ -141,7 +141,7 @@ func (inMsg *inboundMessageWithProto) Get(field Field) (interface{}, error) {
 }
 
 // TODO: once protobuf-based p2p messaging is fully activated,
-// move this semantic checks out of this package
+// move the semantic checks out of this package
 func getField(m *p2ppb.Message, field Field) (interface{}, error) {
 	switch m.GetMessage().(type) {
 	case *p2ppb.Message_Pong:

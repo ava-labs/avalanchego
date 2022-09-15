@@ -36,16 +36,11 @@ func (b *outMsgBuilderWithProto) Version(
 	sig []byte,
 	trackedSubnets []ids.ID,
 ) (OutboundMessage, error) {
-	// Version Messages can't be compressed
-	compress := Version.Compressible()
-	bypassThrottling := true
-
 	subnetIDBytes := make([][]byte, len(trackedSubnets))
 	for i, containerID := range trackedSubnets {
 		copy := containerID
 		subnetIDBytes[i] = copy[:]
 	}
-
 	return b.protoBuilder.createOutbound(
 		Version,
 		&p2ppb.Message{
@@ -62,15 +57,12 @@ func (b *outMsgBuilderWithProto) Version(
 				},
 			},
 		},
-		compress,
-		bypassThrottling,
+		b.compress && Version.Compressible(),
+		true,
 	)
 }
 
 func (b *outMsgBuilderWithProto) PeerList(peers []ips.ClaimedIPPort, bypassThrottling bool) (OutboundMessage, error) {
-	// PeerList messages may be compressed
-	compress := b.compress && PeerList.Compressible()
-
 	claimIPPorts := make([]*p2ppb.ClaimedIpPort, len(peers))
 	for i, p := range peers {
 		// ref. "wrappers.TryPackClaimedIPPortList", "PackX509Certificate"
@@ -93,16 +85,12 @@ func (b *outMsgBuilderWithProto) PeerList(peers []ips.ClaimedIPPort, bypassThrot
 				},
 			},
 		},
-		compress,
+		b.compress && PeerList.Compressible(),
 		bypassThrottling,
 	)
 }
 
 func (b *outMsgBuilderWithProto) Ping() (OutboundMessage, error) {
-	// Ping messages can't be compressed
-	compress := Ping.Compressible()
-	bypassThrottling := false
-
 	return b.protoBuilder.createOutbound(
 		Ping,
 		&p2ppb.Message{
@@ -110,16 +98,12 @@ func (b *outMsgBuilderWithProto) Ping() (OutboundMessage, error) {
 				Ping: &p2ppb.Ping{},
 			},
 		},
-		compress,
-		bypassThrottling,
+		b.compress && Ping.Compressible(),
+		false,
 	)
 }
 
 func (b *outMsgBuilderWithProto) Pong(uptimePercentage uint8) (OutboundMessage, error) {
-	// Pong messages can't be compressed
-	compress := Pong.Compressible()
-	bypassThrottling := false
-
 	return b.protoBuilder.createOutbound(
 		Pong,
 		&p2ppb.Message{
@@ -129,8 +113,8 @@ func (b *outMsgBuilderWithProto) Pong(uptimePercentage uint8) (OutboundMessage, 
 				},
 			},
 		},
-		compress,
-		bypassThrottling,
+		b.compress && Pong.Compressible(),
+		false,
 	)
 }
 
@@ -139,10 +123,6 @@ func (b *outMsgBuilderWithProto) GetStateSummaryFrontier(
 	requestID uint32,
 	deadline time.Duration,
 ) (OutboundMessage, error) {
-	// GetStateSummaryFrontier messages can't be compressed
-	compress := GetStateSummaryFrontier.Compressible()
-	bypassThrottling := false
-
 	return b.protoBuilder.createOutbound(
 		GetStateSummaryFrontier,
 		&p2ppb.Message{
@@ -154,8 +134,8 @@ func (b *outMsgBuilderWithProto) GetStateSummaryFrontier(
 				},
 			},
 		},
-		compress,
-		bypassThrottling,
+		b.compress && GetStateSummaryFrontier.Compressible(),
+		false,
 	)
 }
 
@@ -164,10 +144,6 @@ func (b *outMsgBuilderWithProto) StateSummaryFrontier(
 	requestID uint32,
 	summary []byte,
 ) (OutboundMessage, error) {
-	// StateSummaryFrontier messages "may" be compressed
-	compress := b.compress && StateSummaryFrontier.Compressible()
-	bypassThrottling := false
-
 	return b.protoBuilder.createOutbound(
 		StateSummaryFrontier,
 		&p2ppb.Message{
@@ -179,8 +155,8 @@ func (b *outMsgBuilderWithProto) StateSummaryFrontier(
 				},
 			},
 		},
-		compress,
-		bypassThrottling,
+		b.compress && StateSummaryFrontier.Compressible(),
+		false,
 	)
 }
 
@@ -190,10 +166,6 @@ func (b *outMsgBuilderWithProto) GetAcceptedStateSummary(
 	deadline time.Duration,
 	heights []uint64,
 ) (OutboundMessage, error) {
-	// GetAcceptedStateSummary messages "may" be compressed
-	compress := b.compress && GetAcceptedStateSummary.Compressible()
-	bypassThrottling := false
-
 	return b.protoBuilder.createOutbound(
 		GetAcceptedStateSummary,
 		&p2ppb.Message{
@@ -206,8 +178,8 @@ func (b *outMsgBuilderWithProto) GetAcceptedStateSummary(
 				},
 			},
 		},
-		compress,
-		bypassThrottling,
+		b.compress && GetAcceptedStateSummary.Compressible(),
+		false,
 	)
 }
 
@@ -216,13 +188,8 @@ func (b *outMsgBuilderWithProto) AcceptedStateSummary(
 	requestID uint32,
 	summaryIDs []ids.ID,
 ) (OutboundMessage, error) {
-	// AcceptedStateSummary messages "may" be compressed
-	compress := b.compress && AcceptedStateSummary.Compressible()
-	bypassThrottling := false
-
 	summaryIDBytes := make([][]byte, len(summaryIDs))
 	encodeIDs(summaryIDs, summaryIDBytes)
-
 	return b.protoBuilder.createOutbound(
 		AcceptedStateSummary,
 		&p2ppb.Message{
@@ -234,8 +201,8 @@ func (b *outMsgBuilderWithProto) AcceptedStateSummary(
 				},
 			},
 		},
-		compress,
-		bypassThrottling,
+		b.compress && AcceptedStateSummary.Compressible(),
+		false,
 	)
 }
 
@@ -244,10 +211,6 @@ func (b *outMsgBuilderWithProto) GetAcceptedFrontier(
 	requestID uint32,
 	deadline time.Duration,
 ) (OutboundMessage, error) {
-	// GetAcceptedFrontier messages can't be compressed
-	compress := GetAcceptedFrontier.Compressible()
-	bypassThrottling := false
-
 	return b.protoBuilder.createOutbound(
 		GetAcceptedFrontier,
 		&p2ppb.Message{
@@ -259,8 +222,8 @@ func (b *outMsgBuilderWithProto) GetAcceptedFrontier(
 				},
 			},
 		},
-		compress,
-		bypassThrottling,
+		b.compress && GetAcceptedFrontier.Compressible(),
+		false,
 	)
 }
 
@@ -269,13 +232,8 @@ func (b *outMsgBuilderWithProto) AcceptedFrontier(
 	requestID uint32,
 	containerIDs []ids.ID,
 ) (OutboundMessage, error) {
-	// AcceptedFrontier messages can't be compressed
-	compress := AcceptedFrontier.Compressible()
-	bypassThrottling := false
-
 	containerIDBytes := make([][]byte, len(containerIDs))
 	encodeIDs(containerIDs, containerIDBytes)
-
 	return b.protoBuilder.createOutbound(
 		AcceptedFrontier,
 		&p2ppb.Message{
@@ -287,8 +245,8 @@ func (b *outMsgBuilderWithProto) AcceptedFrontier(
 				},
 			},
 		},
-		compress,
-		bypassThrottling,
+		b.compress && AcceptedFrontier.Compressible(),
+		false,
 	)
 }
 
@@ -298,13 +256,8 @@ func (b *outMsgBuilderWithProto) GetAccepted(
 	deadline time.Duration,
 	containerIDs []ids.ID,
 ) (OutboundMessage, error) {
-	// GetAccepted messages can't be compressed
-	compress := GetAccepted.Compressible()
-	bypassThrottling := false
-
 	containerIDBytes := make([][]byte, len(containerIDs))
 	encodeIDs(containerIDs, containerIDBytes)
-
 	return b.protoBuilder.createOutbound(
 		GetAccepted,
 		&p2ppb.Message{
@@ -317,8 +270,8 @@ func (b *outMsgBuilderWithProto) GetAccepted(
 				},
 			},
 		},
-		compress,
-		bypassThrottling,
+		b.compress && GetAccepted.Compressible(),
+		false,
 	)
 }
 
@@ -327,13 +280,8 @@ func (b *outMsgBuilderWithProto) Accepted(
 	requestID uint32,
 	containerIDs []ids.ID,
 ) (OutboundMessage, error) {
-	// Accepted messages can't be compressed
-	compress := Accepted.Compressible()
-	bypassThrottling := false
-
 	containerIDBytes := make([][]byte, len(containerIDs))
 	encodeIDs(containerIDs, containerIDBytes)
-
 	return b.protoBuilder.createOutbound(
 		Accepted,
 		&p2ppb.Message{
@@ -345,8 +293,8 @@ func (b *outMsgBuilderWithProto) Accepted(
 				},
 			},
 		},
-		compress,
-		bypassThrottling,
+		b.compress && Accepted.Compressible(),
+		false,
 	)
 }
 
@@ -356,10 +304,6 @@ func (b *outMsgBuilderWithProto) GetAncestors(
 	deadline time.Duration,
 	containerID ids.ID,
 ) (OutboundMessage, error) {
-	// GetAncestors messages can't be compressed
-	compress := GetAncestors.Compressible()
-	bypassThrottling := false
-
 	return b.protoBuilder.createOutbound(
 		GetAncestors,
 		&p2ppb.Message{
@@ -372,8 +316,8 @@ func (b *outMsgBuilderWithProto) GetAncestors(
 				},
 			},
 		},
-		compress,
-		bypassThrottling,
+		b.compress && GetAncestors.Compressible(),
+		false,
 	)
 }
 
@@ -382,10 +326,6 @@ func (b *outMsgBuilderWithProto) Ancestors(
 	requestID uint32,
 	containers [][]byte,
 ) (OutboundMessage, error) {
-	// Ancestors messages "may" be compressed
-	compress := b.compress && Ancestors.Compressible()
-	bypassThrottling := false
-
 	return b.protoBuilder.createOutbound(
 		Ancestors,
 		&p2ppb.Message{
@@ -397,8 +337,8 @@ func (b *outMsgBuilderWithProto) Ancestors(
 				},
 			},
 		},
-		compress,
-		bypassThrottling,
+		b.compress && Ancestors.Compressible(),
+		false,
 	)
 }
 
@@ -408,10 +348,6 @@ func (b *outMsgBuilderWithProto) Get(
 	deadline time.Duration,
 	containerID ids.ID,
 ) (OutboundMessage, error) {
-	// Get messages can't be compressed
-	compress := Get.Compressible()
-	bypassThrottling := false
-
 	return b.protoBuilder.createOutbound(
 		Get,
 		&p2ppb.Message{
@@ -424,8 +360,8 @@ func (b *outMsgBuilderWithProto) Get(
 				},
 			},
 		},
-		compress,
-		bypassThrottling,
+		b.compress && Get.Compressible(),
+		false,
 	)
 }
 
@@ -434,10 +370,6 @@ func (b *outMsgBuilderWithProto) Put(
 	requestID uint32,
 	container []byte,
 ) (OutboundMessage, error) {
-	// Put messages may be compressed
-	compress := b.compress && Put.Compressible()
-	bypassThrottling := false
-
 	return b.protoBuilder.createOutbound(
 		Put,
 		&p2ppb.Message{
@@ -449,8 +381,8 @@ func (b *outMsgBuilderWithProto) Put(
 				},
 			},
 		},
-		compress,
-		bypassThrottling,
+		b.compress && Put.Compressible(),
+		false,
 	)
 }
 
@@ -460,10 +392,6 @@ func (b *outMsgBuilderWithProto) PushQuery(
 	deadline time.Duration,
 	container []byte,
 ) (OutboundMessage, error) {
-	// PushQuery messages "may" be compressed
-	compress := b.compress && PushQuery.Compressible()
-	bypassThrottling := false
-
 	return b.protoBuilder.createOutbound(
 		PushQuery,
 		&p2ppb.Message{
@@ -476,8 +404,8 @@ func (b *outMsgBuilderWithProto) PushQuery(
 				},
 			},
 		},
-		compress,
-		bypassThrottling,
+		b.compress && PushQuery.Compressible(),
+		false,
 	)
 }
 
@@ -487,10 +415,6 @@ func (b *outMsgBuilderWithProto) PullQuery(
 	deadline time.Duration,
 	containerID ids.ID,
 ) (OutboundMessage, error) {
-	// PullQuery messages can't be compressed
-	compress := PullQuery.Compressible()
-	bypassThrottling := false
-
 	return b.protoBuilder.createOutbound(
 		PullQuery,
 		&p2ppb.Message{
@@ -503,8 +427,8 @@ func (b *outMsgBuilderWithProto) PullQuery(
 				},
 			},
 		},
-		compress,
-		bypassThrottling,
+		b.compress && PullQuery.Compressible(),
+		false,
 	)
 }
 
@@ -513,13 +437,8 @@ func (b *outMsgBuilderWithProto) Chits(
 	requestID uint32,
 	containerIDs []ids.ID,
 ) (OutboundMessage, error) {
-	// Chits messages can't be compressed
-	compress := Chits.Compressible()
-	bypassThrottling := false
-
 	containerIDBytes := make([][]byte, len(containerIDs))
 	encodeIDs(containerIDs, containerIDBytes)
-
 	return b.protoBuilder.createOutbound(
 		Chits,
 		&p2ppb.Message{
@@ -531,8 +450,8 @@ func (b *outMsgBuilderWithProto) Chits(
 				},
 			},
 		},
-		compress,
-		bypassThrottling,
+		b.compress && Chits.Compressible(),
+		false,
 	)
 }
 
@@ -543,10 +462,6 @@ func (b *outMsgBuilderWithProto) AppRequest(
 	deadline time.Duration,
 	msg []byte,
 ) (OutboundMessage, error) {
-	// App messages "may" be compressed
-	compress := b.compress && AppRequest.Compressible()
-	bypassThrottling := false
-
 	return b.protoBuilder.createOutbound(
 		AppRequest,
 		&p2ppb.Message{
@@ -559,17 +474,13 @@ func (b *outMsgBuilderWithProto) AppRequest(
 				},
 			},
 		},
-		compress,
-		bypassThrottling,
+		b.compress && AppRequest.Compressible(),
+		false,
 	)
 }
 
 // Application level response
 func (b *outMsgBuilderWithProto) AppResponse(chainID ids.ID, requestID uint32, msg []byte) (OutboundMessage, error) {
-	// App messages "may" be compressed
-	compress := b.compress && AppResponse.Compressible()
-	bypassThrottling := false
-
 	return b.protoBuilder.createOutbound(
 		AppResponse,
 		&p2ppb.Message{
@@ -581,17 +492,13 @@ func (b *outMsgBuilderWithProto) AppResponse(chainID ids.ID, requestID uint32, m
 				},
 			},
 		},
-		compress,
-		bypassThrottling,
+		b.compress && AppResponse.Compressible(),
+		false,
 	)
 }
 
 // Application level gossiped message
 func (b *outMsgBuilderWithProto) AppGossip(chainID ids.ID, msg []byte) (OutboundMessage, error) {
-	// App messages "may" be compressed
-	compress := b.compress && AppGossip.Compressible()
-	bypassThrottling := false
-
 	return b.protoBuilder.createOutbound(
 		AppGossip,
 		&p2ppb.Message{
@@ -602,7 +509,7 @@ func (b *outMsgBuilderWithProto) AppGossip(chainID ids.ID, msg []byte) (Outbound
 				},
 			},
 		},
-		compress,
-		bypassThrottling,
+		b.compress && AppGossip.Compressible(),
+		false,
 	)
 }
