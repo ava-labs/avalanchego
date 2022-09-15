@@ -47,8 +47,9 @@ type Config struct {
 	ResourceTracker tracker.ResourceTracker
 }
 
-func (c *Config) GetMessageCreator(time time.Time) message.Creator {
-	if c.IsBlueberryActivated(time) {
+func (c *Config) GetMessageCreator() message.Creator {
+	now := c.Clock.Time()
+	if c.IsBlueberryActivated(now) {
 		return c.MessageCreatorWithProto
 	}
 	return c.MessageCreator

@@ -550,7 +550,7 @@ func (p *peer) sendPings() {
 				}
 			}
 
-			pingMessage, err := p.Config.GetMessageCreator(p.Config.Clock.Time()).Ping()
+			pingMessage, err := p.Config.GetMessageCreator().Ping()
 			p.Log.AssertNoError(err)
 
 			p.Send(p.onClosingCtx, pingMessage)

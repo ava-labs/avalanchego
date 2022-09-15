@@ -469,7 +469,7 @@ func (n *network) Version() (message.OutboundMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	return n.peerConfig.GetMessageCreator(n.peerConfig.Clock.Time()).Version(
+	return n.peerConfig.GetMessageCreator().Version(
 		n.peerConfig.NetworkID,
 		n.peerConfig.Clock.Unix(),
 		mySignedIP.IP.IP,
@@ -482,7 +482,7 @@ func (n *network) Version() (message.OutboundMessage, error) {
 
 func (n *network) Peers() (message.OutboundMessage, error) {
 	peers := n.sampleValidatorIPs()
-	return n.peerConfig.GetMessageCreator(n.peerConfig.Clock.Time()).PeerList(peers, true)
+	return n.peerConfig.GetMessageCreator().PeerList(peers, true)
 }
 
 func (n *network) Pong(nodeID ids.NodeID) (message.OutboundMessage, error) {
@@ -492,7 +492,7 @@ func (n *network) Pong(nodeID ids.NodeID) (message.OutboundMessage, error) {
 	}
 
 	uptimePercentInt := uint8(uptimePercentFloat * 100)
-	return n.peerConfig.GetMessageCreator(n.peerConfig.Clock.Time()).Pong(uptimePercentInt)
+	return n.peerConfig.GetMessageCreator().Pong(uptimePercentInt)
 }
 
 // Dispatch starts accepting connections from other nodes attempting to connect
@@ -1157,7 +1157,7 @@ func (n *network) runTimers() {
 				continue
 			}
 
-			msg, err := n.peerConfig.GetMessageCreator(n.peerConfig.Clock.Time()).PeerList(validatorIPs, false)
+			msg, err := n.peerConfig.GetMessageCreator().PeerList(validatorIPs, false)
 			if err != nil {
 				n.peerConfig.Log.Error(
 					"failed to gossip",
