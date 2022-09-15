@@ -1255,17 +1255,19 @@ func (n *Node) Initialize(
 	// and the engine (initChains) but after the metrics (initMetricsAPI)
 	// message.Creator currently record metrics under network namespace
 	n.networkNamespace = "network"
-	n.msgCreator, err = message.NewCreator(n.MetricsRegisterer,
-		n.Config.NetworkConfig.CompressionEnabled,
+	n.msgCreator, err = message.NewCreator(
+		n.MetricsRegisterer,
 		n.networkNamespace,
+		n.Config.NetworkConfig.CompressionEnabled,
 		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
 	)
 	if err != nil {
 		return fmt.Errorf("problem initializing message creator: %w", err)
 	}
-	n.msgCreatorWithProto, err = message.NewCreatorWithProto(n.MetricsRegisterer,
-		n.Config.NetworkConfig.CompressionEnabled,
+	n.msgCreatorWithProto, err = message.NewCreatorWithProto(
+		n.MetricsRegisterer,
 		n.networkNamespace,
+		n.Config.NetworkConfig.CompressionEnabled,
 		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
 	)
 	if err != nil {

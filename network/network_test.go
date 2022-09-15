@@ -175,16 +175,16 @@ func newMessageCreator(t *testing.T) (message.Creator, message.Creator) {
 
 	mc, err := message.NewCreator(
 		prometheus.NewRegistry(),
-		true,
 		"",
+		true,
 		10*time.Second,
 	)
 	require.NoError(t, err)
 
 	mcProto, err := message.NewCreatorWithProto(
 		prometheus.NewRegistry(),
-		true,
 		"",
+		true,
 		10*time.Second,
 	)
 	require.NoError(t, err)

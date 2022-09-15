@@ -60,9 +60,9 @@ func TestTimeout(t *testing.T) {
 	chainRouter := router.ChainRouter{}
 
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
+	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
 	require.NoError(t, err)
-	mcProto, err := message.NewCreatorWithProto(metrics, true, "dummyNamespace", 10*time.Second)
+	mcProto, err := message.NewCreatorWithProto(metrics, "dummyNamespace", true, 10*time.Second)
 	require.NoError(t, err)
 
 	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
@@ -154,9 +154,9 @@ func TestReliableMessages(t *testing.T) {
 	chainRouter := router.ChainRouter{}
 
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
+	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
 	require.NoError(t, err)
-	mcProto, err := message.NewCreatorWithProto(metrics, true, "dummyNamespace", 10*time.Second)
+	mcProto, err := message.NewCreatorWithProto(metrics, "dummyNamespace", true, 10*time.Second)
 	require.NoError(t, err)
 
 	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
@@ -253,9 +253,9 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	chainRouter := router.ChainRouter{}
 
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
+	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
 	require.NoError(t, err)
-	mcProto, err := message.NewCreatorWithProto(metrics, true, "dummyNamespace", 10*time.Second)
+	mcProto, err := message.NewCreatorWithProto(metrics, "dummyNamespace", true, 10*time.Second)
 	require.NoError(t, err)
 
 	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())

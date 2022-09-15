@@ -112,15 +112,15 @@ func Start(ctx context.Context, ip ips.IPPort, router router.InboundHandler, opt
 	if !ret.useProto {
 		mc, err = message.NewCreator(
 			reg,
-			true,
 			"",
+			true,
 			10*time.Second,
 		)
 	} else {
 		mc, err = message.NewCreatorWithProto(
 			reg,
-			true,
 			"",
+			true,
 			10*time.Second,
 		)
 	}

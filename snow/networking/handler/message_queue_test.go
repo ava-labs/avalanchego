@@ -42,9 +42,9 @@ func TestQueue(t *testing.T) {
 			metrics := prometheus.NewRegistry()
 			var mc message.Creator
 			if !useProto {
-				mc, err = message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
+				mc, err = message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
 			} else {
-				mc, err = message.NewCreatorWithProto(metrics, true, "dummyNamespace", 10*time.Second)
+				mc, err = message.NewCreatorWithProto(metrics, "dummyNamespace", true, 10*time.Second)
 			}
 			require.NoError(err)
 
