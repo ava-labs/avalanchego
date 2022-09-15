@@ -280,7 +280,8 @@ func TestReady(t *testing.T) {
 func TestSend(t *testing.T) {
 	require := require.New(t)
 
-	for _, useProto := range []bool{false, true} {
+	// TODO: add "true" to test proto
+	for _, useProto := range []bool{false} {
 		t.Run(fmt.Sprintf("use proto buf message creator %v", useProto), func(tt *testing.T) {
 			peer0, peer1 := makeReadyTestPeers(tt, useProto)
 			mc := newMessageCreator(tt, useProto)
