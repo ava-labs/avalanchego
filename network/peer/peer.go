@@ -339,10 +339,6 @@ func (p *peer) readMessages() {
 			)
 			return
 		}
-		if isProto {
-			p.Log.Debug("unexpected isProto=true from 'readMsgLen' (not implemented yet)")
-			return
-		}
 
 		// Wait until the throttler says we can proceed to read the message.
 		//
@@ -404,7 +400,12 @@ func (p *peer) readMessages() {
 		)
 
 		// Parse the message
-		msg, err := p.MessageCreator.Parse(msgBytes, p.id, onFinishedHandling)
+		var msg message.InboundMessage
+		if isProto {
+			msg, err = p.MessageCreatorWithProto.Parse(msgBytes, p.id, onFinishedHandling)
+		} else {
+			msg, err = p.MessageCreator.Parse(msgBytes, p.id, onFinishedHandling)
+		}
 		if err != nil {
 			p.Log.Verbo("failed to parse message",
 				zap.Stringer("nodeID", p.id),
