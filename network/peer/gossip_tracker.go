@@ -95,12 +95,10 @@ func (d *GossipTracker) Remove(id ids.NodeID) bool {
 	// remove the peer from everyone else's peer lists
 	for _, knownPeers := range d.knownPeers {
 		// swap with the last element
-		if knownPeers.Contains(d.tail) {
-			knownPeers.Remove(d.tail)
-			knownPeers.Add(idx)
-		} else {
-			knownPeers.Remove(idx)
+		if idx != d.tail {
+			knownPeers.Add(d.tail)
 		}
+		knownPeers.Remove(idx)
 	}
 
 	delete(d.knownPeers, evicted)
