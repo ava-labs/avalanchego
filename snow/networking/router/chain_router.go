@@ -53,12 +53,11 @@ type peer struct {
 // Note that consensus engines are uniquely identified by the ID of the chain
 // that they are working on.
 type ChainRouter struct {
-	clock               mockable.Clock
-	log                 logging.Logger
-	msgCreator          message.Creator
-	msgCreatorWithProto message.Creator
-	lock                sync.Mutex
-	chains              map[ids.ID]handler.Handler
+	clock      mockable.Clock
+	log        logging.Logger
+	msgCreator message.InternalMsgBuilder
+	lock       sync.Mutex
+	chains     map[ids.ID]handler.Handler
 
 	// It is only safe to call [RegisterResponse] with the router lock held. Any
 	// other calls to the timeout manager with the router lock held could cause
@@ -90,8 +89,7 @@ type ChainRouter struct {
 func (cr *ChainRouter) Initialize(
 	nodeID ids.NodeID,
 	log logging.Logger,
-	msgCreator message.Creator,
-	msgCreatorWithProto message.Creator,
+	msgCreator message.InternalMsgBuilder,
 	timeoutManager timeout.Manager,
 	closeTimeout time.Duration,
 	criticalChains ids.Set,
@@ -103,7 +101,6 @@ func (cr *ChainRouter) Initialize(
 ) error {
 	cr.log = log
 	cr.msgCreator = msgCreator
-	cr.msgCreatorWithProto = msgCreatorWithProto
 	cr.chains = make(map[ids.ID]handler.Handler)
 	cr.timeoutManager = timeoutManager
 	cr.closeTimeout = closeTimeout

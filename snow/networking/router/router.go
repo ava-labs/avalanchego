@@ -26,8 +26,7 @@ type Router interface {
 	Initialize(
 		nodeID ids.NodeID,
 		log logging.Logger,
-		msgCreator message.Creator,
-		msgCreatorWithProto message.Creator,
+		msgCreator message.InternalMsgBuilder,
 		timeouts timeout.Manager,
 		shutdownTimeout time.Duration,
 		criticalChains ids.Set,
