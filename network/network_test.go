@@ -173,7 +173,7 @@ func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []id
 func newMessageCreator(t *testing.T) (message.Creator, message.Creator) {
 	t.Helper()
 
-	mc, err := message.NewCreatorWithProto(
+	mc, err := message.NewCreator(
 		prometheus.NewRegistry(),
 		true,
 		"",
@@ -181,7 +181,7 @@ func newMessageCreator(t *testing.T) (message.Creator, message.Creator) {
 	)
 	require.NoError(t, err)
 
-	mcProto, err := message.NewCreator(
+	mcProto, err := message.NewCreatorWithProto(
 		prometheus.NewRegistry(),
 		true,
 		"",
