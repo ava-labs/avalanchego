@@ -99,7 +99,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 			},
 		},
 		metrics: metrics.Noop,
-		recentlyAccepted: window.New(window.Config{
+		recentlyAccepted: window.New[ids.ID](window.Config{
 			Clock:   &mockable.Clock{},
 			MaxSize: 1,
 			TTL:     time.Hour,
@@ -183,7 +183,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 			},
 		},
 		metrics: metrics.Noop,
-		recentlyAccepted: window.New(window.Config{
+		recentlyAccepted: window.New[ids.ID](window.Config{
 			Clock:   &mockable.Clock{},
 			MaxSize: 1,
 			TTL:     time.Hour,
@@ -275,7 +275,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 			},
 		},
 		metrics: metrics.Noop,
-		recentlyAccepted: window.New(window.Config{
+		recentlyAccepted: window.New[ids.ID](window.Config{
 			Clock:   &mockable.Clock{},
 			MaxSize: 1,
 			TTL:     time.Hour,
@@ -365,7 +365,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 			},
 		},
 		metrics: metrics.Noop,
-		recentlyAccepted: window.New(window.Config{
+		recentlyAccepted: window.New[ids.ID](window.Config{
 			Clock:   &mockable.Clock{},
 			MaxSize: 1,
 			TTL:     time.Hour,

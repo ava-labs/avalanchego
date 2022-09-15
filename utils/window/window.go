@@ -7,12 +7,21 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
+var _ Window[struct{}] = &window[struct{}]{}
+
 // Window is an interface which represents a sliding window of elements.
-type Window struct {
+type Window[T any] interface {
+	Add(value T)
+	Oldest() (T, bool)
+	Length() int
+}
+
+type window[T any] struct {
 	// mocked clock for unit testing
 	clock *mockable.Clock
 	// time-to-live for elements in the window
@@ -23,7 +32,7 @@ type Window struct {
 	// mutex for synchronization
 	lock sync.Mutex
 	// elements in the window
-	elements buffer.UnboundedQueue[node]
+	elements buffer.UnboundedQueue[node[T]]
 }
 
 // Config exposes parameters for Window
@@ -34,18 +43,18 @@ type Config struct {
 }
 
 // New returns an instance of window
-func New(config Config) *Window {
-	return &Window{
+func New[T any](config Config) Window[T] {
+	return &window[T]{
 		clock:    config.Clock,
 		ttl:      config.TTL,
 		maxSize:  config.MaxSize,
-		elements: buffer.NewUnboundedSliceQueue[node](config.MaxSize + 1),
+		elements: buffer.NewUnboundedSliceQueue[node[T]](config.MaxSize + 1),
 	}
 }
 
 // Add adds an element to a window and also evicts any elements if they've been
 // present in the window beyond the configured time-to-live
-func (w *Window) Add(value interface{}) {
+func (w *window[T]) Add(value T) {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
@@ -55,14 +64,14 @@ func (w *Window) Add(value interface{}) {
 	}
 
 	// add the new block id
-	w.elements.Enqueue(node{
+	w.elements.Enqueue(node[T]{
 		value:     value,
 		entryTime: w.clock.Time(),
 	})
 }
 
 // Oldest returns the oldest element in the window.
-func (w *Window) Oldest() (interface{}, bool) {
+func (w *window[T]) Oldest() (T, bool) {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
@@ -70,13 +79,13 @@ func (w *Window) Oldest() (interface{}, bool) {
 
 	oldest, ok := w.elements.PeekHead()
 	if !ok {
-		return nil, false
+		return utils.Zero[T](), false
 	}
 	return oldest.value, true
 }
 
 // Length returns the number of elements in the window.
-func (w *Window) Length() int {
+func (w *window[T]) Length() int {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
@@ -85,7 +94,7 @@ func (w *Window) Length() int {
 }
 
 // removeStaleNodes removes any nodes beyond the configured ttl of a window node.
-func (w *Window) removeStaleNodes() {
+func (w *window[T]) removeStaleNodes() {
 	// If we're beyond the expiry threshold, removeStaleNodes this node from our
 	// window. Nodes are guaranteed to be strictly increasing in entry time,
 	// so we can break this loop once we find the first non-stale one.
@@ -99,7 +108,7 @@ func (w *Window) removeStaleNodes() {
 }
 
 // helper struct to represent elements in the window
-type node struct {
-	value     interface{}
+type node[T any] struct {
+	value     T
 	entryTime time.Time
 }

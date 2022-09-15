@@ -42,7 +42,7 @@ func TestAdd(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			window := New(
+			window := New[int](
 				Config{
 					Clock:   &mockable.Clock{},
 					MaxSize: testMaxSize,
@@ -57,7 +57,7 @@ func TestAdd(t *testing.T) {
 
 			require.Equal(t, len(test.window)+1, window.Length())
 			oldest, ok := window.Oldest()
-			require.Equal(t, test.expectedOldest, oldest.(int))
+			require.Equal(t, test.expectedOldest, oldest)
 			require.True(t, ok)
 		})
 	}
@@ -67,7 +67,7 @@ func TestAdd(t *testing.T) {
 // and needs to be evicted on Add.
 func TestTTLAdd(t *testing.T) {
 	clock := mockable.Clock{}
-	window := New(
+	window := New[int](
 		Config{
 			Clock:   &clock,
 			MaxSize: testMaxSize,
@@ -85,7 +85,7 @@ func TestTTLAdd(t *testing.T) {
 
 	require.Equal(t, 3, window.Length())
 	oldest, ok := window.Oldest()
-	require.Equal(t, 1, oldest.(int))
+	require.Equal(t, 1, oldest)
 	require.True(t, ok)
 	// Now we're one second past the ttl of 10 seconds as defined in testTTL,
 	// so all existing elements need to be evicted.
@@ -97,7 +97,7 @@ func TestTTLAdd(t *testing.T) {
 
 	require.Equal(t, 1, window.Length())
 	oldest, ok = window.Oldest()
-	require.Equal(t, 4, oldest.(int))
+	require.Equal(t, 4, oldest)
 	require.True(t, ok)
 	// Now we're one second past the ttl of 10 seconds of when [4] was added,
 	// so all existing elements should be evicted.
@@ -108,14 +108,14 @@ func TestTTLAdd(t *testing.T) {
 	require.Equal(t, 0, window.Length())
 
 	oldest, ok = window.Oldest()
-	require.Nil(t, oldest)
+	require.Equal(t, 0, oldest)
 	require.False(t, ok)
 }
 
 // TestTTLReadOnly tests that stale elements are still evicted on Length
 func TestTTLLength(t *testing.T) {
 	clock := mockable.Clock{}
-	window := New(
+	window := New[int](
 		Config{
 			Clock:   &clock,
 			MaxSize: testMaxSize,
@@ -144,13 +144,15 @@ func TestTTLLength(t *testing.T) {
 // TestTTLReadOnly tests that stale elements are still evicted on calling Oldest
 func TestTTLOldest(t *testing.T) {
 	clock := mockable.Clock{}
-	window := New(
+	windowIntf := New[int](
 		Config{
 			Clock:   &clock,
 			MaxSize: testMaxSize,
 			TTL:     testTTL,
 		},
 	)
+	window, ok := windowIntf.(*window[int])
+	require.True(t, ok)
 	epochStart := time.Unix(0, 0)
 	clock.Set(epochStart)
 
@@ -161,7 +163,7 @@ func TestTTLOldest(t *testing.T) {
 	window.Add(3)
 
 	oldest, ok := window.Oldest()
-	require.Equal(t, 1, oldest.(int))
+	require.Equal(t, 1, oldest)
 	require.True(t, ok)
 	require.Equal(t, 3, window.elements.Len())
 
@@ -171,14 +173,14 @@ func TestTTLOldest(t *testing.T) {
 
 	// Now there shouldn't be any elements in the window
 	oldest, ok = window.Oldest()
-	require.Nil(t, oldest)
+	require.Equal(t, 0, oldest)
 	require.False(t, ok)
 	require.Equal(t, 0, window.elements.Len())
 }
 
 // Tests that we bound the amount of elements in the window
 func TestMaxCapacity(t *testing.T) {
-	window := New(
+	window := New[int](
 		Config{
 			Clock:   &mockable.Clock{},
 			MaxSize: 3,
@@ -207,6 +209,6 @@ func TestMaxCapacity(t *testing.T) {
 
 	require.Equal(t, 3, window.Length())
 	oldest, ok := window.Oldest()
-	require.Equal(t, 4, oldest.(int))
+	require.Equal(t, 4, oldest)
 	require.True(t, ok)
 }
