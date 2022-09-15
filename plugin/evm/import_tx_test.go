@@ -132,7 +132,15 @@ func TestImportTxVerify(t *testing.T) {
 			},
 			ctx:         ctx,
 			rules:       apricotRulesPhase0,
-			expectedErr: "", // Expect this transaction to be valid
+			expectedErr: "", // Expect this transaction to be valid in Apricot Phase 0
+		},
+		"valid import tx blueberry": {
+			generate: func(t *testing.T) UnsignedAtomicTx {
+				return importTx
+			},
+			ctx:         ctx,
+			rules:       blueberryRules,
+			expectedErr: "", // Expect this transaction to be valid in Blueberry
 		},
 		"invalid network ID": {
 			generate: func(t *testing.T) UnsignedAtomicTx {
@@ -322,6 +330,86 @@ func TestImportTxVerify(t *testing.T) {
 			ctx:         ctx,
 			rules:       apricotRulesPhase3,
 			expectedErr: errNoEVMOutputs.Error(),
+		},
+		"non-AVAX input Apricot Phase 6": {
+			generate: func(t *testing.T) UnsignedAtomicTx {
+				tx := *importTx
+				tx.ImportedInputs = []*avax.TransferableInput{
+					{
+						UTXOID: avax.UTXOID{
+							TxID:        txID,
+							OutputIndex: uint32(0),
+						},
+						Asset: avax.Asset{ID: ids.GenerateTestID()},
+						In: &secp256k1fx.TransferInput{
+							Amt: importAmount,
+							Input: secp256k1fx.Input{
+								SigIndices: []uint32{0},
+							},
+						},
+					},
+				}
+				return &tx
+			},
+			ctx:         ctx,
+			rules:       apricotRulesPhase6,
+			expectedErr: "",
+		},
+		"non-AVAX output Apricot Phase 6": {
+			generate: func(t *testing.T) UnsignedAtomicTx {
+				tx := *importTx
+				tx.Outs = []EVMOutput{
+					{
+						Address: importTx.Outs[0].Address,
+						Amount:  importTx.Outs[0].Amount,
+						AssetID: ids.GenerateTestID(),
+					},
+				}
+				return &tx
+			},
+			ctx:         ctx,
+			rules:       apricotRulesPhase6,
+			expectedErr: "",
+		},
+		"non-AVAX input Blueberry": {
+			generate: func(t *testing.T) UnsignedAtomicTx {
+				tx := *importTx
+				tx.ImportedInputs = []*avax.TransferableInput{
+					{
+						UTXOID: avax.UTXOID{
+							TxID:        txID,
+							OutputIndex: uint32(0),
+						},
+						Asset: avax.Asset{ID: ids.GenerateTestID()},
+						In: &secp256k1fx.TransferInput{
+							Amt: importAmount,
+							Input: secp256k1fx.Input{
+								SigIndices: []uint32{0},
+							},
+						},
+					},
+				}
+				return &tx
+			},
+			ctx:         ctx,
+			rules:       blueberryRules,
+			expectedErr: errImportNonAVAXInputBlueberry.Error(),
+		},
+		"non-AVAX output Blueberry": {
+			generate: func(t *testing.T) UnsignedAtomicTx {
+				tx := *importTx
+				tx.Outs = []EVMOutput{
+					{
+						Address: importTx.Outs[0].Address,
+						Amount:  importTx.Outs[0].Amount,
+						AssetID: ids.GenerateTestID(),
+					},
+				}
+				return &tx
+			},
+			ctx:         ctx,
+			rules:       blueberryRules,
+			expectedErr: errImportNonAVAXOutputBlueberry.Error(),
 		},
 	}
 	for name, test := range tests {
