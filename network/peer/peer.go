@@ -620,6 +620,7 @@ func (p *peer) handle(msg message.InboundMessage) {
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", op),
 		)
+		span.AddEvent("dropping message because handshake isn't finished")
 		msg.OnFinishedHandling()
 		return
 	}
@@ -645,6 +646,7 @@ func (p *peer) handlePong(ctx context.Context, msg message.InboundMessage) {
 	if uptime > 100 {
 		return
 	}
+	span.SetAttributes(attribute.Int("uptime", int(uptime)))
 
 	p.observedUptimeLock.Lock()
 	p.observedUptime = uptime // [0, 100] percentage
@@ -668,6 +670,7 @@ func (p *peer) handleVersion(ctx context.Context, msg message.InboundMessage) {
 			zap.Uint32("peerNetworkID", peerNetworkID),
 			zap.Uint32("ourNetworkID", p.NetworkID),
 		)
+		span.AddEvent("networkID mismatch")
 		p.StartClose()
 		return
 	}
@@ -681,12 +684,14 @@ func (p *peer) handleVersion(ctx context.Context, msg message.InboundMessage) {
 				zap.Uint64("beaconTime", uint64(peerTime)),
 				zap.Uint64("ourTime", uint64(myTime)),
 			)
+			span.RecordError(errors.New("beacon reports out of sync time"))
 		} else {
 			p.Log.Debug("peer reports out of sync time",
 				zap.Stringer("beaconID", p.id),
 				zap.Uint64("beaconTime", uint64(peerTime)),
 				zap.Uint64("ourTime", uint64(myTime)),
 			)
+			span.AddEvent("peer reports out of sync time")
 		}
 		p.StartClose()
 		return
@@ -699,6 +704,7 @@ func (p *peer) handleVersion(ctx context.Context, msg message.InboundMessage) {
 			zap.Stringer("nodeID", p.id),
 			zap.Error(err),
 		)
+		span.AddEvent("failed to parse peer version")
 		p.StartClose()
 		return
 	}
@@ -724,6 +730,7 @@ func (p *peer) handleVersion(ctx context.Context, msg message.InboundMessage) {
 			zap.Stringer("peerVersion", peerVersion),
 			zap.Error(err),
 		)
+		span.AddEvent("peer version incompatible")
 		p.StartClose()
 		return
 	}
@@ -737,6 +744,7 @@ func (p *peer) handleVersion(ctx context.Context, msg message.InboundMessage) {
 			zap.Stringer("nodeID", p.id),
 			zap.Uint64("versionTime", versionTime),
 		)
+		span.AddEvent("peer timestamp too far in the future")
 		p.StartClose()
 		return
 	}
@@ -752,6 +760,7 @@ func (p *peer) handleVersion(ctx context.Context, msg message.InboundMessage) {
 				zap.Stringer("nodeID", p.id),
 				zap.Error(err),
 			)
+			span.AddEvent("failed to parse peer's tracked subnets")
 			p.StartClose()
 			return
 		}
@@ -773,6 +782,7 @@ func (p *peer) handleVersion(ctx context.Context, msg message.InboundMessage) {
 			zap.Stringer("nodeID", p.id),
 			zap.Error(err),
 		)
+		span.AddEvent("signature verification failed")
 		p.StartClose()
 		return
 	}
@@ -789,6 +799,7 @@ func (p *peer) handlePeerList(ctx context.Context, msg message.InboundMessage) {
 	defer span.End()
 
 	if !p.finishedHandshake.GetValue() {
+		span.AddEvent("handshake not finished")
 		if !p.gotVersion.GetValue() {
 			return
 		}

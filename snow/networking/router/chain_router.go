@@ -210,7 +210,10 @@ func (cr *ChainRouter) HandleInbound(parentCtx context.Context, msg message.Inbo
 			zap.Stringer("chainID", chainID),
 			zap.Error(errUnknownChain),
 		)
-		span.AddEvent("dropping message", oteltrace.WithAttributes(attribute.String("reason", "unknown chain")))
+		span.AddEvent("dropping message", oteltrace.WithAttributes(
+			attribute.String("reason", "unknown chain"),
+			attribute.Stringer("chainID", chainID),
+		))
 		msg.OnFinishedHandling()
 		return
 	}
@@ -225,8 +228,7 @@ func (cr *ChainRouter) HandleInbound(parentCtx context.Context, msg message.Inbo
 				zap.Stringer("messageOp", op),
 			)
 			cr.metrics.droppedRequests.Inc()
-
-			span.AddEvent("dropping message", oteltrace.WithAttributes(attribute.String("reason", "chain executing")))
+			span.AddEvent("dropping message due to chain executing")
 			msg.OnFinishedHandling()
 			return
 		}
@@ -240,7 +242,7 @@ func (cr *ChainRouter) HandleInbound(parentCtx context.Context, msg message.Inbo
 		uniqueRequestID, req := cr.clearRequest(expectedResponse, nodeID, chainID, requestID)
 		if req == nil {
 			// This was a duplicated response.
-			span.AddEvent("dropping message", oteltrace.WithAttributes(attribute.String("reason", "duplicate response")))
+			span.AddEvent("dropping message due to duplicate response")
 			msg.OnFinishedHandling()
 			return
 		}
@@ -260,7 +262,7 @@ func (cr *ChainRouter) HandleInbound(parentCtx context.Context, msg message.Inbo
 		)
 		cr.metrics.droppedRequests.Inc()
 
-		span.AddEvent("dropping message", oteltrace.WithAttributes(attribute.String("reason", "chain executing")))
+		span.AddEvent("dropping message due to chain executing")
 		msg.OnFinishedHandling()
 		return
 	}
@@ -268,7 +270,7 @@ func (cr *ChainRouter) HandleInbound(parentCtx context.Context, msg message.Inbo
 	uniqueRequestID, req := cr.clearRequest(op, nodeID, chainID, requestID)
 	if req == nil {
 		// We didn't request this message.
-		span.AddEvent("dropping message", oteltrace.WithAttributes(attribute.String("reason", "unrequest message")))
+		span.AddEvent("dropping message due to unrequested message")
 		msg.OnFinishedHandling()
 		return
 	}
