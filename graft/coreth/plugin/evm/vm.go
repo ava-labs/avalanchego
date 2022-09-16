@@ -775,8 +775,8 @@ func (vm *VM) postBatchOnFinalizeAndAssemble(header *types.Header, state *state.
 		size += txSize
 	}
 
-	// In Blueberry the block header must include the atomic trie root.
-	if rules.IsBlueberry {
+	// In Clementine the block header must include the atomic trie root.
+	if rules.IsClementine {
 		// Pass common.Hash{} as the current block's hash to the atomic backend, this avoids
 		// pinning changes to the atomic trie in memory, as we are still computing the header
 		// for this block and don't have its hash yet. Here we calculate the root of the atomic
@@ -848,8 +848,8 @@ func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big
 		if err != nil {
 			return nil, nil, err
 		}
-		if rules.IsBlueberry {
-			// In Blueberry, the atomic trie root should be in ExtraStateRoot.
+		if rules.IsClementine {
+			// In Clementine, the atomic trie root should be in ExtraStateRoot.
 			if header.ExtraStateRoot != atomicRoot {
 				return nil, nil, fmt.Errorf(
 					"%w: (expected %s) (got %s)", errInvalidExtraStateRoot, header.ExtraStateRoot, atomicRoot,
