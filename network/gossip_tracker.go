@@ -109,7 +109,6 @@ func (g *GossipTracker) Remove(id ids.NodeID) bool {
 			}
 		}
 		knownPeers.Remove(g.tail)
-
 	}
 
 	return true
