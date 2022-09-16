@@ -8,7 +8,7 @@ import (
 )
 
 // SubnetTracker describes the interface for checking if a node is tracking a
-// subnet
+// subnet, namely if a node has whitelisted a subnet.
 type SubnetTracker interface {
 	// TracksSubnet returns true if [nodeID] tracks [subnetID]
 	TracksSubnet(nodeID ids.NodeID, subnetID ids.ID) bool

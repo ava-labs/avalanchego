@@ -162,8 +162,6 @@ func (t *Transitive) GetFailed(nodeID ids.NodeID, requestID uint32) error {
 }
 
 func (t *Transitive) PullQuery(nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
-	// TODO: once everyone supports ChitsV2 - we should be sending that message
-	// type here.
 	t.Sender.SendChits(nodeID, requestID, []ids.ID{t.Consensus.Preference()})
 
 	// Try to issue [blkID] to consensus.
@@ -176,8 +174,6 @@ func (t *Transitive) PullQuery(nodeID ids.NodeID, requestID uint32, blkID ids.ID
 }
 
 func (t *Transitive) PushQuery(nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
-	// TODO: once everyone supports ChitsV2 - we should be sending that message
-	// type here.
 	t.Sender.SendChits(nodeID, requestID, []ids.ID{t.Consensus.Preference()})
 
 	blk, err := t.VM.ParseBlock(blkBytes)
@@ -256,10 +252,6 @@ func (t *Transitive) Chits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) 
 	return t.buildBlocks()
 }
 
-func (t *Transitive) ChitsV2(vdr ids.NodeID, requestID uint32, _ []ids.ID, vote ids.ID) error {
-	return t.Chits(vdr, requestID, []ids.ID{vote})
-}
-
 func (t *Transitive) QueryFailed(vdr ids.NodeID, requestID uint32) error {
 	t.blocked.Register(&voter{
 		t:         t,
@@ -317,7 +309,7 @@ func (t *Transitive) Gossip() error {
 	t.Ctx.Log.Verbo("gossiping accepted block to the network",
 		zap.Stringer("blkID", blkID),
 	)
-	t.Sender.SendGossip(blkID, blk.Bytes())
+	t.Sender.SendGossip(blk.Bytes())
 	return nil
 }
 

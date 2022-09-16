@@ -184,6 +184,6 @@ func (gh *getter) Get(nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
 	}
 
 	// Respond to the validator with the fetched block and the same requestID.
-	gh.sender.SendPut(nodeID, requestID, blkID, blk.Bytes())
+	gh.sender.SendPut(nodeID, requestID, blk.Bytes())
 	return nil
 }
