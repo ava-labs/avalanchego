@@ -1,5 +1,15 @@
 # Release Notes
 
+## [v0.10.0](https://github.com/ava-labs/coreth/releases/tag/v0.10.0)
+
+- Deprecate Native Asset Call and Native Asset Balance
+- Deprecate Import/Export of non-AVAX Avalanche Native Tokens via Atomic Transactions
+
+## [v0.9.0](https://github.com/ava-labs/coreth/releases/tag/v0.9.0)
+
+- Migrate to go-ethereum v1.10.23
+- Add API to fetch Chain Config
+
 ## [v0.8.16](https://github.com/ava-labs/coreth/releases/tag/v0.8.16)
 
 - Fix bug in `codeToFetch` database accessors that caused an error when starting/stopping state sync
