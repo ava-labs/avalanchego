@@ -4,6 +4,7 @@
 package bootstrap
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -28,6 +30,9 @@ type parser struct {
 }
 
 func (p *parser) Parse(blkBytes []byte) (queue.Job, error) {
+	_, span := trace.Tracer().Start(context.Background(), "parser.Parse")
+	defer span.End()
+
 	blk, err := p.vm.ParseBlock(blkBytes)
 	if err != nil {
 		return nil, err

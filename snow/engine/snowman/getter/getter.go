@@ -137,7 +137,9 @@ func (gh *getter) GetAcceptedFrontier(parentCtx context.Context, nodeID ids.Node
 	ctx, span := trace.Tracer().Start(parentCtx, "getter.GetAcceptedFrontier")
 	defer span.End()
 
+	_, lastAcceptedSpan := trace.Tracer().Start(ctx, "GetLastAccepted")
 	lastAccepted, err := gh.vm.LastAccepted()
+	lastAcceptedSpan.End()
 	if err != nil {
 		return err
 	}
@@ -151,7 +153,10 @@ func (gh *getter) GetAccepted(parentCtx context.Context, nodeID ids.NodeID, requ
 
 	acceptedIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, blkID := range containerIDs {
-		if blk, err := gh.vm.GetBlock(blkID); err == nil && blk.Status() == choices.Accepted {
+		_, getBlockSpan := trace.Tracer().Start(ctx, "GetBlock")
+		blk, err := gh.vm.GetBlock(blkID)
+		getBlockSpan.End()
+		if err == nil && blk.Status() == choices.Accepted {
 			acceptedIDs = append(acceptedIDs, blkID)
 		}
 	}
@@ -190,7 +195,9 @@ func (gh *getter) Get(parentCtx context.Context, nodeID ids.NodeID, requestID ui
 	ctx, span := trace.Tracer().Start(parentCtx, "getter.Get")
 	defer span.End()
 
+	_, getBlockSpan := trace.Tracer().Start(ctx, "GetBlock")
 	blk, err := gh.vm.GetBlock(blkID)
+	getBlockSpan.End()
 	if err != nil {
 		// If we failed to get the block, that means either an unexpected error
 		// has occurred, [vdr] is not following the protocol, or the

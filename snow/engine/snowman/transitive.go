@@ -124,7 +124,10 @@ func (t *Transitive) Put(parentCtx context.Context, nodeID ids.NodeID, requestID
 	)
 	defer span.End()
 
+	// TODO pass [ctx] instead of creating/stopping the span here.
+	_, parseSpan := trace.Tracer().Start(ctx, "ParseBlock")
 	blk, err := t.VM.ParseBlock(blkBytes)
+	parseSpan.End()
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse block",
 			zap.Stringer("nodeID", nodeID),
@@ -221,7 +224,10 @@ func (t *Transitive) PushQuery(parentCtx context.Context, nodeID ids.NodeID, req
 	// type here.
 	t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{t.Consensus.Preference()})
 
+	// TODO pass [ctx] instead of creating/stopping the span here.
+	_, parseSpan := trace.Tracer().Start(ctx, "ParseBlock")
 	blk, err := t.VM.ParseBlock(blkBytes)
+	parseSpan.End()
 	// If parsing fails, we just drop the request, as we didn't ask for it
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse block",
@@ -362,7 +368,11 @@ func (t *Transitive) Gossip() error {
 	ctx, span := trace.Tracer().Start(context.Background(), "Transitive.Gossip")
 	defer span.End()
 
+	// TODO pass [ctx] instead of creating/stopping the span here.
+	_, lastAcceptedSpan := trace.Tracer().Start(ctx, "LastAccepted")
 	blkID, err := t.VM.LastAccepted()
+	lastAcceptedSpan.End()
+
 	if err != nil {
 		return err
 	}
@@ -412,6 +422,7 @@ func (t *Transitive) Context() *snow.ConsensusContext {
 func (t *Transitive) Start(startReqID uint32) error {
 	t.RequestID = startReqID
 	lastAcceptedID, err := t.VM.LastAccepted()
+
 	if err != nil {
 		return err
 	}
@@ -467,6 +478,9 @@ func (t *Transitive) Start(startReqID uint32) error {
 }
 
 func (t *Transitive) HealthCheck() (interface{}, error) {
+	_, span := trace.Tracer().Start(context.Background(), "Transitive.HealthCheck")
+	defer span.End()
+
 	consensusIntf, consensusErr := t.Consensus.HealthCheck()
 	vmIntf, vmErr := t.VM.HealthCheck()
 	intf := map[string]interface{}{
@@ -493,6 +507,9 @@ func (t *Transitive) GetBlock(blkID ids.ID) (snowman.Block, error) {
 	if blk, ok := t.nonVerifiedCache.Get(blkID); ok {
 		return blk.(snowman.Block), nil
 	}
+
+	_, getBlockSpan := trace.Tracer().Start(context.Background(), "GetBlock")
+	defer getBlockSpan.End()
 	return t.VM.GetBlock(blkID)
 }
 
@@ -505,7 +522,9 @@ func (t *Transitive) buildBlocks() error {
 	for t.pendingBuildBlocks > 0 && t.Consensus.NumProcessing() < t.Params.OptimalProcessing {
 		t.pendingBuildBlocks--
 
+		_, buildBlockSpan := trace.Tracer().Start(context.Background(), "BuildBlock")
 		blk, err := t.VM.BuildBlock()
+		buildBlockSpan.End()
 		if err != nil {
 			t.Ctx.Log.Debug("failed building block",
 				zap.Error(err),
