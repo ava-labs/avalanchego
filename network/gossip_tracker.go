@@ -38,77 +38,77 @@ func NewGossipTracker() *GossipTracker {
 }
 
 // Contains returns if a peer is being tracked
-func (d *GossipTracker) Contains(id ids.NodeID) bool {
-	d.lock.RLock()
-	defer d.lock.RUnlock()
+func (g *GossipTracker) Contains(id ids.NodeID) bool {
+	g.lock.RLock()
+	defer g.lock.RUnlock()
 
-	_, ok := d.knownPeers[id]
+	_, ok := g.knownPeers[id]
 	return ok
 }
 
 // Add starts tracking a peer
-func (d *GossipTracker) Add(id ids.NodeID) bool {
-	d.lock.Lock()
-	defer d.lock.Unlock()
+func (g *GossipTracker) Add(id ids.NodeID) bool {
+	g.lock.Lock()
+	defer g.lock.Unlock()
 
 	// Don't add the peer if it's already being tracked
-	if _, ok := d.peersToIndices[id]; ok {
+	if _, ok := g.peersToIndices[id]; ok {
 		return false
 	}
 
 	// add the peer
-	d.peersToIndices[id] = d.tail
-	d.knownPeers[id] = ids.NewBigBitSet()
-	d.indicesToPeers[d.tail] = id
+	g.peersToIndices[id] = g.tail
+	g.knownPeers[id] = ids.NewBigBitSet()
+	g.indicesToPeers[g.tail] = id
 
-	d.local.Add(d.tail)
+	g.local.Add(g.tail)
 
-	d.tail++
+	g.tail++
 
 	return true
 }
 
 // Remove stops tracking a given peer
-func (d *GossipTracker) Remove(id ids.NodeID) bool {
-	d.lock.Lock()
-	defer d.lock.Unlock()
+func (g *GossipTracker) Remove(id ids.NodeID) bool {
+	g.lock.Lock()
+	defer g.lock.Unlock()
 
 	// Only remove peers that are actually being tracked
-	idx, ok := d.peersToIndices[id]
+	idx, ok := g.peersToIndices[id]
 	if !ok {
 		return false
 	}
 
-	evicted := d.indicesToPeers[idx]
-	d.tail--
+	evicted := g.indicesToPeers[idx]
+	g.tail--
 
 	// swap the peer-to-be-removed with the tail peer
 	// if the element we're swapping with is ourselves, we can skip this swap
 	// since we only need to delete instead
-	if idx != d.tail {
-		lastPeer := d.indicesToPeers[d.tail]
+	if idx != g.tail {
+		lastPeer := g.indicesToPeers[g.tail]
 
-		d.indicesToPeers[idx] = lastPeer
-		d.peersToIndices[lastPeer] = idx
+		g.indicesToPeers[idx] = lastPeer
+		g.peersToIndices[lastPeer] = idx
 	}
 
-	delete(d.knownPeers, evicted)
-	delete(d.peersToIndices, evicted)
-	delete(d.indicesToPeers, d.tail)
+	delete(g.knownPeers, evicted)
+	delete(g.peersToIndices, evicted)
+	delete(g.indicesToPeers, g.tail)
 
-	d.local.Remove(d.tail)
+	g.local.Remove(g.tail)
 
 	// remove the peer from everyone else's peer lists
-	for _, knownPeers := range d.knownPeers {
+	for _, knownPeers := range g.knownPeers {
 		// swap the element to be removed with the tail
-		if idx != d.tail {
-			if knownPeers.Contains(d.tail) {
+		if idx != g.tail {
+			if knownPeers.Contains(g.tail) {
 				knownPeers.Add(idx)
 			} else {
 				knownPeers.Remove(idx)
 			}
 		}
-		knownPeers.Remove(d.tail)
+		knownPeers.Remove(g.tail)
 
 	}
 
@@ -120,18 +120,18 @@ func (d *GossipTracker) Remove(id ids.NodeID) bool {
 // 1. [id] and [learned] should only contain nodeIDs that have been tracked with
 // 	  Add(). Trying to add nodeIDs that aren't tracked yet will result in a noop
 // 	  and this will return [false].
-func (d *GossipTracker) UpdateKnown(id ids.NodeID, learned []ids.NodeID) bool {
-	d.lock.Lock()
-	defer d.lock.Unlock()
+func (g *GossipTracker) UpdateKnown(id ids.NodeID, learned []ids.NodeID) bool {
+	g.lock.Lock()
+	defer g.lock.Unlock()
 
-	known, ok := d.knownPeers[id]
+	known, ok := g.knownPeers[id]
 	if !ok {
 		return false
 	}
 
 	bs := ids.NewBigBitSetFromBits()
 	for _, nodeID := range learned {
-		idx, ok := d.peersToIndices[nodeID]
+		idx, ok := g.peersToIndices[nodeID]
 		if !ok {
 			return false
 		}
@@ -145,18 +145,18 @@ func (d *GossipTracker) UpdateKnown(id ids.NodeID, learned []ids.NodeID) bool {
 }
 
 // GetUnknown returns the peers that we haven't sent to this peer
-func (d *GossipTracker) GetUnknown(id ids.NodeID) (map[ids.NodeID]struct{}, bool) {
-	d.lock.RLock()
-	defer d.lock.RUnlock()
+func (g *GossipTracker) GetUnknown(id ids.NodeID) (map[ids.NodeID]struct{}, bool) {
+	g.lock.RLock()
+	defer g.lock.RUnlock()
 
 	// Calculate the unknown information we need to send to this peer.
 	// We do this by computing the [local] information we know,
 	// computing what the peer knows in its [knownPeers], and sending over
 	// the difference.
 	unknown := ids.NewBigBitSet()
-	unknown.Union(d.local)
+	unknown.Union(g.local)
 
-	knownPeers, ok := d.knownPeers[id]
+	knownPeers, ok := g.knownPeers[id]
 	if !ok {
 		return nil, false
 	}
@@ -170,7 +170,7 @@ func (d *GossipTracker) GetUnknown(id ids.NodeID) (map[ids.NodeID]struct{}, bool
 			continue
 		}
 
-		p := d.indicesToPeers[i]
+		p := g.indicesToPeers[i]
 		result[p] = struct{}{}
 	}
 
