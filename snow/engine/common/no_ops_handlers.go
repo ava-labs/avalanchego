@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
@@ -243,16 +243,6 @@ func (nop *noOpChitsHandler) Chits(nodeID ids.NodeID, requestID uint32, _ []ids.
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.Chits),
-		zap.Stringer("nodeID", nodeID),
-		zap.Uint32("requestID", requestID),
-	)
-	return nil
-}
-
-func (nop *noOpChitsHandler) ChitsV2(nodeID ids.NodeID, requestID uint32, _ []ids.ID, _ ids.ID) error {
-	nop.log.Debug("dropping request",
-		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.ChitsV2),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -57,16 +57,16 @@ type Client interface {
 		options ...rpc.Option,
 	) ([][]byte, ids.ShortID, ids.ID, error)
 	// GetSubnets returns information about the specified subnets
-	GetSubnets(context.Context, []ids.ID, ...rpc.Option) ([]ClientSubnet, error)
+	GetSubnets(ctx context.Context, subnetIDs []ids.ID, options ...rpc.Option) ([]ClientSubnet, error)
 	// GetStakingAssetID returns the assetID of the asset used for staking on
 	// subnet corresponding to [subnetID]
-	GetStakingAssetID(context.Context, ids.ID, ...rpc.Option) (ids.ID, error)
+	GetStakingAssetID(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (ids.ID, error)
 	// GetCurrentValidators returns the list of current validators for subnet with ID [subnetID]
-	GetCurrentValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]ClientPrimaryValidator, error)
+	GetCurrentValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]ClientPermissionlessValidator, error)
 	// GetPendingValidators returns the list of pending validators for subnet with ID [subnetID]
 	GetPendingValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]interface{}, []interface{}, error)
 	// GetCurrentSupply returns an upper bound on the supply of AVAX in the system
-	GetCurrentSupply(ctx context.Context, options ...rpc.Option) (uint64, error)
+	GetCurrentSupply(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, error)
 	// SampleValidators returns the nodeIDs of a sample of [sampleSize] validators from the current validator set for subnet with ID [subnetID]
 	SampleValidators(ctx context.Context, subnetID ids.ID, sampleSize uint16, options ...rpc.Option) ([]ids.NodeID, error)
 	// AddValidator issues a transaction to add a validator to the primary network
@@ -180,10 +180,10 @@ type Client interface {
 	) (*GetTxStatusResponse, error)
 	// GetStake returns the amount of nAVAX that [addrs] have cumulatively
 	// staked on the Primary Network.
-	GetStake(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (uint64, [][]byte, error)
+	GetStake(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (map[ids.ID]uint64, [][]byte, error)
 	// GetMinStake returns the minimum staking amount in nAVAX for validators
 	// and delegators respectively
-	GetMinStake(ctx context.Context, options ...rpc.Option) (uint64, uint64, error)
+	GetMinStake(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, uint64, error)
 	// GetTotalStake returns the total amount (in nAVAX) staked on the network
 	GetTotalStake(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, error)
 	// GetMaxStakeAmount returns the maximum amount of nAVAX staking to the named
@@ -372,7 +372,7 @@ func (c *client) GetCurrentValidators(
 	subnetID ids.ID,
 	nodeIDs []ids.NodeID,
 	options ...rpc.Option,
-) ([]ClientPrimaryValidator, error) {
+) ([]ClientPermissionlessValidator, error) {
 	res := &GetCurrentValidatorsReply{}
 	err := c.requester.SendRequest(ctx, "getCurrentValidators", &GetCurrentValidatorsArgs{
 		SubnetID: subnetID,
@@ -381,7 +381,7 @@ func (c *client) GetCurrentValidators(
 	if err != nil {
 		return nil, err
 	}
-	return getClientPrimaryValidators(res.Validators)
+	return getClientPermissionlessValidators(res.Validators)
 }
 
 func (c *client) GetPendingValidators(
@@ -398,9 +398,11 @@ func (c *client) GetPendingValidators(
 	return res.Validators, res.Delegators, err
 }
 
-func (c *client) GetCurrentSupply(ctx context.Context, options ...rpc.Option) (uint64, error) {
+func (c *client) GetCurrentSupply(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, error) {
 	res := &GetCurrentSupplyReply{}
-	err := c.requester.SendRequest(ctx, "getCurrentSupply", struct{}{}, res, options...)
+	err := c.requester.SendRequest(ctx, "getCurrentSupply", &GetCurrentSupplyArgs{
+		SubnetID: subnetID,
+	}, res, options...)
 	return uint64(res.Supply), err
 }
 
@@ -703,7 +705,7 @@ func (c *client) AwaitTxDecided(ctx context.Context, txID ids.ID, freq time.Dura
 	}
 }
 
-func (c *client) GetStake(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (uint64, [][]byte, error) {
+func (c *client) GetStake(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (map[ids.ID]uint64, [][]byte, error) {
 	res := new(GetStakeReply)
 	err := c.requester.SendRequest(ctx, "getStake", &GetStakeArgs{
 		JSONAddresses: api.JSONAddresses{
@@ -712,23 +714,30 @@ func (c *client) GetStake(ctx context.Context, addrs []ids.ShortID, options ...r
 		Encoding: formatting.Hex,
 	}, res, options...)
 	if err != nil {
-		return 0, nil, err
+		return nil, nil, err
+	}
+
+	staked := make(map[ids.ID]uint64, len(res.Stakeds))
+	for assetID, amount := range res.Stakeds {
+		staked[assetID] = uint64(amount)
 	}
 
 	outputs := make([][]byte, len(res.Outputs))
 	for i, outputStr := range res.Outputs {
 		output, err := formatting.Decode(res.Encoding, outputStr)
 		if err != nil {
-			return 0, nil, err
+			return nil, nil, err
 		}
 		outputs[i] = output
 	}
-	return uint64(res.Staked), outputs, err
+	return staked, outputs, err
 }
 
-func (c *client) GetMinStake(ctx context.Context, options ...rpc.Option) (uint64, uint64, error) {
+func (c *client) GetMinStake(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, uint64, error) {
 	res := new(GetMinStakeReply)
-	err := c.requester.SendRequest(ctx, "getMinStake", struct{}{}, res, options...)
+	err := c.requester.SendRequest(ctx, "getMinStake", &GetMinStakeArgs{
+		SubnetID: subnetID,
+	}, res, options...)
 	return uint64(res.MinValidatorStake), uint64(res.MinDelegatorStake), err
 }
 

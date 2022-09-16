@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package poll
@@ -6,7 +6,7 @@ package poll
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -105,13 +105,13 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 	vdrBag := ids.NodeIDBag{}
 	vdrBag.Add(vdrs...)
 	added := s.Add(1, vdrBag)
-	assert.True(t, added)
+	require.True(t, added)
 
 	vdrBag = ids.NodeIDBag{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(2, vdrBag)
-	assert.True(t, added)
-	assert.Equal(t, s.Len(), 2)
+	require.True(t, added)
+	require.Equal(t, s.Len(), 2)
 
 	// vote vtx1 for poll 1
 	// vote vtx2 for poll 2
@@ -122,22 +122,22 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 
 	// vote out of order
 	results = s.Vote(1, vdr1, []ids.ID{vtx1})
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(2, vdr2, []ids.ID{vtx2})
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(2, vdr3, []ids.ID{vtx2})
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 
 	results = s.Vote(1, vdr2, []ids.ID{vtx1})
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 
 	results = s.Vote(1, vdr3, []ids.ID{vtx1}) // poll 1 finished, poll 2 still remaining
-	assert.Len(t, results, 1)                 // because 1 is the oldest
-	assert.Equal(t, vtx1, results[0].List()[0])
+	require.Len(t, results, 1)                // because 1 is the oldest
+	require.Equal(t, vtx1, results[0].List()[0])
 
 	results = s.Vote(2, vdr1, []ids.ID{vtx2}) // poll 2 finished
-	assert.Len(t, results, 1)                 // because 2 is the oldest now
-	assert.Equal(t, vtx2, results[0].List()[0])
+	require.Len(t, results, 1)                // because 2 is the oldest now
+	require.Equal(t, vtx2, results[0].List()[0])
 }
 
 func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
@@ -158,18 +158,18 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 	vdrBag := ids.NodeIDBag{}
 	vdrBag.Add(vdrs...)
 	added := s.Add(1, vdrBag)
-	assert.True(t, added)
+	require.True(t, added)
 
 	vdrBag = ids.NodeIDBag{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(2, vdrBag)
-	assert.True(t, added)
+	require.True(t, added)
 
 	vdrBag = ids.NodeIDBag{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(3, vdrBag)
-	assert.True(t, added)
-	assert.Equal(t, s.Len(), 3)
+	require.True(t, added)
+	require.Equal(t, s.Len(), 3)
 
 	// vote vtx1 for poll 1
 	// vote vtx2 for poll 2
@@ -183,30 +183,30 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 	// vote out of order
 	// 2 finishes first to create a gap of finished poll between two unfinished polls 1 and 3
 	results = s.Vote(2, vdr3, []ids.ID{vtx2})
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(2, vdr2, []ids.ID{vtx2})
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(2, vdr1, []ids.ID{vtx2})
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 
 	// 3 finishes now, 2 has already finished but 1 is not finished so we expect to receive no results still
 	results = s.Vote(3, vdr2, []ids.ID{vtx3})
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(3, vdr3, []ids.ID{vtx3})
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(3, vdr1, []ids.ID{vtx3})
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 
 	// 1 finishes now, 2 and 3 have already finished so we expect 3 items in results
 	results = s.Vote(1, vdr1, []ids.ID{vtx1})
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(1, vdr2, []ids.ID{vtx1})
-	assert.Len(t, results, 0)
+	require.Len(t, results, 0)
 	results = s.Vote(1, vdr3, []ids.ID{vtx1})
-	assert.Len(t, results, 3)
-	assert.Equal(t, vtx1.String(), results[0].List()[0].String())
-	assert.Equal(t, vtx2.String(), results[1].List()[0].String())
-	assert.Equal(t, vtx3.String(), results[2].List()[0].String())
+	require.Len(t, results, 3)
+	require.Equal(t, vtx1.String(), results[0].List()[0].String())
+	require.Equal(t, vtx2.String(), results[1].List()[0].String())
+	require.Equal(t, vtx3.String(), results[2].List()[0].String())
 }
 
 func TestSetString(t *testing.T) {

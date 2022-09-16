@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package throttling
@@ -8,32 +8,34 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/assert"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 // Test inboundMsgBufferThrottler
 func TestMsgBufferThrottler(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	throttler, err := newInboundMsgBufferThrottler("", prometheus.NewRegistry(), 3)
-	assert.NoError(err)
+	require.NoError(err)
 
 	nodeID1, nodeID2 := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 	// Acquire shouldn't block for first 3
 	throttler.Acquire(context.Background(), nodeID1)
 	throttler.Acquire(context.Background(), nodeID1)
 	throttler.Acquire(context.Background(), nodeID1)
-	assert.Len(throttler.nodeToNumProcessingMsgs, 1)
-	assert.EqualValues(3, throttler.nodeToNumProcessingMsgs[nodeID1])
+	require.Len(throttler.nodeToNumProcessingMsgs, 1)
+	require.EqualValues(3, throttler.nodeToNumProcessingMsgs[nodeID1])
 
 	// Acquire shouldn't block for other node
 	throttler.Acquire(context.Background(), nodeID2)
 	throttler.Acquire(context.Background(), nodeID2)
 	throttler.Acquire(context.Background(), nodeID2)
-	assert.Len(throttler.nodeToNumProcessingMsgs, 2)
-	assert.EqualValues(3, throttler.nodeToNumProcessingMsgs[nodeID1])
-	assert.EqualValues(3, throttler.nodeToNumProcessingMsgs[nodeID2])
+	require.Len(throttler.nodeToNumProcessingMsgs, 2)
+	require.EqualValues(3, throttler.nodeToNumProcessingMsgs[nodeID1])
+	require.EqualValues(3, throttler.nodeToNumProcessingMsgs[nodeID2])
 
 	// Acquire should block for 4th acquire
 	done := make(chan struct{})
@@ -50,8 +52,8 @@ func TestMsgBufferThrottler(t *testing.T) {
 	throttler.release(nodeID1)
 	// fourth acquire should be unblocked
 	<-done
-	assert.Len(throttler.nodeToNumProcessingMsgs, 2)
-	assert.EqualValues(3, throttler.nodeToNumProcessingMsgs[nodeID2])
+	require.Len(throttler.nodeToNumProcessingMsgs, 2)
+	require.EqualValues(3, throttler.nodeToNumProcessingMsgs[nodeID2])
 
 	// Releasing from other node should have no effect
 	throttler.release(nodeID2)
@@ -62,14 +64,14 @@ func TestMsgBufferThrottler(t *testing.T) {
 	throttler.release(nodeID1)
 	throttler.release(nodeID1)
 	throttler.release(nodeID1)
-	assert.Len(throttler.nodeToNumProcessingMsgs, 0)
+	require.Len(throttler.nodeToNumProcessingMsgs, 0)
 }
 
 // Test inboundMsgBufferThrottler when an acquire is cancelled
 func TestMsgBufferThrottlerContextCancelled(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	throttler, err := newInboundMsgBufferThrottler("", prometheus.NewRegistry(), 3)
-	assert.NoError(err)
+	require.NoError(err)
 
 	vdr1Context, vdr1ContextCancelFunc := context.WithCancel(context.Background())
 	nodeID1 := ids.GenerateTestNodeID()
@@ -77,8 +79,8 @@ func TestMsgBufferThrottlerContextCancelled(t *testing.T) {
 	throttler.Acquire(vdr1Context, nodeID1)
 	throttler.Acquire(vdr1Context, nodeID1)
 	throttler.Acquire(vdr1Context, nodeID1)
-	assert.Len(throttler.nodeToNumProcessingMsgs, 1)
-	assert.EqualValues(3, throttler.nodeToNumProcessingMsgs[nodeID1])
+	require.Len(throttler.nodeToNumProcessingMsgs, 1)
+	require.EqualValues(3, throttler.nodeToNumProcessingMsgs[nodeID1])
 
 	// Acquire should block for 4th acquire
 	done := make(chan struct{})

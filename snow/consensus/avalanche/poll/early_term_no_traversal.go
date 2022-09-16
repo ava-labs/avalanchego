@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package poll
@@ -70,7 +70,7 @@ func (p *earlyTermNoTraversalPoll) Finished() bool {
 	// votes will be applied to a single shared ancestor. In this case, the poll
 	// can terminate early, iff there are not enough pending votes for this
 	// ancestor to receive alpha votes.
-	partialVotes := ids.BitSet(0)
+	partialVotes := ids.BitSet64(0)
 	for _, vote := range p.votes.List() {
 		if voters := p.votes.GetSet(vote); voters.Len() < p.alpha {
 			partialVotes.Union(voters)

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tracker
@@ -11,7 +11,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
@@ -19,21 +19,21 @@ import (
 )
 
 func TestNewCPUTracker(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	reg := prometheus.NewRegistry()
 	halflife := 5 * time.Second
 	factory := &meter.ContinuousFactory{}
 
 	trackerIntf, err := NewResourceTracker(reg, resource.NoUsage, factory, halflife)
-	assert.NoError(err)
+	require.NoError(err)
 	tracker, ok := trackerIntf.(*resourceTracker)
-	assert.True(ok)
-	assert.Equal(factory, tracker.factory)
-	assert.NotNil(tracker.processingMeter)
-	assert.Equal(halflife, tracker.halflife)
-	assert.NotNil(tracker.meters)
-	assert.NotNil(tracker.metrics)
+	require.True(ok)
+	require.Equal(factory, tracker.factory)
+	require.NotNil(tracker.processingMeter)
+	require.Equal(halflife, tracker.halflife)
+	require.NotNil(tracker.meters)
+	require.NotNil(tracker.metrics)
 }
 
 func TestCPUTracker(t *testing.T) {
@@ -44,7 +44,7 @@ func TestCPUTracker(t *testing.T) {
 	mockUser.EXPECT().CPUUsage().Return(1.0).Times(3)
 
 	tracker, err := NewResourceTracker(prometheus.NewRegistry(), mockUser, meter.ContinuousFactory{}, time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	node1 := ids.NodeID{1}
 	node2 := ids.NodeID{2}
@@ -105,7 +105,7 @@ func TestCPUTracker(t *testing.T) {
 func TestCPUTrackerTimeUntilCPUUtilization(t *testing.T) {
 	halflife := 5 * time.Second
 	tracker, err := NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, halflife)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	now := time.Now()
 	nodeID := ids.GenerateTestNodeID()
 	// Start the meter
@@ -125,11 +125,11 @@ func TestCPUTrackerTimeUntilCPUUtilization(t *testing.T) {
 	now = now.Add(timeUntilDesiredVal)
 	actualVal := cpuTracker.Usage(nodeID, now)
 	// Make sure the actual/expected are close
-	assert.InDelta(t, desiredVal, actualVal, .00001)
+	require.InDelta(t, desiredVal, actualVal, .00001)
 	// Make sure TimeUntilUsage returns the zero duration if
 	// the value provided >= the current value
-	assert.Zero(t, cpuTracker.TimeUntilUsage(nodeID, now, actualVal))
-	assert.Zero(t, cpuTracker.TimeUntilUsage(nodeID, now, actualVal+.1))
+	require.Zero(t, cpuTracker.TimeUntilUsage(nodeID, now, actualVal))
+	require.Zero(t, cpuTracker.TimeUntilUsage(nodeID, now, actualVal+.1))
 	// Make sure it returns the zero duration if the node isn't known
-	assert.Zero(t, cpuTracker.TimeUntilUsage(ids.GenerateTestNodeID(), now, 0.0001))
+	require.Zero(t, cpuTracker.TimeUntilUsage(ids.GenerateTestNodeID(), now, 0.0001))
 }

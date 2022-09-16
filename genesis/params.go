@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package genesis
@@ -40,8 +40,18 @@ type TxFeeConfig struct {
 	CreateAssetTxFee uint64 `json:"createAssetTxFee"`
 	// Transaction fee for create subnet transactions
 	CreateSubnetTxFee uint64 `json:"createSubnetTxFee"`
+	// Transaction fee for transform subnet transactions
+	TransformSubnetTxFee uint64 `json:"transformSubnetTxFee"`
 	// Transaction fee for create blockchain transactions
 	CreateBlockchainTxFee uint64 `json:"createBlockchainTxFee"`
+	// Transaction fee for adding a primary network validator
+	AddPrimaryNetworkValidatorFee uint64 `json:"addPrimaryNetworkValidatorFee"`
+	// Transaction fee for adding a primary network delegator
+	AddPrimaryNetworkDelegatorFee uint64 `json:"addPrimaryNetworkDelegatorFee"`
+	// Transaction fee for adding a subnet validator
+	AddSubnetValidatorFee uint64 `json:"addSubnetValidatorFee"`
+	// Transaction fee for adding a subnet delegator
+	AddSubnetDelegatorFee uint64 `json:"addSubnetDelegatorFee"`
 }
 
 type Params struct {

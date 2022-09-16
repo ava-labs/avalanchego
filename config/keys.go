@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -16,7 +16,12 @@ const (
 	TxFeeKey                                           = "tx-fee"
 	CreateAssetTxFeeKey                                = "create-asset-tx-fee"
 	CreateSubnetTxFeeKey                               = "create-subnet-tx-fee"
+	TransformSubnetTxFeeKey                            = "transform-subnet-tx-fee"
 	CreateBlockchainTxFeeKey                           = "create-blockchain-tx-fee"
+	AddPrimaryNetworkValidatorFeeKey                   = "add-primary-network-validator-fee"
+	AddPrimaryNetworkDelegatorFeeKey                   = "add-primary-network-delegator-fee"
+	AddSubnetValidatorFeeKey                           = "add-subnet-validator-fee"
+	AddSubnetDelegatorFeeKey                           = "add-subnet-delegator-fee"
 	UptimeRequirementKey                               = "uptime-requirement"
 	MinValidatorStakeKey                               = "min-validator-stake"
 	MaxValidatorStakeKey                               = "max-validator-stake"
@@ -29,7 +34,6 @@ const (
 	StakeMintingPeriodKey                              = "stake-minting-period"
 	StakeSupplyCapKey                                  = "stake-supply-cap"
 	AssertionsEnabledKey                               = "assertions-enabled"
-	SignatureVerificationEnabledKey                    = "signature-verification-enabled"
 	DBTypeKey                                          = "db-type"
 	DBPathKey                                          = "db-dir"
 	DBConfigFileKey                                    = "db-config-file"
@@ -96,6 +100,7 @@ const (
 	NetworkRequireValidatorToConnectKey                = "network-require-validator-to-connect"
 	NetworkPeerReadBufferSizeKey                       = "network-peer-read-buffer-size"
 	NetworkPeerWriteBufferSizeKey                      = "network-peer-write-buffer-size"
+	NetworkTLSKeyLogFileKey                            = "network-tls-key-log-file-unsafe"
 	BenchlistFailThresholdKey                          = "benchlist-fail-threshold"
 	BenchlistDurationKey                               = "benchlist-duration"
 	BenchlistMinFailingDurationKey                     = "benchlist-min-failing-duration"

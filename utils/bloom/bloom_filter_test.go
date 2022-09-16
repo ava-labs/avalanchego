@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bloom
@@ -6,26 +6,27 @@ package bloom
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestNew(t *testing.T) {
 	var (
-		assert          = assert.New(t)
+		require         = require.New(t)
 		maxN     uint64 = 10000
 		p               = 0.1
 		maxBytes uint64 = 1 * units.MiB // 1 MiB
 	)
 	f, err := New(maxN, p, maxBytes)
-	assert.NoError(err)
-	assert.NotNil(f)
+	require.NoError(err)
+	require.NotNil(f)
 
 	f.Add([]byte("hello"))
 
 	checked := f.Check([]byte("hello"))
-	assert.True(checked, "should have contained the key")
+	require.True(checked, "should have contained the key")
 
 	checked = f.Check([]byte("bye"))
-	assert.False(checked, "shouldn't have contained the key")
+	require.False(checked, "shouldn't have contained the key")
 }

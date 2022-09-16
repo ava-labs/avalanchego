@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -11,7 +11,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
@@ -21,52 +21,54 @@ import (
 
 func TestCodecPackInvalidOp(t *testing.T) {
 	codec, err := NewCodecWithMemoryPool("", prometheus.NewRegistry(), 2*units.MiB, 10*time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = codec.Pack(math.MaxUint8, make(map[Field]interface{}), false, false)
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	_, err = codec.Pack(math.MaxUint8, make(map[Field]interface{}), true, false)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestCodecPackMissingField(t *testing.T) {
 	codec, err := NewCodecWithMemoryPool("", prometheus.NewRegistry(), 2*units.MiB, 10*time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = codec.Pack(Get, make(map[Field]interface{}), false, false)
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	_, err = codec.Pack(Get, make(map[Field]interface{}), true, false)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestCodecParseInvalidOp(t *testing.T) {
 	codec, err := NewCodecWithMemoryPool("", prometheus.NewRegistry(), 2*units.MiB, 10*time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = codec.Parse([]byte{math.MaxUint8}, dummyNodeID, dummyOnFinishedHandling)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestCodecParseExtraSpace(t *testing.T) {
 	codec, err := NewCodecWithMemoryPool("", prometheus.NewRegistry(), 2*units.MiB, 10*time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = codec.Parse([]byte{byte(Ping), 0x00, 0x00}, dummyNodeID, dummyOnFinishedHandling)
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	_, err = codec.Parse([]byte{byte(Ping), 0x00, 0x01}, dummyNodeID, dummyOnFinishedHandling)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestDeadlineOverride(t *testing.T) {
 	c, err := NewCodecWithMemoryPool("", prometheus.NewRegistry(), 2*units.MiB, 10*time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	id := ids.GenerateTestID()
-	m := inboundMessage{
-		op: PushQuery,
+	m := inboundMessageWithPacker{
+		inboundMessage: inboundMessage{
+			op: PushQuery,
+		},
 		fields: map[Field]interface{}{
 			ChainID:        id[:],
 			RequestID:      uint32(1337),
@@ -77,30 +79,32 @@ func TestDeadlineOverride(t *testing.T) {
 	}
 
 	packedIntf, err := c.Pack(m.op, m.fields, m.op.Compressible(), false)
-	assert.NoError(t, err, "failed to pack on operation %s", m.op)
+	require.NoError(t, err, "failed to pack on operation %s", m.op)
 
 	unpackedIntf, err := c.Parse(packedIntf.Bytes(), dummyNodeID, dummyOnFinishedHandling)
-	assert.NoError(t, err, "failed to parse w/ compression on operation %s", m.op)
+	require.NoError(t, err, "failed to parse w/ compression on operation %s", m.op)
 
-	unpacked := unpackedIntf.(*inboundMessage)
-	assert.NotEqual(t, unpacked.ExpirationTime(), time.Now().Add(1337*time.Hour))
-	assert.True(t, time.Since(unpacked.ExpirationTime()) <= 10*time.Second)
+	unpacked := unpackedIntf.(*inboundMessageWithPacker)
+	require.NotEqual(t, unpacked.ExpirationTime(), time.Now().Add(1337*time.Hour))
+	require.True(t, time.Since(unpacked.ExpirationTime()) <= 10*time.Second)
 }
 
 // Test packing and then parsing messages
 // when using a gzip compressor
 func TestCodecPackParseGzip(t *testing.T) {
 	c, err := NewCodecWithMemoryPool("", prometheus.DefaultRegisterer, 2*units.MiB, 10*time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	id := ids.GenerateTestID()
 
 	tlsCert, err := staking.NewTLSCert()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	cert := tlsCert.Leaf
 
-	msgs := []inboundMessage{
+	msgs := []inboundMessageWithPacker{
 		{
-			op: Version,
+			inboundMessage: inboundMessage{
+				op: Version,
+			},
 			fields: map[Field]interface{}{
 				NetworkID:      uint32(0),
 				NodeID:         uint32(1337),
@@ -113,7 +117,9 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op: PeerList,
+			inboundMessage: inboundMessage{
+				op: PeerList,
+			},
 			fields: map[Field]interface{}{
 				Peers: []ips.ClaimedIPPort{
 					{
@@ -126,17 +132,23 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op:     Ping,
+			inboundMessage: inboundMessage{
+				op: Ping,
+			},
 			fields: map[Field]interface{}{},
 		},
 		{
-			op: Pong,
+			inboundMessage: inboundMessage{
+				op: Pong,
+			},
 			fields: map[Field]interface{}{
 				Uptime: uint8(80),
 			},
 		},
 		{
-			op: GetAcceptedFrontier,
+			inboundMessage: inboundMessage{
+				op: GetAcceptedFrontier,
+			},
 			fields: map[Field]interface{}{
 				ChainID:   id[:],
 				RequestID: uint32(1337),
@@ -144,7 +156,9 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op: AcceptedFrontier,
+			inboundMessage: inboundMessage{
+				op: AcceptedFrontier,
+			},
 			fields: map[Field]interface{}{
 				ChainID:      id[:],
 				RequestID:    uint32(1337),
@@ -152,7 +166,9 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op: GetAccepted,
+			inboundMessage: inboundMessage{
+				op: GetAccepted,
+			},
 			fields: map[Field]interface{}{
 				ChainID:      id[:],
 				RequestID:    uint32(1337),
@@ -161,7 +177,9 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op: Accepted,
+			inboundMessage: inboundMessage{
+				op: Accepted,
+			},
 			fields: map[Field]interface{}{
 				ChainID:      id[:],
 				RequestID:    uint32(1337),
@@ -169,7 +187,9 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op: Ancestors,
+			inboundMessage: inboundMessage{
+				op: Ancestors,
+			},
 			fields: map[Field]interface{}{
 				ChainID:             id[:],
 				RequestID:           uint32(1337),
@@ -177,7 +197,9 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op: Get,
+			inboundMessage: inboundMessage{
+				op: Get,
+			},
 			fields: map[Field]interface{}{
 				ChainID:     id[:],
 				RequestID:   uint32(1337),
@@ -186,7 +208,9 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op: Put,
+			inboundMessage: inboundMessage{
+				op: Put,
+			},
 			fields: map[Field]interface{}{
 				ChainID:        id[:],
 				RequestID:      uint32(1337),
@@ -195,7 +219,9 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op: PushQuery,
+			inboundMessage: inboundMessage{
+				op: PushQuery,
+			},
 			fields: map[Field]interface{}{
 				ChainID:        id[:],
 				RequestID:      uint32(1337),
@@ -205,7 +231,9 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op: PullQuery,
+			inboundMessage: inboundMessage{
+				op: PullQuery,
+			},
 			fields: map[Field]interface{}{
 				ChainID:     id[:],
 				RequestID:   uint32(1337),
@@ -214,32 +242,25 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
-			op: Chits,
-			fields: map[Field]interface{}{
-				ChainID:      id[:],
-				RequestID:    uint32(1337),
-				ContainerIDs: [][]byte{id[:]},
+			inboundMessage: inboundMessage{
+				op: Chits,
 			},
-		},
-		{
-			op: ChitsV2,
 			fields: map[Field]interface{}{
 				ChainID:      id[:],
 				RequestID:    uint32(1337),
 				ContainerIDs: [][]byte{id[:]},
-				ContainerID:  id[:],
 			},
 		},
 	}
 	for _, m := range msgs {
 		packedIntf, err := c.Pack(m.op, m.fields, m.op.Compressible(), false)
-		assert.NoError(t, err, "failed to pack on operation %s", m.op)
+		require.NoError(t, err, "failed to pack on operation %s", m.op)
 
 		unpackedIntf, err := c.Parse(packedIntf.Bytes(), dummyNodeID, dummyOnFinishedHandling)
-		assert.NoError(t, err, "failed to parse w/ compression on operation %s", m.op)
+		require.NoError(t, err, "failed to parse w/ compression on operation %s", m.op)
 
-		unpacked := unpackedIntf.(*inboundMessage)
+		unpacked := unpackedIntf.(*inboundMessageWithPacker)
 
-		assert.EqualValues(t, len(m.fields), len(unpacked.fields))
+		require.EqualValues(t, len(m.fields), len(unpacked.fields))
 	}
 }

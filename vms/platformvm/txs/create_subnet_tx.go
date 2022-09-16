@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -6,13 +6,9 @@ package txs
 import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var (
-	_ UnsignedTx             = &CreateSubnetTx{}
-	_ secp256k1fx.UnsignedTx = &CreateSubnetTx{}
-)
+var _ UnsignedTx = &CreateSubnetTx{}
 
 // CreateSubnetTx is an unsigned proposal to create a new subnet
 type CreateSubnetTx struct {

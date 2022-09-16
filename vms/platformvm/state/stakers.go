@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -23,10 +23,14 @@ type CurrentStakers interface {
 
 	// PutCurrentValidator adds the [staker] describing a validator to the
 	// staker set.
+	//
+	// Invariant: [staker] is not currently a CurrentValidator
 	PutCurrentValidator(staker *Staker)
 
 	// DeleteCurrentValidator removes the [staker] describing a validator from
 	// the staker set.
+	//
+	// Invariant: [staker] is currently a CurrentValidator
 	DeleteCurrentValidator(staker *Staker)
 
 	// GetCurrentDelegatorIterator returns the delegators associated with the
@@ -36,10 +40,14 @@ type CurrentStakers interface {
 
 	// PutCurrentDelegator adds the [staker] describing a delegator to the
 	// staker set.
+	//
+	// Invariant: [staker] is not currently a CurrentDelegator
 	PutCurrentDelegator(staker *Staker)
 
 	// DeleteCurrentDelegator removes the [staker] describing a delegator from
 	// the staker set.
+	//
+	// Invariant: [staker] is currently a CurrentDelegator
 	DeleteCurrentDelegator(staker *Staker)
 
 	// GetCurrentStakerIterator returns stakers in order of their removal from

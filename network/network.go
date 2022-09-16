@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -153,6 +153,8 @@ type network struct {
 func NewNetwork(
 	config *Config,
 	msgCreator message.Creator,
+	msgCreatorWithProto message.Creator,
+	blueberryTime time.Time, // TODO: remove this once we complete blueberry migration
 	metricsRegisterer prometheus.Registerer,
 	log logging.Logger,
 	listener net.Listener,
@@ -199,16 +201,16 @@ func NewNetwork(
 		return nil, fmt.Errorf("initializing network metrics failed with: %w", err)
 	}
 
-	pingMessge, err := msgCreator.Ping()
-	if err != nil {
-		return nil, fmt.Errorf("initializing common ping message failed with: %w", err)
-	}
-
 	peerConfig := &peer.Config{
-		ReadBufferSize:       config.PeerReadBufferSize,
-		WriteBufferSize:      config.PeerWriteBufferSize,
-		Metrics:              peerMetrics,
-		MessageCreator:       msgCreator,
+		ReadBufferSize:          config.PeerReadBufferSize,
+		WriteBufferSize:         config.PeerWriteBufferSize,
+		Metrics:                 peerMetrics,
+		MessageCreator:          msgCreator,
+		MessageCreatorWithProto: msgCreatorWithProto,
+
+		// TODO: remove this once we complete blueberry migration
+		BlueberryTime: blueberryTime,
+
 		Log:                  log,
 		InboundMsgThrottler:  inboundMsgThrottler,
 		Network:              nil, // This is set below.
@@ -221,8 +223,8 @@ func NewNetwork(
 		PongTimeout:          config.PingPongTimeout,
 		MaxClockDifference:   config.MaxClockDifference,
 		ResourceTracker:      config.ResourceTracker,
-		PingMessage:          pingMessge,
 	}
+
 	onCloseCtx, cancel := context.WithCancel(context.Background())
 	n := &network{
 		config:               config,
@@ -470,7 +472,7 @@ func (n *network) Version() (message.OutboundMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	return n.peerConfig.MessageCreator.Version(
+	return n.peerConfig.GetMessageCreator().Version(
 		n.peerConfig.NetworkID,
 		n.peerConfig.Clock.Unix(),
 		mySignedIP.IP.IP,
@@ -483,7 +485,7 @@ func (n *network) Version() (message.OutboundMessage, error) {
 
 func (n *network) Peers() (message.OutboundMessage, error) {
 	peers := n.sampleValidatorIPs()
-	return n.peerConfig.MessageCreator.PeerList(peers, true)
+	return n.peerConfig.GetMessageCreator().PeerList(peers, true)
 }
 
 func (n *network) Pong(nodeID ids.NodeID) (message.OutboundMessage, error) {
@@ -493,7 +495,7 @@ func (n *network) Pong(nodeID ids.NodeID) (message.OutboundMessage, error) {
 	}
 
 	uptimePercentInt := uint8(uptimePercentFloat * 100)
-	return n.peerConfig.MessageCreator.Pong(uptimePercentInt)
+	return n.peerConfig.GetMessageCreator().Pong(uptimePercentInt)
 }
 
 // Dispatch starts accepting connections from other nodes attempting to connect
@@ -505,11 +507,20 @@ func (n *network) Dispatch() error {
 	for { // Continuously accept new connections
 		conn, err := n.listener.Accept() // Returns error when n.Close() is called
 		if err != nil {
-			if netErr, ok := err.(net.Error); ok && netErr.Temporary() {
-				// Sleep for a small amount of time to try to wait for the
-				// temporary error to go away.
-				time.Sleep(time.Millisecond)
-				continue
+			if netErr, ok := err.(net.Error); ok {
+				if netErr.Timeout() {
+					n.metrics.acceptFailed.WithLabelValues("timeout").Inc()
+				}
+
+				// TODO: deprecate "Temporary" and use "Timeout"
+				if netErr.Temporary() {
+					n.metrics.acceptFailed.WithLabelValues("temporary").Inc()
+
+					// Sleep for a small amount of time to try to wait for the
+					// temporary error to go away.
+					time.Sleep(time.Millisecond)
+					continue
+				}
 			}
 
 			n.peerConfig.Log.Debug("error during server accept",
@@ -1149,7 +1160,7 @@ func (n *network) runTimers() {
 				continue
 			}
 
-			msg, err := n.peerConfig.MessageCreator.PeerList(validatorIPs, false)
+			msg, err := n.peerConfig.GetMessageCreator().PeerList(validatorIPs, false)
 			if err != nil {
 				n.peerConfig.Log.Error(
 					"failed to gossip",

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
@@ -6,7 +6,7 @@ package secp256k1fx
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -15,22 +15,22 @@ import (
 )
 
 func TestCredentialVerify(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	cred := Credential{}
-	assert.NoError(cred.Verify())
+	require.NoError(cred.Verify())
 }
 
 func TestCredentialVerifyNil(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	cred := (*Credential)(nil)
-	assert.ErrorIs(cred.Verify(), errNilCredential)
+	require.ErrorIs(cred.Verify(), errNilCredential)
 }
 
 func TestCredentialSerialize(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
-	assert.NoError(m.RegisterCodec(0, c))
+	require.NoError(m.RegisterCodec(0, c))
 
 	expected := []byte{
 		// Codec version
@@ -82,16 +82,16 @@ func TestCredentialSerialize(t *testing.T) {
 			0x00,
 		},
 	}}
-	assert.NoError(cred.Verify())
+	require.NoError(cred.Verify())
 
 	result, err := m.Marshal(0, &cred)
-	assert.NoError(err)
-	assert.Equal(expected, result)
+	require.NoError(err)
+	require.Equal(expected, result)
 }
 
 func TestCredentialNotState(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	intf := interface{}(&Credential{})
 	_, ok := intf.(verify.State)
-	assert.False(ok)
+	require.False(ok)
 }

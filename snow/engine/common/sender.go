@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
@@ -90,14 +90,8 @@ type FetchSender interface {
 	// and its ancestors.
 	SendGetAncestors(nodeID ids.NodeID, requestID uint32, containerID ids.ID)
 
-	// Tell the specified node that the container whose ID is [containerID] has
-	// body [container].
-	SendPut(
-		nodeID ids.NodeID,
-		requestID uint32,
-		containerID ids.ID,
-		container []byte,
-	)
+	// Tell the specified node about [container].
+	SendPut(nodeID ids.NodeID, requestID uint32, container []byte)
 
 	// Give the specified node several containers at once. Should be in response
 	// to a GetAncestors message with request ID [requestID] from the node.
@@ -109,14 +103,9 @@ type FetchSender interface {
 type QuerySender interface {
 	// Request from the specified nodes their preferred frontier, given the
 	// existence of the specified container.
-	// This is the same as PullQuery, except that this message includes not only
-	// the ID of the container but also its body.
-	SendPushQuery(
-		nodeIDs ids.NodeIDSet,
-		requestID uint32,
-		containerID ids.ID,
-		container []byte,
-	)
+	// This is the same as PullQuery, except that this message includes the body
+	// of the container rather than its ID.
+	SendPushQuery(nodeIDs ids.NodeIDSet, requestID uint32, container []byte)
 
 	// Request from the specified nodes their preferred frontier, given the
 	// existence of the specified container.
@@ -124,16 +113,13 @@ type QuerySender interface {
 
 	// Send chits to the specified node
 	SendChits(nodeID ids.NodeID, requestID uint32, votes []ids.ID)
-
-	// Send chits v2 to the specified node
-	SendChitsV2(nodeID ids.NodeID, requestID uint32, votes []ids.ID, vote ids.ID)
 }
 
 // Gossiper defines how a consensus engine gossips a container on the accepted
 // frontier to other nodes
 type Gossiper interface {
 	// Gossip the provided container throughout the network
-	SendGossip(containerID ids.ID, container []byte)
+	SendGossip(container []byte)
 }
 
 // AppSender sends application (VM) level messages.

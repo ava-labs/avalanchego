@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package validator
@@ -13,7 +13,7 @@ type SubnetValidator struct {
 	Validator `serialize:"true"`
 
 	// ID of the subnet this validator is validating
-	Subnet ids.ID `serialize:"true" json:"subnet"`
+	Subnet ids.ID `serialize:"true" json:"subnetID"`
 }
 
 // SubnetID is the ID of the subnet this validator is validating

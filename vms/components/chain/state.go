@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package chain
@@ -6,13 +6,14 @@ package chain
 import (
 	"fmt"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // State implements an efficient caching layer used to wrap a VM
@@ -103,7 +104,7 @@ func produceGetStatus(s *State, getBlockIDAtHeight func(uint64) (ids.ID, error))
 			internalBlk.SetStatus(choices.Processing)
 			return choices.Processing, nil
 		default:
-			return choices.Unknown, fmt.Errorf("failed to get accepted blkID at height %d", blkHeight)
+			return choices.Unknown, fmt.Errorf("%w: failed to get accepted blkID at height %d", err, blkHeight)
 		}
 	}
 }

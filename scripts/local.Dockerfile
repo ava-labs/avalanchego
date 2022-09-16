@@ -4,13 +4,12 @@
 # in order to build an image using the local version of coreth
 
 # Changes to the minimum golang version must also be replicated in
-# scripts/ansible/roles/golang_base/defaults/main.yml
 # scripts/build_avalanche.sh
 # scripts/local.Dockerfile (here)
 # Dockerfile
 # README.md
 # go.mod
-FROM golang:1.17.9-buster
+FROM golang:1.18.5-buster
 
 RUN mkdir -p /go/src/github.com/ava-labs
 

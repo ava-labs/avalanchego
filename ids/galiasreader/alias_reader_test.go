@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package galiasreader
@@ -8,7 +8,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
@@ -24,7 +24,7 @@ const (
 )
 
 func TestInterface(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	for _, test := range ids.AliasTests {
 		listener := bufconn.Listen(bufSize)
@@ -49,10 +49,10 @@ func TestInterface(t *testing.T) {
 		dopts := grpcutils.DefaultDialOptions
 		dopts = append(dopts, dialer)
 		conn, err := grpcutils.Dial("", dopts...)
-		assert.NoError(err)
+		require.NoError(err)
 
 		r := NewClient(aliasreaderpb.NewAliasReaderClient(conn))
-		test(assert, r, w)
+		test(require, r, w)
 
 		serverCloser.Stop()
 		_ = conn.Close()

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package logging
@@ -52,6 +52,14 @@ func (NoLog) RecoverAndPanic(f func()) { f() }
 func (NoLog) RecoverAndExit(f, exit func()) { defer exit(); f() }
 
 func (NoLog) Stop() {}
+
+type NoWarn struct{ NoLog }
+
+func (NoWarn) Fatal(string, ...zap.Field) { panic("unexpected Fatal") }
+
+func (NoWarn) Error(string, ...zap.Field) { panic("unexpected Error") }
+
+func (NoWarn) Warn(string, ...zap.Field) { panic("unexpected Warn") }
 
 type discard struct{}
 

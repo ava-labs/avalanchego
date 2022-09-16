@@ -9,9 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/stretchr/testify/assert"
 )
 
 var _ Resolver = &mockResolver{}
@@ -25,7 +26,7 @@ func (r *mockResolver) Resolve() (net.IP, error) {
 }
 
 func TestNewUpdater(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	originalIP := net.IPv4zero
 	originalPort := 9651
 	dynamicIP := ips.NewDynamicIPPort(originalIP, uint16(originalPort))
@@ -43,16 +44,16 @@ func TestNewUpdater(t *testing.T) {
 	)
 
 	// Assert NewUpdater returns expected type
-	assert.IsType(&updater{}, updaterIntf)
+	require.IsType(&updater{}, updaterIntf)
 
 	updater := updaterIntf.(*updater)
 
 	// Assert fields set
-	assert.Equal(dynamicIP, updater.dynamicIP)
-	assert.Equal(resolver, updater.resolver)
-	assert.NotNil(updater.stopChan)
-	assert.NotNil(updater.doneChan)
-	assert.Equal(updateFreq, updater.updateFreq)
+	require.Equal(dynamicIP, updater.dynamicIP)
+	require.Equal(resolver, updater.resolver)
+	require.NotNil(updater.stopChan)
+	require.NotNil(updater.doneChan)
+	require.Equal(updateFreq, updater.updateFreq)
 
 	// Start updating the IP address
 	go updaterIntf.Dispatch(logging.NoLog{})
@@ -62,7 +63,7 @@ func TestNewUpdater(t *testing.T) {
 		IP:   newIP,
 		Port: uint16(originalPort),
 	}
-	assert.Eventually(
+	require.Eventually(
 		func() bool { return expectedIP.Equal(dynamicIP.IPPort()) },
 		5*time.Second,
 		updateFreq,
@@ -76,14 +77,14 @@ func TestNewUpdater(t *testing.T) {
 	defer cancel()
 	select {
 	case _, open := <-updater.stopChan:
-		assert.False(open)
+		require.False(open)
 	case <-ctx.Done():
-		assert.FailNow("timeout waiting for stopChan to close")
+		require.FailNow("timeout waiting for stopChan to close")
 	}
 	select {
 	case _, open := <-updater.doneChan:
-		assert.False(open)
+		require.False(open)
 	case <-ctx.Done():
-		assert.FailNow("timeout waiting for doneChan to close")
+		require.FailNow("timeout waiting for doneChan to close")
 	}
 }

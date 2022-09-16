@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package node
@@ -100,7 +100,7 @@ type BootstrapConfig struct {
 	// Max number of times to retry bootstrap before warning the node operator
 	RetryBootstrapWarnFrequency int `json:"retryBootstrapWarnFrequency"`
 
-	// Timeout when connecting to bootstrapping beacons
+	// Timeout before emitting a warn log when connecting to bootstrapping beacons
 	BootstrapBeaconConnectionTimeout time.Duration `json:"bootstrapBeaconConnectionTimeout"`
 
 	// Max number of containers in an ancestors message sent by this node.
@@ -148,9 +148,6 @@ type Config struct {
 
 	// Assertions configuration
 	EnableAssertions bool `json:"enableAssertions"`
-
-	// Crypto configuration
-	EnableCrypto bool `json:"enableCrypto"`
 
 	// Health
 	HealthCheckFreq time.Duration `json:"healthCheckFreq"`

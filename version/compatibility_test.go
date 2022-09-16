@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package version
@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCompatibility(t *testing.T) {
@@ -35,7 +35,7 @@ func TestCompatibility(t *testing.T) {
 		minCompatableTime,
 		prevMinCompatable,
 	).(*compatibility)
-	assert.Equal(t, v, compatibility.Version())
+	require.Equal(t, v, compatibility.Version())
 
 	tests := []struct {
 		peer       *Application

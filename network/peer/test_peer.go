@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -35,13 +35,13 @@ const maxMessageToSend = 1024
 //
 // The returned peer will not throttle inbound or outbound messages.
 //
-// - [ctx] provides a way of canceling the connection request.
-// - [ip] is the remote that will be dialed to create the connection.
-// - [networkID] will be sent to the peer during the handshake. If the peer is
-//   expecting a different [networkID], the handshake will fail and an error
-//   will be returned.
-// - [router] will be called with all non-handshake messages received by the
-//   peer.
+//   - [ctx] provides a way of canceling the connection request.
+//   - [ip] is the remote that will be dialed to create the connection.
+//   - [networkID] will be sent to the peer during the handshake. If the peer is
+//     expecting a different [networkID], the handshake will fail and an error
+//     will be returned.
+//   - [router] will be called with all non-handshake messages received by the
+//     peer.
 func StartTestPeer(
 	ctx context.Context,
 	ip ips.IPPort,
@@ -59,7 +59,7 @@ func StartTestPeer(
 		return nil, err
 	}
 
-	tlsConfg := TLSConfig(*tlsCert)
+	tlsConfg := TLSConfig(*tlsCert, nil)
 	clientUpgrader := NewTLSClientUpgrader(tlsConfg)
 
 	peerID, conn, cert, err := clientUpgrader.Upgrade(conn)
@@ -69,8 +69,18 @@ func StartTestPeer(
 
 	mc, err := message.NewCreator(
 		prometheus.NewRegistry(),
-		true,
 		"",
+		true,
+		10*time.Second,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	mcWithProto, err := message.NewCreatorWithProto(
+		prometheus.NewRegistry(),
+		"",
+		true,
 		10*time.Second,
 	)
 	if err != nil {
@@ -95,17 +105,14 @@ func StartTestPeer(
 		return nil, err
 	}
 
-	pingMessage, err := mc.Ping()
-	if err != nil {
-		return nil, err
-	}
-
 	peer := Start(
 		&Config{
-			Metrics:             metrics,
-			MessageCreator:      mc,
-			Log:                 logging.NoLog{},
-			InboundMsgThrottler: throttling.NewNoInboundThrottler(),
+			Metrics:                 metrics,
+			MessageCreator:          mc,
+			MessageCreatorWithProto: mcWithProto,
+			BlueberryTime:           version.GetBlueberryTime(networkID),
+			Log:                     logging.NoLog{},
+			InboundMsgThrottler:     throttling.NewNoInboundThrottler(),
 			Network: NewTestNetwork(
 				mc,
 				networkID,
@@ -124,7 +131,6 @@ func StartTestPeer(
 			PongTimeout:          constants.DefaultPingPongTimeout,
 			MaxClockDifference:   time.Minute,
 			ResourceTracker:      resourceTracker,
-			PingMessage:          pingMessage,
 		},
 		conn,
 		cert,

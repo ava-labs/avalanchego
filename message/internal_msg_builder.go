@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -37,37 +37,45 @@ func (internalMsgBuilder) InternalFailedRequest(
 	chainID ids.ID,
 	requestID uint32,
 ) InboundMessage {
-	return &inboundMessage{
-		op: op,
+	return &inboundMessageWithPacker{
+		inboundMessage: inboundMessage{
+			op:     op,
+			nodeID: nodeID,
+		},
 		fields: map[Field]interface{}{
 			ChainID:   chainID[:],
 			RequestID: requestID,
 		},
-		nodeID: nodeID,
 	}
 }
 
 func (internalMsgBuilder) InternalTimeout(nodeID ids.NodeID) InboundMessage {
-	return &inboundMessage{
-		op:     Timeout,
-		nodeID: nodeID,
+	return &inboundMessageWithPacker{
+		inboundMessage: inboundMessage{
+			op:     Timeout,
+			nodeID: nodeID,
+		},
 	}
 }
 
 func (internalMsgBuilder) InternalConnected(nodeID ids.NodeID, nodeVersion *version.Application) InboundMessage {
-	return &inboundMessage{
-		op: Connected,
+	return &inboundMessageWithPacker{
+		inboundMessage: inboundMessage{
+			op:     Connected,
+			nodeID: nodeID,
+		},
 		fields: map[Field]interface{}{
 			VersionStruct: nodeVersion,
 		},
-		nodeID: nodeID,
 	}
 }
 
 func (internalMsgBuilder) InternalDisconnected(nodeID ids.NodeID) InboundMessage {
-	return &inboundMessage{
-		op:     Disconnected,
-		nodeID: nodeID,
+	return &inboundMessageWithPacker{
+		inboundMessage: inboundMessage{
+			op:     Disconnected,
+			nodeID: nodeID,
+		},
 	}
 }
 
@@ -75,20 +83,24 @@ func (internalMsgBuilder) InternalVMMessage(
 	nodeID ids.NodeID,
 	notification uint32,
 ) InboundMessage {
-	return &inboundMessage{
-		op: Notify,
+	return &inboundMessageWithPacker{
+		inboundMessage: inboundMessage{
+			op:     Notify,
+			nodeID: nodeID,
+		},
 		fields: map[Field]interface{}{
 			VMMessage: notification,
 		},
-		nodeID: nodeID,
 	}
 }
 
 func (internalMsgBuilder) InternalGossipRequest(
 	nodeID ids.NodeID,
 ) InboundMessage {
-	return &inboundMessage{
-		op:     GossipRequest,
-		nodeID: nodeID,
+	return &inboundMessageWithPacker{
+		inboundMessage: inboundMessage{
+			op:     GossipRequest,
+			nodeID: nodeID,
+		},
 	}
 }

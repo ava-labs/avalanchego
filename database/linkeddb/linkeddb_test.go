@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package linkeddb
@@ -6,14 +6,14 @@ package linkeddb
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 )
 
 func TestLinkedDB(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	db := memdb.New()
 	ldb := NewDefault(db)
@@ -22,44 +22,44 @@ func TestLinkedDB(t *testing.T) {
 	value := []byte("world")
 
 	has, err := ldb.Has(key)
-	assert.NoError(err)
-	assert.False(has, "db unexpectedly had key %s", key)
+	require.NoError(err)
+	require.False(has, "db unexpectedly had key %s", key)
 
 	_, err = ldb.Get(key)
-	assert.Equal(database.ErrNotFound, err, "Expected db.Get to return a Not Found error.")
+	require.Equal(database.ErrNotFound, err, "Expected db.Get to return a Not Found error.")
 
 	err = ldb.Delete(key)
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = ldb.Put(key, value)
-	assert.NoError(err)
+	require.NoError(err)
 
 	has, err = ldb.Has(key)
-	assert.NoError(err)
-	assert.True(has, "db should have had key %s", key)
+	require.NoError(err)
+	require.True(has, "db should have had key %s", key)
 
 	v, err := ldb.Get(key)
-	assert.NoError(err)
-	assert.Equal(value, v)
+	require.NoError(err)
+	require.Equal(value, v)
 
 	err = ldb.Delete(key)
-	assert.NoError(err)
+	require.NoError(err)
 
 	has, err = ldb.Has(key)
-	assert.NoError(err)
-	assert.False(has, "db unexpectedly had key %s", key)
+	require.NoError(err)
+	require.False(has, "db unexpectedly had key %s", key)
 
 	_, err = ldb.Get(key)
-	assert.Equal(database.ErrNotFound, err, "Expected db.Get to return a Not Found error.")
+	require.Equal(database.ErrNotFound, err, "Expected db.Get to return a Not Found error.")
 
 	iterator := db.NewIterator()
 	next := iterator.Next()
-	assert.False(next, "database should be empty")
+	require.False(next, "database should be empty")
 	iterator.Release()
 }
 
 func TestLinkedDBDuplicatedPut(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	db := memdb.New()
 	ldb := NewDefault(db)
@@ -69,26 +69,26 @@ func TestLinkedDBDuplicatedPut(t *testing.T) {
 	value2 := []byte("world2")
 
 	err := ldb.Put(key, value1)
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = ldb.Put(key, value2)
-	assert.NoError(err)
+	require.NoError(err)
 
 	v, err := ldb.Get(key)
-	assert.NoError(err)
-	assert.Equal(value2, v)
+	require.NoError(err)
+	require.Equal(value2, v)
 
 	err = ldb.Delete(key)
-	assert.NoError(err)
+	require.NoError(err)
 
 	iterator := db.NewIterator()
 	next := iterator.Next()
-	assert.False(next, "database should be empty")
+	require.False(next, "database should be empty")
 	iterator.Release()
 }
 
 func TestLinkedDBMultiplePuts(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	db := memdb.New()
 	ldb := NewDefault(db)
@@ -101,67 +101,67 @@ func TestLinkedDBMultiplePuts(t *testing.T) {
 	value3 := []byte("world3")
 
 	err := ldb.Put(key1, value1)
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = ldb.Put(key2, value2)
-	assert.NoError(err)
+	require.NoError(err)
 
 	v, err := ldb.Get(key1)
-	assert.NoError(err)
-	assert.Equal(value1, v)
+	require.NoError(err)
+	require.Equal(value1, v)
 
 	v, err = ldb.Get(key2)
-	assert.NoError(err)
-	assert.Equal(value2, v)
+	require.NoError(err)
+	require.Equal(value2, v)
 
 	err = ldb.Delete(key2)
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = ldb.Put(key2, value2)
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = ldb.Put(key3, value3)
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = ldb.Delete(key2)
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = ldb.Delete(key1)
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = ldb.Delete(key3)
-	assert.NoError(err)
+	require.NoError(err)
 
 	iterator := db.NewIterator()
 	next := iterator.Next()
-	assert.False(next, "database should be empty")
+	require.False(next, "database should be empty")
 	iterator.Release()
 }
 
 func TestEmptyLinkedDBIterator(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	db := memdb.New()
 	ldb := NewDefault(db)
 
 	iterator := ldb.NewIterator()
 	next := iterator.Next()
-	assert.False(next, "The iterator should now be exhausted")
+	require.False(next, "The iterator should now be exhausted")
 
 	k := iterator.Key()
-	assert.Nil(k, "The iterator returned the wrong key")
+	require.Nil(k, "The iterator returned the wrong key")
 
 	v := iterator.Value()
-	assert.Nil(v, "The iterator returned the wrong value")
+	require.Nil(v, "The iterator returned the wrong value")
 
 	err := iterator.Error()
-	assert.NoError(err)
+	require.NoError(err)
 
 	iterator.Release()
 }
 
 func TestLinkedDBLoadHeadKey(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	db := memdb.New()
 	ldb := NewDefault(db)
@@ -170,37 +170,37 @@ func TestLinkedDBLoadHeadKey(t *testing.T) {
 	value := []byte("world")
 
 	err := ldb.Put(key, value)
-	assert.NoError(err)
+	require.NoError(err)
 
 	ldb = NewDefault(db)
 
 	iterator := ldb.NewIterator()
 	next := iterator.Next()
-	assert.True(next, "The iterator shouldn't be exhausted yet")
+	require.True(next, "The iterator shouldn't be exhausted yet")
 
 	k := iterator.Key()
-	assert.Equal(key, k, "The iterator returned the wrong key")
+	require.Equal(key, k, "The iterator returned the wrong key")
 
 	v := iterator.Value()
-	assert.Equal(value, v, "The iterator returned the wrong value")
+	require.Equal(value, v, "The iterator returned the wrong value")
 
 	next = iterator.Next()
-	assert.False(next, "The iterator should now be exhausted")
+	require.False(next, "The iterator should now be exhausted")
 
 	k = iterator.Key()
-	assert.Nil(k, "The iterator returned the wrong key")
+	require.Nil(k, "The iterator returned the wrong key")
 
 	v = iterator.Value()
-	assert.Nil(v, "The iterator returned the wrong value")
+	require.Nil(v, "The iterator returned the wrong value")
 
 	err = iterator.Error()
-	assert.NoError(err)
+	require.NoError(err)
 
 	iterator.Release()
 }
 
 func TestSingleLinkedDBIterator(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	db := memdb.New()
 	ldb := NewDefault(db)
@@ -209,35 +209,35 @@ func TestSingleLinkedDBIterator(t *testing.T) {
 	value := []byte("world")
 
 	err := ldb.Put(key, value)
-	assert.NoError(err)
+	require.NoError(err)
 
 	iterator := ldb.NewIterator()
 	next := iterator.Next()
-	assert.True(next, "The iterator shouldn't be exhausted yet")
+	require.True(next, "The iterator shouldn't be exhausted yet")
 
 	k := iterator.Key()
-	assert.Equal(key, k, "The iterator returned the wrong key")
+	require.Equal(key, k, "The iterator returned the wrong key")
 
 	v := iterator.Value()
-	assert.Equal(value, v, "The iterator returned the wrong value")
+	require.Equal(value, v, "The iterator returned the wrong value")
 
 	next = iterator.Next()
-	assert.False(next, "The iterator should now be exhausted")
+	require.False(next, "The iterator should now be exhausted")
 
 	k = iterator.Key()
-	assert.Nil(k, "The iterator returned the wrong key")
+	require.Nil(k, "The iterator returned the wrong key")
 
 	v = iterator.Value()
-	assert.Nil(v, "The iterator returned the wrong value")
+	require.Nil(v, "The iterator returned the wrong value")
 
 	err = iterator.Error()
-	assert.NoError(err)
+	require.NoError(err)
 
 	iterator.Release()
 }
 
 func TestMultipleLinkedDBIterator(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	db := memdb.New()
 	ldb := NewDefault(db)
@@ -248,41 +248,41 @@ func TestMultipleLinkedDBIterator(t *testing.T) {
 	value1 := []byte("world1")
 
 	err := ldb.Put(key0, value0)
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = ldb.Put(key1, value1)
-	assert.NoError(err)
+	require.NoError(err)
 
 	iterator := ldb.NewIterator()
 	next := iterator.Next()
-	assert.True(next, "The iterator shouldn't be exhausted yet")
+	require.True(next, "The iterator shouldn't be exhausted yet")
 
 	k := iterator.Key()
-	assert.Equal(key1, k, "The iterator returned the wrong key")
+	require.Equal(key1, k, "The iterator returned the wrong key")
 
 	v := iterator.Value()
-	assert.Equal(value1, v, "The iterator returned the wrong value")
+	require.Equal(value1, v, "The iterator returned the wrong value")
 
 	next = iterator.Next()
-	assert.True(next, "The iterator shouldn't be exhausted yet")
+	require.True(next, "The iterator shouldn't be exhausted yet")
 
 	k = iterator.Key()
-	assert.Equal(key0, k, "The iterator returned the wrong key")
+	require.Equal(key0, k, "The iterator returned the wrong key")
 
 	v = iterator.Value()
-	assert.Equal(value0, v, "The iterator returned the wrong value")
+	require.Equal(value0, v, "The iterator returned the wrong value")
 
 	next = iterator.Next()
-	assert.False(next, "The iterator should now be exhausted")
+	require.False(next, "The iterator should now be exhausted")
 
 	err = iterator.Error()
-	assert.NoError(err)
+	require.NoError(err)
 
 	iterator.Release()
 }
 
 func TestMultipleLinkedDBIteratorStart(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	db := memdb.New()
 	ldb := NewDefault(db)
@@ -293,41 +293,41 @@ func TestMultipleLinkedDBIteratorStart(t *testing.T) {
 	value1 := []byte("world1")
 
 	err := ldb.Put(key0, value0)
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = ldb.Put(key1, value1)
-	assert.NoError(err)
+	require.NoError(err)
 
 	iterator := ldb.NewIteratorWithStart(key1)
 	next := iterator.Next()
-	assert.True(next, "The iterator shouldn't be exhausted yet")
+	require.True(next, "The iterator shouldn't be exhausted yet")
 
 	k := iterator.Key()
-	assert.Equal(key1, k, "The iterator returned the wrong key")
+	require.Equal(key1, k, "The iterator returned the wrong key")
 
 	v := iterator.Value()
-	assert.Equal(value1, v, "The iterator returned the wrong value")
+	require.Equal(value1, v, "The iterator returned the wrong value")
 
 	next = iterator.Next()
-	assert.True(next, "The iterator shouldn't be exhausted yet")
+	require.True(next, "The iterator shouldn't be exhausted yet")
 
 	k = iterator.Key()
-	assert.Equal(key0, k, "The iterator returned the wrong key")
+	require.Equal(key0, k, "The iterator returned the wrong key")
 
 	v = iterator.Value()
-	assert.Equal(value0, v, "The iterator returned the wrong value")
+	require.Equal(value0, v, "The iterator returned the wrong value")
 
 	next = iterator.Next()
-	assert.False(next, "The iterator should now be exhausted")
+	require.False(next, "The iterator should now be exhausted")
 
 	err = iterator.Error()
-	assert.NoError(err)
+	require.NoError(err)
 
 	iterator.Release()
 }
 
 func TestSingleLinkedDBIteratorStart(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	db := memdb.New()
 	ldb := NewDefault(db)
@@ -338,27 +338,27 @@ func TestSingleLinkedDBIteratorStart(t *testing.T) {
 	value1 := []byte("world1")
 
 	err := ldb.Put(key0, value0)
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = ldb.Put(key1, value1)
-	assert.NoError(err)
+	require.NoError(err)
 
 	iterator := ldb.NewIteratorWithStart(key0)
 
 	next := iterator.Next()
-	assert.True(next, "The iterator shouldn't be exhausted yet")
+	require.True(next, "The iterator shouldn't be exhausted yet")
 
 	k := iterator.Key()
-	assert.Equal(key0, k, "The iterator returned the wrong key")
+	require.Equal(key0, k, "The iterator returned the wrong key")
 
 	v := iterator.Value()
-	assert.Equal(value0, v, "The iterator returned the wrong value")
+	require.Equal(value0, v, "The iterator returned the wrong value")
 
 	next = iterator.Next()
-	assert.False(next, "The iterator should now be exhausted")
+	require.False(next, "The iterator should now be exhausted")
 
 	err = iterator.Error()
-	assert.NoError(err)
+	require.NoError(err)
 
 	iterator.Release()
 }
@@ -366,7 +366,7 @@ func TestSingleLinkedDBIteratorStart(t *testing.T) {
 // Test that if we call NewIteratorWithStart with a key that is not
 // in the database, the iterator will start at the head
 func TestEmptyLinkedDBIteratorStart(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	db := memdb.New()
 	ldb := NewDefault(db)
@@ -378,63 +378,63 @@ func TestEmptyLinkedDBIteratorStart(t *testing.T) {
 	value1 := []byte("world1")
 
 	err := ldb.Put(key0, value0)
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = ldb.Put(key1, value1)
-	assert.NoError(err)
+	require.NoError(err)
 
 	iter := ldb.NewIteratorWithStart(key2)
 
 	i := 0
 	for iter.Next() {
-		assert.Contains([][]byte{key0, key1}, iter.Key())
-		assert.Contains([][]byte{value0, value1}, iter.Value())
+		require.Contains([][]byte{key0, key1}, iter.Key())
+		require.Contains([][]byte{value0, value1}, iter.Value())
 		i++
 	}
-	assert.Equal(2, i)
+	require.Equal(2, i)
 
 	err = iter.Error()
-	assert.NoError(err)
+	require.NoError(err)
 
 	iter.Release()
 }
 
 func TestLinkedDBIsEmpty(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	db := memdb.New()
 	ldb := NewDefault(db)
 
 	isEmpty, err := ldb.IsEmpty()
-	assert.NoError(err)
-	assert.True(isEmpty)
+	require.NoError(err)
+	require.True(isEmpty)
 
 	key := []byte("hello")
 	value := []byte("world")
 
 	err = ldb.Put(key, value)
-	assert.NoError(err)
+	require.NoError(err)
 
 	isEmpty, err = ldb.IsEmpty()
-	assert.NoError(err)
-	assert.False(isEmpty)
+	require.NoError(err)
+	require.False(isEmpty)
 
 	err = ldb.Delete(key)
-	assert.NoError(err)
+	require.NoError(err)
 
 	isEmpty, err = ldb.IsEmpty()
-	assert.NoError(err)
-	assert.True(isEmpty)
+	require.NoError(err)
+	require.True(isEmpty)
 }
 
 func TestLinkedDBHeadKey(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	db := memdb.New()
 	ldb := NewDefault(db)
 
 	_, err := ldb.HeadKey()
-	assert.Equal(database.ErrNotFound, err)
+	require.Equal(database.ErrNotFound, err)
 
 	key0 := []byte("hello0")
 	value0 := []byte("world0")
@@ -442,35 +442,35 @@ func TestLinkedDBHeadKey(t *testing.T) {
 	value1 := []byte("world1")
 
 	err = ldb.Put(key0, value0)
-	assert.NoError(err)
+	require.NoError(err)
 
 	headKey, err := ldb.HeadKey()
-	assert.NoError(err)
-	assert.Equal(key0, headKey)
+	require.NoError(err)
+	require.Equal(key0, headKey)
 
 	err = ldb.Put(key1, value1)
-	assert.NoError(err)
+	require.NoError(err)
 
 	headKey, err = ldb.HeadKey()
-	assert.NoError(err)
-	assert.Equal(key1, headKey)
+	require.NoError(err)
+	require.Equal(key1, headKey)
 
 	err = ldb.Delete(key1)
-	assert.NoError(err)
+	require.NoError(err)
 
 	headKey, err = ldb.HeadKey()
-	assert.NoError(err)
-	assert.Equal(key0, headKey)
+	require.NoError(err)
+	require.Equal(key0, headKey)
 }
 
 func TestLinkedDBHead(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	db := memdb.New()
 	ldb := NewDefault(db)
 
 	_, _, err := ldb.Head()
-	assert.Equal(database.ErrNotFound, err)
+	require.Equal(database.ErrNotFound, err)
 
 	key0 := []byte("hello0")
 	value0 := []byte("world0")
@@ -478,26 +478,26 @@ func TestLinkedDBHead(t *testing.T) {
 	value1 := []byte("world1")
 
 	err = ldb.Put(key0, value0)
-	assert.NoError(err)
+	require.NoError(err)
 
 	headKey, headVal, err := ldb.Head()
-	assert.NoError(err)
-	assert.Equal(key0, headKey)
-	assert.Equal(value0, headVal)
+	require.NoError(err)
+	require.Equal(key0, headKey)
+	require.Equal(value0, headVal)
 
 	err = ldb.Put(key1, value1)
-	assert.NoError(err)
+	require.NoError(err)
 
 	headKey, headVal, err = ldb.Head()
-	assert.NoError(err)
-	assert.Equal(key1, headKey)
-	assert.Equal(value1, headVal)
+	require.NoError(err)
+	require.Equal(key1, headKey)
+	require.Equal(value1, headVal)
 
 	err = ldb.Delete(key1)
-	assert.NoError(err)
+	require.NoError(err)
 
 	headKey, headVal, err = ldb.Head()
-	assert.NoError(err)
-	assert.Equal(key0, headKey)
-	assert.Equal(value0, headVal)
+	require.NoError(err)
+	require.Equal(key0, headKey)
+	require.Equal(value0, headVal)
 }

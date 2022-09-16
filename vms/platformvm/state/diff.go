@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -17,7 +18,7 @@ import (
 var (
 	_ Diff = &diff{}
 
-	errMissingParentState = errors.New("missing parent state")
+	ErrMissingParentState = errors.New("missing parent state")
 )
 
 type Diff interface {
@@ -32,13 +33,16 @@ type diff struct {
 
 	timestamp time.Time
 
-	currentSupply uint64
+	// Subnet ID --> supply of native asset of the subnet
+	currentSupply map[ids.ID]uint64
 
 	currentStakerDiffs diffStakers
 	pendingStakerDiffs diffStakers
 
-	addedSubnets  []*txs.Tx
-	cachedSubnets []*txs.Tx
+	addedSubnets []*txs.Tx
+	// Subnet ID --> Tx that transforms the subnet
+	transformedSubnets map[ids.ID]*txs.Tx
+	cachedSubnets      []*txs.Tx
 
 	addedChains  map[ids.ID][]*txs.Tx
 	cachedChains map[ids.ID][]*txs.Tx
@@ -64,13 +68,12 @@ func NewDiff(
 ) (Diff, error) {
 	parentState, ok := stateVersions.GetState(parentID)
 	if !ok {
-		return nil, errMissingParentState
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, parentID)
 	}
 	return &diff{
 		parentID:      parentID,
 		stateVersions: stateVersions,
 		timestamp:     parentState.GetTimestamp(),
-		currentSupply: parentState.GetCurrentSupply(),
 	}, nil
 }
 
@@ -82,12 +85,28 @@ func (d *diff) SetTimestamp(timestamp time.Time) {
 	d.timestamp = timestamp
 }
 
-func (d *diff) GetCurrentSupply() uint64 {
-	return d.currentSupply
+func (d *diff) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
+	supply, ok := d.currentSupply[subnetID]
+	if ok {
+		return supply, nil
+	}
+
+	// If the subnet supply wasn't modified in this diff, ask the parent state.
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return 0, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+	return parentState.GetCurrentSupply(subnetID)
 }
 
-func (d *diff) SetCurrentSupply(currentSupply uint64) {
-	d.currentSupply = currentSupply
+func (d *diff) SetCurrentSupply(subnetID ids.ID, currentSupply uint64) {
+	if d.currentSupply == nil {
+		d.currentSupply = map[ids.ID]uint64{
+			subnetID: currentSupply,
+		}
+	} else {
+		d.currentSupply[subnetID] = currentSupply
+	}
 }
 
 func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
@@ -104,7 +123,7 @@ func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 	// If the validator wasn't modified in this diff, ask the parent state.
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return nil, errMissingParentState
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 	return parentState.GetCurrentValidator(subnetID, nodeID)
 }
@@ -120,7 +139,7 @@ func (d *diff) DeleteCurrentValidator(staker *Staker) {
 func (d *diff) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return nil, errMissingParentState
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 
 	parentIterator, err := parentState.GetCurrentDelegatorIterator(subnetID, nodeID)
@@ -142,7 +161,7 @@ func (d *diff) DeleteCurrentDelegator(staker *Staker) {
 func (d *diff) GetCurrentStakerIterator() (StakerIterator, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return nil, errMissingParentState
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 
 	parentIterator, err := parentState.GetCurrentStakerIterator()
@@ -167,7 +186,7 @@ func (d *diff) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 	// If the validator wasn't modified in this diff, ask the parent state.
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return nil, errMissingParentState
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 	return parentState.GetPendingValidator(subnetID, nodeID)
 }
@@ -183,7 +202,7 @@ func (d *diff) DeletePendingValidator(staker *Staker) {
 func (d *diff) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return nil, errMissingParentState
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 
 	parentIterator, err := parentState.GetPendingDelegatorIterator(subnetID, nodeID)
@@ -205,7 +224,7 @@ func (d *diff) DeletePendingDelegator(staker *Staker) {
 func (d *diff) GetPendingStakerIterator() (StakerIterator, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return nil, errMissingParentState
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 
 	parentIterator, err := parentState.GetPendingStakerIterator()
@@ -220,7 +239,7 @@ func (d *diff) GetSubnets() ([]*txs.Tx, error) {
 	if len(d.addedSubnets) == 0 {
 		parentState, ok := d.stateVersions.GetState(d.parentID)
 		if !ok {
-			return nil, errMissingParentState
+			return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 		}
 		return parentState.GetSubnets()
 	}
@@ -231,7 +250,7 @@ func (d *diff) GetSubnets() ([]*txs.Tx, error) {
 
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return nil, errMissingParentState
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 	subnets, err := parentState.GetSubnets()
 	if err != nil {
@@ -253,13 +272,38 @@ func (d *diff) AddSubnet(createSubnetTx *txs.Tx) {
 	}
 }
 
+func (d *diff) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
+	tx, exists := d.transformedSubnets[subnetID]
+	if exists {
+		return tx, nil
+	}
+
+	// If the subnet wasn't transformed in this diff, ask the parent state.
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, ErrMissingParentState
+	}
+	return parentState.GetSubnetTransformation(subnetID)
+}
+
+func (d *diff) AddSubnetTransformation(transformSubnetTxIntf *txs.Tx) {
+	transformSubnetTx := transformSubnetTxIntf.Unsigned.(*txs.TransformSubnetTx)
+	if d.transformedSubnets == nil {
+		d.transformedSubnets = map[ids.ID]*txs.Tx{
+			transformSubnetTx.Subnet: transformSubnetTxIntf,
+		}
+	} else {
+		d.transformedSubnets[transformSubnetTx.Subnet] = transformSubnetTxIntf
+	}
+}
+
 func (d *diff) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
 	addedChains := d.addedChains[subnetID]
 	if len(addedChains) == 0 {
 		// No chains have been added to this subnet
 		parentState, ok := d.stateVersions.GetState(d.parentID)
 		if !ok {
-			return nil, errMissingParentState
+			return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 		}
 		return parentState.GetChains(subnetID)
 	}
@@ -279,7 +323,7 @@ func (d *diff) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
 	// This chain wasn't cached yet
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return nil, errMissingParentState
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 	chains, err := parentState.GetChains(subnetID)
 	if err != nil {
@@ -319,7 +363,7 @@ func (d *diff) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return nil, status.Unknown, errMissingParentState
+		return nil, status.Unknown, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 	return parentState.GetTx(txID)
 }
@@ -346,7 +390,7 @@ func (d *diff) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return nil, errMissingParentState
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 	return parentState.GetRewardUTXOs(txID)
 }
@@ -363,7 +407,7 @@ func (d *diff) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 	if !modified {
 		parentState, ok := d.stateVersions.GetState(d.parentID)
 		if !ok {
-			return nil, errMissingParentState
+			return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 		}
 		return parentState.GetUTXO(utxoID)
 	}
@@ -402,7 +446,9 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 
 func (d *diff) Apply(baseState State) {
 	baseState.SetTimestamp(d.timestamp)
-	baseState.SetCurrentSupply(d.currentSupply)
+	for subnetID, supply := range d.currentSupply {
+		baseState.SetCurrentSupply(subnetID, supply)
+	}
 	for _, subnetValidatorDiffs := range d.currentStakerDiffs.validatorDiffs {
 		for _, validatorDiff := range subnetValidatorDiffs {
 			if validatorDiff.validatorModified {
@@ -447,6 +493,9 @@ func (d *diff) Apply(baseState State) {
 	}
 	for _, subnet := range d.addedSubnets {
 		baseState.AddSubnet(subnet)
+	}
+	for _, tx := range d.transformedSubnets {
+		baseState.AddSubnetTransformation(tx)
 	}
 	for _, chains := range d.addedChains {
 		for _, chain := range chains {

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -6,15 +6,15 @@ package state
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEmptyIterator(t *testing.T) {
-	assert := assert.New(t)
-	assert.False(EmptyIterator.Next())
+	require := require.New(t)
+	require.False(EmptyIterator.Next())
 
 	EmptyIterator.Release()
 
-	assert.False(EmptyIterator.Next())
-	assert.Nil(EmptyIterator.Value())
+	require.False(EmptyIterator.Next())
+	require.Nil(EmptyIterator.Value())
 }

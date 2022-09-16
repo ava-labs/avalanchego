@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -7,19 +7,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 func TestStakerDiffIterator(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	currentStakers := []*Staker{
 		{
 			TxID:     ids.GenerateTestID(),
 			EndTime:  time.Unix(10, 0),
 			NextTime: time.Unix(10, 0),
-			Priority: PrimaryNetworkValidatorCurrentPriority,
+			Priority: txs.PrimaryNetworkValidatorCurrentPriority,
 		},
 	}
 	pendingStakers := []*Staker{
@@ -28,28 +29,28 @@ func TestStakerDiffIterator(t *testing.T) {
 			StartTime: time.Unix(0, 0),
 			EndTime:   time.Unix(5, 0),
 			NextTime:  time.Unix(0, 0),
-			Priority:  PrimaryNetworkDelegatorPendingPriority,
+			Priority:  txs.PrimaryNetworkDelegatorApricotPendingPriority,
 		},
 		{
 			TxID:      ids.GenerateTestID(),
 			StartTime: time.Unix(5, 0),
 			EndTime:   time.Unix(10, 0),
 			NextTime:  time.Unix(5, 0),
-			Priority:  PrimaryNetworkDelegatorPendingPriority,
+			Priority:  txs.PrimaryNetworkDelegatorApricotPendingPriority,
 		},
 		{
 			TxID:      ids.GenerateTestID(),
 			StartTime: time.Unix(11, 0),
 			EndTime:   time.Unix(20, 0),
 			NextTime:  time.Unix(11, 0),
-			Priority:  PrimaryNetworkValidatorPendingPriority,
+			Priority:  txs.PrimaryNetworkValidatorPendingPriority,
 		},
 		{
 			TxID:      ids.GenerateTestID(),
 			StartTime: time.Unix(11, 0),
 			EndTime:   time.Unix(20, 0),
 			NextTime:  time.Unix(11, 0),
-			Priority:  PrimaryNetworkDelegatorPendingPriority,
+			Priority:  txs.PrimaryNetworkDelegatorApricotPendingPriority,
 		},
 	}
 
@@ -100,36 +101,36 @@ func TestStakerDiffIterator(t *testing.T) {
 		NewSliceIterator(pendingStakers...),
 	)
 	for _, expectedStaker := range stakerDiffs {
-		assert.True(it.Next())
+		require.True(it.Next())
 		staker, isAdded := it.Value()
-		assert.Equal(expectedStaker.txID, staker.TxID)
-		assert.Equal(expectedStaker.isAdded, isAdded)
+		require.Equal(expectedStaker.txID, staker.TxID)
+		require.Equal(expectedStaker.isAdded, isAdded)
 	}
-	assert.False(it.Next())
+	require.False(it.Next())
 	it.Release()
-	assert.False(it.Next())
+	require.False(it.Next())
 }
 
 func TestMutableStakerIterator(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	initialStakers := []*Staker{
 		{
 			TxID:     ids.GenerateTestID(),
 			EndTime:  time.Unix(10, 0),
 			NextTime: time.Unix(10, 0),
-			Priority: PrimaryNetworkValidatorCurrentPriority,
+			Priority: txs.PrimaryNetworkValidatorCurrentPriority,
 		},
 		{
 			TxID:     ids.GenerateTestID(),
 			EndTime:  time.Unix(20, 0),
 			NextTime: time.Unix(20, 0),
-			Priority: PrimaryNetworkValidatorCurrentPriority,
+			Priority: txs.PrimaryNetworkValidatorCurrentPriority,
 		},
 		{
 			TxID:     ids.GenerateTestID(),
 			EndTime:  time.Unix(30, 0),
 			NextTime: time.Unix(30, 0),
-			Priority: PrimaryNetworkValidatorCurrentPriority,
+			Priority: txs.PrimaryNetworkValidatorCurrentPriority,
 		},
 	}
 
@@ -140,25 +141,25 @@ func TestMutableStakerIterator(t *testing.T) {
 			TxID:     ids.GenerateTestID(),
 			EndTime:  time.Unix(5, 0),
 			NextTime: time.Unix(5, 0),
-			Priority: PrimaryNetworkValidatorCurrentPriority,
+			Priority: txs.PrimaryNetworkValidatorCurrentPriority,
 		},
 		{
 			TxID:     ids.GenerateTestID(),
 			EndTime:  time.Unix(15, 0),
 			NextTime: time.Unix(15, 0),
-			Priority: PrimaryNetworkValidatorCurrentPriority,
+			Priority: txs.PrimaryNetworkValidatorCurrentPriority,
 		},
 		{
 			TxID:     ids.GenerateTestID(),
 			EndTime:  time.Unix(25, 0),
 			NextTime: time.Unix(25, 0),
-			Priority: PrimaryNetworkValidatorCurrentPriority,
+			Priority: txs.PrimaryNetworkValidatorCurrentPriority,
 		},
 	}
 
 	// Next must be called before Add.
 	hasNext := it.Next()
-	assert.True(hasNext)
+	require.True(hasNext)
 
 	for _, staker := range addedStakers {
 		it.Add(staker)
@@ -174,12 +175,12 @@ func TestMutableStakerIterator(t *testing.T) {
 	}
 
 	for _, expectedStakerTxID := range stakerDiffs {
-		assert.True(hasNext)
+		require.True(hasNext)
 		staker := it.Value()
-		assert.Equal(expectedStakerTxID, staker.TxID)
+		require.Equal(expectedStakerTxID, staker.TxID)
 		hasNext = it.Next()
 	}
-	assert.False(hasNext)
+	require.False(hasNext)
 	it.Release()
-	assert.False(it.Next())
+	require.False(it.Next())
 }

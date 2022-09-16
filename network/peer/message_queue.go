@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -12,8 +12,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/throttling"
+	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
+
+const initialQueueSize = 64
 
 var (
 	_ MessageQueue = &throttledMessageQueue{}
@@ -64,7 +67,7 @@ type throttledMessageQueue struct {
 
 	// queue of the messages
 	// [cond.L] must be held while accessing [queue].
-	queue []message.OutboundMessage
+	queue buffer.UnboundedQueue[message.OutboundMessage]
 }
 
 func NewThrottledMessageQueue(
@@ -78,8 +81,8 @@ func NewThrottledMessageQueue(
 		id:                   id,
 		log:                  log,
 		outboundMsgThrottler: outboundMsgThrottler,
-
-		cond: sync.NewCond(&sync.Mutex{}),
+		cond:                 sync.NewCond(&sync.Mutex{}),
+		queue:                buffer.NewUnboundedSliceQueue[message.OutboundMessage](initialQueueSize),
 	}
 }
 
@@ -126,7 +129,7 @@ func (q *throttledMessageQueue) Push(ctx context.Context, msg message.OutboundMe
 		return false
 	}
 
-	q.queue = append(q.queue, msg)
+	q.queue.Enqueue(msg)
 	q.cond.Signal()
 	return true
 }
@@ -139,7 +142,7 @@ func (q *throttledMessageQueue) Pop() (message.OutboundMessage, bool) {
 		if q.closed {
 			return nil, false
 		}
-		if len(q.queue) > 0 {
+		if q.queue.Len() > 0 {
 			// There is a message
 			break
 		}
@@ -154,7 +157,7 @@ func (q *throttledMessageQueue) PopNow() (message.OutboundMessage, bool) {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 
-	if len(q.queue) == 0 {
+	if q.closed || q.queue.Len() == 0 {
 		// There isn't a message
 		return nil, false
 	}
@@ -163,9 +166,7 @@ func (q *throttledMessageQueue) PopNow() (message.OutboundMessage, bool) {
 }
 
 func (q *throttledMessageQueue) pop() message.OutboundMessage {
-	msg := q.queue[0]
-	q.queue[0] = nil
-	q.queue = q.queue[1:]
+	msg, _ := q.queue.Dequeue()
 
 	q.outboundMsgThrottler.Release(msg, q.id)
 	return msg
@@ -175,9 +176,14 @@ func (q *throttledMessageQueue) Close() {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 
+	if q.closed {
+		return
+	}
+
 	q.closed = true
 
-	for _, msg := range q.queue {
+	for q.queue.Len() > 0 {
+		msg, _ := q.queue.Dequeue()
 		q.outboundMsgThrottler.Release(msg, q.id)
 		q.onFailed.SendFailed(msg)
 	}

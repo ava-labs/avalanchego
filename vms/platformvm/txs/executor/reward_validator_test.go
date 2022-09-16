@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -22,171 +22,221 @@ import (
 )
 
 func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	env := newEnvironment()
 	defer func() {
-		assert.NoError(shutdownEnvironment(env))
+		require.NoError(shutdownEnvironment(env))
 	}()
 	dummyHeight := uint64(1)
 
 	currentStakerIterator, err := env.state.GetCurrentStakerIterator()
-	assert.NoError(err)
-	assert.True(currentStakerIterator.Next())
+	require.NoError(err)
+	require.True(currentStakerIterator.Next())
 
 	stakerToRemove := currentStakerIterator.Value()
 	currentStakerIterator.Release()
 
 	stakerToRemoveTxIntf, _, err := env.state.GetTx(stakerToRemove.TxID)
-	assert.NoError(err)
+	require.NoError(err)
 	stakerToRemoveTx := stakerToRemoveTxIntf.Unsigned.(*txs.AddValidatorTx)
 
 	// Case 1: Chain timestamp is wrong
 	tx, err := env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
-	assert.NoError(err)
+	require.NoError(err)
+
+	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	txExecutor := ProposalTxExecutor{
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
-		ParentID:      lastAcceptedID,
-		StateVersions: env,
 		Tx:            tx,
 	}
-	assert.Error(tx.Unsigned.Visit(&txExecutor))
+	require.Error(tx.Unsigned.Visit(&txExecutor))
 
 	// Advance chain timestamp to time that next validator leaves
 	env.state.SetTimestamp(stakerToRemove.EndTime)
 
 	// Case 2: Wrong validator
 	tx, err = env.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
-	assert.NoError(err)
+	require.NoError(err)
+
+	onCommitState, err = state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onAbortState, err = state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	txExecutor = ProposalTxExecutor{
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
-		ParentID:      lastAcceptedID,
-		StateVersions: env,
 		Tx:            tx,
 	}
-	assert.Error(tx.Unsigned.Visit(&txExecutor))
+	require.Error(tx.Unsigned.Visit(&txExecutor))
 
 	// Case 3: Happy path
 	tx, err = env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
-	assert.NoError(err)
+	require.NoError(err)
+
+	onCommitState, err = state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onAbortState, err = state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	txExecutor = ProposalTxExecutor{
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
-		ParentID:      lastAcceptedID,
-		StateVersions: env,
 		Tx:            tx,
 	}
-	assert.NoError(tx.Unsigned.Visit(&txExecutor))
+	require.NoError(tx.Unsigned.Visit(&txExecutor))
 
-	onCommitStakerIterator, err := txExecutor.OnCommit.GetCurrentStakerIterator()
-	assert.NoError(err)
-	assert.True(onCommitStakerIterator.Next())
+	onCommitStakerIterator, err := txExecutor.OnCommitState.GetCurrentStakerIterator()
+	require.NoError(err)
+	require.True(onCommitStakerIterator.Next())
 
 	nextToRemove := onCommitStakerIterator.Value()
 	onCommitStakerIterator.Release()
-	assert.NotEqual(stakerToRemove.TxID, nextToRemove.TxID)
+	require.NotEqual(stakerToRemove.TxID, nextToRemove.TxID)
 
 	// check that stake/reward is given back
-	stakeOwners := stakerToRemoveTx.Stake[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
+	stakeOwners := stakerToRemoveTx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
 
 	// Get old balances
 	oldBalance, err := avax.GetBalance(env.state, stakeOwners)
-	assert.NoError(err)
+	require.NoError(err)
 
-	txExecutor.OnCommit.Apply(env.state)
+	txExecutor.OnCommitState.Apply(env.state)
 	env.state.SetHeight(dummyHeight)
-	assert.NoError(env.state.Commit())
+	require.NoError(env.state.Commit())
 
 	onCommitBalance, err := avax.GetBalance(env.state, stakeOwners)
-	assert.NoError(err)
-	assert.Equal(oldBalance+stakerToRemove.Weight+27, onCommitBalance)
+	require.NoError(err)
+	require.Equal(oldBalance+stakerToRemove.Weight+27, onCommitBalance)
 }
 
 func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	env := newEnvironment()
 	defer func() {
-		assert.NoError(shutdownEnvironment(env))
+		require.NoError(shutdownEnvironment(env))
 	}()
 	dummyHeight := uint64(1)
 
 	currentStakerIterator, err := env.state.GetCurrentStakerIterator()
-	assert.NoError(err)
-	assert.True(currentStakerIterator.Next())
+	require.NoError(err)
+	require.True(currentStakerIterator.Next())
 
 	stakerToRemove := currentStakerIterator.Value()
 	currentStakerIterator.Release()
 
 	stakerToRemoveTxIntf, _, err := env.state.GetTx(stakerToRemove.TxID)
-	assert.NoError(err)
+	require.NoError(err)
 	stakerToRemoveTx := stakerToRemoveTxIntf.Unsigned.(*txs.AddValidatorTx)
 
 	// Case 1: Chain timestamp is wrong
 	tx, err := env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
-	assert.NoError(err)
+	require.NoError(err)
+
+	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	txExecutor := ProposalTxExecutor{
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
-		ParentID:      lastAcceptedID,
-		StateVersions: env,
 		Tx:            tx,
 	}
-	assert.Error(tx.Unsigned.Visit(&txExecutor))
+	require.Error(tx.Unsigned.Visit(&txExecutor))
 
 	// Advance chain timestamp to time that next validator leaves
 	env.state.SetTimestamp(stakerToRemove.EndTime)
 
 	// Case 2: Wrong validator
 	tx, err = env.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
-	assert.NoError(err)
+	require.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
-		ParentID:      lastAcceptedID,
-		StateVersions: env,
 		Tx:            tx,
 	}
-	assert.Error(tx.Unsigned.Visit(&txExecutor))
+	require.Error(tx.Unsigned.Visit(&txExecutor))
 
 	// Case 3: Happy path
 	tx, err = env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
-	assert.NoError(err)
+	require.NoError(err)
+
+	onCommitState, err = state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onAbortState, err = state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	txExecutor = ProposalTxExecutor{
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
-		ParentID:      lastAcceptedID,
-		StateVersions: env,
 		Tx:            tx,
 	}
-	assert.NoError(tx.Unsigned.Visit(&txExecutor))
+	require.NoError(tx.Unsigned.Visit(&txExecutor))
 
-	onAbortStakerIterator, err := txExecutor.OnAbort.GetCurrentStakerIterator()
-	assert.NoError(err)
-	assert.True(onAbortStakerIterator.Next())
+	onAbortStakerIterator, err := txExecutor.OnAbortState.GetCurrentStakerIterator()
+	require.NoError(err)
+	require.True(onAbortStakerIterator.Next())
 
 	nextToRemove := onAbortStakerIterator.Value()
 	onAbortStakerIterator.Release()
-	assert.NotEqual(stakerToRemove.TxID, nextToRemove.TxID)
+	require.NotEqual(stakerToRemove.TxID, nextToRemove.TxID)
 
 	// check that stake/reward isn't given back
-	stakeOwners := stakerToRemoveTx.Stake[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
+	stakeOwners := stakerToRemoveTx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
 
 	// Get old balances
 	oldBalance, err := avax.GetBalance(env.state, stakeOwners)
-	assert.NoError(err)
+	require.NoError(err)
 
-	txExecutor.OnAbort.Apply(env.state)
+	txExecutor.OnAbortState.Apply(env.state)
 	env.state.SetHeight(dummyHeight)
-	assert.NoError(env.state.Commit())
+	require.NoError(env.state.Commit())
 
 	onAbortBalance, err := avax.GetBalance(env.state, stakeOwners)
-	assert.NoError(err)
-	assert.Equal(oldBalance+stakerToRemove.Weight, onAbortBalance)
+	require.NoError(err)
+	require.Equal(oldBalance+stakerToRemove.Weight, onAbortBalance)
 }
 
 func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	env := newEnvironment()
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
@@ -212,7 +262,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 		ids.ShortEmpty,
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
@@ -226,23 +276,19 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 		ids.ShortEmpty, // Change address
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
-	vdrStaker := state.NewPrimaryNetworkStaker(
+	vdrStaker := state.NewCurrentStaker(
 		vdrTx.ID(),
-		&vdrTx.Unsigned.(*txs.AddValidatorTx).Validator,
+		vdrTx.Unsigned.(*txs.AddValidatorTx),
+		0,
 	)
-	vdrStaker.PotentialReward = 0
-	vdrStaker.NextTime = vdrStaker.EndTime
-	vdrStaker.Priority = state.PrimaryNetworkValidatorCurrentPriority
 
-	delStaker := state.NewPrimaryNetworkStaker(
+	delStaker := state.NewCurrentStaker(
 		delTx.ID(),
-		&delTx.Unsigned.(*txs.AddDelegatorTx).Validator,
+		delTx.Unsigned.(*txs.AddDelegatorTx),
+		1000000,
 	)
-	delStaker.PotentialReward = 1000000
-	delStaker.NextTime = delStaker.EndTime
-	delStaker.Priority = state.PrimaryNetworkDelegatorCurrentPriority
 
 	env.state.PutCurrentValidator(vdrStaker)
 	env.state.AddTx(vdrTx, status.Committed)
@@ -250,26 +296,36 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	env.state.AddTx(delTx, status.Committed)
 	env.state.SetTimestamp(time.Unix(int64(delEndTime), 0))
 	env.state.SetHeight(dummyHeight)
-	assert.NoError(env.state.Commit())
+	require.NoError(env.state.Commit())
 
 	// test validator stake
 	set, ok := env.config.Validators.GetValidators(constants.PrimaryNetworkID)
-	assert.True(ok)
+	require.True(ok)
 	stake, ok := set.GetWeight(vdrNodeID)
-	assert.True(ok)
-	assert.Equal(env.config.MinValidatorStake+env.config.MinDelegatorStake, stake)
+	require.True(ok)
+	require.Equal(env.config.MinValidatorStake+env.config.MinDelegatorStake, stake)
 
 	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
-	assert.NoError(err)
+	require.NoError(err)
+
+	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	txExecutor := ProposalTxExecutor{
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
-		ParentID:      lastAcceptedID,
-		StateVersions: env,
 		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
-	assert.NoError(err)
+	require.NoError(err)
 
 	vdrDestSet := ids.ShortSet{}
 	vdrDestSet.Add(vdrRewardAddress)
@@ -279,38 +335,38 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	expectedReward := uint64(1000000)
 
 	oldVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
-	assert.NoError(err)
+	require.NoError(err)
 	oldDelBalance, err := avax.GetBalance(env.state, delDestSet)
-	assert.NoError(err)
+	require.NoError(err)
 
-	txExecutor.OnCommit.Apply(env.state)
+	txExecutor.OnCommitState.Apply(env.state)
 	env.state.SetHeight(dummyHeight)
-	assert.NoError(env.state.Commit())
+	require.NoError(env.state.Commit())
 
 	// If tx is committed, delegator and delegatee should get reward
 	// and the delegator's reward should be greater because the delegatee's share is 25%
 	commitVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
-	assert.NoError(err)
+	require.NoError(err)
 	vdrReward, err := math.Sub64(commitVdrBalance, oldVdrBalance)
-	assert.NoError(err)
-	assert.NotZero(vdrReward, "expected delegatee balance to increase because of reward")
+	require.NoError(err)
+	require.NotZero(vdrReward, "expected delegatee balance to increase because of reward")
 
 	commitDelBalance, err := avax.GetBalance(env.state, delDestSet)
-	assert.NoError(err)
+	require.NoError(err)
 	delReward, err := math.Sub64(commitDelBalance, oldDelBalance)
-	assert.NoError(err)
-	assert.NotZero(delReward, "expected delegator balance to increase because of reward")
+	require.NoError(err)
+	require.NotZero(delReward, "expected delegator balance to increase because of reward")
 
-	assert.Less(vdrReward, delReward, "the delegator's reward should be greater than the delegatee's because the delegatee's share is 25%")
-	assert.Equal(expectedReward, delReward+vdrReward, "expected total reward to be %d but is %d", expectedReward, delReward+vdrReward)
+	require.Less(vdrReward, delReward, "the delegator's reward should be greater than the delegatee's because the delegatee's share is 25%")
+	require.Equal(expectedReward, delReward+vdrReward, "expected total reward to be %d but is %d", expectedReward, delReward+vdrReward)
 
 	stake, ok = set.GetWeight(vdrNodeID)
-	assert.True(ok)
-	assert.Equal(env.config.MinValidatorStake, stake)
+	require.True(ok)
+	require.Equal(env.config.MinValidatorStake, stake)
 }
 
 func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	env := newEnvironment()
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
@@ -319,7 +375,8 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	}()
 	dummyHeight := uint64(1)
 
-	initialSupply := env.state.GetCurrentSupply()
+	initialSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(err)
 
 	vdrRewardAddress := ids.GenerateTestShortID()
 	delRewardAddress := ids.GenerateTestShortID()
@@ -338,7 +395,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 		ids.ShortEmpty,
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
@@ -351,23 +408,19 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 		ids.ShortEmpty,
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
-	vdrStaker := state.NewPrimaryNetworkStaker(
+	vdrStaker := state.NewCurrentStaker(
 		vdrTx.ID(),
-		&vdrTx.Unsigned.(*txs.AddValidatorTx).Validator,
+		vdrTx.Unsigned.(*txs.AddValidatorTx),
+		0,
 	)
-	vdrStaker.PotentialReward = 0
-	vdrStaker.NextTime = vdrStaker.EndTime
-	vdrStaker.Priority = state.PrimaryNetworkValidatorCurrentPriority
 
-	delStaker := state.NewPrimaryNetworkStaker(
+	delStaker := state.NewCurrentStaker(
 		delTx.ID(),
-		&delTx.Unsigned.(*txs.AddDelegatorTx).Validator,
+		delTx.Unsigned.(*txs.AddDelegatorTx),
+		1000000,
 	)
-	delStaker.PotentialReward = 1000000
-	delStaker.NextTime = delStaker.EndTime
-	delStaker.Priority = state.PrimaryNetworkDelegatorCurrentPriority
 
 	env.state.PutCurrentValidator(vdrStaker)
 	env.state.AddTx(vdrTx, status.Committed)
@@ -375,19 +428,29 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	env.state.AddTx(delTx, status.Committed)
 	env.state.SetTimestamp(time.Unix(int64(delEndTime), 0))
 	env.state.SetHeight(dummyHeight)
-	assert.NoError(env.state.Commit())
+	require.NoError(env.state.Commit())
 
 	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
-	assert.NoError(err)
+	require.NoError(err)
+
+	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	txExecutor := ProposalTxExecutor{
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
 		Backend:       &env.backend,
-		ParentID:      lastAcceptedID,
-		StateVersions: env,
 		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&txExecutor)
-	assert.NoError(err)
+	require.NoError(err)
 
 	vdrDestSet := ids.ShortSet{}
 	vdrDestSet.Add(vdrRewardAddress)
@@ -397,27 +460,28 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	expectedReward := uint64(1000000)
 
 	oldVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
-	assert.NoError(err)
+	require.NoError(err)
 	oldDelBalance, err := avax.GetBalance(env.state, delDestSet)
-	assert.NoError(err)
+	require.NoError(err)
 
-	txExecutor.OnAbort.Apply(env.state)
+	txExecutor.OnAbortState.Apply(env.state)
 	env.state.SetHeight(dummyHeight)
-	assert.NoError(env.state.Commit())
+	require.NoError(env.state.Commit())
 
 	// If tx is aborted, delegator and delegatee shouldn't get reward
 	newVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
-	assert.NoError(err)
+	require.NoError(err)
 	vdrReward, err := math.Sub64(newVdrBalance, oldVdrBalance)
-	assert.NoError(err)
-	assert.Zero(vdrReward, "expected delegatee balance not to increase")
+	require.NoError(err)
+	require.Zero(vdrReward, "expected delegatee balance not to increase")
 
 	newDelBalance, err := avax.GetBalance(env.state, delDestSet)
-	assert.NoError(err)
+	require.NoError(err)
 	delReward, err := math.Sub64(newDelBalance, oldDelBalance)
-	assert.NoError(err)
-	assert.Zero(delReward, "expected delegator balance not to increase")
+	require.NoError(err)
+	require.Zero(delReward, "expected delegator balance not to increase")
 
-	newSupply := env.state.GetCurrentSupply()
-	assert.Equal(initialSupply-expectedReward, newSupply, "should have removed un-rewarded tokens from the potential supply")
+	newSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
+	require.NoError(err)
+	require.Equal(initialSupply-expectedReward, newSupply, "should have removed un-rewarded tokens from the potential supply")
 }

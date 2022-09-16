@@ -1,17 +1,20 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blocks
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 // Block defines the common stateless interface for all blocks
 type Block interface {
+	snow.ContextInitializable
 	ID() ids.ID
 	Parent() ids.ID
 	Bytes() []byte
@@ -23,7 +26,14 @@ type Block interface {
 	// Visit calls [visitor] with this block's concrete type
 	Visit(visitor Visitor) error
 
+	// note: initialize does not assume that block transactions
+	// are initialized, and initializes them itself if they aren't.
 	initialize(bytes []byte) error
+}
+
+type BlueberryBlock interface {
+	Block
+	Timestamp() time.Time
 }
 
 func initialize(blk Block) error {

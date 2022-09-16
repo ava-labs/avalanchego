@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avalanche
@@ -215,10 +215,6 @@ func (t *Transitive) Chits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) 
 	return t.attemptToIssueTxs()
 }
 
-func (t *Transitive) ChitsV2(nodeID ids.NodeID, requestID uint32, votes []ids.ID, _ ids.ID) error {
-	return t.Chits(nodeID, requestID, votes)
-}
-
 func (t *Transitive) QueryFailed(nodeID ids.NodeID, requestID uint32) error {
 	return t.Chits(nodeID, requestID, nil)
 }
@@ -281,7 +277,7 @@ func (t *Transitive) Gossip() error {
 	t.Ctx.Log.Verbo("gossiping accepted vertex to the network",
 		zap.Stringer("vtxID", vtxID),
 	)
-	t.Sender.SendGossip(vtxID, vtx.Bytes())
+	t.Sender.SendGossip(vtx.Bytes())
 	return nil
 }
 

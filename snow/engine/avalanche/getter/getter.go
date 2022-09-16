@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package getter
@@ -142,7 +142,7 @@ func (gh *getter) GetAncestors(nodeID ids.NodeID, requestID uint32, vtxID ids.ID
 func (gh *getter) Get(nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
 	// If this engine has access to the requested vertex, provide it
 	if vtx, err := gh.storage.GetVtx(vtxID); err == nil {
-		gh.sender.SendPut(nodeID, requestID, vtxID, vtx.Bytes())
+		gh.sender.SendPut(nodeID, requestID, vtx.Bytes())
 	}
 	return nil
 }

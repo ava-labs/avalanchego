@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package vertex
@@ -6,7 +6,7 @@ package vertex
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
@@ -22,7 +22,7 @@ func TestBuildInvalid(t *testing.T) {
 		parentIDs,
 		txs,
 	)
-	assert.Error(t, err, "build should have errored because restrictions were provided in epoch 0")
+	require.Error(t, err, "build should have errored because restrictions were provided in epoch 0")
 }
 
 func TestBuildValid(t *testing.T) {
@@ -36,9 +36,9 @@ func TestBuildValid(t *testing.T) {
 		parentIDs,
 		txs,
 	)
-	assert.NoError(t, err)
-	assert.Equal(t, chainID, vtx.ChainID())
-	assert.Equal(t, height, vtx.Height())
-	assert.Equal(t, parentIDs, vtx.ParentIDs())
-	assert.Equal(t, txs, vtx.Txs())
+	require.NoError(t, err)
+	require.Equal(t, chainID, vtx.ChainID())
+	require.Equal(t, height, vtx.Height())
+	require.Equal(t, parentIDs, vtx.ParentIDs())
+	require.Equal(t, txs, vtx.Txs())
 }
