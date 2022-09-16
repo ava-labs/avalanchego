@@ -207,8 +207,8 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 
 	// we should get an empty unknown since we're not tracking anything
 	unknown, ok := d.GetUnknown(id0)
-	r.Empty(unknown)
 	r.False(ok)
+	r.Empty(unknown)
 
 	// we should get a unknown of [+id0, +id1] since we know about id0 and id1,
 	// but id0 and id1 both don't know anything yet
@@ -217,17 +217,17 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 
 	// check id0's unknown
 	unknown, ok = d.GetUnknown(id0)
+	r.True(ok)
 	r.Contains(unknown, id0)
 	r.Contains(unknown, id1)
 	r.Len(unknown, 2)
-	r.True(ok)
 
 	// check id1's unknown
 	unknown, ok = d.GetUnknown(id1)
+	r.True(ok)
 	r.Contains(unknown, id0)
 	r.Contains(unknown, id1)
 	r.Len(unknown, 2)
-	r.True(ok)
 
 	// id0 now knows about id0, but not id1, so it should see [+id1] in its unknown
 	// id1 still knows nothing, so it should see both
@@ -236,16 +236,16 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 
 	// id0 should have a unknown of [id1], since it knows id0
 	unknown, ok = d.GetUnknown(id0)
+	r.True(ok)
 	r.Contains(unknown, id1)
 	r.Len(unknown, 1)
-	r.True(ok)
 
 	// id1 should have a unknown of [id0, id1], since it knows nothing
 	unknown, ok = d.GetUnknown(id1)
+	r.True(ok)
 	r.Contains(unknown, id0)
 	r.Contains(unknown, id1)
 	r.Len(unknown, 2)
-	r.True(ok)
 
 	// add id2, who knows of id0, id1, and id2
 	// id0 and id1 don't know of id2
@@ -255,35 +255,35 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 
 	// id0 doesn't know about [id1, id2]
 	unknown, ok = d.GetUnknown(id0)
+	r.True(ok)
 	r.Contains(unknown, id1)
 	r.Contains(unknown, id2)
 	r.Len(unknown, 2)
-	r.True(ok)
 
 	// id1 doesn't know about [id0, id1, id2]
 	unknown, ok = d.GetUnknown(id1)
+	r.True(ok)
 	r.Contains(unknown, id0)
 	r.Contains(unknown, id1)
 	r.Contains(unknown, id2)
 	r.Len(unknown, 3)
-	r.True(ok)
 
 	// id2 knows about everyone
 	unknown, ok = d.GetUnknown(id2)
-	r.Empty(unknown)
 	r.True(ok)
+	r.Empty(unknown)
 
 	// stop tracking id1
 	r.True(d.Remove(id1))
 	unknown, ok = d.GetUnknown(id1)
-	r.Nil(unknown)
 	r.False(ok)
+	r.Nil(unknown)
 
 	// id0 doesn't know about [id2], we shouldn't care about id1 anymore
 	unknown, ok = d.GetUnknown(id0)
+	r.True(ok)
 	r.Contains(unknown, id2)
 	r.Len(unknown, 1)
-	r.True(ok)
 
 	// id2 knows everyone
 	unknown, ok = d.GetUnknown(id2)
