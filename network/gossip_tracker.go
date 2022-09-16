@@ -10,7 +10,32 @@ import (
 )
 
 // GossipTracker tracks the peers that we're currently aware of, as well as the
-// peers we've told other peers about.
+// peers we've told other peers about. This data is stored in a bitset to
+// optimize space, where only N (num peers) bits will be used.
+//
+// This is done by recording some state information of both what peers this node
+// is aware of, and what peers we've told each peer about.
+//
+//
+// As an example, say we track three peers:
+// 	local: 		[1, 1, 1] // [p3, p2, p1] we always know about everyone
+// 	knownPeers:	{
+// 		p1: [1, 1, 1] // p1 knows about everyone
+// 		p2: [0, 1, 1] // p2 doesn't know about p3
+// 		p3: [0, 0, 1] // p3 knows only about p3
+// 	}
+//
+// GetUnknown computes the information we haven't sent to a given peer
+// (using the bitwise AND NOT operator). Ex:
+// 	GetUnknown(p1) -  [0, 0, 0]
+// 	GetUnknown(p2) -  [1, 0, 0]
+// 	GetUnknown(p3) -  [1, 1, 0]
+//
+// Using the GossipTracker, we can quickly compute the peers each peer doesn't
+// know about using GetUnknown so that in subsequent PeerList gossip messages
+// we only send information that this peer (most likely) doesn't already know
+// about. The only edge-case where we'll send a redundant set of bytes is if
+// Another remote peer gossips to the same peer we're trying to gossip to first.
 type GossipTracker struct {
 	// a bitset of the peers that we are aware of
 	local ids.BigBitSet
