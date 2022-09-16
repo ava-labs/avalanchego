@@ -27,9 +27,9 @@ func SignatureFromBytes(sigBytes []byte) (*Signature, error) {
 	return sig, nil
 }
 
-func AggregateSignatures(pks []*Signature) (*Signature, bool) {
+func AggregateSignatures(sigs []*Signature) (*Signature, bool) {
 	var agg blst.P2Aggregate
-	if !agg.Aggregate(pks, false) {
+	if !agg.Aggregate(sigs, false) {
 		return nil, false
 	}
 	return agg.ToAffine(), true
