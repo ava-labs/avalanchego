@@ -55,7 +55,7 @@ type peer struct {
 type ChainRouter struct {
 	clock      mockable.Clock
 	log        logging.Logger
-	msgCreator message.Creator
+	msgCreator message.InternalMsgBuilder
 	lock       sync.Mutex
 	chains     map[ids.ID]handler.Handler
 
@@ -89,7 +89,7 @@ type ChainRouter struct {
 func (cr *ChainRouter) Initialize(
 	nodeID ids.NodeID,
 	log logging.Logger,
-	msgCreator message.Creator,
+	msgCreator message.InternalMsgBuilder,
 	timeoutManager timeout.Manager,
 	closeTimeout time.Duration,
 	criticalChains ids.Set,

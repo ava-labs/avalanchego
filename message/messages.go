@@ -446,6 +446,8 @@ type OutboundMessage interface {
 
 	AddRef()
 	DecRef()
+
+	IsProto() bool
 }
 
 type outboundMessage struct {
@@ -499,14 +501,17 @@ func (outMsg *outboundMessageWithPacker) DecRef() {
 	}
 }
 
+func (outMsg *outboundMessageWithPacker) IsProto() bool { return false }
+
 type outboundMessageWithProto struct {
 	outboundMessage
 
 	msg *p2ppb.Message
 }
 
-func (outMsg *outboundMessageWithProto) AddRef() {}
-func (outMsg *outboundMessageWithProto) DecRef() {}
+func (outMsg *outboundMessageWithProto) AddRef()       {}
+func (outMsg *outboundMessageWithProto) DecRef()       {}
+func (outMsg *outboundMessageWithProto) IsProto() bool { return true }
 
 // TODO: add other compression algorithms with extended interface
 type msgBuilderProtobuf struct {

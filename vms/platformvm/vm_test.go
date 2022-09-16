@@ -1908,306 +1908,310 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 // test bootstrapping the node
 func TestBootstrapPartiallyAccepted(t *testing.T) {
-	_, genesisBytes := defaultGenesis()
+	require := require.New(t)
 
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	vmDBManager := baseDBManager.NewPrefixDBManager([]byte("vm"))
-	bootstrappingDB := prefixdb.New([]byte("bootstrapping"), baseDBManager.Current().Database)
+	// TODO: add "useProto=true" once handler supports proto
+	for _, useProto := range []bool{false} {
+		t.Run(fmt.Sprintf("use proto buf message creator %v", useProto), func(tt *testing.T) {
+			_, genesisBytes := defaultGenesis()
 
-	blocked, err := queue.NewWithMissing(bootstrappingDB, "", prometheus.NewRegistry())
-	if err != nil {
-		t.Fatal(err)
+			baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
+			vmDBManager := baseDBManager.NewPrefixDBManager([]byte("vm"))
+			bootstrappingDB := prefixdb.New([]byte("bootstrapping"), baseDBManager.Current().Database)
+
+			blocked, err := queue.NewWithMissing(bootstrappingDB, "", prometheus.NewRegistry())
+			require.NoError(err)
+
+			vm := &VM{Factory: Factory{
+				Config: config.Config{
+					Chains:                 chains.MockManager{},
+					Validators:             validators.NewManager(),
+					UptimeLockedCalculator: uptime.NewLockedCalculator(),
+					MinStakeDuration:       defaultMinStakingDuration,
+					MaxStakeDuration:       defaultMaxStakingDuration,
+					RewardConfig:           defaultRewardConfig,
+					BlueberryTime:          mockable.MaxTime,
+				},
+			}}
+
+			vm.clock.Set(defaultGenesisTime)
+			ctx := defaultContext()
+			consensusCtx := snow.DefaultConsensusContextTest()
+			consensusCtx.Context = ctx
+			consensusCtx.SetState(snow.Initializing)
+			ctx.Lock.Lock()
+
+			msgChan := make(chan common.Message, 1)
+			require.NoError(vm.Initialize(ctx, vmDBManager, genesisBytes, nil, nil, msgChan, nil, nil))
+
+			preferred, err := vm.Builder.Preferred()
+			require.NoError(err)
+
+			preferredID := preferred.ID()
+			preferredHeight := preferred.Height()
+
+			advanceTimeTx, err := vm.txBuilder.NewAdvanceTimeTx(defaultGenesisTime.Add(time.Second))
+			require.NoError(err)
+
+			statelessBlk, err := blocks.NewApricotProposalBlock(
+				preferredID,
+				preferredHeight+1,
+				advanceTimeTx,
+			)
+			require.NoError(err)
+
+			advanceTimeBlk := vm.manager.NewBlock(statelessBlk)
+			require.NoError(err)
+
+			advanceTimeBlkID := advanceTimeBlk.ID()
+			advanceTimeBlkBytes := advanceTimeBlk.Bytes()
+
+			peerID := ids.NodeID{1, 2, 3, 4, 5, 4, 3, 2, 1}
+			vdrs := validators.NewSet()
+			require.NoError(vdrs.AddWeight(peerID, 1))
+			beacons := vdrs
+
+			benchlist := benchlist.NewNoBenchlist()
+			timeoutManager, err := timeout.NewManager(
+				&timer.AdaptiveTimeoutConfig{
+					InitialTimeout:     time.Millisecond,
+					MinimumTimeout:     time.Millisecond,
+					MaximumTimeout:     10 * time.Second,
+					TimeoutHalflife:    5 * time.Minute,
+					TimeoutCoefficient: 1.25,
+				},
+				benchlist,
+				"",
+				prometheus.NewRegistry(),
+			)
+			require.NoError(err)
+
+			go timeoutManager.Dispatch()
+
+			chainRouter := &router.ChainRouter{}
+
+			metrics := prometheus.NewRegistry()
+			mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
+			require.NoError(err)
+			mcProto, err := message.NewCreatorWithProto(metrics, "dummyNamespace", true, 10*time.Second)
+			require.NoError(err)
+
+			err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, timeoutManager, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+			require.NoError(err)
+
+			externalSender := &sender.ExternalSenderTest{TB: t}
+			externalSender.Default(true)
+
+			// Passes messages from the consensus engine to the network
+			sender, err := sender.New(
+				consensusCtx,
+				mc,
+				mcProto,
+				time.Now().Add(time.Hour),
+				externalSender,
+				chainRouter,
+				timeoutManager,
+				sender.GossipConfig{
+					AcceptedFrontierPeerSize:  1,
+					OnAcceptPeerSize:          1,
+					AppGossipValidatorSize:    1,
+					AppGossipNonValidatorSize: 1,
+				},
+			)
+			require.NoError(err)
+
+			var reqID uint32
+			externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
+				var inMsg message.InboundMessage
+				if !useProto {
+					inMsg, err = mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+				} else {
+					inMsg, err = mcProto.Parse(msg.Bytes(), ctx.NodeID, func() {})
+				}
+				require.NoError(err)
+				require.Equal(message.GetAcceptedFrontier, inMsg.Op())
+
+				requestIDIntf, err := inMsg.Get(message.RequestID)
+				require.NoError(err)
+				requestID, ok := requestIDIntf.(uint32)
+				require.True(ok)
+
+				reqID = requestID
+				return nodeIDs
+			}
+
+			isBootstrapped := false
+			subnet := &common.SubnetTest{
+				T:               tt,
+				IsBootstrappedF: func() bool { return isBootstrapped },
+				BootstrappedF:   func(ids.ID) { isBootstrapped = true },
+			}
+
+			peers := tracker.NewPeers()
+			startup := tracker.NewStartup(peers, (beacons.Weight()+1)/2)
+			beacons.RegisterCallbackListener(startup)
+
+			// The engine handles consensus
+			consensus := &smcon.Topological{}
+			commonCfg := common.Config{
+				Ctx:                            consensusCtx,
+				Validators:                     vdrs,
+				Beacons:                        beacons,
+				SampleK:                        beacons.Len(),
+				StartupTracker:                 startup,
+				Alpha:                          (beacons.Weight() + 1) / 2,
+				Sender:                         sender,
+				Subnet:                         subnet,
+				AncestorsMaxContainersSent:     2000,
+				AncestorsMaxContainersReceived: 2000,
+				SharedCfg:                      &common.SharedConfig{},
+			}
+
+			snowGetHandler, err := snowgetter.New(vm, commonCfg)
+			require.NoError(err)
+
+			bootstrapConfig := bootstrap.Config{
+				Config:        commonCfg,
+				AllGetsServer: snowGetHandler,
+				Blocked:       blocked,
+				VM:            vm,
+			}
+
+			// Asynchronously passes messages from the network to the consensus engine
+			cpuTracker, err := timetracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+			require.NoError(err)
+
+			handler, err := handler.New(
+				mc,
+				bootstrapConfig.Ctx,
+				vdrs,
+				msgChan,
+				nil,
+				time.Hour,
+				cpuTracker,
+			)
+			require.NoError(err)
+
+			engineConfig := smeng.Config{
+				Ctx:           bootstrapConfig.Ctx,
+				AllGetsServer: snowGetHandler,
+				VM:            bootstrapConfig.VM,
+				Sender:        bootstrapConfig.Sender,
+				Validators:    vdrs,
+				Params: snowball.Parameters{
+					K:                     1,
+					Alpha:                 1,
+					BetaVirtuous:          20,
+					BetaRogue:             20,
+					ConcurrentRepolls:     1,
+					OptimalProcessing:     1,
+					MaxOutstandingItems:   1,
+					MaxItemProcessingTime: 1,
+				},
+				Consensus: consensus,
+			}
+			engine, err := smeng.New(engineConfig)
+			require.NoError(err)
+
+			handler.SetConsensus(engine)
+
+			bootstrapper, err := bootstrap.New(
+				bootstrapConfig,
+				engine.Start,
+			)
+			require.NoError(err)
+
+			handler.SetBootstrapper(bootstrapper)
+
+			// Allow incoming messages to be routed to the new chain
+			chainRouter.AddChain(handler)
+			ctx.Lock.Unlock()
+
+			handler.Start(false)
+
+			ctx.Lock.Lock()
+			if err := bootstrapper.Connected(peerID, version.CurrentApp); err != nil {
+				t.Fatal(err)
+			}
+
+			externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
+				inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+				require.NoError(err)
+				require.Equal(message.GetAccepted, inMsg.Op())
+
+				requestIDIntf, err := inMsg.Get(message.RequestID)
+				require.NoError(err)
+
+				requestID, ok := requestIDIntf.(uint32)
+				require.True(ok)
+
+				reqID = requestID
+				return nodeIDs
+			}
+
+			frontier := []ids.ID{advanceTimeBlkID}
+			if err := bootstrapper.AcceptedFrontier(peerID, reqID, frontier); err != nil {
+				t.Fatal(err)
+			}
+
+			externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
+				var inMsg message.InboundMessage
+				if !useProto {
+					inMsg, err = mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+				} else {
+					inMsg, err = mcProto.Parse(msg.Bytes(), ctx.NodeID, func() {})
+				}
+				require.NoError(err)
+				require.Equal(message.GetAncestors, inMsg.Op())
+
+				requestIDIntf, err := inMsg.Get(message.RequestID)
+				require.NoError(err)
+				requestID, ok := requestIDIntf.(uint32)
+				require.True(ok)
+
+				reqID = requestID
+
+				containerIDIntf, err := inMsg.Get(message.ContainerID)
+				require.NoError(err)
+				containerIDBytes, ok := containerIDIntf.([]byte)
+				require.True(ok)
+				containerID, err := ids.ToID(containerIDBytes)
+				require.NoError(err)
+				if containerID != advanceTimeBlkID {
+					t.Fatalf("wrong block requested")
+				}
+
+				return nodeIDs
+			}
+
+			require.NoError(bootstrapper.Accepted(peerID, reqID, frontier))
+
+			externalSender.SendF = nil
+			externalSender.CantSend = false
+
+			require.NoError(bootstrapper.Ancestors(peerID, reqID, [][]byte{advanceTimeBlkBytes}))
+
+			preferred, err = vm.Builder.Preferred()
+			require.NoError(err)
+
+			options, err := advanceTimeBlk.(smcon.OracleBlock).Options()
+			require.NoError(err)
+
+			// Because the block needs to have been verified for it's preference to be
+			// set correctly, we manually select the correct preference here.
+			advanceTimePreference := options[0]
+
+			if preferred.ID() != advanceTimePreference.ID() {
+				tt.Fatalf("wrong preference reported after bootstrapping to proposal block\nPreferred: %s\nExpected: %s\nGenesis: %s",
+					preferred.ID(),
+					advanceTimePreference.ID(),
+					preferredID)
+			}
+			ctx.Lock.Unlock()
+
+			chainRouter.Shutdown()
+		})
 	}
-
-	vm := &VM{Factory: Factory{
-		Config: config.Config{
-			Chains:                 chains.MockManager{},
-			Validators:             validators.NewManager(),
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			MinStakeDuration:       defaultMinStakingDuration,
-			MaxStakeDuration:       defaultMaxStakingDuration,
-			RewardConfig:           defaultRewardConfig,
-			BlueberryTime:          mockable.MaxTime,
-		},
-	}}
-
-	vm.clock.Set(defaultGenesisTime)
-	ctx := defaultContext()
-	consensusCtx := snow.DefaultConsensusContextTest()
-	consensusCtx.Context = ctx
-	consensusCtx.SetState(snow.Initializing)
-	ctx.Lock.Lock()
-
-	msgChan := make(chan common.Message, 1)
-	if err := vm.Initialize(ctx, vmDBManager, genesisBytes, nil, nil, msgChan, nil, nil); err != nil {
-		t.Fatal(err)
-	}
-
-	preferred, err := vm.Builder.Preferred()
-	if err != nil {
-		t.Fatal(err)
-	}
-	preferredID := preferred.ID()
-	preferredHeight := preferred.Height()
-
-	advanceTimeTx, err := vm.txBuilder.NewAdvanceTimeTx(defaultGenesisTime.Add(time.Second))
-	if err != nil {
-		t.Fatal(err)
-	}
-	statelessBlk, err := blocks.NewApricotProposalBlock(
-		preferredID,
-		preferredHeight+1,
-		advanceTimeTx,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	advanceTimeBlk := vm.manager.NewBlock(statelessBlk)
-	if err != nil {
-		t.Fatal(err)
-	}
-	advanceTimeBlkID := advanceTimeBlk.ID()
-	advanceTimeBlkBytes := advanceTimeBlk.Bytes()
-
-	peerID := ids.NodeID{1, 2, 3, 4, 5, 4, 3, 2, 1}
-	vdrs := validators.NewSet()
-	if err := vdrs.AddWeight(peerID, 1); err != nil {
-		t.Fatal(err)
-	}
-	beacons := vdrs
-
-	benchlist := benchlist.NewNoBenchlist()
-	timeoutManager, err := timeout.NewManager(
-		&timer.AdaptiveTimeoutConfig{
-			InitialTimeout:     time.Millisecond,
-			MinimumTimeout:     time.Millisecond,
-			MaximumTimeout:     10 * time.Second,
-			TimeoutHalflife:    5 * time.Minute,
-			TimeoutCoefficient: 1.25,
-		},
-		benchlist,
-		"",
-		prometheus.NewRegistry(),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	go timeoutManager.Dispatch()
-
-	chainRouter := &router.ChainRouter{}
-	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
-	require.NoError(t, err)
-	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, timeoutManager, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
-	require.NoError(t, err)
-
-	externalSender := &sender.ExternalSenderTest{TB: t}
-	externalSender.Default(true)
-
-	// Passes messages from the consensus engine to the network
-	sender, err := sender.New(
-		consensusCtx,
-		mc,
-		externalSender,
-		chainRouter,
-		timeoutManager,
-		sender.GossipConfig{
-			AcceptedFrontierPeerSize:  1,
-			OnAcceptPeerSize:          1,
-			AppGossipValidatorSize:    1,
-			AppGossipNonValidatorSize: 1,
-		},
-	)
-	require.NoError(t, err)
-
-	var reqID uint32
-	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
-		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
-		require.NoError(t, err)
-		require.Equal(t, message.GetAcceptedFrontier, inMsg.Op())
-
-		requestIDIntf, err := inMsg.Get(message.RequestID)
-		require.NoError(t, err)
-		requestID, ok := requestIDIntf.(uint32)
-		require.True(t, ok)
-
-		reqID = requestID
-		return nodeIDs
-	}
-
-	isBootstrapped := false
-	subnet := &common.SubnetTest{
-		T:               t,
-		IsBootstrappedF: func() bool { return isBootstrapped },
-		BootstrappedF:   func(ids.ID) { isBootstrapped = true },
-	}
-
-	peers := tracker.NewPeers()
-	startup := tracker.NewStartup(peers, (beacons.Weight()+1)/2)
-	beacons.RegisterCallbackListener(startup)
-
-	// The engine handles consensus
-	consensus := &smcon.Topological{}
-	commonCfg := common.Config{
-		Ctx:                            consensusCtx,
-		Validators:                     vdrs,
-		Beacons:                        beacons,
-		SampleK:                        beacons.Len(),
-		StartupTracker:                 startup,
-		Alpha:                          (beacons.Weight() + 1) / 2,
-		Sender:                         sender,
-		Subnet:                         subnet,
-		AncestorsMaxContainersSent:     2000,
-		AncestorsMaxContainersReceived: 2000,
-		SharedCfg:                      &common.SharedConfig{},
-	}
-
-	snowGetHandler, err := snowgetter.New(vm, commonCfg)
-	require.NoError(t, err)
-
-	bootstrapConfig := bootstrap.Config{
-		Config:        commonCfg,
-		AllGetsServer: snowGetHandler,
-		Blocked:       blocked,
-		VM:            vm,
-	}
-
-	// Asynchronously passes messages from the network to the consensus engine
-	cpuTracker, err := timetracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
-	require.NoError(t, err)
-	handler, err := handler.New(
-		mc,
-		bootstrapConfig.Ctx,
-		vdrs,
-		msgChan,
-		nil,
-		time.Hour,
-		cpuTracker,
-	)
-	require.NoError(t, err)
-
-	engineConfig := smeng.Config{
-		Ctx:           bootstrapConfig.Ctx,
-		AllGetsServer: snowGetHandler,
-		VM:            bootstrapConfig.VM,
-		Sender:        bootstrapConfig.Sender,
-		Validators:    vdrs,
-		Params: snowball.Parameters{
-			K:                     1,
-			Alpha:                 1,
-			BetaVirtuous:          20,
-			BetaRogue:             20,
-			ConcurrentRepolls:     1,
-			OptimalProcessing:     1,
-			MaxOutstandingItems:   1,
-			MaxItemProcessingTime: 1,
-		},
-		Consensus: consensus,
-	}
-	engine, err := smeng.New(engineConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
-	handler.SetConsensus(engine)
-
-	bootstrapper, err := bootstrap.New(
-		bootstrapConfig,
-		engine.Start,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	handler.SetBootstrapper(bootstrapper)
-
-	// Allow incoming messages to be routed to the new chain
-	chainRouter.AddChain(handler)
-	ctx.Lock.Unlock()
-
-	handler.Start(false)
-
-	ctx.Lock.Lock()
-	if err := bootstrapper.Connected(peerID, version.CurrentApp); err != nil {
-		t.Fatal(err)
-	}
-
-	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
-		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
-		require.NoError(t, err)
-		require.Equal(t, message.GetAccepted, inMsg.Op())
-
-		requestIDIntf, err := inMsg.Get(message.RequestID)
-		require.NoError(t, err)
-		requestID, ok := requestIDIntf.(uint32)
-		require.True(t, ok)
-
-		reqID = requestID
-		return nodeIDs
-	}
-
-	frontier := []ids.ID{advanceTimeBlkID}
-	if err := bootstrapper.AcceptedFrontier(peerID, reqID, frontier); err != nil {
-		t.Fatal(err)
-	}
-
-	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
-		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
-		require.NoError(t, err)
-		require.Equal(t, message.GetAncestors, inMsg.Op())
-
-		requestIDIntf, err := inMsg.Get(message.RequestID)
-		require.NoError(t, err)
-		requestID, ok := requestIDIntf.(uint32)
-		require.True(t, ok)
-
-		reqID = requestID
-
-		containerIDIntf, err := inMsg.Get(message.ContainerID)
-		require.NoError(t, err)
-		containerIDBytes, ok := containerIDIntf.([]byte)
-		require.True(t, ok)
-		containerID, err := ids.ToID(containerIDBytes)
-		require.NoError(t, err)
-		if containerID != advanceTimeBlkID {
-			t.Fatalf("wrong block requested")
-		}
-
-		return nodeIDs
-	}
-
-	if err := bootstrapper.Accepted(peerID, reqID, frontier); err != nil {
-		t.Fatal(err)
-	}
-
-	externalSender.SendF = nil
-	externalSender.CantSend = false
-
-	if err := bootstrapper.Ancestors(peerID, reqID, [][]byte{advanceTimeBlkBytes}); err != nil {
-		t.Fatal(err)
-	}
-
-	preferred, err = vm.Builder.Preferred()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	options, err := advanceTimeBlk.(smcon.OracleBlock).Options()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Because the block needs to have been verified for it's preference to be
-	// set correctly, we manually select the correct preference here.
-	advanceTimePreference := options[0]
-
-	if preferred.ID() != advanceTimePreference.ID() {
-		t.Fatalf("wrong preference reported after bootstrapping to proposal block\nPreferred: %s\nExpected: %s\nGenesis: %s",
-			preferred.ID(),
-			advanceTimePreference.ID(),
-			preferredID)
-	}
-	ctx.Lock.Unlock()
-
-	chainRouter.Shutdown()
 }
 
 func TestUnverifiedParent(t *testing.T) {

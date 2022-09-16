@@ -63,7 +63,7 @@ type handler struct {
 	clock mockable.Clock
 
 	ctx *snow.ConsensusContext
-	mc  message.Creator
+	mc  message.InternalMsgBuilder
 	// The validator set that validates this chain
 	validators validators.Set
 	// Receives messages from the VM
@@ -101,7 +101,7 @@ type handler struct {
 // Initialize this consensus handler
 // [engine] must be initialized before initializing this handler
 func New(
-	mc message.Creator,
+	mc message.InternalMsgBuilder,
 	ctx *snow.ConsensusContext,
 	validators validators.Set,
 	msgFromVMChan <-chan common.Message,

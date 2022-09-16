@@ -148,6 +148,7 @@ type ManagerConfig struct {
 	ConsensusAcceptorGroup      snow.AcceptorGroup
 	DBManager                   dbManager.Manager
 	MsgCreator                  message.Creator    // message creator, shared with network
+	MsgCreatorWithProto         message.Creator    // message creator using protobufs, shared with network
 	Router                      router.Router      // Routes incoming messages to the appropriate chain
 	Net                         network.Network    // Sends consensus messages to other validators
 	ConsensusParams             avcon.Parameters   // The consensus parameters (alpha, beta, etc.) for new chains
@@ -568,6 +569,8 @@ func (m *manager) createAvalancheChain(
 	sender, err := sender.New(
 		ctx,
 		m.MsgCreator,
+		m.MsgCreatorWithProto,
+		m.BlueberryTime,
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
@@ -754,6 +757,8 @@ func (m *manager) createSnowmanChain(
 	sender, err := sender.New(
 		ctx,
 		m.MsgCreator,
+		m.MsgCreatorWithProto,
+		m.BlueberryTime,
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,

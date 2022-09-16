@@ -26,7 +26,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	called := make(chan struct{})
 
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
+	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
 	require.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
@@ -111,7 +111,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	err := vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
 	require.NoError(t, err)
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
+	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
 	require.NoError(t, err)
 
 	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
@@ -181,10 +181,8 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
 	require.NoError(t, err)
-	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
-	require.NoError(t, err)
 
+	mc := message.NewInternalBuilder()
 	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
 	require.NoError(t, err)
 	handlerIntf, err := New(
@@ -244,10 +242,8 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
 	require.NoError(t, err)
-	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
-	require.NoError(t, err)
 
+	mc := message.NewInternalBuilder()
 	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
 	require.NoError(t, err)
 	handler, err := New(

@@ -339,10 +339,6 @@ func (p *peer) readMessages() {
 			)
 			return
 		}
-		if isProto {
-			p.Log.Debug("unexpected isProto=true from 'readMsgLen' (not implemented yet)")
-			return
-		}
 
 		// Wait until the throttler says we can proceed to read the message.
 		//
@@ -404,7 +400,12 @@ func (p *peer) readMessages() {
 		)
 
 		// Parse the message
-		msg, err := p.MessageCreator.Parse(msgBytes, p.id, onFinishedHandling)
+		var msg message.InboundMessage
+		if isProto {
+			msg, err = p.MessageCreatorWithProto.Parse(msgBytes, p.id, onFinishedHandling)
+		} else {
+			msg, err = p.MessageCreator.Parse(msgBytes, p.id, onFinishedHandling)
+		}
 		if err != nil {
 			p.Log.Verbo("failed to parse message",
 				zap.Stringer("nodeID", p.id),
@@ -490,7 +491,8 @@ func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 	}
 
 	msgLen := uint32(len(msgBytes))
-	msgLenBytes, err := writeMsgLen(msgLen, false /* true to use protobufs */, constants.DefaultMaxMessageSize)
+	isProto := msg.IsProto()
+	msgLenBytes, err := writeMsgLen(msgLen, isProto, constants.DefaultMaxMessageSize)
 	if err != nil {
 		p.Log.Verbo("error writing message length",
 			zap.Stringer("nodeID", p.id),
@@ -548,8 +550,10 @@ func (p *peer) sendPings() {
 				}
 			}
 
-			p.Config.PingMessage.AddRef()
-			p.Send(p.onClosingCtx, p.Config.PingMessage)
+			pingMessage, err := p.Config.GetMessageCreator().Ping()
+			p.Log.AssertNoError(err)
+
+			p.Send(p.onClosingCtx, pingMessage)
 		case <-p.onClosingCtx.Done():
 			return
 		}
