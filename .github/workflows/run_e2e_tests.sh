@@ -59,17 +59,16 @@ echo "Running Avalanche Byzantine Image: ${avalanchego_byzantine_image}"
 echo "Git Commit ID : ${git_commit_id}"
 echo ""
 
-# TODO: restore
-# # >>>>>>>> avalanche-testing custom parameters <<<<<<<<<<<<<
-# custom_params_json="{
-#     \"isKurtosisCoreDevMode\": false,
-#     \"avalanchegoImage\":\"${avalanche_image}\",
-#     \"avalanchegoByzantineImage\":\"${avalanchego_byzantine_image}\",
-#     \"testBatch\":\"${testBatch}\"
-# }"
-# # >>>>>>>> avalanche-testing custom parameters <<<<<<<<<<<<<
-#
-# bash "$AVALANCHE_PATH/.kurtosis/kurtosis.sh" \
-#     --custom-params "${custom_params_json}" \
-#     ${1+"${@}"} \
-#     "${avalanche_testing_image}"
+# >>>>>>>> avalanche-testing custom parameters <<<<<<<<<<<<<
+custom_params_json="{
+    \"isKurtosisCoreDevMode\": false,
+    \"avalanchegoImage\":\"${avalanche_image}\",
+    \"avalanchegoByzantineImage\":\"${avalanchego_byzantine_image}\",
+    \"testBatch\":\"${testBatch}\"
+}"
+# >>>>>>>> avalanche-testing custom parameters <<<<<<<<<<<<<
+
+bash "$AVALANCHE_PATH/.kurtosis/kurtosis.sh" \
+    --custom-params "${custom_params_json}" \
+    ${1+"${@}"} \
+    "${avalanche_testing_image}"
