@@ -15,8 +15,8 @@ type SecretKey = blst.SecretKey
 var (
 	errInvalidSecretKey = errors.New("invalid secret key")
 
-	// TODO: wtf is this
-	dst = []byte("BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_")
+	// More commonly known as G2ProofOfPossession
+	ciphersuite = []byte("BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_")
 )
 
 func NewSecretKey() (*SecretKey, error) {
@@ -45,6 +45,6 @@ func PublicFromSecretKey(sk *SecretKey) *PublicKey {
 
 func Sign(sk *SecretKey, msg []byte) *Signature {
 	sig := new(Signature)
-	sig.Sign(sk, msg, dst)
+	sig.Sign(sk, msg, ciphersuite)
 	return sig
 }

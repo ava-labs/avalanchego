@@ -36,5 +36,5 @@ func AggregatePublicKeys(pks []*PublicKey) (*PublicKey, bool) {
 }
 
 func Verify(pk *PublicKey, sig *Signature, msg []byte) bool {
-	return sig.Verify(false, pk, false, msg, dst)
+	return sig.Verify(false, pk, false, msg, ciphersuite)
 }
