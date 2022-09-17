@@ -133,7 +133,7 @@ func (tx *AddPermissionlessValidatorTx) SyntacticVerify(ctx *snow.Context) error
 	isPrimaryNetwork := tx.Subnet == constants.PrimaryNetworkID
 	if hasKey != isPrimaryNetwork {
 		return fmt.Errorf(
-			"%w: hasKey=%v ; isPrimaryNetwork=%v",
+			"%w: hasKey=%v != isPrimaryNetwork=%v",
 			errInvalidSigner,
 			hasKey,
 			isPrimaryNetwork,
