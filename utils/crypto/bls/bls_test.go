@@ -59,13 +59,13 @@ func TestAggregation(t *testing.T) {
 
 	// Once the aggregator has the required threshold of signatures, it can
 	// aggregate the signatures.
-	aggregatedSig, ok := AggregateSignatures(filteredSigs)
-	require.True(ok)
+	aggregatedSig, err := AggregateSignatures(filteredSigs)
+	require.NoError(err)
 
 	// For anyone looking for a proof of the aggregated signature's correctness,
 	// they can aggregate the public keys and verify the aggregated signature.
-	aggregatedPK, ok := AggregatePublicKeys(filteredPKs)
-	require.True(ok)
+	aggregatedPK, err := AggregatePublicKeys(filteredPKs)
+	require.NoError(err)
 
 	valid := Verify(aggregatedPK, aggregatedSig, msg)
 	require.True(valid)

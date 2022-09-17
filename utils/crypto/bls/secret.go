@@ -10,14 +10,16 @@ import (
 	blst "github.com/supranational/blst/bindings/go"
 )
 
-type SecretKey = blst.SecretKey
+const SecretKeyLen = blst.BLST_SCALAR_BYTES
 
 var (
-	errInvalidSecretKey = errors.New("invalid secret key")
+	errFailedSecretKeyDeserialize = errors.New("couldn't deserialize secret key")
 
 	// More commonly known as G2ProofOfPossession
 	ciphersuite = []byte("BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_")
 )
+
+type SecretKey = blst.SecretKey
 
 func NewSecretKey() (*SecretKey, error) {
 	var ikm [32]byte
@@ -28,7 +30,7 @@ func NewSecretKey() (*SecretKey, error) {
 func SecretKeyFromBytes(skBytes []byte) (*SecretKey, error) {
 	sk := new(SecretKey).Deserialize(skBytes)
 	if sk == nil {
-		return nil, errInvalidSecretKey
+		return nil, errFailedSecretKeyDeserialize
 	}
 	return sk, nil
 }
@@ -38,13 +40,9 @@ func SecretKeyToBytes(sk *SecretKey) []byte {
 }
 
 func PublicFromSecretKey(sk *SecretKey) *PublicKey {
-	pk := new(PublicKey)
-	pk.From(sk)
-	return pk
+	return new(PublicKey).From(sk)
 }
 
 func Sign(sk *SecretKey, msg []byte) *Signature {
-	sig := new(Signature)
-	sig.Sign(sk, msg, ciphersuite)
-	return sig
+	return new(Signature).Sign(sk, msg, ciphersuite)
 }
