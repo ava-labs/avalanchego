@@ -35,6 +35,17 @@ func TestBLS(t *testing.T) {
 	require.ErrorIs(newBLSSigner.Verify(), errInvalidProofOfPossession)
 }
 
+func TestNewBLSDeterministic(t *testing.T) {
+	require := require.New(t)
+
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+
+	blsSigner0 := NewBLS(sk)
+	blsSigner1 := NewBLS(sk)
+	require.Equal(blsSigner0, blsSigner1)
+}
+
 func newBLS() (*BLS, error) {
 	sk, err := bls.NewSecretKey()
 	if err != nil {
