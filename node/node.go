@@ -57,7 +57,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/ips"
@@ -74,6 +73,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -1210,17 +1210,6 @@ func (n *Node) initDiskTargeter(
 	)
 }
 
-func (n *Node) writeSigningProof() error {
-	publicKey := bls.PublicFromSecretKey(n.Config.StakingSigningKey)
-	publicKeyBytes := bls.PublicKeyToBytes(publicKey)
-	signature := bls.Sign(n.Config.StakingSigningKey, publicKeyBytes)
-	signatureBytes := bls.SignatureToBytes(signature)
-	if err := perms.WriteFile(n.Config.StakingSignerProofPath, signatureBytes, perms.ReadWrite); err != nil {
-		return err
-	}
-	return os.Chmod(n.Config.StakingSignerProofPath, perms.ReadOnly)
-}
-
 // Initialize this node
 func (n *Node) Initialize(
 	config *Config,
@@ -1234,20 +1223,17 @@ func (n *Node) Initialize(
 	n.LogFactory = logFactory
 	n.DoneShuttingDown.Add(1)
 
-	if err = n.writeSigningProof(); err != nil {
-		return fmt.Errorf("problem writing staking signer proof: %w", err)
-	}
-
+	signer := signer.NewBLS(n.Config.StakingSigningKey)
 	n.Log.Info("initializing node",
 		zap.Stringer("version", version.CurrentApp),
 		zap.Stringer("nodeID", n.ID),
 		zap.Binary(
-			"stakingSigner",
-			bls.PublicKeyToBytes(
-				bls.PublicFromSecretKey(
-					n.Config.StakingSigningKey,
-				),
-			),
+			"blsPublicKey",
+			signer.PublicKey[:],
+		),
+		zap.Binary(
+			"blsProofOfPossession",
+			signer.ProofOfPossession[:],
 		),
 		zap.Reflect("config", n.Config),
 	)

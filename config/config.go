@@ -780,12 +780,11 @@ func getStakingSigner(v *viper.Viper) (*bls.SecretKey, error) {
 
 func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, error) {
 	config := node.StakingConfig{
-		EnableStaking:          v.GetBool(StakingEnabledKey),
-		DisabledStakingWeight:  v.GetUint64(StakingDisabledWeightKey),
-		StakingKeyPath:         GetExpandedArg(v, StakingTLSKeyPathKey),
-		StakingCertPath:        GetExpandedArg(v, StakingCertPathKey),
-		StakingSignerPath:      GetExpandedArg(v, StakingSignerKeyPathKey),
-		StakingSignerProofPath: GetExpandedArg(v, StakingSignerProofPathKey),
+		EnableStaking:         v.GetBool(StakingEnabledKey),
+		DisabledStakingWeight: v.GetUint64(StakingDisabledWeightKey),
+		StakingKeyPath:        GetExpandedArg(v, StakingTLSKeyPathKey),
+		StakingCertPath:       GetExpandedArg(v, StakingCertPathKey),
+		StakingSignerPath:     GetExpandedArg(v, StakingSignerKeyPathKey),
 	}
 	if !config.EnableStaking && config.DisabledStakingWeight == 0 {
 		return node.StakingConfig{}, errInvalidStakerWeights

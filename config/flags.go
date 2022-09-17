@@ -34,20 +34,19 @@ const (
 
 var (
 	// [defaultUnexpandedDataDir] will be expanded when reading the flags
-	defaultDataDir                = filepath.Join("$HOME", ".avalanchego")
-	defaultDBDir                  = filepath.Join(defaultUnexpandedDataDir, "db")
-	defaultLogDir                 = filepath.Join(defaultUnexpandedDataDir, "logs")
-	defaultProfileDir             = filepath.Join(defaultUnexpandedDataDir, "profiles")
-	defaultStakingPath            = filepath.Join(defaultUnexpandedDataDir, "staking")
-	defaultStakingTLSKeyPath      = filepath.Join(defaultStakingPath, "staker.key")
-	defaultStakingCertPath        = filepath.Join(defaultStakingPath, "staker.crt")
-	defaultStakingSignerKeyPath   = filepath.Join(defaultStakingPath, "signer.key")
-	defaultStakingSignerProofPath = filepath.Join(defaultStakingPath, "proof.sig")
-	defaultConfigDir              = filepath.Join(defaultUnexpandedDataDir, "configs")
-	defaultChainConfigDir         = filepath.Join(defaultConfigDir, "chains")
-	defaultVMConfigDir            = filepath.Join(defaultConfigDir, "vms")
-	defaultVMAliasFilePath        = filepath.Join(defaultVMConfigDir, "aliases.json")
-	defaultSubnetConfigDir        = filepath.Join(defaultConfigDir, "subnets")
+	defaultDataDir              = filepath.Join("$HOME", ".avalanchego")
+	defaultDBDir                = filepath.Join(defaultUnexpandedDataDir, "db")
+	defaultLogDir               = filepath.Join(defaultUnexpandedDataDir, "logs")
+	defaultProfileDir           = filepath.Join(defaultUnexpandedDataDir, "profiles")
+	defaultStakingPath          = filepath.Join(defaultUnexpandedDataDir, "staking")
+	defaultStakingTLSKeyPath    = filepath.Join(defaultStakingPath, "staker.key")
+	defaultStakingCertPath      = filepath.Join(defaultStakingPath, "staker.crt")
+	defaultStakingSignerKeyPath = filepath.Join(defaultStakingPath, "signer.key")
+	defaultConfigDir            = filepath.Join(defaultUnexpandedDataDir, "configs")
+	defaultChainConfigDir       = filepath.Join(defaultConfigDir, "chains")
+	defaultVMConfigDir          = filepath.Join(defaultConfigDir, "vms")
+	defaultVMAliasFilePath      = filepath.Join(defaultVMConfigDir, "aliases.json")
+	defaultSubnetConfigDir      = filepath.Join(defaultConfigDir, "subnets")
 
 	// Places to look for the build directory
 	defaultBuildDirs = []string{}
@@ -262,7 +261,6 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Bool(StakingEphemeralSignerEnabledKey, false, "If true, the node uses an ephemeral staking signer key")
 	fs.String(StakingSignerKeyPathKey, defaultStakingSignerKeyPath, fmt.Sprintf("Path to the signer private key for staking. Ignored if %s is specified", StakingSignerKeyContentKey))
 	fs.String(StakingSignerKeyContentKey, "", "Specifies base64 encoded signer private key for staking")
-	fs.String(StakingSignerProofPathKey, defaultStakingSignerProofPath, "Path to write the proof of ownership of the signer private key")
 
 	fs.Uint64(StakingDisabledWeightKey, 100, "Weight to provide to each peer when staking is disabled")
 	// Uptime Requirement

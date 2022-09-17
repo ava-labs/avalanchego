@@ -74,7 +74,6 @@ const (
 	StakingEphemeralSignerEnabledKey                   = "staking-ephemeral-signer-enabled"
 	StakingSignerKeyPathKey                            = "staking-signer-key-file"
 	StakingSignerKeyContentKey                         = "staking-signer-key-file-content"
-	StakingSignerProofPathKey                          = "staking-signer-proof-file"
 	StakingDisabledWeightKey                           = "staking-disabled-weight"
 	NetworkInitialTimeoutKey                           = "network-initial-timeout"
 	NetworkMinimumTimeoutKey                           = "network-minimum-timeout"
