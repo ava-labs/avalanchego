@@ -11,12 +11,12 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -26,6 +26,7 @@ var (
 
 	errEmptyNodeID             = errors.New("validator nodeID cannot be empty")
 	errNoStake                 = errors.New("no stake")
+	errInvalidSigner           = errors.New("invalid signer")
 	errMultipleStakedAssets    = errors.New("multiple staked assets")
 	errValidatorWeightMismatch = errors.New("validator weight mismatch")
 )
@@ -38,15 +39,13 @@ type AddPermissionlessValidatorTx struct {
 	Validator validator.Validator `serialize:"true" json:"validator"`
 	// ID of the subnet this validator is validating
 	Subnet ids.ID `serialize:"true" json:"subnetID"`
-	// BLS public key for this validator. If the [Subnet] is not the primary
-	// network, this value should be empty
+	// If the [Subnet] is the primary network, [Signer] is the BLS key for this
+	// validator. If the [Subnet] is not the primary network, this value is the
+	// empty signer
 	// Note: We do not enforce that the BLS key is unique across all validators.
-	//       This means that validators can share a key if they so chose.
+	//       This means that validators can share a key if they so choose.
 	//       However, a NodeID does uniquely map to a BLS key
-	NodeSigner []byte `serialize:"true" json:"nodeSigner"`
-	// BLS signature proving ownership of [NodeSigner]. If the [Subnet] is not
-	// the primary network, this value should be empty
-	NodeAuth []byte `serialize:"true" json:"nodeAuth"`
+	Signer signer.Signer `serialize:"true" json:"signer"`
 	// Where to send staked tokens when done validating
 	StakeOuts []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send validation rewards when done validating
@@ -108,12 +107,6 @@ func (tx *AddPermissionlessValidatorTx) Shares() uint32 {
 	return tx.DelegationShares
 }
 
-var (
-	errFailedToVerifyNodeSigner = errors.New("hm")
-	errUnexpectedNodeSigner     = errors.New("hm")
-	errUnexpectedNodeAuth       = errors.New("hm")
-)
-
 // SyntacticVerify returns nil iff [tx] is valid
 func (tx *AddPermissionlessValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
@@ -129,21 +122,22 @@ func (tx *AddPermissionlessValidatorTx) SyntacticVerify(ctx *snow.Context) error
 		return errTooManyShares
 	}
 
-	if tx.Subnet == constants.PrimaryNetworkID {
-		if err := tx.verifyNodeSigner(); err != nil {
-			return fmt.Errorf("failed to verify node signer: %w", err)
-		}
-	} else {
-		if err := tx.verifyNoNodeSigner(); err != nil {
-			return fmt.Errorf("failed to enforce no node signer: %w", err)
-		}
-	}
-
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
-	if err := verify.All(&tx.Validator, tx.ValidatorRewardsOwner, tx.DelegatorRewardsOwner); err != nil {
-		return fmt.Errorf("failed to verify validator or rewards owners: %w", err)
+	if err := verify.All(&tx.Validator, tx.Signer, tx.ValidatorRewardsOwner, tx.DelegatorRewardsOwner); err != nil {
+		return fmt.Errorf("failed to verify validator, signer, or rewards owners: %w", err)
+	}
+
+	hasKey := tx.Signer.Key() != nil
+	isPrimaryNetwork := tx.Subnet == constants.PrimaryNetworkID
+	if hasKey != isPrimaryNetwork {
+		return fmt.Errorf(
+			"%w: hasKey=%v ; isPrimaryNetwork=%v",
+			errInvalidSigner,
+			hasKey,
+			isPrimaryNetwork,
+		)
 	}
 
 	for _, out := range tx.StakeOuts {
@@ -177,31 +171,6 @@ func (tx *AddPermissionlessValidatorTx) SyntacticVerify(ctx *snow.Context) error
 
 	// cache that this is valid
 	tx.SyntacticallyVerified = true
-	return nil
-}
-
-func (tx *AddPermissionlessValidatorTx) verifyNodeSigner() error {
-	nodePublicKey, err := bls.PublicKeyFromBytes(tx.NodeSigner)
-	if err != nil {
-		return err
-	}
-	nodeSignature, err := bls.SignatureFromBytes(tx.NodeAuth)
-	if err != nil {
-		return err
-	}
-	if !bls.Verify(nodePublicKey, nodeSignature, tx.NodeSigner) {
-		return errFailedToVerifyNodeSigner
-	}
-	return nil
-}
-
-func (tx *AddPermissionlessValidatorTx) verifyNoNodeSigner() error {
-	if len(tx.NodeSigner) > 0 {
-		return errUnexpectedNodeSigner
-	}
-	if len(tx.NodeAuth) > 0 {
-		return errUnexpectedNodeAuth
-	}
 	return nil
 }
 
