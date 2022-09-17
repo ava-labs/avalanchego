@@ -6,8 +6,9 @@ package bls
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 func TestPublicKeyWrongSize(t *testing.T) {
