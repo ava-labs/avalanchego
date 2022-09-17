@@ -17,7 +17,8 @@ var (
 
 type BLS struct {
 	PublicKey [bls.PublicKeyLen]byte `serialize:"true" json:"publicKey"`
-	// BLS signature proving ownership of [PublicKey].
+	// BLS signature proving ownership of [PublicKey]. The signed message is the
+	// [PublicKey].
 	ProofOfPossession [bls.SignatureLen]byte `serialize:"true" json:"proofOfPossession"`
 
 	publicKey *bls.PublicKey
