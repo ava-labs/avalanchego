@@ -36,18 +36,9 @@ func TestBLS(t *testing.T) {
 }
 
 func newBLS() (*BLS, error) {
-	blsSK, err := bls.NewSecretKey()
+	sk, err := bls.NewSecretKey()
 	if err != nil {
 		return nil, err
 	}
-
-	blsPK := bls.PublicFromSecretKey(blsSK)
-	blsPKBytes := bls.PublicKeyToBytes(blsPK)
-	blsSig := bls.Sign(blsSK, blsPKBytes)
-	blsSigBytes := bls.SignatureToBytes(blsSig)
-
-	blsSigner := &BLS{}
-	copy(blsSigner.PublicKey[:], blsPKBytes)
-	copy(blsSigner.ProofOfPossession[:], blsSigBytes)
-	return blsSigner, nil
+	return NewBLS(sk), nil
 }

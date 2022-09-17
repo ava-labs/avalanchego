@@ -57,14 +57,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 	blsSK, err := bls.NewSecretKey()
 	require.NoError(t, err)
 
-	blsPK := bls.PublicFromSecretKey(blsSK)
-	blsPKBytes := bls.PublicKeyToBytes(blsPK)
-	blsSig := bls.Sign(blsSK, blsPKBytes)
-	blsSigBytes := bls.SignatureToBytes(blsSig)
-
-	blsSigner := &signer.BLS{}
-	copy(blsSigner.PublicKey[:], blsPKBytes)
-	copy(blsSigner.ProofOfPossession[:], blsSigBytes)
+	blsSigner := signer.NewBLS(blsSK)
 
 	// A BaseTx that fails syntactic verification.
 	invalidBaseTx := BaseTx{}

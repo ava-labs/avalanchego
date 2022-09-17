@@ -24,6 +24,18 @@ type BLS struct {
 	publicKey *bls.PublicKey
 }
 
+func NewBLS(sk *bls.SecretKey) *BLS {
+	pk := bls.PublicFromSecretKey(sk)
+	pkBytes := bls.PublicKeyToBytes(pk)
+	sig := bls.Sign(sk, pkBytes)
+	sigBytes := bls.SignatureToBytes(sig)
+
+	bls := &BLS{}
+	copy(bls.PublicKey[:], pkBytes)
+	copy(bls.ProofOfPossession[:], sigBytes)
+	return bls
+}
+
 func (b *BLS) Verify() error {
 	publicKey, err := bls.PublicKeyFromBytes(b.PublicKey[:])
 	if err != nil {
