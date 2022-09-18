@@ -971,6 +971,7 @@ func (n *Node) initInfoAPI() error {
 		info.Parameters{
 			Version:                       version.CurrentApp,
 			NodeID:                        n.ID,
+			NodeSigner:                    signer.NewBLS(n.Config.StakingSigningKey),
 			NetworkID:                     n.Config.NetworkID,
 			TxFee:                         n.Config.TxFee,
 			CreateAssetTxFee:              n.Config.CreateAssetTxFee,
@@ -1227,14 +1228,7 @@ func (n *Node) Initialize(
 	n.Log.Info("initializing node",
 		zap.Stringer("version", version.CurrentApp),
 		zap.Stringer("nodeID", n.ID),
-		zap.Binary(
-			"blsPublicKey",
-			signer.PublicKey[:],
-		),
-		zap.Binary(
-			"blsProofOfPossession",
-			signer.ProofOfPossession[:],
-		),
+		zap.Reflect("nodeSigner", signer),
 		zap.Reflect("config", n.Config),
 	)
 
