@@ -4,9 +4,11 @@
 package signer
 
 import (
+	"encoding/json"
 	"errors"
 
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
 var (
@@ -54,3 +56,22 @@ func (b *BLS) Verify() error {
 }
 
 func (b *BLS) Key() *bls.PublicKey { return b.publicKey }
+
+func (b *BLS) MarshalJSON() ([]byte, error) {
+	pk, err := formatting.Encode(formatting.HexNC, b.PublicKey[:])
+	if err != nil {
+		return nil, err
+	}
+	pop, err := formatting.Encode(formatting.HexNC, b.ProofOfPossession[:])
+	if err != nil {
+		return nil, err
+	}
+	type jsonBLS struct {
+		PublicKey         string `json:"publicKey"`
+		ProofOfPossession string `json:"proofOfPossession"`
+	}
+	return json.Marshal(jsonBLS{
+		PublicKey:         pk,
+		ProofOfPossession: pop,
+	})
+}
