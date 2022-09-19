@@ -44,44 +44,44 @@ jobs:
       - run: ./scripts/coverage.sh
         shell: bash
 
-  # e2e_test:
-  #   name: e2e tests
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Git checkout
-  #       uses: actions/checkout@v3
-  #       with:
-  #         fetch-depth: 0
-  #     - name: Set up Go
-  #       uses: actions/setup-go@v3
-  #       with:
-  #         go-version: 1.18
-  #     - name: Use Node.js
-  #       uses: actions/setup-node@v3
-  #       with:
-  #         node-version: "14.x"
-  #     - name: Yarn install
-  #       run: yarn
-  #       working-directory: ./contract-examples
-  #     - name: Run e2e tests
-  #       shell: bash
-  #       run: SKIP_NETWORK_RUNNER_START=true SKIP_NETWORK_RUNNER_SHUTDOWN=true ENABLE_SOLIDITY_TESTS=true scripts/run.sh
+  e2e_test:
+    name: e2e tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.18
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "14.x"
+      - name: Yarn install
+        run: yarn
+        working-directory: ./contract-examples
+      - name: Run e2e tests
+        shell: bash
+        run: SKIP_NETWORK_RUNNER_START=true SKIP_NETWORK_RUNNER_SHUTDOWN=true ENABLE_SOLIDITY_TESTS=true scripts/run.sh
 
-  # simulator_test:
-  #   name: Load testing with simulator
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Git checkout
-  #       uses: actions/checkout@v3
-  #       with:
-  #         fetch-depth: 0
-  #     - name: Set up Go
-  #       uses: actions/setup-go@v3
-  #       with:
-  #         go-version: 1.18
-  #     - name: Run simulator tests
-  #       shell: bash
-  #       run: SKIP_NETWORK_RUNNER_SHUTDOWN=true RUN_SIMULATOR=true scripts/run.sh
+  simulator_test:
+    name: Load testing with simulator
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.18
+      - name: Run simulator tests
+        shell: bash
+        run: SKIP_NETWORK_RUNNER_SHUTDOWN=true RUN_SIMULATOR=true scripts/run.sh
 
   release:
     # needs: [lint_test, simulator_test] # TODO: re-add after flaky tests are fixed (unit_test, e2e_test)
