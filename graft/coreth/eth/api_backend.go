@@ -200,7 +200,7 @@ func (b *EthAPIBackend) BlockByNumberOrHash(ctx context.Context, blockNrOrHash r
 	return nil, errors.New("invalid arguments; neither block nor hash specified")
 }
 
-func (b *EthAPIBackend) BadBlocks() []*types.Block {
+func (b *EthAPIBackend) BadBlocks() ([]*types.Block, []*core.BadBlockReason) {
 	return b.eth.blockchain.BadBlocks()
 }
 

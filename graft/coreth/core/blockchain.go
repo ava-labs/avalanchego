@@ -1287,45 +1287,78 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	return nil
 }
 
-// BadBlocks returns a list of the last 'bad blocks' that the client has seen on the network
-func (bc *BlockChain) BadBlocks() []*types.Block {
-	blocks := make([]*types.Block, 0, bc.badBlocks.Len())
-	for _, hash := range bc.badBlocks.Keys() {
-		if blk, exist := bc.badBlocks.Peek(hash); exist {
-			block := blk.(*types.Block)
-			blocks = append(blocks, block)
-		}
-	}
-	return blocks
+type badBlock struct {
+	block  *types.Block
+	reason *BadBlockReason
 }
 
-// addBadBlock adds a bad block to the bad-block LRU cache
-func (bc *BlockChain) addBadBlock(block *types.Block) {
-	bc.badBlocks.Add(block.Hash(), block)
+type BadBlockReason struct {
+	ChainConfig *params.ChainConfig `json:"chainConfig"`
+	Receipts    types.Receipts      `json:"receipts"`
+	Number      uint64              `json:"number"`
+	Hash        common.Hash         `json:"hash"`
+	Error       error               `json:"error"`
 }
 
-// reportBlock logs a bad block error.
-func (bc *BlockChain) reportBlock(block *types.Block, receipts types.Receipts, err error) {
-	bc.addBadBlock(block)
-	badBlockCounter.Inc(1)
-
+func (b *BadBlockReason) String() string {
 	var receiptString string
-	for i, receipt := range receipts {
+	for i, receipt := range b.Receipts {
 		receiptString += fmt.Sprintf("\t %d: cumulative: %v gas: %v contract: %v status: %v tx: %v logs: %v bloom: %x state: %x\n",
 			i, receipt.CumulativeGasUsed, receipt.GasUsed, receipt.ContractAddress.Hex(),
 			receipt.Status, receipt.TxHash.Hex(), receipt.Logs, receipt.Bloom, receipt.PostState)
 	}
-	log.Debug(fmt.Sprintf(`
-########## BAD BLOCK #########
-Chain config: %v
+	reason := fmt.Sprintf(`
+	########## BAD BLOCK #########
+	Chain config: %v
+	
+	Number: %v
+	Hash: %#x
+	%v
+	
+	Error: %v
+	##############################
+	`, b.ChainConfig, b.Number, b.Hash, receiptString, b.Error)
 
-Number: %v
-Hash: %#x
-%v
+	return reason
+}
 
-Error: %v
-##############################
-`, bc.chainConfig, block.Number(), block.Hash(), receiptString, err))
+// BadBlocks returns a list of the last 'bad blocks' that the client has seen on the network and the BadBlockReason
+// that caused each to be reported as a bad block.
+// BadBlocks ensures that the length of the blocks and the BadBlockReason slice have the same length.
+func (bc *BlockChain) BadBlocks() ([]*types.Block, []*BadBlockReason) {
+	blocks := make([]*types.Block, 0, bc.badBlocks.Len())
+	reasons := make([]*BadBlockReason, 0, bc.badBlocks.Len())
+	for _, hash := range bc.badBlocks.Keys() {
+		if blk, exist := bc.badBlocks.Peek(hash); exist {
+			badBlk := blk.(*badBlock)
+			blocks = append(blocks, badBlk.block)
+			reasons = append(reasons, badBlk.reason)
+		}
+	}
+	return blocks, reasons
+}
+
+// addBadBlock adds a bad block to the bad-block LRU cache
+func (bc *BlockChain) addBadBlock(block *types.Block, reason *BadBlockReason) {
+	bc.badBlocks.Add(block.Hash(), &badBlock{
+		block:  block,
+		reason: reason,
+	})
+}
+
+// reportBlock logs a bad block error.
+func (bc *BlockChain) reportBlock(block *types.Block, receipts types.Receipts, err error) {
+	reason := &BadBlockReason{
+		ChainConfig: bc.chainConfig,
+		Receipts:    receipts,
+		Number:      block.NumberU64(),
+		Hash:        block.Hash(),
+		Error:       err,
+	}
+
+	badBlockCounter.Inc(1)
+	bc.addBadBlock(block, reason)
+	log.Debug(reason.String())
 }
 
 func (bc *BlockChain) RemoveRejectedBlocks(start, end uint64) error {
