@@ -11,10 +11,27 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-func TestPublicKeyWrongSize(t *testing.T) {
+func TestPublicKeyFromBytesWrongSize(t *testing.T) {
 	require := require.New(t)
 
 	pkBytes := utils.RandomBytes(PublicKeyLen + 1)
 	_, err := PublicKeyFromBytes(pkBytes)
 	require.ErrorIs(err, errFailedPublicKeyDecompress)
+}
+
+func TestPublicKeyBytes(t *testing.T) {
+	require := require.New(t)
+
+	sk, err := NewSecretKey()
+	require.NoError(err)
+
+	pk := PublicFromSecretKey(sk)
+	pkBytes := PublicKeyToBytes(pk)
+
+	pk2, err := PublicKeyFromBytes(pkBytes)
+	require.NoError(err)
+	pk2Bytes := PublicKeyToBytes(pk2)
+
+	require.Equal(pk, pk2)
+	require.Equal(pkBytes, pk2Bytes)
 }
