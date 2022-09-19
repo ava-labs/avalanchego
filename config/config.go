@@ -768,6 +768,10 @@ func getStakingSigner(v *viper.Viper) (*bls.SecretKey, error) {
 		return nil, fmt.Errorf("couldn't generate new signing key: %w", err)
 	}
 
+	if err := os.MkdirAll(filepath.Dir(signingKeyPath), perms.ReadWriteExecute); err != nil {
+		return nil, fmt.Errorf("couldn't create path for signing key at %s: %w", signingKeyPath, err)
+	}
+
 	keyBytes := bls.SecretKeyToBytes(key)
 	if err := os.WriteFile(signingKeyPath, keyBytes, perms.ReadWrite); err != nil {
 		return nil, fmt.Errorf("couldn't write new signing key to %s: %w", signingKeyPath, err)
