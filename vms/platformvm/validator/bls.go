@@ -61,6 +61,11 @@ func (b *BLS) Verify() error {
 
 func (b *BLS) Key() *bls.PublicKey { return b.publicKey }
 
+type jsonBLS struct {
+	PublicKey         string `json:"publicKey"`
+	ProofOfPossession string `json:"proofOfPossession"`
+}
+
 func (b *BLS) MarshalJSON() ([]byte, error) {
 	pk, err := formatting.Encode(formatting.HexNC, b.PublicKey[:])
 	if err != nil {
@@ -70,12 +75,35 @@ func (b *BLS) MarshalJSON() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	type jsonBLS struct {
-		PublicKey         string `json:"publicKey"`
-		ProofOfPossession string `json:"proofOfPossession"`
-	}
 	return json.Marshal(jsonBLS{
 		PublicKey:         pk,
 		ProofOfPossession: pop,
 	})
+}
+
+func (b *BLS) UnmarshalJSON(bytes []byte) error {
+	jsonBLS := jsonBLS{}
+	err := json.Unmarshal(bytes, &jsonBLS)
+	if err != nil {
+		return err
+	}
+
+	pkBytes, err := formatting.Decode(formatting.HexNC, jsonBLS.PublicKey)
+	if err != nil {
+		return err
+	}
+	pk, err := bls.PublicKeyFromBytes(pkBytes)
+	if err != nil {
+		return err
+	}
+
+	popBytes, err := formatting.Decode(formatting.HexNC, jsonBLS.ProofOfPossession)
+	if err != nil {
+		return err
+	}
+
+	copy(b.PublicKey[:], pkBytes)
+	copy(b.ProofOfPossession[:], popBytes)
+	b.publicKey = pk
+	return nil
 }
