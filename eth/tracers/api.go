@@ -78,7 +78,7 @@ type Backend interface {
 	HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error)
 	BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error)
 	BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error)
-	BadBlocks() []*types.Block
+	BadBlocks() ([]*types.Block, []*core.BadBlockReason)
 	GetTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error)
 	RPCGasCap() uint64
 	ChainConfig() *params.ChainConfig
@@ -477,8 +477,8 @@ func (api *API) TraceBlock(ctx context.Context, blob hexutil.Bytes, config *Trac
 func (api *API) TraceBadBlock(ctx context.Context, hash common.Hash, config *TraceConfig) ([]*txTraceResult, error) {
 	// Search for the bad block corresponding to [hash].
 	var (
-		badBlocks = api.backend.BadBlocks()
-		block     *types.Block
+		badBlocks, _ = api.backend.BadBlocks()
+		block        *types.Block
 	)
 	for _, badBlock := range badBlocks {
 		if hash == block.Hash() {
