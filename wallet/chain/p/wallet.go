@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
@@ -208,7 +209,7 @@ type Wallet interface {
 	//   the delegation reward will be sent to the validator's [rewardsOwner].
 	IssueAddPermissionlessValidatorTx(
 		vdr *validator.SubnetValidator,
-		signer validator.Signer,
+		signer signer.Signer,
 		assetID ids.ID,
 		validationRewardsOwner *secp256k1fx.OutputOwners,
 		delegationRewardsOwner *secp256k1fx.OutputOwners,
@@ -420,7 +421,7 @@ func (w *wallet) IssueTransformSubnetTx(
 
 func (w *wallet) IssueAddPermissionlessValidatorTx(
 	vdr *validator.SubnetValidator,
-	signer validator.Signer,
+	signer signer.Signer,
 	assetID ids.ID,
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,

@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
@@ -219,7 +220,7 @@ type Builder interface {
 	//   the delegation reward will be sent to the validator's [rewardsOwner].
 	NewAddPermissionlessValidatorTx(
 		vdr *validator.SubnetValidator,
-		signer validator.Signer,
+		signer signer.Signer,
 		assetID ids.ID,
 		validationRewardsOwner *secp256k1fx.OutputOwners,
 		delegationRewardsOwner *secp256k1fx.OutputOwners,
@@ -728,7 +729,7 @@ func (b *builder) NewTransformSubnetTx(
 
 func (b *builder) NewAddPermissionlessValidatorTx(
 	vdr *validator.SubnetValidator,
-	signer validator.Signer,
+	signer signer.Signer,
 	assetID ids.ID,
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
