@@ -7,8 +7,8 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -75,8 +75,8 @@ func RegisterUnsignedTxsTypes(targetCodec codec.Registry) error {
 		targetCodec.RegisterType(&AddPermissionlessValidatorTx{}),
 		targetCodec.RegisterType(&AddPermissionlessDelegatorTx{}),
 
-		targetCodec.RegisterType(&validator.Empty{}),
-		targetCodec.RegisterType(&validator.BLS{}),
+		targetCodec.RegisterType(&signer.Empty{}),
+		targetCodec.RegisterType(&signer.ProofOfPossession{}),
 	)
 	return errs.Err
 }

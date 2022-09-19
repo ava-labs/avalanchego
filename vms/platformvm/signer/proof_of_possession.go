@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package validator
+package signer
 
 import (
 	"encoding/json"
@@ -12,12 +12,12 @@ import (
 )
 
 var (
-	_ Signer = &BLS{}
+	_ Signer = &ProofOfPossession{}
 
 	errInvalidProofOfPossession = errors.New("invalid proof of possession")
 )
 
-type BLS struct {
+type ProofOfPossession struct {
 	PublicKey [bls.PublicKeyLen]byte `serialize:"true" json:"publicKey"`
 	// BLS signature proving ownership of [PublicKey]. The signed message is the
 	// [PublicKey].
@@ -28,62 +28,62 @@ type BLS struct {
 	publicKey *bls.PublicKey
 }
 
-func NewBLS(sk *bls.SecretKey) *BLS {
+func NewProofOfPossession(sk *bls.SecretKey) *ProofOfPossession {
 	pk := bls.PublicFromSecretKey(sk)
 	pkBytes := bls.PublicKeyToBytes(pk)
 	sig := bls.SignProofOfPossession(sk, pkBytes)
 	sigBytes := bls.SignatureToBytes(sig)
 
-	bls := &BLS{
+	pop := &ProofOfPossession{
 		publicKey: pk,
 	}
-	copy(bls.PublicKey[:], pkBytes)
-	copy(bls.ProofOfPossession[:], sigBytes)
-	return bls
+	copy(pop.PublicKey[:], pkBytes)
+	copy(pop.ProofOfPossession[:], sigBytes)
+	return pop
 }
 
-func (b *BLS) Verify() error {
-	publicKey, err := bls.PublicKeyFromBytes(b.PublicKey[:])
+func (p *ProofOfPossession) Verify() error {
+	publicKey, err := bls.PublicKeyFromBytes(p.PublicKey[:])
 	if err != nil {
 		return err
 	}
-	signature, err := bls.SignatureFromBytes(b.ProofOfPossession[:])
+	signature, err := bls.SignatureFromBytes(p.ProofOfPossession[:])
 	if err != nil {
 		return err
 	}
-	if !bls.VerifyProofOfPossession(publicKey, signature, b.PublicKey[:]) {
+	if !bls.VerifyProofOfPossession(publicKey, signature, p.PublicKey[:]) {
 		return errInvalidProofOfPossession
 	}
 
-	b.publicKey = publicKey
+	p.publicKey = publicKey
 	return nil
 }
 
-func (b *BLS) Key() *bls.PublicKey { return b.publicKey }
+func (p *ProofOfPossession) Key() *bls.PublicKey { return p.publicKey }
 
-type jsonBLS struct {
+type jsonProofOfPossession struct {
 	PublicKey         string `json:"publicKey"`
 	ProofOfPossession string `json:"proofOfPossession"`
 }
 
-func (b *BLS) MarshalJSON() ([]byte, error) {
-	pk, err := formatting.Encode(formatting.HexNC, b.PublicKey[:])
+func (p *ProofOfPossession) MarshalJSON() ([]byte, error) {
+	pk, err := formatting.Encode(formatting.HexNC, p.PublicKey[:])
 	if err != nil {
 		return nil, err
 	}
-	pop, err := formatting.Encode(formatting.HexNC, b.ProofOfPossession[:])
+	pop, err := formatting.Encode(formatting.HexNC, p.ProofOfPossession[:])
 	if err != nil {
 		return nil, err
 	}
-	return json.Marshal(jsonBLS{
+	return json.Marshal(jsonProofOfPossession{
 		PublicKey:         pk,
 		ProofOfPossession: pop,
 	})
 }
 
-func (b *BLS) UnmarshalJSON(bytes []byte) error {
-	jsonBLS := jsonBLS{}
-	err := json.Unmarshal(bytes, &jsonBLS)
+func (p *ProofOfPossession) UnmarshalJSON(b []byte) error {
+	jsonBLS := jsonProofOfPossession{}
+	err := json.Unmarshal(b, &jsonBLS)
 	if err != nil {
 		return err
 	}
@@ -102,8 +102,8 @@ func (b *BLS) UnmarshalJSON(bytes []byte) error {
 		return err
 	}
 
-	copy(b.PublicKey[:], pkBytes)
-	copy(b.ProofOfPossession[:], popBytes)
-	b.publicKey = pk
+	copy(p.PublicKey[:], pkBytes)
+	copy(p.ProofOfPossession[:], popBytes)
+	p.publicKey = pk
 	return nil
 }
