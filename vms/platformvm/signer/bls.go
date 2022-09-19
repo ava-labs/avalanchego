@@ -23,6 +23,8 @@ type BLS struct {
 	// [PublicKey].
 	ProofOfPossession [bls.SignatureLen]byte `serialize:"true" json:"proofOfPossession"`
 
+	// publicKey is the parsed version of [PublicKey]. It is populated in
+	// [Verify].
 	publicKey *bls.PublicKey
 }
 
