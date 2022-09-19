@@ -169,7 +169,8 @@ func (g *GossipTracker) UpdateKnown(id ids.NodeID, learned []ids.NodeID) bool {
 }
 
 // GetUnknown returns the peers that we haven't sent to this peer
-func (g *GossipTracker) GetUnknown(id ids.NodeID) (ids.NodeIDSet, bool) {
+// [limit] should be >= 0
+func (g *GossipTracker) GetUnknown(id ids.NodeID, limit int) (ids.NodeIDSet, bool) {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 
@@ -190,8 +191,13 @@ func (g *GossipTracker) GetUnknown(id ids.NodeID) (ids.NodeIDSet, bool) {
 	result := ids.NewNodeIDSet(unknown.Len())
 
 	for i := 0; i < unknown.Len(); i++ {
+		// skip the bits that aren't set
 		if !unknown.Contains(i) {
 			continue
+		}
+		// stop if we exceed the max specified elements to return
+		if result.Len() >= limit {
+			break
 		}
 
 		result.Add(g.indicesToPeers[i])
