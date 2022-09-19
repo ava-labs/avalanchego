@@ -14,25 +14,25 @@ import (
 func TestProofOfPossession(t *testing.T) {
 	require := require.New(t)
 
-	blsSigner, err := newProofOfPossession()
+	blsPOP, err := newProofOfPossession()
 	require.NoError(err)
-	require.NoError(blsSigner.Verify())
-	require.NotNil(blsSigner.Key())
+	require.NoError(blsPOP.Verify())
+	require.NotNil(blsPOP.Key())
 
-	blsSigner, err = newProofOfPossession()
+	blsPOP, err = newProofOfPossession()
 	require.NoError(err)
-	blsSigner.ProofOfPossession = [bls.SignatureLen]byte{}
-	require.Error(blsSigner.Verify())
+	blsPOP.ProofOfPossession = [bls.SignatureLen]byte{}
+	require.Error(blsPOP.Verify())
 
-	blsSigner, err = newProofOfPossession()
+	blsPOP, err = newProofOfPossession()
 	require.NoError(err)
-	blsSigner.PublicKey = [bls.PublicKeyLen]byte{}
-	require.Error(blsSigner.Verify())
+	blsPOP.PublicKey = [bls.PublicKeyLen]byte{}
+	require.Error(blsPOP.Verify())
 
-	newBLSSigner, err := newProofOfPossession()
+	newBLSPOP, err := newProofOfPossession()
 	require.NoError(err)
-	newBLSSigner.ProofOfPossession = blsSigner.ProofOfPossession
-	require.ErrorIs(newBLSSigner.Verify(), errInvalidProofOfPossession)
+	newBLSPOP.ProofOfPossession = blsPOP.ProofOfPossession
+	require.ErrorIs(newBLSPOP.Verify(), errInvalidProofOfPossession)
 }
 
 func TestNewProofOfPossessionDeterministic(t *testing.T) {
@@ -41,9 +41,9 @@ func TestNewProofOfPossessionDeterministic(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 
-	blsSigner0 := NewProofOfPossession(sk)
-	blsSigner1 := NewProofOfPossession(sk)
-	require.Equal(blsSigner0, blsSigner1)
+	blsPOP0 := NewProofOfPossession(sk)
+	blsPOP1 := NewProofOfPossession(sk)
+	require.Equal(blsPOP0, blsPOP1)
 }
 
 func newProofOfPossession() (*ProofOfPossession, error) {
