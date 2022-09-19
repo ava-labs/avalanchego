@@ -41,6 +41,7 @@ source "$AVALANCHE_PATH"/scripts/versions.sh
 source "$AVALANCHE_PATH"/scripts/constants.sh
 
 # Set the CGO flags to build the portable version of BLST
+CGO_CFLAGS_ALLOW="-O -D__BLST_PORTABLE__"
 CGO_CFLAGS="-O -D__BLST_PORTABLE__"
 
 echo "Building AvalancheGo..."
