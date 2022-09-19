@@ -31,7 +31,7 @@ type BLS struct {
 func NewBLS(sk *bls.SecretKey) *BLS {
 	pk := bls.PublicFromSecretKey(sk)
 	pkBytes := bls.PublicKeyToBytes(pk)
-	sig := bls.Sign(sk, pkBytes)
+	sig := bls.SignProofOfPossession(sk, pkBytes)
 	sigBytes := bls.SignatureToBytes(sig)
 
 	bls := &BLS{
@@ -51,7 +51,7 @@ func (b *BLS) Verify() error {
 	if err != nil {
 		return err
 	}
-	if !bls.Verify(publicKey, signature, b.PublicKey[:]) {
+	if !bls.VerifyProofOfPossession(publicKey, signature, b.PublicKey[:]) {
 		return errInvalidProofOfPossession
 	}
 

@@ -23,10 +23,13 @@ type (
 	AggregateSignature = blst.P2Aggregate
 )
 
+// SignatureToBytes returns the compressed big-endian format of the signature.
 func SignatureToBytes(sig *Signature) []byte {
 	return sig.Compress()
 }
 
+// SignatureFromBytes parses the compressed big-endian format of the signature
+// into a signature.
 func SignatureFromBytes(sigBytes []byte) (*Signature, error) {
 	sig := new(Signature).Uncompress(sigBytes)
 	if sig == nil {
@@ -38,6 +41,9 @@ func SignatureFromBytes(sigBytes []byte) (*Signature, error) {
 	return sig, nil
 }
 
+// AggregateSignatures aggregates a non-zero number of signatures into a single
+// aggregated signature.
+// Invariant: all [sigs] have been validated.
 func AggregateSignatures(sigs []*Signature) (*Signature, error) {
 	if len(sigs) == 0 {
 		return nil, errNoSignatures

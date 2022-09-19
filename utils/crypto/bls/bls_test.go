@@ -50,6 +50,26 @@ func TestAggregation(t *testing.T) {
 			expectedValid: true,
 		},
 		{
+			name: "valid single key",
+			setup: func(require *require.Assertions) ([]*PublicKey, []*Signature, []byte) {
+				sk, err := NewSecretKey()
+				require.NoError(err)
+
+				pks := []*PublicKey{
+					PublicFromSecretKey(sk),
+				}
+
+				msg := utils.RandomBytes(1234)
+
+				sigs := []*Signature{
+					Sign(sk, msg),
+				}
+
+				return pks, sigs, msg
+			},
+			expectedValid: true,
+		},
+		{
 			name: "wrong message",
 			setup: func(require *require.Assertions) ([]*PublicKey, []*Signature, []byte) {
 				sk0, err := NewSecretKey()
@@ -387,6 +407,84 @@ func TestVerify(t *testing.T) {
 			pk, sig, msg := tt.setup(require)
 			valid := Verify(pk, sig, msg)
 			require.Equal(tt.expectedValid, valid)
+			valid = VerifyProofOfPossession(pk, sig, msg)
+			require.False(valid)
+		})
+	}
+}
+
+func TestVerifyProofOfPossession(t *testing.T) {
+	type test struct {
+		name          string
+		setup         func(*require.Assertions) (pk *PublicKey, sig *Signature, msg []byte)
+		expectedValid bool
+	}
+
+	tests := []test{
+		{
+			name: "valid",
+			setup: func(require *require.Assertions) (*PublicKey, *Signature, []byte) {
+				sk, err := NewSecretKey()
+				require.NoError(err)
+				pk := PublicFromSecretKey(sk)
+				msg := utils.RandomBytes(1234)
+				sig := SignProofOfPossession(sk, msg)
+				return pk, sig, msg
+			},
+			expectedValid: true,
+		},
+		{
+			name: "wrong message",
+			setup: func(require *require.Assertions) (*PublicKey, *Signature, []byte) {
+				sk, err := NewSecretKey()
+				require.NoError(err)
+				pk := PublicFromSecretKey(sk)
+				msg := utils.RandomBytes(1234)
+				sig := SignProofOfPossession(sk, msg)
+				msg[0]++
+				return pk, sig, msg
+			},
+			expectedValid: false,
+		},
+		{
+			name: "wrong pub key",
+			setup: func(require *require.Assertions) (*PublicKey, *Signature, []byte) {
+				sk, err := NewSecretKey()
+				require.NoError(err)
+				msg := utils.RandomBytes(1234)
+				sig := SignProofOfPossession(sk, msg)
+
+				sk2, err := NewSecretKey()
+				require.NoError(err)
+				pk := PublicFromSecretKey(sk2)
+				return pk, sig, msg
+			},
+			expectedValid: false,
+		},
+		{
+			name: "wrong sig",
+			setup: func(require *require.Assertions) (*PublicKey, *Signature, []byte) {
+				sk, err := NewSecretKey()
+				require.NoError(err)
+				pk := PublicFromSecretKey(sk)
+				msg := utils.RandomBytes(1234)
+
+				msg2 := utils.RandomBytes(1234)
+				sig2 := SignProofOfPossession(sk, msg2)
+				return pk, sig2, msg
+			},
+			expectedValid: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			pk, sig, msg := tt.setup(require)
+			valid := VerifyProofOfPossession(pk, sig, msg)
+			require.Equal(tt.expectedValid, valid)
+			valid = Verify(pk, sig, msg)
+			require.False(valid)
 		})
 	}
 }

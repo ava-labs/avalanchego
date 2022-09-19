@@ -23,10 +23,13 @@ type (
 	AggregatePublicKey = blst.P1Aggregate
 )
 
+// PublicKeyToBytes returns the compressed big-endian format of the public key.
 func PublicKeyToBytes(pk *PublicKey) []byte {
 	return pk.Compress()
 }
 
+// PublicKeyFromBytes parses the compressed big-endian format of the public key
+// into a public key.
 func PublicKeyFromBytes(pkBytes []byte) (*PublicKey, error) {
 	pk := new(PublicKey).Uncompress(pkBytes)
 	if pk == nil {
@@ -38,6 +41,9 @@ func PublicKeyFromBytes(pkBytes []byte) (*PublicKey, error) {
 	return pk, nil
 }
 
+// AggregatePublicKeys aggregates a non-zero number of public keys into a single
+// aggregated public key.
+// Invariant: all [pks] have been validated.
 func AggregatePublicKeys(pks []*PublicKey) (*PublicKey, error) {
 	if len(pks) == 0 {
 		return nil, errNoPublicKeys
@@ -50,6 +56,17 @@ func AggregatePublicKeys(pks []*PublicKey) (*PublicKey, error) {
 	return agg.ToAffine(), nil
 }
 
+// Verify the [sig] of [msg] against the [pk].
+// The [sig] and [pk] may have been an aggregation of other signatures and keys.
+// Invariant: [pk] and [sig] have both been validated.
 func Verify(pk *PublicKey, sig *Signature, msg []byte) bool {
-	return sig.Verify(false, pk, false, msg, ciphersuite)
+	return sig.Verify(false, pk, false, msg, ciphersuiteSignature)
+}
+
+// Verify the possession of the secret pre-image of [sk] by verifying a [sig] of
+// [msg] against the [pk].
+// The [sig] and [pk] may have been an aggregation of other signatures and keys.
+// Invariant: [pk] and [sig] have both been validated.
+func VerifyProofOfPossession(pk *PublicKey, sig *Signature, msg []byte) bool {
+	return sig.Verify(false, pk, false, msg, ciphersuiteProofOfPossession)
 }
