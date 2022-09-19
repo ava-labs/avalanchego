@@ -1139,8 +1139,15 @@ func (n *network) NodeUptime() (UptimeResult, bool) {
 }
 
 func (n *network) runTimers() {
-	gossipPeerlists := time.NewTicker(n.config.PeerListGossipFreq)
-	updateUptimes := time.NewTicker(n.config.UptimeMetricFreq)
+	var (
+		peerListValidatorGossipSize    = int(n.config.PeerListValidatorGossipSize)
+		peerListNonValidatorGossipSize = int(n.config.PeerListNonValidatorGossipSize)
+		peerListPeersGossipSize        = int(n.config.PeerListPeersGossipSize)
+
+		gossipPeerlists = time.NewTicker(n.config.PeerListGossipFreq)
+		updateUptimes   = time.NewTicker(n.config.UptimeMetricFreq)
+	)
+
 	defer func() {
 		gossipPeerlists.Stop()
 		updateUptimes.Stop()
@@ -1151,7 +1158,8 @@ func (n *network) runTimers() {
 		case <-n.onCloseCtx.Done():
 			return
 		case <-gossipPeerlists.C:
-			peers := n.samplePeers(constants.PrimaryNetworkID, false, int(n.config.PeerListValidatorGossipSize), int(n.config.PeerListNonValidatorGossipSize), int(n.config.PeerListPeersGossipSize))
+			peers := n.samplePeers(constants.PrimaryNetworkID, false, peerListValidatorGossipSize, peerListNonValidatorGossipSize, peerListPeersGossipSize)
+
 			for _, p := range peers {
 				validatorIPs, nodeIDs := n.sampleValidatorIPs(p)
 
@@ -1176,7 +1184,12 @@ func (n *network) runTimers() {
 				// Remember what information we sent to this peer, so next time
 				// we sample the validators we only send them validators that
 				// they don't already know about.
-				n.gossipTracker.UpdateKnown(p.ID(), nodeIDs)
+				if !n.gossipTracker.UpdateKnown(p.ID(), nodeIDs) {
+					n.peerConfig.Log.Warn(
+						"failed to update known peers",
+						zap.Stringer("peer", p.ID()),
+					)
+				}
 			}
 
 		case <-updateUptimes.C:
