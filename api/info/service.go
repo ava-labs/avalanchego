@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
-	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 )
 
 var (
@@ -46,7 +46,7 @@ type Info struct {
 type Parameters struct {
 	Version                       *version.Application
 	NodeID                        ids.NodeID
-	NodeSigner                    *signer.BLS
+	NodeSigner                    *validator.BLS
 	NetworkID                     uint32
 	TxFee                         uint64
 	CreateAssetTxFee              uint64
@@ -116,8 +116,8 @@ func (service *Info) GetNodeVersion(_ *http.Request, _ *struct{}, reply *GetNode
 
 // GetNodeIDReply are the results from calling GetNodeID
 type GetNodeIDReply struct {
-	NodeID     ids.NodeID  `json:"nodeID"`
-	NodeSigner *signer.BLS `json:"nodeSigner"`
+	NodeID     ids.NodeID     `json:"nodeID"`
+	NodeSigner *validator.BLS `json:"nodeSigner"`
 }
 
 // GetNodeID returns the node ID of this node

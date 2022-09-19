@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package signer
+package validator
 
 import (
 	"testing"
@@ -9,10 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNone(t *testing.T) {
+func TestEmpty(t *testing.T) {
 	require := require.New(t)
 
-	noSigner := &None{}
+	noSigner := &Empty{}
 	require.NoError(noSigner.Verify())
 	require.Nil(noSigner.Key())
 }

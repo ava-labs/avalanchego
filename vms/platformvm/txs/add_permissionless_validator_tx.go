@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -45,7 +44,7 @@ type AddPermissionlessValidatorTx struct {
 	// Note: We do not enforce that the BLS key is unique across all validators.
 	//       This means that validators can share a key if they so choose.
 	//       However, a NodeID does uniquely map to a BLS key
-	Signer signer.Signer `serialize:"true" json:"signer"`
+	Signer validator.Signer `serialize:"true" json:"signer"`
 	// Where to send staked tokens when done validating
 	StakeOuts []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send validation rewards when done validating

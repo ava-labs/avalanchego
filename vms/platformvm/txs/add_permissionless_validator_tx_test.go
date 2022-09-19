@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -57,7 +56,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 	blsSK, err := bls.NewSecretKey()
 	require.NoError(t, err)
 
-	blsSigner := signer.NewBLS(blsSK)
+	blsSigner := validator.NewBLS(blsSK)
 
 	// A BaseTx that fails syntactic verification.
 	invalidBaseTx := BaseTx{}
@@ -141,7 +140,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 						Wght:   1,
 					},
 					Subnet: ids.GenerateTestID(),
-					Signer: &signer.None{},
+					Signer: &validator.Empty{},
 					StakeOuts: []*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
@@ -171,7 +170,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 						Wght:   1,
 					},
 					Subnet: constants.PrimaryNetworkID,
-					Signer: &signer.None{},
+					Signer: &validator.Empty{},
 					StakeOuts: []*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
@@ -204,7 +203,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 						Wght:   1,
 					},
 					Subnet: ids.GenerateTestID(),
-					Signer: &signer.None{},
+					Signer: &validator.Empty{},
 					StakeOuts: []*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
@@ -232,7 +231,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 						Wght:   1,
 					},
 					Subnet: ids.GenerateTestID(),
-					Signer: &signer.None{},
+					Signer: &validator.Empty{},
 					StakeOuts: []*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
@@ -271,7 +270,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 						Wght:   1,
 					},
 					Subnet: ids.GenerateTestID(),
-					Signer: &signer.None{},
+					Signer: &validator.Empty{},
 					StakeOuts: []*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
@@ -310,7 +309,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 						Wght:   1,
 					},
 					Subnet: ids.GenerateTestID(),
-					Signer: &signer.None{},
+					Signer: &validator.Empty{},
 					StakeOuts: []*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
@@ -349,7 +348,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 						Wght:   2,
 					},
 					Subnet: ids.GenerateTestID(),
-					Signer: &signer.None{},
+					Signer: &validator.Empty{},
 					StakeOuts: []*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
@@ -466,7 +465,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 				Wght:   1,
 			},
 			Subnet: ids.GenerateTestID(),
-			Signer: &signer.None{},
+			Signer: &validator.Empty{},
 			StakeOuts: []*avax.TransferableOutput{
 				{
 					Asset: avax.Asset{
