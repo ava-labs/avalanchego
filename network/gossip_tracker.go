@@ -17,7 +17,7 @@ import (
 // is aware of, and what peers we've told each peer about.
 //
 //
-// As an example, say we track three peers:
+// As an example, say we track three peers (most-significant-bit first):
 // 	local: 		[1, 1, 1] // [p3, p2, p1] we always know about everyone
 // 	knownPeers:	{
 // 		p1: [1, 1, 1] // p1 knows about everyone
@@ -169,7 +169,7 @@ func (g *GossipTracker) UpdateKnown(id ids.NodeID, learned []ids.NodeID) bool {
 }
 
 // GetUnknown returns the peers that we haven't sent to this peer
-func (g *GossipTracker) GetUnknown(id ids.NodeID) (map[ids.NodeID]struct{}, bool) {
+func (g *GossipTracker) GetUnknown(id ids.NodeID) (ids.NodeIDSet, bool) {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 
@@ -187,15 +187,14 @@ func (g *GossipTracker) GetUnknown(id ids.NodeID) (map[ids.NodeID]struct{}, bool
 
 	unknown.Difference(knownPeers)
 
-	result := make(map[ids.NodeID]struct{}, unknown.Len())
+	result := ids.NewNodeIDSet(unknown.Len())
 
 	for i := 0; i < unknown.Len(); i++ {
 		if !unknown.Contains(i) {
 			continue
 		}
 
-		p := g.indicesToPeers[i]
-		result[p] = struct{}{}
+		result.Add(g.indicesToPeers[i])
 	}
 
 	return result, true
