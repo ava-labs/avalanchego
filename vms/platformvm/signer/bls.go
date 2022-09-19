@@ -34,7 +34,9 @@ func NewBLS(sk *bls.SecretKey) *BLS {
 	sig := bls.Sign(sk, pkBytes)
 	sigBytes := bls.SignatureToBytes(sig)
 
-	bls := &BLS{}
+	bls := &BLS{
+		publicKey: pk,
+	}
 	copy(bls.PublicKey[:], pkBytes)
 	copy(bls.ProofOfPossession[:], sigBytes)
 	return bls
