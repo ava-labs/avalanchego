@@ -40,5 +40,9 @@ source "$AVALANCHE_PATH"/scripts/versions.sh
 # Load the constants
 source "$AVALANCHE_PATH"/scripts/constants.sh
 
+# Set the CGO flags to build the portable version of BLST
+CGO_CFLAGS_ALLOW="-O -D__BLST_PORTABLE__"
+CGO_CFLAGS="-O -D__BLST_PORTABLE__"
+
 echo "Building AvalancheGo..."
 go build -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit $static_ld_flags" -o "$avalanchego_path" "$AVALANCHE_PATH/main/"*.go
