@@ -7,13 +7,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	gomath "math"
 	"net"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	gomath "math"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -630,7 +629,7 @@ func (n *network) TracksSubnet(nodeID ids.NodeID, subnetID ids.ID) bool {
 
 // validatorsToGossipFor returns a subset of the peers that [p] doesn't know
 // about yet.
-func (n *network) validatorsToGossipFor(p peer.Peer) ([]ips.ClaimedIPPort, []ids.NodeID) {
+func (n *network) validatorsToGossipFor(p peer.Peer) ([]ips.ClaimedIPPort, ids.NodeIDSet) {
 	unknown, ok := n.gossipTracker.GetUnknown(p.ID(), int(n.config.PeerListNumValidatorIPs))
 	if !ok {
 		n.peerConfig.Log.Warn(
@@ -643,7 +642,7 @@ func (n *network) validatorsToGossipFor(p peer.Peer) ([]ips.ClaimedIPPort, []ids
 	// these slices have lengths of zero because it's not guaranteed that
 	// an unknown peer is actually connected yet (could still be connecting).
 	sampledIPs := make([]ips.ClaimedIPPort, 0, len(unknown))
-	nodeIDs := make([]ids.NodeID, 0, len(unknown))
+	nodeIDs := ids.NewNodeIDSet(len(unknown))
 
 	// Only select validators that we haven't already sent this peer
 	for peerID := range unknown {
@@ -672,7 +671,7 @@ func (n *network) validatorsToGossipFor(p peer.Peer) ([]ips.ClaimedIPPort, []ids
 				Signature: peerIP.Signature,
 			},
 		)
-		nodeIDs = append(nodeIDs, peer.ID())
+		nodeIDs.Add(peerID)
 	}
 
 	return sampledIPs, nodeIDs
