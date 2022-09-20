@@ -192,6 +192,8 @@ func (g *GossipTracker) GetUnknown(id ids.NodeID, limit int) (ids.NodeIDSet, boo
 
 	unknown.Difference(knownPeers)
 
+	// We only need to allocate memory for however many 1's are in the unknown
+	// bitset (hamming weight).
 	result := ids.NewNodeIDSet(unknown.HammingWeight())
 
 	for i := 0; i < unknown.Len(); i++ {
