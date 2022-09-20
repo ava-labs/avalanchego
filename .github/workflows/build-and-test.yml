@@ -17,9 +17,13 @@ jobs:
         with:
           go-version: '1.18'
           check-latest: true
+      - name: Install mingw 10.2.0
+        if: matrix.os == 'windows-latest'
+        shell: powershell
+        run: Choco-Install -PackageName mingw -ArgumentList "--version", "10.2.0", "--allow-downgrade"
       - name: build_test
         env:
-          CGO_CFLAGS_ALLOW: '-g -O2 -D__BLST_PORTABLE__'
-          CGO_CFLAGS: '-g -O2 -D__BLST_PORTABLE__'
+          CGO_CFLAGS_ALLOW: '-O -D__BLST_PORTABLE__'
+          CGO_CFLAGS: '-O -D__BLST_PORTABLE__'
         shell: bash
         run: .github/workflows/build_and_test.sh
