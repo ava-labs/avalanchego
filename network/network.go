@@ -629,7 +629,7 @@ func (n *network) TracksSubnet(nodeID ids.NodeID, subnetID ids.ID) bool {
 
 // validatorsToGossipFor returns a subset of the peers that [p] doesn't know
 // about yet.
-func (n *network) validatorsToGossipFor(p peer.Peer) ([]ips.ClaimedIPPort, ids.NodeIDSet) {
+func (n *network) validatorsToGossipFor(p peer.Peer) ([]ips.ClaimedIPPort, []ids.NodeID) {
 	unknown, ok := n.gossipTracker.GetUnknown(p.ID(), int(n.config.PeerListNumValidatorIPs))
 	if !ok {
 		n.peerConfig.Log.Warn(
@@ -642,10 +642,10 @@ func (n *network) validatorsToGossipFor(p peer.Peer) ([]ips.ClaimedIPPort, ids.N
 	// these slices have lengths of zero because it's not guaranteed that
 	// an unknown peer is actually connected yet (could still be connecting).
 	sampledIPs := make([]ips.ClaimedIPPort, 0, len(unknown))
-	nodeIDs := ids.NewNodeIDSet(len(unknown))
+	nodeIDs := make([]ids.NodeID, 0, len(unknown))
 
 	// Only select validators that we haven't already sent this peer
-	for peerID := range unknown {
+	for _, peerID := range unknown {
 		// peers should validate the primary network
 		if !n.config.Validators.Contains(constants.PrimaryNetworkID, p.ID()) {
 			continue
@@ -671,7 +671,7 @@ func (n *network) validatorsToGossipFor(p peer.Peer) ([]ips.ClaimedIPPort, ids.N
 				Signature: peerIP.Signature,
 			},
 		)
-		nodeIDs.Add(peerID)
+		nodeIDs = append(nodeIDs, peerID)
 	}
 
 	return sampledIPs, nodeIDs
