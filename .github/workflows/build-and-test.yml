@@ -10,17 +10,13 @@ jobs:
     strategy:
       matrix:
         # os: [macos-11, macos-12, ubuntu-20.04, ubuntu-22.04, windows-latest, [self-hosted, linux, ARM64, bionic], [self-hosted, linux, ARM64, jammy]]
-        os: [macos-11, macos-12, ubuntu-20.04, ubuntu-22.04, windows-latest, [self-hosted, linux, ARM64, bionic]]
+        os: [macos-11, macos-12, ubuntu-20.04, ubuntu-22.04, [self-hosted, linux, ARM64, bionic]]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
         with:
           go-version: '1.18'
           check-latest: true
-      - name: Install mingw 10.2.0
-        if: matrix.os == 'windows-latest'
-        shell: powershell
-        run: Choco-Install -PackageName mingw -ArgumentList "--version", "10.2.0", "--allow-downgrade"
       - name: build_test
         env:
           CGO_CFLAGS_ALLOW: '-O -D__BLST_PORTABLE__'
