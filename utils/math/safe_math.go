@@ -34,6 +34,10 @@ func Min[T constraints.Ordered](min T, nums ...T) T {
 // Add64 returns:
 // 1) a + b
 // 2) If there is overflow, an error
+//
+// Note that we don't have a generic Add function because checking for
+// an overflow requires knowing the max size of a given type, which we
+// don't know if we're adding generic types.
 func Add64(a, b uint64) (uint64, error) {
 	if a > math.MaxUint64-b {
 		return 0, errOverflow
