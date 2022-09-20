@@ -414,3 +414,49 @@ func Test_BigBitSet_String(t *testing.T) {
 		})
 	}
 }
+
+func Test_BigBitSet_HammingWeight(t *testing.T) {
+	tests := []struct {
+		name     string
+		bitset   []int
+		expected int
+	}{
+		{
+			name:     "empty",
+			bitset:   []int{},
+			expected: 0,
+		},
+		{
+			name:     "populated - all ones",
+			bitset:   []int{5, 4, 3, 2, 1, 0},
+			expected: 6,
+		},
+		{
+			name:     "populated - trailing zeroes",
+			bitset:   []int{5, 4, 3},
+			expected: 3,
+		},
+		{
+			name:     "populated - interwoven 1",
+			bitset:   []int{4, 2, 0},
+			expected: 3,
+		},
+		{
+			name:     "populated - interwoven 2",
+			bitset:   []int{3, 1},
+			expected: 2,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			r := require.New(t)
+			b := NewBigBitSet()
+
+			for _, bit := range test.bitset {
+				b.Add(bit)
+			}
+
+			r.Equal(test.expected, b.HammingWeight())
+		})
+	}
+}

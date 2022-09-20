@@ -6,6 +6,7 @@ package ids
 import (
 	"fmt"
 	"math/big"
+	"math/bits"
 )
 
 // BigBitSet is a bit-set backed by a big.Int
@@ -78,6 +79,17 @@ func (b BigBitSet) Contains(i int) bool {
 // Len returns the bit length of this bitset
 func (b BigBitSet) Len() int {
 	return b.bits.BitLen()
+}
+
+// HammingWeight returns the amount of 1's in the bitset
+func (b BigBitSet) HammingWeight() int {
+	result := 0
+
+	for _, word := range b.bits.Bits() {
+		result += bits.OnesCount(uint(word))
+	}
+
+	return result
 }
 
 // String returns the hex representation of this bitset
