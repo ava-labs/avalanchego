@@ -171,7 +171,7 @@ func TestGossipTracker_Remove(t *testing.T) {
 func TestGossipTracker_UpdateKnown(t *testing.T) {
 	type args struct {
 		id    ids.NodeID
-		known ids.NodeIDSet
+		known []ids.NodeID
 	}
 
 	tests := []struct {
@@ -184,35 +184,35 @@ func TestGossipTracker_UpdateKnown(t *testing.T) {
 			// We should not be able to update an untracked peer
 			name:     "update untracked peer - empty",
 			add:      []ids.NodeID{},
-			args:     args{id0, ids.NodeIDSet{}},
+			args:     args{id0, []ids.NodeID{}},
 			expected: false,
 		},
 		{
 			// We should not be able to update an untracked peer
 			name:     "update untracked peer - populated",
 			add:      []ids.NodeID{id1, id2},
-			args:     args{id0, ids.NodeIDSet{}},
+			args:     args{id0, []ids.NodeID{}},
 			expected: false,
 		},
 		{
 			// We shouldn't be able to know about peers that aren't tracked
 			name:     "update untracked peer - unknown peer",
 			add:      []ids.NodeID{},
-			args:     args{id0, ids.NewNodeIDSetOf(id1)},
+			args:     args{id0, []ids.NodeID{id1}},
 			expected: false,
 		},
 		{
 			// We shouldn't be able to know about peers that aren't tracked
 			name:     "update tracked peer - unknown peer",
 			add:      []ids.NodeID{id0},
-			args:     args{id0, ids.NewNodeIDSetOf(id1)},
+			args:     args{id0, []ids.NodeID{id1}},
 			expected: false,
 		},
 		{
 			// We should be able to update a tracked peer
 			name:     "update tracked peer",
 			add:      []ids.NodeID{id0, id1, id2},
-			args:     args{id0, ids.NodeIDSet{}},
+			args:     args{id0, []ids.NodeID{}},
 			expected: true,
 		},
 	}
@@ -381,7 +381,7 @@ func TestGossipTracker_GetUnknown_E2E(t *testing.T) {
 
 	// id0 now knows about id0, but not id1, so it should see [id1] in its unknown
 	// id1 still knows nothing, so it should see both
-	p0 := ids.NewNodeIDSetOf(id0)
+	p0 := []ids.NodeID{id0}
 	r.True(d.UpdateKnown(id0, p0))
 
 	// id0 should have a unknown of [id1], since it knows id0
@@ -399,7 +399,7 @@ func TestGossipTracker_GetUnknown_E2E(t *testing.T) {
 
 	// add id2, who knows of id0, id1, and id2
 	// id0 and id1 don't know of id2
-	p2 := ids.NewNodeIDSetOf(id0, id1, id2)
+	p2 := []ids.NodeID{id0, id1, id2}
 	d.Add(id2)
 	r.True(d.UpdateKnown(id2, p2))
 
