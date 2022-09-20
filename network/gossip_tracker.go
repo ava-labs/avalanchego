@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 // GossipTracker tracks the peers that we're currently aware of, as well as the
@@ -194,7 +195,7 @@ func (g *GossipTracker) GetUnknown(id ids.NodeID, limit int) (ids.NodeIDSet, boo
 
 	// We only need to allocate memory for however many 1's are in the unknown
 	// bitset (hamming weight).
-	result := ids.NewNodeIDSet(unknown.HammingWeight())
+	result := ids.NewNodeIDSet(safemath.Min(unknown.HammingWeight(), limit))
 
 	for i := 0; i < unknown.Len(); i++ {
 		// skip the bits that aren't set
