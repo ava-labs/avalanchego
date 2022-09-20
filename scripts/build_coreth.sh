@@ -26,10 +26,6 @@ else
     exit 1
 fi
 
-# Set the CGO flags to build the portable version of BLST
-CGO_CFLAGS_ALLOW="-O -D__BLST_PORTABLE__"
-CGO_CFLAGS="-O -D__BLST_PORTABLE__"
-
 # Build Coreth
 echo "Building Coreth @ ${coreth_version} ..."
 cd "$coreth_path"
