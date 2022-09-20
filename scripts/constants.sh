@@ -36,3 +36,7 @@ then
     which $CC > /dev/null || ( echo $CC must be available for static compilation && exit 1 )
     static_ld_flags=' -extldflags "-static" -linkmode external '
 fi
+
+# Set the CGO flags to test the portable version of BLST
+CGO_CFLAGS_ALLOW="-O -D__BLST_PORTABLE__"
+CGO_CFLAGS="-O -D__BLST_PORTABLE__"
