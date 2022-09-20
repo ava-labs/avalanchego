@@ -362,8 +362,8 @@ github.com/onsi/gomega v1.10.1/go.mod h1:iN09h71vgCQne3DLsj+A5owkum+a2tYe+TOCB1y
 github.com/onsi/gomega v1.17.0/go.mod h1:HnhC7FXeEQY45zxNK3PPoIUhzk/80Xly9PcubAlGdZY=
 github.com/onsi/gomega v1.19.0 h1:4ieX6qQjPP/BfC3mpsAtIGGlxTWPeA3Inl/7DtXw1tw=
 github.com/onsi/gomega v1.19.0/go.mod h1:LY+I3pBVzYsTBU1AnDwOSxaYi9WoWiqgwooUqq9yPro=
-github.com/patrick-ogrady/blst v0.0.0-20220920041001-63f91909ae90 h1:zkTvHQbOuiM6b6KFq0sfJH+Fd7VIwp2lV7lWxqFvxaw=
-github.com/patrick-ogrady/blst v0.0.0-20220920041001-63f91909ae90/go.mod h1:P1+8np1ZV2hYmUFcbGlPwVRsodpL0+pUmd6/CBvMOMc=
+github.com/patrick-ogrady/blst v0.0.0-20220920042317-d9f28fe7449f h1:7tyeJjZjonC2sAywj2Udvq93V7rb2A7SfGl+QHwTfCU=
+github.com/patrick-ogrady/blst v0.0.0-20220920042317-d9f28fe7449f/go.mod h1:P1+8np1ZV2hYmUFcbGlPwVRsodpL0+pUmd6/CBvMOMc=
 github.com/pelletier/go-toml v1.9.5 h1:4yBQzkHv+7BHq2PQUZF3Mx0IYxG7LsP222s7Agd3ve8=
 github.com/pelletier/go-toml v1.9.5/go.mod h1:u1nR/EPcESfeI/szUZKdtJ0xRNbUoANCkoOuaOx1Y+c=
 github.com/pelletier/go-toml/v2 v2.0.1 h1:8e3L2cCQzLFi2CR4g7vGFuFxX7Jl1kKX8gW+iV0GUKU=

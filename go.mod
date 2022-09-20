@@ -34,7 +34,7 @@ require (
 	github.com/nbutton23/zxcvbn-go v0.0.0-20180912185939-ae427f1e4c1d
 	github.com/onsi/ginkgo/v2 v2.1.4
 	github.com/onsi/gomega v1.19.0
-	github.com/patrick-ogrady/blst v0.0.0-20220920041001-63f91909ae90
+	github.com/patrick-ogrady/blst v0.0.0-20220920042317-d9f28fe7449f
 	github.com/prometheus/client_golang v1.12.2
 	github.com/prometheus/client_model v0.2.0
 	github.com/rs/cors v1.7.0
