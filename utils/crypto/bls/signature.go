@@ -6,7 +6,7 @@ package bls
 import (
 	"errors"
 
-	blst "github.com/patrick-ogrady/blst/bindings/go"
+	blst "github.com/supranational/blst/bindings/go"
 )
 
 const SignatureLen = blst.BLST_P2_COMPRESS_BYTES

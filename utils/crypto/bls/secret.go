@@ -7,7 +7,7 @@ import (
 	"crypto/rand"
 	"errors"
 
-	blst "github.com/patrick-ogrady/blst/bindings/go"
+	blst "github.com/supranational/blst/bindings/go"
 )
 
 const SecretKeyLen = blst.BLST_SCALAR_BYTES
