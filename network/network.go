@@ -651,7 +651,7 @@ func (n *network) validatorsToGossipFor(p peer.Peer) ([]ips.ClaimedIPPort, []ids
 		peer, ok := n.connectedPeers.GetByID(peerID)
 		n.peersLock.RUnlock()
 		if !ok {
-			n.peerConfig.Log.Warn(
+			n.peerConfig.Log.Debug(
 				"unable to find unknown peer in connected peers",
 				zap.Stringer("peer", peerID),
 			)
