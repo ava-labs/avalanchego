@@ -81,7 +81,7 @@ waitloop:
 					// from the VM to avoid deadlock
 					s.log.Debug("dropping message from VM",
 						zap.String("reason", "channel to engine is full"),
-						zap.Stringer("message", msg),
+						zap.Stringer("messageString", msg),
 					)
 				}
 			case buildBlockTime, ok := <-s.newBuildBlockTime:

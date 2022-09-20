@@ -396,7 +396,7 @@ func (p *peer) readMessages() {
 
 		p.Log.Verbo("parsing message",
 			zap.Stringer("nodeID", p.id),
-			zap.Binary("message", msgBytes),
+			zap.Binary("messageBytes", msgBytes),
 		)
 
 		// Parse the message
@@ -409,7 +409,7 @@ func (p *peer) readMessages() {
 		if err != nil {
 			p.Log.Verbo("failed to parse message",
 				zap.Stringer("nodeID", p.id),
-				zap.Binary("message", msgBytes),
+				zap.Binary("messageBytes", msgBytes),
 				zap.Error(err),
 			)
 
@@ -478,7 +478,7 @@ func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 	msgBytes := msg.Bytes()
 	p.Log.Verbo("sending message",
 		zap.Stringer("nodeID", p.id),
-		zap.Binary("message", msgBytes),
+		zap.Binary("messageBytes", msgBytes),
 	)
 
 	if err := p.conn.SetWriteDeadline(p.nextTimeout()); err != nil {

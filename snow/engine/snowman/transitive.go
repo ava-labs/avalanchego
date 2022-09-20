@@ -323,7 +323,7 @@ func (t *Transitive) Shutdown() error {
 func (t *Transitive) Notify(msg common.Message) error {
 	if msg != common.PendingTxs {
 		t.Ctx.Log.Warn("received an unexpected message from the VM",
-			zap.Stringer("message", msg),
+			zap.Stringer("messageString", msg),
 		)
 		return nil
 	}
