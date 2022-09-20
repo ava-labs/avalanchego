@@ -171,6 +171,10 @@ func (g *GossipTracker) UpdateKnown(id ids.NodeID, learned []ids.NodeID) bool {
 // GetUnknown returns the peers that we haven't sent to this peer
 // [limit] should be >= 0
 func (g *GossipTracker) GetUnknown(id ids.NodeID, limit int) (ids.NodeIDSet, bool) {
+	if limit <= 0 {
+		return ids.NodeIDSet{}, false
+	}
+
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 
