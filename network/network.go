@@ -122,6 +122,7 @@ type network struct {
 
 	sendFailRateCalculator math.Averager
 
+	// Tracks what peers know about which peers
 	gossipTracker *GossipTracker
 	peersLock     sync.RWMutex
 	// trackedIPs contains the set of IPs that we are currently attempting to
@@ -462,9 +463,6 @@ func (n *network) Disconnected(nodeID ids.NodeID) {
 		n.disconnectedFromConnected(peer, nodeID)
 	}
 
-	n.peersLock.Lock()
-	defer n.peersLock.Unlock()
-
 	n.gossipTracker.Remove(nodeID)
 }
 
@@ -485,7 +483,7 @@ func (n *network) Version() (message.OutboundMessage, error) {
 }
 
 func (n *network) Peers(p peer.Peer) (message.OutboundMessage, error) {
-	peers, _ := n.sampleValidatorIPs(p)
+	peers, _ := n.validatorsToGossipFor(p)
 	return n.peerConfig.MessageCreator.PeerList(peers, true)
 }
 
@@ -630,10 +628,11 @@ func (n *network) TracksSubnet(nodeID ids.NodeID, subnetID ids.ID) bool {
 	return subnetID == constants.PrimaryNetworkID || trackedSubnets.Contains(subnetID)
 }
 
-func (n *network) sampleValidatorIPs(p peer.Peer) ([]ips.ClaimedIPPort, []ids.NodeID) {
-	n.peersLock.RLock()
-	unknown, ok := n.gossipTracker.GetUnknown(p.ID())
-	if !ok { // this should never happen
+// validatorsToGossipFor returns a subset of the peers that [p] doesn't know
+// about yet.
+func (n *network) validatorsToGossipFor(p peer.Peer) ([]ips.ClaimedIPPort, []ids.NodeID) {
+	unknown, ok := n.gossipTracker.GetUnknown(p.ID(), int(n.config.PeerListNumValidatorIPs))
+	if !ok {
 		n.peerConfig.Log.Warn(
 			"unable to find peers to gossip to",
 			zap.Stringer("peerID", p.ID()),
@@ -641,28 +640,37 @@ func (n *network) sampleValidatorIPs(p peer.Peer) ([]ips.ClaimedIPPort, []ids.No
 		return nil, nil
 	}
 
-	peers := n.connectedPeers.Sample(
-		int(n.config.PeerListNumValidatorIPs),
-		func(p peer.Peer) bool {
-			// Only sample validators that we haven't already sent this peer
-			_, ok := unknown[p.ID()]
-			return n.config.Validators.Contains(constants.PrimaryNetworkID, p.ID()) && ok
-		},
-	)
-	n.peersLock.RUnlock()
+	sampledIPs := make([]ips.ClaimedIPPort, len(unknown))
+	nodeIDs := make([]ids.NodeID, len(unknown))
 
-	sampledIPs := make([]ips.ClaimedIPPort, len(peers))
-	nodeIDs := make([]ids.NodeID, len(peers))
-	for i, peer := range peers {
-		peerIP := peer.IP()
-		sampledIPs[i] = ips.ClaimedIPPort{
-			Cert:      peer.Cert(),
-			IPPort:    peerIP.IP.IP,
-			Timestamp: peerIP.IP.Timestamp,
-			Signature: peerIP.Signature,
+	// Only select validators that we haven't already sent this peer
+	for peerID := range unknown {
+		n.peersLock.RLock()
+		peer, ok := n.connectedPeers.GetByID(peerID)
+		n.peersLock.RUnlock()
+		if !ok {
+			n.peerConfig.Log.Warn(
+				"unable to find unknown peer in connected peers",
+				zap.Stringer("peer", peerID),
+			)
+			continue
 		}
-		nodeIDs[i] = peer.ID()
+		if !n.config.Validators.Contains(constants.PrimaryNetworkID, p.ID()) {
+			continue
+		}
+
+		peerIP := peer.IP()
+		sampledIPs = append(sampledIPs,
+			ips.ClaimedIPPort{
+				Cert:      peer.Cert(),
+				IPPort:    peerIP.IP.IP,
+				Timestamp: peerIP.IP.Timestamp,
+				Signature: peerIP.Signature,
+			},
+		)
+		nodeIDs = append(nodeIDs, peer.ID())
 	}
+
 	return sampledIPs, nodeIDs
 }
 
@@ -1027,6 +1035,9 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
 	n.peerConfig.Log.Verbo("starting handshake",
 		zap.Stringer("nodeID", nodeID),
 	)
+	// We add the peer to our gossip tracker before the handshake starts because
+	// a PeerList message (which depends on the gossip tracker's info) needs to
+	// be sent as part of the handshake.
 	n.gossipTracker.Add(nodeID)
 
 	// peer.Start requires there is only ever one peer instance running with the
@@ -1158,10 +1169,16 @@ func (n *network) runTimers() {
 		case <-n.onCloseCtx.Done():
 			return
 		case <-gossipPeerlists.C:
-			peers := n.samplePeers(constants.PrimaryNetworkID, false, peerListValidatorGossipSize, peerListNonValidatorGossipSize, peerListPeersGossipSize)
+			peers := n.samplePeers(
+				constants.PrimaryNetworkID,
+				false,
+				peerListValidatorGossipSize,
+				peerListNonValidatorGossipSize,
+				peerListPeersGossipSize,
+			)
 
 			for _, p := range peers {
-				validatorIPs, nodeIDs := n.sampleValidatorIPs(p)
+				validatorIPs, nodeIDs := n.validatorsToGossipFor(p)
 
 				if len(validatorIPs) == 0 {
 					n.peerConfig.Log.Debug(
@@ -1170,7 +1187,7 @@ func (n *network) runTimers() {
 					)
 					continue
 				}
-				msg, err := n.peerConfig.MessageCreator.PeerList(validatorIPs, true)
+				msg, err := n.peerConfig.MessageCreator.PeerList(validatorIPs, false)
 				if err != nil {
 					n.peerConfig.Log.Error(
 						"failed to gossip",

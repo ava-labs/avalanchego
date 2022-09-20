@@ -22,9 +22,7 @@ func NewNodeIDSet(size int) NodeIDSet {
 // NewNodeIDSetOf returns a NodeIDSet given a supplied list of NodeIDs.
 func NewNodeIDSetOf(nodes ...NodeID) NodeIDSet {
 	result := NewNodeIDSet(len(nodes))
-	for _, node := range nodes {
-		result.Add(node)
-	}
+	result.Add(nodes...)
 
 	return result
 }
