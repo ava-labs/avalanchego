@@ -640,8 +640,10 @@ func (n *network) validatorsToGossipFor(p peer.Peer) ([]ips.ClaimedIPPort, []ids
 		return nil, nil
 	}
 
-	sampledIPs := make([]ips.ClaimedIPPort, len(unknown))
-	nodeIDs := make([]ids.NodeID, len(unknown))
+	// these slices have a length of zero because it's not guaranteed that
+	// an unknown peer is actually connected yet (could still be connecting).
+	sampledIPs := make([]ips.ClaimedIPPort, 0, len(unknown))
+	nodeIDs := make([]ids.NodeID, 0, len(unknown))
 
 	// Only select validators that we haven't already sent this peer
 	for peerID := range unknown {
