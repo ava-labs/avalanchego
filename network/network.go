@@ -647,6 +647,7 @@ func (n *network) validatorsToGossipFor(p peer.Peer) ([]ips.ClaimedIPPort, []ids
 
 	// Only select validators that we haven't already sent this peer
 	for peerID := range unknown {
+		// peers should validate the primary network
 		if !n.config.Validators.Contains(constants.PrimaryNetworkID, p.ID()) {
 			continue
 		}
