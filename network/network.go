@@ -647,6 +647,10 @@ func (n *network) validatorsToGossipFor(p peer.Peer) ([]ips.ClaimedIPPort, []ids
 
 	// Only select validators that we haven't already sent this peer
 	for peerID := range unknown {
+		if !n.config.Validators.Contains(constants.PrimaryNetworkID, p.ID()) {
+			continue
+		}
+
 		n.peersLock.RLock()
 		peer, ok := n.connectedPeers.GetByID(peerID)
 		n.peersLock.RUnlock()
@@ -655,9 +659,6 @@ func (n *network) validatorsToGossipFor(p peer.Peer) ([]ips.ClaimedIPPort, []ids
 				"unable to find unknown peer in connected peers",
 				zap.Stringer("peer", peerID),
 			)
-			continue
-		}
-		if !n.config.Validators.Contains(constants.PrimaryNetworkID, p.ID()) {
 			continue
 		}
 
