@@ -84,7 +84,6 @@ type InboundMsgBuilder interface {
 		chainID ids.ID,
 		requestID uint32,
 		deadline time.Duration,
-		containerID ids.ID,
 		container []byte,
 		nodeID ids.NodeID,
 	) InboundMessage
@@ -101,14 +100,6 @@ type InboundMsgBuilder interface {
 		chainID ids.ID,
 		requestID uint32,
 		containerIDs []ids.ID,
-		nodeID ids.NodeID,
-	) InboundMessage
-
-	InboundChitsV2(
-		chainID ids.ID,
-		requestID uint32,
-		containerIDs []ids.ID,
-		containerID ids.ID,
 		nodeID ids.NodeID,
 	) InboundMessage
 
@@ -138,7 +129,6 @@ type InboundMsgBuilder interface {
 	InboundPut(
 		chainID ids.ID,
 		requestID uint32,
-		containerID ids.ID,
 		container []byte,
 		nodeID ids.NodeID,
 	) InboundMessage // used in UTs only
@@ -336,7 +326,6 @@ func (b *inMsgBuilderWithPacker) InboundPushQuery(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
-	containerID ids.ID,
 	container []byte,
 	nodeID ids.NodeID,
 ) InboundMessage {
@@ -351,7 +340,6 @@ func (b *inMsgBuilderWithPacker) InboundPushQuery(
 			ChainID:        chainID[:],
 			RequestID:      requestID,
 			Deadline:       uint64(deadline),
-			ContainerID:    containerID[:],
 			ContainerBytes: container,
 		},
 	}
@@ -397,33 +385,6 @@ func (b *inMsgBuilderWithPacker) InboundChits(
 			ChainID:      chainID[:],
 			RequestID:    requestID,
 			ContainerIDs: containerIDBytes,
-		},
-	}
-}
-
-// The first "containerIDs" is always populated for backward compatibilities with old "Chits"
-// Only after the DAG is linearized, the second "containerID" will be populated
-// with the new snowman chain containers.
-func (b *inMsgBuilderWithPacker) InboundChitsV2(
-	chainID ids.ID,
-	requestID uint32,
-	containerIDs []ids.ID,
-	containerID ids.ID,
-	nodeID ids.NodeID,
-) InboundMessage {
-	containerIDBytes := make([][]byte, len(containerIDs))
-	encodeIDs(containerIDs, containerIDBytes)
-
-	return &inboundMessageWithPacker{
-		inboundMessage: inboundMessage{
-			op:     ChitsV2,
-			nodeID: nodeID,
-		},
-		fields: map[Field]interface{}{
-			ChainID:      chainID[:],
-			RequestID:    requestID,
-			ContainerIDs: containerIDBytes,
-			ContainerID:  containerID[:],
 		},
 	}
 }
@@ -496,7 +457,6 @@ func (b *inMsgBuilderWithPacker) InboundGet(
 func (b *inMsgBuilderWithPacker) InboundPut(
 	chainID ids.ID,
 	requestID uint32,
-	containerID ids.ID,
 	container []byte,
 	nodeID ids.NodeID,
 ) InboundMessage { // used in UTs only
@@ -508,7 +468,6 @@ func (b *inMsgBuilderWithPacker) InboundPut(
 		fields: map[Field]interface{}{
 			ChainID:        chainID[:],
 			RequestID:      requestID,
-			ContainerID:    containerID[:],
 			ContainerBytes: container,
 		},
 	}

@@ -251,17 +251,6 @@ func TestCodecPackParseGzip(t *testing.T) {
 				ContainerIDs: [][]byte{id[:]},
 			},
 		},
-		{
-			inboundMessage: inboundMessage{
-				op: ChitsV2,
-			},
-			fields: map[Field]interface{}{
-				ChainID:      id[:],
-				RequestID:    uint32(1337),
-				ContainerIDs: [][]byte{id[:]},
-				ContainerID:  id[:],
-			},
-		},
 	}
 	for _, m := range msgs {
 		packedIntf, err := c.Pack(m.op, m.fields, m.op.Compressible(), false)
