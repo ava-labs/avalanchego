@@ -192,7 +192,7 @@ func (g *GossipTracker) GetUnknown(id ids.NodeID, limit int) (ids.NodeIDSet, boo
 
 	unknown.Difference(knownPeers)
 
-	result := ids.NewNodeIDSet(unknown.Len())
+	result := ids.NewNodeIDSet(unknown.HammingWeight())
 
 	for i := 0; i < unknown.Len(); i++ {
 		// skip the bits that aren't set
