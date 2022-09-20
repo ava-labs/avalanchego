@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 // GossipTracker tracks the peers that we're currently aware of, as well as the
@@ -171,9 +170,9 @@ func (g *GossipTracker) UpdateKnown(id ids.NodeID, learned []ids.NodeID) bool {
 
 // GetUnknown returns the peers that we haven't sent to this peer
 // [limit] should be >= 0
-func (g *GossipTracker) GetUnknown(id ids.NodeID, limit int) (ids.NodeIDSet, bool) {
+func (g *GossipTracker) GetUnknown(id ids.NodeID, limit int) ([]ids.NodeID, bool) {
 	if limit <= 0 {
-		return ids.NodeIDSet{}, false
+		return nil, false
 	}
 
 	g.lock.RLock()
@@ -193,9 +192,7 @@ func (g *GossipTracker) GetUnknown(id ids.NodeID, limit int) (ids.NodeIDSet, boo
 
 	unknown.Difference(knownPeers)
 
-	// We only need to allocate memory for however many 1's are in the unknown
-	// bitset (hamming weight).
-	result := ids.NewNodeIDSet(safemath.Min(unknown.HammingWeight(), limit))
+	result := make([]ids.NodeID, 0, limit)
 
 	for i := 0; i < unknown.Len(); i++ {
 		// skip the bits that aren't set
@@ -203,11 +200,11 @@ func (g *GossipTracker) GetUnknown(id ids.NodeID, limit int) (ids.NodeIDSet, boo
 			continue
 		}
 		// stop if we exceed the max specified elements to return
-		if result.Len() >= limit {
+		if len(result) >= limit {
 			break
 		}
 
-		result.Add(g.indicesToPeers[i])
+		result = append(result, g.indicesToPeers[i])
 	}
 
 	return result, true

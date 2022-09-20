@@ -4,7 +4,6 @@
 package network
 
 import (
-	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -13,9 +12,10 @@ import (
 )
 
 var (
-	id0 = ids.GenerateTestNodeID()
-	id1 = ids.GenerateTestNodeID()
-	id2 = ids.GenerateTestNodeID()
+	id0   = ids.GenerateTestNodeID()
+	id1   = ids.GenerateTestNodeID()
+	id2   = ids.GenerateTestNodeID()
+	limit = 100
 )
 
 func TestGossipTracker_Contains(t *testing.T) {
@@ -207,7 +207,7 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 	d := NewGossipTracker()
 
 	// we should get an empty unknown since we're not tracking anything
-	unknown, ok := d.GetUnknown(id0, math.MaxInt)
+	unknown, ok := d.GetUnknown(id0, limit)
 	r.False(ok)
 	r.Empty(unknown)
 
@@ -217,14 +217,14 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 	d.Add(id1)
 
 	// check id0's unknown
-	unknown, ok = d.GetUnknown(id0, math.MaxInt)
+	unknown, ok = d.GetUnknown(id0, limit)
 	r.True(ok)
 	r.Contains(unknown, id0)
 	r.Contains(unknown, id1)
 	r.Len(unknown, 2)
 
 	// check id1's unknown
-	unknown, ok = d.GetUnknown(id1, math.MaxInt)
+	unknown, ok = d.GetUnknown(id1, limit)
 	r.True(ok)
 	r.Contains(unknown, id0)
 	r.Contains(unknown, id1)
@@ -236,13 +236,13 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 	r.True(d.UpdateKnown(id0, p0))
 
 	// id0 should have a unknown of [id1], since it knows id0
-	unknown, ok = d.GetUnknown(id0, math.MaxInt)
+	unknown, ok = d.GetUnknown(id0, limit)
 	r.True(ok)
 	r.Contains(unknown, id1)
 	r.Len(unknown, 1)
 
 	// id1 should have a unknown of [id0, id1], since it knows nothing
-	unknown, ok = d.GetUnknown(id1, math.MaxInt)
+	unknown, ok = d.GetUnknown(id1, limit)
 	r.True(ok)
 	r.Contains(unknown, id0)
 	r.Contains(unknown, id1)
@@ -255,14 +255,14 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 	r.True(d.UpdateKnown(id2, p2))
 
 	// id0 doesn't know about [id1, id2]
-	unknown, ok = d.GetUnknown(id0, math.MaxInt)
+	unknown, ok = d.GetUnknown(id0, limit)
 	r.True(ok)
 	r.Contains(unknown, id1)
 	r.Contains(unknown, id2)
 	r.Len(unknown, 2)
 
 	// id1 doesn't know about [id0, id1, id2]
-	unknown, ok = d.GetUnknown(id1, math.MaxInt)
+	unknown, ok = d.GetUnknown(id1, limit)
 	r.True(ok)
 	r.Contains(unknown, id0)
 	r.Contains(unknown, id1)
@@ -270,29 +270,29 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 	r.Len(unknown, 3)
 
 	// id2 knows about everyone
-	unknown, ok = d.GetUnknown(id2, math.MaxInt)
+	unknown, ok = d.GetUnknown(id2, limit)
 	r.True(ok)
 	r.Empty(unknown)
 
 	// stop tracking id1
 	r.True(d.Remove(id1))
-	unknown, ok = d.GetUnknown(id1, math.MaxInt)
+	unknown, ok = d.GetUnknown(id1, limit)
 	r.False(ok)
 	r.Nil(unknown)
 
 	// id0 doesn't know about [id2], we shouldn't care about id1 anymore
-	unknown, ok = d.GetUnknown(id0, math.MaxInt)
+	unknown, ok = d.GetUnknown(id0, limit)
 	r.True(ok)
 	r.Contains(unknown, id2)
 	r.Len(unknown, 1)
 
 	// id2 knows everyone
-	unknown, ok = d.GetUnknown(id2, math.MaxInt)
+	unknown, ok = d.GetUnknown(id2, limit)
 	r.Empty(unknown)
 	r.True(ok)
 }
 
-// Tests that the limit parameter limts the amount of data returned from
+// Tests that the limit parameter limits the amount of data returned from
 // GetUnknown
 func TestGossipTracker_GetUnknown_Limit(t *testing.T) {
 	r := require.New(t)
@@ -302,8 +302,25 @@ func TestGossipTracker_GetUnknown_Limit(t *testing.T) {
 	r.True(d.Add(id1))
 	r.True(d.Add(id2))
 
-	// id2 doesn't know about anybody, but we should only see one result
+	// id2 doesn't know about anybody, but we should filter out anything
+	// over the limit
 	unknown, ok := d.GetUnknown(id2, 1)
 	r.True(ok)
 	r.Len(unknown, 1)
+
+	unknown, ok = d.GetUnknown(id2, 2)
+	r.True(ok)
+	r.Len(unknown, 2)
+
+	// nothing should be filtered here, since we're asking for exactly as many
+	// as are unknown by id2
+	unknown, ok = d.GetUnknown(id2, 3)
+	r.True(ok)
+	r.Len(unknown, 3)
+
+	// sanity-check that asking for more than what is unknown still returns
+	// the same info
+	unknown, ok = d.GetUnknown(id2, 4)
+	r.True(ok)
+	r.Len(unknown, 3)
 }
