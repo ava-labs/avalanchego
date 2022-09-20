@@ -191,7 +191,7 @@ func (g *gossipTracker) Remove(id ids.NodeID) bool {
 // 1. [id] and [learned] should only contain nodeIDs that have been tracked with
 // 	  Add(). Trying to add nodeIDs that aren't tracked yet will result in a noop
 // 	  and this will return [false].
-func (g *GossipTracker) UpdateKnown(id ids.NodeID, learned ids.NodeIDSet) bool {
+func (g *GossipTracker) UpdateKnown(id ids.NodeID, learned []ids.NodeID) bool {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
