@@ -423,27 +423,27 @@ func Test_BigBitSet_HammingWeight(t *testing.T) {
 	}{
 		{
 			name:     "empty",
-			bitset:   []int{},
+			bitset:   []int{}, // []
 			expected: 0,
 		},
 		{
 			name:     "populated - all ones",
-			bitset:   []int{5, 4, 3, 2, 1, 0},
+			bitset:   []int{5, 4, 3, 2, 1, 0}, // [1, 1, 1, 1, 1, 1]
 			expected: 6,
 		},
 		{
 			name:     "populated - trailing zeroes",
-			bitset:   []int{5, 4, 3},
+			bitset:   []int{5, 4, 3}, // [1, 1, 1, 0, 0, 0]
 			expected: 3,
 		},
 		{
 			name:     "populated - interwoven 1",
-			bitset:   []int{4, 2, 0},
+			bitset:   []int{4, 2, 0}, // [1, 0, 1, 0, 1]
 			expected: 3,
 		},
 		{
 			name:     "populated - interwoven 2",
-			bitset:   []int{3, 1},
+			bitset:   []int{3, 1}, // [1, 0, 1, 0]
 			expected: 2,
 		},
 	}
