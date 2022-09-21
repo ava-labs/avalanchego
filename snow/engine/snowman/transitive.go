@@ -653,6 +653,13 @@ func (t *Transitive) sendRequest(nodeID ids.NodeID, blkID ids.ID) {
 		return
 	}
 
+	if blkID == ids.Empty {
+		t.Ctx.Log.Warn("attempting to fetch the empty ID",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stack("stacktrace"),
+		)
+	}
+
 	t.RequestID++
 	t.blkReqs.Add(nodeID, t.RequestID, blkID)
 	t.Ctx.Log.Verbo("sending Get request",
