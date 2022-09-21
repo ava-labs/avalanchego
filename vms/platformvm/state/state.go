@@ -218,12 +218,10 @@ type state struct {
 	currentHeight uint64
 
 	addedBlocks map[ids.ID]stateBlk // map of blockID -> Block
-	// cache of blocks we don't know.
-	// Invariant: If a key is in [unknownBlockCache], it isn't in [blockCache],
-	// and vice versa.
-	unknownBlockCache cache.Cacher[ids.ID, struct{}]
-	blockCache        cache.Cacher[ids.ID, stateBlk] // cache of blockID -> Block
-	blockDB           database.Database
+	// cache of blockID -> Block
+	// If the block isn't known, nil is cached.
+	blockCache cache.Cacher[ids.ID, *stateBlk]
+	blockDB    database.Database
 
 	uptimes        map[ids.NodeID]*uptimeAndReward // nodeID -> uptimes
 	updatedUptimes map[ids.NodeID]struct{}         // nodeID -> nil
@@ -378,18 +376,10 @@ func new(
 	metricsReg prometheus.Registerer,
 	rewards reward.Calculator,
 ) (*state, error) {
-	blockCache, err := metercacher.New[ids.ID, stateBlk](
+	blockCache, err := metercacher.New[ids.ID, *stateBlk](
 		"block_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, stateBlk]{Size: blockCacheSize},
-	)
-	if err != nil {
-		return nil, err
-	}
-	unknownBlockCache, err := metercacher.New[ids.ID, struct{}](
-		"unknown_block_cache",
-		metricsReg,
-		&cache.LRU[ids.ID, struct{}]{Size: blockCacheSize},
+		&cache.LRU[ids.ID, *stateBlk]{Size: blockCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -501,10 +491,9 @@ func new(
 		rewards: rewards,
 		baseDB:  baseDB,
 
-		addedBlocks:       make(map[ids.ID]stateBlk),
-		blockCache:        blockCache,
-		unknownBlockCache: unknownBlockCache,
-		blockDB:           prefixdb.New(blockPrefix, baseDB),
+		addedBlocks: make(map[ids.ID]stateBlk),
+		blockCache:  blockCache,
+		blockDB:     prefixdb.New(blockPrefix, baseDB),
 
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
@@ -1430,8 +1419,7 @@ func (s *state) writeBlocks() error {
 		}
 
 		delete(s.addedBlocks, blkID)
-		s.blockCache.Put(blkID, stBlk)
-		s.unknownBlockCache.Evict(blkID)
+		s.blockCache.Put(blkID, &stBlk)
 		if err = s.blockDB.Put(blkID[:], blockBytes); err != nil {
 			return fmt.Errorf("failed to write block %s: %w", blkID, err)
 		}
@@ -1444,15 +1432,15 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status,
 		return blk.Blk, blk.Status, nil
 	}
 	if blkState, ok := s.blockCache.Get(blockID); ok {
+		if blkState == nil {
+			return nil, choices.Processing, database.ErrNotFound
+		}
 		return blkState.Blk, blkState.Status, nil
-	}
-	if _, ok := s.unknownBlockCache.Get(blockID); ok {
-		return nil, choices.Processing, database.ErrNotFound // status does not matter here
 	}
 
 	blkBytes, err := s.blockDB.Get(blockID[:])
 	if err == database.ErrNotFound {
-		s.unknownBlockCache.Put(blockID, struct{}{})
+		s.blockCache.Put(blockID, nil)
 		return nil, choices.Processing, database.ErrNotFound // status does not matter here
 	} else if err != nil {
 		return nil, choices.Processing, err // status does not matter here
@@ -1469,8 +1457,7 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status,
 		return nil, choices.Processing, err
 	}
 
-	s.blockCache.Put(blockID, blkState)
-	s.unknownBlockCache.Evict(blockID)
+	s.blockCache.Put(blockID, &blkState)
 	return blkState.Blk, blkState.Status, nil
 }
 
