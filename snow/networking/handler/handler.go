@@ -501,7 +501,14 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 	case message.GetAncestors:
 		reqID := msg.Get(message.RequestID).(uint32)
 		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			h.ctx.Log.Error("malformed message",
+				zap.Stringer("messageOp", op),
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint32("requestID", reqID),
+				zap.Error(err),
+			)
+		}
 		return engine.GetAncestors(nodeID, reqID, containerID)
 
 	case message.GetAncestorsFailed:
@@ -516,7 +523,14 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 	case message.Get:
 		reqID := msg.Get(message.RequestID).(uint32)
 		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			h.ctx.Log.Error("malformed message",
+				zap.Stringer("messageOp", op),
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint32("requestID", reqID),
+				zap.Error(err),
+			)
+		}
 		return engine.Get(nodeID, reqID, containerID)
 
 	case message.GetFailed:
@@ -536,7 +550,14 @@ func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 	case message.PullQuery:
 		reqID := msg.Get(message.RequestID).(uint32)
 		containerID, err := ids.ToID(msg.Get(message.ContainerID).([]byte))
-		h.ctx.Log.AssertNoError(err)
+		if err != nil {
+			h.ctx.Log.Error("malformed message",
+				zap.Stringer("messageOp", op),
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint32("requestID", reqID),
+				zap.Error(err),
+			)
+		}
 		return engine.PullQuery(nodeID, reqID, containerID)
 
 	case message.Chits:
