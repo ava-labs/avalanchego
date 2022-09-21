@@ -105,6 +105,21 @@ func newTransitive(config Config) (*Transitive, error) {
 		),
 	}
 
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			config.Ctx.Lock.Lock()
+			config.Ctx.Log.Debug(
+				"current state",
+				zap.Stringer("polls", t.polls),
+				zap.Stringer("requests", &t.blkReqs),
+				zap.Stringer("blocker", &t.blocked),
+			)
+			config.Ctx.Lock.Unlock()
+		}
+	}()
+
 	return t, t.metrics.Initialize("", config.Ctx.Registerer)
 }
 
