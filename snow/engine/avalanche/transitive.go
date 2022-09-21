@@ -114,7 +114,23 @@ func (t *Transitive) Put(nodeID ids.NodeID, requestID uint32, vtxBytes []byte) e
 		return t.GetFailed(nodeID, requestID)
 	}
 
-	if t.Consensus.VertexIssued(vtx) || t.pending.Contains(vtx.ID()) {
+	actualVtxID := vtx.ID()
+	expectedVtxID, ok := t.outstandingVtxReqs.Get(nodeID, requestID)
+	// If the provided vertex is not the requested vertex, we need to explicitly
+	// mark the request as failed to avoid having a dangling dependency.
+	if ok && actualVtxID != expectedVtxID {
+		t.Ctx.Log.Debug("incorrect vertex returned in Put",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+			zap.Stringer("vtxID", actualVtxID),
+			zap.Stringer("expectedVtxID", expectedVtxID),
+		)
+		// We assume that [vtx] is useless because it doesn't match what we
+		// expected.
+		return t.GetFailed(nodeID, requestID)
+	}
+
+	if t.Consensus.VertexIssued(vtx) || t.pending.Contains(actualVtxID) {
 		t.metrics.numUselessPutBytes.Add(float64(len(vtxBytes)))
 	}
 
