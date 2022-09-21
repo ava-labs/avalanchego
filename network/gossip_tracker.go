@@ -102,6 +102,10 @@ func (g *GossipTracker) Add(id ids.NodeID) bool {
 
 	g.tail++
 
+	g.metrics.localPeersSize.Set(float64(g.local.Len()))
+	g.metrics.peersToIndicesSize.Set(float64(len(g.peersToIndices)))
+	g.metrics.indicesToPeersSize.Set(float64(len(g.indicesToPeers)))
+
 	return true
 }
 
@@ -147,6 +151,10 @@ func (g *GossipTracker) Remove(id ids.NodeID) bool {
 		}
 		knownPeers.Remove(g.tail)
 	}
+
+	g.metrics.localPeersSize.Set(float64(g.local.Len()))
+	g.metrics.peersToIndicesSize.Set(float64(len(g.peersToIndices)))
+	g.metrics.indicesToPeersSize.Set(float64(len(g.indicesToPeers)))
 
 	return true
 }
