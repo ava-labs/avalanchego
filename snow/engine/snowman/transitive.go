@@ -187,6 +187,12 @@ func (t *Transitive) GetFailed(nodeID ids.NodeID, requestID uint32) error {
 func (t *Transitive) PullQuery(nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
 	t.Sender.SendChits(nodeID, requestID, []ids.ID{t.Consensus.Preference()})
 
+	if blkID == ids.Empty {
+		t.Ctx.Log.Warn("called pull query with the empty ID",
+			zap.Stringer("nodeID", nodeID),
+		)
+	}
+
 	// Try to issue [blkID] to consensus.
 	// If we're missing an ancestor, request it from [vdr]
 	if _, err := t.issueFromByID(nodeID, blkID); err != nil {
@@ -252,6 +258,12 @@ func (t *Transitive) Chits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) 
 		zap.Stringer("blkID", blkID),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID))
+
+	if blkID == ids.Empty {
+		t.Ctx.Log.Warn("called chits with the empty ID",
+			zap.Stringer("nodeID", nodeID),
+		)
+	}
 
 	// Will record chits once [blkID] has been issued into consensus
 	v := &voter{
