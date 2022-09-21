@@ -382,7 +382,7 @@ func TestGossipTracker_GetUnknown_E2E(t *testing.T) {
 	// id0 now knows about id0, but not id1, so it should see [id1] in its unknown
 	// id1 still knows nothing, so it should see both
 	p0 := []ids.NodeID{id0}
-	r.True(d.UpdateKnown(id0, p0))
+	r.True(g.UpdateKnown(id0, p0))
 
 	// id0 should have a unknown of [id1], since it knows id0
 	unknown, ok = g.GetUnknown(id0, limit)
@@ -400,8 +400,8 @@ func TestGossipTracker_GetUnknown_E2E(t *testing.T) {
 	// add id2, who knows of id0, id1, and id2
 	// id0 and id1 don't know of id2
 	p2 := []ids.NodeID{id0, id1, id2}
-	d.Add(id2)
-	r.True(d.UpdateKnown(id2, p2))
+	g.Add(id2)
+	r.True(g.UpdateKnown(id2, p2))
 
 	// id0 doesn't know about [id1, id2]
 	unknown, ok = g.GetUnknown(id0, limit)

@@ -221,6 +221,11 @@ func NewNetwork(
 		ResourceTracker:      config.ResourceTracker,
 	}
 
+	gossipTracker, err := NewGossipTracker(metricsRegisterer, config.Namespace)
+	if err != nil {
+		return nil, fmt.Errorf("initializing gossip traker failed with: %w", err)
+	}
+
 	onCloseCtx, cancel := context.WithCancel(context.Background())
 	n := &network{
 		config:               config,
@@ -245,7 +250,7 @@ func NewNetwork(
 		)),
 
 		trackedIPs:      make(map[ids.NodeID]*trackedIP),
-		gossipTracker:   NewGossipTracker(),
+		gossipTracker:   gossipTracker,
 		connectingPeers: peer.NewSet(),
 		connectedPeers:  peer.NewSet(),
 		router:          router,
