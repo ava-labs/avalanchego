@@ -266,6 +266,7 @@ func (t *Transitive) Chits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) 
 		t.Ctx.Log.Warn("called chits with the empty ID",
 			zap.Stringer("nodeID", nodeID),
 		)
+		return t.QueryFailed(nodeID, requestID)
 	}
 
 	// Will record chits once [blkID] has been issued into consensus
