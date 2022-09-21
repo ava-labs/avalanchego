@@ -98,7 +98,7 @@ type Topological struct {
 
 type kahnNode struct {
 	inDegree int
-	votes    ids.BitSet
+	votes    ids.BitSet64
 }
 
 func (ta *Topological) Initialize(
@@ -225,7 +225,7 @@ func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
 	// If it isn't possible to have alpha votes for any transaction, then we can
 	// just reset the confidence values in the conflict graph and not perform
 	// any traversals.
-	partialVotes := ids.BitSet(0)
+	partialVotes := ids.BitSet64(0)
 	for vote := range responses {
 		votes := responses.GetSet(vote)
 		partialVotes.Union(votes)

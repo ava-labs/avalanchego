@@ -91,7 +91,7 @@ type VM struct {
 	feeAssetID ids.ID
 
 	// Asset ID --> Bit set with fx IDs the asset supports
-	assetToFxCache *cache.LRU[ids.ID, ids.BitSet]
+	assetToFxCache *cache.LRU[ids.ID, ids.BitSet64]
 
 	// Transaction issuing
 	timer        *timer.Timer
@@ -168,7 +168,7 @@ func (vm *VM) Initialize(
 	vm.toEngine = toEngine
 	vm.baseDB = db
 	vm.db = versiondb.New(db)
-	vm.assetToFxCache = &cache.LRU[ids.ID, ids.BitSet]{Size: assetToFxCacheSize}
+	vm.assetToFxCache = &cache.LRU[ids.ID, ids.BitSet64]{Size: assetToFxCacheSize}
 
 	vm.pubsub = pubsub.New(ctx.NetworkID, ctx.Log)
 
@@ -583,7 +583,7 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 		// This transaction was not an asset creation tx
 		return false
 	}
-	fxIDs := ids.BitSet(0)
+	fxIDs := ids.BitSet64(0)
 	for _, state := range createAssetTx.States {
 		if state.FxIndex == uint32(fxID) {
 			// Cache that this asset supports this fx
