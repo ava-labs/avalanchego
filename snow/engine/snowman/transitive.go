@@ -128,6 +128,22 @@ func (t *Transitive) Put(nodeID ids.NodeID, requestID uint32, blkBytes []byte) e
 		return t.GetFailed(nodeID, requestID)
 	}
 
+	actualBlkID := blk.ID()
+	expectedBlkID, ok := t.blkReqs.Get(nodeID, requestID)
+	// If the provided block is not the requested block, we need to explicitly
+	// mark the request as failed to avoid having a dangling dependency.
+	if ok && actualBlkID != expectedBlkID {
+		t.Ctx.Log.Debug("incorrect block returned in Put",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+			zap.Stringer("blkID", actualBlkID),
+			zap.Stringer("expectedBlkID", expectedBlkID),
+		)
+		// We assume that [blk] is useless because it doesn't match what we
+		// expected.
+		return t.GetFailed(nodeID, requestID)
+	}
+
 	if t.wasIssued(blk) {
 		t.metrics.numUselessPutBytes.Add(float64(len(blkBytes)))
 	}
