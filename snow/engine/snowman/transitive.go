@@ -179,6 +179,7 @@ func (t *Transitive) GetFailed(nodeID ids.NodeID, requestID uint32) error {
 
 	// Because the get request was dropped, we no longer expect blkID to be issued.
 	t.blocked.Abandon(blkID)
+	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
 	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 	return t.buildBlocks()
 }
@@ -347,7 +348,7 @@ func (t *Transitive) Shutdown() error {
 func (t *Transitive) Notify(msg common.Message) error {
 	if msg != common.PendingTxs {
 		t.Ctx.Log.Warn("received an unexpected message from the VM",
-			zap.Stringer("message", msg),
+			zap.Stringer("messageString", msg),
 		)
 		return nil
 	}
