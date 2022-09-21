@@ -74,6 +74,8 @@ type Transitive struct {
 
 	// errs tracks if an error has occurred in a callback
 	errs wrappers.Errs
+
+	shutdown bool
 }
 
 func newTransitive(config Config) (*Transitive, error) {
@@ -110,6 +112,11 @@ func newTransitive(config Config) (*Transitive, error) {
 		defer ticker.Stop()
 		for range ticker.C {
 			config.Ctx.Lock.Lock()
+			if t.shutdown {
+				config.Ctx.Lock.Unlock()
+				return
+			}
+
 			config.Ctx.Log.Debug(
 				"current state",
 				zap.Stringer("polls", t.polls),
@@ -331,6 +338,8 @@ func (t *Transitive) Gossip() error {
 func (t *Transitive) Halt() {}
 
 func (t *Transitive) Shutdown() error {
+	t.shutdown = true
+
 	t.Ctx.Log.Info("shutting down consensus engine")
 	return t.VM.Shutdown()
 }
