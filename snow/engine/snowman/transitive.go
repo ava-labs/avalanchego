@@ -74,6 +74,8 @@ type Transitive struct {
 
 	// errs tracks if an error has occurred in a callback
 	errs wrappers.Errs
+
+	shutdown bool
 }
 
 func newTransitive(config Config) (*Transitive, error) {
@@ -104,6 +106,26 @@ func newTransitive(config Config) (*Transitive, error) {
 			config.Ctx.Registerer,
 		),
 	}
+
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			config.Ctx.Lock.Lock()
+			if t.shutdown {
+				config.Ctx.Lock.Unlock()
+				return
+			}
+
+			config.Ctx.Log.Debug(
+				"current state",
+				zap.Stringer("polls", t.polls),
+				zap.Stringer("requests", &t.blkReqs),
+				zap.Stringer("blocker", &t.blocked),
+			)
+			config.Ctx.Lock.Unlock()
+		}
+	}()
 
 	return t, t.metrics.Initialize("", config.Ctx.Registerer)
 }
@@ -165,6 +187,12 @@ func (t *Transitive) PullQuery(nodeID ids.NodeID, requestID uint32, blkID ids.ID
 	// TODO: once everyone supports ChitsV2 - we should be sending that message
 	// type here.
 	t.Sender.SendChits(nodeID, requestID, []ids.ID{t.Consensus.Preference()})
+
+	if blkID == ids.Empty {
+		t.Ctx.Log.Warn("called pull query with the empty ID",
+			zap.Stringer("nodeID", nodeID),
+		)
+	}
 
 	// Try to issue [blkID] to consensus.
 	// If we're missing an ancestor, request it from [vdr]
@@ -233,6 +261,12 @@ func (t *Transitive) Chits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) 
 		zap.Stringer("blkID", blkID),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID))
+
+	if blkID == ids.Empty {
+		t.Ctx.Log.Warn("called chits with the empty ID",
+			zap.Stringer("nodeID", nodeID),
+		)
+	}
 
 	// Will record chits once [blkID] has been issued into consensus
 	v := &voter{
@@ -324,6 +358,8 @@ func (t *Transitive) Gossip() error {
 func (t *Transitive) Halt() {}
 
 func (t *Transitive) Shutdown() error {
+	t.shutdown = true
+
 	t.Ctx.Log.Info("shutting down consensus engine")
 	return t.VM.Shutdown()
 }
@@ -634,6 +670,13 @@ func (t *Transitive) sendRequest(nodeID ids.NodeID, blkID ids.ID) {
 	// There is already an outstanding request for this block
 	if t.blkReqs.Contains(blkID) {
 		return
+	}
+
+	if blkID == ids.Empty {
+		t.Ctx.Log.Warn("attempting to fetch the empty ID",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stack("stacktrace"),
+		)
 	}
 
 	t.RequestID++
