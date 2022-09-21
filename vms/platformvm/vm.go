@@ -98,7 +98,7 @@ type VM struct {
 	validatorSetCaches map[ids.ID]cache.Cacher
 
 	// sliding window of blocks that were recently accepted
-	recentlyAccepted *window.Window
+	recentlyAccepted window.Window[ids.ID]
 
 	txBuilder         txbuilder.Builder
 	txExecutorBackend *txexecutor.Backend
@@ -141,7 +141,7 @@ func (vm *VM) Initialize(
 	}
 
 	vm.validatorSetCaches = make(map[ids.ID]cache.Cacher)
-	vm.recentlyAccepted = window.New(
+	vm.recentlyAccepted = window.New[ids.ID](
 		window.Config{
 			Clock:   &vm.clock,
 			MaxSize: maxRecentlyAcceptedWindowSize,
@@ -547,7 +547,7 @@ func (vm *VM) GetMinimumHeight() (uint64, error) {
 		return vm.GetCurrentHeight()
 	}
 
-	blk, err := vm.GetBlock(oldest.(ids.ID))
+	blk, err := vm.GetBlock(oldest)
 	if err != nil {
 		return 0, err
 	}

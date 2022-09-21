@@ -28,7 +28,7 @@ func SendMixedQuery(
 	if numPushTo > 0 {
 		sendPushQueryTo := set.NewSet[ids.NodeID](numPushTo)
 		sendPushQueryTo.Add(vdrs[:numPushTo]...)
-		sender.SendPushQuery(sendPushQueryTo, reqID, containerID, container)
+		sender.SendPushQuery(sendPushQueryTo, reqID, container)
 	}
 	if numPullTo := len(vdrs) - numPushTo; numPullTo > 0 {
 		sendPullQueryTo := set.NewSet[ids.NodeID](numPullTo)

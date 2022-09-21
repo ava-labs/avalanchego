@@ -70,8 +70,18 @@ func StartTestPeer(
 
 	mc, err := message.NewCreator(
 		prometheus.NewRegistry(),
-		true,
 		"",
+		true,
+		10*time.Second,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	mcWithProto, err := message.NewCreatorWithProto(
+		prometheus.NewRegistry(),
+		"",
+		true,
 		10*time.Second,
 	)
 	if err != nil {
@@ -96,17 +106,14 @@ func StartTestPeer(
 		return nil, err
 	}
 
-	pingMessage, err := mc.Ping()
-	if err != nil {
-		return nil, err
-	}
-
 	peer := Start(
 		&Config{
-			Metrics:             metrics,
-			MessageCreator:      mc,
-			Log:                 logging.NoLog{},
-			InboundMsgThrottler: throttling.NewNoInboundThrottler(),
+			Metrics:                 metrics,
+			MessageCreator:          mc,
+			MessageCreatorWithProto: mcWithProto,
+			BlueberryTime:           version.GetBlueberryTime(networkID),
+			Log:                     logging.NoLog{},
+			InboundMsgThrottler:     throttling.NewNoInboundThrottler(),
 			Network: NewTestNetwork(
 				mc,
 				networkID,
@@ -125,7 +132,6 @@ func StartTestPeer(
 			PongTimeout:          constants.DefaultPingPongTimeout,
 			MaxClockDifference:   time.Minute,
 			ResourceTracker:      resourceTracker,
-			PingMessage:          pingMessage,
 		},
 		conn,
 		cert,

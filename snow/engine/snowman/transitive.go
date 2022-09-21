@@ -158,13 +158,12 @@ func (t *Transitive) GetFailed(nodeID ids.NodeID, requestID uint32) error {
 
 	// Because the get request was dropped, we no longer expect blkID to be issued.
 	t.blocked.Abandon(blkID)
+	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
 	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 	return t.buildBlocks()
 }
 
 func (t *Transitive) PullQuery(nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
-	// TODO: once everyone supports ChitsV2 - we should be sending that message
-	// type here.
 	t.Sender.SendChits(nodeID, requestID, []ids.ID{t.Consensus.Preference()})
 
 	// Try to issue [blkID] to consensus.
@@ -177,8 +176,6 @@ func (t *Transitive) PullQuery(nodeID ids.NodeID, requestID uint32, blkID ids.ID
 }
 
 func (t *Transitive) PushQuery(nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
-	// TODO: once everyone supports ChitsV2 - we should be sending that message
-	// type here.
 	t.Sender.SendChits(nodeID, requestID, []ids.ID{t.Consensus.Preference()})
 
 	blk, err := t.VM.ParseBlock(blkBytes)
@@ -257,10 +254,6 @@ func (t *Transitive) Chits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) 
 	return t.buildBlocks()
 }
 
-func (t *Transitive) ChitsV2(vdr ids.NodeID, requestID uint32, _ []ids.ID, vote ids.ID) error {
-	return t.Chits(vdr, requestID, []ids.ID{vote})
-}
-
 func (t *Transitive) QueryFailed(vdr ids.NodeID, requestID uint32) error {
 	t.blocked.Register(&voter{
 		t:         t,
@@ -318,7 +311,7 @@ func (t *Transitive) Gossip() error {
 	t.Ctx.Log.Verbo("gossiping accepted block to the network",
 		zap.Stringer("blkID", blkID),
 	)
-	t.Sender.SendGossip(blkID, blk.Bytes())
+	t.Sender.SendGossip(blk.Bytes())
 	return nil
 }
 
@@ -332,7 +325,7 @@ func (t *Transitive) Shutdown() error {
 func (t *Transitive) Notify(msg common.Message) error {
 	if msg != common.PendingTxs {
 		t.Ctx.Log.Warn("received an unexpected message from the VM",
-			zap.Stringer("message", msg),
+			zap.Stringer("messageString", msg),
 		)
 		return nil
 	}
@@ -759,6 +752,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		return t.errs.Err
 	}
 	t.nonVerifieds.Remove(blkID)
+	t.nonVerifiedCache.Evict(blkID)
 	t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
 	t.Ctx.Log.Verbo("adding block to consensus",
 		zap.Stringer("blkID", blkID),
@@ -793,9 +787,11 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 					// block fails verification, hold this in memory for bubbling
 					t.addToNonVerifieds(blk)
 				} else {
+					blkID := blk.ID()
 					// correctly verified will be passed to consensus as processing block
 					// no need to keep it anymore
-					t.nonVerifieds.Remove(blk.ID())
+					t.nonVerifieds.Remove(blkID)
+					t.nonVerifiedCache.Evict(blkID)
 					t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
 					wrappedBlk := &memoryBlock{
 						Block:   blk,
