@@ -370,7 +370,7 @@ func (h *handler) dispatchChans() {
 // Any returned error is treated as fatal
 func (h *handler) handleSyncMsg(msg message.InboundMessage) error {
 	h.ctx.Log.Debug("forwarding sync message to consensus",
-		zap.Stringer("message", msg),
+		zap.Stringer("messageString", msg),
 	)
 
 	var (
@@ -849,7 +849,7 @@ func (h *handler) handleAsyncMsg(msg message.InboundMessage) {
 // Any returned error is treated as fatal
 func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 	h.ctx.Log.Debug("forwarding async message to consensus",
-		zap.Stringer("message", msg),
+		zap.Stringer("messageString", msg),
 	)
 
 	var (
@@ -956,7 +956,7 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 // Any returned error is treated as fatal
 func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 	h.ctx.Log.Debug("forwarding chan message to consensus",
-		zap.Stringer("message", msg),
+		zap.Stringer("messageString", msg),
 	)
 
 	var (
@@ -1035,7 +1035,7 @@ func (h *handler) popUnexpiredMsg(queue MessageQueue, expired prometheus.Counter
 			h.ctx.Log.Verbo("dropping message",
 				zap.String("reason", "timeout"),
 				zap.Stringer("nodeID", msg.NodeID()),
-				zap.Stringer("message", msg),
+				zap.Stringer("messageString", msg),
 			)
 			expired.Inc()
 			msg.OnFinishedHandling()

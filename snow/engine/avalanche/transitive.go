@@ -301,7 +301,7 @@ func (t *Transitive) Notify(msg common.Message) error {
 
 	default:
 		t.Ctx.Log.Warn("received an unexpected message from the VM",
-			zap.Stringer("message", msg),
+			zap.Stringer("messageString", msg),
 		)
 		return nil
 	}

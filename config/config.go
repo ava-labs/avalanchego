@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"math"
 	"net"
 	"os"
@@ -36,10 +37,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
+	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/storage"
 	"github.com/ava-labs/avalanchego/utils/timer"
@@ -72,8 +75,8 @@ var (
 	errStakeMaxConsumptionBelowMin   = errors.New("stake max consumption can't be less than min stake consumption")
 	errStakeMintingPeriodBelowMin    = errors.New("stake minting period can't be less than max stake duration")
 	errCannotWhitelistPrimaryNetwork = errors.New("cannot whitelist primary network")
-	errStakingKeyContentUnset        = fmt.Errorf("%s key not set but %s set", StakingKeyContentKey, StakingCertContentKey)
-	errStakingCertContentUnset       = fmt.Errorf("%s key set but %s not set", StakingKeyContentKey, StakingCertContentKey)
+	errStakingKeyContentUnset        = fmt.Errorf("%s key not set but %s set", StakingTLSKeyContentKey, StakingCertContentKey)
+	errStakingCertContentUnset       = fmt.Errorf("%s key set but %s not set", StakingTLSKeyContentKey, StakingCertContentKey)
 )
 
 func GetRunnerConfig(v *viper.Viper) (runner.Config, error) {
@@ -651,7 +654,7 @@ func getProfilerConfig(v *viper.Viper) (profiler.Config, error) {
 }
 
 func getStakingTLSCertFromFlag(v *viper.Viper) (tls.Certificate, error) {
-	stakingKeyRawContent := v.GetString(StakingKeyContentKey)
+	stakingKeyRawContent := v.GetString(StakingTLSKeyContentKey)
 	stakingKeyContent, err := base64.StdEncoding.DecodeString(stakingKeyRawContent)
 	if err != nil {
 		return tls.Certificate{}, fmt.Errorf("unable to decode base64 content: %w", err)
@@ -673,11 +676,11 @@ func getStakingTLSCertFromFlag(v *viper.Viper) (tls.Certificate, error) {
 
 func getStakingTLSCertFromFile(v *viper.Viper) (tls.Certificate, error) {
 	// Parse the staking key/cert paths and expand environment variables
-	stakingKeyPath := GetExpandedArg(v, StakingKeyPathKey)
+	stakingKeyPath := GetExpandedArg(v, StakingTLSKeyPathKey)
 	stakingCertPath := GetExpandedArg(v, StakingCertPathKey)
 
 	// If staking key/cert locations are specified but not found, error
-	if v.IsSet(StakingKeyPathKey) || v.IsSet(StakingCertPathKey) {
+	if v.IsSet(StakingTLSKeyPathKey) || v.IsSet(StakingCertPathKey) {
 		if _, err := os.Stat(stakingKeyPath); os.IsNotExist(err) {
 			return tls.Certificate{}, fmt.Errorf("couldn't find staking key at %s", stakingKeyPath)
 		} else if _, err := os.Stat(stakingCertPath); os.IsNotExist(err) {
@@ -709,23 +712,83 @@ func getStakingTLSCert(v *viper.Viper) (tls.Certificate, error) {
 	}
 
 	switch {
-	case v.IsSet(StakingKeyContentKey) && !v.IsSet(StakingCertContentKey):
+	case v.IsSet(StakingTLSKeyContentKey) && !v.IsSet(StakingCertContentKey):
 		return tls.Certificate{}, errStakingCertContentUnset
-	case !v.IsSet(StakingKeyContentKey) && v.IsSet(StakingCertContentKey):
+	case !v.IsSet(StakingTLSKeyContentKey) && v.IsSet(StakingCertContentKey):
 		return tls.Certificate{}, errStakingKeyContentUnset
-	case v.IsSet(StakingKeyContentKey) && v.IsSet(StakingCertContentKey):
+	case v.IsSet(StakingTLSKeyContentKey) && v.IsSet(StakingCertContentKey):
 		return getStakingTLSCertFromFlag(v)
 	default:
 		return getStakingTLSCertFromFile(v)
 	}
 }
 
+func getStakingSigner(v *viper.Viper) (*bls.SecretKey, error) {
+	if v.GetBool(StakingEphemeralSignerEnabledKey) {
+		key, err := bls.NewSecretKey()
+		if err != nil {
+			return nil, fmt.Errorf("couldn't generate ephemeral signing key: %w", err)
+		}
+		return key, nil
+	}
+
+	if v.IsSet(StakingSignerKeyContentKey) {
+		signerKeyRawContent := v.GetString(StakingSignerKeyContentKey)
+		signerKeyContent, err := base64.StdEncoding.DecodeString(signerKeyRawContent)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode base64 content: %w", err)
+		}
+		key, err := bls.SecretKeyFromBytes(signerKeyContent)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't parse signing key: %w", err)
+		}
+		return key, nil
+	}
+
+	signingKeyPath := GetExpandedArg(v, StakingSignerKeyPathKey)
+	_, err := os.Stat(signingKeyPath)
+	if !errors.Is(err, fs.ErrNotExist) {
+		signingKeyBytes, err := os.ReadFile(signingKeyPath)
+		if err != nil {
+			return nil, err
+		}
+		key, err := bls.SecretKeyFromBytes(signingKeyBytes)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't parse signing key: %w", err)
+		}
+		return key, nil
+	}
+
+	if v.IsSet(StakingSignerKeyPathKey) {
+		return nil, errors.New("missing staking signing key file")
+	}
+
+	key, err := bls.NewSecretKey()
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate new signing key: %w", err)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(signingKeyPath), perms.ReadWriteExecute); err != nil {
+		return nil, fmt.Errorf("couldn't create path for signing key at %s: %w", signingKeyPath, err)
+	}
+
+	keyBytes := bls.SecretKeyToBytes(key)
+	if err := os.WriteFile(signingKeyPath, keyBytes, perms.ReadWrite); err != nil {
+		return nil, fmt.Errorf("couldn't write new signing key to %s: %w", signingKeyPath, err)
+	}
+	if err := os.Chmod(signingKeyPath, perms.ReadOnly); err != nil {
+		return nil, fmt.Errorf("couldn't restrict permissions on new signing key at %s: %w", signingKeyPath, err)
+	}
+	return key, nil
+}
+
 func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, error) {
 	config := node.StakingConfig{
 		EnableStaking:         v.GetBool(StakingEnabledKey),
 		DisabledStakingWeight: v.GetUint64(StakingDisabledWeightKey),
-		StakingKeyPath:        GetExpandedArg(v, StakingKeyPathKey),
+		StakingKeyPath:        GetExpandedArg(v, StakingTLSKeyPathKey),
 		StakingCertPath:       GetExpandedArg(v, StakingCertPathKey),
+		StakingSignerPath:     GetExpandedArg(v, StakingSignerKeyPathKey),
 	}
 	if !config.EnableStaking && config.DisabledStakingWeight == 0 {
 		return node.StakingConfig{}, errInvalidStakerWeights
@@ -737,6 +800,10 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 
 	var err error
 	config.StakingTLSCert, err = getStakingTLSCert(v)
+	if err != nil {
+		return node.StakingConfig{}, err
+	}
+	config.StakingSigningKey, err = getStakingSigner(v)
 	if err != nil {
 		return node.StakingConfig{}, err
 	}
