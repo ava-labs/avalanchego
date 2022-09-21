@@ -4,9 +4,13 @@
 package network
 
 import (
+	"fmt"
 	"sync"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 // GossipTracker tracks the peers that we're currently aware of, as well as the
@@ -50,16 +54,24 @@ type GossipTracker struct {
 	// tail always points to an empty slot where new peers are added
 	tail int
 	lock sync.RWMutex
+
+	metrics gossipTrackerMetrics
 }
 
 // NewGossipTracker returns an instance of GossipTracker
-func NewGossipTracker() *GossipTracker {
+func NewGossipTracker(registerer prometheus.Registerer, namespace string) (*GossipTracker, error) {
+	m, err := newGossipTrackerMetrics(registerer, fmt.Sprintf("%s_%s", namespace, "gossip_tracker"))
+	if err != nil {
+		return nil, err
+	}
+
 	return &GossipTracker{
 		local:          ids.NewBigBitSet(),
 		knownPeers:     make(map[ids.NodeID]ids.BigBitSet),
 		peersToIndices: make(map[ids.NodeID]int),
 		indicesToPeers: make(map[int]ids.NodeID),
-	}
+		metrics:        m,
+	}, nil
 }
 
 // Contains returns if a peer is being tracked
@@ -208,4 +220,45 @@ func (g *GossipTracker) GetUnknown(id ids.NodeID, limit int) ([]ids.NodeID, bool
 	}
 
 	return result, true
+}
+
+type gossipTrackerMetrics struct {
+	localPeersSize     prometheus.Gauge
+	peersToIndicesSize prometheus.Gauge
+	indicesToPeersSize prometheus.Gauge
+}
+
+func newGossipTrackerMetrics(registerer prometheus.Registerer, namespace string) (gossipTrackerMetrics, error) {
+	m := gossipTrackerMetrics{
+		localPeersSize: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "local_peers_size",
+				Help:      "amount of peers this node is tracking gossip for",
+			},
+		),
+		peersToIndicesSize: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "peers_to_indices_size",
+				Help:      "amount of peers this node is tracking in peersToIndices",
+			},
+		),
+		indicesToPeersSize: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "indices_to_peers_size",
+				Help:      "amount of peers this node is tracking in indicesToPeers",
+			},
+		),
+	}
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		registerer.Register(m.localPeersSize),
+		registerer.Register(m.peersToIndicesSize),
+		registerer.Register(m.indicesToPeersSize),
+	)
+
+	return m, errs.Err
 }

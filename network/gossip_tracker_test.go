@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserveg.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -6,6 +6,7 @@ package network
 import (
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -48,13 +49,14 @@ func TestGossipTracker_Contains(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			r := require.New(t)
-			gossipTracker := NewGossipTracker()
+			g, err := NewGossipTracker(prometheus.NewRegistry(), "foobar")
+			r.NoError(err)
 
 			for _, add := range test.add {
-				r.True(gossipTracker.Add(add))
+				r.True(g.Add(add))
 			}
 
-			r.Equal(test.expected, gossipTracker.Contains(test.contains))
+			r.Equal(test.expected, g.Contains(test.contains))
 		})
 	}
 }
@@ -82,7 +84,8 @@ func TestGossipTracker_Add(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			r := require.New(t)
-			gossipTracker := NewGossipTracker()
+			gossipTracker, err := NewGossipTracker(prometheus.NewRegistry(), "foobar")
+			r.NoError(err)
 
 			for i, p := range test.toAdd {
 				r.Equal(test.expected[i], gossipTracker.Add(p))
@@ -126,14 +129,15 @@ func TestGossipTracker_Remove(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			r := require.New(t)
-			gossipTracker := NewGossipTracker()
+			g, err := NewGossipTracker(prometheus.NewRegistry(), "foobar")
+			r.NoError(err)
 
 			for _, add := range test.toAdd {
-				r.True(gossipTracker.Add(add))
+				r.True(g.Add(add))
 			}
 
 			for i, p := range test.toRemove {
-				r.Equal(test.expectedRemove[i], gossipTracker.Remove(p))
+				r.Equal(test.expectedRemove[i], g.Remove(p))
 			}
 		})
 	}
@@ -191,40 +195,42 @@ func TestGossipTracker_UpdateKnown(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			r := require.New(t)
-			gossipTracker := NewGossipTracker()
+			g, err := NewGossipTracker(prometheus.NewRegistry(), "foobar")
+			r.NoError(err)
 
 			for _, add := range test.add {
-				r.True(gossipTracker.Add(add))
+				r.True(g.Add(add))
 			}
 
-			r.Equal(test.expected, gossipTracker.UpdateKnown(test.args.id, test.args.known))
+			r.Equal(test.expected, g.UpdateKnown(test.args.id, test.args.known))
 		})
 	}
 }
 
 func TestGossipTracker_GetUnknown(t *testing.T) {
 	r := require.New(t)
-	d := NewGossipTracker()
+	g, err := NewGossipTracker(prometheus.NewRegistry(), "foobar")
+	r.NoError(err)
 
 	// we should get an empty unknown since we're not tracking anything
-	unknown, ok := d.GetUnknown(id0, limit)
+	unknown, ok := g.GetUnknown(id0, limit)
 	r.False(ok)
 	r.Empty(unknown)
 
 	// we should get a unknown of [+id0, +id1] since we know about id0 and id1,
 	// but id0 and id1 both don't know anything yet
-	d.Add(id0)
-	d.Add(id1)
+	g.Add(id0)
+	g.Add(id1)
 
 	// check id0's unknown
-	unknown, ok = d.GetUnknown(id0, limit)
+	unknown, ok = g.GetUnknown(id0, limit)
 	r.True(ok)
 	r.Contains(unknown, id0)
 	r.Contains(unknown, id1)
 	r.Len(unknown, 2)
 
 	// check id1's unknown
-	unknown, ok = d.GetUnknown(id1, limit)
+	unknown, ok = g.GetUnknown(id1, limit)
 	r.True(ok)
 	r.Contains(unknown, id0)
 	r.Contains(unknown, id1)
@@ -233,16 +239,16 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 	// id0 now knows about id0, but not id1, so it should see [+id1] in its unknown
 	// id1 still knows nothing, so it should see both
 	p0 := []ids.NodeID{id0}
-	r.True(d.UpdateKnown(id0, p0))
+	r.True(g.UpdateKnown(id0, p0))
 
 	// id0 should have a unknown of [id1], since it knows id0
-	unknown, ok = d.GetUnknown(id0, limit)
+	unknown, ok = g.GetUnknown(id0, limit)
 	r.True(ok)
 	r.Contains(unknown, id1)
 	r.Len(unknown, 1)
 
 	// id1 should have a unknown of [id0, id1], since it knows nothing
-	unknown, ok = d.GetUnknown(id1, limit)
+	unknown, ok = g.GetUnknown(id1, limit)
 	r.True(ok)
 	r.Contains(unknown, id0)
 	r.Contains(unknown, id1)
@@ -251,18 +257,18 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 	// add id2, who knows of id0, id1, and id2
 	// id0 and id1 don't know of id2
 	p2 := []ids.NodeID{id0, id1, id2}
-	d.Add(id2)
-	r.True(d.UpdateKnown(id2, p2))
+	g.Add(id2)
+	r.True(g.UpdateKnown(id2, p2))
 
 	// id0 doesn't know about [id1, id2]
-	unknown, ok = d.GetUnknown(id0, limit)
+	unknown, ok = g.GetUnknown(id0, limit)
 	r.True(ok)
 	r.Contains(unknown, id1)
 	r.Contains(unknown, id2)
 	r.Len(unknown, 2)
 
 	// id1 doesn't know about [id0, id1, id2]
-	unknown, ok = d.GetUnknown(id1, limit)
+	unknown, ok = g.GetUnknown(id1, limit)
 	r.True(ok)
 	r.Contains(unknown, id0)
 	r.Contains(unknown, id1)
@@ -270,24 +276,24 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 	r.Len(unknown, 3)
 
 	// id2 knows about everyone
-	unknown, ok = d.GetUnknown(id2, limit)
+	unknown, ok = g.GetUnknown(id2, limit)
 	r.True(ok)
 	r.Empty(unknown)
 
 	// stop tracking id1
-	r.True(d.Remove(id1))
-	unknown, ok = d.GetUnknown(id1, limit)
+	r.True(g.Remove(id1))
+	unknown, ok = g.GetUnknown(id1, limit)
 	r.False(ok)
 	r.Nil(unknown)
 
 	// id0 doesn't know about [id2], we shouldn't care about id1 anymore
-	unknown, ok = d.GetUnknown(id0, limit)
+	unknown, ok = g.GetUnknown(id0, limit)
 	r.True(ok)
 	r.Contains(unknown, id2)
 	r.Len(unknown, 1)
 
 	// id2 knows everyone
-	unknown, ok = d.GetUnknown(id2, limit)
+	unknown, ok = g.GetUnknown(id2, limit)
 	r.Empty(unknown)
 	r.True(ok)
 }
@@ -296,31 +302,32 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 // GetUnknown
 func TestGossipTracker_GetUnknown_Limit(t *testing.T) {
 	r := require.New(t)
-	d := NewGossipTracker()
+	g, err := NewGossipTracker(prometheus.NewRegistry(), "foobar")
+	r.NoError(err)
 
-	r.True(d.Add(id0))
-	r.True(d.Add(id1))
-	r.True(d.Add(id2))
+	r.True(g.Add(id0))
+	r.True(g.Add(id1))
+	r.True(g.Add(id2))
 
 	// id2 doesn't know about anybody, but we should filter out anything
 	// over the limit
-	unknown, ok := d.GetUnknown(id2, 1)
+	unknown, ok := g.GetUnknown(id2, 1)
 	r.True(ok)
 	r.Len(unknown, 1)
 
-	unknown, ok = d.GetUnknown(id2, 2)
+	unknown, ok = g.GetUnknown(id2, 2)
 	r.True(ok)
 	r.Len(unknown, 2)
 
 	// nothing should be filtered here, since we're asking for exactly as many
 	// as are unknown by id2
-	unknown, ok = d.GetUnknown(id2, 3)
+	unknown, ok = g.GetUnknown(id2, 3)
 	r.True(ok)
 	r.Len(unknown, 3)
 
 	// sanity-check that asking for more than what is unknown still returns
 	// the same info
-	unknown, ok = d.GetUnknown(id2, 4)
+	unknown, ok = g.GetUnknown(id2, 4)
 	r.True(ok)
 	r.Len(unknown, 3)
 }
