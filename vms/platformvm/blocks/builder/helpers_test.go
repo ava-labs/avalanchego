@@ -164,7 +164,7 @@ func newEnvironment(t *testing.T) *environment {
 	}
 
 	registerer := prometheus.NewRegistry()
-	window := window.New(
+	window := window.New[ids.ID](
 		window.Config{
 			Clock:   res.clk,
 			MaxSize: maxRecentlyAcceptedWindowSize,

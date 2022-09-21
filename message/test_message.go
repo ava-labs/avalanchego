@@ -23,4 +23,5 @@ func (m *TestMsg) Bytes() []byte            { return m.bytes }
 func (*TestMsg) BytesSavedCompression() int { return 0 }
 func (*TestMsg) AddRef()                    {}
 func (*TestMsg) DecRef()                    {}
+func (*TestMsg) IsProto() bool              { return false }
 func (m *TestMsg) BypassThrottling() bool   { return m.bypassThrottling }

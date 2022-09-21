@@ -98,7 +98,6 @@ type mempool struct {
 
 	unissuedDecisionTxs txheap.Heap
 	unissuedStakerTxs   txheap.Heap
-	unknownTxs          prometheus.Counter
 
 	// Key: Tx ID
 	// Value: String repr. of the verification error
@@ -141,22 +140,12 @@ func NewMempool(
 		return nil, err
 	}
 
-	unknownTxs := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "unknown_txs_count",
-		Help:      "Number of unknown tx types seen by the mempool",
-	})
-	if err := registerer.Register(unknownTxs); err != nil {
-		return nil, err
-	}
-
 	bytesAvailableMetric.Set(maxMempoolSize)
 	return &mempool{
 		bytesAvailableMetric: bytesAvailableMetric,
 		bytesAvailable:       maxMempoolSize,
 		unissuedDecisionTxs:  unissuedDecisionTxs,
 		unissuedStakerTxs:    unissuedStakerTxs,
-		unknownTxs:           unknownTxs,
 		droppedTxIDs:         &cache.LRU{Size: droppedTxIDsCacheSize},
 		consumedUTXOs:        ids.NewSet(initialConsumedUTXOsSize),
 		dropIncoming:         false, // enable tx adding by default
