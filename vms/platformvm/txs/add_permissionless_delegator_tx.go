@@ -35,7 +35,7 @@ type AddPermissionlessDelegatorTx struct {
 }
 
 // InitCtx sets the FxID fields in the inputs and outputs of this
-// [AddPermissionlessValidatorTx]. Also sets the [ctx] to the given [vm.ctx] so
+// [AddPermissionlessDelegatorTx]. Also sets the [ctx] to the given [vm.ctx] so
 // that the addresses can be json marshalled into human readable format
 func (tx *AddPermissionlessDelegatorTx) InitCtx(ctx *snow.Context) {
 	tx.BaseTx.InitCtx(ctx)

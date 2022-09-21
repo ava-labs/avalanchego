@@ -19,6 +19,12 @@ if [[ -z "${AVALANCHEGO_PATH}" ]]; then
   exit 255
 fi
 
+# Set the CGO flags to use the portable version of BLST
+#
+# We use "export" here instead of just setting a bash variable because we need
+# to pass this flag to all child processes spawned by the shell.
+export CGO_CFLAGS="-O -D__BLST_PORTABLE__"
+
 ENABLE_WHITELIST_VTX_TESTS=${ENABLE_WHITELIST_VTX_TESTS:-false}
 
 #################################
