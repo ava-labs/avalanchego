@@ -367,6 +367,10 @@ func Test_BigBitSet_Clear(t *testing.T) {
 			name:   "populated",
 			bitset: []int{5, 4, 3, 2, 1}, // [1, 1, 1, 1, 1]
 		},
+		{
+			name:   "populated - big",
+			bitset: []int{255}, // [1, 1, 1, 1, 1]
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -425,6 +429,11 @@ func Test_BigBitSet_HammingWeight(t *testing.T) {
 			name:     "empty",
 			bitset:   []int{}, // []
 			expected: 0,
+		},
+		{
+			name:     "populated - more than one word",
+			bitset:   []int{255}, // [1, 0...]
+			expected: 1,
 		},
 		{
 			name:     "populated - all ones",
