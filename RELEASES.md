@@ -1,5 +1,37 @@
 # Release Notes
 
+## [v1.8.6](https://github.com/ava-labs/avalanchego/releases/tag/v1.8.6)
+
+This version is backwards compatible to [v1.8.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.8.0). It is optional, but encouraged. The supported plugin version is `16`.
+
+### BLS
+
+- Added BLS key file at `--staking-signer-key-file`
+- Exposed BLS proof of possession in the `info.getNodeID` API
+- Added BLS proof of possession to `AddPermissionlessValidatorTx`s for the Primary Network
+
+The default value of `--staking-signer-key-file` is `~/.avalanchego/staking/signer.key`. If the key file doesn't exist, it will be populated with a new key.
+
+### Networking
+
+- Added P2P proto support to be activated in a future release
+- Fixed inbound bandwidth spike after leaving the validation set
+- Removed support for `ChitsV2` messages
+- Removed `ContainerID`s from `Put` and `PushQuery` messages
+- Added `pending_timeouts` metric to track the number of active timeouts a node is tracking
+- Fixed overflow in gzip decompression
+- Optimized memory usage in `peer.MessageQueue`
+
+### Miscellaneous
+
+- Fixed bootstrapping ETA metric
+- Removed unused `unknown_txs_count` metric
+- Replaced duplicated code with generic implementations
+
+### Coreth
+
+- Added failure reason to bad block API
+
 ## [v1.8.5](https://github.com/ava-labs/avalanchego/releases/tag/v1.8.5)
 
 Please upgrade your node as soon as possible.
