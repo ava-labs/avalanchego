@@ -153,6 +153,8 @@ type network struct {
 func NewNetwork(
 	config *Config,
 	msgCreator message.Creator,
+	msgCreatorWithProto message.Creator,
+	blueberryTime time.Time, // TODO: remove this once we complete blueberry migration
 	metricsRegisterer prometheus.Registerer,
 	log logging.Logger,
 	listener net.Listener,
@@ -199,16 +201,16 @@ func NewNetwork(
 		return nil, fmt.Errorf("initializing network metrics failed with: %w", err)
 	}
 
-	pingMessge, err := msgCreator.Ping()
-	if err != nil {
-		return nil, fmt.Errorf("initializing common ping message failed with: %w", err)
-	}
-
 	peerConfig := &peer.Config{
-		ReadBufferSize:       config.PeerReadBufferSize,
-		WriteBufferSize:      config.PeerWriteBufferSize,
-		Metrics:              peerMetrics,
-		MessageCreator:       msgCreator,
+		ReadBufferSize:          config.PeerReadBufferSize,
+		WriteBufferSize:         config.PeerWriteBufferSize,
+		Metrics:                 peerMetrics,
+		MessageCreator:          msgCreator,
+		MessageCreatorWithProto: msgCreatorWithProto,
+
+		// TODO: remove this once we complete blueberry migration
+		BlueberryTime: blueberryTime,
+
 		Log:                  log,
 		InboundMsgThrottler:  inboundMsgThrottler,
 		Network:              nil, // This is set below.
@@ -221,8 +223,8 @@ func NewNetwork(
 		PongTimeout:          config.PingPongTimeout,
 		MaxClockDifference:   config.MaxClockDifference,
 		ResourceTracker:      config.ResourceTracker,
-		PingMessage:          pingMessge,
 	}
+
 	onCloseCtx, cancel := context.WithCancel(context.Background())
 	n := &network{
 		config:               config,
@@ -470,7 +472,7 @@ func (n *network) Version() (message.OutboundMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	return n.peerConfig.MessageCreator.Version(
+	return n.peerConfig.GetMessageCreator().Version(
 		n.peerConfig.NetworkID,
 		n.peerConfig.Clock.Unix(),
 		mySignedIP.IP.IP,
@@ -483,7 +485,7 @@ func (n *network) Version() (message.OutboundMessage, error) {
 
 func (n *network) Peers() (message.OutboundMessage, error) {
 	peers := n.sampleValidatorIPs()
-	return n.peerConfig.MessageCreator.PeerList(peers, true)
+	return n.peerConfig.GetMessageCreator().PeerList(peers, true)
 }
 
 func (n *network) Pong(nodeID ids.NodeID) (message.OutboundMessage, error) {
@@ -493,7 +495,7 @@ func (n *network) Pong(nodeID ids.NodeID) (message.OutboundMessage, error) {
 	}
 
 	uptimePercentInt := uint8(uptimePercentFloat * 100)
-	return n.peerConfig.MessageCreator.Pong(uptimePercentInt)
+	return n.peerConfig.GetMessageCreator().Pong(uptimePercentInt)
 }
 
 // Dispatch starts accepting connections from other nodes attempting to connect
@@ -1158,7 +1160,7 @@ func (n *network) runTimers() {
 				continue
 			}
 
-			msg, err := n.peerConfig.MessageCreator.PeerList(validatorIPs, false)
+			msg, err := n.peerConfig.GetMessageCreator().PeerList(validatorIPs, false)
 			if err != nil {
 				n.peerConfig.Log.Error(
 					"failed to gossip",

@@ -8,6 +8,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/window"
@@ -24,7 +25,7 @@ var _ blocks.Visitor = &acceptor{}
 type acceptor struct {
 	*backend
 	metrics          metrics.Metrics
-	recentlyAccepted *window.Window
+	recentlyAccepted window.Window[ids.ID]
 	bootstrapped     *utils.AtomicBool
 }
 

@@ -108,7 +108,6 @@ type OutboundMsgBuilder interface {
 	Put(
 		chainID ids.ID,
 		requestID uint32,
-		containerID ids.ID,
 		container []byte,
 	) (OutboundMessage, error)
 
@@ -116,7 +115,6 @@ type OutboundMsgBuilder interface {
 		chainID ids.ID,
 		requestID uint32,
 		deadline time.Duration,
-		containerID ids.ID,
 		container []byte,
 	) (OutboundMessage, error)
 
@@ -131,13 +129,6 @@ type OutboundMsgBuilder interface {
 		chainID ids.ID,
 		requestID uint32,
 		containerIDs []ids.ID,
-	) (OutboundMessage, error)
-
-	ChitsV2(
-		chainID ids.ID,
-		requestID uint32,
-		containerIDs []ids.ID,
-		containerID ids.ID,
 	) (OutboundMessage, error)
 
 	AppRequest(
@@ -197,7 +188,7 @@ func (b *outMsgBuilderWithPacker) Version(
 			SigBytes:       sig,
 			TrackedSubnets: subnetIDBytes,
 		},
-		Version.Compressible(), // Version Messages can't be compressed
+		b.compress && Version.Compressible(),
 		true,
 	)
 }
@@ -208,7 +199,7 @@ func (b *outMsgBuilderWithPacker) PeerList(peers []ips.ClaimedIPPort, bypassThro
 		map[Field]interface{}{
 			Peers: peers,
 		},
-		b.compress && PeerList.Compressible(), // PeerList messages may be compressed
+		b.compress && PeerList.Compressible(),
 		bypassThrottling,
 	)
 }
@@ -217,7 +208,7 @@ func (b *outMsgBuilderWithPacker) Ping() (OutboundMessage, error) {
 	return b.c.Pack(
 		Ping,
 		nil,
-		Ping.Compressible(), // Ping messages can't be compressed
+		b.compress && Ping.Compressible(),
 		false,
 	)
 }
@@ -228,7 +219,7 @@ func (b *outMsgBuilderWithPacker) Pong(uptimePercentage uint8) (OutboundMessage,
 		map[Field]interface{}{
 			Uptime: uptimePercentage,
 		},
-		Pong.Compressible(), // Pong messages can't be compressed
+		b.compress && Pong.Compressible(),
 		false,
 	)
 }
@@ -245,7 +236,7 @@ func (b *outMsgBuilderWithPacker) GetStateSummaryFrontier(
 			RequestID: requestID,
 			Deadline:  uint64(deadline),
 		},
-		GetStateSummaryFrontier.Compressible(), // GetStateSummaryFrontier messages can't be compressed
+		b.compress && GetStateSummaryFrontier.Compressible(),
 		false,
 	)
 }
@@ -262,7 +253,7 @@ func (b *outMsgBuilderWithPacker) StateSummaryFrontier(
 			RequestID:    requestID,
 			SummaryBytes: summary,
 		},
-		b.compress && StateSummaryFrontier.Compressible(), // StateSummaryFrontier messages may be compressed
+		b.compress && StateSummaryFrontier.Compressible(),
 		false,
 	)
 }
@@ -281,7 +272,7 @@ func (b *outMsgBuilderWithPacker) GetAcceptedStateSummary(
 			Deadline:       uint64(deadline),
 			SummaryHeights: heights,
 		},
-		b.compress && GetAcceptedStateSummary.Compressible(), // GetAcceptedStateSummary messages may be compressed
+		b.compress && GetAcceptedStateSummary.Compressible(),
 		false,
 	)
 }
@@ -300,7 +291,7 @@ func (b *outMsgBuilderWithPacker) AcceptedStateSummary(
 			RequestID:  requestID,
 			SummaryIDs: summaryIDBytes,
 		},
-		b.compress && AcceptedStateSummary.Compressible(), // AcceptedStateSummary messages may be compressed
+		b.compress && AcceptedStateSummary.Compressible(),
 		false,
 	)
 }
@@ -317,7 +308,7 @@ func (b *outMsgBuilderWithPacker) GetAcceptedFrontier(
 			RequestID: requestID,
 			Deadline:  uint64(deadline),
 		},
-		GetAcceptedFrontier.Compressible(), // GetAcceptedFrontier messages can't be compressed
+		b.compress && GetAcceptedFrontier.Compressible(),
 		false,
 	)
 }
@@ -336,7 +327,7 @@ func (b *outMsgBuilderWithPacker) AcceptedFrontier(
 			RequestID:    requestID,
 			ContainerIDs: containerIDBytes,
 		},
-		AcceptedFrontier.Compressible(), // AcceptedFrontier messages can't be compressed
+		b.compress && AcceptedFrontier.Compressible(),
 		false,
 	)
 }
@@ -357,7 +348,7 @@ func (b *outMsgBuilderWithPacker) GetAccepted(
 			Deadline:     uint64(deadline),
 			ContainerIDs: containerIDBytes,
 		},
-		GetAccepted.Compressible(), // GetAccepted messages can't be compressed
+		b.compress && GetAccepted.Compressible(),
 		false,
 	)
 }
@@ -376,7 +367,7 @@ func (b *outMsgBuilderWithPacker) Accepted(
 			RequestID:    requestID,
 			ContainerIDs: containerIDBytes,
 		},
-		Accepted.Compressible(), // Accepted messages can't be compressed
+		b.compress && Accepted.Compressible(),
 		false,
 	)
 }
@@ -395,7 +386,7 @@ func (b *outMsgBuilderWithPacker) GetAncestors(
 			Deadline:    uint64(deadline),
 			ContainerID: containerID[:],
 		},
-		GetAncestors.Compressible(), // GetAncestors messages can't be compressed
+		b.compress && GetAncestors.Compressible(),
 		false,
 	)
 }
@@ -412,7 +403,7 @@ func (b *outMsgBuilderWithPacker) Ancestors(
 			RequestID:           requestID,
 			MultiContainerBytes: containers,
 		},
-		b.compress && Ancestors.Compressible(), // Ancestors messages may be compressed
+		b.compress && Ancestors.Compressible(),
 		false,
 	)
 }
@@ -431,7 +422,7 @@ func (b *outMsgBuilderWithPacker) Get(
 			Deadline:    uint64(deadline),
 			ContainerID: containerID[:],
 		},
-		Get.Compressible(), // Get messages can't be compressed
+		b.compress && Get.Compressible(),
 		false,
 	)
 }
@@ -439,7 +430,6 @@ func (b *outMsgBuilderWithPacker) Get(
 func (b *outMsgBuilderWithPacker) Put(
 	chainID ids.ID,
 	requestID uint32,
-	containerID ids.ID,
 	container []byte,
 ) (OutboundMessage, error) {
 	return b.c.Pack(
@@ -447,10 +437,10 @@ func (b *outMsgBuilderWithPacker) Put(
 		map[Field]interface{}{
 			ChainID:        chainID[:],
 			RequestID:      requestID,
-			ContainerID:    containerID[:],
+			ContainerID:    ids.Empty[:], // Populated for backwards compatibility
 			ContainerBytes: container,
 		},
-		b.compress && Put.Compressible(), // Put messages may be compressed
+		b.compress && Put.Compressible(),
 		false,
 	)
 }
@@ -459,7 +449,6 @@ func (b *outMsgBuilderWithPacker) PushQuery(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
-	containerID ids.ID,
 	container []byte,
 ) (OutboundMessage, error) {
 	return b.c.Pack(
@@ -468,10 +457,10 @@ func (b *outMsgBuilderWithPacker) PushQuery(
 			ChainID:        chainID[:],
 			RequestID:      requestID,
 			Deadline:       uint64(deadline),
-			ContainerID:    containerID[:],
+			ContainerID:    ids.Empty[:], // Populated for backwards compatibility
 			ContainerBytes: container,
 		},
-		b.compress && PushQuery.Compressible(), // PushQuery messages may be compressed
+		b.compress && PushQuery.Compressible(),
 		false,
 	)
 }
@@ -490,7 +479,7 @@ func (b *outMsgBuilderWithPacker) PullQuery(
 			Deadline:    uint64(deadline),
 			ContainerID: containerID[:],
 		},
-		PullQuery.Compressible(), // PullQuery messages can't be compressed
+		b.compress && PullQuery.Compressible(),
 		false,
 	)
 }
@@ -509,29 +498,7 @@ func (b *outMsgBuilderWithPacker) Chits(
 			RequestID:    requestID,
 			ContainerIDs: containerIDBytes,
 		},
-		Chits.Compressible(), // Chits messages can't be compressed
-		false,
-	)
-}
-
-func (b *outMsgBuilderWithPacker) ChitsV2(
-	chainID ids.ID,
-	requestID uint32,
-	containerIDs []ids.ID,
-	containerID ids.ID,
-) (OutboundMessage, error) {
-	containerIDBytes := make([][]byte, len(containerIDs))
-	encodeIDs(containerIDs, containerIDBytes)
-
-	return b.c.Pack(
-		ChitsV2,
-		map[Field]interface{}{
-			ChainID:      chainID[:],
-			RequestID:    requestID,
-			ContainerIDs: containerIDBytes,
-			ContainerID:  containerID[:],
-		},
-		ChitsV2.Compressible(), // ChitsV2 messages can't be compressed
+		b.compress && Chits.Compressible(),
 		false,
 	)
 }
@@ -551,7 +518,7 @@ func (b *outMsgBuilderWithPacker) AppRequest(
 			Deadline:  uint64(deadline),
 			AppBytes:  msg,
 		},
-		b.compress && AppRequest.Compressible(), // App messages may be compressed
+		b.compress && AppRequest.Compressible(),
 		false,
 	)
 }
@@ -565,7 +532,7 @@ func (b *outMsgBuilderWithPacker) AppResponse(chainID ids.ID, requestID uint32, 
 			RequestID: requestID,
 			AppBytes:  msg,
 		},
-		b.compress && AppResponse.Compressible(), // App messages may be compressed
+		b.compress && AppResponse.Compressible(),
 		false,
 	)
 }
@@ -578,7 +545,7 @@ func (b *outMsgBuilderWithPacker) AppGossip(chainID ids.ID, msg []byte) (Outboun
 			ChainID:  chainID[:],
 			AppBytes: msg,
 		},
-		b.compress && AppGossip.Compressible(), // App messages may be compressed
+		b.compress && AppGossip.Compressible(),
 		false,
 	)
 }

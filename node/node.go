@@ -117,7 +117,8 @@ type Node struct {
 	health health.Health
 
 	// Build and parse messages, for both network layer and chain manager
-	msgCreator message.Creator
+	msgCreator          message.Creator
+	msgCreatorWithProto message.Creator
 
 	// Manages creation of blockchains and routing messages to them
 	chainManager chains.Manager
@@ -304,6 +305,8 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
 		n.msgCreator,
+		n.msgCreatorWithProto,
+		version.GetBlueberryTime(n.Config.NetworkID),
 		n.MetricsRegisterer,
 		n.Log,
 		listener,
@@ -704,6 +707,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		ConsensusAcceptorGroup:                  n.ConsensusAcceptorGroup,
 		DBManager:                               n.DBManager,
 		MsgCreator:                              n.msgCreator,
+		MsgCreatorWithProto:                     n.msgCreatorWithProto,
 		Router:                                  n.Config.ConsensusRouter,
 		Net:                                     n.Net,
 		ConsensusParams:                         n.Config.ConsensusParams,
@@ -1251,13 +1255,23 @@ func (n *Node) Initialize(
 	// and the engine (initChains) but after the metrics (initMetricsAPI)
 	// message.Creator currently record metrics under network namespace
 	n.networkNamespace = "network"
-	n.msgCreator, err = message.NewCreator(n.MetricsRegisterer,
-		n.Config.NetworkConfig.CompressionEnabled,
+	n.msgCreator, err = message.NewCreator(
+		n.MetricsRegisterer,
 		n.networkNamespace,
+		n.Config.NetworkConfig.CompressionEnabled,
 		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
 	)
 	if err != nil {
 		return fmt.Errorf("problem initializing message creator: %w", err)
+	}
+	n.msgCreatorWithProto, err = message.NewCreatorWithProto(
+		n.MetricsRegisterer,
+		n.networkNamespace,
+		n.Config.NetworkConfig.CompressionEnabled,
+		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
+	)
+	if err != nil {
+		return fmt.Errorf("problem initializing message creator with proto: %w", err)
 	}
 
 	primaryNetVdrs, err := n.initVdrs()
