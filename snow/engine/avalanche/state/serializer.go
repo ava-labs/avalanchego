@@ -51,7 +51,7 @@ type SerializerConfig struct {
 
 func NewSerializer(config SerializerConfig) vertex.Manager {
 	versionDB := versiondb.New(config.DB)
-	dbCache := &cache.LRU[ids.ID, interface{}]{Size: dbCacheSize}
+	dbCache := &cache.LRU[ids.ID, any]{Size: dbCacheSize}
 	s := Serializer{
 		SerializerConfig: config,
 		versionDB:        versionDB,
