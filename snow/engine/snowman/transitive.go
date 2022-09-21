@@ -157,6 +157,7 @@ func (t *Transitive) GetFailed(nodeID ids.NodeID, requestID uint32) error {
 
 	// Because the get request was dropped, we no longer expect blkID to be issued.
 	t.blocked.Abandon(blkID)
+	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
 	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 	return t.buildBlocks()
 }
