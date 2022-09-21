@@ -8,6 +8,7 @@ on:
 jobs:
   build-x86_64-binaries-tarball:
     runs-on: ubuntu-22.04
+
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
