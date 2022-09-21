@@ -1,5 +1,9 @@
 # Release Notes
 
+## [v1.8.6](https://github.com/ava-labs/avalanchego/releases/tag/v1.8.6)
+
+This version is backwards compatible to [v1.8.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.8.0). It is optional, but encouraged. The supported plugin version is `16`.
+
 ## [v1.8.5](https://github.com/ava-labs/avalanchego/releases/tag/v1.8.5)
 
 Please upgrade your node as soon as possible.

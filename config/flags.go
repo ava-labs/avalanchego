@@ -141,8 +141,8 @@ func addNodeFlags(fs *flag.FlagSet) {
 	)
 	fs.Uint(NetworkPeerListNumValidatorIPsKey, 15, gossipHelpMsg)
 	fs.Uint(NetworkPeerListValidatorGossipSizeKey, 20, gossipHelpMsg)
-	fs.Uint(NetworkPeerListNonValidatorGossipSizeKey, 10, gossipHelpMsg)
-	fs.Uint(NetworkPeerListPeersGossipSizeKey, 0, gossipHelpMsg)
+	fs.Uint(NetworkPeerListNonValidatorGossipSizeKey, 0, gossipHelpMsg)
+	fs.Uint(NetworkPeerListPeersGossipSizeKey, 10, gossipHelpMsg)
 	fs.Duration(NetworkPeerListGossipFreqKey, time.Minute, gossipHelpMsg)
 
 	// Public IP Resolution
