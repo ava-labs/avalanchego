@@ -29,6 +29,7 @@ fi
 # Build Coreth
 echo "Building Coreth @ ${coreth_version} ..."
 cd "$coreth_path"
+echo "CGO_CFLAGS: $CGO_CFLAGS"
 go build -ldflags "-X github.com/ava-labs/coreth/plugin/evm.Version=$coreth_version $static_ld_flags" -o "$evm_path" "plugin/"*.go
 cd "$AVALANCHE_PATH"
 

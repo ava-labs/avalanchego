@@ -73,6 +73,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -970,6 +971,7 @@ func (n *Node) initInfoAPI() error {
 		info.Parameters{
 			Version:                       version.CurrentApp,
 			NodeID:                        n.ID,
+			NodePOP:                       signer.NewProofOfPossession(n.Config.StakingSigningKey),
 			NetworkID:                     n.Config.NetworkID,
 			TxFee:                         n.Config.TxFee,
 			CreateAssetTxFee:              n.Config.CreateAssetTxFee,
@@ -1222,9 +1224,11 @@ func (n *Node) Initialize(
 	n.LogFactory = logFactory
 	n.DoneShuttingDown.Add(1)
 
+	pop := signer.NewProofOfPossession(n.Config.StakingSigningKey)
 	n.Log.Info("initializing node",
 		zap.Stringer("version", version.CurrentApp),
 		zap.Stringer("nodeID", n.ID),
+		zap.Reflect("nodePOP", pop),
 		zap.Reflect("config", n.Config),
 	)
 
