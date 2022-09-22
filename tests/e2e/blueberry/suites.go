@@ -25,11 +25,11 @@ import (
 
 var _ = e2e.DescribeLocal("[Blueberry]", func() {
 	ginkgo.It("can send custom assets X->P and P->X", func() {
-		if e2e.GetEnableWhitelistTxTests() {
+		if e2e.Env.GetEnableWhitelistTxTests() {
 			ginkgo.Skip("whitelist vtx tests are enabled; skipping")
 		}
 
-		uris := e2e.GetURIs()
+		uris := e2e.Env.GetURIs()
 		gomega.Expect(uris).ShouldNot(gomega.BeEmpty())
 
 		kc := secp256k1fx.NewKeychain(genesis.EWOQKey)

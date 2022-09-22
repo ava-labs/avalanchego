@@ -34,14 +34,14 @@ const (
 
 var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 	ginkgo.It("can issue whitelist vtx", func() {
-		if !e2e.GetEnableWhitelistTxTests() {
+		if !e2e.Env.GetEnableWhitelistTxTests() {
 			ginkgo.Skip("whitelist vtx tests are disabled; skipping")
 		}
 
-		uris := e2e.GetURIs()
+		uris := e2e.Env.GetURIs()
 		gomega.Expect(uris).ShouldNot(gomega.BeEmpty())
 
-		testKeys, testKeyAddrs, keyChain := e2e.LoadTestKeys()
+		testKeys, testKeyAddrs, keyChain := e2e.Env.GetTestKeys()
 		var baseWallet primary.Wallet
 		ginkgo.By("collect whitelist vtx metrics", func() {
 			walletURI := uris[0]

@@ -16,11 +16,11 @@ import (
 
 var _ = e2e.DescribeLocal("[Ping]", func() {
 	ginkgo.It("can ping network-runner RPC server", func() {
-		if e2e.GetRunnerGRPCEndpoint() == "" {
+		if e2e.Env.GetRunnerGRPCEndpoint() == "" {
 			ginkgo.Skip("no local network-runner, skipping")
 		}
 
-		runnerCli := e2e.GetRunnerClient()
+		runnerCli := e2e.Env.GetRunnerClient()
 		gomega.Expect(runnerCli).ShouldNot(gomega.BeNil())
 
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

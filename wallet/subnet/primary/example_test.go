@@ -68,7 +68,7 @@ func ExampleWallet() {
 	}
 	log.Printf("created X-chain asset %s in %s\n", createAssetTxID, time.Since(createAssetStartTime))
 
-	// Send 100 schmeckles to the P-chain.
+	// Send 100 MegaAvax to the P-chain.
 	exportStartTime := time.Now()
 	exportTxID, err := xWallet.IssueExportTx(
 		constants.PlatformChainID,
@@ -90,7 +90,7 @@ func ExampleWallet() {
 	}
 	log.Printf("issued X->P export %s in %s\n", exportTxID, time.Since(exportStartTime))
 
-	// Import the 100 schmeckles from the X-chain into the P-chain.
+	// Import the 100 MegaAvax from the X-chain into the P-chain.
 	importStartTime := time.Now()
 	importTxID, err := pWallet.IssueImportTx(xChainID, owner)
 	if err != nil {

@@ -34,11 +34,11 @@ const totalRounds = 50
 
 var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
 	ginkgo.It("can issue a virtuous transfer tx for AVAX asset", func() {
-		if e2e.GetEnableWhitelistTxTests() {
+		if e2e.Env.GetEnableWhitelistTxTests() {
 			ginkgo.Skip("whitelist vtx tests are enabled; skipping")
 		}
 
-		rpcEps := e2e.GetURIs()
+		rpcEps := e2e.Env.GetURIs()
 		gomega.Expect(rpcEps).ShouldNot(gomega.BeEmpty())
 
 		allMetrics := []string{
@@ -50,7 +50,7 @@ var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
 		runFunc := func(round int) {
 			tests.Outf("{{green}}\n\n\n\n\n\n---\n[ROUND #%02d]:{{/}}\n", round)
 
-			testKeys, _, _ := e2e.LoadTestKeys()
+			testKeys, _, _ := e2e.Env.GetTestKeys()
 
 			needPermute := round > 3
 			if needPermute {
