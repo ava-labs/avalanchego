@@ -75,7 +75,7 @@ type ChainRouter struct {
 	// Parameters for doing health checks
 	healthConfig HealthConfig
 	// aggregator of requests based on their time
-	timedRequests linkedhashmap.LinkedHashmap
+	timedRequests linkedhashmap.LinkedHashmap[ids.ID, requestEntry]
 	// Must only be accessed in method [createRequestID].
 	// [lock] must be held when [requestIDBytes] is accessed.
 	requestIDBytes []byte
@@ -107,7 +107,7 @@ func (cr *ChainRouter) Initialize(
 	cr.benched = make(map[ids.NodeID]ids.Set)
 	cr.criticalChains = criticalChains
 	cr.onFatal = onFatal
-	cr.timedRequests = linkedhashmap.New()
+	cr.timedRequests = linkedhashmap.New[ids.ID, requestEntry]()
 	cr.peers = make(map[ids.NodeID]*peer)
 	cr.healthConfig = healthConfig
 	cr.requestIDBytes = make([]byte, hashing.AddrLen+hashing.HashLen+wrappers.IntLen+wrappers.ByteLen) // Validator ID, Chain ID, Request ID, Msg Type
@@ -481,7 +481,7 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 	now := cr.clock.Time()
 	processingRequest := now
 	if _, longestRunning, exists := cr.timedRequests.Oldest(); exists {
-		processingRequest = longestRunning.(requestEntry).time
+		processingRequest = longestRunning.time
 	}
 	timeReqRunning := now.Sub(processingRequest)
 	isOutstanding := timeReqRunning <= cr.healthConfig.MaxOutstandingDuration
@@ -542,15 +542,13 @@ func (cr *ChainRouter) clearRequest(
 	// Create the request ID of the request we sent that this message is (allegedly) in response to.
 	uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, op)
 	// Mark that an outstanding request has been fulfilled
-	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
+	request, exists := cr.timedRequests.Get(uniqueRequestID)
 	if !exists {
 		return uniqueRequestID, nil
 	}
 
 	cr.timedRequests.Delete(uniqueRequestID)
 	cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
-
-	request := requestIntf.(requestEntry)
 	return uniqueRequestID, &request
 }
 
