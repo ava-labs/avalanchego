@@ -37,10 +37,15 @@ func (e *avalancheEndpointRequester) SendRequest(
 	if err != nil {
 		return err
 	}
+
+	if e.base != "" {
+		method = fmt.Sprintf("%s.%s", e.base, method)
+	}
+
 	return SendJSONRequest(
 		ctx,
 		uri,
-		fmt.Sprintf("%s.%s", e.base, method),
+		method,
 		params,
 		reply,
 		options...,
