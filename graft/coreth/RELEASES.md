@@ -4,6 +4,7 @@
 
 - Deprecate Native Asset Call and Native Asset Balance
 - Deprecate Import/Export of non-AVAX Avalanche Native Tokens via Atomic Transactions
+- Add failure reason to bad block API
 
 ## [v0.9.0](https://github.com/ava-labs/coreth/releases/tag/v0.9.0)
 
