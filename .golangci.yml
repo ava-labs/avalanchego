@@ -15,7 +15,6 @@ linters:
   disable-all: true
   enable:
     - asciicheck
-    - deadcode
     - depguard
     - errcheck
     - exportloopref
@@ -37,7 +36,6 @@ linters:
     - unconvert
     - unparam
     - unused
-    - varcheck
     - unconvert
     - whitespace
     - staticcheck
