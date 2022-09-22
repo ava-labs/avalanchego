@@ -376,7 +376,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					FlowChecker: flowChecker,
 					Config: &config.Config{
-						AddSubnetValidatorFee: 1,
+						TxFees: config.TxFees{
+							AddSubnetValidatorFee: 1,
+						},
 					},
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
@@ -420,7 +422,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					FlowChecker: flowChecker,
 					Config: &config.Config{
-						AddSubnetValidatorFee: 1,
+						TxFees: config.TxFees{
+							AddSubnetValidatorFee: 1,
+						},
 					},
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
@@ -468,7 +472,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return &Backend{
 					FlowChecker: flowChecker,
 					Config: &config.Config{
-						AddSubnetValidatorFee: 1,
+						TxFees: config.TxFees{
+							AddSubnetValidatorFee: 1,
+						},
 					},
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,

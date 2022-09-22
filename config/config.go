@@ -47,6 +47,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/storage"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/vms"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
@@ -843,9 +844,9 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 	return config, nil
 }
 
-func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
+func getTxFeeConfig(v *viper.Viper, networkID uint32) config.TxFees {
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
-		return genesis.TxFeeConfig{
+		return config.TxFees{
 			TxFee:                         v.GetUint64(TxFeeKey),
 			CreateAssetTxFee:              v.GetUint64(CreateAssetTxFeeKey),
 			CreateSubnetTxFee:             v.GetUint64(CreateSubnetTxFeeKey),
@@ -1331,7 +1332,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.FdLimit = v.GetUint64(FdLimitKey)
 
 	// Tx Fee
-	nodeConfig.TxFeeConfig = getTxFeeConfig(v, nodeConfig.NetworkID)
+	nodeConfig.TxFees = getTxFeeConfig(v, nodeConfig.NetworkID)
 
 	// Genesis Data
 	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = getGenesisData(v, nodeConfig.NetworkID)

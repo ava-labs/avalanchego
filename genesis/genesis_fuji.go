@@ -9,6 +9,7 @@ import (
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
@@ -18,7 +19,7 @@ var (
 
 	// FujiParams are the params used for the fuji testnet
 	FujiParams = Params{
-		TxFeeConfig: TxFeeConfig{
+		TxFees: config.TxFees{
 			TxFee:                         units.MilliAvax,
 			CreateAssetTxFee:              10 * units.MilliAvax,
 			CreateSubnetTxFee:             100 * units.MilliAvax,

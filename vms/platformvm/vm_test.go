@@ -315,13 +315,15 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
+			TxFees: config.TxFees{
+				TxFee:                 defaultTxFee,
+				CreateSubnetTxFee:     100 * defaultTxFee,
+				TransformSubnetTxFee:  100 * defaultTxFee,
+				CreateBlockchainTxFee: 100 * defaultTxFee,
+			},
 			Chains:                 chains.MockManager{},
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
 			Validators:             validators.NewManager(),
-			TxFee:                  defaultTxFee,
-			CreateSubnetTxFee:      100 * defaultTxFee,
-			TransformSubnetTxFee:   100 * defaultTxFee,
-			CreateBlockchainTxFee:  100 * defaultTxFee,
 			MinValidatorStake:      defaultMinValidatorStake,
 			MaxValidatorStake:      defaultMaxValidatorStake,
 			MinDelegatorStake:      defaultMinDelegatorStake,
@@ -399,10 +401,12 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
+			TxFees: config.TxFees{
+				TxFee: defaultTxFee,
+			},
 			Chains:                 chains.MockManager{},
 			Validators:             validators.NewManager(),
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			TxFee:                  defaultTxFee,
 			MinValidatorStake:      defaultMinValidatorStake,
 			MaxValidatorStake:      defaultMaxValidatorStake,
 			MinDelegatorStake:      defaultMinDelegatorStake,
