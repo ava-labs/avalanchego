@@ -60,13 +60,13 @@ func (p *PrecompileUpgrade) getByKey(key precompileKey) (precompile.StatefulPrec
 	}
 }
 
-// VerifyPrecompileUpgrades checks [c.PrecompileUpgrades] is well formed:
+// verifyPrecompileUpgrades checks [c.PrecompileUpgrades] is well formed:
 // - [upgrades] must specify exactly one key per PrecompileUpgrade
 // - the specified blockTimestamps must monotonically increase
 // - the specified blockTimestamps must be compatible with those
 //   specified in the chainConfig by genesis.
 // - check a precompile is disabled before it is re-enabled
-func (c *ChainConfig) VerifyPrecompileUpgrades() error {
+func (c *ChainConfig) verifyPrecompileUpgrades() error {
 	var lastBlockTimestamp *big.Int
 	for i, upgrade := range c.PrecompileUpgrades {
 		hasKey := false // used to verify if there is only one key per Upgrade
@@ -103,6 +103,9 @@ func (c *ChainConfig) VerifyPrecompileUpgrades() error {
 		)
 		// check the genesis chain config for any enabled upgrade
 		if config, ok := c.PrecompileUpgrade.getByKey(key); ok {
+			if err := config.Verify(); err != nil {
+				return err
+			}
 			disabled = false
 			lastUpgraded = config.Timestamp()
 		} else {
@@ -121,6 +124,10 @@ func (c *ChainConfig) VerifyPrecompileUpgrades() error {
 			}
 			if lastUpgraded != nil && (config.Timestamp().Cmp(lastUpgraded) <= 0) {
 				return fmt.Errorf("PrecompileUpgrades[%d] config timestamp (%v) <= previous timestamp (%v)", i, config.Timestamp(), lastUpgraded)
+			}
+
+			if err := config.Verify(); err != nil {
+				return err
 			}
 
 			disabled = config.IsDisabled()

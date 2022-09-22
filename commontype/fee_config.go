@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -79,6 +80,22 @@ func (f *FeeConfig) Verify() error {
 		return fmt.Errorf("blockGasCostStep = %d cannot be less than 0", f.BlockGasCostStep)
 	}
 	return f.checkByteLens()
+}
+
+// Equal checks if given [other] is same with this FeeConfig.
+func (f *FeeConfig) Equal(other *FeeConfig) bool {
+	if other == nil {
+		return false
+	}
+
+	return utils.BigNumEqual(f.GasLimit, other.GasLimit) &&
+		f.TargetBlockRate == other.TargetBlockRate &&
+		utils.BigNumEqual(f.MinBaseFee, other.MinBaseFee) &&
+		utils.BigNumEqual(f.TargetGas, other.TargetGas) &&
+		utils.BigNumEqual(f.BaseFeeChangeDenominator, other.BaseFeeChangeDenominator) &&
+		utils.BigNumEqual(f.MinBlockGasCost, other.MinBlockGasCost) &&
+		utils.BigNumEqual(f.MaxBlockGasCost, other.MaxBlockGasCost) &&
+		utils.BigNumEqual(f.BlockGasCostStep, other.BlockGasCostStep)
 }
 
 // checkByteLens checks byte lengths against common.HashLen (32 bytes) and returns error

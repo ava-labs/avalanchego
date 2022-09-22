@@ -35,6 +35,8 @@ type StatefulPrecompileConfig interface {
 	// Contract returns a thread-safe singleton that can be used as the StatefulPrecompiledContract when
 	// this config is enabled.
 	Contract() StatefulPrecompiledContract
+	// Verify is called on startup and an error is treated as fatal. Configure can assume the Config has passed verification.
+	Verify() error
 }
 
 // Configure sets the nonce and code to non-empty values then calls Configure on [precompileConfig] to make the necessary

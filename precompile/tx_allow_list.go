@@ -26,10 +26,13 @@ type TxAllowListConfig struct {
 }
 
 // NewTxAllowListConfig returns a config for a network upgrade at [blockTimestamp] that enables
-// TxAllowList with the given [admins] as members of the allowlist.
-func NewTxAllowListConfig(blockTimestamp *big.Int, admins []common.Address) *TxAllowListConfig {
+// TxAllowList with the given [admins] and [enableds] as members of the allowlist.
+func NewTxAllowListConfig(blockTimestamp *big.Int, admins []common.Address, enableds []common.Address) *TxAllowListConfig {
 	return &TxAllowListConfig{
-		AllowListConfig:   AllowListConfig{AllowListAdmins: admins},
+		AllowListConfig: AllowListConfig{
+			AllowListAdmins:  admins,
+			EnabledAddresses: enableds,
+		},
 		UpgradeableConfig: UpgradeableConfig{BlockTimestamp: blockTimestamp},
 	}
 }

@@ -12,9 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-// Enum constants for valid AllowListRole
-type AllowListRole common.Hash
-
 const (
 	SetAdminFuncKey      = "setAdmin"
 	SetEnabledFuncKey    = "setEnabled"
@@ -43,12 +40,16 @@ var (
 
 // AllowListConfig specifies the initial set of allow list admins.
 type AllowListConfig struct {
-	AllowListAdmins []common.Address `json:"adminAddresses"`
+	AllowListAdmins  []common.Address `json:"adminAddresses"`
+	EnabledAddresses []common.Address `json:"enabledAddresses"` // initial enabled addresses
 }
 
 // Configure initializes the address space of [precompileAddr] by initializing the role of each of
 // the addresses in [AllowListAdmins].
 func (c *AllowListConfig) Configure(state StateDB, precompileAddr common.Address) {
+	for _, enabledAddr := range c.EnabledAddresses {
+		setAllowListRole(state, precompileAddr, enabledAddr, AllowListEnabled)
+	}
 	for _, adminAddr := range c.AllowListAdmins {
 		setAllowListRole(state, precompileAddr, adminAddr, AllowListAdmin)
 	}
@@ -59,55 +60,45 @@ func (c *AllowListConfig) Equal(other *AllowListConfig) bool {
 	if other == nil {
 		return false
 	}
-	if len(c.AllowListAdmins) != len(other.AllowListAdmins) {
+	if !areEqualAddressLists(c.AllowListAdmins, other.AllowListAdmins) {
 		return false
 	}
-	for i, admin := range c.AllowListAdmins {
-		if admin != other.AllowListAdmins[i] {
+
+	return areEqualAddressLists(c.EnabledAddresses, other.EnabledAddresses)
+}
+
+// areEqualAddressLists returns true iff [a] and [b] have the same addresses in the same order.
+func areEqualAddressLists(current []common.Address, other []common.Address) bool {
+	if len(current) != len(other) {
+		return false
+	}
+	for i, address := range current {
+		if address != other[i] {
 			return false
 		}
 	}
 	return true
 }
 
-// Valid returns true iff [s] represents a valid role.
-func (s AllowListRole) Valid() bool {
-	switch s {
-	case AllowListNoRole, AllowListEnabled, AllowListAdmin:
-		return true
-	default:
-		return false
+// Verify returns an error if there is an overlapping address between admin and enabled roles
+func (c *AllowListConfig) Verify() error {
+	// return early if either list is empty
+	if len(c.EnabledAddresses) == 0 || len(c.AllowListAdmins) == 0 {
+		return nil
 	}
-}
+	enabledMap := make(map[common.Address]struct{})
+	for _, enabledAddr := range c.EnabledAddresses {
+		if _, ok := enabledMap[enabledAddr]; !ok {
+			enabledMap[enabledAddr] = struct{}{}
+		}
+	}
+	for _, adminAddr := range c.AllowListAdmins {
+		if _, ok := enabledMap[adminAddr]; ok {
+			return fmt.Errorf("cannot set address %s as both admin and enabled", adminAddr)
+		}
+	}
 
-// IsNoRole returns true if [s] indicates no specific role.
-func (s AllowListRole) IsNoRole() bool {
-	switch s {
-	case AllowListNoRole:
-		return true
-	default:
-		return false
-	}
-}
-
-// IsAdmin returns true if [s] indicates the permission to modify the allow list.
-func (s AllowListRole) IsAdmin() bool {
-	switch s {
-	case AllowListAdmin:
-		return true
-	default:
-		return false
-	}
-}
-
-// IsEnabled returns true if [s] indicates that it has permission to access the resource.
-func (s AllowListRole) IsEnabled() bool {
-	switch s {
-	case AllowListAdmin, AllowListEnabled:
-		return true
-	default:
-		return false
-	}
+	return nil
 }
 
 // getAllowListStatus returns the allow list role of [address] for the precompile
@@ -125,6 +116,10 @@ func setAllowListRole(stateDB StateDB, precompileAddr, address common.Address, r
 	// Generate the state key for [address]
 	addressKey := address.Hash()
 	// Assign [role] to the address
+	// This stores the [role] in the contract storage with address [precompileAddr]
+	// and [addressKey] hash. It means that any reusage of the [addressKey] for different value
+	// conflicts with the same slot [role] is stored.
+	// Precompile implementations must use a different key than [addressKey]
 	stateDB.SetState(precompileAddr, addressKey, common.Hash(role))
 }
 

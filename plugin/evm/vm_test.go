@@ -2109,7 +2109,7 @@ func TestBuildAllowListActivationBlock(t *testing.T) {
 	if err := genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)); err != nil {
 		t.Fatal(err)
 	}
-	genesis.Config.ContractDeployerAllowListConfig = precompile.NewContractDeployerAllowListConfig(big.NewInt(time.Now().Unix()), testEthAddrs)
+	genesis.Config.ContractDeployerAllowListConfig = precompile.NewContractDeployerAllowListConfig(big.NewInt(time.Now().Unix()), testEthAddrs, nil)
 
 	genesisJSON, err := genesis.MarshalJSON()
 	if err != nil {
@@ -2173,7 +2173,7 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	if err := genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)); err != nil {
 		t.Fatal(err)
 	}
-	genesis.Config.TxAllowListConfig = precompile.NewTxAllowListConfig(big.NewInt(0), testEthAddrs[0:1])
+	genesis.Config.TxAllowListConfig = precompile.NewTxAllowListConfig(big.NewInt(0), testEthAddrs[0:1], nil)
 	genesisJSON, err := genesis.MarshalJSON()
 	if err != nil {
 		t.Fatal(err)
@@ -2249,7 +2249,7 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 		t.Fatal(err)
 	}
 	enableAllowListTimestamp := time.Unix(0, 0) // enable at genesis
-	genesis.Config.TxAllowListConfig = precompile.NewTxAllowListConfig(big.NewInt(enableAllowListTimestamp.Unix()), testEthAddrs[0:1])
+	genesis.Config.TxAllowListConfig = precompile.NewTxAllowListConfig(big.NewInt(enableAllowListTimestamp.Unix()), testEthAddrs[0:1], nil)
 	genesisJSON, err := genesis.MarshalJSON()
 	if err != nil {
 		t.Fatal(err)
@@ -2356,7 +2356,7 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	if err := genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)); err != nil {
 		t.Fatal(err)
 	}
-	genesis.Config.FeeManagerConfig = precompile.NewFeeManagerConfig(big.NewInt(0), testEthAddrs[0:1])
+	genesis.Config.FeeManagerConfig = precompile.NewFeeManagerConfig(big.NewInt(0), testEthAddrs[0:1], nil, nil)
 
 	// set a lower fee config now
 	testLowFeeConfig := commontype.FeeConfig{
@@ -2484,7 +2484,7 @@ func TestAllowFeeRecipientDisabled(t *testing.T) {
 	}
 	issuer, vm, _, _ := GenesisVM(t, true, string(genesisJSON), "", "")
 
-	vm.miner.SetEtherbase(common.BigToAddress(common.Big1)) // set non-blackhole address by force
+	vm.miner.SetEtherbase(common.HexToAddress("0x0123456789")) // set non-blackhole address by force
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -2533,7 +2533,7 @@ func TestAllowFeeRecipientEnabled(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	etherBase := common.BigToAddress(common.Big1)
+	etherBase := common.HexToAddress("0x0123456789")
 	c := Config{}
 	c.SetDefaults()
 	c.FeeRecipient = etherBase.String()

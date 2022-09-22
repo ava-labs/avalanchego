@@ -56,14 +56,19 @@ var (
 type FeeConfigManagerConfig struct {
 	AllowListConfig // Config for the fee config manager allow list
 	UpgradeableConfig
+	InitialFeeConfig *commontype.FeeConfig `json:"initialFeeConfig,omitempty"` // initial fee config to be immediately activated
 }
 
 // NewFeeManagerConfig returns a config for a network upgrade at [blockTimestamp] that enables
-// FeeConfigManager with the given [admins] as members of the allowlist.
-func NewFeeManagerConfig(blockTimestamp *big.Int, admins []common.Address) *FeeConfigManagerConfig {
+// FeeConfigManager with the given [admins] and [enableds] as members of the allowlist with [initialConfig] as initial fee config if specified.
+func NewFeeManagerConfig(blockTimestamp *big.Int, admins []common.Address, enableds []common.Address, initialConfig *commontype.FeeConfig) *FeeConfigManagerConfig {
 	return &FeeConfigManagerConfig{
-		AllowListConfig:   AllowListConfig{AllowListAdmins: admins},
+		AllowListConfig: AllowListConfig{
+			AllowListAdmins:  admins,
+			EnabledAddresses: enableds,
+		},
 		UpgradeableConfig: UpgradeableConfig{BlockTimestamp: blockTimestamp},
+		InitialFeeConfig:  initialConfig,
 	}
 }
 
@@ -90,14 +95,31 @@ func (c *FeeConfigManagerConfig) Equal(s StatefulPrecompileConfig) bool {
 	if !ok {
 		return false
 	}
-	return c.UpgradeableConfig.Equal(&other.UpgradeableConfig) && c.AllowListConfig.Equal(&other.AllowListConfig)
+	eq := c.UpgradeableConfig.Equal(&other.UpgradeableConfig) && c.AllowListConfig.Equal(&other.AllowListConfig)
+	if !eq {
+		return false
+	}
+
+	if c.InitialFeeConfig == nil {
+		return other.InitialFeeConfig == nil
+	}
+
+	return c.InitialFeeConfig.Equal(other.InitialFeeConfig)
 }
 
 // Configure configures [state] with the desired admins based on [c].
 func (c *FeeConfigManagerConfig) Configure(chainConfig ChainConfig, state StateDB, blockContext BlockContext) {
 	// Store the initial fee config into the state when the fee config manager activates.
-	if err := StoreFeeConfig(state, chainConfig.GetFeeConfig(), blockContext); err != nil {
-		panic(fmt.Sprintf("fee config should have been verified in genesis: %s", err))
+	if c.InitialFeeConfig != nil {
+		if err := StoreFeeConfig(state, *c.InitialFeeConfig, blockContext); err != nil {
+			// This should not happen since we already checked this config with Verify()
+			panic(fmt.Sprintf("invalid feeConfig provided: %s", err))
+		}
+	} else {
+		if err := StoreFeeConfig(state, chainConfig.GetFeeConfig(), blockContext); err != nil {
+			// This should not happen since we already checked the chain config in the genesis creation.
+			panic(fmt.Sprintf("fee config should have been verified in genesis: %s", err))
+		}
 	}
 	c.AllowListConfig.Configure(state, FeeConfigManagerAddress)
 }
@@ -105,6 +127,17 @@ func (c *FeeConfigManagerConfig) Configure(chainConfig ChainConfig, state StateD
 // Contract returns the singleton stateful precompiled contract to be used for the fee manager.
 func (c *FeeConfigManagerConfig) Contract() StatefulPrecompiledContract {
 	return FeeConfigManagerPrecompile
+}
+
+func (c *FeeConfigManagerConfig) Verify() error {
+	if err := c.AllowListConfig.Verify(); err != nil {
+		return err
+	}
+	if c.InitialFeeConfig == nil {
+		return nil
+	}
+
+	return c.InitialFeeConfig.Verify()
 }
 
 // GetFeeConfigManagerStatus returns the role of [address] for the fee config manager list.

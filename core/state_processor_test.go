@@ -332,7 +332,7 @@ func TestBadTxAllowListBlock(t *testing.T) {
 				SubnetEVMTimestamp: big.NewInt(0),
 			},
 			PrecompileUpgrade: params.PrecompileUpgrade{
-				TxAllowListConfig: precompile.NewTxAllowListConfig(big.NewInt(0), []common.Address{}),
+				TxAllowListConfig: precompile.NewTxAllowListConfig(big.NewInt(0), nil, nil),
 			},
 		}
 		signer     = types.LatestSigner(config)

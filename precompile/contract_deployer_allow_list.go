@@ -23,10 +23,13 @@ type ContractDeployerAllowListConfig struct {
 }
 
 // NewContractDeployerAllowListConfig returns a config for a network upgrade at [blockTimestamp] that enables
-// ContractDeployerAllowList with the given [admins] as members of the allowlist.
-func NewContractDeployerAllowListConfig(blockTimestamp *big.Int, admins []common.Address) *ContractDeployerAllowListConfig {
+// ContractDeployerAllowList with [admins] and [enableds] as members of the allowlist.
+func NewContractDeployerAllowListConfig(blockTimestamp *big.Int, admins []common.Address, enableds []common.Address) *ContractDeployerAllowListConfig {
 	return &ContractDeployerAllowListConfig{
-		AllowListConfig:   AllowListConfig{AllowListAdmins: admins},
+		AllowListConfig: AllowListConfig{
+			AllowListAdmins:  admins,
+			EnabledAddresses: enableds,
+		},
 		UpgradeableConfig: UpgradeableConfig{BlockTimestamp: blockTimestamp},
 	}
 }

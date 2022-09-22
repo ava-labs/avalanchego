@@ -195,6 +195,20 @@ func (c *{{.Contract.Type}}Config) Contract() StatefulPrecompiledContract {
 	return {{.Contract.Type}}Precompile
 }
 
+// Verify tries to verify {{.Contract.Type}}Config and returns an error accordingly.
+func (c *{{.Contract.Type}}Config) Verify() error {
+	{{if .Contract.AllowList}}
+	// Verify AllowList first
+	if err := c.AllowListConfig.Verify(); err != nil {
+		return err
+	}
+	{{end}}
+	// CUSTOM CODE STARTS HERE
+	// Add your own custom verify code for {{.Contract.Type}}Config here
+	// and return an error accordingly
+	return nil
+}
+
 {{if .Contract.AllowList}}
 // Get{{.Contract.Type}}AllowListStatus returns the role of [address] for the {{.Contract.Type}} list.
 func Get{{.Contract.Type}}AllowListStatus(stateDB StateDB, address common.Address) AllowListRole {
@@ -203,6 +217,10 @@ func Get{{.Contract.Type}}AllowListStatus(stateDB StateDB, address common.Addres
 
 // Set{{.Contract.Type}}AllowListStatus sets the permissions of [address] to [role] for the
 // {{.Contract.Type}} list. Assumes [role] has already been verified as valid.
+// This stores the [role] in the contract storage with address [{{.Contract.Type}}Address]
+// and [address] hash. It means that any reusage of the [address] key for different value
+// conflicts with the same slot [role] is stored.
+// Precompile implementations must use a different key than [address] for their storage.
 func Set{{.Contract.Type}}AllowListStatus(stateDB StateDB, address common.Address, role AllowListRole) {
 	setAllowListRole(stateDB, {{.Contract.Type}}Address, address, role)
 }

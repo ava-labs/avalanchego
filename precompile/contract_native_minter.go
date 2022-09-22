@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
 )
 
 const (
@@ -35,14 +37,19 @@ var (
 type ContractNativeMinterConfig struct {
 	AllowListConfig
 	UpgradeableConfig
+	InitialMint map[common.Address]*math.HexOrDecimal256 `json:"initialMint,omitempty"` // initial mint config to be immediately minted
 }
 
 // NewContractNativeMinterConfig returns a config for a network upgrade at [blockTimestamp] that enables
-// ContractNativeMinter with the given [admins] as members of the allowlist.
-func NewContractNativeMinterConfig(blockTimestamp *big.Int, admins []common.Address) *ContractNativeMinterConfig {
+// ContractNativeMinter with the given [admins] and [enableds] as members of the allowlist. Also mints balances according to [initialMint] when the upgrade activates.
+func NewContractNativeMinterConfig(blockTimestamp *big.Int, admins []common.Address, enableds []common.Address, initialMint map[common.Address]*math.HexOrDecimal256) *ContractNativeMinterConfig {
 	return &ContractNativeMinterConfig{
-		AllowListConfig:   AllowListConfig{AllowListAdmins: admins},
+		AllowListConfig: AllowListConfig{
+			AllowListAdmins:  admins,
+			EnabledAddresses: enableds,
+		},
 		UpgradeableConfig: UpgradeableConfig{BlockTimestamp: blockTimestamp},
+		InitialMint:       initialMint,
 	}
 }
 
@@ -64,12 +71,36 @@ func (c *ContractNativeMinterConfig) Address() common.Address {
 
 // Configure configures [state] with the desired admins based on [c].
 func (c *ContractNativeMinterConfig) Configure(_ ChainConfig, state StateDB, _ BlockContext) {
+	for to, amount := range c.InitialMint {
+		if amount != nil {
+			bigIntAmount := (*big.Int)(amount)
+			state.AddBalance(to, bigIntAmount)
+		}
+	}
+
 	c.AllowListConfig.Configure(state, ContractNativeMinterAddress)
 }
 
 // Contract returns the singleton stateful precompiled contract to be used for the native minter.
 func (c *ContractNativeMinterConfig) Contract() StatefulPrecompiledContract {
 	return ContractNativeMinterPrecompile
+}
+
+func (c *ContractNativeMinterConfig) Verify() error {
+	if err := c.AllowListConfig.Verify(); err != nil {
+		return err
+	}
+	// ensure that all of the initial mint values in the map are non-nil positive values
+	for addr, amount := range c.InitialMint {
+		if amount == nil {
+			return fmt.Errorf("initial mint cannot contain nil amount for address %s", addr)
+		}
+		bigIntAmount := (*big.Int)(amount)
+		if bigIntAmount.Sign() < 1 {
+			return fmt.Errorf("initial mint cannot contain invalid amount %v for address %s", bigIntAmount, addr)
+		}
+	}
+	return nil
 }
 
 // Equal returns true if [s] is a [*ContractNativeMinterConfig] and it has been configured identical to [c].
@@ -79,7 +110,28 @@ func (c *ContractNativeMinterConfig) Equal(s StatefulPrecompileConfig) bool {
 	if !ok {
 		return false
 	}
-	return c.UpgradeableConfig.Equal(&other.UpgradeableConfig) && c.AllowListConfig.Equal(&other.AllowListConfig)
+	eq := c.UpgradeableConfig.Equal(&other.UpgradeableConfig) && c.AllowListConfig.Equal(&other.AllowListConfig)
+	if !eq {
+		return false
+	}
+
+	if len(c.InitialMint) != len(other.InitialMint) {
+		return false
+	}
+
+	for address, amount := range c.InitialMint {
+		val, ok := other.InitialMint[address]
+		if !ok {
+			return false
+		}
+		bigIntAmount := (*big.Int)(amount)
+		bigIntVal := (*big.Int)(val)
+		if !utils.BigNumEqual(bigIntAmount, bigIntVal) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // GetContractNativeMinterStatus returns the role of [address] for the minter list.
