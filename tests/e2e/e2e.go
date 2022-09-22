@@ -34,7 +34,7 @@ const (
 
 	// Defines default tx confirmation timeout.
 	// Enough for test/custom networks.
-	DefaultConfirmTxTimeout = 10 * time.Second
+	DefaultConfirmTxTimeout = 20 * time.Second
 
 	DefaultShutdownTimeout = 2 * time.Minute
 )

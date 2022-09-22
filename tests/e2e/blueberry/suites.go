@@ -7,9 +7,9 @@ package blueberry
 import (
 	"context"
 
-	"github.com/onsi/gomega"
-
 	ginkgo "github.com/onsi/ginkgo/v2"
+
+	"github.com/onsi/gomega"
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -28,6 +28,11 @@ var _ = e2e.DescribeLocal("[Blueberry]", func() {
 		if e2e.Env.GetEnableWhitelistTxTests() {
 			ginkgo.Skip("whitelist vtx tests are enabled; skipping")
 		}
+
+		ginkgo.By("reload initial snapshot for test independence", func() {
+			err := e2e.Env.RestoreInitialState(true /*switchOffNetworkFirst*/)
+			gomega.Expect(err).Should(gomega.BeNil())
+		})
 
 		uris := e2e.Env.GetURIs()
 		gomega.Expect(uris).ShouldNot(gomega.BeEmpty())

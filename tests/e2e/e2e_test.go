@@ -15,6 +15,7 @@ import (
 
 	// ensure test packages are scanned by ginkgo
 	_ "github.com/ava-labs/avalanchego/tests/e2e/blueberry"
+	_ "github.com/ava-labs/avalanchego/tests/e2e/p"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/ping"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/static-handlers"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/whitelist-vtx"
