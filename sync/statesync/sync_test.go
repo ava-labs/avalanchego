@@ -411,7 +411,7 @@ func TestResyncNewRootAfterDeletes(t *testing.T) {
 		},
 		"delete intermediate storage nodes": {
 			deleteBetweenSyncs: func(t *testing.T, root common.Hash, clientTrieDB *trie.Database) {
-				tr, err := trie.New(root, clientTrieDB)
+				tr, err := trie.New(common.Hash{}, root, clientTrieDB)
 				if err != nil {
 					t.Fatal(err)
 				}

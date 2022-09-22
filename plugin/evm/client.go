@@ -46,31 +46,26 @@ func NewCChainClient(uri string) Client {
 }
 
 func (c *client) StartCPUProfiler(ctx context.Context) error {
-	err := c.adminRequester.SendRequest(ctx, "startCPUProfiler", struct{}{}, &api.EmptyReply{})
-	return err
+	return c.adminRequester.SendRequest(ctx, "startCPUProfiler", struct{}{}, &api.EmptyReply{})
 }
 
 func (c *client) StopCPUProfiler(ctx context.Context) error {
-	err := c.adminRequester.SendRequest(ctx, "stopCPUProfiler", struct{}{}, &api.EmptyReply{})
-	return err
+	return c.adminRequester.SendRequest(ctx, "stopCPUProfiler", struct{}{}, &api.EmptyReply{})
 }
 
 func (c *client) MemoryProfile(ctx context.Context) error {
-	err := c.adminRequester.SendRequest(ctx, "memoryProfile", struct{}{}, &api.EmptyReply{})
-	return err
+	return c.adminRequester.SendRequest(ctx, "memoryProfile", struct{}{}, &api.EmptyReply{})
 }
 
 func (c *client) LockProfile(ctx context.Context) error {
-	err := c.adminRequester.SendRequest(ctx, "lockProfile", struct{}{}, &api.EmptyReply{})
-	return err
+	return c.adminRequester.SendRequest(ctx, "lockProfile", struct{}{}, &api.EmptyReply{})
 }
 
 // SetLogLevel dynamically sets the log level for the C Chain
 func (c *client) SetLogLevel(ctx context.Context, level log.Lvl) error {
-	err := c.adminRequester.SendRequest(ctx, "setLogLevel", &SetLogLevelArgs{
+	return c.adminRequester.SendRequest(ctx, "setLogLevel", &SetLogLevelArgs{
 		Level: level.String(),
 	}, &api.EmptyReply{})
-	return err
 }
 
 // GetVMConfig returns the current config of the VM

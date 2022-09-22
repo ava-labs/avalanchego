@@ -64,7 +64,7 @@ func TestCappedMemoryTrieWriter(t *testing.T) {
 		if i < int(cacheConfig.CommitInterval) {
 			assert.Equal(common.Hash{}, m.LastCommit, "should not have committed block on accept")
 		} else {
-			assert.Equal(block.Root(), m.LastCommit, "should have committed block after commitInterval")
+			assert.Equal(block.Root(), m.LastCommit, "should have committed block after CommitInterval")
 			m.LastCommit = common.Hash{}
 		}
 

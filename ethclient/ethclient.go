@@ -79,6 +79,7 @@ type Client interface {
 	TransactionCount(context.Context, common.Hash) (uint, error)
 	TransactionInBlock(context.Context, common.Hash, uint) (*types.Transaction, error)
 	TransactionReceipt(context.Context, common.Hash) (*types.Receipt, error)
+	SyncProgress(ctx context.Context) error
 	SubscribeNewAcceptedTransactions(context.Context, chan<- *common.Hash) (interfaces.Subscription, error)
 	SubscribeNewPendingTransactions(context.Context, chan<- *common.Hash) (interfaces.Subscription, error)
 	SubscribeNewHead(context.Context, chan<- *types.Header) (interfaces.Subscription, error)
@@ -357,6 +358,24 @@ func (ec *client) TransactionReceipt(ctx context.Context, txHash common.Hash) (*
 		}
 	}
 	return r, err
+}
+
+// SyncProgress retrieves the current progress of the sync algorithm. If there's
+// no sync currently running, it returns nil.
+func (ec *client) SyncProgress(ctx context.Context) error {
+	var (
+		raw     json.RawMessage
+		syncing bool
+	)
+
+	if err := ec.c.CallContext(ctx, &raw, "eth_syncing"); err != nil {
+		return err
+	}
+	// If not syncing, the response will be 'false'. To detect this
+	// we unmarshal into a boolean and return nil on success.
+	// If the chain is syncing, the engine will not forward the
+	// request to the chain and a non-nil err will be returned.
+	return json.Unmarshal(raw, &syncing)
 }
 
 // SubscribeNewAcceptedTransactions subscribes to notifications about the accepted transaction hashes on the given channel.

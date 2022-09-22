@@ -41,9 +41,8 @@ import (
 // API describes the set of methods offered over the RPC interface
 type API struct {
 	Namespace string      // namespace under which the rpc methods of Service are exposed
-	Version   string      // api version for DApp's
+	Version   string      // deprecated - this field is no longer used, but retained for compatibility
 	Service   interface{} // receiver instance which holds the methods
-	Public    bool        // indication if the methods must be considered safe for public use
 	Name      string      // Name of the API
 }
 
@@ -79,7 +78,7 @@ const (
 )
 
 // UnmarshalJSON parses the given JSON fragment into a BlockNumber. It supports:
-// - "latest", "earliest" or "pending" as string arguments
+// - "accepted", "finalized", "latest", "earliest" or "pending" as string arguments
 // - the block number
 // Returned errors:
 // - an invalid block number error when the given argument isn't a known strings
@@ -100,7 +99,9 @@ func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 	case "pending":
 		*bn = PendingBlockNumber
 		return nil
-	case "accepted":
+		// Include "finalized" and "safe" as an option for compatibility with
+		// FinalizedBlockNumber and SafeBlockNumber from geth.
+	case "accepted", "finalized", "safe":
 		*bn = AcceptedBlockNumber
 		return nil
 	}
@@ -117,7 +118,7 @@ func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 }
 
 // MarshalText implements encoding.TextMarshaler. It marshals:
-// - "latest", "earliest" or "pending" as strings
+// - "accepted", "latest", "earliest" or "pending" as strings
 // - other numbers as hex
 func (bn BlockNumber) MarshalText() ([]byte, error) {
 	switch bn {
@@ -180,7 +181,9 @@ func (bnh *BlockNumberOrHash) UnmarshalJSON(data []byte) error {
 		bn := PendingBlockNumber
 		bnh.BlockNumber = &bn
 		return nil
-	case "accepted":
+		// Include "finalized" and "safe" as an option for compatibility with
+		// FinalizedBlockNumber and SafeBlockNumber from geth.
+	case "accepted", "finalized", "safe":
 		bn := AcceptedBlockNumber
 		bnh.BlockNumber = &bn
 		return nil

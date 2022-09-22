@@ -33,6 +33,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/ethdb/memorydb"
 	"github.com/ethereum/go-ethereum/common"
@@ -306,7 +307,7 @@ func TestUnionIterator(t *testing.T) {
 }
 
 func TestIteratorNoDups(t *testing.T) {
-	var tr Trie
+	tr := NewEmpty(NewDatabase(rawdb.NewMemoryDatabase()))
 	for _, val := range testdata1 {
 		tr.Update([]byte(val.k), []byte(val.v))
 	}
@@ -321,7 +322,7 @@ func testIteratorContinueAfterError(t *testing.T, memonly bool) {
 	diskdb := memorydb.New()
 	triedb := NewDatabase(diskdb)
 
-	tr, _ := New(common.Hash{}, triedb)
+	tr := NewEmpty(triedb)
 	for _, val := range testdata1 {
 		tr.Update([]byte(val.k), []byte(val.v))
 	}
@@ -346,7 +347,7 @@ func testIteratorContinueAfterError(t *testing.T, memonly bool) {
 	}
 	for i := 0; i < 20; i++ {
 		// Create trie that will load all nodes from DB.
-		tr, _ := New(tr.Hash(), triedb)
+		tr, _ := New(common.Hash{}, tr.Hash(), triedb)
 
 		// Remove a random node from the database. It can't be the root node
 		// because that one is already loaded.
@@ -413,7 +414,7 @@ func testIteratorContinueAfterSeekError(t *testing.T, memonly bool) {
 	diskdb := memorydb.New()
 	triedb := NewDatabase(diskdb)
 
-	ctr, _ := New(common.Hash{}, triedb)
+	ctr := NewEmpty(triedb)
 	for _, val := range testdata1 {
 		ctr.Update([]byte(val.k), []byte(val.v))
 	}
@@ -435,7 +436,7 @@ func testIteratorContinueAfterSeekError(t *testing.T, memonly bool) {
 	}
 	// Create a new iterator that seeks to "bars". Seeking can't proceed because
 	// the node is missing.
-	tr, _ := New(root, triedb)
+	tr, _ := New(common.Hash{}, root, triedb)
 	it := tr.NodeIterator([]byte("bars"))
 	missing, ok := it.Error().(*MissingNodeError)
 	if !ok {
@@ -494,6 +495,10 @@ func (l *loggingDb) NewBatch() ethdb.Batch {
 	return l.backend.NewBatch()
 }
 
+func (l *loggingDb) NewBatchWithSize(size int) ethdb.Batch {
+	return l.backend.NewBatchWithSize(size)
+}
+
 func (l *loggingDb) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
 	fmt.Printf("NewIterator\n")
 	return l.backend.NewIterator(prefix, start)
@@ -516,7 +521,7 @@ func makeLargeTestTrie() (*Database, *SecureTrie, *loggingDb) {
 	// Create an empty trie
 	logDb := &loggingDb{0, memorydb.New()}
 	triedb := NewDatabase(logDb)
-	trie, _ := NewSecure(common.Hash{}, triedb)
+	trie, _ := NewSecure(common.Hash{}, common.Hash{}, triedb)
 
 	// Fill it with some arbitrary data
 	for i := 0; i < 10000; i++ {
@@ -544,5 +549,56 @@ func TestNodeIteratorLargeTrie(t *testing.T) {
 	// this pr: 5 get operations
 	if have, want := logDb.getCount, uint64(5); have != want {
 		t.Fatalf("Too many lookups during seek, have %d want %d", have, want)
+	}
+}
+
+func TestIteratorNodeBlob(t *testing.T) {
+	var (
+		db     = memorydb.New()
+		triedb = NewDatabase(db)
+		trie   = NewEmpty(triedb)
+	)
+	vals := []struct{ k, v string }{
+		{"do", "verb"},
+		{"ether", "wookiedoo"},
+		{"horse", "stallion"},
+		{"shaman", "horse"},
+		{"doge", "coin"},
+		{"dog", "puppy"},
+		{"somethingveryoddindeedthis is", "myothernodedata"},
+	}
+	all := make(map[string]string)
+	for _, val := range vals {
+		all[val.k] = val.v
+		trie.Update([]byte(val.k), []byte(val.v))
+	}
+	trie.Commit(nil, false)
+	triedb.Cap(0)
+
+	found := make(map[common.Hash][]byte)
+	it := trie.NodeIterator(nil)
+	for it.Next(true) {
+		if it.Hash() == (common.Hash{}) {
+			continue
+		}
+		found[it.Hash()] = it.NodeBlob()
+	}
+
+	dbIter := db.NewIterator(nil, nil)
+	defer dbIter.Release()
+
+	var count int
+	for dbIter.Next() {
+		got, present := found[common.BytesToHash(dbIter.Key())]
+		if !present {
+			t.Fatalf("Miss trie node %v", dbIter.Key())
+		}
+		if !bytes.Equal(got, dbIter.Value()) {
+			t.Fatalf("Unexpected trie node want %v got %v", dbIter.Value(), got)
+		}
+		count += 1
+	}
+	if count != len(found) {
+		t.Fatal("Find extra trie node via iterator")
 	}
 }

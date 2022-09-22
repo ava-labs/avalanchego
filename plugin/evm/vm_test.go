@@ -65,8 +65,10 @@ var (
 	// config overridden in vm.Initialize.
 	genesisJSONSubnetEVM    = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0,\"subnetEVMTimestamp\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x7A1200\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0x71562b71999873DB5b286dF957af199Ec94617F7\": {\"balance\":\"0x4192927743b88000\"}, \"0x703c4b2bD70c169f5717101CaeE543299Fc946C7\": {\"balance\":\"0x4192927743b88000\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
 	genesisJSONPreSubnetEVM = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x7A1200\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0x71562b71999873DB5b286dF957af199Ec94617F7\": {\"balance\":\"0x4192927743b88000\"}, \"0x703c4b2bD70c169f5717101CaeE543299Fc946C7\": {\"balance\":\"0x4192927743b88000\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
-	firstTxAmount           *big.Int
-	genesisBalance          *big.Int
+	genesisJSONLatest       = genesisJSONSubnetEVM
+
+	firstTxAmount  *big.Int
+	genesisBalance *big.Int
 )
 
 func init() {
@@ -138,6 +140,7 @@ func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
 	return subnetID, nil
 }
 
+// If [genesisJSON] is empty, defaults to using [genesisJSONLatest]
 func setupGenesis(t *testing.T,
 	genesisJSON string,
 ) (*snow.Context,
@@ -145,6 +148,9 @@ func setupGenesis(t *testing.T,
 	[]byte,
 	chan engCommon.Message,
 ) {
+	if len(genesisJSON) == 0 {
+		genesisJSON = genesisJSONLatest
+	}
 	genesisBytes := buildGenesisTest(t, genesisJSON)
 	ctx := NewContext()
 
@@ -174,7 +180,9 @@ func setupGenesis(t *testing.T,
 }
 
 // GenesisVM creates a VM instance with the genesis test bytes and returns
-// the channel use to send messages to the engine, the vm
+// the channel use to send messages to the engine, the VM, database manager,
+// and sender.
+// If [genesisJSON] is empty, defaults to using [genesisJSONLatest]
 func GenesisVM(t *testing.T,
 	finishBootstrapping bool,
 	genesisJSON string,
@@ -212,9 +220,9 @@ func GenesisVM(t *testing.T,
 
 func TestVMConfig(t *testing.T) {
 	txFeeCap := float64(11)
-	enabledEthAPIs := []string{"internal-private-debug"}
+	enabledEthAPIs := []string{"debug"}
 	configJSON := fmt.Sprintf("{\"rpc-tx-fee-cap\": %g,\"eth-apis\": %s}", txFeeCap, fmt.Sprintf("[%q]", enabledEthAPIs[0]))
-	_, vm, _, _ := GenesisVM(t, false, genesisJSONSubnetEVM, configJSON, "")
+	_, vm, _, _ := GenesisVM(t, false, "", configJSON, "")
 	assert.Equal(t, vm.config.RPCTxFeeCap, txFeeCap, "Tx Fee Cap should be set")
 	assert.Equal(t, vm.config.EthAPIs(), enabledEthAPIs, "EnabledEthAPIs should be set")
 	assert.NoError(t, vm.Shutdown())
@@ -222,9 +230,9 @@ func TestVMConfig(t *testing.T) {
 
 func TestVMConfigDefaults(t *testing.T) {
 	txFeeCap := float64(11)
-	enabledEthAPIs := []string{"internal-private-debug"}
+	enabledEthAPIs := []string{"debug"}
 	configJSON := fmt.Sprintf("{\"rpc-tx-fee-cap\": %g,\"eth-apis\": %s}", txFeeCap, fmt.Sprintf("[%q]", enabledEthAPIs[0]))
-	_, vm, _, _ := GenesisVM(t, false, genesisJSONSubnetEVM, configJSON, "")
+	_, vm, _, _ := GenesisVM(t, false, "", configJSON, "")
 
 	var vmConfig Config
 	vmConfig.SetDefaults()
@@ -235,7 +243,7 @@ func TestVMConfigDefaults(t *testing.T) {
 }
 
 func TestVMNilConfig(t *testing.T) {
-	_, vm, _, _ := GenesisVM(t, false, genesisJSONSubnetEVM, "", "")
+	_, vm, _, _ := GenesisVM(t, false, "", "", "")
 
 	// VM Config should match defaults if no config is passed in
 	var vmConfig Config
@@ -248,7 +256,7 @@ func TestVMContinuousProfiler(t *testing.T) {
 	profilerDir := t.TempDir()
 	profilerFrequency := 500 * time.Millisecond
 	configJSON := fmt.Sprintf("{\"continuous-profiler-dir\": %q,\"continuous-profiler-frequency\": \"500ms\"}", profilerDir)
-	_, vm, _, _ := GenesisVM(t, false, genesisJSONSubnetEVM, configJSON, "")
+	_, vm, _, _ := GenesisVM(t, false, "", configJSON, "")
 	assert.Equal(t, vm.config.ContinuousProfilerDir, profilerDir, "profiler dir should be set")
 	assert.Equal(t, vm.config.ContinuousProfilerFrequency.Duration, profilerFrequency, "profiler frequency should be set")
 
@@ -1538,11 +1546,8 @@ func TestUncleBlock(t *testing.T) {
 		nil,
 		new(trie.Trie),
 	)
-	uncleBlock := &Block{
-		vm:       vm2,
-		ethBlock: uncleEthBlock,
-		id:       ids.ID(uncleEthBlock.Hash()),
-	}
+	uncleBlock := vm2.newBlock(uncleEthBlock)
+
 	if err := uncleBlock.Verify(); !errors.Is(err, errUnclesUnsupported) {
 		t.Fatalf("VM2 should have failed with %q but got %q", errUnclesUnsupported, err.Error())
 	}
@@ -1596,11 +1601,7 @@ func TestEmptyBlock(t *testing.T) {
 		new(trie.Trie),
 	)
 
-	emptyBlock := &Block{
-		vm:       vm,
-		ethBlock: emptyEthBlock,
-		id:       ids.ID(emptyEthBlock.Hash()),
-	}
+	emptyBlock := vm.newBlock(emptyEthBlock)
 
 	if _, err := vm.ParseBlock(emptyBlock.Bytes()); !errors.Is(err, errEmptyBlock) {
 		t.Fatalf("VM should have failed with errEmptyBlock but got %s", err.Error())
@@ -1868,11 +1869,7 @@ func TestFutureBlock(t *testing.T) {
 		new(trie.Trie),
 	)
 
-	futureBlock := &Block{
-		vm:       vm,
-		ethBlock: modifiedBlock,
-		id:       ids.ID(modifiedBlock.Hash()),
-	}
+	futureBlock := vm.newBlock(modifiedBlock)
 
 	if err := futureBlock.Verify(); err == nil {
 		t.Fatal("Future block should have failed verification due to block timestamp too far in the future")
@@ -2510,9 +2507,7 @@ func TestAllowFeeRecipientDisabled(t *testing.T) {
 	<-issuer
 
 	_, err = vm.BuildBlock()
-	if !errors.Is(err, errInvalidBlock) {
-		t.Fatal("should have got error: %w", errInvalidBlock)
-	}
+	assert.ErrorContains(t, err, "block failed verification")
 
 	vm.miner.SetEtherbase(constants.BlackholeAddr) // set blackhole address
 

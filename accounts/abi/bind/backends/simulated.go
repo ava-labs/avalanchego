@@ -117,8 +117,8 @@ func NewSimulatedBackendWithDatabase(database ethdb.Database, alloc core.Genesis
 		database:   database,
 		blockchain: blockchain,
 		config:     genesis.Config,
-		events:     filters.NewEventSystem(&filterBackend{database, blockchain}, false),
 	}
+	backend.events = filters.NewEventSystem(&filterBackend{database, blockchain, backend}, false)
 	backend.rollback(blockchain.CurrentBlock())
 	return backend
 }
@@ -138,7 +138,7 @@ func (b *SimulatedBackend) Close() error {
 
 // Commit imports all the pending transactions as a single block and starts a
 // fresh new state.
-func (b *SimulatedBackend) Commit(accept bool) {
+func (b *SimulatedBackend) Commit(accept bool) common.Hash {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -151,9 +151,13 @@ func (b *SimulatedBackend) Commit(accept bool) {
 		}
 		b.blockchain.DrainAcceptorQueue()
 	}
+	blockHash := b.acceptedBlock.Hash()
+
 	// Using the last inserted block here makes it possible to build on a side
 	// chain after a fork.
 	b.rollback(b.acceptedBlock)
+
+	return blockHash
 }
 
 // Rollback aborts all pending transactions, reverting to the last committed state.
@@ -724,7 +728,7 @@ func (b *SimulatedBackend) FilterLogs(ctx context.Context, query interfaces.Filt
 	var filter *filters.Filter
 	if query.BlockHash != nil {
 		// Block filter requested, construct a single-shot filter
-		filter = filters.NewBlockFilter(&filterBackend{b.database, b.blockchain}, *query.BlockHash, query.Addresses, query.Topics)
+		filter = filters.NewBlockFilter(&filterBackend{b.database, b.blockchain, b}, *query.BlockHash, query.Addresses, query.Topics)
 	} else {
 		// Initialize unset filter boundaries to run from genesis to chain head
 		from := int64(0)
@@ -736,7 +740,7 @@ func (b *SimulatedBackend) FilterLogs(ctx context.Context, query interfaces.Filt
 			to = query.ToBlock.Int64()
 		}
 		// Construct the range filter
-		filter, _ = filters.NewRangeFilter(&filterBackend{b.database, b.blockchain}, from, to, query.Addresses, query.Topics)
+		filter, _ = filters.NewRangeFilter(&filterBackend{b.database, b.blockchain, b}, from, to, query.Addresses, query.Topics)
 	}
 	// Run the filter and return all the logs
 	logs, err := filter.Logs(ctx)
@@ -857,8 +861,9 @@ func (m callMsg) AccessList() types.AccessList { return m.CallMsg.AccessList }
 // filterBackend implements filters.Backend to support filtering for logs without
 // taking bloom-bits acceleration structures into account.
 type filterBackend struct {
-	db ethdb.Database
-	bc *core.BlockChain
+	db      ethdb.Database
+	bc      *core.BlockChain
+	backend *SimulatedBackend
 }
 
 func (fb *filterBackend) SubscribeChainAcceptedEvent(ch chan<- core.ChainEvent) event.Subscription {

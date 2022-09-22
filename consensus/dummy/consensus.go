@@ -254,11 +254,20 @@ func (self *DummyEngine) verifyBlockFee(
 		if err != nil {
 			return err
 		}
+		// Multiply the [txFeePremium] by the gasUsed in the transaction since this gives the total coin that was paid
+		// above the amount required if the transaction had simply paid the minimum base fee for the block.
+		//
+		// Ex. LegacyTx paying a gas price of 100 gwei for 1M gas in a block with a base fee of 10 gwei.
+		// Total Fee = 100 gwei * 1M gas
+		// Minimum Fee = 10 gwei * 1M gas (minimum fee that would have been accepted for this transaction)
+		// Fee Premium = 90 gwei
+		// Total Overpaid = 90 gwei * 1M gas
+
 		blockFeeContribution.Mul(txFeePremium, gasUsed.SetUint64(receipt.GasUsed))
 		totalBlockFee.Add(totalBlockFee, blockFeeContribution)
 	}
 	// Calculate how much gas the [totalBlockFee] would purchase at the price level
-	// set by this block.
+	// set by the base fee of this block.
 	blockGas := new(big.Int).Div(totalBlockFee, baseFee)
 
 	// Require that the amount of gas purchased by the effective tips within the block, [blockGas],
@@ -282,6 +291,8 @@ func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *type
 			return err
 		}
 
+		// Calculate the expected blockGasCost for this block.
+		// Note: this is a deterministic transtion that defines an exact block fee for this block.
 		blockGasCost := calcBlockGasCost(
 			feeConfig.TargetBlockRate,
 			feeConfig.MinBlockGasCost,
@@ -290,9 +301,11 @@ func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *type
 			parent.BlockGasCost,
 			parent.Time, block.Time(),
 		)
+		// Verify the BlockGasCost set in the header matches the calculated value.
 		if blockBlockGasCost := block.BlockGasCost(); blockBlockGasCost == nil || !blockBlockGasCost.IsUint64() || blockBlockGasCost.Cmp(blockGasCost) != 0 {
 			return fmt.Errorf("invalid blockGasCost: have %d, want %d", blockBlockGasCost, blockGasCost)
 		}
+		// Verify the block fee was paid.
 		if err := self.verifyBlockFee(
 			block.BaseFee(),
 			block.BlockGasCost(),
@@ -314,7 +327,7 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 		if err != nil {
 			return nil, err
 		}
-
+		// Calculate the required block gas cost for this block.
 		header.BlockGasCost = calcBlockGasCost(
 			feeConfig.TargetBlockRate,
 			feeConfig.MinBlockGasCost,
@@ -323,6 +336,7 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 			parent.BlockGasCost,
 			parent.Time, header.Time,
 		)
+		// Verify that this block covers the block fee.
 		if err := self.verifyBlockFee(
 			header.BaseFee,
 			header.BlockGasCost,

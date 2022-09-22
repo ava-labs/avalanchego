@@ -56,8 +56,8 @@ import (
 //go:embed airdrops/011522.json
 var AirdropData []byte
 
-//go:generate gencodec -type Genesis -field-override genesisSpecMarshaling -out gen_genesis.go
-//go:generate gencodec -type GenesisAccount -field-override genesisAccountMarshaling -out gen_genesis_account.go
+//go:generate go run github.com/fjl/gencodec -type Genesis -field-override genesisSpecMarshaling -out gen_genesis.go
+//go:generate go run github.com/fjl/gencodec -type GenesisAccount -field-override genesisAccountMarshaling -out gen_genesis_account.go
 
 var errGenesisNoConfig = errors.New("genesis has no chain configuration")
 
@@ -171,8 +171,8 @@ func (e *GenesisMismatchError) Error() string {
 //
 //	                     genesis == nil       genesis != nil
 //	                  +------------------------------------------
-//	db has no genesis |  ErrNoGenesis      |  genesis
-//	db has genesis    |  ErrNoGenesis      |  genesis (if compatible both block hash and chain config), else error
+//	db has no genesis |  main-net default  |  genesis
+//	db has genesis    |  from DB           |  genesis (if compatible)
 
 // The argument [genesis] must be specified and must contain a valid chain config.
 // If the genesis block has already been set up, then we verify the hash matches the genesis passed in
@@ -324,7 +324,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		if g.BaseFee != nil {
 			head.BaseFee = g.BaseFee
 		} else {
-			head.BaseFee = g.Config.FeeConfig.MinBaseFee
+			head.BaseFee = new(big.Int).Set(g.Config.FeeConfig.MinBaseFee)
 		}
 	}
 	statedb.Commit(false, false)
@@ -377,7 +377,7 @@ func GenesisBlockForTesting(db ethdb.Database, addr common.Address, balance *big
 	g := Genesis{
 		Config:  params.TestChainConfig,
 		Alloc:   GenesisAlloc{addr: {Balance: balance}},
-		BaseFee: big.NewInt(params.TestMaxBaseFee.Int64()),
+		BaseFee: new(big.Int).Set(params.TestMaxBaseFee),
 	}
 	return g.MustCommit(db)
 }

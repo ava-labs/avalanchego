@@ -86,7 +86,7 @@ func TestDecodeEmptyTypedTx(t *testing.T) {
 	input := []byte{0x80}
 	var tx Transaction
 	err := rlp.DecodeBytes(input, &tx)
-	if err != errEmptyTypedTx {
+	if err != errShortTypedTx {
 		t.Fatal("wrong error:", err)
 	}
 }
@@ -124,7 +124,6 @@ func TestEIP2718TransactionSigHash(t *testing.T) {
 
 // This test checks signature operations on access list transactions.
 func TestEIP2930Signer(t *testing.T) {
-
 	var (
 		key, _  = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		keyAddr = crypto.PubkeyToAddress(key.PublicKey)
@@ -487,14 +486,17 @@ func TestTransactionCoding(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		assertEqual(parsedTx, tx)
-
+		if err := assertEqual(parsedTx, tx); err != nil {
+			t.Fatal(err)
+		}
 		// JSON
 		parsedTx, err = encodeDecodeJSON(tx)
 		if err != nil {
 			t.Fatal(err)
 		}
-		assertEqual(parsedTx, tx)
+		if err := assertEqual(parsedTx, tx); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -503,7 +505,7 @@ func encodeDecodeJSON(tx *Transaction) (*Transaction, error) {
 	if err != nil {
 		return nil, fmt.Errorf("json encoding failed: %v", err)
 	}
-	var parsedTx = &Transaction{}
+	parsedTx := &Transaction{}
 	if err := json.Unmarshal(data, &parsedTx); err != nil {
 		return nil, fmt.Errorf("json decoding failed: %v", err)
 	}
@@ -515,7 +517,7 @@ func encodeDecodeBinary(tx *Transaction) (*Transaction, error) {
 	if err != nil {
 		return nil, fmt.Errorf("rlp encoding failed: %v", err)
 	}
-	var parsedTx = &Transaction{}
+	parsedTx := &Transaction{}
 	if err := parsedTx.UnmarshalBinary(data); err != nil {
 		return nil, fmt.Errorf("rlp decoding failed: %v", err)
 	}

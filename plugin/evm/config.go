@@ -21,7 +21,7 @@ const (
 	defaultSnapshotAsync                          = true
 	defaultRpcGasCap                              = 50_000_000 // Default to 50M Gas Limit
 	defaultRpcTxFeeCap                            = 100        // 100 AVAX
-	defaultMetricsExpensiveEnabled                = false
+	defaultMetricsExpensiveEnabled                = true
 	defaultApiMaxDuration                         = 0 // Default to no maximum API call duration
 	defaultWsCpuRefillRate                        = 0 // Default to no maximum WS CPU usage
 	defaultWsCpuMaxStored                         = 0 // Default to no maximum WS CPU usage
@@ -37,7 +37,7 @@ const (
 	defaultOfflinePruningBloomFilterSize   uint64 = 512 // Default size (MB) for the offline pruner to use
 	defaultLogLevel                               = "info"
 	defaultLogJSONFormat                          = false
-	defaultMaxOutboundActiveRequests              = 8
+	defaultMaxOutboundActiveRequests              = 16
 	defaultPopulateMissingTriesParallelism        = 1024
 	defaultStateSyncServerTrieCache               = 64 // MB
 
@@ -52,13 +52,13 @@ const (
 )
 
 var defaultEnabledAPIs = []string{
-	"public-eth",
-	"public-eth-filter",
+	"eth",
+	"eth-filter",
 	"net",
 	"web3",
-	"internal-public-eth",
-	"internal-public-blockchain",
-	"internal-public-transaction-pool",
+	"internal-eth",
+	"internal-blockchain",
+	"internal-transaction",
 }
 
 type Duration struct {

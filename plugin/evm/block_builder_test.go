@@ -45,45 +45,12 @@ func TestBlockBuilderSkipsTimerInitialization(t *testing.T) {
 	}
 
 	builder.handleBlockBuilding()
-	// The wait group should finish immediately since no goroutine
-	// should be created when all prices should be set from the start
-	attemptAwait(t, wg, time.Millisecond)
-}
-
-func TestBlockBuilderStopsTimer(t *testing.T) {
-	shutdownChan := make(chan struct{})
-	wg := &sync.WaitGroup{}
-	config := *params.TestChainConfig
-	config.SubnetEVMTimestamp = big.NewInt(time.Now().Add(1 * time.Second).Unix())
-
-	builder := &blockBuilder{
-		ctx:          snow.DefaultContextTest(),
-		chainConfig:  &config,
-		shutdownChan: shutdownChan,
-		shutdownWg:   wg,
-	}
-
-	builder.handleBlockBuilding()
-
-	if builder.buildBlockTimer == nil {
-		t.Fatal("expected block timer to not be nil")
-	}
-	builder.buildBlockLock.Lock()
-	builder.buildStatus = conditionalBuild
-	builder.buildBlockLock.Unlock()
-
-	// With Subnet EVM set slightly in the future, the builder should create a
-	// goroutine to sleep until its time to update and mark the wait group as done when it has
-	// completed the update.
-	attemptAwait(t, wg, 5*time.Second)
 
 	if builder.buildBlockTimer == nil {
 		t.Fatal("expected block timer to be non-nil")
 	}
-	if builder.buildStatus != mayBuild {
-		t.Fatalf("expected build status to be %d but got %d", dontBuild, builder.buildStatus)
-	}
-	if !builder.isSE {
-		t.Fatal("expected isSE to be true")
-	}
+
+	// The wait group should finish immediately since no goroutine
+	// should be created when all prices should be set from the start
+	attemptAwait(t, wg, time.Millisecond)
 }

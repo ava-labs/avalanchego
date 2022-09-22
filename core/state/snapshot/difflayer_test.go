@@ -340,7 +340,6 @@ func BenchmarkFlatten(b *testing.B) {
 				value := make([]byte, 32)
 				rand.Read(value)
 				accStorage[randomHash()] = value
-
 			}
 			storage[accountKey] = accStorage
 		}

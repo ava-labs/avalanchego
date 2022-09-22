@@ -32,13 +32,13 @@ import (
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/eth/gasprice"
 	"github.com/ava-labs/subnet-evm/miner"
-	"github.com/ethereum/go-ethereum/common"
 )
 
 // DefaultFullGPOConfig contains default gasprice oracle settings for full node.
 var DefaultFullGPOConfig = gasprice.Config{
 	Blocks:              40,
 	Percentile:          60,
+	MaxLookbackSeconds:  gasprice.DefaultMaxLookbackSeconds,
 	MaxCallBlockHistory: gasprice.DefaultMaxCallBlockHistory,
 	MaxBlockHistory:     gasprice.DefaultMaxBlockHistory,
 	MinPrice:            gasprice.DefaultMinPrice,
@@ -55,7 +55,7 @@ func NewDefaultConfig() Config {
 		LightPeers:            100,
 		UltraLightFraction:    75,
 		DatabaseCache:         512,
-		TrieCleanCache:        128,
+		TrieCleanCache:        256,
 		TrieDirtyCache:        256,
 		TrieDirtyCommitTarget: 20,
 		SnapshotCache:         128,
@@ -68,7 +68,7 @@ func NewDefaultConfig() Config {
 	}
 }
 
-//go:generate gencodec -type Config -formats toml -out gen_config.go
+//go:generate go run github.com/fjl/gencodec -type Config -formats toml -out gen_config.go
 
 // Config contains configuration options for of the ETH and LES protocols.
 type Config struct {
@@ -93,9 +93,6 @@ type Config struct {
 	SnapshotAsync                   bool    // Whether to generate the initial snapshot in async mode
 	SnapshotVerify                  bool    // Whether to verify generated snapshots
 	SkipSnapshotRebuild             bool    // Whether to skip rebuilding the snapshot in favor of returning an error (only set to true for tests)
-
-	// Whitelist of required block number -> hash values to accept
-	Whitelist map[uint64]common.Hash `toml:"-"`
 
 	// Light client options
 	LightServ    int  `toml:",omitempty"` // Maximum percentage of time allowed for serving LES requests

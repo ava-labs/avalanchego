@@ -131,12 +131,12 @@ func DeleteStorageSnapshot(db ethdb.KeyValueWriter, accountHash, storageHash com
 // IterateStorageSnapshots returns an iterator for walking the entire storage
 // space of a specific account.
 func IterateStorageSnapshots(db ethdb.Iteratee, accountHash common.Hash) ethdb.Iterator {
-	return db.NewIterator(storageSnapshotsKey(accountHash), nil)
+	return NewKeyLengthIterator(db.NewIterator(storageSnapshotsKey(accountHash), nil), len(SnapshotStoragePrefix)+2*common.HashLength)
 }
 
 // IterateAccountSnapshots returns an iterator for walking all of the accounts in the snapshot
 func IterateAccountSnapshots(db ethdb.Iteratee) ethdb.Iterator {
-	return db.NewIterator(SnapshotAccountPrefix, nil)
+	return NewKeyLengthIterator(db.NewIterator(SnapshotAccountPrefix, nil), len(SnapshotAccountPrefix)+common.HashLength)
 }
 
 // ReadSnapshotGenerator retrieves the serialized snapshot generator saved at
@@ -151,13 +151,5 @@ func ReadSnapshotGenerator(db ethdb.KeyValueReader) []byte {
 func WriteSnapshotGenerator(db ethdb.KeyValueWriter, generator []byte) {
 	if err := db.Put(snapshotGeneratorKey, generator); err != nil {
 		log.Crit("Failed to store snapshot generator", "err", err)
-	}
-}
-
-// DeleteSnapshotGenerator deletes the serialized snapshot generator saved at
-// the last shutdown
-func DeleteSnapshotGenerator(db ethdb.KeyValueWriter) {
-	if err := db.Delete(snapshotGeneratorKey); err != nil {
-		log.Crit("Failed to remove snapshot generator", "err", err)
 	}
 }

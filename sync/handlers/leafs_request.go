@@ -86,7 +86,7 @@ func (lrh *LeafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 		return nil, nil
 	}
 
-	t, err := trie.New(leafsRequest.Root, lrh.trieDB)
+	t, err := trie.New(leafsRequest.Account, leafsRequest.Root, lrh.trieDB)
 	if err != nil {
 		log.Debug("error opening trie when processing request, dropping request", "nodeID", nodeID, "requestID", requestID, "root", leafsRequest.Root, "err", err)
 		lrh.stats.IncMissingRoot()

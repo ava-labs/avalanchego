@@ -104,7 +104,6 @@ func golangBindingsFailure(t *testing.T) {
 			if tt.errorMsg != err.Error() {
 				t.Fatalf("test %d: expected Err %s but got actual Err: %s", i, tt.errorMsg, err.Error())
 			}
-
 		})
 	}
 }

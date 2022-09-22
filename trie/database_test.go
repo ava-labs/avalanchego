@@ -55,10 +55,7 @@ func TestDereferenceWhileCommit(t *testing.T) {
 	)
 
 	// set up a database with a small trie
-	tr1, err := New(common.Hash{}, db)
-	if err != nil {
-		t.Fatal(err)
-	}
+	tr1 := NewEmpty(db)
 	rand.Seed(1) // set random seed so we get deterministic key/values
 	FillTrie(t, numKeys, keyLen, tr1)
 	root, _, err := tr1.Commit(nil, false)
@@ -71,14 +68,11 @@ func TestDereferenceWhileCommit(t *testing.T) {
 	// the second trie has one more leaf so it
 	// does not share the same root as the first trie.
 	firstLeaf := true
-	tr2, err := New(common.Hash{}, db)
-	if err != nil {
-		t.Fatal(err)
-	}
+	tr2 := NewEmpty(db)
 	rand.Seed(1) // set random seed so we get deterministic key/values
 	FillTrie(t, numKeys+1, keyLen, tr2)
 	done := make(chan struct{})
-	onleaf := func([][]byte, []byte, []byte, common.Hash) error {
+	onleaf := func([][]byte, []byte, []byte, common.Hash, []byte) error {
 		if firstLeaf {
 			go func() {
 				db.Dereference(root)
@@ -104,7 +98,7 @@ func TestDereferenceWhileCommit(t *testing.T) {
 	// expected behavior is for root2 to
 	// be present and the trie should iterate
 	// without missing nodes.
-	tr3, err := New(root2, db)
+	tr3, err := New(common.Hash{}, root2, db)
 	assert.NoError(t, err)
 	it := tr3.NodeIterator(nil)
 	for it.Next(true) {

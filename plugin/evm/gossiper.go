@@ -66,11 +66,12 @@ type pushGossiper struct {
 
 	codec  codec.Manager
 	signer types.Signer
+	stats  GossipSentStats
 }
 
 // createGossiper constructs and returns a pushGossiper or noopGossiper
 // based on whether vm.chainConfig.SubnetEVMTimestamp is set
-func (vm *VM) createGossiper() Gossiper {
+func (vm *VM) createGossiper(stats GossipStats) Gossiper {
 	if vm.chainConfig.SubnetEVMTimestamp == nil {
 		return &noopGossiper{}
 	}
@@ -88,6 +89,7 @@ func (vm *VM) createGossiper() Gossiper {
 		recentTxs:            &cache.LRU{Size: recentCacheSize},
 		codec:                vm.networkCodec,
 		signer:               types.LatestSigner(vm.blockChain.Config()),
+		stats:                stats,
 	}
 	net.awaitEthTxGossip()
 	return net
@@ -189,10 +191,17 @@ func (n *pushGossiper) queueRegossipTxs() types.Transactions {
 	rgTxsPerAddr := n.config.RegossipTxsPerAddress
 	localQueued := n.queueExecutableTxs(state, tip.BaseFee(), localTxs, rgFrequency, rgMaxTxs, rgTxsPerAddr)
 	localCount := len(localQueued)
+	n.stats.IncEthTxsRegossipQueuedLocal(localCount)
 	if localCount >= rgMaxTxs {
+		n.stats.IncEthTxsRegossipQueued()
 		return localQueued
 	}
 	remoteQueued := n.queueExecutableTxs(state, tip.BaseFee(), remoteTxs, rgFrequency, rgMaxTxs-localCount, rgTxsPerAddr)
+	n.stats.IncEthTxsRegossipQueuedRemote(len(remoteQueued))
+	if localCount+len(remoteQueued) > 0 {
+		// only increment the regossip stat when there are any txs queued
+		n.stats.IncEthTxsRegossipQueued()
+	}
 	return append(localQueued, remoteQueued...)
 }
 
@@ -305,6 +314,7 @@ func (n *pushGossiper) sendTxs(txs []*types.Transaction) error {
 		"len(txs)", len(txs),
 		"size(txs)", len(msg.Txs),
 	)
+	n.stats.IncEthTxsGossipSent()
 	return n.client.Gossip(msgBytes)
 }
 
@@ -393,12 +403,14 @@ func (n *pushGossiper) GossipTxs(txs []*types.Transaction) error {
 type GossipHandler struct {
 	vm     *VM
 	txPool *core.TxPool
+	stats  GossipReceivedStats
 }
 
-func NewGossipHandler(vm *VM) *GossipHandler {
+func NewGossipHandler(vm *VM, stats GossipReceivedStats) *GossipHandler {
 	return &GossipHandler{
 		vm:     vm,
 		txPool: vm.txPool,
+		stats:  stats,
 	}
 }
 
@@ -427,6 +439,7 @@ func (h *GossipHandler) HandleTxs(nodeID ids.NodeID, msg message.TxsGossip) erro
 		)
 		return nil
 	}
+	h.stats.IncEthTxsGossipReceived()
 	errs := h.txPool.AddRemotes(txs)
 	for i, err := range errs {
 		if err != nil {
@@ -435,7 +448,12 @@ func (h *GossipHandler) HandleTxs(nodeID ids.NodeID, msg message.TxsGossip) erro
 				"err", err,
 				"tx", txs[i].Hash(),
 			)
+			if err == core.ErrAlreadyKnown {
+				h.stats.IncEthTxsGossipReceivedKnown()
+			}
+			continue
 		}
+		h.stats.IncEthTxsGossipReceivedNew()
 	}
 	return nil
 }

@@ -2,7 +2,7 @@ package metrics
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"sync"
 	"testing"
@@ -13,7 +13,7 @@ const FANOUT = 128
 
 // Stop the compiler from complaining during debugging.
 var (
-	_ = ioutil.Discard
+	_ = io.Discard
 	_ = log.LstdFlags
 )
 
@@ -53,11 +53,11 @@ func BenchmarkMetrics(b *testing.B) {
 	wgR.Add(1)
 	go func() {
 		defer wgR.Done()
-		//log.Println("go CaptureRuntimeMemStats")
+		// log.Println("go CaptureRuntimeMemStats")
 		for {
 			select {
 			case <-ch:
-				//log.Println("done CaptureRuntimeMemStats")
+				// log.Println("done CaptureRuntimeMemStats")
 				return
 			default:
 				CaptureRuntimeMemStatsOnce(r)
@@ -78,7 +78,7 @@ func BenchmarkMetrics(b *testing.B) {
 					//log.Println("done Write")
 					return
 				default:
-					WriteOnce(r, ioutil.Discard)
+					WriteOnce(r, io.Discard)
 				}
 			}
 		}()
@@ -89,7 +89,7 @@ func BenchmarkMetrics(b *testing.B) {
 	for i := 0; i < FANOUT; i++ {
 		go func(i int) {
 			defer wg.Done()
-			//log.Println("go", i)
+			// log.Println("go", i)
 			for i := 0; i < b.N; i++ {
 				c.Inc(1)
 				g.Update(int64(i))
@@ -98,7 +98,7 @@ func BenchmarkMetrics(b *testing.B) {
 				m.Mark(1)
 				t.Update(1)
 			}
-			//log.Println("done", i)
+			// log.Println("done", i)
 		}(i)
 	}
 	wg.Wait()

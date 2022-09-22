@@ -16,9 +16,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var (
-	errFailedToFetchLeafs = errors.New("failed to fetch leafs")
-)
+var errFailedToFetchLeafs = errors.New("failed to fetch leafs")
 
 const defaultLeafRequestLimit = 1024
 

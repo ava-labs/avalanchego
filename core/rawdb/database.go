@@ -204,7 +204,8 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 			var accounted bool
 			for _, meta := range [][]byte{
 				databaseVersionKey, headHeaderKey, headBlockKey,
-				snapshotRootKey, snapshotGeneratorKey, uncleanShutdownKey,
+				snapshotRootKey, snapshotBlockHashKey, snapshotGeneratorKey,
+				uncleanShutdownKey, syncRootKey,
 			} {
 				if bytes.Equal(key, meta) {
 					metadata.Add(size)

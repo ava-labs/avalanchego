@@ -110,7 +110,7 @@ func (s *storageTrieTask) IterateLeafs(seek common.Hash) ethdb.Iterator {
 
 func (s *storageTrieTask) OnStart() (bool, error) {
 	// check if this storage root is on disk
-	storageTrie, err := trie.New(s.root, s.sync.trieDB)
+	storageTrie, err := trie.New(common.Hash{}, s.root, s.sync.trieDB)
 	if err != nil {
 		return false, nil
 	}

@@ -25,6 +25,15 @@ type Block struct {
 	status   choices.Status
 }
 
+// newBlock returns a new Block wrapping the ethBlock type and implementing the snowman.Block interface
+func (vm *VM) newBlock(ethBlock *types.Block) *Block {
+	return &Block{
+		id:       ids.ID(ethBlock.Hash()),
+		ethBlock: ethBlock,
+		vm:       vm,
+	}
+}
+
 // ID implements the snowman.Block interface
 func (b *Block) ID() ids.ID { return b.id }
 
@@ -87,7 +96,7 @@ func (b *Block) syntacticVerify() error {
 
 	header := b.ethBlock.Header()
 	rules := b.vm.chainConfig.AvalancheRules(header.Number, new(big.Int).SetUint64(header.Time))
-	return b.vm.getBlockValidator(rules).SyntacticVerify(b)
+	return b.vm.syntacticBlockValidator.SyntacticVerify(b, rules)
 }
 
 // Verify implements the snowman.Block interface

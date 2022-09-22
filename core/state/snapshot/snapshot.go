@@ -165,12 +165,6 @@ type snapshot interface {
 	// Stale return whether this layer has become stale (was flattened across) or
 	// if it's still live.
 	Stale() bool
-
-	// AccountIterator creates an account iterator over an arbitrary layer.
-	AccountIterator(seek common.Hash) AccountIterator
-
-	// StorageIterator creates a storage iterator over an arbitrary layer.
-	StorageIterator(account common.Hash, seek common.Hash) (StorageIterator, bool)
 }
 
 // Tree is an Ethereum state snapshot tree. It consists of one persistent base
@@ -622,20 +616,19 @@ func diffToDisk(bottom *diffLayer) (*diskLayer, bool, error) {
 
 		it := rawdb.IterateStorageSnapshots(base.diskdb, hash)
 		for it.Next() {
-			if key := it.Key(); len(key) == 65 { // TODO(karalabe): Yuck, we should move this into the iterator
-				batch.Delete(key)
-				base.cache.Del(key[1:])
-				snapshotFlushStorageItemMeter.Mark(1)
+			key := it.Key()
+			batch.Delete(key)
+			base.cache.Del(key[1:])
+			snapshotFlushStorageItemMeter.Mark(1)
 
-				// Ensure we don't delete too much data blindly (contract can be
-				// huge). It's ok to flush, the root will go missing in case of a
-				// crash and we'll detect and regenerate the snapshot.
-				if batch.ValueSize() > ethdb.IdealBatchSize {
-					if err := batch.Write(); err != nil {
-						log.Crit("Failed to write storage deletions", "err", err)
-					}
-					batch.Reset()
+			// Ensure we don't delete too much data blindly (contract can be
+			// huge). It's ok to flush, the root will go missing in case of a
+			// crash and we'll detect and regenerate the snapshot.
+			if batch.ValueSize() > ethdb.IdealBatchSize {
+				if err := batch.Write(); err != nil {
+					log.Crit("Failed to write storage deletions", "err", err)
 				}
+				batch.Reset()
 			}
 		}
 		it.Release()
@@ -759,7 +752,6 @@ func (t *Tree) Rebuild(blockHash, root common.Hash) {
 				if stats := layer.genStats; stats != nil {
 					wiper = stats.wiping
 				}
-
 			}
 			// Layer should be inactive now, mark it as stale
 			layer.lock.Lock()

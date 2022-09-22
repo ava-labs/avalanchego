@@ -30,6 +30,7 @@ package eth
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -94,7 +95,7 @@ type Ethereum struct {
 	etherbase common.Address
 
 	networkID     uint64
-	netRPCService *ethapi.PublicNetAPI
+	netRPCService *ethapi.NetAPI
 
 	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
 
@@ -152,8 +153,13 @@ func New(
 	if genesisErr != nil {
 		return nil, genesisErr
 	}
-	log.Info("Initialised chain configuration", "config", chainConfig)
-
+	log.Info("")
+	log.Info(strings.Repeat("-", 153))
+	for _, line := range strings.Split(chainConfig.String(), "\n") {
+		log.Info(line)
+	}
+	log.Info(strings.Repeat("-", 153))
+	log.Info("")
 	// Free airdrop data to save memory usage
 	core.AirdropData = nil
 
@@ -257,7 +263,7 @@ func New(
 	}
 
 	// Start the RPC service
-	eth.netRPCService = ethapi.NewPublicNetAPI(eth.NetVersion())
+	eth.netRPCService = ethapi.NewNetAPI(eth.NetVersion())
 
 	eth.stackRPCs = stack.APIs()
 
@@ -282,37 +288,23 @@ func (s *Ethereum) APIs() []rpc.API {
 	return append(apis, []rpc.API{
 		{
 			Namespace: "eth",
-			Version:   "1.0",
-			Service:   NewPublicEthereumAPI(s),
-			Public:    true,
-			Name:      "public-eth",
+			Service:   NewEthereumAPI(s),
+			Name:      "eth",
 		}, {
 			Namespace: "eth",
-			Version:   "1.0",
-			Service:   filters.NewPublicFilterAPI(s.APIBackend, false, 5*time.Minute),
-			Public:    true,
-			Name:      "public-eth-filter",
+			Service:   filters.NewFilterAPI(s.APIBackend, false, 5*time.Minute),
+			Name:      "eth-filter",
 		}, {
 			Namespace: "admin",
-			Version:   "1.0",
-			Service:   NewPrivateAdminAPI(s),
-			Name:      "private-admin",
+			Service:   NewAdminAPI(s),
+			Name:      "admin",
 		}, {
 			Namespace: "debug",
-			Version:   "1.0",
-			Service:   NewPublicDebugAPI(s),
-			Public:    true,
-			Name:      "public-debug",
-		}, {
-			Namespace: "debug",
-			Version:   "1.0",
-			Service:   NewPrivateDebugAPI(s),
-			Name:      "private-debug",
+			Service:   NewDebugAPI(s),
+			Name:      "debug",
 		}, {
 			Namespace: "net",
-			Version:   "1.0",
 			Service:   s.netRPCService,
-			Public:    true,
 			Name:      "net",
 		},
 	}...)
