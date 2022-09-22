@@ -32,12 +32,12 @@ const tmplSourcePrecompileGo = `
 2- Set gas costs here
 3- It is recommended to only modify code in the highlighted areas marked with "CUSTOM CODE STARTS HERE". Modifying code outside of these areas should be done with caution and with a deep understanding of how these changes may impact the EVM.
 Typically, custom codes are required in only those areas.
-4- Add your precompile upgrade in params/config.go
-5- Add your upgradable config in params/precompile_config.go
+4- Add your upgradable config in params/precompile_config.go
+5- Add your precompile upgrade in params/config.go
 6- Add your solidity interface and test contract to contract-examples/contracts
 7- Write solidity tests for your precompile in contract-examples/test
-8- Create e2e test for your solidity test in tests/e2e/solidity/suites.go
-9- Create your genesis with your precompile enabled in tests/e2e/genesis/
+8- Create your genesis with your precompile enabled in tests/e2e/genesis/
+9- Create e2e test for your solidity test in tests/e2e/solidity/suites.go
 10- Run your e2e precompile Solidity tests with 'E2E=true ./scripts/run.sh'
 
 */
@@ -68,11 +68,13 @@ const (
 	{{.Contract.Type}}RawABI = "{{.Contract.InputABI}}"
 )
 
-// Reference imports to suppress errors if they are not otherwise used.
+// CUSTOM CODE STARTS HERE
+// Reference imports to suppress errors from unused imports. This code and any unnecessary imports can be removed. 
 var (
 	_ = errors.New
 	_ = big.NewInt
 	_ = strings.NewReader
+	_ = fmt.Printf
 )
 
 {{$contract := .Contract}}
@@ -96,6 +98,7 @@ var (
 
 	{{.Contract.Type}}Precompile StatefulPrecompiledContract // will be initialized by init function
 
+	// CUSTOM CODE STARTS HERE
 	// THIS SHOULD BE MOVED TO precompile/params.go with a suitable hex address.
 	{{.Contract.Type}}Address = common.HexToAddress("ASUITABLEHEXADDRESS")
 )
@@ -228,7 +231,7 @@ func Pack{{.Normalized.Name}}(inputStruct {{capitalise .Normalized.Name}}Input) 
 func Unpack{{capitalise .Normalized.Name}}Input(input []byte)({{bindtype $input.Type $structs}}, error) {
 res, err := {{$contract.Type}}ABI.UnpackInput("{{$method.Original.Name}}", input)
 if err != nil {
-	return nil, err
+	return {{convertToNil $input.Type}}, err
 }
 unpacked := *abi.ConvertType(res[0], new({{bindtype $input.Type $structs}})).(*{{bindtype $input.Type $structs}})
 return unpacked, nil

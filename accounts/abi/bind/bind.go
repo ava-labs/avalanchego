@@ -140,6 +140,11 @@ func Bind(types []string, abis []string, bytecodes []string, fsigs []map[string]
 			normalized.Outputs = make([]abi.Argument, len(original.Outputs))
 			copy(normalized.Outputs, original.Outputs)
 			for j, output := range normalized.Outputs {
+				if isPrecompile {
+					if output.Name == "" {
+						return "", fmt.Errorf("ABI outputs for %s require a name to generate the precompile binding, re-generate the ABI from a Solidity source file with all named outputs", normalized.Name)
+					}
+				}
 				if output.Name != "" {
 					normalized.Outputs[j].Name = capitalise(output.Name)
 				}
@@ -267,6 +272,7 @@ func Bind(types []string, abis []string, bytecodes []string, fsigs []map[string]
 		"namedtype":     namedType[lang],
 		"capitalise":    capitalise,
 		"decapitalise":  decapitalise,
+		"convertToNil":  convertToNil,
 	}
 
 	// render the template
@@ -592,6 +598,24 @@ func decapitalise(input string) string {
 
 	goForm := abi.ToCamelCase(input)
 	return strings.ToLower(goForm[:1]) + goForm[1:]
+}
+
+// convertToNil converts any type to its proper nil form.
+func convertToNil(input abi.Type) string {
+	switch input.T {
+	case abi.IntTy, abi.UintTy:
+		return "0"
+	case abi.StringTy:
+		return "\"\""
+	case abi.BoolTy:
+		return "false"
+	case abi.AddressTy:
+		return "common.Address{}"
+	case abi.HashTy:
+		return "common.Hash{}"
+	default:
+		return "nil"
+	}
 }
 
 // structured checks whether a list of ABI data types has enough information to
