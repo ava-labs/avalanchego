@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tracker
@@ -8,7 +8,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -16,7 +16,7 @@ import (
 
 // Assert fields are set correctly.
 func TestNewTargeter(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -34,11 +34,11 @@ func TestNewTargeter(t *testing.T) {
 		tracker,
 	)
 	targeter, ok := targeterIntf.(*targeter)
-	assert.True(ok)
-	assert.Equal(vdrs, targeter.vdrs)
-	assert.Equal(tracker, targeter.tracker)
-	assert.Equal(config.MaxNonVdrUsage, targeter.maxNonVdrUsage)
-	assert.Equal(config.MaxNonVdrNodeUsage, targeter.maxNonVdrNodeUsage)
+	require.True(ok)
+	require.Equal(vdrs, targeter.vdrs)
+	require.Equal(tracker, targeter.tracker)
+	require.Equal(config.MaxNonVdrUsage, targeter.maxNonVdrUsage)
+	require.Equal(config.MaxNonVdrNodeUsage, targeter.maxNonVdrNodeUsage)
 }
 
 func TestTarget(t *testing.T) {
@@ -125,7 +125,7 @@ func TestTarget(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setup()
 			target := targeter.TargetUsage(tt.nodeID)
-			assert.Equal(t, tt.expectedTarget, target)
+			require.Equal(t, tt.expectedTarget, target)
 		})
 	}
 }

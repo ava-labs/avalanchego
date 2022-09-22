@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package info
@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
 var (
@@ -43,14 +44,20 @@ type Info struct {
 }
 
 type Parameters struct {
-	Version               *version.Application
-	NodeID                ids.NodeID
-	NetworkID             uint32
-	TxFee                 uint64
-	CreateAssetTxFee      uint64
-	CreateSubnetTxFee     uint64
-	CreateBlockchainTxFee uint64
-	VMManager             vms.Manager
+	Version                       *version.Application
+	NodeID                        ids.NodeID
+	NodePOP                       *signer.ProofOfPossession
+	NetworkID                     uint32
+	TxFee                         uint64
+	CreateAssetTxFee              uint64
+	CreateSubnetTxFee             uint64
+	TransformSubnetTxFee          uint64
+	CreateBlockchainTxFee         uint64
+	AddPrimaryNetworkValidatorFee uint64
+	AddPrimaryNetworkDelegatorFee uint64
+	AddSubnetValidatorFee         uint64
+	AddSubnetDelegatorFee         uint64
+	VMManager                     vms.Manager
 }
 
 // NewService returns a new admin API service
@@ -109,7 +116,8 @@ func (service *Info) GetNodeVersion(_ *http.Request, _ *struct{}, reply *GetNode
 
 // GetNodeIDReply are the results from calling GetNodeID
 type GetNodeIDReply struct {
-	NodeID ids.NodeID `json:"nodeID"`
+	NodeID  ids.NodeID                `json:"nodeID"`
+	NodePOP *signer.ProofOfPossession `json:"nodePOP"`
 }
 
 // GetNodeID returns the node ID of this node
@@ -117,6 +125,7 @@ func (service *Info) GetNodeID(_ *http.Request, _ *struct{}, reply *GetNodeIDRep
 	service.log.Debug("Info: GetNodeID called")
 
 	reply.NodeID = service.NodeID
+	reply.NodePOP = service.NodePOP
 	return nil
 }
 
@@ -277,10 +286,15 @@ func (service *Info) Uptime(_ *http.Request, _ *struct{}, reply *UptimeResponse)
 type GetTxFeeResponse struct {
 	TxFee json.Uint64 `json:"txFee"`
 	// TODO: remove [CreationTxFee] after enough time for dependencies to update
-	CreationTxFee         json.Uint64 `json:"creationTxFee"`
-	CreateAssetTxFee      json.Uint64 `json:"createAssetTxFee"`
-	CreateSubnetTxFee     json.Uint64 `json:"createSubnetTxFee"`
-	CreateBlockchainTxFee json.Uint64 `json:"createBlockchainTxFee"`
+	CreationTxFee                 json.Uint64 `json:"creationTxFee"`
+	CreateAssetTxFee              json.Uint64 `json:"createAssetTxFee"`
+	CreateSubnetTxFee             json.Uint64 `json:"createSubnetTxFee"`
+	TransformSubnetTxFee          json.Uint64 `json:"transformSubnetTxFee"`
+	CreateBlockchainTxFee         json.Uint64 `json:"createBlockchainTxFee"`
+	AddPrimaryNetworkValidatorFee json.Uint64 `json:"addPrimaryNetworkValidatorFee"`
+	AddPrimaryNetworkDelegatorFee json.Uint64 `json:"addPrimaryNetworkDelegatorFee"`
+	AddSubnetValidatorFee         json.Uint64 `json:"addSubnetValidatorFee"`
+	AddSubnetDelegatorFee         json.Uint64 `json:"addSubnetDelegatorFee"`
 }
 
 // GetTxFee returns the transaction fee in nAVAX.
@@ -289,7 +303,12 @@ func (service *Info) GetTxFee(_ *http.Request, args *struct{}, reply *GetTxFeeRe
 	reply.CreationTxFee = json.Uint64(service.CreateAssetTxFee)
 	reply.CreateAssetTxFee = json.Uint64(service.CreateAssetTxFee)
 	reply.CreateSubnetTxFee = json.Uint64(service.CreateSubnetTxFee)
+	reply.TransformSubnetTxFee = json.Uint64(service.TransformSubnetTxFee)
 	reply.CreateBlockchainTxFee = json.Uint64(service.CreateBlockchainTxFee)
+	reply.AddPrimaryNetworkValidatorFee = json.Uint64(service.AddPrimaryNetworkValidatorFee)
+	reply.AddPrimaryNetworkDelegatorFee = json.Uint64(service.AddPrimaryNetworkDelegatorFee)
+	reply.AddSubnetValidatorFee = json.Uint64(service.AddSubnetValidatorFee)
+	reply.AddSubnetDelegatorFee = json.Uint64(service.AddSubnetDelegatorFee)
 	return nil
 }
 

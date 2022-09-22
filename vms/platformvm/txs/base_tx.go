@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -26,7 +26,7 @@ type BaseTx struct {
 	avax.BaseTx `serialize:"true"`
 
 	// true iff this transaction has already passed syntactic verification
-	SyntacticallyVerified bool
+	SyntacticallyVerified bool `json:"-"`
 
 	unsignedBytes []byte // Unsigned byte representation of this data
 }

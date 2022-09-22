@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package router
@@ -26,7 +26,7 @@ type Router interface {
 	Initialize(
 		nodeID ids.NodeID,
 		log logging.Logger,
-		msgCreator message.Creator,
+		msgCreator message.InternalMsgBuilder,
 		timeouts timeout.Manager,
 		shutdownTimeout time.Duration,
 		criticalChains ids.Set,

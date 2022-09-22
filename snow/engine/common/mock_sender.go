@@ -164,18 +164,6 @@ func (mr *MockSenderMockRecorder) SendChits(nodeID, requestID, votes interface{}
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendChits", reflect.TypeOf((*MockSender)(nil).SendChits), nodeID, requestID, votes)
 }
 
-// SendChitsV2 mocks base method.
-func (m *MockSender) SendChitsV2(nodeID ids.NodeID, requestID uint32, votes []ids.ID, vote ids.ID) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SendChitsV2", nodeID, requestID, votes, vote)
-}
-
-// SendChitsV2 indicates an expected call of SendChitsV2.
-func (mr *MockSenderMockRecorder) SendChitsV2(nodeID, requestID, votes, vote interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendChitsV2", reflect.TypeOf((*MockSender)(nil).SendChitsV2), nodeID, requestID, votes, vote)
-}
-
 // SendGet mocks base method.
 func (m *MockSender) SendGet(nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
 	m.ctrl.T.Helper()
@@ -249,15 +237,15 @@ func (mr *MockSenderMockRecorder) SendGetStateSummaryFrontier(nodeIDs, requestID
 }
 
 // SendGossip mocks base method.
-func (m *MockSender) SendGossip(containerID ids.ID, container []byte) {
+func (m *MockSender) SendGossip(container []byte) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SendGossip", containerID, container)
+	m.ctrl.Call(m, "SendGossip", container)
 }
 
 // SendGossip indicates an expected call of SendGossip.
-func (mr *MockSenderMockRecorder) SendGossip(containerID, container interface{}) *gomock.Call {
+func (mr *MockSenderMockRecorder) SendGossip(container interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendGossip", reflect.TypeOf((*MockSender)(nil).SendGossip), containerID, container)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendGossip", reflect.TypeOf((*MockSender)(nil).SendGossip), container)
 }
 
 // SendPullQuery mocks base method.
@@ -273,27 +261,27 @@ func (mr *MockSenderMockRecorder) SendPullQuery(nodeIDs, requestID, containerID 
 }
 
 // SendPushQuery mocks base method.
-func (m *MockSender) SendPushQuery(nodeIDs ids.NodeIDSet, requestID uint32, containerID ids.ID, container []byte) {
+func (m *MockSender) SendPushQuery(nodeIDs ids.NodeIDSet, requestID uint32, container []byte) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SendPushQuery", nodeIDs, requestID, containerID, container)
+	m.ctrl.Call(m, "SendPushQuery", nodeIDs, requestID, container)
 }
 
 // SendPushQuery indicates an expected call of SendPushQuery.
-func (mr *MockSenderMockRecorder) SendPushQuery(nodeIDs, requestID, containerID, container interface{}) *gomock.Call {
+func (mr *MockSenderMockRecorder) SendPushQuery(nodeIDs, requestID, container interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendPushQuery", reflect.TypeOf((*MockSender)(nil).SendPushQuery), nodeIDs, requestID, containerID, container)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendPushQuery", reflect.TypeOf((*MockSender)(nil).SendPushQuery), nodeIDs, requestID, container)
 }
 
 // SendPut mocks base method.
-func (m *MockSender) SendPut(nodeID ids.NodeID, requestID uint32, containerID ids.ID, container []byte) {
+func (m *MockSender) SendPut(nodeID ids.NodeID, requestID uint32, container []byte) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SendPut", nodeID, requestID, containerID, container)
+	m.ctrl.Call(m, "SendPut", nodeID, requestID, container)
 }
 
 // SendPut indicates an expected call of SendPut.
-func (mr *MockSenderMockRecorder) SendPut(nodeID, requestID, containerID, container interface{}) *gomock.Call {
+func (mr *MockSenderMockRecorder) SendPut(nodeID, requestID, container interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendPut", reflect.TypeOf((*MockSender)(nil).SendPut), nodeID, requestID, containerID, container)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendPut", reflect.TypeOf((*MockSender)(nil).SendPut), nodeID, requestID, container)
 }
 
 // SendStateSummaryFrontier mocks base method.
@@ -556,15 +544,15 @@ func (mr *MockFetchSenderMockRecorder) SendGetAncestors(nodeID, requestID, conta
 }
 
 // SendPut mocks base method.
-func (m *MockFetchSender) SendPut(nodeID ids.NodeID, requestID uint32, containerID ids.ID, container []byte) {
+func (m *MockFetchSender) SendPut(nodeID ids.NodeID, requestID uint32, container []byte) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SendPut", nodeID, requestID, containerID, container)
+	m.ctrl.Call(m, "SendPut", nodeID, requestID, container)
 }
 
 // SendPut indicates an expected call of SendPut.
-func (mr *MockFetchSenderMockRecorder) SendPut(nodeID, requestID, containerID, container interface{}) *gomock.Call {
+func (mr *MockFetchSenderMockRecorder) SendPut(nodeID, requestID, container interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendPut", reflect.TypeOf((*MockFetchSender)(nil).SendPut), nodeID, requestID, containerID, container)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendPut", reflect.TypeOf((*MockFetchSender)(nil).SendPut), nodeID, requestID, container)
 }
 
 // MockQuerySender is a mock of QuerySender interface.
@@ -602,18 +590,6 @@ func (mr *MockQuerySenderMockRecorder) SendChits(nodeID, requestID, votes interf
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendChits", reflect.TypeOf((*MockQuerySender)(nil).SendChits), nodeID, requestID, votes)
 }
 
-// SendChitsV2 mocks base method.
-func (m *MockQuerySender) SendChitsV2(nodeID ids.NodeID, requestID uint32, votes []ids.ID, vote ids.ID) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SendChitsV2", nodeID, requestID, votes, vote)
-}
-
-// SendChitsV2 indicates an expected call of SendChitsV2.
-func (mr *MockQuerySenderMockRecorder) SendChitsV2(nodeID, requestID, votes, vote interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendChitsV2", reflect.TypeOf((*MockQuerySender)(nil).SendChitsV2), nodeID, requestID, votes, vote)
-}
-
 // SendPullQuery mocks base method.
 func (m *MockQuerySender) SendPullQuery(nodeIDs ids.NodeIDSet, requestID uint32, containerID ids.ID) {
 	m.ctrl.T.Helper()
@@ -627,15 +603,15 @@ func (mr *MockQuerySenderMockRecorder) SendPullQuery(nodeIDs, requestID, contain
 }
 
 // SendPushQuery mocks base method.
-func (m *MockQuerySender) SendPushQuery(nodeIDs ids.NodeIDSet, requestID uint32, containerID ids.ID, container []byte) {
+func (m *MockQuerySender) SendPushQuery(nodeIDs ids.NodeIDSet, requestID uint32, container []byte) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SendPushQuery", nodeIDs, requestID, containerID, container)
+	m.ctrl.Call(m, "SendPushQuery", nodeIDs, requestID, container)
 }
 
 // SendPushQuery indicates an expected call of SendPushQuery.
-func (mr *MockQuerySenderMockRecorder) SendPushQuery(nodeIDs, requestID, containerID, container interface{}) *gomock.Call {
+func (mr *MockQuerySenderMockRecorder) SendPushQuery(nodeIDs, requestID, container interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendPushQuery", reflect.TypeOf((*MockQuerySender)(nil).SendPushQuery), nodeIDs, requestID, containerID, container)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendPushQuery", reflect.TypeOf((*MockQuerySender)(nil).SendPushQuery), nodeIDs, requestID, container)
 }
 
 // MockGossiper is a mock of Gossiper interface.
@@ -662,15 +638,15 @@ func (m *MockGossiper) EXPECT() *MockGossiperMockRecorder {
 }
 
 // SendGossip mocks base method.
-func (m *MockGossiper) SendGossip(containerID ids.ID, container []byte) {
+func (m *MockGossiper) SendGossip(container []byte) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SendGossip", containerID, container)
+	m.ctrl.Call(m, "SendGossip", container)
 }
 
 // SendGossip indicates an expected call of SendGossip.
-func (mr *MockGossiperMockRecorder) SendGossip(containerID, container interface{}) *gomock.Call {
+func (mr *MockGossiperMockRecorder) SendGossip(container interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendGossip", reflect.TypeOf((*MockGossiper)(nil).SendGossip), containerID, container)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendGossip", reflect.TypeOf((*MockGossiper)(nil).SendGossip), container)
 }
 
 // MockAppSender is a mock of AppSender interface.

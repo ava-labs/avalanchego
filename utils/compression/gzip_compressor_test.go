@@ -1,14 +1,16 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package compression
 
 import (
+	"math"
 	"math/rand"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestGzipCompressDecompress(t *testing.T) {
@@ -22,41 +24,55 @@ func TestGzipCompressDecompress(t *testing.T) {
 		data2[i] = byte(rand.Intn(256)) // #nosec G404
 	}
 
-	compressor := NewGzipCompressor(2 * units.MiB)
+	compressor, err := NewGzipCompressor(2 * units.MiB)
+	require.NoError(t, err)
 
 	dataCompressed, err := compressor.Compress(data)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	data2Compressed, err := compressor.Compress(data2)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	dataDecompressed, err := compressor.Decompress(dataCompressed)
-	assert.NoError(t, err)
-	assert.EqualValues(t, data, dataDecompressed)
+	require.NoError(t, err)
+	require.EqualValues(t, data, dataDecompressed)
 
 	data2Decompressed, err := compressor.Decompress(data2Compressed)
-	assert.NoError(t, err)
-	assert.EqualValues(t, data2, data2Decompressed)
+	require.NoError(t, err)
+	require.EqualValues(t, data2, data2Decompressed)
 
 	dataDecompressed, err = compressor.Decompress(dataCompressed)
-	assert.NoError(t, err)
-	assert.EqualValues(t, data, dataDecompressed)
+	require.NoError(t, err)
+	require.EqualValues(t, data, dataDecompressed)
 
 	nonGzipData := []byte{1, 2, 3}
 	_, err = compressor.Decompress(nonGzipData)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestGzipSizeLimiting(t *testing.T) {
 	data := make([]byte, 3*units.MiB)
-	compressor := NewGzipCompressor(2 * units.MiB)
-	_, err := compressor.Compress(data) // should be too large
-	assert.Error(t, err)
+	compressor, err := NewGzipCompressor(2 * units.MiB)
+	require.NoError(t, err)
 
-	compressor2 := NewGzipCompressor(4 * units.MiB)
+	_, err = compressor.Compress(data) // should be too large
+	require.Error(t, err)
+
+	compressor2, err := NewGzipCompressor(4 * units.MiB)
+	require.NoError(t, err)
+
 	dataCompressed, err := compressor2.Compress(data)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = compressor.Decompress(dataCompressed) // should be too large
-	assert.Error(t, err)
+	require.Error(t, err)
+}
+
+// Attempts to create gzip compressor with math.MaxInt64
+// which leads to undefined decompress behavior due to integer overflow
+// in limit reader creation.
+func TestNewGzipCompressorWithInvalidLimit(t *testing.T) {
+	require := require.New(t)
+	_, err := NewGzipCompressor(math.MaxInt64)
+	require.ErrorIs(err, ErrInvalidMaxSizeGzipCompressor)
 }

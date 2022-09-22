@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
@@ -31,7 +31,7 @@ type SenderTest struct {
 	CantSendGetAcceptedFrontier, CantSendAcceptedFrontier,
 	CantSendGetAccepted, CantSendAccepted,
 	CantSendGet, CantSendGetAncestors, CantSendPut, CantSendAncestors,
-	CantSendPullQuery, CantSendPushQuery, CantSendChits, CantSendChitsV2,
+	CantSendPullQuery, CantSendPushQuery, CantSendChits,
 	CantSendGossip,
 	CantSendAppRequest, CantSendAppResponse, CantSendAppGossip, CantSendAppGossipSpecific bool
 
@@ -46,13 +46,12 @@ type SenderTest struct {
 	SendAcceptedF                func(ids.NodeID, uint32, []ids.ID)
 	SendGetF                     func(ids.NodeID, uint32, ids.ID)
 	SendGetAncestorsF            func(ids.NodeID, uint32, ids.ID)
-	SendPutF                     func(ids.NodeID, uint32, ids.ID, []byte)
+	SendPutF                     func(ids.NodeID, uint32, []byte)
 	SendAncestorsF               func(ids.NodeID, uint32, [][]byte)
-	SendPushQueryF               func(ids.NodeIDSet, uint32, ids.ID, []byte)
+	SendPushQueryF               func(ids.NodeIDSet, uint32, []byte)
 	SendPullQueryF               func(ids.NodeIDSet, uint32, ids.ID)
 	SendChitsF                   func(ids.NodeID, uint32, []ids.ID)
-	SendChitsV2F                 func(ids.NodeID, uint32, []ids.ID, ids.ID)
-	SendGossipF                  func(ids.ID, []byte)
+	SendGossipF                  func([]byte)
 	SendAppRequestF              func(ids.NodeIDSet, uint32, []byte) error
 	SendAppResponseF             func(ids.NodeID, uint32, []byte) error
 	SendAppGossipF               func([]byte) error
@@ -213,9 +212,9 @@ func (s *SenderTest) SendGetAncestors(validatorID ids.NodeID, requestID uint32, 
 // SendPut calls SendPutF if it was initialized. If it wasn't initialized and
 // this function shouldn't be called and testing was initialized, then testing
 // will fail.
-func (s *SenderTest) SendPut(vdr ids.NodeID, requestID uint32, vtxID ids.ID, vtx []byte) {
+func (s *SenderTest) SendPut(vdr ids.NodeID, requestID uint32, vtx []byte) {
 	if s.SendPutF != nil {
-		s.SendPutF(vdr, requestID, vtxID, vtx)
+		s.SendPutF(vdr, requestID, vtx)
 	} else if s.CantSendPut && s.T != nil {
 		s.T.Fatalf("Unexpectedly called SendPut")
 	}
@@ -235,9 +234,9 @@ func (s *SenderTest) SendAncestors(vdr ids.NodeID, requestID uint32, vtxs [][]by
 // SendPushQuery calls SendPushQueryF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) SendPushQuery(vdrs ids.NodeIDSet, requestID uint32, vtxID ids.ID, vtx []byte) {
+func (s *SenderTest) SendPushQuery(vdrs ids.NodeIDSet, requestID uint32, vtx []byte) {
 	if s.SendPushQueryF != nil {
-		s.SendPushQueryF(vdrs, requestID, vtxID, vtx)
+		s.SendPushQueryF(vdrs, requestID, vtx)
 	} else if s.CantSendPushQuery && s.T != nil {
 		s.T.Fatalf("Unexpectedly called SendPushQuery")
 	}
@@ -265,23 +264,12 @@ func (s *SenderTest) SendChits(vdr ids.NodeID, requestID uint32, votes []ids.ID)
 	}
 }
 
-// SendChitsV2 calls SendChitsV2F if it was initialized. If it wasn't initialized
-// and this function shouldn't be called and testing was initialized, then
-// testing will fail.
-func (s *SenderTest) SendChitsV2(vdr ids.NodeID, requestID uint32, votes []ids.ID, vote ids.ID) {
-	if s.SendChitsV2F != nil {
-		s.SendChitsV2F(vdr, requestID, votes, vote)
-	} else if s.CantSendChitsV2 && s.T != nil {
-		s.T.Fatalf("Unexpectedly called SendChitsV2")
-	}
-}
-
 // SendGossip calls SendGossipF if it was initialized. If it wasn't initialized
 // and this function shouldn't be called and testing was initialized, then
 // testing will fail.
-func (s *SenderTest) SendGossip(containerID ids.ID, container []byte) {
+func (s *SenderTest) SendGossip(container []byte) {
 	if s.SendGossipF != nil {
-		s.SendGossipF(containerID, container)
+		s.SendGossipF(container)
 	} else if s.CantSendGossip && s.T != nil {
 		s.T.Fatalf("Unexpectedly called SendGossip")
 	}

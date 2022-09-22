@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package chains
@@ -72,10 +72,10 @@ var (
 
 // Manager manages the chains running on this node.
 // It can:
-//   * Create a chain
-//   * Add a registrant. When a chain is created, each registrant calls
+//   - Create a chain
+//   - Add a registrant. When a chain is created, each registrant calls
 //     RegisterChain with the new chain as the argument.
-//   * Manage the aliases of chains
+//   - Manage the aliases of chains
 type Manager interface {
 	ids.Aliaser
 
@@ -116,9 +116,9 @@ type ChainParameters struct {
 	// The genesis data of this chain's ledger.
 	GenesisData []byte
 	// The ID of the vm this chain is running.
-	VMAlias string
+	VMID ids.ID
 	// The IDs of the feature extensions this chain is running.
-	FxAliases []string
+	FxIDs []ids.ID
 	// Should only be set if the default beacons can't be used.
 	CustomBeacons validators.Set
 }
@@ -148,6 +148,7 @@ type ManagerConfig struct {
 	ConsensusAcceptorGroup      snow.AcceptorGroup
 	DBManager                   dbManager.Manager
 	MsgCreator                  message.Creator    // message creator, shared with network
+	MsgCreatorWithProto         message.Creator    // message creator using protobufs, shared with network
 	Router                      router.Router      // Routes incoming messages to the appropriate chain
 	Net                         network.Network    // Sends consensus messages to other validators
 	ConsensusParams             avcon.Parameters   // The consensus parameters (alpha, beta, etc.) for new chains
@@ -187,6 +188,7 @@ type ManagerConfig struct {
 
 	ApricotPhase4Time            time.Time
 	ApricotPhase4MinPChainHeight uint64
+	BlueberryTime                time.Time
 
 	// Tracks CPU/disk usage caused by each peer.
 	ResourceTracker timetracker.ResourceTracker
@@ -247,7 +249,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	if m.StakingEnabled && chainParams.SubnetID != constants.PrimaryNetworkID && !m.WhitelistedSubnets.Contains(chainParams.SubnetID) {
 		m.Log.Debug("skipped creating non-whitelisted chain",
 			zap.Stringer("chainID", chainParams.ID),
-			zap.String("vmID", chainParams.VMAlias),
+			zap.Stringer("vmID", chainParams.VMID),
 		)
 		return
 	}
@@ -263,7 +265,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	}
 	m.Log.Info("creating chain",
 		zap.Stringer("chainID", chainParams.ID),
-		zap.String("vmID", chainParams.VMAlias),
+		zap.Stringer("vmID", chainParams.VMID),
 	)
 
 	sb, exists := m.subnets[chainParams.SubnetID]
@@ -348,12 +350,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 
 // Create a chain
 func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, error) {
-	vmID, err := m.VMManager.Lookup(chainParams.VMAlias)
-	if err != nil {
-		return nil, fmt.Errorf("error while looking up VM: %w", err)
-	}
-
-	if chainParams.ID != constants.PlatformChainID && vmID == constants.PlatformVMID {
+	if chainParams.ID != constants.PlatformChainID && chainParams.VMID == constants.PlatformVMID {
 		return nil, errCreatePlatformVM
 	}
 	primaryAlias := m.PrimaryAliasOrDefault(chainParams.ID)
@@ -412,7 +409,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 
 	// Get a factory for the vm we want to use on our chain
-	vmFactory, err := m.VMManager.GetFactory(vmID)
+	vmFactory, err := m.VMManager.GetFactory(chainParams.VMID)
 	if err != nil {
 		return nil, fmt.Errorf("error while getting vmFactory: %w", err)
 	}
@@ -424,13 +421,8 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 	// TODO: Shutdown VM if an error occurs
 
-	fxs := make([]*common.Fx, len(chainParams.FxAliases))
-	for i, fxAlias := range chainParams.FxAliases {
-		fxID, err := m.VMManager.Lookup(fxAlias)
-		if err != nil {
-			return nil, fmt.Errorf("error while looking up Fx: %w", err)
-		}
-
+	fxs := make([]*common.Fx, len(chainParams.FxIDs))
+	for i, fxID := range chainParams.FxIDs {
 		// Get a factory for the fx we want to use on our chain
 		fxFactory, err := m.VMManager.GetFactory(fxID)
 		if err != nil {
@@ -577,6 +569,8 @@ func (m *manager) createAvalancheChain(
 	sender, err := sender.New(
 		ctx,
 		m.MsgCreator,
+		m.MsgCreatorWithProto,
+		m.BlueberryTime,
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
@@ -763,6 +757,8 @@ func (m *manager) createSnowmanChain(
 	sender, err := sender.New(
 		ctx,
 		m.MsgCreator,
+		m.MsgCreatorWithProto,
+		m.BlueberryTime,
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
@@ -805,8 +801,12 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("error while fetching chain config: %w", err)
 	}
 
-	// enable ProposerVM on this VM
-	vm = proposervm.New(vm, m.ApricotPhase4Time, m.ApricotPhase4MinPChainHeight)
+	vm = proposervm.New(
+		vm,
+		m.ApricotPhase4Time,
+		m.ApricotPhase4MinPChainHeight,
+		m.BlueberryTime,
+	)
 
 	if m.MeterVMEnabled {
 		vm = metervm.NewBlockVM(vm)

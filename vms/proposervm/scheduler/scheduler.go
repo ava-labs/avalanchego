@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package scheduler
@@ -81,7 +81,7 @@ waitloop:
 					// from the VM to avoid deadlock
 					s.log.Debug("dropping message from VM",
 						zap.String("reason", "channel to engine is full"),
-						zap.Stringer("message", msg),
+						zap.Stringer("messageString", msg),
 					)
 				}
 			case buildBlockTime, ok := <-s.newBuildBlockTime:

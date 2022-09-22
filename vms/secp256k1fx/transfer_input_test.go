@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
@@ -6,7 +6,7 @@ package secp256k1fx
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -14,71 +14,71 @@ import (
 )
 
 func TestTransferInputAmount(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	in := TransferInput{
 		Amt: 1,
 		Input: Input{
 			SigIndices: []uint32{0, 1},
 		},
 	}
-	assert.Equal(uint64(1), in.Amount())
+	require.Equal(uint64(1), in.Amount())
 }
 
 func TestTransferInputVerify(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	in := TransferInput{
 		Amt: 1,
 		Input: Input{
 			SigIndices: []uint32{0, 1},
 		},
 	}
-	assert.NoError(in.Verify())
+	require.NoError(in.Verify())
 }
 
 func TestTransferInputVerifyNil(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	in := (*TransferInput)(nil)
-	assert.ErrorIs(in.Verify(), errNilInput)
+	require.ErrorIs(in.Verify(), errNilInput)
 }
 
 func TestTransferInputVerifyNoValue(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	in := TransferInput{
 		Amt: 0,
 		Input: Input{
 			SigIndices: []uint32{0, 1},
 		},
 	}
-	assert.ErrorIs(in.Verify(), errNoValueInput)
+	require.ErrorIs(in.Verify(), errNoValueInput)
 }
 
 func TestTransferInputVerifyDuplicated(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	in := TransferInput{
 		Amt: 1,
 		Input: Input{
 			SigIndices: []uint32{0, 0},
 		},
 	}
-	assert.ErrorIs(in.Verify(), errNotSortedUnique)
+	require.ErrorIs(in.Verify(), errNotSortedUnique)
 }
 
 func TestTransferInputVerifyUnsorted(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	in := TransferInput{
 		Amt: 1,
 		Input: Input{
 			SigIndices: []uint32{1, 0},
 		},
 	}
-	assert.ErrorIs(in.Verify(), errNotSortedUnique)
+	require.ErrorIs(in.Verify(), errNotSortedUnique)
 }
 
 func TestTransferInputSerialize(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
-	assert.NoError(m.RegisterCodec(0, c))
+	require.NoError(m.RegisterCodec(0, c))
 
 	expected := []byte{
 		// Codec version
@@ -98,16 +98,16 @@ func TestTransferInputSerialize(t *testing.T) {
 			SigIndices: []uint32{3, 7},
 		},
 	}
-	assert.NoError(in.Verify())
+	require.NoError(in.Verify())
 
 	result, err := m.Marshal(0, &in)
-	assert.NoError(err)
-	assert.Equal(expected, result)
+	require.NoError(err)
+	require.Equal(expected, result)
 }
 
 func TestTransferInputNotState(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	intf := interface{}(&TransferInput{})
 	_, ok := intf.(verify.State)
-	assert.False(ok)
+	require.False(ok)
 }

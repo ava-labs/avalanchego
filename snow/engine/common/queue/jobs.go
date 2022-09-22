@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package queue
@@ -6,6 +6,8 @@ package queue
 import (
 	"fmt"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"go.uber.org/zap"
 
@@ -16,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -200,8 +201,10 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 				)
 			}
 		}
-		j.etaMetric.Set(0)
 	}
+
+	// Now that executing has finished, zero out the ETA.
+	j.etaMetric.Set(0)
 
 	if !restarted {
 		ctx.Log.Info("executed operations",

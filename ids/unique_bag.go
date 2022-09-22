@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ids
@@ -12,16 +12,16 @@ const (
 	minUniqueBagSize = 16
 )
 
-type UniqueBag map[ID]BitSet
+type UniqueBag map[ID]BitSet64
 
 func (b *UniqueBag) init() {
 	if *b == nil {
-		*b = make(map[ID]BitSet, minUniqueBagSize)
+		*b = make(map[ID]BitSet64, minUniqueBagSize)
 	}
 }
 
 func (b *UniqueBag) Add(setID uint, idSet ...ID) {
-	bs := BitSet(0)
+	bs := BitSet64(0)
 	bs.Add(setID)
 
 	for _, id := range idSet {
@@ -29,7 +29,7 @@ func (b *UniqueBag) Add(setID uint, idSet ...ID) {
 	}
 }
 
-func (b *UniqueBag) UnionSet(id ID, set BitSet) {
+func (b *UniqueBag) UnionSet(id ID, set BitSet64) {
 	b.init()
 
 	previousSet := (*b)[id]
@@ -37,7 +37,7 @@ func (b *UniqueBag) UnionSet(id ID, set BitSet) {
 	(*b)[id] = previousSet
 }
 
-func (b *UniqueBag) DifferenceSet(id ID, set BitSet) {
+func (b *UniqueBag) DifferenceSet(id ID, set BitSet64) {
 	b.init()
 
 	previousSet := (*b)[id]
@@ -56,7 +56,7 @@ func (b *UniqueBag) Difference(diff *UniqueBag) {
 	}
 }
 
-func (b *UniqueBag) GetSet(id ID) BitSet { return (*b)[id] }
+func (b *UniqueBag) GetSet(id ID) BitSet64 { return (*b)[id] }
 
 func (b *UniqueBag) RemoveSet(id ID) { delete(*b, id) }
 

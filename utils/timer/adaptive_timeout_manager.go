@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package timer
@@ -103,6 +103,7 @@ type adaptiveTimeoutManager struct {
 	clock                            mockable.Clock
 	networkTimeoutMetric, avgLatency prometheus.Gauge
 	numTimeouts                      prometheus.Counter
+	numPendingTimeouts               prometheus.Gauge
 	// Averages the response time from all peers
 	averager math.Averager
 	// Timeout is [timeoutCoefficient] * average response time
@@ -148,6 +149,11 @@ func NewAdaptiveTimeoutManager(
 			Name:      "timeouts",
 			Help:      "Number of timed out requests",
 		}),
+		numPendingTimeouts: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: metricsNamespace,
+			Name:      "pending_timeouts",
+			Help:      "Number of pending timeouts",
+		}),
 		minimumTimeout:     config.MinimumTimeout,
 		maximumTimeout:     config.MaximumTimeout,
 		currentTimeout:     config.InitialTimeout,
@@ -158,9 +164,12 @@ func NewAdaptiveTimeoutManager(
 	tm.averager = math.NewAverager(float64(config.InitialTimeout), config.TimeoutHalflife, tm.clock.Time())
 
 	errs := &wrappers.Errs{}
-	errs.Add(metricsRegister.Register(tm.networkTimeoutMetric))
-	errs.Add(metricsRegister.Register(tm.avgLatency))
-	errs.Add(metricsRegister.Register(tm.numTimeouts))
+	errs.Add(
+		metricsRegister.Register(tm.networkTimeoutMetric),
+		metricsRegister.Register(tm.avgLatency),
+		metricsRegister.Register(tm.numTimeouts),
+		metricsRegister.Register(tm.numPendingTimeouts),
+	)
 	return tm, errs.Err
 }
 
@@ -195,6 +204,7 @@ func (tm *adaptiveTimeoutManager) put(id ids.ID, op message.Op, handler func()) 
 		op:       op,
 	}
 	tm.timeoutMap[id] = timeout
+	tm.numPendingTimeouts.Set(float64(len(tm.timeoutMap)))
 	heap.Push(&tm.timeoutQueue, timeout)
 
 	tm.setNextTimeoutTime()
@@ -226,6 +236,7 @@ func (tm *adaptiveTimeoutManager) remove(id ids.ID, now time.Time) {
 
 	// Remove the timeout from the map
 	delete(tm.timeoutMap, id)
+	tm.numPendingTimeouts.Set(float64(len(tm.timeoutMap)))
 
 	// Remove the timeout from the queue
 	heap.Remove(&tm.timeoutQueue, timeout.index)

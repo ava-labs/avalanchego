@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
@@ -172,21 +172,21 @@ func TestMergedIterator(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 			it := NewMergedIterator(tt.iterators...)
 			for _, expected := range tt.expected {
-				assert.True(it.Next())
-				assert.Equal(expected, it.Value())
+				require.True(it.Next())
+				require.Equal(expected, it.Value())
 			}
-			assert.False(it.Next())
+			require.False(it.Next())
 			it.Release()
-			assert.False(it.Next())
+			require.False(it.Next())
 		})
 	}
 }
 
 func TestMergedIteratorEarlyRelease(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	stakers0 := []*Staker{
 		{
 			TxID:     ids.GenerateTestID(),
@@ -216,7 +216,7 @@ func TestMergedIteratorEarlyRelease(t *testing.T) {
 		NewSliceIterator(stakers1...),
 		EmptyIterator,
 	)
-	assert.True(it.Next())
+	require.True(it.Next())
 	it.Release()
-	assert.False(it.Next())
+	require.False(it.Next())
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package info
@@ -9,7 +9,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -69,8 +69,8 @@ func TestGetVMsSuccess(t *testing.T) {
 	reply := GetVMsReply{}
 	err := resources.info.GetVMs(nil, nil, &reply)
 
-	assert.Equal(t, expectedVMRegistry, reply.VMs)
-	assert.Equal(t, err, nil)
+	require.Equal(t, expectedVMRegistry, reply.VMs)
+	require.Equal(t, err, nil)
 }
 
 // Tests GetVMs if we fail to list our vms.
@@ -84,7 +84,7 @@ func TestGetVMsVMsListFactoriesFails(t *testing.T) {
 	reply := GetVMsReply{}
 	err := resources.info.GetVMs(nil, nil, &reply)
 
-	assert.Equal(t, errOops, err)
+	require.Equal(t, errOops, err)
 }
 
 // Tests GetVMs if we can't get our vm aliases.
@@ -105,5 +105,5 @@ func TestGetVMsGetAliasesFails(t *testing.T) {
 	reply := GetVMsReply{}
 	err := resources.info.GetVMs(nil, nil, &reply)
 
-	assert.Equal(t, err, errOops)
+	require.Equal(t, err, errOops)
 }

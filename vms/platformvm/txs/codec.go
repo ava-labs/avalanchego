@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -67,6 +68,15 @@ func RegisterUnsignedTxsTypes(targetCodec codec.Registry) error {
 
 		targetCodec.RegisterType(&stakeable.LockIn{}),
 		targetCodec.RegisterType(&stakeable.LockOut{}),
+
+		// Blueberry additions:
+		targetCodec.RegisterType(&RemoveSubnetValidatorTx{}),
+		targetCodec.RegisterType(&TransformSubnetTx{}),
+		targetCodec.RegisterType(&AddPermissionlessValidatorTx{}),
+		targetCodec.RegisterType(&AddPermissionlessDelegatorTx{}),
+
+		targetCodec.RegisterType(&signer.Empty{}),
+		targetCodec.RegisterType(&signer.ProofOfPossession{}),
 	)
 	return errs.Err
 }

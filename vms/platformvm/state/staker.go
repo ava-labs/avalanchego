@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -10,8 +10,7 @@ import (
 	"github.com/google/btree"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var _ btree.Item = &Staker{}
@@ -53,7 +52,7 @@ type Staker struct {
 	// are grouped together. The ordering of these groups is documented in
 	// [priorities.go] and depends on if the stakers are in the pending or
 	// current validator set.
-	Priority Priority
+	Priority txs.Priority
 }
 
 // A *Staker is considered to be less than another *Staker when:
@@ -84,24 +83,31 @@ func (s *Staker) Less(thanIntf btree.Item) bool {
 	return bytes.Compare(s.TxID[:], than.TxID[:]) == -1
 }
 
-func NewPrimaryNetworkStaker(txID ids.ID, vdr *validator.Validator) *Staker {
+func NewCurrentStaker(txID ids.ID, staker txs.Staker, potentialReward uint64) *Staker {
+	endTime := staker.EndTime()
 	return &Staker{
-		TxID:      txID,
-		NodeID:    vdr.ID(),
-		SubnetID:  constants.PrimaryNetworkID,
-		Weight:    vdr.Weight(),
-		StartTime: vdr.StartTime(),
-		EndTime:   vdr.EndTime(),
+		TxID:            txID,
+		NodeID:          staker.NodeID(),
+		SubnetID:        staker.SubnetID(),
+		Weight:          staker.Weight(),
+		StartTime:       staker.StartTime(),
+		EndTime:         endTime,
+		PotentialReward: potentialReward,
+		NextTime:        endTime,
+		Priority:        staker.CurrentPriority(),
 	}
 }
 
-func NewSubnetStaker(txID ids.ID, vdr *validator.SubnetValidator) *Staker {
+func NewPendingStaker(txID ids.ID, staker txs.Staker) *Staker {
+	startTime := staker.StartTime()
 	return &Staker{
 		TxID:      txID,
-		NodeID:    vdr.ID(),
-		SubnetID:  vdr.SubnetID(),
-		Weight:    vdr.Weight(),
-		StartTime: vdr.StartTime(),
-		EndTime:   vdr.EndTime(),
+		NodeID:    staker.NodeID(),
+		SubnetID:  staker.SubnetID(),
+		Weight:    staker.Weight(),
+		StartTime: startTime,
+		EndTime:   staker.EndTime(),
+		NextTime:  startTime,
+		Priority:  staker.PendingPriority(),
 	}
 }

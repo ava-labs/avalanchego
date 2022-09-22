@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package info
@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/rpc"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
 var _ Client = &client{}
@@ -15,7 +16,7 @@ var _ Client = &client{}
 // Client interface for an Info API Client
 type Client interface {
 	GetNodeVersion(context.Context, ...rpc.Option) (*GetNodeVersionReply, error)
-	GetNodeID(context.Context, ...rpc.Option) (ids.NodeID, error)
+	GetNodeID(context.Context, ...rpc.Option) (ids.NodeID, *signer.ProofOfPossession, error)
 	GetNodeIP(context.Context, ...rpc.Option) (string, error)
 	GetNetworkID(context.Context, ...rpc.Option) (uint32, error)
 	GetNetworkName(context.Context, ...rpc.Option) (string, error)
@@ -46,10 +47,10 @@ func (c *client) GetNodeVersion(ctx context.Context, options ...rpc.Option) (*Ge
 	return res, err
 }
 
-func (c *client) GetNodeID(ctx context.Context, options ...rpc.Option) (ids.NodeID, error) {
+func (c *client) GetNodeID(ctx context.Context, options ...rpc.Option) (ids.NodeID, *signer.ProofOfPossession, error) {
 	res := &GetNodeIDReply{}
 	err := c.requester.SendRequest(ctx, "getNodeID", struct{}{}, res, options...)
-	return res.NodeID, err
+	return res.NodeID, res.NodePOP, err
 }
 
 func (c *client) GetNodeIP(ctx context.Context, options ...rpc.Option) (string, error) {

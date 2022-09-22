@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package versiondb
@@ -92,7 +92,7 @@ func (db *Database) Put(key, value []byte) error {
 	if db.mem == nil {
 		return database.ErrClosed
 	}
-	db.mem[string(key)] = valueDelete{value: value}
+	db.mem[string(key)] = valueDelete{value: utils.CopyBytes(value)}
 	return nil
 }
 

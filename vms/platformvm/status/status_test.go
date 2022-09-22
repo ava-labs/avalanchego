@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package status
@@ -8,11 +8,11 @@ import (
 	"math"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStatusJSON(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	statuses := []Status{
 		Committed,
@@ -23,36 +23,36 @@ func TestStatusJSON(t *testing.T) {
 	}
 	for _, status := range statuses {
 		statusJSON, err := json.Marshal(status)
-		assert.NoError(err)
+		require.NoError(err)
 
 		var parsedStatus Status
 		err = json.Unmarshal(statusJSON, &parsedStatus)
-		assert.NoError(err)
-		assert.Equal(status, parsedStatus)
+		require.NoError(err)
+		require.Equal(status, parsedStatus)
 	}
 
 	{
 		status := Status(math.MaxInt32)
 		_, err := json.Marshal(status)
-		assert.Error(err)
+		require.Error(err)
 	}
 
 	{
 		status := Committed
 		err := json.Unmarshal([]byte("null"), &status)
-		assert.NoError(err)
-		assert.Equal(Committed, status)
+		require.NoError(err)
+		require.Equal(Committed, status)
 	}
 
 	{
 		var status Status
 		err := json.Unmarshal([]byte(`"not a status"`), &status)
-		assert.Error(err)
+		require.Error(err)
 	}
 }
 
 func TestStatusVerify(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	statuses := []Status{
 		Committed,
@@ -63,23 +63,23 @@ func TestStatusVerify(t *testing.T) {
 	}
 	for _, status := range statuses {
 		err := status.Verify()
-		assert.NoError(err, "%s failed verification", status)
+		require.NoError(err, "%s failed verification", status)
 	}
 
 	badStatus := Status(math.MaxInt32)
 	err := badStatus.Verify()
-	assert.Error(err, "%s passed verification", badStatus)
+	require.Error(err, "%s passed verification", badStatus)
 }
 
 func TestStatusString(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
-	assert.Equal("Committed", Committed.String())
-	assert.Equal("Aborted", Aborted.String())
-	assert.Equal("Processing", Processing.String())
-	assert.Equal("Unknown", Unknown.String())
-	assert.Equal("Dropped", Dropped.String())
+	require.Equal("Committed", Committed.String())
+	require.Equal("Aborted", Aborted.String())
+	require.Equal("Processing", Processing.String())
+	require.Equal("Unknown", Unknown.String())
+	require.Equal("Dropped", Dropped.String())
 
 	badStatus := Status(math.MaxInt32)
-	assert.Equal("Invalid status", badStatus.String())
+	require.Equal("Invalid status", badStatus.String())
 }

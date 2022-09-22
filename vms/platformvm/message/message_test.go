@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -6,37 +6,37 @@ package message
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 func TestTx(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	tx := utils.RandomBytes(256 * units.KiB)
 	builtMsg := Tx{
 		Tx: tx,
 	}
 	builtMsgBytes, err := Build(&builtMsg)
-	assert.NoError(err)
-	assert.Equal(builtMsgBytes, builtMsg.Bytes())
+	require.NoError(err)
+	require.Equal(builtMsgBytes, builtMsg.Bytes())
 
 	parsedMsgIntf, err := Parse(builtMsgBytes)
-	assert.NoError(err)
-	assert.Equal(builtMsgBytes, parsedMsgIntf.Bytes())
+	require.NoError(err)
+	require.Equal(builtMsgBytes, parsedMsgIntf.Bytes())
 
 	parsedMsg, ok := parsedMsgIntf.(*Tx)
-	assert.True(ok)
+	require.True(ok)
 
-	assert.Equal(tx, parsedMsg.Tx)
+	require.Equal(tx, parsedMsg.Tx)
 }
 
 func TestParseGibberish(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	randomBytes := utils.RandomBytes(256 * units.KiB)
 	_, err := Parse(randomBytes)
-	assert.Error(err)
+	require.Error(err)
 }

@@ -5,34 +5,35 @@
 package state
 
 import (
-	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
+
+	gomock "github.com/golang/mock/gomock"
 )
 
-// MockStakerIterator is a mock of StakerIterator interface
+// MockStakerIterator is a mock of StakerIterator interface.
 type MockStakerIterator struct {
 	ctrl     *gomock.Controller
 	recorder *MockStakerIteratorMockRecorder
 }
 
-// MockStakerIteratorMockRecorder is the mock recorder for MockStakerIterator
+// MockStakerIteratorMockRecorder is the mock recorder for MockStakerIterator.
 type MockStakerIteratorMockRecorder struct {
 	mock *MockStakerIterator
 }
 
-// NewMockStakerIterator creates a new mock instance
+// NewMockStakerIterator creates a new mock instance.
 func NewMockStakerIterator(ctrl *gomock.Controller) *MockStakerIterator {
 	mock := &MockStakerIterator{ctrl: ctrl}
 	mock.recorder = &MockStakerIteratorMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockStakerIterator) EXPECT() *MockStakerIteratorMockRecorder {
 	return m.recorder
 }
 
-// Next mocks base method
+// Next mocks base method.
 func (m *MockStakerIterator) Next() bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Next")
@@ -40,25 +41,25 @@ func (m *MockStakerIterator) Next() bool {
 	return ret0
 }
 
-// Next indicates an expected call of Next
+// Next indicates an expected call of Next.
 func (mr *MockStakerIteratorMockRecorder) Next() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Next", reflect.TypeOf((*MockStakerIterator)(nil).Next))
 }
 
-// Release mocks base method
+// Release mocks base method.
 func (m *MockStakerIterator) Release() {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Release")
 }
 
-// Release indicates an expected call of Release
+// Release indicates an expected call of Release.
 func (mr *MockStakerIteratorMockRecorder) Release() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Release", reflect.TypeOf((*MockStakerIterator)(nil).Release))
 }
 
-// Value mocks base method
+// Value mocks base method.
 func (m *MockStakerIterator) Value() *Staker {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Value")
@@ -66,7 +67,7 @@ func (m *MockStakerIterator) Value() *Staker {
 	return ret0
 }
 
-// Value indicates an expected call of Value
+// Value indicates an expected call of Value.
 func (mr *MockStakerIteratorMockRecorder) Value() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Value", reflect.TypeOf((*MockStakerIterator)(nil).Value))

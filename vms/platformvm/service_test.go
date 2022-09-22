@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -13,7 +13,7 @@ import (
 
 	stdjson "encoding/json"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/keystore"
@@ -66,7 +66,7 @@ var (
 )
 
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
-	vm, _, _, mutableSharedMemory := defaultVM()
+	vm, _, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 	ks := keystore.New(logging.NoLog{}, manager.NewMemDB(version.Semantic1_0_0))
@@ -74,7 +74,10 @@ func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
 		t.Fatal(err)
 	}
 	vm.ctx.Keystore = ks.NewBlockchainKeyStore(vm.ctx.ChainID)
-	return &Service{vm: vm}, mutableSharedMemory
+	return &Service{
+		vm:          vm,
+		addrManager: avax.NewAddressManager(vm.ctx),
+	}, mutableSharedMemory
 }
 
 // Give user [testUsername] control of [testPrivateKey] and keys[0] (which is funded)
@@ -85,7 +88,7 @@ func defaultAddress(t *testing.T, service *Service) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pk, err := testKeyfactory.ToPrivateKey(testPrivateKey)
+	pk, err := testKeyFactory.ToPrivateKey(testPrivateKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,13 +256,13 @@ func TestGetTxStatus(t *testing.T) {
 	}
 
 	// put the chain in existing chain list
-	if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err == nil {
+	if err := service.vm.Builder.AddUnverifiedTx(tx); err == nil {
 		t.Fatal("should have erred because of missing funds")
 	}
 
 	mutableSharedMemory.SharedMemory = sm
 
-	if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
+	if err := service.vm.Builder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	} else if block, err := service.vm.BuildBlock(); err != nil {
 		t.Fatal(err)
@@ -352,7 +355,7 @@ func TestGetTx(t *testing.T) {
 			if err := service.GetTx(nil, arg, &response); err == nil {
 				t.Fatalf("failed test '%s - %s': haven't issued tx yet so shouldn't be able to get it", test.description, encoding.String())
 			}
-			if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
+			if err := service.vm.Builder.AddUnverifiedTx(tx); err != nil {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 			}
 
@@ -373,7 +376,7 @@ func TestGetTx(t *testing.T) {
 						t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 					}
 					commit := options[0].(*blockexecutor.Block)
-					if _, ok := commit.Block.(*blocks.CommitBlock); !ok {
+					if _, ok := commit.Block.(*blocks.ApricotCommitBlock); !ok {
 						t.Fatalf("failed test '%s - %s': should prefer to commit", test.description, encoding.String())
 					}
 					if err := commit.Verify(); err != nil {
@@ -452,12 +455,12 @@ func TestGetBalance(t *testing.T) {
 }
 
 func TestGetStake(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	service, _ := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		assert.NoError(service.vm.Shutdown())
+		require.NoError(service.vm.Shutdown())
 		service.vm.ctx.Lock.Unlock()
 	}()
 
@@ -475,24 +478,24 @@ func TestGetStake(t *testing.T) {
 			formatting.Hex,
 		}
 		response := GetStakeReply{}
-		assert.NoError(service.GetStake(nil, &args, &response))
-		assert.EqualValues(uint64(defaultWeight), uint64(response.Staked))
-		assert.Len(response.Outputs, 1)
+		require.NoError(service.GetStake(nil, &args, &response))
+		require.EqualValues(uint64(defaultWeight), uint64(response.Staked))
+		require.Len(response.Outputs, 1)
 
 		// Unmarshal into an output
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[0])
-		assert.NoError(err)
+		require.NoError(err)
 
 		var output avax.TransferableOutput
 		_, err = txs.Codec.Unmarshal(outputBytes, &output)
-		assert.NoError(err)
+		require.NoError(err)
 
 		out := output.Out.(*secp256k1fx.TransferOutput)
-		assert.EqualValues(out.Amount(), defaultWeight)
-		assert.EqualValues(out.Threshold, 1)
-		assert.Len(out.Addrs, 1)
-		assert.Equal(keys[i].PublicKey().Address(), out.Addrs[0])
-		assert.EqualValues(out.Locktime, 0)
+		require.EqualValues(out.Amount(), defaultWeight)
+		require.EqualValues(out.Threshold, 1)
+		require.Len(out.Addrs, 1)
+		require.Equal(keys[i].PublicKey().Address(), out.Addrs[0])
+		require.EqualValues(out.Locktime, 0)
 	}
 
 	// Make sure this works for multiple addresses
@@ -503,23 +506,23 @@ func TestGetStake(t *testing.T) {
 		formatting.Hex,
 	}
 	response := GetStakeReply{}
-	assert.NoError(service.GetStake(nil, &args, &response))
-	assert.EqualValues(len(genesis.Validators)*defaultWeight, response.Staked)
-	assert.Len(response.Outputs, len(genesis.Validators))
+	require.NoError(service.GetStake(nil, &args, &response))
+	require.EqualValues(len(genesis.Validators)*defaultWeight, response.Staked)
+	require.Len(response.Outputs, len(genesis.Validators))
 
 	for _, outputStr := range response.Outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, outputStr)
-		assert.NoError(err)
+		require.NoError(err)
 
 		var output avax.TransferableOutput
 		_, err = txs.Codec.Unmarshal(outputBytes, &output)
-		assert.NoError(err)
+		require.NoError(err)
 
 		out := output.Out.(*secp256k1fx.TransferOutput)
-		assert.EqualValues(defaultWeight, out.Amount())
-		assert.EqualValues(out.Threshold, 1)
-		assert.EqualValues(out.Locktime, 0)
-		assert.Len(out.Addrs, 1)
+		require.EqualValues(defaultWeight, out.Amount())
+		require.EqualValues(out.Threshold, 1)
+		require.EqualValues(out.Locktime, 0)
+		require.Len(out.Addrs, 1)
 	}
 
 	oldStake := uint64(defaultWeight)
@@ -537,35 +540,36 @@ func TestGetStake(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		keys[0].PublicKey().Address(), // change addr
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
-	staker := state.NewPrimaryNetworkStaker(tx.ID(), &tx.Unsigned.(*txs.AddDelegatorTx).Validator)
-	staker.PotentialReward = 0
-	staker.NextTime = staker.EndTime
-	staker.Priority = state.PrimaryNetworkDelegatorCurrentPriority
+	staker := state.NewCurrentStaker(
+		tx.ID(),
+		tx.Unsigned.(*txs.AddDelegatorTx),
+		0,
+	)
 
 	service.vm.state.PutCurrentDelegator(staker)
 	service.vm.state.AddTx(tx, status.Committed)
-	assert.NoError(service.vm.state.Commit())
+	require.NoError(service.vm.state.Commit())
 
 	// Make sure the delegator addr has the right stake (old stake + stakeAmount)
-	addr, _ := service.vm.FormatLocalAddress(keys[0].PublicKey().Address())
+	addr, _ := service.addrManager.FormatLocalAddress(keys[0].PublicKey().Address())
 	args.Addresses = []string{addr}
-	assert.NoError(service.GetStake(nil, &args, &response))
-	assert.EqualValues(oldStake+stakeAmount, uint64(response.Staked))
-	assert.Len(response.Outputs, 2)
+	require.NoError(service.GetStake(nil, &args, &response))
+	require.EqualValues(oldStake+stakeAmount, uint64(response.Staked))
+	require.Len(response.Outputs, 2)
 
 	// Unmarshal into transferable outputs
 	outputs := make([]avax.TransferableOutput, 2)
 	for i := range outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[i])
-		assert.NoError(err)
+		require.NoError(err)
 		_, err = txs.Codec.Unmarshal(outputBytes, &outputs[i])
-		assert.NoError(err)
+		require.NoError(err)
 	}
 
 	// Make sure the stake amount is as expected
-	assert.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount())
+	require.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount())
 
 	oldStake = uint64(response.Staked)
 
@@ -584,32 +588,33 @@ func TestGetStake(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		keys[0].PublicKey().Address(), // change addr
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
-	staker = state.NewPrimaryNetworkStaker(tx.ID(), &tx.Unsigned.(*txs.AddValidatorTx).Validator)
-	staker.NextTime = staker.StartTime
-	staker.Priority = state.PrimaryNetworkValidatorPendingPriority
+	staker = state.NewPendingStaker(
+		tx.ID(),
+		tx.Unsigned.(*txs.AddValidatorTx),
+	)
 
 	service.vm.state.PutPendingValidator(staker)
 	service.vm.state.AddTx(tx, status.Committed)
-	assert.NoError(service.vm.state.Commit())
+	require.NoError(service.vm.state.Commit())
 
 	// Make sure the delegator has the right stake (old stake + stakeAmount)
-	assert.NoError(service.GetStake(nil, &args, &response))
-	assert.EqualValues(oldStake+stakeAmount, response.Staked)
-	assert.Len(response.Outputs, 3)
+	require.NoError(service.GetStake(nil, &args, &response))
+	require.EqualValues(oldStake+stakeAmount, response.Staked)
+	require.Len(response.Outputs, 3)
 
 	// Unmarshal
 	outputs = make([]avax.TransferableOutput, 3)
 	for i := range outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[i])
-		assert.NoError(err)
+		require.NoError(err)
 		_, err = txs.Codec.Unmarshal(outputBytes, &outputs[i])
-		assert.NoError(err)
+		require.NoError(err)
 	}
 
 	// Make sure the stake amount is as expected
-	assert.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount()+outputs[2].Out.Amount())
+	require.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount()+outputs[2].Out.Amount())
 }
 
 // Test method GetCurrentValidators
@@ -641,10 +646,10 @@ func TestGetCurrentValidators(t *testing.T) {
 	for _, vdr := range genesis.Validators {
 		found := false
 		for i := 0; i < len(response.Validators) && !found; i++ {
-			gotVdr, ok := response.Validators[i].(pchainapi.PrimaryValidator)
+			gotVdr, ok := response.Validators[i].(pchainapi.PermissionlessValidator)
 			switch {
 			case !ok:
-				t.Fatal("expected pchainapi.PrimaryValidator")
+				t.Fatal("expected pchainapi.PermissionlessValidator")
 			case gotVdr.NodeID != vdr.NodeID:
 			case gotVdr.EndTime != vdr.EndTime:
 				t.Fatalf("expected end time of %s to be %v but got %v",
@@ -692,10 +697,11 @@ func TestGetCurrentValidators(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	staker := state.NewPrimaryNetworkStaker(tx.ID(), &tx.Unsigned.(*txs.AddDelegatorTx).Validator)
-	staker.PotentialReward = 0
-	staker.NextTime = staker.EndTime
-	staker.Priority = state.PrimaryNetworkDelegatorCurrentPriority
+	staker := state.NewCurrentStaker(
+		tx.ID(),
+		tx.Unsigned.(*txs.AddDelegatorTx),
+		0,
+	)
 
 	service.vm.state.PutCurrentDelegator(staker)
 	service.vm.state.AddTx(tx, status.Committed)
@@ -717,7 +723,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	// Make sure the delegator is there
 	found := false
 	for i := 0; i < len(response.Validators) && !found; i++ {
-		vdr := response.Validators[i].(pchainapi.PrimaryValidator)
+		vdr := response.Validators[i].(pchainapi.PermissionlessValidator)
 		if vdr.NodeID != validatorNodeID {
 			continue
 		}
@@ -743,23 +749,23 @@ func TestGetCurrentValidators(t *testing.T) {
 }
 
 func TestGetTimestamp(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	service, _ := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		assert.NoError(service.vm.Shutdown())
+		require.NoError(service.vm.Shutdown())
 		service.vm.ctx.Lock.Unlock()
 	}()
 
 	reply := GetTimestampReply{}
-	assert.NoError(service.GetTimestamp(nil, nil, &reply))
-	assert.Equal(service.vm.state.GetTimestamp(), reply.Timestamp)
+	require.NoError(service.GetTimestamp(nil, nil, &reply))
+	require.Equal(service.vm.state.GetTimestamp(), reply.Timestamp)
 
 	newTimestamp := reply.Timestamp.Add(time.Second)
 	service.vm.state.SetTimestamp(newTimestamp)
 
-	assert.NoError(service.GetTimestamp(nil, nil, &reply))
-	assert.Equal(newTimestamp, reply.Timestamp)
+	require.NoError(service.GetTimestamp(nil, nil, &reply))
+	require.Equal(newTimestamp, reply.Timestamp)
 }
 
 func TestGetBlock(t *testing.T) {
@@ -780,6 +786,10 @@ func TestGetBlock(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			service, _ := defaultService(t)
+			service.vm.ctx.Lock.Lock()
+			defer service.vm.ctx.Lock.Unlock()
+
+			service.vm.Config.CreateAssetTxFee = 100 * defaultTxFee
 
 			// Make a block an accept it, then check we can get it.
 			tx, err := service.vm.txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks
@@ -794,12 +804,12 @@ func TestGetBlock(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			preferred, err := service.vm.GetBlock(service.vm.preferred)
+			preferred, err := service.vm.Builder.Preferred()
 			if err != nil {
 				t.Fatal(err)
 			}
-			statelessBlock, err := blocks.NewStandardBlock(
-				service.vm.preferred,
+			statelessBlock, err := blocks.NewApricotStandardBlock(
+				preferred.ID(),
 				preferred.Height()+1,
 				[]*txs.Tx{tx},
 			)
@@ -825,13 +835,16 @@ func TestGetBlock(t *testing.T) {
 
 			switch {
 			case test.encoding == formatting.JSON:
-				assert.Equal(t, block, response.Block)
+				require.Equal(t, statelessBlock, response.Block)
+
+				_, err = stdjson.Marshal(response)
+				require.NoError(t, err)
 			default:
 				decoded, _ := formatting.Decode(response.Encoding, response.Block.(string))
-				assert.Equal(t, block.Bytes(), decoded)
+				require.Equal(t, block.Bytes(), decoded)
 			}
 
-			assert.Equal(t, test.encoding, response.Encoding)
+			require.Equal(t, test.encoding, response.Encoding)
 		})
 	}
 }

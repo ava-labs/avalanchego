@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package throttling
@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -34,7 +34,7 @@ func TestNoInboundConnUpgradeThrottler(t *testing.T) {
 		// throttler should allow all
 		for i := 0; i < 10; i++ {
 			allow := throttler.ShouldUpgrade(host1)
-			assert.True(t, allow)
+			require.True(t, allow)
 		}
 	}
 	{
@@ -48,13 +48,13 @@ func TestNoInboundConnUpgradeThrottler(t *testing.T) {
 		// throttler should allow all
 		for i := 0; i < 10; i++ {
 			allow := throttler.ShouldUpgrade(host1)
-			assert.True(t, allow)
+			require.True(t, allow)
 		}
 	}
 }
 
 func TestInboundConnUpgradeThrottler(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	cooldown := 5 * time.Second
 	throttlerIntf := NewInboundConnUpgradeThrottler(
@@ -67,25 +67,25 @@ func TestInboundConnUpgradeThrottler(t *testing.T) {
 
 	// Allow should always return true
 	// when called with a given IP for the first time
-	assert.True(throttlerIntf.ShouldUpgrade(host1))
-	assert.True(throttlerIntf.ShouldUpgrade(host2))
-	assert.True(throttlerIntf.ShouldUpgrade(host3))
+	require.True(throttlerIntf.ShouldUpgrade(host1))
+	require.True(throttlerIntf.ShouldUpgrade(host2))
+	require.True(throttlerIntf.ShouldUpgrade(host3))
 
 	// Shouldn't allow this IP because the number of connections
 	// within the last [cooldown] is at [MaxRecentConns]
-	assert.False(throttlerIntf.ShouldUpgrade(host4))
+	require.False(throttlerIntf.ShouldUpgrade(host4))
 
 	// Shouldn't allow these IPs again until [cooldown] has passed
-	assert.False(throttlerIntf.ShouldUpgrade(host1))
-	assert.False(throttlerIntf.ShouldUpgrade(host2))
-	assert.False(throttlerIntf.ShouldUpgrade(host3))
+	require.False(throttlerIntf.ShouldUpgrade(host1))
+	require.False(throttlerIntf.ShouldUpgrade(host2))
+	require.False(throttlerIntf.ShouldUpgrade(host3))
 
 	// Local host should never be rate-limited
-	assert.True(throttlerIntf.ShouldUpgrade(loopbackIP))
-	assert.True(throttlerIntf.ShouldUpgrade(loopbackIP))
-	assert.True(throttlerIntf.ShouldUpgrade(loopbackIP))
-	assert.True(throttlerIntf.ShouldUpgrade(loopbackIP))
-	assert.True(throttlerIntf.ShouldUpgrade(loopbackIP))
+	require.True(throttlerIntf.ShouldUpgrade(loopbackIP))
+	require.True(throttlerIntf.ShouldUpgrade(loopbackIP))
+	require.True(throttlerIntf.ShouldUpgrade(loopbackIP))
+	require.True(throttlerIntf.ShouldUpgrade(loopbackIP))
+	require.True(throttlerIntf.ShouldUpgrade(loopbackIP))
 
 	// Make sure [throttler.done] isn't closed
 	throttler := throttlerIntf.(*inboundConnUpgradeThrottler)
@@ -100,7 +100,7 @@ func TestInboundConnUpgradeThrottler(t *testing.T) {
 	// Make sure [throttler.done] is closed
 	select {
 	case _, chanOpen := <-throttler.done:
-		assert.False(chanOpen)
+		require.False(chanOpen)
 	default:
 		t.Fatal("should be done")
 	}

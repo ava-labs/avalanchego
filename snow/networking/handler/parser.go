@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package handler
@@ -16,10 +16,14 @@ var (
 )
 
 func getIDs(field message.Field, msg message.InboundMessage) ([]ids.ID, error) {
-	idsBytes := msg.Get(field).([][]byte)
+	idsBytesIntf, err := msg.Get(field)
+	if err != nil {
+		return nil, err
+	}
+	idsBytes := idsBytesIntf.([][]byte)
+
 	res := make([]ids.ID, len(idsBytes))
 	idSet := ids.NewSet(len(idsBytes))
-
 	for i, bytes := range idsBytes {
 		id, err := ids.ToID(bytes)
 		if err != nil {
@@ -35,9 +39,13 @@ func getIDs(field message.Field, msg message.InboundMessage) ([]ids.ID, error) {
 }
 
 func getSummaryHeights(msg message.InboundMessage) ([]uint64, error) {
-	heights := msg.Get(message.SummaryHeights).([]uint64)
-	heightsSet := make(map[uint64]struct{}, len(heights))
+	heightsIntf, err := msg.Get(message.SummaryHeights)
+	if err != nil {
+		return nil, err
+	}
+	heights := heightsIntf.([]uint64)
 
+	heightsSet := make(map[uint64]struct{}, len(heights))
 	for _, height := range heights {
 		if _, found := heightsSet[height]; found {
 			return nil, errDuplicatedHeight

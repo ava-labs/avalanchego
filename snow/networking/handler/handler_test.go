@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package handler
@@ -10,7 +10,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -26,18 +26,18 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	called := make(chan struct{})
 
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
-	assert.NoError(t, err)
+	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
+	require.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
 
 	vdrs := validators.NewSet()
 	vdr0 := ids.GenerateTestNodeID()
 	err = vdrs.AddWeight(vdr0, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	handlerIntf, err := New(
 		mc,
 		ctx,
@@ -47,7 +47,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		time.Second,
 		resourceTracker,
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	handler := handlerIntf.(*handler)
 
 	bootstrapper := &common.BootstrapperTest{
@@ -109,13 +109,13 @@ func TestHandlerClosesOnError(t *testing.T) {
 
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
-	assert.NoError(t, err)
+	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
+	require.NoError(t, err)
 
 	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	handlerIntf, err := New(
 		mc,
 		ctx,
@@ -125,7 +125,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		time.Second,
 		resourceTracker,
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	handler := handlerIntf.(*handler)
 
 	handler.clock.Set(time.Now())
@@ -180,13 +180,11 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	ctx := snow.DefaultConsensusContextTest()
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
-	assert.NoError(t, err)
-	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
+	mc := message.NewInternalBuilder()
 	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	handlerIntf, err := New(
 		mc,
 		ctx,
@@ -196,7 +194,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		1,
 		resourceTracker,
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	handler := handlerIntf.(*handler)
 
 	handler.clock.Set(time.Now())
@@ -243,13 +241,11 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	msgFromVMChan := make(chan common.Message)
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
-	assert.NoError(t, err)
-	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
+	mc := message.NewInternalBuilder()
 	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	handler, err := New(
 		mc,
 		ctx,
@@ -259,7 +255,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		time.Second,
 		resourceTracker,
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	bootstrapper := &common.BootstrapperTest{
 		BootstrapableTest: common.BootstrapableTest{

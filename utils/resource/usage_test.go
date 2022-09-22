@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package resource
@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const epsilon = 1e-9
@@ -35,11 +35,11 @@ func TestGetSampleWeights(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 
 			newWeight, oldWeight := getSampleWeights(test.frequency, test.halflife)
-			assert.InDelta(1-test.oldWeight, newWeight, epsilon)
-			assert.InDelta(test.oldWeight, oldWeight, epsilon)
+			require.InDelta(1-test.oldWeight, newWeight, epsilon)
+			require.InDelta(test.oldWeight, oldWeight, epsilon)
 		})
 	}
 }

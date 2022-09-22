@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metrics
@@ -7,39 +7,39 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	dto "github.com/prometheus/client_model/go"
 )
 
 func TestMultiGathererEmptyGather(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	g := NewMultiGatherer()
 
 	mfs, err := g.Gather()
-	assert.NoError(err)
-	assert.Empty(mfs)
+	require.NoError(err)
+	require.Empty(mfs)
 }
 
 func TestMultiGathererDuplicatedPrefix(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	g := NewMultiGatherer()
 	og := NewOptionalGatherer()
 
 	err := g.Register("", og)
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = g.Register("", og)
-	assert.Equal(errDuplicatedPrefix, err)
+	require.Equal(errDuplicatedPrefix, err)
 
 	err = g.Register("lol", og)
-	assert.NoError(err)
+	require.NoError(err)
 }
 
 func TestMultiGathererAddedError(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	g := NewMultiGatherer()
 
@@ -49,15 +49,15 @@ func TestMultiGathererAddedError(t *testing.T) {
 	}
 
 	err := g.Register("", tg)
-	assert.NoError(err)
+	require.NoError(err)
 
 	mfs, err := g.Gather()
-	assert.Equal(expected, err)
-	assert.Empty(mfs)
+	require.Equal(expected, err)
+	require.Empty(mfs)
 }
 
 func TestMultiGathererNoAddedPrefix(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	g := NewMultiGatherer()
 
@@ -68,16 +68,16 @@ func TestMultiGathererNoAddedPrefix(t *testing.T) {
 	}
 
 	err := g.Register("", tg)
-	assert.NoError(err)
+	require.NoError(err)
 
 	mfs, err := g.Gather()
-	assert.NoError(err)
-	assert.Len(mfs, 1)
-	assert.Equal(&hello, mfs[0].Name)
+	require.NoError(err)
+	require.Len(mfs, 1)
+	require.Equal(&hello, mfs[0].Name)
 }
 
 func TestMultiGathererAddedPrefix(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	g := NewMultiGatherer()
 
@@ -88,16 +88,16 @@ func TestMultiGathererAddedPrefix(t *testing.T) {
 	}
 
 	err := g.Register(hello, tg)
-	assert.NoError(err)
+	require.NoError(err)
 
 	mfs, err := g.Gather()
-	assert.NoError(err)
-	assert.Len(mfs, 1)
-	assert.Equal(&helloWorld, mfs[0].Name)
+	require.NoError(err)
+	require.Len(mfs, 1)
+	require.Equal(&helloWorld, mfs[0].Name)
 }
 
 func TestMultiGathererJustPrefix(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	g := NewMultiGatherer()
 
@@ -106,16 +106,16 @@ func TestMultiGathererJustPrefix(t *testing.T) {
 	}
 
 	err := g.Register(hello, tg)
-	assert.NoError(err)
+	require.NoError(err)
 
 	mfs, err := g.Gather()
-	assert.NoError(err)
-	assert.Len(mfs, 1)
-	assert.Equal(&hello, mfs[0].Name)
+	require.NoError(err)
+	require.Len(mfs, 1)
+	require.Equal(&hello, mfs[0].Name)
 }
 
 func TestMultiGathererSorted(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	g := NewMultiGatherer()
 
@@ -133,11 +133,11 @@ func TestMultiGathererSorted(t *testing.T) {
 	}
 
 	err := g.Register("", tg)
-	assert.NoError(err)
+	require.NoError(err)
 
 	mfs, err := g.Gather()
-	assert.NoError(err)
-	assert.Len(mfs, 2)
-	assert.Equal(&name0, mfs[0].Name)
-	assert.Equal(&name1, mfs[1].Name)
+	require.NoError(err)
+	require.Len(mfs, 2)
+	require.Equal(&name0, mfs[0].Name)
+	require.Equal(&name1, mfs[1].Name)
 }

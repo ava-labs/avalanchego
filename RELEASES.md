@@ -1,5 +1,234 @@
 # Release Notes
 
+## [v1.8.6](https://github.com/ava-labs/avalanchego/releases/tag/v1.8.6)
+
+This version is backwards compatible to [v1.8.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.8.0). It is optional, but encouraged. The supported plugin version is `16`.
+
+### BLS
+
+- Added BLS key file at `--staking-signer-key-file`
+- Exposed BLS proof of possession in the `info.getNodeID` API
+- Added BLS proof of possession to `AddPermissionlessValidatorTx`s for the Primary Network
+
+The default value of `--staking-signer-key-file` is `~/.avalanchego/staking/signer.key`. If the key file doesn't exist, it will be populated with a new key.
+
+### Networking
+
+- Added P2P proto support to be activated in a future release
+- Fixed inbound bandwidth spike after leaving the validation set
+- Removed support for `ChitsV2` messages
+- Removed `ContainerID`s from `Put` and `PushQuery` messages
+- Added `pending_timeouts` metric to track the number of active timeouts a node is tracking
+- Fixed overflow in gzip decompression
+- Optimized memory usage in `peer.MessageQueue`
+
+### Miscellaneous
+
+- Fixed bootstrapping ETA metric
+- Removed unused `unknown_txs_count` metric
+- Replaced duplicated code with generic implementations
+
+### Coreth
+
+- Added failure reason to bad block API
+
+## [v1.8.5](https://github.com/ava-labs/avalanchego/releases/tag/v1.8.5)
+
+Please upgrade your node as soon as possible.
+
+The supported plugin version is `16`.
+
+### Fixes
+
+- Fixed stale block reference by evicting blocks upon successful verification
+
+### [Coreth](https://medium.com/avalancheavax/apricot-phase-6-native-asset-call-deprecation-a7b7a77b850a)
+
+- Removed check for Apricot Phase6 incompatible fork to unblock nodes that did not upgrade ahead of the activation time
+
+## [v1.8.4](https://github.com/ava-labs/avalanchego/releases/tag/v1.8.4)
+
+Please upgrade your node as soon as possible.
+
+The supported plugin version is `16`.
+
+### Caching
+
+- Added temporarily invalid block caching to reduce repeated network requests
+- Added caching to the proposervm's inner block parsing
+
+### [Coreth](https://medium.com/avalancheavax/apricot-phase-6-native-asset-call-deprecation-a7b7a77b850a)
+
+- Reduced the log level of `BAD BLOCK`s from `ERROR` to `DEBUG`
+- Deprecated Native Asset Call
+
+## [v1.8.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.8.2)
+
+Please upgrade your node as soon as possible.
+
+The changes in `v1.8.x` go into effect at 4 PM EDT on September 6th, 2022 on both Fuji and Mainnet. You should upgrade your node before the changes go into effect, otherwise they may experience loss of uptime.
+
+The supported plugin version is `16`.
+
+### [Coreth](https://medium.com/avalancheavax/apricot-phase-6-native-asset-call-deprecation-a7b7a77b850a)
+
+- Fixed live-lock in bootstrapping, after performing state-sync, by properly reporting `database.ErrNotFound` in `GetBlockIDAtHeight` rather than a formatted error
+- Increased the log level of `BAD BLOCK`s from `DEBUG` to `ERROR`
+- Fixed typo in Chain Config `String` function
+
+## [v1.8.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.8.1)
+
+Please upgrade your node as soon as possible.
+
+The changes in `v1.8.x` go into effect at 4 PM EDT on September 6th, 2022 on both Fuji and Mainnet. You should upgrade your node before the changes go into effect, otherwise they may experience loss of uptime.
+
+The supported plugin version is `16`.
+
+### Miscellaneous
+
+- Reduced the severity of not quickly connecting to bootstrap nodes from `FATAL` to `WARN`
+
+### [Coreth](https://medium.com/avalancheavax/apricot-phase-6-native-asset-call-deprecation-a7b7a77b850a)
+
+- Reduced the log level of `BAD BLOCK`s from `ERROR` to `DEBUG`
+- Added Apricot Phase6 to Chain Config `String` function
+
+## [v1.8.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.8.0)
+
+This is a mandatory security upgrade. Please upgrade your node **as soon as possible.**
+
+The changes in the upgrade go into effect at **4 PM EDT on September 6th, 2022** on both Fuji and Mainnet. You should upgrade your node before the changes go into effect, otherwise they may experience loss of uptime.
+
+You may see some extraneous ERROR logs ("BAD BLOCK") on your node after upgrading. These may continue until the Apricot Phase 6 activation (at 4 PM EDT on September 6th).
+
+The supported plugin version is `16`.
+
+### PlatformVM APIs
+
+- Fixed `GetBlock` API when requesting the encoding as `json`
+- Changed the json key in `AddSubnetValidatorTx`s from `subnet` to `subnetID`
+- Added multiple asset support to `getBalance`
+- Updated `PermissionlessValidator`s returned from `getCurrentValidators` and `getPendingValidators` to include `validationRewardOwner` and `delegationRewardOwner`
+- Deprecated `rewardOwner` in `PermissionlessValidator`s returned from `getCurrentValidators` and `getPendingValidators`
+- Added `subnetID` argument to `getCurrentSupply`
+- Added multiple asset support to `getStake`
+- Added `subnetID` argument to `getMinStake`
+
+### PlatformVM Structures
+
+- Renamed existing blocks
+  - `ProposalBlock` -> `ApricotProposalBlock`
+  - `AbortBlock` -> `ApricotAbortBlock`
+  - `CommitBlock` -> `ApricotCommitBlock`
+  - `StandardBlock` -> `ApricotStandardBlock`
+  - `AtomicBlock` -> `ApricotAtomicBlock`
+- Added new block types **to be enabled in a future release**
+  - `BlueberryProposalBlock`
+    - Introduces a `Time` field and an unused `Txs` field before the remaining `ApricotProposalBlock` fields
+  - `BlueberryAbortBlock`
+    - Introduces a `Time` field before the remaining `ApricotAbortBlock` fields
+  - `BlueberryCommitBlock`
+    - Introduces a `Time` field before the remaining `ApricotCommitBlock` fields
+  - `BlueberryStandardBlock`
+    - Introduces a `Time` field before the remaining `ApricotStandardBlock` fields
+- Added new transaction types **to be enabled in a future release**
+  - `RemoveSubnetValidatorTx`
+    - Can be included into `BlueberryStandardBlock`s
+    - Allows a subnet owner to remove a validator from their subnet
+  - `TransformSubnetTx`
+    - Can be included into `BlueberryStandardBlock`s
+    - Allows a subnet owner to convert their subnet into a permissionless subnet
+  - `AddPermissionlessValidatorTx`
+    - Can be included into `BlueberryStandardBlock`s
+    - Adds a new validator to the requested permissionless subnet
+  - `AddPermissionlessDelegatorTx`
+    - Can be included into `BlueberryStandardBlock`s
+    - Adds a new delegator to the requested permissionless validator on the requested subnet
+
+### PlatformVM Block Building
+
+- Fixed race in `AdvanceTimeTx` creation to avoid unnecessary block construction
+- Added `block_formation_logic.md` to describe how blocks are created
+- Refactored `BlockBuilder` into `ApricotBlockBuilder`
+- Added `BlueberryBlockBuilder`
+- Added `OptionBlock` builder visitor
+- Refactored `Mempool` issuance and removal logic to use transaction visitors
+
+### PlatformVM Block Execution
+
+- Added support for executing `AddValidatorTx`, `AddDelegatorTx`, and `AddSubnetValidatorTx` inside of a `BlueberryStandardBlock`
+- Refactored time advancement into a standard state modification structure
+- Refactored `ProposalTxExecutor` to abstract state diff creation
+- Standardized upgrade checking rules
+- Refactored subnet authorization checking
+
+### Wallet
+
+- Added support for new transaction types in the P-chain wallet
+- Fixed fee amounts used in the Primary Network wallet to reduce unnecessary fee burning
+
+### Networking
+
+- Defined `p2p.proto` to be used for future network messages
+- Added `--network-tls-key-log-file-unsafe` to support inspecting p2p messages
+- Added `avalanche_network_accept_failed` metrics to track networking `Accept` errors
+
+### Miscellaneous
+
+- Removed reserved fields from proto files and renumbered the existing fields
+- Added generic dynamically resized ring buffer
+- Updated gRPC version to `v1.49.0` to fix non-deterministic errors reported in the `rpcchainvm`
+- Removed `--signature-verification-enabled` flag
+- Removed dead code
+  - `ids.QueueSet`
+  - `timer.Repeater`
+  - `timer.NewStagedTimer`
+  - `timer.TimedMeter`
+
+### [Coreth](https://medium.com/avalancheavax/apricot-phase-6-native-asset-call-deprecation-a7b7a77b850a)
+
+- Incorrectly deprecated Native Asset Call
+- Migrated to go-ethereum v1.10.23
+- Added API to fetch Chain Config
+
+## [v1.7.18](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.18)
+
+This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged. The supported plugin version is `15`.
+
+### Fixes
+
+- Fixed bug in `codeToFetch` database accessors that caused an error when starting/stopping state sync
+- Fixed rare BAD BLOCK errors during C-chain bootstrapping
+- Fixed platformvm `couldn't get preferred block state` log due to attempted block building during bootstrapping
+- Fixed platformvm `failed to fetch next staker to reward` error log due to an incorrect `lastAcceptedID` reference
+- Fixed AWS AMI creation
+
+### PlatformVM
+
+- Refactored platformvm metrics handling
+- Refactored platformvm block creation
+- Introduced support to prevent empty nodeID use on the P-chain to be activated in a future upgrade
+
+### Coreth
+
+- Updated gas price estimation to limit lookback window based on block timestamps
+- Added metrics for processed/accepted gas
+- Simplified syntactic block verification
+- Ensured statedb errors during block processing are logged
+- Removed deprecated gossiper/block building logic from pre-Apricot Phase 4
+- Added marshal function for duration to improve config output
+
+### Miscellaneous
+
+- Updated local network genesis to use a newer start time
+- Updated minimum golang version to go1.18.1
+- Removed support for RocksDB
+- Bumped go-ethereum version to v1.10.21
+- Added various additional tests
+- Introduced additional database invariants for all database implementations
+- Added retries to windows CI installations
+- Removed useless ID aliasing during chain creation
+
 ## [v1.7.17](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.17)
 
 This version is backwards compatible to [v1.7.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.7.0). It is optional, but encouraged. The supported plugin version is `15`.

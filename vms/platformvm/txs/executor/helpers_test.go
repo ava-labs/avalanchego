@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -91,7 +92,7 @@ type environment struct {
 	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
 	utxosHandler   utxo.Handler
-	txBuilder      builder.TxBuilder
+	txBuilder      builder.Builder
 	backend        Backend
 }
 
@@ -140,9 +141,9 @@ func newEnvironment() *environment {
 	uptimes := uptime.NewManager(baseState)
 	utxoHandler := utxo.NewHandler(ctx, &clk, baseState, fx)
 
-	txBuilder := builder.NewTxBuilder(
+	txBuilder := builder.New(
 		ctx,
-		config,
+		&config,
 		&clk,
 		fx,
 		baseState,
@@ -178,15 +179,14 @@ func newEnvironment() *environment {
 		backend:        backend,
 	}
 
-	addSubnet(env, txBuilder, backend)
+	addSubnet(env, txBuilder)
 
 	return env
 }
 
 func addSubnet(
 	env *environment,
-	txBuilder builder.TxBuilder,
-	backend Backend,
+	txBuilder builder.Builder,
 ) {
 	// Create a subnet
 	var err error
@@ -211,7 +211,7 @@ func addSubnet(
 	}
 
 	executor := StandardTxExecutor{
-		Backend: &backend,
+		Backend: &env.backend,
 		State:   stateDiff,
 		Tx:      testSubnet1,
 	}
@@ -230,17 +230,6 @@ func defaultState(
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
-	dummyLocalStake := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "uts",
-		Name:      "local_staked",
-		Help:      "Total amount of AVAX on this node staked",
-	})
-	dummyTotalStake := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "uts",
-		Name:      "total_staked",
-		Help:      "Total amount of AVAX staked",
-	})
-
 	genesisBytes := buildGenesisTest(ctx)
 	state, err := state.New(
 		db,
@@ -248,8 +237,7 @@ func defaultState(
 		prometheus.NewRegistry(),
 		cfg,
 		ctx,
-		dummyLocalStake,
-		dummyTotalStake,
+		metrics.Noop,
 		rewards,
 	)
 	if err != nil {
@@ -265,7 +253,7 @@ func defaultState(
 	if err := state.Commit(); err != nil {
 		panic(err)
 	}
-
+	lastAcceptedID = state.GetLastAccepted()
 	return state
 }
 
@@ -315,6 +303,7 @@ func defaultConfig() config.Config {
 		},
 		ApricotPhase3Time: defaultValidateEndTime,
 		ApricotPhase5Time: defaultValidateEndTime,
+		BlueberryTime:     mockable.MaxTime,
 	}
 }
 
@@ -367,14 +356,14 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 		}
 	}
 
-	genesisValidators := make([]api.PrimaryValidator, len(preFundedKeys))
+	genesisValidators := make([]api.PermissionlessValidator, len(preFundedKeys))
 	for i, key := range preFundedKeys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
 		addr, err := address.FormatBech32(hrp, nodeID.Bytes())
 		if err != nil {
 			panic(err)
 		}
-		genesisValidators[i] = api.PrimaryValidator{
+		genesisValidators[i] = api.PermissionlessValidator{
 			Staker: api.Staker{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
 				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),

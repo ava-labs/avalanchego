@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avalanche
@@ -114,7 +114,23 @@ func (t *Transitive) Put(nodeID ids.NodeID, requestID uint32, vtxBytes []byte) e
 		return t.GetFailed(nodeID, requestID)
 	}
 
-	if t.Consensus.VertexIssued(vtx) || t.pending.Contains(vtx.ID()) {
+	actualVtxID := vtx.ID()
+	expectedVtxID, ok := t.outstandingVtxReqs.Get(nodeID, requestID)
+	// If the provided vertex is not the requested vertex, we need to explicitly
+	// mark the request as failed to avoid having a dangling dependency.
+	if ok && actualVtxID != expectedVtxID {
+		t.Ctx.Log.Debug("incorrect vertex returned in Put",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+			zap.Stringer("vtxID", actualVtxID),
+			zap.Stringer("expectedVtxID", expectedVtxID),
+		)
+		// We assume that [vtx] is useless because it doesn't match what we
+		// expected.
+		return t.GetFailed(nodeID, requestID)
+	}
+
+	if t.Consensus.VertexIssued(vtx) || t.pending.Contains(actualVtxID) {
 		t.metrics.numUselessPutBytes.Add(float64(len(vtxBytes)))
 	}
 
@@ -215,10 +231,6 @@ func (t *Transitive) Chits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) 
 	return t.attemptToIssueTxs()
 }
 
-func (t *Transitive) ChitsV2(nodeID ids.NodeID, requestID uint32, votes []ids.ID, _ ids.ID) error {
-	return t.Chits(nodeID, requestID, votes)
-}
-
 func (t *Transitive) QueryFailed(nodeID ids.NodeID, requestID uint32) error {
 	return t.Chits(nodeID, requestID, nil)
 }
@@ -281,7 +293,7 @@ func (t *Transitive) Gossip() error {
 	t.Ctx.Log.Verbo("gossiping accepted vertex to the network",
 		zap.Stringer("vtxID", vtxID),
 	)
-	t.Sender.SendGossip(vtxID, vtx.Bytes())
+	t.Sender.SendGossip(vtx.Bytes())
 	return nil
 }
 
@@ -305,7 +317,7 @@ func (t *Transitive) Notify(msg common.Message) error {
 
 	default:
 		t.Ctx.Log.Warn("received an unexpected message from the VM",
-			zap.Stringer("message", msg),
+			zap.Stringer("messageString", msg),
 		)
 		return nil
 	}

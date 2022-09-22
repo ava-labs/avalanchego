@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -6,7 +6,7 @@ package message
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -22,23 +22,23 @@ func (h *CounterHandler) HandleTx(ids.NodeID, uint32, *Tx) error {
 }
 
 func TestHandleTx(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	handler := CounterHandler{}
 	msg := Tx{}
 
 	err := msg.Handle(&handler, ids.EmptyNodeID, 0)
-	assert.NoError(err)
-	assert.Equal(1, handler.Tx)
+	require.NoError(err)
+	require.Equal(1, handler.Tx)
 }
 
 func TestNoopHandler(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	handler := NoopHandler{
 		Log: logging.NoLog{},
 	}
 
 	err := handler.HandleTx(ids.EmptyNodeID, 0, nil)
-	assert.NoError(err)
+	require.NoError(err)
 }
