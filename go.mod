@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/VictoriaMetrics/fastcache v1.10.0
 	github.com/ava-labs/avalanche-network-runner v1.2.2
-	github.com/ava-labs/avalanchego v1.8.1
+	github.com/ava-labs/avalanchego v1.8.5
 	github.com/cespare/cp v0.1.0
 	github.com/creack/pty v1.1.18
 	github.com/davecgh/go-spew v1.1.1
@@ -53,7 +53,7 @@ require (
 	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/aead/siphash v1.0.1 // indirect
-	github.com/ava-labs/coreth v0.9.0-rc.4 // indirect
+	github.com/ava-labs/coreth v0.9.0-rc.13 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/btcsuite/btcd v0.23.1 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.2.0 // indirect
