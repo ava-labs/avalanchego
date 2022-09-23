@@ -39,6 +39,8 @@ dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7
 github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
+github.com/Enlighten-Fund/coreth v0.9.0-rc.6.0.20220923102700-1a59e8289e58 h1:EhRib1E6qi1pvfFvE8a830/pEpYj9WT0L9VSpXmgaAA=
+github.com/Enlighten-Fund/coreth v0.9.0-rc.6.0.20220923102700-1a59e8289e58/go.mod h1:o9MtalIgKMH3PY7Ca4GDHMziEvGPxaAtKFaLd6uJvJI=
 github.com/Microsoft/go-winio v0.5.2 h1:a9IhgEQBCUEk6QCdml9CiJGhAws+YwffDHEMp1VMrpA=
 github.com/Microsoft/go-winio v0.5.2/go.mod h1:WpS1mjBmmwHBEWmogvA2mj8546UReBk4v8QkMxJ6pZY=
 github.com/NYTimes/gziphandler v1.1.1 h1:ZUDjpQae29j0ryrS0u/B8HZfJBtBQHjqw2rQ2cqUQ3I=
@@ -57,8 +59,6 @@ github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156/go.mod h1:Cb/ax
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/ava-labs/avalanche-network-runner-sdk v0.2.0 h1:YNvM0oFlb7A825kGe0XwwZuvIXTKF1BsuvxJdRLhIaI=
 github.com/ava-labs/avalanche-network-runner-sdk v0.2.0/go.mod h1:bEBRVZnGeRiNdDJAFUj+gA/TPzNDbpY/WzgDAHHwJb8=
-github.com/ava-labs/coreth v0.10.0-rc.1 h1:OIJmXLpKzkyBjmrbPqFEYGM+suewknNOb3iLctWluuM=
-github.com/ava-labs/coreth v0.10.0-rc.1/go.mod h1:o9MtalIgKMH3PY7Ca4GDHMziEvGPxaAtKFaLd6uJvJI=
 github.com/benbjohnson/clock v1.1.0 h1:Q92kusRqC1XV2MjkWETPvjJVqKetz1OzxZB7mHJLju8=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
