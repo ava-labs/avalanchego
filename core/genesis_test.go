@@ -42,10 +42,11 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func setupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig, common.Hash, error) {
-	conf, err := SetupGenesisBlock(db, genesis)
+func setupGenesisBlock(db ethdb.Database, genesis *Genesis, lastAcceptedHash common.Hash) (*params.ChainConfig, common.Hash, error) {
+	conf, err := SetupGenesisBlock(db, genesis, lastAcceptedHash)
 	stored := rawdb.ReadCanonicalHash(db, 0)
 	return conf, stored, err
 }
@@ -86,7 +87,7 @@ func TestSetupGenesis(t *testing.T) {
 		{
 			name: "genesis without ChainConfig",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
-				return setupGenesisBlock(db, new(Genesis))
+				return setupGenesisBlock(db, new(Genesis), common.Hash{})
 			},
 			wantErr:    errGenesisNoConfig,
 			wantConfig: nil,
@@ -94,7 +95,7 @@ func TestSetupGenesis(t *testing.T) {
 		{
 			name: "no block in DB, genesis == nil",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
-				return setupGenesisBlock(db, nil)
+				return setupGenesisBlock(db, nil, common.Hash{})
 			},
 			wantErr:    ErrNoGenesis,
 			wantConfig: nil,
@@ -103,7 +104,7 @@ func TestSetupGenesis(t *testing.T) {
 			name: "custom block in DB, genesis == nil",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
 				customg.MustCommit(db)
-				return setupGenesisBlock(db, nil)
+				return setupGenesisBlock(db, nil, common.Hash{})
 			},
 			wantErr:    ErrNoGenesis,
 			wantHash:   customghash,
@@ -113,7 +114,7 @@ func TestSetupGenesis(t *testing.T) {
 			name: "compatible config in DB",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
 				oldcustomg.MustCommit(db)
-				return setupGenesisBlock(db, &customg)
+				return setupGenesisBlock(db, &customg, customghash)
 			},
 			wantHash:   customghash,
 			wantConfig: customg.Config,
@@ -131,8 +132,13 @@ func TestSetupGenesis(t *testing.T) {
 				blocks, _, _ := GenerateChain(oldcustomg.Config, genesis, dummy.NewFullFaker(), db, 4, 25, nil)
 				bc.InsertChain(blocks)
 				bc.CurrentBlock()
+				for _, block := range blocks {
+					if err := bc.Accept(block); err != nil {
+						t.Fatal(err)
+					}
+				}
 				// This should return a compatibility error.
-				return setupGenesisBlock(db, &customg)
+				return setupGenesisBlock(db, &customg, bc.lastAccepted.Hash())
 			},
 			wantHash:   customghash,
 			wantConfig: customg.Config,
@@ -204,13 +210,14 @@ func TestStatefulPrecompilesConfigure(t *testing.T) {
 			}
 
 			db := rawdb.NewMemoryDatabase()
-			_, err := SetupGenesisBlock(db, genesis)
-			if err != nil {
-				t.Fatal(err)
-			}
 
 			genesisBlock := genesis.ToBlock(nil)
 			genesisRoot := genesisBlock.Root()
+
+			_, err := SetupGenesisBlock(db, genesis, genesisBlock.Hash())
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			statedb, err := state.New(genesisRoot, state.NewDatabase(db), nil)
 			if err != nil {
@@ -221,5 +228,59 @@ func TestStatefulPrecompilesConfigure(t *testing.T) {
 				test.assertState(t, statedb)
 			}
 		})
+	}
+}
+
+// regression test for precompile activation after header block
+func TestPrecompileActivationAfterHeaderBlock(t *testing.T) {
+	db := rawdb.NewMemoryDatabase()
+
+	customg := Genesis{
+		Config: params.SubnetEVMDefaultChainConfig,
+		Alloc: GenesisAlloc{
+			{1}: {Balance: big.NewInt(1), Storage: map[common.Hash]common.Hash{{1}: {1}}},
+		},
+		GasLimit: params.SubnetEVMDefaultChainConfig.FeeConfig.GasLimit.Uint64(),
+	}
+	genesis := customg.MustCommit(db)
+	bc, _ := NewBlockChain(db, DefaultCacheConfig, customg.Config, dummy.NewFullFaker(), vm.Config{}, common.Hash{})
+	defer bc.Stop()
+
+	// Advance header to block #4, past the ContractDeployerAllowListConfig.
+	blocks, _, _ := GenerateChain(customg.Config, genesis, dummy.NewFullFaker(), db, 4, 25, nil)
+
+	require := require.New(t)
+	_, err := bc.InsertChain(blocks)
+	require.NoError(err)
+
+	// accept up to block #2
+	for _, block := range blocks[:2] {
+		require.NoError(bc.Accept(block))
+	}
+	block := bc.CurrentBlock()
+
+	require.Equal(blocks[1].Hash(), bc.lastAccepted.Hash())
+	// header must be bigger than last accepted
+	require.Greater(block.Time(), bc.lastAccepted.Time())
+
+	activatedGenesis := customg
+	contractDeployerConfig := precompile.NewContractDeployerAllowListConfig(big.NewInt(51), nil, nil)
+	activatedGenesis.Config.UpgradeConfig.PrecompileUpgrades = []params.PrecompileUpgrade{
+		{
+			// Enable ContractDeployerAllowList at timestamp 50
+			ContractDeployerAllowListConfig: contractDeployerConfig,
+		},
+	}
+
+	// assert block is after the activation block
+	require.Greater(block.Time(), contractDeployerConfig.Timestamp().Uint64())
+	// assert last accepted block is before the activation block
+	require.Less(bc.lastAccepted.Time(), contractDeployerConfig.Timestamp().Uint64())
+
+	// This should not return any error since the last accepted block is before the activation block.
+	config, _, err := setupGenesisBlock(db, &activatedGenesis, bc.lastAccepted.Hash())
+	require.NoError(err)
+	if !reflect.DeepEqual(config, activatedGenesis.Config) {
+		t.Errorf("returned %v\nwant     %v", config, activatedGenesis.Config)
 	}
 }
