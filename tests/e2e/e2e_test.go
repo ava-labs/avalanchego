@@ -18,8 +18,8 @@ import (
 	_ "github.com/ava-labs/avalanchego/tests/e2e/p"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/ping"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/static-handlers"
-	_ "github.com/ava-labs/avalanchego/tests/e2e/whitelist-vtx"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x/transfer"
+	_ "github.com/ava-labs/avalanchego/tests/e2e/x/whitelist-vtx"
 )
 
 func TestE2E(t *testing.T) {
@@ -37,11 +37,8 @@ var (
 
 	uris string
 
-	testKeysFile           string
-	enableWhitelistTxTests bool
+	testKeysFile string
 )
-
-// TODO: support existing keys
 
 func init() {
 	flag.StringVar(
@@ -85,13 +82,6 @@ func init() {
 		"",
 		"file that contains a list of new-line separated hex-encoded secp256k1 private keys (assume test keys are pre-funded, for test networks)",
 	)
-
-	flag.BoolVar(
-		&enableWhitelistTxTests,
-		"enable-whitelist-vtx-tests",
-		false,
-		"true to enable whitelist vtx tests",
-	)
 }
 
 var _ = ginkgo.BeforeSuite(func() {
@@ -102,7 +92,6 @@ var _ = ginkgo.BeforeSuite(func() {
 		networkRunnerAvalancheGoLogLevel,
 		uris,
 		testKeysFile,
-		enableWhitelistTxTests,
 	)
 	gomega.Expect(err).Should(gomega.BeNil())
 
