@@ -111,6 +111,7 @@ func (h *txHeap) Push(x interface{}) {
 func (h *txHeap) Pop() interface{} {
 	newLen := len(h.txs) - 1
 	htx := h.txs[newLen]
+	h.txs[newLen] = nil
 	h.txs = h.txs[:newLen]
 
 	tx := htx.tx
