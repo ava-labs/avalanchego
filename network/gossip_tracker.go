@@ -39,7 +39,7 @@ import (
 // know about using GetUnknown so that in subsequent PeerList gossip messages
 // we only send information that this peer (most likely) doesn't already know
 // about. The only edge-case where we'll send a redundant set of bytes is if
-// Another remote peer gossips to the same peer we're trying to gossip to first.
+// another remote peer gossips to the same peer we're trying to gossip to first.
 type GossipTracker struct {
 	// a bitset of the peers that we are aware of
 	local ids.BigBitSet
@@ -60,7 +60,7 @@ type GossipTracker struct {
 
 // NewGossipTracker returns an instance of GossipTracker
 func NewGossipTracker(registerer prometheus.Registerer, namespace string) (*GossipTracker, error) {
-	m, err := newGossipTrackerMetrics(registerer, fmt.Sprintf("%s_%s", namespace, "gossip_tracker"))
+	m, err := newGossipTrackerMetrics(registerer, fmt.Sprintf("%s_gossip_tracker", namespace)
 	if err != nil {
 		return nil, err
 	}
