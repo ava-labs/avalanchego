@@ -156,7 +156,7 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 			ID: avaxAssetID,
 		},
 		Out: &secp256k1fx.TransferOutput{
-			Amt: env.config.CreateSubnetTxFee,
+			Amt: env.config.TxFeeUpgrades.BlueberryFees.CreateSubnet,
 		},
 	}
 	utxoID := utxo.InputID()
@@ -171,7 +171,7 @@ func TestBlueberryStandardBlockTimeVerification(t *testing.T) {
 				UTXOID: utxo.UTXOID,
 				Asset:  utxo.Asset,
 				In: &secp256k1fx.TransferInput{
-					Amt: env.config.CreateSubnetTxFee,
+					Amt: env.config.TxFeeUpgrades.BlueberryFees.CreateSubnet,
 				},
 			}},
 		}},
