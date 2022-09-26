@@ -290,7 +290,7 @@ func (b *builder) NewBaseTx(
 	options ...common.Option,
 ) (*txs.CreateSubnetTx, error) {
 	toBurn := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): b.backend.CreateSubnetTxFee(),
+		b.backend.AVAXAssetID(): b.backend.TxFees().CreateSubnet,
 	}
 	for _, out := range outputs {
 		assetID := out.AssetID()
@@ -330,7 +330,7 @@ func (b *builder) NewAddValidatorTx(
 ) (*txs.AddValidatorTx, error) {
 	avaxAssetID := b.backend.AVAXAssetID()
 	toBurn := map[ids.ID]uint64{
-		avaxAssetID: b.backend.AddPrimaryNetworkValidatorFee(),
+		avaxAssetID: b.backend.TxFees().AddPrimaryNetworkValidator,
 	}
 	toStake := map[ids.ID]uint64{
 		avaxAssetID: vdr.Wght,
@@ -362,7 +362,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 	options ...common.Option,
 ) (*txs.AddSubnetValidatorTx, error) {
 	toBurn := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): b.backend.AddSubnetValidatorFee(),
+		b.backend.AVAXAssetID(): b.backend.TxFees().AddPOASubnetValidator,
 	}
 	toStake := map[ids.ID]uint64{}
 	ops := common.NewOptions(options)
@@ -395,7 +395,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	options ...common.Option,
 ) (*txs.RemoveSubnetValidatorTx, error) {
 	toBurn := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): b.backend.BaseTxFee(),
+		b.backend.AVAXAssetID(): b.backend.TxFees().RemovePOASubnetValidator,
 	}
 	toStake := map[ids.ID]uint64{}
 	ops := common.NewOptions(options)
@@ -430,7 +430,7 @@ func (b *builder) NewAddDelegatorTx(
 ) (*txs.AddDelegatorTx, error) {
 	avaxAssetID := b.backend.AVAXAssetID()
 	toBurn := map[ids.ID]uint64{
-		avaxAssetID: b.backend.AddPrimaryNetworkDelegatorFee(),
+		avaxAssetID: b.backend.TxFees().AddPrimaryNetworkDelegator,
 	}
 	toStake := map[ids.ID]uint64{
 		b.backend.AVAXAssetID(): vdr.Wght,
@@ -465,7 +465,7 @@ func (b *builder) NewCreateChainTx(
 	options ...common.Option,
 ) (*txs.CreateChainTx, error) {
 	toBurn := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): b.backend.CreateBlockchainTxFee(),
+		b.backend.AVAXAssetID(): b.backend.TxFees().CreateChain,
 	}
 	toStake := map[ids.ID]uint64{}
 	ops := common.NewOptions(options)
@@ -502,7 +502,7 @@ func (b *builder) NewCreateSubnetTx(
 	options ...common.Option,
 ) (*txs.CreateSubnetTx, error) {
 	toBurn := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): b.backend.CreateSubnetTxFee(),
+		b.backend.AVAXAssetID(): b.backend.TxFees().CreateChain,
 	}
 	toStake := map[ids.ID]uint64{}
 	ops := common.NewOptions(options)
@@ -539,7 +539,7 @@ func (b *builder) NewImportTx(
 		addrs           = ops.Addresses(b.addrs)
 		minIssuanceTime = ops.MinIssuanceTime()
 		avaxAssetID     = b.backend.AVAXAssetID()
-		txFee           = b.backend.BaseTxFee()
+		txFee           = b.backend.TxFees().Import
 
 		importedInputs  = make([]*avax.TransferableInput, 0, len(utxos))
 		importedAmounts = make(map[ids.ID]uint64)
@@ -636,7 +636,7 @@ func (b *builder) NewExportTx(
 	options ...common.Option,
 ) (*txs.ExportTx, error) {
 	toBurn := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): b.backend.BaseTxFee(),
+		b.backend.AVAXAssetID(): b.backend.TxFees().Export,
 	}
 	for _, out := range outputs {
 		assetID := out.AssetID()
@@ -686,7 +686,7 @@ func (b *builder) NewTransformSubnetTx(
 	options ...common.Option,
 ) (*txs.TransformSubnetTx, error) {
 	toBurn := map[ids.ID]uint64{
-		b.backend.AVAXAssetID(): b.backend.TransformSubnetTxFee(),
+		b.backend.AVAXAssetID(): b.backend.TxFees().TransformSubnet,
 		assetID:                 maxSupply - initialSupply,
 	}
 	toStake := map[ids.ID]uint64{}
@@ -739,9 +739,9 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	avaxAssetID := b.backend.AVAXAssetID()
 	toBurn := map[ids.ID]uint64{}
 	if vdr.Subnet == constants.PrimaryNetworkID {
-		toBurn[avaxAssetID] = b.backend.AddPrimaryNetworkValidatorFee()
+		toBurn[avaxAssetID] = b.backend.TxFees().AddPrimaryNetworkValidator
 	} else {
-		toBurn[avaxAssetID] = b.backend.AddSubnetValidatorFee()
+		toBurn[avaxAssetID] = b.backend.TxFees().AddPOSSubnetValidator
 	}
 	toStake := map[ids.ID]uint64{
 		assetID: vdr.Wght,
@@ -781,9 +781,9 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	avaxAssetID := b.backend.AVAXAssetID()
 	toBurn := map[ids.ID]uint64{}
 	if vdr.Subnet == constants.PrimaryNetworkID {
-		toBurn[avaxAssetID] = b.backend.AddPrimaryNetworkDelegatorFee()
+		toBurn[avaxAssetID] = b.backend.TxFees().AddPrimaryNetworkDelegator
 	} else {
-		toBurn[avaxAssetID] = b.backend.AddSubnetDelegatorFee()
+		toBurn[avaxAssetID] = b.backend.TxFees().AddPOSSubnetDelegator
 	}
 	toStake := map[ids.ID]uint64{
 		assetID: vdr.Wght,

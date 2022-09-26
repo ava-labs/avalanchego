@@ -279,23 +279,51 @@ func (service *Info) Uptime(_ *http.Request, _ *struct{}, reply *UptimeResponse)
 	return nil
 }
 
-// TODO: clean all of this up
+// TODO: Remove all deprecated fields
 type GetTxFeeResponse struct {
+	// Deprecated: Use the chain specific fields
 	TxFee json.Uint64 `json:"txFee"`
-	// TODO: remove [CreationTxFee] after enough time for dependencies to update
-	CreationTxFee                 json.Uint64 `json:"creationTxFee"`
-	CreateAssetTxFee              json.Uint64 `json:"createAssetTxFee"`
-	CreateSubnetTxFee             json.Uint64 `json:"createSubnetTxFee"`
-	TransformSubnetTxFee          json.Uint64 `json:"transformSubnetTxFee"`
-	CreateBlockchainTxFee         json.Uint64 `json:"createBlockchainTxFee"`
+	// Deprecated: Use the chain specific fields
+	CreationTxFee json.Uint64 `json:"creationTxFee"`
+	// Deprecated: Use the chain specific fields
+	CreateAssetTxFee json.Uint64 `json:"createAssetTxFee"`
+	// Deprecated: Use the chain specific fields
+	CreateSubnetTxFee json.Uint64 `json:"createSubnetTxFee"`
+	// Deprecated: Use the chain specific fields
+	TransformSubnetTxFee json.Uint64 `json:"transformSubnetTxFee"`
+	// Deprecated: Use the chain specific fields
+	CreateBlockchainTxFee json.Uint64 `json:"createBlockchainTxFee"`
+	// Deprecated: Use the chain specific fields
 	AddPrimaryNetworkValidatorFee json.Uint64 `json:"addPrimaryNetworkValidatorFee"`
+	// Deprecated: Use the chain specific fields
 	AddPrimaryNetworkDelegatorFee json.Uint64 `json:"addPrimaryNetworkDelegatorFee"`
-	AddSubnetValidatorFee         json.Uint64 `json:"addSubnetValidatorFee"`
-	AddSubnetDelegatorFee         json.Uint64 `json:"addSubnetDelegatorFee"`
+	// Deprecated: Use the chain specific fields
+	AddSubnetValidatorFee json.Uint64 `json:"addSubnetValidatorFee"`
+	// Deprecated: Use the chain specific fields
+	AddSubnetDelegatorFee json.Uint64 `json:"addSubnetDelegatorFee"`
+
+	PChainAddPrimaryNetworkValidator json.Uint64 `json:"pChainAddPrimaryNetworkValidator"`
+	PChainAddPrimaryNetworkDelegator json.Uint64 `json:"pChainAddPrimaryNetworkDelegator"`
+	PChainAddPOASubnetValidator      json.Uint64 `json:"pChainAddPOASubnetValidator"`
+	PChainAddPOSSubnetValidator      json.Uint64 `json:"pChainAddPOSSubnetValidator"`
+	PChainAddPOSSubnetDelegator      json.Uint64 `json:"pChainAddPOSSubnetDelegator"`
+	PChainRemovePOASubnetValidator   json.Uint64 `json:"pChainRemovePOASubnetValidator"`
+	PChainCreateSubnet               json.Uint64 `json:"pChainCreateSubnet"`
+	PChainCreateChain                json.Uint64 `json:"pChainCreateChain"`
+	PChainTransformSubnet            json.Uint64 `json:"pChainTransformSubnet"`
+	PChainImport                     json.Uint64 `json:"pChainImport"`
+	PChainExport                     json.Uint64 `json:"pChainExport"`
+
+	XChainBase        json.Uint64 `json:"xChainBase"`
+	XChainCreateAsset json.Uint64 `json:"xChainCreateAsset"`
+	XChainOperation   json.Uint64 `json:"xChainOperation"`
+	XChainImport      json.Uint64 `json:"xChainImport"`
+	XChainExport      json.Uint64 `json:"xChainExport"`
 }
 
 // GetTxFee returns the transaction fee in nAVAX.
 func (service *Info) GetTxFee(_ *http.Request, args *struct{}, reply *GetTxFeeResponse) error {
+	// Deprecated fields:
 	reply.TxFee = json.Uint64(service.XChainTxFees.Base)
 	reply.CreationTxFee = json.Uint64(service.XChainTxFees.CreateAsset)
 	reply.CreateAssetTxFee = json.Uint64(service.XChainTxFees.CreateAsset)
@@ -306,6 +334,27 @@ func (service *Info) GetTxFee(_ *http.Request, args *struct{}, reply *GetTxFeeRe
 	reply.AddPrimaryNetworkDelegatorFee = json.Uint64(service.PChainTxFees.BlueberryFees.AddPrimaryNetworkDelegator)
 	reply.AddSubnetValidatorFee = json.Uint64(service.PChainTxFees.BlueberryFees.AddPOSSubnetValidator)
 	reply.AddSubnetDelegatorFee = json.Uint64(service.PChainTxFees.BlueberryFees.AddPOSSubnetDelegator)
+
+	// P-chain fees
+	reply.PChainAddPrimaryNetworkValidator = json.Uint64(service.PChainTxFees.BlueberryFees.AddPrimaryNetworkValidator)
+	reply.PChainAddPrimaryNetworkDelegator = json.Uint64(service.PChainTxFees.BlueberryFees.AddPrimaryNetworkDelegator)
+	reply.PChainAddPOASubnetValidator = json.Uint64(service.PChainTxFees.BlueberryFees.AddPOASubnetValidator)
+	reply.PChainAddPOSSubnetValidator = json.Uint64(service.PChainTxFees.BlueberryFees.AddPOSSubnetValidator)
+	reply.PChainAddPOSSubnetDelegator = json.Uint64(service.PChainTxFees.BlueberryFees.AddPOSSubnetDelegator)
+	reply.PChainRemovePOASubnetValidator = json.Uint64(service.PChainTxFees.BlueberryFees.RemovePOASubnetValidator)
+	reply.PChainCreateSubnet = json.Uint64(service.PChainTxFees.BlueberryFees.CreateSubnet)
+	reply.PChainCreateChain = json.Uint64(service.PChainTxFees.BlueberryFees.CreateChain)
+	reply.PChainTransformSubnet = json.Uint64(service.PChainTxFees.BlueberryFees.TransformSubnet)
+	reply.PChainImport = json.Uint64(service.PChainTxFees.BlueberryFees.Import)
+	reply.PChainExport = json.Uint64(service.PChainTxFees.BlueberryFees.Export)
+
+	// X-chain fees
+	reply.XChainBase = json.Uint64(service.XChainTxFees.Base)
+	reply.XChainCreateAsset = json.Uint64(service.XChainTxFees.CreateAsset)
+	reply.XChainOperation = json.Uint64(service.XChainTxFees.Operation)
+	reply.XChainImport = json.Uint64(service.XChainTxFees.Import)
+	reply.XChainExport = json.Uint64(service.XChainTxFees.Export)
+
 	return nil
 }
 

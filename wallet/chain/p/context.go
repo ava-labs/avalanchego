@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 )
 
 var _ Context = &context{}
@@ -16,27 +17,13 @@ var _ Context = &context{}
 type Context interface {
 	NetworkID() uint32
 	AVAXAssetID() ids.ID
-	BaseTxFee() uint64
-	CreateSubnetTxFee() uint64
-	TransformSubnetTxFee() uint64
-	CreateBlockchainTxFee() uint64
-	AddPrimaryNetworkValidatorFee() uint64
-	AddPrimaryNetworkDelegatorFee() uint64
-	AddSubnetValidatorFee() uint64
-	AddSubnetDelegatorFee() uint64
+	TxFees() config.TxFees
 }
 
 type context struct {
-	networkID                     uint32
-	avaxAssetID                   ids.ID
-	baseTxFee                     uint64
-	createSubnetTxFee             uint64
-	transformSubnetTxFee          uint64
-	createBlockchainTxFee         uint64
-	addPrimaryNetworkValidatorFee uint64
-	addPrimaryNetworkDelegatorFee uint64
-	addSubnetValidatorFee         uint64
-	addSubnetDelegatorFee         uint64
+	networkID   uint32
+	avaxAssetID ids.ID
+	txFees      config.TxFees
 }
 
 func NewContextFromURI(ctx stdcontext.Context, uri string) (Context, error) {
@@ -68,50 +55,34 @@ func NewContextFromClients(
 	return NewContext(
 		networkID,
 		asset.AssetID,
-		uint64(txFees.TxFee),
-		uint64(txFees.CreateSubnetTxFee),
-		uint64(txFees.TransformSubnetTxFee),
-		uint64(txFees.CreateBlockchainTxFee),
-		uint64(txFees.AddPrimaryNetworkValidatorFee),
-		uint64(txFees.AddPrimaryNetworkDelegatorFee),
-		uint64(txFees.AddSubnetValidatorFee),
-		uint64(txFees.AddSubnetDelegatorFee),
+		config.TxFees{
+			AddPrimaryNetworkValidator: uint64(txFees.PChainAddPrimaryNetworkValidator),
+			AddPrimaryNetworkDelegator: uint64(txFees.PChainAddPrimaryNetworkDelegator),
+			AddPOASubnetValidator:      uint64(txFees.PChainAddPOASubnetValidator),
+			AddPOSSubnetValidator:      uint64(txFees.PChainAddPOSSubnetValidator),
+			AddPOSSubnetDelegator:      uint64(txFees.PChainAddPOSSubnetDelegator),
+			RemovePOASubnetValidator:   uint64(txFees.PChainRemovePOASubnetValidator),
+			CreateSubnet:               uint64(txFees.PChainCreateSubnet),
+			CreateChain:                uint64(txFees.PChainCreateChain),
+			TransformSubnet:            uint64(txFees.PChainTransformSubnet),
+			Import:                     uint64(txFees.PChainImport),
+			Export:                     uint64(txFees.PChainExport),
+		},
 	), nil
 }
 
 func NewContext(
 	networkID uint32,
 	avaxAssetID ids.ID,
-	baseTxFee uint64,
-	createSubnetTxFee uint64,
-	transformSubnetTxFee uint64,
-	createBlockchainTxFee uint64,
-	addPrimaryNetworkValidatorFee uint64,
-	addPrimaryNetworkDelegatorFee uint64,
-	addSubnetValidatorFee uint64,
-	addSubnetDelegatorFee uint64,
+	txFees config.TxFees,
 ) Context {
 	return &context{
-		networkID:                     networkID,
-		avaxAssetID:                   avaxAssetID,
-		baseTxFee:                     baseTxFee,
-		createSubnetTxFee:             createSubnetTxFee,
-		transformSubnetTxFee:          transformSubnetTxFee,
-		createBlockchainTxFee:         createBlockchainTxFee,
-		addPrimaryNetworkValidatorFee: addPrimaryNetworkValidatorFee,
-		addPrimaryNetworkDelegatorFee: addPrimaryNetworkDelegatorFee,
-		addSubnetValidatorFee:         addSubnetValidatorFee,
-		addSubnetDelegatorFee:         addSubnetDelegatorFee,
+		networkID:   networkID,
+		avaxAssetID: avaxAssetID,
+		txFees:      txFees,
 	}
 }
 
-func (c *context) NetworkID() uint32                     { return c.networkID }
-func (c *context) AVAXAssetID() ids.ID                   { return c.avaxAssetID }
-func (c *context) BaseTxFee() uint64                     { return c.baseTxFee }
-func (c *context) CreateSubnetTxFee() uint64             { return c.createSubnetTxFee }
-func (c *context) TransformSubnetTxFee() uint64          { return c.transformSubnetTxFee }
-func (c *context) CreateBlockchainTxFee() uint64         { return c.createBlockchainTxFee }
-func (c *context) AddPrimaryNetworkValidatorFee() uint64 { return c.addPrimaryNetworkValidatorFee }
-func (c *context) AddPrimaryNetworkDelegatorFee() uint64 { return c.addPrimaryNetworkDelegatorFee }
-func (c *context) AddSubnetValidatorFee() uint64         { return c.addSubnetValidatorFee }
-func (c *context) AddSubnetDelegatorFee() uint64         { return c.addSubnetDelegatorFee }
+func (c *context) NetworkID() uint32     { return c.networkID }
+func (c *context) AVAXAssetID() ids.ID   { return c.avaxAssetID }
+func (c *context) TxFees() config.TxFees { return c.txFees }
