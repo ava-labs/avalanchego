@@ -72,9 +72,6 @@ type TestEnvinronment struct {
 	testKeysMu sync.RWMutex
 	testKeys   []*crypto.PrivateKeySECP256K1R
 
-	enableWhitelistTxTestMu sync.RWMutex
-	enableWhitelistTxTests  bool
-
 	snapMu  sync.RWMutex
 	snapped bool
 }
@@ -89,10 +86,7 @@ func (te *TestEnvinronment) ConfigCluster(
 	avalancheGoLogLevel string,
 	uris string,
 	testKeysFile string,
-	enableWhitelistTxTests bool,
 ) error {
-	te.setEnableWhitelistTxTests(enableWhitelistTxTests)
-
 	if avalancheGoExecPath != "" {
 		if _, err := os.Stat(avalancheGoExecPath); err != nil {
 			return fmt.Errorf("could not find avalanchego binary: %w", err)
@@ -267,19 +261,6 @@ func (te *TestEnvinronment) GetTestKeys() ([]*crypto.PrivateKeySECP256K1R, []ids
 	}
 	keyChain := secp256k1fx.NewKeychain(testKeys...)
 	return testKeys, testKeyAddrs, keyChain
-}
-
-func (te *TestEnvinronment) setEnableWhitelistTxTests(b bool) {
-	te.enableWhitelistTxTestMu.Lock()
-	te.enableWhitelistTxTests = b
-	te.enableWhitelistTxTestMu.Unlock()
-}
-
-func (te *TestEnvinronment) GetEnableWhitelistTxTests() (b bool) {
-	te.enableWhitelistTxTestMu.RLock()
-	b = te.enableWhitelistTxTests
-	te.enableWhitelistTxTestMu.RUnlock()
-	return b
 }
 
 func (te *TestEnvinronment) ShutdownCluster() error {
