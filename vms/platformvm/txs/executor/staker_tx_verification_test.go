@@ -100,7 +100,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			name: "fail syntactic verification",
 			backendF: func(*gomock.Controller) *Backend {
 				return &Backend{
-					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{},
+					Ctx:    snow.DefaultContextTest(),
 				}
 			},
 			stateF: func(*gomock.Controller) state.Chain {
@@ -114,6 +115,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			name: "not bootstrapped",
 			backendF: func(*gomock.Controller) *Backend {
 				return &Backend{
+					Config:       &config.Config{},
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: &utils.AtomicBool{},
 				}
@@ -131,6 +133,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.AtomicBool{}
 				bootstrapped.SetValue(true)
 				return &Backend{
+					Config:       &config.Config{},
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
 				}
@@ -150,6 +153,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.AtomicBool{}
 				bootstrapped.SetValue(true)
 				return &Backend{
+					Config:       &config.Config{},
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
 				}
@@ -174,6 +178,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.AtomicBool{}
 				bootstrapped.SetValue(true)
 				return &Backend{
+					Config:       &config.Config{},
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
 				}
@@ -198,6 +203,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.AtomicBool{}
 				bootstrapped.SetValue(true)
 				return &Backend{
+					Config:       &config.Config{},
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
 				}
@@ -223,6 +229,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.AtomicBool{}
 				bootstrapped.SetValue(true)
 				return &Backend{
+					Config:       &config.Config{},
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
 				}
@@ -251,6 +258,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.AtomicBool{}
 				bootstrapped.SetValue(true)
 				return &Backend{
+					Config:       &config.Config{},
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
 				}
@@ -279,6 +287,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.AtomicBool{}
 				bootstrapped.SetValue(true)
 				return &Backend{
+					Config:       &config.Config{},
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
 				}
@@ -309,6 +318,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.AtomicBool{}
 				bootstrapped.SetValue(true)
 				return &Backend{
+					Config:       &config.Config{},
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
 				}
@@ -333,6 +343,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped := &utils.AtomicBool{}
 				bootstrapped.SetValue(true)
 				return &Backend{
+					Config:       &config.Config{},
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
 				}
@@ -373,11 +384,16 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					gomock.Any(),
 				).Return(errors.New("flow check failed"))
 
+				txFees := config.TxFees{
+					AddPOASubnetValidator: 1,
+				}
 				return &Backend{
 					FlowChecker: flowChecker,
 					Config: &config.Config{
-						TxFees: config.TxFees{
-							AddSubnetValidatorFee: 1,
+						TxFeeUpgrades: config.TxFeeUpgrades{
+							InitialFees:       txFees,
+							ApricotPhase3Fees: txFees,
+							BlueberryFees:     txFees,
 						},
 					},
 					Ctx:          snow.DefaultContextTest(),
@@ -419,11 +435,16 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					gomock.Any(),
 				).Return(nil)
 
+				txFees := config.TxFees{
+					AddPOASubnetValidator: 1,
+				}
 				return &Backend{
 					FlowChecker: flowChecker,
 					Config: &config.Config{
-						TxFees: config.TxFees{
-							AddSubnetValidatorFee: 1,
+						TxFeeUpgrades: config.TxFeeUpgrades{
+							InitialFees:       txFees,
+							ApricotPhase3Fees: txFees,
+							BlueberryFees:     txFees,
 						},
 					},
 					Ctx:          snow.DefaultContextTest(),
@@ -469,11 +490,16 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					gomock.Any(),
 				).Return(nil)
 
+				txFees := config.TxFees{
+					AddPOASubnetValidator: 1,
+				}
 				return &Backend{
 					FlowChecker: flowChecker,
 					Config: &config.Config{
-						TxFees: config.TxFees{
-							AddSubnetValidatorFee: 1,
+						TxFeeUpgrades: config.TxFeeUpgrades{
+							InitialFees:       txFees,
+							ApricotPhase3Fees: txFees,
+							BlueberryFees:     txFees,
 						},
 					},
 					Ctx:          snow.DefaultContextTest(),

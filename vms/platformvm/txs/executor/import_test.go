@@ -101,7 +101,7 @@ func TestNewImportTx(t *testing.T) {
 			sharedMemory: fundedSharedMemory(
 				env.ctx.XChainID,
 				map[ids.ID]uint64{
-					env.ctx.AVAXAssetID: env.config.TxFee - 1,
+					env.ctx.AVAXAssetID: env.config.TxFeeUpgrades.InitialFees.Import - 1,
 				},
 			),
 			sourceKeys: []*crypto.PrivateKeySECP256K1R{sourceKey},
@@ -113,7 +113,7 @@ func TestNewImportTx(t *testing.T) {
 			sharedMemory: fundedSharedMemory(
 				env.ctx.XChainID,
 				map[ids.ID]uint64{
-					env.ctx.AVAXAssetID: env.config.TxFee,
+					env.ctx.AVAXAssetID: env.config.TxFeeUpgrades.InitialFees.Import,
 				},
 			),
 			sourceKeys:   []*crypto.PrivateKeySECP256K1R{sourceKey},
@@ -126,7 +126,7 @@ func TestNewImportTx(t *testing.T) {
 			sharedMemory: fundedSharedMemory(
 				cChainID,
 				map[ids.ID]uint64{
-					env.ctx.AVAXAssetID: env.config.TxFee,
+					env.ctx.AVAXAssetID: env.config.TxFeeUpgrades.InitialFees.Import,
 				},
 			),
 			sourceKeys:   []*crypto.PrivateKeySECP256K1R{sourceKey},
@@ -140,7 +140,7 @@ func TestNewImportTx(t *testing.T) {
 			sharedMemory: fundedSharedMemory(
 				env.ctx.XChainID,
 				map[ids.ID]uint64{
-					env.ctx.AVAXAssetID: env.config.TxFee,
+					env.ctx.AVAXAssetID: env.config.TxFeeUpgrades.InitialFees.Import,
 					customAssetID:       1,
 				},
 			),
@@ -155,7 +155,7 @@ func TestNewImportTx(t *testing.T) {
 			sharedMemory: fundedSharedMemory(
 				env.ctx.XChainID,
 				map[ids.ID]uint64{
-					env.ctx.AVAXAssetID: env.config.TxFee,
+					env.ctx.AVAXAssetID: env.config.TxFeeUpgrades.InitialFees.Import,
 					customAssetID:       1,
 				},
 			),
@@ -200,7 +200,7 @@ func TestNewImportTx(t *testing.T) {
 				totalOut += out.Out.Amount()
 			}
 
-			require.Equal(env.config.TxFee, totalIn-totalOut, "burned too much")
+			require.Equal(env.config.TxFeeUpgrades.InitialFees.Import, totalIn-totalOut, "burned too much")
 
 			fakedState, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)
