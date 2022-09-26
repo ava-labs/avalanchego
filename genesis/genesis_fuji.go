@@ -22,7 +22,7 @@ var (
 	// FujiParams are the params used for the fuji testnet
 	FujiParams = Params{
 		PChainTxFees: pchainconfig.TxFeeUpgrades{
-			InitialFees: pchainconfig.TxFees{
+			Initial: pchainconfig.TxFees{
 				AddPrimaryNetworkValidator: 0,
 				AddPrimaryNetworkDelegator: 0,
 				AddPOASubnetValidator:      units.MilliAvax,
@@ -35,7 +35,7 @@ var (
 				Import:                     units.MilliAvax,
 				Export:                     units.MilliAvax,
 			},
-			ApricotPhase3Fees: pchainconfig.TxFees{
+			ApricotPhase3: pchainconfig.TxFees{
 				AddPrimaryNetworkValidator: 0,
 				AddPrimaryNetworkDelegator: 0,
 				AddPOASubnetValidator:      units.MilliAvax,
@@ -48,7 +48,7 @@ var (
 				Import:                     units.MilliAvax,
 				Export:                     units.MilliAvax,
 			},
-			BlueberryFees: pchainconfig.TxFees{
+			Blueberry: pchainconfig.TxFees{
 				AddPrimaryNetworkValidator: 0,
 				AddPrimaryNetworkDelegator: 0,
 				AddPOASubnetValidator:      units.MilliAvax,

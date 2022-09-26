@@ -317,9 +317,9 @@ func defaultConfig() *config.Config {
 	}
 	return &config.Config{
 		TxFeeUpgrades: config.TxFeeUpgrades{
-			InitialFees:       baseTxFees,
-			ApricotPhase3Fees: baseTxFees,
-			BlueberryFees:     baseTxFees,
+			Initial:       baseTxFees,
+			ApricotPhase3: baseTxFees,
+			Blueberry:     baseTxFees,
 		},
 		Chains:                 chains.MockManager{},
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),

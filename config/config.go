@@ -869,9 +869,9 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) (pchainconfig.TxFeeUpgrade
 			Export:      v.GetUint64(XChainExportFeeKey),
 		}
 		return pchainconfig.TxFeeUpgrades{
-			InitialFees:       pChainTxFees,
-			ApricotPhase3Fees: pChainTxFees,
-			BlueberryFees:     pChainTxFees,
+			Initial:       pChainTxFees,
+			ApricotPhase3: pChainTxFees,
+			Blueberry:     pChainTxFees,
 		}, xChainTxFees
 	}
 	return genesis.GetTxFeeUpgrades(networkID)

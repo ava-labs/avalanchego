@@ -18,7 +18,7 @@ type TxFees struct {
 }
 
 type TxFeeUpgrades struct {
-	InitialFees       TxFees
-	ApricotPhase3Fees TxFees
-	BlueberryFees     TxFees
+	Initial       TxFees `json:"initial"`
+	ApricotPhase3 TxFees `json:"apricotPhase3"`
+	Blueberry     TxFees `json:"blueberry"`
 }

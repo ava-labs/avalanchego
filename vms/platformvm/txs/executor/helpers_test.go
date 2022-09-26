@@ -285,7 +285,7 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 func defaultConfig() config.Config {
 	return config.Config{
 		TxFeeUpgrades: config.TxFeeUpgrades{
-			InitialFees: config.TxFees{
+			Initial: config.TxFees{
 				AddPrimaryNetworkValidator: 0,
 				AddPrimaryNetworkDelegator: 0,
 				AddPOASubnetValidator:      defaultTxFee,
@@ -298,7 +298,7 @@ func defaultConfig() config.Config {
 				Import:                     defaultTxFee,
 				Export:                     defaultTxFee,
 			},
-			ApricotPhase3Fees: config.TxFees{
+			ApricotPhase3: config.TxFees{
 				AddPrimaryNetworkValidator: 0,
 				AddPrimaryNetworkDelegator: 0,
 				AddPOASubnetValidator:      defaultTxFee,
@@ -311,7 +311,7 @@ func defaultConfig() config.Config {
 				Import:                     defaultTxFee,
 				Export:                     defaultTxFee,
 			},
-			BlueberryFees: config.TxFees{
+			Blueberry: config.TxFees{
 				AddPrimaryNetworkValidator: 0,
 				AddPrimaryNetworkDelegator: 0,
 				AddPOASubnetValidator:      defaultTxFee,

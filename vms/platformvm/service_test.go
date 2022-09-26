@@ -789,9 +789,9 @@ func TestGetBlock(t *testing.T) {
 			service.vm.ctx.Lock.Lock()
 			defer service.vm.ctx.Lock.Unlock()
 
-			service.vm.Config.TxFeeUpgrades.InitialFees.CreateChain = 100 * defaultTxFee
-			service.vm.Config.TxFeeUpgrades.ApricotPhase3Fees.CreateChain = 100 * defaultTxFee
-			service.vm.Config.TxFeeUpgrades.BlueberryFees.CreateChain = 100 * defaultTxFee
+			service.vm.Config.TxFeeUpgrades.Initial.CreateChain = 100 * defaultTxFee
+			service.vm.Config.TxFeeUpgrades.ApricotPhase3.CreateChain = 100 * defaultTxFee
+			service.vm.Config.TxFeeUpgrades.Blueberry.CreateChain = 100 * defaultTxFee
 
 			// Make a block an accept it, then check we can get it.
 			tx, err := service.vm.txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks

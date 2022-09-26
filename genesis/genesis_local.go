@@ -56,9 +56,9 @@ var (
 	// LocalParams are the params used for local networks
 	LocalParams = Params{
 		PChainTxFees: pchainconfig.TxFeeUpgrades{
-			InitialFees:       LocalPChainTxFees,
-			ApricotPhase3Fees: LocalPChainTxFees,
-			BlueberryFees:     LocalPChainTxFees,
+			Initial:       LocalPChainTxFees,
+			ApricotPhase3: LocalPChainTxFees,
+			Blueberry:     LocalPChainTxFees,
 		},
 		XChainTxFees: xchainconfig.TxFees{
 			Base:        units.MilliAvax,

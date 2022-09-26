@@ -316,7 +316,7 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
 			TxFeeUpgrades: config.TxFeeUpgrades{
-				InitialFees: config.TxFees{
+				Initial: config.TxFees{
 					AddPrimaryNetworkValidator: 0,
 					AddPrimaryNetworkDelegator: 0,
 					AddPOASubnetValidator:      defaultTxFee,
@@ -329,7 +329,7 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 					Import:                     defaultTxFee,
 					Export:                     defaultTxFee,
 				},
-				ApricotPhase3Fees: config.TxFees{
+				ApricotPhase3: config.TxFees{
 					AddPrimaryNetworkValidator: 0,
 					AddPrimaryNetworkDelegator: 0,
 					AddPOASubnetValidator:      defaultTxFee,
@@ -342,7 +342,7 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 					Import:                     defaultTxFee,
 					Export:                     defaultTxFee,
 				},
-				BlueberryFees: config.TxFees{
+				Blueberry: config.TxFees{
 					AddPrimaryNetworkValidator: 0,
 					AddPrimaryNetworkDelegator: 0,
 					AddPOASubnetValidator:      defaultTxFee,
@@ -437,7 +437,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
 			TxFeeUpgrades: config.TxFeeUpgrades{
-				InitialFees: config.TxFees{
+				Initial: config.TxFees{
 					AddPrimaryNetworkValidator: 0,
 					AddPrimaryNetworkDelegator: 0,
 					AddPOASubnetValidator:      defaultTxFee,
@@ -450,7 +450,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 					Import:                     defaultTxFee,
 					Export:                     defaultTxFee,
 				},
-				ApricotPhase3Fees: config.TxFees{
+				ApricotPhase3: config.TxFees{
 					AddPrimaryNetworkValidator: 0,
 					AddPrimaryNetworkDelegator: 0,
 					AddPOASubnetValidator:      defaultTxFee,
@@ -463,7 +463,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 					Import:                     defaultTxFee,
 					Export:                     defaultTxFee,
 				},
-				BlueberryFees: config.TxFees{
+				Blueberry: config.TxFees{
 					AddPrimaryNetworkValidator: 0,
 					AddPrimaryNetworkDelegator: 0,
 					AddPOASubnetValidator:      defaultTxFee,

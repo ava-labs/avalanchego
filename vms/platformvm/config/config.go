@@ -86,12 +86,12 @@ func (c *Config) IsBlueberryActivated(timestamp time.Time) bool {
 
 func (c *Config) GetTxFees(timestamp time.Time) *TxFees {
 	if c.IsBlueberryActivated(timestamp) {
-		return &c.BlueberryFees
+		return &c.Blueberry
 	}
 	if c.IsApricotPhase3Activated(timestamp) {
-		return &c.ApricotPhase3Fees
+		return &c.ApricotPhase3
 	}
-	return &c.InitialFees
+	return &c.Initial
 }
 
 // Create the blockchain described in [tx], but only if this node is a member of

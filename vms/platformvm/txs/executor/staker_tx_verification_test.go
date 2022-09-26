@@ -391,9 +391,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					FlowChecker: flowChecker,
 					Config: &config.Config{
 						TxFeeUpgrades: config.TxFeeUpgrades{
-							InitialFees:       txFees,
-							ApricotPhase3Fees: txFees,
-							BlueberryFees:     txFees,
+							Initial:       txFees,
+							ApricotPhase3: txFees,
+							Blueberry:     txFees,
 						},
 					},
 					Ctx:          snow.DefaultContextTest(),
@@ -442,9 +442,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					FlowChecker: flowChecker,
 					Config: &config.Config{
 						TxFeeUpgrades: config.TxFeeUpgrades{
-							InitialFees:       txFees,
-							ApricotPhase3Fees: txFees,
-							BlueberryFees:     txFees,
+							Initial:       txFees,
+							ApricotPhase3: txFees,
+							Blueberry:     txFees,
 						},
 					},
 					Ctx:          snow.DefaultContextTest(),
@@ -497,9 +497,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					FlowChecker: flowChecker,
 					Config: &config.Config{
 						TxFeeUpgrades: config.TxFeeUpgrades{
-							InitialFees:       txFees,
-							ApricotPhase3Fees: txFees,
-							BlueberryFees:     txFees,
+							Initial:       txFees,
+							ApricotPhase3: txFees,
+							Blueberry:     txFees,
 						},
 					},
 					Ctx:          snow.DefaultContextTest(),
