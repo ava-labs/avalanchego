@@ -37,48 +37,28 @@ var (
 	//go:embed genesis_local.json
 	localGenesisConfigJSON []byte
 
+	// LocalPChainTxFees are the fees for P-chain transactions on the local
+	// network
+	LocalPChainTxFees = pchainconfig.TxFees{
+		AddPrimaryNetworkValidator: 0,
+		AddPrimaryNetworkDelegator: 0,
+		AddPOASubnetValidator:      units.MilliAvax,
+		AddPOSSubnetValidator:      units.MilliAvax,
+		AddPOSSubnetDelegator:      units.MilliAvax,
+		RemovePOASubnetValidator:   units.MilliAvax,
+		CreateSubnet:               100 * units.MilliAvax,
+		CreateChain:                100 * units.MilliAvax,
+		TransformSubnet:            100 * units.MilliAvax,
+		Import:                     units.MilliAvax,
+		Export:                     units.MilliAvax,
+	}
+
 	// LocalParams are the params used for local networks
 	LocalParams = Params{
 		PChainTxFees: pchainconfig.TxFeeUpgrades{
-			InitialFees: pchainconfig.TxFees{
-				AddPrimaryNetworkValidator: 0,
-				AddPrimaryNetworkDelegator: 0,
-				AddPOASubnetValidator:      units.MilliAvax,
-				AddPOSSubnetValidator:      units.MilliAvax, // didn't exist
-				AddPOSSubnetDelegator:      units.MilliAvax, // didn't exist
-				RemovePOASubnetValidator:   units.MilliAvax, // didn't exist
-				CreateSubnet:               100 * units.MilliAvax,
-				CreateChain:                100 * units.MilliAvax,
-				TransformSubnet:            100 * units.MilliAvax, // didn't exist
-				Import:                     units.MilliAvax,
-				Export:                     units.MilliAvax,
-			},
-			ApricotPhase3Fees: pchainconfig.TxFees{
-				AddPrimaryNetworkValidator: 0,
-				AddPrimaryNetworkDelegator: 0,
-				AddPOASubnetValidator:      units.MilliAvax,
-				AddPOSSubnetValidator:      units.MilliAvax, // didn't exist
-				AddPOSSubnetDelegator:      units.MilliAvax, // didn't exist
-				RemovePOASubnetValidator:   units.MilliAvax, // didn't exist
-				CreateSubnet:               100 * units.MilliAvax,
-				CreateChain:                100 * units.MilliAvax,
-				TransformSubnet:            100 * units.MilliAvax, // didn't exist
-				Import:                     units.MilliAvax,
-				Export:                     units.MilliAvax,
-			},
-			BlueberryFees: pchainconfig.TxFees{
-				AddPrimaryNetworkValidator: 0,
-				AddPrimaryNetworkDelegator: 0,
-				AddPOASubnetValidator:      units.MilliAvax,
-				AddPOSSubnetValidator:      units.MilliAvax,
-				AddPOSSubnetDelegator:      units.MilliAvax,
-				RemovePOASubnetValidator:   units.MilliAvax,
-				CreateSubnet:               100 * units.MilliAvax,
-				CreateChain:                100 * units.MilliAvax,
-				TransformSubnet:            100 * units.MilliAvax,
-				Import:                     units.MilliAvax,
-				Export:                     units.MilliAvax,
-			},
+			InitialFees:       LocalPChainTxFees,
+			ApricotPhase3Fees: LocalPChainTxFees,
+			BlueberryFees:     LocalPChainTxFees,
 		},
 		XChainTxFees: xchainconfig.TxFees{
 			Base:        units.MilliAvax,
