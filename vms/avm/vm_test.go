@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -302,10 +303,15 @@ func GenesisVMWithArgs(tb testing.TB, additionalFxs []*common.Fx, args *BuildGen
 	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
 
 	issuer := make(chan common.Message, 1)
-	vm := &VM{Factory: Factory{
-		TxFee:            testTxFee,
-		CreateAssetTxFee: testTxFee,
-		BlueberryTime:    testBlueberryTime,
+	vm := &VM{Config: config.Config{
+		TxFees: config.TxFees{
+			Base:        testTxFee,
+			CreateAsset: testTxFee,
+			Operation:   testTxFee,
+			Import:      testTxFee,
+			Export:      testTxFee,
+		},
+		BlueberryTime: testBlueberryTime,
 	}}
 	configBytes, err := stdjson.Marshal(Config{IndexTransactions: true})
 	if err != nil {
@@ -411,7 +417,7 @@ func setupIssueTx(t testing.TB) (chan common.Message, *VM, *snow.Context, []*txs
 			Outs: []*avax.TransferableOutput{{
 				Asset: avax.Asset{ID: avaxTx.ID()},
 				Out: &secp256k1fx.TransferOutput{
-					Amt: startBalance - vm.TxFee,
+					Amt: startBalance - vm.TxFees.Base,
 					OutputOwners: secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{key.PublicKey().Address()},
@@ -1262,7 +1268,7 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 			},
 			Asset: avax.Asset{ID: avaxTx.ID()},
 			In: &secp256k1fx.TransferInput{
-				Amt: startBalance - vm.TxFee,
+				Amt: startBalance - vm.TxFees.Base,
 				Input: secp256k1fx.Input{
 					SigIndices: []uint32{
 						0,
@@ -1273,7 +1279,7 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - 2*vm.TxFee,
+				Amt: startBalance - 2*vm.TxFees.Base,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{key.PublicKey().Address()},
@@ -1818,7 +1824,7 @@ func TestIssueExportTx(t *testing.T) {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.TxFee,
+				Amt: startBalance - vm.TxFees.Export,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{key.PublicKey().Address()},
@@ -1953,7 +1959,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: assetID,
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.TxFee,
+				Amt: startBalance - vm.TxFees.Export,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{key.PublicKey().Address()},

@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -86,7 +87,7 @@ func TestTxNil(t *testing.T) {
 	}
 
 	tx := (*Tx)(nil)
-	if err := tx.SyntacticVerify(ctx, m, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, m, ids.Empty, &config.TxFees{}, 1); err == nil {
 		t.Fatalf("Should have erred due to nil tx")
 	}
 }
@@ -95,7 +96,7 @@ func TestTxEmpty(t *testing.T) {
 	ctx := NewContext(t)
 	c := setupCodec()
 	tx := &Tx{}
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &config.TxFees{}, 1); err == nil {
 		t.Fatalf("Should have erred due to nil tx")
 	}
 }
@@ -128,7 +129,7 @@ func TestTxInvalidCredential(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &config.TxFees{}, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid credential")
 	}
 }
@@ -181,7 +182,7 @@ func TestTxInvalidUnsignedTx(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &config.TxFees{}, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid unsigned tx")
 	}
 }
@@ -225,7 +226,7 @@ func TestTxInvalidNumberOfCredentials(t *testing.T) {
 	}
 	tx.Initialize(nil, nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 1); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &config.TxFees{}, 1); err == nil {
 		t.Fatalf("Tx should have failed due to an invalid number of credentials")
 	}
 }

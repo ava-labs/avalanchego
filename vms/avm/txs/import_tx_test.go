@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -220,7 +221,7 @@ func TestImportTxSyntacticVerify(t *testing.T) {
 	}
 	tx.Initialize(nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err != nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &config.TxFees{}, 0); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -267,7 +268,7 @@ func TestImportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 	}
 	tx.Initialize(nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &config.TxFees{}, 0); err == nil {
 		t.Fatalf("should have erred due to memo field being too long")
 	}
 }

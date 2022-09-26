@@ -439,7 +439,7 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 			Outs: []*avax.TransferableOutput{{
 				Asset: avax.Asset{ID: genesisTx.ID()},
 				Out: &secp256k1fx.TransferOutput{
-					Amt: startBalance - vm.TxFee,
+					Amt: startBalance - vm.TxFees.Base,
 					OutputOwners: secp256k1fx.OutputOwners{
 						Locktime:  0,
 						Threshold: 1,
@@ -534,7 +534,7 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 			Outs: []*avax.TransferableOutput{{
 				Asset: avax.Asset{ID: genesisTx.ID()},
 				Out: &secp256k1fx.TransferOutput{
-					Amt: startBalance - vm.TxFee,
+					Amt: startBalance - vm.TxFees.Base,
 					OutputOwners: secp256k1fx.OutputOwners{
 						Locktime:  0,
 						Threshold: 1,
@@ -675,7 +675,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 			Outs: []*avax.TransferableOutput{{
 				Asset: avax.Asset{ID: genesisTx.ID()},
 				Out: &secp256k1fx.TransferOutput{
-					Amt: startBalance - vm.TxFee,
+					Amt: startBalance - vm.TxFees.Base,
 					OutputOwners: secp256k1fx.OutputOwners{
 						Locktime:  0,
 						Threshold: 1,
@@ -822,7 +822,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 			Outs: []*avax.TransferableOutput{{
 				Asset: avax.Asset{ID: genesisTx.ID()},
 				Out: &secp256k1fx.TransferOutput{
-					Amt: startBalance - vm.TxFee,
+					Amt: startBalance - vm.TxFees.Base,
 					OutputOwners: secp256k1fx.OutputOwners{
 						Locktime:  0,
 						Threshold: 1,
@@ -1047,7 +1047,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.TxFee,
+				Amt: startBalance - vm.TxFees.Export,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -1111,7 +1111,7 @@ func TestExportTxSemanticVerifyUnknownCredFx(t *testing.T) {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.TxFee,
+				Amt: startBalance - vm.TxFees.Export,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -1175,7 +1175,7 @@ func TestExportTxSemanticVerifyMissingUTXO(t *testing.T) {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.TxFee,
+				Amt: startBalance - vm.TxFees.Export,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -1256,7 +1256,7 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.TxFee,
+				Amt: startBalance - vm.TxFees.Export,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -1384,7 +1384,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.TxFee,
+				Amt: startBalance - vm.TxFees.Export,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -1448,7 +1448,7 @@ func TestExportTxSemanticVerifyInvalidTransfer(t *testing.T) {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.TxFee,
+				Amt: startBalance - vm.TxFees.Export,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -1541,7 +1541,7 @@ func TestExportTxSemanticVerifyTransferCustomAssetBeforeBlueberry(t *testing.T) 
 			{
 				Asset: avax.Asset{ID: avaxID},
 				Out: &secp256k1fx.TransferOutput{
-					Amt: startBalance - vm.TxFee,
+					Amt: startBalance - vm.TxFees.Export,
 					OutputOwners: secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -1643,7 +1643,7 @@ func TestExportTxSemanticVerifyTransferCustomAssetAfterBlueberry(t *testing.T) {
 			{
 				Asset: avax.Asset{ID: avaxID},
 				Out: &secp256k1fx.TransferOutput{
-					Amt: startBalance - vm.TxFee,
+					Amt: startBalance - vm.TxFees.Export,
 					OutputOwners: secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},

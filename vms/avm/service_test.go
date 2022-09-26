@@ -147,7 +147,7 @@ func sampleAddrs(t *testing.T, vm *VM, addrs []ids.ShortID) ([]ids.ShortID, []st
 // Returns error if [numTxFees] tx fees was not deducted from the addresses in [fromAddrs]
 // relative to their starting balance
 func verifyTxFeeDeducted(t *testing.T, s *Service, fromAddrs []ids.ShortID, numTxFees int) error {
-	totalTxFee := uint64(numTxFees) * s.vm.TxFee
+	totalTxFee := uint64(numTxFees) * s.vm.TxFees.Base
 	fromAddrsStartBalance := startBalance * uint64(len(fromAddrs))
 
 	// Key: Address
@@ -1563,7 +1563,7 @@ func buildBaseTx(avaxTx *txs.Tx, vm *VM, key *crypto.PrivateKeySECP256K1R) *txs.
 			Outs: []*avax.TransferableOutput{{
 				Asset: avax.Asset{ID: avaxTx.ID()},
 				Out: &secp256k1fx.TransferOutput{
-					Amt: startBalance - vm.TxFee,
+					Amt: startBalance - vm.TxFees.Base,
 					OutputOwners: secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{key.PublicKey().Address()},
@@ -1597,7 +1597,7 @@ func buildExportTx(avaxTx *txs.Tx, vm *VM, key *crypto.PrivateKeySECP256K1R) *tx
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.TxFee,
+				Amt: startBalance - vm.TxFees.Export,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{key.PublicKey().Address()},

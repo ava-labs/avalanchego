@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -220,7 +221,7 @@ func TestExportTxSyntacticVerify(t *testing.T) {
 	}
 	tx.Initialize(nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err != nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &config.TxFees{}, 0); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -231,7 +232,7 @@ func TestExportTxSyntacticVerifyNil(t *testing.T) {
 
 	tx := (*ExportTx)(nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &config.TxFees{}, 0); err == nil {
 		t.Fatalf("should have erred due to a nil ExportTx")
 	}
 }
@@ -277,7 +278,7 @@ func TestExportTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 	}
 	tx.Initialize(nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &config.TxFees{}, 0); err == nil {
 		t.Fatalf("should have erred due to a wrong network ID")
 	}
 }
@@ -328,7 +329,7 @@ func TestExportTxSyntacticVerifyWrongBlockchainID(t *testing.T) {
 	}
 	tx.Initialize(nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &config.TxFees{}, 0); err == nil {
 		t.Fatalf("should have erred due to wrong blockchain ID")
 	}
 }
@@ -375,7 +376,7 @@ func TestExportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 	}
 	tx.Initialize(nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &config.TxFees{}, 0); err == nil {
 		t.Fatalf("should have erred due to memo field being too long")
 	}
 }
@@ -431,7 +432,7 @@ func TestExportTxSyntacticVerifyInvalidBaseOutput(t *testing.T) {
 	}
 	tx.Initialize(nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &config.TxFees{}, 0); err == nil {
 		t.Fatalf("should have erred due to an invalid base output")
 	}
 }
@@ -499,7 +500,7 @@ func TestExportTxSyntacticVerifyUnsortedBaseOutputs(t *testing.T) {
 	}
 	tx.Initialize(nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &config.TxFees{}, 0); err == nil {
 		t.Fatalf("should have erred due to unsorted base outputs")
 	}
 }
@@ -545,7 +546,7 @@ func TestExportTxSyntacticVerifyInvalidOutput(t *testing.T) {
 	}
 	tx.Initialize(nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &config.TxFees{}, 0); err == nil {
 		t.Fatalf("should have erred due to invalid output")
 	}
 }
@@ -603,7 +604,7 @@ func TestExportTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 	}
 	tx.Initialize(nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &config.TxFees{}, 0); err == nil {
 		t.Fatalf("should have erred due to unsorted outputs")
 	}
 }
@@ -669,7 +670,7 @@ func TestExportTxSyntacticVerifyInvalidInput(t *testing.T) {
 	}
 	tx.Initialize(nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &config.TxFees{}, 0); err == nil {
 		t.Fatalf("should have erred due to invalid input")
 	}
 }
@@ -735,7 +736,7 @@ func TestExportTxSyntacticVerifyUnsortedInputs(t *testing.T) {
 	}
 	tx.Initialize(nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &config.TxFees{}, 0); err == nil {
 		t.Fatalf("should have erred due to unsorted inputs")
 	}
 }
@@ -781,7 +782,7 @@ func TestExportTxSyntacticVerifyInvalidFlowCheck(t *testing.T) {
 	}
 	tx.Initialize(nil)
 
-	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
+	if err := tx.SyntacticVerify(ctx, c, ids.Empty, &config.TxFees{}, 0); err == nil {
 		t.Fatalf("should have erred due to an invalid flow check")
 	}
 }
