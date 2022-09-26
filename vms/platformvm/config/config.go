@@ -16,30 +16,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-type TxFees struct {
-	// Transaction fee
-	TxFee uint64 `json:"txFee"`
-	// Transaction fee for create asset transactions
-	CreateAssetTxFee uint64 `json:"createAssetTxFee"`
-	// Transaction fee for create subnet transactions
-	CreateSubnetTxFee uint64 `json:"createSubnetTxFee"`
-	// Transaction fee for transform subnet transactions
-	TransformSubnetTxFee uint64 `json:"transformSubnetTxFee"`
-	// Transaction fee for create blockchain transactions
-	CreateBlockchainTxFee uint64 `json:"createBlockchainTxFee"`
-	// Transaction fee for adding a primary network validator
-	AddPrimaryNetworkValidatorFee uint64 `json:"addPrimaryNetworkValidatorFee"`
-	// Transaction fee for adding a primary network delegator
-	AddPrimaryNetworkDelegatorFee uint64 `json:"addPrimaryNetworkDelegatorFee"`
-	// Transaction fee for adding a subnet validator
-	AddSubnetValidatorFee uint64 `json:"addSubnetValidatorFee"`
-	// Transaction fee for adding a subnet delegator
-	AddSubnetDelegatorFee uint64 `json:"addSubnetDelegatorFee"`
-}
-
 // Struct collecting all foundational parameters of PlatformVM
 type Config struct {
-	TxFees
+	TxFeeUpgrades
 
 	// The node's chain manager
 	Chains chains.Manager
@@ -105,18 +84,14 @@ func (c *Config) IsBlueberryActivated(timestamp time.Time) bool {
 	return !timestamp.Before(c.BlueberryTime)
 }
 
-func (c *Config) GetCreateBlockchainTxFee(timestamp time.Time) uint64 {
-	if c.IsApricotPhase3Activated(timestamp) {
-		return c.CreateBlockchainTxFee
+func (c *Config) GetTxFees(timestamp time.Time) *TxFees {
+	if c.IsBlueberryActivated(timestamp) {
+		return &c.BlueberryFees
 	}
-	return c.CreateAssetTxFee
-}
-
-func (c *Config) GetCreateSubnetTxFee(timestamp time.Time) uint64 {
 	if c.IsApricotPhase3Activated(timestamp) {
-		return c.CreateSubnetTxFee
+		return &c.ApricotPhase3Fees
 	}
-	return c.CreateAssetTxFee
+	return &c.InitialFees
 }
 
 // Create the blockchain described in [tx], but only if this node is a member of

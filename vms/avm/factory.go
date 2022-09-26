@@ -4,26 +4,17 @@
 package avm
 
 import (
-	"time"
-
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 )
 
 var _ vms.Factory = &Factory{}
 
 type Factory struct {
-	TxFee            uint64
-	CreateAssetTxFee uint64
-
-	// Time of the Blueberry network upgrade
-	BlueberryTime time.Time
-}
-
-func (f *Factory) IsBlueberryActivated(timestamp time.Time) bool {
-	return !timestamp.Before(f.BlueberryTime)
+	config.Config
 }
 
 func (f *Factory) New(*snow.Context) (interface{}, error) {
-	return &VM{Factory: *f}, nil
+	return &VM{Config: f.Config}, nil
 }

@@ -99,16 +99,25 @@ func addNodeFlags(fs *flag.FlagSet) {
 	// Network ID
 	fs.String(NetworkNameKey, constants.MainnetName, "Network ID this node will connect to")
 
-	// AVAX fees
-	fs.Uint64(TxFeeKey, genesis.LocalParams.TxFee, "Transaction fee, in nAVAX")
-	fs.Uint64(CreateAssetTxFeeKey, genesis.LocalParams.CreateAssetTxFee, "Transaction fee, in nAVAX, for transactions that create new assets")
-	fs.Uint64(CreateSubnetTxFeeKey, genesis.LocalParams.CreateSubnetTxFee, "Transaction fee, in nAVAX, for transactions that create new subnets")
-	fs.Uint64(TransformSubnetTxFeeKey, genesis.LocalParams.TransformSubnetTxFee, "Transaction fee, in nAVAX, for transactions that transform subnets")
-	fs.Uint64(CreateBlockchainTxFeeKey, genesis.LocalParams.CreateBlockchainTxFee, "Transaction fee, in nAVAX, for transactions that create new blockchains")
-	fs.Uint64(AddPrimaryNetworkValidatorFeeKey, genesis.LocalParams.AddPrimaryNetworkValidatorFee, "Transaction fee, in nAVAX, for transactions that add new primary network validators")
-	fs.Uint64(AddPrimaryNetworkDelegatorFeeKey, genesis.LocalParams.AddPrimaryNetworkDelegatorFee, "Transaction fee, in nAVAX, for transactions that add new primary network delegators")
-	fs.Uint64(AddSubnetValidatorFeeKey, genesis.LocalParams.AddSubnetValidatorFee, "Transaction fee, in nAVAX, for transactions that add new subnet validators")
-	fs.Uint64(AddSubnetDelegatorFeeKey, genesis.LocalParams.AddSubnetDelegatorFee, "Transaction fee, in nAVAX, for transactions that add new subnet delegators")
+	// P-Chain fees
+	fs.Uint64(PChainAddPrimaryNetworkValidatorFeeKey, genesis.LocalParams.PChainTxFees.BlueberryFees.AddPrimaryNetworkValidator, "Transaction fee, in nAVAX, for adding a Primary Network validator on the P-chain")
+	fs.Uint64(PChainAddPrimaryNetworkDelegatorFeeKey, genesis.LocalParams.PChainTxFees.BlueberryFees.AddPrimaryNetworkDelegator, "Transaction fee, in nAVAX, for adding a Primary Network delegator on the P-chain")
+	fs.Uint64(PChainAddPOASubnetValidatorFeeKey, genesis.LocalParams.PChainTxFees.BlueberryFees.AddPOASubnetValidator, "Transaction fee, in nAVAX, for adding a PoA subnet validator on the P-chain")
+	fs.Uint64(PChainAddPOSSubnetValidatorFeeKey, genesis.LocalParams.PChainTxFees.BlueberryFees.AddPOSSubnetValidator, "Transaction fee, in nAVAX, for adding a PoS subnet validator on the P-chain")
+	fs.Uint64(PChainAddPOSSubnetDelegatorFeeKey, genesis.LocalParams.PChainTxFees.BlueberryFees.AddPOSSubnetDelegator, "Transaction fee, in nAVAX, for adding a PoS subnet delegator on the P-chain")
+	fs.Uint64(PChainRemovePOASubnetValidatorFeeKey, genesis.LocalParams.PChainTxFees.BlueberryFees.RemovePOASubnetValidator, "Transaction fee, in nAVAX, for removing a PoA subnet validator on the P-chain")
+	fs.Uint64(PChainCreateSubnetFeeKey, genesis.LocalParams.PChainTxFees.BlueberryFees.CreateSubnet, "Transaction fee, in nAVAX, for creating a new subnet on the P-chain")
+	fs.Uint64(PChainCreateChainFeeKey, genesis.LocalParams.PChainTxFees.BlueberryFees.CreateChain, "Transaction fee, in nAVAX, for creating a new chain on a PoA subnet on the P-chain")
+	fs.Uint64(PChainTransformSubnetFeeKey, genesis.LocalParams.PChainTxFees.BlueberryFees.TransformSubnet, "Transaction fee, in nAVAX, for transforming a PoA subnet into a PoS subnet on the P-chain")
+	fs.Uint64(PChainImportFeeKey, genesis.LocalParams.PChainTxFees.BlueberryFees.Import, "Transaction fee, in nAVAX, for issuing an ImportTx on the P-chain")
+	fs.Uint64(PChainExportFeeKey, genesis.LocalParams.PChainTxFees.BlueberryFees.Export, "Transaction fee, in nAVAX, for issuing an ExportTx on the P-chain")
+
+	// X-chain fees
+	fs.Uint64(XChainBaseFeeKey, genesis.LocalParams.XChainTxFees.Base, "Transaction fee, in nAVAX, for issuing a BaseTx on the X-chain")
+	fs.Uint64(XChainCreateAssetFeeKey, genesis.LocalParams.XChainTxFees.CreateAsset, "Transaction fee, in nAVAX, for issuing a CreateAssetTx on the X-chain")
+	fs.Uint64(XChainOperationFeeKey, genesis.LocalParams.XChainTxFees.Operation, "Transaction fee, in nAVAX, for issuing an OperationTx on the X-chain")
+	fs.Uint64(XChainImportFeeKey, genesis.LocalParams.XChainTxFees.Import, "Transaction fee, in nAVAX, for issuing an ImportTx on the X-chain")
+	fs.Uint64(XChainExportFeeKey, genesis.LocalParams.XChainTxFees.Export, "Transaction fee, in nAVAX, for issuing an ExportTx on the X-chain")
 
 	// Database
 	fs.String(DBTypeKey, leveldb.Name, fmt.Sprintf("Database type to use. Should be one of {%s, %s}", leveldb.Name, memdb.Name))

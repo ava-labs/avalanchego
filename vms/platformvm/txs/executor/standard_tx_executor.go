@@ -55,7 +55,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 
 	// Verify the flowcheck
 	timestamp := e.State.GetTimestamp()
-	createBlockchainTxFee := e.Config.GetCreateBlockchainTxFee(timestamp)
+	txFees := e.Config.GetTxFees(timestamp)
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -63,7 +63,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 		tx.Outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: createBlockchainTxFee,
+			e.Ctx.AVAXAssetID: txFees.CreateChain,
 		},
 	); err != nil {
 		return err
@@ -92,7 +92,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 
 	// Verify the flowcheck
 	timestamp := e.State.GetTimestamp()
-	createSubnetTxFee := e.Config.GetCreateSubnetTxFee(timestamp)
+	txFees := e.Config.GetTxFees(timestamp)
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -100,7 +100,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		tx.Outs,
 		e.Tx.Creds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: createSubnetTxFee,
+			e.Ctx.AVAXAssetID: txFees.CreateSubnet,
 		},
 	); err != nil {
 		return err
@@ -175,6 +175,8 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins, tx.Ins)
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
+		timestamp := e.State.GetTimestamp()
+		txFees := e.Config.GetTxFees(timestamp)
 		if err := e.FlowChecker.VerifySpendUTXOs(
 			tx,
 			utxos,
@@ -182,7 +184,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 			tx.Outs,
 			e.Tx.Creds,
 			map[ids.ID]uint64{
-				e.Ctx.AVAXAssetID: e.Config.TxFee,
+				e.Ctx.AVAXAssetID: txFees.Import,
 			},
 		); err != nil {
 			return err
@@ -220,6 +222,8 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	// Verify the flowcheck
+	timestamp := e.State.GetTimestamp()
+	txFees := e.Config.GetTxFees(timestamp)
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -227,7 +231,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		outs,
 		e.Tx.Creds,
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: e.Config.TxFee,
+			e.Ctx.AVAXAssetID: txFees.Export,
 		},
 	); err != nil {
 		return fmt.Errorf("failed verifySpend: %w", err)
@@ -447,6 +451,9 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		return err
 	}
 
+	timestamp := e.State.GetTimestamp()
+	txFees := e.Config.GetTxFees(timestamp)
+
 	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
 	if err := e.Backend.FlowChecker.VerifySpend(
 		tx,
@@ -458,7 +465,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		//            entry in this map literal from being overwritten by the
 		//            second entry.
 		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: e.Config.TransformSubnetTxFee,
+			e.Ctx.AVAXAssetID: txFees.TransformSubnet,
 			tx.AssetID:        totalRewardAmount,
 		},
 	); err != nil {

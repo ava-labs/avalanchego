@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -78,8 +79,7 @@ func (t *OperationTx) SyntacticVerify(
 	ctx *snow.Context,
 	c codec.Manager,
 	txFeeAssetID ids.ID,
-	txFee uint64,
-	_ uint64,
+	txFees *config.TxFees,
 	numFxs int,
 ) error {
 	switch {
@@ -89,7 +89,7 @@ func (t *OperationTx) SyntacticVerify(
 		return errNoOperations
 	}
 
-	if err := t.BaseTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, txFee, numFxs); err != nil {
+	if err := t.BaseTx.syntacticVerify(ctx, c, txFeeAssetID, txFees.Operation, numFxs); err != nil {
 		return err
 	}
 

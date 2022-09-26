@@ -47,8 +47,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/storage"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/vms"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+
+	xchainconfig "github.com/ava-labs/avalanchego/vms/avm/config"
+	pchainconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
 )
 
 const (
@@ -844,21 +846,35 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 	return config, nil
 }
 
-func getTxFeeConfig(v *viper.Viper, networkID uint32) config.TxFees {
+func getTxFeeConfig(v *viper.Viper, networkID uint32) (pchainconfig.TxFeeUpgrades, xchainconfig.TxFees) {
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
-		return config.TxFees{
-			TxFee:                         v.GetUint64(TxFeeKey),
-			CreateAssetTxFee:              v.GetUint64(CreateAssetTxFeeKey),
-			CreateSubnetTxFee:             v.GetUint64(CreateSubnetTxFeeKey),
-			TransformSubnetTxFee:          v.GetUint64(TransformSubnetTxFeeKey),
-			CreateBlockchainTxFee:         v.GetUint64(CreateBlockchainTxFeeKey),
-			AddPrimaryNetworkValidatorFee: v.GetUint64(AddPrimaryNetworkValidatorFeeKey),
-			AddPrimaryNetworkDelegatorFee: v.GetUint64(AddPrimaryNetworkDelegatorFeeKey),
-			AddSubnetValidatorFee:         v.GetUint64(AddSubnetValidatorFeeKey),
-			AddSubnetDelegatorFee:         v.GetUint64(AddSubnetDelegatorFeeKey),
+		pChainTxFees := pchainconfig.TxFees{
+			AddPrimaryNetworkValidator: v.GetUint64(PChainAddPrimaryNetworkValidatorFeeKey),
+			AddPrimaryNetworkDelegator: v.GetUint64(PChainAddPrimaryNetworkDelegatorFeeKey),
+			AddPOASubnetValidator:      v.GetUint64(PChainAddPOASubnetValidatorFeeKey),
+			AddPOSSubnetValidator:      v.GetUint64(PChainAddPOSSubnetValidatorFeeKey),
+			AddPOSSubnetDelegator:      v.GetUint64(PChainAddPOSSubnetDelegatorFeeKey),
+			RemovePOASubnetValidator:   v.GetUint64(PChainRemovePOASubnetValidatorFeeKey),
+			CreateSubnet:               v.GetUint64(PChainCreateSubnetFeeKey),
+			CreateChain:                v.GetUint64(PChainCreateChainFeeKey),
+			TransformSubnet:            v.GetUint64(PChainTransformSubnetFeeKey),
+			Import:                     v.GetUint64(PChainImportFeeKey),
+			Export:                     v.GetUint64(PChainExportFeeKey),
 		}
+		xChainTxFees := xchainconfig.TxFees{
+			Base:        v.GetUint64(XChainBaseFeeKey),
+			CreateAsset: v.GetUint64(XChainCreateAssetFeeKey),
+			Operation:   v.GetUint64(XChainOperationFeeKey),
+			Import:      v.GetUint64(XChainImportFeeKey),
+			Export:      v.GetUint64(XChainExportFeeKey),
+		}
+		return pchainconfig.TxFeeUpgrades{
+			InitialFees:       pChainTxFees,
+			ApricotPhase3Fees: pChainTxFees,
+			BlueberryFees:     pChainTxFees,
+		}, xChainTxFees
 	}
-	return genesis.GetTxFeeConfig(networkID)
+	return genesis.GetTxFeeUpgrades(networkID)
 }
 
 func getGenesisData(v *viper.Viper, networkID uint32) ([]byte, ids.ID, error) {
@@ -1332,7 +1348,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.FdLimit = v.GetUint64(FdLimitKey)
 
 	// Tx Fee
-	nodeConfig.TxFees = getTxFeeConfig(v, nodeConfig.NetworkID)
+	nodeConfig.PChainTxFeeConfig, nodeConfig.XChainTxFeeConfig = getTxFeeConfig(v, nodeConfig.NetworkID)
 
 	// Genesis Data
 	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = getGenesisData(v, nodeConfig.NetworkID)

@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+
+	xchainconfig "github.com/ava-labs/avalanchego/vms/avm/config"
+	pchainconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
 )
 
 type StakingConfig struct {
@@ -36,19 +38,20 @@ type StakingConfig struct {
 
 type Params struct {
 	StakingConfig
-	config.TxFees
+	PChainTxFees pchainconfig.TxFeeUpgrades
+	XChainTxFees xchainconfig.TxFees
 }
 
-func GetTxFeeConfig(networkID uint32) config.TxFees {
+func GetTxFeeUpgrades(networkID uint32) (pchainconfig.TxFeeUpgrades, xchainconfig.TxFees) {
 	switch networkID {
 	case constants.MainnetID:
-		return MainnetParams.TxFees
+		return MainnetParams.PChainTxFees, MainnetParams.XChainTxFees
 	case constants.FujiID:
-		return FujiParams.TxFees
+		return FujiParams.PChainTxFees, FujiParams.XChainTxFees
 	case constants.LocalID:
-		return LocalParams.TxFees
+		return LocalParams.PChainTxFees, LocalParams.XChainTxFees
 	default:
-		return LocalParams.TxFees
+		return LocalParams.PChainTxFees, LocalParams.XChainTxFees
 	}
 }
 

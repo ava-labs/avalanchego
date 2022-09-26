@@ -203,7 +203,7 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 		amountsWithFee[assetKey] = amount
 	}
 
-	amountWithFee, err := math.Add64(amounts[w.vm.feeAssetID], w.vm.TxFee)
+	amountWithFee, err := math.Add64(amounts[w.vm.feeAssetID], w.vm.TxFees.Base)
 	if err != nil {
 		return fmt.Errorf("problem calculating required spend amount: %w", err)
 	}

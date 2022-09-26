@@ -24,6 +24,9 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
+
+	xchainconfig "github.com/ava-labs/avalanchego/vms/avm/config"
+	pchainconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
 )
 
 var (
@@ -44,20 +47,13 @@ type Info struct {
 }
 
 type Parameters struct {
-	Version                       *version.Application
-	NodeID                        ids.NodeID
-	NodePOP                       *signer.ProofOfPossession
-	NetworkID                     uint32
-	TxFee                         uint64
-	CreateAssetTxFee              uint64
-	CreateSubnetTxFee             uint64
-	TransformSubnetTxFee          uint64
-	CreateBlockchainTxFee         uint64
-	AddPrimaryNetworkValidatorFee uint64
-	AddPrimaryNetworkDelegatorFee uint64
-	AddSubnetValidatorFee         uint64
-	AddSubnetDelegatorFee         uint64
-	VMManager                     vms.Manager
+	PChainTxFees pchainconfig.TxFeeUpgrades
+	XChainTxFees xchainconfig.TxFees
+	Version      *version.Application
+	NodeID       ids.NodeID
+	NodePOP      *signer.ProofOfPossession
+	NetworkID    uint32
+	VMManager    vms.Manager
 }
 
 // NewService returns a new admin API service
@@ -283,6 +279,7 @@ func (service *Info) Uptime(_ *http.Request, _ *struct{}, reply *UptimeResponse)
 	return nil
 }
 
+// TODO: clean all of this up
 type GetTxFeeResponse struct {
 	TxFee json.Uint64 `json:"txFee"`
 	// TODO: remove [CreationTxFee] after enough time for dependencies to update
@@ -299,16 +296,16 @@ type GetTxFeeResponse struct {
 
 // GetTxFee returns the transaction fee in nAVAX.
 func (service *Info) GetTxFee(_ *http.Request, args *struct{}, reply *GetTxFeeResponse) error {
-	reply.TxFee = json.Uint64(service.TxFee)
-	reply.CreationTxFee = json.Uint64(service.CreateAssetTxFee)
-	reply.CreateAssetTxFee = json.Uint64(service.CreateAssetTxFee)
-	reply.CreateSubnetTxFee = json.Uint64(service.CreateSubnetTxFee)
-	reply.TransformSubnetTxFee = json.Uint64(service.TransformSubnetTxFee)
-	reply.CreateBlockchainTxFee = json.Uint64(service.CreateBlockchainTxFee)
-	reply.AddPrimaryNetworkValidatorFee = json.Uint64(service.AddPrimaryNetworkValidatorFee)
-	reply.AddPrimaryNetworkDelegatorFee = json.Uint64(service.AddPrimaryNetworkDelegatorFee)
-	reply.AddSubnetValidatorFee = json.Uint64(service.AddSubnetValidatorFee)
-	reply.AddSubnetDelegatorFee = json.Uint64(service.AddSubnetDelegatorFee)
+	reply.TxFee = json.Uint64(service.XChainTxFees.Base)
+	reply.CreationTxFee = json.Uint64(service.XChainTxFees.CreateAsset)
+	reply.CreateAssetTxFee = json.Uint64(service.XChainTxFees.CreateAsset)
+	reply.CreateSubnetTxFee = json.Uint64(service.PChainTxFees.BlueberryFees.CreateSubnet)
+	reply.TransformSubnetTxFee = json.Uint64(service.PChainTxFees.BlueberryFees.TransformSubnet)
+	reply.CreateBlockchainTxFee = json.Uint64(service.PChainTxFees.BlueberryFees.CreateChain)
+	reply.AddPrimaryNetworkValidatorFee = json.Uint64(service.PChainTxFees.BlueberryFees.AddPrimaryNetworkValidator)
+	reply.AddPrimaryNetworkDelegatorFee = json.Uint64(service.PChainTxFees.BlueberryFees.AddPrimaryNetworkDelegator)
+	reply.AddSubnetValidatorFee = json.Uint64(service.PChainTxFees.BlueberryFees.AddPOSSubnetValidator)
+	reply.AddSubnetDelegatorFee = json.Uint64(service.PChainTxFees.BlueberryFees.AddPOSSubnetDelegator)
 	return nil
 }
 

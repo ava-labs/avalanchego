@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -64,8 +65,7 @@ func (t *CreateAssetTx) SyntacticVerify(
 	ctx *snow.Context,
 	c codec.Manager,
 	txFeeAssetID ids.ID,
-	_ uint64,
-	txFee uint64,
+	txFees *config.TxFees,
 	numFxs int,
 ) error {
 	switch {
@@ -98,7 +98,7 @@ func (t *CreateAssetTx) SyntacticVerify(
 		}
 	}
 
-	if err := t.BaseTx.SyntacticVerify(ctx, c, txFeeAssetID, txFee, txFee, numFxs); err != nil {
+	if err := t.BaseTx.syntacticVerify(ctx, c, txFeeAssetID, txFees.CreateAsset, numFxs); err != nil {
 		return err
 	}
 

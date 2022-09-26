@@ -9,8 +9,10 @@ import (
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+
+	xchainconfig "github.com/ava-labs/avalanchego/vms/avm/config"
+	pchainconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
 )
 
 var (
@@ -19,16 +21,53 @@ var (
 
 	// MainnetParams are the params used for mainnet
 	MainnetParams = Params{
-		TxFees: config.TxFees{
-			TxFee:                         units.MilliAvax,
-			CreateAssetTxFee:              10 * units.MilliAvax,
-			CreateSubnetTxFee:             1 * units.Avax,
-			TransformSubnetTxFee:          1 * units.Avax,
-			CreateBlockchainTxFee:         1 * units.Avax,
-			AddPrimaryNetworkValidatorFee: 0,
-			AddPrimaryNetworkDelegatorFee: 0,
-			AddSubnetValidatorFee:         units.MilliAvax,
-			AddSubnetDelegatorFee:         units.MilliAvax,
+		PChainTxFees: pchainconfig.TxFeeUpgrades{
+			InitialFees: pchainconfig.TxFees{
+				AddPrimaryNetworkValidator: 0,
+				AddPrimaryNetworkDelegator: 0,
+				AddPOASubnetValidator:      units.MilliAvax,
+				AddPOSSubnetValidator:      units.MilliAvax, // didn't exist
+				AddPOSSubnetDelegator:      units.MilliAvax, // didn't exist
+				RemovePOASubnetValidator:   units.MilliAvax, // didn't exist
+				CreateSubnet:               10 * units.MilliAvax,
+				CreateChain:                10 * units.MilliAvax,
+				TransformSubnet:            10 * units.MilliAvax, // didn't exist
+				Import:                     units.MilliAvax,
+				Export:                     units.MilliAvax,
+			},
+			ApricotPhase3Fees: pchainconfig.TxFees{
+				AddPrimaryNetworkValidator: 0,
+				AddPrimaryNetworkDelegator: 0,
+				AddPOASubnetValidator:      units.MilliAvax,
+				AddPOSSubnetValidator:      units.MilliAvax, // didn't exist
+				AddPOSSubnetDelegator:      units.MilliAvax, // didn't exist
+				RemovePOASubnetValidator:   units.MilliAvax, // didn't exist
+				CreateSubnet:               units.Avax,
+				CreateChain:                units.Avax,
+				TransformSubnet:            units.Avax, // didn't exist
+				Import:                     units.MilliAvax,
+				Export:                     units.MilliAvax,
+			},
+			BlueberryFees: pchainconfig.TxFees{
+				AddPrimaryNetworkValidator: 0,
+				AddPrimaryNetworkDelegator: 0,
+				AddPOASubnetValidator:      100 * units.MilliAvax,
+				AddPOSSubnetValidator:      150 * units.MilliAvax,
+				AddPOSSubnetDelegator:      150 * units.MilliAvax,
+				RemovePOASubnetValidator:   50 * units.MilliAvax,
+				CreateSubnet:               10 * units.Avax,
+				CreateChain:                5 * units.Avax,
+				TransformSubnet:            100 * units.Avax,
+				Import:                     10 * units.MilliAvax,
+				Export:                     10 * units.MilliAvax,
+			},
+		},
+		XChainTxFees: xchainconfig.TxFees{
+			Base:        units.MilliAvax,
+			CreateAsset: 10 * units.MilliAvax,
+			Operation:   units.MilliAvax,
+			Import:      units.MilliAvax,
+			Export:      units.MilliAvax,
 		},
 		StakingConfig: StakingConfig{
 			UptimeRequirement: .8, // 80%

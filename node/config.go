@@ -24,7 +24,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/vms"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+
+	xchainconfig "github.com/ava-labs/avalanchego/vms/avm/config"
+	pchainconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
 )
 
 type IPCConfig struct {
@@ -138,10 +140,12 @@ type Config struct {
 	HTTPConfig      `json:"httpConfig"`
 	IPConfig        `json:"ipConfig"`
 	StakingConfig   `json:"stakingConfig"`
-	config.TxFees   `json:"txFeeConfig"`
 	StateSyncConfig `json:"stateSyncConfig"`
 	BootstrapConfig `json:"bootstrapConfig"`
 	DatabaseConfig  `json:"databaseConfig"`
+
+	PChainTxFeeConfig pchainconfig.TxFeeUpgrades `json:"pChainTxFeeConfig"`
+	XChainTxFeeConfig xchainconfig.TxFees        `json:"xChainTxFeeConfig"`
 
 	// Genesis information
 	GenesisBytes []byte `json:"-"`

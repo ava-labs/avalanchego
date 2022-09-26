@@ -72,13 +72,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
+	xchainconfig "github.com/ava-labs/avalanchego/vms/avm/config"
+	pchainconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
 )
 
 var (
@@ -771,8 +772,8 @@ func (n *Node) initVMs() error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		vmRegisterer.Register(constants.PlatformVMID, &platformvm.Factory{
-			Config: config.Config{
-				TxFees:                 n.Config.TxFees,
+			Config: pchainconfig.Config{
+				TxFeeUpgrades:          n.Config.PChainTxFeeConfig,
 				Chains:                 n.chainManager,
 				Validators:             vdrs,
 				SubnetTracker:          n.Net,
@@ -793,9 +794,10 @@ func (n *Node) initVMs() error {
 			},
 		}),
 		vmRegisterer.Register(constants.AVMID, &avm.Factory{
-			TxFee:            n.Config.TxFee,
-			CreateAssetTxFee: n.Config.CreateAssetTxFee,
-			BlueberryTime:    version.GetBlueberryTime(n.Config.NetworkID),
+			Config: xchainconfig.Config{
+				TxFees:        n.Config.XChainTxFeeConfig,
+				BlueberryTime: version.GetBlueberryTime(n.Config.NetworkID),
+			},
 		}),
 		vmRegisterer.Register(constants.EVMID, &coreth.Factory{}),
 		n.Config.VMManager.RegisterFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
@@ -961,20 +963,13 @@ func (n *Node) initInfoAPI() error {
 	primaryValidators, _ := n.vdrs.GetValidators(constants.PrimaryNetworkID)
 	service, err := info.NewService(
 		info.Parameters{
-			Version:                       version.CurrentApp,
-			NodeID:                        n.ID,
-			NodePOP:                       signer.NewProofOfPossession(n.Config.StakingSigningKey),
-			NetworkID:                     n.Config.NetworkID,
-			TxFee:                         n.Config.TxFee,
-			CreateAssetTxFee:              n.Config.CreateAssetTxFee,
-			CreateSubnetTxFee:             n.Config.CreateSubnetTxFee,
-			TransformSubnetTxFee:          n.Config.TransformSubnetTxFee,
-			CreateBlockchainTxFee:         n.Config.CreateBlockchainTxFee,
-			AddPrimaryNetworkValidatorFee: n.Config.AddPrimaryNetworkValidatorFee,
-			AddPrimaryNetworkDelegatorFee: n.Config.AddPrimaryNetworkDelegatorFee,
-			AddSubnetValidatorFee:         n.Config.AddSubnetValidatorFee,
-			AddSubnetDelegatorFee:         n.Config.AddSubnetDelegatorFee,
-			VMManager:                     n.Config.VMManager,
+			PChainTxFees: n.Config.PChainTxFeeConfig,
+			XChainTxFees: n.Config.XChainTxFeeConfig,
+			Version:      version.CurrentApp,
+			NodeID:       n.ID,
+			NodePOP:      signer.NewProofOfPossession(n.Config.StakingSigningKey),
+			NetworkID:    n.Config.NetworkID,
+			VMManager:    n.Config.VMManager,
 		},
 		n.Log,
 		n.chainManager,
