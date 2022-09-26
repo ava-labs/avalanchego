@@ -315,11 +315,46 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
-			TxFees: config.TxFees{
-				TxFee:                 defaultTxFee,
-				CreateSubnetTxFee:     100 * defaultTxFee,
-				TransformSubnetTxFee:  100 * defaultTxFee,
-				CreateBlockchainTxFee: 100 * defaultTxFee,
+			TxFeeUpgrades: config.TxFeeUpgrades{
+				InitialFees: config.TxFees{
+					AddPrimaryNetworkValidator: 0,
+					AddPrimaryNetworkDelegator: 0,
+					AddPOASubnetValidator:      defaultTxFee,
+					AddPOSSubnetValidator:      defaultTxFee,
+					AddPOSSubnetDelegator:      defaultTxFee,
+					RemovePOASubnetValidator:   defaultTxFee,
+					CreateSubnet:               0,
+					CreateChain:                0,
+					TransformSubnet:            100 * defaultTxFee,
+					Import:                     defaultTxFee,
+					Export:                     defaultTxFee,
+				},
+				ApricotPhase3Fees: config.TxFees{
+					AddPrimaryNetworkValidator: 0,
+					AddPrimaryNetworkDelegator: 0,
+					AddPOASubnetValidator:      defaultTxFee,
+					AddPOSSubnetValidator:      defaultTxFee,
+					AddPOSSubnetDelegator:      defaultTxFee,
+					RemovePOASubnetValidator:   defaultTxFee,
+					CreateSubnet:               100 * defaultTxFee,
+					CreateChain:                100 * defaultTxFee,
+					TransformSubnet:            100 * defaultTxFee,
+					Import:                     defaultTxFee,
+					Export:                     defaultTxFee,
+				},
+				BlueberryFees: config.TxFees{
+					AddPrimaryNetworkValidator: 0,
+					AddPrimaryNetworkDelegator: 0,
+					AddPOASubnetValidator:      defaultTxFee,
+					AddPOSSubnetValidator:      defaultTxFee,
+					AddPOSSubnetDelegator:      defaultTxFee,
+					RemovePOASubnetValidator:   defaultTxFee,
+					CreateSubnet:               100 * defaultTxFee,
+					CreateChain:                100 * defaultTxFee,
+					TransformSubnet:            100 * defaultTxFee,
+					Import:                     defaultTxFee,
+					Export:                     defaultTxFee,
+				},
 			},
 			Chains:                 chains.MockManager{},
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -401,8 +436,46 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
-			TxFees: config.TxFees{
-				TxFee: defaultTxFee,
+			TxFeeUpgrades: config.TxFeeUpgrades{
+				InitialFees: config.TxFees{
+					AddPrimaryNetworkValidator: 0,
+					AddPrimaryNetworkDelegator: 0,
+					AddPOASubnetValidator:      defaultTxFee,
+					AddPOSSubnetValidator:      defaultTxFee,
+					AddPOSSubnetDelegator:      defaultTxFee,
+					RemovePOASubnetValidator:   defaultTxFee,
+					CreateSubnet:               0,
+					CreateChain:                0,
+					TransformSubnet:            100 * defaultTxFee,
+					Import:                     defaultTxFee,
+					Export:                     defaultTxFee,
+				},
+				ApricotPhase3Fees: config.TxFees{
+					AddPrimaryNetworkValidator: 0,
+					AddPrimaryNetworkDelegator: 0,
+					AddPOASubnetValidator:      defaultTxFee,
+					AddPOSSubnetValidator:      defaultTxFee,
+					AddPOSSubnetDelegator:      defaultTxFee,
+					RemovePOASubnetValidator:   defaultTxFee,
+					CreateSubnet:               100 * defaultTxFee,
+					CreateChain:                100 * defaultTxFee,
+					TransformSubnet:            100 * defaultTxFee,
+					Import:                     defaultTxFee,
+					Export:                     defaultTxFee,
+				},
+				BlueberryFees: config.TxFees{
+					AddPrimaryNetworkValidator: 0,
+					AddPrimaryNetworkDelegator: 0,
+					AddPOASubnetValidator:      defaultTxFee,
+					AddPOSSubnetValidator:      defaultTxFee,
+					AddPOSSubnetDelegator:      defaultTxFee,
+					RemovePOASubnetValidator:   defaultTxFee,
+					CreateSubnet:               100 * defaultTxFee,
+					CreateChain:                100 * defaultTxFee,
+					TransformSubnet:            100 * defaultTxFee,
+					Import:                     defaultTxFee,
+					Export:                     defaultTxFee,
+				},
 			},
 			Chains:                 chains.MockManager{},
 			Validators:             validators.NewManager(),
@@ -508,19 +581,7 @@ func TestGenesis(t *testing.T) {
 		} else if out, ok := utxos[0].Out.(*secp256k1fx.TransferOutput); !ok {
 			t.Fatal("expected utxo output to be type *secp256k1fx.TransferOutput")
 		} else if out.Amount() != uint64(utxo.Amount) {
-			id := keys[0].PublicKey().Address()
-			hrp := constants.NetworkIDToHRP[testNetworkID]
-			addr, err := address.FormatBech32(hrp, id.Bytes())
-			if err != nil {
-				t.Fatal(err)
-			}
-			if utxo.Address == addr { // Address that paid tx fee to create testSubnet1 has less tokens
-				if out.Amount() != uint64(utxo.Amount)-vm.TxFee {
-					t.Fatalf("expected UTXO to have value %d but has value %d", uint64(utxo.Amount)-vm.TxFee, out.Amount())
-				}
-			} else {
-				t.Fatalf("expected UTXO to have value %d but has value %d", uint64(utxo.Amount), out.Amount())
-			}
+			t.Fatalf("expected UTXO to have value %d but has value %d", uint64(utxo.Amount), out.Amount())
 		}
 	}
 
