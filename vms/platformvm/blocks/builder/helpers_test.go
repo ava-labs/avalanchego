@@ -302,11 +302,24 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 }
 
 func defaultConfig() *config.Config {
+	baseTxFees := config.TxFees{
+		AddPrimaryNetworkValidator: 0,
+		AddPrimaryNetworkDelegator: 0,
+		AddPOASubnetValidator:      defaultTxFee,
+		AddPOSSubnetValidator:      defaultTxFee,
+		AddPOSSubnetDelegator:      defaultTxFee,
+		RemovePOASubnetValidator:   defaultTxFee,
+		CreateSubnet:               0,
+		CreateChain:                0,
+		TransformSubnet:            100 * defaultTxFee,
+		Import:                     defaultTxFee,
+		Export:                     defaultTxFee,
+	}
 	return &config.Config{
-		TxFees: config.TxFees{
-			TxFee:                 defaultTxFee,
-			CreateSubnetTxFee:     100 * defaultTxFee,
-			CreateBlockchainTxFee: 100 * defaultTxFee,
+		TxFeeUpgrades: config.TxFeeUpgrades{
+			InitialFees:       baseTxFees,
+			ApricotPhase3Fees: baseTxFees,
+			BlueberryFees:     baseTxFees,
 		},
 		Chains:                 chains.MockManager{},
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
