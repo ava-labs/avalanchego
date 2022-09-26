@@ -145,7 +145,7 @@ var _ = e2e.DescribeXChain("[WhitelistTx]", func() {
 			key2CurBalX := balances[avaxAssetID]
 			tests.Outf("{{green}}second wallet balance:{{/}} %d\n", key2CurBalX)
 
-			gomega.Expect(key1CurBalX).Should(gomega.Equal(key1PrevBalX - transferAmount - baseWallet.X().BaseTxFee()))
+			gomega.Expect(key1CurBalX).Should(gomega.Equal(key1PrevBalX - transferAmount - baseWallet.X().TxFees().Base))
 			gomega.Expect(key2CurBalX).Should(gomega.Equal(key2PrevBalX + transferAmount))
 		})
 

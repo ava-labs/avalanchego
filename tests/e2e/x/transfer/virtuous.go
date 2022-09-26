@@ -145,7 +145,7 @@ var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
 
 			amountToTransfer := senderOrigBal / 10
 
-			senderNewBal := senderOrigBal - amountToTransfer - baseWallet.X().BaseTxFee()
+			senderNewBal := senderOrigBal - amountToTransfer - baseWallet.X().TxFees().Base
 			receiverNewBal := receiverOrigBal + amountToTransfer
 
 			ginkgo.By("X-Chain transfer with wrong amount must fail", func() {
