@@ -9,9 +9,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
@@ -31,26 +29,28 @@ import (
 )
 
 func TestAcceptorVisitProposalBlock(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	blk, err := blocks.NewProposalBlock(
-		ids.GenerateTestID(),
+	lastAcceptedID := ids.GenerateTestID()
+
+	blk, err := blocks.NewApricotProposalBlock(
+		lastAcceptedID,
 		1,
 		&txs.Tx{
 			Unsigned: &txs.AddDelegatorTx{
 				// Without the line below, this function will error.
-				RewardsOwner: &secp256k1fx.OutputOwners{},
+				DelegationRewardsOwner: &secp256k1fx.OutputOwners{},
 			},
 			Creds: []verify.Verifiable{},
 		},
 	)
-	assert.NoError(err)
-
-	metrics := metrics.Metrics{}
-	err = metrics.Initialize("", prometheus.NewRegistry(), ids.Set{})
-	assert.NoError(err)
+	require.NoError(err)
 
 	blkID := blk.ID()
+
+	s := state.NewMockState(ctrl)
 	acceptor := &acceptor{
 		backend: &backend{
 			ctx: &snow.Context{
@@ -59,28 +59,30 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 			blkIDToState: map[ids.ID]*blockState{
 				blkID: {},
 			},
+			state: s,
 		},
-		metrics:          metrics,
+		metrics:          metrics.Noop,
 		recentlyAccepted: nil,
 	}
 
-	err = acceptor.ProposalBlock(blk)
-	assert.NoError(err)
+	err = acceptor.ApricotProposalBlock(blk)
+	require.NoError(err)
 
-	assert.Equal(blkID, acceptor.backend.lastAccepted)
+	require.Equal(blkID, acceptor.backend.lastAccepted)
 
 	_, exists := acceptor.GetState(blkID)
-	assert.False(exists)
+	require.False(exists)
+
+	s.EXPECT().GetLastAccepted().Return(lastAcceptedID).Times(1)
+
+	_, exists = acceptor.GetState(lastAcceptedID)
+	require.True(exists)
 }
 
 func TestAcceptorVisitAtomicBlock(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-
-	metrics := metrics.Metrics{}
-	err := metrics.Initialize("", prometheus.NewRegistry(), ids.Set{})
-	assert.NoError(err)
 
 	s := state.NewMockState(ctrl)
 	sharedMemory := atomic.NewMockSharedMemory(ctrl)
@@ -96,26 +98,26 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 				SharedMemory: sharedMemory,
 			},
 		},
-		metrics: metrics,
-		recentlyAccepted: window.New(window.Config{
+		metrics: metrics.Noop,
+		recentlyAccepted: window.New[ids.ID](window.Config{
 			Clock:   &mockable.Clock{},
 			MaxSize: 1,
 			TTL:     time.Hour,
 		}),
 	}
 
-	blk, err := blocks.NewAtomicBlock(
+	blk, err := blocks.NewApricotAtomicBlock(
 		parentID,
 		1,
 		&txs.Tx{
 			Unsigned: &txs.AddDelegatorTx{
 				// Without the line below, this function will error.
-				RewardsOwner: &secp256k1fx.OutputOwners{},
+				DelegationRewardsOwner: &secp256k1fx.OutputOwners{},
 			},
 			Creds: []verify.Verifiable{},
 		},
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Set expected calls on the state.
 	// We should error after [commonAccept] is called.
@@ -123,8 +125,8 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	s.EXPECT().SetHeight(blk.Height()).Times(1)
 	s.EXPECT().AddStatelessBlock(blk, choices.Accepted).Times(1)
 
-	err = acceptor.AtomicBlock(blk)
-	assert.Error(err, "should fail because the block isn't in the state map")
+	err = acceptor.ApricotAtomicBlock(blk)
+	require.Error(err, "should fail because the block isn't in the state map")
 
 	// Set [blk]'s state in the map as though it had been verified.
 	onAcceptState := state.NewMockDiff(ctrl)
@@ -157,18 +159,14 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	onAcceptState.EXPECT().Apply(s).Times(1)
 	sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1)
 
-	err = acceptor.AtomicBlock(blk)
-	assert.NoError(err)
+	err = acceptor.ApricotAtomicBlock(blk)
+	require.NoError(err)
 }
 
 func TestAcceptorVisitStandardBlock(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-
-	metrics := metrics.Metrics{}
-	err := metrics.Initialize("", prometheus.NewRegistry(), ids.Set{})
-	assert.NoError(err)
 
 	s := state.NewMockState(ctrl)
 	sharedMemory := atomic.NewMockSharedMemory(ctrl)
@@ -184,28 +182,28 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 				SharedMemory: sharedMemory,
 			},
 		},
-		metrics: metrics,
-		recentlyAccepted: window.New(window.Config{
+		metrics: metrics.Noop,
+		recentlyAccepted: window.New[ids.ID](window.Config{
 			Clock:   &mockable.Clock{},
 			MaxSize: 1,
 			TTL:     time.Hour,
 		}),
 	}
 
-	blk, err := blocks.NewStandardBlock(
+	blk, err := blocks.NewApricotStandardBlock(
 		parentID,
 		1,
 		[]*txs.Tx{
 			{
 				Unsigned: &txs.AddDelegatorTx{
 					// Without the line below, this function will error.
-					RewardsOwner: &secp256k1fx.OutputOwners{},
+					DelegationRewardsOwner: &secp256k1fx.OutputOwners{},
 				},
 				Creds: []verify.Verifiable{},
 			},
 		},
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Set expected calls on the state.
 	// We should error after [commonAccept] is called.
@@ -213,8 +211,8 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	s.EXPECT().SetHeight(blk.Height()).Times(1)
 	s.EXPECT().AddStatelessBlock(blk, choices.Accepted).Times(1)
 
-	err = acceptor.StandardBlock(blk)
-	assert.Error(err, "should fail because the block isn't in the state map")
+	err = acceptor.ApricotStandardBlock(blk)
+	require.Error(err, "should fail because the block isn't in the state map")
 
 	// Set [blk]'s state in the map as though it had been verified.
 	onAcceptState := state.NewMockDiff(ctrl)
@@ -251,20 +249,16 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	onAcceptState.EXPECT().Apply(s).Times(1)
 	sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1)
 
-	err = acceptor.StandardBlock(blk)
-	assert.NoError(err)
-	assert.True(calledOnAcceptFunc)
-	assert.Equal(blk.ID(), acceptor.backend.lastAccepted)
+	err = acceptor.ApricotStandardBlock(blk)
+	require.NoError(err)
+	require.True(calledOnAcceptFunc)
+	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }
 
 func TestAcceptorVisitCommitBlock(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-
-	metrics := metrics.Metrics{}
-	err := metrics.Initialize("", prometheus.NewRegistry(), ids.Set{})
-	assert.NoError(err)
 
 	s := state.NewMockState(ctrl)
 	sharedMemory := atomic.NewMockSharedMemory(ctrl)
@@ -279,25 +273,22 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 				Log:          logging.NoLog{},
 				SharedMemory: sharedMemory,
 			},
-			bootstrapped: &utils.AtomicBool{},
 		},
-		metrics: metrics,
-		recentlyAccepted: window.New(window.Config{
+		metrics: metrics.Noop,
+		recentlyAccepted: window.New[ids.ID](window.Config{
 			Clock:   &mockable.Clock{},
 			MaxSize: 1,
 			TTL:     time.Hour,
 		}),
+		bootstrapped: &utils.AtomicBool{},
 	}
 
-	blk, err := blocks.NewCommitBlock(
-		parentID,
-		1,
-	)
-	assert.NoError(err)
-	blkID := blk.ID()
+	blk, err := blocks.NewApricotCommitBlock(parentID, 1 /*height*/)
+	require.NoError(err)
 
-	err = acceptor.CommitBlock(blk)
-	assert.Error(err, "should fail because the block isn't in the state map")
+	blkID := blk.ID()
+	err = acceptor.ApricotCommitBlock(blk)
+	require.Error(err, "should fail because the block isn't in the state map")
 
 	// Set [blk]'s state in the map as though it had been verified.
 	onAcceptState := state.NewMockDiff(ctrl)
@@ -335,8 +326,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	// Set expected calls on dependencies.
 	// Make sure the parent is accepted first.
 	gomock.InOrder(
-		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1),
-		parentStatelessBlk.EXPECT().Visit(gomock.Any()).Return(nil).Times(1),
+		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(2),
 		s.EXPECT().SetLastAccepted(parentID).Times(1),
 		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
 		s.EXPECT().SetHeight(blk.Height()-1).Times(1),
@@ -350,19 +340,15 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		s.EXPECT().Commit().Return(nil).Times(1),
 	)
 
-	err = acceptor.CommitBlock(blk)
-	assert.NoError(err)
-	assert.Equal(blk.ID(), acceptor.backend.lastAccepted)
+	err = acceptor.ApricotCommitBlock(blk)
+	require.NoError(err)
+	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }
 
 func TestAcceptorVisitAbortBlock(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-
-	metrics := metrics.Metrics{}
-	err := metrics.Initialize("", prometheus.NewRegistry(), ids.Set{})
-	assert.NoError(err)
 
 	s := state.NewMockState(ctrl)
 	sharedMemory := atomic.NewMockSharedMemory(ctrl)
@@ -377,25 +363,22 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 				Log:          logging.NoLog{},
 				SharedMemory: sharedMemory,
 			},
-			bootstrapped: &utils.AtomicBool{},
 		},
-		metrics: metrics,
-		recentlyAccepted: window.New(window.Config{
+		metrics: metrics.Noop,
+		recentlyAccepted: window.New[ids.ID](window.Config{
 			Clock:   &mockable.Clock{},
 			MaxSize: 1,
 			TTL:     time.Hour,
 		}),
+		bootstrapped: &utils.AtomicBool{},
 	}
 
-	blk, err := blocks.NewAbortBlock(
-		parentID,
-		1,
-	)
-	assert.NoError(err)
-	blkID := blk.ID()
+	blk, err := blocks.NewApricotAbortBlock(parentID, 1 /*height*/)
+	require.NoError(err)
 
-	err = acceptor.AbortBlock(blk)
-	assert.Error(err, "should fail because the block isn't in the state map")
+	blkID := blk.ID()
+	err = acceptor.ApricotAbortBlock(blk)
+	require.Error(err, "should fail because the block isn't in the state map")
 
 	// Set [blk]'s state in the map as though it had been verified.
 	onAcceptState := state.NewMockDiff(ctrl)
@@ -433,8 +416,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	// Set expected calls on dependencies.
 	// Make sure the parent is accepted first.
 	gomock.InOrder(
-		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(1),
-		parentStatelessBlk.EXPECT().Visit(gomock.Any()).Return(nil).Times(1),
+		parentStatelessBlk.EXPECT().ID().Return(parentID).Times(2),
 		s.EXPECT().SetLastAccepted(parentID).Times(1),
 		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
 		s.EXPECT().SetHeight(blk.Height()-1).Times(1),
@@ -448,7 +430,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 		s.EXPECT().Commit().Return(nil).Times(1),
 	)
 
-	err = acceptor.AbortBlock(blk)
-	assert.NoError(err)
-	assert.Equal(blk.ID(), acceptor.backend.lastAccepted)
+	err = acceptor.ApricotAbortBlock(blk)
+	require.NoError(err)
+	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }

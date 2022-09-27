@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package throttling
@@ -40,7 +40,7 @@ func newInboundMsgByteThrottler(
 			nodeToVdrBytesUsed:     make(map[ids.NodeID]uint64),
 			nodeToAtLargeBytesUsed: make(map[ids.NodeID]uint64),
 		},
-		waitingToAcquire:   linkedhashmap.New(),
+		waitingToAcquire:   linkedhashmap.New[uint64, *msgMetadata](),
 		nodeToWaitingMsgID: make(map[ids.NodeID]uint64),
 	}
 	return t, t.metrics.initialize(namespace, registerer)
@@ -68,7 +68,7 @@ type inboundMsgByteThrottler struct {
 	// Node ID --> Msg ID for a message this node is waiting to acquire
 	nodeToWaitingMsgID map[ids.NodeID]uint64
 	// Msg ID --> *msgMetadata
-	waitingToAcquire linkedhashmap.LinkedHashmap
+	waitingToAcquire linkedhashmap.LinkedHashmap[uint64, *msgMetadata]
 	// Invariant: The node is only waiting on a single message at a time
 	//
 	// Invariant: waitingToAcquire.Get(nodeToWaitingMsgIDs[nodeID])
@@ -224,7 +224,7 @@ func (t *inboundMsgByteThrottler) release(metadata *msgMetadata, nodeID ids.Node
 		// waiting messages or we exhaust the bytes.
 		iter := t.waitingToAcquire.NewIterator()
 		for t.remainingAtLargeBytes > 0 && iter.Next() {
-			msg := iter.Value().(*msgMetadata)
+			msg := iter.Value()
 			// From the at-large allocation, take the maximum number of bytes
 			// without exceeding the per-node limit on taking from at-large pool.
 			atLargeBytesGiven := math.Min64(
@@ -257,10 +257,9 @@ func (t *inboundMsgByteThrottler) release(metadata *msgMetadata, nodeID ids.Node
 	// Get the message from [nodeID], if any, waiting to acquire
 	msgID, ok := t.nodeToWaitingMsgID[nodeID]
 	if vdrBytesToReturn > 0 && ok {
-		msgIntf, exists := t.waitingToAcquire.Get(msgID)
+		msg, exists := t.waitingToAcquire.Get(msgID)
 		if exists {
 			// Give [msg] all the bytes we can
-			msg := msgIntf.(*msgMetadata)
 			bytesToGive := math.Min64(msg.bytesNeeded, vdrBytesToReturn)
 			msg.bytesNeeded -= bytesToGive
 			vdrBytesToReturn -= bytesToGive

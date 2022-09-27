@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package math
@@ -136,6 +136,7 @@ func (h *averagerHeapBackend) Push(x interface{}) {
 func (h *averagerHeapBackend) Pop() interface{} {
 	newLen := len(h.entries) - 1
 	e := h.entries[newLen]
+	h.entries[newLen] = nil
 	delete(h.nodeIDToEntry, e.nodeID)
 	h.entries = h.entries[:newLen]
 	return e

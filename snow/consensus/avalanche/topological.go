@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avalanche
@@ -98,7 +98,7 @@ type Topological struct {
 
 type kahnNode struct {
 	inDegree int
-	votes    ids.BitSet
+	votes    ids.BitSet64
 }
 
 func (ta *Topological) Initialize(
@@ -143,8 +143,6 @@ func (ta *Topological) Parameters() Parameters { return ta.params }
 func (ta *Topological) IsVirtuous(tx snowstorm.Tx) bool { return ta.cg.IsVirtuous(tx) }
 
 func (ta *Topological) Add(vtx Vertex) error {
-	ta.ctx.Log.AssertTrue(vtx != nil, "Attempting to insert nil vertex")
-
 	if vtx.Status().Decided() {
 		return nil // Already decided this vertex
 	}
@@ -225,7 +223,7 @@ func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
 	// If it isn't possible to have alpha votes for any transaction, then we can
 	// just reset the confidence values in the conflict graph and not perform
 	// any traversals.
-	partialVotes := ids.BitSet(0)
+	partialVotes := ids.BitSet64(0)
 	for vote := range responses {
 		votes := responses.GetSet(vote)
 		partialVotes.Union(votes)

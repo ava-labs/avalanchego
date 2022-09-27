@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sender
@@ -11,7 +11,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -40,7 +40,7 @@ var defaultGossipConfig = GossipConfig{
 func TestTimeout(t *testing.T) {
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	benchlist := benchlist.NewNoBenchlist()
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -54,31 +54,33 @@ func TestTimeout(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
+
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
-	assert.NoError(t, err)
+	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
+	require.NoError(t, err)
+	mcProto, err := message.NewCreatorWithProto(metrics, "dummyNamespace", true, 10*time.Second)
+	require.NoError(t, err)
+
 	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	context := snow.DefaultConsensusContextTest()
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(context, mc, externalSender, &chainRouter, tm, defaultGossipConfig)
-	assert.NoError(t, err)
+	sender, err := New(context, mc, mcProto, time.Now().Add(time.Hour) /* TODO: test with blueberry accepted */, externalSender, &chainRouter, tm, defaultGossipConfig)
+	require.NoError(t, err)
 
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 	failedVDRs := ids.NodeIDSet{}
 	ctx := snow.DefaultConsensusContextTest()
 	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -88,7 +90,7 @@ func TestTimeout(t *testing.T) {
 		time.Hour,
 		resourceTracker,
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	bootstrapper := &common.BootstrapperTest{
 		BootstrapableTest: common.BootstrapableTest{
@@ -131,7 +133,7 @@ func TestTimeout(t *testing.T) {
 func TestReliableMessages(t *testing.T) {
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.NodeID{1}, 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	benchlist := benchlist.NewNoBenchlist()
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -145,29 +147,32 @@ func TestReliableMessages(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
+
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
-	assert.NoError(t, err)
+	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
+	require.NoError(t, err)
+	mcProto, err := message.NewCreatorWithProto(metrics, "dummyNamespace", true, 10*time.Second)
+	require.NoError(t, err)
+
 	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	context := snow.DefaultConsensusContextTest()
 
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(context, mc, externalSender, &chainRouter, tm, defaultGossipConfig)
-	assert.NoError(t, err)
+	sender, err := New(context, mc, mcProto, time.Now().Add(time.Hour) /* TODO: test with blueberry accepted */, externalSender, &chainRouter, tm, defaultGossipConfig)
+	require.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
 	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -177,7 +182,7 @@ func TestReliableMessages(t *testing.T) {
 		1,
 		resourceTracker,
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	bootstrapper := &common.BootstrapperTest{
 		BootstrapableTest: common.BootstrapableTest{
@@ -228,7 +233,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	benchlist := benchlist.NewNoBenchlist()
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     10 * time.Millisecond,
@@ -241,29 +246,32 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
+
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, true, "dummyNamespace", 10*time.Second)
-	assert.NoError(t, err)
+	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
+	require.NoError(t, err)
+	mcProto, err := message.NewCreatorWithProto(metrics, "dummyNamespace", true, 10*time.Second)
+	require.NoError(t, err)
+
 	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	context := snow.DefaultConsensusContextTest()
 
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(context, mc, externalSender, &chainRouter, tm, defaultGossipConfig)
-	assert.NoError(t, err)
+	sender, err := New(context, mc, mcProto, time.Now().Add(time.Hour) /* TODO: test with blueberry accepted */, externalSender, &chainRouter, tm, defaultGossipConfig)
+	require.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
 	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -273,7 +281,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		time.Second,
 		resourceTracker,
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	bootstrapper := &common.BootstrapperTest{
 		BootstrapableTest: common.BootstrapableTest{

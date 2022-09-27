@@ -1,11 +1,14 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -22,10 +25,10 @@ type builderWithOptions struct {
 // NewBuilderWithOptions returns a new transaction builder that will use the
 // given options by default.
 //
-// - [builder] is the builder that will be called to perform the underlying
-//   opterations.
-// - [options] will be provided to the builder in addition to the options
-//   provided in the method calls.
+//   - [builder] is the builder that will be called to perform the underlying
+//     opterations.
+//   - [options] will be provided to the builder in addition to the options
+//     provided in the method calls.
 func NewBuilderWithOptions(builder Builder, options ...common.Option) Builder {
 	return &builderWithOptions{
 		Builder: builder,
@@ -71,6 +74,18 @@ func (b *builderWithOptions) NewAddSubnetValidatorTx(
 ) (*txs.AddSubnetValidatorTx, error) {
 	return b.Builder.NewAddSubnetValidatorTx(
 		vdr,
+		common.UnionOptions(b.options, options)...,
+	)
+}
+
+func (b *builderWithOptions) RemoveSubnetValidatorTx(
+	nodeID ids.NodeID,
+	subnetID ids.ID,
+	options ...common.Option,
+) (*txs.RemoveSubnetValidatorTx, error) {
+	return b.Builder.NewRemoveSubnetValidatorTx(
+		nodeID,
+		subnetID,
 		common.UnionOptions(b.options, options)...,
 	)
 }
@@ -135,6 +150,76 @@ func (b *builderWithOptions) NewExportTx(
 	return b.Builder.NewExportTx(
 		chainID,
 		outputs,
+		common.UnionOptions(b.options, options)...,
+	)
+}
+
+func (b *builderWithOptions) NewTransformSubnetTx(
+	subnetID ids.ID,
+	assetID ids.ID,
+	initialSupply uint64,
+	maxSupply uint64,
+	minConsumptionRate uint64,
+	maxConsumptionRate uint64,
+	minValidatorStake uint64,
+	maxValidatorStake uint64,
+	minStakeDuration time.Duration,
+	maxStakeDuration time.Duration,
+	minDelegationFee uint32,
+	minDelegatorStake uint64,
+	maxValidatorWeightFactor byte,
+	uptimeRequirement uint32,
+	options ...common.Option,
+) (*txs.TransformSubnetTx, error) {
+	return b.Builder.NewTransformSubnetTx(
+		subnetID,
+		assetID,
+		initialSupply,
+		maxSupply,
+		minConsumptionRate,
+		maxConsumptionRate,
+		minValidatorStake,
+		maxValidatorStake,
+		minStakeDuration,
+		maxStakeDuration,
+		minDelegationFee,
+		minDelegatorStake,
+		maxValidatorWeightFactor,
+		uptimeRequirement,
+		common.UnionOptions(b.options, options)...,
+	)
+}
+
+func (b *builderWithOptions) NewAddPermissionlessValidatorTx(
+	vdr *validator.SubnetValidator,
+	signer signer.Signer,
+	assetID ids.ID,
+	validationRewardsOwner *secp256k1fx.OutputOwners,
+	delegationRewardsOwner *secp256k1fx.OutputOwners,
+	shares uint32,
+	options ...common.Option,
+) (*txs.AddPermissionlessValidatorTx, error) {
+	return b.Builder.NewAddPermissionlessValidatorTx(
+		vdr,
+		signer,
+		assetID,
+		validationRewardsOwner,
+		delegationRewardsOwner,
+		shares,
+		common.UnionOptions(b.options, options)...,
+	)
+}
+
+func (b *builderWithOptions) NewAddPermissionlessDelegatorTx(
+	vdr *validator.SubnetValidator,
+	assetID ids.ID,
+	rewardsOwner *secp256k1fx.OutputOwners,
+	options ...common.Option,
+) (*txs.AddPermissionlessDelegatorTx, error) {
+	return b.Builder.NewAddPermissionlessDelegatorTx(
+		vdr,
+		assetID,
+		rewardsOwner,
 		common.UnionOptions(b.options, options)...,
 	)
 }

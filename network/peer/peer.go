@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -339,10 +339,6 @@ func (p *peer) readMessages() {
 			)
 			return
 		}
-		if isProto {
-			p.Log.Debug("unexpected isProto=true from 'readMsgLen' (not implemented yet)")
-			return
-		}
 
 		// Wait until the throttler says we can proceed to read the message.
 		//
@@ -400,15 +396,20 @@ func (p *peer) readMessages() {
 
 		p.Log.Verbo("parsing message",
 			zap.Stringer("nodeID", p.id),
-			zap.Binary("message", msgBytes),
+			zap.Binary("messageBytes", msgBytes),
 		)
 
 		// Parse the message
-		msg, err := p.MessageCreator.Parse(msgBytes, p.id, onFinishedHandling)
+		var msg message.InboundMessage
+		if isProto {
+			msg, err = p.MessageCreatorWithProto.Parse(msgBytes, p.id, onFinishedHandling)
+		} else {
+			msg, err = p.MessageCreator.Parse(msgBytes, p.id, onFinishedHandling)
+		}
 		if err != nil {
 			p.Log.Verbo("failed to parse message",
 				zap.Stringer("nodeID", p.id),
-				zap.Binary("message", msgBytes),
+				zap.Binary("messageBytes", msgBytes),
 				zap.Error(err),
 			)
 
@@ -442,7 +443,13 @@ func (p *peer) writeMessages() {
 
 	// Make sure that the version is the first message sent
 	msg, err := p.Network.Version()
-	p.Log.AssertNoError(err)
+	if err != nil {
+		p.Log.Error("failed to create message",
+			zap.Stringer("messageOp", message.Version),
+			zap.Error(err),
+		)
+		return
+	}
 
 	p.writeMessage(writer, msg)
 
@@ -477,7 +484,7 @@ func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 	msgBytes := msg.Bytes()
 	p.Log.Verbo("sending message",
 		zap.Stringer("nodeID", p.id),
-		zap.Binary("message", msgBytes),
+		zap.Binary("messageBytes", msgBytes),
 	)
 
 	if err := p.conn.SetWriteDeadline(p.nextTimeout()); err != nil {
@@ -490,7 +497,8 @@ func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 	}
 
 	msgLen := uint32(len(msgBytes))
-	msgLenBytes, err := writeMsgLen(msgLen, false /* true to use protobufs */, constants.DefaultMaxMessageSize)
+	isProto := msg.IsProto()
+	msgLenBytes, err := writeMsgLen(msgLen, isProto, constants.DefaultMaxMessageSize)
 	if err != nil {
 		p.Log.Verbo("error writing message length",
 			zap.Stringer("nodeID", p.id),
@@ -548,8 +556,16 @@ func (p *peer) sendPings() {
 				}
 			}
 
-			p.Config.PingMessage.AddRef()
-			p.Send(p.onClosingCtx, p.Config.PingMessage)
+			pingMessage, err := p.Config.GetMessageCreator().Ping()
+			if err != nil {
+				p.Log.Error("failed to create message",
+					zap.Stringer("messageOp", message.Ping),
+					zap.Error(err),
+				)
+				return
+			}
+
+			p.Send(p.onClosingCtx, pingMessage)
 		case <-p.onClosingCtx.Done():
 			return
 		}
@@ -593,13 +609,36 @@ func (p *peer) handle(msg message.InboundMessage) {
 
 func (p *peer) handlePing(_ message.InboundMessage) {
 	msg, err := p.Network.Pong(p.id)
-	p.Log.AssertNoError(err)
+	if err != nil {
+		p.Log.Error("failed to create message",
+			zap.Stringer("messageOp", message.Pong),
+			zap.Error(err),
+		)
+		return
+	}
 	p.Send(p.onClosingCtx, msg)
 }
 
 func (p *peer) handlePong(msg message.InboundMessage) {
-	uptime := msg.Get(message.Uptime).(uint8)
+	uptimeIntf, err := msg.Get(message.Uptime)
+	if err != nil {
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.Pong),
+			zap.Stringer("field", message.Uptime),
+			zap.Error(err),
+		)
+		p.StartClose()
+		return
+	}
+
+	uptime := uptimeIntf.(uint8)
 	if uptime > 100 {
+		p.Log.Debug("dropping pong message with invalid uptime",
+			zap.Stringer("nodeID", p.id),
+			zap.Uint8("uptime", uptime),
+		)
+		p.StartClose()
 		return
 	}
 
@@ -610,13 +649,27 @@ func (p *peer) handlePong(msg message.InboundMessage) {
 
 func (p *peer) handleVersion(msg message.InboundMessage) {
 	if p.gotVersion.GetValue() {
+		// TODO: this should never happen, should we close the connection here?
 		p.Log.Verbo("dropping duplicated version message",
 			zap.Stringer("nodeID", p.id),
 		)
 		return
 	}
 
-	if peerNetworkID := msg.Get(message.NetworkID).(uint32); peerNetworkID != p.NetworkID {
+	peerNetworkIDIntf, err := msg.Get(message.NetworkID)
+	if err != nil {
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.Version),
+			zap.Stringer("field", message.NetworkID),
+			zap.Error(err),
+		)
+		p.StartClose()
+		return
+	}
+	peerNetworkID := peerNetworkIDIntf.(uint32)
+
+	if peerNetworkID != p.NetworkID {
 		p.Log.Debug("networkID mismatch",
 			zap.Stringer("nodeID", p.id),
 			zap.Uint32("peerNetworkID", peerNetworkID),
@@ -626,27 +679,51 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 		return
 	}
 
-	myTime := float64(p.Clock.Unix())
-	peerTime := float64(msg.Get(message.MyTime).(uint64))
-	if math.Abs(peerTime-myTime) > p.MaxClockDifference.Seconds() {
+	peerTimeIntf, err := msg.Get(message.MyTime)
+	if err != nil {
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.Version),
+			zap.Stringer("field", message.MyTime),
+			zap.Error(err),
+		)
+		p.StartClose()
+		return
+	}
+	peerTime := peerTimeIntf.(uint64)
+
+	myTime := p.Clock.Unix()
+	if math.Abs(float64(peerTime)-float64(myTime)) > p.MaxClockDifference.Seconds() {
 		if p.Beacons.Contains(p.id) {
 			p.Log.Warn("beacon reports out of sync time",
-				zap.Stringer("beaconID", p.id),
-				zap.Uint64("beaconTime", uint64(peerTime)),
-				zap.Uint64("ourTime", uint64(myTime)),
+				zap.Stringer("nodeID", p.id),
+				zap.Uint64("peerTime", peerTime),
+				zap.Uint64("myTime", myTime),
 			)
 		} else {
 			p.Log.Debug("peer reports out of sync time",
-				zap.Stringer("beaconID", p.id),
-				zap.Uint64("beaconTime", uint64(peerTime)),
-				zap.Uint64("ourTime", uint64(myTime)),
+				zap.Stringer("nodeID", p.id),
+				zap.Uint64("peerTime", peerTime),
+				zap.Uint64("myTime", myTime),
 			)
 		}
 		p.StartClose()
 		return
 	}
 
-	peerVersionStr := msg.Get(message.VersionStr).(string)
+	peerVersionStrIntf, err := msg.Get(message.VersionStr)
+	if err != nil {
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.Version),
+			zap.Stringer("field", message.VersionStr),
+			zap.Error(err),
+		)
+		p.StartClose()
+		return
+	}
+	peerVersionStr := peerVersionStrIntf.(string)
+
 	peerVersion, err := version.ParseApplication(peerVersionStr)
 	if err != nil {
 		p.Log.Debug("failed to parse peer version",
@@ -682,11 +759,23 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 		return
 	}
 
+	versionTimeIntf, err := msg.Get(message.VersionTime)
+	if err != nil {
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.Version),
+			zap.Stringer("field", message.VersionTime),
+			zap.Error(err),
+		)
+		p.StartClose()
+		return
+	}
+	versionTime := versionTimeIntf.(uint64)
+
 	// Note that it is expected that the [versionTime] can be in the past. We
 	// are just verifying that the claimed signing time isn't too far in the
 	// future here.
-	versionTime := msg.Get(message.VersionTime).(uint64)
-	if float64(versionTime)-myTime > p.MaxClockDifference.Seconds() {
+	if float64(versionTime)-float64(myTime) > p.MaxClockDifference.Seconds() {
 		p.Log.Debug("peer attempting to connect with version timestamp too far in the future",
 			zap.Stringer("nodeID", p.id),
 			zap.Uint64("versionTime", versionTime),
@@ -695,10 +784,20 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 		return
 	}
 
-	peerIP := msg.Get(message.IP).(ips.IPPort)
-
 	// handle subnet IDs
-	subnetIDsBytes := msg.Get(message.TrackedSubnets).([][]byte)
+	subnetIDsBytesIntf, err := msg.Get(message.TrackedSubnets)
+	if err != nil {
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.Version),
+			zap.Stringer("field", message.TrackedSubnets),
+			zap.Error(err),
+		)
+		p.StartClose()
+		return
+	}
+	subnetIDsBytes := subnetIDsBytesIntf.([][]byte)
+
 	for _, subnetIDBytes := range subnetIDsBytes {
 		subnetID, err := ids.ToID(subnetIDBytes)
 		if err != nil {
@@ -715,12 +814,38 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 		}
 	}
 
+	peerIPIntf, err := msg.Get(message.IP)
+	if err != nil {
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.Version),
+			zap.Stringer("field", message.IP),
+			zap.Error(err),
+		)
+		p.StartClose()
+		return
+	}
+	peerIP := peerIPIntf.(ips.IPPort)
+
+	signatureIntf, err := msg.Get(message.SigBytes)
+	if err != nil {
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.Version),
+			zap.Stringer("field", message.SigBytes),
+			zap.Error(err),
+		)
+		p.StartClose()
+		return
+	}
+	signature := signatureIntf.([]byte)
+
 	p.ip = &SignedIP{
 		IP: UnsignedIP{
 			IP:        peerIP,
 			Timestamp: versionTime,
 		},
-		Signature: msg.Get(message.SigBytes).([]byte),
+		Signature: signature,
 	}
 	if err := p.ip.Verify(p.cert); err != nil {
 		p.Log.Debug("signature verification failed",
@@ -734,7 +859,13 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 	p.gotVersion.SetValue(true)
 
 	peerlistMsg, err := p.Network.Peers()
-	p.Log.AssertNoError(err)
+	if err != nil {
+		p.Log.Error("failed to create message",
+			zap.Stringer("messageOp", message.PeerList),
+			zap.Error(err),
+		)
+		return
+	}
 	p.Send(p.onClosingCtx, peerlistMsg)
 }
 
@@ -749,7 +880,19 @@ func (p *peer) handlePeerList(msg message.InboundMessage) {
 		close(p.onFinishHandshake)
 	}
 
-	ips := msg.Get(message.Peers).([]ips.ClaimedIPPort)
+	ipsIntf, err := msg.Get(message.Peers)
+	if err != nil {
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.PeerList),
+			zap.Stringer("field", message.Peers),
+			zap.Error(err),
+		)
+		p.StartClose()
+		return
+	}
+	ips := ipsIntf.([]ips.ClaimedIPPort)
+
 	for _, ip := range ips {
 		if !p.Network.Track(ip) {
 			p.Metrics.NumUselessPeerListBytes.Add(float64(ip.BytesLen()))

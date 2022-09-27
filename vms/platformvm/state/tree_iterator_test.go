@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -9,13 +9,13 @@ import (
 
 	"github.com/google/btree"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
 
 func TestTreeIterator(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	stakers := []*Staker{
 		{
 			TxID:     ids.GenerateTestID(),
@@ -33,27 +33,27 @@ func TestTreeIterator(t *testing.T) {
 
 	tree := btree.New(defaultTreeDegree)
 	for _, staker := range stakers {
-		assert.Nil(tree.ReplaceOrInsert(staker))
+		require.Nil(tree.ReplaceOrInsert(staker))
 	}
 
 	it := NewTreeIterator(tree)
 	for _, staker := range stakers {
-		assert.True(it.Next())
-		assert.Equal(staker, it.Value())
+		require.True(it.Next())
+		require.Equal(staker, it.Value())
 	}
-	assert.False(it.Next())
+	require.False(it.Next())
 	it.Release()
 }
 
 func TestTreeIteratorNil(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	it := NewTreeIterator(nil)
-	assert.False(it.Next())
+	require.False(it.Next())
 	it.Release()
 }
 
 func TestTreeIteratorEarlyRelease(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	stakers := []*Staker{
 		{
 			TxID:     ids.GenerateTestID(),
@@ -71,11 +71,11 @@ func TestTreeIteratorEarlyRelease(t *testing.T) {
 
 	tree := btree.New(defaultTreeDegree)
 	for _, staker := range stakers {
-		assert.Nil(tree.ReplaceOrInsert(staker))
+		require.Nil(tree.ReplaceOrInsert(staker))
 	}
 
 	it := NewTreeIterator(tree)
-	assert.True(it.Next())
+	require.True(it.Next())
 	it.Release()
-	assert.False(it.Next())
+	require.False(it.Next())
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package mockable
@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestClockSet(t *testing.T) {
@@ -34,8 +34,8 @@ func TestClockSync(t *testing.T) {
 
 func TestClockUnixTime(t *testing.T) {
 	clock := Clock{true, time.Unix(123, 123)}
-	assert.Zero(t, clock.UnixTime().Nanosecond())
-	assert.Equal(t, 123, clock.Time().Nanosecond())
+	require.Zero(t, clock.UnixTime().Nanosecond())
+	require.Equal(t, 123, clock.Time().Nanosecond())
 }
 
 func TestClockUnix(t *testing.T) {

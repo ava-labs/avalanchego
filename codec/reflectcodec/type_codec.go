@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package reflectcodec
@@ -19,6 +19,8 @@ const (
 )
 
 var (
+	ErrMaxMarshalSliceLimitExceeded = errors.New("maximum marshal slice limit exceeded")
+
 	errMarshalNil   = errors.New("can't marshal nil pointer or interface")
 	errUnmarshalNil = errors.New("can't unmarshal nil")
 	errNeedPointer  = errors.New("argument to unmarshal must be a pointer")
@@ -138,7 +140,8 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 	case reflect.Slice:
 		numElts := value.Len() // # elements in the slice/array. 0 if this slice is nil.
 		if uint32(numElts) > maxSliceLen {
-			return fmt.Errorf("slice length, %d, exceeds maximum length, %d",
+			return fmt.Errorf("%w; slice length, %d, exceeds maximum length, %d",
+				ErrMaxMarshalSliceLimitExceeded,
 				numElts,
 				maxSliceLen)
 		}
@@ -166,7 +169,7 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 			return p.Err
 		}
 		if uint32(numElts) > c.maxSliceLen {
-			return fmt.Errorf("array length, %d, exceeds maximum length, %d", numElts, c.maxSliceLen)
+			return fmt.Errorf("%w; array length, %d, exceeds maximum length, %d", ErrMaxMarshalSliceLimitExceeded, numElts, c.maxSliceLen)
 		}
 		for i := 0; i < numElts; i++ { // Process each element in the array
 			if err := c.marshal(value.Index(i), p, c.maxSliceLen); err != nil {
@@ -277,12 +280,14 @@ func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSli
 			return fmt.Errorf("couldn't unmarshal slice: %w", p.Err)
 		}
 		if numElts32 > maxSliceLen {
-			return fmt.Errorf("array length, %d, exceeds maximum length, %d",
+			return fmt.Errorf("%w; array length, %d, exceeds maximum length, %d",
+				ErrMaxMarshalSliceLimitExceeded,
 				numElts32,
 				maxSliceLen)
 		}
 		if numElts32 > math.MaxInt32 {
-			return fmt.Errorf("array length, %d, exceeds maximum length, %d",
+			return fmt.Errorf("%w; array length, %d, exceeds maximum length, %d",
+				ErrMaxMarshalSliceLimitExceeded,
 				numElts32,
 				math.MaxInt32)
 		}

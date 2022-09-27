@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -47,8 +47,6 @@ const (
 	StateSummaryFrontier
 	GetAcceptedStateSummary
 	AcceptedStateSummary
-	// linearize dag
-	ChitsV2
 
 	// Internal messages (External messages should be added above these):
 	GetAcceptedFrontierFailed
@@ -92,7 +90,6 @@ var (
 		Ancestors,
 		Put,
 		Chits,
-		ChitsV2,
 		AppResponse,
 		StateSummaryFrontier,
 		AcceptedStateSummary,
@@ -137,7 +134,6 @@ var (
 		PushQuery,
 		PullQuery,
 		Chits,
-		ChitsV2,
 		GetAcceptedFrontierFailed,
 		GetAcceptedFailed,
 		GetAncestorsFailed,
@@ -179,23 +175,19 @@ var (
 		Ancestors:            GetAncestorsFailed,
 		Put:                  GetFailed,
 		Chits:                QueryFailed,
-		ChitsV2:              QueryFailed,
 		AppResponse:          AppRequestFailed,
 		StateSummaryFrontier: GetStateSummaryFrontierFailed,
 		AcceptedStateSummary: GetAcceptedStateSummaryFailed,
 	}
 	FailedToResponseOps = map[Op]Op{
-		GetAcceptedFrontierFailed: AcceptedFrontier,
-		GetAcceptedFailed:         Accepted,
-		GetAncestorsFailed:        Ancestors,
-		GetFailed:                 Put,
-
-		// "ChitV2" response failure also uses "Chits"
-		QueryFailed: Chits,
-
-		AppRequestFailed:              AppResponse,
 		GetStateSummaryFrontierFailed: StateSummaryFrontier,
 		GetAcceptedStateSummaryFailed: AcceptedStateSummary,
+		GetAcceptedFrontierFailed:     AcceptedFrontier,
+		GetAcceptedFailed:             Accepted,
+		GetAncestorsFailed:            Ancestors,
+		GetFailed:                     Put,
+		QueryFailed:                   Chits,
+		AppRequestFailed:              AppResponse,
 	}
 	UnrequestedOps = map[Op]struct{}{
 		GetAcceptedFrontier:     {},
@@ -231,16 +223,6 @@ var (
 		PushQuery: {ChainID, RequestID, Deadline, ContainerID, ContainerBytes},
 		PullQuery: {ChainID, RequestID, Deadline, ContainerID},
 		Chits:     {ChainID, RequestID, ContainerIDs},
-
-		// ChitV2 is used for transition from DAG to linear chain
-		// First "ContainerIDs" field represents the votes from the existing DAG
-		// Second "ContainerID" field represents the vote from newly instantiated snowman chain
-		// The message sender should populate both, and the message handler should choose "one"
-		// depending on the consensus engine it's running at the time.
-		//
-		// TODO: define a new chit message v3 with container ID as a single value
-		//       once DAG is linearized
-		ChitsV2: {ChainID, RequestID, ContainerIDs, ContainerID},
 
 		// Application level:
 		AppRequest:  {ChainID, RequestID, Deadline, AppBytes},
@@ -297,8 +279,6 @@ func (op Op) String() string {
 		return "pull_query"
 	case Chits:
 		return "chits"
-	case ChitsV2:
-		return "chits_v2"
 	case AppRequest:
 		return "app_request"
 	case AppResponse:

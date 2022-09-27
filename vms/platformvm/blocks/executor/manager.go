@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -22,6 +22,7 @@ type Manager interface {
 	// Returns the ID of the most recently accepted block.
 	LastAccepted() ids.ID
 	GetBlock(blkID ids.ID) (snowman.Block, error)
+	GetStatelessBlock(blkID ids.ID) (blocks.Block, error)
 	NewBlock(blocks.Block) snowman.Block
 }
 
@@ -30,13 +31,12 @@ func NewManager(
 	metrics metrics.Metrics,
 	s state.State,
 	txExecutorBackend *executor.Backend,
-	recentlyAccepted *window.Window,
+	recentlyAccepted window.Window[ids.ID],
 ) Manager {
 	backend := &backend{
 		Mempool:      mempool,
 		lastAccepted: s.GetLastAccepted(),
 		state:        s,
-		bootstrapped: txExecutorBackend.Bootstrapped,
 		ctx:          txExecutorBackend.Ctx,
 		blkIDToState: map[ids.ID]*blockState{},
 	}
@@ -51,6 +51,7 @@ func NewManager(
 			backend:          backend,
 			metrics:          metrics,
 			recentlyAccepted: recentlyAccepted,
+			bootstrapped:     txExecutorBackend.Bootstrapped,
 		},
 		rejector: &rejector{backend: backend},
 	}
@@ -69,6 +70,10 @@ func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {
 		return nil, err
 	}
 	return m.NewBlock(blk), nil
+}
+
+func (m *manager) GetStatelessBlock(blkID ids.ID) (blocks.Block, error) {
+	return m.backend.GetBlock(blkID)
 }
 
 func (m *manager) NewBlock(blk blocks.Block) snowman.Block {

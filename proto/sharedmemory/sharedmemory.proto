@@ -4,6 +4,12 @@ package sharedmemory;
 
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/sharedmemory";
 
+service SharedMemory {
+  rpc Get(GetRequest) returns (GetResponse);
+  rpc Indexed(IndexedRequest) returns (IndexedResponse);
+  rpc Apply(ApplyRequest) returns (ApplyResponse);
+}
+
 message BatchPut {
   bytes key = 1;
   bytes value = 2;
@@ -68,9 +74,3 @@ message ApplyRequest {
 }
 
 message ApplyResponse {}
-
-service SharedMemory {
-  rpc Get(GetRequest) returns (GetResponse);
-  rpc Indexed(IndexedRequest) returns (IndexedResponse);
-  rpc Apply(ApplyRequest) returns (ApplyResponse);
-}

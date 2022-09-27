@@ -1,0 +1,109 @@
+- name: Setup gpg key
+  apt_key:
+    url: https://downloads.avax.network/avalanchego.gpg.key
+    state: present
+
+- name: Setup avalanchego repo
+  apt_repository:
+    repo: deb https://downloads.avax.network/apt bionic main
+    state: present
+
+- name: Setup golang repo
+  apt_repository:
+    repo: ppa:longsleep/golang-backports 
+    state: present
+
+- name: Install go
+  apt:
+    name: golang
+    state: latest
+
+- name: Update git clone
+  git:
+    repo: "{{ repo_url }}"
+    dest: "{{ repo_folder }}"
+    version: "{{ tag }}"
+    update: yes
+    force: yes
+
+- name: Setup systemd
+  template:
+    src: templates/avalanchego.service.j2
+    dest: /etc/systemd/system/avalanchego.service
+    mode: 0755
+
+- name: Create avalanche user
+  user:
+    name: "{{ ava_user }}"
+    shell: /bin/bash
+    uid: 114
+    group: "{{ ava_group }}"
+
+- name: Create avalanche config dir
+  file:
+    path: /etc/avalanchego
+    owner: "{{ ava_user }}"
+    group: "{{ ava_group }}"
+    state: directory
+
+- name: Create avalanche C config dir
+  file:
+    path: /etc/avalanchego/C
+    owner: "{{ ava_user }}"
+    group: "{{ ava_group }}"
+    state: directory
+
+- name: Create avalanche log dir
+  file:
+    path: "{{ log_dir }}"
+    owner: "{{ ava_user }}"
+    group: "{{ ava_group }}"
+    state: directory
+
+- name: Create avalanche database dir
+  file:
+    path: "{{ db_dir }}"
+    owner: "{{ ava_user }}"
+    group: "{{ ava_group }}"
+    state: directory
+
+- name: Create avalanche plugins directory
+  file:
+    path: "{{ plugin_dir }}"
+    owner: "{{ ava_user }}"
+    group: "{{ ava_group }}"
+    state: directory
+    recurse: yes
+
+- name: Build avalanchego
+  command: ./scripts/build.sh
+  args:
+    chdir: "{{ repo_folder }}"
+
+- name: Copy avalanchego binaries to the correct location
+  command: cp build/avalanchego /usr/local/bin/avalanchego
+  args:
+    chdir: "{{ repo_folder }}"
+
+- name: Copy evm binaries to the correct location
+  command: cp build/plugins/evm {{ plugin_dir }}
+  args:
+    chdir: "{{ repo_folder }}"
+
+
+- name: Configure avalanche 
+  template:
+    src: templates/conf.json.j2
+    dest: /etc/avalanchego/conf.json
+    mode: 0644
+
+- name: Configure avalanche C Chain
+  template:
+    src: templates/C/config.json.j2
+    dest: /etc/avalanchego/C/config.json
+    mode: 0644
+
+- name: Enable Avalanche
+  systemd:
+    name: avalanchego
+    enabled: yes

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package router
@@ -55,7 +55,7 @@ type peer struct {
 type ChainRouter struct {
 	clock      mockable.Clock
 	log        logging.Logger
-	msgCreator message.Creator
+	msgCreator message.InternalMsgBuilder
 	lock       sync.Mutex
 	chains     map[ids.ID]handler.Handler
 
@@ -75,7 +75,7 @@ type ChainRouter struct {
 	// Parameters for doing health checks
 	healthConfig HealthConfig
 	// aggregator of requests based on their time
-	timedRequests linkedhashmap.LinkedHashmap
+	timedRequests linkedhashmap.LinkedHashmap[ids.ID, requestEntry]
 	// Must only be accessed in method [createRequestID].
 	// [lock] must be held when [requestIDBytes] is accessed.
 	requestIDBytes []byte
@@ -89,7 +89,7 @@ type ChainRouter struct {
 func (cr *ChainRouter) Initialize(
 	nodeID ids.NodeID,
 	log logging.Logger,
-	msgCreator message.Creator,
+	msgCreator message.InternalMsgBuilder,
 	timeoutManager timeout.Manager,
 	closeTimeout time.Duration,
 	criticalChains ids.Set,
@@ -107,7 +107,7 @@ func (cr *ChainRouter) Initialize(
 	cr.benched = make(map[ids.NodeID]ids.Set)
 	cr.criticalChains = criticalChains
 	cr.onFatal = onFatal
-	cr.timedRequests = linkedhashmap.New()
+	cr.timedRequests = linkedhashmap.New[ids.ID, requestEntry]()
 	cr.peers = make(map[ids.NodeID]*peer)
 	cr.healthConfig = healthConfig
 	cr.requestIDBytes = make([]byte, hashing.AddrLen+hashing.HashLen+wrappers.IntLen+wrappers.ByteLen) // Validator ID, Chain ID, Request ID, Msg Type
@@ -175,8 +175,32 @@ func (cr *ChainRouter) RegisterRequest(
 func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	nodeID := msg.NodeID()
 	op := msg.Op()
-	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
-	cr.log.AssertNoError(err)
+
+	chainIDIntf, err := msg.Get(message.ChainID)
+	if err != nil {
+		cr.log.Debug("dropping message with invalid field",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("messageOp", op),
+			zap.Stringer("field", message.ChainID),
+			zap.Error(err),
+		)
+
+		msg.OnFinishedHandling()
+		return
+	}
+	chainIDBytes := chainIDIntf.([]byte)
+	chainID, err := ids.ToID(chainIDBytes)
+	if err != nil {
+		cr.log.Debug("dropping message with invalid field",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("messageOp", op),
+			zap.Stringer("field", message.ChainID),
+			zap.Error(err),
+		)
+
+		msg.OnFinishedHandling()
+		return
+	}
 
 	// AppGossip is the only message currently not containing a requestID
 	// Here we assign the requestID already in use for gossiped containers
@@ -185,7 +209,21 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	if op == message.AppGossip {
 		requestID = constants.GossipMsgRequestID
 	} else {
-		requestID = msg.Get(message.RequestID).(uint32)
+		// Invariant: Getting a [RequestID] must never error in the handler. Any
+		//            verification performed by the message is done here.
+		requestIDIntf, err := msg.Get(message.RequestID)
+		if err != nil {
+			cr.log.Debug("dropping message with invalid field",
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("messageOp", op),
+				zap.Stringer("field", message.RequestID),
+				zap.Error(err),
+			)
+
+			msg.OnFinishedHandling()
+			return
+		}
+		requestID = requestIDIntf.(uint32)
 	}
 
 	cr.lock.Lock()
@@ -207,6 +245,8 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 
 	ctx := chain.Context()
 
+	// TODO: [requestID] can overflow, which means a timeout on the request
+	//       before the overflow may not be handled properly.
 	if _, notRequested := message.UnrequestedOps[op]; notRequested ||
 		(op == message.Put && requestID == constants.GossipMsgRequestID) {
 		if ctx.IsExecuting() {
@@ -441,7 +481,7 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 	now := cr.clock.Time()
 	processingRequest := now
 	if _, longestRunning, exists := cr.timedRequests.Oldest(); exists {
-		processingRequest = longestRunning.(requestEntry).time
+		processingRequest = longestRunning.time
 	}
 	timeReqRunning := now.Sub(processingRequest)
 	isOutstanding := timeReqRunning <= cr.healthConfig.MaxOutstandingDuration
@@ -502,25 +542,19 @@ func (cr *ChainRouter) clearRequest(
 	// Create the request ID of the request we sent that this message is (allegedly) in response to.
 	uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, op)
 	// Mark that an outstanding request has been fulfilled
-	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
+	request, exists := cr.timedRequests.Get(uniqueRequestID)
 	if !exists {
 		return uniqueRequestID, nil
 	}
 
 	cr.timedRequests.Delete(uniqueRequestID)
 	cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
-
-	request := requestIntf.(requestEntry)
 	return uniqueRequestID, &request
 }
 
 // Assumes [cr.lock] is held.
 // Assumes [message.Op] is an alias of byte.
 func (cr *ChainRouter) createRequestID(nodeID ids.NodeID, chainID ids.ID, requestID uint32, op message.Op) ids.ID {
-	// Make sure to standardize chits messages.
-	if op == message.ChitsV2 {
-		op = message.Chits
-	}
 	copy(cr.requestIDBytes, nodeID[:])
 	copy(cr.requestIDBytes[hashing.AddrLen:], chainID[:])
 	binary.BigEndian.PutUint32(cr.requestIDBytes[hashing.AddrLen+hashing.HashLen:], requestID)

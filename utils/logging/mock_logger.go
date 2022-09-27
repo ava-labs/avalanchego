@@ -34,64 +34,6 @@ func (m *MockLogger) EXPECT() *MockLoggerMockRecorder {
 	return m.recorder
 }
 
-// AssertDeferredNoError mocks base method.
-func (m *MockLogger) AssertDeferredNoError(f func() error) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "AssertDeferredNoError", f)
-}
-
-// AssertDeferredNoError indicates an expected call of AssertDeferredNoError.
-func (mr *MockLoggerMockRecorder) AssertDeferredNoError(f interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AssertDeferredNoError", reflect.TypeOf((*MockLogger)(nil).AssertDeferredNoError), f)
-}
-
-// AssertDeferredTrue mocks base method.
-func (m *MockLogger) AssertDeferredTrue(f func() bool, format string, args ...zap.Field) {
-	m.ctrl.T.Helper()
-	varargs := []interface{}{f, format}
-	for _, a := range args {
-		varargs = append(varargs, a)
-	}
-	m.ctrl.Call(m, "AssertDeferredTrue", varargs...)
-}
-
-// AssertDeferredTrue indicates an expected call of AssertDeferredTrue.
-func (mr *MockLoggerMockRecorder) AssertDeferredTrue(f, format interface{}, args ...interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{f, format}, args...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AssertDeferredTrue", reflect.TypeOf((*MockLogger)(nil).AssertDeferredTrue), varargs...)
-}
-
-// AssertNoError mocks base method.
-func (m *MockLogger) AssertNoError(err error) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "AssertNoError", err)
-}
-
-// AssertNoError indicates an expected call of AssertNoError.
-func (mr *MockLoggerMockRecorder) AssertNoError(err interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AssertNoError", reflect.TypeOf((*MockLogger)(nil).AssertNoError), err)
-}
-
-// AssertTrue mocks base method.
-func (m *MockLogger) AssertTrue(b bool, format string, args ...zap.Field) {
-	m.ctrl.T.Helper()
-	varargs := []interface{}{b, format}
-	for _, a := range args {
-		varargs = append(varargs, a)
-	}
-	m.ctrl.Call(m, "AssertTrue", varargs...)
-}
-
-// AssertTrue indicates an expected call of AssertTrue.
-func (mr *MockLoggerMockRecorder) AssertTrue(b, format interface{}, args ...interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{b, format}, args...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AssertTrue", reflect.TypeOf((*MockLogger)(nil).AssertTrue), varargs...)
-}
-
 // Debug mocks base method.
 func (m *MockLogger) Debug(format string, args ...zap.Field) {
 	m.ctrl.T.Helper()

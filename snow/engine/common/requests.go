@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
@@ -47,14 +47,17 @@ func (r *Requests) Add(vdr ids.NodeID, requestID uint32, containerID ids.ID) {
 	}
 }
 
+// Get the containerID the request is expecting and if the request exists.
+func (r *Requests) Get(vdr ids.NodeID, requestID uint32) (ids.ID, bool) {
+	containerID, ok := r.reqsToID[vdr][requestID]
+	return containerID, ok
+}
+
 // Remove attempts to abandon a requestID sent to a validator. If the request is
 // currently outstanding, the requested ID will be returned along with true. If
 // the request isn't currently outstanding, false will be returned.
 func (r *Requests) Remove(vdr ids.NodeID, requestID uint32) (ids.ID, bool) {
-	vdrReqs, ok := r.reqsToID[vdr]
-	if !ok {
-		return ids.ID{}, false
-	}
+	vdrReqs := r.reqsToID[vdr]
 	containerID, ok := vdrReqs[requestID]
 	if !ok {
 		return ids.ID{}, false

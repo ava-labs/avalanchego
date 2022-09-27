@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p
@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var _ Signer = &signer{}
+var _ Signer = &txSigner{}
 
 type Signer interface {
 	SignUnsigned(ctx stdcontext.Context, tx txs.UnsignedTx) (*txs.Tx, error)
@@ -24,24 +24,24 @@ type SignerBackend interface {
 	GetTx(ctx stdcontext.Context, txID ids.ID) (*txs.Tx, error)
 }
 
-type signer struct {
+type txSigner struct {
 	kc      *secp256k1fx.Keychain
 	backend SignerBackend
 }
 
 func NewSigner(kc *secp256k1fx.Keychain, backend SignerBackend) Signer {
-	return &signer{
+	return &txSigner{
 		kc:      kc,
 		backend: backend,
 	}
 }
 
-func (s *signer) SignUnsigned(ctx stdcontext.Context, utx txs.UnsignedTx) (*txs.Tx, error) {
+func (s *txSigner) SignUnsigned(ctx stdcontext.Context, utx txs.UnsignedTx) (*txs.Tx, error) {
 	tx := &txs.Tx{Unsigned: utx}
 	return tx, s.Sign(ctx, tx)
 }
 
-func (s *signer) Sign(ctx stdcontext.Context, tx *txs.Tx) error {
+func (s *txSigner) Sign(ctx stdcontext.Context, tx *txs.Tx) error {
 	return tx.Unsigned.Visit(&signerVisitor{
 		kc:      s.kc,
 		backend: s.backend,

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package logging
@@ -13,9 +13,8 @@ import (
 var _ Logger = &log{}
 
 type log struct {
-	assertionsEnabled bool
-	wrappedCores      []WrappedCore
-	internalLogger    *zap.Logger
+	wrappedCores   []WrappedCore
+	internalLogger *zap.Logger
 }
 
 type WrappedCore struct {
@@ -47,11 +46,10 @@ func newZapLogger(prefix string, wrappedCores ...WrappedCore) *zap.Logger {
 }
 
 // New returns a new logger set up according to [config]
-func NewLogger(assertionsEnabled bool, prefix string, wrappedCores ...WrappedCore) Logger {
+func NewLogger(prefix string, wrappedCores ...WrappedCore) Logger {
 	return &log{
-		assertionsEnabled: assertionsEnabled,
-		internalLogger:    newZapLogger(prefix, wrappedCores...),
-		wrappedCores:      wrappedCores,
+		internalLogger: newZapLogger(prefix, wrappedCores...),
+		wrappedCores:   wrappedCores,
 	}
 }
 
@@ -104,43 +102,6 @@ func (l *log) Debug(msg string, fields ...zap.Field) {
 
 func (l *log) Verbo(msg string, fields ...zap.Field) {
 	l.log(Verbo, msg, fields...)
-}
-
-func (l *log) AssertNoError(err error) {
-	if err != nil {
-		l.Fatal("assertion failed", zap.Error(err))
-	}
-	if l.assertionsEnabled && err != nil {
-		l.Stop()
-		panic(err)
-	}
-}
-
-func (l *log) AssertTrue(b bool, msg string, fields ...zap.Field) {
-	if !b {
-		l.Fatal(msg, fields...)
-	}
-	if l.assertionsEnabled && !b {
-		l.Stop()
-		panic(msg)
-	}
-}
-
-func (l *log) AssertDeferredTrue(f func() bool, msg string, fields ...zap.Field) {
-	// Note, the logger will only be notified here if assertions are enabled
-	if l.assertionsEnabled && !f() {
-		l.Fatal(msg, fields...)
-		l.Stop()
-		panic(msg)
-	}
-}
-
-func (l *log) AssertDeferredNoError(f func() error) {
-	if l.assertionsEnabled {
-		if err := f(); err != nil {
-			l.AssertNoError(err)
-		}
-	}
 }
 
 func (l *log) StopOnPanic() {

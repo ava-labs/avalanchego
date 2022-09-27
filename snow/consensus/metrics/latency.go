@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metrics
@@ -49,7 +49,7 @@ type latency struct {
 	// ProcessingEntries keeps track of the [opStart] that each item was issued
 	// into the consensus instance. This is used to calculate the amount of time
 	// to accept or reject the item.
-	processingEntries linkedhashmap.LinkedHashmap
+	processingEntries linkedhashmap.LinkedHashmap[ids.ID, opStart]
 
 	// log reports anomalous events.
 	log logging.Logger
@@ -78,7 +78,7 @@ type latency struct {
 func NewLatency(metricName, descriptionName string, log logging.Logger, namespace string, reg prometheus.Registerer) (Latency, error) {
 	errs := wrappers.Errs{}
 	l := &latency{
-		processingEntries: linkedhashmap.New(),
+		processingEntries: linkedhashmap.New[ids.ID, opStart](),
 		log:               log,
 		numProcessing: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
@@ -127,7 +127,7 @@ func (l *latency) Issued(id ids.ID, pollNumber uint64) {
 }
 
 func (l *latency) Accepted(id ids.ID, pollNumber uint64) {
-	startIntf, ok := l.processingEntries.Get(id)
+	start, ok := l.processingEntries.Get(id)
 	if !ok {
 		l.log.Debug("unable to measure tx latency",
 			zap.Stringer("status", choices.Accepted),
@@ -137,8 +137,6 @@ func (l *latency) Accepted(id ids.ID, pollNumber uint64) {
 	}
 	l.processingEntries.Delete(id)
 
-	start := startIntf.(opStart)
-
 	l.pollsAccepted.Observe(float64(pollNumber - start.pollNumber))
 
 	duration := time.Since(start.time)
@@ -147,7 +145,7 @@ func (l *latency) Accepted(id ids.ID, pollNumber uint64) {
 }
 
 func (l *latency) Rejected(id ids.ID, pollNumber uint64) {
-	startIntf, ok := l.processingEntries.Get(id)
+	start, ok := l.processingEntries.Get(id)
 	if !ok {
 		l.log.Debug("unable to measure tx latency",
 			zap.Stringer("status", choices.Rejected),
@@ -157,8 +155,6 @@ func (l *latency) Rejected(id ids.ID, pollNumber uint64) {
 	}
 	l.processingEntries.Delete(id)
 
-	start := startIntf.(opStart)
-
 	l.pollsRejected.Observe(float64(pollNumber - start.pollNumber))
 
 	duration := time.Since(start.time)
@@ -167,12 +163,11 @@ func (l *latency) Rejected(id ids.ID, pollNumber uint64) {
 }
 
 func (l *latency) MeasureAndGetOldestDuration() time.Duration {
-	_, oldestTimeIntf, exists := l.processingEntries.Oldest()
+	_, oldestOp, exists := l.processingEntries.Oldest()
 	if !exists {
 		return 0
 	}
-	oldestTime := oldestTimeIntf.(opStart).time
-	return time.Since(oldestTime)
+	return time.Since(oldestOp.time)
 }
 
 func (l *latency) NumProcessing() int {

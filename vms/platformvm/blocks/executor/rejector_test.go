@@ -8,9 +8,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -18,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -36,52 +33,52 @@ func TestRejectBlock(t *testing.T) {
 		{
 			name: "proposal block",
 			newBlockFunc: func() (blocks.Block, error) {
-				return blocks.NewProposalBlock(
+				return blocks.NewApricotProposalBlock(
 					ids.GenerateTestID(),
 					1,
 					&txs.Tx{
 						Unsigned: &txs.AddDelegatorTx{
 							// Without the line below, this function will error.
-							RewardsOwner: &secp256k1fx.OutputOwners{},
+							DelegationRewardsOwner: &secp256k1fx.OutputOwners{},
 						},
 						Creds: []verify.Verifiable{},
 					},
 				)
 			},
 			rejectFunc: func(r *rejector, b blocks.Block) error {
-				return r.ProposalBlock(b.(*blocks.ProposalBlock))
+				return r.ApricotProposalBlock(b.(*blocks.ApricotProposalBlock))
 			},
 		},
 		{
 			name: "atomic block",
 			newBlockFunc: func() (blocks.Block, error) {
-				return blocks.NewAtomicBlock(
+				return blocks.NewApricotAtomicBlock(
 					ids.GenerateTestID(),
 					1,
 					&txs.Tx{
 						Unsigned: &txs.AddDelegatorTx{
 							// Without the line below, this function will error.
-							RewardsOwner: &secp256k1fx.OutputOwners{},
+							DelegationRewardsOwner: &secp256k1fx.OutputOwners{},
 						},
 						Creds: []verify.Verifiable{},
 					},
 				)
 			},
 			rejectFunc: func(r *rejector, b blocks.Block) error {
-				return r.AtomicBlock(b.(*blocks.AtomicBlock))
+				return r.ApricotAtomicBlock(b.(*blocks.ApricotAtomicBlock))
 			},
 		},
 		{
 			name: "standard block",
 			newBlockFunc: func() (blocks.Block, error) {
-				return blocks.NewStandardBlock(
+				return blocks.NewApricotStandardBlock(
 					ids.GenerateTestID(),
 					1,
 					[]*txs.Tx{
 						{
 							Unsigned: &txs.AddDelegatorTx{
 								// Without the line below, this function will error.
-								RewardsOwner: &secp256k1fx.OutputOwners{},
+								DelegationRewardsOwner: &secp256k1fx.OutputOwners{},
 							},
 							Creds: []verify.Verifiable{},
 						},
@@ -89,47 +86,37 @@ func TestRejectBlock(t *testing.T) {
 				)
 			},
 			rejectFunc: func(r *rejector, b blocks.Block) error {
-				return r.StandardBlock(b.(*blocks.StandardBlock))
+				return r.ApricotStandardBlock(b.(*blocks.ApricotStandardBlock))
 			},
 		},
 		{
 			name: "commit",
 			newBlockFunc: func() (blocks.Block, error) {
-				return blocks.NewCommitBlock(
-					ids.GenerateTestID(),
-					1,
-				)
+				return blocks.NewApricotCommitBlock(ids.GenerateTestID() /*parent*/, 1 /*height*/)
 			},
 			rejectFunc: func(r *rejector, blk blocks.Block) error {
-				return r.CommitBlock(blk.(*blocks.CommitBlock))
+				return r.ApricotCommitBlock(blk.(*blocks.ApricotCommitBlock))
 			},
 		},
 		{
 			name: "abort",
 			newBlockFunc: func() (blocks.Block, error) {
-				return blocks.NewAbortBlock(
-					ids.GenerateTestID(),
-					1,
-				)
+				return blocks.NewApricotAbortBlock(ids.GenerateTestID() /*parent*/, 1 /*height*/)
 			},
 			rejectFunc: func(r *rejector, blk blocks.Block) error {
-				return r.AbortBlock(blk.(*blocks.AbortBlock))
+				return r.ApricotAbortBlock(blk.(*blocks.ApricotAbortBlock))
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
 			blk, err := tt.newBlockFunc()
-			assert.NoError(err)
-
-			metrics := metrics.Metrics{}
-			err = metrics.Initialize("", prometheus.NewRegistry(), ids.Set{})
-			assert.NoError(err)
+			require.NoError(err)
 
 			mempool := mempool.NewMockMempool(ctrl)
 			state := state.NewMockState(ctrl)
@@ -158,9 +145,9 @@ func TestRejectBlock(t *testing.T) {
 			)
 
 			err = tt.rejectFunc(rejector, blk)
-			assert.NoError(err)
+			require.NoError(err)
 			// Make sure block and its parent are removed from the state map.
-			assert.NotContains(rejector.blkIDToState, blk.ID())
+			require.NotContains(rejector.blkIDToState, blk.ID())
 		})
 	}
 }

@@ -1,12 +1,13 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blocks
 
 import (
 	"testing"
+	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
@@ -18,148 +19,237 @@ import (
 
 var preFundedKeys = crypto.BuildTestKeys()
 
-func TestStandardBlock(t *testing.T) {
-	// check standard block can be built and parsed
-	assert := assert.New(t)
+func TestStandardBlocks(t *testing.T) {
+	// check Apricot standard block can be built and parsed
+	require := require.New(t)
+	blkTimestamp := time.Now()
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
 	height := uint64(2022)
 	txs, err := testDecisionTxs()
-	assert.NoError(err)
+	require.NoError(err)
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
-		standardBlk, err := NewStandardBlock(
-			parentID,
-			height,
-			txs,
-		)
-		assert.NoError(err)
+		apricotStandardBlk, err := NewApricotStandardBlock(parentID, height, txs)
+		require.NoError(err)
 
 		// parse block
-		parsed, err := Parse(cdc, standardBlk.Bytes())
-		assert.NoError(err)
+		parsed, err := Parse(cdc, apricotStandardBlk.Bytes())
+		require.NoError(err)
 
 		// compare content
-		assert.Equal(standardBlk.ID(), parsed.ID())
-		assert.Equal(standardBlk.Bytes(), parsed.Bytes())
-		assert.Equal(standardBlk.Parent(), parsed.Parent())
-		assert.Equal(standardBlk.Height(), parsed.Height())
+		require.Equal(apricotStandardBlk.ID(), parsed.ID())
+		require.Equal(apricotStandardBlk.Bytes(), parsed.Bytes())
+		require.Equal(apricotStandardBlk.Parent(), parsed.Parent())
+		require.Equal(apricotStandardBlk.Height(), parsed.Height())
 
-		parsedStandardBlk, ok := parsed.(*StandardBlock)
-		assert.True(ok)
-		assert.Equal(txs, parsedStandardBlk.Transactions)
+		_, ok := parsed.(*ApricotStandardBlock)
+		require.True(ok)
+		require.Equal(txs, parsed.Txs())
+
+		// check that blueberry standard block can be built and parsed
+		blueberryStandardBlk, err := NewBlueberryStandardBlock(blkTimestamp, parentID, height, txs)
+		require.NoError(err)
+
+		// parse block
+		parsed, err = Parse(cdc, blueberryStandardBlk.Bytes())
+		require.NoError(err)
+
+		// compare content
+		require.Equal(blueberryStandardBlk.ID(), parsed.ID())
+		require.Equal(blueberryStandardBlk.Bytes(), parsed.Bytes())
+		require.Equal(blueberryStandardBlk.Parent(), parsed.Parent())
+		require.Equal(blueberryStandardBlk.Height(), parsed.Height())
+		parsedBlueberryStandardBlk, ok := parsed.(*BlueberryStandardBlock)
+		require.True(ok)
+		require.Equal(txs, parsedBlueberryStandardBlk.Txs())
+
+		// timestamp check for blueberry blocks only
+		require.Equal(blueberryStandardBlk.Timestamp(), parsedBlueberryStandardBlk.Timestamp())
+
+		// backward compatibility check
+		require.Equal(parsed.Txs(), parsedBlueberryStandardBlk.Txs())
 	}
 }
 
-func TestProposalBlock(t *testing.T) {
-	// check proposal block can be built and parsed
-	assert := assert.New(t)
+func TestProposalBlocks(t *testing.T) {
+	// check Apricot proposal block can be built and parsed
+	require := require.New(t)
+	blkTimestamp := time.Now()
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
 	height := uint64(2022)
 	tx, err := testProposalTx()
-	assert.NoError(err)
+	require.NoError(err)
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
-		proposalBlk, err := NewProposalBlock(
+		apricotProposalBlk, err := NewApricotProposalBlock(
 			parentID,
 			height,
 			tx,
 		)
-		assert.NoError(err)
+		require.NoError(err)
 
 		// parse block
-		parsed, err := Parse(cdc, proposalBlk.Bytes())
-		assert.NoError(err)
+		parsed, err := Parse(cdc, apricotProposalBlk.Bytes())
+		require.NoError(err)
 
 		// compare content
-		assert.Equal(proposalBlk.ID(), parsed.ID())
-		assert.Equal(proposalBlk.Bytes(), parsed.Bytes())
-		assert.Equal(proposalBlk.Parent(), parsed.Parent())
-		assert.Equal(proposalBlk.Height(), parsed.Height())
+		require.Equal(apricotProposalBlk.ID(), parsed.ID())
+		require.Equal(apricotProposalBlk.Bytes(), parsed.Bytes())
+		require.Equal(apricotProposalBlk.Parent(), parsed.Parent())
+		require.Equal(apricotProposalBlk.Height(), parsed.Height())
 
-		parsedProposalBlk, ok := parsed.(*ProposalBlock)
-		assert.True(ok)
-		assert.Equal(tx, parsedProposalBlk.Tx)
+		parsedApricotProposalBlk, ok := parsed.(*ApricotProposalBlock)
+		require.True(ok)
+		require.Equal([]*txs.Tx{tx}, parsedApricotProposalBlk.Txs())
+
+		// check that blueberry proposal block can be built and parsed
+		blueberryProposalBlk, err := NewBlueberryProposalBlock(
+			blkTimestamp,
+			parentID,
+			height,
+			tx,
+		)
+		require.NoError(err)
+
+		// parse block
+		parsed, err = Parse(cdc, blueberryProposalBlk.Bytes())
+		require.NoError(err)
+
+		// compare content
+		require.Equal(blueberryProposalBlk.ID(), parsed.ID())
+		require.Equal(blueberryProposalBlk.Bytes(), parsed.Bytes())
+		require.Equal(blueberryProposalBlk.Parent(), blueberryProposalBlk.Parent())
+		require.Equal(blueberryProposalBlk.Height(), parsed.Height())
+		parsedBlueberryProposalBlk, ok := parsed.(*BlueberryProposalBlock)
+		require.True(ok)
+		require.Equal([]*txs.Tx{tx}, parsedBlueberryProposalBlk.Txs())
+
+		// timestamp check for blueberry blocks only
+		require.Equal(blueberryProposalBlk.Timestamp(), parsedBlueberryProposalBlk.Timestamp())
+
+		// backward compatibility check
+		require.Equal(parsedApricotProposalBlk.Txs(), parsedBlueberryProposalBlk.Txs())
 	}
 }
 
 func TestCommitBlock(t *testing.T) {
-	// check commit block can be built and parsed
-	assert := assert.New(t)
+	// check Apricot commit block can be built and parsed
+	require := require.New(t)
+	blkTimestamp := time.Now()
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
 	height := uint64(2022)
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
-		commitBlk, err := NewCommitBlock(parentID, height)
-		assert.NoError(err)
+		apricotCommitBlk, err := NewApricotCommitBlock(parentID, height)
+		require.NoError(err)
 
 		// parse block
-		parsed, err := Parse(cdc, commitBlk.Bytes())
-		assert.NoError(err)
+		parsed, err := Parse(cdc, apricotCommitBlk.Bytes())
+		require.NoError(err)
 
 		// compare content
-		assert.Equal(commitBlk.ID(), parsed.ID())
-		assert.Equal(commitBlk.Bytes(), parsed.Bytes())
-		assert.Equal(commitBlk.Parent(), parsed.Parent())
-		assert.Equal(commitBlk.Height(), parsed.Height())
+		require.Equal(apricotCommitBlk.ID(), parsed.ID())
+		require.Equal(apricotCommitBlk.Bytes(), parsed.Bytes())
+		require.Equal(apricotCommitBlk.Parent(), parsed.Parent())
+		require.Equal(apricotCommitBlk.Height(), parsed.Height())
+
+		// check that blueberry commit block can be built and parsed
+		blueberryCommitBlk, err := NewBlueberryCommitBlock(blkTimestamp, parentID, height)
+		require.NoError(err)
+
+		// parse block
+		parsed, err = Parse(cdc, blueberryCommitBlk.Bytes())
+		require.NoError(err)
+
+		// compare content
+		require.Equal(blueberryCommitBlk.ID(), parsed.ID())
+		require.Equal(blueberryCommitBlk.Bytes(), parsed.Bytes())
+		require.Equal(blueberryCommitBlk.Parent(), blueberryCommitBlk.Parent())
+		require.Equal(blueberryCommitBlk.Height(), parsed.Height())
+
+		// timestamp check for blueberry blocks only
+		parsedBlueberryCommitBlk, ok := parsed.(*BlueberryCommitBlock)
+		require.True(ok)
+		require.Equal(blueberryCommitBlk.Timestamp(), parsedBlueberryCommitBlk.Timestamp())
 	}
 }
 
 func TestAbortBlock(t *testing.T) {
-	// check abort block can be built and parsed
-	assert := assert.New(t)
+	// check Apricot abort block can be built and parsed
+	require := require.New(t)
+	blkTimestamp := time.Now()
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
 	height := uint64(2022)
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
-		abortBlk, err := NewAbortBlock(parentID, height)
-		assert.NoError(err)
+		apricotAbortBlk, err := NewApricotAbortBlock(parentID, height)
+		require.NoError(err)
 
 		// parse block
-		parsed, err := Parse(cdc, abortBlk.Bytes())
-		assert.NoError(err)
+		parsed, err := Parse(cdc, apricotAbortBlk.Bytes())
+		require.NoError(err)
 
 		// compare content
-		assert.Equal(abortBlk.ID(), parsed.ID())
-		assert.Equal(abortBlk.Bytes(), parsed.Bytes())
-		assert.Equal(abortBlk.Parent(), parsed.Parent())
-		assert.Equal(abortBlk.Height(), parsed.Height())
+		require.Equal(apricotAbortBlk.ID(), parsed.ID())
+		require.Equal(apricotAbortBlk.Bytes(), parsed.Bytes())
+		require.Equal(apricotAbortBlk.Parent(), parsed.Parent())
+		require.Equal(apricotAbortBlk.Height(), parsed.Height())
+
+		// check that blueberry abort block can be built and parsed
+		blueberryAbortBlk, err := NewBlueberryAbortBlock(blkTimestamp, parentID, height)
+		require.NoError(err)
+
+		// parse block
+		parsed, err = Parse(cdc, blueberryAbortBlk.Bytes())
+		require.NoError(err)
+
+		// compare content
+		require.Equal(blueberryAbortBlk.ID(), parsed.ID())
+		require.Equal(blueberryAbortBlk.Bytes(), parsed.Bytes())
+		require.Equal(blueberryAbortBlk.Parent(), blueberryAbortBlk.Parent())
+		require.Equal(blueberryAbortBlk.Height(), parsed.Height())
+
+		// timestamp check for blueberry blocks only
+		parsedBlueberryAbortBlk, ok := parsed.(*BlueberryAbortBlock)
+		require.True(ok)
+		require.Equal(blueberryAbortBlk.Timestamp(), parsedBlueberryAbortBlk.Timestamp())
 	}
 }
 
 func TestAtomicBlock(t *testing.T) {
 	// check atomic block can be built and parsed
-	assert := assert.New(t)
+	require := require.New(t)
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
 	height := uint64(2022)
 	tx, err := testAtomicTx()
-	assert.NoError(err)
+	require.NoError(err)
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
 		// build block
-		atomicBlk, err := NewAtomicBlock(
+		atomicBlk, err := NewApricotAtomicBlock(
 			parentID,
 			height,
 			tx,
 		)
-		assert.NoError(err)
+		require.NoError(err)
 
 		// parse block
 		parsed, err := Parse(cdc, atomicBlk.Bytes())
-		assert.NoError(err)
+		require.NoError(err)
 
 		// compare content
-		assert.Equal(atomicBlk.ID(), parsed.ID())
-		assert.Equal(atomicBlk.Bytes(), parsed.Bytes())
-		assert.Equal(atomicBlk.Parent(), parsed.Parent())
-		assert.Equal(atomicBlk.Height(), parsed.Height())
+		require.Equal(atomicBlk.ID(), parsed.ID())
+		require.Equal(atomicBlk.Bytes(), parsed.Bytes())
+		require.Equal(atomicBlk.Parent(), parsed.Parent())
+		require.Equal(atomicBlk.Height(), parsed.Height())
 
-		parsedAtomicBlk, ok := parsed.(*AtomicBlock)
-		assert.True(ok)
-		assert.Equal(tx, parsedAtomicBlk.Tx)
+		parsedAtomicBlk, ok := parsed.(*ApricotAtomicBlock)
+		require.True(ok)
+		require.Equal([]*txs.Tx{tx}, parsedAtomicBlk.Txs())
 	}
 }
 
@@ -210,7 +300,7 @@ func testAtomicTx() (*txs.Tx, error) {
 
 func testDecisionTxs() ([]*txs.Tx, error) {
 	countTxs := 2
-	txes := make([]*txs.Tx, 0, countTxs)
+	decisionTxs := make([]*txs.Tx, 0, countTxs)
 	for i := 0; i < countTxs; i++ {
 		// Create the tx
 		utx := &txs.CreateChainTx{
@@ -253,9 +343,9 @@ func testDecisionTxs() ([]*txs.Tx, error) {
 		if err != nil {
 			return nil, err
 		}
-		txes = append(txes, tx)
+		decisionTxs = append(decisionTxs, tx)
 	}
-	return txes, nil
+	return decisionTxs, nil
 }
 
 func testProposalTx() (*txs.Tx, error) {

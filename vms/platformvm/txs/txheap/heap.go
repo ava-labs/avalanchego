@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txheap
@@ -111,6 +111,7 @@ func (h *txHeap) Push(x interface{}) {
 func (h *txHeap) Pop() interface{} {
 	newLen := len(h.txs) - 1
 	htx := h.txs[newLen]
+	h.txs[newLen] = nil
 	h.txs = h.txs[:newLen]
 
 	tx := htx.tx

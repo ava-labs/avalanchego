@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -7,13 +7,14 @@ import (
 	"context"
 	"crypto"
 	"crypto/x509"
+	"fmt"
 	"net"
 	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -43,61 +44,68 @@ type rawTestPeer struct {
 	inboundMsgChan <-chan message.InboundMessage
 }
 
-func newMessageCreator(t *testing.T) message.Creator {
+func newMessageCreator(t *testing.T) (message.Creator, message.Creator) {
 	t.Helper()
+
 	mc, err := message.NewCreator(
 		prometheus.NewRegistry(),
-		true,
 		"",
+		true,
 		10*time.Second,
 	)
-	assert.NoError(t, err)
-	return mc
+	require.NoError(t, err)
+
+	mcProto, err := message.NewCreatorWithProto(
+		prometheus.NewRegistry(),
+		"",
+		true,
+		10*time.Second,
+	)
+	require.NoError(t, err)
+
+	return mc, mcProto
 }
 
 func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 	t.Helper()
-	assert := assert.New(t)
+	require := require.New(t)
 
 	conn0, conn1 := net.Pipe()
 
 	tlsCert0, err := staking.NewTLSCert()
-	assert.NoError(err)
+	require.NoError(err)
 
 	tlsCert1, err := staking.NewTLSCert()
-	assert.NoError(err)
+	require.NoError(err)
 
 	nodeID0 := ids.NodeIDFromCert(tlsCert0.Leaf)
 	nodeID1 := ids.NodeIDFromCert(tlsCert1.Leaf)
 
-	mc := newMessageCreator(t)
-
-	pingMessage, err := mc.Ping()
-	assert.NoError(err)
+	mc, mcProto := newMessageCreator(t)
 
 	metrics, err := NewMetrics(
 		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
 	)
-	assert.NoError(err)
+	require.NoError(err)
 
 	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, 10*time.Second)
-	assert.NoError(err)
+	require.NoError(err)
 	sharedConfig := Config{
-		Metrics:              metrics,
-		MessageCreator:       mc,
-		Log:                  logging.NoLog{},
-		InboundMsgThrottler:  throttling.NewNoInboundThrottler(),
-		VersionCompatibility: version.GetCompatibility(constants.LocalID),
-		MySubnets:            ids.Set{},
-		Beacons:              validators.NewSet(),
-		NetworkID:            constants.LocalID,
-		PingFrequency:        constants.DefaultPingFrequency,
-		PongTimeout:          constants.DefaultPingPongTimeout,
-		MaxClockDifference:   time.Minute,
-		ResourceTracker:      resourceTracker,
-		PingMessage:          pingMessage,
+		Metrics:                 metrics,
+		MessageCreator:          mc,
+		MessageCreatorWithProto: mcProto,
+		Log:                     logging.NoLog{},
+		InboundMsgThrottler:     throttling.NewNoInboundThrottler(),
+		VersionCompatibility:    version.GetCompatibility(constants.LocalID),
+		MySubnets:               ids.Set{},
+		Beacons:                 validators.NewSet(),
+		NetworkID:               constants.LocalID,
+		PingFrequency:           constants.DefaultPingFrequency,
+		PongTimeout:             constants.DefaultPingPongTimeout,
+		MaxClockDifference:      time.Minute,
+		ResourceTracker:         resourceTracker,
 	}
 	peerConfig0 := sharedConfig
 	peerConfig1 := sharedConfig
@@ -195,92 +203,102 @@ func makeTestPeers(t *testing.T) (*testPeer, *testPeer) {
 
 func makeReadyTestPeers(t *testing.T) (*testPeer, *testPeer) {
 	t.Helper()
-	assert := assert.New(t)
+	require := require.New(t)
 
 	peer0, peer1 := makeTestPeers(t)
 
 	err := peer0.AwaitReady(context.Background())
-	assert.NoError(err)
+	require.NoError(err)
 	isReady := peer0.Ready()
-	assert.True(isReady)
+	require.True(isReady)
 
 	err = peer1.AwaitReady(context.Background())
-	assert.NoError(err)
+	require.NoError(err)
 	isReady = peer1.Ready()
-	assert.True(isReady)
+	require.True(isReady)
 
 	return peer0, peer1
 }
 
 func TestReady(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
-	rawPeer0, rawPeer1 := makeRawTestPeers(t)
+	// TODO: once "NewNetwork" handles proto, add "true"
+	for _, useProto := range []bool{false} {
+		t.Run(fmt.Sprintf("use proto buf message creator %v", useProto), func(tt *testing.T) {
+			rawPeer0, rawPeer1 := makeRawTestPeers(tt)
 
-	peer0 := Start(
-		rawPeer0.config,
-		rawPeer0.conn,
-		rawPeer1.cert,
-		rawPeer1.nodeID,
-		NewThrottledMessageQueue(
-			rawPeer0.config.Metrics,
-			rawPeer1.nodeID,
-			logging.NoLog{},
-			throttling.NewNoOutboundThrottler(),
-		),
-	)
+			peer0 := Start(
+				rawPeer0.config,
+				rawPeer0.conn,
+				rawPeer1.cert,
+				rawPeer1.nodeID,
+				NewThrottledMessageQueue(
+					rawPeer0.config.Metrics,
+					rawPeer1.nodeID,
+					logging.NoLog{},
+					throttling.NewNoOutboundThrottler(),
+				),
+			)
 
-	isReady := peer0.Ready()
-	assert.False(isReady)
+			isReady := peer0.Ready()
+			require.False(isReady)
 
-	peer1 := Start(
-		rawPeer1.config,
-		rawPeer1.conn,
-		rawPeer0.cert,
-		rawPeer0.nodeID,
-		NewThrottledMessageQueue(
-			rawPeer1.config.Metrics,
-			rawPeer0.nodeID,
-			logging.NoLog{},
-			throttling.NewNoOutboundThrottler(),
-		),
-	)
+			peer1 := Start(
+				rawPeer1.config,
+				rawPeer1.conn,
+				rawPeer0.cert,
+				rawPeer0.nodeID,
+				NewThrottledMessageQueue(
+					rawPeer1.config.Metrics,
+					rawPeer0.nodeID,
+					logging.NoLog{},
+					throttling.NewNoOutboundThrottler(),
+				),
+			)
 
-	err := peer0.AwaitReady(context.Background())
-	assert.NoError(err)
-	isReady = peer0.Ready()
-	assert.True(isReady)
+			err := peer0.AwaitReady(context.Background())
+			require.NoError(err)
+			isReady = peer0.Ready()
+			require.True(isReady)
 
-	err = peer1.AwaitReady(context.Background())
-	assert.NoError(err)
-	isReady = peer1.Ready()
-	assert.True(isReady)
+			err = peer1.AwaitReady(context.Background())
+			require.NoError(err)
+			isReady = peer1.Ready()
+			require.True(isReady)
 
-	peer0.StartClose()
-	err = peer0.AwaitClosed(context.Background())
-	assert.NoError(err)
-	err = peer1.AwaitClosed(context.Background())
-	assert.NoError(err)
+			peer0.StartClose()
+			err = peer0.AwaitClosed(context.Background())
+			require.NoError(err)
+			err = peer1.AwaitClosed(context.Background())
+			require.NoError(err)
+		})
+	}
 }
 
 func TestSend(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
-	peer0, peer1 := makeReadyTestPeers(t)
-	mc := newMessageCreator(t)
+	// TODO: add "true" to test proto
+	for _, useProto := range []bool{false} {
+		t.Run(fmt.Sprintf("use proto buf message creator %v", useProto), func(tt *testing.T) {
+			peer0, peer1 := makeReadyTestPeers(tt)
+			mc, _ := newMessageCreator(t)
 
-	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
-	assert.NoError(err)
+			outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
+			require.NoError(err)
 
-	sent := peer0.Send(context.Background(), outboundGetMsg)
-	assert.True(sent)
+			sent := peer0.Send(context.Background(), outboundGetMsg)
+			require.True(sent)
 
-	inboundGetMsg := <-peer1.inboundMsgChan
-	assert.Equal(message.Get, inboundGetMsg.Op())
+			inboundGetMsg := <-peer1.inboundMsgChan
+			require.Equal(message.Get, inboundGetMsg.Op())
 
-	peer1.StartClose()
-	err = peer0.AwaitClosed(context.Background())
-	assert.NoError(err)
-	err = peer1.AwaitClosed(context.Background())
-	assert.NoError(err)
+			peer1.StartClose()
+			err = peer0.AwaitClosed(context.Background())
+			require.NoError(err)
+			err = peer1.AwaitClosed(context.Background())
+			require.NoError(err)
+		})
+	}
 }

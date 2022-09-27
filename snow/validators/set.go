@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package validators
@@ -361,6 +361,7 @@ func (s *set) remove(vdrID ids.NodeID) error {
 
 	// Remove i
 	delete(s.vdrMap, vdrID)
+	s.vdrSlice[e] = nil
 	s.vdrSlice = s.vdrSlice[:e]
 	s.vdrWeights = s.vdrWeights[:e]
 	s.vdrMaskedWeights = s.vdrMaskedWeights[:e]

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ids
@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestShortSetContains(t *testing.T) {
@@ -270,50 +270,50 @@ func TestShortSetString(t *testing.T) {
 func TestShortSetPop(t *testing.T) {
 	var s ShortSet
 	_, ok := s.Pop()
-	assert.False(t, ok)
+	require.False(t, ok)
 
 	s = make(ShortSet)
 	_, ok = s.Pop()
-	assert.False(t, ok)
+	require.False(t, ok)
 
 	id1, id2 := GenerateTestShortID(), GenerateTestShortID()
 	s.Add(id1, id2)
 
 	got, ok := s.Pop()
-	assert.True(t, ok)
-	assert.True(t, got == id1 || got == id2)
-	assert.EqualValues(t, 1, s.Len())
+	require.True(t, ok)
+	require.True(t, got == id1 || got == id2)
+	require.EqualValues(t, 1, s.Len())
 
 	got, ok = s.Pop()
-	assert.True(t, ok)
-	assert.True(t, got == id1 || got == id2)
-	assert.EqualValues(t, 0, s.Len())
+	require.True(t, ok)
+	require.True(t, got == id1 || got == id2)
+	require.EqualValues(t, 0, s.Len())
 
 	_, ok = s.Pop()
-	assert.False(t, ok)
+	require.False(t, ok)
 }
 
 func TestShortSortedList(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	set := ShortSet{}
-	assert.Len(set.SortedList(), 0)
+	require.Len(set.SortedList(), 0)
 
 	set.Add(ShortID{0})
 	sorted := set.SortedList()
-	assert.Len(sorted, 1)
-	assert.Equal(ShortID{0}, sorted[0])
+	require.Len(sorted, 1)
+	require.Equal(ShortID{0}, sorted[0])
 
 	set.Add(ShortID{1})
 	sorted = set.SortedList()
-	assert.Len(sorted, 2)
-	assert.Equal(ShortID{0}, sorted[0])
-	assert.Equal(ShortID{1}, sorted[1])
+	require.Len(sorted, 2)
+	require.Equal(ShortID{0}, sorted[0])
+	require.Equal(ShortID{1}, sorted[1])
 
 	set.Add(ShortID{2})
 	sorted = set.SortedList()
-	assert.Len(sorted, 3)
-	assert.Equal(ShortID{0}, sorted[0])
-	assert.Equal(ShortID{1}, sorted[1])
-	assert.Equal(ShortID{2}, sorted[2])
+	require.Len(sorted, 3)
+	require.Equal(ShortID{0}, sorted[0])
+	require.Equal(ShortID{1}, sorted[1])
+	require.Equal(ShortID{2}, sorted[2])
 }

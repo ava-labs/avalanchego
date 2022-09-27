@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package summary
@@ -6,19 +6,19 @@ package summary
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBuild(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	forkHeight := uint64(2022)
 	block := []byte("blockBytes")
 	coreSummary := []byte("coreSummary")
 	builtSummary, err := Build(forkHeight, block, coreSummary)
-	assert.NoError(err)
+	require.NoError(err)
 
-	assert.Equal(builtSummary.ForkHeight(), forkHeight)
-	assert.Equal(builtSummary.BlockBytes(), block)
-	assert.Equal(builtSummary.InnerSummaryBytes(), coreSummary)
+	require.Equal(builtSummary.ForkHeight(), forkHeight)
+	require.Equal(builtSummary.BlockBytes(), block)
+	require.Equal(builtSummary.InnerSummaryBytes(), coreSummary)
 }

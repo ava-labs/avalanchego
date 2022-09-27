@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package dialer
@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -70,10 +70,10 @@ func TestDialerCancelDial(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		startTime := time.Now()
 		_, err := dialer.Dial(context.Background(), myIP)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		// Connecting to myself shouldn't take more than 50 ms if outgoing
 		// connections aren't throttled
-		assert.WithinDuration(t, startTime, time.Now(), 50*time.Millisecond)
+		require.WithinDuration(t, startTime, time.Now(), 50*time.Millisecond)
 	}
 
 	// Make another outgoing connection but immediately cancel the context
@@ -83,7 +83,7 @@ func TestDialerCancelDial(t *testing.T) {
 	sixthDialDone := make(chan struct{}, 1)
 	go func() {
 		_, err := dialer.Dial(ctx, myIP)
-		assert.Error(t, err)
+		require.Error(t, err)
 		close(sixthDialDone)
 	}()
 

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 package block
 
@@ -23,7 +23,12 @@ type HeightIndexedChainVM interface {
 	//   index.
 	VerifyHeightIndex() error
 
-	// GetBlockIDAtHeight returns the ID of the block that was accepted with
-	// [height].
+	// GetBlockIDAtHeight returns:
+	// - The ID of the block that was accepted with [height].
+	// - database.ErrNotFound if the [height] index is unknown.
+	//
+	// Note: A returned value of [database.ErrNotFound] typically means that the
+	//       underlying VM was state synced and does not have access to the
+	//       blockID at [height].
 	GetBlockIDAtHeight(height uint64) (ids.ID, error)
 }

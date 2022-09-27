@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package math
@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAverager(t *testing.T) {
@@ -16,12 +16,12 @@ func TestAverager(t *testing.T) {
 
 	a := NewSyncAverager(NewAverager(0, halflife, currentTime))
 	expectedValue := float64(0)
-	assert.Equal(t, expectedValue, a.Read())
+	require.Equal(t, expectedValue, a.Read())
 
 	currentTime = currentTime.Add(halflife)
 	a.Observe(1, currentTime)
 	expectedValue = 1.0 / 1.5
-	assert.Equal(t, expectedValue, a.Read())
+	require.Equal(t, expectedValue, a.Read())
 }
 
 func TestAveragerTimeTravel(t *testing.T) {
@@ -30,12 +30,12 @@ func TestAveragerTimeTravel(t *testing.T) {
 
 	a := NewSyncAverager(NewAverager(1, halflife, currentTime))
 	expectedValue := float64(1)
-	assert.Equal(t, expectedValue, a.Read())
+	require.Equal(t, expectedValue, a.Read())
 
 	currentTime = currentTime.Add(-halflife)
 	a.Observe(0, currentTime)
 	expectedValue = 1.0 / 1.5
-	assert.Equal(t, expectedValue, a.Read())
+	require.Equal(t, expectedValue, a.Read())
 }
 
 func TestUninitializedAverager(t *testing.T) {
@@ -45,8 +45,8 @@ func TestUninitializedAverager(t *testing.T) {
 	firstObservation := float64(10)
 
 	a := NewUninitializedAverager(halfLife)
-	assert.Equal(t, 0.0, a.Read())
+	require.Equal(t, 0.0, a.Read())
 
 	a.Observe(firstObservation, currentTime)
-	assert.Equal(t, firstObservation, a.Read())
+	require.Equal(t, firstObservation, a.Read())
 }

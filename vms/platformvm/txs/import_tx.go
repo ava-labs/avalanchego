@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -14,8 +14,7 @@ import (
 )
 
 var (
-	_ UnsignedTx             = &ImportTx{}
-	_ secp256k1fx.UnsignedTx = &ImportTx{}
+	_ UnsignedTx = &ImportTx{}
 
 	errNoImportInputs = errors.New("tx has no imported inputs")
 )

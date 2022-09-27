@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package process
@@ -83,17 +83,6 @@ func (p *process) Start() error {
 		log.Warn("sybil control is not enforced",
 			zap.String("reason", "staking is disabled"),
 		)
-	}
-
-	// Check if transaction signatures should be checked
-	if !p.config.EnableCrypto {
-		// TODO: actually disable crypto verification
-		log.Warn("transaction signatures are not being checked")
-	}
-
-	// Track if assertions should be executed
-	if p.config.LoggingConfig.Assertions {
-		log.Debug("assertions are enabled. This may slow down execution")
 	}
 
 	// TODO move this to config

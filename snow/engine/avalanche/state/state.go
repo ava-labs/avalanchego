@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -143,14 +143,10 @@ func (s *state) SetEdge(id ids.ID, frontier []ids.ID) error {
 
 	size := wrappers.IntLen + hashing.HashLen*len(frontier)
 	p := wrappers.Packer{Bytes: make([]byte, size)}
-
 	p.PackInt(uint32(len(frontier)))
 	for _, id := range frontier {
 		p.PackFixedBytes(id[:])
 	}
-
-	s.log.AssertNoError(p.Err)
-	s.log.AssertTrue(p.Offset == len(p.Bytes), "Wrong offset after packing")
 
 	return s.db.Put(id[:], p.Bytes)
 }

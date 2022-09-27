@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tracker
@@ -72,7 +72,7 @@ func (t *cpuResourceTracker) Usage(nodeID ids.NodeID, now time.Time) float64 {
 		return 0
 	}
 
-	portionUsageByNode := m.(meter.Meter).Read(now) / measuredProcessingTime
+	portionUsageByNode := m.Read(now) / measuredProcessingTime
 	return realCPUUsage * portionUsageByNode
 }
 
@@ -107,7 +107,7 @@ func (t *cpuResourceTracker) TimeUntilUsage(nodeID ids.NodeID, now time.Time, va
 	}
 
 	scale := realCPUUsage / measuredProcessingTime
-	return m.(meter.Meter).TimeUntil(now, value/scale)
+	return m.TimeUntil(now, value/scale)
 }
 
 type diskResourceTracker struct {
@@ -136,7 +136,7 @@ func (t *diskResourceTracker) Usage(nodeID ids.NodeID, now time.Time) float64 {
 		return 0
 	}
 
-	portionUsageByNode := m.(meter.Meter).Read(now) / measuredProcessingTime
+	portionUsageByNode := m.Read(now) / measuredProcessingTime
 	return realReadUsage * portionUsageByNode
 }
 
@@ -184,7 +184,7 @@ func (t *diskResourceTracker) TimeUntilUsage(nodeID ids.NodeID, now time.Time, v
 	}
 
 	scale := realReadUsage / measuredProcessingTime
-	return m.(meter.Meter).TimeUntil(now, value/scale)
+	return m.TimeUntil(now, value/scale)
 }
 
 type resourceTracker struct {
@@ -200,7 +200,7 @@ type resourceTracker struct {
 	// utilized. This doesn't necessarily result in the meters being sorted
 	// based on their usage. However, in practice the nodes that are not being
 	// utilized will move towards the oldest elements where they can be deleted.
-	meters  linkedhashmap.LinkedHashmap
+	meters  linkedhashmap.LinkedHashmap[ids.NodeID, meter.Meter]
 	metrics *trackerMetrics
 }
 
@@ -215,7 +215,7 @@ func NewResourceTracker(
 		resources:       resources,
 		processingMeter: factory.New(halflife),
 		halflife:        halflife,
-		meters:          linkedhashmap.New(),
+		meters:          linkedhashmap.New[ids.NodeID, meter.Meter](),
 	}
 	var err error
 	t.metrics, err = newCPUTrackerMetrics("resource_tracker", reg)
@@ -257,7 +257,7 @@ func (rt *resourceTracker) StopProcessing(nodeID ids.NodeID, now time.Time) {
 func (rt *resourceTracker) getMeter(nodeID ids.NodeID) meter.Meter {
 	m, exists := rt.meters.Get(nodeID)
 	if exists {
-		return m.(meter.Meter)
+		return m
 	}
 
 	newMeter := rt.factory.New(rt.halflife)
@@ -272,12 +272,11 @@ func (rt *resourceTracker) getMeter(nodeID ids.NodeID) meter.Meter {
 // doesn't guarantee that all meters showing less than [epsilon] are removed.
 func (rt *resourceTracker) prune(now time.Time) {
 	for {
-		oldest, meterIntf, exists := rt.meters.Oldest()
+		oldest, meter, exists := rt.meters.Oldest()
 		if !exists {
 			return
 		}
 
-		meter := meterIntf.(meter.Meter)
 		if meter.Read(now) > epsilon {
 			return
 		}

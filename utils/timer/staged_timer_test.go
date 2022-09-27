@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package timer
@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSingleStagedTimer(t *testing.T) {
@@ -25,7 +25,7 @@ func TestSingleStagedTimer(t *testing.T) {
 
 	timer.SetTimeoutIn(time.Millisecond)
 	wg.Wait()
-	assert.Equal(t, i, ticks)
+	require.Equal(t, i, ticks)
 }
 
 func TestMultiStageTimer(t *testing.T) {
@@ -43,5 +43,5 @@ func TestMultiStageTimer(t *testing.T) {
 
 	timer.SetTimeoutIn(time.Millisecond)
 	wg.Wait()
-	assert.Equal(t, i, ticks)
+	require.Equal(t, i, ticks)
 }

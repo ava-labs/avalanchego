@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
@@ -33,10 +33,12 @@ func (f *Flat) Initialize(params Parameters, choice ids.ID) {
 
 func (f *Flat) Parameters() Parameters { return f.params }
 
-func (f *Flat) RecordPoll(votes ids.Bag) {
+func (f *Flat) RecordPoll(votes ids.Bag) bool {
 	if pollMode, numVotes := votes.Mode(); numVotes >= f.params.Alpha {
 		f.RecordSuccessfulPoll(pollMode)
-	} else {
-		f.RecordUnsuccessfulPoll()
+		return true
 	}
+
+	f.RecordUnsuccessfulPoll()
+	return false
 }

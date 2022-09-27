@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blocks
@@ -11,6 +11,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
+
+// Version is the current default codec version
+const Version = txs.Version
 
 // GenesisCode allows blocks of larger than usual size to be parsed.
 // While this gives flexibility in accommodating large genesis blocks
@@ -30,31 +33,43 @@ func init() {
 	errs := wrappers.Errs{}
 	for _, c := range []codec.Registry{c, gc} {
 		errs.Add(
-			RegisterBlockTypes(c),
+			RegisterApricotBlockTypes(c),
 			txs.RegisterUnsignedTxsTypes(c),
+			RegisterBlueberryBlockTypes(c),
 		)
 	}
 	errs.Add(
-		Codec.RegisterCodec(txs.Version, c),
-		GenesisCodec.RegisterCodec(txs.Version, gc),
+		Codec.RegisterCodec(Version, c),
+		GenesisCodec.RegisterCodec(Version, gc),
 	)
 	if errs.Errored() {
 		panic(errs.Err)
 	}
 }
 
-// RegisterBlockTypes allows registering relevant type of blocks package
+// RegisterApricotBlockTypes allows registering relevant type of blocks package
 // in the right sequence. Following repackaging of platformvm package, a few
 // subpackage-level codecs were introduced, each handling serialization of
 // specific types.
-func RegisterBlockTypes(targetCodec codec.Registry) error {
+func RegisterApricotBlockTypes(targetCodec codec.Registry) error {
 	errs := wrappers.Errs{}
 	errs.Add(
-		targetCodec.RegisterType(&ProposalBlock{}),
-		targetCodec.RegisterType(&AbortBlock{}),
-		targetCodec.RegisterType(&CommitBlock{}),
-		targetCodec.RegisterType(&StandardBlock{}),
-		targetCodec.RegisterType(&AtomicBlock{}),
+		targetCodec.RegisterType(&ApricotProposalBlock{}),
+		targetCodec.RegisterType(&ApricotAbortBlock{}),
+		targetCodec.RegisterType(&ApricotCommitBlock{}),
+		targetCodec.RegisterType(&ApricotStandardBlock{}),
+		targetCodec.RegisterType(&ApricotAtomicBlock{}),
+	)
+	return errs.Err
+}
+
+func RegisterBlueberryBlockTypes(targetCodec codec.Registry) error {
+	errs := wrappers.Errs{}
+	errs.Add(
+		targetCodec.RegisterType(&BlueberryProposalBlock{}),
+		targetCodec.RegisterType(&BlueberryAbortBlock{}),
+		targetCodec.RegisterType(&BlueberryCommitBlock{}),
+		targetCodec.RegisterType(&BlueberryStandardBlock{}),
 	)
 	return errs.Err
 }

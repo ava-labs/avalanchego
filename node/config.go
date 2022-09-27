@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package node
@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -83,9 +84,11 @@ type StakingConfig struct {
 	genesis.StakingConfig
 	EnableStaking         bool            `json:"enableStaking"`
 	StakingTLSCert        tls.Certificate `json:"-"`
+	StakingSigningKey     *bls.SecretKey  `json:"-"`
 	DisabledStakingWeight uint64          `json:"disabledStakingWeight"`
 	StakingKeyPath        string          `json:"stakingKeyPath"`
 	StakingCertPath       string          `json:"stakingCertPath"`
+	StakingSignerPath     string          `json:"stakingSignerPath"`
 }
 
 type StateSyncConfig struct {
@@ -100,7 +103,7 @@ type BootstrapConfig struct {
 	// Max number of times to retry bootstrap before warning the node operator
 	RetryBootstrapWarnFrequency int `json:"retryBootstrapWarnFrequency"`
 
-	// Timeout when connecting to bootstrapping beacons
+	// Timeout before emitting a warn log when connecting to bootstrapping beacons
 	BootstrapBeaconConnectionTimeout time.Duration `json:"bootstrapBeaconConnectionTimeout"`
 
 	// Max number of containers in an ancestors message sent by this node.
@@ -145,12 +148,6 @@ type Config struct {
 
 	// ID of the network this node should connect to
 	NetworkID uint32 `json:"networkID"`
-
-	// Assertions configuration
-	EnableAssertions bool `json:"enableAssertions"`
-
-	// Crypto configuration
-	EnableCrypto bool `json:"enableCrypto"`
 
 	// Health
 	HealthCheckFreq time.Duration `json:"healthCheckFreq"`

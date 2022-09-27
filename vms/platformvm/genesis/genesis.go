@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package genesis
@@ -30,12 +30,12 @@ func Parse(genesisBytes []byte) (*Genesis, error) {
 		return nil, err
 	}
 	for _, tx := range gen.Validators {
-		if err := tx.Sign(Codec, nil); err != nil {
+		if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
 			return nil, err
 		}
 	}
 	for _, tx := range gen.Chains {
-		if err := tx.Sign(Codec, nil); err != nil {
+		if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
 			return nil, err
 		}
 	}

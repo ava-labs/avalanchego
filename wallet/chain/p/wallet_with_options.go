@@ -1,11 +1,14 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -70,6 +73,18 @@ func (w *walletWithOptions) IssueAddSubnetValidatorTx(
 	)
 }
 
+func (w *walletWithOptions) IssueRemoveSubnetValidatorTx(
+	nodeID ids.NodeID,
+	subnetID ids.ID,
+	options ...common.Option,
+) (ids.ID, error) {
+	return w.Wallet.IssueRemoveSubnetValidatorTx(
+		nodeID,
+		subnetID,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
 func (w *walletWithOptions) IssueAddDelegatorTx(
 	vdr *validator.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
@@ -130,6 +145,76 @@ func (w *walletWithOptions) IssueExportTx(
 	return w.Wallet.IssueExportTx(
 		chainID,
 		outputs,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
+func (w *walletWithOptions) IssueTransformSubnetTx(
+	subnetID ids.ID,
+	assetID ids.ID,
+	initialSupply uint64,
+	maxSupply uint64,
+	minConsumptionRate uint64,
+	maxConsumptionRate uint64,
+	minValidatorStake uint64,
+	maxValidatorStake uint64,
+	minStakeDuration time.Duration,
+	maxStakeDuration time.Duration,
+	minDelegationFee uint32,
+	minDelegatorStake uint64,
+	maxValidatorWeightFactor byte,
+	uptimeRequirement uint32,
+	options ...common.Option,
+) (ids.ID, error) {
+	return w.Wallet.IssueTransformSubnetTx(
+		subnetID,
+		assetID,
+		initialSupply,
+		maxSupply,
+		minConsumptionRate,
+		maxConsumptionRate,
+		minValidatorStake,
+		maxValidatorStake,
+		minStakeDuration,
+		maxStakeDuration,
+		minDelegationFee,
+		minDelegatorStake,
+		maxValidatorWeightFactor,
+		uptimeRequirement,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
+func (w *walletWithOptions) IssueAddPermissionlessValidatorTx(
+	vdr *validator.SubnetValidator,
+	signer signer.Signer,
+	assetID ids.ID,
+	validationRewardsOwner *secp256k1fx.OutputOwners,
+	delegationRewardsOwner *secp256k1fx.OutputOwners,
+	shares uint32,
+	options ...common.Option,
+) (ids.ID, error) {
+	return w.Wallet.IssueAddPermissionlessValidatorTx(
+		vdr,
+		signer,
+		assetID,
+		validationRewardsOwner,
+		delegationRewardsOwner,
+		shares,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
+func (w *walletWithOptions) IssueAddPermissionlessDelegatorTx(
+	vdr *validator.SubnetValidator,
+	assetID ids.ID,
+	rewardsOwner *secp256k1fx.OutputOwners,
+	options ...common.Option,
+) (ids.ID, error) {
+	return w.Wallet.IssueAddPermissionlessDelegatorTx(
+		vdr,
+		assetID,
+		rewardsOwner,
 		common.UnionOptions(w.options, options)...,
 	)
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inte. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inte. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package linkedhashmap
@@ -7,191 +7,135 @@ import (
 	"container/list"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 )
+
+var _ LinkedHashmap[int, struct{}] = &linkedHashmap[int, struct{}]{}
 
 // Hashmap provides an O(1) mapping from a comparable key to any value.
 // Comparable is defined by https://golang.org/ref/spec#Comparison_operators.
-type Hashmap interface {
-	Put(key, val interface{})
-	Get(key interface{}) (val interface{}, exists bool)
-	Delete(key interface{})
+type Hashmap[K, V any] interface {
+	Put(key K, val V)
+	Get(key K) (val V, exists bool)
+	Delete(key K)
 	Len() int
 }
 
 // LinkedHashmap is a hashmap that keeps track of the oldest pairing an the
 // newest pairing.
-type LinkedHashmap interface {
-	Hashmap
+type LinkedHashmap[K, V any] interface {
+	Hashmap[K, V]
 
-	Oldest() (key interface{}, val interface{}, exists bool)
-	Newest() (key interface{}, val interface{}, exists bool)
-	NewIterator() Iter
+	Oldest() (key K, val V, exists bool)
+	Newest() (key K, val V, exists bool)
+	NewIterator() Iter[K, V]
 }
 
-// Iterates over the keys and values in a LinkedHashmap
-// from oldest to newest elements.
-// Assumes the underlying LinkedHashmap is not modified while
-// the iterator is in use, except to delete elements that
-// have already been iterated over.
-type Iter interface {
-	Next() bool
-	Key() interface{}
-	Value() interface{}
+type keyValue[K, V any] struct {
+	key   K
+	value V
 }
 
-type keyValue struct {
-	key   interface{}
-	value interface{}
-}
-
-type linkedHashmap struct {
+type linkedHashmap[K comparable, V any] struct {
 	lock      sync.RWMutex
-	entryMap  map[interface{}]*list.Element
+	entryMap  map[K]*list.Element
 	entryList *list.List
 }
 
-func New() LinkedHashmap {
-	return &linkedHashmap{
-		entryMap:  make(map[interface{}]*list.Element),
+func New[K comparable, V any]() LinkedHashmap[K, V] {
+	return &linkedHashmap[K, V]{
+		entryMap:  make(map[K]*list.Element),
 		entryList: list.New(),
 	}
 }
 
-func (lh *linkedHashmap) Put(key, val interface{}) {
+func (lh *linkedHashmap[K, V]) Put(key K, val V) {
 	lh.lock.Lock()
 	defer lh.lock.Unlock()
 
 	lh.put(key, val)
 }
 
-func (lh *linkedHashmap) Get(key interface{}) (interface{}, bool) {
+func (lh *linkedHashmap[K, V]) Get(key K) (V, bool) {
 	lh.lock.Lock()
 	defer lh.lock.Unlock()
 
 	return lh.get(key)
 }
 
-func (lh *linkedHashmap) Delete(key interface{}) {
+func (lh *linkedHashmap[K, V]) Delete(key K) {
 	lh.lock.Lock()
 	defer lh.lock.Unlock()
 
 	lh.delete(key)
 }
 
-func (lh *linkedHashmap) Len() int {
+func (lh *linkedHashmap[K, V]) Len() int {
 	lh.lock.Lock()
 	defer lh.lock.Unlock()
 
 	return lh.len()
 }
 
-func (lh *linkedHashmap) Oldest() (interface{}, interface{}, bool) {
+func (lh *linkedHashmap[K, V]) Oldest() (K, V, bool) {
 	lh.lock.Lock()
 	defer lh.lock.Unlock()
 
 	return lh.oldest()
 }
 
-func (lh *linkedHashmap) Newest() (interface{}, interface{}, bool) {
+func (lh *linkedHashmap[K, V]) Newest() (K, V, bool) {
 	lh.lock.Lock()
 	defer lh.lock.Unlock()
 
 	return lh.newest()
 }
 
-func (lh *linkedHashmap) put(key, value interface{}) {
+func (lh *linkedHashmap[K, V]) put(key K, value V) {
 	if e, ok := lh.entryMap[key]; ok {
 		lh.entryList.MoveToBack(e)
-		e.Value = keyValue{
+		e.Value = keyValue[K, V]{
 			key:   key,
 			value: value,
 		}
 	} else {
-		lh.entryMap[key] = lh.entryList.PushBack(keyValue{
+		lh.entryMap[key] = lh.entryList.PushBack(keyValue[K, V]{
 			key:   key,
 			value: value,
 		})
 	}
 }
 
-func (lh *linkedHashmap) get(key interface{}) (interface{}, bool) {
+func (lh *linkedHashmap[K, V]) get(key K) (V, bool) {
 	if e, ok := lh.entryMap[key]; ok {
-		return e.Value.(keyValue).value, true
+		return e.Value.(keyValue[K, V]).value, true
 	}
-	return nil, false
+	return utils.Zero[V](), false
 }
 
-func (lh *linkedHashmap) delete(key interface{}) {
+func (lh *linkedHashmap[K, V]) delete(key K) {
 	if e, ok := lh.entryMap[key]; ok {
 		lh.entryList.Remove(e)
 		delete(lh.entryMap, key)
 	}
 }
 
-func (lh *linkedHashmap) len() int { return len(lh.entryMap) }
+func (lh *linkedHashmap[K, V]) len() int { return len(lh.entryMap) }
 
-func (lh *linkedHashmap) oldest() (interface{}, interface{}, bool) {
+func (lh *linkedHashmap[K, V]) oldest() (K, V, bool) {
 	if val := lh.entryList.Front(); val != nil {
-		return val.Value.(keyValue).key, val.Value.(keyValue).value, true
+		return val.Value.(keyValue[K, V]).key, val.Value.(keyValue[K, V]).value, true
 	}
-	return nil, nil, false
+	return utils.Zero[K](), utils.Zero[V](), false
 }
 
-func (lh *linkedHashmap) newest() (interface{}, interface{}, bool) {
+func (lh *linkedHashmap[K, V]) newest() (K, V, bool) {
 	if val := lh.entryList.Back(); val != nil {
-		return val.Value.(keyValue).key, val.Value.(keyValue).value, true
+		return val.Value.(keyValue[K, V]).key, val.Value.(keyValue[K, V]).value, true
 	}
-	return nil, nil, false
+	return utils.Zero[K](), utils.Zero[V](), false
 }
 
-func (lh *linkedHashmap) NewIterator() Iter {
-	return &iterator{lh: lh}
+func (lh *linkedHashmap[K, V]) NewIterator() Iter[K, V] {
+	return &iterator[K, V]{lh: lh}
 }
-
-type iterator struct {
-	lh                     *linkedHashmap
-	key                    interface{}
-	value                  interface{}
-	next                   *list.Element
-	initialized, exhausted bool
-}
-
-func (it *iterator) Next() bool {
-	// If the iterator has been exhausted, there is no next value.
-	if it.exhausted {
-		it.key = ids.Empty
-		it.value = nil
-		it.next = nil
-		return false
-	}
-
-	it.lh.lock.RLock()
-	defer it.lh.lock.RUnlock()
-
-	// If the iterator was not yet initialized, do it now.
-	if !it.initialized {
-		it.initialized = true
-		oldest := it.lh.entryList.Front()
-		if oldest == nil {
-			it.exhausted = true
-			it.key = ids.Empty
-			it.value = nil
-			it.next = nil
-			return false
-		}
-		it.next = oldest
-	}
-
-	// It's important to ensure that [it.next] is not nil
-	// by not deleting elements that have not yet been iterated
-	// over from [it.lh]
-	it.key = it.next.Value.(keyValue).key
-	it.value = it.next.Value.(keyValue).value
-	it.next = it.next.Next() // Next time, return next element
-	it.exhausted = it.next == nil
-	return true
-}
-
-func (it *iterator) Key() interface{}   { return it.key }
-func (it *iterator) Value() interface{} { return it.value }

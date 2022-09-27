@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package states
@@ -8,7 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -31,7 +31,7 @@ var (
 )
 
 func TestTxState(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	db := memdb.New()
 	parser, err := txs.NewParser([]fxs.Fx{
@@ -39,15 +39,15 @@ func TestTxState(t *testing.T) {
 		&nftfx.Fx{},
 		&propertyfx.Fx{},
 	})
-	assert.NoError(err)
+	require.NoError(err)
 
 	stateIntf, err := NewTxState(db, parser, prometheus.NewRegistry())
-	assert.NoError(err)
+	require.NoError(err)
 
 	s := stateIntf.(*txState)
 
 	_, err = s.GetTx(ids.Empty)
-	assert.Equal(database.ErrNotFound, err)
+	require.Equal(database.ErrNotFound, err)
 
 	tx := &txs.Tx{
 		Unsigned: &txs.BaseTx{
@@ -74,29 +74,29 @@ func TestTxState(t *testing.T) {
 	}
 
 	err = tx.SignSECP256K1Fx(parser.Codec(), [][]*crypto.PrivateKeySECP256K1R{{keys[0]}})
-	assert.NoError(err)
+	require.NoError(err)
 
 	err = s.PutTx(ids.Empty, tx)
-	assert.NoError(err)
+	require.NoError(err)
 
 	loadedTx, err := s.GetTx(ids.Empty)
-	assert.NoError(err)
-	assert.Equal(tx.ID(), loadedTx.ID())
+	require.NoError(err)
+	require.Equal(tx.ID(), loadedTx.ID())
 
 	s.txCache.Flush()
 
 	loadedTx, err = s.GetTx(ids.Empty)
-	assert.NoError(err)
-	assert.Equal(tx.ID(), loadedTx.ID())
+	require.NoError(err)
+	require.Equal(tx.ID(), loadedTx.ID())
 
 	err = s.DeleteTx(ids.Empty)
-	assert.NoError(err)
+	require.NoError(err)
 
 	_, err = s.GetTx(ids.Empty)
-	assert.Equal(database.ErrNotFound, err)
+	require.Equal(database.ErrNotFound, err)
 
 	s.txCache.Flush()
 
 	_, err = s.GetTx(ids.Empty)
-	assert.Equal(database.ErrNotFound, err)
+	require.Equal(database.ErrNotFound, err)
 }

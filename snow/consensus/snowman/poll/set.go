@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package poll
@@ -42,7 +42,7 @@ type set struct {
 	durPolls metric.Averager
 	factory  Factory
 	// maps requestID -> poll
-	polls linkedhashmap.LinkedHashmap
+	polls linkedhashmap.LinkedHashmap[uint32, pollHolder]
 }
 
 // NewSet returns a new empty set of polls
@@ -80,7 +80,7 @@ func NewSet(
 		numPolls: numPolls,
 		durPolls: durPolls,
 		factory:  factory,
-		polls:    linkedhashmap.New(),
+		polls:    linkedhashmap.New[uint32, pollHolder](),
 	}
 }
 
@@ -112,7 +112,7 @@ func (s *set) Add(requestID uint32, vdrs ids.NodeIDBag) bool {
 // Vote registers the connections response to a query for [id]. If there was no
 // query, or the response has already be registered, nothing is performed.
 func (s *set) Vote(requestID uint32, vdr ids.NodeID, vote ids.ID) []ids.Bag {
-	pollHolderIntf, exists := s.polls.Get(requestID)
+	holder, exists := s.polls.Get(requestID)
 	if !exists {
 		s.log.Verbo("dropping vote",
 			zap.String("reason", "unknown poll"),
@@ -122,7 +122,6 @@ func (s *set) Vote(requestID uint32, vdr ids.NodeID, vote ids.ID) []ids.Bag {
 		return nil
 	}
 
-	holder := pollHolderIntf.(pollHolder)
 	p := holder.GetPoll()
 
 	s.log.Verbo("processing vote",
@@ -146,7 +145,7 @@ func (s *set) processFinishedPolls() []ids.Bag {
 	// iterate from oldest to newest
 	iter := s.polls.NewIterator()
 	for iter.Next() {
-		holder := iter.Value().(pollHolder)
+		holder := iter.Value()
 		p := holder.GetPoll()
 		if !p.Finished() {
 			// since we're iterating from oldest to newest, if the next poll has not finished,
@@ -173,7 +172,7 @@ func (s *set) processFinishedPolls() []ids.Bag {
 // Drop registers the connections response to a query for [id]. If there was no
 // query, or the response has already be registered, nothing is performed.
 func (s *set) Drop(requestID uint32, vdr ids.NodeID) []ids.Bag {
-	pollHolderIntf, exists := s.polls.Get(requestID)
+	holder, exists := s.polls.Get(requestID)
 	if !exists {
 		s.log.Verbo("dropping vote",
 			zap.String("reason", "unknown poll"),
@@ -188,8 +187,7 @@ func (s *set) Drop(requestID uint32, vdr ids.NodeID) []ids.Bag {
 		zap.Uint32("requestID", requestID),
 	)
 
-	pollHolder := pollHolderIntf.(pollHolder)
-	poll := pollHolder.GetPoll()
+	poll := holder.GetPoll()
 
 	poll.Drop(vdr)
 	if !poll.Finished() {

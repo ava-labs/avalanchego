@@ -95,7 +95,7 @@ var _ = ginkgo.BeforeSuite(func() {
 	)
 	cancel()
 	gomega.Expect(err).Should(gomega.BeNil())
-	tests.Outf("{{green}}successfully started network-runner :{{/}} %+v\n", resp.ClusterInfo.NodeNames)
+	tests.Outf("{{green}}successfully started network-runner: {{/}} %+v\n", resp.ClusterInfo.NodeNames)
 
 	// start is async, so wait some time for cluster health
 	time.Sleep(time.Minute)

@@ -12,7 +12,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
@@ -26,13 +26,13 @@ func TestNewSystemThrottler(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	assert := assert.New(t)
+	require := require.New(t)
 	reg := prometheus.NewRegistry()
 	clock := mockable.Clock{}
 	clock.Set(time.Now())
 	vdrs := validators.NewSet()
 	resourceTracker, err := tracker.NewResourceTracker(reg, resource.NoUsage, meter.ContinuousFactory{}, time.Second)
-	assert.NoError(err)
+	require.NoError(err)
 	cpuTracker := resourceTracker.CPUTracker()
 
 	config := SystemThrottlerConfig{
@@ -41,20 +41,20 @@ func TestNewSystemThrottler(t *testing.T) {
 	}
 	targeter := tracker.NewMockTargeter(ctrl)
 	throttlerIntf, err := NewSystemThrottler("", reg, config, vdrs, cpuTracker, targeter)
-	assert.NoError(err)
+	require.NoError(err)
 	throttler, ok := throttlerIntf.(*systemThrottler)
-	assert.True(ok)
-	assert.EqualValues(clock, config.Clock)
-	assert.EqualValues(time.Second, config.MaxRecheckDelay)
-	assert.EqualValues(cpuTracker, throttler.tracker)
-	assert.EqualValues(targeter, throttler.targeter)
+	require.True(ok)
+	require.EqualValues(clock, config.Clock)
+	require.EqualValues(time.Second, config.MaxRecheckDelay)
+	require.EqualValues(cpuTracker, throttler.tracker)
+	require.EqualValues(targeter, throttler.targeter)
 }
 
 func TestSystemThrottler(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	assert := assert.New(t)
+	require := require.New(t)
 
 	// Setup
 	mockTracker := tracker.NewMockTracker(ctrl)
@@ -65,10 +65,10 @@ func TestSystemThrottler(t *testing.T) {
 	vdrs := validators.NewSet()
 	vdrID, nonVdrID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 	err := vdrs.AddWeight(vdrID, 1)
-	assert.NoError(err)
+	require.NoError(err)
 	targeter := tracker.NewMockTargeter(ctrl)
 	throttler, err := NewSystemThrottler("", prometheus.NewRegistry(), config, vdrs, mockTracker, targeter)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Case: Actual usage <= target usage; should return immediately
 	// for both validator and non-validator
@@ -109,7 +109,7 @@ func TestSystemThrottler(t *testing.T) {
 	// and avoid flakiness. If the min re-check freq isn't honored,
 	// we'll wait [timeUntilAtDiskTarget].
 	case <-time.After(5 * maxRecheckDelay):
-		assert.FailNow("should have returned after about [maxRecheckDelay]")
+		require.FailNow("should have returned after about [maxRecheckDelay]")
 	case <-onAcquire:
 	}
 
@@ -132,13 +132,13 @@ func TestSystemThrottler(t *testing.T) {
 	// and avoid flakiness. If the min re-check freq isn't honored,
 	// we'll wait [timeUntilAtDiskTarget].
 	case <-time.After(5 * maxRecheckDelay):
-		assert.FailNow("should have returned after about [maxRecheckDelay]")
+		require.FailNow("should have returned after about [maxRecheckDelay]")
 	case <-onAcquire:
 	}
 }
 
 func TestSystemThrottlerContextCancel(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -151,10 +151,10 @@ func TestSystemThrottlerContextCancel(t *testing.T) {
 	vdrs := validators.NewSet()
 	vdrID := ids.GenerateTestNodeID()
 	err := vdrs.AddWeight(vdrID, 1)
-	assert.NoError(err)
+	require.NoError(err)
 	targeter := tracker.NewMockTargeter(ctrl)
 	throttler, err := NewSystemThrottler("", prometheus.NewRegistry(), config, vdrs, mockTracker, targeter)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// Case: Actual usage > target usage; we should wait.
 	// Mock the tracker so that the first loop iteration inside acquire,
@@ -175,6 +175,6 @@ func TestSystemThrottlerContextCancel(t *testing.T) {
 	case <-onAcquire:
 	case <-time.After(maxRecheckDelay / 2):
 		// Make sure Acquire returns well before the second check (i.e. "immediately")
-		assert.Fail("should have returned immediately")
+		require.Fail("should have returned immediately")
 	}
 }

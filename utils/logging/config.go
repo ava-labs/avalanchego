@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package logging
@@ -15,7 +15,6 @@ type RotatingWriterConfig struct {
 type Config struct {
 	RotatingWriterConfig
 	DisableWriterDisplaying bool   `json:"disableWriterDisplaying"`
-	Assertions              bool   `json:"assertions"`
 	LogLevel                Level  `json:"logLevel"`
 	DisplayLevel            Level  `json:"displayLevel"`
 	LogFormat               Format `json:"logFormat"`

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package profiler
@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestProfiler(t *testing.T) {
@@ -18,29 +18,29 @@ func TestProfiler(t *testing.T) {
 
 	// Test Start and Stop CPU Profiler
 	err := p.StartCPUProfiler()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = p.StopCPUProfiler()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = os.Stat(filepath.Join(dir, cpuProfileFile))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test Stop CPU Profiler without it running
 	err = p.StopCPUProfiler()
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	// Test Memory Profiler
 	err = p.MemoryProfile()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = os.Stat(filepath.Join(dir, memProfileFile))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test Lock Profiler
 	err = p.LockProfile()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = os.Stat(filepath.Join(dir, lockProfileFile))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
