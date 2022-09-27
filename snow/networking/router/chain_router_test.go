@@ -612,18 +612,18 @@ func TestRouterCrossChainMessages(t *testing.T) {
 	require.NoError(t, vdrs.AddWeight(ids.GenerateTestNodeID(), 1))
 
 	// Create bootstrapper, engine and handler
-	senderCtx := snow.DefaultConsensusContextTest()
-	senderCtx.ChainID = ids.GenerateTestID()
-	senderCtx.Registerer = prometheus.NewRegistry()
-	senderCtx.Metrics = metrics.NewOptionalGatherer()
-	senderCtx.Executing(false)
+	requester := snow.DefaultConsensusContextTest()
+	requester.ChainID = ids.GenerateTestID()
+	requester.Registerer = prometheus.NewRegistry()
+	requester.Metrics = metrics.NewOptionalGatherer()
+	requester.Executing(false)
 
 	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
 	require.NoError(t, err)
 
-	senderHandler, err := handler.New(
+	requesterHandler, err := handler.New(
 		mc,
-		senderCtx,
+		requester,
 		vdrs,
 		nil,
 		nil,
@@ -632,15 +632,15 @@ func TestRouterCrossChainMessages(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	receiverCtx := snow.DefaultConsensusContextTest()
-	receiverCtx.ChainID = ids.GenerateTestID()
-	receiverCtx.Registerer = prometheus.NewRegistry()
-	receiverCtx.Metrics = metrics.NewOptionalGatherer()
-	receiverCtx.Executing(false)
+	responder := snow.DefaultConsensusContextTest()
+	responder.ChainID = ids.GenerateTestID()
+	responder.Registerer = prometheus.NewRegistry()
+	responder.Metrics = metrics.NewOptionalGatherer()
+	responder.Executing(false)
 
-	receiverHandler, err := handler.New(
+	responderHandler, err := handler.New(
 		mc,
-		receiverCtx,
+		responder,
 		vdrs,
 		nil,
 		nil,
@@ -650,26 +650,26 @@ func TestRouterCrossChainMessages(t *testing.T) {
 	require.NoError(t, err)
 
 	// assumed bootstrapping is done
-	receiverCtx.SetState(snow.NormalOp)
-	senderCtx.SetState(snow.NormalOp)
+	responder.SetState(snow.NormalOp)
+	requester.SetState(snow.NormalOp)
 
 	// router tracks two chains - one will send a message to the other
-	chainRouter.AddChain(senderHandler)
-	chainRouter.AddChain(receiverHandler)
+	chainRouter.AddChain(requesterHandler)
+	chainRouter.AddChain(responderHandler)
 
 	// Each chain should start off with a connected message
-	require.Equal(t, 1, chainRouter.chains[senderCtx.ChainID].Len())
-	require.Equal(t, 1, chainRouter.chains[receiverCtx.ChainID].Len())
+	require.Equal(t, 1, chainRouter.chains[requester.ChainID].Len())
+	require.Equal(t, 1, chainRouter.chains[responder.ChainID].Len())
 
+	// Requester sends a request to the responder
 	msg := []byte("foobar")
-	chainRouter.HandleInbound(mc.InternalCrossChainAppRequest(senderCtx.NodeID, senderCtx.ChainID, receiverCtx.ChainID, uint32(1), time.Minute, msg))
-	require.Equal(t, 2, chainRouter.chains[receiverCtx.ChainID].Len())
+	chainRouter.HandleInbound(mc.InternalCrossChainAppRequest(requester.NodeID, requester.ChainID, responder.ChainID, uint32(1), time.Minute, msg))
+	require.Equal(t, 2, chainRouter.chains[responder.ChainID].Len())
 
-	// register the cross-chain response so we don't drop it
-	chainRouter.RegisterRequest(senderCtx.NodeID, receiverCtx.ChainID, senderCtx.ChainID, uint32(1), message.CrossChainAppResponse)
-	chainRouter.HandleInbound(mc.InternalCrossChainAppResponse(senderCtx.NodeID, senderCtx.ChainID, receiverCtx.ChainID, uint32(1), msg))
-	require.Equal(t, 3, chainRouter.chains[receiverCtx.ChainID].Len())
-
-	// The sender chain shouldn't have any new messages.
-	require.Equal(t, 1, chainRouter.chains[senderCtx.ChainID].Len())
+	// We register the cross-chain response on the requester-side so we don't
+	// drop it.
+	chainRouter.RegisterRequest(nodeID, requester.ChainID, responder.ChainID, uint32(1), message.CrossChainAppResponse)
+	// Responder sends a response back to the requester.
+	chainRouter.HandleInbound(mc.InternalCrossChainAppResponse(nodeID, responder.ChainID, requester.ChainID, uint32(1), msg))
+	require.Equal(t, 2, chainRouter.chains[requester.ChainID].Len())
 }

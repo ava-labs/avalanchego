@@ -71,7 +71,14 @@ func (internalMsgBuilder) InternalFailedRequest(
 	}
 }
 
-func (i internalMsgBuilder) InternalCrossChainAppRequest(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, deadline time.Duration, msg []byte) InboundMessage {
+func (i internalMsgBuilder) InternalCrossChainAppRequest(
+	nodeID ids.NodeID,
+	sourceChainID ids.ID,
+	destinationChainID ids.ID,
+	requestID uint32,
+	deadline time.Duration,
+	msg []byte,
+) InboundMessage {
 	received := i.clock.Time()
 
 	return &inboundMessageWithPacker{
@@ -89,7 +96,13 @@ func (i internalMsgBuilder) InternalCrossChainAppRequest(nodeID ids.NodeID, sour
 	}
 }
 
-func (internalMsgBuilder) InternalCrossChainAppResponse(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, msg []byte) InboundMessage {
+func (internalMsgBuilder) InternalCrossChainAppResponse(
+	nodeID ids.NodeID,
+	sourceChainID ids.ID,
+	destinationChainID ids.ID,
+	requestID uint32,
+	msg []byte,
+) InboundMessage {
 	return &inboundMessageWithPacker{
 		inboundMessage: inboundMessage{
 			op:     CrossChainAppResponse,
