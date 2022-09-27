@@ -160,7 +160,7 @@ const (
 	RetryBootstrapWarnFrequencyKey                     = "bootstrap-retry-warn-frequency"
 	PluginModeKey                                      = "plugin-mode-enabled"
 	BootstrapBeaconConnectionTimeoutKey                = "bootstrap-beacon-connection-timeout"
-	BootstrapMaxTimeGetAncestorsKey                    = "boostrap-max-time-get-ancestors"
+	BootstrapMaxTimeGetAncestorsKey                    = "bootstrap-max-time-get-ancestors"
 	BootstrapAncestorsMaxContainersSentKey             = "bootstrap-ancestors-max-containers-sent"
 	BootstrapAncestorsMaxContainersReceivedKey         = "bootstrap-ancestors-max-containers-received"
 	ChainConfigDirKey                                  = "chain-config-dir"
