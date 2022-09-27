@@ -33,7 +33,6 @@ const (
 	StakeMinConsumptionRateKey                         = "stake-min-consumption-rate"
 	StakeMintingPeriodKey                              = "stake-minting-period"
 	StakeSupplyCapKey                                  = "stake-supply-cap"
-	AssertionsEnabledKey                               = "assertions-enabled"
 	DBTypeKey                                          = "db-type"
 	DBPathKey                                          = "db-dir"
 	DBConfigFileKey                                    = "db-config-file"

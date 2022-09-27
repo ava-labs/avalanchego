@@ -321,7 +321,12 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	m.chainsLock.Unlock()
 
 	// Associate the newly created chain with its default alias
-	m.Log.AssertNoError(m.Alias(chainParams.ID, chainParams.ID.String()))
+	if err := m.Alias(chainParams.ID, chainParams.ID.String()); err != nil {
+		m.Log.Error("failed to alias the new chain with itself",
+			zap.Stringer("chainID", chainParams.ID),
+			zap.Error(err),
+		)
+	}
 
 	// Notify those that registered to be notified when a new chain is created
 	m.notifyRegistrants(chain.Name, chain.Engine)
