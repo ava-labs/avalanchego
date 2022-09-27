@@ -51,7 +51,7 @@ func NewInternalBuilder() InternalMsgBuilder {
 	return internalMsgBuilder{}
 }
 
-func (i internalMsgBuilder) InternalFailedRequest(
+func (internalMsgBuilder) InternalFailedRequest(
 	op Op,
 	nodeID ids.NodeID,
 	sourceChainID ids.ID,
@@ -89,7 +89,7 @@ func (i internalMsgBuilder) InternalCrossChainAppRequest(nodeID ids.NodeID, sour
 	}
 }
 
-func (i internalMsgBuilder) InternalCrossChainAppResponse(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, msg []byte) InboundMessage {
+func (internalMsgBuilder) InternalCrossChainAppResponse(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, msg []byte) InboundMessage {
 	return &inboundMessageWithPacker{
 		inboundMessage: inboundMessage{
 			op:     CrossChainAppResponse,
@@ -104,7 +104,7 @@ func (i internalMsgBuilder) InternalCrossChainAppResponse(nodeID ids.NodeID, sou
 	}
 }
 
-func (i internalMsgBuilder) InternalTimeout(nodeID ids.NodeID) InboundMessage {
+func (internalMsgBuilder) InternalTimeout(nodeID ids.NodeID) InboundMessage {
 	return &inboundMessageWithPacker{
 		inboundMessage: inboundMessage{
 			op:     Timeout,

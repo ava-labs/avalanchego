@@ -42,16 +42,11 @@ const (
 	AppRequest
 	AppResponse
 	AppGossip
-
 	// State sync
 	GetStateSummaryFrontier
 	StateSummaryFrontier
 	GetAcceptedStateSummary
 	AcceptedStateSummary
-
-	// Cross-chain messaging:
-	CrossChainAppRequest
-	CrossChainAppResponse
 
 	// Internal messages (External messages should be added above these):
 	GetAcceptedFrontierFailed
@@ -67,6 +62,8 @@ const (
 	GossipRequest
 	GetStateSummaryFrontierFailed
 	GetAcceptedStateSummaryFailed
+	CrossChainAppRequest
+	CrossChainAppResponse
 	CrossChainAppRequestFailed
 )
 
@@ -184,15 +181,15 @@ var (
 		GetAcceptedStateSummary: AcceptedStateSummary,
 	}
 	ResponseToFailedOps = map[Op]Op{
-		AcceptedFrontier:     GetAcceptedFrontierFailed,
-		Accepted:             GetAcceptedFailed,
-		Ancestors:            GetAncestorsFailed,
-		Put:                  GetFailed,
-		Chits:                QueryFailed,
-		AppResponse:          AppRequestFailed,
+		AcceptedFrontier:      GetAcceptedFrontierFailed,
+		Accepted:              GetAcceptedFailed,
+		Ancestors:             GetAncestorsFailed,
+		Put:                   GetFailed,
+		Chits:                 QueryFailed,
+		AppResponse:           AppRequestFailed,
 		CrossChainAppResponse: CrossChainAppRequestFailed,
-		StateSummaryFrontier: GetStateSummaryFrontierFailed,
-		AcceptedStateSummary: GetAcceptedStateSummaryFailed,
+		StateSummaryFrontier:  GetStateSummaryFrontierFailed,
+		AcceptedStateSummary:  GetAcceptedStateSummaryFailed,
 	}
 	FailedToResponseOps = map[Op]Op{
 		GetStateSummaryFrontierFailed: StateSummaryFrontier,

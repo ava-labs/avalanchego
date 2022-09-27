@@ -330,7 +330,7 @@ func (s *SenderTest) SendAppResponse(nodeID ids.NodeID, requestID uint32, appRes
 func (s *SenderTest) SendAppGossip(appGossipBytes []byte) error {
 	switch {
 	case s.SendAppGossipF != nil:
-		return s.SendAppGossip(appGossipBytes)
+		return s.SendAppGossipF(appGossipBytes)
 	case s.CantSendAppGossip && s.T != nil:
 		s.T.Fatal(errSendAppGossip)
 	}
