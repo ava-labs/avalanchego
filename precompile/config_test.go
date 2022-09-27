@@ -65,6 +65,16 @@ func TestVerifyPrecompileUpgrades(t *testing.T) {
 			expectedError: "cannot set address",
 		},
 		{
+			name:          "duplicate admins in config in native minter allowlist",
+			config:        NewContractNativeMinterConfig(big.NewInt(3), append(admins, admins[0]), enableds, nil),
+			expectedError: "duplicate address",
+		},
+		{
+			name:          "duplicate enableds in config in native minter allowlist",
+			config:        NewContractNativeMinterConfig(big.NewInt(3), admins, append(enableds, enableds[0]), nil),
+			expectedError: "duplicate address",
+		},
+		{
 			name:          "invalid allow list config in fee manager allowlist",
 			config:        NewFeeManagerConfig(big.NewInt(3), admins, admins, nil),
 			expectedError: "cannot set address",
