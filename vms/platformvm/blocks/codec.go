@@ -12,6 +12,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
+// Version is the current default codec version
+const Version = txs.Version
+
 // GenesisCode allows blocks of larger than usual size to be parsed.
 // While this gives flexibility in accommodating large genesis blocks
 // it must not be used to parse new, unverified blocks which instead
@@ -36,8 +39,8 @@ func init() {
 		)
 	}
 	errs.Add(
-		Codec.RegisterCodec(txs.Version, c),
-		GenesisCodec.RegisterCodec(txs.Version, gc),
+		Codec.RegisterCodec(Version, c),
+		GenesisCodec.RegisterCodec(Version, gc),
 	)
 	if errs.Errored() {
 		panic(errs.Err)
