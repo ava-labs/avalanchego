@@ -177,7 +177,7 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	nodeID := msg.NodeID()
 	op := msg.Op()
 
-	chainIDIntf, err := msg.Get(message.ChainID)
+	destinationChainIDIntf, err := msg.Get(message.ChainID)
 	if err != nil {
 		cr.log.Debug("dropping message with invalid field",
 			zap.Stringer("nodeID", nodeID),
@@ -189,8 +189,8 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 		msg.OnFinishedHandling()
 		return
 	}
-	chainIDBytes := chainIDIntf.([]byte)
-	chainID, err := ids.ToID(chainIDBytes)
+	destinationChainIDBytes := destinationChainIDIntf.([]byte)
+	destinationChainID, err := ids.ToID(destinationChainIDBytes)
 	if err != nil {
 		cr.log.Debug("dropping message with invalid field",
 			zap.Stringer("nodeID", nodeID),
@@ -205,28 +205,33 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 
 	var sourceChainID ids.ID
 
-
 	switch op {
 	case message.CrossChainAppRequest, message.CrossChainAppResponse,
 		message.CrossChainAppRequestFailed:
-		sourceChainID, err = ids.ToID(msg.Get(message.SourceChainID).([]byte))
-		cr.log.AssertNoError(err)
-		nodeID, err := ids.ToNodeID(msg.Get(message.NodeID).([]byte))
-		cr.log.AssertNoError(err)
-
-		// Only local cross-chain messages are supported.
-		if nodeID != cr.nodeID {
-			cr.log.Debug(
-				"dropping message",
-				zap.Stringer("messageOp", op),
+		sourceChainIDIntf, err := msg.Get(message.SourceChainID)
+		if err != nil {
+			cr.log.Debug("dropping message with invalid field",
 				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("sourceChainID", sourceChainID),
-				zap.Stringer("destinationChainID", chainID),
+				zap.Stringer("messageOp", op),
+				zap.Stringer("field", message.SourceChainID),
+				zap.Error(err),
 			)
-
-			msg.OnFinishedHandling()
 			return
 		}
+		sourceChainID, err = ids.ToID(sourceChainIDIntf.([]byte))
+		if err != nil {
+			cr.log.Debug("dropping message with invalid field",
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("messageOp", op),
+				zap.Stringer("field", message.SourceChainID),
+				zap.Error(err),
+			)
+			return
+		}
+	default:
+		// For non cross-chain specific app messages, the source chain
+		// is always the destination chain.
+		sourceChainID = destinationChainID
 	}
 
 	// AppGossip is the only message currently not containing a requestID
@@ -257,12 +262,12 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	defer cr.lock.Unlock()
 
 	// Get the chain, if it exists
-	chain, exists := cr.chains[chainID]
+	chain, exists := cr.chains[destinationChainID]
 	if !exists || !chain.IsValidator(nodeID) {
 		cr.log.Debug("dropping message",
 			zap.Stringer("messageOp", op),
 			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("chainID", chainID),
+			zap.Stringer("chainID", destinationChainID),
 			zap.Error(errUnknownChain),
 		)
 
@@ -293,7 +298,7 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	if expectedResponse, isFailed := message.FailedToResponseOps[op]; isFailed {
 		// Create the request ID of the request we sent that this message is in
 		// response to.
-		uniqueRequestID, req := cr.clearRequest(expectedResponse, nodeID, sourceChainID, chainID, requestID)
+		uniqueRequestID, req := cr.clearRequest(expectedResponse, nodeID, sourceChainID, destinationChainID, requestID)
 		if req == nil {
 			// This was a duplicated response.
 			msg.OnFinishedHandling()
@@ -319,7 +324,7 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 		return
 	}
 
-	uniqueRequestID, req := cr.clearRequest(op, nodeID, sourceChainID, chainID, requestID)
+	uniqueRequestID, req := cr.clearRequest(op, nodeID, sourceChainID, destinationChainID, requestID)
 	if req == nil {
 		// We didn't request this message.
 		msg.OnFinishedHandling()
@@ -330,7 +335,7 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	latency := cr.clock.Time().Sub(req.time)
 
 	// Tell the timeout manager we got a response
-	cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, req.op, latency)
+	cr.timeoutManager.RegisterResponse(nodeID, destinationChainID, uniqueRequestID, req.op, latency)
 
 	// Pass the response to the chain
 	chain.Push(msg)

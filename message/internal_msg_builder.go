@@ -17,12 +17,6 @@ type InternalMsgBuilder interface {
 	InternalFailedRequest(
 		op Op,
 		nodeID ids.NodeID,
-		chainID ids.ID,
-		requestID uint32,
-	) InboundMessage
-	InternalFailedCrossChainAppRequest(
-		op Op,
-		nodeID ids.NodeID,
 		sourceChainID ids.ID,
 		destinationChainID ids.ID,
 		requestID uint32,
@@ -60,29 +54,10 @@ func NewInternalBuilder() InternalMsgBuilder {
 func (i internalMsgBuilder) InternalFailedRequest(
 	op Op,
 	nodeID ids.NodeID,
-	chainID ids.ID,
-	requestID uint32,
-) InboundMessage {
-	return &inboundMessageWithPacker{
-		inboundMessage: inboundMessage{
-			op:     op,
-			nodeID: nodeID,
-		},
-		fields: map[Field]interface{}{
-			ChainID:   chainID[:],
-			RequestID: requestID,
-		},
-	}
-}
-
-func (internalMsgBuilder) InternalFailedCrossChainAppRequest(
-	op Op,
-	nodeID ids.NodeID,
 	sourceChainID ids.ID,
 	destinationChainID ids.ID,
 	requestID uint32,
 ) InboundMessage {
-
 	return &inboundMessageWithPacker{
 		inboundMessage: inboundMessage{
 			op:     op,
@@ -101,8 +76,8 @@ func (i internalMsgBuilder) InternalCrossChainAppRequest(nodeID ids.NodeID, sour
 
 	return &inboundMessageWithPacker{
 		inboundMessage: inboundMessage{
-			op: CrossChainAppRequest,
-			nodeID: nodeID,
+			op:             CrossChainAppRequest,
+			nodeID:         nodeID,
 			expirationTime: received.Add(deadline),
 		},
 		fields: map[Field]interface{}{
@@ -117,7 +92,7 @@ func (i internalMsgBuilder) InternalCrossChainAppRequest(nodeID ids.NodeID, sour
 func (i internalMsgBuilder) InternalCrossChainAppResponse(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, msg []byte) InboundMessage {
 	return &inboundMessageWithPacker{
 		inboundMessage: inboundMessage{
-			op: CrossChainAppResponse,
+			op:     CrossChainAppResponse,
 			nodeID: nodeID,
 		},
 		fields: map[Field]interface{}{

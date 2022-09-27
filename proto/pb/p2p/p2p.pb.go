@@ -32,6 +32,7 @@ type Message struct {
 	// That is because when the compression is enabled, we don't want to include uncompressed fields.
 	//
 	// Types that are assignable to Message:
+	//
 	//	*Message_CompressedGzip
 	//	*Message_Ping
 	//	*Message_Pong
