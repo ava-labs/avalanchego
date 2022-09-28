@@ -168,7 +168,7 @@ func (cr *ChainRouter) RegisterRequest(nodeID ids.NodeID, sourceChainID ids.ID, 
 
 	// Register a timeout to fire if we don't get a reply in time.
 	cr.timeoutManager.RegisterRequest(nodeID, destinationChainID, op, uniqueRequestID, func() {
-		msg := cr.msgCreator.InternalFailedRequest(failedOp, nodeID, sourceChainID, destinationChainID, 0)
+		msg := cr.msgCreator.InternalFailedRequest(failedOp, nodeID, sourceChainID, destinationChainID, requestID)
 		cr.HandleInbound(msg)
 	})
 }
