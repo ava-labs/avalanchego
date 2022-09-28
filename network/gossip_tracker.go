@@ -51,10 +51,7 @@ type GossipTracker struct {
 	// a mapping of indices in the bitsets => the peer they correspond to
 	indicesToPeers map[int]ids.NodeID
 
-	// tail always points to an empty slot where new peers are added
-	tail int
-	lock sync.RWMutex
-
+	lock    sync.RWMutex
 	metrics gossipTrackerMetrics
 }
 
@@ -94,13 +91,12 @@ func (g *GossipTracker) Add(id ids.NodeID) bool {
 	}
 
 	// add the peer
-	g.peersToIndices[id] = g.tail
+	tail := len(g.peersToIndices)
+	g.peersToIndices[id] = tail
 	g.knownPeers[id] = ids.NewBigBitSet()
-	g.indicesToPeers[g.tail] = id
+	g.indicesToPeers[tail] = id
 
-	g.local.Add(g.tail)
-
-	g.tail++
+	g.local.Add(tail)
 
 	g.metrics.localPeersSize.Set(float64(g.local.Len()))
 	g.metrics.peersToIndicesSize.Set(float64(len(g.peersToIndices)))
@@ -121,13 +117,12 @@ func (g *GossipTracker) Remove(id ids.NodeID) bool {
 	}
 
 	evicted := g.indicesToPeers[idx]
-	g.tail--
-
 	// swap the peer-to-be-removed with the tail peer
 	// if the element we're swapping with is ourselves, we can skip this swap
 	// since we only need to delete instead
-	if idx != g.tail {
-		lastPeer := g.indicesToPeers[g.tail]
+	tail := len(g.peersToIndices) - 1
+	if idx != tail {
+		lastPeer := g.indicesToPeers[tail]
 
 		g.indicesToPeers[idx] = lastPeer
 		g.peersToIndices[lastPeer] = idx
@@ -135,21 +130,21 @@ func (g *GossipTracker) Remove(id ids.NodeID) bool {
 
 	delete(g.knownPeers, evicted)
 	delete(g.peersToIndices, evicted)
-	delete(g.indicesToPeers, g.tail)
+	delete(g.indicesToPeers, tail)
 
-	g.local.Remove(g.tail)
+	g.local.Remove(tail)
 
 	// remove the peer from everyone else's peer lists
 	for _, knownPeers := range g.knownPeers {
 		// swap the element to be removed with the tail
-		if idx != g.tail {
-			if knownPeers.Contains(g.tail) {
+		if idx != tail {
+			if knownPeers.Contains(tail) {
 				knownPeers.Add(idx)
 			} else {
 				knownPeers.Remove(idx)
 			}
 		}
-		knownPeers.Remove(g.tail)
+		knownPeers.Remove(tail)
 	}
 
 	g.metrics.localPeersSize.Set(float64(g.local.Len()))
