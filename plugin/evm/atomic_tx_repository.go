@@ -82,7 +82,7 @@ func NewAtomicTxRepository(
 		return nil, err
 	}
 
-	// TODO: remove post blueberry as all network participants will have applied the repair script.
+	// TODO: remove post banff as all network participants will have applied the repair script.
 	repairHeights := getAtomicRepositoryRepairHeights(bonusBlocks, canonicalBlocks)
 	if err := repo.RepairForBonusBlocks(repairHeights, getAtomicTxFromBlockByHeight); err != nil {
 		return nil, fmt.Errorf("failed to repair atomic repository: %w", err)

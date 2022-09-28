@@ -59,7 +59,7 @@ func IsProhibited(addr common.Address) bool {
 	return false
 }
 
-// TODO: deprecate after Blueberry activation.
+// TODO: deprecate after Banff activation.
 func (evm *EVM) isProhibitedWithTimestamp(addr common.Address) error {
 	if addr != NativeAssetCallAddr {
 		return nil
@@ -97,8 +97,8 @@ type (
 func (evm *EVM) precompile(addr common.Address) (precompile.StatefulPrecompiledContract, bool) {
 	var precompiles map[common.Address]precompile.StatefulPrecompiledContract
 	switch {
-	case evm.chainRules.IsBlueberry:
-		precompiles = PrecompiledContractsBlueberry
+	case evm.chainRules.IsBanff:
+		precompiles = PrecompiledContractsBanff
 	case evm.chainRules.IsApricotPhase2:
 		precompiles = PrecompiledContractsApricotPhase2
 	case evm.chainRules.IsIstanbul:

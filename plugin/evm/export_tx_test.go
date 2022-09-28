@@ -1141,12 +1141,12 @@ func TestExportTxVerify(t *testing.T) {
 			rules:       apricotRulesPhase0,
 			expectedErr: "",
 		},
-		"valid export tx blueberry": {
+		"valid export tx banff": {
 			generate: func(t *testing.T) UnsignedAtomicTx {
 				return exportTx
 			},
 			ctx:         ctx,
-			rules:       blueberryRules,
+			rules:       banffRules,
 			expectedErr: "",
 		},
 		"incorrect networkID": {
@@ -1314,7 +1314,7 @@ func TestExportTxVerify(t *testing.T) {
 			rules:       apricotRulesPhase6,
 			expectedErr: "",
 		},
-		"non-AVAX input Blueberry": {
+		"non-AVAX input Banff": {
 			generate: func(t *testing.T) UnsignedAtomicTx {
 				tx := *exportTx
 				tx.Ins = []EVMInput{
@@ -1328,10 +1328,10 @@ func TestExportTxVerify(t *testing.T) {
 				return &tx
 			},
 			ctx:         ctx,
-			rules:       blueberryRules,
-			expectedErr: errExportNonAVAXInputBlueberry.Error(),
+			rules:       banffRules,
+			expectedErr: errExportNonAVAXInputBanff.Error(),
 		},
-		"non-AVAX output Blueberry": {
+		"non-AVAX output Banff": {
 			generate: func(t *testing.T) UnsignedAtomicTx {
 				tx := *exportTx
 				tx.ExportedOutputs = []*avax.TransferableOutput{
@@ -1350,8 +1350,8 @@ func TestExportTxVerify(t *testing.T) {
 				return &tx
 			},
 			ctx:         ctx,
-			rules:       blueberryRules,
-			expectedErr: errExportNonAVAXOutputBlueberry.Error(),
+			rules:       banffRules,
+			expectedErr: errExportNonAVAXOutputBanff.Error(),
 		},
 	}
 

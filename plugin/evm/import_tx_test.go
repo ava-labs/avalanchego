@@ -134,13 +134,13 @@ func TestImportTxVerify(t *testing.T) {
 			rules:       apricotRulesPhase0,
 			expectedErr: "", // Expect this transaction to be valid in Apricot Phase 0
 		},
-		"valid import tx blueberry": {
+		"valid import tx banff": {
 			generate: func(t *testing.T) UnsignedAtomicTx {
 				return importTx
 			},
 			ctx:         ctx,
-			rules:       blueberryRules,
-			expectedErr: "", // Expect this transaction to be valid in Blueberry
+			rules:       banffRules,
+			expectedErr: "", // Expect this transaction to be valid in Banff
 		},
 		"invalid network ID": {
 			generate: func(t *testing.T) UnsignedAtomicTx {
@@ -371,7 +371,7 @@ func TestImportTxVerify(t *testing.T) {
 			rules:       apricotRulesPhase6,
 			expectedErr: "",
 		},
-		"non-AVAX input Blueberry": {
+		"non-AVAX input Banff": {
 			generate: func(t *testing.T) UnsignedAtomicTx {
 				tx := *importTx
 				tx.ImportedInputs = []*avax.TransferableInput{
@@ -392,10 +392,10 @@ func TestImportTxVerify(t *testing.T) {
 				return &tx
 			},
 			ctx:         ctx,
-			rules:       blueberryRules,
-			expectedErr: errImportNonAVAXInputBlueberry.Error(),
+			rules:       banffRules,
+			expectedErr: errImportNonAVAXInputBanff.Error(),
 		},
-		"non-AVAX output Blueberry": {
+		"non-AVAX output Banff": {
 			generate: func(t *testing.T) UnsignedAtomicTx {
 				tx := *importTx
 				tx.Outs = []EVMOutput{
@@ -408,8 +408,8 @@ func TestImportTxVerify(t *testing.T) {
 				return &tx
 			},
 			ctx:         ctx,
-			rules:       blueberryRules,
-			expectedErr: errImportNonAVAXOutputBlueberry.Error(),
+			rules:       banffRules,
+			expectedErr: errImportNonAVAXOutputBanff.Error(),
 		},
 	}
 	for name, test := range tests {
