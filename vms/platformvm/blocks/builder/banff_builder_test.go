@@ -32,7 +32,7 @@ import (
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
 
-func TestBlueberryFork(t *testing.T) {
+func TestBanffFork(t *testing.T) {
 	require := require.New(t)
 
 	env := newEnvironment(t)
@@ -51,7 +51,7 @@ func TestBlueberryFork(t *testing.T) {
 		chainTime.Add(2 * executor.SyncBound),
 	}
 	lastApricotTime := apricotTimes[len(apricotTimes)-1]
-	env.config.BlueberryTime = lastApricotTime.Add(time.Second)
+	env.config.BanffTime = lastApricotTime.Add(time.Second)
 
 	for i, nextValidatorStartTime := range apricotTimes {
 		// add a validator with the right start time
@@ -100,8 +100,8 @@ func TestBlueberryFork(t *testing.T) {
 		env.Builder.SetPreference(commitBlk.ID())
 	}
 
-	// set local clock at blueberry time, so to try and build a blueberry block
-	localTime := env.config.BlueberryTime
+	// set local clock at banff time, so to try and build a banff block
+	localTime := env.config.BanffTime
 	env.clk.Set(localTime)
 
 	createChainTx, err := env.txBuilder.NewCreateChainTx(
@@ -122,11 +122,11 @@ func TestBlueberryFork(t *testing.T) {
 	require.NoError(proposalBlk.Accept())
 	require.NoError(env.state.Commit())
 
-	// check Blueberry fork is activated
-	require.True(env.state.GetTimestamp().Equal(env.config.BlueberryTime))
+	// check Banff fork is activated
+	require.True(env.state.GetTimestamp().Equal(env.config.BanffTime))
 }
 
-func TestBuildBlueberryBlock(t *testing.T) {
+func TestBuildBanffBlock(t *testing.T) {
 	var (
 		parentID = ids.GenerateTestID()
 		height   = uint64(1337)
@@ -216,7 +216,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				return s
 			},
 			expectedBlkF: func(require *require.Assertions) blocks.Block {
-				expectedBlk, err := blocks.NewBlueberryProposalBlock(
+				expectedBlk, err := blocks.NewBanffProposalBlock(
 					parentTimestamp,
 					parentID,
 					height,
@@ -263,7 +263,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				return s
 			},
 			expectedBlkF: func(require *require.Assertions) blocks.Block {
-				expectedBlk, err := blocks.NewBlueberryStandardBlock(
+				expectedBlk, err := blocks.NewBanffStandardBlock(
 					parentTimestamp,
 					parentID,
 					height,
@@ -366,7 +366,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				return s
 			},
 			expectedBlkF: func(require *require.Assertions) blocks.Block {
-				expectedBlk, err := blocks.NewBlueberryStandardBlock(
+				expectedBlk, err := blocks.NewBanffStandardBlock(
 					now.Add(-1*time.Second), // note the advanced time
 					parentID,
 					height,
@@ -419,7 +419,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				return s
 			},
 			expectedBlkF: func(require *require.Assertions) blocks.Block {
-				expectedBlk, err := blocks.NewBlueberryStandardBlock(
+				expectedBlk, err := blocks.NewBanffStandardBlock(
 					parentTimestamp,
 					parentID,
 					height,
@@ -473,7 +473,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 				return s
 			},
 			expectedBlkF: func(require *require.Assertions) blocks.Block {
-				expectedBlk, err := blocks.NewBlueberryStandardBlock(
+				expectedBlk, err := blocks.NewBanffStandardBlock(
 					parentTimestamp,
 					parentID,
 					height,
@@ -492,7 +492,7 @@ func TestBuildBlueberryBlock(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			gotBlk, err := buildBlueberryBlock(
+			gotBlk, err := buildBanffBlock(
 				tt.builderF(ctrl),
 				parentID,
 				height,

@@ -211,13 +211,13 @@ func (p *postForkCommonComponents) buildChild(
 		return nil, err
 	}
 
-	blueberryActivated := newTimestamp.After(p.vm.activationTimeBlueberry)
+	banffActivated := newTimestamp.After(p.vm.activationTimeBanff)
 
 	// Build the child
 	var statelessChild block.SignedBlock
 	if delay >= proposer.MaxDelay {
-		if blueberryActivated {
-			statelessChild, err = block.BuildUnsignedBlueberry(
+		if banffActivated {
+			statelessChild, err = block.BuildUnsignedBanff(
 				parentID,
 				newTimestamp,
 				pChainHeight,
@@ -235,8 +235,8 @@ func (p *postForkCommonComponents) buildChild(
 			return nil, err
 		}
 	} else {
-		if blueberryActivated {
-			statelessChild, err = block.BuildBlueberry(
+		if banffActivated {
+			statelessChild, err = block.BuildBanff(
 				parentID,
 				newTimestamp,
 				pChainHeight,

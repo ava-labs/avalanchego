@@ -904,7 +904,7 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 	}
 }
 
-func TestAdvanceTimeTxAfterBlueberry(t *testing.T) {
+func TestAdvanceTimeTxAfterBanff(t *testing.T) {
 	env := newEnvironment()
 	env.ctx.Lock.Lock()
 	defer func() {
@@ -913,9 +913,9 @@ func TestAdvanceTimeTxAfterBlueberry(t *testing.T) {
 		}
 	}()
 	env.clk.Set(defaultGenesisTime) // VM's clock reads the genesis time
-	env.config.BlueberryTime = defaultGenesisTime.Add(SyncBound)
+	env.config.BanffTime = defaultGenesisTime.Add(SyncBound)
 
-	// Proposed advancing timestamp to the blueberry timestamp
+	// Proposed advancing timestamp to the banff timestamp
 	tx, err := env.txBuilder.NewAdvanceTimeTx(defaultGenesisTime.Add(SyncBound))
 	if err != nil {
 		t.Fatal(err)
@@ -938,7 +938,7 @@ func TestAdvanceTimeTxAfterBlueberry(t *testing.T) {
 		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
-	require.ErrorIs(t, err, errAdvanceTimeTxIssuedAfterBlueberry)
+	require.ErrorIs(t, err, errAdvanceTimeTxIssuedAfterBanff)
 }
 
 // Ensure marshaling/unmarshaling works

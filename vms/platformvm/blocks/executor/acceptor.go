@@ -29,10 +29,10 @@ type acceptor struct {
 	bootstrapped     *utils.AtomicBool
 }
 
-func (a *acceptor) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
+func (a *acceptor) BanffAbortBlock(b *blocks.BanffAbortBlock) error {
 	a.ctx.Log.Debug(
 		"accepting block",
-		zap.String("blockType", "blueberry abort"),
+		zap.String("blockType", "banff abort"),
 		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),
@@ -41,10 +41,10 @@ func (a *acceptor) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
 	return a.abortBlock(b)
 }
 
-func (a *acceptor) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
+func (a *acceptor) BanffCommitBlock(b *blocks.BanffCommitBlock) error {
 	a.ctx.Log.Debug(
 		"accepting block",
-		zap.String("blockType", "blueberry commit"),
+		zap.String("blockType", "banff commit"),
 		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),
@@ -53,10 +53,10 @@ func (a *acceptor) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
 	return a.commitBlock(b)
 }
 
-func (a *acceptor) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) error {
+func (a *acceptor) BanffProposalBlock(b *blocks.BanffProposalBlock) error {
 	a.ctx.Log.Debug(
 		"accepting block",
-		zap.String("blockType", "blueberry proposal"),
+		zap.String("blockType", "banff proposal"),
 		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),
@@ -66,10 +66,10 @@ func (a *acceptor) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 	return nil
 }
 
-func (a *acceptor) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) error {
+func (a *acceptor) BanffStandardBlock(b *blocks.BanffStandardBlock) error {
 	a.ctx.Log.Debug(
 		"accepting block",
-		zap.String("blockType", "blueberry standard"),
+		zap.String("blockType", "banff standard"),
 		zap.Stringer("blkID", b.ID()),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),

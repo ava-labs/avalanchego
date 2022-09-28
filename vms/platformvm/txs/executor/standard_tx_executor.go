@@ -20,12 +20,12 @@ import (
 var (
 	_ txs.Visitor = &StandardTxExecutor{}
 
-	errEmptyNodeID                            = errors.New("validator nodeID cannot be empty")
-	errIssuedAddStakerTxBeforeBlueberry       = errors.New("staker transaction issued before Blueberry")
-	errCustomAssetBeforeBlueberry             = errors.New("custom assets can only be imported after Blueberry")
-	errRemoveSubnetValidatorTxBeforeBlueberry = errors.New("RemoveSubnetValidatorTx issued before Blueberry")
-	errTransformSubnetTxBeforeBlueberry       = errors.New("TransformSubnetTx issued before Blueberry")
-	errMaxStakeDurationTooLarge               = errors.New("max stake duration must be less than or equal to the global max stake duration")
+	errEmptyNodeID                        = errors.New("validator nodeID cannot be empty")
+	errIssuedAddStakerTxBeforeBanff       = errors.New("staker transaction issued before Banff")
+	errCustomAssetBeforeBanff             = errors.New("custom assets can only be imported after Banff")
+	errRemoveSubnetValidatorTxBeforeBanff = errors.New("RemoveSubnetValidatorTx issued before Banff")
+	errTransformSubnetTxBeforeBanff       = errors.New("TransformSubnetTx issued before Banff")
+	errMaxStakeDurationTooLarge           = errors.New("max stake duration must be less than or equal to the global max stake duration")
 )
 
 type StandardTxExecutor struct {
@@ -132,15 +132,15 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		e.Inputs.Add(utxoID)
 		utxoIDs[i] = utxoID[:]
 
-		if !e.Config.IsBlueberryActivated(currentChainTime) {
-			// TODO: Remove this check once the Blueberry network upgrade is
+		if !e.Config.IsBanffActivated(currentChainTime) {
+			// TODO: Remove this check once the Banff network upgrade is
 			//       complete.
 			//
-			// Blueberry network upgrade allows exporting of all assets to the
+			// Banff network upgrade allows exporting of all assets to the
 			// P-chain.
 			assetID := in.AssetID()
 			if assetID != e.Ctx.AVAXAssetID {
-				return errCustomAssetBeforeBlueberry
+				return errCustomAssetBeforeBanff
 			}
 		}
 	}
@@ -275,16 +275,16 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 }
 
 func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
-	// AddValidatorTx is a proposal transaction until the Blueberry fork
+	// AddValidatorTx is a proposal transaction until the Banff fork
 	// activation. Following the activation, AddValidatorTxs must be issued into
 	// StandardBlocks.
 	currentTimestamp := e.State.GetTimestamp()
-	if !e.Config.IsBlueberryActivated(currentTimestamp) {
+	if !e.Config.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
-			"%w: timestamp (%s) < Blueberry fork time (%s)",
-			errIssuedAddStakerTxBeforeBlueberry,
+			"%w: timestamp (%s) < Banff fork time (%s)",
+			errIssuedAddStakerTxBeforeBanff,
 			currentTimestamp,
-			e.Config.BlueberryTime,
+			e.Config.BanffTime,
 		)
 	}
 
@@ -312,16 +312,16 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 }
 
 func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	// AddSubnetValidatorTx is a proposal transaction until the Blueberry fork
+	// AddSubnetValidatorTx is a proposal transaction until the Banff fork
 	// activation. Following the activation, AddSubnetValidatorTxs must be
 	// issued into StandardBlocks.
 	currentTimestamp := e.State.GetTimestamp()
-	if !e.Config.IsBlueberryActivated(currentTimestamp) {
+	if !e.Config.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
-			"%w: timestamp (%s) < Blueberry fork time (%s)",
-			errIssuedAddStakerTxBeforeBlueberry,
+			"%w: timestamp (%s) < Banff fork time (%s)",
+			errIssuedAddStakerTxBeforeBanff,
 			currentTimestamp,
-			e.Config.BlueberryTime,
+			e.Config.BanffTime,
 		)
 	}
 
@@ -345,16 +345,16 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 }
 
 func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
-	// AddDelegatorTx is a proposal transaction until the Blueberry fork
+	// AddDelegatorTx is a proposal transaction until the Banff fork
 	// activation. Following the activation, AddDelegatorTxs must be issued into
 	// StandardBlocks.
 	currentTimestamp := e.State.GetTimestamp()
-	if !e.Config.IsBlueberryActivated(currentTimestamp) {
+	if !e.Config.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
-			"%w: timestamp (%s) < Blueberry fork time (%s)",
-			errIssuedAddStakerTxBeforeBlueberry,
+			"%w: timestamp (%s) < Banff fork time (%s)",
+			errIssuedAddStakerTxBeforeBanff,
 			currentTimestamp,
-			e.Config.BlueberryTime,
+			e.Config.BanffTime,
 		)
 	}
 
@@ -383,12 +383,12 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 // Note: [tx.NodeID] may be either a current or pending validator.
 func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
 	currentTimestamp := e.State.GetTimestamp()
-	if !e.Config.IsBlueberryActivated(currentTimestamp) {
+	if !e.Config.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
-			"%w: timestamp (%s) < Blueberry fork time (%s)",
-			errRemoveSubnetValidatorTxBeforeBlueberry,
+			"%w: timestamp (%s) < Banff fork time (%s)",
+			errRemoveSubnetValidatorTxBeforeBanff,
 			currentTimestamp,
-			e.Config.BlueberryTime,
+			e.Config.BanffTime,
 		)
 	}
 
@@ -418,17 +418,17 @@ func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidat
 }
 
 func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
-	// TODO: Remove this check once the Blueberry network upgrade is complete.
+	// TODO: Remove this check once the Banff network upgrade is complete.
 	//
-	// Blueberry network upgrade allows transforming a permissioned subnet into
+	// Banff network upgrade allows transforming a permissioned subnet into
 	// a permissionless subnet.
 	currentTimestamp := e.State.GetTimestamp()
-	if !e.Config.IsBlueberryActivated(currentTimestamp) {
+	if !e.Config.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
-			"%w: timestamp (%s) < Blueberry fork time (%s)",
-			errTransformSubnetTxBeforeBlueberry,
+			"%w: timestamp (%s) < Banff fork time (%s)",
+			errTransformSubnetTxBeforeBanff,
 			currentTimestamp,
-			e.Config.BlueberryTime,
+			e.Config.BanffTime,
 		)
 	}
 
@@ -478,14 +478,14 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 }
 
 func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
-	// TODO: Remove this check once the Blueberry network upgrade is complete.
+	// TODO: Remove this check once the Banff network upgrade is complete.
 	currentTimestamp := e.State.GetTimestamp()
-	if !e.Config.IsBlueberryActivated(currentTimestamp) {
+	if !e.Config.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
-			"%w: timestamp (%s) < Blueberry fork time (%s)",
-			errIssuedAddStakerTxBeforeBlueberry,
+			"%w: timestamp (%s) < Banff fork time (%s)",
+			errIssuedAddStakerTxBeforeBanff,
 			currentTimestamp,
-			e.Config.BlueberryTime,
+			e.Config.BanffTime,
 		)
 	}
 
@@ -509,14 +509,14 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 }
 
 func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
-	// TODO: Remove this check once the Blueberry network upgrade is complete.
+	// TODO: Remove this check once the Banff network upgrade is complete.
 	currentTimestamp := e.State.GetTimestamp()
-	if !e.Config.IsBlueberryActivated(currentTimestamp) {
+	if !e.Config.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
-			"%w: timestamp (%s) < Blueberry fork time (%s)",
-			errIssuedAddStakerTxBeforeBlueberry,
+			"%w: timestamp (%s) < Banff fork time (%s)",
+			errIssuedAddStakerTxBeforeBanff,
 			currentTimestamp,
-			e.Config.BlueberryTime,
+			e.Config.BanffTime,
 		)
 	}
 

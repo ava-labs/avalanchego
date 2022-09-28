@@ -45,8 +45,8 @@ type sender struct {
 	msgCreator          message.Creator
 	msgCreatorWithProto message.Creator
 
-	// TODO: remove this once we complete blueberry migration
-	blueberryTime time.Time
+	// TODO: remove this once we complete banff migration
+	banffTime time.Time
 
 	clock mockable.Clock
 
@@ -65,7 +65,7 @@ func New(
 	ctx *snow.ConsensusContext,
 	msgCreator message.Creator,
 	msgCreatorWithProto message.Creator,
-	blueberryTime time.Time,
+	banffTime time.Time,
 	externalSender ExternalSender,
 	router router.Router,
 	timeouts timeout.Manager,
@@ -75,7 +75,7 @@ func New(
 		ctx:                 ctx,
 		msgCreator:          msgCreator,
 		msgCreatorWithProto: msgCreatorWithProto,
-		blueberryTime:       blueberryTime,
+		banffTime:           banffTime,
 		sender:              externalSender,
 		router:              router,
 		timeouts:            timeouts,
@@ -100,7 +100,7 @@ func New(
 
 func (s *sender) getMsgCreator() message.Creator {
 	now := s.clock.Time()
-	if now.Before(s.blueberryTime) {
+	if now.Before(s.banffTime) {
 		return s.msgCreator
 	}
 	return s.msgCreatorWithProto

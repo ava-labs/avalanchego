@@ -1,8 +1,8 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Implements tests for the blueberry network upgrade.
-package blueberry
+// Implements tests for the banff network upgrade.
+package banff
 
 import (
 	"context"
@@ -23,14 +23,14 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 )
 
-var _ = ginkgo.Describe("[Blueberry]", func() {
+var _ = ginkgo.Describe("[Banff]", func() {
 	ginkgo.It("can send custom assets X->P and P->X",
 		// use this for filtering tests by labels
 		// ref. https://onsi.github.io/ginkgo/#spec-labels
 		ginkgo.Label(
 			"require-network-runner",
 			"xp",
-			"blueberry",
+			"banff",
 		),
 		func() {
 			ginkgo.By("reload initial snapshot for test independence", func() {

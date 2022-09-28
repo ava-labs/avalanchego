@@ -12,13 +12,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-func TestNewBlueberryAbortBlock(t *testing.T) {
+func TestNewBanffAbortBlock(t *testing.T) {
 	require := require.New(t)
 
 	timestamp := time.Now().Truncate(time.Second)
 	parentID := ids.GenerateTestID()
 	height := uint64(1337)
-	blk, err := NewBlueberryAbortBlock(
+	blk, err := NewBanffAbortBlock(
 		timestamp,
 		parentID,
 		height,

@@ -54,7 +54,7 @@ func (tx *AddPermissionlessDelegatorTx) Weight() uint64       { return tx.Valida
 
 func (tx *AddPermissionlessDelegatorTx) PendingPriority() Priority {
 	if tx.Subnet == constants.PrimaryNetworkID {
-		return PrimaryNetworkDelegatorBlueberryPendingPriority
+		return PrimaryNetworkDelegatorBanffPendingPriority
 	}
 	return SubnetPermissionlessDelegatorPendingPriority
 }

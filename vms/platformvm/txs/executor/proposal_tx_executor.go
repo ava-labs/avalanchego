@@ -33,13 +33,13 @@ const (
 var (
 	_ txs.Visitor = &ProposalTxExecutor{}
 
-	errChildBlockNotAfterParent          = errors.New("proposed timestamp not after current chain time")
-	errInvalidState                      = errors.New("generated output isn't valid state")
-	errShouldBePermissionlessStaker      = errors.New("expected permissionless staker")
-	errWrongTxType                       = errors.New("wrong transaction type")
-	errInvalidID                         = errors.New("invalid ID")
-	errProposedAddStakerTxAfterBlueberry = errors.New("staker transaction proposed after Blueberry")
-	errAdvanceTimeTxIssuedAfterBlueberry = errors.New("AdvanceTimeTx issued after Blueberry")
+	errChildBlockNotAfterParent      = errors.New("proposed timestamp not after current chain time")
+	errInvalidState                  = errors.New("generated output isn't valid state")
+	errShouldBePermissionlessStaker  = errors.New("expected permissionless staker")
+	errWrongTxType                   = errors.New("wrong transaction type")
+	errInvalidID                     = errors.New("invalid ID")
+	errProposedAddStakerTxAfterBanff = errors.New("staker transaction proposed after Banff")
+	errAdvanceTimeTxIssuedAfterBanff = errors.New("AdvanceTimeTx issued after Banff")
 )
 
 type ProposalTxExecutor struct {
@@ -81,16 +81,16 @@ func (*ProposalTxExecutor) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDe
 }
 
 func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
-	// AddValidatorTx is a proposal transaction until the Blueberry fork
+	// AddValidatorTx is a proposal transaction until the Banff fork
 	// activation. Following the activation, AddValidatorTxs must be issued into
 	// StandardBlocks.
 	currentTimestamp := e.OnCommitState.GetTimestamp()
-	if e.Config.IsBlueberryActivated(currentTimestamp) {
+	if e.Config.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
-			"%w: timestamp (%s) >= Blueberry fork time (%s)",
-			errProposedAddStakerTxAfterBlueberry,
+			"%w: timestamp (%s) >= Banff fork time (%s)",
+			errProposedAddStakerTxAfterBanff,
 			currentTimestamp,
-			e.Config.BlueberryTime,
+			e.Config.BanffTime,
 		)
 	}
 
@@ -126,16 +126,16 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 }
 
 func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	// AddSubnetValidatorTx is a proposal transaction until the Blueberry fork
+	// AddSubnetValidatorTx is a proposal transaction until the Banff fork
 	// activation. Following the activation, AddSubnetValidatorTxs must be
 	// issued into StandardBlocks.
 	currentTimestamp := e.OnCommitState.GetTimestamp()
-	if e.Config.IsBlueberryActivated(currentTimestamp) {
+	if e.Config.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
-			"%w: timestamp (%s) >= Blueberry fork time (%s)",
-			errProposedAddStakerTxAfterBlueberry,
+			"%w: timestamp (%s) >= Banff fork time (%s)",
+			errProposedAddStakerTxAfterBanff,
 			currentTimestamp,
-			e.Config.BlueberryTime,
+			e.Config.BanffTime,
 		)
 	}
 
@@ -170,16 +170,16 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 }
 
 func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
-	// AddDelegatorTx is a proposal transaction until the Blueberry fork
+	// AddDelegatorTx is a proposal transaction until the Banff fork
 	// activation. Following the activation, AddDelegatorTxs must be issued into
 	// StandardBlocks.
 	currentTimestamp := e.OnCommitState.GetTimestamp()
-	if e.Config.IsBlueberryActivated(currentTimestamp) {
+	if e.Config.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
-			"%w: timestamp (%s) >= Blueberry fork time (%s)",
-			errProposedAddStakerTxAfterBlueberry,
+			"%w: timestamp (%s) >= Banff fork time (%s)",
+			errProposedAddStakerTxAfterBanff,
 			currentTimestamp,
-			e.Config.BlueberryTime,
+			e.Config.BanffTime,
 		)
 	}
 
@@ -224,12 +224,12 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 
 	// Validate [newChainTime]
 	newChainTime := tx.Timestamp()
-	if e.Config.IsBlueberryActivated(newChainTime) {
+	if e.Config.IsBanffActivated(newChainTime) {
 		return fmt.Errorf(
-			"%w: proposed timestamp (%s) >= Blueberry fork time (%s)",
-			errAdvanceTimeTxIssuedAfterBlueberry,
+			"%w: proposed timestamp (%s) >= Banff fork time (%s)",
+			errAdvanceTimeTxIssuedAfterBanff,
 			newChainTime,
-			e.Config.BlueberryTime,
+			e.Config.BanffTime,
 		)
 	}
 

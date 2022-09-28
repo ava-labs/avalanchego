@@ -43,11 +43,11 @@ import (
 )
 
 var (
-	networkID         uint32 = 10
-	chainID                  = ids.ID{5, 4, 3, 2, 1}
-	testTxFee                = uint64(1000)
-	testBlueberryTime        = time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC)
-	startBalance             = uint64(50000)
+	networkID     uint32 = 10
+	chainID              = ids.ID{5, 4, 3, 2, 1}
+	testTxFee            = uint64(1000)
+	testBanffTime        = time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC)
+	startBalance         = uint64(50000)
 
 	keys  []*crypto.PrivateKeySECP256K1R
 	addrs []ids.ShortID // addrs[i] corresponds to keys[i]
@@ -305,7 +305,7 @@ func GenesisVMWithArgs(tb testing.TB, additionalFxs []*common.Fx, args *BuildGen
 	vm := &VM{Factory: Factory{
 		TxFee:            testTxFee,
 		CreateAssetTxFee: testTxFee,
-		BlueberryTime:    testBlueberryTime,
+		BanffTime:        testBanffTime,
 	}}
 	configBytes, err := stdjson.Marshal(Config{IndexTransactions: true})
 	if err != nil {

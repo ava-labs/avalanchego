@@ -59,7 +59,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				BlueberryTime: mockable.MaxTime, // blueberry is not activated
+				BanffTime: mockable.MaxTime, // banff is not activated
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -147,7 +147,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
 				ApricotPhase5Time: time.Now().Add(time.Hour),
-				BlueberryTime:     mockable.MaxTime, // blueberry is not activated
+				BanffTime:         mockable.MaxTime, // banff is not activated
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -237,7 +237,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
 				ApricotPhase5Time: time.Now().Add(time.Hour),
-				BlueberryTime:     mockable.MaxTime, // blueberry is not activated
+				BanffTime:         mockable.MaxTime, // banff is not activated
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -343,7 +343,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				BlueberryTime: mockable.MaxTime, // blueberry is not activated
+				BanffTime: mockable.MaxTime, // banff is not activated
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -416,7 +416,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				BlueberryTime: mockable.MaxTime, // blueberry is not activated
+				BanffTime: mockable.MaxTime, // banff is not activated
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -478,7 +478,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				BlueberryTime: mockable.MaxTime, // blueberry is not activated
+				BanffTime: mockable.MaxTime, // banff is not activated
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -497,7 +497,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 	require.Error(err)
 }
 
-func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
+func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -551,7 +551,7 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 			verifier := &verifier{
 				txExecutorBackend: &executor.Backend{
 					Config: &config.Config{
-						BlueberryTime: time.Time{}, // blueberry is activated
+						BanffTime: time.Time{}, // banff is activated
 					},
 					Clk: &mockable.Clock{},
 				},
@@ -560,7 +560,7 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 
 			// build and verify child block
 			childHeight := parentHeight + 1
-			statelessAbortBlk, err := blocks.NewBlueberryAbortBlock(test.childTime, parentID, childHeight)
+			statelessAbortBlk, err := blocks.NewBanffAbortBlock(test.childTime, parentID, childHeight)
 			require.NoError(err)
 
 			// setup parent state
@@ -591,7 +591,7 @@ func TestBlueberryAbortBlockTimestampChecks(t *testing.T) {
 }
 
 // TODO combine with TestApricotCommitBlockTimestampChecks
-func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
+func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -645,7 +645,7 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 			verifier := &verifier{
 				txExecutorBackend: &executor.Backend{
 					Config: &config.Config{
-						BlueberryTime: time.Time{}, // blueberry is activated
+						BanffTime: time.Time{}, // banff is activated
 					},
 					Clk: &mockable.Clock{},
 				},
@@ -654,7 +654,7 @@ func TestBlueberryCommitBlockTimestampChecks(t *testing.T) {
 
 			// build and verify child block
 			childHeight := parentHeight + 1
-			statelessCommitBlk, err := blocks.NewBlueberryCommitBlock(test.childTime, parentID, childHeight)
+			statelessCommitBlk, err := blocks.NewBanffCommitBlock(test.childTime, parentID, childHeight)
 			require.NoError(err)
 
 			// setup parent state
@@ -727,7 +727,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
 				ApricotPhase5Time: time.Now().Add(time.Hour),
-				BlueberryTime:     mockable.MaxTime, // blueberry is not activated
+				BanffTime:         mockable.MaxTime, // banff is not activated
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -817,7 +817,7 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				BlueberryTime: mockable.MaxTime, // blueberry is not activated
+				BanffTime: mockable.MaxTime, // banff is not activated
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -842,7 +842,7 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 	require.ErrorIs(err, state.ErrMissingParentState)
 }
 
-func TestVerifierVisitBlueberryStandardBlockWithProposalBlockParent(t *testing.T) {
+func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -876,14 +876,14 @@ func TestVerifierVisitBlueberryStandardBlockWithProposalBlockParent(t *testing.T
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				BlueberryTime: time.Time{}, // blueberry is activated
+				BanffTime: time.Time{}, // banff is activated
 			},
 			Clk: &mockable.Clock{},
 		},
 		backend: backend,
 	}
 
-	blk, err := blocks.NewBlueberryStandardBlock(
+	blk, err := blocks.NewBanffStandardBlock(
 		parentTime.Add(time.Second),
 		parentID,
 		2,
@@ -898,7 +898,7 @@ func TestVerifierVisitBlueberryStandardBlockWithProposalBlockParent(t *testing.T
 
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 
-	err = verifier.BlueberryStandardBlock(blk)
+	err = verifier.BanffStandardBlock(blk)
 	require.ErrorIs(err, state.ErrMissingParentState)
 }
 
@@ -914,7 +914,7 @@ func TestVerifierVisitApricotCommitBlockUnexpectedParentState(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				BlueberryTime: mockable.MaxTime, // blueberry is not activated
+				BanffTime: mockable.MaxTime, // banff is not activated
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -945,7 +945,7 @@ func TestVerifierVisitApricotCommitBlockUnexpectedParentState(t *testing.T) {
 	require.ErrorIs(err, state.ErrMissingParentState)
 }
 
-func TestVerifierVisitBlueberryCommitBlockUnexpectedParentState(t *testing.T) {
+func TestVerifierVisitBanffCommitBlockUnexpectedParentState(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -958,7 +958,7 @@ func TestVerifierVisitBlueberryCommitBlockUnexpectedParentState(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				BlueberryTime: time.Time{}, // blueberry is activated
+				BanffTime: time.Time{}, // banff is activated
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -976,7 +976,7 @@ func TestVerifierVisitBlueberryCommitBlockUnexpectedParentState(t *testing.T) {
 		},
 	}
 
-	blk, err := blocks.NewBlueberryCommitBlock(
+	blk, err := blocks.NewBanffCommitBlock(
 		timestamp,
 		parentID,
 		2,
@@ -987,7 +987,7 @@ func TestVerifierVisitBlueberryCommitBlockUnexpectedParentState(t *testing.T) {
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 
 	// Verify the block.
-	err = verifier.BlueberryCommitBlock(blk)
+	err = verifier.BanffCommitBlock(blk)
 	require.ErrorIs(err, state.ErrMissingParentState)
 }
 
@@ -1003,7 +1003,7 @@ func TestVerifierVisitApricotAbortBlockUnexpectedParentState(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				BlueberryTime: mockable.MaxTime, // blueberry is not activated
+				BanffTime: mockable.MaxTime, // banff is not activated
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -1034,7 +1034,7 @@ func TestVerifierVisitApricotAbortBlockUnexpectedParentState(t *testing.T) {
 	require.ErrorIs(err, state.ErrMissingParentState)
 }
 
-func TestVerifierVisitBlueberryAbortBlockUnexpectedParentState(t *testing.T) {
+func TestVerifierVisitBanffAbortBlockUnexpectedParentState(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -1047,7 +1047,7 @@ func TestVerifierVisitBlueberryAbortBlockUnexpectedParentState(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				BlueberryTime: time.Time{}, // blueberry is activated
+				BanffTime: time.Time{}, // banff is activated
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -1065,7 +1065,7 @@ func TestVerifierVisitBlueberryAbortBlockUnexpectedParentState(t *testing.T) {
 		},
 	}
 
-	blk, err := blocks.NewBlueberryAbortBlock(
+	blk, err := blocks.NewBanffAbortBlock(
 		timestamp,
 		parentID,
 		2,
@@ -1076,6 +1076,6 @@ func TestVerifierVisitBlueberryAbortBlockUnexpectedParentState(t *testing.T) {
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 
 	// Verify the block.
-	err = verifier.BlueberryAbortBlock(blk)
+	err = verifier.BanffAbortBlock(blk)
 	require.ErrorIs(err, state.ErrMissingParentState)
 }
