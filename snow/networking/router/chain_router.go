@@ -130,7 +130,7 @@ func (cr *ChainRouter) Initialize(
 }
 
 // RegisterRequest marks that we should expect to receive a reply for a request
-// issued by [sourceChainID] from the given validator's [destinationChainID]
+// issued by [requestingChainID] from the given validator's [respondingChainID]
 // and the reply should have the given requestID.
 //
 // The type of message we expect is [op].
@@ -139,7 +139,7 @@ func (cr *ChainRouter) Initialize(
 // and passing it to the appropriate chain or by a timeout.
 // This method registers a timeout that calls such methods if we don't get a
 // reply in time.
-func (cr *ChainRouter) RegisterRequest(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, op message.Op) {
+func (cr *ChainRouter) RegisterRequest(nodeID ids.NodeID, requestingChainID ids.ID, respondingChainID ids.ID, requestID uint32, op message.Op) {
 	cr.lock.Lock()
 	// When we receive a response message type (Chits, Put, Accepted, etc.)
 	// we validate that we actually sent the corresponding request.
@@ -148,7 +148,7 @@ func (cr *ChainRouter) RegisterRequest(nodeID ids.NodeID, sourceChainID ids.ID, 
 	// For cross-chain messages, the responding chain is the source of the
 	// response which is sent to the requester which is the destination,
 	// which is why we flip the two in request id generation.
-	uniqueRequestID := cr.createRequestID(nodeID, destinationChainID, sourceChainID, requestID, op)
+	uniqueRequestID := cr.createRequestID(nodeID, respondingChainID, requestingChainID, requestID, op)
 	// Add to the set of unfulfilled requests
 	cr.timedRequests.Put(uniqueRequestID, requestEntry{
 		time: cr.clock.Time(),
@@ -167,8 +167,8 @@ func (cr *ChainRouter) RegisterRequest(nodeID ids.NodeID, sourceChainID ids.ID, 
 	}
 
 	// Register a timeout to fire if we don't get a reply in time.
-	cr.timeoutManager.RegisterRequest(nodeID, destinationChainID, op, uniqueRequestID, func() {
-		msg := cr.msgCreator.InternalFailedRequest(failedOp, nodeID, destinationChainID, sourceChainID, requestID)
+	cr.timeoutManager.RegisterRequest(nodeID, respondingChainID, op, uniqueRequestID, func() {
+		msg := cr.msgCreator.InternalFailedRequest(failedOp, nodeID, respondingChainID, requestingChainID, requestID)
 		cr.HandleInbound(msg)
 	})
 }
