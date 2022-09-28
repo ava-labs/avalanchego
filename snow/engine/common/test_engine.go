@@ -510,9 +510,9 @@ func (e *EngineTest) QueryFailed(nodeID ids.NodeID, requestID uint32) error {
 	return errQueryFailed
 }
 
-func (e *EngineTest) CrossChainAppRequest(requestingChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+func (e *EngineTest) CrossChainAppRequest(chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
 	if e.CrossChainAppRequestF != nil {
-		return e.CrossChainAppRequestF(requestingChainID, requestID, request)
+		return e.CrossChainAppRequestF(chainID, requestID, request)
 	}
 	if !e.CantCrossChainAppRequest {
 		return nil
@@ -524,9 +524,9 @@ func (e *EngineTest) CrossChainAppRequest(requestingChainID ids.ID, requestID ui
 	return errCrossChainAppRequest
 }
 
-func (e *EngineTest) CrossChainAppRequestFailed(respondingChainID ids.ID, requestID uint32) error {
+func (e *EngineTest) CrossChainAppRequestFailed(chainID ids.ID, requestID uint32) error {
 	if e.CrossChainAppRequestFailedF != nil {
-		return e.CrossChainAppRequestFailedF(respondingChainID, requestID)
+		return e.CrossChainAppRequestFailedF(chainID, requestID)
 	}
 	if !e.CantCrossChainAppRequestFailed {
 		return nil
@@ -538,9 +538,9 @@ func (e *EngineTest) CrossChainAppRequestFailed(respondingChainID ids.ID, reques
 	return errCrossChainAppRequestFailed
 }
 
-func (e *EngineTest) CrossChainAppResponse(respondingChainID ids.ID, requestID uint32, response []byte) error {
+func (e *EngineTest) CrossChainAppResponse(chainID ids.ID, requestID uint32, response []byte) error {
 	if e.CrossChainAppResponseF != nil {
-		return e.CrossChainAppResponseF(respondingChainID, requestID, response)
+		return e.CrossChainAppResponseF(chainID, requestID, response)
 	}
 	if !e.CantCrossChainAppResponse {
 		return nil
