@@ -1189,8 +1189,9 @@ func newValidRemoveSubnetValidatorTxVerifyEnv(t *testing.T, ctrl *gomock.Control
 		tx:            tx,
 		state:         mockState,
 		staker: &state.Staker{
-			TxID:   ids.GenerateTestID(),
-			NodeID: ids.GenerateTestNodeID(),
+			TxID:     ids.GenerateTestID(),
+			NodeID:   ids.GenerateTestNodeID(),
+			Priority: txs.SubnetPermissionedValidatorCurrentPriority,
 		},
 	}
 }
@@ -1219,7 +1220,6 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					},
 				}
 				env.state.EXPECT().GetTx(env.unsignedTx.Subnet).Return(subnetTx, status.Committed, nil).Times(1)
-				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
 				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
 				env.flowChecker.EXPECT().VerifySpend(
 					env.unsignedTx, env.state, env.unsignedTx.Ins, env.unsignedTx.Outs, env.tx.Creds[:len(env.tx.Creds)-1], gomock.Any(),
@@ -1320,6 +1320,36 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			expectedErr: errNotValidator,
 		},
 		{
+			name: "validator is permissionless",
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+
+				staker := *env.staker
+				staker.Priority = txs.SubnetPermissionlessValidatorCurrentPriority
+
+				// Set dependency expectations.
+				env.state.EXPECT().GetTimestamp().Return(env.blueberryTime.Add(time.Second)).Times(1)
+				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(&staker, nil).Times(1)
+				e := &StandardTxExecutor{
+					Backend: &Backend{
+						Config: &config.Config{
+							BlueberryTime: env.blueberryTime,
+						},
+						Bootstrapped: &utils.AtomicBool{},
+						Fx:           env.fx,
+						FlowChecker:  env.flowChecker,
+						Ctx:          &snow.Context{},
+					},
+					Tx:    env.tx,
+					State: env.state,
+				}
+				e.Bootstrapped.SetValue(true)
+				return env.unsignedTx, e
+			},
+			shouldErr:   true,
+			expectedErr: errRemovePermissionlessValidator,
+		},
+		{
 			name: "tx has no credentials",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
@@ -1375,41 +1405,6 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			expectedErr: errCantFindSubnet,
 		},
 		{
-			name: "subnet immutable",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
-				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-
-				// Set dependency expectations.
-				env.state.EXPECT().GetTimestamp().Return(env.blueberryTime.Add(time.Second)).Times(1)
-				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil).Times(1)
-				subnetOwner := fx.NewMockOwner(ctrl)
-				subnetTx := &txs.Tx{
-					Unsigned: &txs.CreateSubnetTx{
-						Owner: subnetOwner,
-					},
-				}
-				env.state.EXPECT().GetTx(env.unsignedTx.Subnet).Return(subnetTx, status.Committed, nil).Times(1)
-				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, nil).Times(1)
-				e := &StandardTxExecutor{
-					Backend: &Backend{
-						Config: &config.Config{
-							BlueberryTime: env.blueberryTime,
-						},
-						Bootstrapped: &utils.AtomicBool{},
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
-					},
-					Tx:    env.tx,
-					State: env.state,
-				}
-				e.Bootstrapped.SetValue(true)
-				return env.unsignedTx, e
-			},
-			shouldErr:   true,
-			expectedErr: errIsImmutable,
-		},
-		{
 			name: "no permission to remove validator",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
@@ -1423,7 +1418,6 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					},
 				}
 				env.state.EXPECT().GetTx(env.unsignedTx.Subnet).Return(subnetTx, status.Committed, nil)
-				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
 				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(errors.New(""))
 				e := &StandardTxExecutor{
 					Backend: &Backend{
@@ -1458,7 +1452,6 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					},
 				}
 				env.state.EXPECT().GetTx(env.unsignedTx.Subnet).Return(subnetTx, status.Committed, nil)
-				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
 				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil)
 				env.flowChecker.EXPECT().VerifySpend(
 					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
