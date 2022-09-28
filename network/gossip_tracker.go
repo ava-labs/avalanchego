@@ -60,7 +60,7 @@ type GossipTracker struct {
 
 // NewGossipTracker returns an instance of GossipTracker
 func NewGossipTracker(registerer prometheus.Registerer, namespace string) (*GossipTracker, error) {
-	m, err := newGossipTrackerMetrics(registerer, fmt.Sprintf("%s_gossip_tracker", namespace)
+	m, err := newGossipTrackerMetrics(registerer, fmt.Sprintf("%s_gossip_tracker", namespace))
 	if err != nil {
 		return nil, err
 	}
