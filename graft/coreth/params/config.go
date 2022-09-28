@@ -73,7 +73,7 @@ var (
 		ApricotPhasePre6BlockTimestamp:  big.NewInt(time.Date(2022, time.September, 5, 1, 30, 0, 0, time.UTC).Unix()),
 		ApricotPhase6BlockTimestamp:     big.NewInt(time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC).Unix()),
 		ApricotPhasePost6BlockTimestamp: big.NewInt(time.Date(2022, time.September, 7, 3, 0, 0, 0, time.UTC).Unix()),
-		// TODO Add Blueberry
+		// TODO Add Banff
 		// TODO Add Clementine
 	}
 
@@ -100,7 +100,7 @@ var (
 		ApricotPhasePre6BlockTimestamp:  big.NewInt(time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC).Unix()),
 		ApricotPhase6BlockTimestamp:     big.NewInt(time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC).Unix()),
 		ApricotPhasePost6BlockTimestamp: big.NewInt(time.Date(2022, time.September, 7, 6, 0, 0, 0, time.UTC).Unix()),
-		// TODO Add Blueberry
+		// TODO Add Banff
 		// TODO Add Clementine
 	}
 
@@ -127,7 +127,7 @@ var (
 		ApricotPhasePre6BlockTimestamp:  big.NewInt(0),
 		ApricotPhase6BlockTimestamp:     big.NewInt(0),
 		ApricotPhasePost6BlockTimestamp: big.NewInt(0),
-		BlueberryBlockTimestamp:         big.NewInt(0),
+		BanffBlockTimestamp:             big.NewInt(0),
 		ClementineBlockTimestamp:        big.NewInt(0),
 	}
 
@@ -141,7 +141,7 @@ var (
 	TestApricotPhasePre6Config  = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil}
 	TestApricotPhase6Config     = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil}
 	TestApricotPhasePost6Config = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil}
-	TestBlueberryChainConfig    = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil}
+	TestBanffChainConfig        = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil}
 	TestClementineChainConfig   = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0)}
 	TestRules                   = TestChainConfig.AvalancheRules(new(big.Int), new(big.Int))
 )
@@ -189,8 +189,8 @@ type ChainConfig struct {
 	ApricotPhase6BlockTimestamp *big.Int `json:"apricotPhase6BlockTimestamp,omitempty"`
 	// Apricot Phase Post-6 deprecates the NativeAssetCall precompile (soft). (nil = no fork, 0 = already activated)
 	ApricotPhasePost6BlockTimestamp *big.Int `json:"apricotPhasePost6BlockTimestamp,omitempty"`
-	// Blueberry TODO comment. (nil = no fork, 0 = already activated)
-	BlueberryBlockTimestamp *big.Int `json:"blueberryBlockTimestamp,omitempty"`
+	// Banff TODO comment. (nil = no fork, 0 = already activated)
+	BanffBlockTimestamp *big.Int `json:"banffBlockTimestamp,omitempty"`
 	// Clementine TODO comment. (nil = no fork, 0 = already activated)
 	ClementineBlockTimestamp *big.Int `json:"clementineBlockTimestamp,omitempty"`
 }
@@ -228,7 +228,7 @@ func (c *ChainConfig) String() string {
 	banner += fmt.Sprintf(" - Apricot Phase P6 Timestamp        %-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.8.0)\n", c.ApricotPhasePre6BlockTimestamp)
 	banner += fmt.Sprintf(" - Apricot Phase 6 Timestamp:        %-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.8.0)\n", c.ApricotPhase6BlockTimestamp)
 	banner += fmt.Sprintf(" - Apricot Phase Post-6 Timestamp:   %-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.8.0\n", c.ApricotPhasePost6BlockTimestamp)
-	banner += fmt.Sprintf(" - Blueberry Timestamp:              %-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0)\n", c.BlueberryBlockTimestamp)
+	banner += fmt.Sprintf(" - Banff Timestamp:              %-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0)\n", c.BanffBlockTimestamp)
 	banner += fmt.Sprintf(" - Clementine Timestamp:             %-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0)\n", c.ClementineBlockTimestamp)
 	banner += "\n"
 	return banner
@@ -336,10 +336,10 @@ func (c *ChainConfig) IsApricotPhasePost6(blockTimestamp *big.Int) bool {
 	return utils.IsForked(c.ApricotPhasePost6BlockTimestamp, blockTimestamp)
 }
 
-// IsBlueberry returns whether [blockTimestamp] represents a block
-// with a timestamp after the Blueberry upgrade time.
-func (c *ChainConfig) IsBlueberry(blockTimestamp *big.Int) bool {
-	return utils.IsForked(c.BlueberryBlockTimestamp, blockTimestamp)
+// IsBanff returns whether [blockTimestamp] represents a block
+// with a timestamp after the Banff upgrade time.
+func (c *ChainConfig) IsBanff(blockTimestamp *big.Int) bool {
+	return utils.IsForked(c.BanffBlockTimestamp, blockTimestamp)
 }
 
 // IsClementine returns whether [blockTimestamp] represents a block
@@ -426,7 +426,7 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "apricotPhasePre6BlockTimestamp", block: c.ApricotPhasePre6BlockTimestamp},
 		{name: "apricotPhase6BlockTimestamp", block: c.ApricotPhase6BlockTimestamp},
 		{name: "apricotPhasePost6BlockTimestamp", block: c.ApricotPhasePost6BlockTimestamp},
-		{name: "blueberryBlockTimestamp", block: c.BlueberryBlockTimestamp},
+		{name: "banffBlockTimestamp", block: c.BanffBlockTimestamp},
 		{name: "clementineBlockTimestamp", block: c.ClementineBlockTimestamp},
 	} {
 		if lastFork.name != "" {
@@ -512,8 +512,8 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headHeight *big.Int, 
 	}
 	// TODO: add Phase 6 checks
 
-	if isForkIncompatible(c.BlueberryBlockTimestamp, newcfg.BlueberryBlockTimestamp, headTimestamp) {
-		return newCompatError("Blueberry fork block timestamp", c.BlueberryBlockTimestamp, newcfg.BlueberryBlockTimestamp)
+	if isForkIncompatible(c.BanffBlockTimestamp, newcfg.BanffBlockTimestamp, headTimestamp) {
+		return newCompatError("Banff fork block timestamp", c.BanffBlockTimestamp, newcfg.BanffBlockTimestamp)
 	}
 	if isForkIncompatible(c.ClementineBlockTimestamp, newcfg.ClementineBlockTimestamp, headTimestamp) {
 		return newCompatError("Clementine fork block timestamp", c.ClementineBlockTimestamp, newcfg.ClementineBlockTimestamp)
@@ -581,7 +581,7 @@ type Rules struct {
 	// Rules for Avalanche releases
 	IsApricotPhase1, IsApricotPhase2, IsApricotPhase3, IsApricotPhase4, IsApricotPhase5 bool
 	IsApricotPhasePre6, IsApricotPhase6, IsApricotPhasePost6                            bool
-	IsBlueberry                                                                         bool
+	IsBanff                                                                             bool
 	IsClementine                                                                        bool
 
 	// Precompiles maps addresses to stateful precompiled contracts that are enabled
@@ -623,7 +623,7 @@ func (c *ChainConfig) AvalancheRules(blockNum, blockTimestamp *big.Int) Rules {
 	rules.IsApricotPhasePre6 = c.IsApricotPhasePre6(blockTimestamp)
 	rules.IsApricotPhase6 = c.IsApricotPhase6(blockTimestamp)
 	rules.IsApricotPhasePost6 = c.IsApricotPhasePost6(blockTimestamp)
-	rules.IsBlueberry = c.IsBlueberry(blockTimestamp)
+	rules.IsBanff = c.IsBanff(blockTimestamp)
 	rules.IsClementine = c.IsClementine(blockTimestamp)
 
 	// Initialize the stateful precompiles that should be enabled at [blockTimestamp].
