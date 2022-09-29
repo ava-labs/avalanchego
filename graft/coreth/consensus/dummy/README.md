@@ -12,7 +12,7 @@ The dummy consensus engine is responsible for performing verification on the hea
 
 ## Dynamic Fees
 
-As of Apricot Phase 3, the C-Chain includes a dynamic fee algorithm based off of (EIP-1559)[]. This introduces a field to the block type called `BaseFee`. The Base Fee sets a minimum gas price for any transaction to be included in the block. For example, a transaction with a gas price of 49 gwei, will be invalid to include in a block with a base fee of 50 gwei.
+As of Apricot Phase 3, the C-Chain includes a dynamic fee algorithm based off of (EIP-1559)[https://eips.ethereum.org/EIPS/eip-1559]. This introduces a field to the block type called `BaseFee`. The Base Fee sets a minimum gas price for any transaction to be included in the block. For example, a transaction with a gas price of 49 gwei, will be invalid to include in a block with a base fee of 50 gwei.
 
 The dynamic fee algorithm aims to adjust the base fee to handle network congestion. Coreth sets a target utilization on the network, and the dynamic fee algorithm adjusts the base fee accordingly. If the network operates above the target utilization, the dynamic fee algorithm will increase the base fee to make utilizing he network more expensive and bring overall utilization down. If the network operates below the target utilization, the dynamic fee algorithm will decrease the base fee to make it cheaper to use the network.
 
