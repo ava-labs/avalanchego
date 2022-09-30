@@ -136,6 +136,7 @@ func (h *averagerHeapBackend) Push(x interface{}) {
 func (h *averagerHeapBackend) Pop() interface{} {
 	newLen := len(h.entries) - 1
 	e := h.entries[newLen]
+	h.entries[newLen] = nil
 	delete(h.nodeIDToEntry, e.nodeID)
 	h.entries = h.entries[:newLen]
 	return e

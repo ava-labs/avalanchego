@@ -302,7 +302,7 @@ func TestBuildApricotBlock(t *testing.T) {
 			parentStateF: func(ctrl *gomock.Controller) state.Chain {
 				s := state.NewMockChain(ctrl)
 
-				// Once in [buildBlueberryBlock], once in [GetNextStakerChangeTime],
+				// Once in [buildBanffBlock], once in [GetNextStakerChangeTime],
 				s.EXPECT().GetTimestamp().Return(parentTimestamp).Times(2)
 
 				// Handle calls in [getNextStakerToReward]

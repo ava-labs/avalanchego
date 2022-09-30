@@ -73,6 +73,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -306,7 +307,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		&n.Config.NetworkConfig,
 		n.msgCreator,
 		n.msgCreatorWithProto,
-		version.GetBlueberryTime(n.Config.NetworkID),
+		version.GetBanffTime(n.Config.NetworkID),
 		n.MetricsRegisterer,
 		n.Log,
 		listener,
@@ -737,7 +738,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
 		ApricotPhase4Time:                       version.GetApricotPhase4Time(n.Config.NetworkID),
 		ApricotPhase4MinPChainHeight:            version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
-		BlueberryTime:                           version.GetBlueberryTime(n.Config.NetworkID),
+		BanffTime:                               version.GetBanffTime(n.Config.NetworkID),
 		ResourceTracker:                         n.resourceTracker,
 		StateSyncBeacons:                        n.Config.StateSyncIDs,
 	})
@@ -796,13 +797,13 @@ func (n *Node) initVMs() error {
 				RewardConfig:                  n.Config.RewardConfig,
 				ApricotPhase3Time:             version.GetApricotPhase3Time(n.Config.NetworkID),
 				ApricotPhase5Time:             version.GetApricotPhase5Time(n.Config.NetworkID),
-				BlueberryTime:                 version.GetBlueberryTime(n.Config.NetworkID),
+				BanffTime:                     version.GetBanffTime(n.Config.NetworkID),
 			},
 		}),
 		vmRegisterer.Register(constants.AVMID, &avm.Factory{
 			TxFee:            n.Config.TxFee,
 			CreateAssetTxFee: n.Config.CreateAssetTxFee,
-			BlueberryTime:    version.GetBlueberryTime(n.Config.NetworkID),
+			BanffTime:        version.GetBanffTime(n.Config.NetworkID),
 		}),
 		vmRegisterer.Register(constants.EVMID, &coreth.Factory{}),
 		n.Config.VMManager.RegisterFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
@@ -970,6 +971,7 @@ func (n *Node) initInfoAPI() error {
 		info.Parameters{
 			Version:                       version.CurrentApp,
 			NodeID:                        n.ID,
+			NodePOP:                       signer.NewProofOfPossession(n.Config.StakingSigningKey),
 			NetworkID:                     n.Config.NetworkID,
 			TxFee:                         n.Config.TxFee,
 			CreateAssetTxFee:              n.Config.CreateAssetTxFee,
@@ -1222,9 +1224,11 @@ func (n *Node) Initialize(
 	n.LogFactory = logFactory
 	n.DoneShuttingDown.Add(1)
 
+	pop := signer.NewProofOfPossession(n.Config.StakingSigningKey)
 	n.Log.Info("initializing node",
 		zap.Stringer("version", version.CurrentApp),
 		zap.Stringer("nodeID", n.ID),
+		zap.Reflect("nodePOP", pop),
 		zap.Reflect("config", n.Config),
 	)
 

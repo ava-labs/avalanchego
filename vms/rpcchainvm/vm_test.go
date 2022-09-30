@@ -146,7 +146,7 @@ func Test_VMCreateHandlers(t *testing.T) {
 			require.NoErrorf(err, "failed to create listener: %v", err)
 
 			go func() {
-				err := http.Serve(listener, r)
+				err := http.Serve(listener, r) // #nosec G114
 				require.NoErrorf(err, "failed to serve HTTP: %v", err)
 			}()
 

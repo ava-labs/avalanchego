@@ -93,8 +93,8 @@ type Config struct {
 	// Time of the AP5 network upgrade
 	ApricotPhase5Time time.Time
 
-	// Time of the Blueberry network upgrade
-	BlueberryTime time.Time
+	// Time of the Banff network upgrade
+	BanffTime time.Time
 }
 
 func (c *Config) IsApricotPhase3Activated(timestamp time.Time) bool {
@@ -105,8 +105,8 @@ func (c *Config) IsApricotPhase5Activated(timestamp time.Time) bool {
 	return !timestamp.Before(c.ApricotPhase5Time)
 }
 
-func (c *Config) IsBlueberryActivated(timestamp time.Time) bool {
-	return !timestamp.Before(c.BlueberryTime)
+func (c *Config) IsBanffActivated(timestamp time.Time) bool {
+	return !timestamp.Before(c.BanffTime)
 }
 
 func (c *Config) GetCreateBlockchainTxFee(timestamp time.Time) uint64 {

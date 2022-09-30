@@ -43,9 +43,9 @@ func TestParse(t *testing.T) {
 
 	builtBlockBytes := builtBlock.Bytes()
 
-	parsedBlockIntf, requireBlueberry, err := Parse(builtBlockBytes)
+	parsedBlockIntf, requireBanff, err := Parse(builtBlockBytes)
 	require.NoError(err)
-	require.False(requireBlueberry)
+	require.False(requireBanff)
 
 	parsedBlock, ok := parsedBlockIntf.(SignedBlock)
 	require.True(ok)
@@ -97,9 +97,9 @@ func TestParseOption(t *testing.T) {
 
 	builtOptionBytes := builtOption.Bytes()
 
-	parsedOption, requireBlueberry, err := Parse(builtOptionBytes)
+	parsedOption, requireBanff, err := Parse(builtOptionBytes)
 	require.NoError(err)
-	require.False(requireBlueberry)
+	require.False(requireBanff)
 
 	equalOption(require, builtOption, parsedOption)
 }
@@ -117,9 +117,9 @@ func TestParseUnsigned(t *testing.T) {
 
 	builtBlockBytes := builtBlock.Bytes()
 
-	parsedBlockIntf, requireBlueberry, err := Parse(builtBlockBytes)
+	parsedBlockIntf, requireBanff, err := Parse(builtBlockBytes)
 	require.NoError(err)
-	require.False(requireBlueberry)
+	require.False(requireBanff)
 
 	parsedBlock, ok := parsedBlockIntf.(SignedBlock)
 	require.True(ok)

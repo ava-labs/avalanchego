@@ -13,7 +13,7 @@ import (
 )
 
 // [timestamp] is min(max(now, parent timestamp), next staker change time)
-func buildBlueberryBlock(
+func buildBanffBlock(
 	builder *builder,
 	parentID ids.ID,
 	height uint64,
@@ -34,7 +34,7 @@ func buildBlueberryBlock(
 			return nil, fmt.Errorf("could not build tx to reward staker: %w", err)
 		}
 
-		return blocks.NewBlueberryProposalBlock(
+		return blocks.NewBanffProposalBlock(
 			timestamp,
 			parentID,
 			height,
@@ -52,7 +52,7 @@ func buildBlueberryBlock(
 	}
 
 	// Issue a block with as many transactions as possible.
-	return blocks.NewBlueberryStandardBlock(
+	return blocks.NewBanffStandardBlock(
 		timestamp,
 		parentID,
 		height,

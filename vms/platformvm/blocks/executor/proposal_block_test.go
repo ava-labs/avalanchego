@@ -141,7 +141,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	require.NoError(block.Verify())
 }
 
-func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
+func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -153,19 +153,19 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 		}
 	}()
 	env.clk.Set(defaultGenesisTime)
-	env.config.BlueberryTime = time.Time{} // activate Blueberry
+	env.config.BanffTime = time.Time{} // activate Banff
 
 	// create parentBlock. It's a standard one for simplicity
 	parentTime := defaultGenesisTime
 	parentHeight := uint64(2022)
 
-	blueberryParentBlk, err := blocks.NewApricotStandardBlock(
+	banffParentBlk, err := blocks.NewApricotStandardBlock(
 		genesisBlkID, // does not matter
 		parentHeight,
 		nil, // txs do not matter in this test
 	)
 	require.NoError(err)
-	parentID := blueberryParentBlk.ID()
+	parentID := banffParentBlk.ID()
 
 	// store parent block, with relevant quantities
 	chainTime := parentTime
@@ -176,7 +176,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
 
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
-		statelessBlock: blueberryParentBlk,
+		statelessBlock: banffParentBlk,
 		onAcceptState:  onParentAccept,
 		timestamp:      parentTime,
 	}
@@ -185,7 +185,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	env.mockedState.EXPECT().GetStatelessBlock(gomock.Any()).DoAndReturn(
 		func(blockID ids.ID) (blocks.Block, choices.Status, error) {
 			if blockID == parentID {
-				return blueberryParentBlk, choices.Accepted, nil
+				return banffParentBlk, choices.Accepted, nil
 			}
 			return nil, choices.Rejected, database.ErrNotFound
 		}).AnyTimes()
@@ -253,10 +253,10 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 
 	{
 		// wrong height
-		statelessProposalBlock, err := blocks.NewBlueberryProposalBlock(
+		statelessProposalBlock, err := blocks.NewBanffProposalBlock(
 			parentTime.Add(time.Second),
 			parentID,
-			blueberryParentBlk.Height(),
+			banffParentBlk.Height(),
 			blkTx,
 		)
 		require.NoError(err)
@@ -269,7 +269,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 		// wrong version
 		statelessProposalBlock, err := blocks.NewApricotProposalBlock(
 			parentID,
-			blueberryParentBlk.Height()+1,
+			banffParentBlk.Height()+1,
 			blkTx,
 		)
 		require.NoError(err)
@@ -280,10 +280,10 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 
 	{
 		// wrong timestamp, earlier than parent
-		statelessProposalBlock, err := blocks.NewBlueberryProposalBlock(
+		statelessProposalBlock, err := blocks.NewBanffProposalBlock(
 			parentTime.Add(-1*time.Second),
 			parentID,
-			blueberryParentBlk.Height()+1,
+			banffParentBlk.Height()+1,
 			blkTx,
 		)
 		require.NoError(err)
@@ -295,10 +295,10 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	{
 		// wrong timestamp, violated synchrony bound
 		beyondSyncBoundTimeStamp := env.clk.Time().Add(executor.SyncBound).Add(time.Second)
-		statelessProposalBlock, err := blocks.NewBlueberryProposalBlock(
+		statelessProposalBlock, err := blocks.NewBanffProposalBlock(
 			beyondSyncBoundTimeStamp,
 			parentID,
-			blueberryParentBlk.Height()+1,
+			banffParentBlk.Height()+1,
 			blkTx,
 		)
 		require.NoError(err)
@@ -310,10 +310,10 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	{
 		// wrong timestamp, skipped staker set change event
 		skippedStakerEventTimeStamp := nextStakerTime.Add(time.Second)
-		statelessProposalBlock, err := blocks.NewBlueberryProposalBlock(
+		statelessProposalBlock, err := blocks.NewBanffProposalBlock(
 			skippedStakerEventTimeStamp,
 			parentID,
-			blueberryParentBlk.Height()+1,
+			banffParentBlk.Height()+1,
 			blkTx,
 		)
 		require.NoError(err)
@@ -330,10 +330,10 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 			},
 		}
 		require.NoError(invalidTx.Sign(txs.Codec, nil))
-		statelessProposalBlock, err := blocks.NewBlueberryProposalBlock(
+		statelessProposalBlock, err := blocks.NewBanffProposalBlock(
 			parentTime.Add(time.Second),
 			parentID,
-			blueberryParentBlk.Height()+1,
+			banffParentBlk.Height()+1,
 			invalidTx,
 		)
 		require.NoError(err)
@@ -344,25 +344,25 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 
 	{
 		// include too many transactions
-		statelessProposalBlock, err := blocks.NewBlueberryProposalBlock(
+		statelessProposalBlock, err := blocks.NewBanffProposalBlock(
 			nextStakerTime,
 			parentID,
-			blueberryParentBlk.Height()+1,
+			banffParentBlk.Height()+1,
 			blkTx,
 		)
 		require.NoError(err)
 
 		statelessProposalBlock.Transactions = []*txs.Tx{blkTx}
 		block := env.blkManager.NewBlock(statelessProposalBlock)
-		require.ErrorIs(block.Verify(), errBlueberryProposalBlockWithMultipleTransactions)
+		require.ErrorIs(block.Verify(), errBanffProposalBlockWithMultipleTransactions)
 	}
 
 	{
 		// valid
-		statelessProposalBlock, err := blocks.NewBlueberryProposalBlock(
+		statelessProposalBlock, err := blocks.NewBanffProposalBlock(
 			nextStakerTime,
 			parentID,
-			blueberryParentBlk.Height()+1,
+			banffParentBlk.Height()+1,
 			blkTx,
 		)
 		require.NoError(err)
@@ -372,7 +372,7 @@ func TestBlueberryProposalBlockTimeVerification(t *testing.T) {
 	}
 }
 
-func TestBlueberryProposalBlockUpdateStakers(t *testing.T) {
+func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 	// Chronological order (not in scale):
 	// Staker0:    |--- ??? // Staker0 end time depends on the test
 	// Staker1:        |------------------------------------------------------|
@@ -558,7 +558,7 @@ func TestBlueberryProposalBlockUpdateStakers(t *testing.T) {
 				}
 			}()
 
-			env.config.BlueberryTime = time.Time{} // activate Blueberry
+			env.config.BanffTime = time.Time{} // activate Banff
 			env.config.WhitelistedSubnets.Add(testSubnet1.ID())
 
 			for _, staker := range test.stakers {
@@ -646,7 +646,7 @@ func TestBlueberryProposalBlockUpdateStakers(t *testing.T) {
 				preferredID := env.state.GetLastAccepted()
 				parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
 				require.NoError(err)
-				statelessProposalBlock, err := blocks.NewBlueberryProposalBlock(
+				statelessProposalBlock, err := blocks.NewBanffProposalBlock(
 					newTime,
 					parentBlk.ID(),
 					parentBlk.Height()+1,
@@ -692,7 +692,7 @@ func TestBlueberryProposalBlockUpdateStakers(t *testing.T) {
 	}
 }
 
-func TestBlueberryProposalBlockRemoveSubnetValidator(t *testing.T) {
+func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, nil)
 	defer func() {
@@ -700,7 +700,7 @@ func TestBlueberryProposalBlockRemoveSubnetValidator(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
-	env.config.BlueberryTime = time.Time{} // activate Blueberry
+	env.config.BanffTime = time.Time{} // activate Banff
 	env.config.WhitelistedSubnets.Add(testSubnet1.ID())
 
 	// Add a subnet validator to the staker set
@@ -796,7 +796,7 @@ func TestBlueberryProposalBlockRemoveSubnetValidator(t *testing.T) {
 	preferredID := env.state.GetLastAccepted()
 	parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
 	require.NoError(err)
-	statelessProposalBlock, err := blocks.NewBlueberryProposalBlock(
+	statelessProposalBlock, err := blocks.NewBanffProposalBlock(
 		subnetVdr1EndTime,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
@@ -823,7 +823,7 @@ func TestBlueberryProposalBlockRemoveSubnetValidator(t *testing.T) {
 	require.False(env.config.Validators.Contains(testSubnet1.ID(), subnetValidatorNodeID))
 }
 
-func TestBlueberryProposalBlockWhitelistedSubnet(t *testing.T) {
+func TestBanffProposalBlockWhitelistedSubnet(t *testing.T) {
 	require := require.New(t)
 
 	for _, whitelist := range []bool{true, false} {
@@ -834,7 +834,7 @@ func TestBlueberryProposalBlockWhitelistedSubnet(t *testing.T) {
 					t.Fatal(err)
 				}
 			}()
-			env.config.BlueberryTime = time.Time{} // activate Blueberry
+			env.config.BanffTime = time.Time{} // activate Banff
 			if whitelist {
 				env.config.WhitelistedSubnets.Add(testSubnet1.ID())
 			}
@@ -905,7 +905,7 @@ func TestBlueberryProposalBlockWhitelistedSubnet(t *testing.T) {
 			preferredID := env.state.GetLastAccepted()
 			parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
 			require.NoError(err)
-			statelessProposalBlock, err := blocks.NewBlueberryProposalBlock(
+			statelessProposalBlock, err := blocks.NewBanffProposalBlock(
 				subnetVdr1StartTime,
 				parentBlk.ID(),
 				parentBlk.Height()+1,
@@ -926,7 +926,7 @@ func TestBlueberryProposalBlockWhitelistedSubnet(t *testing.T) {
 	}
 }
 
-func TestBlueberryProposalBlockDelegatorStakerWeight(t *testing.T) {
+func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, nil)
 	defer func() {
@@ -934,7 +934,7 @@ func TestBlueberryProposalBlockDelegatorStakerWeight(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
-	env.config.BlueberryTime = time.Time{} // activate Blueberry
+	env.config.BanffTime = time.Time{} // activate Banff
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -990,7 +990,7 @@ func TestBlueberryProposalBlockDelegatorStakerWeight(t *testing.T) {
 	preferredID := env.state.GetLastAccepted()
 	parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
 	require.NoError(err)
-	statelessProposalBlock, err := blocks.NewBlueberryProposalBlock(
+	statelessProposalBlock, err := blocks.NewBanffProposalBlock(
 		pendingValidatorStartTime,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
@@ -1080,7 +1080,7 @@ func TestBlueberryProposalBlockDelegatorStakerWeight(t *testing.T) {
 	preferredID = env.state.GetLastAccepted()
 	parentBlk, _, err = env.state.GetStatelessBlock(preferredID)
 	require.NoError(err)
-	statelessProposalBlock, err = blocks.NewBlueberryProposalBlock(
+	statelessProposalBlock, err = blocks.NewBanffProposalBlock(
 		pendingDelegatorStartTime,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
@@ -1104,7 +1104,7 @@ func TestBlueberryProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require.Equal(env.config.MinDelegatorStake+env.config.MinValidatorStake, vdrWeight)
 }
 
-func TestBlueberryProposalBlockDelegatorStakers(t *testing.T) {
+func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, nil)
 	defer func() {
@@ -1112,7 +1112,7 @@ func TestBlueberryProposalBlockDelegatorStakers(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
-	env.config.BlueberryTime = time.Time{} // activate Blueberry
+	env.config.BanffTime = time.Time{} // activate Banff
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
@@ -1171,7 +1171,7 @@ func TestBlueberryProposalBlockDelegatorStakers(t *testing.T) {
 	preferredID := env.state.GetLastAccepted()
 	parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
 	require.NoError(err)
-	statelessProposalBlock, err := blocks.NewBlueberryProposalBlock(
+	statelessProposalBlock, err := blocks.NewBanffProposalBlock(
 		pendingValidatorStartTime,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
@@ -1260,7 +1260,7 @@ func TestBlueberryProposalBlockDelegatorStakers(t *testing.T) {
 	preferredID = env.state.GetLastAccepted()
 	parentBlk, _, err = env.state.GetStatelessBlock(preferredID)
 	require.NoError(err)
-	statelessProposalBlock, err = blocks.NewBlueberryProposalBlock(
+	statelessProposalBlock, err = blocks.NewBanffProposalBlock(
 		pendingDelegatorStartTime,
 		parentBlk.ID(),
 		parentBlk.Height()+1,

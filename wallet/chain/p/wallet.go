@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
@@ -196,6 +197,8 @@ type Wallet interface {
 	//
 	// - [vdr] specifies all the details of the validation period such as the
 	//   subnetID, startTime, endTime, stake weight, and nodeID.
+	// - [signer] if the subnetID is the primary network, this is the BLS key
+	//   for this validator. Otherwise, this value should be the empty signer.
 	// - [assetID] specifies the asset to stake.
 	// - [validationRewardsOwner] specifies the owner of all the rewards this
 	//   validator earns for its validation period.
@@ -206,6 +209,7 @@ type Wallet interface {
 	//   the delegation reward will be sent to the validator's [rewardsOwner].
 	IssueAddPermissionlessValidatorTx(
 		vdr *validator.SubnetValidator,
+		signer signer.Signer,
 		assetID ids.ID,
 		validationRewardsOwner *secp256k1fx.OutputOwners,
 		delegationRewardsOwner *secp256k1fx.OutputOwners,
@@ -417,6 +421,7 @@ func (w *wallet) IssueTransformSubnetTx(
 
 func (w *wallet) IssueAddPermissionlessValidatorTx(
 	vdr *validator.SubnetValidator,
+	signer signer.Signer,
 	assetID ids.ID,
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
@@ -425,6 +430,7 @@ func (w *wallet) IssueAddPermissionlessValidatorTx(
 ) (ids.ID, error) {
 	utx, err := w.builder.NewAddPermissionlessValidatorTx(
 		vdr,
+		signer,
 		assetID,
 		validationRewardsOwner,
 		delegationRewardsOwner,
