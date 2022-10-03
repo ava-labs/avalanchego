@@ -7,8 +7,9 @@ import (
 	"errors"
 	"math"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"golang.org/x/exp/constraints"
+
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 var errOverflow = errors.New("overflow occurred")
@@ -58,6 +59,10 @@ func Sub[T constraints.Unsigned](a, b T) (T, error) {
 // Mul64 returns:
 // 1) a * b
 // 2) If there is overflow, an error
+//
+// Note that we don't have a generic Mul function because checking for
+// an overflow requires knowing the max size of a given type, which we
+// don't know if we're adding generic types.
 func Mul64(a, b uint64) (uint64, error) {
 	if b != 0 && a > math.MaxUint64/b {
 		return 0, errOverflow
