@@ -24,13 +24,13 @@ func BuildUnsignedApricot(
 	return buildUnsigned(apricotCodec, parentID, timestamp, pChainHeight, blockBytes)
 }
 
-func BuildUnsignedBlueberry(
+func BuildUnsignedBanff(
 	parentID ids.ID,
 	timestamp time.Time,
 	pChainHeight uint64,
 	blockBytes []byte,
 ) (SignedBlock, error) {
-	return buildUnsigned(blueberryCodec, parentID, timestamp, pChainHeight, blockBytes)
+	return buildUnsigned(banffCodec, parentID, timestamp, pChainHeight, blockBytes)
 }
 
 func buildUnsigned(
@@ -70,7 +70,7 @@ func BuildApricot(
 	return build(apricotCodec, parentID, timestamp, pChainHeight, cert, blockBytes, chainID, key)
 }
 
-func BuildBlueberry(
+func BuildBanff(
 	parentID ids.ID,
 	timestamp time.Time,
 	pChainHeight uint64,
@@ -79,7 +79,7 @@ func BuildBlueberry(
 	chainID ids.ID,
 	key crypto.Signer,
 ) (SignedBlock, error) {
-	return build(blueberryCodec, parentID, timestamp, pChainHeight, cert, blockBytes, chainID, key)
+	return build(banffCodec, parentID, timestamp, pChainHeight, cert, blockBytes, chainID, key)
 }
 
 func build(
@@ -145,7 +145,7 @@ func BuildHeader(
 		Body:   bodyID,
 	}
 
-	bytes, err := blueberryCodec.Marshal(codecVersion, &header)
+	bytes, err := banffCodec.Marshal(codecVersion, &header)
 	header.bytes = bytes
 	return &header, err
 }
@@ -162,7 +162,7 @@ func BuildOption(
 		InnerBytes: innerBytes,
 	}
 
-	bytes, err := blueberryCodec.Marshal(codecVersion, &block)
+	bytes, err := banffCodec.Marshal(codecVersion, &block)
 	if err != nil {
 		return nil, err
 	}

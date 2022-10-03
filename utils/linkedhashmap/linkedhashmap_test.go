@@ -14,7 +14,7 @@ import (
 func TestLinkedHashmap(t *testing.T) {
 	require := require.New(t)
 
-	lh := New()
+	lh := New[ids.ID, int]()
 	require.Equal(0, lh.Len(), "a new hashmap should be empty")
 
 	key0 := ids.GenerateTestID()
@@ -101,7 +101,7 @@ func TestIterator(t *testing.T) {
 
 	// Case: No elements
 	{
-		lh := New()
+		lh := New[ids.ID, int]()
 		iter := lh.NewIterator()
 		require.NotNil(iter)
 		// Should immediately be exhausted
@@ -109,12 +109,12 @@ func TestIterator(t *testing.T) {
 		require.False(iter.Next())
 		// Should be empty
 		require.EqualValues(ids.Empty, iter.Key())
-		require.Nil(iter.Value())
+		require.Zero(iter.Value())
 	}
 
 	// Case: 1 element
 	{
-		lh := New()
+		lh := New[ids.ID, int]()
 		iter := lh.NewIterator()
 		require.NotNil(iter)
 		lh.Put(id1, 1)
@@ -141,7 +141,7 @@ func TestIterator(t *testing.T) {
 
 	// Case: Multiple elements
 	{
-		lh := New()
+		lh := New[ids.ID, int]()
 		lh.Put(id1, 1)
 		lh.Put(id2, 2)
 		lh.Put(id3, 3)
@@ -162,7 +162,7 @@ func TestIterator(t *testing.T) {
 
 	// Case: Delete element that has been iterated over
 	{
-		lh := New()
+		lh := New[ids.ID, int]()
 		lh.Put(id1, 1)
 		lh.Put(id2, 2)
 		lh.Put(id3, 3)

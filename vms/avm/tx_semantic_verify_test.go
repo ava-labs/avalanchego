@@ -1479,7 +1479,7 @@ func TestExportTxSemanticVerifyInvalidTransfer(t *testing.T) {
 	}
 }
 
-func TestExportTxSemanticVerifyTransferCustomAssetBeforeBlueberry(t *testing.T) {
+func TestExportTxSemanticVerifyTransferCustomAssetBeforeBanff(t *testing.T) {
 	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
@@ -1489,7 +1489,7 @@ func TestExportTxSemanticVerifyTransferCustomAssetBeforeBlueberry(t *testing.T) 
 		ctx.Lock.Unlock()
 	}()
 
-	vm.clock.Set(testBlueberryTime.Add(-time.Second))
+	vm.clock.Set(testBanffTime.Add(-time.Second))
 
 	genesisAvaxTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	avaxID := genesisAvaxTx.ID()
@@ -1581,7 +1581,7 @@ func TestExportTxSemanticVerifyTransferCustomAssetBeforeBlueberry(t *testing.T) 
 	}
 }
 
-func TestExportTxSemanticVerifyTransferCustomAssetAfterBlueberry(t *testing.T) {
+func TestExportTxSemanticVerifyTransferCustomAssetAfterBanff(t *testing.T) {
 	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
@@ -1591,7 +1591,7 @@ func TestExportTxSemanticVerifyTransferCustomAssetAfterBlueberry(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	vm.clock.Set(testBlueberryTime.Add(time.Second))
+	vm.clock.Set(testBanffTime.Add(time.Second))
 
 	genesisAvaxTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	avaxID := genesisAvaxTx.ID()

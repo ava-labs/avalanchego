@@ -135,7 +135,7 @@ func TestNewImportTx(t *testing.T) {
 			shouldVerify: true,
 		},
 		{
-			description:   "attempting to import non-avax from X-chain pre-blueberry",
+			description:   "attempting to import non-avax from X-chain pre-banff",
 			sourceChainID: env.ctx.XChainID,
 			sharedMemory: fundedSharedMemory(
 				env.ctx.XChainID,
@@ -145,12 +145,12 @@ func TestNewImportTx(t *testing.T) {
 				},
 			),
 			sourceKeys:   []*crypto.PrivateKeySECP256K1R{sourceKey},
-			timestamp:    env.config.BlueberryTime.Add(-time.Second),
+			timestamp:    env.config.BanffTime.Add(-time.Second),
 			shouldErr:    false,
 			shouldVerify: false,
 		},
 		{
-			description:   "attempting to import non-avax from X-chain post-blueberry",
+			description:   "attempting to import non-avax from X-chain post-banff",
 			sourceChainID: env.ctx.XChainID,
 			sharedMemory: fundedSharedMemory(
 				env.ctx.XChainID,
@@ -160,7 +160,7 @@ func TestNewImportTx(t *testing.T) {
 				},
 			),
 			sourceKeys:   []*crypto.PrivateKeySECP256K1R{sourceKey},
-			timestamp:    env.config.BlueberryTime,
+			timestamp:    env.config.BanffTime,
 			shouldErr:    false,
 			shouldVerify: true,
 		},

@@ -54,11 +54,11 @@ type Mempool interface {
 	Get(txID ids.ID) *txs.Tx
 	Remove(txs []*txs.Tx)
 
-	// Following Blueberry activation, all mempool transactions,
+	// Following Banff activation, all mempool transactions,
 	// (both decision and staker) are included into Standard blocks.
 	// HasTxs allow to check for availability of any mempool transaction.
 	HasTxs() bool
-	// PeekTxs returns the next txs for Blueberry blocks
+	// PeekTxs returns the next txs for Banff blocks
 	// up to maxTxsBytes without removing them from the mempool.
 	// It returns nil if !HasTxs()
 	PeekTxs(maxTxsBytes int) []*txs.Tx
@@ -76,9 +76,9 @@ type Mempool interface {
 	MarkDropped(txID ids.ID, reason string)
 	GetDropReason(txID ids.ID) (string, bool)
 
-	// TODO: following Blueberry, these methods can be removed
+	// TODO: following Banff, these methods can be removed
 
-	// Pre Blueberry activation, decision transactions are included into
+	// Pre Banff activation, decision transactions are included into
 	// standard blocks.
 	HasApricotDecisionTxs() bool
 	// PeekApricotDecisionTxs returns the next decisionTxs, up to maxTxsBytes,

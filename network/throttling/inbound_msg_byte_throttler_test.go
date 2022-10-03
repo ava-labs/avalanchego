@@ -428,7 +428,7 @@ func TestMsgThrottlerNextMsg(t *testing.T) {
 	firstMsgID := throttler.nodeToWaitingMsgID[vdr1ID]
 	firstMsg, exists := throttler.waitingToAcquire.Get(firstMsgID)
 	require.True(exists)
-	require.EqualValues(maxBytes-2, firstMsg.(*msgMetadata).bytesNeeded)
+	require.EqualValues(maxBytes-2, firstMsg.bytesNeeded)
 
 	select {
 	case <-doneVdr:

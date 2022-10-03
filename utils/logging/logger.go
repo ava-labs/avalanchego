@@ -36,17 +36,6 @@ type Logger interface {
 	// aspect of the program
 	Verbo(msg string, fields ...zap.Field)
 
-	// If assertions are enabled, will result in a panic if err is non-nil
-	AssertNoError(err error)
-	// If assertions are enabled, will result in a panic if b is false
-	AssertTrue(b bool, msg string, fields ...zap.Field)
-	// If assertions are enabled, the function will be called and will result in
-	// a panic the returned value is non-nil
-	AssertDeferredNoError(f func() error)
-	// If assertions are enabled, the function will be called and will result in
-	//  a panic the returned value is false
-	AssertDeferredTrue(f func() bool, msg string, fields ...zap.Field)
-
 	// Recovers a panic, logs the error, and rethrows the panic.
 	StopOnPanic()
 	// If a function panics, this will log that panic and then re-panic ensuring

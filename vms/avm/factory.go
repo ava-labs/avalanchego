@@ -16,12 +16,12 @@ type Factory struct {
 	TxFee            uint64
 	CreateAssetTxFee uint64
 
-	// Time of the Blueberry network upgrade
-	BlueberryTime time.Time
+	// Time of the Banff network upgrade
+	BanffTime time.Time
 }
 
-func (f *Factory) IsBlueberryActivated(timestamp time.Time) bool {
-	return !timestamp.Before(f.BlueberryTime)
+func (f *Factory) IsBanffActivated(timestamp time.Time) bool {
+	return !timestamp.Before(f.BanffTime)
 }
 
 func (f *Factory) New(*snow.Context) (interface{}, error) {

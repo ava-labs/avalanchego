@@ -13,25 +13,25 @@ import (
 )
 
 var (
-	_ BlueberryBlock = &BlueberryStandardBlock{}
-	_ Block          = &ApricotStandardBlock{}
+	_ BanffBlock = &BanffStandardBlock{}
+	_ Block      = &ApricotStandardBlock{}
 )
 
-type BlueberryStandardBlock struct {
+type BanffStandardBlock struct {
 	Time                 uint64 `serialize:"true" json:"time"`
 	ApricotStandardBlock `serialize:"true"`
 }
 
-func (b *BlueberryStandardBlock) Timestamp() time.Time  { return time.Unix(int64(b.Time), 0) }
-func (b *BlueberryStandardBlock) Visit(v Visitor) error { return v.BlueberryStandardBlock(b) }
+func (b *BanffStandardBlock) Timestamp() time.Time  { return time.Unix(int64(b.Time), 0) }
+func (b *BanffStandardBlock) Visit(v Visitor) error { return v.BanffStandardBlock(b) }
 
-func NewBlueberryStandardBlock(
+func NewBanffStandardBlock(
 	timestamp time.Time,
 	parentID ids.ID,
 	height uint64,
 	txs []*txs.Tx,
-) (*BlueberryStandardBlock, error) {
-	blk := &BlueberryStandardBlock{
+) (*BanffStandardBlock, error) {
+	blk := &BanffStandardBlock{
 		Time: uint64(timestamp.Unix()),
 		ApricotStandardBlock: ApricotStandardBlock{
 			CommonBlock: CommonBlock{

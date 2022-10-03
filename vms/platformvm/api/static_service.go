@@ -290,7 +290,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			RewardsOwner:     owner,
 			DelegationShares: delegationFee,
 		}}
-		if err := tx.Sign(genesis.Codec, nil); err != nil {
+		if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
 			return err
 		}
 
@@ -316,7 +316,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			GenesisData: genesisBytes,
 			SubnetAuth:  &secp256k1fx.Input{},
 		}}
-		if err := tx.Sign(genesis.Codec, nil); err != nil {
+		if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
 			return err
 		}
 
@@ -336,7 +336,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 
 	// Marshal genesis to bytes
-	bytes, err := genesis.Codec.Marshal(txs.Version, g)
+	bytes, err := genesis.Codec.Marshal(genesis.Version, g)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal genesis: %w", err)
 	}

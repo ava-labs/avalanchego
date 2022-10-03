@@ -228,7 +228,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 			config,
 			msgCreator,
 			msgCreatorWithProto,
-			time.Now().Add(time.Hour), // TODO: test proto with blueberry activated
+			time.Now().Add(time.Hour), // TODO: test proto with banff activated
 			prometheus.NewRegistry(),
 			logging.NoLog{},
 			listeners[i],
