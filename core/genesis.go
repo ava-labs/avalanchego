@@ -162,7 +162,7 @@ func (e *GenesisMismatchError) Error() string {
 // The stored chain configuration will be updated if it is compatible (i.e. does not
 // specify a fork block below the local head block). In case of a conflict, the
 // error is a *params.ConfigCompatError and the new, unwritten config is returned.
-func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig, error) {
+func SetupGenesisBlock(db ethdb.Database, genesis *Genesis, lastAcceptedHash common.Hash) (*params.ChainConfig, error) {
 	if genesis == nil {
 		return nil, ErrNoGenesis
 	}
@@ -209,12 +209,18 @@ func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig
 
 	// Check config compatibility and write the config. Compatibility errors
 	// are returned to the caller unless we're already at block zero.
-	headBlock := rawdb.ReadHeadBlock(db)
-	if headBlock == nil {
-		return newcfg, fmt.Errorf("missing head block")
+	// we use last accepted block for cfg compatibility check. Note this allows
+	// the node to continue if it previously halted due to attempting to process blocks with
+	// an incorrect chain config.
+	lastBlock := ReadBlockByHash(db, lastAcceptedHash)
+	// this should never happen, but we check anyway
+	// when we start syncing from scratch, the last accepted block
+	// will be genesis block
+	if lastBlock == nil {
+		return newcfg, fmt.Errorf("missing last accepted block")
 	}
-	height := headBlock.NumberU64()
-	timestamp := headBlock.Time()
+	height := lastBlock.NumberU64()
+	timestamp := lastBlock.Time()
 	compatErr := storedcfg.CheckCompatible(newcfg, height, timestamp)
 	if compatErr != nil && height != 0 && compatErr.RewindTo != 0 {
 		return newcfg, compatErr
@@ -329,4 +335,13 @@ func GenesisBlockForTesting(db ethdb.Database, addr common.Address, balance *big
 		BaseFee: big.NewInt(params.ApricotPhase3InitialBaseFee),
 	}
 	return g.MustCommit(db)
+}
+
+// ReadBlockByHash reads the block with the given hash from the database.
+func ReadBlockByHash(db ethdb.Reader, hash common.Hash) *types.Block {
+	blockNumber := rawdb.ReadHeaderNumber(db, hash)
+	if blockNumber == nil {
+		return nil
+	}
+	return rawdb.ReadBlock(db, hash, *blockNumber)
 }

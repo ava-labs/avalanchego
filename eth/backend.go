@@ -150,7 +150,7 @@ func New(
 		"dirty", common.StorageSize(config.TrieDirtyCache)*1024*1024,
 	)
 
-	chainConfig, genesisErr := core.SetupGenesisBlock(chainDb, config.Genesis)
+	chainConfig, genesisErr := core.SetupGenesisBlock(chainDb, config.Genesis, lastAcceptedHash)
 	if genesisErr != nil {
 		return nil, genesisErr
 	}

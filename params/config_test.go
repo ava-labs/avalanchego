@@ -34,25 +34,25 @@ import (
 
 func TestCheckCompatible(t *testing.T) {
 	type test struct {
-		stored, new               *ChainConfig
-		headHeight, headTimestamp uint64
-		wantErr                   *ConfigCompatError
+		stored, new                 *ChainConfig
+		blockHeight, blockTimestamp uint64
+		wantErr                     *ConfigCompatError
 	}
 	tests := []test{
-		{stored: TestChainConfig, new: TestChainConfig, headHeight: 0, headTimestamp: 0, wantErr: nil},
-		{stored: TestChainConfig, new: TestChainConfig, headHeight: 100, headTimestamp: 1000, wantErr: nil},
+		{stored: TestChainConfig, new: TestChainConfig, blockHeight: 0, blockTimestamp: 0, wantErr: nil},
+		{stored: TestChainConfig, new: TestChainConfig, blockHeight: 100, blockTimestamp: 1000, wantErr: nil},
 		{
-			stored:        &ChainConfig{EIP150Block: big.NewInt(10)},
-			new:           &ChainConfig{EIP150Block: big.NewInt(20)},
-			headHeight:    9,
-			headTimestamp: 90,
-			wantErr:       nil,
+			stored:         &ChainConfig{EIP150Block: big.NewInt(10)},
+			new:            &ChainConfig{EIP150Block: big.NewInt(20)},
+			blockHeight:    9,
+			blockTimestamp: 90,
+			wantErr:        nil,
 		},
 		{
-			stored:        TestChainConfig,
-			new:           &ChainConfig{HomesteadBlock: nil},
-			headHeight:    3,
-			headTimestamp: 30,
+			stored:         TestChainConfig,
+			new:            &ChainConfig{HomesteadBlock: nil},
+			blockHeight:    3,
+			blockTimestamp: 30,
 			wantErr: &ConfigCompatError{
 				What:         "Homestead fork block",
 				StoredConfig: big.NewInt(0),
@@ -61,10 +61,10 @@ func TestCheckCompatible(t *testing.T) {
 			},
 		},
 		{
-			stored:        TestChainConfig,
-			new:           &ChainConfig{HomesteadBlock: big.NewInt(1)},
-			headHeight:    3,
-			headTimestamp: 30,
+			stored:         TestChainConfig,
+			new:            &ChainConfig{HomesteadBlock: big.NewInt(1)},
+			blockHeight:    3,
+			blockTimestamp: 30,
 			wantErr: &ConfigCompatError{
 				What:         "Homestead fork block",
 				StoredConfig: big.NewInt(0),
@@ -73,10 +73,10 @@ func TestCheckCompatible(t *testing.T) {
 			},
 		},
 		{
-			stored:        &ChainConfig{HomesteadBlock: big.NewInt(30), EIP150Block: big.NewInt(10)},
-			new:           &ChainConfig{HomesteadBlock: big.NewInt(25), EIP150Block: big.NewInt(20)},
-			headHeight:    25,
-			headTimestamp: 250,
+			stored:         &ChainConfig{HomesteadBlock: big.NewInt(30), EIP150Block: big.NewInt(10)},
+			new:            &ChainConfig{HomesteadBlock: big.NewInt(25), EIP150Block: big.NewInt(20)},
+			blockHeight:    25,
+			blockTimestamp: 250,
 			wantErr: &ConfigCompatError{
 				What:         "EIP150 fork block",
 				StoredConfig: big.NewInt(10),
@@ -85,17 +85,17 @@ func TestCheckCompatible(t *testing.T) {
 			},
 		},
 		{
-			stored:        &ChainConfig{ConstantinopleBlock: big.NewInt(30)},
-			new:           &ChainConfig{ConstantinopleBlock: big.NewInt(30), PetersburgBlock: big.NewInt(30)},
-			headHeight:    40,
-			headTimestamp: 400,
-			wantErr:       nil,
+			stored:         &ChainConfig{ConstantinopleBlock: big.NewInt(30)},
+			new:            &ChainConfig{ConstantinopleBlock: big.NewInt(30), PetersburgBlock: big.NewInt(30)},
+			blockHeight:    40,
+			blockTimestamp: 400,
+			wantErr:        nil,
 		},
 		{
-			stored:        &ChainConfig{ConstantinopleBlock: big.NewInt(30)},
-			new:           &ChainConfig{ConstantinopleBlock: big.NewInt(30), PetersburgBlock: big.NewInt(31)},
-			headHeight:    40,
-			headTimestamp: 400,
+			stored:         &ChainConfig{ConstantinopleBlock: big.NewInt(30)},
+			new:            &ChainConfig{ConstantinopleBlock: big.NewInt(30), PetersburgBlock: big.NewInt(31)},
+			blockHeight:    40,
+			blockTimestamp: 400,
 			wantErr: &ConfigCompatError{
 				What:         "Petersburg fork block",
 				StoredConfig: nil,
@@ -104,10 +104,10 @@ func TestCheckCompatible(t *testing.T) {
 			},
 		},
 		{
-			stored:        TestChainConfig,
-			new:           TestApricotPhase4Config,
-			headHeight:    0,
-			headTimestamp: 0,
+			stored:         TestChainConfig,
+			new:            TestApricotPhase4Config,
+			blockHeight:    0,
+			blockTimestamp: 0,
 			wantErr: &ConfigCompatError{
 				What:         "ApricotPhase5 fork block timestamp",
 				StoredConfig: big.NewInt(0),
@@ -116,10 +116,10 @@ func TestCheckCompatible(t *testing.T) {
 			},
 		},
 		{
-			stored:        TestChainConfig,
-			new:           TestApricotPhase4Config,
-			headHeight:    10,
-			headTimestamp: 100,
+			stored:         TestChainConfig,
+			new:            TestApricotPhase4Config,
+			blockHeight:    10,
+			blockTimestamp: 100,
 			wantErr: &ConfigCompatError{
 				What:         "ApricotPhase5 fork block timestamp",
 				StoredConfig: big.NewInt(0),
@@ -130,9 +130,9 @@ func TestCheckCompatible(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := test.stored.CheckCompatible(test.new, test.headHeight, test.headTimestamp)
+		err := test.stored.CheckCompatible(test.new, test.blockHeight, test.blockTimestamp)
 		if !reflect.DeepEqual(err, test.wantErr) {
-			t.Errorf("error mismatch:\nstored: %v\nnew: %v\nheadHeight: %v\nerr: %v\nwant: %v", test.stored, test.new, test.headHeight, err, test.wantErr)
+			t.Errorf("error mismatch:\nstored: %v\nnew: %v\nblockHeight: %v\nerr: %v\nwant: %v", test.stored, test.new, test.blockHeight, err, test.wantErr)
 		}
 	}
 }
