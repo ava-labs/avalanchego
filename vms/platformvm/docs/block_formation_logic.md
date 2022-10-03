@@ -1,6 +1,6 @@
 # Block Composition and Formation Logic
 
-AvalancheGo v1.8.0 (Blueberry) slightly changes the way the P-chain selects transactions to be included in next block and deals with block timestamps. In this brief document we detail the process and the changes.
+AvalancheGo v1.9.0 (Banff) slightly changes the way the P-chain selects transactions to be included in next block and deals with block timestamps. In this brief document we detail the process and the changes.
 
 ## Apricot
 
@@ -53,11 +53,11 @@ Note that the order in which these steps are executed matters. A block updating 
 
 Block formation terminates as soon as any of the steps executed manage to select transactions to be included into a block. Otherwise, an error is raised to signal that there are no transactions to be issued. Finally a timer is kicked off to schedule the next block formation attempt.
 
-## Blueberry
+## Banff
 
-### Blueberry Block Content
+### Banff Block Content
 
-Blueberry allows the following block types with the following content:
+Banff allows the following block types with the following content:
 
 - _Standard Blocks_ may contain multiple transactions of the following types:
   - CreateChainTx
@@ -87,9 +87,9 @@ So the main differences with respect to Apricot are:
 - New Transaction types: _RemoveSubnetValidatorTx_, _TransformSubnetTx_, _AddPermissionlessValidatorTx_, _AddPermissionlessDelegatorTx_ have been added into Standard Blocks.
 - Block timestamp is explicitly serialized into block header, to allow chain time update.
 
-### Blueberry Block Formation Logic
+### Banff Block Formation Logic
 
-The activation of the Blueberry upgrade only makes minor changes to the way the P-chain selects transactions to be included in next block, such as block timestamp calculation. Below are the details of changes.
+The activation of the Banff upgrade only makes minor changes to the way the P-chain selects transactions to be included in next block, such as block timestamp calculation. Below are the details of changes.
 
 Operations are carried out in the following order:
 

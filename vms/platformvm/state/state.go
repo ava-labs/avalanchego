@@ -425,7 +425,7 @@ func new(
 	}
 
 	utxoDB := prefixdb.New(utxoPrefix, baseDB)
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, genesis.Codec, metricsReg)
+	utxoState, err := avax.NewMeteredUTXOState(utxoDB, txs.GenesisCodec, metricsReg)
 	if err != nil {
 		return nil, err
 	}
@@ -744,11 +744,11 @@ func (s *state) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 	}
 
 	stx := txBytesAndStatus{}
-	if _, err := genesis.Codec.Unmarshal(txBytes, &stx); err != nil {
+	if _, err := txs.GenesisCodec.Unmarshal(txBytes, &stx); err != nil {
 		return nil, status.Unknown, err
 	}
 
-	tx, err := txs.Parse(genesis.Codec, stx.Tx)
+	tx, err := txs.Parse(txs.GenesisCodec, stx.Tx)
 	if err != nil {
 		return nil, status.Unknown, err
 	}
@@ -902,7 +902,7 @@ func (s *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids
 		Height:   height,
 		SubnetID: subnetID,
 	}
-	prefixBytes, err := genesis.Codec.Marshal(txs.Version, prefixStruct)
+	prefixBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, prefixStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -925,7 +925,7 @@ func (s *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids
 		}
 
 		weightDiff := ValidatorWeightDiff{}
-		_, err = genesis.Codec.Unmarshal(diffIter.Value(), &weightDiff)
+		_, err = blocks.GenesisCodec.Unmarshal(diffIter.Value(), &weightDiff)
 		if err != nil {
 			return nil, err
 		}
@@ -1400,7 +1400,7 @@ func (s *state) writeBlocks() error {
 		)
 
 		// Note: blocks to be stored are verified, so it's safe to marshal them with GenesisCodec
-		blockBytes, err := blocks.GenesisCodec.Marshal(txs.Version, &stBlk)
+		blockBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, &stBlk)
 		if err != nil {
 			return fmt.Errorf("failed to marshal block %s to store: %w", blkID, err)
 		}
@@ -1461,7 +1461,7 @@ func (s *state) writeCurrentPrimaryNetworkStakers(height uint64) error {
 		Height:   height,
 		SubnetID: constants.PrimaryNetworkID,
 	}
-	prefixBytes, err := genesis.Codec.Marshal(txs.Version, prefixStruct)
+	prefixBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, prefixStruct)
 	if err != nil {
 		return fmt.Errorf("failed to create prefix bytes: %w", err)
 	}
@@ -1494,7 +1494,7 @@ func (s *state) writeCurrentPrimaryNetworkStakers(height uint64) error {
 					PotentialReward: staker.PotentialReward,
 				}
 
-				vdrBytes, err := genesis.Codec.Marshal(txs.Version, vdr)
+				vdrBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, vdr)
 				if err != nil {
 					return fmt.Errorf("failed to serialize current validator: %w", err)
 				}
@@ -1521,7 +1521,7 @@ func (s *state) writeCurrentPrimaryNetworkStakers(height uint64) error {
 		}
 		weightDiffs[nodeID] = weightDiff
 
-		weightDiffBytes, err := genesis.Codec.Marshal(txs.Version, weightDiff)
+		weightDiffBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, weightDiff)
 		if err != nil {
 			return fmt.Errorf("failed to serialize validator weight diff: %w", err)
 		}
@@ -1572,7 +1572,7 @@ func (s *state) writeCurrentSubnetStakers(height uint64) error {
 			Height:   height,
 			SubnetID: subnetID,
 		}
-		prefixBytes, err := genesis.Codec.Marshal(txs.Version, prefixStruct)
+		prefixBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, prefixStruct)
 		if err != nil {
 			return fmt.Errorf("failed to create prefix bytes: %w", err)
 		}
@@ -1612,7 +1612,7 @@ func (s *state) writeCurrentSubnetStakers(height uint64) error {
 			}
 			weightDiffs[nodeID] = weightDiff
 
-			weightDiffBytes, err := genesis.Codec.Marshal(txs.Version, weightDiff)
+			weightDiffBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, weightDiff)
 			if err != nil {
 				return fmt.Errorf("failed to serialize validator weight diff: %w", err)
 			}
@@ -1754,7 +1754,7 @@ func (s *state) writeUptimes() error {
 		uptime := s.uptimes[nodeID]
 		uptime.LastUpdated = uint64(uptime.lastUpdated.Unix())
 
-		uptimeBytes, err := genesis.Codec.Marshal(txs.Version, uptime)
+		uptimeBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, uptime)
 		if err != nil {
 			return fmt.Errorf("failed to serialize uptime: %w", err)
 		}
@@ -1777,7 +1777,7 @@ func (s *state) writeTXs() error {
 
 		// Note that we're serializing a [txBytesAndStatus] here, not a
 		// *txs.Tx, so we don't use [txs.Codec].
-		txBytes, err := genesis.Codec.Marshal(txs.Version, &stx)
+		txBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stx)
 		if err != nil {
 			return fmt.Errorf("failed to serialize tx: %w", err)
 		}
@@ -1799,7 +1799,7 @@ func (s *state) writeRewardUTXOs() error {
 		txDB := linkeddb.NewDefault(rawTxDB)
 
 		for _, utxo := range utxos {
-			utxoBytes, err := genesis.Codec.Marshal(txs.Version, utxo)
+			utxoBytes, err := txs.GenesisCodec.Marshal(txs.Version, utxo)
 			if err != nil {
 				return fmt.Errorf("failed to serialize reward UTXO: %w", err)
 			}

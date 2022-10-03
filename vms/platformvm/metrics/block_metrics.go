@@ -56,17 +56,17 @@ func newBlockMetric(
 	return blockMetric
 }
 
-func (m *blockMetrics) BlueberryAbortBlock(*blocks.BlueberryAbortBlock) error {
+func (m *blockMetrics) BanffAbortBlock(*blocks.BanffAbortBlock) error {
 	m.numAbortBlocks.Inc()
 	return nil
 }
 
-func (m *blockMetrics) BlueberryCommitBlock(*blocks.BlueberryCommitBlock) error {
+func (m *blockMetrics) BanffCommitBlock(*blocks.BanffCommitBlock) error {
 	m.numCommitBlocks.Inc()
 	return nil
 }
 
-func (m *blockMetrics) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) error {
+func (m *blockMetrics) BanffProposalBlock(b *blocks.BanffProposalBlock) error {
 	m.numProposalBlocks.Inc()
 	for _, tx := range b.Transactions {
 		if err := tx.Unsigned.Visit(m.txMetrics); err != nil {
@@ -76,7 +76,7 @@ func (m *blockMetrics) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) 
 	return b.Tx.Unsigned.Visit(m.txMetrics)
 }
 
-func (m *blockMetrics) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) error {
+func (m *blockMetrics) BanffStandardBlock(b *blocks.BanffStandardBlock) error {
 	m.numStandardBlocks.Inc()
 	for _, tx := range b.Transactions {
 		if err := tx.Unsigned.Visit(m.txMetrics); err != nil {

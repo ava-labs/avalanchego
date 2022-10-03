@@ -11,6 +11,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/stretchr/testify/require"
+
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -29,17 +31,27 @@ import (
 //
 //	$ go test -run=NONE -bench=BenchmarkMarshalVersion > /tmp/cpu.before.txt
 //	$ USE_PROTO=true go test -run=NONE -bench=BenchmarkMarshalVersion > /tmp/cpu.after.txt
+//	$ USE_PROTO=true USE_PROTO_BUILDER=true go test -run=NONE -bench=BenchmarkMarshalVersion > /tmp/cpu.after.txt
 //	$ benchcmp /tmp/cpu.before.txt /tmp/cpu.after.txt
 //	$ benchstat -alpha 0.03 -geomean /tmp/cpu.before.txt /tmp/cpu.after.txt
 //
 //	$ go test -run=NONE -bench=BenchmarkMarshalVersion -benchmem > /tmp/mem.before.txt
 //	$ USE_PROTO=true go test -run=NONE -bench=BenchmarkMarshalVersion -benchmem > /tmp/mem.after.txt
+//	$ USE_PROTO=true USE_PROTO_BUILDER=true go test -run=NONE -bench=BenchmarkMarshalVersion -benchmem > /tmp/mem.after.txt
 //	$ benchcmp /tmp/mem.before.txt /tmp/mem.after.txt
 //	$ benchstat -alpha 0.03 -geomean /tmp/mem.before.txt /tmp/mem.after.txt
 func BenchmarkMarshalVersion(b *testing.B) {
+	require := require.New(b)
+
 	b.StopTimer()
 
 	id := ids.GenerateTestID()
+
+	// version message does not require compression
+	// thus no in-place update for proto test cases
+	// which makes the benchmarks fairer to proto
+	// as there's no need to copy the original test message
+	// for each run
 	inboundMsg := inboundMessageWithPacker{
 		inboundMessage: inboundMessage{
 			op: Version,
@@ -56,13 +68,11 @@ func BenchmarkMarshalVersion(b *testing.B) {
 		},
 	}
 	packerCodec, err := NewCodecWithMemoryPool("", prometheus.NewRegistry(), 2*units.MiB, 10*time.Second)
-	if err != nil {
-		b.Fatal(err)
-	}
+	require.NoError(err)
+
 	packerMsg, err := packerCodec.Pack(inboundMsg.op, inboundMsg.fields, inboundMsg.op.Compressible(), false)
-	if err != nil {
-		b.Fatal(err)
-	}
+	require.NoError(err)
+
 	packerMsgN := len(packerMsg.Bytes())
 
 	protoMsg := p2ppb.Message{
@@ -81,23 +91,29 @@ func BenchmarkMarshalVersion(b *testing.B) {
 	}
 	protoMsgN := proto.Size(&protoMsg)
 
-	useProto := os.Getenv("USE_PROTO") == "true"
-	b.Logf("marshaling packer %d-byte, proto %d-byte (use proto %v)", packerMsgN, protoMsgN, useProto)
+	useProto := os.Getenv("USE_PROTO") != ""
+	useProtoBuilder := os.Getenv("USE_PROTO_BUILDER") != ""
+
+	protoCodec, err := newMsgBuilderProtobuf("", prometheus.NewRegistry(), 2*units.MiB, 10*time.Second)
+	require.NoError(err)
+
+	b.Logf("marshaling packer %d-byte, proto %d-byte (use proto %v, use proto builder %v)", packerMsgN, protoMsgN, useProto, useProtoBuilder)
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		if !useProto {
-			_, err := packerCodec.Pack(inboundMsg.op, inboundMsg.fields, inboundMsg.op.Compressible(), false)
-			if err != nil {
-				b.Fatal(err)
-			}
+			// version does not compress message
+			_, err := packerCodec.Pack(inboundMsg.op, inboundMsg.fields, false, false)
+			require.NoError(err)
 			continue
 		}
 
-		_, err := proto.Marshal(&protoMsg)
-		if err != nil {
-			b.Fatal(err)
+		if useProtoBuilder {
+			_, err = protoCodec.createOutbound(inboundMsg.op, &protoMsg, false, false)
+		} else {
+			_, err = proto.Marshal(&protoMsg)
 		}
+		require.NoError(err)
 	}
 }
 
@@ -110,14 +126,18 @@ func BenchmarkMarshalVersion(b *testing.B) {
 //
 //	$ go test -run=NONE -bench=BenchmarkUnmarshalVersion > /tmp/cpu.before.txt
 //	$ USE_PROTO=true go test -run=NONE -bench=BenchmarkUnmarshalVersion > /tmp/cpu.after.txt
+//	$ USE_PROTO=true USE_PROTO_BUILDER=true go test -run=NONE -bench=BenchmarkUnmarshalVersion > /tmp/cpu.after.txt
 //	$ benchcmp /tmp/cpu.before.txt /tmp/cpu.after.txt
 //	$ benchstat -alpha 0.03 -geomean /tmp/cpu.before.txt /tmp/cpu.after.txt
 //
 //	$ go test -run=NONE -bench=BenchmarkUnmarshalVersion -benchmem > /tmp/mem.before.txt
 //	$ USE_PROTO=true go test -run=NONE -bench=BenchmarkUnmarshalVersion -benchmem > /tmp/mem.after.txt
+//	$ USE_PROTO=true USE_PROTO_BUILDER=true go test -run=NONE -bench=BenchmarkUnmarshalVersion -benchmem > /tmp/mem.after.txt
 //	$ benchcmp /tmp/mem.before.txt /tmp/mem.after.txt
 //	$ benchstat -alpha 0.03 -geomean /tmp/mem.before.txt /tmp/mem.after.txt
 func BenchmarkUnmarshalVersion(b *testing.B) {
+	require := require.New(b)
+
 	b.StopTimer()
 
 	id := ids.GenerateTestID()
@@ -137,9 +157,7 @@ func BenchmarkUnmarshalVersion(b *testing.B) {
 		},
 	}
 	packerCodec, err := NewCodecWithMemoryPool("", prometheus.NewRegistry(), 2*units.MiB, 10*time.Second)
-	if err != nil {
-		b.Fatal(err)
-	}
+	require.NoError(err)
 
 	protoMsg := p2ppb.Message{
 		Message: &p2ppb.Message_Version{
@@ -157,32 +175,33 @@ func BenchmarkUnmarshalVersion(b *testing.B) {
 	}
 
 	rawMsg, err := proto.Marshal(&protoMsg)
-	if err != nil {
-		b.Fatal(err)
-	}
+	require.NoError(err)
 
-	useProto := os.Getenv("USE_PROTO") == "true"
+	useProto := os.Getenv("USE_PROTO") != ""
 	if !useProto {
 		msgInf, err := packerCodec.Pack(inboundMsg.op, inboundMsg.fields, inboundMsg.op.Compressible(), false)
-		if err != nil {
-			b.Fatal(err)
-		}
+		require.NoError(err)
 		rawMsg = msgInf.Bytes()
 	}
+
+	useProtoBuilder := os.Getenv("USE_PROTO_BUILDER") != ""
+	protoCodec, err := newMsgBuilderProtobuf("", prometheus.NewRegistry(), 2*units.MiB, 10*time.Second)
+	require.NoError(err)
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		if !useProto {
 			_, err := packerCodec.Parse(rawMsg, dummyNodeID, dummyOnFinishedHandling)
-			if err != nil {
-				b.Fatal(err)
-			}
+			require.NoError(err)
 			continue
 		}
 
-		var protoMsg p2ppb.Message
-		if err := proto.Unmarshal(rawMsg, &protoMsg); err != nil {
-			b.Fatal(err)
+		if useProtoBuilder {
+			_, err = protoCodec.parseInbound(rawMsg, dummyNodeID, dummyOnFinishedHandling)
+		} else {
+			var protoMsg p2ppb.Message
+			err = proto.Unmarshal(rawMsg, &protoMsg)
 		}
+		require.NoError(err)
 	}
 }

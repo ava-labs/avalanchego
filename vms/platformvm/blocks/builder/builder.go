@@ -201,7 +201,7 @@ func (b *builder) buildBlock() (blocks.Block, error) {
 	// timeWasCapped means that [timestamp] was reduced to
 	// [nextStakerChangeTime]. It is used as a flag for [buildApricotBlock] to
 	// be willing to issue an advanceTimeTx. It is also used as a flag for
-	// [buildBlueberryBlock] to force the issuance of an empty block to advance
+	// [buildBanffBlock] to force the issuance of an empty block to advance
 	// the time forward; if there are no available transactions.
 	timeWasCapped := !timestamp.Before(nextStakerChangeTime)
 	if timeWasCapped {
@@ -209,9 +209,9 @@ func (b *builder) buildBlock() (blocks.Block, error) {
 	}
 	// [timestamp] = min(max(now, parentTime), nextStakerChangeTime)
 
-	// If the blueberry timestamp has come, build blueberry blocks.
-	if b.txExecutorBackend.Config.IsBlueberryActivated(timestamp) {
-		return buildBlueberryBlock(
+	// If the banff timestamp has come, build banff blocks.
+	if b.txExecutorBackend.Config.IsBanffActivated(timestamp) {
+		return buildBanffBlock(
 			b,
 			preferredID,
 			nextHeight,

@@ -128,6 +128,22 @@ func (t *Transitive) Put(nodeID ids.NodeID, requestID uint32, blkBytes []byte) e
 		return t.GetFailed(nodeID, requestID)
 	}
 
+	actualBlkID := blk.ID()
+	expectedBlkID, ok := t.blkReqs.Get(nodeID, requestID)
+	// If the provided block is not the requested block, we need to explicitly
+	// mark the request as failed to avoid having a dangling dependency.
+	if ok && actualBlkID != expectedBlkID {
+		t.Ctx.Log.Debug("incorrect block returned in Put",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+			zap.Stringer("blkID", actualBlkID),
+			zap.Stringer("expectedBlkID", expectedBlkID),
+		)
+		// We assume that [blk] is useless because it doesn't match what we
+		// expected.
+		return t.GetFailed(nodeID, requestID)
+	}
+
 	if t.wasIssued(blk) {
 		t.metrics.numUselessPutBytes.Add(float64(len(blkBytes)))
 	}
@@ -157,13 +173,12 @@ func (t *Transitive) GetFailed(nodeID ids.NodeID, requestID uint32) error {
 
 	// Because the get request was dropped, we no longer expect blkID to be issued.
 	t.blocked.Abandon(blkID)
+	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
 	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 	return t.buildBlocks()
 }
 
 func (t *Transitive) PullQuery(nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
-	// TODO: once everyone supports ChitsV2 - we should be sending that message
-	// type here.
 	t.Sender.SendChits(nodeID, requestID, []ids.ID{t.Consensus.Preference()})
 
 	// Try to issue [blkID] to consensus.
@@ -176,8 +191,6 @@ func (t *Transitive) PullQuery(nodeID ids.NodeID, requestID uint32, blkID ids.ID
 }
 
 func (t *Transitive) PushQuery(nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
-	// TODO: once everyone supports ChitsV2 - we should be sending that message
-	// type here.
 	t.Sender.SendChits(nodeID, requestID, []ids.ID{t.Consensus.Preference()})
 
 	blk, err := t.VM.ParseBlock(blkBytes)
@@ -256,10 +269,6 @@ func (t *Transitive) Chits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) 
 	return t.buildBlocks()
 }
 
-func (t *Transitive) ChitsV2(vdr ids.NodeID, requestID uint32, _ []ids.ID, vote ids.ID) error {
-	return t.Chits(vdr, requestID, []ids.ID{vote})
-}
-
 func (t *Transitive) QueryFailed(vdr ids.NodeID, requestID uint32) error {
 	t.blocked.Register(&voter{
 		t:         t,
@@ -317,7 +326,7 @@ func (t *Transitive) Gossip() error {
 	t.Ctx.Log.Verbo("gossiping accepted block to the network",
 		zap.Stringer("blkID", blkID),
 	)
-	t.Sender.SendGossip(blkID, blk.Bytes())
+	t.Sender.SendGossip(blk.Bytes())
 	return nil
 }
 
@@ -331,7 +340,7 @@ func (t *Transitive) Shutdown() error {
 func (t *Transitive) Notify(msg common.Message) error {
 	if msg != common.PendingTxs {
 		t.Ctx.Log.Warn("received an unexpected message from the VM",
-			zap.Stringer("message", msg),
+			zap.Stringer("messageString", msg),
 		)
 		return nil
 	}
@@ -743,33 +752,15 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	// By ensuring that the parent is either processing or accepted, it is
 	// guaranteed that the parent was successfully verified. This means that
 	// calling Verify on this block is allowed.
-
-	// make sure this block is valid
-	if err := blk.Verify(); err != nil {
-		t.Ctx.Log.Debug("block verification failed",
-			zap.Error(err),
-		)
-
-		// if verify fails, then all descendants are also invalid
-		t.addToNonVerifieds(blk)
+	blkAdded, err := t.addUnverifiedBlockToConsensus(blk)
+	if err != nil {
+		return err
+	}
+	if !blkAdded {
 		t.blocked.Abandon(blkID)
 		t.metrics.numBlocked.Set(float64(len(t.pending))) // Tracks performance statistics
 		t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 		return t.errs.Err
-	}
-	t.nonVerifieds.Remove(blkID)
-	t.nonVerifiedCache.Evict(blkID)
-	t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
-	t.Ctx.Log.Verbo("adding block to consensus",
-		zap.Stringer("blkID", blkID),
-	)
-	wrappedBlk := &memoryBlock{
-		Block:   blk,
-		metrics: &t.metrics,
-		tree:    t.nonVerifieds,
-	}
-	if err := t.Consensus.Add(wrappedBlk); err != nil {
-		return err
 	}
 
 	// Add all the oracle blocks if they exist. We call verify on all the blocks
@@ -785,29 +776,14 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 			}
 
 			for _, blk := range options {
-				if err := blk.Verify(); err != nil {
-					t.Ctx.Log.Debug("block verification failed",
-						zap.Error(err),
-					)
-					dropped = append(dropped, blk)
-					// block fails verification, hold this in memory for bubbling
-					t.addToNonVerifieds(blk)
-				} else {
-					blkID := blk.ID()
-					// correctly verified will be passed to consensus as processing block
-					// no need to keep it anymore
-					t.nonVerifieds.Remove(blkID)
-					t.nonVerifiedCache.Evict(blkID)
-					t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
-					wrappedBlk := &memoryBlock{
-						Block:   blk,
-						metrics: &t.metrics,
-						tree:    t.nonVerifieds,
-					}
-					if err := t.Consensus.Add(wrappedBlk); err != nil {
-						return err
-					}
+				blkAdded, err := t.addUnverifiedBlockToConsensus(blk)
+				if err != nil {
+					return err
+				}
+				if blkAdded {
 					added = append(added, blk)
+				} else {
+					dropped = append(dropped, blk)
 				}
 			}
 		}
@@ -876,4 +852,32 @@ func (t *Transitive) addToNonVerifieds(blk snowman.Block) {
 		t.nonVerifiedCache.Put(blkID, blk)
 		t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
 	}
+}
+
+// addUnverifiedBlockToConsensus returns whether the block was added and an
+// error if one occurred while adding it to consensus.
+func (t *Transitive) addUnverifiedBlockToConsensus(blk snowman.Block) (bool, error) {
+	// make sure this block is valid
+	if err := blk.Verify(); err != nil {
+		t.Ctx.Log.Debug("block verification failed",
+			zap.Error(err),
+		)
+
+		// if verify fails, then all descendants are also invalid
+		t.addToNonVerifieds(blk)
+		return false, nil
+	}
+
+	blkID := blk.ID()
+	t.nonVerifieds.Remove(blkID)
+	t.nonVerifiedCache.Evict(blkID)
+	t.metrics.numNonVerifieds.Set(float64(t.nonVerifieds.Len()))
+	t.Ctx.Log.Verbo("adding block to consensus",
+		zap.Stringer("blkID", blkID),
+	)
+	return true, t.Consensus.Add(&memoryBlock{
+		Block:   blk,
+		metrics: &t.metrics,
+		tree:    t.nonVerifieds,
+	})
 }

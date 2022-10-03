@@ -249,16 +249,6 @@ func (nop *noOpChitsHandler) Chits(nodeID ids.NodeID, requestID uint32, _ []ids.
 	return nil
 }
 
-func (nop *noOpChitsHandler) ChitsV2(nodeID ids.NodeID, requestID uint32, _ []ids.ID, _ ids.ID) error {
-	nop.log.Debug("dropping request",
-		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.ChitsV2),
-		zap.Stringer("nodeID", nodeID),
-		zap.Uint32("requestID", requestID),
-	)
-	return nil
-}
-
 func (nop *noOpChitsHandler) QueryFailed(nodeID ids.NodeID, requestID uint32) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
