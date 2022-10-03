@@ -523,15 +523,16 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, lastHeight *big.Int, 
 	}
 	// TODO: add Phase 6 checks
 
-	if isForkIncompatible(c.BanffBlockTimestamp, newcfg.BanffBlockTimestamp, lastTimestamp) {
-		return newCompatError("Banff fork block timestamp", c.BanffBlockTimestamp, newcfg.BanffBlockTimestamp)
-	}
-	if isForkIncompatible(c.BanffPostBlockTimestamp, newcfg.BanffPostBlockTimestamp, lastTimestamp) {
-		return newCompatError("Banff Post fork block timestamp", c.BanffPostBlockTimestamp, newcfg.BanffPostBlockTimestamp)
-	}
-	if isForkIncompatible(c.CortinaBlockTimestamp, newcfg.CortinaBlockTimestamp, lastTimestamp) {
-		return newCompatError("Cortina fork block timestamp", c.CortinaBlockTimestamp, newcfg.CortinaBlockTimestamp)
-	}
+	// TODO activate isForkIncompatible checks
+	// if isForkIncompatible(c.BanffBlockTimestamp, newcfg.BanffBlockTimestamp, lastTimestamp) {
+	// 	return newCompatError("Banff fork block timestamp", c.BanffBlockTimestamp, newcfg.BanffBlockTimestamp)
+	// }
+	// if isForkIncompatible(c.BanffPostBlockTimestamp, newcfg.BanffPostBlockTimestamp, lastTimestamp) {
+	// 	return newCompatError("Banff Post fork block timestamp", c.BanffPostBlockTimestamp, newcfg.BanffPostBlockTimestamp)
+	// }
+	// if isForkIncompatible(c.CortinaBlockTimestamp, newcfg.CortinaBlockTimestamp, lastTimestamp) {
+	// 	return newCompatError("Cortina fork block timestamp", c.CortinaBlockTimestamp, newcfg.CortinaBlockTimestamp)
+	// }
 	return nil
 }
 
