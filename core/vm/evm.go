@@ -67,6 +67,8 @@ func (evm *EVM) isProhibitedWithTimestamp(addr common.Address) error {
 
 	// Return error depending on the phase
 	switch {
+	case evm.chainRules.IsBanffPost: // Disable the soft fork as of Banff post
+		return nil
 	case evm.chainRules.IsApricotPhasePost6: // If we are in the soft fork, return the soft error
 		return vmerrs.ErrToAddrProhibitedSoft
 	case evm.chainRules.IsApricotPhase6: // If we are in Phase6, return nil

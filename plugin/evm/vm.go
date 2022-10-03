@@ -775,8 +775,8 @@ func (vm *VM) postBatchOnFinalizeAndAssemble(header *types.Header, state *state.
 		size += txSize
 	}
 
-	// In Clementine the block header must include the atomic trie root.
-	if rules.IsClementine {
+	// In Cortina the block header must include the atomic trie root.
+	if rules.IsCortina {
 		// Pass common.Hash{} as the current block's hash to the atomic backend, this avoids
 		// pinning changes to the atomic trie in memory, as we are still computing the header
 		// for this block and don't have its hash yet. Here we calculate the root of the atomic
@@ -848,8 +848,8 @@ func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big
 		if err != nil {
 			return nil, nil, err
 		}
-		if rules.IsClementine {
-			// In Clementine, the atomic trie root should be in ExtraStateRoot.
+		if rules.IsCortina {
+			// In Cortina, the atomic trie root should be in ExtraStateRoot.
 			if header.ExtraStateRoot != atomicRoot {
 				return nil, nil, fmt.Errorf(
 					"%w: (expected %s) (got %s)", errInvalidExtraStateRoot, header.ExtraStateRoot, atomicRoot,
@@ -1108,10 +1108,10 @@ func (vm *VM) Version() (string, error) {
 }
 
 // NewHandler returns a new Handler for a service where:
-//   * The handler's functionality is defined by [service]
+//   - The handler's functionality is defined by [service]
 //     [service] should be a gorilla RPC service (see https://www.gorillatoolkit.org/pkg/rpc/v2)
-//   * The name of the service is [name]
-//   * The LockOption is the first element of [lockOption]
+//   - The name of the service is [name]
+//   - The LockOption is the first element of [lockOption]
 //     By default the LockOption is WriteLock
 //     [lockOption] should have either 0 or 1 elements. Elements beside the first are ignored.
 func newHandler(name string, service interface{}, lockOption ...commonEng.LockOption) (*commonEng.HTTPHandler, error) {
