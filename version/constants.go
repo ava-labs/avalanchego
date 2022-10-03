@@ -75,9 +75,8 @@ var (
 	}
 	ApricotPhase6DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
-	// FIXME: update this before release
 	BanffTimes = map[uint32]time.Time{
-		constants.MainnetID: time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
+		constants.MainnetID: time.Date(2022, time.October, 18, 14, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(2022, time.October, 3, 14, 0, 0, 0, time.UTC),
 	}
 	BanffDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
