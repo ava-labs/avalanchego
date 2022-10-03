@@ -4,9 +4,9 @@
 
 This upgrade adds support for creating Proof-of-Stake Subnets.
 
-The changes in the upgrade go into effect at 10 AM EDT, October 18th 2022 on Mainnet.
+This version is not backwards compatible. The changes in the upgrade go into effect at 12 PM EDT, October 18th 2022 on Mainnet.
 
-**All Mainnet nodes should upgrade before 10 AM EDT, October 18th 2022.**
+**All Mainnet nodes should upgrade before 12 PM EDT, October 18th 2022.**
 
 The supported plugin version is `17`.
 
