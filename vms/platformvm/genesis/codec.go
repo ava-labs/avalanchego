@@ -4,30 +4,9 @@
 package genesis
 
 import (
-	"math"
-
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 )
 
-var Codec codec.Manager
+const Version = blocks.Version
 
-func init() {
-	gc := linearcodec.NewCustomMaxLength(math.MaxInt32)
-	Codec = codec.NewManager(math.MaxInt32)
-
-	// To maintain codec type ordering, skip positions
-	// for Proposal/Abort/Commit/Standard/Atomic blocks
-	gc.SkipRegistrations(5)
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		txs.RegisterUnsignedTxsTypes(gc),
-		Codec.RegisterCodec(txs.Version, gc),
-	)
-	if errs.Errored() {
-		panic(errs.Err)
-	}
-}
+var Codec = blocks.GenesisCodec

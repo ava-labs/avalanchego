@@ -444,7 +444,13 @@ func (p *peer) writeMessages() {
 
 	// Make sure that the version is the first message sent
 	msg, err := p.Network.Version()
-	p.Log.AssertNoError(err)
+	if err != nil {
+		p.Log.Error("failed to create message",
+			zap.Stringer("messageOp", message.Version),
+			zap.Error(err),
+		)
+		return
+	}
 
 	p.writeMessage(writer, msg)
 
@@ -552,7 +558,13 @@ func (p *peer) sendPings() {
 			}
 
 			pingMessage, err := p.Config.GetMessageCreator().Ping()
-			p.Log.AssertNoError(err)
+			if err != nil {
+				p.Log.Error("failed to create message",
+					zap.Stringer("messageOp", message.Ping),
+					zap.Error(err),
+				)
+				return
+			}
 
 			p.Send(p.onClosingCtx, pingMessage)
 		case <-p.onClosingCtx.Done():
@@ -598,7 +610,13 @@ func (p *peer) handle(msg message.InboundMessage) {
 
 func (p *peer) handlePing(_ message.InboundMessage) {
 	msg, err := p.Network.Pong(p.id)
-	p.Log.AssertNoError(err)
+	if err != nil {
+		p.Log.Error("failed to create message",
+			zap.Stringer("messageOp", message.Pong),
+			zap.Error(err),
+		)
+		return
+	}
 	p.Send(p.onClosingCtx, msg)
 }
 
@@ -842,7 +860,13 @@ func (p *peer) handleVersion(msg message.InboundMessage) {
 	p.gotVersion.SetValue(true)
 
 	peerlistMsg, err := p.Network.Peers()
-	p.Log.AssertNoError(err)
+	if err != nil {
+		p.Log.Error("failed to create message",
+			zap.Stringer("messageOp", message.PeerList),
+			zap.Error(err),
+		)
+		return
+	}
 	p.Send(p.onClosingCtx, peerlistMsg)
 }
 

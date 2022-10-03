@@ -352,7 +352,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 			MinStakeDuration:       defaultMinStakingDuration,
 			MaxStakeDuration:       defaultMaxStakingDuration,
 			RewardConfig:           defaultRewardConfig,
-			BlueberryTime:          mockable.MaxTime, // Blueberry not yet active
+			BanffTime:              mockable.MaxTime, // Banff not yet active
 		},
 	}}
 

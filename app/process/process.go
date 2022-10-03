@@ -85,11 +85,6 @@ func (p *process) Start() error {
 		)
 	}
 
-	// Track if assertions should be executed
-	if p.config.LoggingConfig.Assertions {
-		log.Debug("assertions are enabled. This may slow down execution")
-	}
-
 	// TODO move this to config
 	// SupportsNAT() for NoRouter is false.
 	// Which means we tried to perform a NAT activity but we were not successful.

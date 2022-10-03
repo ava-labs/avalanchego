@@ -189,7 +189,7 @@ type ManagerConfig struct {
 
 	ApricotPhase4Time            time.Time
 	ApricotPhase4MinPChainHeight uint64
-	BlueberryTime                time.Time
+	BanffTime                    time.Time
 
 	// Tracks CPU/disk usage caused by each peer.
 	ResourceTracker timetracker.ResourceTracker
@@ -322,7 +322,12 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	m.chainsLock.Unlock()
 
 	// Associate the newly created chain with its default alias
-	m.Log.AssertNoError(m.Alias(chainParams.ID, chainParams.ID.String()))
+	if err := m.Alias(chainParams.ID, chainParams.ID.String()); err != nil {
+		m.Log.Error("failed to alias the new chain with itself",
+			zap.Stringer("chainID", chainParams.ID),
+			zap.Error(err),
+		)
+	}
 
 	// Notify those that registered to be notified when a new chain is created
 	m.notifyRegistrants(chain.Name, chain.Engine)
@@ -571,7 +576,7 @@ func (m *manager) createAvalancheChain(
 		ctx,
 		m.MsgCreator,
 		m.MsgCreatorWithProto,
-		m.BlueberryTime,
+		m.BanffTime,
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
@@ -759,7 +764,7 @@ func (m *manager) createSnowmanChain(
 		ctx,
 		m.MsgCreator,
 		m.MsgCreatorWithProto,
-		m.BlueberryTime,
+		m.BanffTime,
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
@@ -806,7 +811,7 @@ func (m *manager) createSnowmanChain(
 		vm,
 		m.ApricotPhase4Time,
 		m.ApricotPhase4MinPChainHeight,
-		m.BlueberryTime,
+		m.BanffTime,
 	)
 
 	if m.MeterVMEnabled {

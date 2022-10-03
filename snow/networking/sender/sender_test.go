@@ -73,7 +73,7 @@ func TestTimeout(t *testing.T) {
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(context, mc, mcProto, time.Now().Add(time.Hour) /* TODO: test with blueberry accepted */, externalSender, &chainRouter, tm, defaultGossipConfig)
+	sender, err := New(context, mc, mcProto, time.Now().Add(time.Hour) /* TODO: test with banff accepted */, externalSender, &chainRouter, tm, defaultGossipConfig)
 	require.NoError(t, err)
 
 	wg := sync.WaitGroup{}
@@ -168,7 +168,7 @@ func TestReliableMessages(t *testing.T) {
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(context, mc, mcProto, time.Now().Add(time.Hour) /* TODO: test with blueberry accepted */, externalSender, &chainRouter, tm, defaultGossipConfig)
+	sender, err := New(context, mc, mcProto, time.Now().Add(time.Hour) /* TODO: test with banff accepted */, externalSender, &chainRouter, tm, defaultGossipConfig)
 	require.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
@@ -267,7 +267,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(context, mc, mcProto, time.Now().Add(time.Hour) /* TODO: test with blueberry accepted */, externalSender, &chainRouter, tm, defaultGossipConfig)
+	sender, err := New(context, mc, mcProto, time.Now().Add(time.Hour) /* TODO: test with banff accepted */, externalSender, &chainRouter, tm, defaultGossipConfig)
 	require.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()

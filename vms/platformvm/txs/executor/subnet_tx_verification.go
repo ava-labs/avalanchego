@@ -22,6 +22,32 @@ var (
 	errUnauthorizedSubnetModification = errors.New("unauthorized subnet modification")
 )
 
+// verifyPoASubnetAuthorization carries out the validation for modifying a PoA
+// subnet. This is an extension of [verifySubnetAuthorization] that additionally
+// verifies that the subnet being modified is currently a PoA subnet.
+func verifyPoASubnetAuthorization(
+	backend *Backend,
+	chainState state.Chain,
+	sTx *txs.Tx,
+	subnetID ids.ID,
+	subnetAuth verify.Verifiable,
+) ([]verify.Verifiable, error) {
+	creds, err := verifySubnetAuthorization(backend, chainState, sTx, subnetID, subnetAuth)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = chainState.GetSubnetTransformation(subnetID)
+	if err == nil {
+		return nil, fmt.Errorf("%q %w", subnetID, errIsImmutable)
+	}
+	if err != database.ErrNotFound {
+		return nil, err
+	}
+
+	return creds, nil
+}
+
 // verifySubnetAuthorization carries out the validation for modifying a subnet.
 // The last credential in [sTx.Creds] is used as the subnet authorization.
 // Returns the remaining tx credentials that should be used to authorize the
@@ -54,14 +80,6 @@ func verifySubnetAuthorization(
 	subnet, ok := subnetIntf.Unsigned.(*txs.CreateSubnetTx)
 	if !ok {
 		return nil, fmt.Errorf("%q %w", subnetID, errIsNotSubnet)
-	}
-
-	_, err = chainState.GetSubnetTransformation(subnetID)
-	if err == nil {
-		return nil, fmt.Errorf("%q %w", subnetID, errIsImmutable)
-	}
-	if err != database.ErrNotFound {
-		return nil, err
 	}
 
 	if err := backend.Fx.VerifyPermission(sTx.Unsigned, subnetAuth, subnetCred, subnet.Owner); err != nil {

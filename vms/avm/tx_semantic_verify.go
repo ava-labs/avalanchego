@@ -98,11 +98,11 @@ func (t *txSemanticVerify) ExportTx(tx *txs.ExportTx) error {
 		}
 
 		assetID := out.AssetID()
-		if !t.vm.IsBlueberryActivated(now) {
-			// TODO: Remove this check once the Blueberry network upgrade is
+		if !t.vm.IsBanffActivated(now) {
+			// TODO: Remove this check once the Banff network upgrade is
 			//       complete.
 			//
-			// Blueberry network upgrade allows exporting of all assets to the
+			// Banff network upgrade allows exporting of all assets to the
 			// P-chain.
 			if assetID != t.vm.ctx.AVAXAssetID && tx.DestinationChain == constants.PlatformChainID {
 				return errWrongAssetID

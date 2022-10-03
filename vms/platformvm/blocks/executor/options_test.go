@@ -15,9 +15,9 @@ import (
 
 func TestOptionsUnexpectedBlockType(t *testing.T) {
 	tests := []blocks.Block{
-		&blocks.BlueberryAbortBlock{},
-		&blocks.BlueberryCommitBlock{},
-		&blocks.BlueberryStandardBlock{},
+		&blocks.BanffAbortBlock{},
+		&blocks.BanffCommitBlock{},
+		&blocks.BanffStandardBlock{},
 		&blocks.ApricotAbortBlock{},
 		&blocks.ApricotCommitBlock{},
 		&blocks.ApricotStandardBlock{},

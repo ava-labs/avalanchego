@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
@@ -209,6 +210,8 @@ type Builder interface {
 	//
 	// - [vdr] specifies all the details of the validation period such as the
 	//   subnetID, startTime, endTime, stake weight, and nodeID.
+	// - [signer] if the subnetID is the primary network, this is the BLS key
+	//   for this validator. Otherwise, this value should be the empty signer.
 	// - [assetID] specifies the asset to stake.
 	// - [validationRewardsOwner] specifies the owner of all the rewards this
 	//   validator earns for its validation period.
@@ -219,6 +222,7 @@ type Builder interface {
 	//   the delegation reward will be sent to the validator's [rewardsOwner].
 	NewAddPermissionlessValidatorTx(
 		vdr *validator.SubnetValidator,
+		signer signer.Signer,
 		assetID ids.ID,
 		validationRewardsOwner *secp256k1fx.OutputOwners,
 		delegationRewardsOwner *secp256k1fx.OutputOwners,
@@ -727,6 +731,7 @@ func (b *builder) NewTransformSubnetTx(
 
 func (b *builder) NewAddPermissionlessValidatorTx(
 	vdr *validator.SubnetValidator,
+	signer signer.Signer,
 	assetID ids.ID,
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
@@ -761,6 +766,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 		}},
 		Validator:             vdr.Validator,
 		Subnet:                vdr.Subnet,
+		Signer:                signer,
 		StakeOuts:             stakeOutputs,
 		ValidatorRewardsOwner: validationRewardsOwner,
 		DelegatorRewardsOwner: delegationRewardsOwner,

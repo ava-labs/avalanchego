@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -25,6 +26,7 @@ var (
 
 	errEmptyNodeID             = errors.New("validator nodeID cannot be empty")
 	errNoStake                 = errors.New("no stake")
+	errInvalidSigner           = errors.New("invalid signer")
 	errMultipleStakedAssets    = errors.New("multiple staked assets")
 	errValidatorWeightMismatch = errors.New("validator weight mismatch")
 )
@@ -37,6 +39,13 @@ type AddPermissionlessValidatorTx struct {
 	Validator validator.Validator `serialize:"true" json:"validator"`
 	// ID of the subnet this validator is validating
 	Subnet ids.ID `serialize:"true" json:"subnetID"`
+	// If the [Subnet] is the primary network, [Signer] is the BLS key for this
+	// validator. If the [Subnet] is not the primary network, this value is the
+	// empty signer
+	// Note: We do not enforce that the BLS key is unique across all validators.
+	//       This means that validators can share a key if they so choose.
+	//       However, a NodeID does uniquely map to a BLS key
+	Signer signer.Signer `serialize:"true" json:"signer"`
 	// Where to send staked tokens when done validating
 	StakeOuts []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send validation rewards when done validating
@@ -116,8 +125,19 @@ func (tx *AddPermissionlessValidatorTx) SyntacticVerify(ctx *snow.Context) error
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
-	if err := verify.All(&tx.Validator, tx.ValidatorRewardsOwner, tx.DelegatorRewardsOwner); err != nil {
-		return fmt.Errorf("failed to verify validator or rewards owners: %w", err)
+	if err := verify.All(&tx.Validator, tx.Signer, tx.ValidatorRewardsOwner, tx.DelegatorRewardsOwner); err != nil {
+		return fmt.Errorf("failed to verify validator, signer, or rewards owners: %w", err)
+	}
+
+	hasKey := tx.Signer.Key() != nil
+	isPrimaryNetwork := tx.Subnet == constants.PrimaryNetworkID
+	if hasKey != isPrimaryNetwork {
+		return fmt.Errorf(
+			"%w: hasKey=%v != isPrimaryNetwork=%v",
+			errInvalidSigner,
+			hasKey,
+			isPrimaryNetwork,
+		)
 	}
 
 	for _, out := range tx.StakeOuts {
