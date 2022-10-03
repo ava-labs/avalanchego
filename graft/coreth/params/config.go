@@ -73,8 +73,7 @@ var (
 		ApricotPhasePre6BlockTimestamp:  big.NewInt(time.Date(2022, time.September, 5, 1, 30, 0, 0, time.UTC).Unix()),
 		ApricotPhase6BlockTimestamp:     big.NewInt(time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC).Unix()),
 		ApricotPhasePost6BlockTimestamp: big.NewInt(time.Date(2022, time.September, 7, 3, 0, 0, 0, time.UTC).Unix()),
-		// TODO Add Banff
-		// TODO Add Clementine
+		// TODO Add Banff, Banff Post, and Cortina timestamps
 	}
 
 	// AvalancheFujiChainConfig is the configuration for the Fuji Test Network
@@ -101,7 +100,8 @@ var (
 		ApricotPhase6BlockTimestamp:     big.NewInt(time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC).Unix()),
 		ApricotPhasePost6BlockTimestamp: big.NewInt(time.Date(2022, time.September, 7, 6, 0, 0, 0, time.UTC).Unix()),
 		BanffBlockTimestamp:             big.NewInt(time.Date(2022, time.October, 3, 14, 0, 0, 0, time.UTC).Unix()),
-		// TODO Add Clementine
+		BanffPostBlockTimestamp:         big.NewInt(time.Date(2022, time.October, 4, 19, 0, 0, 0, time.UTC).Unix()),
+		// TODO add Cortina timestamp
 	}
 
 	// AvalancheLocalChainConfig is the configuration for the Avalanche Local Network
@@ -128,21 +128,22 @@ var (
 		ApricotPhase6BlockTimestamp:     big.NewInt(0),
 		ApricotPhasePost6BlockTimestamp: big.NewInt(0),
 		BanffBlockTimestamp:             big.NewInt(0),
-		ClementineBlockTimestamp:        big.NewInt(0),
+		BanffPostBlockTimestamp:         big.NewInt(0),
 	}
 
-	TestChainConfig             = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0)}
-	TestLaunchConfig            = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil}
-	TestApricotPhase1Config     = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, nil, nil, nil, nil}
-	TestApricotPhase2Config     = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, nil, nil, nil}
-	TestApricotPhase3Config     = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, nil, nil}
-	TestApricotPhase4Config     = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, nil}
-	TestApricotPhase5Config     = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil}
-	TestApricotPhasePre6Config  = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil}
-	TestApricotPhase6Config     = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil}
-	TestApricotPhasePost6Config = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil}
-	TestBanffChainConfig        = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil}
-	TestClementineChainConfig   = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0)}
+	TestChainConfig             = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0)}
+	TestLaunchConfig            = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil}
+	TestApricotPhase1Config     = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil}
+	TestApricotPhase2Config     = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, nil, nil, nil, nil}
+	TestApricotPhase3Config     = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, nil, nil, nil}
+	TestApricotPhase4Config     = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, nil, nil}
+	TestApricotPhase5Config     = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil, nil}
+	TestApricotPhasePre6Config  = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, nil}
+	TestApricotPhase6Config     = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil}
+	TestApricotPhasePost6Config = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil}
+	TestBanffChainConfig        = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil}
+	TestBanffPostChainConfig    = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil}
+	TestCortinaChainConfig      = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0)}
 	TestRules                   = TestChainConfig.AvalancheRules(new(big.Int), new(big.Int))
 )
 
@@ -191,8 +192,10 @@ type ChainConfig struct {
 	ApricotPhasePost6BlockTimestamp *big.Int `json:"apricotPhasePost6BlockTimestamp,omitempty"`
 	// Banff TODO comment. (nil = no fork, 0 = already activated)
 	BanffBlockTimestamp *big.Int `json:"banffBlockTimestamp,omitempty"`
-	// Clementine TODO comment. (nil = no fork, 0 = already activated)
-	ClementineBlockTimestamp *big.Int `json:"clementineBlockTimestamp,omitempty"`
+	// BanffPost TODO comment. (nil = no fork, 0 = already activated)
+	BanffPostBlockTimestamp *big.Int `json:"banffPostBlockTimestamp,omitempty"`
+	// Cortina TODO comment. (nil = no fork, 0 = already activated)
+	CortinaBlockTimestamp *big.Int `json:"cortinaBlockTimestamp,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -228,8 +231,9 @@ func (c *ChainConfig) String() string {
 	banner += fmt.Sprintf(" - Apricot Phase P6 Timestamp        %-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.8.0)\n", c.ApricotPhasePre6BlockTimestamp)
 	banner += fmt.Sprintf(" - Apricot Phase 6 Timestamp:        %-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.8.0)\n", c.ApricotPhase6BlockTimestamp)
 	banner += fmt.Sprintf(" - Apricot Phase Post-6 Timestamp:   %-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.8.0\n", c.ApricotPhasePost6BlockTimestamp)
-	banner += fmt.Sprintf(" - Banff Timestamp:              %-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0)\n", c.BanffBlockTimestamp)
-	banner += fmt.Sprintf(" - Clementine Timestamp:             %-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0)\n", c.ClementineBlockTimestamp)
+	banner += fmt.Sprintf(" - Banff Timestamp:                  %-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0)\n", c.BanffBlockTimestamp)
+	banner += fmt.Sprintf(" - Banff Post Timestamp:             %-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0)\n", c.BanffPostBlockTimestamp)
+	banner += fmt.Sprintf(" - Cortina Timestamp:                %-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0)\n", c.CortinaBlockTimestamp)
 	banner += "\n"
 	return banner
 }
@@ -342,10 +346,16 @@ func (c *ChainConfig) IsBanff(blockTimestamp *big.Int) bool {
 	return utils.IsForked(c.BanffBlockTimestamp, blockTimestamp)
 }
 
-// IsClementine returns whether [blockTimestamp] represents a block
-// with a timestamp after the Clementine upgrade time.
-func (c *ChainConfig) IsClementine(blockTimestamp *big.Int) bool {
-	return utils.IsForked(c.ClementineBlockTimestamp, blockTimestamp)
+// IsBanffPost returns whether [blockTimestamp] represents a block
+// with a timestamp after the BanffPost upgrade time.
+func (c *ChainConfig) IsBanffPost(blockTimestamp *big.Int) bool {
+	return utils.IsForked(c.BanffPostBlockTimestamp, blockTimestamp)
+}
+
+// IsCortina returns whether [blockTimestamp] represents a block
+// with a timestamp after the Cortina upgrade time.
+func (c *ChainConfig) IsCortina(blockTimestamp *big.Int) bool {
+	return utils.IsForked(c.CortinaBlockTimestamp, blockTimestamp)
 }
 
 // CheckCompatible checks whether scheduled fork transitions have been imported
@@ -427,7 +437,8 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "apricotPhase6BlockTimestamp", block: c.ApricotPhase6BlockTimestamp},
 		{name: "apricotPhasePost6BlockTimestamp", block: c.ApricotPhasePost6BlockTimestamp},
 		{name: "banffBlockTimestamp", block: c.BanffBlockTimestamp},
-		{name: "clementineBlockTimestamp", block: c.ClementineBlockTimestamp},
+		{name: "banffPostBlockTimestamp", block: c.BanffPostBlockTimestamp},
+		{name: "cortinaBlockTimestamp", block: c.CortinaBlockTimestamp},
 	} {
 		if lastFork.name != "" {
 			// Next one must be higher number
@@ -515,8 +526,11 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, lastHeight *big.Int, 
 	if isForkIncompatible(c.BanffBlockTimestamp, newcfg.BanffBlockTimestamp, lastTimestamp) {
 		return newCompatError("Banff fork block timestamp", c.BanffBlockTimestamp, newcfg.BanffBlockTimestamp)
 	}
-	if isForkIncompatible(c.ClementineBlockTimestamp, newcfg.ClementineBlockTimestamp, lastTimestamp) {
-		return newCompatError("Clementine fork block timestamp", c.ClementineBlockTimestamp, newcfg.ClementineBlockTimestamp)
+	if isForkIncompatible(c.BanffPostBlockTimestamp, newcfg.BanffPostBlockTimestamp, lastTimestamp) {
+		return newCompatError("Banff Post fork block timestamp", c.BanffPostBlockTimestamp, newcfg.BanffPostBlockTimestamp)
+	}
+	if isForkIncompatible(c.CortinaBlockTimestamp, newcfg.CortinaBlockTimestamp, lastTimestamp) {
+		return newCompatError("Cortina fork block timestamp", c.CortinaBlockTimestamp, newcfg.CortinaBlockTimestamp)
 	}
 	return nil
 }
@@ -581,8 +595,8 @@ type Rules struct {
 	// Rules for Avalanche releases
 	IsApricotPhase1, IsApricotPhase2, IsApricotPhase3, IsApricotPhase4, IsApricotPhase5 bool
 	IsApricotPhasePre6, IsApricotPhase6, IsApricotPhasePost6                            bool
-	IsBanff                                                                             bool
-	IsClementine                                                                        bool
+	IsBanff, IsBanffPost                                                                bool
+	IsCortina                                                                           bool
 
 	// Precompiles maps addresses to stateful precompiled contracts that are enabled
 	// for this rule set.
@@ -624,7 +638,8 @@ func (c *ChainConfig) AvalancheRules(blockNum, blockTimestamp *big.Int) Rules {
 	rules.IsApricotPhase6 = c.IsApricotPhase6(blockTimestamp)
 	rules.IsApricotPhasePost6 = c.IsApricotPhasePost6(blockTimestamp)
 	rules.IsBanff = c.IsBanff(blockTimestamp)
-	rules.IsClementine = c.IsClementine(blockTimestamp)
+	rules.IsBanffPost = c.IsBanffPost(blockTimestamp)
+	rules.IsCortina = c.IsCortina(blockTimestamp)
 
 	// Initialize the stateful precompiles that should be enabled at [blockTimestamp].
 	rules.Precompiles = make(map[common.Address]precompile.StatefulPrecompiledContract)

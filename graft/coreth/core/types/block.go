@@ -111,7 +111,7 @@ type Header struct {
 	// headers.
 	BlockGasCost *big.Int `json:"blockGasCost" rlp:"optional"`
 
-	// ExtraStateRoot root was added by Clementine and is ignored in legacy headers.
+	// ExtraStateRoot root was added by Cortina and is ignored in legacy headers.
 	ExtraStateRoot common.Hash `json:"extraStateRoot" rlp:"optional"`
 }
 
