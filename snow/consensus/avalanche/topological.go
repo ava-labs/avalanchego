@@ -143,8 +143,6 @@ func (ta *Topological) Parameters() Parameters { return ta.params }
 func (ta *Topological) IsVirtuous(tx snowstorm.Tx) bool { return ta.cg.IsVirtuous(tx) }
 
 func (ta *Topological) Add(vtx Vertex) error {
-	ta.ctx.Log.AssertTrue(vtx != nil, "Attempting to insert nil vertex")
-
 	if vtx.Status().Decided() {
 		return nil // Already decided this vertex
 	}

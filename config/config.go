@@ -1339,9 +1339,6 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 		return node.Config{}, fmt.Errorf("unable to load genesis file: %w", err)
 	}
 
-	// Assertions
-	nodeConfig.EnableAssertions = v.GetBool(AssertionsEnabledKey)
-
 	// StateSync Configs
 	nodeConfig.StateSyncConfig, err = getStateSyncConfig(v)
 	if err != nil {

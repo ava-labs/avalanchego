@@ -12,13 +12,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-func TestNewBlueberryCommitBlock(t *testing.T) {
+func TestNewBanffCommitBlock(t *testing.T) {
 	require := require.New(t)
 
 	timestamp := time.Now().Truncate(time.Second)
 	parentID := ids.GenerateTestID()
 	height := uint64(1337)
-	blk, err := NewBlueberryCommitBlock(
+	blk, err := NewBanffCommitBlock(
 		timestamp,
 		parentID,
 		height,

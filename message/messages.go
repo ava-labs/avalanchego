@@ -33,6 +33,7 @@ var (
 	_ OutboundMessage = &outboundMessageWithProto{}
 
 	errUnknownMessageTypeForOp = errors.New("unknown message type for Op")
+	errUnexpectedCompressedOp  = errors.New("unexpected compressed Op")
 
 	errInvalidIPAddrLen = errors.New("invalid IP address field length (expected 16-byte)")
 	errInvalidCert      = errors.New("invalid TLS certificate field")
@@ -629,8 +630,15 @@ func (mb *msgBuilderProtobuf) unmarshal(b []byte) (Op, *p2ppb.Message, bool, int
 	}
 
 	op, err := msgToOp(m)
+	if err != nil {
+		return 0, nil, true, 0, 0, err
+	}
+	if !op.Compressible() {
+		return 0, nil, true, 0, 0, errUnexpectedCompressedOp
+	}
+
 	bytesSavedCompression := len(decompressed) - len(compressed)
-	return op, m, true, bytesSavedCompression, decompressTook, err
+	return op, m, true, bytesSavedCompression, decompressTook, nil
 }
 
 func msgToOp(m *p2ppb.Message) (Op, error) {

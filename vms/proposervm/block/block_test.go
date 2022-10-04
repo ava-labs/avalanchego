@@ -61,6 +61,6 @@ func TestBlockSizeLimitExceeded(t *testing.T) {
 	require.ErrorIs(err, reflectcodec.ErrMaxMarshalSliceLimitExceeded)
 
 	// with the new max limit, it should be able to build blocks
-	_, err = BuildUnsignedBlueberry(parentID, timestamp, pChainHeight, innerBlockBytes)
+	_, err = BuildUnsignedBanff(parentID, timestamp, pChainHeight, innerBlockBytes)
 	require.NoError(err)
 }

@@ -29,6 +29,7 @@ var (
 	errFutureStakeTime                 = fmt.Errorf("staker is attempting to start staking more than %s ahead of the current chain time", MaxFutureStartTime)
 	errValidatorSubset                 = errors.New("all subnets' staking period must be a subset of the primary network")
 	errNotValidator                    = errors.New("isn't a current or pending validator")
+	errRemovePermissionlessValidator   = errors.New("attempting to remove permissionless validator")
 	errStakeOverflow                   = errors.New("validator stake exceeds limit")
 	errOverDelegated                   = errors.New("validator would be over delegated")
 	errIsNotTransformSubnetTx          = errors.New("is not a transform subnet tx")
@@ -208,7 +209,7 @@ func verifyAddSubnetValidatorTx(
 		return errValidatorSubset
 	}
 
-	baseTxCreds, err := verifySubnetAuthorization(backend, chainState, sTx, tx.Validator.Subnet, tx.SubnetAuth)
+	baseTxCreds, err := verifyPoASubnetAuthorization(backend, chainState, sTx, tx.Validator.Subnet, tx.SubnetAuth)
 	if err != nil {
 		return err
 	}
@@ -241,7 +242,7 @@ func verifyAddSubnetValidatorTx(
 // Returns true if [tx.NodeID] is a current validator of [tx.Subnet].
 // Returns an error if the given tx is invalid.
 // The transaction is valid if:
-// * [tx.NodeID] is a current/pending validator of [tx.Subnet].
+// * [tx.NodeID] is a current/pending PoA validator of [tx.Subnet].
 // * [sTx]'s creds authorize it to spend the stated inputs.
 // * [sTx]'s creds authorize it to remove a validator from [tx.Subnet].
 // * The flow checker passes.
@@ -271,6 +272,11 @@ func removeSubnetValidatorValidation(
 			tx.Subnet,
 			err,
 		)
+	}
+
+	if vdr.Priority != txs.SubnetPermissionedValidatorCurrentPriority &&
+		vdr.Priority != txs.SubnetPermissionedValidatorPendingPriority {
+		return nil, false, errRemovePermissionlessValidator
 	}
 
 	if !backend.Bootstrapped.GetValue() {

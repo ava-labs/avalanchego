@@ -149,9 +149,6 @@ type Config struct {
 	// ID of the network this node should connect to
 	NetworkID uint32 `json:"networkID"`
 
-	// Assertions configuration
-	EnableAssertions bool `json:"enableAssertions"`
-
 	// Health
 	HealthCheckFreq time.Duration `json:"healthCheckFreq"`
 

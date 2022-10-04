@@ -44,8 +44,8 @@ type sender struct {
 	msgCreator          message.Creator
 	msgCreatorWithProto message.Creator
 
-	// TODO: remove this once we complete blueberry migration
-	blueberryTime time.Time
+	// TODO: remove this once we complete banff migration
+	banffTime time.Time
 
 	clock mockable.Clock
 
@@ -64,7 +64,7 @@ func New(
 	ctx *snow.ConsensusContext,
 	msgCreator message.Creator,
 	msgCreatorWithProto message.Creator,
-	blueberryTime time.Time,
+	banffTime time.Time,
 	externalSender ExternalSender,
 	router router.Router,
 	timeouts timeout.Manager,
@@ -74,7 +74,7 @@ func New(
 		ctx:                 ctx,
 		msgCreator:          msgCreator,
 		msgCreatorWithProto: msgCreatorWithProto,
-		blueberryTime:       blueberryTime,
+		banffTime:           banffTime,
 		sender:              externalSender,
 		router:              router,
 		timeouts:            timeouts,
@@ -99,7 +99,7 @@ func New(
 
 func (s *sender) getMsgCreator() message.Creator {
 	now := s.clock.Time()
-	if now.Before(s.blueberryTime) {
+	if now.Before(s.banffTime) {
 		return s.msgCreator
 	}
 	return s.msgCreatorWithProto
@@ -131,14 +131,25 @@ func (s *sender) SendGetStateSummaryFrontier(nodeIDs ids.NodeIDSet, requestID ui
 
 	// Create the outbound message.
 	outMsg, err := msgCreator.GetStateSummaryFrontier(s.ctx.ChainID, requestID, deadline)
-	s.ctx.Log.AssertNoError(err)
 
 	// Send the message over the network.
-	sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
+	var sentTo ids.NodeIDSet
+	if err == nil {
+		sentTo = s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
+	} else {
+		s.ctx.Log.Error("failed to build message",
+			zap.Stringer("messageOp", message.GetStateSummaryFrontier),
+			zap.Stringer("chainID", s.ctx.ChainID),
+			zap.Uint32("requestID", requestID),
+			zap.Duration("deadline", deadline),
+			zap.Error(err),
+		)
+	}
+
 	for nodeID := range nodeIDs {
 		if !sentTo.Contains(nodeID) {
 			s.ctx.Log.Debug("failed to send message",
-				zap.Stringer("messageOp", outMsg.Op()),
+				zap.Stringer("messageOp", message.GetStateSummaryFrontier),
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("chainID", s.ctx.ChainID),
 				zap.Uint32("requestID", requestID),
@@ -175,13 +186,13 @@ func (s *sender) SendStateSummaryFrontier(nodeID ids.NodeID, requestID uint32, s
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
-			zap.Stringer("messageOp", outMsg.Op()),
+			zap.Stringer("messageOp", message.StateSummaryFrontier),
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
 		)
 		s.ctx.Log.Verbo("failed to send message",
-			zap.Stringer("messageOp", outMsg.Op()),
+			zap.Stringer("messageOp", message.StateSummaryFrontier),
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
@@ -271,7 +282,7 @@ func (s *sender) SendAcceptedStateSummary(nodeID ids.NodeID, requestID uint32, s
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
-			zap.Stringer("messageOp", outMsg.Op()),
+			zap.Stringer("messageOp", message.AcceptedStateSummary),
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
@@ -306,14 +317,25 @@ func (s *sender) SendGetAcceptedFrontier(nodeIDs ids.NodeIDSet, requestID uint32
 
 	// Create the outbound message.
 	outMsg, err := msgCreator.GetAcceptedFrontier(s.ctx.ChainID, requestID, deadline)
-	s.ctx.Log.AssertNoError(err)
 
 	// Send the message over the network.
-	sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
+	var sentTo ids.NodeIDSet
+	if err == nil {
+		sentTo = s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
+	} else {
+		s.ctx.Log.Error("failed to build message",
+			zap.Stringer("messageOp", message.GetAcceptedFrontier),
+			zap.Stringer("chainID", s.ctx.ChainID),
+			zap.Uint32("requestID", requestID),
+			zap.Duration("deadline", deadline),
+			zap.Error(err),
+		)
+	}
+
 	for nodeID := range nodeIDs {
 		if !sentTo.Contains(nodeID) {
 			s.ctx.Log.Debug("failed to send message",
-				zap.Stringer("messageOp", outMsg.Op()),
+				zap.Stringer("messageOp", message.GetAcceptedFrontier),
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("chainID", s.ctx.ChainID),
 				zap.Uint32("requestID", requestID),
@@ -350,7 +372,7 @@ func (s *sender) SendAcceptedFrontier(nodeID ids.NodeID, requestID uint32, conta
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
-			zap.Stringer("messageOp", outMsg.Op()),
+			zap.Stringer("messageOp", message.AcceptedFrontier),
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
@@ -440,7 +462,7 @@ func (s *sender) SendAccepted(nodeID ids.NodeID, requestID uint32, containerIDs 
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
-			zap.Stringer("messageOp", outMsg.Op()),
+			zap.Stringer("messageOp", message.Accepted),
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
@@ -497,7 +519,7 @@ func (s *sender) SendGetAncestors(nodeID ids.NodeID, requestID uint32, container
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
-			zap.Stringer("messageOp", outMsg.Op()),
+			zap.Stringer("messageOp", message.GetAncestors),
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
@@ -534,7 +556,7 @@ func (s *sender) SendAncestors(nodeID ids.NodeID, requestID uint32, containers [
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
-			zap.Stringer("messageOp", outMsg.Op()),
+			zap.Stringer("messageOp", message.Ancestors),
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
@@ -576,14 +598,27 @@ func (s *sender) SendGet(nodeID ids.NodeID, requestID uint32, containerID ids.ID
 	deadline := s.timeouts.TimeoutDuration()
 	// Create the outbound message.
 	outMsg, err := msgCreator.Get(s.ctx.ChainID, requestID, deadline, containerID)
-	s.ctx.Log.AssertNoError(err)
 
 	// Send the message over the network.
-	nodeIDs := ids.NewNodeIDSet(1)
-	nodeIDs.Add(nodeID)
-	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
+	var sentTo ids.NodeIDSet
+	if err == nil {
+		nodeIDs := ids.NewNodeIDSet(1)
+		nodeIDs.Add(nodeID)
+		sentTo = s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
+	} else {
+		s.ctx.Log.Error("failed to build message",
+			zap.Stringer("messageOp", message.Get),
+			zap.Stringer("chainID", s.ctx.ChainID),
+			zap.Uint32("requestID", requestID),
+			zap.Duration("deadline", deadline),
+			zap.Stringer("containerID", containerID),
+			zap.Error(err),
+		)
+	}
+
+	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
-			zap.Stringer("messageOp", outMsg.Op()),
+			zap.Stringer("messageOp", message.Get),
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
@@ -621,13 +656,13 @@ func (s *sender) SendPut(nodeID ids.NodeID, requestID uint32, container []byte) 
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
-			zap.Stringer("messageOp", outMsg.Op()),
+			zap.Stringer("messageOp", message.Put),
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
 		)
 		s.ctx.Log.Verbo("failed to send message",
-			zap.Stringer("messageOp", outMsg.Op()),
+			zap.Stringer("messageOp", message.Put),
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
@@ -763,15 +798,26 @@ func (s *sender) SendPullQuery(nodeIDs ids.NodeIDSet, requestID uint32, containe
 
 	// Create the outbound message.
 	outMsg, err := msgCreator.PullQuery(s.ctx.ChainID, requestID, deadline, containerID)
-	s.ctx.Log.AssertNoError(err)
 
 	// Send the message over the network.
-	sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
+	var sentTo ids.NodeIDSet
+	if err == nil {
+		sentTo = s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly())
+	} else {
+		s.ctx.Log.Error("failed to build message",
+			zap.Stringer("messageOp", message.PullQuery),
+			zap.Stringer("chainID", s.ctx.ChainID),
+			zap.Uint32("requestID", requestID),
+			zap.Duration("deadline", deadline),
+			zap.Stringer("containerID", containerID),
+			zap.Error(err),
+		)
+	}
 
 	for nodeID := range nodeIDs {
 		if !sentTo.Contains(nodeID) {
 			s.ctx.Log.Debug("failed to send message",
-				zap.Stringer("messageOp", outMsg.Op()),
+				zap.Stringer("messageOp", message.PullQuery),
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("chainID", s.ctx.ChainID),
 				zap.Uint32("requestID", requestID),
@@ -816,7 +862,7 @@ func (s *sender) SendChits(nodeID ids.NodeID, requestID uint32, votes []ids.ID) 
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
-			zap.Stringer("messageOp", outMsg.Op()),
+			zap.Stringer("messageOp", message.Chits),
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
@@ -969,13 +1015,13 @@ func (s *sender) SendAppResponse(nodeID ids.NodeID, requestID uint32, appRespons
 	nodeIDs.Add(nodeID)
 	if sentTo := s.sender.Send(outMsg, nodeIDs, s.ctx.SubnetID, s.ctx.IsValidatorOnly()); sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
-			zap.Stringer("messageOp", outMsg.Op()),
+			zap.Stringer("messageOp", message.AppResponse),
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
 		)
 		s.ctx.Log.Verbo("failed to send message",
-			zap.Stringer("messageOp", outMsg.Op()),
+			zap.Stringer("messageOp", message.AppResponse),
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
@@ -1005,12 +1051,12 @@ func (s *sender) SendAppGossipSpecific(nodeIDs ids.NodeIDSet, appGossipBytes []b
 		for nodeID := range nodeIDs {
 			if !sentTo.Contains(nodeID) {
 				s.ctx.Log.Debug("failed to send message",
-					zap.Stringer("messageOp", outMsg.Op()),
+					zap.Stringer("messageOp", message.AppGossip),
 					zap.Stringer("nodeID", nodeID),
 					zap.Stringer("chainID", s.ctx.ChainID),
 				)
 				s.ctx.Log.Verbo("failed to send message",
-					zap.Stringer("messageOp", outMsg.Op()),
+					zap.Stringer("messageOp", message.AppGossip),
 					zap.Stringer("nodeID", nodeID),
 					zap.Stringer("chainID", s.ctx.ChainID),
 					zap.Binary("payload", appGossipBytes),
@@ -1044,11 +1090,11 @@ func (s *sender) SendAppGossip(appGossipBytes []byte) error {
 	sentTo := s.sender.Gossip(outMsg, s.ctx.SubnetID, s.ctx.IsValidatorOnly(), validatorSize, nonValidatorSize, peerSize)
 	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
-			zap.Stringer("messageOp", outMsg.Op()),
+			zap.Stringer("messageOp", message.AppGossip),
 			zap.Stringer("chainID", s.ctx.ChainID),
 		)
 		s.ctx.Log.Verbo("failed to send message",
-			zap.Stringer("messageOp", outMsg.Op()),
+			zap.Stringer("messageOp", message.AppGossip),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Binary("payload", appGossipBytes),
 		)
@@ -1082,11 +1128,11 @@ func (s *sender) SendGossip(container []byte) {
 	)
 	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
-			zap.Stringer("messageOp", outMsg.Op()),
+			zap.Stringer("messageOp", message.Put),
 			zap.Stringer("chainID", s.ctx.ChainID),
 		)
 		s.ctx.Log.Verbo("failed to send message",
-			zap.Stringer("messageOp", outMsg.Op()),
+			zap.Stringer("messageOp", message.Put),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Binary("container", container),
 		)
@@ -1124,11 +1170,11 @@ func (s *sender) Accept(ctx *snow.ConsensusContext, _ ids.ID, container []byte) 
 	)
 	if sentTo.Len() == 0 {
 		s.ctx.Log.Debug("failed to send message",
-			zap.Stringer("messageOp", outMsg.Op()),
+			zap.Stringer("messageOp", message.Put),
 			zap.Stringer("chainID", s.ctx.ChainID),
 		)
 		s.ctx.Log.Verbo("failed to send message",
-			zap.Stringer("messageOp", outMsg.Op()),
+			zap.Stringer("messageOp", message.Put),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Binary("container", container),
 		)
