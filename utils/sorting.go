@@ -77,6 +77,18 @@ func IsSortedAndUniqueByHash[T ~[]byte](s []T) bool {
 	return true
 }
 
+// Returns true iff the elements in [s] are unique.
+func IsUnique[T comparable](elts []T) bool {
+	asMap := make(map[T]struct{}, len(elts))
+	for _, elt := range elts {
+		if _, ok := asMap[elt]; ok {
+			return false
+		}
+		asMap[elt] = struct{}{}
+	}
+	return true
+}
+
 // IsSorted2DByteSlice returns true iff [s] is sorted.
 // Note that each byte slice need not be sorted internally.
 // The byte slices must be sorted relative to one another.
