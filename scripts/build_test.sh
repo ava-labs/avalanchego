@@ -6,6 +6,18 @@ set -o pipefail
 
 export GOGC=25
 
+# Root directory
+SUBNET_EVM_PATH=$(
+    cd "$(dirname "${BASH_SOURCE[0]}")"
+    cd .. && pwd
+)
+
+# Load the versions
+source "$SUBNET_EVM_PATH"/scripts/versions.sh
+
+# Load the constants
+source "$SUBNET_EVM_PATH"/scripts/constants.sh
+
 # We pass in the arguments to this script directly to enable easily passing parameters such as enabling race detection,
 # parallelism, and test coverage.
 # DO NOT RUN "tests/e2e" since it's run by ginkgo

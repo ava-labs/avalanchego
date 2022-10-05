@@ -26,6 +26,9 @@ SUBNET_EVM_PATH=$(
 )
 source "$SUBNET_EVM_PATH"/scripts/versions.sh
 
+# Load the constants
+source "$SUBNET_EVM_PATH"/scripts/constants.sh
+
 VERSION=$avalanche_version
 DEFAULT_ACCOUNT="0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"
 GENESIS_ADDRESS=${GENESIS_ADDRESS-$DEFAULT_ACCOUNT}

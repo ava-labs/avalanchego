@@ -1,6 +1,6 @@
 github.com/VictoriaMetrics/fastcache v1.10.0 h1:5hDJnLsKLpnUEToub7ETuRu8RCkb40woBZAUiKonXzY=
-github.com/ava-labs/avalanchego v1.8.5 h1:HhNJUsvwk+DxxncutN/4rlnUmnQvtF/73qNbpW3BFJc=
-github.com/ava-labs/avalanchego v1.8.5/go.mod h1:GAo3tDCj5Ulx9xIY78ad5SmGFqtdmFRjJGQ2gJk//Vk=
+github.com/ava-labs/avalanchego v1.8.6 h1:eYyW/m1+3o8HbhXsd6k52hcGxDTyGYfXHj7PX7fqc4A=
+github.com/ava-labs/avalanchego v1.8.6/go.mod h1:nYYiHRS6LmA+05rLVLDjaVjB3D7LZwAmBqYi0mweEgI=
 github.com/btcsuite/btcd v0.23.1 h1:IB8cVQcC2X5mHbnfirLG5IZnkWYNTPlLZVrxUYSotbE=
 github.com/btcsuite/btcd/btcec/v2 v2.2.0 h1:fzn1qaOt32TuLjFlkzYSsBC35Q3KUjT1SwPxiMSCF5k=
 github.com/btcsuite/btcd/btcec/v2 v2.2.0/go.mod h1:U7MHm051Al6XmscBQ0BoNydpOTsFAn707034b5nY8zU=

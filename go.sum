@@ -63,12 +63,12 @@ github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156 h1:eMwmnE/GDgah
 github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156/go.mod h1:Cb/ax3seSYIx7SuZdm2G2xzfwmv3TPSk2ucNfQESPXM=
 github.com/andreyvit/diff v0.0.0-20170406064948-c7f18ee00883/go.mod h1:rCTlJbsFo29Kk6CurOXKm700vrz8f0KW0JNfpkRJY/8=
 github.com/apache/arrow/go/arrow v0.0.0-20191024131854-af6fa24be0db/go.mod h1:VTxUBvSJ3s3eHAg65PNgrsn5BtqCRPdmyXh6rAfdxN0=
-github.com/ava-labs/avalanche-network-runner v1.2.2 h1:2XfJ4lIHPowa0K7VAfQzFIuE6YrraY5kFbxP04UyQR8=
-github.com/ava-labs/avalanche-network-runner v1.2.2/go.mod h1:2v30qT4ODecok/cCCgTDJLqeRnvvo8Lu8OqVab5vEPA=
-github.com/ava-labs/avalanchego v1.8.5 h1:HhNJUsvwk+DxxncutN/4rlnUmnQvtF/73qNbpW3BFJc=
-github.com/ava-labs/avalanchego v1.8.5/go.mod h1:GAo3tDCj5Ulx9xIY78ad5SmGFqtdmFRjJGQ2gJk//Vk=
-github.com/ava-labs/coreth v0.9.0-rc.13 h1:ccbNzZGV767q8hp97qKtEE/4HTD+fbEHYdAQgEXuR/U=
-github.com/ava-labs/coreth v0.9.0-rc.13/go.mod h1:TCUPN8PjyzwOTtH9VsxAVcd8eMh8jcbFgz4a5DOx1Ug=
+github.com/ava-labs/avalanche-network-runner v1.2.4-0.20221003163451-7d3d1bfa924f h1:9mcWnEt0J51SGUQ9q/bcg7C7iAJc3C9XRNh87TRQdyI=
+github.com/ava-labs/avalanche-network-runner v1.2.4-0.20221003163451-7d3d1bfa924f/go.mod h1:itR+KLMfvHu7yeZdwHkDanOImRyG3xtsZJai3UC7sk4=
+github.com/ava-labs/avalanchego v1.8.6 h1:eYyW/m1+3o8HbhXsd6k52hcGxDTyGYfXHj7PX7fqc4A=
+github.com/ava-labs/avalanchego v1.8.6/go.mod h1:nYYiHRS6LmA+05rLVLDjaVjB3D7LZwAmBqYi0mweEgI=
+github.com/ava-labs/coreth v0.10.0-rc.1 h1:OIJmXLpKzkyBjmrbPqFEYGM+suewknNOb3iLctWluuM=
+github.com/ava-labs/coreth v0.10.0-rc.1/go.mod h1:o9MtalIgKMH3PY7Ca4GDHMziEvGPxaAtKFaLd6uJvJI=
 github.com/benbjohnson/clock v1.3.0 h1:ip6w0uFQkncKQ979AypyG0ER7mqUSBdKLOgAle/AT8A=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=
@@ -563,6 +563,8 @@ github.com/stretchr/testify v1.8.0 h1:pSgiaMZlXftHpm5L7V1+rVB+AZJydKsMxsQBIJw4PK
 github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
 github.com/subosito/gotenv v1.3.0 h1:mjC+YW8QpAdXibNi+vNWgzmgBH4+5l5dCXv8cNysBLI=
 github.com/subosito/gotenv v1.3.0/go.mod h1:YzJjq/33h7nrwdY+iHMhEOEEbW0ovIz0tB6t6PwAXzs=
+github.com/supranational/blst v0.3.11-0.20220920110316-f72618070295 h1:rVKS9JjtqE4/PscoIsP46sRnJhfq8YFbjlk0fUJTRnY=
+github.com/supranational/blst v0.3.11-0.20220920110316-f72618070295/go.mod h1:jZJtfjgudtNl4en1tzwPIV3KjUnQUvG3/j+w+fVonLw=
 github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a h1:1ur3QoCqvE5fl+nylMaIr9PVV1w343YRDtsy+Rwu7XI=
 github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a/go.mod h1:RRCYJbIwD5jmqPI9XoAFR0OcDxqUctll6zUj/+B4S48=
 github.com/tinylib/msgp v1.0.2/go.mod h1:+d+yLhGm8mzTaHzB+wgMYrodPfmZrzkirds8fDWklFE=
