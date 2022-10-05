@@ -26,3 +26,4 @@ WARNING: this information is provided by the community. Please exercise caution 
 | 53935    | Mainnet | DeFi Kingdoms Subnet |
 | 909      | Mainnet | Portal Fantasy Subnet |
 | 73772    | Mainnet | Swimmer Network Subnet |
+| 432204   | Mainnet | Dexalot Subnet |
