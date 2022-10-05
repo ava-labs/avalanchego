@@ -5,7 +5,6 @@ package rpc
 
 import (
 	"context"
-	"fmt"
 	"net/url"
 )
 
@@ -16,13 +15,12 @@ type EndpointRequester interface {
 }
 
 type avalancheEndpointRequester struct {
-	uri, base string
+	uri string
 }
 
 func NewEndpointRequester(uri, base string) EndpointRequester {
 	return &avalancheEndpointRequester{
-		uri:  uri,
-		base: base,
+		uri: uri,
 	}
 }
 
@@ -36,10 +34,6 @@ func (e *avalancheEndpointRequester) SendRequest(
 	uri, err := url.Parse(e.uri)
 	if err != nil {
 		return err
-	}
-
-	if e.base != "" {
-		method = fmt.Sprintf("%s.%s", e.base, method)
 	}
 
 	return SendJSONRequest(
