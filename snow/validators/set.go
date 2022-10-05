@@ -99,7 +99,7 @@ func NewBestSet(expectedSampleSize int) Set {
 	}
 }
 
-// vdrSet of validators. Validator function results are cached. Therefore, to
+// Set of validators. Validator function results are cached. Therefore, to
 // update a validators weight, one should ensure to call add with the updated
 // validator.
 type vdrSet struct {
