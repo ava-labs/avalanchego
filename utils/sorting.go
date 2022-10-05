@@ -82,15 +82,6 @@ func IsUnique[T comparable](elts []T) bool {
 	return true
 }
 
-// IsSorted2DByteSlice returns true iff [s] is sorted.
-// Note that each byte slice need not be sorted internally.
-// The byte slices must be sorted relative to one another.
-func IsSorted2DByteSlice[T ~[]byte](s []T) bool {
-	return sort.SliceIsSorted(s, func(i, j int) bool {
-		return bytes.Compare(s[i], s[j]) == -1
-	})
-}
-
 // IsSortedAndUnique returns true if the elements in the data are unique and sorted.
 func IsSortedAndUnique(data sort.Interface) bool {
 	for i := 0; i < data.Len()-1; i++ {
