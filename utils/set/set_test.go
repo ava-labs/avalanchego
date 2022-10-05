@@ -29,121 +29,86 @@ func generateTestSettable() testSettable {
 }
 
 func TestSet(t *testing.T) {
+	require := require.New(t)
 	id1 := testSettable{1}
 
 	s := Set[testSettable]{id1: struct{}{}}
 
 	s.Add(id1)
-	if !s.Contains(id1) {
-		t.Fatalf("Initial value not set correctly")
-	}
+	require.True(s.Contains(id1))
 
 	s.Remove(id1)
-	if s.Contains(id1) {
-		t.Fatalf("Value not removed correctly")
-	}
+	require.False(s.Contains(id1))
 
 	s.Add(id1)
-	if !s.Contains(id1) {
-		t.Fatalf("Initial value not set correctly")
-	} else if s.Len() != 1 {
-		t.Fatalf("Bad set size")
-	} else if list := s.List(); len(list) != 1 {
-		t.Fatalf("Bad list size")
-	} else if list[0] != id1 {
-		t.Fatalf("Set value not correct")
-	}
+	require.True(s.Contains(id1))
+	require.Len(s.List(), 1)
+	require.Equal(len(s.List()), 1)
+	require.Equal(id1, s.List()[0])
 
 	s.Clear()
-	if s.Contains(id1) {
-		t.Fatalf("Value not removed correctly")
-	}
+	require.False(s.Contains(id1))
 
 	s.Add(id1)
 
 	s2 := Set[testSettable]{}
 
-	if s.Overlaps(s2) {
-		t.Fatalf("Empty set shouldn't overlap")
-	}
+	require.False(s.Overlaps(s2))
 
 	s2.Union(s)
-	if !s2.Contains(id1) {
-		t.Fatalf("Value not union added correctly")
-	}
-
-	if !s.Overlaps(s2) {
-		t.Fatalf("Sets overlap")
-	}
+	require.True(s2.Contains(id1))
+	require.True(s.Overlaps(s2))
 
 	s2.Difference(s)
-	if s2.Contains(id1) {
-		t.Fatalf("Value not difference removed correctly")
-	}
-
-	if s.Overlaps(s2) {
-		t.Fatalf("Sets don't overlap")
-	}
+	require.False(s2.Contains(id1))
+	require.False(s.Overlaps(s2))
 }
 
 func TestSetCappedList(t *testing.T) {
+	require := require.New(t)
 	s := Set[testSettable]{}
 
 	var id testSettable
 
-	if list := s.CappedList(0); len(list) != 0 {
-		t.Fatalf("List should have been empty but was %v", list)
-	}
+	require.Len(s.CappedList(0), 0)
 
 	s.Add(id)
 
-	if list := s.CappedList(0); len(list) != 0 {
-		t.Fatalf("List should have been empty but was %v", list)
-	} else if list := s.CappedList(1); len(list) != 1 {
-		t.Fatalf("List should have had length %d but had %d", 1, len(list))
-	} else if returnedID := list[0]; id != returnedID {
-		t.Fatalf("List should have been %s but was %s", id, returnedID)
-	} else if list := s.CappedList(2); len(list) != 1 {
-		t.Fatalf("List should have had length %d but had %d", 1, len(list))
-	} else if returnedID := list[0]; id != returnedID {
-		t.Fatalf("List should have been %s but was %s", id, returnedID)
-	}
+	require.Len(s.CappedList(0), 0)
+	require.Len(s.CappedList(1), 1)
+	require.Equal(s.CappedList(1)[0], id)
+	require.Len(s.CappedList(2), 1)
+	require.Equal(s.CappedList(2)[0], id)
 
 	id2 := testSettable{1}
 	s.Add(id2)
 
-	if list := s.CappedList(0); len(list) != 0 {
-		t.Fatalf("List should have been empty but was %v", list)
-	} else if list := s.CappedList(1); len(list) != 1 {
-		t.Fatalf("List should have had length %d but had %d", 1, len(list))
-	} else if returnedID := list[0]; id != returnedID && id2 != returnedID {
-		t.Fatalf("List should have been %s but was %s", id, returnedID)
-	} else if list := s.CappedList(2); len(list) != 2 {
-		t.Fatalf("List should have had length %d but had %d", 2, len(list))
-	} else if list := s.CappedList(3); len(list) != 2 {
-		t.Fatalf("List should have had length %d but had %d", 2, len(list))
-	} else if returnedID := list[0]; id != returnedID && id2 != returnedID {
-		t.Fatalf("list contains unexpected element %s", returnedID)
-	} else if returnedID := list[1]; id != returnedID && id2 != returnedID {
-		t.Fatalf("list contains unexpected element %s", returnedID)
-	}
+	require.Len(s.CappedList(0), 0)
+	require.Len(s.CappedList(1), 1)
+	require.Len(s.CappedList(2), 2)
+	require.Len(s.CappedList(3), 2)
+	gotList := s.CappedList(2)
+	require.Contains(gotList, id)
+	require.Contains(gotList, id2)
+	require.NotEqual(gotList[0], gotList[1])
 }
 
 // Test that Clear() works with both the iterative and set-to-nil path
 func TestSetClearLarge(t *testing.T) {
+	require := require.New(t)
+
 	// Using iterative clear path
 	set := Set[testSettable]{}
 	for i := 0; i < clearSizeThreshold; i++ {
 		set.Add(generateTestSettable())
 	}
 	set.Clear()
-	if set.Len() != 0 {
-		t.Fatal("length should be 0")
-	}
+	require.Len(set, 0)
+	require.Equal(set.Len(), 0)
+
 	set.Add(generateTestSettable())
-	if set.Len() != 1 {
-		t.Fatal("length should be 1")
-	}
+	require.Len(set, 1)
+	require.Equal(set.Len(), 1)
 
 	// Using bulk (set map to nil) path
 	set = Set[testSettable]{}
@@ -151,13 +116,12 @@ func TestSetClearLarge(t *testing.T) {
 		set.Add(generateTestSettable())
 	}
 	set.Clear()
-	if set.Len() != 0 {
-		t.Fatal("length should be 0")
-	}
+	require.Len(set, 0)
+	require.Equal(set.Len(), 0)
+
 	set.Add(generateTestSettable())
-	if set.Len() != 1 {
-		t.Fatal("length should be 1")
-	}
+	require.Len(set, 1)
+	require.Equal(set.Len(), 1)
 }
 
 func TestSetPop(t *testing.T) {
