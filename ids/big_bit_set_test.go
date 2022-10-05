@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_BigBitSet_FromBits(t *testing.T) {
+func Test_BigBitSet_New(t *testing.T) {
 	tests := []struct {
 		name   string
 		bits   []int
@@ -30,7 +30,7 @@ func Test_BigBitSet_FromBits(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			r := require.New(t)
-			b := NewBigBitSetFromBits(test.bits...)
+			b := NewBigBitSet(test.bits...)
 
 			for _, bit := range test.bits {
 				r.True(b.Contains(bit))
@@ -369,7 +369,7 @@ func Test_BigBitSet_Clear(t *testing.T) {
 		},
 		{
 			name:   "populated - big",
-			bitset: []int{255}, // [1, 1, 1, 1, 1]
+			bitset: []int{255}, // [1, 0...]
 		},
 	}
 	for _, test := range tests {

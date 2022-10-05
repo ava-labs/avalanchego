@@ -17,26 +17,17 @@ type BigBitSet struct {
 	bits *big.Int
 }
 
-// NewBigBitSetFromBits returns a new instance of BigBitSet using a list of
-// bits to set to 1.
+// NewBigBitSet returns a new instance of BigBitSet with [bits] set to 1.
 //
 // Invariants:
 // 1. Negative bits will cause a panic.
 // 2. Duplicate bits are allowed but will cause a no-op.
-func NewBigBitSetFromBits(bits ...int) BigBitSet {
-	b := NewBigBitSet()
+func NewBigBitSet(bits ...int) BigBitSet {
+	b := BigBitSet{new(big.Int)}
 	for _, bit := range bits {
 		b.Add(bit)
 	}
-
 	return b
-}
-
-// NewBigBitSet returns a new instance of BigBitSet
-func NewBigBitSet() BigBitSet {
-	return BigBitSet{
-		bits: big.NewInt(int64(0)),
-	}
 }
 
 // Add sets the [i]'th bit to 1
@@ -84,11 +75,9 @@ func (b BigBitSet) Len() int {
 // HammingWeight returns the amount of 1's in the bitset
 func (b BigBitSet) HammingWeight() int {
 	result := 0
-
 	for _, word := range b.bits.Bits() {
 		result += bits.OnesCount(uint(word))
 	}
-
 	return result
 }
 
