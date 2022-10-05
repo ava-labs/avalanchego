@@ -310,7 +310,7 @@ go: downloading github.com/spf13/viper v1.10.1
 
 ## Create an EVM Subnet on Fuji Testnet
 
-See [this tutorial](https://docs.avax.network/subnets/create-a-fuji-subnet).
+See [this tutorial](https://docs.avax.network/subnets/create-a-fuji-subnet-subnet-cli).
 
 ## Customize a Subnet
 
