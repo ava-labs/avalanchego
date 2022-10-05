@@ -18,7 +18,7 @@ type avalancheEndpointRequester struct {
 	uri string
 }
 
-func NewEndpointRequester(uri, base string) EndpointRequester {
+func NewEndpointRequester(uri string) EndpointRequester {
 	return &avalancheEndpointRequester{
 		uri: uri,
 	}
