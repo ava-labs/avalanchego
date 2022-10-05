@@ -171,8 +171,8 @@ func (s Set[_]) String() string {
 	return sb.String()
 }
 
-// Removes and returns an element. If the set is empty, does nothing and returns
-// false.
+// Removes and returns an element.
+// If the set is empty, does nothing and returns false.
 func (s *Set[T]) Pop() (T, bool) {
 	for elt := range *s {
 		delete(*s, elt)
