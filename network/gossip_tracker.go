@@ -168,7 +168,7 @@ func (g *GossipTracker) UpdateKnown(id ids.NodeID, learned []ids.NodeID) bool {
 		return false
 	}
 
-	bs := ids.NewBigBitSetFromBits()
+	bs := ids.NewBigBitSet()
 	for _, nodeID := range learned {
 		idx, ok := g.peersToIndices[nodeID]
 		if !ok {
