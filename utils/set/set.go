@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -26,7 +27,7 @@ type Settable interface {
 	String() string
 }
 
-// Set is a set of IDs
+// Set is a set of elements.
 type Set[T Settable] map[T]struct{}
 
 // Return a new set with initial capacity [size].
@@ -40,47 +41,48 @@ func NewSet[T Settable](size int) Set[T] {
 	return make(map[T]struct{}, size)
 }
 
-func (ids *Set[T]) resize(size int) {
-	if *ids == nil {
+func (s *Set[T]) resize(size int) {
+	if *s == nil {
 		if minSetSize > size {
 			size = minSetSize
 		}
-		*ids = make(map[T]struct{}, size)
+		*s = make(map[T]struct{}, size)
 	}
 }
 
-// Add all the ids to this set, if the id is already in the set, nothing happens
-func (ids *Set[T]) Add(elts ...T) {
-	ids.resize(2 * len(elts))
-	for _, id := range elts {
-		(*ids)[id] = struct{}{}
+// Add all the elements to this set.
+// If the element is already in the set, nothing happens.
+func (s *Set[T]) Add(elts ...T) {
+	s.resize(2 * len(elts))
+	for _, elt := range elts {
+		(*s)[elt] = struct{}{}
 	}
 }
 
-// Union adds all the ids from the provided set to this set.
-func (ids *Set[T]) Union(set Set[T]) {
-	ids.resize(2 * set.Len())
-	for id := range set {
-		(*ids)[id] = struct{}{}
-	}
-}
-
-// Difference removes all the ids from the provided set to this set.
-func (ids *Set[T]) Difference(set Set[T]) {
+// Union adds all the elements from the provided set to this set.
+func (s *Set[T]) Union(set Set[T]) {
+	s.resize(2 * set.Len())
 	for elt := range set {
-		delete(*ids, elt)
+		(*s)[elt] = struct{}{}
 	}
 }
 
-// Contains returns true if the set contains this id, false otherwise
-func (ids *Set[T]) Contains(elt T) bool {
-	_, contains := (*ids)[elt]
+// Difference removes all the elements in [set] from [s].
+func (s *Set[T]) Difference(set Set[T]) {
+	for elt := range set {
+		delete(*s, elt)
+	}
+}
+
+// Contains returns true iff the set contains this element.
+func (s *Set[T]) Contains(elt T) bool {
+	_, contains := (*s)[elt]
 	return contains
 }
 
 // Overlaps returns true if the intersection of the set is non-empty
-func (ids *Set[T]) Overlaps(big Set[T]) bool {
-	small := *ids
+func (s *Set[T]) Overlaps(big Set[T]) bool {
+	small := *s
 	if small.Len() > big.Len() {
 		small, big = big, small
 	}
@@ -93,66 +95,67 @@ func (ids *Set[T]) Overlaps(big Set[T]) bool {
 	return false
 }
 
-// Len returns the number of ids in this set
-func (ids Set[_]) Len() int { return len(ids) }
+// Len returns the number of elements in this set.
+func (s Set[_]) Len() int { return len(s) }
 
-// Remove all the id from this set, if the id isn't in the set, nothing happens
-func (ids *Set[T]) Remove(elts ...T) {
+// Remove all the given elements from this set.
+// If an element isn't in the set, it's ignored.
+func (s *Set[T]) Remove(elts ...T) {
 	for _, elt := range elts {
-		delete(*ids, elt)
+		delete(*s, elt)
 	}
 }
 
 // Clear empties this set
-func (ids *Set[_]) Clear() {
-	if len(*ids) > clearSizeThreshold {
-		*ids = nil
+func (s *Set[_]) Clear() {
+	if len(*s) > clearSizeThreshold {
+		*s = nil
 		return
 	}
-	for elt := range *ids {
-		delete(*ids, elt)
+	for elt := range *s {
+		delete(*s, elt)
 	}
 }
 
 // List converts this set into a list
-func (ids Set[T]) List() []T {
-	idList := make([]T, ids.Len())
+func (s Set[T]) List() []T {
+	elts := make([]T, s.Len())
 	i := 0
-	for id := range ids {
-		idList[i] = id
+	for elt := range s {
+		elts[i] = elt
 		i++
 	}
-	return idList
+	return elts
 }
 
 // CappedList returns a list of length at most [size].
 // Size should be >= 0. If size < 0, returns nil.
-func (ids Set[T]) CappedList(size int) []T {
+func (s Set[T]) CappedList(size int) []T {
 	if size < 0 {
 		return nil
 	}
-	if l := ids.Len(); l < size {
+	if l := s.Len(); l < size {
 		size = l
 	}
 	i := 0
-	idList := make([]T, size)
-	for elt := range ids {
+	elts := make([]T, size)
+	for elt := range s {
 		if i >= size {
 			break
 		}
-		idList[i] = elt
+		elts[i] = elt
 		i++
 	}
-	return idList
+	return elts
 }
 
 // Equals returns true if the sets contain the same elements
-func (ids Set[T]) Equals(other Set[T]) bool {
-	if ids.Len() != other.Len() {
+func (s Set[T]) Equals(other Set[T]) bool {
+	if s.Len() != other.Len() {
 		return false
 	}
 	for elt := range other {
-		if _, contains := ids[elt]; !contains {
+		if _, contains := s[elt]; !contains {
 			return false
 		}
 	}
@@ -160,16 +163,16 @@ func (ids Set[T]) Equals(other Set[T]) bool {
 }
 
 // String returns the string representation of a set
-func (ids Set[_]) String() string {
+func (s Set[_]) String() string {
 	sb := strings.Builder{}
 	sb.WriteString("{")
 	first := true
-	for id := range ids {
+	for elt := range s {
 		if !first {
 			sb.WriteString(", ")
 		}
 		first = false
-		sb.WriteString(id.String())
+		sb.WriteString(elt.String())
 	}
 	sb.WriteString("}")
 	return sb.String()
@@ -177,21 +180,21 @@ func (ids Set[_]) String() string {
 
 // Removes and returns an element. If the set is empty, does nothing and returns
 // false.
-func (ids *Set[T]) Pop() (T, bool) {
-	for id := range *ids {
-		delete(*ids, id)
-		return id, true
+func (s *Set[T]) Pop() (T, bool) {
+	for elt := range *s {
+		delete(*s, elt)
+		return elt, true
 	}
-	return *new(T), false //nolint:gocritic
+	return utils.Zero[T](), false
 }
 
-func (ids *Set[_]) MarshalJSON() ([]byte, error) {
-	idsList := ids.List()
+func (s *Set[_]) MarshalJSON() ([]byte, error) {
+	elts := s.List()
 
 	// Sort for determinism
-	asStrs := make([]string, len(idsList))
-	for i, id := range idsList {
-		asStrs[i] = id.String()
+	asStrs := make([]string, len(elts))
+	for i, elt := range elts {
+		asStrs[i] = elt.String()
 	}
 	sort.Strings(asStrs)
 
@@ -217,9 +220,9 @@ func (ids *Set[_]) MarshalJSON() ([]byte, error) {
 }
 
 // Returns an element. If the set is empty, returns false
-func (ids *Set[T]) Peek() (T, bool) {
-	for id := range *ids {
-		return id, true
+func (s *Set[T]) Peek() (T, bool) {
+	for elt := range *s {
+		return elt, true
 	}
 	return *new(T), false //nolint:gocritic
 }
