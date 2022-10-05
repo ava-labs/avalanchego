@@ -24,13 +24,6 @@ func SortSliceSortable[T Sortable[T]](s []T) {
 	})
 }
 
-// Sorts the elements of [s].
-func SortSliceOrdered[T constraints.Ordered](s []T) {
-	sort.Slice(s, func(i, j int) bool {
-		return s[i] < s[j]
-	})
-}
-
 // Sorts the elements of [s] based on their hashes.
 func SortByHash[T ~[]byte](s []T) {
 	sort.Slice(s, func(i, j int) bool {

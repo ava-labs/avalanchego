@@ -56,38 +56,6 @@ func TestSortSliceSortable(t *testing.T) {
 	require.Equal([]sortable{1, 2, 3}, s)
 }
 
-func TestSortSliceOrdered(t *testing.T) {
-	require := require.New(t)
-
-	var s []int
-	SortSliceOrdered(s)
-	require.True(IsSortedAndUniqueOrdered(s))
-	require.Equal(0, len(s))
-
-	s = []int{1}
-	SortSliceOrdered(s)
-	require.True(IsSortedAndUniqueOrdered(s))
-	require.Equal([]int{1}, s)
-
-	s = []int{1, 2}
-	SortSliceOrdered(s)
-	require.True(IsSortedAndUniqueOrdered(s))
-	require.Equal([]int{1, 2}, s)
-
-	s = []int{2, 1}
-	SortSliceOrdered(s)
-	require.True(IsSortedAndUniqueOrdered(s))
-	require.Equal([]int{1, 2}, s)
-
-	s = []int{1, 2, 1}
-	SortSliceOrdered(s)
-	require.Equal([]int{1, 1, 2}, s)
-
-	s = []int{2, 1, 3}
-	SortSliceOrdered(s)
-	require.Equal([]int{1, 2, 3}, s)
-}
-
 func TestIsSortedAndUniqueSortable(t *testing.T) {
 	require := require.New(t)
 
