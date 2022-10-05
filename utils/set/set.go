@@ -40,7 +40,7 @@ func NewSet[T Settable](size int) Set[T] {
 	return make(map[T]struct{}, size)
 }
 
-func (ids *Set[T]) init(size int) {
+func (ids *Set[T]) resize(size int) {
 	if *ids == nil {
 		if minSetSize > size {
 			size = minSetSize
@@ -51,7 +51,7 @@ func (ids *Set[T]) init(size int) {
 
 // Add all the ids to this set, if the id is already in the set, nothing happens
 func (ids *Set[T]) Add(elts ...T) {
-	ids.init(2 * len(elts))
+	ids.resize(2 * len(elts))
 	for _, id := range elts {
 		(*ids)[id] = struct{}{}
 	}
@@ -59,7 +59,7 @@ func (ids *Set[T]) Add(elts ...T) {
 
 // Union adds all the ids from the provided set to this set.
 func (ids *Set[T]) Union(set Set[T]) {
-	ids.init(2 * set.Len())
+	ids.resize(2 * set.Len())
 	for id := range set {
 		(*ids)[id] = struct{}{}
 	}
