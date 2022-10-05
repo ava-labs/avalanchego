@@ -314,3 +314,28 @@ func TestIsSortedAndUnique(t *testing.T) {
 	s = sortableSlice{1, 2, 3}
 	require.True(IsSortedAndUnique(s))
 }
+
+func TestIsUnique(t *testing.T) {
+	require := require.New(t)
+
+	var s []int
+	require.True(IsUnique(s))
+
+	s = []int{}
+	require.True(IsUnique(s))
+
+	s = []int{1}
+	require.True(IsUnique(s))
+
+	s = []int{1, 2}
+	require.True(IsUnique(s))
+
+	s = []int{1, 1}
+	require.False(IsUnique(s))
+
+	s = []int{2, 1}
+	require.True(IsUnique(s))
+
+	s = []int{1, 2, 1}
+	require.False(IsUnique(s))
+}
