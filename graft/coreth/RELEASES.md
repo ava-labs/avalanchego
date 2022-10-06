@@ -1,5 +1,12 @@
 # Release Notes
 
+## [v0.11.0](https://github.com/ava-labs/coreth/releases/tag/v0.10.0)
+
+- Update Chain Config compatibility check to compare against last accepted block timestamp
+- Bump go-ethereum dependency to v1.10.25
+- Add Banff activation times for Mainnet and Fuji for October 18 4pm UTC and October 3 2pm UTC respectively
+- Banff cleanup
+
 ## [v0.10.0](https://github.com/ava-labs/coreth/releases/tag/v0.10.0)
 
 - Deprecate Native Asset Call and Native Asset Balance
