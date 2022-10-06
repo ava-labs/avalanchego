@@ -1,6 +1,6 @@
 github.com/VictoriaMetrics/fastcache v1.10.0 h1:5hDJnLsKLpnUEToub7ETuRu8RCkb40woBZAUiKonXzY=
-github.com/ava-labs/avalanchego v1.8.6 h1:eYyW/m1+3o8HbhXsd6k52hcGxDTyGYfXHj7PX7fqc4A=
-github.com/ava-labs/avalanchego v1.8.6/go.mod h1:nYYiHRS6LmA+05rLVLDjaVjB3D7LZwAmBqYi0mweEgI=
+github.com/ava-labs/avalanchego v1.9.0 h1:9H6LZMVH9aSUJXviyBxn9owX8Dgs4azN7ojRsqLQpq0=
+github.com/ava-labs/avalanchego v1.9.0/go.mod h1:F0VZ+ukCllfz8VT79wZQlcRsTh1sbCCi5iWIhbLG8BQ=
 github.com/btcsuite/btcd v0.23.1 h1:IB8cVQcC2X5mHbnfirLG5IZnkWYNTPlLZVrxUYSotbE=
 github.com/btcsuite/btcd/btcec/v2 v2.2.0 h1:fzn1qaOt32TuLjFlkzYSsBC35Q3KUjT1SwPxiMSCF5k=
 github.com/btcsuite/btcd/btcec/v2 v2.2.0/go.mod h1:U7MHm051Al6XmscBQ0BoNydpOTsFAn707034b5nY8zU=
@@ -17,8 +17,8 @@ github.com/decred/dcrd/crypto/blake256 v1.0.0 h1:/8DMNYp9SGi5f0w7uCm6d6M4OU2rGFK
 github.com/decred/dcrd/crypto/blake256 v1.0.0/go.mod h1:sQl2p6Y26YV+ZOcSTP6thNdn47hh8kt6rqSlvmrXFAc=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 h1:YLtO71vCjJRCBcrPMtQ9nqBsqpA1m5sE92cU+pd5Mcc=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1/go.mod h1:hyedUtir6IdtD/7lIxGeCxkaw7y45JueMRL4DIyJDKs=
-github.com/ethereum/go-ethereum v1.10.23 h1:Xk8XAT4/UuqcjMLIMF+7imjkg32kfVFKoeyQDaO2yWM=
-github.com/ethereum/go-ethereum v1.10.23/go.mod h1:EYFyF19u3ezGLD4RqOkLq+ZCXzYbLoNDdZlMt7kyKFg=
+github.com/ethereum/go-ethereum v1.10.25 h1:5dFrKJDnYf8L6/5o42abCE6a9yJm9cs4EJVRyYMr55s=
+github.com/ethereum/go-ethereum v1.10.25/go.mod h1:EYFyF19u3ezGLD4RqOkLq+ZCXzYbLoNDdZlMt7kyKFg=
 github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5 h1:FtmdgXiUlNeRsoNMFlKLDt+S+6hbjVMEW6RGQ7aUf7c=
 github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 h1:f6D9Hr8xV8uYKlyuj8XIruxlh9WjVjdh1gIicAS7ays=
 github.com/go-ole/go-ole v1.2.6 h1:/Fpf6oFPoeFik9ty7siob0G6Ke8QvQEuVcuChpwXzpY=
