@@ -5,6 +5,7 @@ package set
 
 import (
 	"bytes"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -25,7 +26,7 @@ const (
 // Settable describes an element that can be in a set.
 type Settable interface {
 	comparable
-	String() string
+	fmt.Stringer
 }
 
 // Set is a set of elements.

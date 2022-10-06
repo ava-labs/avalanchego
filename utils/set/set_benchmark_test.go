@@ -9,52 +9,23 @@ import (
 	"testing"
 )
 
-func BenchmarkSetListSmall(b *testing.B) {
-	smallLen := 5
-	set := Set[testSettable]{}
-	for i := 0; i < smallLen; i++ {
-		var s testSettable
-		if _, err := rand.Read(s[:]); err != nil {
-			b.Fatal(err)
-		}
-		set.Add(s)
-	}
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		set.List()
-	}
-}
-
-func BenchmarkSetListMedium(b *testing.B) {
-	mediumLen := 25
-	set := Set[testSettable]{}
-	for i := 0; i < mediumLen; i++ {
-		var s testSettable
-		if _, err := rand.Read(s[:]); err != nil {
-			b.Fatal(err)
-		}
-		set.Add(s)
-	}
-	b.ResetTimer()
-
-	for n := 0; n < b.N; n++ {
-		set.List()
-	}
-}
-
-func BenchmarkSetListLarge(b *testing.B) {
-	largeLen := 100000
-	set := Set[testSettable]{}
-	for i := 0; i < largeLen; i++ {
-		var s testSettable
-		if _, err := rand.Read(s[:]); err != nil {
-			b.Fatal(err)
-		}
-		set.Add(s)
-	}
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		set.List()
+func BenchmarkSetList(b *testing.B) {
+	sizes := []int{5, 25, 100, 100_000} // Test with various sizes
+	for size := range sizes {
+		b.Run(strconv.Itoa(size), func(b *testing.B) {
+			set := Set[testSettable]{}
+			for i := 0; i < size; i++ {
+				var s testSettable
+				if _, err := rand.Read(s[:]); err != nil {
+					b.Fatal(err)
+				}
+				set.Add(s)
+			}
+			b.ResetTimer()
+			for n := 0; n < b.N; n++ {
+				set.List()
+			}
+		})
 	}
 }
 

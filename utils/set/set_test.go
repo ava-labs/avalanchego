@@ -172,29 +172,3 @@ func TestSetMarshalJSON(t *testing.T) {
 		require.Equal(fmt.Sprintf("[\"%s\",\"%s\"]", id1, id2), string(asJSON))
 	}
 }
-
-// TODO remove if we can't implement this
-// func TestSortedList(t *testing.T) {
-// 	require := require.New(t)
-
-// 	set := Set[settable]{}
-// 	require.Len(set.SortedList(), 0)
-
-// 	set.Add(ID{0})
-// 	sorted := set.SortedList()
-// 	require.Len(sorted, 1)
-// 	require.Equal(ID{0}, sorted[0])
-
-// 	set.Add(ID{1})
-// 	sorted = set.SortedList()
-// 	require.Len(sorted, 2)
-// 	require.Equal(ID{0}, sorted[0])
-// 	require.Equal(ID{1}, sorted[1])
-
-// 	set.Add(ID{2})
-// 	sorted = set.SortedList()
-// 	require.Len(sorted, 3)
-// 	require.Equal(ID{0}, sorted[0])
-// 	require.Equal(ID{1}, sorted[1])
-// 	require.Equal(ID{2}, sorted[2])
-// }
