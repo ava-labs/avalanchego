@@ -90,7 +90,11 @@ func (g *GossipTracker) Add(id ids.NodeID) bool {
 		return false
 	}
 
-	// add the peer
+	// Add the peer to the MSB of the bitset.
+	// NOTE: strict ordering is not guaranteed due to invariants with [Remove].
+	// TODO: consider adding to the LSB instead, so that every time a new peer
+	// is added the resulting unknown isn't [1, 0,..., 0] (high sparsity),
+	// and is instead [1].
 	tail := len(g.peersToIndices)
 	g.peersToIndices[id] = tail
 	g.knownPeers[id] = ids.NewBigBitSet()
@@ -209,6 +213,11 @@ func (g *GossipTracker) GetUnknown(id ids.NodeID, limit int) ([]ids.NodeID, bool
 
 	result := make([]ids.NodeID, 0, limit)
 
+	// We iterate from the LSB -> MSB when computing our diffs.
+	// This is because [Add] always inserts at the MSB, so we retrieve the
+	// unknown peers starting at the oldest unknown peer to avoid complications
+	// where a subset of nodes might be "flickering" offline/online, resulting
+	// in the same diff being sent over each time.
 	for i := 0; i < unknown.Len(); i++ {
 		// skip the bits that aren't set
 		if !unknown.Contains(i) {

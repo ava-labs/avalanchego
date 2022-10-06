@@ -217,7 +217,7 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 	r.False(ok)
 	r.Empty(unknown)
 
-	// we should get a unknown of [+id0, +id1] since we know about id0 and id1,
+	// we should get a unknown of [id0, id1] since we know about id0 and id1,
 	// but id0 and id1 both don't know anything yet
 	g.Add(id0)
 	g.Add(id1)
@@ -236,7 +236,7 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 	r.Contains(unknown, id1)
 	r.Len(unknown, 2)
 
-	// id0 now knows about id0, but not id1, so it should see [+id1] in its unknown
+	// id0 now knows about id0, but not id1, so it should see [id1] in its unknown
 	// id1 still knows nothing, so it should see both
 	p0 := []ids.NodeID{id0}
 	r.True(g.UpdateKnown(id0, p0))
