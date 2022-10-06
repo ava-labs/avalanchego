@@ -26,7 +26,7 @@ const (
 // Settable describes an element that can be in a set.
 type Settable interface {
 	comparable
-	fmt.Stringer
+	// fmt.Stringer TODO put back or remove
 }
 
 // Set is a set of elements.
@@ -166,7 +166,7 @@ func (s Set[_]) String() string {
 			sb.WriteString(", ")
 		}
 		first = false
-		sb.WriteString(elt.String())
+		sb.WriteString(fmt.Sprintf("%v", elt))
 	}
 	sb.WriteString("}")
 	return sb.String()
@@ -188,7 +188,7 @@ func (s *Set[_]) MarshalJSON() ([]byte, error) {
 	// Sort for determinism
 	asStrs := make([]string, len(elts))
 	for i, elt := range elts {
-		asStrs[i] = elt.String()
+		asStrs[i] = fmt.Sprintf("%v", elt)
 	}
 	sort.Strings(asStrs)
 
