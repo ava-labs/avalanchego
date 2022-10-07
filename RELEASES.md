@@ -1,5 +1,42 @@
 # Release Notes
 
+## [v1.9.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0)
+
+This upgrade adds support for creating Proof-of-Stake Subnets.
+
+This version is not backwards compatible. The changes in the upgrade go into effect at 12 PM EDT, October 18th 2022 on Mainnet.
+
+**All Mainnet nodes should upgrade before 12 PM EDT, October 18th 2022.**
+
+The supported plugin version is `17`.
+
+### Upgrades
+
+- Activated P2P serialization format change to Protobuf
+- Activated non-AVAX `ImportTx`/`ExportTx`s to/from the P-chain
+- Activated `Banff*` blocks on the P-chain
+- Deactivated `Apricot*` blocks on the P-chain
+- Activated `RemoveSubnetValidatorTx`s on the P-chain
+- Activated `TransformSubnetTx`s on the P-chain
+- Activated `AddPermissionlessValidatorTx`s on the P-chain
+- Activated `AddPermissionlessDelegatorTx`s on the P-chain
+- Deactivated ANT `ImportTx`/`ExportTx`s on the C-chain
+- Deactivated ANT precompiles on the C-chain
+
+### Deprecations
+
+- Ubuntu 18.04 releases are deprecated and will not be provided for `>=v1.9.1`
+
+### Miscellaneous
+
+- Fixed locked input signing in the P-chain wallet
+- Removed assertions from the logger interface
+- Removed `--assertions-enabled` flag
+- Fixed typo in `--bootstrap-max-time-get-ancestors` flag
+- Standardized exported P-Chain codec usage
+- Improved isolation and execution of the E2E tests
+- Updated the linked hashmap implementation to use generics
+
 ## [v1.8.6](https://github.com/ava-labs/avalanchego/releases/tag/v1.8.6)
 
 This version is backwards compatible to [v1.8.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.8.0). It is optional, but encouraged. The supported plugin version is `16`.

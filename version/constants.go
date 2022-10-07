@@ -13,8 +13,8 @@ import (
 var (
 	Current = &Semantic{
 		Major: 1,
-		Minor: 8,
-		Patch: 6,
+		Minor: 9,
+		Patch: 0,
 	}
 	CurrentApp = &Application{
 		Major: Current.Major,
@@ -23,12 +23,12 @@ var (
 	}
 	MinimumCompatibleVersion = &Application{
 		Major: 1,
-		Minor: 8,
+		Minor: 9,
 		Patch: 0,
 	}
 	PrevMinimumCompatibleVersion = &Application{
 		Major: 1,
-		Minor: 7,
+		Minor: 8,
 		Patch: 0,
 	}
 
@@ -75,10 +75,9 @@ var (
 	}
 	ApricotPhase6DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
-	// FIXME: update this before release
 	BanffTimes = map[uint32]time.Time{
-		constants.MainnetID: time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
+		constants.MainnetID: time.Date(2022, time.October, 18, 16, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(2022, time.October, 3, 14, 0, 0, 0, time.UTC),
 	}
 	BanffDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
@@ -143,7 +142,7 @@ func GetCompatibility(networkID uint32) Compatibility {
 	return NewCompatibility(
 		CurrentApp,
 		MinimumCompatibleVersion,
-		GetApricotPhase6Time(networkID),
+		GetBanffTime(networkID),
 		PrevMinimumCompatibleVersion,
 	)
 }
