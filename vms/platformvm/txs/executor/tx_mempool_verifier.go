@@ -67,7 +67,7 @@ func (v *MempoolTxVerifier) AddPermissionlessDelegatorTx(tx *txs.AddPermissionle
 	return v.standardTx(tx)
 }
 
-// TODO: simplify this function after Blueberry is activated.
+// TODO: simplify this function after Banff is activated.
 func (v *MempoolTxVerifier) proposalTx(tx txs.StakerTx) error {
 	startTime := tx.StartTime()
 	maxLocalStartTime := v.Clk.Time().Add(MaxFutureStartTime)
@@ -80,9 +80,9 @@ func (v *MempoolTxVerifier) proposalTx(tx txs.StakerTx) error {
 		return err
 	}
 
-	// Make sure that the Blueberry fork check will pass.
+	// Make sure that the Banff fork check will pass.
 	currentChainTime := onCommitState.GetTimestamp()
-	if v.Backend.Config.IsBlueberryActivated(currentChainTime) {
+	if v.Backend.Config.IsBanffActivated(currentChainTime) {
 		return v.standardTx(tx)
 	}
 

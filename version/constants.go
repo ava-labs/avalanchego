@@ -13,8 +13,8 @@ import (
 var (
 	Current = &Semantic{
 		Major: 1,
-		Minor: 8,
-		Patch: 6,
+		Minor: 9,
+		Patch: 0,
 	}
 	CurrentApp = &Application{
 		Major: Current.Major,
@@ -23,12 +23,12 @@ var (
 	}
 	MinimumCompatibleVersion = &Application{
 		Major: 1,
-		Minor: 8,
+		Minor: 9,
 		Patch: 0,
 	}
 	PrevMinimumCompatibleVersion = &Application{
 		Major: 1,
-		Minor: 7,
+		Minor: 8,
 		Patch: 0,
 	}
 
@@ -75,12 +75,11 @@ var (
 	}
 	ApricotPhase6DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
-	// FIXME: update this before release
-	BlueberryTimes = map[uint32]time.Time{
-		constants.MainnetID: time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
+	BanffTimes = map[uint32]time.Time{
+		constants.MainnetID: time.Date(2022, time.October, 18, 16, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(2022, time.October, 3, 14, 0, 0, 0, time.UTC),
 	}
-	BlueberryDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
+	BanffDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
 	// FIXME: update this before release
 	XChainMigrationTimes = map[uint32]time.Time{
@@ -125,11 +124,11 @@ func GetApricotPhase6Time(networkID uint32) time.Time {
 	return ApricotPhase6DefaultTime
 }
 
-func GetBlueberryTime(networkID uint32) time.Time {
-	if upgradeTime, exists := BlueberryTimes[networkID]; exists {
+func GetBanffTime(networkID uint32) time.Time {
+	if upgradeTime, exists := BanffTimes[networkID]; exists {
 		return upgradeTime
 	}
-	return BlueberryDefaultTime
+	return BanffDefaultTime
 }
 
 func GetXChainMigrationTime(networkID uint32) time.Time {
@@ -143,7 +142,7 @@ func GetCompatibility(networkID uint32) Compatibility {
 	return NewCompatibility(
 		CurrentApp,
 		MinimumCompatibleVersion,
-		GetApricotPhase6Time(networkID),
+		GetBanffTime(networkID),
 		PrevMinimumCompatibleVersion,
 	)
 }

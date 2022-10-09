@@ -27,8 +27,8 @@ type Config struct {
 	MessageCreator          message.Creator
 	MessageCreatorWithProto message.Creator
 
-	// TODO: remove this once we complete blueberry migration
-	BlueberryTime time.Time
+	// TODO: remove this once we complete banff migration
+	BanffTime time.Time
 
 	Log                  logging.Logger
 	InboundMsgThrottler  throttling.InboundMsgThrottler
@@ -52,12 +52,12 @@ type Config struct {
 
 func (c *Config) GetMessageCreator() message.Creator {
 	now := c.Clock.Time()
-	if c.IsBlueberryActivated(now) {
+	if c.IsBanffActivated(now) {
 		return c.MessageCreatorWithProto
 	}
 	return c.MessageCreator
 }
 
-func (c *Config) IsBlueberryActivated(time time.Time) bool {
-	return !time.Before(c.BlueberryTime)
+func (c *Config) IsBanffActivated(time time.Time) bool {
+	return !time.Before(c.BanffTime)
 }

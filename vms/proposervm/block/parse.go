@@ -9,13 +9,13 @@ import (
 
 func Parse(bytes []byte) (Block, bool, error) {
 	var (
-		block            Block
-		requireBlueberry bool
+		block        Block
+		requireBanff bool
 	)
 	parsedVersion, err := apricotCodec.Unmarshal(bytes, &block)
 	if err != nil {
-		parsedVersion, err = blueberryCodec.Unmarshal(bytes, &block)
-		requireBlueberry = true
+		parsedVersion, err = banffCodec.Unmarshal(bytes, &block)
+		requireBanff = true
 	}
 	if err != nil {
 		return nil, false, err
@@ -23,12 +23,12 @@ func Parse(bytes []byte) (Block, bool, error) {
 	if parsedVersion != codecVersion {
 		return nil, false, fmt.Errorf("expected codec version %d but got %d", codecVersion, parsedVersion)
 	}
-	return block, requireBlueberry, block.initialize(bytes)
+	return block, requireBanff, block.initialize(bytes)
 }
 
 func ParseHeader(bytes []byte) (Header, error) {
 	header := statelessHeader{}
-	parsedVersion, err := blueberryCodec.Unmarshal(bytes, &header)
+	parsedVersion, err := banffCodec.Unmarshal(bytes, &header)
 	if err != nil {
 		return nil, err
 	}

@@ -35,7 +35,7 @@ func init() {
 		errs.Add(
 			RegisterApricotBlockTypes(c),
 			txs.RegisterUnsignedTxsTypes(c),
-			RegisterBlueberryBlockTypes(c),
+			RegisterBanffBlockTypes(c),
 		)
 	}
 	errs.Add(
@@ -63,13 +63,13 @@ func RegisterApricotBlockTypes(targetCodec codec.Registry) error {
 	return errs.Err
 }
 
-func RegisterBlueberryBlockTypes(targetCodec codec.Registry) error {
+func RegisterBanffBlockTypes(targetCodec codec.Registry) error {
 	errs := wrappers.Errs{}
 	errs.Add(
-		targetCodec.RegisterType(&BlueberryProposalBlock{}),
-		targetCodec.RegisterType(&BlueberryAbortBlock{}),
-		targetCodec.RegisterType(&BlueberryCommitBlock{}),
-		targetCodec.RegisterType(&BlueberryStandardBlock{}),
+		targetCodec.RegisterType(&BanffProposalBlock{}),
+		targetCodec.RegisterType(&BanffAbortBlock{}),
+		targetCodec.RegisterType(&BanffCommitBlock{}),
+		targetCodec.RegisterType(&BanffStandardBlock{}),
 	)
 	return errs.Err
 }

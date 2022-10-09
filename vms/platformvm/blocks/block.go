@@ -31,7 +31,7 @@ type Block interface {
 	initialize(bytes []byte) error
 }
 
-type BlueberryBlock interface {
+type BanffBlock interface {
 	Block
 	Timestamp() time.Time
 }

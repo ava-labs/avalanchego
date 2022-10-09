@@ -188,7 +188,7 @@ type ManagerConfig struct {
 
 	ApricotPhase4Time            time.Time
 	ApricotPhase4MinPChainHeight uint64
-	BlueberryTime                time.Time
+	BanffTime                    time.Time
 
 	// Tracks CPU/disk usage caused by each peer.
 	ResourceTracker timetracker.ResourceTracker
@@ -575,7 +575,7 @@ func (m *manager) createAvalancheChain(
 		ctx,
 		m.MsgCreator,
 		m.MsgCreatorWithProto,
-		m.BlueberryTime,
+		m.BanffTime,
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
@@ -763,7 +763,7 @@ func (m *manager) createSnowmanChain(
 		ctx,
 		m.MsgCreator,
 		m.MsgCreatorWithProto,
-		m.BlueberryTime,
+		m.BanffTime,
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
@@ -810,7 +810,7 @@ func (m *manager) createSnowmanChain(
 		vm,
 		m.ApricotPhase4Time,
 		m.ApricotPhase4MinPChainHeight,
-		m.BlueberryTime,
+		m.BanffTime,
 	)
 
 	if m.MeterVMEnabled {

@@ -19,14 +19,14 @@ import (
 var (
 	_ blocks.Visitor = &verifier{}
 
-	errBlueberryBlockIssuedBeforeFork                 = errors.New("blueberry block issued before fork")
-	errApricotBlockIssuedAfterFork                    = errors.New("apricot block issued after fork")
-	errBlueberryProposalBlockWithMultipleTransactions = errors.New("BlueberryProposalBlock contains multiple transactions")
-	errBlueberryStandardBlockWithoutChanges           = errors.New("BlueberryStandardBlock performs no state changes")
-	errChildBlockEarlierThanParent                    = errors.New("proposed timestamp before current chain time")
-	errConflictingBatchTxs                            = errors.New("block contains conflicting transactions")
-	errConflictingParentTxs                           = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
-	errOptionBlockTimestampNotMatchingParent          = errors.New("option block proposed timestamp not matching parent block one")
+	errBanffBlockIssuedBeforeFork                 = errors.New("banff block issued before fork")
+	errApricotBlockIssuedAfterFork                = errors.New("apricot block issued after fork")
+	errBanffProposalBlockWithMultipleTransactions = errors.New("BanffProposalBlock contains multiple transactions")
+	errBanffStandardBlockWithoutChanges           = errors.New("BanffStandardBlock performs no state changes")
+	errChildBlockEarlierThanParent                = errors.New("proposed timestamp before current chain time")
+	errConflictingBatchTxs                        = errors.New("block contains conflicting transactions")
+	errConflictingParentTxs                       = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
+	errOptionBlockTimestampNotMatchingParent      = errors.New("option block proposed timestamp not matching parent block one")
 )
 
 // verifier handles the logic for verifying a block.
@@ -35,26 +35,26 @@ type verifier struct {
 	txExecutorBackend *executor.Backend
 }
 
-func (v *verifier) BlueberryAbortBlock(b *blocks.BlueberryAbortBlock) error {
-	if err := v.blueberryOptionBlock(b); err != nil {
+func (v *verifier) BanffAbortBlock(b *blocks.BanffAbortBlock) error {
+	if err := v.banffOptionBlock(b); err != nil {
 		return err
 	}
 	return v.abortBlock(b)
 }
 
-func (v *verifier) BlueberryCommitBlock(b *blocks.BlueberryCommitBlock) error {
-	if err := v.blueberryOptionBlock(b); err != nil {
+func (v *verifier) BanffCommitBlock(b *blocks.BanffCommitBlock) error {
+	if err := v.banffOptionBlock(b); err != nil {
 		return err
 	}
 	return v.commitBlock(b)
 }
 
-func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) error {
+func (v *verifier) BanffProposalBlock(b *blocks.BanffProposalBlock) error {
 	if len(b.Transactions) != 0 {
-		return errBlueberryProposalBlockWithMultipleTransactions
+		return errBanffProposalBlockWithMultipleTransactions
 	}
 
-	if err := v.blueberryNonOptionBlock(b); err != nil {
+	if err := v.banffNonOptionBlock(b); err != nil {
 		return err
 	}
 
@@ -88,8 +88,8 @@ func (v *verifier) BlueberryProposalBlock(b *blocks.BlueberryProposalBlock) erro
 	return v.proposalBlock(&b.ApricotProposalBlock, onCommitState, onAbortState)
 }
 
-func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) error {
-	if err := v.blueberryNonOptionBlock(b); err != nil {
+func (v *verifier) BanffStandardBlock(b *blocks.BanffStandardBlock) error {
+	if err := v.banffNonOptionBlock(b); err != nil {
 		return err
 	}
 
@@ -113,7 +113,7 @@ func (v *verifier) BlueberryStandardBlock(b *blocks.BlueberryStandardBlock) erro
 	// If this block doesn't perform any changes, then it should never have been
 	// issued.
 	if changes.Len() == 0 && len(b.Transactions) == 0 {
-		return errBlueberryStandardBlockWithoutChanges
+		return errBanffStandardBlockWithoutChanges
 	}
 
 	onAcceptState.SetTimestamp(nextChainTime)
@@ -221,13 +221,13 @@ func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 	return nil
 }
 
-func (v *verifier) blueberryOptionBlock(b blocks.BlueberryBlock) error {
-	if err := v.blueberryCommonBlock(b); err != nil {
+func (v *verifier) banffOptionBlock(b blocks.BanffBlock) error {
+	if err := v.banffCommonBlock(b); err != nil {
 		return err
 	}
 
-	// Blueberry option blocks must be uniquely generated from the
-	// BlueberryProposalBlock. This means that the timestamp must be
+	// Banff option blocks must be uniquely generated from the
+	// BanffProposalBlock. This means that the timestamp must be
 	// standardized to a specific value. Therefore, we require the timestamp to
 	// be equal to the parents timestamp.
 	parentID := b.Parent()
@@ -244,8 +244,8 @@ func (v *verifier) blueberryOptionBlock(b blocks.BlueberryBlock) error {
 	return nil
 }
 
-func (v *verifier) blueberryNonOptionBlock(b blocks.BlueberryBlock) error {
-	if err := v.blueberryCommonBlock(b); err != nil {
+func (v *verifier) banffNonOptionBlock(b blocks.BanffBlock) error {
+	if err := v.banffCommonBlock(b); err != nil {
 		return err
 	}
 
@@ -279,10 +279,10 @@ func (v *verifier) blueberryNonOptionBlock(b blocks.BlueberryBlock) error {
 	)
 }
 
-func (v *verifier) blueberryCommonBlock(b blocks.BlueberryBlock) error {
+func (v *verifier) banffCommonBlock(b blocks.BanffBlock) error {
 	timestamp := b.Timestamp()
-	if !v.txExecutorBackend.Config.IsBlueberryActivated(timestamp) {
-		return fmt.Errorf("%w: timestamp = %s", errBlueberryBlockIssuedBeforeFork, timestamp)
+	if !v.txExecutorBackend.Config.IsBanffActivated(timestamp) {
+		return fmt.Errorf("%w: timestamp = %s", errBanffBlockIssuedBeforeFork, timestamp)
 	}
 	return v.commonBlock(b)
 }
@@ -292,13 +292,13 @@ func (v *verifier) apricotCommonBlock(b blocks.Block) error {
 	// parent was verified. Apricot blocks only update the timestamp with
 	// AdvanceTimeTxs. This means that this block's timestamp will be equal to
 	// the parent block's timestamp; unless this is a CommitBlock. In order for
-	// the timestamp of the CommitBlock to be after the Blueberry activation,
+	// the timestamp of the CommitBlock to be after the Banff activation,
 	// the parent ApricotProposalBlock must include an AdvanceTimeTx with a
-	// timestamp after the Blueberry timestamp. This is verified not to occur
+	// timestamp after the Banff timestamp. This is verified not to occur
 	// during the verification of the ProposalBlock.
 	parentID := b.Parent()
 	timestamp := v.getTimestamp(parentID)
-	if v.txExecutorBackend.Config.IsBlueberryActivated(timestamp) {
+	if v.txExecutorBackend.Config.IsBanffActivated(timestamp) {
 		return fmt.Errorf("%w: timestamp = %s", errApricotBlockIssuedAfterFork, timestamp)
 	}
 	return v.commonBlock(b)
@@ -389,7 +389,7 @@ func (v *verifier) proposalBlock(
 		statelessBlock: b,
 		// It is safe to use [b.onAbortState] here because the timestamp will
 		// never be modified by an Apricot Abort block and the timestamp will
-		// always be the same as the Blueberry Proposal Block.
+		// always be the same as the Banff Proposal Block.
 		timestamp: onAbortState.GetTimestamp(),
 	}
 

@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func TestNewBlueberryProposalBlock(t *testing.T) {
+func TestNewBanffProposalBlock(t *testing.T) {
 	require := require.New(t)
 
 	timestamp := time.Now().Truncate(time.Second)
@@ -42,7 +42,7 @@ func TestNewBlueberryProposalBlock(t *testing.T) {
 	}
 	require.NoError(tx.Sign(txs.Codec, nil))
 
-	blk, err := NewBlueberryProposalBlock(
+	blk, err := NewBanffProposalBlock(
 		timestamp,
 		parentID,
 		height,

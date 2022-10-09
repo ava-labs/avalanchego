@@ -13,11 +13,11 @@ import (
 )
 
 var (
-	_ BlueberryBlock = &BlueberryProposalBlock{}
-	_ Block          = &ApricotProposalBlock{}
+	_ BanffBlock = &BanffProposalBlock{}
+	_ Block      = &ApricotProposalBlock{}
 )
 
-type BlueberryProposalBlock struct {
+type BanffProposalBlock struct {
 	Time uint64 `serialize:"true" json:"time"`
 	// Transactions is currently unused. This is populated so that introducing
 	// them in the future will not require a codec change.
@@ -28,23 +28,23 @@ type BlueberryProposalBlock struct {
 	ApricotProposalBlock `serialize:"true"`
 }
 
-func (b *BlueberryProposalBlock) InitCtx(ctx *snow.Context) {
+func (b *BanffProposalBlock) InitCtx(ctx *snow.Context) {
 	for _, tx := range b.Transactions {
 		tx.Unsigned.InitCtx(ctx)
 	}
 	b.ApricotProposalBlock.InitCtx(ctx)
 }
 
-func (b *BlueberryProposalBlock) Timestamp() time.Time  { return time.Unix(int64(b.Time), 0) }
-func (b *BlueberryProposalBlock) Visit(v Visitor) error { return v.BlueberryProposalBlock(b) }
+func (b *BanffProposalBlock) Timestamp() time.Time  { return time.Unix(int64(b.Time), 0) }
+func (b *BanffProposalBlock) Visit(v Visitor) error { return v.BanffProposalBlock(b) }
 
-func NewBlueberryProposalBlock(
+func NewBanffProposalBlock(
 	timestamp time.Time,
 	parentID ids.ID,
 	height uint64,
 	tx *txs.Tx,
-) (*BlueberryProposalBlock, error) {
-	blk := &BlueberryProposalBlock{
+) (*BanffProposalBlock, error) {
+	blk := &BanffProposalBlock{
 		Time: uint64(timestamp.Unix()),
 		ApricotProposalBlock: ApricotProposalBlock{
 			CommonBlock: CommonBlock{

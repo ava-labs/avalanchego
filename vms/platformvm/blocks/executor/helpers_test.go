@@ -354,7 +354,7 @@ func defaultConfig() *config.Config {
 		},
 		ApricotPhase3Time: defaultValidateEndTime,
 		ApricotPhase5Time: defaultValidateEndTime,
-		BlueberryTime:     mockable.MaxTime,
+		BanffTime:         mockable.MaxTime,
 	}
 }
 
