@@ -154,9 +154,16 @@ func TestSnowballLastBinary(t *testing.T) {
 	require.Equal(one, tree.Preference())
 	require.False(tree.Finalized())
 
+	expected = "SB(NumSuccessfulPolls = 1, SF(Confidence = 1, Finalized = false)) Bits = [0, 255)\n" +
+		"    SB(Preference = 1, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 1, SF(Confidence = 1, Finalized = false, SL(Preference = 1))) Bit = 255"
+	require.Equal(expected, tree.String())
+
 	require.True(tree.RecordPoll(oneBag))
 	require.Equal(one, tree.Preference())
 	require.True(tree.Finalized())
+
+	expected = "SB(Preference = 1, NumSuccessfulPolls[0] = 0, NumSuccessfulPolls[1] = 2, SF(Confidence = 2, Finalized = true, SL(Preference = 1))) Bit = 255"
+	require.Equal(expected, tree.String())
 }
 
 func TestSnowballAddPreviouslyRejected(t *testing.T) {

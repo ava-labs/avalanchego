@@ -127,9 +127,6 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Bool(LogRotaterCompressEnabledKey, false, "Enables the compression of rotated log files through gzip.")
 	fs.Bool(LogDisableDisplayPluginLogsKey, false, "Disables displaying plugin logs in stdout.")
 
-	// Assertions
-	fs.Bool(AssertionsEnabledKey, true, "Turn on assertion execution")
-
 	// Peer List Gossip
 	gossipHelpMsg := fmt.Sprintf(
 		"Gossip [%s] validator IPs to [%s] validators, [%s] non-validators, and [%s] validating or non-validating peers every [%s]",

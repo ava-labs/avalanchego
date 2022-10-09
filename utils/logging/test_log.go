@@ -37,14 +37,6 @@ func (NoLog) Debug(string, ...zap.Field) {}
 
 func (NoLog) Verbo(string, ...zap.Field) {}
 
-func (NoLog) AssertNoError(error) {}
-
-func (NoLog) AssertTrue(bool, string, ...zap.Field) {}
-
-func (NoLog) AssertDeferredTrue(func() bool, string, ...zap.Field) {}
-
-func (NoLog) AssertDeferredNoError(func() error) {}
-
 func (NoLog) StopOnPanic() {}
 
 func (NoLog) RecoverAndPanic(f func()) { f() }

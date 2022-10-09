@@ -1468,7 +1468,7 @@ func TestEngineGetVertex(t *testing.T) {
 	sender.CantSendGetAcceptedFrontier = false
 	engCfg.Sender = sender
 
-	vdr := validators.GenerateRandomValidator(1)
+	vdrID := ids.GenerateTestNodeID()
 
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
@@ -1510,7 +1510,7 @@ func TestEngineGetVertex(t *testing.T) {
 	}
 
 	sender.SendPutF = func(v ids.NodeID, _ uint32, vtx []byte) {
-		if v != vdr.ID() {
+		if v != vdrID {
 			t.Fatalf("Wrong validator")
 		}
 		if !bytes.Equal(mVtx.Bytes(), vtx) {
@@ -1518,7 +1518,7 @@ func TestEngineGetVertex(t *testing.T) {
 		}
 	}
 
-	if err := te.Get(vdr.ID(), 0, mVtx.ID()); err != nil {
+	if err := te.Get(vdrID, 0, mVtx.ID()); err != nil {
 		t.Fatal(err)
 	}
 }

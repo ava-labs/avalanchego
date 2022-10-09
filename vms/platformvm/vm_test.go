@@ -330,7 +330,7 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 			RewardConfig:           defaultRewardConfig,
 			ApricotPhase3Time:      defaultValidateEndTime,
 			ApricotPhase5Time:      defaultValidateEndTime,
-			BlueberryTime:          mockable.MaxTime,
+			BanffTime:              mockable.MaxTime,
 		},
 	}}
 
@@ -409,7 +409,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 			MinStakeDuration:       defaultMinStakingDuration,
 			MaxStakeDuration:       defaultMaxStakingDuration,
 			RewardConfig:           defaultRewardConfig,
-			BlueberryTime:          mockable.MaxTime,
+			BanffTime:              mockable.MaxTime,
 		},
 	}}
 
@@ -1659,7 +1659,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 			MinStakeDuration:       defaultMinStakingDuration,
 			MaxStakeDuration:       defaultMaxStakingDuration,
 			RewardConfig:           defaultRewardConfig,
-			BlueberryTime:          mockable.MaxTime,
+			BanffTime:              mockable.MaxTime,
 		},
 	}}
 	firstVM.clock.Set(defaultGenesisTime)
@@ -1750,7 +1750,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 			MinStakeDuration:       defaultMinStakingDuration,
 			MaxStakeDuration:       defaultMaxStakingDuration,
 			RewardConfig:           defaultRewardConfig,
-			BlueberryTime:          mockable.MaxTime,
+			BanffTime:              mockable.MaxTime,
 		},
 	}}
 
@@ -1793,7 +1793,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 			MinStakeDuration:       defaultMinStakingDuration,
 			MaxStakeDuration:       defaultMaxStakingDuration,
 			RewardConfig:           defaultRewardConfig,
-			BlueberryTime:          mockable.MaxTime,
+			BanffTime:              mockable.MaxTime,
 		},
 	}}
 
@@ -1878,7 +1878,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 			MinStakeDuration:       defaultMinStakingDuration,
 			MaxStakeDuration:       defaultMaxStakingDuration,
 			RewardConfig:           defaultRewardConfig,
-			BlueberryTime:          mockable.MaxTime,
+			BanffTime:              mockable.MaxTime,
 		},
 	}}
 
@@ -1930,7 +1930,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 					MinStakeDuration:       defaultMinStakingDuration,
 					MaxStakeDuration:       defaultMaxStakingDuration,
 					RewardConfig:           defaultRewardConfig,
-					BlueberryTime:          mockable.MaxTime,
+					BanffTime:              mockable.MaxTime,
 				},
 			}}
 
@@ -2226,7 +2226,7 @@ func TestUnverifiedParent(t *testing.T) {
 			MinStakeDuration:       defaultMinStakingDuration,
 			MaxStakeDuration:       defaultMaxStakingDuration,
 			RewardConfig:           defaultRewardConfig,
-			BlueberryTime:          mockable.MaxTime,
+			BanffTime:              mockable.MaxTime,
 		},
 	}}
 
@@ -2370,7 +2370,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 			RewardConfig:           defaultRewardConfig,
 			Validators:             validators.NewManager(),
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			BlueberryTime:          mockable.MaxTime,
+			BanffTime:              mockable.MaxTime,
 		},
 	}}
 
@@ -2399,7 +2399,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 			UptimePercentage:       .21,
 			Validators:             validators.NewManager(),
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			BlueberryTime:          mockable.MaxTime,
+			BanffTime:              mockable.MaxTime,
 		},
 	}}
 
@@ -2524,7 +2524,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 			RewardConfig:           defaultRewardConfig,
 			Validators:             validators.NewManager(),
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			BlueberryTime:          mockable.MaxTime,
+			BanffTime:              mockable.MaxTime,
 		},
 	}}
 

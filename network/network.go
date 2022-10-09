@@ -154,7 +154,7 @@ func NewNetwork(
 	config *Config,
 	msgCreator message.Creator,
 	msgCreatorWithProto message.Creator,
-	blueberryTime time.Time, // TODO: remove this once we complete blueberry migration
+	banffTime time.Time, // TODO: remove this once we complete banff migration
 	metricsRegisterer prometheus.Registerer,
 	log logging.Logger,
 	listener net.Listener,
@@ -208,8 +208,8 @@ func NewNetwork(
 		MessageCreator:          msgCreator,
 		MessageCreatorWithProto: msgCreatorWithProto,
 
-		// TODO: remove this once we complete blueberry migration
-		BlueberryTime: blueberryTime,
+		// TODO: remove this once we complete banff migration
+		BanffTime: banffTime,
 
 		Log:                  log,
 		InboundMsgThrottler:  inboundMsgThrottler,

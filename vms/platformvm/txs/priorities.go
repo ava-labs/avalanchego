@@ -9,8 +9,8 @@ const (
 	PrimaryNetworkDelegatorApricotPendingPriority Priority = iota + 1
 	// then primary network validators,
 	PrimaryNetworkValidatorPendingPriority
-	// then primary network blueberry delegators,
-	PrimaryNetworkDelegatorBlueberryPendingPriority
+	// then primary network banff delegators,
+	PrimaryNetworkDelegatorBanffPendingPriority
 	// then permissionless subnet validators,
 	SubnetPermissionlessValidatorPendingPriority
 	// then permissionless subnet delegators.
@@ -35,12 +35,12 @@ const (
 )
 
 var PendingToCurrentPriorities = []Priority{
-	PrimaryNetworkDelegatorApricotPendingPriority:   PrimaryNetworkDelegatorCurrentPriority,
-	PrimaryNetworkValidatorPendingPriority:          PrimaryNetworkValidatorCurrentPriority,
-	PrimaryNetworkDelegatorBlueberryPendingPriority: PrimaryNetworkDelegatorCurrentPriority,
-	SubnetPermissionlessValidatorPendingPriority:    SubnetPermissionlessValidatorCurrentPriority,
-	SubnetPermissionlessDelegatorPendingPriority:    SubnetPermissionlessDelegatorCurrentPriority,
-	SubnetPermissionedValidatorPendingPriority:      SubnetPermissionedValidatorCurrentPriority,
+	PrimaryNetworkDelegatorApricotPendingPriority: PrimaryNetworkDelegatorCurrentPriority,
+	PrimaryNetworkValidatorPendingPriority:        PrimaryNetworkValidatorCurrentPriority,
+	PrimaryNetworkDelegatorBanffPendingPriority:   PrimaryNetworkDelegatorCurrentPriority,
+	SubnetPermissionlessValidatorPendingPriority:  SubnetPermissionlessValidatorCurrentPriority,
+	SubnetPermissionlessDelegatorPendingPriority:  SubnetPermissionlessDelegatorCurrentPriority,
+	SubnetPermissionedValidatorPendingPriority:    SubnetPermissionedValidatorCurrentPriority,
 }
 
 type Priority byte

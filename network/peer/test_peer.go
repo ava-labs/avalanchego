@@ -110,7 +110,7 @@ func StartTestPeer(
 			Metrics:                 metrics,
 			MessageCreator:          mc,
 			MessageCreatorWithProto: mcWithProto,
-			BlueberryTime:           version.GetBlueberryTime(networkID),
+			BanffTime:               version.GetBanffTime(networkID),
 			Log:                     logging.NoLog{},
 			InboundMsgThrottler:     throttling.NewNoInboundThrottler(),
 			Network: NewTestNetwork(

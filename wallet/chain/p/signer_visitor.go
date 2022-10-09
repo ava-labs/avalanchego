@@ -161,7 +161,12 @@ func (s *signerVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDe
 func (s *signerVisitor) getSigners(sourceChainID ids.ID, ins []*avax.TransferableInput) ([][]*crypto.PrivateKeySECP256K1R, error) {
 	txSigners := make([][]*crypto.PrivateKeySECP256K1R, len(ins))
 	for credIndex, transferInput := range ins {
-		input, ok := transferInput.In.(*secp256k1fx.TransferInput)
+		inIntf := transferInput.In
+		if stakeableIn, ok := inIntf.(*stakeable.LockIn); ok {
+			inIntf = stakeableIn.TransferableIn
+		}
+
+		input, ok := inIntf.(*secp256k1fx.TransferInput)
 		if !ok {
 			return nil, errUnknownInputType
 		}

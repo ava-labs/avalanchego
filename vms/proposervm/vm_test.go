@@ -2166,7 +2166,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 
 	// Create a block near the tip (0).
 	blkNearTipInnerBytes := []byte{1}
-	blkNearTip, err := statelessblock.BuildBlueberry(
+	blkNearTip, err := statelessblock.BuildBanff(
 		ids.GenerateTestID(),     // parent
 		time.Time{},              // timestamp
 		1,                        // pChainHeight,

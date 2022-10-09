@@ -15,7 +15,6 @@ type RotatingWriterConfig struct {
 type Config struct {
 	RotatingWriterConfig
 	DisableWriterDisplaying bool   `json:"disableWriterDisplaying"`
-	Assertions              bool   `json:"assertions"`
 	LogLevel                Level  `json:"logLevel"`
 	DisplayLevel            Level  `json:"displayLevel"`
 	LogFormat               Format `json:"logFormat"`

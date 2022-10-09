@@ -300,9 +300,9 @@ func (h *handler) Spend(
 	amountBurned := uint64(0)
 
 	for _, utxo := range utxos {
-		// If we have consumed more AVAX than we are trying to stake, and we
-		// have burned more AVAX then we need to, then we have no need to
-		// consume more AVAX
+		// If we have consumed more AVAX than we are trying to stake,
+		// and we have burned more AVAX than we need to,
+		// then we have no need to consume more AVAX
 		if amountBurned >= fee && amountStaked >= amount {
 			break
 		}
