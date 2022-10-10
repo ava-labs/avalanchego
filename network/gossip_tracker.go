@@ -91,10 +91,6 @@ func (g *GossipTracker) Add(id ids.NodeID) bool {
 	}
 
 	// Add the peer to the MSB of the bitset.
-	// NOTE: strict ordering is not guaranteed due to invariants with [Remove].
-	// TODO: consider adding to the LSB instead, so that every time a new peer
-	// is added the resulting unknown isn't [1, 0,..., 0] (high sparsity),
-	// and is instead [1].
 	tail := len(g.peersToIndices)
 	g.peersToIndices[id] = tail
 	g.knownPeers[id] = ids.NewBigBitSet()
