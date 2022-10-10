@@ -81,6 +81,16 @@ func (b BigBitSet) HammingWeight() int {
 	return result
 }
 
+// Lsh performs a left-wise bitshift by [n] bits
+func (b BigBitSet) Lsh(n uint) {
+	b.bits.Lsh(b.bits, n)
+}
+
+// Rsh performs a right-wise bitshift by [n] bits
+func (b BigBitSet) Rsh(n uint) {
+	b.bits.Rsh(b.bits, n)
+}
+
 // String returns the hex representation of this bitset
 func (b BigBitSet) String() string {
 	return fmt.Sprintf("%x", b.bits.Bytes())
