@@ -610,9 +610,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		"timeoutManager",
 		prometheus.NewRegistry(),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	go tm.Dispatch()
 
 	// Create chain router
