@@ -210,7 +210,6 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	}
 
 	var sourceChainID ids.ID
-
 	switch op {
 	case message.CrossChainAppRequest, message.CrossChainAppResponse,
 		message.CrossChainAppRequestFailed:
