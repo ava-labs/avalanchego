@@ -5,11 +5,12 @@ package avm
 
 import (
 	"container/list"
-	stdjson "encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
 	"time"
+
+	stdjson "encoding/json"
 
 	"github.com/gorilla/rpc/v2"
 

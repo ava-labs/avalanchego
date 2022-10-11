@@ -976,7 +976,7 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 				zap.Uint32("requestID", requestID),
 				zap.Error(err),
 			)
-			return err
+			return nil
 		}
 		appBytesIntf, err := msg.Get(message.AppBytes)
 		if err != nil {
@@ -999,23 +999,10 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 		requestID := requestIDIntf.(uint32)
 		sourceChainIDIntf, err := msg.Get(message.SourceChainID)
 		if err != nil {
-			h.ctx.Log.Debug("dropping message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.SourceChainID),
-				zap.Error(err),
-			)
-			return nil
+			return err
 		}
 		sourceChainID, err := ids.ToID(sourceChainIDIntf.([]byte))
 		if err != nil {
-			h.ctx.Log.Debug("dropping message with invalid chain id",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Error(err),
-			)
 			return err
 		}
 		appBytesIntf, err := msg.Get(message.AppBytes)
@@ -1026,7 +1013,7 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 				zap.Stringer("field", message.AppBytes),
 				zap.Error(err),
 			)
-			return nil
+			return engine.CrossChainAppRequestFailed(sourceChainID, requestID)
 		}
 		appBytes := appBytesIntf.([]byte)
 		return engine.CrossChainAppResponse(sourceChainID, requestID, appBytes)
@@ -1039,23 +1026,10 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 		requestID := requestIDIntf.(uint32)
 		sourceChainIDIntf, err := msg.Get(message.SourceChainID)
 		if err != nil {
-			h.ctx.Log.Debug("dropping message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.SourceChainID),
-				zap.Error(err),
-			)
-			return nil
+			return err
 		}
 		sourceChainID, err := ids.ToID(sourceChainIDIntf.([]byte))
 		if err != nil {
-			h.ctx.Log.Debug("dropping message with invalid chain id",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Error(err),
-			)
 			return err
 		}
 		return engine.CrossChainAppRequestFailed(sourceChainID, requestID)
