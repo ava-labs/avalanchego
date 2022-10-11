@@ -275,7 +275,6 @@ func (nop *noOpAppHandler) CrossChainAppRequest(chainID ids.ID, requestID uint32
 		zap.Stringer("chainID", chainID),
 		zap.Uint32("requestID", requestID),
 	)
-
 	return nil
 }
 
