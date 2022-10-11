@@ -139,7 +139,13 @@ func (cr *ChainRouter) Initialize(
 // and passing it to the appropriate chain or by a timeout.
 // This method registers a timeout that calls such methods if we don't get a
 // reply in time.
-func (cr *ChainRouter) RegisterRequest(nodeID ids.NodeID, requestingChainID ids.ID, respondingChainID ids.ID, requestID uint32, op message.Op) {
+func (cr *ChainRouter) RegisterRequest(
+	nodeID ids.NodeID,
+	requestingChainID ids.ID,
+	respondingChainID ids.ID,
+	requestID uint32,
+	op message.Op,
+) {
 	cr.lock.Lock()
 	// When we receive a response message type (Chits, Put, Accepted, etc.)
 	// we validate that we actually sent the corresponding request.
