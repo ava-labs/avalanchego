@@ -288,8 +288,7 @@ func (nop *noOpAppHandler) CrossChainAppRequestFailed(chainID ids.ID, requestID 
 }
 
 func (nop *noOpAppHandler) CrossChainAppResponse(chainID ids.ID, requestID uint32, response []byte) error {
-	nop.log.Debug(
-		"dropping request",
+	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.CrossChainAppResponse),
 		zap.Stringer("chainID", chainID),
