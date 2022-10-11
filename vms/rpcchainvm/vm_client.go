@@ -568,7 +568,6 @@ func (vm *VMClient) CrossChainAppRequest(chainID ids.ID, requestID uint32, deadl
 			Request:   request,
 		},
 	)
-
 	return err
 }
 
