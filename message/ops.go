@@ -168,18 +168,6 @@ var (
 		CrossChainAppResponse,
 	}
 
-	RequestToResponseOps = map[Op]Op{
-		GetAcceptedFrontier:     AcceptedFrontier,
-		GetAccepted:             Accepted,
-		GetAncestors:            Ancestors,
-		Get:                     Put,
-		PushQuery:               Chits,
-		PullQuery:               Chits,
-		AppRequest:              AppResponse,
-		CrossChainAppRequest:    CrossChainAppResponse,
-		GetStateSummaryFrontier: StateSummaryFrontier,
-		GetAcceptedStateSummary: AcceptedStateSummary,
-	}
 	ResponseToFailedOps = map[Op]Op{
 		AcceptedFrontier:      GetAcceptedFrontierFailed,
 		Accepted:              GetAcceptedFailed,
