@@ -242,7 +242,6 @@ func (vm *VM) Initialize(
 			return fmt.Errorf("failed to initialize disabled indexer: %w", err)
 		}
 	}
-
 	return vm.db.Commit()
 }
 
