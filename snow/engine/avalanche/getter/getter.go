@@ -153,7 +153,7 @@ func (gh *getter) GetAncestors(parentCtx context.Context, nodeID ids.NodeID, req
 func (gh *getter) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
 	// If this engine has access to the requested vertex, provide it
 	if vtx, err := gh.storage.GetVtx(vtxID); err == nil {
-		gh.sender.SendPut(ctx, nodeID, requestID, vtxID, vtx.Bytes())
+		gh.sender.SendPut(ctx, nodeID, requestID, vtx.Bytes())
 	}
 	return nil
 }

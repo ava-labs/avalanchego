@@ -54,7 +54,7 @@ var (
 
 	dbPrefix = []byte("proposervm")
 
-	errBlueberryBlockBeforeBlueberry = errors.New("block requiring Blueberry issued before Blueberry activated")
+	errBanffBlockBeforeBanff = errors.New("block requiring Banff issued before Banff activated")
 )
 
 type VM struct {
@@ -66,7 +66,7 @@ type VM struct {
 	activationTime      time.Time
 	minimumPChainHeight uint64
 
-	blueberryActivationTime time.Time
+	banffActivationTime time.Time
 
 	state.State
 	hIndexer                indexer.HeightIndexer
@@ -103,14 +103,14 @@ type VM struct {
 	// lastAcceptedHeight is set to the last accepted PostForkBlock's height.
 	lastAcceptedHeight uint64
 
-	activationTimeBlueberry time.Time
+	activationTimeBanff time.Time
 }
 
 func New(
 	vm block.ChainVM,
 	activationTime time.Time,
 	minimumPChainHeight uint64,
-	blueberryActivationTime time.Time,
+	banffActivationTime time.Time,
 ) *VM {
 	bVM, _ := vm.(block.BatchedChainVM)
 	hVM, _ := vm.(block.HeightIndexedChainVM)
@@ -124,7 +124,7 @@ func New(
 		activationTime:      activationTime,
 		minimumPChainHeight: minimumPChainHeight,
 
-		blueberryActivationTime: blueberryActivationTime,
+		banffActivationTime: banffActivationTime,
 	}
 }
 
@@ -618,15 +618,15 @@ func (vm *VM) setLastAcceptedMetadata() error {
 }
 
 func (vm *VM) parsePostForkBlock(b []byte) (PostForkBlock, error) {
-	statelessBlock, requireBlueberry, err := statelessblock.Parse(b)
+	statelessBlock, requireBanff, err := statelessblock.Parse(b)
 	if err != nil {
 		return nil, err
 	}
 
-	if requireBlueberry {
-		blueberryActivated := vm.Clock.Time().After(vm.activationTimeBlueberry)
-		if !blueberryActivated {
-			return nil, errBlueberryBlockBeforeBlueberry
+	if requireBanff {
+		banffActivated := vm.Clock.Time().After(vm.activationTimeBanff)
+		if !banffActivated {
+			return nil, errBanffBlockBeforeBanff
 		}
 	}
 
@@ -741,6 +741,7 @@ func (vm *VM) storePostForkBlock(blk PostForkBlock) error {
 }
 
 func (vm *VM) verifyAndRecordInnerBlk(postFork PostForkBlock) error {
+	postForkID := postFork.ID()
 	// If inner block's Verify returned true, don't call it again.
 	//
 	// Note that if [innerBlk.Verify] returns nil, this method returns nil. This
@@ -752,11 +753,11 @@ func (vm *VM) verifyAndRecordInnerBlk(postFork PostForkBlock) error {
 			return err
 		}
 		vm.Tree.Add(currentInnerBlk)
+		vm.innerBlkCache.Put(postForkID, currentInnerBlk)
 	} else {
 		postFork.setInnerBlk(originalInnerBlk)
 	}
-
-	vm.verifiedBlocks[postFork.ID()] = postFork
+	vm.verifiedBlocks[postForkID] = postFork
 	return nil
 }
 

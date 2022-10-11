@@ -34,18 +34,19 @@ const (
 
 var (
 	// [defaultUnexpandedDataDir] will be expanded when reading the flags
-	defaultDataDir         = filepath.Join("$HOME", ".avalanchego")
-	defaultDBDir           = filepath.Join(defaultUnexpandedDataDir, "db")
-	defaultLogDir          = filepath.Join(defaultUnexpandedDataDir, "logs")
-	defaultProfileDir      = filepath.Join(defaultUnexpandedDataDir, "profiles")
-	defaultStakingPath     = filepath.Join(defaultUnexpandedDataDir, "staking")
-	defaultStakingKeyPath  = filepath.Join(defaultStakingPath, "staker.key")
-	defaultStakingCertPath = filepath.Join(defaultStakingPath, "staker.crt")
-	defaultConfigDir       = filepath.Join(defaultUnexpandedDataDir, "configs")
-	defaultChainConfigDir  = filepath.Join(defaultConfigDir, "chains")
-	defaultVMConfigDir     = filepath.Join(defaultConfigDir, "vms")
-	defaultVMAliasFilePath = filepath.Join(defaultVMConfigDir, "aliases.json")
-	defaultSubnetConfigDir = filepath.Join(defaultConfigDir, "subnets")
+	defaultDataDir              = filepath.Join("$HOME", ".avalanchego")
+	defaultDBDir                = filepath.Join(defaultUnexpandedDataDir, "db")
+	defaultLogDir               = filepath.Join(defaultUnexpandedDataDir, "logs")
+	defaultProfileDir           = filepath.Join(defaultUnexpandedDataDir, "profiles")
+	defaultStakingPath          = filepath.Join(defaultUnexpandedDataDir, "staking")
+	defaultStakingTLSKeyPath    = filepath.Join(defaultStakingPath, "staker.key")
+	defaultStakingCertPath      = filepath.Join(defaultStakingPath, "staker.crt")
+	defaultStakingSignerKeyPath = filepath.Join(defaultStakingPath, "signer.key")
+	defaultConfigDir            = filepath.Join(defaultUnexpandedDataDir, "configs")
+	defaultChainConfigDir       = filepath.Join(defaultConfigDir, "chains")
+	defaultVMConfigDir          = filepath.Join(defaultConfigDir, "vms")
+	defaultVMAliasFilePath      = filepath.Join(defaultVMConfigDir, "aliases.json")
+	defaultSubnetConfigDir      = filepath.Join(defaultConfigDir, "subnets")
 
 	// Places to look for the build directory
 	defaultBuildDirs = []string{}
@@ -126,9 +127,6 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Bool(LogRotaterCompressEnabledKey, false, "Enables the compression of rotated log files through gzip.")
 	fs.Bool(LogDisableDisplayPluginLogsKey, false, "Disables displaying plugin logs in stdout.")
 
-	// Assertions
-	fs.Bool(AssertionsEnabledKey, true, "Turn on assertion execution")
-
 	// Peer List Gossip
 	gossipHelpMsg := fmt.Sprintf(
 		"Gossip [%s] validator IPs to [%s] validators, [%s] non-validators, and [%s] validating or non-validating peers every [%s]",
@@ -140,14 +138,12 @@ func addNodeFlags(fs *flag.FlagSet) {
 	)
 	fs.Uint(NetworkPeerListNumValidatorIPsKey, 15, gossipHelpMsg)
 	fs.Uint(NetworkPeerListValidatorGossipSizeKey, 20, gossipHelpMsg)
-	fs.Uint(NetworkPeerListNonValidatorGossipSizeKey, 10, gossipHelpMsg)
-	fs.Uint(NetworkPeerListPeersGossipSizeKey, 0, gossipHelpMsg)
+	fs.Uint(NetworkPeerListNonValidatorGossipSizeKey, 0, gossipHelpMsg)
+	fs.Uint(NetworkPeerListPeersGossipSizeKey, 10, gossipHelpMsg)
 	fs.Duration(NetworkPeerListGossipFreqKey, time.Minute, gossipHelpMsg)
 
 	// Public IP Resolution
 	fs.String(PublicIPKey, "", "Public IP of this node for P2P communication. If empty, try to discover with NAT. Ignored if dynamic-public-ip is non-empty")
-	fs.Duration(DynamicUpdateDurationKey, 5*time.Minute, "Dynamic IP and NAT traversal update duration")                                                        // Deprecated
-	fs.String(DynamicPublicIPResolverKey, "", "'ifconfigco' (alias 'ifconfig') or 'opendns' or 'ifconfigme'. By default does not do dynamic public IP updates") // Deprecated
 	fs.Duration(PublicIPResolutionFreqKey, 5*time.Minute, "Frequency at which this node resolves/updates its public IP and renew NAT mappings, if applicable")
 	fs.String(PublicIPResolutionServiceKey, "", "Only acceptable values are 'ifconfigco', 'opendns' or 'ifconfigme'. When provided, the node will use that service to periodically resolve/update its public IP")
 
@@ -252,11 +248,15 @@ func addNodeFlags(fs *flag.FlagSet) {
 	// Staking
 	fs.Uint(StakingPortKey, DefaultStakingPort, "Port of the consensus server")
 	fs.Bool(StakingEnabledKey, true, "Enable staking. If enabled, Network TLS is required")
-	fs.Bool(StakingEphemeralCertEnabledKey, false, "If true, the node uses an ephemeral staking key and certificate, and has an ephemeral node ID")
-	fs.String(StakingKeyPathKey, defaultStakingKeyPath, fmt.Sprintf("Path to the TLS private key for staking. Ignored if %s is specified", StakingKeyContentKey))
-	fs.String(StakingKeyContentKey, "", "Specifies base64 encoded TLS private key for staking")
+	fs.Bool(StakingEphemeralCertEnabledKey, false, "If true, the node uses an ephemeral staking TLS key and certificate, and has an ephemeral node ID")
+	fs.String(StakingTLSKeyPathKey, defaultStakingTLSKeyPath, fmt.Sprintf("Path to the TLS private key for staking. Ignored if %s is specified", StakingTLSKeyContentKey))
+	fs.String(StakingTLSKeyContentKey, "", "Specifies base64 encoded TLS private key for staking")
 	fs.String(StakingCertPathKey, defaultStakingCertPath, fmt.Sprintf("Path to the TLS certificate for staking. Ignored if %s is specified", StakingCertContentKey))
 	fs.String(StakingCertContentKey, "", "Specifies base64 encoded TLS certificate for staking")
+	fs.Bool(StakingEphemeralSignerEnabledKey, false, "If true, the node uses an ephemeral staking signer key")
+	fs.String(StakingSignerKeyPathKey, defaultStakingSignerKeyPath, fmt.Sprintf("Path to the signer private key for staking. Ignored if %s is specified", StakingSignerKeyContentKey))
+	fs.String(StakingSignerKeyContentKey, "", "Specifies base64 encoded signer private key for staking")
+
 	fs.Uint64(StakingDisabledWeightKey, 100, "Weight to provide to each peer when staking is disabled")
 	// Uptime Requirement
 	fs.Float64(UptimeRequirementKey, genesis.LocalParams.UptimeRequirement, "Fraction of time a validator must be online to receive rewards")

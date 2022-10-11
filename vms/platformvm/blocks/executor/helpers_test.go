@@ -199,7 +199,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	}
 
 	registerer := prometheus.NewRegistry()
-	window := window.New(
+	window := window.New[ids.ID](
 		window.Config{
 			Clock:   res.clk,
 			MaxSize: maxRecentlyAcceptedWindowSize,
@@ -354,7 +354,7 @@ func defaultConfig() *config.Config {
 		},
 		ApricotPhase3Time: defaultValidateEndTime,
 		ApricotPhase5Time: defaultValidateEndTime,
-		BlueberryTime:     mockable.MaxTime,
+		BanffTime:         mockable.MaxTime,
 	}
 }
 

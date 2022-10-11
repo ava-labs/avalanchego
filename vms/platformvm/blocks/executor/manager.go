@@ -31,7 +31,7 @@ func NewManager(
 	metrics metrics.Metrics,
 	s state.State,
 	txExecutorBackend *executor.Backend,
-	recentlyAccepted *window.Window,
+	recentlyAccepted window.Window[ids.ID],
 ) Manager {
 	backend := &backend{
 		Mempool:      mempool,

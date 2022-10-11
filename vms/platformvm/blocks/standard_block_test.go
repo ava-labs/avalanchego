@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func TestNewBlueberryStandardBlock(t *testing.T) {
+func TestNewBanffStandardBlock(t *testing.T) {
 	require := require.New(t)
 
 	timestamp := time.Now().Truncate(time.Second)
@@ -42,7 +42,7 @@ func TestNewBlueberryStandardBlock(t *testing.T) {
 	}
 	require.NoError(tx.Sign(txs.Codec, nil))
 
-	blk, err := NewBlueberryStandardBlock(
+	blk, err := NewBanffStandardBlock(
 		timestamp,
 		parentID,
 		height,

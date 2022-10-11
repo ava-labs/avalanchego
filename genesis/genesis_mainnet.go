@@ -22,7 +22,7 @@ var (
 			TxFee:                         units.MilliAvax,
 			CreateAssetTxFee:              10 * units.MilliAvax,
 			CreateSubnetTxFee:             1 * units.Avax,
-			TransformSubnetTxFee:          1 * units.Avax,
+			TransformSubnetTxFee:          10 * units.Avax,
 			CreateBlockchainTxFee:         1 * units.Avax,
 			AddPrimaryNetworkValidatorFee: 0,
 			AddPrimaryNetworkDelegatorFee: 0,

@@ -54,11 +54,11 @@ type Mempool interface {
 	Get(txID ids.ID) *txs.Tx
 	Remove(txs []*txs.Tx)
 
-	// Following Blueberry activation, all mempool transactions,
+	// Following Banff activation, all mempool transactions,
 	// (both decision and staker) are included into Standard blocks.
 	// HasTxs allow to check for availability of any mempool transaction.
 	HasTxs() bool
-	// PeekTxs returns the next txs for Blueberry blocks
+	// PeekTxs returns the next txs for Banff blocks
 	// up to maxTxsBytes without removing them from the mempool.
 	// It returns nil if !HasTxs()
 	PeekTxs(maxTxsBytes int) []*txs.Tx
@@ -76,9 +76,9 @@ type Mempool interface {
 	MarkDropped(txID ids.ID, reason string)
 	GetDropReason(txID ids.ID) (string, bool)
 
-	// TODO: following Blueberry, these methods can be removed
+	// TODO: following Banff, these methods can be removed
 
-	// Pre Blueberry activation, decision transactions are included into
+	// Pre Banff activation, decision transactions are included into
 	// standard blocks.
 	HasApricotDecisionTxs() bool
 	// PeekApricotDecisionTxs returns the next decisionTxs, up to maxTxsBytes,
@@ -98,7 +98,6 @@ type mempool struct {
 
 	unissuedDecisionTxs txheap.Heap
 	unissuedStakerTxs   txheap.Heap
-	unknownTxs          prometheus.Counter
 
 	// Key: Tx ID
 	// Value: String repr. of the verification error
@@ -141,22 +140,12 @@ func NewMempool(
 		return nil, err
 	}
 
-	unknownTxs := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "unknown_txs_count",
-		Help:      "Number of unknown tx types seen by the mempool",
-	})
-	if err := registerer.Register(unknownTxs); err != nil {
-		return nil, err
-	}
-
 	bytesAvailableMetric.Set(maxMempoolSize)
 	return &mempool{
 		bytesAvailableMetric: bytesAvailableMetric,
 		bytesAvailable:       maxMempoolSize,
 		unissuedDecisionTxs:  unissuedDecisionTxs,
 		unissuedStakerTxs:    unissuedStakerTxs,
-		unknownTxs:           unknownTxs,
 		droppedTxIDs:         &cache.LRU{Size: droppedTxIDsCacheSize},
 		consumedUTXOs:        ids.NewSet(initialConsumedUTXOsSize),
 		dropIncoming:         false, // enable tx adding by default

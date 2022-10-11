@@ -4,6 +4,7 @@
 package compression
 
 import (
+	"math"
 	"math/rand"
 	"testing"
 
@@ -23,7 +24,8 @@ func TestGzipCompressDecompress(t *testing.T) {
 		data2[i] = byte(rand.Intn(256)) // #nosec G404
 	}
 
-	compressor := NewGzipCompressor(2 * units.MiB)
+	compressor, err := NewGzipCompressor(2 * units.MiB)
+	require.NoError(t, err)
 
 	dataCompressed, err := compressor.Compress(data)
 	require.NoError(t, err)
@@ -50,14 +52,27 @@ func TestGzipCompressDecompress(t *testing.T) {
 
 func TestGzipSizeLimiting(t *testing.T) {
 	data := make([]byte, 3*units.MiB)
-	compressor := NewGzipCompressor(2 * units.MiB)
-	_, err := compressor.Compress(data) // should be too large
+	compressor, err := NewGzipCompressor(2 * units.MiB)
+	require.NoError(t, err)
+
+	_, err = compressor.Compress(data) // should be too large
 	require.Error(t, err)
 
-	compressor2 := NewGzipCompressor(4 * units.MiB)
+	compressor2, err := NewGzipCompressor(4 * units.MiB)
+	require.NoError(t, err)
+
 	dataCompressed, err := compressor2.Compress(data)
 	require.NoError(t, err)
 
 	_, err = compressor.Decompress(dataCompressed) // should be too large
 	require.Error(t, err)
+}
+
+// Attempts to create gzip compressor with math.MaxInt64
+// which leads to undefined decompress behavior due to integer overflow
+// in limit reader creation.
+func TestNewGzipCompressorWithInvalidLimit(t *testing.T) {
+	require := require.New(t)
+	_, err := NewGzipCompressor(math.MaxInt64)
+	require.ErrorIs(err, ErrInvalidMaxSizeGzipCompressor)
 }

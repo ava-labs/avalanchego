@@ -40,7 +40,6 @@ var (
 	errPullQuery                     = errors.New("unexpectedly called PullQuery")
 	errQueryFailed                   = errors.New("unexpectedly called QueryFailed")
 	errChits                         = errors.New("unexpectedly called Chits")
-	errChitsV2                       = errors.New("unexpectedly called ChitsV2")
 	errStart                         = errors.New("unexpectedly called Start")
 
 	_ Engine = &EngineTest{}
@@ -89,7 +88,6 @@ type EngineTest struct {
 	CantPullQuery,
 	CantQueryFailed,
 	CantChits,
-	CantChitsV2,
 
 	CantConnected,
 	CantDisconnected,
@@ -113,7 +111,6 @@ type EngineTest struct {
 	PutF, PushQueryF                                   func(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte) error
 	AncestorsF                                         func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) error
 	AcceptedFrontierF, GetAcceptedF, AcceptedF, ChitsF func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error
-	ChitsV2F                                           func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID, containerID ids.ID) error
 	GetStateSummaryFrontierF, GetStateSummaryFrontierFailedF, GetAcceptedStateSummaryFailedF,
 	GetAcceptedFrontierF, GetFailedF, GetAncestorsFailedF,
 	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF, AppRequestFailedF func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
@@ -567,19 +564,6 @@ func (e *EngineTest) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		e.T.Fatal(errChits)
 	}
 	return errChits
-}
-
-func (e *EngineTest) ChitsV2(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID, containerID ids.ID) error {
-	if e.ChitsV2F != nil {
-		return e.ChitsV2F(ctx, nodeID, requestID, containerIDs, containerID)
-	}
-	if !e.CantChitsV2 {
-		return nil
-	}
-	if e.T != nil {
-		e.T.Fatal(errChitsV2)
-	}
-	return errChitsV2
 }
 
 func (e *EngineTest) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {

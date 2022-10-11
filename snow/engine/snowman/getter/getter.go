@@ -212,6 +212,6 @@ func (gh *getter) Get(parentCtx context.Context, nodeID ids.NodeID, requestID ui
 	}
 
 	// Respond to the validator with the fetched block and the same requestID.
-	gh.sender.SendPut(ctx, nodeID, requestID, blkID, blk.Bytes())
+	gh.sender.SendPut(ctx, nodeID, requestID, blk.Bytes())
 	return nil
 }

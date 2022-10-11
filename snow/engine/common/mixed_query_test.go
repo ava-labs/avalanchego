@@ -33,7 +33,6 @@ func TestSendMixedQuery(t *testing.T) {
 					gomock.Any(),
 					ids.NodeIDSet{vdr1: struct{}{}, vdr2: struct{}{}, vdr3: struct{}{}},
 					reqID,
-					containerID,
 					containerBytes,
 				).Times(1)
 				s.EXPECT().SendPullQuery(
@@ -54,7 +53,6 @@ func TestSendMixedQuery(t *testing.T) {
 					gomock.Any(),
 					ids.NodeIDSet{vdr1: struct{}{}},
 					reqID,
-					containerID,
 					containerBytes,
 				).Times(1)
 				s.EXPECT().SendPullQuery(
@@ -75,7 +73,6 @@ func TestSendMixedQuery(t *testing.T) {
 					gomock.Any(),
 					ids.NodeIDSet{vdr1: struct{}{}, vdr2: struct{}{}},
 					reqID,
-					containerID,
 					containerBytes,
 				).Times(1)
 				s.EXPECT().SendPullQuery(
@@ -96,7 +93,6 @@ func TestSendMixedQuery(t *testing.T) {
 					gomock.Any(),
 					gomock.Any(),
 					reqID,
-					containerID,
 					containerBytes,
 				).Times(0)
 				s.EXPECT().SendPullQuery(
@@ -117,7 +113,6 @@ func TestSendMixedQuery(t *testing.T) {
 					gomock.Any(),
 					ids.NodeIDSet{vdr1: struct{}{}, vdr2: struct{}{}},
 					reqID,
-					containerID,
 					containerBytes,
 				).Times(1)
 				s.EXPECT().SendPullQuery(
