@@ -286,7 +286,6 @@ func (nop *noOpAppHandler) CrossChainAppRequestFailed(chainID ids.ID, requestID 
 		zap.Stringer("chainID", chainID),
 		zap.Uint32("requestID", requestID),
 	)
-
 	return nil
 }
 
