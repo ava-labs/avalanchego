@@ -970,6 +970,12 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 		}
 		sourceChainID, err := ids.ToID(sourceChainIDIntf.([]byte))
 		if err != nil {
+			h.ctx.Log.Debug("dropping message with invalid chain id",
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("messageOp", op),
+				zap.Uint32("requestID", requestID),
+				zap.Error(err),
+			)
 			return err
 		}
 		appBytesIntf, err := msg.Get(message.AppBytes)
@@ -1004,6 +1010,12 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 		}
 		sourceChainID, err := ids.ToID(sourceChainIDIntf.([]byte))
 		if err != nil {
+			h.ctx.Log.Debug("dropping message with invalid chain id",
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("messageOp", op),
+				zap.Uint32("requestID", requestID),
+				zap.Error(err),
+			)
 			return err
 		}
 		appBytesIntf, err := msg.Get(message.AppBytes)
@@ -1038,6 +1050,12 @@ func (h *handler) executeAsyncMsg(msg message.InboundMessage) error {
 		}
 		sourceChainID, err := ids.ToID(sourceChainIDIntf.([]byte))
 		if err != nil {
+			h.ctx.Log.Debug("dropping message with invalid chain id",
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("messageOp", op),
+				zap.Uint32("requestID", requestID),
+				zap.Error(err),
+			)
 			return err
 		}
 		return engine.CrossChainAppRequestFailed(sourceChainID, requestID)
