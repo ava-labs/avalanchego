@@ -592,7 +592,6 @@ func (vm *VMClient) CrossChainAppResponse(chainID ids.ID, requestID uint32, resp
 			Response:  response,
 		},
 	)
-
 	return err
 }
 
