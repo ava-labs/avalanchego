@@ -268,8 +268,7 @@ func NewNoOpAppHandler(log logging.Logger) AppHandler {
 }
 
 func (nop *noOpAppHandler) CrossChainAppRequest(chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
-	nop.log.Debug(
-		"dropping request",
+	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.CrossChainAppRequest),
 		zap.Stringer("chainID", chainID),
