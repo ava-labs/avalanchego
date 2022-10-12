@@ -33,26 +33,25 @@ type client struct {
 // NewClient returns a client to interact with Health API endpoint
 func NewClient(uri string) Client {
 	return &client{requester: rpc.NewEndpointRequester(
-		uri+"/ext/health",
-		"health",
+		uri + "/ext/health",
 	)}
 }
 
 func (c *client) Readiness(ctx context.Context, options ...rpc.Option) (*APIHealthReply, error) {
 	res := &APIHealthReply{}
-	err := c.requester.SendRequest(ctx, "readiness", struct{}{}, res, options...)
+	err := c.requester.SendRequest(ctx, "health.readiness", struct{}{}, res, options...)
 	return res, err
 }
 
 func (c *client) Health(ctx context.Context, options ...rpc.Option) (*APIHealthReply, error) {
 	res := &APIHealthReply{}
-	err := c.requester.SendRequest(ctx, "health", struct{}{}, res, options...)
+	err := c.requester.SendRequest(ctx, "health.health", struct{}{}, res, options...)
 	return res, err
 }
 
 func (c *client) Liveness(ctx context.Context, options ...rpc.Option) (*APIHealthReply, error) {
 	res := &APIHealthReply{}
-	err := c.requester.SendRequest(ctx, "liveness", struct{}{}, res, options...)
+	err := c.requester.SendRequest(ctx, "health.liveness", struct{}{}, res, options...)
 	return res, err
 }
 

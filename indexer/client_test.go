@@ -33,7 +33,7 @@ func TestIndexClient(t *testing.T) {
 		// Test GetIndex
 		client.requester = &mockClient{
 			require:        require,
-			expectedMethod: "getIndex",
+			expectedMethod: "index.getIndex",
 			onSendRequestF: func(reply interface{}) error {
 				*(reply.(*GetIndexResponse)) = GetIndexResponse{Index: 5}
 				return nil
@@ -51,7 +51,7 @@ func TestIndexClient(t *testing.T) {
 		require.NoError(err)
 		client.requester = &mockClient{
 			require:        require,
-			expectedMethod: "getLastAccepted",
+			expectedMethod: "index.getLastAccepted",
 			onSendRequestF: func(reply interface{}) error {
 				*(reply.(*FormattedContainer)) = FormattedContainer{
 					ID:    id,
@@ -73,7 +73,7 @@ func TestIndexClient(t *testing.T) {
 		require.NoError(err)
 		client.requester = &mockClient{
 			require:        require,
-			expectedMethod: "getContainerRange",
+			expectedMethod: "index.getContainerRange",
 			onSendRequestF: func(reply interface{}) error {
 				*(reply.(*GetContainerRangeResponse)) = GetContainerRangeResponse{Containers: []FormattedContainer{{
 					ID:    id,
@@ -92,7 +92,7 @@ func TestIndexClient(t *testing.T) {
 		// Test IsAccepted
 		client.requester = &mockClient{
 			require:        require,
-			expectedMethod: "isAccepted",
+			expectedMethod: "index.isAccepted",
 			onSendRequestF: func(reply interface{}) error {
 				*(reply.(*IsAcceptedResponse)) = IsAcceptedResponse{IsAccepted: true}
 				return nil
@@ -110,7 +110,7 @@ func TestIndexClient(t *testing.T) {
 		require.NoError(err)
 		client.requester = &mockClient{
 			require:        require,
-			expectedMethod: "getContainerByID",
+			expectedMethod: "index.getContainerByID",
 			onSendRequestF: func(reply interface{}) error {
 				*(reply.(*FormattedContainer)) = FormattedContainer{
 					ID:    id,
