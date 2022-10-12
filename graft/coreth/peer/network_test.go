@@ -16,11 +16,12 @@ import (
 
 	"github.com/ava-labs/coreth/plugin/evm/message"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -452,9 +453,19 @@ func buildGossip(codec codec.Manager, msg message.GossipMessage) ([]byte, error)
 }
 
 type testAppSender struct {
-	sendAppRequestFn  func(ids.NodeIDSet, uint32, []byte) error
-	sendAppResponseFn func(ids.NodeID, uint32, []byte) error
-	sendAppGossipFn   func([]byte) error
+	sendCrossChainAppRequestFn  func(ids.ID, uint32, []byte) error
+	sendCrossChainAppResponseFn func(ids.ID, uint32, []byte) error
+	sendAppRequestFn            func(ids.NodeIDSet, uint32, []byte) error
+	sendAppResponseFn           func(ids.NodeID, uint32, []byte) error
+	sendAppGossipFn             func([]byte) error
+}
+
+func (t testAppSender) SendCrossChainAppRequest(chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
+	return t.sendCrossChainAppRequestFn(chainID, requestID, appRequestBytes)
+}
+
+func (t testAppSender) SendCrossChainAppResponse(chainID ids.ID, requestID uint32, appResponseBytes []byte) error {
+	return t.sendCrossChainAppResponseFn(chainID, requestID, appResponseBytes)
 }
 
 func (t testAppSender) SendAppGossipSpecific(ids.NodeIDSet, []byte) error {
