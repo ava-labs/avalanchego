@@ -39,36 +39,35 @@ type client struct {
 // NewClient returns a new Info API Client
 func NewClient(uri string) Client {
 	return &client{requester: rpc.NewEndpointRequester(
-		uri+"/ext/admin",
-		"admin",
+		uri + "/ext/admin",
 	)}
 }
 
 func (c *client) StartCPUProfiler(ctx context.Context, options ...rpc.Option) error {
-	return c.requester.SendRequest(ctx, "startCPUProfiler", struct{}{}, &api.EmptyReply{}, options...)
+	return c.requester.SendRequest(ctx, "admin.startCPUProfiler", struct{}{}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) StopCPUProfiler(ctx context.Context, options ...rpc.Option) error {
-	return c.requester.SendRequest(ctx, "stopCPUProfiler", struct{}{}, &api.EmptyReply{}, options...)
+	return c.requester.SendRequest(ctx, "admin.stopCPUProfiler", struct{}{}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) MemoryProfile(ctx context.Context, options ...rpc.Option) error {
-	return c.requester.SendRequest(ctx, "memoryProfile", struct{}{}, &api.EmptyReply{}, options...)
+	return c.requester.SendRequest(ctx, "admin.memoryProfile", struct{}{}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) LockProfile(ctx context.Context, options ...rpc.Option) error {
-	return c.requester.SendRequest(ctx, "lockProfile", struct{}{}, &api.EmptyReply{}, options...)
+	return c.requester.SendRequest(ctx, "admin.lockProfile", struct{}{}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) Alias(ctx context.Context, endpoint, alias string, options ...rpc.Option) error {
-	return c.requester.SendRequest(ctx, "alias", &AliasArgs{
+	return c.requester.SendRequest(ctx, "admin.alias", &AliasArgs{
 		Endpoint: endpoint,
 		Alias:    alias,
 	}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) AliasChain(ctx context.Context, chain, alias string, options ...rpc.Option) error {
-	return c.requester.SendRequest(ctx, "aliasChain", &AliasChainArgs{
+	return c.requester.SendRequest(ctx, "admin.aliasChain", &AliasChainArgs{
 		Chain: chain,
 		Alias: alias,
 	}, &api.EmptyReply{}, options...)
@@ -76,19 +75,19 @@ func (c *client) AliasChain(ctx context.Context, chain, alias string, options ..
 
 func (c *client) GetChainAliases(ctx context.Context, chain string, options ...rpc.Option) ([]string, error) {
 	res := &GetChainAliasesReply{}
-	err := c.requester.SendRequest(ctx, "getChainAliases", &GetChainAliasesArgs{
+	err := c.requester.SendRequest(ctx, "admin.getChainAliases", &GetChainAliasesArgs{
 		Chain: chain,
 	}, res, options...)
 	return res.Aliases, err
 }
 
 func (c *client) Stacktrace(ctx context.Context, options ...rpc.Option) error {
-	return c.requester.SendRequest(ctx, "stacktrace", struct{}{}, &api.EmptyReply{}, options...)
+	return c.requester.SendRequest(ctx, "admin.stacktrace", struct{}{}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) LoadVMs(ctx context.Context, options ...rpc.Option) (map[ids.ID][]string, map[ids.ID]string, error) {
 	res := &LoadVMsReply{}
-	err := c.requester.SendRequest(ctx, "loadVMs", struct{}{}, res, options...)
+	err := c.requester.SendRequest(ctx, "admin.loadVMs", struct{}{}, res, options...)
 	return res.NewVMs, res.FailedVMs, err
 }
 
@@ -116,7 +115,7 @@ func (c *client) SetLoggerLevel(
 			return fmt.Errorf("couldn't parse %q to log level", displayLevel)
 		}
 	}
-	return c.requester.SendRequest(ctx, "setLoggerLevel", &SetLoggerLevelArgs{
+	return c.requester.SendRequest(ctx, "admin.setLoggerLevel", &SetLoggerLevelArgs{
 		LoggerName:   loggerName,
 		LogLevel:     &logLevelArg,
 		DisplayLevel: &displayLevelArg,
@@ -129,7 +128,7 @@ func (c *client) GetLoggerLevel(
 	options ...rpc.Option,
 ) (map[string]LogAndDisplayLevels, error) {
 	res := &GetLoggerLevelReply{}
-	err := c.requester.SendRequest(ctx, "getLoggerLevel", &GetLoggerLevelArgs{
+	err := c.requester.SendRequest(ctx, "admin.getLoggerLevel", &GetLoggerLevelArgs{
 		LoggerName: loggerName,
 	}, res, options...)
 	return res.LoggerLevels, err
@@ -137,6 +136,6 @@ func (c *client) GetLoggerLevel(
 
 func (c *client) GetConfig(ctx context.Context, options ...rpc.Option) (interface{}, error) {
 	var res interface{}
-	err := c.requester.SendRequest(ctx, "getConfig", struct{}{}, &res, options...)
+	err := c.requester.SendRequest(ctx, "admin.getConfig", struct{}{}, &res, options...)
 	return res, err
 }
