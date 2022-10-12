@@ -33,7 +33,8 @@ type SenderTest struct {
 	CantSendGet, CantSendGetAncestors, CantSendPut, CantSendAncestors,
 	CantSendPullQuery, CantSendPushQuery, CantSendChits,
 	CantSendGossip,
-	CantSendAppRequest, CantSendAppResponse, CantSendAppGossip, CantSendAppGossipSpecific bool
+	CantSendAppRequest, CantSendAppResponse, CantSendAppGossip, CantSendAppGossipSpecific,
+	CantSendCrossChainAppRequest, CantSendCrossChainAppResponse bool
 
 	AcceptF                      func(*snow.ConsensusContext, ids.ID, []byte) error
 	SendGetStateSummaryFrontierF func(ids.NodeIDSet, uint32)
@@ -56,6 +57,8 @@ type SenderTest struct {
 	SendAppResponseF             func(ids.NodeID, uint32, []byte) error
 	SendAppGossipF               func([]byte) error
 	SendAppGossipSpecificF       func(ids.NodeIDSet, []byte) error
+	SendCrossChainAppRequestF    func(ids.ID, uint32, []byte)
+	SendCrossChainAppResponseF   func(ids.ID, uint32, []byte)
 }
 
 // Default set the default callable value to [cant]
@@ -81,6 +84,8 @@ func (s *SenderTest) Default(cant bool) {
 	s.CantSendAppResponse = cant
 	s.CantSendAppGossip = cant
 	s.CantSendAppGossipSpecific = cant
+	s.CantSendCrossChainAppRequest = cant
+	s.CantSendCrossChainAppResponse = cant
 }
 
 // SendGetStateSummaryFrontier calls SendGetStateSummaryFrontierF if it was initialized. If it
@@ -273,6 +278,24 @@ func (s *SenderTest) SendGossip(container []byte) {
 	} else if s.CantSendGossip && s.T != nil {
 		s.T.Fatalf("Unexpectedly called SendGossip")
 	}
+}
+
+func (s *SenderTest) SendCrossChainAppRequest(chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
+	if s.SendCrossChainAppRequestF != nil {
+		s.SendCrossChainAppRequestF(chainID, requestID, appRequestBytes)
+	} else if s.CantSendCrossChainAppRequest && s.T != nil {
+		s.T.Fatal("Unexpectedly called SendCrossChainAppRequest")
+	}
+	return nil
+}
+
+func (s *SenderTest) SendCrossChainAppResponse(chainID ids.ID, requestID uint32, appResponseBytes []byte) error {
+	if s.SendCrossChainAppResponseF != nil {
+		s.SendCrossChainAppResponseF(chainID, requestID, appResponseBytes)
+	} else if s.CantSendCrossChainAppResponse && s.T != nil {
+		s.T.Fatal("Unexpectedly called SendCrossChainAppResponse")
+	}
+	return nil
 }
 
 // SendAppRequest calls SendAppRequestF if it was initialized. If it wasn't
