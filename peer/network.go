@@ -170,6 +170,18 @@ func (n *network) request(nodeID ids.NodeID, request []byte, responseHandler mes
 	return nil
 }
 
+func (n *network) CrossChainAppRequest(requestingChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+	return nil
+}
+
+func (n *network) CrossChainAppRequestFailed(respondingChainID ids.ID, requestID uint32) error {
+	return nil
+}
+
+func (n *network) CrossChainAppResponse(respondingChainID ids.ID, requestID uint32, response []byte) error {
+	return nil
+}
+
 // AppRequest is called by avalanchego -> VM when there is an incoming AppRequest from a peer
 // error returned by this function is expected to be treated as fatal by the engine
 // returns error if the requestHandler returns an error

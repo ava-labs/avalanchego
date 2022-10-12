@@ -49,10 +49,11 @@ import (
 	// inside of cmd/geth.
 	_ "github.com/ava-labs/coreth/eth/tracers/native"
 
-	"github.com/ava-labs/coreth/metrics"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+
+	"github.com/ava-labs/coreth/metrics"
 
 	avalancheRPC "github.com/gorilla/rpc/v2"
 
