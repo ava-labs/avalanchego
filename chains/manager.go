@@ -410,8 +410,8 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	// before it's first access would cause a panic.
 	ctx.SetState(snow.Initializing)
 
-	if sbConfigs, ok := m.SubnetConfigs[chainParams.SubnetID]; ok {
-		if sbConfigs.ValidatorOnly {
+	if subnetConfig, ok := m.SubnetConfigs[chainParams.SubnetID]; ok {
+		if subnetConfig.ValidatorOnly {
 			ctx.SetValidatorOnly()
 		}
 	}
@@ -450,11 +450,13 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 
 	consensusParams := m.ConsensusParams
-	if sbConfigs, ok := m.SubnetConfigs[chainParams.SubnetID]; ok && chainParams.SubnetID != constants.PrimaryNetworkID {
-		consensusParams = sbConfigs.ConsensusParameters
+	// short circuit it before reading from subnetConfigs
+	if chainParams.SubnetID != constants.PrimaryNetworkID {
+		if subnetConfig, ok := m.SubnetConfigs[chainParams.SubnetID]; ok {
+			consensusParams = subnetConfig.ConsensusParameters
+		}
 	}
 
-	// The validators of this blockchain
 	var vdrs validators.Set // Validators validating this blockchain
 	var ok bool
 	if m.StakingEnabled {
@@ -569,8 +571,11 @@ func (m *manager) createAvalancheChain(
 	msgChan := make(chan common.Message, defaultChannelSize)
 
 	gossipConfig := m.GossipConfig
-	if sbConfigs, ok := m.SubnetConfigs[ctx.SubnetID]; ok && ctx.SubnetID != constants.PrimaryNetworkID {
-		gossipConfig = sbConfigs.GossipConfig
+	// short circuit it before reading from subnetConfigs
+	if ctx.SubnetID != constants.PrimaryNetworkID {
+		if subnetConfig, ok := m.SubnetConfigs[ctx.SubnetID]; ok {
+			gossipConfig = subnetConfig.GossipConfig
+		}
 	}
 
 	// Passes messages from the consensus engine to the network
@@ -757,8 +762,11 @@ func (m *manager) createSnowmanChain(
 	msgChan := make(chan common.Message, defaultChannelSize)
 
 	gossipConfig := m.GossipConfig
-	if sbConfigs, ok := m.SubnetConfigs[ctx.SubnetID]; ok && ctx.SubnetID != constants.PrimaryNetworkID {
-		gossipConfig = sbConfigs.GossipConfig
+	// short circuit it before reading from subnetConfigs
+	if ctx.SubnetID != constants.PrimaryNetworkID {
+		if subnetConfig, ok := m.SubnetConfigs[ctx.SubnetID]; ok {
+			gossipConfig = subnetConfig.GossipConfig
+		}
 	}
 
 	// Passes messages from the consensus engine to the network

@@ -1007,11 +1007,7 @@ func getChainConfigsFromDir(v *viper.Viper) (map[string]chains.ChainConfig, erro
 		return make(map[string]chains.ChainConfig), nil
 	}
 
-	chainConfigs, err := readChainConfigPath(chainConfigPath)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't read chain configs: %w", err)
-	}
-	return chainConfigs, nil
+	return readChainConfigPath(chainConfigPath)
 }
 
 // getChainConfigs reads & puts chainConfigs to node config
@@ -1060,6 +1056,13 @@ func readChainConfigPath(chainConfigPath string) (map[string]chains.ChainConfig,
 	return chainConfigMap, nil
 }
 
+func getSubnetConfigs(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]chains.SubnetConfig, error) {
+	if v.IsSet(SubnetConfigContentKey) {
+		return getSubnetConfigsFromFlags(v, subnetIDs)
+	}
+	return getSubnetConfigsFromDir(v, subnetIDs)
+}
+
 func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]chains.SubnetConfig, error) {
 	subnetConfigContentB64 := v.GetString(SubnetConfigContentKey)
 	subnetConfigContent, err := base64.StdEncoding.DecodeString(subnetConfigContentB64)
@@ -1076,11 +1079,8 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]c
 	res := make(map[ids.ID]chains.SubnetConfig)
 	for _, subnetID := range subnetIDs {
 		if rawSubnetConfigBytes, ok := subnetConfigs[subnetID]; ok {
-			subnetConfig := defaultSubnetConfig(v)
-			if err := json.Unmarshal(rawSubnetConfigBytes, &subnetConfig); err != nil {
-				return nil, err
-			}
-			if err := subnetConfig.ConsensusParameters.Valid(); err != nil {
+			subnetConfig, err := parseSubnetConfigs(rawSubnetConfigBytes, getDefaultSubnetConfig(v))
+			if err != nil {
 				return nil, err
 			}
 			res[subnetID] = subnetConfig
@@ -1100,22 +1100,7 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]cha
 		return make(map[ids.ID]chains.SubnetConfig), nil
 	}
 
-	subnetConfigs, err := readSubnetConfigs(subnetConfigPath, subnetIDs, defaultSubnetConfig(v))
-	if err != nil {
-		return nil, fmt.Errorf("couldn't read subnet configs: %w", err)
-	}
-	return subnetConfigs, nil
-}
-
-func getSubnetConfigs(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]chains.SubnetConfig, error) {
-	if v.IsSet(SubnetConfigContentKey) {
-		return getSubnetConfigsFromFlags(v, subnetIDs)
-	}
-	return getSubnetConfigsFromDir(v, subnetIDs)
-}
-
-// readSubnetConfigs reads subnet config files from a path and given subnetIDs and returns a map.
-func readSubnetConfigs(subnetConfigPath string, subnetIDs []ids.ID, defaultSubnetConfig chains.SubnetConfig) (map[ids.ID]chains.SubnetConfig, error) {
+	// reads subnet config files from a path and given subnetIDs and returns a map.
 	subnetConfigs := make(map[ids.ID]chains.SubnetConfig)
 	for _, subnetID := range subnetIDs {
 		filePath := filepath.Join(subnetConfigPath, subnetID.String()+subnetConfigFileExt)
@@ -1135,21 +1120,28 @@ func readSubnetConfigs(subnetConfigPath string, subnetIDs []ids.ID, defaultSubne
 		if err != nil {
 			return nil, err
 		}
-
-		configData := defaultSubnetConfig
-		if err := json.Unmarshal(file, &configData); err != nil {
+		config, err := parseSubnetConfigs(file, getDefaultSubnetConfig(v))
+		if err != nil {
 			return nil, err
 		}
-		if err := configData.ConsensusParameters.Valid(); err != nil {
-			return nil, err
-		}
-		subnetConfigs[subnetID] = configData
+		subnetConfigs[subnetID] = config
 	}
 
 	return subnetConfigs, nil
 }
 
-func defaultSubnetConfig(v *viper.Viper) chains.SubnetConfig {
+func parseSubnetConfigs(data []byte, defaultSubnetConfig chains.SubnetConfig) (chains.SubnetConfig, error) {
+	if err := json.Unmarshal(data, &defaultSubnetConfig); err != nil {
+		return chains.SubnetConfig{}, err
+	}
+
+	if err := defaultSubnetConfig.ConsensusParameters.Valid(); err != nil {
+		return chains.SubnetConfig{}, fmt.Errorf("invalid consensus parameters: %w", err)
+	}
+	return defaultSubnetConfig, nil
+}
+
+func getDefaultSubnetConfig(v *viper.Viper) chains.SubnetConfig {
 	return chains.SubnetConfig{
 		ConsensusParameters: getConsensusConfig(v),
 		ValidatorOnly:       false,
@@ -1341,14 +1333,24 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	// Subnet Configs
 	subnetConfigs, err := getSubnetConfigs(v, nodeConfig.WhitelistedSubnets.List())
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, fmt.Errorf("couldn't read subnet configs: %w", err)
 	}
 	nodeConfig.SubnetConfigs = subnetConfigs
+
+	// Node health
+	nodeConfig.MinPercentConnectedStakeHealthy = map[ids.ID]float64{
+		constants.PrimaryNetworkID: calcMinConnectedStake(nodeConfig.ConsensusParams.Parameters),
+	}
+
+	nodeConfig.MinPercentConnectedStakeHealthy = make(map[ids.ID]float64)
+	for subnetID, config := range subnetConfigs {
+		nodeConfig.MinPercentConnectedStakeHealthy[subnetID] = calcMinConnectedStake(config.ConsensusParameters.Parameters)
+	}
 
 	// Chain Configs
 	nodeConfig.ChainConfigs, err = getChainConfigs(v)
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, fmt.Errorf("couldn't read chain configs: %w", err)
 	}
 
 	// Profiler
@@ -1380,4 +1382,13 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 
 	nodeConfig.DiskTargeterConfig, err = getDiskTargeterConfig(v)
 	return nodeConfig, err
+}
+
+// calcMinConnectedStake takes [consensusParams] as input and calculates the
+// expected min connected stake percentage according to alpha and k.
+func calcMinConnectedStake(consensusParams snowball.Parameters) float64 {
+	alpha := consensusParams.Alpha
+	k := consensusParams.K
+	r := float64(alpha) / float64(k)
+	return r*(1-constants.MinConnectedStakeBuffer) + constants.MinConnectedStakeBuffer
 }
