@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
@@ -141,6 +142,7 @@ type ChainConfig struct {
 type ManagerConfig struct {
 	StakingEnabled              bool            // True iff the network has staking enabled
 	StakingCert                 tls.Certificate // needed to sign snowman++ blocks
+	StakingBLSKey               *bls.SecretKey
 	Log                         logging.Logger
 	LogFactory                  logging.Factory
 	VMManager                   vms.Manager // Manage mappings from vm ID --> vm
@@ -398,6 +400,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 			ValidatorState:    m.validatorState,
 			StakingCertLeaf:   m.StakingCert.Leaf,
 			StakingLeafSigner: m.StakingCert.PrivateKey.(crypto.Signer),
+			StakingBLSKey:     m.StakingBLSKey,
 		},
 		DecisionAcceptor:  m.DecisionAcceptorGroup,
 		ConsensusAcceptor: m.ConsensusAcceptorGroup,
