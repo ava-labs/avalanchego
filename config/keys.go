@@ -38,8 +38,6 @@ const (
 	DBConfigFileKey                                    = "db-config-file"
 	DBConfigContentKey                                 = "db-config-file-content"
 	PublicIPKey                                        = "public-ip"
-	DynamicUpdateDurationKey                           = "dynamic-update-duration"
-	DynamicPublicIPResolverKey                         = "dynamic-public-ip"
 	PublicIPResolutionFreqKey                          = "public-ip-resolution-frequency"
 	PublicIPResolutionServiceKey                       = "public-ip-resolution-service"
 	InboundConnUpgradeThrottlerCooldownKey             = "inbound-connection-throttling-cooldown"

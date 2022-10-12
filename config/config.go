@@ -58,10 +58,7 @@ const (
 )
 
 var (
-	deprecatedKeys = map[string]string{
-		DynamicUpdateDurationKey:   fmt.Sprintf("replaced by %q", PublicIPResolutionFreqKey),
-		DynamicPublicIPResolverKey: fmt.Sprintf("replaced by %q", PublicIPResolutionServiceKey),
-	}
+	deprecatedKeys = map[string]string{}
 
 	errInvalidStakerWeights          = errors.New("staking weights must be positive")
 	errStakingDisableOnPublicNetwork = errors.New("staking disabled on public network")
@@ -563,26 +560,16 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 }
 
 func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
-	// If both deprecated and current flag are given,
-	// override deprecated flag value with new flag value.
-	ipResolutionService := v.GetString(DynamicPublicIPResolverKey)
-	if v.IsSet(PublicIPResolutionServiceKey) {
-		ipResolutionService = v.GetString(PublicIPResolutionServiceKey)
-	}
-
-	ipResolutionFreq := v.GetDuration(DynamicUpdateDurationKey)
-	if v.IsSet(PublicIPResolutionFreqKey) {
-		ipResolutionFreq = v.GetDuration(PublicIPResolutionFreqKey)
-	}
+	ipResolutionService := v.GetString(PublicIPResolutionServiceKey)
+	ipResolutionFreq := v.GetDuration(PublicIPResolutionFreqKey)
 	if ipResolutionFreq <= 0 {
 		return node.IPConfig{}, fmt.Errorf("%q must be > 0", PublicIPResolutionFreqKey)
 	}
 
 	stakingPort := uint16(v.GetUint(StakingPortKey))
 	publicIP := v.GetString(PublicIPKey)
-
 	if publicIP != "" && ipResolutionService != "" {
-		return node.IPConfig{}, fmt.Errorf("only one of --%s and --%s/--%s can be given", PublicIPKey, DynamicPublicIPResolverKey, PublicIPResolutionServiceKey)
+		return node.IPConfig{}, fmt.Errorf("only one of --%s and --%s can be given", PublicIPKey, PublicIPResolutionServiceKey)
 	}
 
 	if publicIP != "" {
