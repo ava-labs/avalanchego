@@ -259,7 +259,7 @@ run_simulator() {
 
   echo "running simulator"
   simulator \
-  --network-runner-output=$BASEDIR/avalanchego-${VERSION}/output.yaml \
+  --cluster-info-yaml=$BASEDIR/avalanchego-${VERSION}/output.yaml \
   --keys=./cmd/simulator/.simulator/keys \
   --timeout=30s \
   --concurrency=10 \

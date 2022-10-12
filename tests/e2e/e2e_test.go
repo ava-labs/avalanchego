@@ -175,6 +175,7 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	subnetEVMRPCEps = make([]string, 0)
 	blockchainID, logsDir := "", ""
+	pid := 0
 
 	// wait up to 5-minute for custom VM installation
 	outf("\n{{magenta}}waiting for all custom VMs to report healthy...{{/}}\n")
@@ -195,6 +196,9 @@ done:
 
 		// all logs are stored under root data dir
 		logsDir = resp.GetClusterInfo().GetRootDataDir()
+
+		// ANR server pid
+		pid = int(resp.GetClusterInfo().GetPid())
 
 		for blkChainID, vmInfo := range resp.ClusterInfo.CustomChains {
 			if vmInfo.VmId == vmID.String() {
@@ -222,7 +226,6 @@ done:
 		outf("{{blue}}avalanche subnet-evm RPC:{{/}} %q\n", rpcEP)
 	}
 
-	pid := os.Getpid()
 	outf("{{blue}}{{bold}}writing output %q with PID %d{{/}}\n", utils.GetOutputPath(), pid)
 	ci := clusterInfo{
 		URIs:     uris,

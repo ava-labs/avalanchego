@@ -34,7 +34,7 @@ var (
 	timeout time.Duration
 	keysDir string
 
-	networkRunnerOutputPath string
+	clusterInfoYamlPath string
 	rpcEndpoints            []string
 
 	concurrency int
@@ -52,7 +52,7 @@ func newCommand() *cobra.Command {
 
 	cmd.PersistentFlags().DurationVarP(&timeout, "timeout", "t", time.Minute, "Duration to run simulator")
 	cmd.PersistentFlags().StringVarP(&keysDir, "keys", "k", ".simulator/keys", "Directory for key files")
-	cmd.PersistentFlags().StringVarP(&networkRunnerOutputPath, "network-runner-output", "o", "", "If non-empty, it loads the endpoints from the YAML and overwrites --config")
+	cmd.PersistentFlags().StringVarP(&clusterInfoYamlPath, "cluster-info-yaml", "o", "", "If non-empty, it loads the endpoints from the YAML and overwrites --config")
 	cmd.PersistentFlags().StringSliceVarP(&rpcEndpoints, "endpoints", "e", nil, "If non-empty, it loads the endpoints from the YAML and overwrites --config")
 	cmd.PersistentFlags().IntVarP(&concurrency, "concurrency", "c", 10, "Concurrency")
 	cmd.PersistentFlags().Uint64VarP(&baseFee, "base-fee", "f", 25, "Base fee")
@@ -62,8 +62,8 @@ func newCommand() *cobra.Command {
 }
 
 func runFunc(cmd *cobra.Command, args []string) {
-	log.Printf("launching simulator with rpc endpoints %q or network runner output %q, timeout %v, concurrentcy %d, base fee %d, priority fee %d",
-		rpcEndpoints, networkRunnerOutputPath, timeout, concurrency, baseFee, priorityFee)
+	log.Printf("launching simulator with rpc endpoints %q or cluster info yaml %q, timeout %v, concurrentcy %d, base fee %d, priority fee %d",
+		rpcEndpoints, clusterInfoYamlPath, timeout, concurrency, baseFee, priorityFee)
 
 	cfg := &worker.Config{
 		Endpoints:   rpcEndpoints,
@@ -72,15 +72,15 @@ func runFunc(cmd *cobra.Command, args []string) {
 		PriorityFee: priorityFee,
 	}
 
-	if networkRunnerOutputPath != "" {
-		log.Printf("loading network runner output %q", networkRunnerOutputPath)
-		b, err := os.ReadFile(networkRunnerOutputPath)
+	if clusterInfoYamlPath != "" {
+		log.Printf("loading cluster info yaml %q", clusterInfoYamlPath)
+		b, err := os.ReadFile(clusterInfoYamlPath)
 		if err != nil {
-			log.Fatalf("failed to read network-runner output %v", err)
+			log.Fatalf("failed to read cluster info yaml %v", err)
 		}
 		var ci networkRunnerClusterInfo
 		if err = yaml.Unmarshal(b, &ci); err != nil {
-			log.Fatalf("failed to parse network-runner output %v", err)
+			log.Fatalf("failed to parse cluster info yaml %v", err)
 		}
 
 		eps := make([]string, len(ci.URIs))

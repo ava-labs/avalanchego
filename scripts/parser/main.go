@@ -56,11 +56,11 @@ func startSubnet(outputFile string, avalanchegoPath string, pluginDir string, gr
 	if err != nil {
 		panic(err)
 	}
-	blockchainId, logsDir, err := runner.WaitForCustomVm(vmId)
+	blockchainId, logsDir, pid, err := runner.WaitForCustomVm(vmId)
 	if err != nil {
 		panic(err)
 	}
-	runner.GetClusterInfo(blockchainId, logsDir)
+	runner.SaveClusterInfo(blockchainId, logsDir, pid)
 }
 
 func parseMetamask(outputFile string, chainId string, address string) {

@@ -92,8 +92,9 @@ func startRunner(vmName string, genesisPath string, pluginDir string) error {
 	return nil
 }
 
-func WaitForCustomVm(vmId ids.ID) (string, string, error) {
+func WaitForCustomVm(vmId ids.ID) (string, string, int, error) {
 	blockchainID, logsDir := "", ""
+	pid := 0
 
 	// wait up to 5-minute for custom VM installation
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
@@ -111,7 +112,7 @@ done:
 		ccancel()
 		if err != nil {
 			cancel()
-			return "", "", err
+			return "", "", 0, err
 		}
 
 		if !resp.ClusterInfo.Healthy {
@@ -125,6 +126,9 @@ done:
 		// all logs are stored under root data dir
 		logsDir = resp.GetClusterInfo().GetRootDataDir()
 
+		// ANR server pid
+		pid = int(resp.GetClusterInfo().GetPid())
+
 		for chainID, chainInfo := range resp.ClusterInfo.CustomChains {
 			if chainInfo.VmId == vmId.String() {
 				blockchainID = chainID
@@ -136,20 +140,23 @@ done:
 	err := ctx.Err()
 	if err != nil {
 		cancel()
-		return "", "", err
+		return "", "", 0, err
 	}
 	cancel()
 
 	if blockchainID == "" {
-		return "", "", errors.New("BlockchainId not found")
+		return "", "", 0, errors.New("BlockchainId not found")
 	}
 	if logsDir == "" {
-		return "", "", errors.New("logsDir not found")
+		return "", "", 0, errors.New("logsDir not found")
 	}
-	return blockchainID, logsDir, nil
+	if pid == 0 {
+		return "", "", pid, errors.New("pid not found")
+	}
+	return blockchainID, logsDir, pid, nil
 }
 
-func GetClusterInfo(blockchainId string, logsDir string) (clusterInfo, error) {
+func SaveClusterInfo(blockchainId string, logsDir string, pid int) (clusterInfo, error) {
 	cctx, ccancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	uris, err := cli.URIs(cctx)
 	ccancel()
@@ -165,7 +172,6 @@ func GetClusterInfo(blockchainId string, logsDir string) (clusterInfo, error) {
 		outf("{{blue}}avalanche subnet-evm RPC:{{/}} %q\n", rpcEP)
 	}
 
-	pid := os.Getpid()
 	ci := clusterInfo{
 		URIs:     uris,
 		Endpoint: fmt.Sprintf("/ext/bc/%s", blockchainId),
@@ -183,13 +189,13 @@ func StartNetwork(vmId ids.ID, vmName string, genesisPath string, pluginDir stri
 	fmt.Println("Starting network")
 	startRunner(vmName, genesisPath, pluginDir)
 
-	blockchainId, logsDir, err := WaitForCustomVm(vmId)
+	blockchainId, logsDir, pid, err := WaitForCustomVm(vmId)
 	if err != nil {
 		return clusterInfo{}, err
 	}
 	fmt.Println("Got custom vm")
 
-	return GetClusterInfo(blockchainId, logsDir)
+	return SaveClusterInfo(blockchainId, logsDir, pid)
 }
 
 func StopNetwork() error {
