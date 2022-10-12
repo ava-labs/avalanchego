@@ -60,11 +60,3 @@ func NewValidator(
 		weight: weight,
 	}
 }
-
-// GenerateRandomValidator creates a random validator with the provided weight
-func GenerateRandomValidator(weight uint64) Validator {
-	return NewValidator(
-		ids.GenerateTestNodeID(),
-		weight,
-	)
-}

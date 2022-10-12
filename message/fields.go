@@ -35,6 +35,7 @@ const (
 	SummaryHeights                   // Used for state sync
 	SummaryIDs                       // Used for state sync
 	VersionStruct                    // Used internally
+	SourceChainID                    // Used for cross-chain messaging
 )
 
 // Packer returns the packer function that can be used to pack this field.
@@ -111,6 +112,8 @@ func (f Field) String() string {
 		return "IP"
 	case ChainID:
 		return "ChainID"
+	case SourceChainID:
+		return "SourceChainID"
 	case RequestID:
 		return "RequestID"
 	case Deadline:
