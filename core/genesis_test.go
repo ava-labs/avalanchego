@@ -43,7 +43,7 @@ import (
 )
 
 func setupGenesisBlock(db ethdb.Database, genesis *Genesis, lastAcceptedHash common.Hash) (*params.ChainConfig, common.Hash, error) {
-	conf, err := SetupGenesisBlock(db, genesis, lastAcceptedHash)
+	conf, err := SetupGenesisBlock(db, genesis, lastAcceptedHash, false)
 	stored := rawdb.ReadCanonicalHash(db, 0)
 	return conf, stored, err
 }

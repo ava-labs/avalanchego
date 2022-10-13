@@ -162,7 +162,9 @@ func (e *GenesisMismatchError) Error() string {
 // The stored chain configuration will be updated if it is compatible (i.e. does not
 // specify a fork block below the local head block). In case of a conflict, the
 // error is a *params.ConfigCompatError and the new, unwritten config is returned.
-func SetupGenesisBlock(db ethdb.Database, genesis *Genesis, lastAcceptedHash common.Hash) (*params.ChainConfig, error) {
+func SetupGenesisBlock(
+	db ethdb.Database, genesis *Genesis, lastAcceptedHash common.Hash, skipChainConfigCheckCompatible bool,
+) (*params.ChainConfig, error) {
 	if genesis == nil {
 		return nil, ErrNoGenesis
 	}
@@ -221,9 +223,13 @@ func SetupGenesisBlock(db ethdb.Database, genesis *Genesis, lastAcceptedHash com
 	}
 	height := lastBlock.NumberU64()
 	timestamp := lastBlock.Time()
-	compatErr := storedcfg.CheckCompatible(newcfg, height, timestamp)
-	if compatErr != nil && height != 0 && compatErr.RewindTo != 0 {
-		return newcfg, compatErr
+	if skipChainConfigCheckCompatible {
+		log.Info("skipping verifying activated network upgrades on chain config")
+	} else {
+		compatErr := storedcfg.CheckCompatible(newcfg, height, timestamp)
+		if compatErr != nil && height != 0 && compatErr.RewindTo != 0 {
+			return newcfg, compatErr
+		}
 	}
 	rawdb.WriteChainConfig(db, stored, newcfg)
 	return newcfg, nil
