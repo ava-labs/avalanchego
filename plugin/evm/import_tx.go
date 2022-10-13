@@ -167,7 +167,7 @@ func (utx *UnsignedImportTx) Burned(assetID ids.ID) (uint64, error) {
 		}
 	}
 
-	return math.Sub64(input, spent)
+	return math.Sub(input, spent)
 }
 
 // SemanticVerify this transaction is valid.
