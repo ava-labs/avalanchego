@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
+	"github.com/ava-labs/avalanchego/vms/proposervm/tree"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -2166,8 +2167,9 @@ func TestVMInnerBlkCache(t *testing.T) {
 
 	// Create a block near the tip (0).
 	blkNearTipInnerBytes := []byte{1}
+	parentID := ids.GenerateTestID()
 	blkNearTip, err := statelessblock.BuildBanff(
-		ids.GenerateTestID(),     // parent
+		parentID,                 // parent
 		time.Time{},              // timestamp
 		1,                        // pChainHeight,
 		vm.ctx.StakingCertLeaf,   // cert
@@ -2207,4 +2209,31 @@ func TestVMInnerBlkCache(t *testing.T) {
 
 	_, ok = vm.innerBlkCache.Get(blkNearTip.ID())
 	require.False(ok)
+
+	// Reset the tip height
+	vm.lastAcceptedHeight = 0
+
+	// Test that when the block is verified, the reference in the cache
+	// to the inner block is the same reference that the engine has.
+	mockTree := tree.NewMockTree(ctrl)
+	newInnerBlock := snowman.NewMockBlock(ctrl)
+	// Tree says it doesn't contain [blkNearTip]
+	mockTree.EXPECT().Get(newInnerBlock).Return(nil, false)
+	// We should add it.
+	mockTree.EXPECT().Add(newInnerBlock)
+	vm.Tree = mockTree
+
+	blk := NewMockPostForkBlock(ctrl)
+	blk.EXPECT().ID().Return(blkNearTip.ID())
+	blk.EXPECT().getInnerBlk().Return(newInnerBlock)
+	newInnerBlock.EXPECT().Verify().Return(nil)
+
+	// When we verify [blk] we see that the inner block isn't in the tree
+	// (hasn't been verified) so we verify it and put it in the cahce.
+	err = vm.verifyAndRecordInnerBlk(blk)
+	require.NoError(err)
+
+	gotBlk, ok = vm.innerBlkCache.Get(blkNearTip.ID())
+	require.True(ok)
+	require.Equal(newInnerBlock, gotBlk)
 }

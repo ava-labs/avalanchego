@@ -741,6 +741,7 @@ func (vm *VM) storePostForkBlock(blk PostForkBlock) error {
 }
 
 func (vm *VM) verifyAndRecordInnerBlk(postFork PostForkBlock) error {
+	postForkID := postFork.ID()
 	// If inner block's Verify returned true, don't call it again.
 	//
 	// Note that if [innerBlk.Verify] returns nil, this method returns nil. This
@@ -752,11 +753,11 @@ func (vm *VM) verifyAndRecordInnerBlk(postFork PostForkBlock) error {
 			return err
 		}
 		vm.Tree.Add(currentInnerBlk)
+		vm.innerBlkCache.Put(postForkID, currentInnerBlk)
 	} else {
 		postFork.setInnerBlk(originalInnerBlk)
 	}
-
-	vm.verifiedBlocks[postFork.ID()] = postFork
+	vm.verifiedBlocks[postForkID] = postFork
 	return nil
 }
 

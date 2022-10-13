@@ -28,6 +28,9 @@ service VM {
   rpc AppResponse(AppResponseMsg) returns (google.protobuf.Empty);
   rpc AppGossip(AppGossipMsg) returns (google.protobuf.Empty);
   rpc Gather(google.protobuf.Empty) returns (GatherResponse);
+  rpc CrossChainAppRequest(CrossChainAppRequestMsg) returns (google.protobuf.Empty);
+  rpc CrossChainAppRequestFailed(CrossChainAppRequestFailedMsg) returns (google.protobuf.Empty);
+  rpc CrossChainAppResponse(CrossChainAppResponseMsg) returns (google.protobuf.Empty);
 
   // BatchedChainVM
   rpc GetAncestors(GetAncestorsRequest) returns (GetAncestorsResponse);
@@ -208,6 +211,33 @@ message AppGossipMsg {
   bytes node_id = 1;
   // The message body
   bytes msg = 2;
+}
+
+message CrossChainAppRequestMsg {
+  // The chain that sent us this request
+  bytes chain_id = 1;
+  // The ID of this request
+  uint32 request_id = 2;
+  // deadline for this request
+  google.protobuf.Timestamp deadline = 3;
+  // The request body
+  bytes request = 4;
+}
+
+message CrossChainAppRequestFailedMsg {
+  // The chain that we failed to get a response from
+  bytes chain_id = 1;
+  // The ID of the request we sent and didn't get a response to
+  uint32 request_id = 2;
+}
+
+message CrossChainAppResponseMsg {
+  // The chain that we got a response from
+  bytes chain_id = 1;
+  // Request ID of request that this is in response to
+  uint32 request_id = 2;
+  // The response body
+  bytes response = 3;
 }
 
 message ConnectedRequest {

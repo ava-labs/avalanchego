@@ -235,6 +235,18 @@ func (t *Transitive) QueryFailed(nodeID ids.NodeID, requestID uint32) error {
 	return t.Chits(nodeID, requestID, nil)
 }
 
+func (t *Transitive) CrossChainAppRequest(chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+	return t.VM.CrossChainAppRequest(chainID, requestID, deadline, request)
+}
+
+func (t *Transitive) CrossChainAppRequestFailed(chainID ids.ID, requestID uint32) error {
+	return t.VM.CrossChainAppRequestFailed(chainID, requestID)
+}
+
+func (t *Transitive) CrossChainAppResponse(chainID ids.ID, requestID uint32, response []byte) error {
+	return t.VM.CrossChainAppResponse(chainID, requestID, response)
+}
+
 func (t *Transitive) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	// Notify the VM of this request
 	return t.VM.AppRequest(nodeID, requestID, deadline, request)
