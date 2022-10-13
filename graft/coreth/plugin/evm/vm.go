@@ -429,6 +429,7 @@ func (vm *VM) Initialize(
 	vm.ethConfig.OfflinePruningBloomFilterSize = vm.config.OfflinePruningBloomFilterSize
 	vm.ethConfig.OfflinePruningDataDirectory = vm.config.OfflinePruningDataDirectory
 	vm.ethConfig.CommitInterval = vm.config.CommitInterval
+	vm.ethConfig.SkipUpgradeCheck = vm.config.SkipUpgradeCheck
 
 	// Create directory for offline pruning
 	if len(vm.ethConfig.OfflinePruningDataDirectory) != 0 {

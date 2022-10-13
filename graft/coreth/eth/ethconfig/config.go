@@ -160,4 +160,10 @@ type Config struct {
 	OfflinePruning                bool
 	OfflinePruningBloomFilterSize uint64
 	OfflinePruningDataDirectory   string
+
+	// SkipUpgradeCheck disables checking that upgrades must take place before the last
+	// accepted block. Skipping this check is useful when a node operator does not update
+	// their node before the network upgrade and their node accepts blocks that have
+	// identical state with the pre-upgrade ruleset.
+	SkipUpgradeCheck bool
 }

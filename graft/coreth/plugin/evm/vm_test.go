@@ -21,9 +21,11 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 
+	"github.com/ava-labs/coreth/metrics"
 	"github.com/ava-labs/coreth/trie"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -3815,4 +3817,48 @@ func TestGetAtomicRepositoryRepairHeights(t *testing.T) {
 	assert.Len(t, mainnetHeights, 76)
 	sorted := sort.SliceIsSorted(mainnetHeights, func(i, j int) bool { return mainnetHeights[i] < mainnetHeights[j] })
 	assert.True(t, sorted)
+}
+
+func TestSkipChainConfigCheckCompatible(t *testing.T) {
+	// Hack: registering metrics uses global variables, so we need to disable metrics here so that we can initialize the VM twice.
+	metrics.Enabled = false
+	defer func() { metrics.Enabled = true }()
+
+	importAmount := uint64(50000000)
+	issuer, vm, dbManager, _, appSender := GenesisVMWithUTXOs(t, true, genesisJSONApricotPhase1, "", "", map[ids.ShortID]uint64{
+		testShortIDAddrs[0]: importAmount,
+	})
+	defer func() { require.NoError(t, vm.Shutdown()) }()
+
+	// Since rewinding is permitted for last accepted height of 0, we must
+	// accept one block to test the SkipUpgradeCheck functionality.
+	importTx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	require.NoError(t, err)
+	require.NoError(t, vm.issueTx(importTx, true /*=local*/))
+	<-issuer
+
+	blk, err := vm.BuildBlock()
+	require.NoError(t, err)
+	require.NoError(t, blk.Verify())
+	require.NoError(t, vm.SetPreference(blk.ID()))
+	require.NoError(t, blk.Accept())
+
+	reinitVM := &VM{}
+	// use the block's timestamp instead of 0 since rewind to genesis
+	// is hardcoded to be allowed in core/genesis.go.
+	genesisWithUpgrade := &core.Genesis{}
+	require.NoError(t, json.Unmarshal([]byte(genesisJSONApricotPhase1), genesisWithUpgrade))
+	genesisWithUpgrade.Config.ApricotPhase2BlockTimestamp = big.NewInt(blk.Timestamp().Unix())
+	genesisWithUpgradeBytes, err := json.Marshal(genesisWithUpgrade)
+	require.NoError(t, err)
+
+	// this will not be allowed
+	err = reinitVM.Initialize(vm.ctx, dbManager, genesisWithUpgradeBytes, []byte{}, []byte{}, issuer, []*engCommon.Fx{}, appSender)
+	require.ErrorContains(t, err, "mismatching ApricotPhase2 fork block timestamp in database")
+
+	// try again with skip-upgrade-check
+	config := []byte("{\"skip-upgrade-check\": true}")
+	err = reinitVM.Initialize(vm.ctx, dbManager, genesisWithUpgradeBytes, []byte{}, config, issuer, []*engCommon.Fx{}, appSender)
+	require.NoError(t, err)
+	require.NoError(t, reinitVM.Shutdown())
 }

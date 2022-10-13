@@ -134,6 +134,12 @@ type Config struct {
 	StateSyncIDs             string `json:"state-sync-ids"`
 	StateSyncCommitInterval  uint64 `json:"state-sync-commit-interval"`
 	StateSyncMinBlocks       uint64 `json:"state-sync-min-blocks"`
+
+	// SkipUpgradeCheck disables checking that upgrades must take place before the last
+	// accepted block. Skipping this check is useful when a node operator does not update
+	// their node before the network upgrade and their node accepts blocks that have
+	// identical state with the pre-upgrade ruleset.
+	SkipUpgradeCheck bool `json:"skip-upgrade-check"`
 }
 
 // EthAPIs returns an array of strings representing the Eth APIs that should be enabled
