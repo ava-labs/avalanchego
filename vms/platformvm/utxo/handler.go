@@ -248,7 +248,7 @@ func (h *handler) Spend(
 		remainingValue := in.Amount()
 
 		// Stake any value that should be staked
-		amountToStake := math.Min64(
+		amountToStake := math.Min(
 			amount-amountStaked, // Amount we still need to stake
 			remainingValue,      // Amount available to stake
 		)
@@ -339,7 +339,7 @@ func (h *handler) Spend(
 		remainingValue := in.Amount()
 
 		// Burn any value that should be burned
-		amountToBurn := math.Min64(
+		amountToBurn := math.Min(
 			fee-amountBurned, // Amount we still need to burn
 			remainingValue,   // Amount available to burn
 		)
@@ -347,7 +347,7 @@ func (h *handler) Spend(
 		remainingValue -= amountToBurn
 
 		// Stake any value that should be staked
-		amountToStake := math.Min64(
+		amountToStake := math.Min(
 			amount-amountStaked, // Amount we still need to stake
 			remainingValue,      // Amount available to stake
 		)
