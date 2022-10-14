@@ -268,6 +268,36 @@ func NewNoOpAppHandler(log logging.Logger) AppHandler {
 	return &noOpAppHandler{log: log}
 }
 
+func (nop *noOpAppHandler) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.CrossChainAppRequest),
+		zap.Stringer("chainID", chainID),
+		zap.Uint32("requestID", requestID),
+	)
+	return nil
+}
+
+func (nop *noOpAppHandler) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.CrossChainAppRequestFailed),
+		zap.Stringer("chainID", chainID),
+		zap.Uint32("requestID", requestID),
+	)
+	return nil
+}
+
+func (nop *noOpAppHandler) CrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, response []byte) error {
+	nop.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.CrossChainAppResponse),
+		zap.Stringer("chainID", chainID),
+		zap.Uint32("requestID", requestID),
+	)
+	return nil
+}
+
 func (nop *noOpAppHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, _ []byte) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),

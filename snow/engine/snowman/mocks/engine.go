@@ -180,6 +180,48 @@ func (_m *Engine) Context() *snow.ConsensusContext {
 	return r0
 }
 
+// CrossChainAppRequest provides a mock function with given fields: ctx, chainID, requestID, deadline, request
+func (_m *Engine) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+	ret := _m.Called(ctx, chainID, requestID, deadline, request)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, ids.ID, uint32, time.Time, []byte) error); ok {
+		r0 = rf(ctx, chainID, requestID, deadline, request)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// CrossChainAppRequestFailed provides a mock function with given fields: ctx, chainID, requestID
+func (_m *Engine) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32) error {
+	ret := _m.Called(ctx, chainID, requestID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, ids.ID, uint32) error); ok {
+		r0 = rf(ctx, chainID, requestID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// CrossChainAppResponse provides a mock function with given fields: ctx, chainID, requestID, response
+func (_m *Engine) CrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, response []byte) error {
+	ret := _m.Called(ctx, chainID, requestID, response)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, ids.ID, uint32, []byte) error); ok {
+		r0 = rf(ctx, chainID, requestID, response)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Disconnected provides a mock function with given fields: id
 func (_m *Engine) Disconnected(id ids.NodeID) error {
 	ret := _m.Called(id)

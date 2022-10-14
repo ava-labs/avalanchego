@@ -503,7 +503,7 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.NodeID]ui
 			} else {
 				// The validator's weight was increased at this block, so in the
 				// prior block it was lower.
-				op = math.Sub64
+				op = math.Sub[uint64]
 			}
 
 			newWeight, err := op(vdrSet[nodeID], diff.Amount)

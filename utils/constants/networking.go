@@ -25,4 +25,9 @@ const (
 	DefaultByteSliceCap    = 128
 
 	MaxContainersLen = int(4 * DefaultMaxMessageSize / 5)
+
+	// MinConnectedStakeBuffer is the safety buffer for calculation of MinConnectedStake.
+	// This increases the required stake percentage above alpha/k. Must be [0-1]
+	// 0 means MinConnectedStake = alpha/k, 1 means MinConnectedStake = 1 (fully connected)
+	MinConnectedStakeBuffer = .2
 )

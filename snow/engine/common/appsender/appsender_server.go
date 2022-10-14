@@ -27,6 +27,30 @@ func NewServer(appSender common.AppSender) *Server {
 	return &Server{appSender: appSender}
 }
 
+func (s *Server) SendCrossChainAppRequest(parentCtx context.Context, msg *appsenderpb.SendCrossChainAppRequestMsg) (*emptypb.Empty, error) {
+	ctx, span := trace.Tracer().Start(parentCtx, "Server.SendCrossChainAppRequest")
+	defer span.End()
+
+	chainID, err := ids.ToID(msg.ChainId)
+	if err != nil {
+		return &emptypb.Empty{}, err
+	}
+
+	return &emptypb.Empty{}, s.appSender.SendCrossChainAppRequest(ctx, chainID, msg.RequestId, msg.Request)
+}
+
+func (s *Server) SendCrossChainAppResponse(parentCtx context.Context, msg *appsenderpb.SendCrossChainAppResponseMsg) (*emptypb.Empty, error) {
+	ctx, span := trace.Tracer().Start(parentCtx, "Server.SendCrossChainAppResponse")
+	defer span.End()
+
+	chainID, err := ids.ToID(msg.ChainId)
+	if err != nil {
+		return &emptypb.Empty{}, err
+	}
+
+	return &emptypb.Empty{}, s.appSender.SendCrossChainAppResponse(ctx, chainID, msg.RequestId, msg.Response)
+}
+
 func (s *Server) SendAppRequest(parentCtx context.Context, req *appsenderpb.SendAppRequestMsg) (*emptypb.Empty, error) {
 	ctx, span := trace.Tracer().Start(parentCtx, "Server.SendAppRequest")
 	defer span.End()

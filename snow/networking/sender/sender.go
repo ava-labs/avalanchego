@@ -129,7 +129,7 @@ func (s *sender) SendGetStateSummaryFrontier(parentCtx context.Context, nodeIDs 
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, requestID, message.StateSummaryFrontier)
+		s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID, message.StateSummaryFrontier)
 	}
 
 	msgCreator := s.getMsgCreator()
@@ -240,7 +240,7 @@ func (s *sender) SendGetAcceptedStateSummary(parentCtx context.Context, nodeIDs 
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, requestID, message.AcceptedStateSummary)
+		s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID, message.AcceptedStateSummary)
 	}
 
 	msgCreator := s.getMsgCreator()
@@ -344,7 +344,7 @@ func (s *sender) SendGetAcceptedFrontier(parentCtx context.Context, nodeIDs ids.
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, requestID, message.AcceptedFrontier)
+		s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID, message.AcceptedFrontier)
 	}
 
 	msgCreator := s.getMsgCreator()
@@ -448,7 +448,7 @@ func (s *sender) SendGetAccepted(parentCtx context.Context, nodeIDs ids.NodeIDSe
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, requestID, message.Accepted)
+		s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID, message.Accepted)
 	}
 
 	msgCreator := s.getMsgCreator()
@@ -544,13 +544,13 @@ func (s *sender) SendGetAncestors(parentCtx context.Context, nodeID ids.NodeID, 
 
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from this node.
-	s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, requestID, message.Ancestors)
+	s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID, message.Ancestors)
 
 	msgCreator := s.getMsgCreator()
 
 	// Sending a GetAncestors to myself always fails.
 	if nodeID == s.ctx.NodeID {
-		inMsg := msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, s.ctx.ChainID, requestID)
+		inMsg := msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID)
 		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
@@ -560,7 +560,7 @@ func (s *sender) SendGetAncestors(parentCtx context.Context, nodeID ids.NodeID, 
 	if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
 		s.failedDueToBench[message.GetAncestors].Inc() // update metric
 		s.timeouts.RegisterRequestToUnreachableValidator()
-		inMsg := msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, s.ctx.ChainID, requestID)
+		inMsg := msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID)
 		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
@@ -579,7 +579,7 @@ func (s *sender) SendGetAncestors(parentCtx context.Context, nodeID ids.NodeID, 
 			zap.Error(err),
 		)
 
-		inMsg := msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, s.ctx.ChainID, requestID)
+		inMsg := msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID)
 		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
@@ -597,7 +597,7 @@ func (s *sender) SendGetAncestors(parentCtx context.Context, nodeID ids.NodeID, 
 		)
 
 		s.timeouts.RegisterRequestToUnreachableValidator()
-		inMsg := msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, s.ctx.ChainID, requestID)
+		inMsg := msgCreator.InternalFailedRequest(message.GetAncestorsFailed, nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID)
 		go s.router.HandleInbound(ctx, inMsg)
 	}
 }
@@ -656,13 +656,13 @@ func (s *sender) SendGet(parentCtx context.Context, nodeID ids.NodeID, requestID
 
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from this node.
-	s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, requestID, message.Put)
+	s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID, message.Put)
 
 	msgCreator := s.getMsgCreator()
 
 	// Sending a Get to myself always fails.
 	if nodeID == s.ctx.NodeID {
-		inMsg := msgCreator.InternalFailedRequest(message.GetFailed, nodeID, s.ctx.ChainID, requestID)
+		inMsg := msgCreator.InternalFailedRequest(message.GetFailed, nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID)
 		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
@@ -672,7 +672,7 @@ func (s *sender) SendGet(parentCtx context.Context, nodeID ids.NodeID, requestID
 	if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
 		s.failedDueToBench[message.Get].Inc() // update metric
 		s.timeouts.RegisterRequestToUnreachableValidator()
-		inMsg := msgCreator.InternalFailedRequest(message.GetFailed, nodeID, s.ctx.ChainID, requestID)
+		inMsg := msgCreator.InternalFailedRequest(message.GetFailed, nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID)
 		go s.router.HandleInbound(ctx, inMsg)
 		return
 	}
@@ -710,7 +710,7 @@ func (s *sender) SendGet(parentCtx context.Context, nodeID ids.NodeID, requestID
 		)
 
 		s.timeouts.RegisterRequestToUnreachableValidator()
-		inMsg := msgCreator.InternalFailedRequest(message.GetFailed, nodeID, s.ctx.ChainID, requestID)
+		inMsg := msgCreator.InternalFailedRequest(message.GetFailed, nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID)
 		go s.router.HandleInbound(ctx, inMsg)
 	}
 }
@@ -780,7 +780,7 @@ func (s *sender) SendPushQuery(parentCtx context.Context, nodeIDs ids.NodeIDSet,
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, requestID, message.Chits)
+		s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID, message.Chits)
 	}
 
 	// Note that this timeout duration won't exactly match the one that gets
@@ -806,7 +806,7 @@ func (s *sender) SendPushQuery(parentCtx context.Context, nodeIDs ids.NodeIDSet,
 			s.timeouts.RegisterRequestToUnreachableValidator()
 
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
-			inMsg := msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, requestID)
+			inMsg := msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID)
 			go s.router.HandleInbound(ctx, inMsg)
 		}
 	}
@@ -847,7 +847,7 @@ func (s *sender) SendPushQuery(parentCtx context.Context, nodeIDs ids.NodeIDSet,
 
 			// Register failures for nodes we didn't send a request to.
 			s.timeouts.RegisterRequestToUnreachableValidator()
-			inMsg := msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, requestID)
+			inMsg := msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID)
 			go s.router.HandleInbound(ctx, inMsg)
 		}
 	}
@@ -871,7 +871,7 @@ func (s *sender) SendPullQuery(parentCtx context.Context, nodeIDs ids.NodeIDSet,
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, requestID, message.Chits)
+		s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID, message.Chits)
 	}
 
 	// Note that this timeout duration won't exactly match the one that gets
@@ -896,7 +896,7 @@ func (s *sender) SendPullQuery(parentCtx context.Context, nodeIDs ids.NodeIDSet,
 			nodeIDs.Remove(nodeID)
 			s.timeouts.RegisterRequestToUnreachableValidator()
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
-			inMsg := msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, requestID)
+			inMsg := msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID)
 			go s.router.HandleInbound(ctx, inMsg)
 		}
 	}
@@ -931,7 +931,7 @@ func (s *sender) SendPullQuery(parentCtx context.Context, nodeIDs ids.NodeIDSet,
 
 			// Register failures for nodes we didn't send a request to.
 			s.timeouts.RegisterRequestToUnreachableValidator()
-			inMsg := msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, requestID)
+			inMsg := msgCreator.InternalFailedRequest(message.QueryFailed, nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID)
 			go s.router.HandleInbound(ctx, inMsg)
 		}
 	}
@@ -983,6 +983,49 @@ func (s *sender) SendChits(parentCtx context.Context, nodeID ids.NodeID, request
 	}
 }
 
+func (s *sender) SendCrossChainAppRequest(parentCtx context.Context, chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
+	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendCrossChainAppRequest", oteltrace.WithAttributes(
+		attribute.Stringer("chainID", chainID),
+		attribute.Int64("requestID", int64(requestID)),
+	))
+	defer span.End()
+
+	s.router.RegisterRequest(ctx, s.ctx.NodeID, s.ctx.ChainID, chainID, requestID, message.CrossChainAppResponse)
+
+	msgCreator := s.getMsgCreator()
+	inMsg := msgCreator.InternalCrossChainAppRequest(
+		s.ctx.NodeID,
+		s.ctx.ChainID,
+		chainID,
+		requestID,
+		s.timeouts.TimeoutDuration(),
+		appRequestBytes,
+	)
+
+	go s.router.HandleInbound(ctx, inMsg)
+	return nil
+}
+
+func (s *sender) SendCrossChainAppResponse(parentCtx context.Context, chainID ids.ID, requestID uint32, appResponseBytes []byte) error {
+	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendCrossChainAppResponse", oteltrace.WithAttributes(
+		attribute.Stringer("chainID", chainID),
+		attribute.Int64("requestID", int64(requestID)),
+	))
+	defer span.End()
+
+	msgCreator := s.getMsgCreator()
+	inMsg := msgCreator.InternalCrossChainAppResponse(
+		s.ctx.NodeID,
+		s.ctx.ChainID,
+		chainID,
+		requestID,
+		appResponseBytes,
+	)
+
+	go s.router.HandleInbound(ctx, inMsg)
+	return nil
+}
+
 // SendAppRequest sends an application-level request to the given nodes.
 // The meaning of this request, and how it should be handled, is defined by the VM.
 func (s *sender) SendAppRequest(parentCtx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, appRequestBytes []byte) error {
@@ -1000,7 +1043,7 @@ func (s *sender) SendAppRequest(parentCtx context.Context, nodeIDs ids.NodeIDSet
 	// to send them a message, to avoid busy looping when disconnected from
 	// the internet.
 	for nodeID := range nodeIDs {
-		s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, requestID, message.AppResponse)
+		s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID, message.AppResponse)
 	}
 
 	// Note that this timeout duration won't exactly match the one that gets
@@ -1026,7 +1069,7 @@ func (s *sender) SendAppRequest(parentCtx context.Context, nodeIDs ids.NodeIDSet
 			s.timeouts.RegisterRequestToUnreachableValidator()
 
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
-			inMsg := msgCreator.InternalFailedRequest(message.AppRequestFailed, nodeID, s.ctx.ChainID, requestID)
+			inMsg := msgCreator.InternalFailedRequest(message.AppRequestFailed, nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID)
 			go s.router.HandleInbound(ctx, inMsg)
 		}
 	}
@@ -1067,7 +1110,7 @@ func (s *sender) SendAppRequest(parentCtx context.Context, nodeIDs ids.NodeIDSet
 
 			// Register failures for nodes we didn't send a request to.
 			s.timeouts.RegisterRequestToUnreachableValidator()
-			inMsg := msgCreator.InternalFailedRequest(message.AppRequestFailed, nodeID, s.ctx.ChainID, requestID)
+			inMsg := msgCreator.InternalFailedRequest(message.AppRequestFailed, nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID)
 			go s.router.HandleInbound(ctx, inMsg)
 		}
 	}

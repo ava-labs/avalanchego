@@ -42,7 +42,7 @@ func (v *validator) addWeight(weight uint64) {
 }
 
 func (v *validator) removeWeight(weight uint64) {
-	newTotalWeight, err := safemath.Sub64(v.weight, weight)
+	newTotalWeight, err := safemath.Sub(v.weight, weight)
 	if err != nil {
 		newTotalWeight = 0
 	}

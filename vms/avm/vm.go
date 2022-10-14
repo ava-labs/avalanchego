@@ -1047,6 +1047,18 @@ func (vm *VM) lookupAssetID(asset string) (ids.ID, error) {
 	return ids.ID{}, fmt.Errorf("asset '%s' not found", asset)
 }
 
+func (vm *VM) CrossChainAppRequest(_ context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+	return nil
+}
+
+func (vm *VM) CrossChainAppRequestFailed(_ context.Context, chainID ids.ID, requestID uint32) error {
+	return nil
+}
+
+func (vm *VM) CrossChainAppResponse(_ context.Context, chainID ids.ID, requestID uint32, response []byte) error {
+	return nil
+}
+
 // This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppRequest(_ context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	return nil

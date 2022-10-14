@@ -115,7 +115,7 @@ func (cr *ChainRouter) Initialize(
 	cr.timedRequests = linkedhashmap.New[ids.ID, requestEntry]()
 	cr.peers = make(map[ids.NodeID]*peer)
 	cr.healthConfig = healthConfig
-	cr.requestIDBytes = make([]byte, hashing.AddrLen+hashing.HashLen+wrappers.IntLen+wrappers.ByteLen) // Validator ID, Chain ID, Request ID, Msg Type
+	cr.requestIDBytes = make([]byte, hashing.AddrLen+hashing.HashLen+hashing.HashLen+wrappers.IntLen+wrappers.ByteLen) // Validator ID, Source Chain ID, Destination Chain ID, Request ID, Msg Type
 
 	// Mark myself as connected
 	myself := &peer{
@@ -134,10 +134,12 @@ func (cr *ChainRouter) Initialize(
 	return nil
 }
 
-// RegisterRequest marks that we should expect to receive a reply from the given
-// validator regarding the given chain and the reply should have the given
-// requestID.
+// RegisterRequest marks that we should expect to receive a reply for a request
+// issued by [requestingChainID] from the given validator's [respondingChainID]
+// and the reply should have the given requestID.
+//
 // The type of message we expect is [op].
+//
 // Every registered request must be cleared either by receiving a valid reply
 // and passing it to the appropriate chain or by a timeout.
 // This method registers a timeout that calls such methods if we don't get a
@@ -145,7 +147,8 @@ func (cr *ChainRouter) Initialize(
 func (cr *ChainRouter) RegisterRequest(
 	ctx context.Context,
 	nodeID ids.NodeID,
-	chainID ids.ID,
+	requestingChainID ids.ID,
+	respondingChainID ids.ID,
 	requestID uint32,
 	op message.Op,
 ) {
@@ -153,7 +156,11 @@ func (cr *ChainRouter) RegisterRequest(
 	// When we receive a response message type (Chits, Put, Accepted, etc.)
 	// we validate that we actually sent the corresponding request.
 	// Give this request a unique ID so we can do that validation.
-	uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, op)
+	//
+	// For cross-chain messages, the responding chain is the source of the
+	// response which is sent to the requester which is the destination,
+	// which is why we flip the two in request id generation.
+	uniqueRequestID := cr.createRequestID(nodeID, respondingChainID, requestingChainID, requestID, op)
 	// Add to the set of unfulfilled requests
 	cr.timedRequests.Put(uniqueRequestID, requestEntry{
 		time: cr.clock.Time(),
@@ -172,8 +179,8 @@ func (cr *ChainRouter) RegisterRequest(
 	}
 
 	// Register a timeout to fire if we don't get a reply in time.
-	cr.timeoutManager.RegisterRequest(nodeID, chainID, op, uniqueRequestID, func() {
-		msg := cr.msgCreator.InternalFailedRequest(failedOp, nodeID, chainID, requestID)
+	cr.timeoutManager.RegisterRequest(nodeID, respondingChainID, op, uniqueRequestID, func() {
+		msg := cr.msgCreator.InternalFailedRequest(failedOp, nodeID, respondingChainID, requestingChainID, requestID)
 		cr.HandleInbound(ctx, msg)
 	})
 }
@@ -185,7 +192,7 @@ func (cr *ChainRouter) HandleInbound(parentCtx context.Context, msg message.Inbo
 	nodeID := msg.NodeID()
 	op := msg.Op()
 
-	chainIDIntf, err := msg.Get(message.ChainID)
+	destinationChainIDIntf, err := msg.Get(message.ChainID)
 	if err != nil {
 		cr.log.Debug("dropping message with invalid field",
 			zap.Stringer("nodeID", nodeID),
@@ -197,8 +204,8 @@ func (cr *ChainRouter) HandleInbound(parentCtx context.Context, msg message.Inbo
 		msg.OnFinishedHandling()
 		return
 	}
-	chainIDBytes := chainIDIntf.([]byte)
-	chainID, err := ids.ToID(chainIDBytes)
+	destinationChainIDBytes := destinationChainIDIntf.([]byte)
+	destinationChainID, err := ids.ToID(destinationChainIDBytes)
 	if err != nil {
 		cr.log.Debug("dropping message with invalid field",
 			zap.Stringer("nodeID", nodeID),
@@ -210,7 +217,38 @@ func (cr *ChainRouter) HandleInbound(parentCtx context.Context, msg message.Inbo
 		msg.OnFinishedHandling()
 		return
 	}
-	span.SetAttributes(attribute.Stringer("chainID", chainID))
+	span.SetAttributes(attribute.Stringer("destinationChainID", destinationChainID))
+
+	var sourceChainID ids.ID
+	switch op {
+	case message.CrossChainAppRequest, message.CrossChainAppResponse,
+		message.CrossChainAppRequestFailed:
+		sourceChainIDIntf, err := msg.Get(message.SourceChainID)
+		if err != nil {
+			cr.log.Debug("dropping message with invalid field",
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("messageOp", op),
+				zap.Stringer("field", message.SourceChainID),
+				zap.Error(err),
+			)
+			return
+		}
+		sourceChainID, err = ids.ToID(sourceChainIDIntf.([]byte))
+		if err != nil {
+			cr.log.Debug("dropping message with invalid field",
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("messageOp", op),
+				zap.Stringer("field", message.SourceChainID),
+				zap.Error(err),
+			)
+			return
+		}
+	default:
+		// For non cross-chain specific app messages, the source chain
+		// is always the destination chain.
+		sourceChainID = destinationChainID
+	}
+	span.SetAttributes(attribute.Stringer("sourceChainID", sourceChainID))
 
 	// AppGossip is the only message currently not containing a requestID
 	// Here we assign the requestID already in use for gossiped containers
@@ -240,17 +278,18 @@ func (cr *ChainRouter) HandleInbound(parentCtx context.Context, msg message.Inbo
 	defer cr.lock.Unlock()
 
 	// Get the chain, if it exists
-	chain, exists := cr.chains[chainID]
+	chain, exists := cr.chains[destinationChainID]
 	if !exists || !chain.IsValidator(nodeID) {
 		cr.log.Debug("dropping message",
 			zap.Stringer("messageOp", op),
 			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("chainID", chainID),
+			zap.Stringer("chainID", destinationChainID),
 			zap.Error(errUnknownChain),
 		)
 		span.AddEvent("dropping message", oteltrace.WithAttributes(
 			attribute.String("reason", "unknown chain"),
-			attribute.Stringer("chainID", chainID),
+			attribute.Stringer("sourceChainID", sourceChainID),
+			attribute.Stringer("destinationChainID", destinationChainID),
 		))
 		msg.OnFinishedHandling()
 		return
@@ -279,7 +318,7 @@ func (cr *ChainRouter) HandleInbound(parentCtx context.Context, msg message.Inbo
 	if expectedResponse, isFailed := message.FailedToResponseOps[op]; isFailed {
 		// Create the request ID of the request we sent that this message is in
 		// response to.
-		uniqueRequestID, req := cr.clearRequest(expectedResponse, nodeID, chainID, requestID)
+		uniqueRequestID, req := cr.clearRequest(expectedResponse, nodeID, sourceChainID, destinationChainID, requestID)
 		if req == nil {
 			// This was a duplicated response.
 			span.AddEvent("dropping message due to duplicate response")
@@ -307,7 +346,7 @@ func (cr *ChainRouter) HandleInbound(parentCtx context.Context, msg message.Inbo
 		return
 	}
 
-	uniqueRequestID, req := cr.clearRequest(op, nodeID, chainID, requestID)
+	uniqueRequestID, req := cr.clearRequest(op, nodeID, sourceChainID, destinationChainID, requestID)
 	if req == nil {
 		// We didn't request this message.
 		span.AddEvent("dropping message due to unrequested message")
@@ -320,7 +359,7 @@ func (cr *ChainRouter) HandleInbound(parentCtx context.Context, msg message.Inbo
 	span.SetAttributes(attribute.Int64("latency", int64(latency)))
 
 	// Tell the timeout manager we got a response
-	cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, req.op, latency)
+	cr.timeoutManager.RegisterResponse(nodeID, destinationChainID, uniqueRequestID, req.op, latency)
 
 	// Pass the response to the chain
 	chain.Push(ctx, msg)
@@ -553,11 +592,12 @@ func (cr *ChainRouter) removeChain(chainID ids.ID) {
 func (cr *ChainRouter) clearRequest(
 	op message.Op,
 	nodeID ids.NodeID,
-	chainID ids.ID,
+	sourceChainID ids.ID,
+	destinationChainID ids.ID,
 	requestID uint32,
 ) (ids.ID, *requestEntry) {
 	// Create the request ID of the request we sent that this message is (allegedly) in response to.
-	uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, op)
+	uniqueRequestID := cr.createRequestID(nodeID, sourceChainID, destinationChainID, requestID, op)
 	// Mark that an outstanding request has been fulfilled
 	request, exists := cr.timedRequests.Get(uniqueRequestID)
 	if !exists {
@@ -571,10 +611,11 @@ func (cr *ChainRouter) clearRequest(
 
 // Assumes [cr.lock] is held.
 // Assumes [message.Op] is an alias of byte.
-func (cr *ChainRouter) createRequestID(nodeID ids.NodeID, chainID ids.ID, requestID uint32, op message.Op) ids.ID {
+func (cr *ChainRouter) createRequestID(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, op message.Op) ids.ID {
 	copy(cr.requestIDBytes, nodeID[:])
-	copy(cr.requestIDBytes[hashing.AddrLen:], chainID[:])
-	binary.BigEndian.PutUint32(cr.requestIDBytes[hashing.AddrLen+hashing.HashLen:], requestID)
-	cr.requestIDBytes[hashing.AddrLen+hashing.HashLen+wrappers.IntLen] = byte(op)
+	copy(cr.requestIDBytes[hashing.AddrLen:], sourceChainID[:])
+	copy(cr.requestIDBytes[hashing.AddrLen+hashing.HashLen:], destinationChainID[:])
+	binary.BigEndian.PutUint32(cr.requestIDBytes[hashing.AddrLen+hashing.HashLen+hashing.HashLen:], requestID)
+	cr.requestIDBytes[hashing.AddrLen+hashing.HashLen+hashing.HashLen+wrappers.IntLen] = byte(op)
 	return hashing.ComputeHash256Array(cr.requestIDBytes)
 }

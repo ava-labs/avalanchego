@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow"
@@ -50,7 +51,6 @@ func TestShutdown(t *testing.T) {
 	go tm.Dispatch()
 
 	chainRouter := ChainRouter{}
-
 	mc := message.NewInternalBuilder()
 	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
 	require.NoError(t, err)
@@ -231,6 +231,7 @@ func TestShutdownTimesOut(t *testing.T) {
 
 // Ensure that a timeout fires if we don't get a response to a request
 func TestRouterTimeout(t *testing.T) {
+	r := require.New(t)
 	// Create a timeout manager
 	maxTimeout := 25 * time.Millisecond
 	tm, err := timeout.NewManager(
@@ -245,7 +246,7 @@ func TestRouterTimeout(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	)
-	require.NoError(t, err)
+	r.NoError(err)
 	go tm.Dispatch()
 
 	// Create a router
@@ -253,13 +254,14 @@ func TestRouterTimeout(t *testing.T) {
 
 	mc := message.NewInternalBuilder()
 	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Millisecond, ids.Set{}, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry())
-	require.NoError(t, err)
+	r.NoError(err)
 
 	// Create bootstrapper, engine and handler
 	var (
 		calledGetFailed, calledGetAncestorsFailed,
 		calledQueryFailed, calledQueryFailed2,
-		calledGetAcceptedFailed, calledGetAcceptedFrontierFailed bool
+		calledGetAcceptedFailed, calledGetAcceptedFrontierFailed,
+		calledCrossChainAppRequestFailed bool
 
 		wg = sync.WaitGroup{}
 	)
@@ -267,10 +269,10 @@ func TestRouterTimeout(t *testing.T) {
 	ctx := snow.DefaultConsensusContextTest()
 	vdrs := validators.NewSet()
 	err = vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
-	require.NoError(t, err)
+	r.NoError(err)
 
 	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
-	require.NoError(t, err)
+	r.NoError(err)
 	handler, err := handler.New(
 		mc,
 		ctx,
@@ -280,7 +282,7 @@ func TestRouterTimeout(t *testing.T) {
 		time.Second,
 		resourceTracker,
 	)
-	require.NoError(t, err)
+	r.NoError(err)
 
 	bootstrapper := &common.BootstrapperTest{
 		BootstrapableTest: common.BootstrapableTest{
@@ -324,6 +326,11 @@ func TestRouterTimeout(t *testing.T) {
 		calledGetAcceptedFrontierFailed = true
 		return nil
 	}
+	bootstrapper.CrossChainAppRequestFailedF = func(ctx context.Context, chainID ids.ID, requestID uint32) error {
+		defer wg.Done()
+		calledCrossChainAppRequestFailed = true
+		return nil
+	}
 	handler.SetBootstrapper(bootstrapper)
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
 
@@ -340,19 +347,26 @@ func TestRouterTimeout(t *testing.T) {
 		message.Chits,
 		message.Accepted,
 		message.AcceptedFrontier,
+		message.CrossChainAppResponse,
 	}
 
 	wg.Add(len(msgs))
 
 	for i, msg := range msgs {
-		chainRouter.RegisterRequest(context.Background(), ids.GenerateTestNodeID(), ctx.ChainID, uint32(i), msg)
+		chainRouter.RegisterRequest(context.Background(), ids.GenerateTestNodeID(), ctx.ChainID, ctx.ChainID, uint32(i), msg)
 	}
 
 	wg.Wait()
 
 	chainRouter.lock.Lock()
 	defer chainRouter.lock.Unlock()
-	require.True(t, calledGetFailed && calledGetAncestorsFailed && calledQueryFailed2 && calledGetAcceptedFailed && calledGetAcceptedFrontierFailed)
+
+	r.True(calledGetFailed)
+	r.True(calledGetAncestorsFailed)
+	r.True(calledQueryFailed2)
+	r.True(calledGetAcceptedFailed)
+	r.True(calledGetAcceptedFrontierFailed)
+	r.True(calledCrossChainAppRequestFailed)
 }
 
 func TestRouterClearTimeouts(t *testing.T) {
@@ -435,7 +449,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 
 	vID := ids.GenerateTestNodeID()
 	for i, op := range ops {
-		chainRouter.RegisterRequest(context.Background(), vID, ctx.ChainID, uint32(i), op)
+		chainRouter.RegisterRequest(context.Background(), vID, ctx.ChainID, ctx.ChainID, uint32(i), op)
 	}
 
 	// Clear each timeout by simulating responses to the queries
@@ -573,7 +587,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 
 	// register a validator request
 	reqID++
-	chainRouter.RegisterRequest(context.Background(), vID, ctx.ChainID, reqID, message.Get)
+	chainRouter.RegisterRequest(context.Background(), vID, ctx.ChainID, ctx.ChainID, reqID, message.Get)
 	require.Equal(t, 1, chainRouter.timedRequests.Len())
 
 	// remove it from validators
@@ -586,4 +600,93 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	// shouldn't clear out timed request, as the request should be cleared when
 	// the GetFailed message is sent
 	require.Equal(t, 1, chainRouter.timedRequests.Len())
+}
+
+func TestRouterCrossChainMessages(t *testing.T) {
+	tm, err := timeout.NewManager(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     3 * time.Second,
+			MinimumTimeout:     3 * time.Second,
+			MaximumTimeout:     5 * time.Minute,
+			TimeoutCoefficient: 1,
+			TimeoutHalflife:    5 * time.Minute,
+		},
+		benchlist.NewNoBenchlist(),
+		"timeoutManager",
+		prometheus.NewRegistry(),
+	)
+	require.NoError(t, err)
+	go tm.Dispatch()
+
+	// Create chain router
+	nodeID := ids.GenerateTestNodeID()
+	mc := message.NewInternalBuilder()
+	chainRouter := ChainRouter{}
+	require.NoError(t, chainRouter.Initialize(nodeID, logging.NoLog{}, mc, tm, time.Millisecond, ids.Set{}, ids.Set{}, nil, HealthConfig{}, "", prometheus.NewRegistry()))
+
+	// Set up validators
+	vdrs := validators.NewSet()
+	require.NoError(t, vdrs.AddWeight(ids.GenerateTestNodeID(), 1))
+
+	// Create bootstrapper, engine and handler
+	requester := snow.DefaultConsensusContextTest()
+	requester.ChainID = ids.GenerateTestID()
+	requester.Registerer = prometheus.NewRegistry()
+	requester.Metrics = metrics.NewOptionalGatherer()
+	requester.Executing(false)
+
+	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	require.NoError(t, err)
+
+	requesterHandler, err := handler.New(
+		mc,
+		requester,
+		vdrs,
+		nil,
+		nil,
+		time.Second,
+		resourceTracker,
+	)
+	require.NoError(t, err)
+
+	responder := snow.DefaultConsensusContextTest()
+	responder.ChainID = ids.GenerateTestID()
+	responder.Registerer = prometheus.NewRegistry()
+	responder.Metrics = metrics.NewOptionalGatherer()
+	responder.Executing(false)
+
+	responderHandler, err := handler.New(
+		mc,
+		responder,
+		vdrs,
+		nil,
+		nil,
+		time.Second,
+		resourceTracker,
+	)
+	require.NoError(t, err)
+
+	// assumed bootstrapping is done
+	responder.SetState(snow.NormalOp)
+	requester.SetState(snow.NormalOp)
+
+	// router tracks two chains - one will send a message to the other
+	chainRouter.AddChain(requesterHandler)
+	chainRouter.AddChain(responderHandler)
+
+	// Each chain should start off with a connected message
+	require.Equal(t, 1, chainRouter.chains[requester.ChainID].Len())
+	require.Equal(t, 1, chainRouter.chains[responder.ChainID].Len())
+
+	// Requester sends a request to the responder
+	msg := []byte("foobar")
+	chainRouter.HandleInbound(context.Background(), mc.InternalCrossChainAppRequest(requester.NodeID, requester.ChainID, responder.ChainID, uint32(1), time.Minute, msg))
+	require.Equal(t, 2, chainRouter.chains[responder.ChainID].Len())
+
+	// We register the cross-chain response on the requester-side so we don't
+	// drop it.
+	chainRouter.RegisterRequest(context.Background(), nodeID, requester.ChainID, responder.ChainID, uint32(1), message.CrossChainAppResponse)
+	// Responder sends a response back to the requester.
+	chainRouter.HandleInbound(context.Background(), mc.InternalCrossChainAppResponse(nodeID, responder.ChainID, requester.ChainID, uint32(1), msg))
+	require.Equal(t, 2, chainRouter.chains[requester.ChainID].Len())
 }

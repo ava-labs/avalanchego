@@ -24,6 +24,32 @@ func NewClient(client appsenderpb.AppSenderClient) *Client {
 }
 
 // TODO use ctx
+func (c *Client) SendCrossChainAppRequest(_ context.Context, chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
+	_, err := c.client.SendCrossChainAppRequest(
+		context.Background(),
+		&appsenderpb.SendCrossChainAppRequestMsg{
+			ChainId:   chainID[:],
+			RequestId: requestID,
+			Request:   appRequestBytes,
+		},
+	)
+	return err
+}
+
+// TODO use ctx
+func (c *Client) SendCrossChainAppResponse(_ context.Context, chainID ids.ID, requestID uint32, appResponseBytes []byte) error {
+	_, err := c.client.SendCrossChainAppResponse(
+		context.Background(),
+		&appsenderpb.SendCrossChainAppResponseMsg{
+			ChainId:   chainID[:],
+			RequestId: requestID,
+			Response:  appResponseBytes,
+		},
+	)
+	return err
+}
+
+// TODO use ctx
 func (c *Client) SendAppRequest(_ context.Context, nodeIDs ids.NodeIDSet, requestID uint32, request []byte) error {
 	nodeIDsBytes := make([][]byte, nodeIDs.Len())
 	i := 0

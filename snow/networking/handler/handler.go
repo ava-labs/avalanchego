@@ -51,6 +51,7 @@ type Handler interface {
 	SetOnStopped(onStopped func())
 	Start(recoverPanic bool)
 	Push(ctx context.Context, msg message.InboundMessage)
+	Len() int
 	Stop()
 	StopWithError(err error)
 	Stopped() chan struct{}
@@ -233,11 +234,16 @@ func (h *handler) HealthCheck() (interface{}, error) {
 // Push the message onto the handler's queue
 func (h *handler) Push(ctx context.Context, msg message.InboundMessage) {
 	switch msg.Op() {
-	case message.AppRequest, message.AppGossip, message.AppRequestFailed, message.AppResponse:
+	case message.AppRequest, message.AppGossip, message.AppRequestFailed, message.AppResponse,
+		message.CrossChainAppRequest, message.CrossChainAppRequestFailed, message.CrossChainAppResponse:
 		h.asyncMessageQueue.Push(ctx, msg)
 	default:
 		h.syncMessageQueue.Push(ctx, msg)
 	}
+}
+
+func (h *handler) Len() int {
+	return h.syncMessageQueue.Len() + h.asyncMessageQueue.Len()
 }
 
 func (h *handler) RegisterTimeout(d time.Duration) {
@@ -946,6 +952,89 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg message.InboundMessag
 		appBytes := appBytesIntf.([]byte)
 
 		return engine.AppGossip(ctx, nodeID, appBytes)
+
+	case message.CrossChainAppRequest:
+		requestIDIntf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		requestID := requestIDIntf.(uint32)
+		sourceChainIDIntf, err := msg.Get(message.SourceChainID)
+		if err != nil {
+			h.ctx.Log.Debug("dropping message with invalid field",
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("messageOp", op),
+				zap.Uint32("requestID", requestID),
+				zap.Stringer("field", message.SourceChainID),
+				zap.Error(err),
+			)
+			return nil
+		}
+		sourceChainID, err := ids.ToID(sourceChainIDIntf.([]byte))
+		if err != nil {
+			h.ctx.Log.Debug("dropping message with invalid chain id",
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("messageOp", op),
+				zap.Uint32("requestID", requestID),
+				zap.Error(err),
+			)
+			return nil
+		}
+		appBytesIntf, err := msg.Get(message.AppBytes)
+		if err != nil {
+			h.ctx.Log.Debug("dropping message with invalid field",
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("messageOp", op),
+				zap.Stringer("field", message.AppBytes),
+				zap.Error(err),
+			)
+			return nil
+		}
+		appBytes := appBytesIntf.([]byte)
+		return engine.CrossChainAppRequest(ctx, sourceChainID, requestID, msg.ExpirationTime(), appBytes)
+
+	case message.CrossChainAppResponse:
+		requestIDIntf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		requestID := requestIDIntf.(uint32)
+		sourceChainIDIntf, err := msg.Get(message.SourceChainID)
+		if err != nil {
+			return err
+		}
+		sourceChainID, err := ids.ToID(sourceChainIDIntf.([]byte))
+		if err != nil {
+			return err
+		}
+		appBytesIntf, err := msg.Get(message.AppBytes)
+		if err != nil {
+			h.ctx.Log.Debug("dropping message with invalid field",
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("messageOp", op),
+				zap.Stringer("field", message.AppBytes),
+				zap.Error(err),
+			)
+			return engine.CrossChainAppRequestFailed(ctx, sourceChainID, requestID)
+		}
+		appBytes := appBytesIntf.([]byte)
+		return engine.CrossChainAppResponse(ctx, sourceChainID, requestID, appBytes)
+
+	case message.CrossChainAppRequestFailed:
+		requestIDIntf, err := msg.Get(message.RequestID)
+		if err != nil {
+			return err
+		}
+		requestID := requestIDIntf.(uint32)
+		sourceChainIDIntf, err := msg.Get(message.SourceChainID)
+		if err != nil {
+			return err
+		}
+		sourceChainID, err := ids.ToID(sourceChainIDIntf.([]byte))
+		if err != nil {
+			return err
+		}
+		return engine.CrossChainAppRequestFailed(ctx, sourceChainID, requestID)
 
 	default:
 		return fmt.Errorf(

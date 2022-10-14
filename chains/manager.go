@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
@@ -141,6 +142,7 @@ type ChainConfig struct {
 type ManagerConfig struct {
 	StakingEnabled              bool            // True iff the network has staking enabled
 	StakingCert                 tls.Certificate // needed to sign snowman++ blocks
+	StakingBLSKey               *bls.SecretKey
 	Log                         logging.Logger
 	LogFactory                  logging.Factory
 	VMManager                   vms.Manager // Manage mappings from vm ID --> vm
@@ -398,6 +400,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 			ValidatorState:    m.validatorState,
 			StakingCertLeaf:   m.StakingCert.Leaf,
 			StakingLeafSigner: m.StakingCert.PrivateKey.(crypto.Signer),
+			StakingBLSKey:     m.StakingBLSKey,
 		},
 		DecisionAcceptor:  m.DecisionAcceptorGroup,
 		ConsensusAcceptor: m.ConsensusAcceptorGroup,
@@ -407,8 +410,8 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	// before it's first access would cause a panic.
 	ctx.SetState(snow.Initializing)
 
-	if sbConfigs, ok := m.SubnetConfigs[chainParams.SubnetID]; ok {
-		if sbConfigs.ValidatorOnly {
+	if subnetConfig, ok := m.SubnetConfigs[chainParams.SubnetID]; ok {
+		if subnetConfig.ValidatorOnly {
 			ctx.SetValidatorOnly()
 		}
 	}
@@ -447,11 +450,13 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 
 	consensusParams := m.ConsensusParams
-	if sbConfigs, ok := m.SubnetConfigs[chainParams.SubnetID]; ok && chainParams.SubnetID != constants.PrimaryNetworkID {
-		consensusParams = sbConfigs.ConsensusParameters
+	// short circuit it before reading from subnetConfigs
+	if chainParams.SubnetID != constants.PrimaryNetworkID {
+		if subnetConfig, ok := m.SubnetConfigs[chainParams.SubnetID]; ok {
+			consensusParams = subnetConfig.ConsensusParameters
+		}
 	}
 
-	// The validators of this blockchain
 	var vdrs validators.Set // Validators validating this blockchain
 	var ok bool
 	if m.StakingEnabled {
@@ -566,8 +571,11 @@ func (m *manager) createAvalancheChain(
 	msgChan := make(chan common.Message, defaultChannelSize)
 
 	gossipConfig := m.GossipConfig
-	if sbConfigs, ok := m.SubnetConfigs[ctx.SubnetID]; ok && ctx.SubnetID != constants.PrimaryNetworkID {
-		gossipConfig = sbConfigs.GossipConfig
+	// short circuit it before reading from subnetConfigs
+	if ctx.SubnetID != constants.PrimaryNetworkID {
+		if subnetConfig, ok := m.SubnetConfigs[ctx.SubnetID]; ok {
+			gossipConfig = subnetConfig.GossipConfig
+		}
 	}
 
 	// Passes messages from the consensus engine to the network
@@ -754,8 +762,11 @@ func (m *manager) createSnowmanChain(
 	msgChan := make(chan common.Message, defaultChannelSize)
 
 	gossipConfig := m.GossipConfig
-	if sbConfigs, ok := m.SubnetConfigs[ctx.SubnetID]; ok && ctx.SubnetID != constants.PrimaryNetworkID {
-		gossipConfig = sbConfigs.GossipConfig
+	// short circuit it before reading from subnetConfigs
+	if ctx.SubnetID != constants.PrimaryNetworkID {
+		if subnetConfig, ok := m.SubnetConfigs[ctx.SubnetID]; ok {
+			gossipConfig = subnetConfig.GossipConfig
+		}
 	}
 
 	// Passes messages from the consensus engine to the network
