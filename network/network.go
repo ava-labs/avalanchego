@@ -1199,7 +1199,7 @@ func (n *network) runTimers() {
 				msg, err := n.peerConfig.MessageCreator.PeerList(validatorIPs, false)
 				if err != nil {
 					n.peerConfig.Log.Error(
-						"failed to gossip",
+						"failed to create PeerList",
 						zap.Int("peerListLen", len(validatorIPs)),
 						zap.Error(err),
 					)
