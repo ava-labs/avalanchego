@@ -4,6 +4,9 @@
 package rawdb
 
 import (
+	"encoding/binary"
+
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -152,4 +155,25 @@ func packSyncStorageTrieKey(root common.Hash, account common.Hash) []byte {
 	bytes = append(bytes, root[:]...)
 	bytes = append(bytes, account[:]...)
 	return bytes
+}
+
+// WriteSyncPerformed logs an entry in [db] indicating the VM state synced to [blockNumber].
+func WriteSyncPerformed(db ethdb.KeyValueWriter, blockNumber uint64) error {
+	syncPerformedPrefixLen := len(syncPerformedPrefix)
+	bytes := make([]byte, syncPerformedPrefixLen+wrappers.LongLen)
+	copy(bytes[:syncPerformedPrefixLen], syncPerformedPrefix)
+	binary.BigEndian.PutUint64(bytes[syncPerformedPrefixLen:], blockNumber)
+	return db.Put(bytes, []byte{0x01})
+}
+
+// NewSyncPerformedIterator returns an iterator over all block numbers the VM
+// has state synced to.
+func NewSyncPerformedIterator(db ethdb.Iteratee) ethdb.Iterator {
+	return NewKeyLengthIterator(db.NewIterator(syncPerformedPrefix, nil), syncPerformedKeyLength)
+}
+
+// UnpackSyncPerformedKey returns the block number from keys the iterator returned
+// from NewSyncPerformedIterator.
+func UnpackSyncPerformedKey(key []byte) uint64 {
+	return binary.BigEndian.Uint64(key[len(syncPerformedPrefix):])
 }

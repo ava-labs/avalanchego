@@ -1766,11 +1766,11 @@ func (bc *BlockChain) gatherBlockRootsAboveLastAccepted() map[common.Hash]struct
 	return blockRoots
 }
 
-// ResetState reinitializes the state of the blockchain
+// ResetToStateSyncedBlock reinitializes the state of the blockchain
 // to the trie represented by [block.Root()] after updating
-// in-memory current block pointers to [block].
-// Only used in state sync.
-func (bc *BlockChain) ResetState(block *types.Block) error {
+// in-memory and on disk current block pointers to [block].
+// Only should be called after state sync has completed.
+func (bc *BlockChain) ResetToStateSyncedBlock(block *types.Block) error {
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
 
@@ -1781,6 +1781,10 @@ func (bc *BlockChain) ResetState(block *types.Block) error {
 	rawdb.WriteHeadHeaderHash(batch, block.Hash())
 	rawdb.WriteSnapshotBlockHash(batch, block.Hash())
 	rawdb.WriteSnapshotRoot(batch, block.Root())
+	if err := rawdb.WriteSyncPerformed(batch, block.NumberU64()); err != nil {
+		return err
+	}
+
 	if err := batch.Write(); err != nil {
 		return err
 	}

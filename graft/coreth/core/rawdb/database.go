@@ -131,9 +131,10 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		cliqueSnaps     stat
 
 		// State sync statistics
-		codeToFetch  stat
-		syncProgress stat
-		syncSegments stat
+		codeToFetch   stat
+		syncProgress  stat
+		syncSegments  stat
+		syncPerformed stat
 
 		// Les statistic
 		chtTrieNodes   stat
@@ -198,6 +199,8 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 			syncSegments.Add(size)
 		case bytes.HasPrefix(key, CodeToFetchPrefix) && len(key) == codeToFetchKeyLength:
 			codeToFetch.Add(size)
+		case bytes.HasPrefix(key, syncPerformedPrefix) && len(key) == syncPerformedKeyLength:
+			syncPerformed.Add(size)
 		default:
 			var accounted bool
 			for _, meta := range [][]byte{
@@ -242,6 +245,7 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		{"State sync", "Trie segments", syncSegments.Size(), syncSegments.Count()},
 		{"State sync", "Storage tries to fetch", syncProgress.Size(), syncProgress.Count()},
 		{"State sync", "Code to fetch", codeToFetch.Size(), codeToFetch.Count()},
+		{"State sync", "Block numbers synced to", syncPerformed.Size(), syncPerformed.Count()},
 	}
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"Database", "Category", "Size", "Items"})
