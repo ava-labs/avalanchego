@@ -777,7 +777,7 @@ func (vm *VM) optimalPChainHeight(minPChainHeight uint64) (uint64, error) {
 		return 0, err
 	}
 
-	return math.Max64(minimumHeight, minPChainHeight), nil
+	return math.Max(minimumHeight, minPChainHeight), nil
 }
 
 // parseInnerBlock attempts to parse the provided bytes as an inner block. If
@@ -799,7 +799,7 @@ func (vm *VM) parseInnerBlock(outerBlkID ids.ID, innerBlkBytes []byte) (snowman.
 // Caches proposervm block ID --> inner block if the inner block's height
 // is within [innerBlkCacheSize] of the last accepted block's height.
 func (vm *VM) cacheInnerBlock(outerBlkID ids.ID, innerBlk snowman.Block) {
-	diff := math.Diff64(innerBlk.Height(), vm.lastAcceptedHeight)
+	diff := math.AbsDiff(innerBlk.Height(), vm.lastAcceptedHeight)
 	if diff < innerBlkCacheSize {
 		vm.innerBlkCache.Put(outerBlkID, innerBlk)
 	}
