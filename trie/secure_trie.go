@@ -241,13 +241,13 @@ func (t *StateTrie) Commit(collectLeaf bool) (common.Hash, *NodeSet, error) {
 	return t.trie.Commit(collectLeaf)
 }
 
-// Hash returns the root hash of SecureTrie. It does not write to the
+// Hash returns the root hash of StateTrie. It does not write to the
 // database and can be used even if the trie doesn't have one.
 func (t *StateTrie) Hash() common.Hash {
 	return t.trie.Hash()
 }
 
-// Copy returns a copy of SecureTrie.
+// Copy returns a copy of StateTrie.
 func (t *StateTrie) Copy() *StateTrie {
 	return &StateTrie{
 		trie:        *t.trie.Copy(),
