@@ -31,6 +31,7 @@ import (
 	"bytes"
 	"encoding/binary"
 
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/coreth/metrics"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -95,6 +96,10 @@ var (
 	syncStorageTriesKeyLength = len(syncStorageTriesPrefix) + 2*common.HashLength
 	syncSegmentsKeyLength     = len(syncSegmentsPrefix) + 2*common.HashLength
 	codeToFetchKeyLength      = len(CodeToFetchPrefix) + common.HashLength
+
+	// State sync metadata
+	syncPerformedPrefix    = []byte("sync_performed")
+	syncPerformedKeyLength = len(syncPerformedPrefix) + wrappers.LongLen // prefix + block number as uint64
 
 	preimagePrefix = []byte("secure-key-")      // preimagePrefix + hash -> preimage
 	configPrefix   = []byte("ethereum-config-") // config prefix for the db

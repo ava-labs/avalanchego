@@ -353,7 +353,7 @@ func (client *stateSyncerClient) finishSync() error {
 	parentHash := block.ParentHash()
 	client.chain.BloomIndexer().AddCheckpoint(parentHeight/params.BloomBitsBlocks, parentHash)
 
-	if err := client.chain.BlockChain().ResetState(block); err != nil {
+	if err := client.chain.BlockChain().ResetToStateSyncedBlock(block); err != nil {
 		return err
 	}
 
