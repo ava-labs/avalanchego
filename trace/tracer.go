@@ -34,6 +34,8 @@ const (
 )
 
 var (
+	_ otel.ErrorHandler = &otelErrHandler{}
+
 	errUnknownExporterType = errors.New("unknown exporter type")
 
 	// [tracerProvider] shares the same lifetime as a [node.Node].
@@ -105,7 +107,7 @@ func newExporter(config ExporterConfig) (sdktrace.SpanExporter, error) {
 }
 
 type TraceConfig struct {
-	ExporterConfig
+	ExporterConfig `json:"exporterConfig"`
 
 	// If false, use a no-op tracer. All other fields are ignored.
 	Enabled bool `json:"enabled"`
