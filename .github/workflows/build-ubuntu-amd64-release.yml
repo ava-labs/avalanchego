@@ -6,8 +6,8 @@ on:
       - "*"
 
 jobs:
-  build-bionic-amd64-package:
-    runs-on: ubuntu-latest
+  build-jammy-amd64-package:
+    runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v3
@@ -23,7 +23,7 @@ jobs:
       - name: Install aws cli
         run: |
           sudo apt update
-          sudo apt-get -y install awscli
+          sudo apt -y install awscli
 
       - name: Get the version
         id: get_version
@@ -43,7 +43,7 @@ jobs:
           TAG: ${{ steps.get_version.outputs.VERSION }}
           BUCKET: ${{ secrets.BUCKET }}
           ARCH: "amd64"
-          RELEASE: "bionic"
+          RELEASE: "jammy"
 
   build-focal-amd64-package:
     runs-on: ubuntu-20.04
@@ -62,7 +62,7 @@ jobs:
       - name: Install aws cli
         run: |
           sudo apt update
-          sudo apt-get -y install awscli
+          sudo apt -y install awscli
 
       - name: Get the version
         id: get_version
