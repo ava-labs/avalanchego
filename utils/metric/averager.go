@@ -31,7 +31,7 @@ func NewAveragerWithErrs(namespace, name, desc string, reg prometheus.Registerer
 		count: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      fmt.Sprintf("%s_count", name),
-			Help:      fmt.Sprintf("# of observations of %s", desc),
+			Help:      fmt.Sprintf("Total # of observations of %s", desc),
 		}),
 		sum: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,

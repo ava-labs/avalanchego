@@ -300,7 +300,7 @@ func (v *ValidatorWeightDiff) Add(negative bool, amount uint64) error {
 	if v.Amount > amount {
 		v.Amount -= amount
 	} else {
-		v.Amount = math.Diff64(v.Amount, amount)
+		v.Amount = math.AbsDiff(v.Amount, amount)
 		v.Decrease = negative
 	}
 	return nil
