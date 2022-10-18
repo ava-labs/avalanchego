@@ -399,7 +399,6 @@ func (p *peer) readMessages() {
 			span.End()
 			return
 		}
-		span.End()
 
 		// Track the time it takes from now until the time the message is
 		// handled (in the event this message is handled at the network level)
