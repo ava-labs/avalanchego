@@ -72,7 +72,7 @@ func (t *outboundMsgThrottler) Acquire(msg message.OutboundMessage, nodeID ids.N
 
 	// Take as many bytes as we can from the at-large allocation.
 	bytesNeeded := uint64(len(msg.Bytes()))
-	atLargeBytesUsed := math.Min64(
+	atLargeBytesUsed := math.Min(
 		// only give as many bytes as needed
 		bytesNeeded,
 		// don't exceed per-node limit
@@ -99,7 +99,7 @@ func (t *outboundMsgThrottler) Acquire(msg message.OutboundMessage, nodeID ids.N
 	} else {
 		vdrBytesAllowed -= vdrBytesAlreadyUsed
 	}
-	vdrBytesUsed := math.Min64(t.remainingVdrBytes, bytesNeeded, vdrBytesAllowed)
+	vdrBytesUsed := math.Min(t.remainingVdrBytes, bytesNeeded, vdrBytesAllowed)
 	bytesNeeded -= vdrBytesUsed
 	if bytesNeeded != 0 {
 		// Can't acquire enough bytes to queue this message to be sent
@@ -142,7 +142,7 @@ func (t *outboundMsgThrottler) Release(msg message.OutboundMessage, nodeID ids.N
 	// that will be given back to [nodeID]'s validator allocation.
 	vdrBytesUsed := t.nodeToVdrBytesUsed[nodeID]
 	msgSize := uint64(len(msg.Bytes()))
-	vdrBytesToReturn := math.Min64(msgSize, vdrBytesUsed)
+	vdrBytesToReturn := math.Min(msgSize, vdrBytesUsed)
 	t.nodeToVdrBytesUsed[nodeID] -= vdrBytesToReturn
 	if t.nodeToVdrBytesUsed[nodeID] == 0 {
 		delete(t.nodeToVdrBytesUsed, nodeID)

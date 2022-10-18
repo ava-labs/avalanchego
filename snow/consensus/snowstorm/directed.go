@@ -215,10 +215,12 @@ func (dg *Directed) shouldVote(tx Tx) (bool, error) {
 
 	// Notify those listening for accepted txs if the transaction has a binary
 	// format.
-	if bytes := tx.Bytes(); len(bytes) > 0 {
+	txBytes := tx.Bytes()
+	txBytesLen := len(txBytes)
+	if txBytesLen > 0 {
 		// Note that DecisionAcceptor.Accept must be called before tx.Accept to
 		// honor Acceptor.Accept's invariant.
-		if err := dg.ctx.DecisionAcceptor.Accept(dg.ctx, txID, bytes); err != nil {
+		if err := dg.ctx.DecisionAcceptor.Accept(dg.ctx, txID, txBytes); err != nil {
 			return false, err
 		}
 	}
@@ -228,7 +230,7 @@ func (dg *Directed) shouldVote(tx Tx) (bool, error) {
 	}
 
 	// Notify the metrics that this transaction was accepted.
-	dg.Latency.Accepted(txID, dg.pollNumber)
+	dg.Latency.Accepted(txID, dg.pollNumber, txBytesLen)
 	return false, nil
 }
 
@@ -656,10 +658,12 @@ func (dg *Directed) acceptTx(tx Tx) error {
 
 	// Notify those listening that this tx has been accepted if the transaction
 	// has a binary format.
-	if bytes := tx.Bytes(); len(bytes) > 0 {
+	txBytes := tx.Bytes()
+	txBytesLen := len(txBytes)
+	if txBytesLen > 0 {
 		// Note that DecisionAcceptor.Accept must be called before tx.Accept to
 		// honor Acceptor.Accept's invariant.
-		if err := dg.ctx.DecisionAcceptor.Accept(dg.ctx, txID, bytes); err != nil {
+		if err := dg.ctx.DecisionAcceptor.Accept(dg.ctx, txID, txBytes); err != nil {
 			return err
 		}
 	}
@@ -673,10 +677,10 @@ func (dg *Directed) acceptTx(tx Tx) error {
 		dg.ctx.Log.Info("whitelist tx accepted",
 			zap.Stringer("txID", txID),
 		)
-		dg.whitelistTxLatency.Accepted(txID, dg.pollNumber)
+		dg.whitelistTxLatency.Accepted(txID, dg.pollNumber, txBytesLen)
 	} else {
 		// just regular tx
-		dg.Latency.Accepted(txID, dg.pollNumber)
+		dg.Latency.Accepted(txID, dg.pollNumber, txBytesLen)
 	}
 
 	// If there is a tx that was accepted pending on this tx, the ancestor
@@ -708,9 +712,9 @@ func (dg *Directed) rejectTx(tx Tx) error {
 		dg.ctx.Log.Info("whitelist tx rejected",
 			zap.Stringer("txID", txID),
 		)
-		dg.whitelistTxLatency.Rejected(txID, dg.pollNumber)
+		dg.whitelistTxLatency.Rejected(txID, dg.pollNumber, len(tx.Bytes()))
 	} else {
-		dg.Latency.Rejected(txID, dg.pollNumber)
+		dg.Latency.Rejected(txID, dg.pollNumber, len(tx.Bytes()))
 	}
 
 	// If there is a tx that was accepted pending on this tx, the ancestor tx

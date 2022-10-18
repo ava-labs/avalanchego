@@ -507,7 +507,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	if err != nil {
 		return err
 	}
-	newSupply, err := math.Sub64(currentSupply, stakerToRemove.PotentialReward)
+	newSupply, err := math.Sub(currentSupply, stakerToRemove.PotentialReward)
 	if err != nil {
 		return err
 	}
@@ -687,14 +687,14 @@ func GetMaxWeight(
 		if !delegator.NextTime.Before(startTime) {
 			// We have advanced time to be at the inside of the delegation
 			// window. Make sure that the max weight is updated accordingly.
-			currentMax = math.Max64(currentMax, currentWeight)
+			currentMax = math.Max(currentMax, currentWeight)
 		}
 
 		var op func(uint64, uint64) (uint64, error)
 		if isAdded {
 			op = math.Add64
 		} else {
-			op = math.Sub64
+			op = math.Sub[uint64]
 		}
 		currentWeight, err = op(currentWeight, delegator.Weight)
 		if err != nil {
@@ -704,5 +704,5 @@ func GetMaxWeight(
 	// Because we assume [startTime] < [endTime], we have advanced time to
 	// be at the end of the delegation window. Make sure that the max weight is
 	// updated accordingly.
-	return math.Max64(currentMax, currentWeight), nil
+	return math.Max(currentMax, currentWeight), nil
 }

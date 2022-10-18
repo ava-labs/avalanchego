@@ -95,6 +95,15 @@ type Config struct {
 
 	// Time of the Banff network upgrade
 	BanffTime time.Time
+
+	// Subnet ID --> Minimum portion of the subnet's stake this node must be
+	// connected to in order to report healthy.
+	// [constants.PrimaryNetworkID] is always a key in this map.
+	// If a subnet is in this map, but it isn't whitelisted, its corresponding
+	// value isn't used.
+	// If a subnet is whitelisted but not in this map, we use the value for the
+	// Primary Network.
+	MinPercentConnectedStakeHealthy map[ids.ID]float64
 }
 
 func (c *Config) IsApricotPhase3Activated(timestamp time.Time) bool {

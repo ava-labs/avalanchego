@@ -4,7 +4,10 @@
 package message
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -14,10 +17,25 @@ type InternalMsgBuilder interface {
 	InternalFailedRequest(
 		op Op,
 		nodeID ids.NodeID,
-		chainID ids.ID,
+		sourceChainID ids.ID,
+		destinationChainID ids.ID,
 		requestID uint32,
 	) InboundMessage
-
+	InternalCrossChainAppRequest(
+		nodeID ids.NodeID,
+		sourceChainID ids.ID,
+		destinationChainID ids.ID,
+		requestID uint32,
+		deadline time.Duration,
+		msg []byte,
+	) InboundMessage
+	InternalCrossChainAppResponse(
+		nodeID ids.NodeID,
+		sourceChainID ids.ID,
+		destinationChainID ids.ID,
+		requestID uint32,
+		msg []byte,
+	) InboundMessage
 	InternalTimeout(nodeID ids.NodeID) InboundMessage
 	InternalConnected(nodeID ids.NodeID, nodeVersion *version.Application) InboundMessage
 	InternalDisconnected(nodeID ids.NodeID) InboundMessage
@@ -25,7 +43,9 @@ type InternalMsgBuilder interface {
 	InternalGossipRequest(nodeID ids.NodeID) InboundMessage
 }
 
-type internalMsgBuilder struct{}
+type internalMsgBuilder struct {
+	clock mockable.Clock
+}
 
 func NewInternalBuilder() InternalMsgBuilder {
 	return internalMsgBuilder{}
@@ -34,7 +54,8 @@ func NewInternalBuilder() InternalMsgBuilder {
 func (internalMsgBuilder) InternalFailedRequest(
 	op Op,
 	nodeID ids.NodeID,
-	chainID ids.ID,
+	sourceChainID ids.ID,
+	destinationChainID ids.ID,
 	requestID uint32,
 ) InboundMessage {
 	return &inboundMessageWithPacker{
@@ -43,8 +64,55 @@ func (internalMsgBuilder) InternalFailedRequest(
 			nodeID: nodeID,
 		},
 		fields: map[Field]interface{}{
-			ChainID:   chainID[:],
-			RequestID: requestID,
+			SourceChainID: sourceChainID[:],
+			ChainID:       destinationChainID[:],
+			RequestID:     requestID,
+		},
+	}
+}
+
+func (i internalMsgBuilder) InternalCrossChainAppRequest(
+	nodeID ids.NodeID,
+	sourceChainID ids.ID,
+	destinationChainID ids.ID,
+	requestID uint32,
+	deadline time.Duration,
+	msg []byte,
+) InboundMessage {
+	received := i.clock.Time()
+
+	return &inboundMessageWithPacker{
+		inboundMessage: inboundMessage{
+			op:             CrossChainAppRequest,
+			nodeID:         nodeID,
+			expirationTime: received.Add(deadline),
+		},
+		fields: map[Field]interface{}{
+			SourceChainID: sourceChainID[:],
+			ChainID:       destinationChainID[:],
+			RequestID:     requestID,
+			AppBytes:      msg,
+		},
+	}
+}
+
+func (internalMsgBuilder) InternalCrossChainAppResponse(
+	nodeID ids.NodeID,
+	sourceChainID ids.ID,
+	destinationChainID ids.ID,
+	requestID uint32,
+	msg []byte,
+) InboundMessage {
+	return &inboundMessageWithPacker{
+		inboundMessage: inboundMessage{
+			op:     CrossChainAppResponse,
+			nodeID: nodeID,
+		},
+		fields: map[Field]interface{}{
+			SourceChainID: sourceChainID[:],
+			ChainID:       destinationChainID[:],
+			RequestID:     requestID,
+			AppBytes:      msg,
 		},
 	}
 }

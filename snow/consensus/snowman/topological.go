@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -36,6 +37,7 @@ type Topological struct {
 	metrics.Latency
 	metrics.Polls
 	metrics.Height
+	metrics.Timestamp
 
 	// pollNumber is the number of times RecordPolls has been called
 	pollNumber uint64
@@ -92,7 +94,7 @@ type votes struct {
 	votes ids.Bag
 }
 
-func (ts *Topological) Initialize(ctx *snow.ConsensusContext, params snowball.Parameters, rootID ids.ID, rootHeight uint64) error {
+func (ts *Topological) Initialize(ctx *snow.ConsensusContext, params snowball.Parameters, rootID ids.ID, rootHeight uint64, rootTime time.Time) error {
 	if err := params.Verify(); err != nil {
 		return err
 	}
@@ -115,6 +117,12 @@ func (ts *Topological) Initialize(ctx *snow.ConsensusContext, params snowball.Pa
 	}
 	ts.Height = heightMetrics
 
+	timestampMetrics, err := metrics.NewTimestamp("", ctx.Registerer)
+	if err != nil {
+		return err
+	}
+	ts.Timestamp = timestampMetrics
+
 	ts.leaves = ids.Set{}
 	ts.kahnNodes = make(map[ids.ID]kahnNode)
 	ts.ctx = ctx
@@ -126,8 +134,10 @@ func (ts *Topological) Initialize(ctx *snow.ConsensusContext, params snowball.Pa
 	}
 	ts.tail = rootID
 
-	// Initially set the height to the last accepted block.
+	// Initially set the metrics for the last accepted block.
 	ts.Height.Accepted(ts.height)
+	ts.Timestamp.Accepted(rootTime)
+
 	return nil
 }
 
@@ -158,7 +168,7 @@ func (ts *Topological) Add(blk Block) error {
 		if err := blk.Reject(); err != nil {
 			return err
 		}
-		ts.Latency.Rejected(blkID, ts.pollNumber)
+		ts.Latency.Rejected(blkID, ts.pollNumber, len(blk.Bytes()))
 		return nil
 	}
 
@@ -591,8 +601,9 @@ func (ts *Topological) acceptPreferredChild(n *snowmanBlock) error {
 	// now implies its preferredness.
 	ts.preferredIDs.Remove(pref)
 
-	ts.Latency.Accepted(pref, ts.pollNumber)
+	ts.Latency.Accepted(pref, ts.pollNumber, len(bytes))
 	ts.Height.Accepted(ts.height)
+	ts.Timestamp.Accepted(child.Timestamp())
 
 	// Because ts.blocks contains the last accepted block, we don't delete the
 	// block from the blocks map here.
@@ -612,7 +623,7 @@ func (ts *Topological) acceptPreferredChild(n *snowmanBlock) error {
 		if err := child.Reject(); err != nil {
 			return err
 		}
-		ts.Latency.Rejected(childID, ts.pollNumber)
+		ts.Latency.Rejected(childID, ts.pollNumber, len(child.Bytes()))
 
 		// Track which blocks have been directly rejected
 		rejects = append(rejects, childID)
@@ -640,7 +651,7 @@ func (ts *Topological) rejectTransitively(rejected []ids.ID) error {
 			if err := child.Reject(); err != nil {
 				return err
 			}
-			ts.Latency.Rejected(childID, ts.pollNumber)
+			ts.Latency.Rejected(childID, ts.pollNumber, len(child.Bytes()))
 
 			// add the newly rejected block to the end of the stack
 			rejected = append(rejected, childID)
