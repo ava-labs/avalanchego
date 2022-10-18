@@ -373,7 +373,7 @@ func verifyAddDelegatorTx(
 	}
 
 	if backend.Config.IsApricotPhase3Activated(currentTimestamp) {
-		maximumWeight = math.Min64(maximumWeight, backend.Config.MaxValidatorStake)
+		maximumWeight = math.Min(maximumWeight, backend.Config.MaxValidatorStake)
 	}
 
 	txID := sTx.ID()
@@ -665,7 +665,7 @@ func verifyAddPermissionlessDelegatorTx(
 	if err != nil {
 		maximumWeight = stdmath.MaxUint64
 	}
-	maximumWeight = math.Min64(maximumWeight, delegatorRules.maxValidatorStake)
+	maximumWeight = math.Min(maximumWeight, delegatorRules.maxValidatorStake)
 
 	txID := sTx.ID()
 	newStaker := state.NewPendingStaker(txID, tx)

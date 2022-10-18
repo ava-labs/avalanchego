@@ -98,7 +98,7 @@ func (s *Serializer) buildVtx(
 		if err != nil {
 			return nil, err
 		}
-		height = math.Max64(height, childHeight)
+		height = math.Max(height, childHeight)
 	}
 
 	var (

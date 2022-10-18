@@ -4,6 +4,8 @@
 package snowman
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
@@ -18,6 +20,7 @@ type Consensus interface {
 		params snowball.Parameters,
 		lastAcceptedID ids.ID,
 		lastAcceptedHeight uint64,
+		lastAcceptedTime time.Time,
 	) error
 
 	// Returns the parameters that describe this snowman instance

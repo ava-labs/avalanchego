@@ -376,7 +376,7 @@ func (b *beaconManager) Disconnected(vdrID ids.NodeID) {
 		// weight can become disconnected. Because it is possible that there are
 		// changes to the validators set, we utilize that Sub64 returns 0 on
 		// error.
-		b.totalWeight, _ = math.Sub64(b.totalWeight, weight)
+		b.totalWeight, _ = math.Sub(b.totalWeight, weight)
 	}
 	b.Router.Disconnected(vdrID)
 }
