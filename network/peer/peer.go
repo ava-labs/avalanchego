@@ -395,7 +395,7 @@ func (p *peer) readMessages() {
 				zap.Error(err),
 			)
 			onFinishedHandling()
-			span.RecordError(err)
+			span.AddEvent(fmt.Sprintf("error reading message: %s", err))
 			span.End()
 			return
 		}
@@ -431,7 +431,7 @@ func (p *peer) readMessages() {
 
 			// Couldn't parse the message. Read the next one.
 			onFinishedHandling()
-			span.RecordError(fmt.Errorf("failed to parse message: %s", err))
+			span.AddEvent(fmt.Sprintf("failed to parse message: %s", err))
 			span.End()
 			p.ResourceTracker.StopProcessing(p.id, p.Clock.Time())
 			continue
