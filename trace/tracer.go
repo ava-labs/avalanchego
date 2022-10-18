@@ -37,6 +37,7 @@ var (
 	_ otel.ErrorHandler = &otelErrHandler{}
 
 	errUnknownExporterType = errors.New("unknown exporter type")
+	errInvalidTimeouts     = errors.New("tracerProviderShutdownTimeout must be >= tracerExportTimeout")
 
 	// [tracerProvider] shares the same lifetime as a [node.Node].
 	// [InitTracer] is called when the node executes Dispatch()
@@ -134,6 +135,11 @@ func InitTracer(log logging.Logger, config TraceConfig) error {
 	if !config.Enabled {
 		// [tracerProvider] is a no-op tracer provider by default.
 		return nil
+	}
+
+	if tracerProviderShutdownTimeout < tracerExportTimeout {
+		// Sanity check to make sure consts are valid.
+		return errInvalidTimeouts
 	}
 
 	// Handle opentelemetry errors by logging them
