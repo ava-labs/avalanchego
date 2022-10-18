@@ -31,7 +31,8 @@ jobs:
 
       - name: Get the version
         id: get_version
-        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+        run: |
+          echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
         shell: bash
 
       - name: Install aws cli
@@ -42,7 +43,7 @@ jobs:
       - name: Create zip file
         run: 7z a avalanchego-macos-${VERSION}.zip build/avalanchego build/plugins
         env:
-          VERSION: ${{ steps.get_version.outputs.VERSION }}
+          VERSION: ${{ env.VERSION }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -55,4 +56,4 @@ jobs:
         run: aws s3 cp avalanchego-macos-${VERSION}.zip s3://${BUCKET}/macos/
         env:
           BUCKET: ${{ secrets.BUCKET }}
-          VERSION: ${{ steps.get_version.outputs.VERSION }}
+          VERSION: ${{ env.VERSION }}
