@@ -310,6 +310,9 @@ func (b *bootstrapper) HealthCheck() (interface{}, error) {
 func (b *bootstrapper) GetVM() common.VM { return b.VM }
 
 func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
+	ctx, span := trace.Tracer().Start(context.Background(), "bootstrapper.ForceAccepted")
+	defer span.End()
+
 	pendingContainerIDs := b.Blocked.MissingIDs()
 
 	// Initialize the fetch from set to the currently preferred peers
@@ -343,7 +346,7 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 
 	// Process received blocks
 	for _, blk := range toProcess {
-		if err := b.process(context.TODO(), blk, nil); err != nil {
+		if err := b.process(ctx, blk, nil); err != nil {
 			return err
 		}
 	}
