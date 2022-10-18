@@ -1,0 +1,23 @@
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners#codeowners-syntax
+
+* @StephenButtolph
+/app/ @danlaine
+/codec/ @danlaine
+/database/corruptabledb/ @ceyonur
+/ids/ @danlaine @joshua-kim
+/indexer/ @danlaine
+/message/ @gyuho
+/network/ @danlaine @joshua-kim @StephenButtolph
+/network/throttling/ @danlaine @dboehm-avalabs @StephenButtolph
+/proto/ @gyuho @hexfusion
+/snow/ @danlaine @StephenButtolph
+/snow/consensus/ @gyuho @StephenButtolph
+/snow/engine/snowman/syncer/ @abi87
+/snow/uptime/ @ceyonur
+/utils/logging/ @ceyonur
+/vms/avm/ @coffeeavax @StephenButtolph
+/vms/platformvm/ @abi87 @danlaine @StephenButtolph
+/vms/proposervm/ @abi87 @StephenButtolph
+/vms/rpcchainvm/ @hexfusion @StephenButtolph
+/vms/registry/ @joshua-kim
+/tests/ @abi87 @gyuho
