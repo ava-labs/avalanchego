@@ -4,7 +4,6 @@
 package router
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"strings"
@@ -21,11 +20,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -75,10 +72,7 @@ type ChainRouter struct {
 	// Parameters for doing health checks
 	healthConfig HealthConfig
 	// aggregator of requests based on their time
-	timedRequests linkedhashmap.LinkedHashmap[ids.ID, requestEntry]
-	// Must only be accessed in method [createRequestID].
-	// [lock] must be held when [requestIDBytes] is accessed.
-	requestIDBytes []byte
+	timedRequests linkedhashmap.LinkedHashmap[ids.RequestID, requestEntry]
 }
 
 // Initialize the router.
@@ -107,10 +101,9 @@ func (cr *ChainRouter) Initialize(
 	cr.benched = make(map[ids.NodeID]ids.Set)
 	cr.criticalChains = criticalChains
 	cr.onFatal = onFatal
-	cr.timedRequests = linkedhashmap.New[ids.ID, requestEntry]()
+	cr.timedRequests = linkedhashmap.New[ids.RequestID, requestEntry]()
 	cr.peers = make(map[ids.NodeID]*peer)
 	cr.healthConfig = healthConfig
-	cr.requestIDBytes = make([]byte, hashing.AddrLen+hashing.HashLen+hashing.HashLen+wrappers.IntLen+wrappers.ByteLen) // Validator ID, Source Chain ID, Destination Chain ID, Request ID, Msg Type
 
 	// Mark myself as connected
 	myself := &peer{
@@ -154,7 +147,13 @@ func (cr *ChainRouter) RegisterRequest(
 	// For cross-chain messages, the responding chain is the source of the
 	// response which is sent to the requester which is the destination,
 	// which is why we flip the two in request id generation.
-	uniqueRequestID := cr.createRequestID(nodeID, respondingChainID, requestingChainID, requestID, op)
+	uniqueRequestID := ids.RequestID{
+		NodeID:             nodeID,
+		SourceChainID:      respondingChainID,
+		DestinationChainID: requestingChainID,
+		RequestID:          requestID,
+		Op:                 byte(op),
+	}
 	// Add to the set of unfulfilled requests
 	cr.timedRequests.Put(uniqueRequestID, requestEntry{
 		time: cr.clock.Time(),
@@ -576,9 +575,15 @@ func (cr *ChainRouter) clearRequest(
 	sourceChainID ids.ID,
 	destinationChainID ids.ID,
 	requestID uint32,
-) (ids.ID, *requestEntry) {
+) (ids.RequestID, *requestEntry) {
 	// Create the request ID of the request we sent that this message is (allegedly) in response to.
-	uniqueRequestID := cr.createRequestID(nodeID, sourceChainID, destinationChainID, requestID, op)
+	uniqueRequestID := ids.RequestID{
+		NodeID:             nodeID,
+		SourceChainID:      sourceChainID,
+		DestinationChainID: destinationChainID,
+		RequestID:          requestID,
+		Op:                 byte(op),
+	}
 	// Mark that an outstanding request has been fulfilled
 	request, exists := cr.timedRequests.Get(uniqueRequestID)
 	if !exists {
@@ -588,15 +593,4 @@ func (cr *ChainRouter) clearRequest(
 	cr.timedRequests.Delete(uniqueRequestID)
 	cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
 	return uniqueRequestID, &request
-}
-
-// Assumes [cr.lock] is held.
-// Assumes [message.Op] is an alias of byte.
-func (cr *ChainRouter) createRequestID(nodeID ids.NodeID, sourceChainID ids.ID, destinationChainID ids.ID, requestID uint32, op message.Op) ids.ID {
-	copy(cr.requestIDBytes, nodeID[:])
-	copy(cr.requestIDBytes[hashing.AddrLen:], sourceChainID[:])
-	copy(cr.requestIDBytes[hashing.AddrLen+hashing.HashLen:], destinationChainID[:])
-	binary.BigEndian.PutUint32(cr.requestIDBytes[hashing.AddrLen+hashing.HashLen+hashing.HashLen:], requestID)
-	cr.requestIDBytes[hashing.AddrLen+hashing.HashLen+hashing.HashLen+wrappers.IntLen] = byte(op)
-	return hashing.ComputeHash256Array(cr.requestIDBytes)
 }
