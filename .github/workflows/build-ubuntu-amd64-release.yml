@@ -27,7 +27,8 @@ jobs:
 
       - name: Get the version
         id: get_version
-        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+        run: |
+          echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
         shell: bash
 
       - name: Configure AWS credentials
@@ -40,7 +41,7 @@ jobs:
       - name: Create debian package
         run: ./.github/workflows/build-deb-pkg.sh
         env:
-          TAG: ${{ steps.get_version.outputs.VERSION }}
+          TAG: ${{ env.VERSION }}
           BUCKET: ${{ secrets.BUCKET }}
           ARCH: "amd64"
           RELEASE: "jammy"
@@ -66,7 +67,8 @@ jobs:
 
       - name: Get the version
         id: get_version
-        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+        run: |
+          echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
         shell: bash
 
       - name: Configure AWS credentials
@@ -79,7 +81,7 @@ jobs:
       - name: Create debian package
         run: ./.github/workflows/build-deb-pkg.sh
         env:
-          TAG: ${{ steps.get_version.outputs.VERSION }}
+          TAG: ${{ env.VERSION }}
           BUCKET: ${{ secrets.BUCKET }}
           ARCH: "amd64"
           RELEASE: "focal"
