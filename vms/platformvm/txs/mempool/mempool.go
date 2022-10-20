@@ -60,7 +60,6 @@ type Mempool interface {
 	HasTxs() bool
 	// PeekTxs returns the next txs for Banff blocks
 	// up to maxTxsBytes without removing them from the mempool.
-	// It returns nil if !HasTxs()
 	PeekTxs(maxTxsBytes int) []*txs.Tx
 
 	HasStakerTx() bool
@@ -75,16 +74,6 @@ type Mempool interface {
 	// reissued.
 	MarkDropped(txID ids.ID, reason string)
 	GetDropReason(txID ids.ID) (string, bool)
-
-	// TODO: following Banff, these methods can be removed
-
-	// Pre Banff activation, decision transactions are included into
-	// standard blocks.
-	HasApricotDecisionTxs() bool
-	// PeekApricotDecisionTxs returns the next decisionTxs, up to maxTxsBytes,
-	// without removing them from the mempool.
-	// It returns nil if !HasApricotDecisionTxs()
-	PeekApricotDecisionTxs(maxTxsBytes int) []*txs.Tx
 }
 
 // Transactions from clients that have not yet been put into blocks and added to
@@ -229,16 +218,16 @@ func (m *mempool) HasTxs() bool {
 }
 
 func (m *mempool) PeekTxs(maxTxsBytes int) []*txs.Tx {
-	txs, size := m.peekApricotDecisionTxs(maxTxsBytes)
+	txs := m.unissuedDecisionTxs.List()
+	txs = append(txs, m.unissuedStakerTxs.List()...)
 
-	for _, tx := range m.unissuedStakerTxs.List() {
+	size := 0
+	for i, tx := range txs {
 		size += len(tx.Bytes())
 		if size > maxTxsBytes {
-			break
+			return txs[:i]
 		}
-		txs = append(txs, tx)
 	}
-
 	return txs
 }
 
@@ -251,8 +240,6 @@ func (m *mempool) addStakerTx(tx *txs.Tx) {
 	m.unissuedStakerTxs.Add(tx)
 	m.register(tx)
 }
-
-func (m *mempool) HasApricotDecisionTxs() bool { return m.unissuedDecisionTxs.Len() > 0 }
 
 func (m *mempool) HasStakerTx() bool { return m.unissuedStakerTxs.Len() > 0 }
 
@@ -270,27 +257,6 @@ func (m *mempool) removeStakerTx(tx *txs.Tx) {
 	if m.unissuedStakerTxs.Remove(txID) != nil {
 		m.deregister(tx)
 	}
-}
-
-func (m *mempool) PeekApricotDecisionTxs(maxTxsBytes int) []*txs.Tx {
-	txs, _ := m.peekApricotDecisionTxs(maxTxsBytes)
-	return txs
-}
-
-func (m *mempool) peekApricotDecisionTxs(maxTxsBytes int) ([]*txs.Tx, int) {
-	list := m.unissuedDecisionTxs.List()
-
-	totalBytes, txsToKeep := 0, 0
-	for _, tx := range list {
-		totalBytes += len(tx.Bytes())
-		if totalBytes > maxTxsBytes {
-			break
-		}
-		txsToKeep++
-	}
-
-	list = list[:txsToKeep]
-	return list, totalBytes
 }
 
 func (m *mempool) PeekStakerTx() *txs.Tx {

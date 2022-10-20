@@ -44,7 +44,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -94,6 +93,8 @@ var (
 
 	// time that genesis validators stop validating
 	defaultValidateEndTime = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
+
+	banffForkTime = defaultValidateEndTime.Add(-5 * defaultMinStakingDuration)
 
 	// each key controls an address that has [defaultBalance] AVAX at genesis
 	keys = crypto.BuildTestKeys()
@@ -330,7 +331,7 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 			RewardConfig:           defaultRewardConfig,
 			ApricotPhase3Time:      defaultValidateEndTime,
 			ApricotPhase5Time:      defaultValidateEndTime,
-			BanffTime:              mockable.MaxTime,
+			BanffTime:              banffForkTime,
 		},
 	}}
 
@@ -338,7 +339,7 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
 	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
 
-	vm.clock.Set(defaultGenesisTime)
+	vm.clock.Set(banffForkTime.Add(time.Second))
 	msgChan := make(chan common.Message, 1)
 	ctx := defaultContext()
 
@@ -363,6 +364,8 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 	}
 
 	// Create a subnet and store it in testSubnet1
+	// Note: following Banff activation, block acceptance will move
+	// chain time ahead
 	var err error
 	testSubnet1, err = vm.txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
@@ -409,7 +412,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 			MinStakeDuration:       defaultMinStakingDuration,
 			MaxStakeDuration:       defaultMaxStakingDuration,
 			RewardConfig:           defaultRewardConfig,
-			BanffTime:              mockable.MaxTime,
+			BanffTime:              banffForkTime,
 		},
 	}}
 
@@ -535,11 +538,6 @@ func TestGenesis(t *testing.T) {
 		}
 	}
 
-	// Ensure genesis timestamp is correct
-	if timestamp := vm.state.GetTimestamp(); timestamp.Unix() != int64(genesisState.Time) {
-		t.Fatalf("vm's time is incorrect. Expected %v got %v", genesisState.Time, timestamp)
-	}
-
 	// Ensure the new subnet we created exists
 	if _, _, err := vm.state.GetTx(testSubnet1.ID()); err != nil {
 		t.Fatalf("expected subnet %s to exist", testSubnet1.ID())
@@ -556,7 +554,7 @@ func TestAddValidatorCommit(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
+	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	rewardAddress := ids.GenerateTestShortID()
@@ -581,19 +579,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(blk.Verify())
-
-	// Assert preferences are correct
-	block := blk.(smcon.OracleBlock)
-	options, err := block.Options()
-	require.NoError(err)
-
-	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
-	require.True(ok)
-
-	require.NoError(block.Accept())
-	require.NoError(commit.Verify())
-	require.NoError(commit.Accept()) // commit the proposal
+	require.NoError(blk.Accept())
 
 	_, txStatus, err := vm.state.GetTx(tx.ID())
 	require.NoError(err)
@@ -604,7 +590,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	require.NoError(err)
 }
 
-// verify invalid proposal to add validator to primary network
+// verify invalid attempt to add validator to primary network
 func TestInvalidAddValidatorCommit(t *testing.T) {
 	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
@@ -641,7 +627,12 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	}
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
-	statelessBlk, err := blocks.NewApricotProposalBlock(preferredID, preferredHeight+1, tx)
+	statelessBlk, err := blocks.NewBanffStandardBlock(
+		preferred.Timestamp(),
+		preferredID,
+		preferredHeight+1,
+		[]*txs.Tx{tx},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -665,7 +656,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	}
 }
 
-// Reject proposal to add validator to primary network
+// Reject attempt to add validator to primary network
 func TestAddValidatorReject(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM()
@@ -675,7 +666,7 @@ func TestAddValidatorReject(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultGenesisTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
+	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	rewardAddress := ids.GenerateTestShortID()
@@ -700,28 +691,10 @@ func TestAddValidatorReject(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(blk.Verify())
+	require.NoError(blk.Reject())
 
-	// Assert preferences are correct
-	block := blk.(smcon.OracleBlock)
-	options, err := block.Options()
-	require.NoError(err)
-
-	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
-	require.True(ok)
-
-	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
-	require.True(ok)
-
-	require.NoError(block.Accept())
-	require.NoError(commit.Verify())
-	require.NoError(abort.Verify())
-	require.NoError(abort.Accept()) // reject the proposal
-
-	_, txStatus, err := vm.state.GetTx(tx.ID())
-	require.NoError(err)
-	require.Equal(status.Aborted, txStatus)
+	_, _, err = vm.state.GetTx(tx.ID())
+	require.Error(err, database.ErrNotFound)
 
 	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
@@ -775,7 +748,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultValidateStartTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
+	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := ids.NodeID(keys[0].PublicKey().Address())
 
@@ -800,34 +773,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(blk.Verify())
-
-	// Assert preferences are correct
-	block := blk.(smcon.OracleBlock)
-	options, err := block.Options()
-	require.NoError(err)
-
-	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
-	require.True(ok)
-
-	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
-	require.True(ok)
-
-	require.NoError(block.Accept())
-	require.NoError(commit.Verify())
-	require.NoError(abort.Verify())
-
-	{
-		onAccept, ok := vm.manager.GetState(abort.ID())
-		require.True(ok)
-
-		_, txStatus, err := onAccept.GetTx(tx.ID())
-		require.NoError(err)
-		require.Equal(status.Aborted, txStatus)
-	}
-
-	require.NoError(commit.Accept())
+	require.NoError(blk.Accept())
 
 	_, txStatus, err := vm.state.GetTx(tx.ID())
 	require.NoError(err)
@@ -848,7 +794,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	startTime := defaultValidateStartTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
+	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	nodeID := ids.NodeID(keys[0].PublicKey().Address())
 
@@ -873,38 +819,10 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(blk.Verify())
+	require.NoError(blk.Reject())
 
-	// Assert preferences are correct
-	block := blk.(smcon.OracleBlock)
-	options, err := block.Options()
-	require.NoError(err)
-
-	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
-	require.True(ok)
-
-	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
-	require.True(ok)
-
-	require.NoError(block.Accept())
-	require.NoError(commit.Verify())
-
-	{
-		onAccept, ok := vm.manager.GetState(commit.ID())
-		require.True(ok)
-
-		_, txStatus, err := onAccept.GetTx(tx.ID())
-		require.NoError(err)
-		require.Equal(status.Committed, txStatus)
-	}
-
-	require.NoError(abort.Verify())
-	require.NoError(abort.Accept())
-
-	_, txStatus, err := vm.state.GetTx(tx.ID())
-	require.NoError(err)
-	require.Equal(status.Aborted, txStatus)
+	_, _, err = vm.state.GetTx(tx.ID())
+	require.Error(err, database.ErrNotFound)
 
 	// Verify that new validator NOT in pending validator set
 	_, err = vm.state.GetPendingValidator(testSubnet1.ID(), nodeID)
@@ -924,7 +842,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 	// Fast forward clock to time for genesis validators to leave
 	vm.clock.Set(defaultValidateEndTime)
 
-	blk, err := vm.Builder.BuildBlock() // should contain proposal to advance time
+	blk, err := vm.Builder.BuildBlock() // should advance time
 	require.NoError(err)
 
 	require.NoError(blk.Verify())
@@ -935,10 +853,10 @@ func TestRewardValidatorAccept(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
+	_, ok := commit.Block.(*blocks.BanffCommitBlock)
 	require.True(ok)
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
+	_, ok = abort.Block.(*blocks.BanffAbortBlock)
 	require.True(ok)
 
 	require.NoError(block.Accept())
@@ -979,11 +897,11 @@ func TestRewardValidatorAccept(t *testing.T) {
 	require.NoError(err)
 
 	commit = options[0].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.ApricotCommitBlock)
+	_, ok = commit.Block.(*blocks.BanffCommitBlock)
 	require.True(ok)
 
 	abort = options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
+	_, ok = abort.Block.(*blocks.BanffAbortBlock)
 	require.True(ok)
 
 	require.NoError(block.Accept())
@@ -1023,7 +941,7 @@ func TestRewardValidatorReject(t *testing.T) {
 	// Fast forward clock to time for genesis validators to leave
 	vm.clock.Set(defaultValidateEndTime)
 
-	blk, err := vm.Builder.BuildBlock() // should contain proposal to advance time
+	blk, err := vm.Builder.BuildBlock() // should advance time
 	require.NoError(err)
 	require.NoError(blk.Verify())
 
@@ -1033,11 +951,11 @@ func TestRewardValidatorReject(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
+	_, ok := commit.Block.(*blocks.BanffCommitBlock)
 	require.True(ok)
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
+	_, ok = abort.Block.(*blocks.BanffAbortBlock)
 	require.True(ok)
 
 	require.NoError(block.Accept())
@@ -1074,11 +992,11 @@ func TestRewardValidatorReject(t *testing.T) {
 	require.NoError(err)
 
 	commit = options[0].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.ApricotCommitBlock)
+	_, ok = commit.Block.(*blocks.BanffCommitBlock)
 	require.True(ok)
 
 	abort = options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
+	_, ok = abort.Block.(*blocks.BanffAbortBlock)
 	require.True(ok)
 
 	require.NoError(blk.Accept())
@@ -1118,7 +1036,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	// Fast forward clock to time for genesis validators to leave
 	vm.clock.Set(defaultValidateEndTime)
 
-	blk, err := vm.Builder.BuildBlock() // should contain proposal to advance time
+	blk, err := vm.Builder.BuildBlock() // should advance time
 	require.NoError(err)
 	require.NoError(blk.Verify())
 
@@ -1128,11 +1046,11 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
+	_, ok := commit.Block.(*blocks.BanffCommitBlock)
 	require.True(ok)
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
+	_, ok = abort.Block.(*blocks.BanffAbortBlock)
 	require.True(ok)
 
 	require.NoError(block.Accept())
@@ -1170,11 +1088,11 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	require.NoError(err)
 
 	commit = options[0].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.ApricotCommitBlock)
+	_, ok = commit.Block.(*blocks.BanffCommitBlock)
 	require.True(ok)
 
 	abort = options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
+	_, ok = abort.Block.(*blocks.BanffAbortBlock)
 	require.True(ok)
 
 	require.NoError(blk.Accept())
@@ -1322,7 +1240,7 @@ func TestCreateSubnet(t *testing.T) {
 	require.True(found)
 
 	// Now that we've created a new subnet, add a validator to that subnet
-	startTime := defaultValidateStartTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
+	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	// [startTime, endTime] is subset of time keys[0] validates default subnet so tx is valid
 	addValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
@@ -1342,37 +1260,10 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(blk.Verify())
-
-	// Assert preferences are correct and accept the proposal/commit
-	block := blk.(smcon.OracleBlock)
-	options, err := block.Options()
-	require.NoError(err)
-
-	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
-	require.True(ok)
-
-	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
-	require.True(ok)
-
-	require.NoError(block.Accept())
-	require.NoError(commit.Verify())
-	require.NoError(abort.Verify())
-
-	txID := blk.(blocks.Block).Txs()[0].ID()
-	{
-		onAccept, ok := vm.manager.GetState(abort.ID())
-		require.True(ok)
-
-		_, txStatus, err := onAccept.GetTx(txID)
-		require.NoError(err)
-		require.Equal(status.Aborted, txStatus)
-	}
-
-	require.NoError(commit.Accept()) // add the validator to pending validator set
+	require.NoError(blk.Accept()) // add the validator to pending validator set
 	require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
 
+	txID := blk.(blocks.Block).Txs()[0].ID()
 	_, txStatus, err = vm.state.GetTx(txID)
 	require.NoError(err)
 	require.Equal(status.Committed, txStatus)
@@ -1386,42 +1277,9 @@ func TestCreateSubnet(t *testing.T) {
 	vm.clock.Set(startTime)
 	blk, err = vm.Builder.BuildBlock() // should be advance time tx
 	require.NoError(err)
-
 	require.NoError(blk.Verify())
-
-	// Assert preferences are correct and accept the proposal/commit
-	block = blk.(smcon.OracleBlock)
-	options, err = block.Options()
-	require.NoError(err)
-
-	commit = options[0].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.ApricotCommitBlock)
-	require.True(ok)
-
-	abort = options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
-	require.True(ok)
-
-	require.NoError(block.Accept())
-	require.NoError(commit.Verify())
-	require.NoError(abort.Verify())
-
-	txID = blk.(blocks.Block).Txs()[0].ID()
-	{
-		onAccept, ok := vm.manager.GetState(abort.ID())
-		require.True(ok)
-
-		_, txStatus, err := onAccept.GetTx(txID)
-		require.NoError(err)
-		require.Equal(status.Aborted, txStatus)
-	}
-
-	require.NoError(commit.Accept()) // move validator addValidatorTx from pending to current
+	require.NoError(blk.Accept()) // move validator addValidatorTx from pending to current
 	require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
-
-	_, txStatus, err = vm.state.GetTx(txID)
-	require.NoError(err)
-	require.Equal(status.Committed, txStatus)
 
 	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
@@ -1431,44 +1289,10 @@ func TestCreateSubnet(t *testing.T) {
 
 	// fast forward clock to time validator should stop validating
 	vm.clock.Set(endTime)
-	blk, err = vm.Builder.BuildBlock() // should be advance time tx
+	blk, err = vm.Builder.BuildBlock()
 	require.NoError(err)
-
 	require.NoError(blk.Verify())
-
-	// Assert preferences are correct
-	// and accept the proposal/commit
-	block = blk.(smcon.OracleBlock)
-	options, err = block.Options()
-	require.NoError(err)
-
-	commit = options[0].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.ApricotCommitBlock)
-	require.True(ok)
-
-	abort = options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
-	require.True(ok)
-
-	require.NoError(block.Accept())
-	require.NoError(commit.Verify())
-	require.NoError(abort.Verify())
-
-	txID = blk.(blocks.Block).Txs()[0].ID()
-	{
-		onAccept, ok := vm.manager.GetState(abort.ID())
-		require.True(ok)
-
-		_, txStatus, err := onAccept.GetTx(txID)
-		require.NoError(err)
-		require.Equal(status.Aborted, txStatus)
-	}
-
-	require.NoError(commit.Accept()) // remove validator from current validator set
-
-	_, txStatus, err = vm.state.GetTx(txID)
-	require.NoError(err)
-	require.Equal(status.Committed, txStatus)
+	require.NoError(blk.Accept()) // remove validator from current validator set
 
 	_, err = vm.state.GetPendingValidator(createSubnetTx.ID(), nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
@@ -1646,7 +1470,8 @@ func TestOptimisticAtomicImport(t *testing.T) {
 }
 
 // test restarting the node
-func TestRestartPartiallyAccepted(t *testing.T) {
+func TestRestartFullyAccepted(t *testing.T) {
+	require := require.New(t)
 	_, genesisBytes := defaultGenesis()
 	db := manager.NewMemDB(version.Semantic1_0_0)
 
@@ -1659,87 +1484,74 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 			MinStakeDuration:       defaultMinStakingDuration,
 			MaxStakeDuration:       defaultMaxStakingDuration,
 			RewardConfig:           defaultRewardConfig,
-			BanffTime:              mockable.MaxTime,
+			BanffTime:              banffForkTime,
 		},
 	}}
-	firstVM.clock.Set(defaultGenesisTime)
+
 	firstCtx := defaultContext()
+
+	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
+	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
+	m := atomic.NewMemory(atomicDB)
+	msm := &mutableSharedMemory{
+		SharedMemory: m.NewSharedMemory(firstCtx.ChainID),
+	}
+	firstCtx.SharedMemory = msm
+
+	initialClkTime := banffForkTime.Add(time.Second)
+	firstVM.clock.Set(initialClkTime)
 	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
-	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil, nil); err != nil {
-		t.Fatal(err)
-	}
+	err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil, nil)
+	require.NoError(err)
 
 	genesisID, err := firstVM.LastAccepted()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	firstAdvanceTimeTx, err := firstVM.txBuilder.NewAdvanceTimeTx(defaultGenesisTime.Add(time.Second))
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	nextChainTime := initialClkTime.Add(time.Second)
+	firstVM.clock.Set(initialClkTime)
 	preferred, err := firstVM.Builder.Preferred()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := blocks.NewApricotProposalBlock(
+	// include a tx to make the block be accepted
+	tx := &txs.Tx{Unsigned: &txs.ImportTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    firstVM.ctx.NetworkID,
+			BlockchainID: firstVM.ctx.ChainID,
+		}},
+		SourceChain: firstVM.ctx.XChainID,
+		ImportedInputs: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
+				TxID:        ids.Empty.Prefix(1),
+				OutputIndex: 1,
+			},
+			Asset: avax.Asset{ID: firstVM.ctx.AVAXAssetID},
+			In: &secp256k1fx.TransferInput{
+				Amt: 50000,
+			},
+		}},
+	}}
+	require.NoError(tx.Sign(txs.Codec, [][]*crypto.PrivateKeySECP256K1R{{}}))
+
+	statelessBlk, err := blocks.NewBanffStandardBlock(
+		nextChainTime,
 		preferredID,
 		preferredHeight+1,
-		firstAdvanceTimeTx,
+		[]*txs.Tx{tx},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	firstAdvanceTimeBlk := firstVM.manager.NewBlock(statelessBlk)
 
-	firstVM.clock.Set(defaultGenesisTime.Add(3 * time.Second))
-	if err := firstAdvanceTimeBlk.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	nextChainTime = nextChainTime.Add(2 * time.Second)
+	firstVM.clock.Set(nextChainTime)
+	require.NoError(firstAdvanceTimeBlk.Verify())
+	require.NoError(firstAdvanceTimeBlk.Accept())
 
-	options, err := firstAdvanceTimeBlk.(smcon.OracleBlock).Options()
-	if err != nil {
-		t.Fatal(err)
-	}
-	firstOption := options[0]
-	secondOption := options[1]
-
-	if err := firstOption.Verify(); err != nil {
-		t.Fatal(err)
-	} else if err := secondOption.Verify(); err != nil {
-		t.Fatal(err)
-	} else if err := firstAdvanceTimeBlk.Accept(); err != nil { // time advances to defaultGenesisTime.Add(time.Second)
-		t.Fatal(err)
-	}
-
-	// Byte representation of block that proposes advancing time to defaultGenesisTime + 2 seconds
-	secondAdvanceTimeBlkBytes := []byte{
-		0, 0,
-		0, 0, 0, 0,
-		6, 150, 225, 43, 97, 69, 215, 238,
-		150, 164, 249, 184, 2, 197, 216, 49,
-		6, 78, 81, 50, 190, 8, 44, 165,
-		219, 127, 96, 39, 235, 155, 17, 108,
-		0, 0, 0, 0,
-		0, 0, 0, 1,
-		0, 0, 0, 19,
-		0, 0, 0, 0, 95, 34, 234, 149,
-		0, 0, 0, 0,
-	}
-	if _, err := firstVM.ParseBlock(secondAdvanceTimeBlkBytes); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := firstVM.Shutdown(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(firstVM.Shutdown())
 	firstCtx.Lock.Unlock()
 
 	secondVM := &VM{Factory: Factory{
@@ -1750,12 +1562,13 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 			MinStakeDuration:       defaultMinStakingDuration,
 			MaxStakeDuration:       defaultMaxStakingDuration,
 			RewardConfig:           defaultRewardConfig,
-			BanffTime:              mockable.MaxTime,
+			BanffTime:              banffForkTime,
 		},
 	}}
 
-	secondVM.clock.Set(defaultGenesisTime)
 	secondCtx := defaultContext()
+	secondCtx.SharedMemory = msm
+	secondVM.clock.Set(initialClkTime)
 	secondCtx.Lock.Lock()
 	defer func() {
 		if err := secondVM.Shutdown(); err != nil {
@@ -1766,455 +1579,327 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 
 	secondDB := db.NewPrefixDBManager([]byte{})
 	secondMsgChan := make(chan common.Message, 1)
-	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil, nil); err != nil {
-		t.Fatal(err)
-	}
+	err = secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil, nil)
+	require.NoError(err)
 
 	lastAccepted, err := secondVM.LastAccepted()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if genesisID != lastAccepted {
-		t.Fatalf("Shouldn't have changed the genesis")
-	}
-}
-
-// test restarting the node
-func TestRestartFullyAccepted(t *testing.T) {
-	_, genesisBytes := defaultGenesis()
-
-	db := manager.NewMemDB(version.Semantic1_0_0)
-	firstDB := db.NewPrefixDBManager([]byte{})
-	firstVM := &VM{Factory: Factory{
-		Config: config.Config{
-			Chains:                 chains.MockManager{},
-			Validators:             validators.NewManager(),
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			MinStakeDuration:       defaultMinStakingDuration,
-			MaxStakeDuration:       defaultMaxStakingDuration,
-			RewardConfig:           defaultRewardConfig,
-			BanffTime:              mockable.MaxTime,
-		},
-	}}
-
-	firstVM.clock.Set(defaultGenesisTime)
-	firstCtx := defaultContext()
-	firstCtx.Lock.Lock()
-
-	firstMsgChan := make(chan common.Message, 1)
-	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil, nil); err != nil {
-		t.Fatal(err)
-	}
-
-	firstAdvanceTimeTx, err := firstVM.txBuilder.NewAdvanceTimeTx(defaultGenesisTime.Add(time.Second))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	preferred, err := firstVM.Builder.Preferred()
-	if err != nil {
-		t.Fatal(err)
-	}
-	preferredID := preferred.ID()
-	preferredHeight := preferred.Height()
-
-	statelessBlk, err := blocks.NewApricotProposalBlock(
-		preferredID,
-		preferredHeight+1,
-		firstAdvanceTimeTx,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	firstAdvanceTimeBlk := firstVM.manager.NewBlock(statelessBlk)
-	firstVM.clock.Set(defaultGenesisTime.Add(3 * time.Second))
-	if err := firstAdvanceTimeBlk.Verify(); err != nil {
-		t.Fatal(err)
-	}
-
-	options, err := firstAdvanceTimeBlk.(smcon.OracleBlock).Options()
-	if err != nil {
-		t.Fatal(err)
-	} else if err := options[0].Verify(); err != nil {
-		t.Fatal(err)
-	} else if err := options[1].Verify(); err != nil {
-		t.Fatal(err)
-	} else if err := firstAdvanceTimeBlk.Accept(); err != nil {
-		t.Fatal(err)
-	} else if err := options[0].Accept(); err != nil {
-		t.Fatal(err)
-	} else if err := options[1].Reject(); err != nil {
-		t.Fatal(err)
-	}
-
-	// Byte representation of block that proposes advancing time to defaultGenesisTime + 2 seconds
-	secondAdvanceTimeBlkBytes := []byte{
-		0, 0,
-		0, 0, 0, 0,
-		6, 150, 225, 43, 97, 69, 215, 238,
-		150, 164, 249, 184, 2, 197, 216, 49,
-		6, 78, 81, 50, 190, 8, 44, 165,
-		219, 127, 96, 39, 235, 155, 17, 108,
-		0, 0, 0, 0,
-		0, 0, 0, 1,
-		0, 0, 0, 19,
-		0, 0, 0, 0, 95, 34, 234, 149,
-		0, 0, 0, 0,
-	}
-	if _, err := firstVM.ParseBlock(secondAdvanceTimeBlkBytes); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := firstVM.Shutdown(); err != nil {
-		t.Fatal(err)
-	}
-	firstCtx.Lock.Unlock()
-
-	secondVM := &VM{Factory: Factory{
-		Config: config.Config{
-			Chains:                 chains.MockManager{},
-			Validators:             validators.NewManager(),
-			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			MinStakeDuration:       defaultMinStakingDuration,
-			MaxStakeDuration:       defaultMaxStakingDuration,
-			RewardConfig:           defaultRewardConfig,
-			BanffTime:              mockable.MaxTime,
-		},
-	}}
-
-	secondVM.clock.Set(defaultGenesisTime)
-	secondCtx := defaultContext()
-	secondCtx.Lock.Lock()
-	defer func() {
-		if err := secondVM.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
-		secondCtx.Lock.Unlock()
-	}()
-
-	secondDB := db.NewPrefixDBManager([]byte{})
-	secondMsgChan := make(chan common.Message, 1)
-	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil, nil); err != nil {
-		t.Fatal(err)
-	}
-	lastAccepted, err := secondVM.LastAccepted()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if options[0].ID() != lastAccepted {
-		t.Fatalf("Should have changed the genesis")
-	}
+	require.NoError(err)
+	require.Equal(genesisID, lastAccepted)
 }
 
 // test bootstrapping the node
 func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require := require.New(t)
 
-	// TODO: add "useProto=true" once handler supports proto
-	for _, useProto := range []bool{false} {
-		t.Run(fmt.Sprintf("use proto buf message creator %v", useProto), func(tt *testing.T) {
-			_, genesisBytes := defaultGenesis()
+	_, genesisBytes := defaultGenesis()
 
-			baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-			vmDBManager := baseDBManager.NewPrefixDBManager([]byte("vm"))
-			bootstrappingDB := prefixdb.New([]byte("bootstrapping"), baseDBManager.Current().Database)
+	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
+	vmDBManager := baseDBManager.NewPrefixDBManager([]byte("vm"))
+	bootstrappingDB := prefixdb.New([]byte("bootstrapping"), baseDBManager.Current().Database)
 
-			blocked, err := queue.NewWithMissing(bootstrappingDB, "", prometheus.NewRegistry())
-			require.NoError(err)
+	blocked, err := queue.NewWithMissing(bootstrappingDB, "", prometheus.NewRegistry())
+	require.NoError(err)
 
-			vm := &VM{Factory: Factory{
-				Config: config.Config{
-					Chains:                 chains.MockManager{},
-					Validators:             validators.NewManager(),
-					UptimeLockedCalculator: uptime.NewLockedCalculator(),
-					MinStakeDuration:       defaultMinStakingDuration,
-					MaxStakeDuration:       defaultMaxStakingDuration,
-					RewardConfig:           defaultRewardConfig,
-					BanffTime:              mockable.MaxTime,
-				},
-			}}
+	vm := &VM{Factory: Factory{
+		Config: config.Config{
+			Chains:                 chains.MockManager{},
+			Validators:             validators.NewManager(),
+			UptimeLockedCalculator: uptime.NewLockedCalculator(),
+			MinStakeDuration:       defaultMinStakingDuration,
+			MaxStakeDuration:       defaultMaxStakingDuration,
+			RewardConfig:           defaultRewardConfig,
+			BanffTime:              banffForkTime,
+		},
+	}}
 
-			vm.clock.Set(defaultGenesisTime)
-			ctx := defaultContext()
-			consensusCtx := snow.DefaultConsensusContextTest()
-			consensusCtx.Context = ctx
-			consensusCtx.SetState(snow.Initializing)
-			ctx.Lock.Lock()
+	initialClkTime := banffForkTime.Add(time.Second)
+	vm.clock.Set(initialClkTime)
+	ctx := defaultContext()
 
-			msgChan := make(chan common.Message, 1)
-			require.NoError(vm.Initialize(ctx, vmDBManager, genesisBytes, nil, nil, msgChan, nil, nil))
-
-			preferred, err := vm.Builder.Preferred()
-			require.NoError(err)
-
-			preferredID := preferred.ID()
-			preferredHeight := preferred.Height()
-
-			advanceTimeTx, err := vm.txBuilder.NewAdvanceTimeTx(defaultGenesisTime.Add(time.Second))
-			require.NoError(err)
-
-			statelessBlk, err := blocks.NewApricotProposalBlock(
-				preferredID,
-				preferredHeight+1,
-				advanceTimeTx,
-			)
-			require.NoError(err)
-
-			advanceTimeBlk := vm.manager.NewBlock(statelessBlk)
-			require.NoError(err)
-
-			advanceTimeBlkID := advanceTimeBlk.ID()
-			advanceTimeBlkBytes := advanceTimeBlk.Bytes()
-
-			peerID := ids.NodeID{1, 2, 3, 4, 5, 4, 3, 2, 1}
-			vdrs := validators.NewSet()
-			require.NoError(vdrs.AddWeight(peerID, 1))
-			beacons := vdrs
-
-			benchlist := benchlist.NewNoBenchlist()
-			timeoutManager, err := timeout.NewManager(
-				&timer.AdaptiveTimeoutConfig{
-					InitialTimeout:     time.Millisecond,
-					MinimumTimeout:     time.Millisecond,
-					MaximumTimeout:     10 * time.Second,
-					TimeoutHalflife:    5 * time.Minute,
-					TimeoutCoefficient: 1.25,
-				},
-				benchlist,
-				"",
-				prometheus.NewRegistry(),
-			)
-			require.NoError(err)
-
-			go timeoutManager.Dispatch()
-
-			chainRouter := &router.ChainRouter{}
-
-			metrics := prometheus.NewRegistry()
-			mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
-			require.NoError(err)
-			mcProto, err := message.NewCreatorWithProto(metrics, "dummyNamespace", true, 10*time.Second)
-			require.NoError(err)
-
-			err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, timeoutManager, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
-			require.NoError(err)
-
-			externalSender := &sender.ExternalSenderTest{TB: t}
-			externalSender.Default(true)
-
-			// Passes messages from the consensus engine to the network
-			sender, err := sender.New(
-				consensusCtx,
-				mc,
-				mcProto,
-				time.Now().Add(time.Hour),
-				externalSender,
-				chainRouter,
-				timeoutManager,
-				sender.GossipConfig{
-					AcceptedFrontierPeerSize:  1,
-					OnAcceptPeerSize:          1,
-					AppGossipValidatorSize:    1,
-					AppGossipNonValidatorSize: 1,
-				},
-			)
-			require.NoError(err)
-
-			var reqID uint32
-			externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
-				var inMsg message.InboundMessage
-				if !useProto {
-					inMsg, err = mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
-				} else {
-					inMsg, err = mcProto.Parse(msg.Bytes(), ctx.NodeID, func() {})
-				}
-				require.NoError(err)
-				require.Equal(message.GetAcceptedFrontier, inMsg.Op())
-
-				requestIDIntf, err := inMsg.Get(message.RequestID)
-				require.NoError(err)
-				requestID, ok := requestIDIntf.(uint32)
-				require.True(ok)
-
-				reqID = requestID
-				return nodeIDs
-			}
-
-			isBootstrapped := false
-			subnet := &common.SubnetTest{
-				T:               tt,
-				IsBootstrappedF: func() bool { return isBootstrapped },
-				BootstrappedF:   func(ids.ID) { isBootstrapped = true },
-			}
-
-			peers := tracker.NewPeers()
-			startup := tracker.NewStartup(peers, (beacons.Weight()+1)/2)
-			beacons.RegisterCallbackListener(startup)
-
-			// The engine handles consensus
-			consensus := &smcon.Topological{}
-			commonCfg := common.Config{
-				Ctx:                            consensusCtx,
-				Validators:                     vdrs,
-				Beacons:                        beacons,
-				SampleK:                        beacons.Len(),
-				StartupTracker:                 startup,
-				Alpha:                          (beacons.Weight() + 1) / 2,
-				Sender:                         sender,
-				Subnet:                         subnet,
-				AncestorsMaxContainersSent:     2000,
-				AncestorsMaxContainersReceived: 2000,
-				SharedCfg:                      &common.SharedConfig{},
-			}
-
-			snowGetHandler, err := snowgetter.New(vm, commonCfg)
-			require.NoError(err)
-
-			bootstrapConfig := bootstrap.Config{
-				Config:        commonCfg,
-				AllGetsServer: snowGetHandler,
-				Blocked:       blocked,
-				VM:            vm,
-			}
-
-			// Asynchronously passes messages from the network to the consensus engine
-			cpuTracker, err := timetracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
-			require.NoError(err)
-
-			handler, err := handler.New(
-				mc,
-				bootstrapConfig.Ctx,
-				vdrs,
-				msgChan,
-				nil,
-				time.Hour,
-				cpuTracker,
-			)
-			require.NoError(err)
-
-			engineConfig := smeng.Config{
-				Ctx:           bootstrapConfig.Ctx,
-				AllGetsServer: snowGetHandler,
-				VM:            bootstrapConfig.VM,
-				Sender:        bootstrapConfig.Sender,
-				Validators:    vdrs,
-				Params: snowball.Parameters{
-					K:                     1,
-					Alpha:                 1,
-					BetaVirtuous:          20,
-					BetaRogue:             20,
-					ConcurrentRepolls:     1,
-					OptimalProcessing:     1,
-					MaxOutstandingItems:   1,
-					MaxItemProcessingTime: 1,
-				},
-				Consensus: consensus,
-			}
-			engine, err := smeng.New(engineConfig)
-			require.NoError(err)
-
-			handler.SetConsensus(engine)
-
-			bootstrapper, err := bootstrap.New(
-				bootstrapConfig,
-				engine.Start,
-			)
-			require.NoError(err)
-
-			handler.SetBootstrapper(bootstrapper)
-
-			// Allow incoming messages to be routed to the new chain
-			chainRouter.AddChain(handler)
-			ctx.Lock.Unlock()
-
-			handler.Start(false)
-
-			ctx.Lock.Lock()
-			if err := bootstrapper.Connected(peerID, version.CurrentApp); err != nil {
-				t.Fatal(err)
-			}
-
-			externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
-				inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
-				require.NoError(err)
-				require.Equal(message.GetAccepted, inMsg.Op())
-
-				requestIDIntf, err := inMsg.Get(message.RequestID)
-				require.NoError(err)
-
-				requestID, ok := requestIDIntf.(uint32)
-				require.True(ok)
-
-				reqID = requestID
-				return nodeIDs
-			}
-
-			frontier := []ids.ID{advanceTimeBlkID}
-			if err := bootstrapper.AcceptedFrontier(peerID, reqID, frontier); err != nil {
-				t.Fatal(err)
-			}
-
-			externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
-				var inMsg message.InboundMessage
-				if !useProto {
-					inMsg, err = mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
-				} else {
-					inMsg, err = mcProto.Parse(msg.Bytes(), ctx.NodeID, func() {})
-				}
-				require.NoError(err)
-				require.Equal(message.GetAncestors, inMsg.Op())
-
-				requestIDIntf, err := inMsg.Get(message.RequestID)
-				require.NoError(err)
-				requestID, ok := requestIDIntf.(uint32)
-				require.True(ok)
-
-				reqID = requestID
-
-				containerIDIntf, err := inMsg.Get(message.ContainerID)
-				require.NoError(err)
-				containerIDBytes, ok := containerIDIntf.([]byte)
-				require.True(ok)
-				containerID, err := ids.ToID(containerIDBytes)
-				require.NoError(err)
-				if containerID != advanceTimeBlkID {
-					t.Fatalf("wrong block requested")
-				}
-
-				return nodeIDs
-			}
-
-			require.NoError(bootstrapper.Accepted(peerID, reqID, frontier))
-
-			externalSender.SendF = nil
-			externalSender.CantSend = false
-
-			require.NoError(bootstrapper.Ancestors(peerID, reqID, [][]byte{advanceTimeBlkBytes}))
-
-			preferred, err = vm.Builder.Preferred()
-			require.NoError(err)
-
-			options, err := advanceTimeBlk.(smcon.OracleBlock).Options()
-			require.NoError(err)
-
-			// Because the block needs to have been verified for it's preference to be
-			// set correctly, we manually select the correct preference here.
-			advanceTimePreference := options[0]
-
-			if preferred.ID() != advanceTimePreference.ID() {
-				tt.Fatalf("wrong preference reported after bootstrapping to proposal block\nPreferred: %s\nExpected: %s\nGenesis: %s",
-					preferred.ID(),
-					advanceTimePreference.ID(),
-					preferredID)
-			}
-			ctx.Lock.Unlock()
-
-			chainRouter.Shutdown()
-		})
+	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
+	m := atomic.NewMemory(atomicDB)
+	msm := &mutableSharedMemory{
+		SharedMemory: m.NewSharedMemory(ctx.ChainID),
 	}
+	ctx.SharedMemory = msm
+
+	consensusCtx := snow.DefaultConsensusContextTest()
+	consensusCtx.Context = ctx
+	consensusCtx.SetState(snow.Initializing)
+	ctx.Lock.Lock()
+
+	msgChan := make(chan common.Message, 1)
+	require.NoError(vm.Initialize(ctx, vmDBManager, genesisBytes, nil, nil, msgChan, nil, nil))
+
+	preferred, err := vm.Builder.Preferred()
+	require.NoError(err)
+
+	// include a tx to make the block be accepted
+	tx := &txs.Tx{Unsigned: &txs.ImportTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
+		}},
+		SourceChain: vm.ctx.XChainID,
+		ImportedInputs: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
+				TxID:        ids.Empty.Prefix(1),
+				OutputIndex: 1,
+			},
+			Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+			In: &secp256k1fx.TransferInput{
+				Amt: 50000,
+			},
+		}},
+	}}
+	require.NoError(tx.Sign(txs.Codec, [][]*crypto.PrivateKeySECP256K1R{{}}))
+
+	nextChainTime := initialClkTime.Add(time.Second)
+	preferredID := preferred.ID()
+	preferredHeight := preferred.Height()
+	statelessBlk, err := blocks.NewBanffStandardBlock(
+		nextChainTime,
+		preferredID,
+		preferredHeight+1,
+		[]*txs.Tx{tx},
+	)
+	require.NoError(err)
+
+	advanceTimeBlk := vm.manager.NewBlock(statelessBlk)
+	require.NoError(err)
+
+	advanceTimeBlkID := advanceTimeBlk.ID()
+	advanceTimeBlkBytes := advanceTimeBlk.Bytes()
+
+	peerID := ids.NodeID{1, 2, 3, 4, 5, 4, 3, 2, 1}
+	vdrs := validators.NewSet()
+	require.NoError(vdrs.AddWeight(peerID, 1))
+	beacons := vdrs
+
+	benchlist := benchlist.NewNoBenchlist()
+	timeoutManager, err := timeout.NewManager(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     time.Millisecond,
+			MinimumTimeout:     time.Millisecond,
+			MaximumTimeout:     10 * time.Second,
+			TimeoutHalflife:    5 * time.Minute,
+			TimeoutCoefficient: 1.25,
+		},
+		benchlist,
+		"",
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+
+	go timeoutManager.Dispatch()
+
+	chainRouter := &router.ChainRouter{}
+
+	metrics := prometheus.NewRegistry()
+	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
+	require.NoError(err)
+
+	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, timeoutManager, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	require.NoError(err)
+
+	externalSender := &sender.ExternalSenderTest{TB: t}
+	externalSender.Default(true)
+
+	// Passes messages from the consensus engine to the network
+	sender, err := sender.New(
+		consensusCtx,
+		mc,
+		mc,
+		time.Now(),
+		externalSender,
+		chainRouter,
+		timeoutManager,
+		sender.GossipConfig{
+			AcceptedFrontierPeerSize:  1,
+			OnAcceptPeerSize:          1,
+			AppGossipValidatorSize:    1,
+			AppGossipNonValidatorSize: 1,
+		},
+	)
+	require.NoError(err)
+
+	var reqID uint32
+	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
+		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+		require.NoError(err)
+		require.Equal(message.GetAcceptedFrontier, inMsg.Op())
+
+		requestIDIntf, err := inMsg.Get(message.RequestID)
+		require.NoError(err)
+		requestID, ok := requestIDIntf.(uint32)
+		require.True(ok)
+
+		reqID = requestID
+		return nodeIDs
+	}
+
+	isBootstrapped := false
+	subnet := &common.SubnetTest{
+		T:               t,
+		IsBootstrappedF: func() bool { return isBootstrapped },
+		BootstrappedF:   func(ids.ID) { isBootstrapped = true },
+	}
+
+	peers := tracker.NewPeers()
+	startup := tracker.NewStartup(peers, (beacons.Weight()+1)/2)
+	beacons.RegisterCallbackListener(startup)
+
+	// The engine handles consensus
+	consensus := &smcon.Topological{}
+	commonCfg := common.Config{
+		Ctx:                            consensusCtx,
+		Validators:                     vdrs,
+		Beacons:                        beacons,
+		SampleK:                        beacons.Len(),
+		StartupTracker:                 startup,
+		Alpha:                          (beacons.Weight() + 1) / 2,
+		Sender:                         sender,
+		Subnet:                         subnet,
+		AncestorsMaxContainersSent:     2000,
+		AncestorsMaxContainersReceived: 2000,
+		SharedCfg:                      &common.SharedConfig{},
+	}
+
+	snowGetHandler, err := snowgetter.New(vm, commonCfg)
+	require.NoError(err)
+
+	bootstrapConfig := bootstrap.Config{
+		Config:        commonCfg,
+		AllGetsServer: snowGetHandler,
+		Blocked:       blocked,
+		VM:            vm,
+	}
+
+	// Asynchronously passes messages from the network to the consensus engine
+	cpuTracker, err := timetracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	require.NoError(err)
+
+	handler, err := handler.New(
+		mc,
+		bootstrapConfig.Ctx,
+		vdrs,
+		msgChan,
+		nil,
+		time.Hour,
+		cpuTracker,
+	)
+	require.NoError(err)
+
+	engineConfig := smeng.Config{
+		Ctx:           bootstrapConfig.Ctx,
+		AllGetsServer: snowGetHandler,
+		VM:            bootstrapConfig.VM,
+		Sender:        bootstrapConfig.Sender,
+		Validators:    vdrs,
+		Params: snowball.Parameters{
+			K:                     1,
+			Alpha:                 1,
+			BetaVirtuous:          20,
+			BetaRogue:             20,
+			ConcurrentRepolls:     1,
+			OptimalProcessing:     1,
+			MaxOutstandingItems:   1,
+			MaxItemProcessingTime: 1,
+		},
+		Consensus: consensus,
+	}
+	engine, err := smeng.New(engineConfig)
+	require.NoError(err)
+
+	handler.SetConsensus(engine)
+
+	bootstrapper, err := bootstrap.New(
+		bootstrapConfig,
+		engine.Start,
+	)
+	require.NoError(err)
+
+	handler.SetBootstrapper(bootstrapper)
+
+	// Allow incoming messages to be routed to the new chain
+	chainRouter.AddChain(handler)
+	ctx.Lock.Unlock()
+
+	handler.Start(false)
+
+	ctx.Lock.Lock()
+	if err := bootstrapper.Connected(peerID, version.CurrentApp); err != nil {
+		t.Fatal(err)
+	}
+
+	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
+		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+		require.NoError(err)
+		require.Equal(message.GetAccepted, inMsg.Op())
+
+		requestIDIntf, err := inMsg.Get(message.RequestID)
+		require.NoError(err)
+
+		requestID, ok := requestIDIntf.(uint32)
+		require.True(ok)
+
+		reqID = requestID
+		return nodeIDs
+	}
+
+	frontier := []ids.ID{advanceTimeBlkID}
+	if err := bootstrapper.AcceptedFrontier(peerID, reqID, frontier); err != nil {
+		t.Fatal(err)
+	}
+
+	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
+		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+		require.NoError(err)
+		require.Equal(message.GetAncestors, inMsg.Op())
+
+		requestIDIntf, err := inMsg.Get(message.RequestID)
+		require.NoError(err)
+		requestID, ok := requestIDIntf.(uint32)
+		require.True(ok)
+
+		reqID = requestID
+
+		containerIDIntf, err := inMsg.Get(message.ContainerID)
+		require.NoError(err)
+		containerIDBytes, ok := containerIDIntf.([]byte)
+		require.True(ok)
+		containerID, err := ids.ToID(containerIDBytes)
+		require.NoError(err)
+		if containerID != advanceTimeBlkID {
+			t.Fatalf("wrong block requested")
+		}
+
+		return nodeIDs
+	}
+
+	require.NoError(bootstrapper.Accepted(peerID, reqID, frontier))
+
+	externalSender.SendF = nil
+	externalSender.CantSend = false
+
+	require.NoError(bootstrapper.Ancestors(peerID, reqID, [][]byte{advanceTimeBlkBytes}))
+
+	preferred, err = vm.Builder.Preferred()
+	require.NoError(err)
+
+	if preferred.ID() != advanceTimeBlk.ID() {
+		t.Fatalf("wrong preference reported after bootstrapping to proposal block\nPreferred: %s\nExpected: %s\nGenesis: %s",
+			preferred.ID(),
+			advanceTimeBlk.ID(),
+			preferredID)
+	}
+	ctx.Lock.Unlock()
+
+	chainRouter.Shutdown()
 }
 
 func TestUnverifiedParent(t *testing.T) {
+	require := require.New(t)
 	_, genesisBytes := defaultGenesis()
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 
@@ -2226,83 +1911,92 @@ func TestUnverifiedParent(t *testing.T) {
 			MinStakeDuration:       defaultMinStakingDuration,
 			MaxStakeDuration:       defaultMaxStakingDuration,
 			RewardConfig:           defaultRewardConfig,
-			BanffTime:              mockable.MaxTime,
+			BanffTime:              banffForkTime,
 		},
 	}}
 
-	vm.clock.Set(defaultGenesisTime)
+	initialClkTime := banffForkTime.Add(time.Second)
+	vm.clock.Set(initialClkTime)
 	ctx := defaultContext()
 	ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown())
 		ctx.Lock.Unlock()
 	}()
 
 	msgChan := make(chan common.Message, 1)
-	if err := vm.Initialize(ctx, dbManager, genesisBytes, nil, nil, msgChan, nil, nil); err != nil {
-		t.Fatal(err)
-	}
+	err := vm.Initialize(ctx, dbManager, genesisBytes, nil, nil, msgChan, nil, nil)
+	require.NoError(err)
 
-	firstAdvanceTimeTx, err := vm.txBuilder.NewAdvanceTimeTx(defaultGenesisTime.Add(time.Second))
-	if err != nil {
-		t.Fatal(err)
-	}
+	// include a tx1 to make the block be accepted
+	tx1 := &txs.Tx{Unsigned: &txs.ImportTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
+		}},
+		SourceChain: vm.ctx.XChainID,
+		ImportedInputs: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
+				TxID:        ids.Empty.Prefix(1),
+				OutputIndex: 1,
+			},
+			Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+			In: &secp256k1fx.TransferInput{
+				Amt: 50000,
+			},
+		}},
+	}}
+	require.NoError(tx1.Sign(txs.Codec, [][]*crypto.PrivateKeySECP256K1R{{}}))
 
 	preferred, err := vm.Builder.Preferred()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+	nextChainTime := initialClkTime.Add(time.Second)
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := blocks.NewApricotProposalBlock(
+	statelessBlk, err := blocks.NewBanffStandardBlock(
+		nextChainTime,
 		preferredID,
 		preferredHeight+1,
-		firstAdvanceTimeTx,
+		[]*txs.Tx{tx1},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	firstAdvanceTimeBlk := vm.manager.NewBlock(statelessBlk)
+	err = firstAdvanceTimeBlk.Verify()
+	require.NoError(err)
 
-	vm.clock.Set(defaultGenesisTime.Add(2 * time.Second))
-	if err := firstAdvanceTimeBlk.Verify(); err != nil {
-		t.Fatal(err)
-	}
-
-	options, err := firstAdvanceTimeBlk.(smcon.OracleBlock).Options()
-	if err != nil {
-		t.Fatal(err)
-	}
-	firstOption := options[0]
-	secondOption := options[1]
-
-	secondAdvanceTimeTx, err := vm.txBuilder.NewAdvanceTimeTx(defaultGenesisTime.Add(2 * time.Second))
-	if err != nil {
-		t.Fatal(err)
-	}
-	statelessSecondAdvanceTimeBlk, err := blocks.NewApricotProposalBlock(
-		firstOption.ID(),
-		firstOption.(*blockexecutor.Block).Height()+1,
-		secondAdvanceTimeTx,
+	// include a tx1 to make the block be accepted
+	tx2 := &txs.Tx{Unsigned: &txs.ImportTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
+		}},
+		SourceChain: vm.ctx.XChainID,
+		ImportedInputs: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
+				TxID:        ids.Empty.Prefix(2),
+				OutputIndex: 2,
+			},
+			Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+			In: &secp256k1fx.TransferInput{
+				Amt: 50000,
+			},
+		}},
+	}}
+	require.NoError(tx1.Sign(txs.Codec, [][]*crypto.PrivateKeySECP256K1R{{}}))
+	nextChainTime = nextChainTime.Add(time.Second)
+	vm.clock.Set(nextChainTime)
+	statelessSecondAdvanceTimeBlk, err := blocks.NewBanffStandardBlock(
+		nextChainTime,
+		firstAdvanceTimeBlk.ID(),
+		firstAdvanceTimeBlk.Height()+1,
+		[]*txs.Tx{tx2},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	require.NoError(err)
 	secondAdvanceTimeBlk := vm.manager.NewBlock(statelessSecondAdvanceTimeBlk)
 
-	if parentBlkID := secondAdvanceTimeBlk.Parent(); parentBlkID != firstOption.ID() {
-		t.Fatalf("Wrong parent block ID returned")
-	} else if err := firstOption.Verify(); err != nil {
-		t.Fatal(err)
-	} else if err := secondOption.Verify(); err != nil {
-		t.Fatal(err)
-	} else if err := secondAdvanceTimeBlk.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	require.Equal(secondAdvanceTimeBlk.Parent(), firstAdvanceTimeBlk.ID())
+	require.NoError(secondAdvanceTimeBlk.Verify())
 }
 
 func TestMaxStakeAmount(t *testing.T) {
@@ -2370,7 +2064,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 			RewardConfig:           defaultRewardConfig,
 			Validators:             validators.NewManager(),
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			BanffTime:              mockable.MaxTime,
+			BanffTime:              banffForkTime,
 		},
 	}}
 
@@ -2380,8 +2074,9 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstMsgChan := make(chan common.Message, 1)
 	require.NoError(firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil, nil))
 
-	firstVM.clock.Set(defaultGenesisTime)
-	firstVM.uptimeManager.(uptime.TestManager).SetTime(defaultGenesisTime)
+	initialClkTime := banffForkTime.Add(time.Second)
+	firstVM.clock.Set(initialClkTime)
+	firstVM.uptimeManager.(uptime.TestManager).SetTime(initialClkTime)
 
 	require.NoError(firstVM.SetState(snow.Bootstrapping))
 	require.NoError(firstVM.SetState(snow.NormalOp))
@@ -2399,7 +2094,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 			UptimePercentage:       .21,
 			Validators:             validators.NewManager(),
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			BanffTime:              mockable.MaxTime,
+			BanffTime:              banffForkTime,
 		},
 	}}
 
@@ -2422,7 +2117,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	secondVM.clock.Set(defaultValidateEndTime)
 	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
 
-	blk, err := secondVM.Builder.BuildBlock() // should contain proposal to advance time
+	blk, err := secondVM.Builder.BuildBlock() // should advance time
 	require.NoError(err)
 
 	require.NoError(blk.Verify())
@@ -2433,11 +2128,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
+	_, ok := commit.Block.(*blocks.BanffCommitBlock)
 	require.True(ok)
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
+	_, ok = abort.Block.(*blocks.BanffAbortBlock)
 	require.True(ok)
 
 	require.NoError(block.Accept())
@@ -2475,12 +2170,12 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	options, err = block.Options()
 	require.NoError(err)
 
-	commit = options[1].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.ApricotCommitBlock)
+	commit = options[0].(*blockexecutor.Block)
+	_, ok = commit.Block.(*blocks.BanffCommitBlock)
 	require.True(ok)
 
-	abort = options[0].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
+	abort = options[1].(*blockexecutor.Block)
+	_, ok = abort.Block.(*blocks.BanffAbortBlock)
 	require.True(ok)
 
 	require.NoError(blk.Accept())
@@ -2524,7 +2219,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 			RewardConfig:           defaultRewardConfig,
 			Validators:             validators.NewManager(),
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			BanffTime:              mockable.MaxTime,
+			BanffTime:              banffForkTime,
 		},
 	}}
 
@@ -2539,8 +2234,9 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	vm.clock.Set(defaultGenesisTime)
-	vm.uptimeManager.(uptime.TestManager).SetTime(defaultGenesisTime)
+	initialClkTime := banffForkTime.Add(time.Second)
+	vm.clock.Set(initialClkTime)
+	vm.uptimeManager.(uptime.TestManager).SetTime(initialClkTime)
 
 	require.NoError(vm.SetState(snow.Bootstrapping))
 	require.NoError(vm.SetState(snow.NormalOp))
@@ -2549,7 +2245,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	vm.clock.Set(defaultValidateEndTime)
 	vm.uptimeManager.(uptime.TestManager).SetTime(defaultValidateEndTime)
 
-	blk, err := vm.Builder.BuildBlock() // should contain proposal to advance time
+	blk, err := vm.Builder.BuildBlock() // should advance time
 	require.NoError(err)
 
 	require.NoError(blk.Verify())
@@ -2560,11 +2256,11 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*blocks.ApricotCommitBlock)
+	_, ok := commit.Block.(*blocks.BanffCommitBlock)
 	require.True(ok)
 
 	abort := options[1].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
+	_, ok = abort.Block.(*blocks.BanffAbortBlock)
 	require.True(ok)
 
 	require.NoError(block.Accept())
@@ -2587,12 +2283,12 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	options, err = block.Options()
 	require.NoError(err)
 
-	abort = options[0].(*blockexecutor.Block)
-	_, ok = abort.Block.(*blocks.ApricotAbortBlock)
+	commit = options[0].(*blockexecutor.Block)
+	_, ok = commit.Block.(*blocks.BanffCommitBlock)
 	require.True(ok)
 
-	commit = options[1].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.ApricotCommitBlock)
+	abort = options[1].(*blockexecutor.Block)
+	_, ok = abort.Block.(*blocks.BanffAbortBlock)
 	require.True(ok)
 
 	require.NoError(blk.Accept())

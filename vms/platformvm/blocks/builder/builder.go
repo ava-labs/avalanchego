@@ -209,19 +209,7 @@ func (b *builder) buildBlock() (blocks.Block, error) {
 	}
 	// [timestamp] = min(max(now, parentTime), nextStakerChangeTime)
 
-	// If the banff timestamp has come, build banff blocks.
-	if b.txExecutorBackend.Config.IsBanffActivated(timestamp) {
-		return buildBanffBlock(
-			b,
-			preferredID,
-			nextHeight,
-			timestamp,
-			timeWasCapped,
-			preferredState,
-		)
-	}
-
-	return buildApricotBlock(
+	return buildBlock(
 		b,
 		preferredID,
 		nextHeight,
@@ -372,4 +360,52 @@ func (b *builder) notifyBlockReady() {
 	default:
 		b.txExecutorBackend.Ctx.Log.Debug("dropping message to consensus engine")
 	}
+}
+
+// [timestamp] is min(max(now, parent timestamp), next staker change time)
+func buildBlock(
+	builder *builder,
+	parentID ids.ID,
+	height uint64,
+	timestamp time.Time,
+	forceAdvanceTime bool,
+	parentState state.Chain,
+) (blocks.Block, error) {
+	// Try rewarding stakers whose staking period ends at the new chain time.
+	// This is done first to prioritize advancing the timestamp as quickly as
+	// possible.
+	stakerTxID, shouldReward, err := builder.getNextStakerToReward(timestamp, parentState)
+	if err != nil {
+		return nil, fmt.Errorf("could not find next staker to reward: %w", err)
+	}
+	if shouldReward {
+		rewardValidatorTx, err := builder.txBuilder.NewRewardValidatorTx(stakerTxID)
+		if err != nil {
+			return nil, fmt.Errorf("could not build tx to reward staker: %w", err)
+		}
+
+		return blocks.NewBanffProposalBlock(
+			timestamp,
+			parentID,
+			height,
+			rewardValidatorTx,
+		)
+	}
+
+	// Clean out the mempool's transactions with invalid timestamps.
+	builder.dropExpiredStakerTxs(timestamp)
+
+	// If there is no reason to build a block, don't.
+	if !builder.Mempool.HasTxs() && !forceAdvanceTime {
+		builder.txExecutorBackend.Ctx.Log.Debug("no pending txs to issue into a block")
+		return nil, errNoPendingBlocks
+	}
+
+	// Issue a block with as many transactions as possible.
+	return blocks.NewBanffStandardBlock(
+		timestamp,
+		parentID,
+		height,
+		builder.Mempool.PeekTxs(targetBlockSize),
+	)
 }

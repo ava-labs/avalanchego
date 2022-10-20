@@ -67,7 +67,6 @@ func (v *MempoolTxVerifier) AddPermissionlessDelegatorTx(tx *txs.AddPermissionle
 	return v.standardTx(tx)
 }
 
-// TODO: simplify this function after Banff is activated.
 func (v *MempoolTxVerifier) proposalTx(tx txs.StakerTx) error {
 	startTime := tx.StartTime()
 	maxLocalStartTime := v.Clk.Time().Add(MaxFutureStartTime)
@@ -75,35 +74,7 @@ func (v *MempoolTxVerifier) proposalTx(tx txs.StakerTx) error {
 		return errFutureStakeTime
 	}
 
-	onCommitState, err := state.NewDiff(v.ParentID, v.StateVersions)
-	if err != nil {
-		return err
-	}
-
-	// Make sure that the Banff fork check will pass.
-	currentChainTime := onCommitState.GetTimestamp()
-	if v.Backend.Config.IsBanffActivated(currentChainTime) {
-		return v.standardTx(tx)
-	}
-
-	onAbortState, err := state.NewDiff(v.ParentID, v.StateVersions)
-	if err != nil {
-		return err
-	}
-
-	executor := ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       v.Backend,
-		Tx:            v.Tx,
-	}
-	err = tx.Visit(&executor)
-	// We ignore [errFutureStakeTime] here because the time will be advanced
-	// when this transaction is issued.
-	if errors.Is(err, errFutureStakeTime) {
-		return nil
-	}
-	return err
+	return v.standardTx(tx)
 }
 
 func (v *MempoolTxVerifier) standardTx(tx txs.UnsignedTx) error {
