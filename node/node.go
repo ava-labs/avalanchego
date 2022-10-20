@@ -806,7 +806,6 @@ func (n *Node) initVMs() error {
 		vmRegisterer.Register(constants.AVMID, &avm.Factory{
 			TxFee:            n.Config.TxFee,
 			CreateAssetTxFee: n.Config.CreateAssetTxFee,
-			BanffTime:        version.GetBanffTime(n.Config.NetworkID),
 		}),
 		vmRegisterer.Register(constants.EVMID, &coreth.Factory{}),
 		n.Config.VMManager.RegisterFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
