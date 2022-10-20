@@ -822,7 +822,6 @@ func (m *manager) createSnowmanChain(
 		vm,
 		m.ApricotPhase4Time,
 		m.ApricotPhase4MinPChainHeight,
-		m.BanffTime,
 	)
 
 	if m.MeterVMEnabled {

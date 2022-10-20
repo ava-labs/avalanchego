@@ -5,7 +5,6 @@ package proposervm
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -53,8 +52,6 @@ var (
 	_ block.StateSyncableVM      = &VM{}
 
 	dbPrefix = []byte("proposervm")
-
-	errBanffBlockBeforeBanff = errors.New("block requiring Banff issued before Banff activated")
 )
 
 type VM struct {
@@ -65,8 +62,6 @@ type VM struct {
 
 	activationTime      time.Time
 	minimumPChainHeight uint64
-
-	banffActivationTime time.Time
 
 	state.State
 	hIndexer                indexer.HeightIndexer
@@ -102,15 +97,12 @@ type VM struct {
 
 	// lastAcceptedHeight is set to the last accepted PostForkBlock's height.
 	lastAcceptedHeight uint64
-
-	activationTimeBanff time.Time
 }
 
 func New(
 	vm block.ChainVM,
 	activationTime time.Time,
 	minimumPChainHeight uint64,
-	banffActivationTime time.Time,
 ) *VM {
 	bVM, _ := vm.(block.BatchedChainVM)
 	hVM, _ := vm.(block.HeightIndexedChainVM)
@@ -123,8 +115,6 @@ func New(
 
 		activationTime:      activationTime,
 		minimumPChainHeight: minimumPChainHeight,
-
-		banffActivationTime: banffActivationTime,
 	}
 }
 
@@ -618,16 +608,9 @@ func (vm *VM) setLastAcceptedMetadata() error {
 }
 
 func (vm *VM) parsePostForkBlock(b []byte) (PostForkBlock, error) {
-	statelessBlock, requireBanff, err := statelessblock.Parse(b)
+	statelessBlock, err := statelessblock.Parse(b)
 	if err != nil {
 		return nil, err
-	}
-
-	if requireBanff {
-		banffActivated := vm.Clock.Time().After(vm.activationTimeBanff)
-		if !banffActivated {
-			return nil, errBanffBlockBeforeBanff
-		}
 	}
 
 	// if the block already exists, then make sure the status is set correctly

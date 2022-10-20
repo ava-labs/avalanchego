@@ -10,7 +10,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
@@ -35,7 +34,7 @@ func TestVerifyNoCertWithSignature(t *testing.T) {
 
 	require := require.New(t)
 
-	builtBlockIntf, err := BuildUnsignedApricot(parentID, timestamp, pChainHeight, innerBlockBytes)
+	builtBlockIntf, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes)
 	require.NoError(err)
 
 	builtBlock := builtBlockIntf.(*statelessBlock)
@@ -48,7 +47,7 @@ func TestVerifyNoCertWithSignature(t *testing.T) {
 	require.Error(err)
 }
 
-func TestBlockSizeLimitExceeded(t *testing.T) {
+func TestBlockSizeLimit(t *testing.T) {
 	require := require.New(t)
 
 	parentID := ids.ID{1}
@@ -56,11 +55,7 @@ func TestBlockSizeLimitExceeded(t *testing.T) {
 	pChainHeight := uint64(2)
 	innerBlockBytes := bytes.Repeat([]byte{0}, 270*units.KiB)
 
-	// linear codec should fail to marshal, due to exceeded maximum length
-	_, err := BuildUnsignedApricot(parentID, timestamp, pChainHeight, innerBlockBytes)
-	require.ErrorIs(err, reflectcodec.ErrMaxMarshalSliceLimitExceeded)
-
-	// with the new max limit, it should be able to build blocks
-	_, err = BuildUnsignedBanff(parentID, timestamp, pChainHeight, innerBlockBytes)
+	// with the large limit, it should be able to build large blocks
+	_, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes)
 	require.NoError(err)
 }

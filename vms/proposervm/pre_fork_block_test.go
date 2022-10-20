@@ -341,7 +341,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	}
 
 	// postFork block does NOT verify if parent is before fork activation time
-	postForkStatelessChild, err := block.BuildApricot(
+	postForkStatelessChild, err := block.Build(
 		coreGenBlk.ID(),
 		coreBlk.Timestamp(),
 		0, // pChainHeight
@@ -762,7 +762,7 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	slb, err := block.BuildApricot(
+	slb, err := block.Build(
 		firstBlock.ID(), // refer unknown parent
 		firstBlock.Timestamp(),
 		0, // pChainHeight,

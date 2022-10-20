@@ -891,7 +891,7 @@ func initTestRemoteProposerVM(
 		}
 	}
 
-	proVM := New(coreVM, proBlkStartTime, 0, time.Time{})
+	proVM := New(coreVM, proBlkStartTime, 0)
 
 	valState := &validators.TestState{
 		T: t,

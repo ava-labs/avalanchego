@@ -33,7 +33,7 @@ func testBlockState(a *require.Assertions, bs BlockState) {
 	cert := tlsCert.Leaf
 	key := tlsCert.PrivateKey.(crypto.Signer)
 
-	b, err := block.BuildApricot(
+	b, err := block.Build(
 		parentID,
 		timestamp,
 		pChainHeight,
