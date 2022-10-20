@@ -5,14 +5,7 @@ package wrappers
 
 import (
 	"bytes"
-	"net"
-	"reflect"
 	"testing"
-
-	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 const (
@@ -354,55 +347,6 @@ func TestPackerUnpackBytes(t *testing.T) {
 	}
 }
 
-func TestPackerPackFixedByteSlices(t *testing.T) {
-	p := Packer{MaxSize: 12}
-
-	p.PackFixedByteSlices([][]byte{[]byte("Avax"), []byte("Evax")})
-
-	if p.Errored() {
-		t.Fatal(p.Err)
-	}
-
-	if size := len(p.Bytes); size != 12 {
-		t.Fatalf("Packer.PackFixedByteSlices wrote %d byte(s) but expected %d byte(s)", size, 12)
-	}
-
-	expected := []byte("\x00\x00\x00\x02AvaxEvax")
-	if !bytes.Equal(p.Bytes, expected) {
-		t.Fatalf("Packer.PackPackFixedByteSlicesBytes wrote:\n%v\nExpected:\n%v", p.Bytes, expected)
-	}
-
-	p.PackFixedByteSlices([][]byte{[]byte("Avax"), []byte("Evax")})
-	if !p.Errored() {
-		t.Fatal("Packer.PackFixedByteSlices did not fail when attempt was beyond p.MaxSize")
-	}
-}
-
-func TestPackerUnpackFixedByteSlices(t *testing.T) {
-	var (
-		p           = Packer{Bytes: []byte("\x00\x00\x00\x02AvaxEvax")}
-		actual      = p.UnpackFixedByteSlices(4)
-		expected    = [][]byte{[]byte("Avax"), []byte("Evax")}
-		expectedLen = 12
-	)
-
-	switch {
-	case p.Errored():
-		t.Fatalf("Packer.UnpackFixedByteSlices unexpectedly raised %s", p.Err)
-	case !reflect.DeepEqual(actual, expected):
-		t.Fatalf("Packer.UnpackFixedByteSlices returned %d, but expected %d", actual, expected)
-	case p.Offset != expectedLen:
-		t.Fatalf("Packer.UnpackFixedByteSlices left Offset %d, expected %d", p.Offset, expectedLen)
-	}
-
-	actual = p.UnpackFixedByteSlices(4)
-	if !p.Errored() {
-		t.Fatalf("Packer.UnpackFixedByteSlices should have set error, due to attempted out of bounds read")
-	} else if actual != nil {
-		t.Fatalf("Packer.UnpackFixedByteSlices returned %v, expected sentinal value %v", actual, nil)
-	}
-}
-
 func TestPackerString(t *testing.T) {
 	p := Packer{MaxSize: 6}
 
@@ -527,125 +471,4 @@ func TestPackerUnpackBool(t *testing.T) {
 	} else if actual != expected {
 		t.Fatalf("Packer.UnpackBool returned %t, expected sentinal value %t", actual, BoolSentinal)
 	}
-}
-
-func TestPacker2DByteSlice(t *testing.T) {
-	// Case: empty array
-	p := Packer{MaxSize: 1024}
-	arr := [][]byte{}
-	p.Pack2DByteSlice(arr)
-	if p.Errored() {
-		t.Fatal(p.Err)
-	}
-	arrUnpacked := p.Unpack2DByteSlice()
-	if len(arrUnpacked) != 0 {
-		t.Fatal("should be empty")
-	}
-
-	// Case: Array has one element
-	p = Packer{MaxSize: 1024}
-	arr = [][]byte{
-		{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
-	}
-	p.Pack2DByteSlice(arr)
-	if p.Errored() {
-		t.Fatal(p.Err)
-	}
-	p = Packer{MaxSize: 1024, Bytes: p.Bytes}
-	arrUnpacked = p.Unpack2DByteSlice()
-	if p.Errored() {
-		t.Fatal(p.Err)
-	}
-	if l := len(arrUnpacked); l != 1 {
-		t.Fatalf("should be length 1 but is length %d", l)
-	}
-	if !bytes.Equal(arrUnpacked[0], arr[0]) {
-		t.Fatal("should match")
-	}
-
-	// Case: Array has multiple elements
-	p = Packer{MaxSize: 1024}
-	arr = [][]byte{
-		{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
-		{11, 12, 3, 4, 5, 6, 7, 8, 9, 10},
-	}
-	p.Pack2DByteSlice(arr)
-	if p.Errored() {
-		t.Fatal(p.Err)
-	}
-	p = Packer{MaxSize: 1024, Bytes: p.Bytes}
-	arrUnpacked = p.Unpack2DByteSlice()
-	if p.Errored() {
-		t.Fatal(p.Err)
-	}
-	if l := len(arrUnpacked); l != 2 {
-		t.Fatalf("should be length 1 but is length %d", l)
-	}
-	if !bytes.Equal(arrUnpacked[0], arr[0]) {
-		t.Fatal("should match")
-	}
-	if !bytes.Equal(arrUnpacked[1], arr[1]) {
-		t.Fatal("should match")
-	}
-}
-
-func TestPackX509Certificate(t *testing.T) {
-	cert, err := staking.NewTLSCert()
-	require.NoError(t, err)
-
-	p := Packer{MaxSize: 10000}
-	p.PackX509Certificate(cert.Leaf)
-	require.NoError(t, p.Err)
-
-	p.Offset = 0
-	unpackedCert := p.UnpackX509Certificate()
-
-	require.Equal(t, cert.Leaf.Raw, unpackedCert.Raw)
-}
-
-func TestPackClaimedIPPort(t *testing.T) {
-	cert, err := staking.NewTLSCert()
-	require.NoError(t, err)
-
-	ip := ips.ClaimedIPPort{
-		IPPort:    ips.IPPort{IP: net.IPv4(1, 2, 3, 4), Port: 5},
-		Cert:      cert.Leaf,
-		Signature: []byte("signature"),
-	}
-
-	p := Packer{MaxSize: 10000}
-	p.PackClaimedIPPort(ip)
-	require.NoError(t, p.Err)
-
-	p.Offset = 0
-	unpackedIPCert := p.UnpackClaimedIPPort()
-
-	require.Equal(t, ip.IPPort, unpackedIPCert.IPPort)
-	require.Equal(t, ip.Cert.Raw, unpackedIPCert.Cert.Raw)
-	require.Equal(t, ip.Signature, unpackedIPCert.Signature)
-}
-
-func TestPackClaimedIPPortList(t *testing.T) {
-	cert, err := staking.NewTLSCert()
-	require.NoError(t, err)
-
-	ip := ips.ClaimedIPPort{
-		IPPort:    ips.IPPort{IP: net.IPv4(1, 2, 3, 4), Port: 5},
-		Cert:      cert.Leaf,
-		Signature: []byte("signature"),
-		Timestamp: 2,
-	}
-
-	p := Packer{MaxSize: 10000}
-	TryPackClaimedIPPortList(&p, []ips.ClaimedIPPort{ip})
-	require.NoError(t, p.Err)
-
-	p.Offset = 0
-	unpackedIPCertList := TryUnpackClaimedIPPortList(&p)
-	resolvedUnpackedIPCertList := unpackedIPCertList.([]ips.ClaimedIPPort)
-	require.NotEmpty(t, resolvedUnpackedIPCertList)
-	require.Equal(t, ip.IPPort, resolvedUnpackedIPCertList[0].IPPort)
-	require.Equal(t, ip.Cert.Raw, resolvedUnpackedIPCertList[0].Cert.Raw)
-	require.Equal(t, ip.Signature, resolvedUnpackedIPCertList[0].Signature)
-	require.Equal(t, ip.Timestamp, resolvedUnpackedIPCertList[0].Timestamp)
 }

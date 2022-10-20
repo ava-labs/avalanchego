@@ -3,10 +3,6 @@
 
 package message
 
-import (
-	"github.com/ava-labs/avalanchego/utils/wrappers"
-)
-
 // Field that may be packed into a message
 type Field uint32
 
@@ -37,66 +33,6 @@ const (
 	VersionStruct                    // Used internally
 	SourceChainID                    // Used for cross-chain messaging
 )
-
-// Packer returns the packer function that can be used to pack this field.
-func (f Field) Packer() func(*wrappers.Packer, interface{}) {
-	switch f {
-	case VersionStr:
-		return wrappers.TryPackStr
-	case NetworkID, NodeID, RequestID:
-		return wrappers.TryPackInt
-	case MyTime, Deadline, VersionTime:
-		return wrappers.TryPackLong
-	case IP:
-		return wrappers.TryPackIP
-	case ChainID, ContainerID: // TODO: This will be shortened to use a modified varint spec
-		return wrappers.TryPackHash
-	case ContainerBytes, AppBytes, SigBytes, SummaryBytes:
-		return wrappers.TryPackBytes
-	case ContainerIDs, TrackedSubnets, SummaryIDs:
-		return wrappers.TryPackHashes
-	case MultiContainerBytes:
-		return wrappers.TryPack2DBytes
-	case Peers:
-		return wrappers.TryPackClaimedIPPortList
-	case Uptime:
-		return wrappers.TryPackByte
-	case SummaryHeights:
-		return wrappers.TryPackUint64Slice
-	default:
-		return nil
-	}
-}
-
-// Unpacker returns the unpacker function that can be used to unpack this field.
-func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
-	switch f {
-	case VersionStr:
-		return wrappers.TryUnpackStr
-	case NetworkID, NodeID, RequestID:
-		return wrappers.TryUnpackInt
-	case MyTime, Deadline, VersionTime:
-		return wrappers.TryUnpackLong
-	case IP:
-		return wrappers.TryUnpackIP
-	case ChainID, ContainerID: // TODO: This will be shortened to use a modified varint spec
-		return wrappers.TryUnpackHash
-	case ContainerBytes, AppBytes, SigBytes, SummaryBytes:
-		return wrappers.TryUnpackBytes
-	case ContainerIDs, TrackedSubnets, SummaryIDs:
-		return wrappers.TryUnpackHashes
-	case MultiContainerBytes:
-		return wrappers.TryUnpack2DBytes
-	case Peers:
-		return wrappers.TryUnpackClaimedIPPortList
-	case Uptime:
-		return wrappers.TryUnpackByte
-	case SummaryHeights:
-		return wrappers.TryUnpackUint64Slice
-	default:
-		return nil
-	}
-}
 
 func (f Field) String() string {
 	switch f {

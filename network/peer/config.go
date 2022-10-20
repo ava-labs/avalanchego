@@ -21,14 +21,10 @@ type Config struct {
 	// Size, in bytes, of the buffer this peer reads messages into
 	ReadBufferSize int
 	// Size, in bytes, of the buffer this peer writes messages into
-	WriteBufferSize         int
-	Clock                   mockable.Clock
-	Metrics                 *Metrics
-	MessageCreator          message.Creator
-	MessageCreatorWithProto message.Creator
-
-	// TODO: remove this once we complete banff migration
-	BanffTime time.Time
+	WriteBufferSize int
+	Clock           mockable.Clock
+	Metrics         *Metrics
+	MessageCreator  message.Creator
 
 	Log                  logging.Logger
 	InboundMsgThrottler  throttling.InboundMsgThrottler
@@ -48,16 +44,4 @@ type Config struct {
 
 	// Tracks CPU/disk usage caused by each peer.
 	ResourceTracker tracker.ResourceTracker
-}
-
-func (c *Config) GetMessageCreator() message.Creator {
-	now := c.Clock.Time()
-	if c.IsBanffActivated(now) {
-		return c.MessageCreatorWithProto
-	}
-	return c.MessageCreator
-}
-
-func (c *Config) IsBanffActivated(time time.Time) bool {
-	return !time.Before(c.BanffTime)
 }

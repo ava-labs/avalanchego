@@ -77,16 +77,6 @@ func StartTestPeer(
 		return nil, err
 	}
 
-	mcWithProto, err := message.NewCreatorWithProto(
-		prometheus.NewRegistry(),
-		"",
-		true,
-		10*time.Second,
-	)
-	if err != nil {
-		return nil, err
-	}
-
 	metrics, err := NewMetrics(
 		logging.NoLog{},
 		"",
@@ -107,12 +97,10 @@ func StartTestPeer(
 
 	peer := Start(
 		&Config{
-			Metrics:                 metrics,
-			MessageCreator:          mc,
-			MessageCreatorWithProto: mcWithProto,
-			BanffTime:               version.GetBanffTime(networkID),
-			Log:                     logging.NoLog{},
-			InboundMsgThrottler:     throttling.NewNoInboundThrottler(),
+			Metrics:             metrics,
+			MessageCreator:      mc,
+			Log:                 logging.NoLog{},
+			InboundMsgThrottler: throttling.NewNoInboundThrottler(),
 			Network: NewTestNetwork(
 				mc,
 				networkID,

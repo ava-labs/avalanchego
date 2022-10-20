@@ -15,14 +15,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-func Test_newInboundBuilderWithProto(t *testing.T) {
+func Test_newInboundBuilder(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 
-	mb, err := newMsgBuilderProtobuf("test", prometheus.NewRegistry(), int64(constants.DefaultMaxMessageSize), 5*time.Second)
+	mb, err := newMsgBuilder("test", prometheus.NewRegistry(), int64(constants.DefaultMaxMessageSize), 5*time.Second)
 	require.NoError(err)
 
-	builder := newInboundBuilderWithProto(mb)
+	builder := newInboundBuilder(mb)
 
 	inMsg := builder.InboundAccepted(
 		ids.GenerateTestID(),
