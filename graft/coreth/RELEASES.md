@@ -5,6 +5,12 @@
 - Add cache size config parameters for `trie-clean-cache`, `trie-dirty-cache`, `trie-dirty-commit-target`, and `snapshot-cache`
 - Increase default `trie-clean-cache` size from 256 MB to 512 MB
 - Increase default `snapshot-cache` size from 128 MB to 256 MB
+- Add optional flag to skip chain config upgrade check on startup (allows VM to start after missing a network upgrade)
+- Make Avalanche blockchainID (separate from EVM ChainID) available within the EVM
+- Record block height when performing state sync
+- Add support for VM-to-VM messaging
+- Move `eth_getChainConfig` under the `BlockChainAPI`
+- Remove block builder timer logic to rely on ProposerVM to meter block production
 
 ## [v0.11.0](https://github.com/ava-labs/coreth/releases/tag/v0.11.0)
 
