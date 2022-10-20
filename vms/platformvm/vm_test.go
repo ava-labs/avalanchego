@@ -1709,8 +1709,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	sender, err := sender.New(
 		consensusCtx,
 		mc,
-		mc,
-		time.Now(),
 		externalSender,
 		chainRouter,
 		timeoutManager,

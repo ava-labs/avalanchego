@@ -710,8 +710,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		DecisionAcceptorGroup:                   n.DecisionAcceptorGroup,
 		ConsensusAcceptorGroup:                  n.ConsensusAcceptorGroup,
 		DBManager:                               n.DBManager,
-		MsgCreator:                              n.msgCreator,
-		MsgCreatorWithProto:                     n.msgCreatorWithProto,
+		MsgCreator:                              n.msgCreatorWithProto,
 		Router:                                  n.Config.ConsensusRouter,
 		Net:                                     n.Net,
 		ConsensusParams:                         n.Config.ConsensusParams,
@@ -740,7 +739,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
 		ApricotPhase4Time:                       version.GetApricotPhase4Time(n.Config.NetworkID),
 		ApricotPhase4MinPChainHeight:            version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
-		BanffTime:                               version.GetBanffTime(n.Config.NetworkID),
 		ResourceTracker:                         n.resourceTracker,
 		StateSyncBeacons:                        n.Config.StateSyncIDs,
 	})
