@@ -16,6 +16,10 @@ const (
 	defaultAcceptorQueueLimit                     = 64 // Provides 2 minutes of buffer (2s block target) for a commit delay
 	defaultPruningEnabled                         = true
 	defaultCommitInterval                         = 4096
+	defaultTrieCleanCache                         = 512
+	defaultTrieDirtyCache                         = 256
+	defaultTrieDirtyCommitTarget                  = 20
+	defaultSnapshotCache                          = 256
 	defaultSyncableCommitInterval                 = defaultCommitInterval * 4
 	defaultSnapshotAsync                          = true
 	defaultRpcGasCap                              = 50_000_000 // Default to 50M Gas Limit
@@ -79,6 +83,12 @@ type Config struct {
 	// Coreth API Gas/Price Caps
 	RPCGasCap   uint64  `json:"rpc-gas-cap"`
 	RPCTxFeeCap float64 `json:"rpc-tx-fee-cap"`
+
+	// Cache settings
+	TrieCleanCache        int `json:"trie-clean-cache"`         // Size of the trie clean cache (MB)
+	TrieDirtyCache        int `json:"trie-dirty-cache"`         // Size of the trie dirty cache (MB)
+	TrieDirtyCommitTarget int `json:"trie-dirty-commit-target"` // Memory limit to target in the dirty cache before performing a commit (MB)
+	SnapshotCache         int `json:"snapshot-cache"`           // Size of the snapshot disk layer clean cache (MB)
 
 	// Eth Settings
 	Preimages      bool `json:"preimages-enabled"`
@@ -163,6 +173,10 @@ func (c *Config) SetDefaults() {
 	c.ContinuousProfilerFrequency.Duration = defaultContinuousProfilerFrequency
 	c.ContinuousProfilerMaxFiles = defaultContinuousProfilerMaxFiles
 	c.Pruning = defaultPruningEnabled
+	c.TrieCleanCache = defaultTrieCleanCache
+	c.TrieDirtyCache = defaultTrieDirtyCache
+	c.TrieDirtyCommitTarget = defaultTrieDirtyCommitTarget
+	c.SnapshotCache = defaultSnapshotCache
 	c.AcceptorQueueLimit = defaultAcceptorQueueLimit
 	c.SnapshotAsync = defaultSnapshotAsync
 	c.TxRegossipFrequency.Duration = defaultTxRegossipFrequency

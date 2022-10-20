@@ -126,18 +126,6 @@ func New(
 	if chainDb == nil {
 		return nil, errors.New("chainDb cannot be nil")
 	}
-	if !config.Pruning && config.TrieDirtyCache > 0 {
-		// If snapshots are enabled, allocate 2/5 of the TrieDirtyCache memory cap to the snapshot cache
-		if config.SnapshotCache > 0 {
-			config.TrieCleanCache += config.TrieDirtyCache * 3 / 5
-			config.SnapshotCache += config.TrieDirtyCache * 2 / 5
-		} else {
-			// If snapshots are disabled, the TrieDirtyCache will be written through to the clean cache
-			// so move the cache allocation from the dirty cache to the clean cache
-			config.TrieCleanCache += config.TrieDirtyCache
-			config.TrieDirtyCache = 0
-		}
-	}
 
 	// round TrieCleanCache and SnapshotCache up to nearest 64MB, since fastcache will mmap
 	// memory in 64MBs chunks.
@@ -145,9 +133,10 @@ func New(
 	config.SnapshotCache = roundUpCacheSize(config.SnapshotCache, 64)
 
 	log.Info(
-		"Allocated trie memory caches",
-		"clean", common.StorageSize(config.TrieCleanCache)*1024*1024,
-		"dirty", common.StorageSize(config.TrieDirtyCache)*1024*1024,
+		"Allocated memory caches",
+		"trie clean", common.StorageSize(config.TrieCleanCache)*1024*1024,
+		"trie dirty", common.StorageSize(config.TrieDirtyCache)*1024*1024,
+		"snapshot clean", common.StorageSize(config.SnapshotCache)*1024*1024,
 	)
 
 	chainConfig, genesisErr := core.SetupGenesisBlock(chainDb, config.Genesis, lastAcceptedHash, config.SkipUpgradeCheck)

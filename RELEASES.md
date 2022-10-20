@@ -1,6 +1,12 @@
 # Release Notes
 
-## [v0.11.0](https://github.com/ava-labs/coreth/releases/tag/v0.10.0)
+## [v0.11.1](https://github.com/ava-labs/coreth/releases/tag/v0.11.1)
+
+- Add cache size config parameters for `trie-clean-cache`, `trie-dirty-cache`, `trie-dirty-commit-target`, and `snapshot-cache`
+- Increase default `trie-clean-cache` size from 256 MB to 512 MB
+- Increase default `snapshot-cache` size from 128 MB to 256 MB
+
+## [v0.11.0](https://github.com/ava-labs/coreth/releases/tag/v0.11.0)
 
 - Update Chain Config compatibility check to compare against last accepted block timestamp
 - Bump go-ethereum dependency to v1.10.25
