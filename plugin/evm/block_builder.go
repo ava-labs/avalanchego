@@ -11,34 +11,19 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ethereum/go-ethereum/log"
 )
 
-// buildingBlkStatus denotes the current status of the VM in block production.
-type buildingBlkStatus uint8
-
-var (
-	// AP4 Params
-	minBlockTimeAP4 = 500 * time.Millisecond
-)
-
-const (
-	// waitBlockTime is the amount of time to wait for BuildBlock to be
-	// called by the engine before deciding whether or not to gossip the
-	// transaction that triggered the PendingTxs message to the engine.
-	//
-	// This is done to reduce contention in the network when there is no
-	// preferred producer. If we did not wait here, we may gossip a new
-	// transaction to a peer while building a block that will conflict with
-	// whatever the peer makes.
-	waitBlockTime = 100 * time.Millisecond
-
-	dontBuild buildingBlkStatus = iota
-	mayBuild
-	building
-)
+// waitBlockTime is the amount of time to wait for BuildBlock to be
+// called by the engine before deciding whether or not to gossip the
+// transaction that triggered the PendingTxs message to the engine.
+//
+// This is done to reduce contention in the network when there is no
+// preferred producer. If we did not wait here, we may gossip a new
+// transaction to a peer while building a block that will conflict with
+// whatever the peer makes.
+const waitBlockTime = 100 * time.Millisecond
 
 type blockBuilder struct {
 	ctx         *snow.Context
@@ -55,21 +40,16 @@ type blockBuilder struct {
 	// is ready to be build. This notifies the consensus engine.
 	notifyBuildBlockChan chan<- commonEng.Message
 
-	// [buildBlockLock] must be held when accessing [buildStatus]
+	// [buildBlockLock] must be held when accessing [buildSent]
 	buildBlockLock sync.Mutex
 
-	// [buildBlockTimer] is a timer handling block production.
-	buildBlockTimer *timer.Timer
-
-	// buildStatus signals the phase of block building the VM is currently in.
-	// [dontBuild] indicates there's no need to build a block.
-	// [mayBuild] indicates the VM should proceed to build a block.
-	// [building] indicates the VM has sent a request to the engine to build a block.
-	buildStatus buildingBlkStatus
+	// buildSent is true iff we have sent a PendingTxs message to the consensus message and
+	// are still waiting for buildBlock to be called.
+	buildSent bool
 }
 
 func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *blockBuilder {
-	b := &blockBuilder{
+	return &blockBuilder{
 		ctx:                  vm.ctx,
 		chainConfig:          vm.chainConfig,
 		txPool:               vm.txPool,
@@ -78,16 +58,7 @@ func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *bl
 		shutdownChan:         vm.shutdownChan,
 		shutdownWg:           &vm.shutdownWg,
 		notifyBuildBlockChan: notifyBuildBlockChan,
-		buildStatus:          dontBuild,
 	}
-
-	b.handleBlockBuilding()
-	return b
-}
-
-func (b *blockBuilder) handleBlockBuilding() {
-	b.buildBlockTimer = timer.NewTimer(b.buildBlockTimerCallback)
-	go b.ctx.Log.RecoverAndPanic(b.buildBlockTimer.Dispatch)
 }
 
 // handleGenerateBlock should be called immediately after [BuildBlock].
@@ -97,16 +68,13 @@ func (b *blockBuilder) handleGenerateBlock() {
 	b.buildBlockLock.Lock()
 	defer b.buildBlockLock.Unlock()
 
-	// If we still need to build a block immediately after building, we let the
-	// engine know it [mayBuild] in [minBlockTimeAP4].
-	//
-	// It is often the case in AP4 that a block (with the same txs) could be built
-	// after a few seconds of delay as the [baseFee] and/or [blockGasCost] decrease.
+	// Reset buildSent now that the engine has called BuildBlock.
+	b.buildSent = false
+
+	// Check if there are transactions in the mempool signifying the VM
+	// is already ready to build another block.
 	if b.needToBuild() {
-		b.buildStatus = mayBuild
-		b.buildBlockTimer.SetTimeoutIn(minBlockTimeAP4)
-	} else {
-		b.buildStatus = dontBuild
+		b.markBuilding()
 	}
 }
 
@@ -117,31 +85,11 @@ func (b *blockBuilder) needToBuild() bool {
 	return size > 0 || b.mempool.Len() > 0
 }
 
-// buildBlockTimerCallback is the timer callback that sends a notification
-// to the engine when the VM is ready to build a block.
-func (b *blockBuilder) buildBlockTimerCallback() {
-	b.buildBlockLock.Lock()
-	defer b.buildBlockLock.Unlock()
-
-	switch b.buildStatus {
-	case dontBuild:
-	case mayBuild:
-		b.markBuilding()
-	case building:
-		// If the status has already been set to building, there is no need
-		// to send an additional request to the consensus engine until the call
-		// to BuildBlock resets the block status.
-	default:
-		// Log an error if an invalid status is found.
-		log.Error("Found invalid build status in build block timer", "buildStatus", b.buildStatus)
-	}
-}
-
 // markBuilding assumes the [buildBlockLock] is held.
 func (b *blockBuilder) markBuilding() {
 	select {
 	case b.notifyBuildBlockChan <- commonEng.PendingTxs:
-		b.buildStatus = building
+		b.buildSent = true
 	default:
 		log.Error("Failed to push PendingTxs notification to the consensus engine.")
 	}
@@ -154,7 +102,9 @@ func (b *blockBuilder) signalTxsReady() {
 	b.buildBlockLock.Lock()
 	defer b.buildBlockLock.Unlock()
 
-	if b.buildStatus != dontBuild {
+	// If we have already signalled the engine, that we're ready to build a block
+	// do not send a second notification.
+	if b.buildSent {
 		return
 	}
 
@@ -216,7 +166,6 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 					}
 				}
 			case <-b.shutdownChan:
-				b.buildBlockTimer.Stop()
 				return
 			}
 		}
