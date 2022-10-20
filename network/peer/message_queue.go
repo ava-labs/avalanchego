@@ -67,7 +67,7 @@ type throttledMessageQueue struct {
 
 	// queue of the messages
 	// [cond.L] must be held while accessing [queue].
-	queue buffer.UnboundedQueue[message.OutboundMessage]
+	queue buffer.Deque[message.OutboundMessage]
 }
 
 func NewThrottledMessageQueue(
@@ -82,7 +82,7 @@ func NewThrottledMessageQueue(
 		log:                  log,
 		outboundMsgThrottler: outboundMsgThrottler,
 		cond:                 sync.NewCond(&sync.Mutex{}),
-		queue:                buffer.NewUnboundedSliceQueue[message.OutboundMessage](initialQueueSize),
+		queue:                buffer.NewUnboundedDeque[message.OutboundMessage](initialQueueSize),
 	}
 }
 
@@ -129,7 +129,7 @@ func (q *throttledMessageQueue) Push(ctx context.Context, msg message.OutboundMe
 		return false
 	}
 
-	q.queue.Enqueue(msg)
+	q.queue.PushRight(msg)
 	q.cond.Signal()
 	return true
 }
@@ -166,7 +166,7 @@ func (q *throttledMessageQueue) PopNow() (message.OutboundMessage, bool) {
 }
 
 func (q *throttledMessageQueue) pop() message.OutboundMessage {
-	msg, _ := q.queue.Dequeue()
+	msg, _ := q.queue.PopLeft()
 
 	q.outboundMsgThrottler.Release(msg, q.id)
 	return msg
@@ -183,7 +183,7 @@ func (q *throttledMessageQueue) Close() {
 	q.closed = true
 
 	for q.queue.Len() > 0 {
-		msg, _ := q.queue.Dequeue()
+		msg, _ := q.queue.PopLeft()
 		q.outboundMsgThrottler.Release(msg, q.id)
 		q.onFailed.SendFailed(msg)
 	}

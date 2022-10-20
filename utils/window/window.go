@@ -32,7 +32,7 @@ type window[T any] struct {
 	// mutex for synchronization
 	lock sync.Mutex
 	// elements in the window
-	elements buffer.UnboundedQueue[node[T]]
+	elements buffer.Deque[node[T]]
 }
 
 // Config exposes parameters for Window
@@ -48,7 +48,7 @@ func New[T any](config Config) Window[T] {
 		clock:    config.Clock,
 		ttl:      config.TTL,
 		maxSize:  config.MaxSize,
-		elements: buffer.NewUnboundedSliceQueue[node[T]](config.MaxSize + 1),
+		elements: buffer.NewUnboundedDeque[node[T]](config.MaxSize + 1),
 	}
 }
 
@@ -60,11 +60,11 @@ func (w *window[T]) Add(value T) {
 
 	w.removeStaleNodes()
 	if w.elements.Len() >= w.maxSize {
-		_, _ = w.elements.Dequeue()
+		_, _ = w.elements.PopLeft()
 	}
 
 	// add the new block id
-	w.elements.Enqueue(node[T]{
+	w.elements.PushRight(node[T]{
 		value:     value,
 		entryTime: w.clock.Time(),
 	})
@@ -77,7 +77,7 @@ func (w *window[T]) Oldest() (T, bool) {
 
 	w.removeStaleNodes()
 
-	oldest, ok := w.elements.PeekHead()
+	oldest, ok := w.elements.PeekLeft()
 	if !ok {
 		return utils.Zero[T](), false
 	}
@@ -99,11 +99,11 @@ func (w *window[T]) removeStaleNodes() {
 	// window. Nodes are guaranteed to be strictly increasing in entry time,
 	// so we can break this loop once we find the first non-stale one.
 	for {
-		oldest, ok := w.elements.PeekHead()
+		oldest, ok := w.elements.PeekLeft()
 		if !ok || w.clock.Time().Sub(oldest.entryTime) <= w.ttl {
 			return
 		}
-		_, _ = w.elements.Dequeue()
+		_, _ = w.elements.PopLeft()
 	}
 }
 

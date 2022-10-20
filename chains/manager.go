@@ -214,7 +214,7 @@ type manager struct {
 	registrants []Registrant
 
 	// queue that holds chain create requests
-	chainsQueue buffer.UnboundedBlockingQueue[ChainParameters]
+	chainsQueue buffer.BlockingDeque[ChainParameters]
 	// unblocks chain creator to start processing the queue
 	unblockChainCreatorCh  chan struct{}
 	chainCreatorShutdownCh chan struct{}
@@ -234,13 +234,12 @@ type manager struct {
 
 // New returns a new Manager
 func New(config *ManagerConfig) Manager {
-	queue := buffer.NewUnboundedSliceQueue[ChainParameters](initialQueueSize)
 	return &manager{
 		Aliaser:                ids.NewAliaser(),
 		ManagerConfig:          *config,
 		subnets:                make(map[ids.ID]Subnet),
 		chains:                 make(map[ids.ID]handler.Handler),
-		chainsQueue:            buffer.NewUnboundedBlockingQueue(queue),
+		chainsQueue:            buffer.NewUnboundedBlockingDeque[ChainParameters](initialQueueSize),
 		unblockChainCreatorCh:  make(chan struct{}),
 		chainCreatorShutdownCh: make(chan struct{}),
 	}
@@ -252,7 +251,7 @@ func (m *manager) Router() router.Router { return m.ManagerConfig.Router }
 // QueueChainCreation queues a chain creation request
 // Invariant: Whitelisted Subnet must be checked before calling this function
 func (m *manager) QueueChainCreation(chainParams ChainParameters) {
-	if ok := m.chainsQueue.Enqueue(chainParams); !ok {
+	if ok := m.chainsQueue.PushRight(chainParams); !ok {
 		m.Log.Debug("cannot enqueue new chain",
 			zap.Stringer("chainID", chainParams.ID),
 		)
@@ -1031,7 +1030,7 @@ func (m *manager) dispatchChainCreator(platform ChainParameters) {
 		// Get the next chain we should create.
 		// Dequeue waits until an element is pushed, so this is not
 		// busy-looping.
-		chainParams, ok := m.chainsQueue.Dequeue()
+		chainParams, ok := m.chainsQueue.PopLeft()
 		if !ok { // queue is closed, return directly
 			return
 		}
