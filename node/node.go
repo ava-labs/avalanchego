@@ -572,14 +572,16 @@ func (n *Node) initIndexer() error {
 func (n *Node) initChains(genesisBytes []byte) {
 	n.Log.Info("initializing chains")
 
-	// Create the Platform Chain
-	n.chainManager.ForceCreateChain(chains.ChainParameters{
+	platformChain := chains.ChainParameters{
 		ID:            constants.PlatformChainID,
 		SubnetID:      constants.PrimaryNetworkID,
 		GenesisData:   genesisBytes, // Specifies other chains to create
 		VMID:          constants.PlatformVMID,
 		CustomBeacons: n.beacons,
-	})
+	}
+
+	// Start the chain creator with the Platform Chain
+	n.chainManager.StartChainCreator(platformChain)
 }
 
 // initAPIServer initializes the server that handles HTTP calls
@@ -724,7 +726,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		CriticalChains:                          criticalChains,
 		TimeoutManager:                          timeoutManager,
 		Health:                                  n.health,
-		WhitelistedSubnets:                      n.Config.WhitelistedSubnets,
 		RetryBootstrap:                          n.Config.RetryBootstrap,
 		RetryBootstrapWarnFrequency:             n.Config.RetryBootstrapWarnFrequency,
 		ShutdownNodeFunc:                        n.Shutdown,

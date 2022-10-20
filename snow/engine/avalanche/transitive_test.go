@@ -1859,6 +1859,200 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 	}
 }
 
+func TestEngineAbandonChit(t *testing.T) {
+	require := require.New(t)
+
+	_, _, engCfg := DefaultConfig()
+
+	vals := validators.NewSet()
+	engCfg.Validators = vals
+
+	vdr := ids.GenerateTestNodeID()
+	err := vals.AddWeight(vdr, 1)
+	require.NoError(err)
+
+	sender := &common.SenderTest{T: t}
+	sender.Default(true)
+	sender.CantSendGetAcceptedFrontier = false
+	engCfg.Sender = sender
+
+	manager := vertex.NewTestManager(t)
+	manager.Default(true)
+	engCfg.Manager = manager
+
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	mVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+
+	vts := []avalanche.Vertex{gVtx, mVtx}
+
+	vtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		BytesV:   []byte{0, 1, 2, 3},
+	}
+
+	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
+		switch id {
+		case gVtx.ID():
+			return gVtx, nil
+		case mVtx.ID():
+			return mVtx, nil
+		}
+		t.Fatalf("Unknown vertex")
+		panic("Should have errored")
+	}
+
+	te, err := newTransitive(engCfg)
+	require.NoError(err)
+
+	err = te.Start(0)
+	require.NoError(err)
+
+	var reqID uint32
+	sender.SendPushQueryF = func(_ ids.NodeIDSet, requestID uint32, _ []byte) {
+		reqID = requestID
+	}
+
+	err = te.issue(vtx)
+	require.NoError(err)
+
+	fakeVtxID := ids.GenerateTestID()
+	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
+		require.Equal(fakeVtxID, id)
+		return nil, errMissing
+	}
+
+	sender.SendGetF = func(_ ids.NodeID, requestID uint32, _ ids.ID) {
+		reqID = requestID
+	}
+
+	// Register a voter dependency on an unknown vertex.
+	err = te.Chits(vdr, reqID, []ids.ID{fakeVtxID})
+	require.NoError(err)
+	require.Len(te.vtxBlocked, 1)
+
+	sender.CantSendPullQuery = false
+
+	err = te.GetFailed(vdr, reqID)
+	require.NoError(err)
+	require.Empty(te.vtxBlocked)
+}
+
+func TestEngineAbandonChitWithUnexpectedPutVertex(t *testing.T) {
+	require := require.New(t)
+
+	_, _, engCfg := DefaultConfig()
+
+	vals := validators.NewSet()
+	engCfg.Validators = vals
+
+	vdr := ids.GenerateTestNodeID()
+	err := vals.AddWeight(vdr, 1)
+	require.NoError(err)
+
+	sender := &common.SenderTest{T: t}
+	sender.Default(true)
+	sender.CantSendGetAcceptedFrontier = false
+	engCfg.Sender = sender
+
+	manager := vertex.NewTestManager(t)
+	manager.Default(true)
+	engCfg.Manager = manager
+
+	gVtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		},
+		BytesV: []byte{0},
+	}
+	mVtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		},
+		BytesV: []byte{1},
+	}
+
+	vts := []avalanche.Vertex{gVtx, mVtx}
+
+	vtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: vts,
+		HeightV:  1,
+		BytesV:   []byte{0, 1, 2, 3},
+	}
+
+	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
+		switch id {
+		case gVtx.ID():
+			return gVtx, nil
+		case mVtx.ID():
+			return mVtx, nil
+		}
+		t.Fatalf("Unknown vertex")
+		panic("Should have errored")
+	}
+
+	te, err := newTransitive(engCfg)
+	require.NoError(err)
+
+	err = te.Start(0)
+	require.NoError(err)
+
+	var reqID uint32
+	sender.SendPushQueryF = func(_ ids.NodeIDSet, requestID uint32, _ []byte) {
+		reqID = requestID
+	}
+
+	err = te.issue(vtx)
+	require.NoError(err)
+
+	fakeVtxID := ids.GenerateTestID()
+	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
+		require.Equal(fakeVtxID, id)
+		return nil, errMissing
+	}
+
+	sender.SendGetF = func(_ ids.NodeID, requestID uint32, _ ids.ID) {
+		reqID = requestID
+	}
+
+	// Register a voter dependency on an unknown vertex.
+	err = te.Chits(vdr, reqID, []ids.ID{fakeVtxID})
+	require.NoError(err)
+	require.Len(te.vtxBlocked, 1)
+
+	sender.CantSendPullQuery = false
+
+	gVtxBytes := gVtx.Bytes()
+	manager.ParseVtxF = func(b []byte) (avalanche.Vertex, error) {
+		require.Equal(gVtxBytes, b)
+		return gVtx, nil
+	}
+
+	// Respond with an unexpected vertex and verify that the request is
+	// correctly cleared.
+	err = te.Put(vdr, reqID, gVtxBytes)
+	require.NoError(err)
+	require.Empty(te.vtxBlocked)
+}
+
 func TestEngineBlockingChitRequest(t *testing.T) {
 	_, _, engCfg := DefaultConfig()
 

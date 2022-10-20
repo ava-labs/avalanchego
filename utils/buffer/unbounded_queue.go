@@ -10,7 +10,8 @@ const defaultInitSize = 32
 // An unbounded queue.
 // Not safe for concurrent access.
 type UnboundedQueue[T any] interface {
-	Enqueue(T)
+	// Returns true if the item was added to the queue.
+	Enqueue(T) bool
 	// Returns false if the queue is empty.
 	Dequeue() (T, bool)
 	// Returns the oldest element without removing it.
@@ -47,7 +48,7 @@ type unboundedSliceQueue[T any] struct {
 	data             []T
 }
 
-func (b *unboundedSliceQueue[T]) Enqueue(elt T) {
+func (b *unboundedSliceQueue[T]) Enqueue(elt T) bool {
 	// Invariant (5) says it's safe to place the element without resizing.
 	b.data[b.tail] = elt
 	b.size++
@@ -55,7 +56,7 @@ func (b *unboundedSliceQueue[T]) Enqueue(elt T) {
 	b.tail %= len(b.data)
 
 	if b.head != b.tail {
-		return
+		return true
 	}
 	// Invariant (1) says if the head and the tail are equal then the queue is empty.
 	// It isn't -- we just enqueued an element -- so we need to resize to honor invariant (1).
@@ -66,6 +67,7 @@ func (b *unboundedSliceQueue[T]) Enqueue(elt T) {
 	b.data = newData
 	b.head = 0
 	b.tail = b.size
+	return true
 }
 
 func (b *unboundedSliceQueue[T]) Dequeue() (T, bool) {

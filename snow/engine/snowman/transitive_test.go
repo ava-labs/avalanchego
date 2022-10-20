@@ -1124,6 +1124,8 @@ func TestEngineAbandonQuery(t *testing.T) {
 }
 
 func TestEngineAbandonChit(t *testing.T) {
+	require := require.New(t)
+
 	vdr, _, sender, vm, te, gBlk := setupDefaultConfig(t)
 
 	sender.Default(true)
@@ -1149,43 +1151,100 @@ func TestEngineAbandonChit(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	sender.CantSendPushQuery = false
-
-	if err := te.issue(blk); err != nil {
-		t.Fatal(err)
+	var reqID uint32
+	sender.SendPushQueryF = func(_ ids.NodeIDSet, requestID uint32, _ []byte) {
+		reqID = requestID
 	}
+
+	err := te.issue(blk)
+	require.NoError(err)
 
 	fakeBlkID := ids.GenerateTestID()
 	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
-		switch id {
-		case fakeBlkID:
-			return nil, errUnknownBlock
-		default:
-			t.Fatalf("Loaded unknown block")
-			panic("Should have failed")
-		}
+		require.Equal(fakeBlkID, id)
+		return nil, errUnknownBlock
 	}
 
-	reqID := new(uint32)
 	sender.SendGetF = func(_ ids.NodeID, requestID uint32, _ ids.ID) {
-		*reqID = requestID
+		reqID = requestID
 	}
 
-	if err := te.Chits(vdr, 0, []ids.ID{fakeBlkID}); err != nil {
-		t.Fatal(err)
+	// Register a voter dependency on an unknown block.
+	err = te.Chits(vdr, reqID, []ids.ID{fakeBlkID})
+	require.NoError(err)
+	require.Len(te.blocked, 1)
+
+	sender.CantSendPullQuery = false
+
+	err = te.GetFailed(vdr, reqID)
+	require.NoError(err)
+	require.Empty(te.blocked)
+}
+
+func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
+	require := require.New(t)
+
+	vdr, _, sender, vm, te, gBlk := setupDefaultConfig(t)
+
+	sender.Default(true)
+
+	blk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: gBlk.ID(),
+		HeightV: 1,
+		BytesV:  []byte{1},
 	}
 
-	if len(te.blocked) != 1 {
-		t.Fatalf("Should have blocked on request")
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case gBlk.ID():
+			return gBlk, nil
+		case blk.ID():
+			return nil, errUnknownBlock
+		}
+		t.Fatalf("Wrong block requested")
+		return nil, errUnknownBlock
 	}
 
-	if err := te.GetFailed(vdr, *reqID); err != nil {
-		t.Fatal(err)
+	var reqID uint32
+	sender.SendPushQueryF = func(_ ids.NodeIDSet, requestID uint32, _ []byte) {
+		reqID = requestID
 	}
 
-	if len(te.blocked) != 0 {
-		t.Fatalf("Should have removed request")
+	err := te.issue(blk)
+	require.NoError(err)
+
+	fakeBlkID := ids.GenerateTestID()
+	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
+		require.Equal(fakeBlkID, id)
+		return nil, errUnknownBlock
 	}
+
+	sender.SendGetF = func(_ ids.NodeID, requestID uint32, _ ids.ID) {
+		reqID = requestID
+	}
+
+	// Register a voter dependency on an unknown block.
+	err = te.Chits(vdr, reqID, []ids.ID{fakeBlkID})
+	require.NoError(err)
+	require.Len(te.blocked, 1)
+
+	sender.CantSendPullQuery = false
+
+	gBlkBytes := gBlk.Bytes()
+	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		require.Equal(gBlkBytes, b)
+		return gBlk, nil
+	}
+
+	// Respond with an unexpected block and verify that the request is correctly
+	// cleared.
+	err = te.Put(vdr, reqID, gBlkBytes)
+	require.NoError(err)
+	require.Empty(te.blocked)
 }
 
 func TestEngineBlockingChitRequest(t *testing.T) {
