@@ -361,7 +361,6 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(TracingEndpointKey, "localhost:4317", "The endpoint to send trace data to")
 	fs.Float64(TracingSampleRateKey, 0.1, "The fraction of traces to sample. If >= 1, always sample. If <= 0, never sample")
 	// TODO add flag to take in headers to send from exporter
-
 }
 
 // BuildFlagSet returns a complete set of flags for avalanchego

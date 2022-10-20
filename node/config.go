@@ -224,7 +224,7 @@ type Config struct {
 	RequiredAvailableDiskSpace         uint64 `json:"requiredAvailableDiskSpace"`
 	WarningThresholdAvailableDiskSpace uint64 `json:"warningThresholdAvailableDiskSpace"`
 
-	TraceConfig trace.TraceConfig `json:"traceConfig"`
+	TraceConfig trace.Config `json:"traceConfig"`
 
 	// See comment on [MinPercentConnectedStakeHealthy] in platformvm.Config
 	MinPercentConnectedStakeHealthy map[ids.ID]float64 `json:"minPercentConnectedStakeHealthy"`

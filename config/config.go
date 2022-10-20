@@ -1201,10 +1201,10 @@ func getDiskTargeterConfig(v *viper.Viper) (tracker.TargeterConfig, error) {
 	}
 }
 
-func getTraceConfig(v *viper.Viper) (trace.TraceConfig, error) {
+func getTraceConfig(v *viper.Viper) (trace.Config, error) {
 	enabled := v.GetBool(TracingEnabledKey)
 	if !enabled {
-		return trace.TraceConfig{
+		return trace.Config{
 			Enabled: false,
 		}, nil
 	}
@@ -1220,14 +1220,14 @@ func getTraceConfig(v *viper.Viper) (trace.TraceConfig, error) {
 	case trace.HTTP.String():
 		exporterType = trace.HTTP
 	default:
-		return trace.TraceConfig{}, fmt.Errorf("unknown exporter type %q", exporterTypeStr)
+		return trace.Config{}, fmt.Errorf("unknown exporter type %q", exporterTypeStr)
 	}
 
 	if endpoint == "" {
-		return trace.TraceConfig{}, fmt.Errorf("endpoint cannot be empty")
+		return trace.Config{}, fmt.Errorf("endpoint cannot be empty")
 	}
 
-	return trace.TraceConfig{
+	return trace.Config{
 		ExporterConfig: trace.ExporterConfig{
 			Type:     exporterType,
 			Endpoint: endpoint,

@@ -104,10 +104,9 @@ func newExporter(config ExporterConfig) (sdktrace.SpanExporter, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), tracerProviderExportCreationTimeout)
 	defer cancel()
 	return otlptrace.New(ctx, client)
-
 }
 
-type TraceConfig struct {
+type Config struct {
 	ExporterConfig `json:"exporterConfig"`
 
 	// If false, use a no-op tracer. All other fields are ignored.
@@ -131,7 +130,7 @@ func (h otelErrHandler) Handle(err error) {
 
 // Initialize the tracer.
 // If this is never called, we use a no-op tracer.
-func InitTracer(log logging.Logger, config TraceConfig) error {
+func InitTracer(log logging.Logger, config Config) error {
 	if !config.Enabled {
 		// [tracerProvider] is a no-op tracer provider by default.
 		return nil
