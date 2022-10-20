@@ -113,8 +113,6 @@ func init() {
 		testEthAddrs = append(testEthAddrs, GetEthAddress(secpKey))
 		testShortIDAddrs = append(testShortIDAddrs, pk.PublicKey().Address())
 	}
-
-	minBlockTimeAP4 = time.Millisecond
 }
 
 // BuildGenesisTest returns the genesis bytes for Coreth VM to be used in testing
