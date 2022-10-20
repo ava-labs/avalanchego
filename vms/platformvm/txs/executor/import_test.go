@@ -21,7 +21,7 @@ import (
 )
 
 func TestNewImportTx(t *testing.T) {
-	env := newEnvironment()
+	env := newEnvironment( /*postBanff*/ false)
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)

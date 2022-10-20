@@ -23,7 +23,7 @@ import (
 
 func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment()
+	env := newEnvironment( /*postBanff*/ false)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -135,7 +135,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 
 func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment()
+	env := newEnvironment( /*postBanff*/ false)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -237,7 +237,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 
 func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment()
+	env := newEnvironment( /*postBanff*/ false)
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
@@ -367,7 +367,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 
 func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment()
+	env := newEnvironment( /*postBanff*/ false)
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)

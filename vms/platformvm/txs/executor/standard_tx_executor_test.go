@@ -38,7 +38,7 @@ import (
 const _ time.Duration = math.MaxUint32 * time.Second
 
 func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
-	env := newEnvironment()
+	env := newEnvironment( /*postBanff*/ false)
 	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
@@ -170,7 +170,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		}
 	}
 
-	dummyH := newEnvironment()
+	dummyH := newEnvironment( /*postBanff*/ false)
 	currentTimestamp := dummyH.state.GetTimestamp()
 
 	type test struct {
@@ -338,7 +338,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
-			freshTH := newEnvironment()
+			freshTH := newEnvironment( /*postBanff*/ false)
 			freshTH.config.ApricotPhase3Time = tt.AP3Time
 			defer func() {
 				if err := shutdownEnvironment(freshTH); err != nil {
@@ -398,7 +398,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 }
 
 func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
-	env := newEnvironment()
+	env := newEnvironment( /*postBanff*/ false)
 	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
@@ -900,7 +900,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 }
 
 func TestStandardTxExecutorAddValidator(t *testing.T) {
-	env := newEnvironment()
+	env := newEnvironment( /*postBanff*/ false)
 	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
