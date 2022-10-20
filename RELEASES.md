@@ -1,5 +1,11 @@
 # Release Notes
 
+## [v1.9.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.1)
+
+Normal notes
+
+The supported plugin version is `17`.
+
 ## [v1.9.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0)
 
 This upgrade adds support for creating Proof-of-Stake Subnets.
