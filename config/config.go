@@ -75,6 +75,7 @@ var (
 	errCannotWhitelistPrimaryNetwork = errors.New("cannot whitelist primary network")
 	errStakingKeyContentUnset        = fmt.Errorf("%s key not set but %s set", StakingTLSKeyContentKey, StakingCertContentKey)
 	errStakingCertContentUnset       = fmt.Errorf("%s key set but %s not set", StakingTLSKeyContentKey, StakingCertContentKey)
+	errTracingEndpointEmpty          = fmt.Errorf("%s cannot be empty", TracingEndpointKey)
 )
 
 func GetRunnerConfig(v *viper.Viper) (runner.Config, error) {
@@ -1209,22 +1210,15 @@ func getTraceConfig(v *viper.Viper) (trace.Config, error) {
 		}, nil
 	}
 
-	var (
-		exporterTypeStr = v.GetString(TracingExporterTypeKey)
-		exporterType    trace.ExporterType
-		endpoint        = v.GetString(TracingEndpointKey)
-	)
-	switch strings.ToLower(exporterTypeStr) {
-	case trace.GRPC.String():
-		exporterType = trace.GRPC
-	case trace.HTTP.String():
-		exporterType = trace.HTTP
-	default:
-		return trace.Config{}, fmt.Errorf("unknown exporter type %q", exporterTypeStr)
+	exporterTypeStr := v.GetString(TracingExporterTypeKey)
+	exporterType, err := trace.ExporterTypeFromString(exporterTypeStr)
+	if err != nil {
+		return trace.Config{}, err
 	}
 
+	endpoint := v.GetString(TracingEndpointKey)
 	if endpoint == "" {
-		return trace.Config{}, fmt.Errorf("endpoint cannot be empty")
+		return trace.Config{}, errTracingEndpointEmpty
 	}
 
 	return trace.Config{

@@ -37,8 +37,7 @@ const (
 var (
 	_ otel.ErrorHandler = &otelErrHandler{}
 
-	errUnknownExporterType = errors.New("unknown exporter type")
-	errInvalidTimeouts     = errors.New("tracerProviderShutdownTimeout must be >= tracerExportTimeout")
+	errInvalidTimeouts = errors.New("tracerProviderShutdownTimeout must be >= tracerExportTimeout")
 
 	// [tracerProvider] shares the same lifetime as a [node.Node].
 	// [InitTracer] is called when the node executes Dispatch()
@@ -53,24 +52,6 @@ func newResource() *resource.Resource {
 		attribute.String("version", version.Current.String()),
 		semconv.ServiceNameKey.String(constants.AppName),
 	)
-}
-
-type ExporterType byte
-
-const (
-	GRPC ExporterType = iota + 1
-	HTTP
-)
-
-func (t ExporterType) String() string {
-	switch t {
-	case GRPC:
-		return "grpc"
-	case HTTP:
-		return "http"
-	default:
-		return "unknown"
-	}
 }
 
 type ExporterConfig struct {
