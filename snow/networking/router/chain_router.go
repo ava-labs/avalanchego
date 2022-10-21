@@ -15,6 +15,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"go.opentelemetry.io/otel/attribute"
+
 	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"go.uber.org/zap"

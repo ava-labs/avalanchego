@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
+
 	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"go.uber.org/zap"

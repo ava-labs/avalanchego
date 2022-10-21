@@ -10,10 +10,11 @@ import (
 
 	stdmath "math"
 
-	"go.uber.org/zap"
-
 	"go.opentelemetry.io/otel/attribute"
+
 	oteltrace "go.opentelemetry.io/otel/trace"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
