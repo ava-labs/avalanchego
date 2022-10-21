@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/nodeid"
 )
 
 func TestParse(t *testing.T) {
@@ -30,10 +31,17 @@ func TestParse(t *testing.T) {
 	cert := tlsCert.Leaf
 	key := tlsCert.PrivateKey.(crypto.Signer)
 
+	nodeIDBytes, err := nodeid.RecoverSecp256PublicKey(cert)
+	require.NoError(err)
+
+	nodeID, err := ids.ToNodeID(nodeIDBytes)
+	require.NoError(err)
+
 	builtBlock, err := Build(
 		parentID,
 		timestamp,
 		pChainHeight,
+		nodeID,
 		cert,
 		innerBlockBytes,
 		chainID,

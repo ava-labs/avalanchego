@@ -908,7 +908,7 @@ func initTestRemoteProposerVM(
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
+	ctx.NodeID = pTestNodeID
 	ctx.StakingCertLeaf = pTestCert.Leaf
 	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState

@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/nodeid"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -89,7 +90,16 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 	}
 
 	b.cert = cert
-	b.proposer = ids.NodeIDFromCert(cert)
+
+	nodeIDBytes, err := nodeid.RecoverSecp256PublicKey(cert)
+	if err != nil {
+		return err
+	}
+	nodeID, err := ids.ToNodeID(nodeIDBytes)
+	if err != nil {
+		return err
+	}
+	b.proposer = nodeID
 	return nil
 }
 

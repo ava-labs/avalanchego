@@ -33,6 +33,7 @@ func TestBuild(t *testing.T) {
 		parentID,
 		timestamp,
 		pChainHeight,
+		ids.EmptyNodeID,
 		cert,
 		innerBlockBytes,
 		chainID,
