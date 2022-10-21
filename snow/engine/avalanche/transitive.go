@@ -98,8 +98,8 @@ func newTransitive(config Config) (*Transitive, error) {
 	return t, t.metrics.Initialize("", config.Ctx.Registerer)
 }
 
-func (t *Transitive) Put(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
-	ctx, span := trace.Tracer().Start(parentCtx, "Transitive.Put", oteltrace.WithAttributes(
+func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
+	ctx, span := trace.Tracer().Start(ctx, "Transitive.Put", oteltrace.WithAttributes(
 		attribute.Int("vtxLen", len(vtxBytes)),
 		attribute.Int64("requestID", int64(requestID)),
 	))
@@ -183,8 +183,8 @@ func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 	return t.attemptToIssueTxs()
 }
 
-func (t *Transitive) PullQuery(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
-	ctx, span := trace.Tracer().Start(parentCtx, "Transitive.PullQuery", oteltrace.WithAttributes(
+func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
+	ctx, span := trace.Tracer().Start(ctx, "Transitive.PullQuery", oteltrace.WithAttributes(
 		attribute.String("vtxID", vtxID.String()),
 		attribute.Int64("requestID", int64(requestID)),
 	))
@@ -202,8 +202,8 @@ func (t *Transitive) PullQuery(parentCtx context.Context, nodeID ids.NodeID, req
 	return t.attemptToIssueTxs()
 }
 
-func (t *Transitive) PushQuery(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
-	ctx, span := trace.Tracer().Start(parentCtx, "Transitive.PushQuery", oteltrace.WithAttributes(
+func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
+	ctx, span := trace.Tracer().Start(ctx, "Transitive.PushQuery", oteltrace.WithAttributes(
 		attribute.Int64("requestID", int64(requestID)),
 		attribute.Int("vtxLen", len(vtxBytes)),
 	))

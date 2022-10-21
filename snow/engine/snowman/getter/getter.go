@@ -54,8 +54,8 @@ type getter struct {
 	getAncestorsBlks metric.Averager
 }
 
-func (gh *getter) GetStateSummaryFrontier(parentCtx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	ctx, span := trace.Tracer().Start(parentCtx, "getter.GetStateSummaryFrontier")
+func (gh *getter) GetStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	ctx, span := trace.Tracer().Start(ctx, "getter.GetStateSummaryFrontier")
 	defer span.End()
 
 	// Note: we do not check if gh.ssVM.StateSyncEnabled since we want all
@@ -85,8 +85,8 @@ func (gh *getter) GetStateSummaryFrontier(parentCtx context.Context, nodeID ids.
 	return nil
 }
 
-func (gh *getter) GetAcceptedStateSummary(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, heights []uint64) error {
-	ctx, span := trace.Tracer().Start(parentCtx, "getter.GetAcceptedStateSummary")
+func (gh *getter) GetAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, heights []uint64) error {
+	ctx, span := trace.Tracer().Start(ctx, "getter.GetAcceptedStateSummary")
 	defer span.End()
 
 	// If there are no requested heights, then we can return the result
@@ -133,8 +133,8 @@ func (gh *getter) GetAcceptedStateSummary(parentCtx context.Context, nodeID ids.
 	return nil
 }
 
-func (gh *getter) GetAcceptedFrontier(parentCtx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	ctx, span := trace.Tracer().Start(parentCtx, "getter.GetAcceptedFrontier")
+func (gh *getter) GetAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	ctx, span := trace.Tracer().Start(ctx, "getter.GetAcceptedFrontier")
 	defer span.End()
 
 	_, lastAcceptedSpan := trace.Tracer().Start(ctx, "GetLastAccepted")
@@ -147,8 +147,8 @@ func (gh *getter) GetAcceptedFrontier(parentCtx context.Context, nodeID ids.Node
 	return nil
 }
 
-func (gh *getter) GetAccepted(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
-	ctx, span := trace.Tracer().Start(parentCtx, "getter.GetAccepted")
+func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
+	ctx, span := trace.Tracer().Start(ctx, "getter.GetAccepted")
 	defer span.End()
 
 	acceptedIDs := make([]ids.ID, 0, len(containerIDs))
@@ -164,8 +164,8 @@ func (gh *getter) GetAccepted(parentCtx context.Context, nodeID ids.NodeID, requ
 	return nil
 }
 
-func (gh *getter) GetAncestors(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
-	ctx, span := trace.Tracer().Start(parentCtx, "getter.GetAncestors")
+func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
+	ctx, span := trace.Tracer().Start(ctx, "getter.GetAncestors")
 	defer span.End()
 
 	ancestorsBytes, err := block.GetAncestors(
@@ -191,8 +191,8 @@ func (gh *getter) GetAncestors(parentCtx context.Context, nodeID ids.NodeID, req
 	return nil
 }
 
-func (gh *getter) Get(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
-	ctx, span := trace.Tracer().Start(parentCtx, "getter.Get")
+func (gh *getter) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
+	ctx, span := trace.Tracer().Start(ctx, "getter.Get")
 	defer span.End()
 
 	_, getBlockSpan := trace.Tracer().Start(ctx, "GetBlock")

@@ -644,8 +644,8 @@ func (p *peer) handle(msg message.InboundMessage) {
 	p.Router.HandleInbound(ctx, msg)
 }
 
-func (p *peer) handlePing(parentCtx context.Context, _ message.InboundMessage) {
-	ctx, span := trace.Tracer().Start(parentCtx, "peer.handlePing")
+func (p *peer) handlePing(ctx context.Context, _ message.InboundMessage) {
+	ctx, span := trace.Tracer().Start(ctx, "peer.handlePing")
 	defer span.End()
 
 	msg, err := p.Network.Pong(ctx, p.id)

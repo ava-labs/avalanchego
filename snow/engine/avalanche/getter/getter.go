@@ -72,8 +72,8 @@ func (gh *getter) GetAcceptedStateSummary(_ context.Context, nodeID ids.NodeID, 
 	return nil
 }
 
-func (gh *getter) GetAcceptedFrontier(parentCtx context.Context, validatorID ids.NodeID, requestID uint32) error {
-	ctx, span := trace.Tracer().Start(parentCtx, "getter.GetAcceptedFrontier")
+func (gh *getter) GetAcceptedFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32) error {
+	ctx, span := trace.Tracer().Start(ctx, "getter.GetAcceptedFrontier")
 	defer span.End()
 
 	acceptedFrontier := gh.storage.Edge()
@@ -81,8 +81,8 @@ func (gh *getter) GetAcceptedFrontier(parentCtx context.Context, validatorID ids
 	return nil
 }
 
-func (gh *getter) GetAccepted(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
-	ctx, span := trace.Tracer().Start(parentCtx, "getter.GetAccepted")
+func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
+	ctx, span := trace.Tracer().Start(ctx, "getter.GetAccepted")
 	defer span.End()
 
 	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
@@ -95,8 +95,8 @@ func (gh *getter) GetAccepted(parentCtx context.Context, nodeID ids.NodeID, requ
 	return nil
 }
 
-func (gh *getter) GetAncestors(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
-	ctx, span := trace.Tracer().Start(parentCtx, "getter.GetAncestors")
+func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
+	ctx, span := trace.Tracer().Start(ctx, "getter.GetAncestors")
 	defer span.End()
 
 	startTime := time.Now()

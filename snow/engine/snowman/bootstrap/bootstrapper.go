@@ -147,8 +147,8 @@ func (b *bootstrapper) Start(startReqID uint32) error {
 
 // Ancestors handles the receipt of multiple containers. Should be received in
 // response to a GetAncestors message to [nodeID] with request ID [requestID]
-func (b *bootstrapper) Ancestors(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
-	ctx, span := trace.Tracer().Start(parentCtx, "bootstrapper.Ancestors",
+func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
+	ctx, span := trace.Tracer().Start(ctx, "bootstrapper.Ancestors",
 		oteltrace.WithAttributes(
 			attribute.Int64("requestID", int64(requestID)),
 			attribute.Int("numBlocks", len(blks)),
@@ -411,8 +411,8 @@ func (b *bootstrapper) Clear() error {
 //
 // If [blk]'s height is <= the last accepted height, then it will be removed
 // from the missingIDs set.
-func (b *bootstrapper) process(parentCtx context.Context, blk snowman.Block, processingBlocks map[ids.ID]snowman.Block) error {
-	ctx, span := trace.Tracer().Start(parentCtx, "bootstrapper.process")
+func (b *bootstrapper) process(ctx context.Context, blk snowman.Block, processingBlocks map[ids.ID]snowman.Block) error {
+	ctx, span := trace.Tracer().Start(ctx, "bootstrapper.process")
 	defer span.End()
 
 	for {

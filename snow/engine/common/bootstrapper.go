@@ -153,8 +153,8 @@ func (b *bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, 
 	return nil
 }
 
-func (b *bootstrapper) GetAcceptedFrontierFailed(parentCtx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	ctx, span := trace.Tracer().Start(parentCtx, "bootstrapper.GetAcceptedFrontierFailed")
+func (b *bootstrapper) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	ctx, span := trace.Tracer().Start(ctx, "bootstrapper.GetAcceptedFrontierFailed")
 	defer span.End()
 
 	// ignores any late responses
@@ -262,8 +262,8 @@ func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 	return b.Bootstrapable.ForceAccepted(accepted)
 }
 
-func (b *bootstrapper) GetAcceptedFailed(parentCtx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	ctx, span := trace.Tracer().Start(parentCtx, "bootstrapper.GetAcceptedFailed")
+func (b *bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	ctx, span := trace.Tracer().Start(ctx, "bootstrapper.GetAcceptedFailed")
 	defer span.End()
 
 	// ignores any late responses

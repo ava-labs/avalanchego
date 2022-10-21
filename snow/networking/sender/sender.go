@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"go.opentelemetry.io/otel/attribute"
+
 	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"go.uber.org/zap"
@@ -111,8 +112,8 @@ func (s *sender) getMsgCreator() message.Creator {
 	return s.msgCreatorWithProto
 }
 
-func (s *sender) SendGetStateSummaryFrontier(parentCtx context.Context, nodeIDs ids.NodeIDSet, requestID uint32) {
-	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendGetStateSummaryFrontier", oteltrace.WithAttributes(
+func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32) {
+	ctx, span := trace.Tracer().Start(ctx, "sender.SendGetStateSummaryFrontier", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeIDs),
 		attribute.String("nodeIDs", nodeIDs.String()),
 		attribute.Int64("requestID", int64(requestID)),
@@ -171,8 +172,8 @@ func (s *sender) SendGetStateSummaryFrontier(parentCtx context.Context, nodeIDs 
 	}
 }
 
-func (s *sender) SendStateSummaryFrontier(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) {
-	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendStateSummaryFrontier", oteltrace.WithAttributes(
+func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) {
+	ctx, span := trace.Tracer().Start(ctx, "sender.SendStateSummaryFrontier", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
 		attribute.Int("summaryLen", len(summary)),
 		attribute.Int64("requestID", int64(requestID)),
@@ -221,8 +222,8 @@ func (s *sender) SendStateSummaryFrontier(parentCtx context.Context, nodeID ids.
 	}
 }
 
-func (s *sender) SendGetAcceptedStateSummary(parentCtx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, heights []uint64) {
-	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendGetAcceptedStateSummary", oteltrace.WithAttributes(
+func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, heights []uint64) {
+	ctx, span := trace.Tracer().Start(ctx, "sender.SendGetAcceptedStateSummary", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeIDs),
 		attribute.String("nodeIDs", nodeIDs.String()),
 		attribute.Int64("requestID", int64(requestID)),
@@ -283,8 +284,8 @@ func (s *sender) SendGetAcceptedStateSummary(parentCtx context.Context, nodeIDs 
 	}
 }
 
-func (s *sender) SendAcceptedStateSummary(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) {
-	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendAcceptedStateSummary", oteltrace.WithAttributes(
+func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) {
+	ctx, span := trace.Tracer().Start(ctx, "sender.SendAcceptedStateSummary", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
 		attribute.String("summaryIDs", fmt.Sprintf("%s", summaryIDs)),
 		attribute.Int64("requestID", int64(requestID)),
@@ -326,8 +327,8 @@ func (s *sender) SendAcceptedStateSummary(parentCtx context.Context, nodeID ids.
 	}
 }
 
-func (s *sender) SendGetAcceptedFrontier(parentCtx context.Context, nodeIDs ids.NodeIDSet, requestID uint32) {
-	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendGetAcceptedFrontier", oteltrace.WithAttributes(
+func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32) {
+	ctx, span := trace.Tracer().Start(ctx, "sender.SendGetAcceptedFrontier", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeIDs),
 		attribute.Stringer("nodeIDs", nodeIDs),
 		attribute.Int64("requestID", int64(requestID)),
@@ -386,8 +387,8 @@ func (s *sender) SendGetAcceptedFrontier(parentCtx context.Context, nodeIDs ids.
 	}
 }
 
-func (s *sender) SendAcceptedFrontier(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
-	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendAcceptedFrontier", oteltrace.WithAttributes(
+func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
+	ctx, span := trace.Tracer().Start(ctx, "sender.SendAcceptedFrontier", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
 		attribute.String("containerIDs", fmt.Sprintf("%s", containerIDs)),
 		attribute.Int64("requestID", int64(requestID)),
@@ -430,8 +431,8 @@ func (s *sender) SendAcceptedFrontier(parentCtx context.Context, nodeID ids.Node
 	}
 }
 
-func (s *sender) SendGetAccepted(parentCtx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, containerIDs []ids.ID) {
-	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendGetAccepted", oteltrace.WithAttributes(
+func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, containerIDs []ids.ID) {
+	ctx, span := trace.Tracer().Start(ctx, "sender.SendGetAccepted", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeIDs),
 		attribute.String("containerIDs", fmt.Sprintf("%s", containerIDs)),
 		attribute.Int64("requestID", int64(requestID)),
@@ -491,8 +492,8 @@ func (s *sender) SendGetAccepted(parentCtx context.Context, nodeIDs ids.NodeIDSe
 	}
 }
 
-func (s *sender) SendAccepted(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
-	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendAccepted", oteltrace.WithAttributes(
+func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
+	ctx, span := trace.Tracer().Start(ctx, "sender.SendAccepted", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
 		attribute.String("containerIDs", fmt.Sprintf("%s", containerIDs)),
 		attribute.Int64("requestID", int64(requestID)),
@@ -534,8 +535,8 @@ func (s *sender) SendAccepted(parentCtx context.Context, nodeID ids.NodeID, requ
 	}
 }
 
-func (s *sender) SendGetAncestors(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
-	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendGetAncestors", oteltrace.WithAttributes(
+func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
+	ctx, span := trace.Tracer().Start(ctx, "sender.SendGetAncestors", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
 		attribute.Stringer("containerID", containerID),
 		attribute.Int64("requestID", int64(requestID)),
@@ -646,8 +647,8 @@ func (s *sender) SendAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 // chain to the specified node. The Get message signifies that this
 // consensus engine would like the recipient to send this consensus engine the
 // specified container.
-func (s *sender) SendGet(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
-	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendGet", oteltrace.WithAttributes(
+func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
+	ctx, span := trace.Tracer().Start(ctx, "sender.SendGet", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
 		attribute.Stringer("containerID", containerID),
 		attribute.Int64("requestID", int64(requestID)),
@@ -765,8 +766,8 @@ func (s *sender) SendPut(ctx context.Context, nodeID ids.NodeID, requestID uint3
 // on the specified nodes.
 // The PushQuery message signifies that this consensus engine would like each node to send
 // their preferred frontier given the existence of the specified container.
-func (s *sender) SendPushQuery(parentCtx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, container []byte) {
-	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendPushQuery", oteltrace.WithAttributes(
+func (s *sender) SendPushQuery(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, container []byte) {
+	ctx, span := trace.Tracer().Start(ctx, "sender.SendPushQuery", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeIDs),
 		attribute.Int64("requestID", int64(requestID)),
 		attribute.String("nodeIDs", nodeIDs.String()),
@@ -857,8 +858,8 @@ func (s *sender) SendPushQuery(parentCtx context.Context, nodeIDs ids.NodeIDSet,
 // on the specified nodes.
 // The PullQuery message signifies that this consensus engine would like each node to send
 // their preferred frontier.
-func (s *sender) SendPullQuery(parentCtx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, containerID ids.ID) {
-	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendPullQuery", oteltrace.WithAttributes(
+func (s *sender) SendPullQuery(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, containerID ids.ID) {
+	ctx, span := trace.Tracer().Start(ctx, "sender.SendPullQuery", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeIDs),
 		attribute.Stringer("containerID", containerID),
 		attribute.Int64("requestID", int64(requestID)),
@@ -938,8 +939,8 @@ func (s *sender) SendPullQuery(parentCtx context.Context, nodeIDs ids.NodeIDSet,
 }
 
 // SendChits sends chits
-func (s *sender) SendChits(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) {
-	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendChits", oteltrace.WithAttributes(
+func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) {
+	ctx, span := trace.Tracer().Start(ctx, "sender.SendChits", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
 		attribute.String("votes", fmt.Sprintf("%s", votes)),
 		attribute.Int64("requestID", int64(requestID)),
@@ -983,8 +984,8 @@ func (s *sender) SendChits(parentCtx context.Context, nodeID ids.NodeID, request
 	}
 }
 
-func (s *sender) SendCrossChainAppRequest(parentCtx context.Context, chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
-	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendCrossChainAppRequest", oteltrace.WithAttributes(
+func (s *sender) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
+	ctx, span := trace.Tracer().Start(ctx, "sender.SendCrossChainAppRequest", oteltrace.WithAttributes(
 		attribute.Stringer("chainID", chainID),
 		attribute.Int64("requestID", int64(requestID)),
 	))
@@ -1006,8 +1007,8 @@ func (s *sender) SendCrossChainAppRequest(parentCtx context.Context, chainID ids
 	return nil
 }
 
-func (s *sender) SendCrossChainAppResponse(parentCtx context.Context, chainID ids.ID, requestID uint32, appResponseBytes []byte) error {
-	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendCrossChainAppResponse", oteltrace.WithAttributes(
+func (s *sender) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, appResponseBytes []byte) error {
+	ctx, span := trace.Tracer().Start(ctx, "sender.SendCrossChainAppResponse", oteltrace.WithAttributes(
 		attribute.Stringer("chainID", chainID),
 		attribute.Int64("requestID", int64(requestID)),
 	))
@@ -1028,8 +1029,8 @@ func (s *sender) SendCrossChainAppResponse(parentCtx context.Context, chainID id
 
 // SendAppRequest sends an application-level request to the given nodes.
 // The meaning of this request, and how it should be handled, is defined by the VM.
-func (s *sender) SendAppRequest(parentCtx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, appRequestBytes []byte) error {
-	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendAppRequest", oteltrace.WithAttributes(
+func (s *sender) SendAppRequest(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, appRequestBytes []byte) error {
+	ctx, span := trace.Tracer().Start(ctx, "sender.SendAppRequest", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeIDs),
 		attribute.String("nodeIDs", nodeIDs.String()),
 		attribute.Int64("requestID", int64(requestID)),
@@ -1119,8 +1120,8 @@ func (s *sender) SendAppRequest(parentCtx context.Context, nodeIDs ids.NodeIDSet
 
 // SendAppResponse sends a response to an application-level request from the
 // given node
-func (s *sender) SendAppResponse(parentCtx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
-	ctx, span := trace.Tracer().Start(parentCtx, "sender.SendAppResponse", oteltrace.WithAttributes(
+func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
+	ctx, span := trace.Tracer().Start(ctx, "sender.SendAppResponse", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
 		attribute.Int("appResponseLen", len(appResponseBytes)),
 		attribute.Int64("requestID", int64(requestID)),

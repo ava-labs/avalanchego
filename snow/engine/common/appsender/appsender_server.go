@@ -27,8 +27,8 @@ func NewServer(appSender common.AppSender) *Server {
 	return &Server{appSender: appSender}
 }
 
-func (s *Server) SendCrossChainAppRequest(parentCtx context.Context, msg *appsenderpb.SendCrossChainAppRequestMsg) (*emptypb.Empty, error) {
-	ctx, span := trace.Tracer().Start(parentCtx, "Server.SendCrossChainAppRequest")
+func (s *Server) SendCrossChainAppRequest(ctx context.Context, msg *appsenderpb.SendCrossChainAppRequestMsg) (*emptypb.Empty, error) {
+	ctx, span := trace.Tracer().Start(ctx, "Server.SendCrossChainAppRequest")
 	defer span.End()
 
 	chainID, err := ids.ToID(msg.ChainId)
@@ -39,8 +39,8 @@ func (s *Server) SendCrossChainAppRequest(parentCtx context.Context, msg *appsen
 	return &emptypb.Empty{}, s.appSender.SendCrossChainAppRequest(ctx, chainID, msg.RequestId, msg.Request)
 }
 
-func (s *Server) SendCrossChainAppResponse(parentCtx context.Context, msg *appsenderpb.SendCrossChainAppResponseMsg) (*emptypb.Empty, error) {
-	ctx, span := trace.Tracer().Start(parentCtx, "Server.SendCrossChainAppResponse")
+func (s *Server) SendCrossChainAppResponse(ctx context.Context, msg *appsenderpb.SendCrossChainAppResponseMsg) (*emptypb.Empty, error) {
+	ctx, span := trace.Tracer().Start(ctx, "Server.SendCrossChainAppResponse")
 	defer span.End()
 
 	chainID, err := ids.ToID(msg.ChainId)
@@ -51,8 +51,8 @@ func (s *Server) SendCrossChainAppResponse(parentCtx context.Context, msg *appse
 	return &emptypb.Empty{}, s.appSender.SendCrossChainAppResponse(ctx, chainID, msg.RequestId, msg.Response)
 }
 
-func (s *Server) SendAppRequest(parentCtx context.Context, req *appsenderpb.SendAppRequestMsg) (*emptypb.Empty, error) {
-	ctx, span := trace.Tracer().Start(parentCtx, "Server.SendAppRequest")
+func (s *Server) SendAppRequest(ctx context.Context, req *appsenderpb.SendAppRequestMsg) (*emptypb.Empty, error) {
+	ctx, span := trace.Tracer().Start(ctx, "Server.SendAppRequest")
 	defer span.End()
 
 	nodeIDs := ids.NewNodeIDSet(len(req.NodeIds))
@@ -67,8 +67,8 @@ func (s *Server) SendAppRequest(parentCtx context.Context, req *appsenderpb.Send
 	return &emptypb.Empty{}, err
 }
 
-func (s *Server) SendAppResponse(parentCtx context.Context, req *appsenderpb.SendAppResponseMsg) (*emptypb.Empty, error) {
-	ctx, span := trace.Tracer().Start(parentCtx, "Server.SendAppResponse")
+func (s *Server) SendAppResponse(ctx context.Context, req *appsenderpb.SendAppResponseMsg) (*emptypb.Empty, error) {
+	ctx, span := trace.Tracer().Start(ctx, "Server.SendAppResponse")
 	defer span.End()
 
 	nodeID, err := ids.ToNodeID(req.NodeId)
@@ -79,16 +79,16 @@ func (s *Server) SendAppResponse(parentCtx context.Context, req *appsenderpb.Sen
 	return &emptypb.Empty{}, err
 }
 
-func (s *Server) SendAppGossip(parentCtx context.Context, req *appsenderpb.SendAppGossipMsg) (*emptypb.Empty, error) {
-	ctx, span := trace.Tracer().Start(parentCtx, "Server.SendAppGossip")
+func (s *Server) SendAppGossip(ctx context.Context, req *appsenderpb.SendAppGossipMsg) (*emptypb.Empty, error) {
+	ctx, span := trace.Tracer().Start(ctx, "Server.SendAppGossip")
 	defer span.End()
 
 	err := s.appSender.SendAppGossip(ctx, req.Msg)
 	return &emptypb.Empty{}, err
 }
 
-func (s *Server) SendAppGossipSpecific(parentCtx context.Context, req *appsenderpb.SendAppGossipSpecificMsg) (*emptypb.Empty, error) {
-	ctx, span := trace.Tracer().Start(parentCtx, "Server.SendAppGossipSpecific")
+func (s *Server) SendAppGossipSpecific(ctx context.Context, req *appsenderpb.SendAppGossipSpecificMsg) (*emptypb.Empty, error) {
+	ctx, span := trace.Tracer().Start(ctx, "Server.SendAppGossipSpecific")
 	defer span.End()
 
 	nodeIDs := ids.NewNodeIDSet(len(req.NodeIds))

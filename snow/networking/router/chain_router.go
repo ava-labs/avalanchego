@@ -185,8 +185,8 @@ func (cr *ChainRouter) RegisterRequest(
 	})
 }
 
-func (cr *ChainRouter) HandleInbound(parentCtx context.Context, msg message.InboundMessage) {
-	ctx, span := trace.Tracer().Start(parentCtx, "router.HandleInbound")
+func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMessage) {
+	ctx, span := trace.Tracer().Start(ctx, "router.HandleInbound")
 	defer span.End()
 
 	nodeID := msg.NodeID()
