@@ -20,7 +20,6 @@ import (
 // This is done by recording some state information of both what peers this node
 // is aware of, and what peers we've told each peer about.
 //
-//
 // As an example, say we track three peers (most-significant-bit first):
 // 	local: 		[1, 1, 1] // [p3, p2, p1] we always know about everyone
 // 	knownPeers:	{
