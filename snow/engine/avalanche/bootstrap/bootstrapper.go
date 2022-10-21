@@ -136,8 +136,9 @@ func (b *bootstrapper) Clear() error {
 // Expects vtxs[0] to be the vertex requested in the corresponding GetAncestors.
 func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxs [][]byte) error {
 	ctx, span := trace.Tracer().Start(ctx, "bootstrapper.Ancestors", oteltrace.WithAttributes(
-		attribute.Int("numVtxs", len(vtxs)),
+		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
+		attribute.Int("numVtxs", len(vtxs)),
 	))
 	defer span.End()
 

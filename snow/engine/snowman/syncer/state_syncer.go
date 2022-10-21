@@ -115,7 +115,7 @@ func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.Node
 	_, span := trace.Tracer().Start(ctx, "stateSyncer.StateSummaryFrontier", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("summaryBytesLen", len(summaryBytes)),
+		attribute.Int("summaryLen", len(summaryBytes)),
 	))
 	defer span.End()
 
@@ -232,7 +232,7 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 	_, span := trace.Tracer().Start(ctx, "stateSyncer.AcceptedStateSummary", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
-		attribute.String("summaryIDs", fmt.Sprintf("%s", summaryIDs)),
+		attribute.Int("numSummaryIDs", len(summaryIDs)),
 	))
 	defer span.End()
 

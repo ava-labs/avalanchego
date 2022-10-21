@@ -293,7 +293,6 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		)
 		span.AddEvent("dropping message", oteltrace.WithAttributes(
 			attribute.String("reason", "unknown chain"),
-			attribute.Stringer("sourceChainID", sourceChainID),
 			attribute.Stringer("destinationChainID", destinationChainID),
 		))
 		msg.OnFinishedHandling()
@@ -312,7 +311,9 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 				zap.Stringer("messageOp", op),
 			)
 			cr.metrics.droppedRequests.Inc()
-			span.AddEvent("dropping message due to chain executing")
+			span.AddEvent("dropping message", oteltrace.WithAttributes(
+				attribute.String("reason", "chain executing"),
+			))
 			msg.OnFinishedHandling()
 			return
 		}
@@ -326,7 +327,9 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		uniqueRequestID, req := cr.clearRequest(expectedResponse, nodeID, sourceChainID, destinationChainID, requestID)
 		if req == nil {
 			// This was a duplicated response.
-			span.AddEvent("dropping message due to duplicate response")
+			span.AddEvent("dropping message", oteltrace.WithAttributes(
+				attribute.String("reason", "duplicate response"),
+			))
 			msg.OnFinishedHandling()
 			return
 		}
@@ -346,7 +349,9 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		)
 		cr.metrics.droppedRequests.Inc()
 
-		span.AddEvent("dropping message due to chain executing")
+		span.AddEvent("dropping message", oteltrace.WithAttributes(
+			attribute.String("reason", "chain executing"),
+		))
 		msg.OnFinishedHandling()
 		return
 	}
@@ -354,7 +359,9 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	uniqueRequestID, req := cr.clearRequest(op, nodeID, sourceChainID, destinationChainID, requestID)
 	if req == nil {
 		// We didn't request this message.
-		span.AddEvent("dropping message due to unrequested message")
+		span.AddEvent("dropping message", oteltrace.WithAttributes(
+			attribute.String("reason", "unrequested message"),
+		))
 		msg.OnFinishedHandling()
 		return
 	}

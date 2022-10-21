@@ -381,9 +381,10 @@ func (p *peer) readMessages() {
 			return
 		}
 
-		_, span := trace.Tracer().Start(context.Background(), "peer.readMessages", oteltrace.WithAttributes(
+		ctx := context.Background()
+		ctx, span := trace.Tracer().Start(ctx, "peer.readMessages", oteltrace.WithAttributes(
 			attribute.Stringer("sender", p.id),
-			attribute.Int64("msgSize", int64(msgLen)),
+			attribute.Int64("msgLen", int64(msgLen)),
 		))
 
 		// Read the message
@@ -435,9 +436,6 @@ func (p *peer) readMessages() {
 			p.ResourceTracker.StopProcessing(p.id, p.Clock.Time())
 			continue
 		}
-		span.SetAttributes(
-			attribute.Int64("msgSize", int64(msgLen)),
-		)
 
 		now := p.Clock.Time().Unix()
 		atomic.StoreInt64(&p.Config.LastReceived, now)
@@ -446,7 +444,7 @@ func (p *peer) readMessages() {
 
 		// Handle the message. Note that when we are done handling this message,
 		// we must call [msg.OnFinishedHandling()].
-		p.handle(msg)
+		p.handle(ctx, msg)
 		p.ResourceTracker.StopProcessing(p.id, p.Clock.Time())
 		span.End()
 	}
@@ -500,16 +498,15 @@ func (p *peer) writeMessages() {
 }
 
 func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
-	_, span := trace.Tracer().Start(context.Background(), "peer.writeMessage",
-		oteltrace.WithAttributes(
-			attribute.Stringer("op", msg.Op()),
-			attribute.Stringer("recipient", p.id),
-			attribute.Int("msgSize", len(msg.Bytes())),
-		),
-	)
+	msgBytes := msg.Bytes()
+	msgLen := len(msgBytes)
+	_, span := trace.Tracer().Start(context.Background(), "peer.writeMessage", oteltrace.WithAttributes(
+		attribute.Stringer("recipient", p.id),
+		attribute.Stringer("op", msg.Op()),
+		attribute.Int("msgLen", msgLen),
+	))
 	defer span.End()
 
-	msgBytes := msg.Bytes()
 	p.Log.Verbo("sending message",
 		zap.Stringer("nodeID", p.id),
 		zap.Binary("messageBytes", msgBytes),
@@ -524,9 +521,8 @@ func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 		return
 	}
 
-	msgLen := uint32(len(msgBytes))
 	isProto := msg.IsProto()
-	msgLenBytes, err := writeMsgLen(msgLen, isProto, constants.DefaultMaxMessageSize)
+	msgLenBytes, err := writeMsgLen(uint32(msgLen), isProto, constants.DefaultMaxMessageSize)
 	if err != nil {
 		p.Log.Verbo("error writing message length",
 			zap.Stringer("nodeID", p.id),
@@ -600,17 +596,15 @@ func (p *peer) sendPings() {
 	}
 }
 
-func (p *peer) handle(msg message.InboundMessage) {
-	ctx, span := trace.Tracer().Start(context.Background(), "peer.handle",
-		oteltrace.WithAttributes(
-			attribute.Stringer("sender", p.id),
-			attribute.Stringer("expiration", msg.ExpirationTime()),
-			attribute.Stringer("op", msg.Op()),
-		),
-	)
+func (p *peer) handle(ctx context.Context, msg message.InboundMessage) {
+	op := msg.Op()
+	ctx, span := trace.Tracer().Start(ctx, "peer.handle", oteltrace.WithAttributes(
+		attribute.Stringer("sender", p.id),
+		attribute.Stringer("op", op),
+		attribute.Stringer("expiration", msg.ExpirationTime()),
+	))
 	defer span.End()
 
-	op := msg.Op()
 	switch op { // Network-related message types
 	case message.Ping:
 		p.handlePing(ctx, msg)

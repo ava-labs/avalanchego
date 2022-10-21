@@ -174,8 +174,8 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs ids.No
 func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) {
 	ctx, span := trace.Tracer().Start(ctx, "sender.SendStateSummaryFrontier", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
-		attribute.Int("summaryLen", len(summary)),
 		attribute.Int64("requestID", int64(requestID)),
+		attribute.Int("summaryLen", len(summary)),
 	))
 	defer span.End()
 
@@ -225,7 +225,7 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs ids.No
 	ctx, span := trace.Tracer().Start(ctx, "sender.SendGetAcceptedStateSummary", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeIDs),
 		attribute.Int64("requestID", int64(requestID)),
-		attribute.String("heights", fmt.Sprintf("%v", heights)),
+		attribute.Int("numHeights", len(heights)),
 	))
 	defer span.End()
 
@@ -285,8 +285,8 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs ids.No
 func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) {
 	ctx, span := trace.Tracer().Start(ctx, "sender.SendAcceptedStateSummary", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
-		attribute.String("summaryIDs", fmt.Sprintf("%s", summaryIDs)),
 		attribute.Int64("requestID", int64(requestID)),
+		attribute.Int("numSummaryIDs", len(summaryIDs)),
 	))
 	defer span.End()
 
@@ -387,8 +387,8 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs ids.NodeID
 func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
 	ctx, span := trace.Tracer().Start(ctx, "sender.SendAcceptedFrontier", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
-		attribute.String("containerIDs", fmt.Sprintf("%s", containerIDs)),
 		attribute.Int64("requestID", int64(requestID)),
+		attribute.Int("numContainerIDs", len(containerIDs)),
 	))
 	defer span.End()
 
@@ -431,8 +431,8 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, containerIDs []ids.ID) {
 	ctx, span := trace.Tracer().Start(ctx, "sender.SendGetAccepted", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeIDs),
-		attribute.String("containerIDs", fmt.Sprintf("%s", containerIDs)),
 		attribute.Int64("requestID", int64(requestID)),
+		attribute.Int("numContainerIDs", len(containerIDs)),
 	))
 	defer span.End()
 
@@ -492,8 +492,8 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs ids.NodeIDSet, req
 func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
 	ctx, span := trace.Tracer().Start(ctx, "sender.SendAccepted", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
-		attribute.String("containerIDs", fmt.Sprintf("%s", containerIDs)),
 		attribute.Int64("requestID", int64(requestID)),
+		attribute.Int("numContainerIDs", len(containerIDs)),
 	))
 	defer span.End()
 
@@ -535,8 +535,8 @@ func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
 	ctx, span := trace.Tracer().Start(ctx, "sender.SendGetAncestors", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
-		attribute.Stringer("containerID", containerID),
 		attribute.Int64("requestID", int64(requestID)),
+		attribute.Stringer("containerID", containerID),
 	))
 	defer span.End()
 
@@ -606,8 +606,8 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 func (s *sender) SendAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) {
 	_, span := trace.Tracer().Start(ctx, "sender.SendAncestors", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
-		attribute.Int("numContainers", len(containers)),
 		attribute.Int64("requestID", int64(requestID)),
+		attribute.Int("numContainers", len(containers)),
 	))
 	defer span.End()
 
@@ -647,8 +647,8 @@ func (s *sender) SendAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
 	ctx, span := trace.Tracer().Start(ctx, "sender.SendGet", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
-		attribute.Stringer("containerID", containerID),
 		attribute.Int64("requestID", int64(requestID)),
+		attribute.Stringer("containerID", containerID),
 	))
 	defer span.End()
 
@@ -857,8 +857,8 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs ids.NodeIDSet, reque
 func (s *sender) SendPullQuery(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, containerID ids.ID) {
 	ctx, span := trace.Tracer().Start(ctx, "sender.SendPullQuery", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeIDs),
-		attribute.Stringer("containerID", containerID),
 		attribute.Int64("requestID", int64(requestID)),
+		attribute.Stringer("containerID", containerID),
 	))
 	defer span.End()
 
@@ -938,8 +938,8 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs ids.NodeIDSet, reque
 func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) {
 	ctx, span := trace.Tracer().Start(ctx, "sender.SendChits", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
-		attribute.String("votes", fmt.Sprintf("%s", votes)),
 		attribute.Int64("requestID", int64(requestID)),
+		attribute.Int("numVotes", len(votes)),
 	))
 	defer span.End()
 
@@ -1118,8 +1118,8 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs ids.NodeIDSet, requ
 func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
 	ctx, span := trace.Tracer().Start(ctx, "sender.SendAppResponse", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
-		attribute.Int("appResponseLen", len(appResponseBytes)),
 		attribute.Int64("requestID", int64(requestID)),
+		attribute.Int("appResponseLen", len(appResponseBytes)),
 	))
 	defer span.End()
 

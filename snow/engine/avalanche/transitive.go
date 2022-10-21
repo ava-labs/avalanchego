@@ -101,8 +101,9 @@ func newTransitive(config Config) (*Transitive, error) {
 
 func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
 	ctx, span := trace.Tracer().Start(ctx, "Transitive.Put", oteltrace.WithAttributes(
-		attribute.Int("vtxLen", len(vtxBytes)),
+		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
+		attribute.Int("vtxLen", len(vtxBytes)),
 	))
 	defer span.End()
 
@@ -154,6 +155,7 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 
 func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	_, span := trace.Tracer().Start(ctx, "Transitive.GetFailed", oteltrace.WithAttributes(
+		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
 	))
 	defer span.End()
@@ -186,8 +188,9 @@ func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 
 func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
 	ctx, span := trace.Tracer().Start(ctx, "Transitive.PullQuery", oteltrace.WithAttributes(
-		attribute.Stringer("vtxID", vtxID),
+		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
+		attribute.Stringer("vtxID", vtxID),
 	))
 	defer span.End()
 
@@ -205,6 +208,7 @@ func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 
 func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
 	ctx, span := trace.Tracer().Start(ctx, "Transitive.PushQuery", oteltrace.WithAttributes(
+		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
 		attribute.Int("vtxLen", len(vtxBytes)),
 	))
@@ -242,8 +246,9 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 
 func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) error {
 	_, span := trace.Tracer().Start(ctx, "Transitive.Chits", oteltrace.WithAttributes(
-		attribute.String("votes", fmt.Sprintf("%s", votes)),
+		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
+		attribute.Int("numVotes", len(votes)),
 	))
 	defer span.End()
 

@@ -150,6 +150,7 @@ func (b *bootstrapper) Start(startReqID uint32) error {
 // response to a GetAncestors message to [nodeID] with request ID [requestID]
 func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
 	ctx, span := trace.Tracer().Start(ctx, "bootstrapper.Ancestors", oteltrace.WithAttributes(
+		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
 		attribute.Int("numBlocks", len(blks)),
 	))

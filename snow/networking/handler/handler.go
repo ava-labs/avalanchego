@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
 	"go.uber.org/zap"
@@ -1129,7 +1131,9 @@ func (h *handler) popUnexpiredMsg(queue MessageQueue, expired prometheus.Counter
 				zap.Stringer("messageString", msg),
 			)
 			span := trace.SpanFromContext(ctx)
-			span.AddEvent("dropping message due to timeout")
+			span.AddEvent("dropping message", trace.WithAttributes(
+				attribute.String("reason", "timeout"),
+			))
 			expired.Inc()
 			msg.OnFinishedHandling()
 			continue

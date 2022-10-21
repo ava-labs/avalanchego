@@ -119,7 +119,7 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	ctx, span := trace.Tracer().Start(ctx, "Transitive.Put", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("block size", len(blkBytes)),
+		attribute.Int("blkLen", len(blkBytes)),
 	))
 	defer span.End()
 
@@ -205,6 +205,7 @@ func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 
 func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
 	ctx, span := trace.Tracer().Start(ctx, "Transitive.PullQuery", oteltrace.WithAttributes(
+		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
 		attribute.Stringer("blockID", blkID),
 	))
@@ -226,7 +227,7 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 	ctx, span := trace.Tracer().Start(ctx, "Transitive.PushQuery", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("blkSize", len(blkBytes)),
+		attribute.Int("blkLen", len(blkBytes)),
 	))
 	defer span.End()
 
@@ -273,7 +274,7 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 	ctx, span := trace.Tracer().Start(ctx, "Transitive.Chits", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
-		attribute.String("votes", fmt.Sprintf("%s", votes)),
+		attribute.Int("numVotes", len(votes)),
 	))
 	defer span.End()
 
@@ -320,16 +321,16 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 	return t.buildBlocks()
 }
 
-func (t *Transitive) QueryFailed(ctx context.Context, vdr ids.NodeID, requestID uint32) error {
+func (t *Transitive) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	_, span := trace.Tracer().Start(ctx, "Transitive.PullQuery", oteltrace.WithAttributes(
-		attribute.Stringer("nodeID", vdr),
+		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
 	))
 	defer span.End()
 
 	t.blocked.Register(&voter{
 		t:         t,
-		vdr:       vdr,
+		vdr:       nodeID,
 		requestID: requestID,
 	})
 	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
@@ -620,13 +621,13 @@ func (t *Transitive) issueFromByID(ctx context.Context, nodeID ids.NodeID, blkID
 // Returns true if the block is processing in consensus or is decided.
 // If a dependency is missing, request it from [vdr].
 func (t *Transitive) issueFrom(ctx context.Context, nodeID ids.NodeID, blk snowman.Block) (bool, error) {
+	blkID := blk.ID()
 	ctx, span := trace.Tracer().Start(ctx, "Transitive.issueFrom", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
-		attribute.Stringer("blkID", blk.ID()),
+		attribute.Stringer("blkID", blkID),
 	))
 	defer span.End()
 
-	blkID := blk.ID()
 	// issue [blk] and its ancestors to consensus.
 	for !t.wasIssued(blk) {
 		if err := t.issue(blk); err != nil {
@@ -805,8 +806,9 @@ func (t *Transitive) pullQuery(ctx context.Context, blkID ids.ID) {
 // Send a query for this block. Some validators will be sent
 // a Push Query and some will be sent a Pull Query.
 func (t *Transitive) sendMixedQuery(ctx context.Context, blk snowman.Block) {
+	blkID := blk.ID()
 	ctx, span := trace.Tracer().Start(ctx, "Transitive.sendMixedQuery", oteltrace.WithAttributes(
-		attribute.Stringer("blkID", blk.ID()),
+		attribute.Stringer("blkID", blkID),
 	))
 	defer span.End()
 
@@ -817,7 +819,7 @@ func (t *Transitive) sendMixedQuery(ctx context.Context, blk snowman.Block) {
 	if err != nil {
 		t.Ctx.Log.Error("dropped query for block",
 			zap.String("reason", "insufficient number of validators"),
-			zap.Stringer("blkID", blk.ID()),
+			zap.Stringer("blkID", blkID),
 		)
 		return
 	}
@@ -840,7 +842,7 @@ func (t *Transitive) sendMixedQuery(ctx context.Context, blk snowman.Block) {
 			vdrBag.List(), // Note that this doesn't contain duplicates; length may be < k
 			numPushTo,
 			t.RequestID,
-			blk.ID(),
+			blkID,
 			blk.Bytes(),
 		)
 	}
