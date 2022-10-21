@@ -115,7 +115,6 @@ func (s *sender) getMsgCreator() message.Creator {
 func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32) {
 	ctx, span := trace.Tracer().Start(ctx, "sender.SendGetStateSummaryFrontier", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeIDs),
-		attribute.String("nodeIDs", nodeIDs.String()),
 		attribute.Int64("requestID", int64(requestID)),
 	))
 	defer span.End()
@@ -225,7 +224,6 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, heights []uint64) {
 	ctx, span := trace.Tracer().Start(ctx, "sender.SendGetAcceptedStateSummary", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeIDs),
-		attribute.String("nodeIDs", nodeIDs.String()),
 		attribute.Int64("requestID", int64(requestID)),
 		attribute.String("heights", fmt.Sprintf("%v", heights)),
 	))
@@ -330,7 +328,6 @@ func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32) {
 	ctx, span := trace.Tracer().Start(ctx, "sender.SendGetAcceptedFrontier", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeIDs),
-		attribute.Stringer("nodeIDs", nodeIDs),
 		attribute.Int64("requestID", int64(requestID)),
 	))
 	defer span.End()
@@ -770,7 +767,6 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs ids.NodeIDSet, reque
 	ctx, span := trace.Tracer().Start(ctx, "sender.SendPushQuery", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeIDs),
 		attribute.Int64("requestID", int64(requestID)),
-		attribute.String("nodeIDs", nodeIDs.String()),
 		attribute.Int("containerLen", len(container)),
 	))
 	defer span.End()
@@ -1032,7 +1028,6 @@ func (s *sender) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, 
 func (s *sender) SendAppRequest(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, appRequestBytes []byte) error {
 	ctx, span := trace.Tracer().Start(ctx, "sender.SendAppRequest", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeIDs),
-		attribute.String("nodeIDs", nodeIDs.String()),
 		attribute.Int64("requestID", int64(requestID)),
 		attribute.Int("appRequestLen", len(appRequestBytes)),
 	))
@@ -1174,7 +1169,6 @@ func (s *sender) SendAppGossipSpecific(ctx context.Context, nodeIDs ids.NodeIDSe
 	_, span := trace.Tracer().Start(ctx, "sender.SendAppGossipSpecific", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeIDs),
 		attribute.Int("appGossipLen", len(appGossipBytes)),
-		attribute.String("nodeIDs", nodeIDs.String()),
 	))
 	defer span.End()
 

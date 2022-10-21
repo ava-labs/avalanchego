@@ -218,7 +218,9 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		msg.OnFinishedHandling()
 		return
 	}
-	span.SetAttributes(attribute.Stringer("destinationChainID", destinationChainID))
+	span.SetAttributes(
+		attribute.Stringer("destinationChainID", destinationChainID),
+	)
 
 	var sourceChainID ids.ID
 	switch op {
@@ -249,7 +251,9 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		// is always the destination chain.
 		sourceChainID = destinationChainID
 	}
-	span.SetAttributes(attribute.Stringer("sourceChainID", sourceChainID))
+	span.SetAttributes(
+		attribute.Stringer("sourceChainID", sourceChainID),
+	)
 
 	// AppGossip is the only message currently not containing a requestID
 	// Here we assign the requestID already in use for gossiped containers
@@ -357,7 +361,9 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 
 	// Calculate how long it took [nodeID] to reply
 	latency := cr.clock.Time().Sub(req.time)
-	span.SetAttributes(attribute.Int64("latency", int64(latency)))
+	span.SetAttributes(
+		attribute.Int64("latency", int64(latency)),
+	)
 
 	// Tell the timeout manager we got a response
 	cr.timeoutManager.RegisterResponse(nodeID, destinationChainID, uniqueRequestID, req.op, latency)

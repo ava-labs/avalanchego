@@ -186,7 +186,7 @@ func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 
 func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
 	ctx, span := trace.Tracer().Start(ctx, "Transitive.PullQuery", oteltrace.WithAttributes(
-		attribute.String("vtxID", vtxID.String()),
+		attribute.Stringer("vtxID", vtxID),
 		attribute.Int64("requestID", int64(requestID)),
 	))
 	defer span.End()

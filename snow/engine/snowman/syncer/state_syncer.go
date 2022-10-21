@@ -113,7 +113,7 @@ func New(
 
 func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryBytes []byte) error {
 	_, span := trace.Tracer().Start(ctx, "stateSyncer.StateSummaryFrontier", oteltrace.WithAttributes(
-		attribute.String("nodeID", nodeID.String()),
+		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
 		attribute.Int("summaryBytesLen", len(summaryBytes)),
 	))
@@ -167,7 +167,7 @@ func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.Node
 
 func (ss *stateSyncer) GetStateSummaryFrontierFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	_, span := trace.Tracer().Start(ctx, "stateSyncer.GetStateSummaryFrontierFailed", oteltrace.WithAttributes(
-		attribute.String("nodeID", nodeID.String()),
+		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
 	))
 	defer span.End()
@@ -230,7 +230,7 @@ func (ss *stateSyncer) receivedStateSummaryFrontier() error {
 
 func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error {
 	_, span := trace.Tracer().Start(ctx, "stateSyncer.AcceptedStateSummary", oteltrace.WithAttributes(
-		attribute.String("nodeID", nodeID.String()),
+		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
 		attribute.String("summaryIDs", fmt.Sprintf("%s", summaryIDs)),
 	))
@@ -379,7 +379,7 @@ func (ss *stateSyncer) selectSyncableStateSummary() block.StateSummary {
 
 func (ss *stateSyncer) GetAcceptedStateSummaryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	ctx, span := trace.Tracer().Start(ctx, "stateSyncer.GetAcceptedStateSummaryFailed", oteltrace.WithAttributes(
-		attribute.String("nodeID", nodeID.String()),
+		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
 	))
 	defer span.End()

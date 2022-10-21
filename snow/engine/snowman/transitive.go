@@ -116,13 +116,11 @@ func newTransitive(config Config) (*Transitive, error) {
 }
 
 func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
-	ctx, span := trace.Tracer().Start(ctx, "Transitive.Put",
-		oteltrace.WithAttributes(
-			attribute.Stringer("nodeID", nodeID),
-			attribute.Int64("requestID", int64(requestID)),
-			attribute.Int("block size", len(blkBytes)),
-		),
-	)
+	ctx, span := trace.Tracer().Start(ctx, "Transitive.Put", oteltrace.WithAttributes(
+		attribute.Stringer("nodeID", nodeID),
+		attribute.Int64("requestID", int64(requestID)),
+		attribute.Int("block size", len(blkBytes)),
+	))
 	defer span.End()
 
 	// TODO pass [ctx] instead of creating/stopping the span here.
@@ -180,12 +178,10 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 }
 
 func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	_, span := trace.Tracer().Start(ctx, "Transitive.GetFailed",
-		oteltrace.WithAttributes(
-			attribute.Stringer("nodeID", nodeID),
-			attribute.Int64("requestID", int64(requestID)),
-		),
-	)
+	_, span := trace.Tracer().Start(ctx, "Transitive.GetFailed", oteltrace.WithAttributes(
+		attribute.Stringer("nodeID", nodeID),
+		attribute.Int64("requestID", int64(requestID)),
+	))
 	defer span.End()
 
 	// We don't assume that this function is called after a failed Get message.
@@ -227,13 +223,11 @@ func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
-	ctx, span := trace.Tracer().Start(ctx, "Transitive.PushQuery",
-		oteltrace.WithAttributes(
-			attribute.Stringer("nodeID", nodeID),
-			attribute.Int64("requestID", int64(requestID)),
-			attribute.Int("blkSize", len(blkBytes)),
-		),
-	)
+	ctx, span := trace.Tracer().Start(ctx, "Transitive.PushQuery", oteltrace.WithAttributes(
+		attribute.Stringer("nodeID", nodeID),
+		attribute.Int64("requestID", int64(requestID)),
+		attribute.Int("blkSize", len(blkBytes)),
+	))
 	defer span.End()
 
 	t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{t.Consensus.Preference()})
@@ -276,13 +270,11 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) error {
-	ctx, span := trace.Tracer().Start(ctx, "Transitive.Chits",
-		oteltrace.WithAttributes(
-			attribute.Stringer("nodeID", nodeID),
-			attribute.Int64("requestID", int64(requestID)),
-			attribute.String("votes", fmt.Sprintf("%s", votes)),
-		),
-	)
+	ctx, span := trace.Tracer().Start(ctx, "Transitive.Chits", oteltrace.WithAttributes(
+		attribute.Stringer("nodeID", nodeID),
+		attribute.Int64("requestID", int64(requestID)),
+		attribute.String("votes", fmt.Sprintf("%s", votes)),
+	))
 	defer span.End()
 
 	// Since this is a linear chain, there should only be one ID in the vote set
@@ -411,7 +403,9 @@ func (t *Transitive) Gossip() error {
 	t.Ctx.Log.Verbo("gossiping accepted block to the network",
 		zap.Stringer("blkID", blkID),
 	)
-	span.SetAttributes(attribute.String("blkID", blkID.String()))
+	span.SetAttributes(
+		attribute.Stringer("blkID", blkID),
+	)
 	t.Sender.SendGossip(ctx, blk.Bytes())
 	return nil
 }

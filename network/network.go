@@ -495,7 +495,7 @@ func (n *network) Peers() (message.OutboundMessage, error) {
 
 func (n *network) Pong(ctx context.Context, nodeID ids.NodeID) (message.OutboundMessage, error) {
 	_, span := trace.Tracer().Start(ctx, "network.Pong", oteltrace.WithAttributes(
-		attribute.String("recipient", nodeID.String()),
+		attribute.Stringer("recipient", nodeID),
 	))
 	defer span.End()
 
@@ -505,7 +505,9 @@ func (n *network) Pong(ctx context.Context, nodeID ids.NodeID) (message.Outbound
 	}
 
 	uptimePercentInt := uint8(uptimePercentFloat * 100)
-	span.SetAttributes(attribute.Int("uptime", int(uptimePercentInt)))
+	span.SetAttributes(
+		attribute.Int("uptime", int(uptimePercentInt)),
+	)
 	return n.peerConfig.GetMessageCreator().Pong(uptimePercentInt)
 }
 

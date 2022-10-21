@@ -381,12 +381,10 @@ func (p *peer) readMessages() {
 			return
 		}
 
-		_, span := trace.Tracer().Start(context.Background(), "peer.readMessages",
-			oteltrace.WithAttributes(
-				attribute.String("sender", p.id.String()),
-				attribute.Int64("msgSize", int64(msgLen)),
-			),
-		)
+		_, span := trace.Tracer().Start(context.Background(), "peer.readMessages", oteltrace.WithAttributes(
+			attribute.Stringer("sender", p.id),
+			attribute.Int64("msgSize", int64(msgLen)),
+		))
 
 		// Read the message
 		msgBytes := make([]byte, msgLen)
@@ -437,7 +435,9 @@ func (p *peer) readMessages() {
 			p.ResourceTracker.StopProcessing(p.id, p.Clock.Time())
 			continue
 		}
-		span.SetAttributes(attribute.Int64("msgSize", int64(msgLen)))
+		span.SetAttributes(
+			attribute.Int64("msgSize", int64(msgLen)),
+		)
 
 		now := p.Clock.Time().Unix()
 		atomic.StoreInt64(&p.Config.LastReceived, now)
@@ -502,8 +502,8 @@ func (p *peer) writeMessages() {
 func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 	_, span := trace.Tracer().Start(context.Background(), "peer.writeMessage",
 		oteltrace.WithAttributes(
-			attribute.String("op", msg.Op().String()),
-			attribute.String("recipient", p.id.String()),
+			attribute.Stringer("op", msg.Op()),
+			attribute.Stringer("recipient", p.id),
 			attribute.Int("msgSize", len(msg.Bytes())),
 		),
 	)
@@ -603,9 +603,9 @@ func (p *peer) sendPings() {
 func (p *peer) handle(msg message.InboundMessage) {
 	ctx, span := trace.Tracer().Start(context.Background(), "peer.handle",
 		oteltrace.WithAttributes(
-			attribute.String("sender", p.id.String()),
-			attribute.String("expiration", msg.ExpirationTime().String()),
-			attribute.String("op", msg.Op().String()),
+			attribute.Stringer("sender", p.id),
+			attribute.Stringer("expiration", msg.ExpirationTime()),
+			attribute.Stringer("op", msg.Op()),
 		),
 	)
 	defer span.End()
@@ -685,7 +685,9 @@ func (p *peer) handlePong(ctx context.Context, msg message.InboundMessage) {
 		p.StartClose()
 		return
 	}
-	span.SetAttributes(attribute.Int("uptime", int(uptime)))
+	span.SetAttributes(
+		attribute.Int("uptime", int(uptime)),
+	)
 
 	p.observedUptimeLock.Lock()
 	p.observedUptime = uptime // [0, 100] percentage
@@ -952,7 +954,9 @@ func (p *peer) handlePeerList(ctx context.Context, msg message.InboundMessage) {
 		return
 	}
 	ips := ipsIntf.([]ips.ClaimedIPPort)
-	span.SetAttributes(attribute.Int("numPeers", len(ips)))
+	span.SetAttributes(
+		attribute.Int("numPeers", len(ips)),
+	)
 	for _, ip := range ips {
 		if !p.Network.Track(ip) {
 			p.Metrics.NumUselessPeerListBytes.Add(float64(ip.BytesLen()))

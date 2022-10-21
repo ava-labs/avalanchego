@@ -49,7 +49,7 @@ var (
 
 func newResource() *resource.Resource {
 	return resource.NewWithAttributes(semconv.SchemaURL,
-		attribute.String("version", version.Current.String()),
+		attribute.Stringer("version", version.Current),
 		semconv.ServiceNameKey.String(constants.AppName),
 	)
 }
