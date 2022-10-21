@@ -5,7 +5,6 @@ package snowman
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -216,7 +215,6 @@ func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 	// Try to issue [blkID] to consensus.
 	// If we're missing an ancestor, request it from [vdr]
 	if _, err := t.issueFromByID(ctx, nodeID, blkID); err != nil {
-		span.RecordError(err)
 		return err
 	}
 
@@ -387,10 +385,10 @@ func (t *Transitive) Gossip() error {
 	_, lastAcceptedSpan := trace.Tracer().Start(ctx, "LastAccepted")
 	blkID, err := t.VM.LastAccepted()
 	lastAcceptedSpan.End()
-
 	if err != nil {
 		return err
 	}
+
 	blk, err := t.GetBlock(blkID)
 	if err != nil {
 		t.Ctx.Log.Warn("dropping gossip request",
@@ -398,7 +396,7 @@ func (t *Transitive) Gossip() error {
 			zap.Stringer("blkID", blkID),
 			zap.Error(err),
 		)
-		span.RecordError(errors.New("couldn't get block to gossip"))
+		span.RecordError(err)
 		return nil
 	}
 	t.Ctx.Log.Verbo("gossiping accepted block to the network",

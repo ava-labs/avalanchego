@@ -34,7 +34,8 @@ import (
 )
 
 var (
-	errClosed = errors.New("closed")
+	errClosed          = errors.New("closed")
+	errBeaconOutOfSync = errors.New("beacon reports out of sync time")
 
 	_ Peer = &peer{}
 )
@@ -745,7 +746,7 @@ func (p *peer) handleVersion(ctx context.Context, msg message.InboundMessage) {
 				zap.Uint64("peerTime", peerTime),
 				zap.Uint64("myTime", myTime),
 			)
-			span.RecordError(errors.New("beacon reports out of sync time"))
+			span.RecordError(errBeaconOutOfSync)
 		} else {
 			p.Log.Debug("peer reports out of sync time",
 				zap.Stringer("nodeID", p.id),
