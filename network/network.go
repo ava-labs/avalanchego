@@ -123,7 +123,7 @@ type network struct {
 	sendFailRateCalculator math.Averager
 
 	// Tracks what peers know about which peers
-	gossipTracker *GossipTracker
+	gossipTracker GossipTracker
 	peersLock     sync.RWMutex
 	// trackedIPs contains the set of IPs that we are currently attempting to
 	// connect to. An entry is added to this set when we first start attempting
