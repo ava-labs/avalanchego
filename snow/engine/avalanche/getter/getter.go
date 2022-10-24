@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
@@ -73,18 +72,12 @@ func (gh *getter) GetAcceptedStateSummary(_ context.Context, nodeID ids.NodeID, 
 }
 
 func (gh *getter) GetAcceptedFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32) error {
-	ctx, span := trace.Tracer().Start(ctx, "getter.GetAcceptedFrontier")
-	defer span.End()
-
 	acceptedFrontier := gh.storage.Edge()
 	gh.sender.SendAcceptedFrontier(ctx, validatorID, requestID, acceptedFrontier)
 	return nil
 }
 
 func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
-	ctx, span := trace.Tracer().Start(ctx, "getter.GetAccepted")
-	defer span.End()
-
 	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, vtxID := range containerIDs {
 		if vtx, err := gh.storage.GetVtx(vtxID); err == nil && vtx.Status() == choices.Accepted {
@@ -96,9 +89,6 @@ func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 }
 
 func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
-	ctx, span := trace.Tracer().Start(ctx, "getter.GetAncestors")
-	defer span.End()
-
 	startTime := time.Now()
 	gh.log.Verbo("called GetAncestors",
 		zap.Stringer("nodeID", nodeID),

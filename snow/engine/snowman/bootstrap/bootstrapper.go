@@ -10,10 +10,6 @@ import (
 	"math"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
-
-	oteltrace "go.opentelemetry.io/otel/trace"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -22,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -149,13 +144,6 @@ func (b *bootstrapper) Start(startReqID uint32) error {
 // Ancestors handles the receipt of multiple containers. Should be received in
 // response to a GetAncestors message to [nodeID] with request ID [requestID]
 func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
-	ctx, span := trace.Tracer().Start(ctx, "bootstrapper.Ancestors", oteltrace.WithAttributes(
-		attribute.Stringer("nodeID", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("numBlocks", len(blks)),
-	))
-	defer span.End()
-
 	// Make sure this is in response to a request we made
 	wantedBlkID, ok := b.OutstandingRequests.Remove(nodeID, requestID)
 	if !ok { // this message isn't in response to a request we made
@@ -309,10 +297,7 @@ func (b *bootstrapper) HealthCheck() (interface{}, error) {
 
 func (b *bootstrapper) GetVM() common.VM { return b.VM }
 
-func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
-	ctx, span := trace.Tracer().Start(context.Background(), "bootstrapper.ForceAccepted")
-	defer span.End()
-
+func (b *bootstrapper) ForceAccepted(ctx context.Context, acceptedContainerIDs []ids.ID) error {
 	pendingContainerIDs := b.Blocked.MissingIDs()
 
 	// Initialize the fetch from set to the currently preferred peers
@@ -412,9 +397,6 @@ func (b *bootstrapper) Clear() error {
 // If [blk]'s height is <= the last accepted height, then it will be removed
 // from the missingIDs set.
 func (b *bootstrapper) process(ctx context.Context, blk snowman.Block, processingBlocks map[ids.ID]snowman.Block) error {
-	ctx, span := trace.Tracer().Start(ctx, "bootstrapper.process")
-	defer span.End()
-
 	for {
 		blkID := blk.ID()
 		if b.Halted() {

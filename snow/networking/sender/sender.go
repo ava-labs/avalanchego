@@ -9,10 +9,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"go.opentelemetry.io/otel/attribute"
-
-	oteltrace "go.opentelemetry.io/otel/trace"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -21,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
-	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
@@ -93,12 +88,6 @@ func New(
 }
 
 func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32) {
-	ctx, span := trace.Tracer().Start(ctx, "sender.SendGetStateSummaryFrontier", oteltrace.WithAttributes(
-		attribute.Stringer("recipients", nodeIDs),
-		attribute.Int64("requestID", int64(requestID)),
-	))
-	defer span.End()
-
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -150,13 +139,6 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs ids.No
 }
 
 func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) {
-	ctx, span := trace.Tracer().Start(ctx, "sender.SendStateSummaryFrontier", oteltrace.WithAttributes(
-		attribute.Stringer("recipients", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("summaryLen", len(summary)),
-	))
-	defer span.End()
-
 	// Sending this message to myself.
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundStateSummaryFrontier(s.ctx.ChainID, requestID, summary, nodeID)
@@ -198,13 +180,6 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 }
 
 func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, heights []uint64) {
-	ctx, span := trace.Tracer().Start(ctx, "sender.SendGetAcceptedStateSummary", oteltrace.WithAttributes(
-		attribute.Stringer("recipients", nodeIDs),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("numHeights", len(heights)),
-	))
-	defer span.End()
-
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -257,13 +232,6 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs ids.No
 }
 
 func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) {
-	ctx, span := trace.Tracer().Start(ctx, "sender.SendAcceptedStateSummary", oteltrace.WithAttributes(
-		attribute.Stringer("recipients", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("numSummaryIDs", len(summaryIDs)),
-	))
-	defer span.End()
-
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundAcceptedStateSummary(s.ctx.ChainID, requestID, summaryIDs, nodeID)
 		go s.router.HandleInbound(ctx, inMsg)
@@ -298,12 +266,6 @@ func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 }
 
 func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32) {
-	ctx, span := trace.Tracer().Start(ctx, "sender.SendGetAcceptedFrontier", oteltrace.WithAttributes(
-		attribute.Stringer("recipients", nodeIDs),
-		attribute.Int64("requestID", int64(requestID)),
-	))
-	defer span.End()
-
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -355,13 +317,6 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs ids.NodeID
 }
 
 func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
-	ctx, span := trace.Tracer().Start(ctx, "sender.SendAcceptedFrontier", oteltrace.WithAttributes(
-		attribute.Stringer("recipients", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("numContainerIDs", len(containerIDs)),
-	))
-	defer span.End()
-
 	// Sending this message to myself.
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundAcceptedFrontier(s.ctx.ChainID, requestID, containerIDs, nodeID)
@@ -397,13 +352,6 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 }
 
 func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, containerIDs []ids.ID) {
-	ctx, span := trace.Tracer().Start(ctx, "sender.SendGetAccepted", oteltrace.WithAttributes(
-		attribute.Stringer("recipients", nodeIDs),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("numContainerIDs", len(containerIDs)),
-	))
-	defer span.End()
-
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -456,13 +404,6 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs ids.NodeIDSet, req
 }
 
 func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
-	ctx, span := trace.Tracer().Start(ctx, "sender.SendAccepted", oteltrace.WithAttributes(
-		attribute.Stringer("recipients", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("numContainerIDs", len(containerIDs)),
-	))
-	defer span.End()
-
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundAccepted(s.ctx.ChainID, requestID, containerIDs, nodeID)
 		go s.router.HandleInbound(ctx, inMsg)
@@ -497,13 +438,6 @@ func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 }
 
 func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
-	ctx, span := trace.Tracer().Start(ctx, "sender.SendGetAncestors", oteltrace.WithAttributes(
-		attribute.Stringer("recipients", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Stringer("containerID", containerID),
-	))
-	defer span.End()
-
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from this node.
 	s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID, message.Ancestors)
@@ -566,13 +500,6 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 // on the specified node.
 // The Ancestors message gives the recipient the contents of several containers.
 func (s *sender) SendAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) {
-	_, span := trace.Tracer().Start(ctx, "sender.SendAncestors", oteltrace.WithAttributes(
-		attribute.Stringer("recipients", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("numContainers", len(containers)),
-	))
-	defer span.End()
-
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.Ancestors(s.ctx.ChainID, requestID, containers)
 	if err != nil {
@@ -605,13 +532,6 @@ func (s *sender) SendAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 // consensus engine would like the recipient to send this consensus engine the
 // specified container.
 func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
-	ctx, span := trace.Tracer().Start(ctx, "sender.SendGet", oteltrace.WithAttributes(
-		attribute.Stringer("recipients", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Stringer("containerID", containerID),
-	))
-	defer span.End()
-
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from this node.
 	s.router.RegisterRequest(ctx, nodeID, s.ctx.ChainID, s.ctx.ChainID, requestID, message.Put)
@@ -676,12 +596,6 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 // The Put message signifies that this consensus engine is giving to the recipient
 // the contents of the specified container.
 func (s *sender) SendPut(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte) {
-	_, span := trace.Tracer().Start(ctx, "sender.SendPut", oteltrace.WithAttributes(
-		attribute.Stringer("recipients", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-	))
-	defer span.End()
-
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.Put(s.ctx.ChainID, requestID, container)
 	if err != nil {
@@ -720,13 +634,6 @@ func (s *sender) SendPut(ctx context.Context, nodeID ids.NodeID, requestID uint3
 // The PushQuery message signifies that this consensus engine would like each node to send
 // their preferred frontier given the existence of the specified container.
 func (s *sender) SendPushQuery(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, container []byte) {
-	ctx, span := trace.Tracer().Start(ctx, "sender.SendPushQuery", oteltrace.WithAttributes(
-		attribute.Stringer("recipients", nodeIDs),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("containerLen", len(container)),
-	))
-	defer span.End()
-
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
 	// We register timeouts for all nodes, regardless of whether we fail
@@ -809,13 +716,6 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs ids.NodeIDSet, reque
 // The PullQuery message signifies that this consensus engine would like each node to send
 // their preferred frontier.
 func (s *sender) SendPullQuery(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, containerID ids.ID) {
-	ctx, span := trace.Tracer().Start(ctx, "sender.SendPullQuery", oteltrace.WithAttributes(
-		attribute.Stringer("recipients", nodeIDs),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Stringer("containerID", containerID),
-	))
-	defer span.End()
-
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
 	// We register timeouts for all nodes, regardless of whether we fail
@@ -888,13 +788,6 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs ids.NodeIDSet, reque
 
 // SendChits sends chits
 func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) {
-	ctx, span := trace.Tracer().Start(ctx, "sender.SendChits", oteltrace.WithAttributes(
-		attribute.Stringer("recipients", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("numVotes", len(votes)),
-	))
-	defer span.End()
-
 	// If [nodeID] is myself, send this message directly
 	// to my own router rather than sending it over the network
 	if nodeID == s.ctx.NodeID {
@@ -931,12 +824,6 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 }
 
 func (s *sender) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
-	ctx, span := trace.Tracer().Start(ctx, "sender.SendCrossChainAppRequest", oteltrace.WithAttributes(
-		attribute.Stringer("chainID", chainID),
-		attribute.Int64("requestID", int64(requestID)),
-	))
-	defer span.End()
-
 	s.router.RegisterRequest(ctx, s.ctx.NodeID, s.ctx.ChainID, chainID, requestID, message.CrossChainAppResponse)
 
 	inMsg := s.msgCreator.InternalCrossChainAppRequest(
@@ -953,12 +840,6 @@ func (s *sender) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, r
 }
 
 func (s *sender) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, appResponseBytes []byte) error {
-	ctx, span := trace.Tracer().Start(ctx, "sender.SendCrossChainAppResponse", oteltrace.WithAttributes(
-		attribute.Stringer("chainID", chainID),
-		attribute.Int64("requestID", int64(requestID)),
-	))
-	defer span.End()
-
 	inMsg := s.msgCreator.InternalCrossChainAppResponse(
 		s.ctx.NodeID,
 		s.ctx.ChainID,
@@ -974,13 +855,6 @@ func (s *sender) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, 
 // SendAppRequest sends an application-level request to the given nodes.
 // The meaning of this request, and how it should be handled, is defined by the VM.
 func (s *sender) SendAppRequest(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, appRequestBytes []byte) error {
-	ctx, span := trace.Tracer().Start(ctx, "sender.SendAppRequest", oteltrace.WithAttributes(
-		attribute.Stringer("recipients", nodeIDs),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("appRequestLen", len(appRequestBytes)),
-	))
-	defer span.End()
-
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
 	// We register timeouts for all nodes, regardless of whether we fail
@@ -1062,13 +936,6 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs ids.NodeIDSet, requ
 // SendAppResponse sends a response to an application-level request from the
 // given node
 func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
-	ctx, span := trace.Tracer().Start(ctx, "sender.SendAppResponse", oteltrace.WithAttributes(
-		attribute.Stringer("recipients", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("appResponseLen", len(appResponseBytes)),
-	))
-	defer span.End()
-
 	if nodeID == s.ctx.NodeID {
 		inMsg := s.msgCreator.InboundAppResponse(s.ctx.ChainID, requestID, appResponseBytes, nodeID)
 		go s.router.HandleInbound(ctx, inMsg)
@@ -1110,12 +977,6 @@ func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, request
 }
 
 func (s *sender) SendAppGossipSpecific(ctx context.Context, nodeIDs ids.NodeIDSet, appGossipBytes []byte) error {
-	_, span := trace.Tracer().Start(ctx, "sender.SendAppGossipSpecific", oteltrace.WithAttributes(
-		attribute.Stringer("recipients", nodeIDs),
-		attribute.Int("appGossipLen", len(appGossipBytes)),
-	))
-	defer span.End()
-
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
 	if err != nil {
@@ -1151,11 +1012,6 @@ func (s *sender) SendAppGossipSpecific(ctx context.Context, nodeIDs ids.NodeIDSe
 
 // SendAppGossip sends an application-level gossip message.
 func (s *sender) SendAppGossip(ctx context.Context, appGossipBytes []byte) error {
-	_, span := trace.Tracer().Start(ctx, "sender.SendAppGossip", oteltrace.WithAttributes(
-		attribute.Int("appGossipLen", len(appGossipBytes)),
-	))
-	defer span.End()
-
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
 	if err != nil {
@@ -1189,11 +1045,6 @@ func (s *sender) SendAppGossip(ctx context.Context, appGossipBytes []byte) error
 
 // SendGossip gossips the provided container
 func (s *sender) SendGossip(ctx context.Context, container []byte) {
-	_, span := trace.Tracer().Start(ctx, "sender.SendGossip", oteltrace.WithAttributes(
-		attribute.Int("containerLen", len(container)),
-	))
-	defer span.End()
-
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.Put(s.ctx.ChainID, constants.GossipMsgRequestID, container)
 	if err != nil {

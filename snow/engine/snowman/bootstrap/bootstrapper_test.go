@@ -265,7 +265,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	err = bs.ForceAccepted(acceptedIDs)
+	err = bs.ForceAccepted(context.Background(), acceptedIDs)
 	switch {
 	case err != nil: // should finish
 		t.Fatal(err)
@@ -386,7 +386,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request blk1
+	if err := bs.ForceAccepted(context.Background(), acceptedIDs); err != nil { // should request blk1
 		t.Fatal(err)
 	}
 
@@ -553,7 +553,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 		requested = vtxID
 	}
 
-	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request blk2
+	if err := bs.ForceAccepted(context.Background(), acceptedIDs); err != nil { // should request blk2
 		t.Fatal(err)
 	}
 
@@ -706,7 +706,7 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	}
 
 	// should request blk2
-	err = bs.ForceAccepted(acceptedIDs)
+	err = bs.ForceAccepted(context.Background(), acceptedIDs)
 	switch {
 	case err != nil:
 		t.Fatal(err)
@@ -890,7 +890,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 		requested = vtxID
 	}
 
-	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request blk2
+	if err := bs.ForceAccepted(context.Background(), acceptedIDs); err != nil { // should request blk2
 		t.Fatal(err)
 	}
 
@@ -1015,7 +1015,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		requestIDs[vtxID] = reqID
 	}
 
-	if err := bs.ForceAccepted([]ids.ID{blkID1, blkID2}); err != nil { // should request blk2 and blk1
+	if err := bs.ForceAccepted(context.Background(), []ids.ID{blkID1, blkID2}); err != nil { // should request blk2 and blk1
 		t.Fatal(err)
 	}
 
@@ -1186,7 +1186,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	// Force Accept blk3
-	if err := bs.ForceAccepted([]ids.ID{blkID3}); err != nil { // should request blk3
+	if err := bs.ForceAccepted(context.Background(), []ids.ID{blkID3}); err != nil { // should request blk3
 		t.Fatal(err)
 	}
 
@@ -1209,7 +1209,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 	requestIDs = map[ids.ID]uint32{}
 
-	if err := bs.ForceAccepted([]ids.ID{blkID4}); err != nil {
+	if err := bs.ForceAccepted(context.Background(), []ids.ID{blkID4}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1320,7 +1320,7 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 	}
 
 	// Force Accept, the already transitively accepted, blk0
-	if err := bs.ForceAccepted([]ids.ID{blk0.ID()}); err != nil { // should request blk0
+	if err := bs.ForceAccepted(context.Background(), []ids.ID{blk0.ID()}); err != nil { // should request blk0
 		t.Fatal(err)
 	}
 
@@ -1407,7 +1407,7 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := bs.ForceAccepted([]ids.ID{blk2.ID()}); err != nil {
+	if err := bs.ForceAccepted(context.Background(), []ids.ID{blk2.ID()}); err != nil {
 		t.Fatal(err)
 	}
 

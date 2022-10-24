@@ -180,7 +180,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		return nil, errParsedUnknownVertex
 	}
 
-	if err := bs.ForceAccepted(acceptedIDs); err != nil {
+	if err := bs.ForceAccepted(context.Background(), acceptedIDs); err != nil {
 		t.Fatal(err)
 	}
 
@@ -294,7 +294,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		return nil, errParsedUnknownVertex
 	}
 
-	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx0
+	if err := bs.ForceAccepted(context.Background(), acceptedIDs); err != nil { // should request vtx0
 		t.Fatal(err)
 	} else if reqVtxID != vtxID0 {
 		t.Fatalf("should have requested vtxID0 but requested %s", reqVtxID)
@@ -462,7 +462,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		*reqIDPtr = reqID
 	}
 
-	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx0
+	if err := bs.ForceAccepted(context.Background(), acceptedIDs); err != nil { // should request vtx0
 		t.Fatal(err)
 	}
 
@@ -603,7 +603,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 		*reqIDPtr = reqID
 	}
 
-	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx1
+	if err := bs.ForceAccepted(context.Background(), acceptedIDs); err != nil { // should request vtx1
 		t.Fatal(err)
 	}
 
@@ -726,7 +726,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 		requested = vtxID
 	}
 
-	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx1
+	if err := bs.ForceAccepted(context.Background(), acceptedIDs); err != nil { // should request vtx1
 		t.Fatal(err)
 	} else if requested != vtxID1 {
 		t.Fatal("requested wrong vtx")
@@ -841,7 +841,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		requestIDs[vtxID] = reqID
 	}
 
-	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx0 and vtx1
+	if err := bs.ForceAccepted(context.Background(), acceptedIDs); err != nil { // should request vtx0 and vtx1
 		t.Fatal(err)
 	}
 
@@ -978,7 +978,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 		requestIDs[vtxID] = reqID
 	}
 
-	if err := bs.ForceAccepted(acceptedIDs); err != nil { // should request vtx2
+	if err := bs.ForceAccepted(context.Background(), acceptedIDs); err != nil { // should request vtx2
 		t.Fatal(err)
 	}
 
@@ -1170,7 +1170,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		requestIDs[vtxID] = reqID
 	}
 
-	if err := bs.ForceAccepted([]ids.ID{vtxID3, vtxID4}); err != nil { // should request vtx3 and vtx4
+	if err := bs.ForceAccepted(context.Background(), []ids.ID{vtxID3, vtxID4}); err != nil { // should request vtx3 and vtx4
 		t.Fatal(err)
 	}
 
@@ -1202,7 +1202,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	bs.needToFetch.Clear()
 	requestIDs = map[ids.ID]uint32{}
 
-	if err := bs.ForceAccepted([]ids.ID{vtxID5, vtxID3}); err != nil {
+	if err := bs.ForceAccepted(context.Background(), []ids.ID{vtxID5, vtxID3}); err != nil {
 		t.Fatal(err)
 	}
 

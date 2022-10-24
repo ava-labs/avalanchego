@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
@@ -55,9 +54,6 @@ type getter struct {
 }
 
 func (gh *getter) GetStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	ctx, span := trace.Tracer().Start(ctx, "getter.GetStateSummaryFrontier")
-	defer span.End()
-
 	// Note: we do not check if gh.ssVM.StateSyncEnabled since we want all
 	// nodes, including those disabling state sync to serve state summaries if
 	// these are available
@@ -86,9 +82,6 @@ func (gh *getter) GetStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 }
 
 func (gh *getter) GetAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, heights []uint64) error {
-	ctx, span := trace.Tracer().Start(ctx, "getter.GetAcceptedStateSummary")
-	defer span.End()
-
 	// If there are no requested heights, then we can return the result
 	// immediately, regardless of if the underlying VM implements state sync.
 	if len(heights) == 0 {
@@ -134,12 +127,7 @@ func (gh *getter) GetAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 }
 
 func (gh *getter) GetAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	ctx, span := trace.Tracer().Start(ctx, "getter.GetAcceptedFrontier")
-	defer span.End()
-
-	_, lastAcceptedSpan := trace.Tracer().Start(ctx, "GetLastAccepted")
 	lastAccepted, err := gh.vm.LastAccepted()
-	lastAcceptedSpan.End()
 	if err != nil {
 		return err
 	}
@@ -148,14 +136,9 @@ func (gh *getter) GetAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 }
 
 func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
-	ctx, span := trace.Tracer().Start(ctx, "getter.GetAccepted")
-	defer span.End()
-
 	acceptedIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, blkID := range containerIDs {
-		_, getBlockSpan := trace.Tracer().Start(ctx, "GetBlock")
 		blk, err := gh.vm.GetBlock(blkID)
-		getBlockSpan.End()
 		if err == nil && blk.Status() == choices.Accepted {
 			acceptedIDs = append(acceptedIDs, blkID)
 		}
@@ -165,9 +148,6 @@ func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 }
 
 func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
-	ctx, span := trace.Tracer().Start(ctx, "getter.GetAncestors")
-	defer span.End()
-
 	ancestorsBytes, err := block.GetAncestors(
 		gh.vm,
 		blkID,
@@ -192,12 +172,7 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (gh *getter) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
-	ctx, span := trace.Tracer().Start(ctx, "getter.Get")
-	defer span.End()
-
-	_, getBlockSpan := trace.Tracer().Start(ctx, "GetBlock")
 	blk, err := gh.vm.GetBlock(blkID)
-	getBlockSpan.End()
 	if err != nil {
 		// If we failed to get the block, that means either an unexpected error
 		// has occurred, [vdr] is not following the protocol, or the

@@ -10,10 +10,6 @@ import (
 
 	stdmath "math"
 
-	"go.opentelemetry.io/otel/attribute"
-
-	oteltrace "go.opentelemetry.io/otel/trace"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -22,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -112,13 +107,6 @@ func New(
 }
 
 func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryBytes []byte) error {
-	_, span := trace.Tracer().Start(ctx, "stateSyncer.StateSummaryFrontier", oteltrace.WithAttributes(
-		attribute.Stringer("nodeID", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("summaryLen", len(summaryBytes)),
-	))
-	defer span.End()
-
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync StateSummaryFrontier message",
@@ -166,12 +154,6 @@ func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.Node
 }
 
 func (ss *stateSyncer) GetStateSummaryFrontierFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	_, span := trace.Tracer().Start(ctx, "stateSyncer.GetStateSummaryFrontierFailed", oteltrace.WithAttributes(
-		attribute.Stringer("nodeID", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-	))
-	defer span.End()
-
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync GetStateSummaryFrontierFailed message",
@@ -229,13 +211,6 @@ func (ss *stateSyncer) receivedStateSummaryFrontier() error {
 }
 
 func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error {
-	_, span := trace.Tracer().Start(ctx, "stateSyncer.AcceptedStateSummary", oteltrace.WithAttributes(
-		attribute.Stringer("nodeID", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("numSummaryIDs", len(summaryIDs)),
-	))
-	defer span.End()
-
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync AcceptedStateSummary message",
@@ -378,12 +353,6 @@ func (ss *stateSyncer) selectSyncableStateSummary() block.StateSummary {
 }
 
 func (ss *stateSyncer) GetAcceptedStateSummaryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	ctx, span := trace.Tracer().Start(ctx, "stateSyncer.GetAcceptedStateSummaryFailed", oteltrace.WithAttributes(
-		attribute.Stringer("nodeID", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-	))
-	defer span.End()
-
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync GetAcceptedStateSummaryFailed message",

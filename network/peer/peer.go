@@ -8,7 +8,6 @@ import (
 	"context"
 	"crypto/x509"
 	"errors"
-	"fmt"
 	"io"
 	"math"
 	"net"
@@ -16,15 +15,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
-
-	oteltrace "go.opentelemetry.io/otel/trace"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
@@ -34,8 +28,7 @@ import (
 )
 
 var (
-	errClosed          = errors.New("closed")
-	errBeaconOutOfSync = errors.New("beacon reports out of sync time")
+	errClosed = errors.New("closed")
 
 	_ Peer = &peer{}
 )
@@ -382,12 +375,6 @@ func (p *peer) readMessages() {
 			return
 		}
 
-		ctx := context.Background()
-		ctx, span := trace.Tracer().Start(ctx, "peer.readMessages", oteltrace.WithAttributes(
-			attribute.Stringer("sender", p.id),
-			attribute.Int64("msgLen", int64(msgLen)),
-		))
-
 		// Read the message
 		msgBytes := make([]byte, msgLen)
 		if _, err := io.ReadFull(reader, msgBytes); err != nil {
@@ -396,8 +383,6 @@ func (p *peer) readMessages() {
 				zap.Error(err),
 			)
 			onFinishedHandling()
-			span.AddEvent(fmt.Sprintf("error reading message: %s", err))
-			span.End()
 			return
 		}
 
@@ -427,8 +412,6 @@ func (p *peer) readMessages() {
 
 			// Couldn't parse the message. Read the next one.
 			onFinishedHandling()
-			span.AddEvent(fmt.Sprintf("failed to parse message: %s", err))
-			span.End()
 			p.ResourceTracker.StopProcessing(p.id, p.Clock.Time())
 			continue
 		}
@@ -440,9 +423,8 @@ func (p *peer) readMessages() {
 
 		// Handle the message. Note that when we are done handling this message,
 		// we must call [msg.OnFinishedHandling()].
-		p.handle(ctx, msg)
+		p.handle(context.Background(), msg)
 		p.ResourceTracker.StopProcessing(p.id, p.Clock.Time())
-		span.End()
 	}
 }
 
@@ -495,14 +477,6 @@ func (p *peer) writeMessages() {
 
 func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 	msgBytes := msg.Bytes()
-	msgLen := len(msgBytes)
-	_, span := trace.Tracer().Start(context.Background(), "peer.writeMessage", oteltrace.WithAttributes(
-		attribute.Stringer("recipient", p.id),
-		attribute.Stringer("op", msg.Op()),
-		attribute.Int("msgLen", msgLen),
-	))
-	defer span.End()
-
 	p.Log.Verbo("sending message",
 		zap.Stringer("nodeID", p.id),
 		zap.Binary("messageBytes", msgBytes),
@@ -516,7 +490,8 @@ func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 		return
 	}
 
-	msgLenBytes, err := writeMsgLen(uint32(msgLen), constants.DefaultMaxMessageSize)
+	msgLen := uint32(len(msgBytes))
+	msgLenBytes, err := writeMsgLen(msgLen, constants.DefaultMaxMessageSize)
 	if err != nil {
 		p.Log.Verbo("error writing message length",
 			zap.Stringer("nodeID", p.id),
@@ -591,28 +566,21 @@ func (p *peer) sendPings() {
 
 func (p *peer) handle(ctx context.Context, msg message.InboundMessage) {
 	op := msg.Op()
-	ctx, span := trace.Tracer().Start(ctx, "peer.handle", oteltrace.WithAttributes(
-		attribute.Stringer("sender", p.id),
-		attribute.Stringer("op", op),
-		attribute.Stringer("expiration", msg.ExpirationTime()),
-	))
-	defer span.End()
-
 	switch op { // Network-related message types
 	case message.Ping:
-		p.handlePing(ctx, msg)
+		p.handlePing(msg)
 		msg.OnFinishedHandling()
 		return
 	case message.Pong:
-		p.handlePong(ctx, msg)
+		p.handlePong(msg)
 		msg.OnFinishedHandling()
 		return
 	case message.Version:
-		p.handleVersion(ctx, msg)
+		p.handleVersion(msg)
 		msg.OnFinishedHandling()
 		return
 	case message.PeerList:
-		p.handlePeerList(ctx, msg)
+		p.handlePeerList(msg)
 		msg.OnFinishedHandling()
 		return
 	}
@@ -623,7 +591,6 @@ func (p *peer) handle(ctx context.Context, msg message.InboundMessage) {
 			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", op),
 		)
-		span.AddEvent("dropping message because handshake isn't finished")
 		msg.OnFinishedHandling()
 		return
 	}
@@ -632,11 +599,8 @@ func (p *peer) handle(ctx context.Context, msg message.InboundMessage) {
 	p.Router.HandleInbound(ctx, msg)
 }
 
-func (p *peer) handlePing(ctx context.Context, _ message.InboundMessage) {
-	ctx, span := trace.Tracer().Start(ctx, "peer.handlePing")
-	defer span.End()
-
-	msg, err := p.Network.Pong(ctx, p.id)
+func (p *peer) handlePing(_ message.InboundMessage) {
+	msg, err := p.Network.Pong(p.id)
 	if err != nil {
 		p.Log.Error("failed to create message",
 			zap.Stringer("messageOp", message.Pong),
@@ -647,10 +611,7 @@ func (p *peer) handlePing(ctx context.Context, _ message.InboundMessage) {
 	p.Send(p.onClosingCtx, msg)
 }
 
-func (p *peer) handlePong(ctx context.Context, msg message.InboundMessage) {
-	_, span := trace.Tracer().Start(ctx, "peer.handlePong")
-	defer span.End()
-
+func (p *peer) handlePong(msg message.InboundMessage) {
 	uptimeIntf, err := msg.Get(message.Uptime)
 	if err != nil {
 		p.Log.Debug("message with invalid field",
@@ -672,19 +633,13 @@ func (p *peer) handlePong(ctx context.Context, msg message.InboundMessage) {
 		p.StartClose()
 		return
 	}
-	span.SetAttributes(
-		attribute.Int("uptime", int(uptime)),
-	)
 
 	p.observedUptimeLock.Lock()
 	p.observedUptime = uptime // [0, 100] percentage
 	p.observedUptimeLock.Unlock()
 }
 
-func (p *peer) handleVersion(ctx context.Context, msg message.InboundMessage) {
-	_, span := trace.Tracer().Start(ctx, "peer.handleVersion")
-	defer span.End()
-
+func (p *peer) handleVersion(msg message.InboundMessage) {
 	if p.gotVersion.GetValue() {
 		// TODO: this should never happen, should we close the connection here?
 		p.Log.Verbo("dropping duplicated version message",
@@ -712,7 +667,6 @@ func (p *peer) handleVersion(ctx context.Context, msg message.InboundMessage) {
 			zap.Uint32("peerNetworkID", peerNetworkID),
 			zap.Uint32("ourNetworkID", p.NetworkID),
 		)
-		span.AddEvent("networkID mismatch")
 		p.StartClose()
 		return
 	}
@@ -738,14 +692,12 @@ func (p *peer) handleVersion(ctx context.Context, msg message.InboundMessage) {
 				zap.Uint64("peerTime", peerTime),
 				zap.Uint64("myTime", myTime),
 			)
-			span.RecordError(errBeaconOutOfSync)
 		} else {
 			p.Log.Debug("peer reports out of sync time",
 				zap.Stringer("nodeID", p.id),
 				zap.Uint64("peerTime", peerTime),
 				zap.Uint64("myTime", myTime),
 			)
-			span.AddEvent("peer reports out of sync time")
 		}
 		p.StartClose()
 		return
@@ -770,7 +722,6 @@ func (p *peer) handleVersion(ctx context.Context, msg message.InboundMessage) {
 			zap.Stringer("nodeID", p.id),
 			zap.Error(err),
 		)
-		span.AddEvent("failed to parse peer version")
 		p.StartClose()
 		return
 	}
@@ -796,7 +747,6 @@ func (p *peer) handleVersion(ctx context.Context, msg message.InboundMessage) {
 			zap.Stringer("peerVersion", peerVersion),
 			zap.Error(err),
 		)
-		span.AddEvent("peer version incompatible")
 		p.StartClose()
 		return
 	}
@@ -822,7 +772,6 @@ func (p *peer) handleVersion(ctx context.Context, msg message.InboundMessage) {
 			zap.Stringer("nodeID", p.id),
 			zap.Uint64("versionTime", versionTime),
 		)
-		span.AddEvent("peer timestamp too far in the future")
 		p.StartClose()
 		return
 	}
@@ -848,7 +797,6 @@ func (p *peer) handleVersion(ctx context.Context, msg message.InboundMessage) {
 				zap.Stringer("nodeID", p.id),
 				zap.Error(err),
 			)
-			span.AddEvent("failed to parse peer's tracked subnets")
 			p.StartClose()
 			return
 		}
@@ -896,7 +844,6 @@ func (p *peer) handleVersion(ctx context.Context, msg message.InboundMessage) {
 			zap.Stringer("nodeID", p.id),
 			zap.Error(err),
 		)
-		span.AddEvent("signature verification failed")
 		p.StartClose()
 		return
 	}
@@ -914,12 +861,8 @@ func (p *peer) handleVersion(ctx context.Context, msg message.InboundMessage) {
 	p.Send(p.onClosingCtx, peerlistMsg)
 }
 
-func (p *peer) handlePeerList(ctx context.Context, msg message.InboundMessage) {
-	_, span := trace.Tracer().Start(ctx, "peer.handlePeerList")
-	defer span.End()
-
+func (p *peer) handlePeerList(msg message.InboundMessage) {
 	if !p.finishedHandshake.GetValue() {
-		span.AddEvent("handshake not finished")
 		if !p.gotVersion.GetValue() {
 			return
 		}
@@ -941,9 +884,6 @@ func (p *peer) handlePeerList(ctx context.Context, msg message.InboundMessage) {
 		return
 	}
 	ips := ipsIntf.([]ips.ClaimedIPPort)
-	span.SetAttributes(
-		attribute.Int("numPeers", len(ips)),
-	)
 	for _, ip := range ips {
 		if !p.Network.Track(ip) {
 			p.Metrics.NumUselessPeerListBytes.Add(float64(ip.BytesLen()))

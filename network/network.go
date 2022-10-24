@@ -17,10 +17,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"go.opentelemetry.io/otel/attribute"
-
-	oteltrace "go.opentelemetry.io/otel/trace"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/health"
@@ -32,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
-	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -487,21 +482,13 @@ func (n *network) Peers() (message.OutboundMessage, error) {
 	return n.peerConfig.MessageCreator.PeerList(peers, true)
 }
 
-func (n *network) Pong(ctx context.Context, nodeID ids.NodeID) (message.OutboundMessage, error) {
-	_, span := trace.Tracer().Start(ctx, "network.Pong", oteltrace.WithAttributes(
-		attribute.Stringer("recipient", nodeID),
-	))
-	defer span.End()
-
+func (n *network) Pong(nodeID ids.NodeID) (message.OutboundMessage, error) {
 	uptimePercentFloat, err := n.config.UptimeCalculator.CalculateUptimePercent(nodeID)
 	if err != nil {
 		uptimePercentFloat = 0
 	}
 
 	uptimePercentInt := uint8(uptimePercentFloat * 100)
-	span.SetAttributes(
-		attribute.Int("uptime", int(uptimePercentInt)),
-	)
 	return n.peerConfig.MessageCreator.Pong(uptimePercentInt)
 }
 

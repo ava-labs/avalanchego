@@ -4,7 +4,6 @@
 package peer
 
 import (
-	"context"
 	"crypto"
 	"time"
 
@@ -83,6 +82,6 @@ func (n *testNetwork) Peers() (message.OutboundMessage, error) {
 	return n.mc.PeerList(nil, true)
 }
 
-func (n *testNetwork) Pong(context.Context, ids.NodeID) (message.OutboundMessage, error) {
+func (n *testNetwork) Pong(ids.NodeID) (message.OutboundMessage, error) {
 	return n.mc.Pong(n.uptime)
 }

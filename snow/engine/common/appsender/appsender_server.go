@@ -10,7 +10,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/trace"
 
 	appsenderpb "github.com/ava-labs/avalanchego/proto/pb/appsender"
 )
@@ -28,9 +27,6 @@ func NewServer(appSender common.AppSender) *Server {
 }
 
 func (s *Server) SendCrossChainAppRequest(ctx context.Context, msg *appsenderpb.SendCrossChainAppRequestMsg) (*emptypb.Empty, error) {
-	ctx, span := trace.Tracer().Start(ctx, "Server.SendCrossChainAppRequest")
-	defer span.End()
-
 	chainID, err := ids.ToID(msg.ChainId)
 	if err != nil {
 		return &emptypb.Empty{}, err
@@ -40,9 +36,6 @@ func (s *Server) SendCrossChainAppRequest(ctx context.Context, msg *appsenderpb.
 }
 
 func (s *Server) SendCrossChainAppResponse(ctx context.Context, msg *appsenderpb.SendCrossChainAppResponseMsg) (*emptypb.Empty, error) {
-	ctx, span := trace.Tracer().Start(ctx, "Server.SendCrossChainAppResponse")
-	defer span.End()
-
 	chainID, err := ids.ToID(msg.ChainId)
 	if err != nil {
 		return &emptypb.Empty{}, err
@@ -52,9 +45,6 @@ func (s *Server) SendCrossChainAppResponse(ctx context.Context, msg *appsenderpb
 }
 
 func (s *Server) SendAppRequest(ctx context.Context, req *appsenderpb.SendAppRequestMsg) (*emptypb.Empty, error) {
-	ctx, span := trace.Tracer().Start(ctx, "Server.SendAppRequest")
-	defer span.End()
-
 	nodeIDs := ids.NewNodeIDSet(len(req.NodeIds))
 	for _, nodeIDBytes := range req.NodeIds {
 		nodeID, err := ids.ToNodeID(nodeIDBytes)
@@ -68,9 +58,6 @@ func (s *Server) SendAppRequest(ctx context.Context, req *appsenderpb.SendAppReq
 }
 
 func (s *Server) SendAppResponse(ctx context.Context, req *appsenderpb.SendAppResponseMsg) (*emptypb.Empty, error) {
-	ctx, span := trace.Tracer().Start(ctx, "Server.SendAppResponse")
-	defer span.End()
-
 	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
@@ -80,17 +67,11 @@ func (s *Server) SendAppResponse(ctx context.Context, req *appsenderpb.SendAppRe
 }
 
 func (s *Server) SendAppGossip(ctx context.Context, req *appsenderpb.SendAppGossipMsg) (*emptypb.Empty, error) {
-	ctx, span := trace.Tracer().Start(ctx, "Server.SendAppGossip")
-	defer span.End()
-
 	err := s.appSender.SendAppGossip(ctx, req.Msg)
 	return &emptypb.Empty{}, err
 }
 
 func (s *Server) SendAppGossipSpecific(ctx context.Context, req *appsenderpb.SendAppGossipSpecificMsg) (*emptypb.Empty, error) {
-	ctx, span := trace.Tracer().Start(ctx, "Server.SendAppGossipSpecific")
-	defer span.End()
-
 	nodeIDs := ids.NewNodeIDSet(len(req.NodeIds))
 	for _, nodeIDBytes := range req.NodeIds {
 		nodeID, err := ids.ToNodeID(nodeIDBytes)

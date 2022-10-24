@@ -11,7 +11,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/math"
 )
 
@@ -154,9 +153,6 @@ func (b *bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, 
 }
 
 func (b *bootstrapper) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	ctx, span := trace.Tracer().Start(ctx, "bootstrapper.GetAcceptedFrontierFailed")
-	defer span.End()
-
 	// ignores any late responses
 	if requestID != b.Config.SharedCfg.RequestID {
 		b.Ctx.Log.Debug("received out-of-sync GetAcceptedFrontierFailed message",
@@ -259,13 +255,10 @@ func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 		)
 	}
 
-	return b.Bootstrapable.ForceAccepted(accepted)
+	return b.Bootstrapable.ForceAccepted(ctx, accepted)
 }
 
 func (b *bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	ctx, span := trace.Tracer().Start(ctx, "bootstrapper.GetAcceptedFailed")
-	defer span.End()
-
 	// ignores any late responses
 	if requestID != b.Config.SharedCfg.RequestID {
 		b.Ctx.Log.Debug("received out-of-sync GetAcceptedFailed message",
@@ -320,7 +313,7 @@ func (b *bootstrapper) Startup() error {
 		b.Ctx.Log.Info("bootstrapping skipped",
 			zap.String("reason", "no provided bootstraps"),
 		)
-		return b.Bootstrapable.ForceAccepted(nil)
+		return b.Bootstrapable.ForceAccepted(context.TODO(), nil)
 	}
 
 	b.Config.SharedCfg.RequestID++

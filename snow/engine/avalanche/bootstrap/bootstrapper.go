@@ -10,10 +10,6 @@ import (
 	"math"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
-
-	oteltrace "go.opentelemetry.io/otel/trace"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -23,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -135,13 +130,6 @@ func (b *bootstrapper) Clear() error {
 // response to a GetAncestors message to [nodeID] with request ID [requestID].
 // Expects vtxs[0] to be the vertex requested in the corresponding GetAncestors.
 func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxs [][]byte) error {
-	ctx, span := trace.Tracer().Start(ctx, "bootstrapper.Ancestors", oteltrace.WithAttributes(
-		attribute.Stringer("nodeID", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("numVtxs", len(vtxs)),
-	))
-	defer span.End()
-
 	lenVtxs := len(vtxs)
 	if lenVtxs == 0 {
 		b.Ctx.Log.Debug("Ancestors contains no vertices",
@@ -509,7 +497,7 @@ func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 }
 
 // ForceAccepted starts bootstrapping. Process the vertices in [accepterContainerIDs].
-func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
+func (b *bootstrapper) ForceAccepted(ctx context.Context, acceptedContainerIDs []ids.ID) error {
 	pendingContainerIDs := b.VtxBlocked.MissingIDs()
 	// Append the list of accepted container IDs to pendingContainerIDs to ensure
 	// we iterate over every container that must be traversed.
@@ -531,7 +519,7 @@ func (b *bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 			b.needToFetch.Add(vtxID) // We don't have this vertex. Mark that we have to fetch it.
 		}
 	}
-	return b.process(context.TODO(), toProcess...)
+	return b.process(ctx, toProcess...)
 }
 
 // checkFinish repeatedly executes pending transactions and requests new frontier blocks until there aren't any new ones

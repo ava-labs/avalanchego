@@ -155,6 +155,8 @@ type Node struct {
 	// This node's configuration
 	Config *Config
 
+	tracer trace.Tracer
+
 	// ensures that we only close the node once.
 	shutdownOnce sync.Once
 
@@ -382,11 +384,6 @@ func (b *beaconManager) Disconnected(vdrID ids.NodeID) {
 // Dispatch starts the node's servers.
 // Returns when the node exits.
 func (n *Node) Dispatch() error {
-	// Set up tracer
-	if err := trace.InitTracer(n.Log, n.Config.TraceConfig); err != nil {
-		n.Log.Error("failed to initialize tracer", zap.Error(err))
-	}
-
 	// Start the HTTP API server
 	go n.Log.RecoverAndPanic(func() {
 		var err error
@@ -1239,6 +1236,17 @@ func (n *Node) Initialize(
 		return fmt.Errorf("problem initializing node beacons: %w", err)
 	}
 
+	if n.Config.TraceConfig.Enabled {
+		// Set up tracer
+		tracer, err := trace.New(n.Config.TraceConfig)
+		if err != nil {
+			return fmt.Errorf("couldn't initialize tracer: %w", err)
+		}
+		n.tracer = tracer
+
+		n.Config.ConsensusRouter = router.Trace(n.Config.ConsensusRouter, tracer)
+	}
+
 	if err := n.initAPIServer(); err != nil { // Start the API Server
 		return fmt.Errorf("couldn't initialize API server: %w", err)
 	}
@@ -1407,11 +1415,13 @@ func (n *Node) shutdown() {
 		}
 	}
 
-	n.Log.Info("shutting down tracing")
-	if err := trace.ShutdownTracer(); err != nil {
-		n.Log.Warn("error during tracer shutdown",
-			zap.Error(err),
-		)
+	if n.Config.TraceConfig.Enabled {
+		n.Log.Info("shutting down tracing")
+		if err := n.tracer.Close(); err != nil {
+			n.Log.Warn("error during tracer shutdown",
+				zap.Error(err),
+			)
+		}
 	}
 
 	n.DoneShuttingDown.Done()

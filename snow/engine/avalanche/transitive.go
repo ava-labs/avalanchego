@@ -8,10 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
-
-	oteltrace "go.opentelemetry.io/otel/trace"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -22,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/events"
-	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -100,13 +95,6 @@ func newTransitive(config Config) (*Transitive, error) {
 }
 
 func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
-	ctx, span := trace.Tracer().Start(ctx, "Transitive.Put", oteltrace.WithAttributes(
-		attribute.Stringer("nodeID", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("vtxLen", len(vtxBytes)),
-	))
-	defer span.End()
-
 	t.Ctx.Log.Verbo("called Put",
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
@@ -154,12 +142,6 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 }
 
 func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	_, span := trace.Tracer().Start(ctx, "Transitive.GetFailed", oteltrace.WithAttributes(
-		attribute.Stringer("nodeID", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-	))
-	defer span.End()
-
 	vtxID, ok := t.outstandingVtxReqs.Remove(nodeID, requestID)
 	if !ok {
 		t.Ctx.Log.Debug("unexpected GetFailed",
@@ -187,13 +169,6 @@ func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
-	ctx, span := trace.Tracer().Start(ctx, "Transitive.PullQuery", oteltrace.WithAttributes(
-		attribute.Stringer("nodeID", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Stringer("vtxID", vtxID),
-	))
-	defer span.End()
-
 	// Immediately respond to the query with the current consensus preferences.
 	t.Sender.SendChits(ctx, nodeID, requestID, t.Consensus.Preferences().List())
 
@@ -207,13 +182,6 @@ func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxBytes []byte) error {
-	ctx, span := trace.Tracer().Start(ctx, "Transitive.PushQuery", oteltrace.WithAttributes(
-		attribute.Stringer("nodeID", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("vtxLen", len(vtxBytes)),
-	))
-	defer span.End()
-
 	// Immediately respond to the query with the current consensus preferences.
 	t.Sender.SendChits(ctx, nodeID, requestID, t.Consensus.Preferences().List())
 
@@ -245,13 +213,6 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) error {
-	_, span := trace.Tracer().Start(ctx, "Transitive.Chits", oteltrace.WithAttributes(
-		attribute.Stringer("nodeID", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("numVotes", len(votes)),
-	))
-	defer span.End()
-
 	v := &voter{
 		t:         t,
 		vdr:       nodeID,

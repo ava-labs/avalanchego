@@ -8,10 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
-
-	oteltrace "go.opentelemetry.io/otel/trace"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -23,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/poll"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/events"
-	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -115,17 +110,7 @@ func newTransitive(config Config) (*Transitive, error) {
 }
 
 func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
-	ctx, span := trace.Tracer().Start(ctx, "Transitive.Put", oteltrace.WithAttributes(
-		attribute.Stringer("nodeID", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("blkLen", len(blkBytes)),
-	))
-	defer span.End()
-
-	// TODO pass [ctx] instead of creating/stopping the span here.
-	_, parseSpan := trace.Tracer().Start(ctx, "ParseBlock")
 	blk, err := t.VM.ParseBlock(blkBytes)
-	parseSpan.End()
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse block",
 			zap.Stringer("nodeID", nodeID),
@@ -138,7 +123,6 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 			zap.Binary("block", blkBytes),
 			zap.Error(err),
 		)
-		span.AddEvent("failed to parse block")
 		// because GetFailed doesn't utilize the assumption that we actually
 		// sent a Get message, we can safely call GetFailed here to potentially
 		// abandon the request.
@@ -177,12 +161,6 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 }
 
 func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	_, span := trace.Tracer().Start(ctx, "Transitive.GetFailed", oteltrace.WithAttributes(
-		attribute.Stringer("nodeID", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-	))
-	defer span.End()
-
 	// We don't assume that this function is called after a failed Get message.
 	// Check to see if we have an outstanding request and also get what the request was for if it exists.
 	blkID, ok := t.blkReqs.Remove(nodeID, requestID)
@@ -191,7 +169,6 @@ func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 		)
-		span.AddEvent("unexpected GetFailed")
 		return nil
 	}
 
@@ -203,13 +180,6 @@ func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
-	ctx, span := trace.Tracer().Start(ctx, "Transitive.PullQuery", oteltrace.WithAttributes(
-		attribute.Stringer("nodeID", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Stringer("blockID", blkID),
-	))
-	defer span.End()
-
 	t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{t.Consensus.Preference()})
 
 	// Try to issue [blkID] to consensus.
@@ -222,19 +192,9 @@ func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
-	ctx, span := trace.Tracer().Start(ctx, "Transitive.PushQuery", oteltrace.WithAttributes(
-		attribute.Stringer("nodeID", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("blkLen", len(blkBytes)),
-	))
-	defer span.End()
-
 	t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{t.Consensus.Preference()})
 
-	// TODO pass [ctx] instead of creating/stopping the span here.
-	_, parseSpan := trace.Tracer().Start(ctx, "ParseBlock")
 	blk, err := t.VM.ParseBlock(blkBytes)
-	parseSpan.End()
 	// If parsing fails, we just drop the request, as we didn't ask for it
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse block",
@@ -248,7 +208,6 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 			zap.Binary("block", blkBytes),
 			zap.Error(err),
 		)
-		span.AddEvent("failed to parse block")
 		return nil
 	}
 
@@ -269,13 +228,6 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) error {
-	ctx, span := trace.Tracer().Start(ctx, "Transitive.Chits", oteltrace.WithAttributes(
-		attribute.Stringer("nodeID", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("numVotes", len(votes)),
-	))
-	defer span.End()
-
 	// Since this is a linear chain, there should only be one ID in the vote set
 	if len(votes) != 1 {
 		t.Ctx.Log.Debug("failing Chits",
@@ -284,7 +236,6 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 		)
-		span.AddEvent("got multiple votes")
 		// because QueryFailed doesn't utilize the assumption that we actually
 		// sent a Query message, we can safely call QueryFailed here to
 		// potentially abandon the request.
@@ -320,12 +271,6 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 }
 
 func (t *Transitive) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	_, span := trace.Tracer().Start(ctx, "Transitive.PullQuery", oteltrace.WithAttributes(
-		attribute.Stringer("nodeID", nodeID),
-		attribute.Int64("requestID", int64(requestID)),
-	))
-	defer span.End()
-
 	t.blocked.Register(&voter{
 		t:         t,
 		vdr:       nodeID,
@@ -378,13 +323,7 @@ func (t *Transitive) Disconnected(nodeID ids.NodeID) error {
 func (t *Transitive) Timeout() error { return nil }
 
 func (t *Transitive) Gossip() error {
-	ctx, span := trace.Tracer().Start(context.Background(), "Transitive.Gossip")
-	defer span.End()
-
-	// TODO pass [ctx] instead of creating/stopping the span here.
-	_, lastAcceptedSpan := trace.Tracer().Start(ctx, "LastAccepted")
 	blkID, err := t.VM.LastAccepted()
-	lastAcceptedSpan.End()
 	if err != nil {
 		return err
 	}
@@ -396,16 +335,12 @@ func (t *Transitive) Gossip() error {
 			zap.Stringer("blkID", blkID),
 			zap.Error(err),
 		)
-		span.RecordError(err)
 		return nil
 	}
 	t.Ctx.Log.Verbo("gossiping accepted block to the network",
 		zap.Stringer("blkID", blkID),
 	)
-	span.SetAttributes(
-		attribute.Stringer("blkID", blkID),
-	)
-	t.Sender.SendGossip(ctx, blk.Bytes())
+	t.Sender.SendGossip(context.TODO(), blk.Bytes())
 	return nil
 }
 
@@ -492,9 +427,6 @@ func (t *Transitive) Start(startReqID uint32) error {
 }
 
 func (t *Transitive) HealthCheck() (interface{}, error) {
-	_, span := trace.Tracer().Start(context.Background(), "Transitive.HealthCheck")
-	defer span.End()
-
 	consensusIntf, consensusErr := t.Consensus.HealthCheck()
 	vmIntf, vmErr := t.VM.HealthCheck()
 	intf := map[string]interface{}{
@@ -522,8 +454,6 @@ func (t *Transitive) GetBlock(blkID ids.ID) (snowman.Block, error) {
 		return blk.(snowman.Block), nil
 	}
 
-	_, getBlockSpan := trace.Tracer().Start(context.Background(), "GetBlock")
-	defer getBlockSpan.End()
 	return t.VM.GetBlock(blkID)
 }
 
@@ -536,9 +466,7 @@ func (t *Transitive) buildBlocks() error {
 	for t.pendingBuildBlocks > 0 && t.Consensus.NumProcessing() < t.Params.OptimalProcessing {
 		t.pendingBuildBlocks--
 
-		_, buildBlockSpan := trace.Tracer().Start(context.Background(), "BuildBlock")
 		blk, err := t.VM.BuildBlock()
-		buildBlockSpan.End()
 		if err != nil {
 			t.Ctx.Log.Debug("failed building block",
 				zap.Error(err),
@@ -585,15 +513,12 @@ func (t *Transitive) buildBlocks() error {
 // Issue another poll to the network, asking what it prefers given the block we prefer.
 // Helps move consensus along.
 func (t *Transitive) repoll() {
-	ctx, span := trace.Tracer().Start(context.Background(), "Transitive.repoll")
-	defer span.End()
-
 	// if we are issuing a repoll, we should gossip our current preferences to
 	// propagate the most likely branch as quickly as possible
 	prefID := t.Consensus.Preference()
 
 	for i := t.polls.Len(); i < t.Params.ConcurrentRepolls; i++ {
-		t.pullQuery(ctx, prefID)
+		t.pullQuery(context.TODO(), prefID)
 	}
 }
 
@@ -601,12 +526,6 @@ func (t *Transitive) repoll() {
 // If we do not have [blkID], request it.
 // Returns true if the block is processing in consensus or is decided.
 func (t *Transitive) issueFromByID(ctx context.Context, nodeID ids.NodeID, blkID ids.ID) (bool, error) {
-	ctx, span := trace.Tracer().Start(ctx, "Transitive.issueFromByID", oteltrace.WithAttributes(
-		attribute.Stringer("nodeID", nodeID),
-		attribute.Stringer("blkID", blkID),
-	))
-	defer span.End()
-
 	blk, err := t.GetBlock(blkID)
 	if err != nil {
 		t.sendRequest(ctx, nodeID, blkID)
@@ -619,14 +538,8 @@ func (t *Transitive) issueFromByID(ctx context.Context, nodeID ids.NodeID, blkID
 // Returns true if the block is processing in consensus or is decided.
 // If a dependency is missing, request it from [vdr].
 func (t *Transitive) issueFrom(ctx context.Context, nodeID ids.NodeID, blk snowman.Block) (bool, error) {
-	blkID := blk.ID()
-	ctx, span := trace.Tracer().Start(ctx, "Transitive.issueFrom", oteltrace.WithAttributes(
-		attribute.Stringer("nodeID", nodeID),
-		attribute.Stringer("blkID", blkID),
-	))
-	defer span.End()
-
 	// issue [blk] and its ancestors to consensus.
+	blkID := blk.ID()
 	for !t.wasIssued(blk) {
 		if err := t.issue(blk); err != nil {
 			return false, err
@@ -743,12 +656,6 @@ func (t *Transitive) issue(blk snowman.Block) error {
 
 // Request that [vdr] send us block [blkID]
 func (t *Transitive) sendRequest(ctx context.Context, nodeID ids.NodeID, blkID ids.ID) {
-	ctx, span := trace.Tracer().Start(ctx, "Transitive.sendRequest", oteltrace.WithAttributes(
-		attribute.Stringer("nodeID", nodeID),
-		attribute.Stringer("blkID", blkID),
-	))
-	defer span.End()
-
 	// There is already an outstanding request for this block
 	if t.blkReqs.Contains(blkID) {
 		return
@@ -769,11 +676,6 @@ func (t *Transitive) sendRequest(ctx context.Context, nodeID ids.NodeID, blkID i
 
 // send a pull query for this block ID
 func (t *Transitive) pullQuery(ctx context.Context, blkID ids.ID) {
-	ctx, span := trace.Tracer().Start(ctx, "Transitive.pullQuery", oteltrace.WithAttributes(
-		attribute.Stringer("blkID", blkID),
-	))
-	defer span.End()
-
 	t.Ctx.Log.Verbo("sampling from validators",
 		zap.Stringer("validators", t.Validators),
 	)
@@ -804,15 +706,11 @@ func (t *Transitive) pullQuery(ctx context.Context, blkID ids.ID) {
 // Send a query for this block. Some validators will be sent
 // a Push Query and some will be sent a Pull Query.
 func (t *Transitive) sendMixedQuery(ctx context.Context, blk snowman.Block) {
-	blkID := blk.ID()
-	ctx, span := trace.Tracer().Start(ctx, "Transitive.sendMixedQuery", oteltrace.WithAttributes(
-		attribute.Stringer("blkID", blkID),
-	))
-	defer span.End()
-
 	t.Ctx.Log.Verbo("sampling from validators",
 		zap.Stringer("validators", t.Validators),
 	)
+
+	blkID := blk.ID()
 	vdrs, err := t.Validators.Sample(t.Params.K)
 	if err != nil {
 		t.Ctx.Log.Error("dropped query for block",
@@ -848,9 +746,6 @@ func (t *Transitive) sendMixedQuery(ctx context.Context, blk snowman.Block) {
 
 // issue [blk] to consensus
 func (t *Transitive) deliver(blk snowman.Block) error {
-	ctx, span := trace.Tracer().Start(context.Background(), "Transitive.deliver")
-	defer span.End()
-
 	blkID := blk.ID()
 	if t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) {
 		return nil
@@ -920,13 +815,13 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	// If the block is now preferred, query the network for its preferences
 	// with this new block.
 	if t.Consensus.IsPreferred(blk) {
-		t.sendMixedQuery(ctx, blk)
+		t.sendMixedQuery(context.TODO(), blk)
 	}
 
 	t.blocked.Fulfill(blkID)
 	for _, blk := range added {
 		if t.Consensus.IsPreferred(blk) {
-			t.sendMixedQuery(ctx, blk)
+			t.sendMixedQuery(context.TODO(), blk)
 		}
 
 		blkID := blk.ID()

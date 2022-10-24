@@ -13,10 +13,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"go.opentelemetry.io/otel/attribute"
-
-	oteltrace "go.opentelemetry.io/otel/trace"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -24,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
-	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -186,9 +181,6 @@ func (cr *ChainRouter) RegisterRequest(
 }
 
 func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMessage) {
-	ctx, span := trace.Tracer().Start(ctx, "router.HandleInbound")
-	defer span.End()
-
 	nodeID := msg.NodeID()
 	op := msg.Op()
 
@@ -217,9 +209,6 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		msg.OnFinishedHandling()
 		return
 	}
-	span.SetAttributes(
-		attribute.Stringer("destinationChainID", destinationChainID),
-	)
 
 	var sourceChainID ids.ID
 	switch op {
@@ -250,9 +239,6 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		// is always the destination chain.
 		sourceChainID = destinationChainID
 	}
-	span.SetAttributes(
-		attribute.Stringer("sourceChainID", sourceChainID),
-	)
 
 	// AppGossip is the only message currently not containing a requestID
 	// Here we assign the requestID already in use for gossiped containers
@@ -290,10 +276,6 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 			zap.Stringer("chainID", destinationChainID),
 			zap.Error(errUnknownChain),
 		)
-		span.AddEvent("dropping message", oteltrace.WithAttributes(
-			attribute.String("reason", "unknown chain"),
-			attribute.Stringer("destinationChainID", destinationChainID),
-		))
 		msg.OnFinishedHandling()
 		return
 	}
@@ -310,9 +292,6 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 				zap.Stringer("messageOp", op),
 			)
 			cr.metrics.droppedRequests.Inc()
-			span.AddEvent("dropping message", oteltrace.WithAttributes(
-				attribute.String("reason", "chain executing"),
-			))
 			msg.OnFinishedHandling()
 			return
 		}
@@ -326,9 +305,6 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		uniqueRequestID, req := cr.clearRequest(expectedResponse, nodeID, sourceChainID, destinationChainID, requestID)
 		if req == nil {
 			// This was a duplicated response.
-			span.AddEvent("dropping message", oteltrace.WithAttributes(
-				attribute.String("reason", "duplicate response"),
-			))
 			msg.OnFinishedHandling()
 			return
 		}
@@ -347,10 +323,6 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 			zap.Stringer("messageOp", op),
 		)
 		cr.metrics.droppedRequests.Inc()
-
-		span.AddEvent("dropping message", oteltrace.WithAttributes(
-			attribute.String("reason", "chain executing"),
-		))
 		msg.OnFinishedHandling()
 		return
 	}
@@ -358,18 +330,12 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	uniqueRequestID, req := cr.clearRequest(op, nodeID, sourceChainID, destinationChainID, requestID)
 	if req == nil {
 		// We didn't request this message.
-		span.AddEvent("dropping message", oteltrace.WithAttributes(
-			attribute.String("reason", "unrequested message"),
-		))
 		msg.OnFinishedHandling()
 		return
 	}
 
 	// Calculate how long it took [nodeID] to reply
 	latency := cr.clock.Time().Sub(req.time)
-	span.SetAttributes(
-		attribute.Int64("latency", int64(latency)),
-	)
 
 	// Tell the timeout manager we got a response
 	cr.timeoutManager.RegisterResponse(nodeID, destinationChainID, uniqueRequestID, req.op, latency)
