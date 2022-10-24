@@ -423,7 +423,7 @@ func (p *peer) readMessages() {
 
 		// Handle the message. Note that when we are done handling this message,
 		// we must call [msg.OnFinishedHandling()].
-		p.handle(context.Background(), msg)
+		p.handle(msg)
 		p.ResourceTracker.StopProcessing(p.id, p.Clock.Time())
 	}
 }
@@ -564,7 +564,7 @@ func (p *peer) sendPings() {
 	}
 }
 
-func (p *peer) handle(ctx context.Context, msg message.InboundMessage) {
+func (p *peer) handle(msg message.InboundMessage) {
 	op := msg.Op()
 	switch op { // Network-related message types
 	case message.Ping:
@@ -596,7 +596,7 @@ func (p *peer) handle(ctx context.Context, msg message.InboundMessage) {
 	}
 
 	// Consensus and app-level messages
-	p.Router.HandleInbound(ctx, msg)
+	p.Router.HandleInbound(context.Background(), msg)
 }
 
 func (p *peer) handlePing(_ message.InboundMessage) {
