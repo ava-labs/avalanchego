@@ -37,8 +37,7 @@ const (
 var (
 	_ common.BootstrapableEngine = &bootstrapper{}
 
-	errParseFailedUnrequestedVtx = "failed to parse unrequested vertex"
-	errUnexpectedTimeout         = errors.New("unexpected timeout fired")
+	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
 
 func New(config Config, onFinished func(lastReqID uint32) error) (common.BootstrapableEngine, error) {
@@ -152,20 +151,20 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 	vtx, err := b.Manager.ParseVtx(vtxs[0]) // first vertex should be the one we requested in GetAncestors request
 	if err != nil {
 		if !requested {
-			b.Ctx.Log.Debug(errParseFailedUnrequestedVtx,
+			b.Ctx.Log.Debug("failed to parse unrequested vertex",
 				zap.Stringer("nodeID", nodeID),
 				zap.Uint32("requestID", requestID),
 				zap.Error(err),
 			)
 			return nil
 		}
-		b.Ctx.Log.Debug(errParseFailedUnrequestedVtx,
+		b.Ctx.Log.Debug("failed to parse requested vertex",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 			zap.Stringer("vtxID", requestedVtxID),
 			zap.Error(err),
 		)
-		b.Ctx.Log.Verbo(errParseFailedUnrequestedVtx,
+		b.Ctx.Log.Verbo("failed to parse requested vertex",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 			zap.Stringer("vtxID", requestedVtxID),
