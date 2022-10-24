@@ -53,7 +53,7 @@ func (e *tracedEngine) StateSummaryFrontier(ctx context.Context, nodeID ids.Node
 }
 
 func (e *tracedEngine) GetStateSummaryFrontierFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	ctx, span := e.tracer.Start(ctx, "tracedEngine.StateSummaryFrontier", oteltrace.WithAttributes(
+	ctx, span := e.tracer.Start(ctx, "tracedEngine.GetStateSummaryFrontierFailed", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
 	))
