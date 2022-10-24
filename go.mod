@@ -11,7 +11,7 @@ go 1.18
 require (
 	github.com/Microsoft/go-winio v0.5.2
 	github.com/NYTimes/gziphandler v1.1.1
-	github.com/ava-labs/avalanche-ledger-go v0.0.9
+	github.com/ava-labs/avalanche-ledger-go v0.0.10
 	github.com/ava-labs/avalanche-network-runner-sdk v0.2.0
 	github.com/ava-labs/coreth v0.11.1-rc.2
 	github.com/btcsuite/btcd v0.23.1
@@ -121,7 +121,7 @@ require (
 	github.com/tklauser/numcpus v0.2.2 // indirect
 	github.com/tyler-smith/go-bip39 v1.0.2 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
-	github.com/zondax/hid v0.9.0 // indirect
+	github.com/zondax/hid v0.9.1-0.20220302062450-5552068d2266 // indirect
 	github.com/zondax/ledger-go v0.12.3-0.20221005223406-dbd460b7296d // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
