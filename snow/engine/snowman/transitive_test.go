@@ -863,7 +863,7 @@ func TestEngineRepoll(t *testing.T) {
 		}
 	}
 
-	te.repoll()
+	te.repoll(context.Background())
 
 	if !*queried {
 		t.Fatalf("Should have sent a query to the peer")
@@ -1080,7 +1080,7 @@ func TestEngineNoRepollQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	te.repoll()
+	te.repoll(context.Background())
 }
 
 func TestEngineAbandonQuery(t *testing.T) {

@@ -79,7 +79,7 @@ func (v *voter) Update(ctx context.Context) {
 	}
 
 	v.t.Ctx.Log.Debug("Snowman engine can't quiesce")
-	v.t.repoll()
+	v.t.repoll(ctx)
 }
 
 // bubbleVotes bubbles the [votes] a set of the number of votes for specific
