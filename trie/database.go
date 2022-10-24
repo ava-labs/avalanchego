@@ -31,6 +31,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"runtime"
 	"sync"
 	"time"
 
@@ -279,8 +280,9 @@ func expandNode(hash hashNode, n node) node {
 
 // Config defines all necessary options for database.
 type Config struct {
-	Cache     int  // Memory allowance (MB) to use for caching trie nodes in memory
-	Preimages bool // Flag whether the preimage of trie key is recorded
+	Cache     int    // Memory allowance (MB) to use for caching trie nodes in memory
+	Preimages bool   // Flag whether the preimage of trie key is recorded
+	Journal   string // File location to load trie clean cache from
 }
 
 // NewDatabase creates a new trie database to store ephemeral trie content before
@@ -296,7 +298,11 @@ func NewDatabase(diskdb ethdb.KeyValueStore) *Database {
 func NewDatabaseWithConfig(diskdb ethdb.KeyValueStore, config *Config) *Database {
 	var cleans *fastcache.Cache
 	if config != nil && config.Cache > 0 {
-		cleans = fastcache.New(config.Cache * 1024 * 1024)
+		if config.Journal == "" {
+			cleans = fastcache.New(config.Cache * 1024 * 1024)
+		} else {
+			cleans = fastcache.LoadFromFileOrNew(config.Journal, config.Cache*1024*1024)
+		}
 	}
 	var preimage *preimageStore
 	if config != nil && config.Preimages {
@@ -894,4 +900,55 @@ func (db *Database) CommitPreimages() error {
 		return nil
 	}
 	return db.preimages.commit(true)
+}
+
+// saveCache saves clean state cache to given directory path
+// using specified CPU cores.
+func (db *Database) saveCache(dir string, threads int) error {
+	if db.cleans == nil {
+		return nil
+	}
+	log.Info("Writing clean trie cache to disk", "path", dir, "threads", threads)
+
+	start := time.Now()
+	err := db.cleans.SaveToFileConcurrent(dir, threads)
+	if err != nil {
+		log.Error("Failed to persist clean trie cache", "error", err)
+		return err
+	}
+	log.Info("Persisted the clean trie cache", "path", dir, "elapsed", common.PrettyDuration(time.Since(start)))
+	return nil
+}
+
+// SaveCache atomically saves fast cache data to the given dir using half
+// available CPU cores.
+func (db *Database) SaveCache(dir string) error {
+	concurrency := runtime.GOMAXPROCS(0) / 2
+	if concurrency == 0 {
+		concurrency = 1
+	}
+	return db.saveCache(dir, concurrency)
+}
+
+// SaveCachePeriodically atomically saves fast cache data to the given dir with
+// the specified interval. All dump operation will only use a single CPU core.
+func (db *Database) SaveCachePeriodically(dir string, interval time.Duration, stopCh <-chan struct{}) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			db.saveCache(dir, 1)
+		case <-stopCh:
+			// Write the latest contents of the cache to disk after receiving a stop request.
+			// Note: this is different than geth, which requires an explicit
+			// call to save the cache on shutdown.
+			err := db.SaveCache(dir)
+			if err != nil {
+				log.Warn("Failed to save cache after stop requested", "err", err)
+			}
+			return
+		}
+	}
 }

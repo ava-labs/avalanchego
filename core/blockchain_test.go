@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"math/big"
 	"testing"
+	"time"
 
+	"github.com/VictoriaMetrics/fastcache"
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/state"
@@ -16,8 +18,10 @@ import (
 	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/trie"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -639,4 +643,57 @@ func TestCanonicalHashMarker(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestCleanCacheJournal(t *testing.T) {
+	chainDB := rawdb.NewMemoryDatabase()
+	gspec := &Genesis{
+		Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
+		Alloc: GenesisAlloc{
+			common.Address{1}: {Balance: big.NewInt(1)}, // non-zero alloc needed to cause trie writes.
+		},
+	}
+	genesisBlock := gspec.MustCommit(chainDB)
+	require.NotNil(t, genesisBlock)
+	journal := t.TempDir()
+
+	blockchain, err := createBlockChain(
+		chainDB,
+		&CacheConfig{
+			TrieCleanLimit:        64, // Smallest possible non-zero size (for a faster test).
+			TrieDirtyLimit:        256,
+			TrieDirtyCommitTarget: 20,
+			Pruning:               true, // Enable pruning
+			CommitInterval:        4096,
+			SnapshotLimit:         256,
+			AcceptorQueueLimit:    64,
+			TrieCleanRejournal:    1 * time.Minute, // Must be non-zero to enable journaling.
+			TrieCleanJournal:      journal,
+		},
+		gspec.Config,
+		common.Hash{})
+	require.NoError(t, err)
+	blockchain.Stop() // this causes the cache to be written.
+
+	// Load cache and verify it is not empty.
+	cache, err := fastcache.LoadFromFile(journal)
+	require.NoError(t, err)
+	stats := fastcache.Stats{}
+	cache.UpdateStats(&stats)
+	require.NotZero(t, stats.EntriesCount)
+
+	// The cache should contain the full state trie (since it is small enough).
+	trieDB := trie.NewDatabase(chainDB)
+	tr, err := trie.New(common.Hash{}, genesisBlock.Root(), trieDB)
+	require.NoError(t, err)
+	it := tr.NodeIterator(nil)
+	nodeCount := 0
+	for it.Next(true) {
+		if it.Leaf() {
+			continue // leaf nodes do not have a hash
+		}
+		require.True(t, cache.Has(it.Hash().Bytes()))
+		nodeCount++
+	}
+	require.NotZero(t, nodeCount)
 }

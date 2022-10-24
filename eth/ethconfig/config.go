@@ -114,6 +114,8 @@ type Config struct {
 	// DatabaseFreezer    string
 
 	TrieCleanCache        int
+	TrieCleanJournal      string
+	TrieCleanRejournal    time.Duration
 	TrieDirtyCache        int
 	TrieDirtyCommitTarget int
 	SnapshotCache         int

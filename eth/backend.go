@@ -198,6 +198,8 @@ func New(
 		}
 		cacheConfig = &core.CacheConfig{
 			TrieCleanLimit:                  config.TrieCleanCache,
+			TrieCleanJournal:                config.TrieCleanJournal,
+			TrieCleanRejournal:              config.TrieCleanRejournal,
 			TrieDirtyLimit:                  config.TrieDirtyCache,
 			TrieDirtyCommitTarget:           config.TrieDirtyCommitTarget,
 			Pruning:                         config.Pruning,

@@ -116,21 +116,23 @@ type cacheableFeeConfig struct {
 // CacheConfig contains the configuration values for the trie caching/pruning
 // that's resident in a blockchain.
 type CacheConfig struct {
-	TrieCleanLimit                  int     // Memory allowance (MB) to use for caching trie nodes in memory
-	TrieDirtyLimit                  int     // Memory limit (MB) at which to block on insert and force a flush of dirty trie nodes to disk
-	TrieDirtyCommitTarget           int     // Memory limit (MB) to target for the dirties cache before invoking commit
-	CommitInterval                  uint64  // Commit the trie every [CommitInterval] blocks.
-	Pruning                         bool    // Whether to disable trie write caching and GC altogether (archive node)
-	AcceptorQueueLimit              int     // Blocks to queue before blocking during acceptance
-	PopulateMissingTries            *uint64 // If non-nil, sets the starting height for re-generating historical tries.
-	PopulateMissingTriesParallelism int     // Is the number of readers to use when trying to populate missing tries.
-	AllowMissingTries               bool    // Whether to allow an archive node to run with pruning enabled
-	SnapshotDelayInit               bool    // Whether to initialize snapshots on startup or wait for external call
-	SnapshotLimit                   int     // Memory allowance (MB) to use for caching snapshot entries in memory
-	SnapshotAsync                   bool    // Generate snapshot tree async
-	SnapshotVerify                  bool    // Verify generated snapshots
-	SkipSnapshotRebuild             bool    // Whether to skip rebuilding the snapshot in favor of returning an error (only set to true for tests)
-	Preimages                       bool    // Whether to store preimage of trie key to the disk
+	TrieCleanLimit                  int           // Memory allowance (MB) to use for caching trie nodes in memory
+	TrieCleanJournal                string        // Disk journal for saving clean cache entries.
+	TrieCleanRejournal              time.Duration // Time interval to dump clean cache to disk periodically
+	TrieDirtyLimit                  int           // Memory limit (MB) at which to block on insert and force a flush of dirty trie nodes to disk
+	TrieDirtyCommitTarget           int           // Memory limit (MB) to target for the dirties cache before invoking commit
+	CommitInterval                  uint64        // Commit the trie every [CommitInterval] blocks.
+	Pruning                         bool          // Whether to disable trie write caching and GC altogether (archive node)
+	AcceptorQueueLimit              int           // Blocks to queue before blocking during acceptance
+	PopulateMissingTries            *uint64       // If non-nil, sets the starting height for re-generating historical tries.
+	PopulateMissingTriesParallelism int           // Is the number of readers to use when trying to populate missing tries.
+	AllowMissingTries               bool          // Whether to allow an archive node to run with pruning enabled
+	SnapshotDelayInit               bool          // Whether to initialize snapshots on startup or wait for external call
+	SnapshotLimit                   int           // Memory allowance (MB) to use for caching snapshot entries in memory
+	SnapshotAsync                   bool          // Generate snapshot tree async
+	SnapshotVerify                  bool          // Verify generated snapshots
+	SkipSnapshotRebuild             bool          // Whether to skip rebuilding the snapshot in favor of returning an error (only set to true for tests)
+	Preimages                       bool          // Whether to store preimage of trie key to the disk
 }
 
 var DefaultCacheConfig = &CacheConfig{
@@ -225,6 +227,15 @@ type BlockChain struct {
 	// during shutdown and in tests.
 	acceptorWg sync.WaitGroup
 
+	// [rejournalWg] is used to wait for the trie clean rejournaling to complete.
+	// This is used during shutdown.
+	rejournalWg sync.WaitGroup
+
+	// quit channel is used to listen for when the blockchain is shut down to close
+	// async processes.
+	// WaitGroups are used to ensure that async processes have finished during shutdown.
+	quit chan struct{}
+
 	// [acceptorTip] is the last block processed by the acceptor. This is
 	// returned as the LastAcceptedBlock() to ensure clients get only fully
 	// processed blocks. This may be equal to [lastAccepted].
@@ -255,6 +266,7 @@ func NewBlockChain(
 		db:          db,
 		stateCache: state.NewDatabaseWithConfig(db, &trie.Config{
 			Cache:     cacheConfig.TrieCleanLimit,
+			Journal:   cacheConfig.TrieCleanJournal,
 			Preimages: cacheConfig.Preimages,
 		}),
 		bodyCache:      bodyCache,
@@ -267,6 +279,7 @@ func NewBlockChain(
 		badBlocks:      badBlocks,
 		senderCacher:   newTxSenderCacher(runtime.NumCPU()),
 		acceptorQueue:  make(chan *types.Block, cacheConfig.AcceptorQueueLimit),
+		quit:           make(chan struct{}),
 	}
 	bc.validator = NewBlockValidator(chainConfig, bc, engine)
 	bc.prefetcher = newStatePrefetcher(chainConfig, bc, engine)
@@ -326,6 +339,20 @@ func NewBlockChain(
 
 	// Start processing accepted blocks effects in the background
 	go bc.startAcceptor()
+
+	// If periodic cache journal is required, spin it up.
+	if bc.cacheConfig.TrieCleanRejournal > 0 && len(bc.cacheConfig.TrieCleanJournal) > 0 {
+		if bc.cacheConfig.TrieCleanRejournal < time.Minute {
+			log.Warn("Sanitizing invalid trie cache journal time", "provided", bc.cacheConfig.TrieCleanRejournal, "updated", time.Minute)
+			bc.cacheConfig.TrieCleanRejournal = time.Minute
+		}
+		triedb := bc.stateCache.TrieDB()
+		bc.rejournalWg.Add(1)
+		go func() {
+			defer bc.rejournalWg.Done()
+			triedb.SaveCachePeriodically(bc.cacheConfig.TrieCleanJournal, bc.cacheConfig.TrieCleanRejournal, bc.quit)
+		}()
+	}
 
 	return bc, nil
 }
@@ -712,6 +739,8 @@ func (bc *BlockChain) Stop() {
 	}
 
 	// Wait for accepted feed to process all remaining items
+	log.Info("Closing quit channel")
+	close(bc.quit)
 	log.Info("Stopping Acceptor")
 	start := time.Now()
 	bc.stopAcceptor()
@@ -735,6 +764,10 @@ func (bc *BlockChain) Stop() {
 	// Unsubscribe all subscriptions registered from blockchain.
 	log.Info("Closing scope")
 	bc.scope.Close()
+
+	// Waiting for clean trie re-journal to complete
+	log.Info("Waiting for trie re-journal to complete")
+	bc.rejournalWg.Wait()
 
 	log.Info("Blockchain stopped")
 }
@@ -1806,6 +1839,7 @@ func (bc *BlockChain) ResetState(block *types.Block) error {
 	lastAcceptedHash := block.Hash()
 	bc.stateCache = state.NewDatabaseWithConfig(bc.db, &trie.Config{
 		Cache:     bc.cacheConfig.TrieCleanLimit,
+		Journal:   bc.cacheConfig.TrieCleanJournal,
 		Preimages: bc.cacheConfig.Preimages,
 	})
 	if err := bc.loadLastState(lastAcceptedHash); err != nil {
