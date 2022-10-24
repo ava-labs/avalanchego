@@ -29,6 +29,10 @@ func ExporterTypeFromString(exporterTypeStr string) (ExporterType, error) {
 
 type ExporterType byte
 
+func (t ExporterType) MarshalJSON() ([]byte, error) {
+	return []byte(`"` + t.String() + `"`), nil
+}
+
 func (t ExporterType) String() string {
 	switch t {
 	case GRPC:
