@@ -121,12 +121,12 @@ func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
 	return subnetID, nil
 }
 
-func newEnvironment() *environment {
+func newEnvironment(postBanff bool) *environment {
 	var isBootstrapped utils.AtomicBool
 	isBootstrapped.SetValue(true)
 
-	config := defaultConfig()
-	clk := defaultClock()
+	config := defaultConfig(postBanff)
+	clk := defaultClock(postBanff)
 
 	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
@@ -282,7 +282,11 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	return ctx, msm
 }
 
-func defaultConfig() config.Config {
+func defaultConfig(postBanff bool) config.Config {
+	banffTime := mockable.MaxTime
+	if postBanff {
+		banffTime = defaultValidateEndTime.Add(-2 * time.Second)
+	}
 	return config.Config{
 		Chains:                 chains.MockManager{},
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -303,13 +307,18 @@ func defaultConfig() config.Config {
 		},
 		ApricotPhase3Time: defaultValidateEndTime,
 		ApricotPhase5Time: defaultValidateEndTime,
-		BanffTime:         mockable.MaxTime,
+		BanffTime:         banffTime,
 	}
 }
 
-func defaultClock() mockable.Clock {
+func defaultClock(postBanff bool) mockable.Clock {
+	now := defaultGenesisTime
+	if postBanff {
+		// 1 second after Banff fork
+		now = defaultValidateEndTime.Add(-2 * time.Second)
+	}
 	clk := mockable.Clock{}
-	clk.Set(defaultGenesisTime)
+	clk.Set(now)
 	return clk
 }
 

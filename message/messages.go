@@ -8,8 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"strings"
-	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -27,13 +25,12 @@ import (
 )
 
 var (
-	_ InboundMessage  = &inboundMessageWithPacker{}
-	_ InboundMessage  = &inboundMessageWithProto{}
-	_ OutboundMessage = &outboundMessageWithPacker{}
-	_ OutboundMessage = &outboundMessageWithProto{}
+	_ InboundMessage  = &inboundExternalMessage{}
+	_ OutboundMessage = &outboundMessage{}
 
 	errUnknownMessageTypeForOp = errors.New("unknown message type for Op")
 	errUnexpectedCompressedOp  = errors.New("unexpected compressed Op")
+	errMissingField            = errors.New("message missing field")
 
 	errInvalidIPAddrLen = errors.New("invalid IP address field length (expected 16-byte)")
 	errInvalidCert      = errors.New("invalid TLS certificate field")
@@ -85,59 +82,17 @@ func (inMsg *inboundMessage) OnFinishedHandling() {
 	}
 }
 
-type inboundMessageWithPacker struct {
-	inboundMessage
-
-	fields map[Field]interface{}
-}
-
-// Field returns the value of the specified field in this message
-func (inMsg *inboundMessageWithPacker) Get(field Field) (interface{}, error) {
-	value, ok := inMsg.fields[field]
-	if !ok {
-		return nil, fmt.Errorf("%w: %s", errMissingField, field)
-	}
-	return value, nil
-}
-
-func (inMsg *inboundMessageWithPacker) String() string {
-	sb := strings.Builder{}
-	sb.WriteString(fmt.Sprintf("(Op: %s, NodeID: %s", inMsg.op, inMsg.nodeID))
-	if requestIDIntf, exists := inMsg.fields[RequestID]; exists {
-		sb.WriteString(fmt.Sprintf(", RequestID: %d", requestIDIntf.(uint32)))
-	}
-	if !inMsg.expirationTime.IsZero() {
-		sb.WriteString(fmt.Sprintf(", Deadline: %d", inMsg.expirationTime.Unix()))
-	}
-	switch inMsg.op {
-	case GetAccepted, Accepted, Chits, AcceptedFrontier:
-		sb.WriteString(fmt.Sprintf(", NumContainerIDs: %d)", len(inMsg.fields[ContainerIDs].([][]byte))))
-	case Get, GetAncestors, PullQuery:
-		sb.WriteString(fmt.Sprintf(", ContainerID: 0x%x)", inMsg.fields[ContainerID].([]byte)))
-	case Ancestors:
-		sb.WriteString(fmt.Sprintf(", NumContainers: %d)", len(inMsg.fields[MultiContainerBytes].([][]byte))))
-	case Notify:
-		sb.WriteString(fmt.Sprintf(", Notification: %d)", inMsg.fields[VMMessage].(uint32)))
-	case AppRequest, AppResponse, AppGossip:
-		sb.WriteString(fmt.Sprintf(", len(AppMsg): %d)", len(inMsg.fields[AppBytes].([]byte))))
-	default:
-		sb.WriteString(")")
-	}
-
-	return sb.String()
-}
-
-type inboundMessageWithProto struct {
+type inboundExternalMessage struct {
 	inboundMessage
 
 	msg *p2ppb.Message
 }
 
-func (inMsg *inboundMessageWithProto) String() string {
+func (inMsg *inboundExternalMessage) String() string {
 	return inMsg.msg.String()
 }
 
-func (inMsg *inboundMessageWithProto) Get(field Field) (interface{}, error) {
+func (inMsg *inboundExternalMessage) Get(field Field) (interface{}, error) {
 	return getField(inMsg.msg, field)
 }
 
@@ -444,11 +399,6 @@ type OutboundMessage interface {
 	Bytes() []byte
 	Op() Op
 	BypassThrottling() bool
-
-	AddRef()
-	DecRef()
-
-	IsProto() bool
 }
 
 type outboundMessage struct {
@@ -456,6 +406,8 @@ type outboundMessage struct {
 	bytes                 []byte
 	bytesSavedCompression int
 	bypassThrottling      bool
+
+	msg *p2ppb.Message
 }
 
 // Op returns the value of the specified operation in this message
@@ -475,47 +427,8 @@ func (outMsg *outboundMessage) BytesSavedCompression() int {
 // BypassThrottling when attempting to send this message
 func (outMsg *outboundMessage) BypassThrottling() bool { return outMsg.bypassThrottling }
 
-type outboundMessageWithPacker struct {
-	outboundMessage
-
-	refLock sync.Mutex
-	refs    int
-	c       *codec
-}
-
-func (outMsg *outboundMessageWithPacker) AddRef() {
-	outMsg.refLock.Lock()
-	defer outMsg.refLock.Unlock()
-
-	outMsg.refs++
-}
-
-// Once the reference count of this message goes to 0, the byte slice should not
-// be inspected.
-func (outMsg *outboundMessageWithPacker) DecRef() {
-	outMsg.refLock.Lock()
-	defer outMsg.refLock.Unlock()
-
-	outMsg.refs--
-	if outMsg.refs == 0 {
-		outMsg.c.byteSlicePool.Put(outMsg.bytes)
-	}
-}
-
-func (outMsg *outboundMessageWithPacker) IsProto() bool { return false }
-
-type outboundMessageWithProto struct {
-	outboundMessage
-
-	msg *p2ppb.Message
-}
-
-func (outMsg *outboundMessageWithProto) AddRef()       {}
-func (outMsg *outboundMessageWithProto) DecRef()       {}
-func (outMsg *outboundMessageWithProto) IsProto() bool { return true }
-
 // TODO: add other compression algorithms with extended interface
-type msgBuilderProtobuf struct {
+type msgBuilder struct {
 	gzipCompressor compression.Compressor
 	clock          mockable.Clock
 
@@ -525,15 +438,13 @@ type msgBuilderProtobuf struct {
 	maxMessageTimeout time.Duration
 }
 
-// NOTE: the metrics registration paths are the same as "NewCodecWithMemoryPool"!
-// To avoid conflicts, use the different namespace if created at the same time.
-func newMsgBuilderProtobuf(namespace string, metrics prometheus.Registerer, maxMessageSize int64, maxMessageTimeout time.Duration) (*msgBuilderProtobuf, error) {
+func newMsgBuilder(namespace string, metrics prometheus.Registerer, maxMessageSize int64, maxMessageTimeout time.Duration) (*msgBuilder, error) {
 	cpr, err := compression.NewGzipCompressor(maxMessageSize)
 	if err != nil {
 		return nil, err
 	}
 
-	mb := &msgBuilderProtobuf{
+	mb := &msgBuilder{
 		gzipCompressor: cpr,
 
 		compressTimeMetrics:   make(map[Op]metric.Averager, len(ExternalOps)),
@@ -569,7 +480,7 @@ func newMsgBuilderProtobuf(namespace string, metrics prometheus.Registerer, maxM
 // NOTE THAT the passed message must be verified beforehand.
 // NOTE THAT the passed message will be modified if compression is enabled.
 // TODO: find a way to not in-place modify the message
-func (mb *msgBuilderProtobuf) marshal(m *p2ppb.Message, gzipCompress bool) ([]byte, int, time.Duration, error) {
+func (mb *msgBuilder) marshal(m *p2ppb.Message, gzipCompress bool) ([]byte, int, time.Duration, error) {
 	uncompressedMsgBytes, err := proto.Marshal(m)
 	if err != nil {
 		return nil, 0, 0, err
@@ -605,7 +516,7 @@ func (mb *msgBuilderProtobuf) marshal(m *p2ppb.Message, gzipCompress bool) ([]by
 	return compressedMsgBytes, bytesSaved, compressTook, nil
 }
 
-func (mb *msgBuilderProtobuf) unmarshal(b []byte) (Op, *p2ppb.Message, bool, int, time.Duration, error) {
+func (mb *msgBuilder) unmarshal(b []byte) (Op, *p2ppb.Message, bool, int, time.Duration, error) {
 	m := new(p2ppb.Message)
 	if err := proto.Unmarshal(b, m); err != nil {
 		return 0, nil, false, 0, 0, err
@@ -694,7 +605,7 @@ func msgToOp(m *p2ppb.Message) (Op, error) {
 
 // NOTE THAT the passed message will be updated if compression is enabled.
 // TODO: find a way to not in-place modify the message
-func (mb *msgBuilderProtobuf) createOutbound(op Op, msg *p2ppb.Message, gzipCompress bool, bypassThrottling bool) (*outboundMessageWithProto, error) {
+func (mb *msgBuilder) createOutbound(op Op, msg *p2ppb.Message, gzipCompress bool, bypassThrottling bool) (*outboundMessage, error) {
 	b, saved, compressTook, err := mb.marshal(msg, gzipCompress)
 	if err != nil {
 		return nil, err
@@ -703,18 +614,16 @@ func (mb *msgBuilderProtobuf) createOutbound(op Op, msg *p2ppb.Message, gzipComp
 		mb.compressTimeMetrics[op].Observe(float64(compressTook))
 	}
 
-	return &outboundMessageWithProto{
-		outboundMessage: outboundMessage{
-			op:                    op,
-			bytes:                 b,
-			bytesSavedCompression: saved,
-			bypassThrottling:      bypassThrottling,
-		},
-		msg: msg,
+	return &outboundMessage{
+		op:                    op,
+		bytes:                 b,
+		bytesSavedCompression: saved,
+		bypassThrottling:      bypassThrottling,
+		msg:                   msg,
 	}, nil
 }
 
-func (mb *msgBuilderProtobuf) parseInbound(bytes []byte, nodeID ids.NodeID, onFinishedHandling func()) (*inboundMessageWithProto, error) {
+func (mb *msgBuilder) parseInbound(bytes []byte, nodeID ids.NodeID, onFinishedHandling func()) (*inboundExternalMessage, error) {
 	op, m, wasCompressed, bytesSavedCompression, decompressTook, err := mb.unmarshal(bytes)
 	if err != nil {
 		return nil, err
@@ -732,7 +641,7 @@ func (mb *msgBuilderProtobuf) parseInbound(bytes []byte, nodeID ids.NodeID, onFi
 		expirationTime = mb.clock.Time().Add(deadlineDuration)
 	}
 
-	return &inboundMessageWithProto{
+	return &inboundExternalMessage{
 		inboundMessage: inboundMessage{
 			op:                    op,
 			bytesSavedCompression: bytesSavedCompression,

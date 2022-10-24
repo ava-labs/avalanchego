@@ -20,11 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-const (
-	// StatusUpdateFrequency is how many containers should be processed between
-	// logs
-	StatusUpdateFrequency = 2500
-)
+const progressUpdateFrequency = 30 * time.Second
 
 // Jobs tracks a series of jobs that form a DAG of dependencies.
 type Jobs struct {
@@ -112,6 +108,7 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 	numExecuted := 0
 	numToExecute := j.state.numJobs
 	startTime := time.Now()
+	lastProgressUpdate := startTime
 
 	// Disable and clear state caches to prevent us from attempting to execute
 	// a vertex that was previously parsed, but not saved to the VM. Some VMs
@@ -179,7 +176,7 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 		}
 
 		numExecuted++
-		if numExecuted%StatusUpdateFrequency == 0 { // Periodically print progress
+		if time.Since(lastProgressUpdate) > progressUpdateFrequency { // Periodically print progress
 			eta := timer.EstimateETA(
 				startTime,
 				uint64(numExecuted),
@@ -200,6 +197,8 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 					zap.Duration("eta", eta),
 				)
 			}
+
+			lastProgressUpdate = time.Now()
 		}
 	}
 

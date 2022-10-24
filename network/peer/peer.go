@@ -338,7 +338,7 @@ func (p *peer) readMessages() {
 		}
 
 		// Parse the message length
-		msgLen, isProto, err := readMsgLen(msgLenBytes, constants.DefaultMaxMessageSize)
+		msgLen, err := readMsgLen(msgLenBytes, constants.DefaultMaxMessageSize)
 		if err != nil {
 			p.Log.Verbo("error reading message length",
 				zap.Stringer("nodeID", p.id),
@@ -415,12 +415,7 @@ func (p *peer) readMessages() {
 		)
 
 		// Parse the message
-		var msg message.InboundMessage
-		if isProto {
-			msg, err = p.MessageCreatorWithProto.Parse(msgBytes, p.id, onFinishedHandling)
-		} else {
-			msg, err = p.MessageCreator.Parse(msgBytes, p.id, onFinishedHandling)
-		}
+		msg, err := p.MessageCreator.Parse(msgBytes, p.id, onFinishedHandling)
 		if err != nil {
 			p.Log.Verbo("failed to parse message",
 				zap.Stringer("nodeID", p.id),
@@ -518,12 +513,10 @@ func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 			zap.Stringer("nodeID", p.id),
 			zap.Error(err),
 		)
-		msg.DecRef()
 		return
 	}
 
-	isProto := msg.IsProto()
-	msgLenBytes, err := writeMsgLen(uint32(msgLen), isProto, constants.DefaultMaxMessageSize)
+	msgLenBytes, err := writeMsgLen(uint32(msgLen), constants.DefaultMaxMessageSize)
 	if err != nil {
 		p.Log.Verbo("error writing message length",
 			zap.Stringer("nodeID", p.id),
@@ -539,7 +532,6 @@ func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 			zap.Stringer("nodeID", p.id),
 			zap.Error(err),
 		)
-		msg.DecRef()
 		return
 	}
 
@@ -581,7 +573,7 @@ func (p *peer) sendPings() {
 				}
 			}
 
-			pingMessage, err := p.Config.GetMessageCreator().Ping()
+			pingMessage, err := p.Config.MessageCreator.Ping()
 			if err != nil {
 				p.Log.Error("failed to create message",
 					zap.Stringer("messageOp", message.Ping),

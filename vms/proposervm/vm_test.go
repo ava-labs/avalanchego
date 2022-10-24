@@ -127,7 +127,7 @@ func initTestProposerVM(
 		}
 	}
 
-	proVM := New(coreVM, proBlkStartTime, minPChainHeight, time.Time{})
+	proVM := New(coreVM, proBlkStartTime, minPChainHeight)
 
 	valState := &validators.TestState{
 		T: t,
@@ -477,7 +477,7 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		return nil, errMarshallingFailed
 	}
-	slb, err := statelessblock.BuildApricot(
+	slb, err := statelessblock.Build(
 		proVM.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
@@ -522,7 +522,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		return innerBlk, nil
 	}
 
-	slb1, err := statelessblock.BuildApricot(
+	slb1, err := statelessblock.Build(
 		proVM.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
@@ -543,7 +543,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		},
 	}
 
-	slb2, err := statelessblock.BuildApricot(
+	slb2, err := statelessblock.Build(
 		proVM.preferred,
 		innerBlk.Timestamp(),
 		200, // pChainHeight,
@@ -635,7 +635,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 		t.Fatal("could not retrieve pChain height")
 	}
 
-	netSlb, err := statelessblock.BuildUnsignedApricot(
+	netSlb, err := statelessblock.BuildUnsigned(
 		proVM.preferred,
 		netcoreBlk.Timestamp(),
 		pChainHeight,
@@ -866,7 +866,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		}
 	}
 
-	proVM := New(coreVM, time.Time{}, 0, time.Time{})
+	proVM := New(coreVM, time.Time{}, 0)
 
 	valState := &validators.TestState{
 		T: t,
@@ -936,7 +936,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp(),
 	}
-	statelessBlock, err := statelessblock.BuildUnsignedApricot(
+	statelessBlock, err := statelessblock.BuildUnsigned(
 		coreGenBlk.ID(),
 		coreBlk.Timestamp(),
 		0,
@@ -1041,7 +1041,7 @@ func TestInnerBlockDeduplication(t *testing.T) {
 	coreBlk1 := &wrappedBlock{
 		Block: coreBlk,
 	}
-	statelessBlock0, err := statelessblock.BuildUnsignedApricot(
+	statelessBlock0, err := statelessblock.BuildUnsigned(
 		coreGenBlk.ID(),
 		coreBlk.Timestamp(),
 		0,
@@ -1050,7 +1050,7 @@ func TestInnerBlockDeduplication(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	statelessBlock1, err := statelessblock.BuildUnsignedApricot(
+	statelessBlock1, err := statelessblock.BuildUnsigned(
 		coreGenBlk.ID(),
 		coreBlk.Timestamp(),
 		1,
@@ -1196,7 +1196,7 @@ func TestInnerVMRollback(t *testing.T) {
 
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 
-	proVM := New(coreVM, time.Time{}, 0, time.Time{})
+	proVM := New(coreVM, time.Time{}, 0)
 
 	if err := proVM.Initialize(ctx, dbManager, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("failed to initialize proposerVM with %s", err)
@@ -1220,7 +1220,7 @@ func TestInnerVMRollback(t *testing.T) {
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp(),
 	}
-	statelessBlock, err := statelessblock.BuildUnsignedApricot(
+	statelessBlock, err := statelessblock.BuildUnsigned(
 		coreGenBlk.ID(),
 		coreBlk.Timestamp(),
 		0,
@@ -1287,7 +1287,7 @@ func TestInnerVMRollback(t *testing.T) {
 
 	coreBlk.StatusV = choices.Processing
 
-	proVM = New(coreVM, time.Time{}, 0, time.Time{})
+	proVM = New(coreVM, time.Time{}, 0)
 
 	if err := proVM.Initialize(ctx, dbManager, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("failed to initialize proposerVM with %s", err)
@@ -1341,7 +1341,7 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 		HeightV:    coreBlk0.Height() + 1,
 		TimestampV: coreBlk0.Timestamp(),
 	}
-	statelessBlock0, err := statelessblock.BuildUnsignedApricot(
+	statelessBlock0, err := statelessblock.BuildUnsigned(
 		coreGenBlk.ID(),
 		coreBlk0.Timestamp(),
 		0,
@@ -1463,7 +1463,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 		TimestampV: gBlock.Timestamp(),
 	}
 
-	ySlb, err := statelessblock.BuildUnsignedApricot(
+	ySlb, err := statelessblock.BuildUnsigned(
 		gBlock.ID(),
 		gBlock.Timestamp(),
 		defaultPChainHeight,
@@ -1574,7 +1574,7 @@ func TestTooFarAdvanced(t *testing.T) {
 		t.Fatalf("could not verify valid block due to %s", err)
 	}
 
-	ySlb, err := statelessblock.BuildUnsignedApricot(
+	ySlb, err := statelessblock.BuildUnsigned(
 		aBlock.ID(),
 		aBlock.Timestamp().Add(maxSkew),
 		defaultPChainHeight,
@@ -1597,7 +1597,7 @@ func TestTooFarAdvanced(t *testing.T) {
 		t.Fatal("should have errored errProposerWindowNotStarted")
 	}
 
-	ySlb, err = statelessblock.BuildUnsignedApricot(
+	ySlb, err = statelessblock.BuildUnsigned(
 		aBlock.ID(),
 		aBlock.Timestamp().Add(proposer.MaxDelay),
 		defaultPChainHeight,
@@ -1813,7 +1813,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		}
 	}
 
-	proVM := New(coreVM, time.Time{}, 0, time.Time{})
+	proVM := New(coreVM, time.Time{}, 0)
 
 	valState := &validators.TestState{
 		T: t,
@@ -1890,7 +1890,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		TimestampV: coreGenBlk.Timestamp(),
 	}
 
-	ySlb, err := statelessblock.BuildUnsignedApricot(
+	ySlb, err := statelessblock.BuildUnsigned(
 		coreGenBlk.ID(),
 		coreGenBlk.Timestamp(),
 		defaultPChainHeight,
@@ -1991,7 +1991,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		}
 	}
 
-	proVM := New(coreVM, time.Time{}, 0, time.Time{})
+	proVM := New(coreVM, time.Time{}, 0)
 
 	valState := &validators.TestState{
 		T: t,
@@ -2128,7 +2128,6 @@ func TestVMInnerBlkCache(t *testing.T) {
 		innerVM,
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
-		time.Time{}, // fork is active
 	)
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -2168,7 +2167,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 	// Create a block near the tip (0).
 	blkNearTipInnerBytes := []byte{1}
 	parentID := ids.GenerateTestID()
-	blkNearTip, err := statelessblock.BuildBanff(
+	blkNearTip, err := statelessblock.Build(
 		parentID,                 // parent
 		time.Time{},              // timestamp
 		1,                        // pChainHeight,

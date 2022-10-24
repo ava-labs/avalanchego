@@ -14,8 +14,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"google.golang.org/protobuf/proto"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/ips"
@@ -24,143 +22,12 @@ import (
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
-// Ensures the message size with proto not blow up compared to packer.
-func TestProtoMarshalSizeVersion(t *testing.T) {
-	t.Parallel()
-	require := require.New(t)
-
-	id := ids.GenerateTestID()
-	inboundMsg := inboundMessageWithPacker{
-		inboundMessage: inboundMessage{
-			op: Version,
-		},
-		fields: map[Field]interface{}{
-			NetworkID:      uint32(1337),
-			NodeID:         uint32(0),
-			MyTime:         uint64(time.Now().Unix()),
-			IP:             ips.IPPort{IP: net.IPv4(1, 2, 3, 4)},
-			VersionStr:     "v1.2.3",
-			VersionTime:    uint64(time.Now().Unix()),
-			SigBytes:       []byte{'y', 'e', 'e', 't'},
-			TrackedSubnets: [][]byte{id[:]},
-		},
-	}
-	packerCodec, err := NewCodecWithMemoryPool(
-		"",
-		prometheus.NewRegistry(),
-		2*units.MiB,
-		10*time.Second,
-	)
-	require.NoError(err)
-
-	packerMsg, err := packerCodec.Pack(
-		inboundMsg.op,
-		inboundMsg.fields,
-		inboundMsg.op.Compressible(),
-		false,
-	)
-	require.NoError(err)
-
-	packerMsgN := len(packerMsg.Bytes())
-
-	protoMsg := p2ppb.Message{
-		Message: &p2ppb.Message_Version{
-			Version: &p2ppb.Version{
-				NetworkId:      uint32(1337),
-				MyTime:         uint64(time.Now().Unix()),
-				IpAddr:         []byte(net.IPv4(1, 2, 3, 4).To16()),
-				IpPort:         0,
-				MyVersion:      "v1.2.3",
-				MyVersionTime:  uint64(time.Now().Unix()),
-				Sig:            []byte{'y', 'e', 'e', 't'},
-				TrackedSubnets: [][]byte{id[:]},
-			},
-		},
-	}
-	protoMsgN := proto.Size(&protoMsg)
-
-	t.Logf("marshaled; packer %d-byte, proto %d-byte", packerMsgN, protoMsgN)
-	require.Greater(packerMsgN, protoMsgN)
-}
-
-// Ensures the message size with proto not blow up compared to packer.
-func TestProtoMarshalSizeAncestors(t *testing.T) {
-	t.Parallel()
-	require := require.New(t)
-
-	id := ids.GenerateTestID()
-	inboundMsg := inboundMessageWithPacker{
-		inboundMessage: inboundMessage{
-			op: Ancestors,
-		},
-		fields: map[Field]interface{}{
-			ChainID:   id[:],
-			RequestID: uint32(12345),
-			MultiContainerBytes: [][]byte{
-				bytes.Repeat([]byte{0}, 100),
-				bytes.Repeat([]byte{0}, 100),
-				bytes.Repeat([]byte{0}, 100),
-			},
-		},
-	}
-	packerCodec, err := NewCodecWithMemoryPool(
-		"",
-		prometheus.NewRegistry(),
-		2*units.MiB,
-		10*time.Second,
-	)
-	require.NoError(err)
-
-	compressible := inboundMsg.op.Compressible()
-	require.True(compressible)
-
-	packerMsg, err := packerCodec.Pack(
-		inboundMsg.op,
-		inboundMsg.fields,
-		compressible,
-		false,
-	)
-	require.NoError(err)
-
-	packerMsgN := len(packerMsg.Bytes())
-
-	protoMsg := p2ppb.Message{
-		Message: &p2ppb.Message_Ancestors_{
-			Ancestors_: &p2ppb.Ancestors{
-				ChainId:   id[:],
-				RequestId: 12345,
-				Containers: [][]byte{
-					bytes.Repeat([]byte{0}, 100),
-					bytes.Repeat([]byte{0}, 100),
-					bytes.Repeat([]byte{0}, 100),
-				},
-			},
-		},
-	}
-
-	mb, err := newMsgBuilderProtobuf(
-		"test",
-		prometheus.NewRegistry(),
-		units.MiB,
-		5*time.Second,
-	)
-	require.NoError(err)
-
-	b, _, _, err := mb.marshal(&protoMsg, compressible)
-	require.NoError(err)
-
-	protoMsgN := len(b)
-	t.Logf("marshaled; packer %d-byte, proto %d-byte", packerMsgN, protoMsgN)
-
-	require.GreaterOrEqual(packerMsgN, protoMsgN)
-}
-
-func TestNewOutboundInboundMessageWithProto(t *testing.T) {
+func TestNewOutboundInboundMessage(t *testing.T) {
 	t.Parallel()
 
 	require := require.New(t)
 
-	mb, err := newMsgBuilderProtobuf(
+	mb, err := newMsgBuilder(
 		"test",
 		prometheus.NewRegistry(),
 		units.MiB,

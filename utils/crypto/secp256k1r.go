@@ -175,6 +175,10 @@ func (k *PrivateKeySECP256K1R) PublicKey() PublicKey {
 	return k.pk
 }
 
+func (k *PrivateKeySECP256K1R) Address() ids.ShortID {
+	return k.PublicKey().Address()
+}
+
 func (k *PrivateKeySECP256K1R) Sign(msg []byte) ([]byte, error) {
 	return k.SignHash(hashing.ComputeHash256(msg))
 }

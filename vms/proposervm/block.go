@@ -211,54 +211,28 @@ func (p *postForkCommonComponents) buildChild(
 		return nil, err
 	}
 
-	banffActivated := newTimestamp.After(p.vm.activationTimeBanff)
-
 	// Build the child
 	var statelessChild block.SignedBlock
 	if delay >= proposer.MaxDelay {
-		if banffActivated {
-			statelessChild, err = block.BuildUnsignedBanff(
-				parentID,
-				newTimestamp,
-				pChainHeight,
-				innerBlock.Bytes(),
-			)
-		} else {
-			statelessChild, err = block.BuildUnsignedApricot(
-				parentID,
-				newTimestamp,
-				pChainHeight,
-				innerBlock.Bytes(),
-			)
-		}
-		if err != nil {
-			return nil, err
-		}
+		statelessChild, err = block.BuildUnsigned(
+			parentID,
+			newTimestamp,
+			pChainHeight,
+			innerBlock.Bytes(),
+		)
 	} else {
-		if banffActivated {
-			statelessChild, err = block.BuildBanff(
-				parentID,
-				newTimestamp,
-				pChainHeight,
-				p.vm.ctx.StakingCertLeaf,
-				innerBlock.Bytes(),
-				p.vm.ctx.ChainID,
-				p.vm.ctx.StakingLeafSigner,
-			)
-		} else {
-			statelessChild, err = block.BuildApricot(
-				parentID,
-				newTimestamp,
-				pChainHeight,
-				p.vm.ctx.StakingCertLeaf,
-				innerBlock.Bytes(),
-				p.vm.ctx.ChainID,
-				p.vm.ctx.StakingLeafSigner,
-			)
-		}
-		if err != nil {
-			return nil, err
-		}
+		statelessChild, err = block.Build(
+			parentID,
+			newTimestamp,
+			pChainHeight,
+			p.vm.ctx.StakingCertLeaf,
+			innerBlock.Bytes(),
+			p.vm.ctx.ChainID,
+			p.vm.ctx.StakingLeafSigner,
+		)
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	child := &postForkBlock{

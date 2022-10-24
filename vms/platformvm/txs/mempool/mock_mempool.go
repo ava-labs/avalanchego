@@ -116,20 +116,6 @@ func (mr *MockMempoolMockRecorder) Has(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Has", reflect.TypeOf((*MockMempool)(nil).Has), arg0)
 }
 
-// HasApricotDecisionTxs mocks base method.
-func (m *MockMempool) HasApricotDecisionTxs() bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HasApricotDecisionTxs")
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// HasApricotDecisionTxs indicates an expected call of HasApricotDecisionTxs.
-func (mr *MockMempoolMockRecorder) HasApricotDecisionTxs() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasApricotDecisionTxs", reflect.TypeOf((*MockMempool)(nil).HasApricotDecisionTxs))
-}
-
 // HasStakerTx mocks base method.
 func (m *MockMempool) HasStakerTx() bool {
 	m.ctrl.T.Helper()
@@ -168,20 +154,6 @@ func (m *MockMempool) MarkDropped(arg0 ids.ID, arg1 string) {
 func (mr *MockMempoolMockRecorder) MarkDropped(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkDropped", reflect.TypeOf((*MockMempool)(nil).MarkDropped), arg0, arg1)
-}
-
-// PeekApricotDecisionTxs mocks base method.
-func (m *MockMempool) PeekApricotDecisionTxs(arg0 int) []*txs.Tx {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PeekApricotDecisionTxs", arg0)
-	ret0, _ := ret[0].([]*txs.Tx)
-	return ret0
-}
-
-// PeekApricotDecisionTxs indicates an expected call of PeekApricotDecisionTxs.
-func (mr *MockMempoolMockRecorder) PeekApricotDecisionTxs(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PeekApricotDecisionTxs", reflect.TypeOf((*MockMempool)(nil).PeekApricotDecisionTxs), arg0)
 }
 
 // PeekStakerTx mocks base method.

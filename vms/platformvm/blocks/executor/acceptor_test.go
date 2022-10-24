@@ -172,6 +172,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	sharedMemory := atomic.NewMockSharedMemory(ctrl)
 
 	parentID := ids.GenerateTestID()
+	clk := &mockable.Clock{}
 	acceptor := &acceptor{
 		backend: &backend{
 			lastAccepted: parentID,
@@ -184,13 +185,14 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 		},
 		metrics: metrics.Noop,
 		recentlyAccepted: window.New[ids.ID](window.Config{
-			Clock:   &mockable.Clock{},
+			Clock:   clk,
 			MaxSize: 1,
 			TTL:     time.Hour,
 		}),
 	}
 
-	blk, err := blocks.NewApricotStandardBlock(
+	blk, err := blocks.NewBanffStandardBlock(
+		clk.Time(),
 		parentID,
 		1,
 		[]*txs.Tx{
@@ -211,7 +213,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	s.EXPECT().SetHeight(blk.Height()).Times(1)
 	s.EXPECT().AddStatelessBlock(blk, choices.Accepted).Times(1)
 
-	err = acceptor.ApricotStandardBlock(blk)
+	err = acceptor.BanffStandardBlock(blk)
 	require.Error(err, "should fail because the block isn't in the state map")
 
 	// Set [blk]'s state in the map as though it had been verified.
@@ -249,7 +251,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	onAcceptState.EXPECT().Apply(s).Times(1)
 	sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1)
 
-	err = acceptor.ApricotStandardBlock(blk)
+	err = acceptor.BanffStandardBlock(blk)
 	require.NoError(err)
 	require.True(calledOnAcceptFunc)
 	require.Equal(blk.ID(), acceptor.backend.lastAccepted)

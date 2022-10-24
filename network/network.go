@@ -158,8 +158,6 @@ type network struct {
 func NewNetwork(
 	config *Config,
 	msgCreator message.Creator,
-	msgCreatorWithProto message.Creator,
-	banffTime time.Time, // TODO: remove this once we complete banff migration
 	metricsRegisterer prometheus.Registerer,
 	log logging.Logger,
 	listener net.Listener,
@@ -207,14 +205,10 @@ func NewNetwork(
 	}
 
 	peerConfig := &peer.Config{
-		ReadBufferSize:          config.PeerReadBufferSize,
-		WriteBufferSize:         config.PeerWriteBufferSize,
-		Metrics:                 peerMetrics,
-		MessageCreator:          msgCreator,
-		MessageCreatorWithProto: msgCreatorWithProto,
-
-		// TODO: remove this once we complete banff migration
-		BanffTime: banffTime,
+		ReadBufferSize:  config.PeerReadBufferSize,
+		WriteBufferSize: config.PeerWriteBufferSize,
+		Metrics:         peerMetrics,
+		MessageCreator:  msgCreator,
 
 		Log:                  log,
 		InboundMsgThrottler:  inboundMsgThrottler,
@@ -477,7 +471,7 @@ func (n *network) Version() (message.OutboundMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	return n.peerConfig.GetMessageCreator().Version(
+	return n.peerConfig.MessageCreator.Version(
 		n.peerConfig.NetworkID,
 		n.peerConfig.Clock.Unix(),
 		mySignedIP.IP.IP,
@@ -490,7 +484,7 @@ func (n *network) Version() (message.OutboundMessage, error) {
 
 func (n *network) Peers() (message.OutboundMessage, error) {
 	peers := n.sampleValidatorIPs()
-	return n.peerConfig.GetMessageCreator().PeerList(peers, true)
+	return n.peerConfig.MessageCreator.PeerList(peers, true)
 }
 
 func (n *network) Pong(ctx context.Context, nodeID ids.NodeID) (message.OutboundMessage, error) {
@@ -508,7 +502,7 @@ func (n *network) Pong(ctx context.Context, nodeID ids.NodeID) (message.Outbound
 	span.SetAttributes(
 		attribute.Int("uptime", int(uptimePercentInt)),
 	)
-	return n.peerConfig.GetMessageCreator().Pong(uptimePercentInt)
+	return n.peerConfig.MessageCreator.Pong(uptimePercentInt)
 }
 
 // Dispatch starts accepting connections from other nodes attempting to connect
@@ -757,9 +751,6 @@ func (n *network) send(msg message.OutboundMessage, peers []peer.Peer) ids.NodeI
 
 	// send to peer and update metrics
 	for _, peer := range peers {
-		// Add a reference to the message so that if it is sent, it won't be
-		// collected until it is done being processed.
-		msg.AddRef()
 		if peer.Send(n.onCloseCtx, msg) {
 			sentTo.Add(peer.ID())
 
@@ -771,10 +762,6 @@ func (n *network) send(msg message.OutboundMessage, peers []peer.Peer) ids.NodeI
 			n.sendFailRateCalculator.Observe(1, now)
 		}
 	}
-
-	// The message has been passed to all peers that it will be sent to, so we
-	// can decrease the sender reference now.
-	msg.DecRef()
 	return sentTo
 }
 
@@ -1173,7 +1160,7 @@ func (n *network) runTimers() {
 				continue
 			}
 
-			msg, err := n.peerConfig.GetMessageCreator().PeerList(validatorIPs, false)
+			msg, err := n.peerConfig.MessageCreator.PeerList(validatorIPs, false)
 			if err != nil {
 				n.peerConfig.Log.Error(
 					"failed to gossip",

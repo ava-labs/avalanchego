@@ -37,9 +37,9 @@ jobs:
         run: |
           if [[ ${{ github.event_name }} == 'push' ]];
           then
-            echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+            echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
           else
-            echo ::set-output name=VERSION::${{ inputs.tag }}
+            echo "VERSION=${{ inputs.tag }}" >> $GITHUB_ENV
           fi
         shell: bash
 
@@ -54,6 +54,6 @@ jobs:
         run: |
           ./.github/workflows/update-ami.py
         env:
-          TAG: ${{ steps.get_tag.outputs.VERSION }}
+          TAG: ${{ env.VERSION }}
           PRODUCT_ID: ${{ secrets.MARKETPLACE_PRODUCT }}
           ROLE_ARN: ${{ secrets.MARKETPLACE_ROLE }}

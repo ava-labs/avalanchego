@@ -125,14 +125,14 @@ func TestAdaptiveTimeoutManager(t *testing.T) {
 
 		numSuccessful--
 		if numSuccessful > 0 {
-			tm.Put(ids.ID{byte(numSuccessful)}, message.PullQuery, *callback)
+			tm.Put(ids.RequestID{Op: byte(numSuccessful)}, message.PullQuery, *callback)
 		}
 		if numSuccessful >= 0 {
 			wg.Done()
 		}
 		if numSuccessful%2 == 0 {
-			tm.Remove(ids.ID{byte(numSuccessful)})
-			tm.Put(ids.ID{byte(numSuccessful)}, message.PullQuery, *callback)
+			tm.Remove(ids.RequestID{Op: byte(numSuccessful)})
+			tm.Put(ids.RequestID{Op: byte(numSuccessful)}, message.PullQuery, *callback)
 		}
 	}
 	(*callback)()

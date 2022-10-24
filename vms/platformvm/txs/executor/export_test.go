@@ -17,7 +17,7 @@ import (
 )
 
 func TestNewExportTx(t *testing.T) {
-	env := newEnvironment()
+	env := newEnvironment( /*postBanff*/ true)
 	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {

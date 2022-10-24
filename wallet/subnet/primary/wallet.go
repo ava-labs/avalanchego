@@ -8,10 +8,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -42,8 +42,8 @@ func (w *wallet) X() x.Wallet { return w.x }
 // the UTXOs may become out of sync.
 //
 // The wallet manages all UTXOs locally, and performs all tx signing locally.
-func NewWalletFromURI(ctx context.Context, uri string, kc *secp256k1fx.Keychain) (Wallet, error) {
-	pCTX, xCTX, utxos, err := FetchState(ctx, uri, kc.Addrs)
+func NewWalletFromURI(ctx context.Context, uri string, kc keychain.Keychain) (Wallet, error) {
+	pCTX, xCTX, utxos, err := FetchState(ctx, uri, kc.Addresses())
 	if err != nil {
 		return nil, err
 	}
@@ -51,8 +51,8 @@ func NewWalletFromURI(ctx context.Context, uri string, kc *secp256k1fx.Keychain)
 }
 
 // Creates a wallet with pre-loaded/cached P-chain transactions.
-func NewWalletWithTxs(ctx context.Context, uri string, kc *secp256k1fx.Keychain, preloadTXs ...ids.ID) (Wallet, error) {
-	pCTX, xCTX, utxos, err := FetchState(ctx, uri, kc.Addrs)
+func NewWalletWithTxs(ctx context.Context, uri string, kc keychain.Keychain, preloadTXs ...ids.ID) (Wallet, error) {
+	pCTX, xCTX, utxos, err := FetchState(ctx, uri, kc.Addresses())
 	if err != nil {
 		return nil, err
 	}
@@ -78,19 +78,20 @@ func NewWalletWithTxsAndState(
 	pCTX p.Context,
 	xCTX x.Context,
 	utxos UTXOs,
-	kc *secp256k1fx.Keychain,
+	kc keychain.Keychain,
 	pTXs map[ids.ID]*txs.Tx,
 ) Wallet {
+	addrs := kc.Addresses()
 	pUTXOs := NewChainUTXOs(constants.PlatformChainID, utxos)
 	pBackend := p.NewBackend(pCTX, pUTXOs, pTXs)
-	pBuilder := p.NewBuilder(kc.Addrs, pBackend)
+	pBuilder := p.NewBuilder(addrs, pBackend)
 	pSigner := p.NewSigner(kc, pBackend)
 	pClient := platformvm.NewClient(uri)
 
 	xChainID := xCTX.BlockchainID()
 	xUTXOs := NewChainUTXOs(xChainID, utxos)
 	xBackend := x.NewBackend(xCTX, xChainID, xUTXOs)
-	xBuilder := x.NewBuilder(kc.Addrs, xBackend)
+	xBuilder := x.NewBuilder(addrs, xBackend)
 	xSigner := x.NewSigner(kc, xBackend)
 	xClient := avm.NewClient(uri, "X")
 
@@ -106,7 +107,7 @@ func NewWalletWithState(
 	pCTX p.Context,
 	xCTX x.Context,
 	utxos UTXOs,
-	kc *secp256k1fx.Keychain,
+	kc keychain.Keychain,
 ) Wallet {
 	pTXs := make(map[ids.ID]*txs.Tx)
 	return NewWalletWithTxsAndState(uri, pCTX, xCTX, utxos, kc, pTXs)

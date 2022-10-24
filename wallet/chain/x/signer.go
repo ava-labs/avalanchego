@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -46,11 +47,11 @@ type SignerBackend interface {
 }
 
 type signer struct {
-	kc      *secp256k1fx.Keychain
+	kc      keychain.Keychain
 	backend SignerBackend
 }
 
-func NewSigner(kc *secp256k1fx.Keychain, backend SignerBackend) Signer {
+func NewSigner(kc keychain.Keychain, backend SignerBackend) Signer {
 	return &signer{
 		kc:      kc,
 		backend: backend,
@@ -132,9 +133,9 @@ func (s *signer) signExportTx(ctx stdcontext.Context, tx *txs.Tx, utx *txs.Expor
 	return s.sign(tx, txCreds, txSigners)
 }
 
-func (s *signer) getSigners(ctx stdcontext.Context, sourceChainID ids.ID, ins []*avax.TransferableInput) ([]verify.Verifiable, [][]*crypto.PrivateKeySECP256K1R, error) {
+func (s *signer) getSigners(ctx stdcontext.Context, sourceChainID ids.ID, ins []*avax.TransferableInput) ([]verify.Verifiable, [][]keychain.Signer, error) {
 	txCreds := make([]verify.Verifiable, len(ins))
-	txSigners := make([][]*crypto.PrivateKeySECP256K1R, len(ins))
+	txSigners := make([][]keychain.Signer, len(ins))
 	for credIndex, transferInput := range ins {
 		txCreds[credIndex] = &secp256k1fx.Credential{}
 		input, ok := transferInput.In.(*secp256k1fx.TransferInput)
@@ -142,7 +143,7 @@ func (s *signer) getSigners(ctx stdcontext.Context, sourceChainID ids.ID, ins []
 			return nil, nil, errUnknownInputType
 		}
 
-		inputSigners := make([]*crypto.PrivateKeySECP256K1R, len(input.SigIndices))
+		inputSigners := make([]keychain.Signer, len(input.SigIndices))
 		txSigners[credIndex] = inputSigners
 
 		utxoID := transferInput.InputID()
@@ -179,9 +180,9 @@ func (s *signer) getSigners(ctx stdcontext.Context, sourceChainID ids.ID, ins []
 	return txCreds, txSigners, nil
 }
 
-func (s *signer) getOpsSigners(ctx stdcontext.Context, sourceChainID ids.ID, ops []*txs.Operation) ([]verify.Verifiable, [][]*crypto.PrivateKeySECP256K1R, error) {
+func (s *signer) getOpsSigners(ctx stdcontext.Context, sourceChainID ids.ID, ops []*txs.Operation) ([]verify.Verifiable, [][]keychain.Signer, error) {
 	txCreds := make([]verify.Verifiable, len(ops))
-	txSigners := make([][]*crypto.PrivateKeySECP256K1R, len(ops))
+	txSigners := make([][]keychain.Signer, len(ops))
 	for credIndex, op := range ops {
 		var input *secp256k1fx.Input
 		switch op := op.Op.(type) {
@@ -204,7 +205,7 @@ func (s *signer) getOpsSigners(ctx stdcontext.Context, sourceChainID ids.ID, ops
 			return nil, nil, errUnknownOpType
 		}
 
-		inputSigners := make([]*crypto.PrivateKeySECP256K1R, len(input.SigIndices))
+		inputSigners := make([]keychain.Signer, len(input.SigIndices))
 		txSigners[credIndex] = inputSigners
 
 		if len(op.UTXOIDs) != 1 {
@@ -255,7 +256,7 @@ func (s *signer) getOpsSigners(ctx stdcontext.Context, sourceChainID ids.ID, ops
 	return txCreds, txSigners, nil
 }
 
-func (s *signer) sign(tx *txs.Tx, creds []verify.Verifiable, txSigners [][]*crypto.PrivateKeySECP256K1R) error {
+func (s *signer) sign(tx *txs.Tx, creds []verify.Verifiable, txSigners [][]keychain.Signer) error {
 	codec := Parser.Codec()
 	unsignedBytes, err := codec.Marshal(txs.CodecVersion, &tx.Unsigned)
 	if err != nil {
@@ -302,7 +303,7 @@ func (s *signer) sign(tx *txs.Tx, creds []verify.Verifiable, txSigners [][]*cryp
 				// transaction. However, we can attempt to partially sign it.
 				continue
 			}
-			addr := signer.PublicKey().Address()
+			addr := signer.Address()
 			if sig := cred.Sigs[sigIndex]; sig != emptySig {
 				// If this signature has already been populated, we can just
 				// copy the needed signature for the future.

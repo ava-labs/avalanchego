@@ -5,7 +5,7 @@
 
 - name: Setup avalanchego repo
   apt_repository:
-    repo: deb https://downloads.avax.network/apt bionic main
+    repo: deb https://downloads.avax.network/apt focal main
     state: present
 
 - name: Setup golang repo
