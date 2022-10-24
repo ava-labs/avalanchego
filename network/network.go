@@ -637,7 +637,7 @@ func (n *network) TracksSubnet(nodeID ids.NodeID, subnetID ids.ID) bool {
 func (n *network) validatorsToGossipFor(p peer.Peer) ([]ips.ClaimedIPPort, []ids.NodeID) {
 	// peers should validate the primary network
 	if !n.config.Validators.Contains(constants.PrimaryNetworkID, p.ID()) {
-		return nil, nil
+		return []ips.ClaimedIPPort{}, []ids.NodeID{}
 	}
 
 	unknown, ok := n.gossipTracker.GetUnknown(p.ID(), int(n.config.PeerListNumValidatorIPs))
@@ -646,7 +646,7 @@ func (n *network) validatorsToGossipFor(p peer.Peer) ([]ips.ClaimedIPPort, []ids
 			"unable to find peers to gossip to",
 			zap.Stringer("peerID", p.ID()),
 		)
-		return nil, nil
+		return []ips.ClaimedIPPort{}, []ids.NodeID{}
 	}
 
 	// these slices have lengths of zero because it's not guaranteed that
@@ -664,7 +664,7 @@ func (n *network) validatorsToGossipFor(p peer.Peer) ([]ips.ClaimedIPPort, []ids
 				"unable to find unknown peer in connected peers",
 				zap.Stringer("peer", peerID),
 			)
-			return nil, nil
+			return []ips.ClaimedIPPort{}, []ids.NodeID{}
 		}
 
 		peerIP := peer.IP()
