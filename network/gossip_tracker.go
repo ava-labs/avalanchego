@@ -10,7 +10,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 // GossipTracker tracks the peers that we're currently aware of, as well as the
@@ -18,32 +17,55 @@ import (
 // optimize space, where only N (num peers) bits will be used.
 //
 // This is done by recording some state information of both what peers this node
-// is aware of, and what peers we've told each peer about.
+// is aware of, and what peers we've told each peer about. As an example,
+// say we track three peers (most-significant-bit first):
 //
-// As an example, say we track three peers (most-significant-bit first):
-// 	local: 		[1, 1, 1] // [p3, p2, p1] we always know about everyone
-// 	knownPeers:	{
-// 		p1: [1, 1, 1] // p1 knows about everyone
-// 		p2: [0, 1, 1] // p2 doesn't know about p3
-// 		p3: [0, 0, 1] // p3 knows only about p3
-// 	}
+//	local: 		[1, 1, 1] // [p3, p2, p1] we always know about everyone
+//	knownPeers:	{
+//		p1: [1, 1, 1] // we have already told [p1] about all peers
+//		p2: [0, 1, 1] // [p2] doesn't know about [p3]
+//		p3: [0, 0, 1] // [p3] knows only about [p3]
+//	}
 //
 // GetUnknown computes the information we haven't sent to a given peer
 // (using the bitwise AND NOT operator). Ex:
-// 	GetUnknown(p1) -  [0, 0, 0]
-// 	GetUnknown(p2) -  [1, 0, 0]
-// 	GetUnknown(p3) -  [1, 1, 0]
 //
-// Using the GossipTracker, we can quickly compute the peers each peer doesn't
+//	GetUnknown(p1) -  [0, 0, 0]
+//	GetUnknown(p2) -  [1, 0, 0]
+//	GetUnknown(p3) -  [1, 1, 0]
+//
+// Using the gossipTracker, we can quickly compute the peers each peer doesn't
 // know about using GetUnknown so that in subsequent PeerList gossip messages
 // we only send information that this peer (most likely) doesn't already know
 // about. The only edge-case where we'll send a redundant set of bytes is if
 // another remote peer gossips to the same peer we're trying to gossip to first.
-type GossipTracker struct {
+type GossipTracker interface {
+	// Contains returns if a peer is being tracked
+	// Returns:
+	// 	[ok]: False if [id] is not tracked. True otherwise.
+	Contains(id ids.NodeID) (ok bool)
+	// Add starts tracking a peer
+	// Returns :
+	// 	[ok]: False if [id] is already tracked. True otherwise.
+	Add(id ids.NodeID) (ok bool)
+	// Remove stops tracking a given peer
+	// Returns:
+	// 	[ok]: False if [id] is not already tracked. True otherwise.
+	Remove(id ids.NodeID) (ok bool)
+	// UpdateKnown adds [learned] to the peers known by [id]
+	UpdateKnown(id ids.NodeID, learned []ids.NodeID)
+	// GetUnknown gets the peers that we haven't sent to this peer
+	// Returns:
+	// 	[unknown]: a slice of [limit] peers that [id] doesn't know about
+	// 	[ok]: False if [id] is not tracked. True otherwise.
+	GetUnknown(id ids.NodeID, limit int) (unknown []ids.NodeID, ok bool)
+}
+
+type gossipTracker struct {
 	// a bitset of the peers that we are aware of
 	local ids.BigBitSet
 
-	// a mapping of peer => the peers we know we sent to them
+	// a mapping of peer => the peers we have sent them
 	knownPeers map[ids.NodeID]ids.BigBitSet
 	// a mapping of peers => the index they occupy in the bitsets
 	peersToIndices map[ids.NodeID]int
@@ -54,14 +76,14 @@ type GossipTracker struct {
 	metrics gossipTrackerMetrics
 }
 
-// NewGossipTracker returns an instance of GossipTracker
-func NewGossipTracker(registerer prometheus.Registerer, namespace string) (*GossipTracker, error) {
+// NewGossipTracker returns an instance of gossipTracker
+func NewGossipTracker(registerer prometheus.Registerer, namespace string) (*gossipTracker, error) {
 	m, err := newGossipTrackerMetrics(registerer, fmt.Sprintf("%s_gossip_tracker", namespace))
 	if err != nil {
 		return nil, err
 	}
 
-	return &GossipTracker{
+	return &gossipTracker{
 		local:          ids.NewBigBitSet(),
 		knownPeers:     make(map[ids.NodeID]ids.BigBitSet),
 		peersToIndices: make(map[ids.NodeID]int),
@@ -70,17 +92,15 @@ func NewGossipTracker(registerer prometheus.Registerer, namespace string) (*Goss
 	}, nil
 }
 
-// Contains returns if a peer is being tracked
-func (g *GossipTracker) Contains(id ids.NodeID) bool {
+func (g *gossipTracker) Contains(id ids.NodeID) (ok bool) {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 
-	_, ok := g.knownPeers[id]
+	_, ok = g.knownPeers[id]
 	return ok
 }
 
-// Add starts tracking a peer
-func (g *GossipTracker) Add(id ids.NodeID) bool {
+func (g *gossipTracker) Add(id ids.NodeID) (ok bool) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -104,8 +124,7 @@ func (g *GossipTracker) Add(id ids.NodeID) bool {
 	return true
 }
 
-// Remove stops tracking a given peer
-func (g *GossipTracker) Remove(id ids.NodeID) bool {
+func (g *gossipTracker) Remove(id ids.NodeID) (ok bool) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -153,12 +172,10 @@ func (g *GossipTracker) Remove(id ids.NodeID) bool {
 	return true
 }
 
-// UpdateKnown adds to the peers that a peer knows about
-// invariants:
-// 1. [id] and [learned] should only contain nodeIDs that have been tracked with
-// 	  Add(). Trying to add nodeIDs that aren't tracked yet will result in a noop
-// 	  and this will return [false].
-func (g *GossipTracker) UpdateKnown(id ids.NodeID, learned []ids.NodeID) bool {
+// UpdateKnown invariant: [id] and [learned] SHOULD only contain nodeIDs that
+// have been tracked with Add(). Trying to add nodeIDs that aren't tracked yet
+// will result in a noop and this will return [false].
+func (g *gossipTracker) UpdateKnown(id ids.NodeID, learned []ids.NodeID) (ok bool) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -182,11 +199,10 @@ func (g *GossipTracker) UpdateKnown(id ids.NodeID, learned []ids.NodeID) bool {
 	return true
 }
 
-// GetUnknown returns the peers that we haven't sent to this peer
-// [limit] should be >= 0
-func (g *GossipTracker) GetUnknown(id ids.NodeID, limit int) ([]ids.NodeID, bool) {
+// GetUnknown invariant: [limit] SHOULD be > 0.
+func (g *gossipTracker) GetUnknown(id ids.NodeID, limit int) (unknown []ids.NodeID, ok bool) {
 	if limit <= 0 {
-		return nil, false
+		return []ids.NodeID{}, false
 	}
 
 	g.lock.RLock()
@@ -194,17 +210,17 @@ func (g *GossipTracker) GetUnknown(id ids.NodeID, limit int) ([]ids.NodeID, bool
 
 	// Calculate the unknown information we need to send to this peer.
 	// We do this by computing the [local] information we know,
-	// computing what the peer knows in its [knownPeers], and sending over
+	// computing what the peer knows in its [knownBits], and sending over
 	// the difference.
-	unknown := ids.NewBigBitSet()
-	unknown.Union(g.local)
+	unknownBits := ids.NewBigBitSet()
+	unknownBits.Union(g.local)
 
-	knownPeers, ok := g.knownPeers[id]
+	knownBits, ok := g.knownPeers[id]
 	if !ok {
 		return nil, false
 	}
 
-	unknown.Difference(knownPeers)
+	unknownBits.Difference(knownBits)
 
 	result := make([]ids.NodeID, 0, limit)
 
@@ -213,9 +229,9 @@ func (g *GossipTracker) GetUnknown(id ids.NodeID, limit int) ([]ids.NodeID, bool
 	// unknown peers starting at the oldest unknown peer to avoid complications
 	// where a subset of nodes might be "flickering" offline/online, resulting
 	// in the same diff being sent over each time.
-	for i := 0; i < unknown.Len(); i++ {
+	for i := 0; i < unknownBits.Len(); i++ {
 		// skip the bits that aren't set
-		if !unknown.Contains(i) {
+		if !unknownBits.Contains(i) {
 			continue
 		}
 		// stop if we exceed the max specified elements to return
@@ -227,45 +243,4 @@ func (g *GossipTracker) GetUnknown(id ids.NodeID, limit int) ([]ids.NodeID, bool
 	}
 
 	return result, true
-}
-
-type gossipTrackerMetrics struct {
-	localPeersSize     prometheus.Gauge
-	peersToIndicesSize prometheus.Gauge
-	indicesToPeersSize prometheus.Gauge
-}
-
-func newGossipTrackerMetrics(registerer prometheus.Registerer, namespace string) (gossipTrackerMetrics, error) {
-	m := gossipTrackerMetrics{
-		localPeersSize: prometheus.NewGauge(
-			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "local_peers_size",
-				Help:      "amount of peers this node is tracking gossip for",
-			},
-		),
-		peersToIndicesSize: prometheus.NewGauge(
-			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "peers_to_indices_size",
-				Help:      "amount of peers this node is tracking in peersToIndices",
-			},
-		),
-		indicesToPeersSize: prometheus.NewGauge(
-			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "indices_to_peers_size",
-				Help:      "amount of peers this node is tracking in indicesToPeers",
-			},
-		),
-	}
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		registerer.Register(m.localPeersSize),
-		registerer.Register(m.peersToIndicesSize),
-		registerer.Register(m.indicesToPeersSize),
-	)
-
-	return m, errs.Err
 }
