@@ -14,9 +14,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
-const (
-	tracerProviderExportCreationTimeout = 5 * time.Second
-)
+const tracerProviderExportCreationTimeout = 5 * time.Second
 
 type ExporterConfig struct {
 	Type ExporterType `json:"type"`
