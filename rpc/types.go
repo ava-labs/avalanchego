@@ -99,8 +99,8 @@ func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 	case "pending":
 		*bn = PendingBlockNumber
 		return nil
-		// Include "finalized" and "safe" as an option for compatibility with
-		// FinalizedBlockNumber and SafeBlockNumber from geth.
+	// Include "finalized" and "safe" as an option for compatibility with
+	// FinalizedBlockNumber and SafeBlockNumber from geth.
 	case "accepted", "finalized", "safe":
 		*bn = AcceptedBlockNumber
 		return nil
@@ -181,8 +181,8 @@ func (bnh *BlockNumberOrHash) UnmarshalJSON(data []byte) error {
 		bn := PendingBlockNumber
 		bnh.BlockNumber = &bn
 		return nil
-		// Include "finalized" and "safe" as an option for compatibility with
-		// FinalizedBlockNumber and SafeBlockNumber from geth.
+	// Include "finalized" and "safe" as an option for compatibility with
+	// FinalizedBlockNumber and SafeBlockNumber from geth.
 	case "accepted", "finalized", "safe":
 		bn := AcceptedBlockNumber
 		bnh.BlockNumber = &bn

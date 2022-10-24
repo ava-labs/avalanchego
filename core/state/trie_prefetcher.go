@@ -34,8 +34,10 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-// triePrefetchMetricsPrefix is the prefix under which to publish the metrics.
-var triePrefetchMetricsPrefix = "trie/prefetch/"
+var (
+	// triePrefetchMetricsPrefix is the prefix under which to publish the metrics.
+	triePrefetchMetricsPrefix = "trie/prefetch/"
+)
 
 // triePrefetcher is an active prefetcher, which receives accounts or storage
 // items and does trie-loading of them. The goal is to get as much useful content
@@ -220,7 +222,7 @@ type subfetcher struct {
 
 	wake chan struct{}  // Wake channel if a new task is scheduled
 	stop chan struct{}  // Channel to interrupt processing
-	term chan struct{}  // Channel to signal iterruption
+	term chan struct{}  // Channel to signal interruption
 	copy chan chan Trie // Channel to request a copy of the current trie
 
 	seen map[string]struct{} // Tracks the entries already loaded
@@ -340,7 +342,12 @@ func (sf *subfetcher) loop() {
 					if _, ok := sf.seen[string(task)]; ok {
 						sf.dups++
 					} else {
-						_, err := sf.trie.TryGet(task)
+						var err error
+						if len(task) == len(common.Address{}) {
+							_, err = sf.trie.TryGetAccount(task)
+						} else {
+							_, err = sf.trie.TryGet(task)
+						}
 						if err != nil {
 							log.Error("Trie prefetcher failed fetching", "root", sf.root, "err", err)
 						}

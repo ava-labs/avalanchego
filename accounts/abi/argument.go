@@ -217,7 +217,6 @@ func (arguments Arguments) UnpackValues(data []byte) ([]interface{}, error) {
 			// coded as just like uint256,bool,uint256
 			virtualArgs += getTypeSize(arg.Type)/32 - 1
 		}
-
 		retval = append(retval, marshalledValue)
 	}
 	return retval, nil

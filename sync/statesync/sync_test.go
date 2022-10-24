@@ -4,9 +4,11 @@
 package statesync
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"math/rand"
+	"runtime/pprof"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -97,24 +99,34 @@ func waitFor(t *testing.T, result <-chan error, expected error, timeout time.Dur
 			t.Fatal("unexpected error waiting for sync result", err)
 		}
 	case <-time.After(timeout):
+		// print a stack trace to assist with debugging
+		// if the test times out.
+		var stackBuf bytes.Buffer
+		pprof.Lookup("goroutine").WriteTo(&stackBuf, 2)
+		t.Log(stackBuf.String())
+		// fail the test
 		t.Fatal("unexpected timeout waiting for sync result")
 	}
 }
 
 func TestSimpleSyncCases(t *testing.T) {
-	clientErr := errors.New("dummy client error")
+	var (
+		numAccounts      = 250
+		numAccountsSmall = 10
+		clientErr        = errors.New("dummy client error")
+	)
 	tests := map[string]syncTest{
 		"accounts": {
 			prepareForTest: func(t *testing.T) (ethdb.Database, *trie.Database, common.Hash) {
 				serverTrieDB := trie.NewDatabase(memorydb.New())
-				root, _ := trie.FillAccounts(t, serverTrieDB, common.Hash{}, 1000, nil)
+				root, _ := trie.FillAccounts(t, serverTrieDB, common.Hash{}, numAccounts, nil)
 				return memorydb.New(), serverTrieDB, root
 			},
 		},
 		"accounts with code": {
 			prepareForTest: func(t *testing.T) (ethdb.Database, *trie.Database, common.Hash) {
 				serverTrieDB := trie.NewDatabase(memorydb.New())
-				root, _ := trie.FillAccounts(t, serverTrieDB, common.Hash{}, 1000, func(t *testing.T, index int, account types.StateAccount) types.StateAccount {
+				root, _ := trie.FillAccounts(t, serverTrieDB, common.Hash{}, numAccounts, func(t *testing.T, index int, account types.StateAccount) types.StateAccount {
 					if index%3 == 0 {
 						codeBytes := make([]byte, 256)
 						_, err := rand.Read(codeBytes)
@@ -134,14 +146,14 @@ func TestSimpleSyncCases(t *testing.T) {
 		"accounts with code and storage": {
 			prepareForTest: func(t *testing.T) (ethdb.Database, *trie.Database, common.Hash) {
 				serverTrieDB := trie.NewDatabase(memorydb.New())
-				root := fillAccountsWithStorage(t, serverTrieDB, common.Hash{}, 1000)
+				root := fillAccountsWithStorage(t, serverTrieDB, common.Hash{}, numAccounts)
 				return memorydb.New(), serverTrieDB, root
 			},
 		},
 		"accounts with storage": {
 			prepareForTest: func(t *testing.T) (ethdb.Database, *trie.Database, common.Hash) {
 				serverTrieDB := trie.NewDatabase(memorydb.New())
-				root, _ := trie.FillAccounts(t, serverTrieDB, common.Hash{}, 1000, func(t *testing.T, i int, account types.StateAccount) types.StateAccount {
+				root, _ := trie.FillAccounts(t, serverTrieDB, common.Hash{}, numAccounts, func(t *testing.T, i int, account types.StateAccount) types.StateAccount {
 					if i%5 == 0 {
 						account.Root, _, _ = trie.GenerateTrie(t, serverTrieDB, 16, common.HashLength)
 					}
@@ -154,14 +166,14 @@ func TestSimpleSyncCases(t *testing.T) {
 		"accounts with overlapping storage": {
 			prepareForTest: func(t *testing.T) (ethdb.Database, *trie.Database, common.Hash) {
 				serverTrieDB := trie.NewDatabase(memorydb.New())
-				root, _ := FillAccountsWithOverlappingStorage(t, serverTrieDB, common.Hash{}, 1000, 3)
+				root, _ := FillAccountsWithOverlappingStorage(t, serverTrieDB, common.Hash{}, numAccounts, 3)
 				return memorydb.New(), serverTrieDB, root
 			},
 		},
 		"failed to fetch leafs": {
 			prepareForTest: func(t *testing.T) (ethdb.Database, *trie.Database, common.Hash) {
 				serverTrieDB := trie.NewDatabase(memorydb.New())
-				root, _ := trie.FillAccounts(t, serverTrieDB, common.Hash{}, 100, nil)
+				root, _ := trie.FillAccounts(t, serverTrieDB, common.Hash{}, numAccountsSmall, nil)
 				return memorydb.New(), serverTrieDB, root
 			},
 			GetLeafsIntercept: func(_ message.LeafsRequest, _ message.LeafsResponse) (message.LeafsResponse, error) {
@@ -172,7 +184,7 @@ func TestSimpleSyncCases(t *testing.T) {
 		"failed to fetch code": {
 			prepareForTest: func(t *testing.T) (ethdb.Database, *trie.Database, common.Hash) {
 				serverTrieDB := trie.NewDatabase(memorydb.New())
-				root := fillAccountsWithStorage(t, serverTrieDB, common.Hash{}, 100)
+				root := fillAccountsWithStorage(t, serverTrieDB, common.Hash{}, numAccountsSmall)
 				return memorydb.New(), serverTrieDB, root
 			},
 			GetCodeIntercept: func(_ []common.Hash, _ [][]byte) ([][]byte, error) {

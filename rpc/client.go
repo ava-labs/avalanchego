@@ -192,9 +192,9 @@ func DialContext(ctx context.Context, rawurl string) (*Client, error) {
 		return DialHTTP(rawurl)
 	case "ws", "wss":
 		return DialWebsocket(ctx, rawurl, "")
-	// case "stdio":
+	//case "stdio":
 	//	return DialStdIO(ctx)
-	// case "":
+	//case "":
 	//	return DialIPC(ctx, rawurl)
 	default:
 		return nil, fmt.Errorf("no known transport for URL scheme %q", u.Scheme)

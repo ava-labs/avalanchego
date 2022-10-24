@@ -678,11 +678,14 @@ func (vm *VM) VerifyHeightIndex() error {
 	return nil
 }
 
-// GetBlockIDAtHeight retrieves the blkID of the canonical block at [blkHeight]
-// if [blkHeight] is less than the height of the last accepted block, this will return
-// a canonical block. Otherwise, it may return a blkID that has not yet been accepted.
-// Note: Engine's interface requires this function returns database.ErrNotFound
-// if a block is not found.
+// GetBlockAtHeight implements the HeightIndexedChainVM interface and returns the
+// canonical block at [blkHeight].
+// If [blkHeight] is less than the height of the last accepted block, this will return
+// the block accepted at that height. Otherwise, it may return a blkID that has not yet
+// been accepted.
+// Note: the engine assumes that if a block is not found at [blkHeight], then
+// [database.ErrNotFound] will be returned. This indicates that the VM has state synced
+// and does not have all historical blocks available.
 func (vm *VM) GetBlockIDAtHeight(blkHeight uint64) (ids.ID, error) {
 	ethBlock := vm.blockChain.GetBlockByNumber(blkHeight)
 	if ethBlock == nil {
@@ -697,10 +700,10 @@ func (vm *VM) Version() (string, error) {
 }
 
 // NewHandler returns a new Handler for a service where:
-//   * The handler's functionality is defined by [service]
+//   - The handler's functionality is defined by [service]
 //     [service] should be a gorilla RPC service (see https://www.gorillatoolkit.org/pkg/rpc/v2)
-//   * The name of the service is [name]
-//   * The LockOption is the first element of [lockOption]
+//   - The name of the service is [name]
+//   - The LockOption is the first element of [lockOption]
 //     By default the LockOption is WriteLock
 //     [lockOption] should have either 0 or 1 elements. Elements beside the first are ignored.
 func newHandler(name string, service interface{}, lockOption ...commonEng.LockOption) (*commonEng.HTTPHandler, error) {

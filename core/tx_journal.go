@@ -29,6 +29,7 @@ package core
 import (
 	"errors"
 	"io"
+	"io/fs"
 	"os"
 
 	"github.com/ava-labs/subnet-evm/core/types"
@@ -67,12 +68,12 @@ func newTxJournal(path string) *txJournal {
 // load parses a transaction journal dump from disk, loading its contents into
 // the specified pool.
 func (journal *txJournal) load(add func([]*types.Transaction) []error) error {
-	// Skip the parsing if the journal file doesn't exist at all
-	if !common.FileExist(journal.path) {
-		return nil
-	}
 	// Open the journal for loading any past transactions
 	input, err := os.Open(journal.path)
+	if errors.Is(err, fs.ErrNotExist) {
+		// Skip the parsing if the journal file doesn't exist at all
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -148,7 +149,7 @@ func (journal *txJournal) rotate(all map[common.Address]types.Transactions) erro
 		journal.writer = nil
 	}
 	// Generate a new journal with the contents of the current pool
-	replacement, err := os.OpenFile(journal.path+".new", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	replacement, err := os.OpenFile(journal.path+".new", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
@@ -168,7 +169,7 @@ func (journal *txJournal) rotate(all map[common.Address]types.Transactions) erro
 	if err = os.Rename(journal.path+".new", journal.path); err != nil {
 		return err
 	}
-	sink, err := os.OpenFile(journal.path, os.O_WRONLY|os.O_APPEND, 0o644)
+	sink, err := os.OpenFile(journal.path, os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return err
 	}

@@ -59,8 +59,8 @@ func TestKeyStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("account file %s doesn't exist (%v)", a.URL, err)
 	}
-	if runtime.GOOS != "windows" && stat.Mode() != 0o600 {
-		t.Fatalf("account file has wrong mode: got %o, want %o", stat.Mode(), 0o600)
+	if runtime.GOOS != "windows" && stat.Mode() != 0600 {
+		t.Fatalf("account file has wrong mode: got %o, want %o", stat.Mode(), 0600)
 	}
 	if !ks.HasAddress(a.Address) {
 		t.Errorf("HasAccount(%x) should've returned true", a.Address)
@@ -224,7 +224,7 @@ func TestSignRace(t *testing.T) {
 // Tests that the wallet notifier loop starts and stops correctly based on the
 // addition and removal of wallet event subscriptions.
 func TestWalletNotifierLifecycle(t *testing.T) {
-	// Create a temporary kesytore to test with
+	// Create a temporary keystore to test with
 	_, ks := tmpKeyStore(t, false)
 
 	// Ensure that the notification updater is not running yet

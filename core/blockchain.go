@@ -59,6 +59,7 @@ var (
 	acceptorQueueGauge           = metrics.NewRegisteredGauge("blockchain/acceptor/queue/size", nil)
 	processedBlockGasUsedCounter = metrics.NewRegisteredCounter("blockchain/blocks/gas/used/processed", nil)
 	acceptedBlockGasUsedCounter  = metrics.NewRegisteredCounter("blockchain/blocks/gas/used/accepted", nil)
+	badBlockCounter              = metrics.NewRegisteredCounter("blockchain/blocks/bad/count", nil)
 
 	ErrRefuseToCorruptArchiver = errors.New("node has operated with pruning disabled, shutting down to prevent missing tries")
 
@@ -123,8 +124,8 @@ type CacheConfig struct {
 	AcceptorQueueLimit              int     // Blocks to queue before blocking during acceptance
 	PopulateMissingTries            *uint64 // If non-nil, sets the starting height for re-generating historical tries.
 	PopulateMissingTriesParallelism int     // Is the number of readers to use when trying to populate missing tries.
-	SnapshotDelayInit               bool    // Whether to initialize snapshots on startup or wait for external call
 	AllowMissingTries               bool    // Whether to allow an archive node to run with pruning enabled
+	SnapshotDelayInit               bool    // Whether to initialize snapshots on startup or wait for external call
 	SnapshotLimit                   int     // Memory allowance (MB) to use for caching snapshot entries in memory
 	SnapshotAsync                   bool    // Generate snapshot tree async
 	SnapshotVerify                  bool    // Verify generated snapshots
@@ -547,6 +548,13 @@ func (bc *BlockChain) Export(w io.Writer) error {
 
 // ExportN writes a subset of the active chain to the given writer.
 func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
+	return bc.ExportCallback(func(block *types.Block) error {
+		return block.EncodeRLP(w)
+	}, first, last)
+}
+
+// ExportCallback invokes [callback] for every block from [first] to [last] in order.
+func (bc *BlockChain) ExportCallback(callback func(block *types.Block) error, first uint64, last uint64) error {
 	if first > last {
 		return fmt.Errorf("export failed: first (%d) is greater than last (%d)", first, last)
 	}
@@ -566,7 +574,7 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 			return fmt.Errorf("export failed: chain reorg during export")
 		}
 		parentHash = block.Hash()
-		if err := block.EncodeRLP(w); err != nil {
+		if err := callback(block); err != nil {
 			return err
 		}
 		if time.Since(reported) >= statsReportLimit {
@@ -715,6 +723,10 @@ func (bc *BlockChain) Stop() {
 		log.Error("Failed to Shutdown state manager", "err", err)
 	}
 	log.Info("State manager shut down", "t", time.Since(start))
+	// Flush the collected preimages to disk
+	if err := bc.stateCache.TrieDB().CommitPreimages(); err != nil {
+		log.Error("Failed to commit trie preimages", "err", err)
+	}
 
 	// Stop senderCacher's goroutines
 	log.Info("Shutting down sender cacher")
@@ -889,7 +901,7 @@ func (bc *BlockChain) newTip(block *types.Block) bool {
 // writeBlockAndSetHead expects to be the last verification step during InsertBlock
 // since it creates a reference that will only be cleaned up by Accept/Reject.
 func (bc *BlockChain) writeBlockAndSetHead(block *types.Block, receipts []*types.Receipt, logs []*types.Log, state *state.StateDB) error {
-	if err := bc.writeBlockWithState(block, receipts, logs, state); err != nil {
+	if err := bc.writeBlockWithState(block, receipts, state); err != nil {
 		return err
 	}
 
@@ -906,7 +918,7 @@ func (bc *BlockChain) writeBlockAndSetHead(block *types.Block, receipts []*types
 
 // writeBlockWithState writes the block and all associated state to the database,
 // but it expects the chain mutex to be held.
-func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.Receipt, logs []*types.Log, state *state.StateDB) error {
+func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.Receipt, state *state.StateDB) error {
 	// Irrelevant of the canonical status, write the block itself to the database.
 	//
 	// Note all the components of block(hash->number map, header, body, receipts)
@@ -1268,6 +1280,7 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	if err := indexesBatch.Write(); err != nil {
 		log.Crit("Failed to delete useless indexes", "err", err)
 	}
+
 	// If any logs need to be fired, do it now. In theory we could avoid creating
 	// this goroutine if there are no events to fire, but realistcally that only
 	// ever happens if we're reorging empty blocks, which will only happen on idle
@@ -1286,44 +1299,78 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	return nil
 }
 
-// BadBlocks returns a list of the last 'bad blocks' that the client has seen on the network
-func (bc *BlockChain) BadBlocks() []*types.Block {
-	blocks := make([]*types.Block, 0, bc.badBlocks.Len())
-	for _, hash := range bc.badBlocks.Keys() {
-		if blk, exist := bc.badBlocks.Peek(hash); exist {
-			block := blk.(*types.Block)
-			blocks = append(blocks, block)
-		}
-	}
-	return blocks
+type badBlock struct {
+	block  *types.Block
+	reason *BadBlockReason
 }
 
-// addBadBlock adds a bad block to the bad-block LRU cache
-func (bc *BlockChain) addBadBlock(block *types.Block) {
-	bc.badBlocks.Add(block.Hash(), block)
+type BadBlockReason struct {
+	ChainConfig *params.ChainConfig `json:"chainConfig"`
+	Receipts    types.Receipts      `json:"receipts"`
+	Number      uint64              `json:"number"`
+	Hash        common.Hash         `json:"hash"`
+	Error       error               `json:"error"`
 }
 
-// reportBlock logs a bad block error.
-func (bc *BlockChain) reportBlock(block *types.Block, receipts types.Receipts, err error) {
-	bc.addBadBlock(block)
-
+func (b *BadBlockReason) String() string {
 	var receiptString string
-	for i, receipt := range receipts {
+	for i, receipt := range b.Receipts {
 		receiptString += fmt.Sprintf("\t %d: cumulative: %v gas: %v contract: %v status: %v tx: %v logs: %v bloom: %x state: %x\n",
 			i, receipt.CumulativeGasUsed, receipt.GasUsed, receipt.ContractAddress.Hex(),
 			receipt.Status, receipt.TxHash.Hex(), receipt.Logs, receipt.Bloom, receipt.PostState)
 	}
-	log.Error(fmt.Sprintf(`
-########## BAD BLOCK #########
-Chain config: %v
+	reason := fmt.Sprintf(`
+	########## BAD BLOCK #########
+	Chain config: %v
+	
+	Number: %v
+	Hash: %#x
+	%v
+	
+	Error: %v
+	##############################
+	`, b.ChainConfig, b.Number, b.Hash, receiptString, b.Error)
 
-Number: %v
-Hash: %#x
-%v
+	return reason
+}
 
-Error: %v
-##############################
-`, bc.chainConfig, block.Number(), block.Hash(), receiptString, err))
+// BadBlocks returns a list of the last 'bad blocks' that the client has seen on the network and the BadBlockReason
+// that caused each to be reported as a bad block.
+// BadBlocks ensures that the length of the blocks and the BadBlockReason slice have the same length.
+func (bc *BlockChain) BadBlocks() ([]*types.Block, []*BadBlockReason) {
+	blocks := make([]*types.Block, 0, bc.badBlocks.Len())
+	reasons := make([]*BadBlockReason, 0, bc.badBlocks.Len())
+	for _, hash := range bc.badBlocks.Keys() {
+		if blk, exist := bc.badBlocks.Peek(hash); exist {
+			badBlk := blk.(*badBlock)
+			blocks = append(blocks, badBlk.block)
+			reasons = append(reasons, badBlk.reason)
+		}
+	}
+	return blocks, reasons
+}
+
+// addBadBlock adds a bad block to the bad-block LRU cache
+func (bc *BlockChain) addBadBlock(block *types.Block, reason *BadBlockReason) {
+	bc.badBlocks.Add(block.Hash(), &badBlock{
+		block:  block,
+		reason: reason,
+	})
+}
+
+// reportBlock logs a bad block error.
+func (bc *BlockChain) reportBlock(block *types.Block, receipts types.Receipts, err error) {
+	reason := &BadBlockReason{
+		ChainConfig: bc.chainConfig,
+		Receipts:    receipts,
+		Number:      block.NumberU64(),
+		Hash:        block.Hash(),
+		Error:       err,
+	}
+
+	badBlockCounter.Inc(1)
+	bc.addBadBlock(block, reason)
+	log.Debug(reason.String())
 }
 
 func (bc *BlockChain) RemoveRejectedBlocks(start, end uint64) error {
@@ -1535,7 +1582,7 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64) error 
 		// Flatten snapshot if initialized, holding a reference to the state root until the next block
 		// is processed.
 		if err := bc.flattenSnapshot(func() error {
-			triedb.Reference(root, common.Hash{}, true)
+			triedb.Reference(root, common.Hash{})
 			if previousRoot != (common.Hash{}) {
 				triedb.Dereference(previousRoot)
 			}

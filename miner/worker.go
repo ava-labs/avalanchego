@@ -139,9 +139,7 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 		// such that the gas limit converged to it. Since this is hardbaked now, we remove the ability to configure it.
 		gasLimit = core.CalcGasLimit(parent.GasUsed(), parent.GasLimit(), configuredGasLimit, configuredGasLimit)
 	}
-
 	num := parent.Number()
-
 	header := &types.Header{
 		ParentHash: parent.Hash(),
 		Number:     num.Add(num, common.Big1),

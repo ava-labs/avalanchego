@@ -151,7 +151,7 @@ func runTestScript(t *testing.T, file string) {
 // 		buf := make([]byte, 2000)
 // 		n, err := conn.Read(buf)
 // 		conn.Close()
-
+//
 // 		if err != nil {
 // 			t.Fatal("read error:", err)
 // 		}

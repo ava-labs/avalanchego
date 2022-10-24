@@ -43,15 +43,13 @@ func init() {
 	register("prestateTracer", newPrestateTracer)
 }
 
-type (
-	prestate = map[common.Address]*account
-	account  struct {
-		Balance string                      `json:"balance"`
-		Nonce   uint64                      `json:"nonce"`
-		Code    string                      `json:"code"`
-		Storage map[common.Hash]common.Hash `json:"storage"`
-	}
-)
+type prestate = map[common.Address]*account
+type account struct {
+	Balance string                      `json:"balance"`
+	Nonce   uint64                      `json:"nonce"`
+	Code    string                      `json:"code"`
+	Storage map[common.Hash]common.Hash `json:"storage"`
+}
 
 type prestateTracer struct {
 	env       *vm.EVM
@@ -63,10 +61,10 @@ type prestateTracer struct {
 	reason    error  // Textual reason for the interruption
 }
 
-func newPrestateTracer(ctx *tracers.Context) tracers.Tracer {
+func newPrestateTracer(ctx *tracers.Context, _ json.RawMessage) (tracers.Tracer, error) {
 	// First callframe contains tx context info
 	// and is populated on start and end.
-	return &prestateTracer{prestate: prestate{}}
+	return &prestateTracer{prestate: prestate{}}, nil
 }
 
 // CaptureStart implements the EVMLogger interface to initialize the tracing operation.
@@ -83,12 +81,11 @@ func (t *prestateTracer) CaptureStart(env *vm.EVM, from common.Address, to commo
 	toBal = new(big.Int).Sub(toBal, value)
 	t.prestate[to].Balance = hexutil.EncodeBig(toBal)
 
-	// The sender balance is after reducing: value, gasLimit, intrinsicGas.
+	// The sender balance is after reducing: value and gasLimit.
 	// We need to re-add them to get the pre-tx balance.
 	fromBal := hexutil.MustDecodeBig(t.prestate[from].Balance)
 	gasPrice := env.TxContext.GasPrice
 	consumedGas := new(big.Int).Mul(gasPrice, new(big.Int).SetUint64(t.gasLimit))
-
 	fromBal.Add(fromBal, new(big.Int).Add(value, consumedGas))
 	t.prestate[from].Balance = hexutil.EncodeBig(fromBal)
 	t.prestate[from].Nonce--

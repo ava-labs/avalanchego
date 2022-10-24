@@ -350,7 +350,7 @@ func wsPingTestHandler(t *testing.T, conn *websocket.Conn, shutdown, sendPing <-
 	}
 
 	// Read from the connection to process control messages.
-	pongCh := make(chan string)
+	var pongCh = make(chan string)
 	conn.SetPongHandler(func(d string) error {
 		t.Logf("server got pong: %q", d)
 		pongCh <- d

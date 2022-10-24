@@ -114,7 +114,7 @@ func TestWatchNoDir(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Create the directory and copy a key file into it.
-	os.MkdirAll(dir, 0o700)
+	os.MkdirAll(dir, 0700)
 	defer os.RemoveAll(dir)
 	file := filepath.Join(dir, "aaa")
 	if err := cp.CopyFile(file, cachetestAccounts[0].URL.Path); err != nil {
@@ -329,7 +329,7 @@ func TestUpdatedKeyfileContents(t *testing.T) {
 	t.Skip("FLAKY")
 	t.Parallel()
 
-	// Create a temporary kesytore to test with
+	// Create a temporary keystore to test with
 	rand.Seed(time.Now().UnixNano())
 	dir := filepath.Join(os.TempDir(), fmt.Sprintf("eth-keystore-watch-test-%d-%d", os.Getpid(), rand.Int()))
 	ks := NewKeyStore(dir, LightScryptN, LightScryptP)
@@ -341,7 +341,7 @@ func TestUpdatedKeyfileContents(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Create the directory and copy a key file into it.
-	os.MkdirAll(dir, 0o700)
+	os.MkdirAll(dir, 0700)
 	defer os.RemoveAll(dir)
 	file := filepath.Join(dir, "aaa")
 
@@ -394,7 +394,7 @@ func TestUpdatedKeyfileContents(t *testing.T) {
 	time.Sleep(1000 * time.Millisecond)
 
 	// Now replace file contents with crap
-	if err := os.WriteFile(file, []byte("foo"), 0o600); err != nil {
+	if err := os.WriteFile(file, []byte("foo"), 0600); err != nil {
 		t.Fatal(err)
 		return
 	}
@@ -411,5 +411,5 @@ func forceCopyFile(dst, src string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(dst, data, 0o644)
+	return os.WriteFile(dst, data, 0644)
 }
