@@ -79,7 +79,7 @@ func (r *tracedRouter) RegisterRequest(
 }
 
 func (r *tracedRouter) HandleInbound(ctx context.Context, msg message.InboundMessage) {
-	ctx, span := r.tracer.Start(ctx, "router.HandleInbound")
+	ctx, span := r.tracer.Start(ctx, "tracedRouter.HandleInbound")
 	defer span.End()
 
 	r.router.HandleInbound(ctx, msg)
