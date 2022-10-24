@@ -46,14 +46,16 @@ type GossipTracker interface {
 	Contains(id ids.NodeID) (ok bool)
 	// Add starts tracking a peer
 	// Returns :
-	// 	[ok]: False if [id] is already tracked. True otherwise.
+	// 	[ok]: False if [id] is tracked. True otherwise.
 	Add(id ids.NodeID) (ok bool)
 	// Remove stops tracking a given peer
 	// Returns:
-	// 	[ok]: False if [id] is not already tracked. True otherwise.
+	// 	[ok]: False if [id] is not tracked. True otherwise.
 	Remove(id ids.NodeID) (ok bool)
 	// UpdateKnown adds [learned] to the peers known by [id]
-	UpdateKnown(id ids.NodeID, learned []ids.NodeID)
+	// Returns:
+	// 	[ok]: False if [id] is not tracked. True otherwise.
+	UpdateKnown(id ids.NodeID, learned []ids.NodeID) (ok bool)
 	// GetUnknown gets the peers that we haven't sent to this peer
 	// Returns:
 	// 	[unknown]: a slice of [limit] peers that [id] doesn't know about
@@ -77,7 +79,7 @@ type gossipTracker struct {
 }
 
 // NewGossipTracker returns an instance of gossipTracker
-func NewGossipTracker(registerer prometheus.Registerer, namespace string) (*gossipTracker, error) {
+func NewGossipTracker(registerer prometheus.Registerer, namespace string) (GossipTracker, error) {
 	m, err := newGossipTrackerMetrics(registerer, fmt.Sprintf("%s_gossip_tracker", namespace))
 	if err != nil {
 		return nil, err
@@ -92,11 +94,11 @@ func NewGossipTracker(registerer prometheus.Registerer, namespace string) (*goss
 	}, nil
 }
 
-func (g *gossipTracker) Contains(id ids.NodeID) (ok bool) {
+func (g *gossipTracker) Contains(id ids.NodeID) bool {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 
-	_, ok = g.knownPeers[id]
+	_, ok := g.knownPeers[id]
 	return ok
 }
 
@@ -124,7 +126,7 @@ func (g *gossipTracker) Add(id ids.NodeID) (ok bool) {
 	return true
 }
 
-func (g *gossipTracker) Remove(id ids.NodeID) (ok bool) {
+func (g *gossipTracker) Remove(id ids.NodeID) bool {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -175,7 +177,7 @@ func (g *gossipTracker) Remove(id ids.NodeID) (ok bool) {
 // UpdateKnown invariant: [id] and [learned] SHOULD only contain nodeIDs that
 // have been tracked with Add(). Trying to add nodeIDs that aren't tracked yet
 // will result in a noop and this will return [false].
-func (g *gossipTracker) UpdateKnown(id ids.NodeID, learned []ids.NodeID) (ok bool) {
+func (g *gossipTracker) UpdateKnown(id ids.NodeID, learned []ids.NodeID) bool {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -200,7 +202,7 @@ func (g *gossipTracker) UpdateKnown(id ids.NodeID, learned []ids.NodeID) (ok boo
 }
 
 // GetUnknown invariant: [limit] SHOULD be > 0.
-func (g *gossipTracker) GetUnknown(id ids.NodeID, limit int) (unknown []ids.NodeID, ok bool) {
+func (g *gossipTracker) GetUnknown(id ids.NodeID, limit int) ([]ids.NodeID, bool) {
 	if limit <= 0 {
 		return []ids.NodeID{}, false
 	}
@@ -210,17 +212,17 @@ func (g *gossipTracker) GetUnknown(id ids.NodeID, limit int) (unknown []ids.Node
 
 	// Calculate the unknown information we need to send to this peer.
 	// We do this by computing the [local] information we know,
-	// computing what the peer knows in its [knownBits], and sending over
+	// computing what the peer knows in its [known], and sending over
 	// the difference.
-	unknownBits := ids.NewBigBitSet()
-	unknownBits.Union(g.local)
+	unknown := ids.NewBigBitSet()
+	unknown.Union(g.local)
 
-	knownBits, ok := g.knownPeers[id]
+	known, ok := g.knownPeers[id]
 	if !ok {
 		return nil, false
 	}
 
-	unknownBits.Difference(knownBits)
+	unknown.Difference(known)
 
 	result := make([]ids.NodeID, 0, limit)
 
@@ -229,9 +231,9 @@ func (g *gossipTracker) GetUnknown(id ids.NodeID, limit int) (unknown []ids.Node
 	// unknown peers starting at the oldest unknown peer to avoid complications
 	// where a subset of nodes might be "flickering" offline/online, resulting
 	// in the same diff being sent over each time.
-	for i := 0; i < unknownBits.Len(); i++ {
+	for i := 0; i < unknown.Len(); i++ {
 		// skip the bits that aren't set
-		if !unknownBits.Contains(i) {
+		if !unknown.Contains(i) {
 			continue
 		}
 		// stop if we exceed the max specified elements to return
