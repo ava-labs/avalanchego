@@ -103,7 +103,7 @@ func (b *bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, 
 	// frontier we got from others
 	b.acceptedFrontierSet.Add(containerIDs...)
 
-	b.sendGetAcceptedFrontiers()
+	b.sendGetAcceptedFrontiers(ctx)
 
 	// still waiting on requests
 	if b.pendingReceiveAcceptedFrontier.Len() != 0 {
@@ -317,7 +317,7 @@ func (b *bootstrapper) Startup() error {
 	}
 
 	b.Config.SharedCfg.RequestID++
-	b.sendGetAcceptedFrontiers()
+	b.sendGetAcceptedFrontiers(context.TODO())
 	return nil
 }
 
@@ -342,7 +342,7 @@ func (b *bootstrapper) Restart(reset bool) error {
 
 // Ask up to [MaxOutstandingBroadcastRequests] bootstrap validators to send
 // their accepted frontier with the current accepted frontier
-func (b *bootstrapper) sendGetAcceptedFrontiers() {
+func (b *bootstrapper) sendGetAcceptedFrontiers(ctx context.Context) {
 	vdrs := ids.NewNodeIDSet(1)
 	for b.pendingSendAcceptedFrontier.Len() > 0 && b.pendingReceiveAcceptedFrontier.Len() < MaxOutstandingBroadcastRequests {
 		vdr, _ := b.pendingSendAcceptedFrontier.Pop()
@@ -353,7 +353,7 @@ func (b *bootstrapper) sendGetAcceptedFrontiers() {
 	}
 
 	if vdrs.Len() > 0 {
-		b.Sender.SendGetAcceptedFrontier(context.TODO(), vdrs, b.Config.SharedCfg.RequestID)
+		b.Sender.SendGetAcceptedFrontier(ctx, vdrs, b.Config.SharedCfg.RequestID)
 	}
 }
 

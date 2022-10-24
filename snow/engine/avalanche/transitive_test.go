@@ -566,7 +566,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		}
 	}
 
-	if err := te.issue(vtx0); err != nil {
+	if err := te.issue(context.Background(), vtx0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -708,12 +708,12 @@ func TestEngineBlockedIssue(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := te.issue(vtx1); err != nil {
+	if err := te.issue(context.Background(), vtx1); err != nil {
 		t.Fatal(err)
 	}
 
 	vtx1.ParentsV[0] = vtx0
-	if err := te.issue(vtx0); err != nil {
+	if err := te.issue(context.Background(), vtx0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -863,7 +863,7 @@ func TestEngineScheduleRepoll(t *testing.T) {
 		*requestID = reqID
 	}
 
-	if err := te.issue(vtx); err != nil {
+	if err := te.issue(context.Background(), vtx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1161,7 +1161,7 @@ func TestEngineIssueRepoll(t *testing.T) {
 		}
 	}
 
-	te.repoll()
+	te.repoll(context.Background())
 	if err := te.errs.Err; err != nil {
 		t.Fatal(err)
 	}
@@ -1586,7 +1586,7 @@ func TestEngineInsufficientValidators(t *testing.T) {
 		*queried = true
 	}
 
-	if err := te.issue(vtx); err != nil {
+	if err := te.issue(context.Background(), vtx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1750,7 +1750,7 @@ func TestEngineSingleQuery(t *testing.T) {
 	sender.CantSendPushQuery = false
 	sender.CantSendPullQuery = false
 
-	if err := te.issue(vtx); err != nil {
+	if err := te.issue(context.Background(), vtx); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -1837,10 +1837,10 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := te.issue(parentVtx); err != nil {
+	if err := te.issue(context.Background(), parentVtx); err != nil {
 		t.Fatal(err)
 	}
-	if err := te.issue(blockingVtx); err != nil {
+	if err := te.issue(context.Background(), blockingVtx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1851,7 +1851,7 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 	sender.CantSendPushQuery = false
 
 	missingVtx.StatusV = choices.Processing
-	if err := te.issue(missingVtx); err != nil {
+	if err := te.issue(context.Background(), missingVtx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1925,7 +1925,7 @@ func TestEngineAbandonChit(t *testing.T) {
 		reqID = requestID
 	}
 
-	err = te.issue(vtx)
+	err = te.issue(context.Background(), vtx)
 	require.NoError(err)
 
 	fakeVtxID := ids.GenerateTestID()
@@ -2021,7 +2021,7 @@ func TestEngineAbandonChitWithUnexpectedPutVertex(t *testing.T) {
 		reqID = requestID
 	}
 
-	err = te.issue(vtx)
+	err = te.issue(context.Background(), vtx)
 	require.NoError(err)
 
 	fakeVtxID := ids.GenerateTestID()
@@ -2136,7 +2136,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := te.issue(parentVtx); err != nil {
+	if err := te.issue(context.Background(), parentVtx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2167,7 +2167,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	sender.CantSendPushQuery = false
 
 	missingVtx.StatusV = choices.Processing
-	if err := te.issue(missingVtx); err != nil {
+	if err := te.issue(context.Background(), missingVtx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2258,7 +2258,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := te.issue(blockingVtx); err != nil {
+	if err := te.issue(context.Background(), blockingVtx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2275,7 +2275,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		}
 	}
 
-	if err := te.issue(issuedVtx); err != nil {
+	if err := te.issue(context.Background(), issuedVtx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2300,7 +2300,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	sender.CantSendChits = false
 
 	missingVtx.StatusV = choices.Processing
-	if err := te.issue(missingVtx); err != nil {
+	if err := te.issue(context.Background(), missingVtx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2391,7 +2391,7 @@ func TestEngineMissingTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := te.issue(blockingVtx); err != nil {
+	if err := te.issue(context.Background(), blockingVtx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2408,7 +2408,7 @@ func TestEngineMissingTx(t *testing.T) {
 		}
 	}
 
-	if err := te.issue(issuedVtx); err != nil {
+	if err := te.issue(context.Background(), issuedVtx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2433,7 +2433,7 @@ func TestEngineMissingTx(t *testing.T) {
 	sender.CantSendChits = false
 
 	missingVtx.StatusV = choices.Processing
-	if err := te.issue(missingVtx); err != nil {
+	if err := te.issue(context.Background(), missingVtx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2498,7 +2498,7 @@ func TestEngineIssueBlockingTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := te.issue(vtx); err != nil {
+	if err := te.issue(context.Background(), vtx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3429,7 +3429,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 		*reqID = requestID
 	}
 
-	if err := te.issue(vtx0); err != nil {
+	if err := te.issue(context.Background(), vtx0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3437,7 +3437,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 		t.Fatalf("should have failed verification")
 	}
 
-	if err := te.issue(vtx1); err != nil {
+	if err := te.issue(context.Background(), vtx1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3539,7 +3539,7 @@ func TestEnginePartiallyValidVertex(t *testing.T) {
 		}
 	}
 
-	if err := te.issue(vtx); err != nil {
+	if err := te.issue(context.Background(), vtx); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -4207,7 +4207,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	if err := te.issue(vtx); err != nil {
+	if err := te.issue(context.Background(), vtx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -4369,7 +4369,7 @@ func TestEngineBubbleVotes(t *testing.T) {
 		*fetched = true
 	}
 
-	issued, err := te.issueFrom(vdr, pendingVtx1)
+	issued, err := te.issueFrom(context.Background(), vdr, pendingVtx1)
 	require.NoError(t, err)
 	require.False(t, issued, "shouldn't have been able to issue %s", pendingVtx1.ID())
 	require.True(t, *queried, "should have queried for %s", vtx.ID())

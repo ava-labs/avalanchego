@@ -4,6 +4,7 @@
 package snowstorm
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -685,10 +686,10 @@ func (dg *Directed) acceptTx(tx Tx) error {
 
 	// If there is a tx that was accepted pending on this tx, the ancestor
 	// should be notified that it doesn't need to block on this tx anymore.
-	dg.pendingAccept.Fulfill(txID)
+	dg.pendingAccept.Fulfill(context.TODO(), txID)
 	// If there is a tx that was issued pending on this tx, the ancestor tx
 	// doesn't need to be rejected because of this tx.
-	dg.pendingReject.Abandon(txID)
+	dg.pendingReject.Abandon(context.TODO(), txID)
 
 	return nil
 }
@@ -719,10 +720,10 @@ func (dg *Directed) rejectTx(tx Tx) error {
 
 	// If there is a tx that was accepted pending on this tx, the ancestor tx
 	// can't be accepted.
-	dg.pendingAccept.Abandon(txID)
+	dg.pendingAccept.Abandon(context.TODO(), txID)
 	// If there is a tx that was issued pending on this tx, the ancestor tx must
 	// be rejected.
-	dg.pendingReject.Fulfill(txID)
+	dg.pendingReject.Fulfill(context.TODO(), txID)
 	return nil
 }
 
@@ -756,7 +757,7 @@ func (dg *Directed) registerAcceptor(tx Tx) error {
 	// This ensures that virtuous txs built on top of rogue txs don't force the
 	// node to treat the rogue tx as virtuous.
 	dg.virtuousVoting.Remove(txID)
-	dg.pendingAccept.Register(toAccept)
+	dg.pendingAccept.Register(context.TODO(), toAccept)
 	return nil
 }
 
@@ -786,6 +787,6 @@ func (dg *Directed) registerRejector(tx Tx) error {
 	}
 
 	// Register these dependencies
-	dg.pendingReject.Register(toReject)
+	dg.pendingReject.Register(context.TODO(), toReject)
 	return nil
 }

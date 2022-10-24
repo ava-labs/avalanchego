@@ -4,6 +4,8 @@
 package snowstorm
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/events"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -21,14 +23,14 @@ type acceptor struct {
 
 func (a *acceptor) Dependencies() ids.Set { return a.deps }
 
-func (a *acceptor) Fulfill(id ids.ID) {
+func (a *acceptor) Fulfill(ctx context.Context, id ids.ID) {
 	a.deps.Remove(id)
-	a.Update()
+	a.Update(ctx)
 }
 
-func (a *acceptor) Abandon(id ids.ID) { a.rejected = true }
+func (a *acceptor) Abandon(_ context.Context, id ids.ID) { a.rejected = true }
 
-func (a *acceptor) Update() {
+func (a *acceptor) Update(context.Context) {
 	// If I was rejected or I am still waiting on dependencies to finish or an
 	// error has occurred, I shouldn't do anything.
 	if a.rejected || a.deps.Len() != 0 || a.errs.Errored() {

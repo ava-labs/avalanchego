@@ -157,7 +157,7 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	if _, err := t.issueFrom(ctx, nodeID, blk); err != nil {
 		return err
 	}
-	return t.buildBlocks()
+	return t.buildBlocks(ctx)
 }
 
 func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
@@ -173,10 +173,10 @@ func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 	}
 
 	// Because the get request was dropped, we no longer expect blkID to be issued.
-	t.blocked.Abandon(blkID)
+	t.blocked.Abandon(ctx, blkID)
 	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
 	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
-	return t.buildBlocks()
+	return t.buildBlocks(ctx)
 }
 
 func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
@@ -188,7 +188,7 @@ func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 		return err
 	}
 
-	return t.buildBlocks()
+	return t.buildBlocks(ctx)
 }
 
 func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
@@ -224,7 +224,7 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 		return err
 	}
 
-	return t.buildBlocks()
+	return t.buildBlocks(ctx)
 }
 
 func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) error {
@@ -265,19 +265,22 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		v.deps.Add(blkID)
 	}
 
-	t.blocked.Register(v)
+	t.blocked.Register(ctx, v)
 	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
-	return t.buildBlocks()
+	return t.buildBlocks(ctx)
 }
 
 func (t *Transitive) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	t.blocked.Register(&voter{
-		t:         t,
-		vdr:       nodeID,
-		requestID: requestID,
-	})
+	t.blocked.Register(
+		ctx,
+		&voter{
+			t:         t,
+			vdr:       nodeID,
+			requestID: requestID,
+		},
+	)
 	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
-	return t.buildBlocks()
+	return t.buildBlocks(ctx)
 }
 
 func (t *Transitive) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
@@ -361,7 +364,7 @@ func (t *Transitive) Notify(msg common.Message) error {
 
 	// the pending txs message means we should attempt to build a block.
 	t.pendingBuildBlocks++
-	return t.buildBlocks()
+	return t.buildBlocks(context.TODO())
 }
 
 func (t *Transitive) Context() *snow.ConsensusContext {
@@ -404,7 +407,7 @@ func (t *Transitive) Start(startReqID uint32) error {
 		default:
 			for _, blk := range options {
 				// note that deliver will set the VM's preference
-				if err := t.deliver(blk); err != nil {
+				if err := t.deliver(context.TODO(), blk); err != nil {
 					return err
 				}
 			}
@@ -459,7 +462,7 @@ func (t *Transitive) GetBlock(blkID ids.ID) (snowman.Block, error) {
 
 // Build blocks if they have been requested and the number of processing blocks
 // is less than optimal.
-func (t *Transitive) buildBlocks() error {
+func (t *Transitive) buildBlocks(ctx context.Context) error {
 	if err := t.errs.Err; err != nil {
 		return err
 	}
@@ -495,7 +498,7 @@ func (t *Transitive) buildBlocks() error {
 			)
 		}
 
-		added, err := t.issueWithAncestors(blk)
+		added, err := t.issueWithAncestors(ctx, blk)
 		if err != nil {
 			return err
 		}
@@ -512,13 +515,13 @@ func (t *Transitive) buildBlocks() error {
 
 // Issue another poll to the network, asking what it prefers given the block we prefer.
 // Helps move consensus along.
-func (t *Transitive) repoll() {
+func (t *Transitive) repoll(ctx context.Context) {
 	// if we are issuing a repoll, we should gossip our current preferences to
 	// propagate the most likely branch as quickly as possible
 	prefID := t.Consensus.Preference()
 
 	for i := t.polls.Len(); i < t.Params.ConcurrentRepolls; i++ {
-		t.pullQuery(context.TODO(), prefID)
+		t.pullQuery(ctx, prefID)
 	}
 }
 
@@ -541,7 +544,7 @@ func (t *Transitive) issueFrom(ctx context.Context, nodeID ids.NodeID, blk snowm
 	// issue [blk] and its ancestors to consensus.
 	blkID := blk.ID()
 	for !t.wasIssued(blk) {
-		if err := t.issue(blk); err != nil {
+		if err := t.issue(ctx, blk); err != nil {
 			return false, err
 		}
 
@@ -564,7 +567,7 @@ func (t *Transitive) issueFrom(ctx context.Context, nodeID ids.NodeID, blk snowm
 		// A dependency should never be waiting on a decided or processing
 		// block. However, if the block was marked as rejected by the VM, the
 		// dependencies may still be waiting. Therefore, they should abandoned.
-		t.blocked.Abandon(blkID)
+		t.blocked.Abandon(ctx, blkID)
 	}
 
 	// Tracks performance statistics
@@ -576,12 +579,12 @@ func (t *Transitive) issueFrom(ctx context.Context, nodeID ids.NodeID, blk snowm
 // issueWithAncestors attempts to issue the branch ending with [blk] to consensus.
 // Returns true if the block is processing in consensus or is decided.
 // If a dependency is missing and the dependency hasn't been requested, the issuance will be abandoned.
-func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
+func (t *Transitive) issueWithAncestors(ctx context.Context, blk snowman.Block) (bool, error) {
 	blkID := blk.ID()
 	// issue [blk] and its ancestors into consensus
 	status := blk.Status()
 	for status.Fetched() && !t.wasIssued(blk) {
-		if err := t.issue(blk); err != nil {
+		if err := t.issue(ctx, blk); err != nil {
 			return false, err
 		}
 		blkID = blk.Parent()
@@ -606,7 +609,7 @@ func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
 
 	// We don't have this block and have no reason to expect that we will get it.
 	// Abandon the block to avoid a memory leak.
-	t.blocked.Abandon(blkID)
+	t.blocked.Abandon(ctx, blkID)
 	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 	return false, t.errs.Err
 }
@@ -620,7 +623,7 @@ func (t *Transitive) wasIssued(blk snowman.Block) bool {
 }
 
 // Issue [blk] to consensus once its ancestors have been issued.
-func (t *Transitive) issue(blk snowman.Block) error {
+func (t *Transitive) issue(ctx context.Context, blk snowman.Block) error {
 	blkID := blk.ID()
 
 	// mark that the block is queued to be added to consensus once its ancestors have been
@@ -645,7 +648,7 @@ func (t *Transitive) issue(blk snowman.Block) error {
 		i.deps.Add(parentID)
 	}
 
-	t.blocked.Register(i)
+	t.blocked.Register(ctx, i)
 
 	// Tracks performance statistics
 	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
@@ -745,7 +748,7 @@ func (t *Transitive) sendMixedQuery(ctx context.Context, blk snowman.Block) {
 }
 
 // issue [blk] to consensus
-func (t *Transitive) deliver(blk snowman.Block) error {
+func (t *Transitive) deliver(ctx context.Context, blk snowman.Block) error {
 	blkID := blk.ID()
 	if t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) {
 		return nil
@@ -762,7 +765,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	if err != nil || !(parent.Status() == choices.Accepted || t.Consensus.Processing(parentID)) {
 		// if the parent isn't processing or the last accepted block, then this
 		// block is effectively rejected
-		t.blocked.Abandon(blkID)
+		t.blocked.Abandon(ctx, blkID)
 		t.metrics.numBlocked.Set(float64(len(t.pending))) // Tracks performance statistics
 		t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 		return t.errs.Err
@@ -776,7 +779,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		return err
 	}
 	if !blkAdded {
-		t.blocked.Abandon(blkID)
+		t.blocked.Abandon(ctx, blkID)
 		t.metrics.numBlocked.Set(float64(len(t.pending))) // Tracks performance statistics
 		t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 		return t.errs.Err
@@ -815,29 +818,29 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	// If the block is now preferred, query the network for its preferences
 	// with this new block.
 	if t.Consensus.IsPreferred(blk) {
-		t.sendMixedQuery(context.TODO(), blk)
+		t.sendMixedQuery(ctx, blk)
 	}
 
-	t.blocked.Fulfill(blkID)
+	t.blocked.Fulfill(ctx, blkID)
 	for _, blk := range added {
 		if t.Consensus.IsPreferred(blk) {
-			t.sendMixedQuery(context.TODO(), blk)
+			t.sendMixedQuery(ctx, blk)
 		}
 
 		blkID := blk.ID()
 		t.removeFromPending(blk)
-		t.blocked.Fulfill(blkID)
+		t.blocked.Fulfill(ctx, blkID)
 		t.blkReqs.RemoveAny(blkID)
 	}
 	for _, blk := range dropped {
 		blkID := blk.ID()
 		t.removeFromPending(blk)
-		t.blocked.Abandon(blkID)
+		t.blocked.Abandon(ctx, blkID)
 		t.blkReqs.RemoveAny(blkID)
 	}
 
 	// If we should issue multiple queries at the same time, we need to repoll
-	t.repoll()
+	t.repoll(ctx)
 
 	// Tracks performance statistics
 	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))

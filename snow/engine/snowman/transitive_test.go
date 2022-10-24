@@ -493,7 +493,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		}
 	}
 
-	if err := te.issue(blk0); err != nil {
+	if err := te.issue(context.Background(), blk0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -629,12 +629,12 @@ func TestEngineBlockedIssue(t *testing.T) {
 		}
 	}
 
-	if err := te.issue(blk1); err != nil {
+	if err := te.issue(context.Background(), blk1); err != nil {
 		t.Fatal(err)
 	}
 
 	blk0.StatusV = choices.Processing
-	if err := te.issue(blk0); err != nil {
+	if err := te.issue(context.Background(), blk0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -669,7 +669,7 @@ func TestEngineAbandonResponse(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	if err := te.issue(blk); err != nil {
+	if err := te.issue(context.Background(), blk); err != nil {
 		t.Fatal(err)
 	}
 	if err := te.QueryFailed(context.Background(), vdr, 1); err != nil {
@@ -968,7 +968,7 @@ func TestVoteCanceling(t *testing.T) {
 		}
 	}
 
-	if err := te.issue(blk); err != nil {
+	if err := te.issue(context.Background(), blk); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1041,7 +1041,7 @@ func TestEngineNoQuery(t *testing.T) {
 		BytesV:  []byte{1},
 	}
 
-	if err := te.issue(blk); err != nil {
+	if err := te.issue(context.Background(), blk); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -1157,7 +1157,7 @@ func TestEngineAbandonChit(t *testing.T) {
 		reqID = requestID
 	}
 
-	err := te.issue(blk)
+	err := te.issue(context.Background(), blk)
 	require.NoError(err)
 
 	fakeBlkID := ids.GenerateTestID()
@@ -1215,7 +1215,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 		reqID = requestID
 	}
 
-	err := te.issue(blk)
+	err := te.issue(context.Background(), blk)
 	require.NoError(err)
 
 	fakeBlkID := ids.GenerateTestID()
@@ -1304,7 +1304,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 		}
 	}
 
-	if err := te.issue(parentBlk); err != nil {
+	if err := te.issue(context.Background(), parentBlk); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1321,7 +1321,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 	sender.CantSendPushQuery = false
 
 	missingBlk.StatusV = choices.Processing
-	if err := te.issue(missingBlk); err != nil {
+	if err := te.issue(context.Background(), missingBlk); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1374,7 +1374,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		}
 	}
 
-	if err := te.issue(blockingBlk); err != nil {
+	if err := te.issue(context.Background(), blockingBlk); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1391,7 +1391,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		}
 	}
 
-	if err := te.issue(issuedBlk); err != nil {
+	if err := te.issue(context.Background(), issuedBlk); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1406,7 +1406,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	sender.CantSendPullQuery = false
 
 	missingBlk.StatusV = choices.Processing
-	if err := te.issue(missingBlk); err != nil {
+	if err := te.issue(context.Background(), missingBlk); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -1509,11 +1509,11 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 			return nil, errUnknownBlock
 		}
 	}
-	if err := te.issue(validBlk); err != nil {
+	if err := te.issue(context.Background(), validBlk); err != nil {
 		t.Fatal(err)
 	}
 	sender.SendPushQueryF = nil
-	if err := te.issue(invalidBlk); err != nil {
+	if err := te.issue(context.Background(), invalidBlk); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1960,7 +1960,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		}
 	}
 
-	if err := te.issue(blk); err != nil {
+	if err := te.issue(context.Background(), blk); err != nil {
 		t.Fatal(err)
 	}
 
