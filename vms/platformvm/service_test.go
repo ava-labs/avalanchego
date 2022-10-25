@@ -468,7 +468,7 @@ func TestGetStake(t *testing.T) {
 	genesis, _ := defaultGenesis()
 	addrsStrs := []string{}
 	for i, validator := range genesis.Validators {
-		addr := fmt.Sprintf("P-%s", validator.ValidationRewardOwner.Addresses[0])
+		addr := fmt.Sprintf("P-%s", validator.RewardOwner.Addresses[0])
 		addrsStrs = append(addrsStrs, addr)
 
 		args := GetStakeArgs{
