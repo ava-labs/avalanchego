@@ -1221,7 +1221,7 @@ func (n *network) gossipPeerLists() {
 			continue
 		}
 
-		received := n.Send(msg, ids.NewNodeIDSetOf(p.ID()), constants.PrimaryNetworkID, false)
+		sent := n.Send(msg, ids.NewNodeIDSetOf(p.ID()), constants.PrimaryNetworkID, false)
 
 		// If we didn't send any PeerList gossip to this peer, we should
 		// not update the gossip tracker, so we can retry it on the next
