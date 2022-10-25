@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -25,9 +26,10 @@ import (
 type testFunc func(*testing.T, Factory)
 
 var (
-	GenesisID     = ids.Empty.Prefix(0)
-	GenesisHeight = uint64(0)
-	Genesis       = &TestBlock{TestDecidable: choices.TestDecidable{
+	GenesisID        = ids.Empty.Prefix(0)
+	GenesisHeight    = uint64(0)
+	GenesisTimestamp = time.Unix(1, 0)
+	Genesis          = &TestBlock{TestDecidable: choices.TestDecidable{
 		IDV:     GenesisID,
 		StatusV: choices.Accepted,
 	}}
@@ -95,7 +97,7 @@ func InitializeTest(t *testing.T, factory Factory) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -123,7 +125,7 @@ func NumProcessingTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -175,7 +177,7 @@ func AddToTailTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -213,7 +215,7 @@ func AddToNonTailTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -266,7 +268,7 @@ func AddToUnknownTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -309,7 +311,7 @@ func StatusOrProcessingPreviouslyAcceptedTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -341,7 +343,7 @@ func StatusOrProcessingPreviouslyRejectedTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -382,7 +384,7 @@ func StatusOrProcessingUnissuedTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -423,7 +425,7 @@ func StatusOrProcessingIssuedTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -467,7 +469,7 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -519,7 +521,7 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -590,7 +592,7 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight))
+	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	firstBlock := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -649,7 +651,7 @@ func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -678,7 +680,7 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -760,7 +762,7 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -878,7 +880,7 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -929,7 +931,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1076,7 +1078,7 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	err := sm.Initialize(ctx, params, GenesisID, GenesisHeight)
+	err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp)
 	require.NoError(err)
 
 	block0 := &TestBlock{
@@ -1187,7 +1189,7 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight))
+	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	block0 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1290,7 +1292,7 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1433,7 +1435,7 @@ func MetricsProcessingErrorTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err == nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err == nil {
 		t.Fatalf("should have errored during initialization due to a duplicate metric")
 	}
 }
@@ -1462,7 +1464,7 @@ func MetricsAcceptedErrorTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err == nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err == nil {
 		t.Fatalf("should have errored during initialization due to a duplicate metric")
 	}
 }
@@ -1491,7 +1493,7 @@ func MetricsRejectedErrorTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err == nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err == nil {
 		t.Fatalf("should have errored during initialization due to a duplicate metric")
 	}
 }
@@ -1511,7 +1513,7 @@ func ErrorOnInitialRejectionTest(t *testing.T, factory Factory) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1550,7 +1552,7 @@ func ErrorOnAcceptTest(t *testing.T, factory Factory) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1590,7 +1592,7 @@ func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1640,7 +1642,7 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1737,7 +1739,7 @@ func ErrorOnAddDecidedBlock(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight))
+	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	block0 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1765,7 +1767,7 @@ func ErrorOnAddDuplicateBlockID(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight))
+	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	block0 := &TestBlock{
 		TestDecidable: choices.TestDecidable{

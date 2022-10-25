@@ -4,6 +4,8 @@
 package message
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -11,7 +13,10 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-var _ InternalMsgBuilder = internalMsgBuilder{}
+var (
+	_ InternalMsgBuilder = internalMsgBuilder{}
+	_ InboundMessage     = &internalMessage{}
+)
 
 type InternalMsgBuilder interface {
 	InternalFailedRequest(
@@ -58,7 +63,7 @@ func (internalMsgBuilder) InternalFailedRequest(
 	destinationChainID ids.ID,
 	requestID uint32,
 ) InboundMessage {
-	return &inboundMessageWithPacker{
+	return &internalMessage{
 		inboundMessage: inboundMessage{
 			op:     op,
 			nodeID: nodeID,
@@ -81,7 +86,7 @@ func (i internalMsgBuilder) InternalCrossChainAppRequest(
 ) InboundMessage {
 	received := i.clock.Time()
 
-	return &inboundMessageWithPacker{
+	return &internalMessage{
 		inboundMessage: inboundMessage{
 			op:             CrossChainAppRequest,
 			nodeID:         nodeID,
@@ -103,7 +108,7 @@ func (internalMsgBuilder) InternalCrossChainAppResponse(
 	requestID uint32,
 	msg []byte,
 ) InboundMessage {
-	return &inboundMessageWithPacker{
+	return &internalMessage{
 		inboundMessage: inboundMessage{
 			op:     CrossChainAppResponse,
 			nodeID: nodeID,
@@ -118,7 +123,7 @@ func (internalMsgBuilder) InternalCrossChainAppResponse(
 }
 
 func (internalMsgBuilder) InternalTimeout(nodeID ids.NodeID) InboundMessage {
-	return &inboundMessageWithPacker{
+	return &internalMessage{
 		inboundMessage: inboundMessage{
 			op:     Timeout,
 			nodeID: nodeID,
@@ -127,7 +132,7 @@ func (internalMsgBuilder) InternalTimeout(nodeID ids.NodeID) InboundMessage {
 }
 
 func (internalMsgBuilder) InternalConnected(nodeID ids.NodeID, nodeVersion *version.Application) InboundMessage {
-	return &inboundMessageWithPacker{
+	return &internalMessage{
 		inboundMessage: inboundMessage{
 			op:     Connected,
 			nodeID: nodeID,
@@ -139,7 +144,7 @@ func (internalMsgBuilder) InternalConnected(nodeID ids.NodeID, nodeVersion *vers
 }
 
 func (internalMsgBuilder) InternalDisconnected(nodeID ids.NodeID) InboundMessage {
-	return &inboundMessageWithPacker{
+	return &internalMessage{
 		inboundMessage: inboundMessage{
 			op:     Disconnected,
 			nodeID: nodeID,
@@ -151,7 +156,7 @@ func (internalMsgBuilder) InternalVMMessage(
 	nodeID ids.NodeID,
 	notification uint32,
 ) InboundMessage {
-	return &inboundMessageWithPacker{
+	return &internalMessage{
 		inboundMessage: inboundMessage{
 			op:     Notify,
 			nodeID: nodeID,
@@ -165,10 +170,45 @@ func (internalMsgBuilder) InternalVMMessage(
 func (internalMsgBuilder) InternalGossipRequest(
 	nodeID ids.NodeID,
 ) InboundMessage {
-	return &inboundMessageWithPacker{
+	return &internalMessage{
 		inboundMessage: inboundMessage{
 			op:     GossipRequest,
 			nodeID: nodeID,
 		},
 	}
+}
+
+type internalMessage struct {
+	inboundMessage
+
+	fields map[Field]interface{}
+}
+
+// Field returns the value of the specified field in this message
+func (inMsg *internalMessage) Get(field Field) (interface{}, error) {
+	value, ok := inMsg.fields[field]
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", errMissingField, field)
+	}
+	return value, nil
+}
+
+func (inMsg *internalMessage) String() string {
+	sb := strings.Builder{}
+	sb.WriteString(fmt.Sprintf("(Op: %s, NodeID: %s", inMsg.op, inMsg.nodeID))
+	if requestIDIntf, exists := inMsg.fields[RequestID]; exists {
+		sb.WriteString(fmt.Sprintf(", RequestID: %d", requestIDIntf.(uint32)))
+	}
+	if !inMsg.expirationTime.IsZero() {
+		sb.WriteString(fmt.Sprintf(", Deadline: %d", inMsg.expirationTime.Unix()))
+	}
+
+	switch inMsg.op {
+	case Notify:
+		sb.WriteString(fmt.Sprintf(", Notification: %d)", inMsg.fields[VMMessage].(uint32)))
+	default:
+		sb.WriteString(")")
+	}
+
+	return sb.String()
 }

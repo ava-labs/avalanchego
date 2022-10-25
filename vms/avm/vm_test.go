@@ -305,7 +305,6 @@ func GenesisVMWithArgs(tb testing.TB, additionalFxs []*common.Fx, args *BuildGen
 	vm := &VM{Factory: Factory{
 		TxFee:            testTxFee,
 		CreateAssetTxFee: testTxFee,
-		BanffTime:        testBanffTime,
 	}}
 	configBytes, err := stdjson.Marshal(Config{IndexTransactions: true})
 	if err != nil {

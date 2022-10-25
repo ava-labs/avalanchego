@@ -5,6 +5,8 @@ package executor
 
 import (
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -24,15 +26,15 @@ func (*MempoolTxVerifier) AdvanceTimeTx(*txs.AdvanceTimeTx) error         { retu
 func (*MempoolTxVerifier) RewardValidatorTx(*txs.RewardValidatorTx) error { return errWrongTxType }
 
 func (v *MempoolTxVerifier) AddValidatorTx(tx *txs.AddValidatorTx) error {
-	return v.proposalTx(tx)
+	return v.standardTx(tx)
 }
 
 func (v *MempoolTxVerifier) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	return v.proposalTx(tx)
+	return v.standardTx(tx)
 }
 
 func (v *MempoolTxVerifier) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
-	return v.proposalTx(tx)
+	return v.standardTx(tx)
 }
 
 func (v *MempoolTxVerifier) CreateChainTx(tx *txs.CreateChainTx) error {
@@ -67,35 +69,16 @@ func (v *MempoolTxVerifier) AddPermissionlessDelegatorTx(tx *txs.AddPermissionle
 	return v.standardTx(tx)
 }
 
-// TODO: simplify this function after Banff is activated.
-func (v *MempoolTxVerifier) proposalTx(tx txs.StakerTx) error {
-	startTime := tx.StartTime()
-	maxLocalStartTime := v.Clk.Time().Add(MaxFutureStartTime)
-	if startTime.After(maxLocalStartTime) {
-		return errFutureStakeTime
-	}
-
-	onCommitState, err := state.NewDiff(v.ParentID, v.StateVersions)
+func (v *MempoolTxVerifier) standardTx(tx txs.UnsignedTx) error {
+	baseState, err := v.standardBaseState()
 	if err != nil {
 		return err
 	}
 
-	// Make sure that the Banff fork check will pass.
-	currentChainTime := onCommitState.GetTimestamp()
-	if v.Backend.Config.IsBanffActivated(currentChainTime) {
-		return v.standardTx(tx)
-	}
-
-	onAbortState, err := state.NewDiff(v.ParentID, v.StateVersions)
-	if err != nil {
-		return err
-	}
-
-	executor := ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       v.Backend,
-		Tx:            v.Tx,
+	executor := StandardTxExecutor{
+		Backend: v.Backend,
+		State:   baseState,
+		Tx:      v.Tx,
 	}
 	err = tx.Visit(&executor)
 	// We ignore [errFutureStakeTime] here because the time will be advanced
@@ -106,25 +89,52 @@ func (v *MempoolTxVerifier) proposalTx(tx txs.StakerTx) error {
 	return err
 }
 
-func (v *MempoolTxVerifier) standardTx(tx txs.UnsignedTx) error {
-	state, err := state.NewDiff(
-		v.ParentID,
-		v.StateVersions,
-	)
+// Upon Banff activation, txs are not verified against current chain time
+// but against the block timestamp. [baseTime] calculates
+// the right timestamp to be used to mempool tx verification
+func (v *MempoolTxVerifier) standardBaseState() (state.Diff, error) {
+	state, err := state.NewDiff(v.ParentID, v.StateVersions)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	executor := StandardTxExecutor{
-		Backend: v.Backend,
-		State:   state,
-		Tx:      v.Tx,
+	nextBlkTime, err := v.nextBlockTime(state)
+	if err != nil {
+		return nil, err
 	}
-	err = tx.Visit(&executor)
-	// We ignore [errFutureStakeTime] here because the time will be advanced
-	// when this transaction is issued.
-	if errors.Is(err, errFutureStakeTime) {
-		return nil
+
+	if !v.Backend.Config.IsBanffActivated(nextBlkTime) {
+		// next tx would be included into an Apricot block
+		// so we verify it against current chain state
+		return state, nil
 	}
-	return err
+
+	// next tx would be included into a Banff block
+	// so we verify it against duly updated chain state
+	changes, err := AdvanceTimeTo(v.Backend, state, nextBlkTime)
+	if err != nil {
+		return nil, err
+	}
+	changes.Apply(state)
+	state.SetTimestamp(nextBlkTime)
+
+	return state, nil
+}
+
+func (v *MempoolTxVerifier) nextBlockTime(state state.Diff) (time.Time, error) {
+	var (
+		parentTime  = state.GetTimestamp()
+		nextBlkTime = v.Clk.Time()
+	)
+	if parentTime.After(nextBlkTime) {
+		nextBlkTime = parentTime
+	}
+	nextStakerChangeTime, err := GetNextStakerChangeTime(state)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("could not calculate next staker change time: %w", err)
+	}
+	if !nextBlkTime.Before(nextStakerChangeTime) {
+		nextBlkTime = nextStakerChangeTime
+	}
+	return nextBlkTime, nil
 }

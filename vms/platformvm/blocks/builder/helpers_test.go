@@ -322,11 +322,12 @@ func defaultConfig() *config.Config {
 		},
 		ApricotPhase3Time: defaultValidateEndTime,
 		ApricotPhase5Time: defaultValidateEndTime,
-		BanffTime:         mockable.MaxTime,
+		BanffTime:         time.Time{}, // neglecting fork ordering this for package tests
 	}
 }
 
 func defaultClock() *mockable.Clock {
+	// set time after Banff fork (and before default nextStakerTime)
 	clk := mockable.Clock{}
 	clk.Set(defaultGenesisTime)
 	return &clk

@@ -203,40 +203,6 @@ var (
 		GetStateSummaryFrontier: {},
 		GetAcceptedStateSummary: {},
 	}
-
-	// Defines the messages that can be sent/received with this network
-	messages = map[Op][]Field{
-		// Handshake:
-		// TODO: remove NodeID from the Version message
-		Version:  {NetworkID, NodeID, MyTime, IP, VersionStr, VersionTime, SigBytes, TrackedSubnets},
-		PeerList: {Peers},
-		Ping:     {},
-		Pong:     {Uptime},
-		// Bootstrapping:
-		GetAcceptedFrontier: {ChainID, RequestID, Deadline},
-		AcceptedFrontier:    {ChainID, RequestID, ContainerIDs},
-		GetAccepted:         {ChainID, RequestID, Deadline, ContainerIDs},
-		Accepted:            {ChainID, RequestID, ContainerIDs},
-		GetAncestors:        {ChainID, RequestID, Deadline, ContainerID},
-		Ancestors:           {ChainID, RequestID, MultiContainerBytes},
-		// Consensus:
-		Get:       {ChainID, RequestID, Deadline, ContainerID},
-		Put:       {ChainID, RequestID, ContainerID, ContainerBytes},
-		PushQuery: {ChainID, RequestID, Deadline, ContainerID, ContainerBytes},
-		PullQuery: {ChainID, RequestID, Deadline, ContainerID},
-		Chits:     {ChainID, RequestID, ContainerIDs},
-
-		// Application level:
-		AppRequest:  {ChainID, RequestID, Deadline, AppBytes},
-		AppResponse: {ChainID, RequestID, AppBytes},
-		AppGossip:   {ChainID, AppBytes},
-
-		// State Sync
-		GetStateSummaryFrontier: {ChainID, RequestID, Deadline},
-		StateSummaryFrontier:    {ChainID, RequestID, SummaryBytes},
-		GetAcceptedStateSummary: {ChainID, RequestID, Deadline, SummaryHeights},
-		AcceptedStateSummary:    {ChainID, RequestID, SummaryIDs},
-	}
 )
 
 func (op Op) Compressible() bool {

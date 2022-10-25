@@ -5,6 +5,7 @@ package executor
 
 import (
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 
@@ -33,7 +34,8 @@ func TestRejectBlock(t *testing.T) {
 		{
 			name: "proposal block",
 			newBlockFunc: func() (blocks.Block, error) {
-				return blocks.NewApricotProposalBlock(
+				return blocks.NewBanffProposalBlock(
+					time.Now(),
 					ids.GenerateTestID(),
 					1,
 					&txs.Tx{
@@ -46,7 +48,7 @@ func TestRejectBlock(t *testing.T) {
 				)
 			},
 			rejectFunc: func(r *rejector, b blocks.Block) error {
-				return r.ApricotProposalBlock(b.(*blocks.ApricotProposalBlock))
+				return r.BanffProposalBlock(b.(*blocks.BanffProposalBlock))
 			},
 		},
 		{
@@ -71,7 +73,8 @@ func TestRejectBlock(t *testing.T) {
 		{
 			name: "standard block",
 			newBlockFunc: func() (blocks.Block, error) {
-				return blocks.NewApricotStandardBlock(
+				return blocks.NewBanffStandardBlock(
+					time.Now(),
 					ids.GenerateTestID(),
 					1,
 					[]*txs.Tx{
@@ -86,25 +89,25 @@ func TestRejectBlock(t *testing.T) {
 				)
 			},
 			rejectFunc: func(r *rejector, b blocks.Block) error {
-				return r.ApricotStandardBlock(b.(*blocks.ApricotStandardBlock))
+				return r.BanffStandardBlock(b.(*blocks.BanffStandardBlock))
 			},
 		},
 		{
 			name: "commit",
 			newBlockFunc: func() (blocks.Block, error) {
-				return blocks.NewApricotCommitBlock(ids.GenerateTestID() /*parent*/, 1 /*height*/)
+				return blocks.NewBanffCommitBlock(time.Now(), ids.GenerateTestID() /*parent*/, 1 /*height*/)
 			},
 			rejectFunc: func(r *rejector, blk blocks.Block) error {
-				return r.ApricotCommitBlock(blk.(*blocks.ApricotCommitBlock))
+				return r.BanffCommitBlock(blk.(*blocks.BanffCommitBlock))
 			},
 		},
 		{
 			name: "abort",
 			newBlockFunc: func() (blocks.Block, error) {
-				return blocks.NewApricotAbortBlock(ids.GenerateTestID() /*parent*/, 1 /*height*/)
+				return blocks.NewBanffAbortBlock(time.Now(), ids.GenerateTestID() /*parent*/, 1 /*height*/)
 			},
 			rejectFunc: func(r *rejector, blk blocks.Block) error {
-				return r.ApricotAbortBlock(blk.(*blocks.ApricotAbortBlock))
+				return r.BanffAbortBlock(blk.(*blocks.BanffAbortBlock))
 			},
 		},
 	}

@@ -17,7 +17,7 @@ The minimum recommended hardware specification for nodes connected to Mainnet is
 - CPU: Equivalent of 8 AWS vCPU
 - RAM: 16 GiB
 - Storage: 1 TiB
-- OS: Ubuntu 20.04 or macOS >= 12
+- OS: Ubuntu 20.04/22.04 or macOS >= 12
 - Network: Reliable IPv4 or IPv6 network connection, with an open public port.
 
 If you plan to build AvalancheGo from source, you will also need the following software:
@@ -65,6 +65,15 @@ To add the repository on Ubuntu 20.04 (Focal), run:
 sudo su -
 wget -O - https://downloads.avax.network/avalanchego.gpg.key | apt-key add -
 echo "deb https://downloads.avax.network/apt focal main" > /etc/apt/sources.list.d/avalanche.list
+exit
+```
+
+To add the repository on Ubuntu 22.04 (Jammy), run:
+
+```sh
+sudo su -
+wget -O - https://downloads.avax.network/avalanchego.gpg.key | apt-key add -
+echo "deb https://downloads.avax.network/apt jammy main" > /etc/apt/sources.list.d/avalanche.list
 exit
 ```
 

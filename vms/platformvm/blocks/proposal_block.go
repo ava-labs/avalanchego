@@ -77,6 +77,9 @@ func (b *ApricotProposalBlock) InitCtx(ctx *snow.Context) {
 func (b *ApricotProposalBlock) Txs() []*txs.Tx        { return []*txs.Tx{b.Tx} }
 func (b *ApricotProposalBlock) Visit(v Visitor) error { return v.ApricotProposalBlock(b) }
 
+// NewApricotProposalBlock is kept for testing purposes only.
+// Following Banff activation and subsequent code cleanup, Apricot Proposal blocks
+// should be only verified (upon bootstrap), never created anymore
 func NewApricotProposalBlock(
 	parentID ids.ID,
 	height uint64,

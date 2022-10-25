@@ -5,7 +5,6 @@ package network
 
 import (
 	"crypto"
-	"fmt"
 	"net"
 	"sync"
 	"testing"
@@ -170,7 +169,7 @@ func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []id
 	return dialer, listeners, nodeIDs, configs
 }
 
-func newMessageCreator(t *testing.T) (message.Creator, message.Creator) {
+func newMessageCreator(t *testing.T) message.Creator {
 	t.Helper()
 
 	mc, err := message.NewCreator(
@@ -181,15 +180,7 @@ func newMessageCreator(t *testing.T) (message.Creator, message.Creator) {
 	)
 	require.NoError(t, err)
 
-	mcProto, err := message.NewCreatorWithProto(
-		prometheus.NewRegistry(),
-		"",
-		true,
-		10*time.Second,
-	)
-	require.NoError(t, err)
-
-	return mc, mcProto
+	return mc
 }
 
 func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler) ([]ids.NodeID, []Network, *sync.WaitGroup) {
@@ -207,7 +198,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 		require.NoError(err)
 	}
 
-	msgCreator, msgCreatorWithProto := newMessageCreator(t)
+	msgCreator := newMessageCreator(t)
 
 	var (
 		networks = make([]Network, len(configs))
@@ -227,8 +218,6 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 		net, err := NewNetwork(
 			config,
 			msgCreator,
-			msgCreatorWithProto,
-			time.Now().Add(time.Hour), // TODO: test proto with banff activated
 			prometheus.NewRegistry(),
 			logging.NoLog{},
 			listeners[i],
@@ -300,52 +289,40 @@ func TestNewNetwork(t *testing.T) {
 func TestSend(t *testing.T) {
 	require := require.New(t)
 
-	for _, useProto := range []bool{false, true} {
-		t.Run(fmt.Sprintf("use proto buf message creator %v", useProto), func(tt *testing.T) {
-			received := make(chan message.InboundMessage)
-			nodeIDs, networks, wg := newFullyConnectedTestNetwork(
-				tt,
-				[]router.InboundHandler{
-					router.InboundHandlerFunc(func(message.InboundMessage) {
-						tt.Fatal("unexpected message received")
-					}),
-					router.InboundHandlerFunc(func(msg message.InboundMessage) {
-						received <- msg
-					}),
-					router.InboundHandlerFunc(func(message.InboundMessage) {
-						tt.Fatal("unexpected message received")
-					}),
-				},
-			)
+	received := make(chan message.InboundMessage)
+	nodeIDs, networks, wg := newFullyConnectedTestNetwork(
+		t,
+		[]router.InboundHandler{
+			router.InboundHandlerFunc(func(message.InboundMessage) {
+				t.Fatal("unexpected message received")
+			}),
+			router.InboundHandlerFunc(func(msg message.InboundMessage) {
+				received <- msg
+			}),
+			router.InboundHandlerFunc(func(message.InboundMessage) {
+				t.Fatal("unexpected message received")
+			}),
+		},
+	)
 
-			net0 := networks[0]
+	net0 := networks[0]
 
-			mc, mcProto := newMessageCreator(tt)
-			var (
-				outboundGetMsg message.OutboundMessage
-				err            error
-			)
-			if !useProto {
-				outboundGetMsg, err = mc.Get(ids.Empty, 1, time.Second, ids.Empty)
-			} else {
-				outboundGetMsg, err = mcProto.Get(ids.Empty, 1, time.Second, ids.Empty)
-			}
-			require.NoError(err)
+	mc := newMessageCreator(t)
+	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
+	require.NoError(err)
 
-			toSend := ids.NodeIDSet{}
-			toSend.Add(nodeIDs[1])
-			sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, false)
-			require.EqualValues(toSend, sentTo)
+	toSend := ids.NodeIDSet{}
+	toSend.Add(nodeIDs[1])
+	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, false)
+	require.EqualValues(toSend, sentTo)
 
-			inboundGetMsg := <-received
-			require.Equal(message.Get, inboundGetMsg.Op())
+	inboundGetMsg := <-received
+	require.Equal(message.Get, inboundGetMsg.Op())
 
-			for _, net := range networks {
-				net.StartClose()
-			}
-			wg.Wait()
-		})
+	for _, net := range networks {
+		net.StartClose()
 	}
+	wg.Wait()
 }
 
 func TestTrackVerifiesSignatures(t *testing.T) {

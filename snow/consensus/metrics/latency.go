@@ -26,10 +26,12 @@ type Latency interface {
 	Issued(id ids.ID, pollNumber uint64)
 
 	// Accepted marks the item as having been accepted.
-	Accepted(id ids.ID, pollNumber uint64)
+	// Pass the container size in bytes for metrics tracking.
+	Accepted(id ids.ID, pollNumber uint64, containerSize int)
 
 	// Rejected marks the item as having been rejected.
-	Rejected(id ids.ID, pollNumber uint64)
+	// Pass the container size in bytes for metrics tracking.
+	Rejected(id ids.ID, pollNumber uint64, containerSize int)
 
 	// MeasureAndGetOldestDuration returns the amount of time the oldest item
 	// has been processing.
@@ -67,11 +69,13 @@ type latency struct {
 
 	// latAccepted tracks the number of nanoseconds that an item was processing
 	// before being accepted
-	latAccepted metric.Averager
+	latAccepted              metric.Averager
+	containerSizeAcceptedSum prometheus.Gauge
 
 	// rejected tracks the number of nanoseconds that an item was processing
 	// before being rejected
-	latRejected metric.Averager
+	latRejected              metric.Averager
+	containerSizeRejectedSum prometheus.Gauge
 }
 
 // Initialize the metrics with the provided names.
@@ -80,11 +84,15 @@ func NewLatency(metricName, descriptionName string, log logging.Logger, namespac
 	l := &latency{
 		processingEntries: linkedhashmap.New[ids.ID, opStart](),
 		log:               log,
+
+		// e.g.,
+		// "avalanche_7y7zwo7XatqnX4dtTakLo32o7jkMX4XuDa26WaxbCXoCT1qKK_blks_processing" to count how blocks are currently processing
 		numProcessing: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      fmt.Sprintf("%s_processing", metricName),
 			Help:      fmt.Sprintf("Number of currently processing %s", metricName),
 		}),
+
 		pollsAccepted: metric.NewAveragerWithErrs(
 			namespace,
 			fmt.Sprintf("%s_polls_accepted", metricName),
@@ -99,6 +107,13 @@ func NewLatency(metricName, descriptionName string, log logging.Logger, namespac
 			reg,
 			&errs,
 		),
+
+		// e.g.,
+		// "avalanche_C_blks_accepted_count" to count how many "Observe" gets called -- count all "Accept"
+		// "avalanche_C_blks_accepted_sum" to count how many ns have elapsed since its issuance on acceptance
+		// "avalanche_C_blks_accepted_sum / avalanche_C_blks_accepted_count" is the average block acceptance latency in ns
+		// "avalanche_C_blks_accepted_container_size_sum" to track cumulative sum of all accepted blocks' sizes
+		// "avalanche_C_blks_accepted_container_size_sum / avalanche_C_blks_accepted_count" is the average block size
 		latAccepted: metric.NewAveragerWithErrs(
 			namespace,
 			fmt.Sprintf("%s_accepted", metricName),
@@ -106,6 +121,18 @@ func NewLatency(metricName, descriptionName string, log logging.Logger, namespac
 			reg,
 			&errs,
 		),
+		containerSizeAcceptedSum: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      fmt.Sprintf("%s_accepted_container_size_sum", metricName),
+			Help:      fmt.Sprintf("Cumulative sum of container size of all accepted %s", metricName),
+		}),
+
+		// e.g.,
+		// "avalanche_P_blks_rejected_count" to count how many "Observe" gets called -- count all "Reject"
+		// "avalanche_P_blks_rejected_sum" to count how many ns have elapsed since its issuance on rejection
+		// "avalanche_P_blks_accepted_sum / avalanche_P_blks_accepted_count" is the average block acceptance latency in ns
+		// "avalanche_P_blks_accepted_container_size_sum" to track cumulative sum of all accepted blocks' sizes
+		// "avalanche_P_blks_accepted_container_size_sum / avalanche_P_blks_accepted_count" is the average block size
 		latRejected: metric.NewAveragerWithErrs(
 			namespace,
 			fmt.Sprintf("%s_rejected", metricName),
@@ -113,8 +140,17 @@ func NewLatency(metricName, descriptionName string, log logging.Logger, namespac
 			reg,
 			&errs,
 		),
+		containerSizeRejectedSum: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      fmt.Sprintf("%s_rejected_container_size_sum", metricName),
+			Help:      fmt.Sprintf("Cumulative sum of container size of all rejected %s", metricName),
+		}),
 	}
-	errs.Add(reg.Register(l.numProcessing))
+	errs.Add(
+		reg.Register(l.numProcessing),
+		reg.Register(l.containerSizeAcceptedSum),
+		reg.Register(l.containerSizeRejectedSum),
+	)
 	return l, errs.Err
 }
 
@@ -126,7 +162,7 @@ func (l *latency) Issued(id ids.ID, pollNumber uint64) {
 	l.numProcessing.Inc()
 }
 
-func (l *latency) Accepted(id ids.ID, pollNumber uint64) {
+func (l *latency) Accepted(id ids.ID, pollNumber uint64, containerSize int) {
 	start, ok := l.processingEntries.Get(id)
 	if !ok {
 		l.log.Debug("unable to measure tx latency",
@@ -142,9 +178,11 @@ func (l *latency) Accepted(id ids.ID, pollNumber uint64) {
 	duration := time.Since(start.time)
 	l.latAccepted.Observe(float64(duration))
 	l.numProcessing.Dec()
+
+	l.containerSizeAcceptedSum.Add(float64(containerSize))
 }
 
-func (l *latency) Rejected(id ids.ID, pollNumber uint64) {
+func (l *latency) Rejected(id ids.ID, pollNumber uint64, containerSize int) {
 	start, ok := l.processingEntries.Get(id)
 	if !ok {
 		l.log.Debug("unable to measure tx latency",
@@ -160,6 +198,8 @@ func (l *latency) Rejected(id ids.ID, pollNumber uint64) {
 	duration := time.Since(start.time)
 	l.latRejected.Observe(float64(duration))
 	l.numProcessing.Dec()
+
+	l.containerSizeRejectedSum.Add(float64(containerSize))
 }
 
 func (l *latency) MeasureAndGetOldestDuration() time.Duration {

@@ -118,8 +118,7 @@ type Node struct {
 	health health.Health
 
 	// Build and parse messages, for both network layer and chain manager
-	msgCreator          message.Creator
-	msgCreatorWithProto message.Creator
+	msgCreator message.Creator
 
 	// Manages creation of blockchains and routing messages to them
 	chainManager chains.Manager
@@ -306,8 +305,6 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
 		n.msgCreator,
-		n.msgCreatorWithProto,
-		version.GetBanffTime(n.Config.NetworkID),
 		n.MetricsRegisterer,
 		n.Log,
 		listener,
@@ -376,7 +373,7 @@ func (b *beaconManager) Disconnected(vdrID ids.NodeID) {
 		// weight can become disconnected. Because it is possible that there are
 		// changes to the validators set, we utilize that Sub64 returns 0 on
 		// error.
-		b.totalWeight, _ = math.Sub64(b.totalWeight, weight)
+		b.totalWeight, _ = math.Sub(b.totalWeight, weight)
 	}
 	b.Router.Disconnected(vdrID)
 }
@@ -572,14 +569,16 @@ func (n *Node) initIndexer() error {
 func (n *Node) initChains(genesisBytes []byte) {
 	n.Log.Info("initializing chains")
 
-	// Create the Platform Chain
-	n.chainManager.ForceCreateChain(chains.ChainParameters{
+	platformChain := chains.ChainParameters{
 		ID:            constants.PlatformChainID,
 		SubnetID:      constants.PrimaryNetworkID,
 		GenesisData:   genesisBytes, // Specifies other chains to create
 		VMID:          constants.PlatformVMID,
 		CustomBeacons: n.beacons,
-	})
+	}
+
+	// Start the chain creator with the Platform Chain
+	n.chainManager.StartChainCreator(platformChain)
 }
 
 // initAPIServer initializes the server that handles HTTP calls
@@ -709,7 +708,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		ConsensusAcceptorGroup:                  n.ConsensusAcceptorGroup,
 		DBManager:                               n.DBManager,
 		MsgCreator:                              n.msgCreator,
-		MsgCreatorWithProto:                     n.msgCreatorWithProto,
 		Router:                                  n.Config.ConsensusRouter,
 		Net:                                     n.Net,
 		ConsensusParams:                         n.Config.ConsensusParams,
@@ -724,7 +722,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		CriticalChains:                          criticalChains,
 		TimeoutManager:                          timeoutManager,
 		Health:                                  n.health,
-		WhitelistedSubnets:                      n.Config.WhitelistedSubnets,
 		RetryBootstrap:                          n.Config.RetryBootstrap,
 		RetryBootstrapWarnFrequency:             n.Config.RetryBootstrapWarnFrequency,
 		ShutdownNodeFunc:                        n.Shutdown,
@@ -739,7 +736,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
 		ApricotPhase4Time:                       version.GetApricotPhase4Time(n.Config.NetworkID),
 		ApricotPhase4MinPChainHeight:            version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
-		BanffTime:                               version.GetBanffTime(n.Config.NetworkID),
 		ResourceTracker:                         n.resourceTracker,
 		StateSyncBeacons:                        n.Config.StateSyncIDs,
 	})
@@ -805,7 +801,6 @@ func (n *Node) initVMs() error {
 		vmRegisterer.Register(constants.AVMID, &avm.Factory{
 			TxFee:            n.Config.TxFee,
 			CreateAssetTxFee: n.Config.CreateAssetTxFee,
-			BanffTime:        version.GetBanffTime(n.Config.NetworkID),
 		}),
 		vmRegisterer.Register(constants.EVMID, &coreth.Factory{}),
 		n.Config.VMManager.RegisterFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
@@ -1269,15 +1264,6 @@ func (n *Node) Initialize(
 	)
 	if err != nil {
 		return fmt.Errorf("problem initializing message creator: %w", err)
-	}
-	n.msgCreatorWithProto, err = message.NewCreatorWithProto(
-		n.MetricsRegisterer,
-		n.networkNamespace,
-		n.Config.NetworkConfig.CompressionEnabled,
-		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
-	)
-	if err != nil {
-		return fmt.Errorf("problem initializing message creator with proto: %w", err)
 	}
 
 	primaryNetVdrs, err := n.initVdrs()
