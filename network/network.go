@@ -1185,6 +1185,7 @@ func (n *network) runTimers() {
 	}
 }
 
+// gossipPeerLists gossips validators to peers in the network
 func (n *network) gossipPeerLists() {
 	var (
 		peerListValidatorGossipSize    = int(n.config.PeerListValidatorGossipSize)
