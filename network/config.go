@@ -125,11 +125,11 @@ type Config struct {
 	TLSKey crypto.Signer `json:"-"`
 
 	// WhitelistedSubnets of the node.
-	WhitelistedSubnets ids.Set        `json:"whitelistedSubnets"`
-	Beacons            validators.Set `json:"beacons"`
+	WhitelistedSubnets ids.Set        `json:"-"`
+	Beacons            validators.Set `json:"-"`
 
 	// Validators are the current validators in the Avalanche network
-	Validators validators.Manager `json:"validators"`
+	Validators validators.Manager `json:"-"`
 
 	UptimeCalculator uptime.Calculator `json:"-"`
 
@@ -139,7 +139,7 @@ type Config struct {
 
 	// UptimeRequirement is the fraction of time a validator must be online and
 	// responsive for us to vote that they should receive a staking reward.
-	UptimeRequirement float64 `json:"uptimeRequirement"`
+	UptimeRequirement float64 `json:"-"`
 
 	// RequireValidatorToConnect require that all connections must have at least
 	// one validator between the 2 peers. This can be useful to enable if the
