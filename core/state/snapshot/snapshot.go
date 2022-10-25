@@ -35,11 +35,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/VictoriaMetrics/fastcache"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/metrics"
 	"github.com/ava-labs/subnet-evm/trie"
+	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -933,7 +933,7 @@ func NewDiskLayer(diskdb ethdb.KeyValueStore) Snapshot {
 
 		// state sync uses iterators to access data, so this cache is not used.
 		// initializing it out of caution.
-		cache: fastcache.New(32 * 1024),
+		cache: utils.NewMeteredCache(32*1024, "", "", 0),
 	}
 }
 
@@ -943,7 +943,7 @@ func NewTestTree(diskdb ethdb.KeyValueStore, blockHash, root common.Hash) *Tree 
 		diskdb:    diskdb,
 		root:      root,
 		blockHash: blockHash,
-		cache:     fastcache.New(128 * 256),
+		cache:     utils.NewMeteredCache(128*256, "", "", 0),
 		created:   time.Now(),
 	}
 	return &Tree{

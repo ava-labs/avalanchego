@@ -104,6 +104,10 @@ const (
 	// statsReportLimit is the time limit during import and export after which we
 	// always print out progress. This avoids the user wondering what's going on.
 	statsReportLimit = 8 * time.Second
+
+	// trieCleanCacheStatsNamespace is the namespace to surface stats from the trie
+	// clean cache's underlying fastcache.
+	trieCleanCacheStatsNamespace = "trie/memcache/clean/fastcache"
 )
 
 // cacheableFeeConfig encapsulates fee configuration itself and the block number that it has changed at,
@@ -265,9 +269,10 @@ func NewBlockChain(
 		cacheConfig: cacheConfig,
 		db:          db,
 		stateCache: state.NewDatabaseWithConfig(db, &trie.Config{
-			Cache:     cacheConfig.TrieCleanLimit,
-			Journal:   cacheConfig.TrieCleanJournal,
-			Preimages: cacheConfig.Preimages,
+			Cache:       cacheConfig.TrieCleanLimit,
+			Journal:     cacheConfig.TrieCleanJournal,
+			Preimages:   cacheConfig.Preimages,
+			StatsPrefix: trieCleanCacheStatsNamespace,
 		}),
 		bodyCache:      bodyCache,
 		receiptsCache:  receiptsCache,
@@ -1838,9 +1843,10 @@ func (bc *BlockChain) ResetState(block *types.Block) error {
 
 	lastAcceptedHash := block.Hash()
 	bc.stateCache = state.NewDatabaseWithConfig(bc.db, &trie.Config{
-		Cache:     bc.cacheConfig.TrieCleanLimit,
-		Journal:   bc.cacheConfig.TrieCleanJournal,
-		Preimages: bc.cacheConfig.Preimages,
+		Cache:       bc.cacheConfig.TrieCleanLimit,
+		Journal:     bc.cacheConfig.TrieCleanJournal,
+		Preimages:   bc.cacheConfig.Preimages,
+		StatsPrefix: trieCleanCacheStatsNamespace,
 	})
 	if err := bc.loadLastState(lastAcceptedHash); err != nil {
 		return err

@@ -32,7 +32,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/VictoriaMetrics/fastcache"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/trie"
@@ -91,7 +90,7 @@ func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, 
 	snapshot := &diskLayer{
 		diskdb:    diskdb,
 		triedb:    triedb,
-		cache:     fastcache.New(cache * 1024 * 1024),
+		cache:     newMeteredSnapshotCache(cache * 1024 * 1024),
 		root:      baseRoot,
 		blockHash: baseBlockHash,
 		created:   time.Now(),
