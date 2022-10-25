@@ -18,7 +18,7 @@ import (
 
 // protocolVersion should be bumped anytime changes are made which require
 // the plugin vm to upgrade to latest avalanchego release to be compatible.
-const protocolVersion = 16
+const protocolVersion = 17
 
 var (
 	// Handshake is a common handshake that is shared by plugin and host.

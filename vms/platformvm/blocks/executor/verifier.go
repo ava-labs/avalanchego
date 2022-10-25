@@ -20,7 +20,6 @@ import (
 var (
 	_ blocks.Visitor = &verifier{}
 
-	errBanffBlockIssuedBeforeFork                 = errors.New("banff block issued before fork")
 	errApricotBlockIssuedAfterFork                = errors.New("apricot block issued after fork")
 	errBanffProposalBlockWithMultipleTransactions = errors.New("BanffProposalBlock contains multiple transactions")
 	errBanffStandardBlockWithoutChanges           = errors.New("BanffStandardBlock performs no state changes")
@@ -223,7 +222,7 @@ func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 }
 
 func (v *verifier) banffOptionBlock(b blocks.BanffBlock) error {
-	if err := v.banffCommonBlock(b); err != nil {
+	if err := v.commonBlock(b); err != nil {
 		return err
 	}
 
@@ -246,7 +245,7 @@ func (v *verifier) banffOptionBlock(b blocks.BanffBlock) error {
 }
 
 func (v *verifier) banffNonOptionBlock(b blocks.BanffBlock) error {
-	if err := v.banffCommonBlock(b); err != nil {
+	if err := v.commonBlock(b); err != nil {
 		return err
 	}
 
@@ -278,14 +277,6 @@ func (v *verifier) banffNonOptionBlock(b blocks.BanffBlock) error {
 		nextStakerChangeTime,
 		now,
 	)
-}
-
-func (v *verifier) banffCommonBlock(b blocks.BanffBlock) error {
-	timestamp := b.Timestamp()
-	if !v.txExecutorBackend.Config.IsBanffActivated(timestamp) {
-		return fmt.Errorf("%w: timestamp = %s", errBanffBlockIssuedBeforeFork, timestamp)
-	}
-	return v.commonBlock(b)
 }
 
 func (v *verifier) apricotCommonBlock(b blocks.Block) error {

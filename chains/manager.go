@@ -38,7 +38,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -60,7 +62,10 @@ import (
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 )
 
-const defaultChannelSize = 1
+const (
+	defaultChannelSize = 1
+	initialQueueSize   = 3
+)
 
 var (
 	errUnknownChainID   = errors.New("unknown chain ID")
@@ -83,11 +88,11 @@ type Manager interface {
 	// Return the router this Manager is using to route consensus messages to chains
 	Router() router.Router
 
-	// Create a chain in the future
-	CreateChain(ChainParameters)
-
-	// Create a chain now
-	ForceCreateChain(ChainParameters)
+	// Queues a chain to be created in the future after chain creator is unblocked.
+	// This is only called from the P-chain thread to create other chains
+	// Queued chains are created only after P-chain is bootstrapped.
+	// This assumes only chains in whitelisted subnets are queued.
+	QueueChainCreation(ChainParameters)
 
 	// Add a registrant [r]. Every time a chain is
 	// created, [r].RegisterChain([new chain]) is called.
@@ -104,6 +109,9 @@ type Manager interface {
 
 	// Returns true iff the chain with the given ID exists and is finished bootstrapping
 	IsBootstrapped(ids.ID) bool
+
+	// Starts the chain creator with the initial platform chain parameters, must be called once
+	StartChainCreator(platformChain ChainParameters)
 
 	Shutdown()
 }
@@ -142,6 +150,7 @@ type ChainConfig struct {
 type ManagerConfig struct {
 	StakingEnabled              bool            // True iff the network has staking enabled
 	StakingCert                 tls.Certificate // needed to sign snowman++ blocks
+	StakingBLSKey               *bls.SecretKey
 	Log                         logging.Logger
 	LogFactory                  logging.Factory
 	VMManager                   vms.Manager // Manage mappings from vm ID --> vm
@@ -149,7 +158,6 @@ type ManagerConfig struct {
 	ConsensusAcceptorGroup      snow.AcceptorGroup
 	DBManager                   dbManager.Manager
 	MsgCreator                  message.Creator    // message creator, shared with network
-	MsgCreatorWithProto         message.Creator    // message creator using protobufs, shared with network
 	Router                      router.Router      // Routes incoming messages to the appropriate chain
 	Net                         network.Network    // Sends consensus messages to other validators
 	ConsensusParams             avcon.Parameters   // The consensus parameters (alpha, beta, etc.) for new chains
@@ -162,7 +170,6 @@ type ManagerConfig struct {
 	AVAXAssetID                 ids.ID
 	XChainID                    ids.ID
 	CriticalChains              set.Set[ids.ID] // Chains that can't exit gracefully
-	WhitelistedSubnets          set.Set[ids.ID] // Subnets to validate
 	TimeoutManager              timeout.Manager // Manages request timeouts when sending messages to other validators
 	Health                      health.Registerer
 	RetryBootstrap              bool                    // Should Bootstrap be retried
@@ -189,7 +196,6 @@ type ManagerConfig struct {
 
 	ApricotPhase4Time            time.Time
 	ApricotPhase4MinPChainHeight uint64
-	BanffTime                    time.Time
 
 	// Tracks CPU/disk usage caused by each peer.
 	ResourceTracker timetracker.ResourceTracker
@@ -206,8 +212,11 @@ type manager struct {
 	// Those notified when a chain is created
 	registrants []Registrant
 
-	unblocked     bool
-	blockedChains []ChainParameters
+	// queue that holds chain create requests
+	chainsQueue buffer.BlockingDeque[ChainParameters]
+	// unblocks chain creator to start processing the queue
+	unblockChainCreatorCh  chan struct{}
+	chainCreatorShutdownCh chan struct{}
 
 	// Key: Subnet's ID
 	// Value: Subnet description
@@ -225,35 +234,31 @@ type manager struct {
 // New returns a new Manager
 func New(config *ManagerConfig) Manager {
 	return &manager{
-		Aliaser:       ids.NewAliaser(),
-		ManagerConfig: *config,
-		subnets:       make(map[ids.ID]Subnet),
-		chains:        make(map[ids.ID]handler.Handler),
+		Aliaser:                ids.NewAliaser(),
+		ManagerConfig:          *config,
+		subnets:                make(map[ids.ID]Subnet),
+		chains:                 make(map[ids.ID]handler.Handler),
+		chainsQueue:            buffer.NewUnboundedBlockingDeque[ChainParameters](initialQueueSize),
+		unblockChainCreatorCh:  make(chan struct{}),
+		chainCreatorShutdownCh: make(chan struct{}),
 	}
 }
 
 // Router that this chain manager is using to route consensus messages to chains
 func (m *manager) Router() router.Router { return m.ManagerConfig.Router }
 
-// Create a chain
-func (m *manager) CreateChain(chain ChainParameters) {
-	if !m.unblocked {
-		m.blockedChains = append(m.blockedChains, chain)
-	} else {
-		m.ForceCreateChain(chain)
+// QueueChainCreation queues a chain creation request
+// Invariant: Whitelisted Subnet must be checked before calling this function
+func (m *manager) QueueChainCreation(chainParams ChainParameters) {
+	if ok := m.chainsQueue.PushRight(chainParams); !ok {
+		m.Log.Debug("cannot enqueue new chain",
+			zap.Stringer("chainID", chainParams.ID),
+		)
 	}
 }
 
-// Create a chain, this is only called from the P-chain thread, except for
-// creating the P-chain.
-func (m *manager) ForceCreateChain(chainParams ChainParameters) {
-	if m.StakingEnabled && chainParams.SubnetID != constants.PrimaryNetworkID && !m.WhitelistedSubnets.Contains(chainParams.SubnetID) {
-		m.Log.Debug("skipped creating non-whitelisted chain",
-			zap.Stringer("chainID", chainParams.ID),
-			zap.Stringer("vmID", chainParams.VMID),
-		)
-		return
-	}
+// createChain creates and starts the chain
+func (m *manager) createChain(chainParams ChainParameters) {
 	// Assert that there isn't already a chain with an alias in [chain].Aliases
 	// (Recall that the string representation of a chain's ID is also an alias
 	//  for a chain)
@@ -264,6 +269,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 		)
 		return
 	}
+
 	m.Log.Info("creating chain",
 		zap.Stringer("chainID", chainParams.ID),
 		zap.Stringer("vmID", chainParams.VMID),
@@ -305,7 +311,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 		// created or not. This attempts to notify the node operator that their
 		// node may not be properly validating the subnet they expect to be
 		// validating.
-		healthCheckErr := fmt.Errorf("failed to create chain on whitelisted subnet: %s", chainParams.SubnetID)
+		healthCheckErr := fmt.Errorf("failed to create chain on subnet: %s", chainParams.SubnetID)
 		if err := m.Health.RegisterHealthCheck(chainAlias, health.CheckerFunc(func() (interface{}, error) {
 			return nil, healthCheckErr
 		})); err != nil {
@@ -399,6 +405,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 			ValidatorState:    m.validatorState,
 			StakingCertLeaf:   m.StakingCert.Leaf,
 			StakingLeafSigner: m.StakingCert.PrivateKey.(crypto.Signer),
+			StakingBLSKey:     m.StakingBLSKey,
 		},
 		DecisionAcceptor:  m.DecisionAcceptorGroup,
 		ConsensusAcceptor: m.ConsensusAcceptorGroup,
@@ -408,8 +415,8 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	// before it's first access would cause a panic.
 	ctx.SetState(snow.Initializing)
 
-	if sbConfigs, ok := m.SubnetConfigs[chainParams.SubnetID]; ok {
-		if sbConfigs.ValidatorOnly {
+	if subnetConfig, ok := m.SubnetConfigs[chainParams.SubnetID]; ok {
+		if subnetConfig.ValidatorOnly {
 			ctx.SetValidatorOnly()
 		}
 	}
@@ -448,11 +455,13 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 
 	consensusParams := m.ConsensusParams
-	if sbConfigs, ok := m.SubnetConfigs[chainParams.SubnetID]; ok && chainParams.SubnetID != constants.PrimaryNetworkID {
-		consensusParams = sbConfigs.ConsensusParameters
+	// short circuit it before reading from subnetConfigs
+	if chainParams.SubnetID != constants.PrimaryNetworkID {
+		if subnetConfig, ok := m.SubnetConfigs[chainParams.SubnetID]; ok {
+			consensusParams = subnetConfig.ConsensusParameters
+		}
 	}
 
-	// The validators of this blockchain
 	var vdrs validators.Set // Validators validating this blockchain
 	var ok bool
 	if m.StakingEnabled {
@@ -517,15 +526,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 
 func (m *manager) AddRegistrant(r Registrant) { m.registrants = append(m.registrants, r) }
 
-func (m *manager) unblockChains() {
-	m.unblocked = true
-	blocked := m.blockedChains
-	m.blockedChains = nil
-	for _, chainParams := range blocked {
-		m.ForceCreateChain(chainParams)
-	}
-}
-
 // Create a DAG-based blockchain that uses Avalanche
 func (m *manager) createAvalancheChain(
 	ctx *snow.ConsensusContext,
@@ -567,16 +567,17 @@ func (m *manager) createAvalancheChain(
 	msgChan := make(chan common.Message, defaultChannelSize)
 
 	gossipConfig := m.GossipConfig
-	if sbConfigs, ok := m.SubnetConfigs[ctx.SubnetID]; ok && ctx.SubnetID != constants.PrimaryNetworkID {
-		gossipConfig = sbConfigs.GossipConfig
+	// short circuit it before reading from subnetConfigs
+	if ctx.SubnetID != constants.PrimaryNetworkID {
+		if subnetConfig, ok := m.SubnetConfigs[ctx.SubnetID]; ok {
+			gossipConfig = subnetConfig.GossipConfig
+		}
 	}
 
 	// Passes messages from the consensus engine to the network
 	sender, err := sender.New(
 		ctx,
 		m.MsgCreator,
-		m.MsgCreatorWithProto,
-		m.BanffTime,
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
@@ -755,16 +756,17 @@ func (m *manager) createSnowmanChain(
 	msgChan := make(chan common.Message, defaultChannelSize)
 
 	gossipConfig := m.GossipConfig
-	if sbConfigs, ok := m.SubnetConfigs[ctx.SubnetID]; ok && ctx.SubnetID != constants.PrimaryNetworkID {
-		gossipConfig = sbConfigs.GossipConfig
+	// short circuit it before reading from subnetConfigs
+	if ctx.SubnetID != constants.PrimaryNetworkID {
+		if subnetConfig, ok := m.SubnetConfigs[ctx.SubnetID]; ok {
+			gossipConfig = subnetConfig.GossipConfig
+		}
 	}
 
 	// Passes messages from the consensus engine to the network
 	sender, err := sender.New(
 		ctx,
 		m.MsgCreator,
-		m.MsgCreatorWithProto,
-		m.BanffTime,
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
@@ -778,6 +780,7 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
 
+	var bootstrapFunc func()
 	// first vm to be init is P-Chain once, which provides validator interface to all ProposerVMs
 	if m.validatorState == nil {
 		valState, ok := vm.(validators.State)
@@ -799,6 +802,9 @@ func (m *manager) createSnowmanChain(
 			m.validatorState = validators.NewNoValidatorsState(m.validatorState)
 			ctx.ValidatorState = validators.NewNoValidatorsState(ctx.ValidatorState)
 		}
+
+		// Set this func only for platform
+		bootstrapFunc = func() { close(m.unblockChainCreatorCh) }
 	}
 
 	// Initialize the ProposerVM and the vm wrapped inside it
@@ -811,7 +817,6 @@ func (m *manager) createSnowmanChain(
 		vm,
 		m.ApricotPhase4Time,
 		m.ApricotPhase4MinPChainHeight,
-		m.BanffTime,
 	)
 
 	if m.MeterVMEnabled {
@@ -899,7 +904,7 @@ func (m *manager) createSnowmanChain(
 		AllGetsServer: snowGetHandler,
 		Blocked:       blocked,
 		VM:            vm,
-		Bootstrapped:  m.unblockChains,
+		Bootstrapped:  bootstrapFunc,
 	}
 	bootstrapper, err := smbootstrap.New(
 		bootstrapCfg,
@@ -998,9 +1003,46 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 	return nil
 }
 
+// Starts chain creation loop to process queued chains
+func (m *manager) StartChainCreator(platform ChainParameters) {
+	m.Log.Info("starting chain creator")
+	go m.dispatchChainCreator(platform)
+}
+
+func (m *manager) dispatchChainCreator(platform ChainParameters) {
+	m.createChain(platform) // create initial platform chain
+
+	select {
+	// This channel will be closed when Shutdown is called on the manager.
+	case <-m.chainCreatorShutdownCh:
+		return
+	case <-m.unblockChainCreatorCh:
+	}
+
+	// Handle chain creations
+	for {
+		// Get the next chain we should create.
+		// Dequeue waits until an element is pushed, so this is not
+		// busy-looping.
+		chainParams, ok := m.chainsQueue.PopLeft()
+		if !ok { // queue is closed, return directly
+			return
+		}
+		m.createChain(chainParams)
+	}
+}
+
+// Shutdown stops all the chains
+func (m *manager) closeChainCreator() {
+	m.Log.Info("stopping chain creator")
+	m.chainsQueue.Close()
+	close(m.chainCreatorShutdownCh)
+}
+
 // Shutdown stops all the chains
 func (m *manager) Shutdown() {
 	m.Log.Info("shutting down chain manager")
+	m.closeChainCreator()
 	m.ManagerConfig.Router.Shutdown()
 }
 

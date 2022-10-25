@@ -307,7 +307,7 @@ func (s *vdrSet) removeWeight(vdrID ids.NodeID, weight uint64) error {
 	vdr := s.vdrSlice[i]
 
 	oldWeight := s.vdrWeights[i]
-	weight = safemath.Min64(oldWeight, weight)
+	weight = safemath.Min(oldWeight, weight)
 	s.vdrWeights[i] -= weight
 	vdr.removeWeight(weight)
 	if !s.maskedVdrs.Contains(vdrID) {
@@ -368,7 +368,7 @@ func (s *vdrSet) remove(vdrID ids.NodeID) error {
 	s.vdrMaskedWeights = s.vdrMaskedWeights[:e]
 
 	if !s.maskedVdrs.Contains(vdrID) {
-		newTotalWeight, err := safemath.Sub64(s.totalWeight, iElem.Weight())
+		newTotalWeight, err := safemath.Sub(s.totalWeight, iElem.Weight())
 		if err != nil {
 			return err
 		}

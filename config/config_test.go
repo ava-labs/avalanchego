@@ -405,7 +405,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			testF: func(require *require.Assertions, given map[ids.ID]chains.SubnetConfig) {
 				require.Nil(given)
 			},
-			errMessage: "couldn't read subnet configs",
+			errMessage: "invalid character",
 		},
 		"subnet is not whitelisted": {
 			fileName:  "Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU.json",
@@ -576,6 +576,14 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCalcMinConnectedStake(t *testing.T) {
+	v := setupViperFlags()
+	defaultParams := getConsensusConfig(v)
+	defaultExpectedMinStake := 0.8
+	minStake := calcMinConnectedStake(defaultParams.Parameters)
+	require.Equal(t, defaultExpectedMinStake, minStake)
 }
 
 // setups config json file and writes content

@@ -276,7 +276,7 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 		}
 	}
 
-	bStatelessBlock, err := block.BuildUnsignedApricot(
+	bStatelessBlock, err := block.BuildUnsigned(
 		xBlock.ID(),
 		yBlock.Timestamp(),
 		0,
@@ -478,7 +478,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		TimestampV: coreGenBlk.Timestamp(),
 	}
 
-	ySlb, err := block.BuildUnsignedApricot(
+	ySlb, err := block.BuildUnsigned(
 		coreGenBlk.ID(),
 		coreGenBlk.Timestamp(),
 		uint64(2000),

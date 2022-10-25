@@ -90,7 +90,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 		}
 	}
 
-	dummyH := newEnvironment()
+	dummyH := newEnvironment( /*postBanff*/ false)
 	currentTimestamp := dummyH.state.GetTimestamp()
 
 	type test struct {
@@ -258,7 +258,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
-			freshTH := newEnvironment()
+			freshTH := newEnvironment( /*postBanff*/ false)
 			freshTH.config.ApricotPhase3Time = tt.AP3Time
 			defer func() {
 				if err := shutdownEnvironment(freshTH); err != nil {
@@ -304,25 +304,12 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			} else if err == nil && tt.shouldErr {
 				t.Fatalf("expected test to error but got none")
 			}
-
-			mempoolExecutor := MempoolTxVerifier{
-				Backend:       &freshTH.backend,
-				ParentID:      lastAcceptedID,
-				StateVersions: freshTH,
-				Tx:            tx,
-			}
-			err = tx.Unsigned.Visit(&mempoolExecutor)
-			if err != nil && !tt.shouldErr {
-				t.Fatalf("shouldn't have errored but got %s", err)
-			} else if err == nil && tt.shouldErr {
-				t.Fatalf("expected test to error but got none")
-			}
 		})
 	}
 }
 
 func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
-	env := newEnvironment()
+	env := newEnvironment( /*postBanff*/ false)
 	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
@@ -895,7 +882,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 }
 
 func TestProposalTxExecuteAddValidator(t *testing.T) {
-	env := newEnvironment()
+	env := newEnvironment( /*postBanff*/ false)
 	env.ctx.Lock.Lock()
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {

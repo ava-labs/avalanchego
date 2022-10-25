@@ -24,7 +24,7 @@ import (
 
 func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment()
+	env := newEnvironment( /*postBanff*/ false)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -136,7 +136,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 
 func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment()
+	env := newEnvironment( /*postBanff*/ false)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -238,7 +238,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 
 func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment()
+	env := newEnvironment( /*postBanff*/ false)
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
@@ -348,13 +348,13 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	// and the delegator's reward should be greater because the delegatee's share is 25%
 	commitVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
 	require.NoError(err)
-	vdrReward, err := math.Sub64(commitVdrBalance, oldVdrBalance)
+	vdrReward, err := math.Sub(commitVdrBalance, oldVdrBalance)
 	require.NoError(err)
 	require.NotZero(vdrReward, "expected delegatee balance to increase because of reward")
 
 	commitDelBalance, err := avax.GetBalance(env.state, delDestSet)
 	require.NoError(err)
-	delReward, err := math.Sub64(commitDelBalance, oldDelBalance)
+	delReward, err := math.Sub(commitDelBalance, oldDelBalance)
 	require.NoError(err)
 	require.NotZero(delReward, "expected delegator balance to increase because of reward")
 
@@ -368,7 +368,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 
 func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment()
+	env := newEnvironment( /*postBanff*/ false)
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
@@ -472,13 +472,13 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	// If tx is aborted, delegator and delegatee shouldn't get reward
 	newVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
 	require.NoError(err)
-	vdrReward, err := math.Sub64(newVdrBalance, oldVdrBalance)
+	vdrReward, err := math.Sub(newVdrBalance, oldVdrBalance)
 	require.NoError(err)
 	require.Zero(vdrReward, "expected delegatee balance not to increase")
 
 	newDelBalance, err := avax.GetBalance(env.state, delDestSet)
 	require.NoError(err)
-	delReward, err := math.Sub64(newDelBalance, oldDelBalance)
+	delReward, err := math.Sub(newDelBalance, oldDelBalance)
 	require.NoError(err)
 	require.Zero(delReward, "expected delegator balance not to increase")
 

@@ -575,7 +575,7 @@ func (ta *Topological) update(vtx Vertex) error {
 				return err
 			}
 			delete(ta.nodes, vtxID)
-			ta.Latency.Rejected(vtxID, ta.pollNumber)
+			ta.Latency.Rejected(vtxID, ta.pollNumber, len(vtx.Bytes()))
 
 			ta.preferenceCache[vtxID] = false
 			ta.virtuousCache[vtxID] = false
@@ -642,7 +642,8 @@ func (ta *Topological) update(vtx Vertex) error {
 		// I'm acceptable, why not accept?
 		// Note that ConsensusAcceptor.Accept must be called before vtx.Accept
 		// to honor Acceptor.Accept's invariant.
-		if err := ta.ctx.ConsensusAcceptor.Accept(ta.ctx, vtxID, vtx.Bytes()); err != nil {
+		vtxBytes := vtx.Bytes()
+		if err := ta.ctx.ConsensusAcceptor.Accept(ta.ctx, vtxID, vtxBytes); err != nil {
 			return err
 		}
 
@@ -650,7 +651,7 @@ func (ta *Topological) update(vtx Vertex) error {
 			return err
 		}
 		delete(ta.nodes, vtxID)
-		ta.Latency.Accepted(vtxID, ta.pollNumber)
+		ta.Latency.Accepted(vtxID, ta.pollNumber, len(vtxBytes))
 	case rejectable:
 		// I'm rejectable, why not reject?
 		ta.ctx.Log.Trace("rejecting vertex",
@@ -667,7 +668,7 @@ func (ta *Topological) update(vtx Vertex) error {
 			return err
 		}
 		delete(ta.nodes, vtxID)
-		ta.Latency.Rejected(vtxID, ta.pollNumber)
+		ta.Latency.Rejected(vtxID, ta.pollNumber, len(vtx.Bytes()))
 	}
 	return nil
 }

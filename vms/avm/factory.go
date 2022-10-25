@@ -4,8 +4,6 @@
 package avm
 
 import (
-	"time"
-
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms"
 )
@@ -15,13 +13,6 @@ var _ vms.Factory = &Factory{}
 type Factory struct {
 	TxFee            uint64
 	CreateAssetTxFee uint64
-
-	// Time of the Banff network upgrade
-	BanffTime time.Time
-}
-
-func (f *Factory) IsBanffActivated(timestamp time.Time) bool {
-	return !timestamp.Before(f.BanffTime)
 }
 
 func (f *Factory) New(*snow.Context) (interface{}, error) {

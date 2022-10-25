@@ -56,7 +56,9 @@ func TestKeychainAdd(t *testing.T) {
 	addr, _ := ids.ShortFromString(addrs[0])
 	rsk, exists := kc.Get(addr)
 	require.True(exists)
-	require.Equal(sk.Bytes(), rsk.Bytes())
+	rsksecp, ok := rsk.(*crypto.PrivateKeySECP256K1R)
+	require.True(ok, "Factory should have returned secp256k1r private key")
+	require.Equal(sk.Bytes(), rsksecp.Bytes())
 
 	addrs := kc.Addresses()
 	require.Equal(1, addrs.Len())

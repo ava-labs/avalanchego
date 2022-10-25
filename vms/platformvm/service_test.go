@@ -376,7 +376,7 @@ func TestGetTx(t *testing.T) {
 						t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 					}
 					commit := options[0].(*blockexecutor.Block)
-					if _, ok := commit.Block.(*blocks.ApricotCommitBlock); !ok {
+					if _, ok := commit.Block.(*blocks.BanffCommitBlock); !ok {
 						t.Fatalf("failed test '%s - %s': should prefer to commit", test.description, encoding.String())
 					}
 					if err := commit.Verify(); err != nil {
@@ -785,6 +785,7 @@ func TestGetBlock(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
 			service, _ := defaultService(t)
 			service.vm.ctx.Lock.Lock()
 			defer service.vm.ctx.Lock.Unlock()
@@ -801,27 +802,23 @@ func TestGetBlock(t *testing.T) {
 				[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 				keys[0].PublicKey().Address(), // change addr
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
+
 			preferred, err := service.vm.Builder.Preferred()
-			if err != nil {
-				t.Fatal(err)
-			}
-			statelessBlock, err := blocks.NewApricotStandardBlock(
+			require.NoError(err)
+
+			statelessBlock, err := blocks.NewBanffStandardBlock(
+				preferred.Timestamp(),
 				preferred.ID(),
 				preferred.Height()+1,
 				[]*txs.Tx{tx},
 			)
-			if err != nil {
-				t.Fatal("couldn't create block: %w", err)
-			}
+			require.NoError(err)
+
 			block := service.vm.manager.NewBlock(statelessBlock)
-			if err := block.Verify(); err != nil {
-				t.Fatal("couldn't verify block: %w", err)
-			} else if err := block.Accept(); err != nil {
-				t.Fatal("couldn't accept block: %w", err)
-			}
+
+			require.NoError(block.Verify())
+			require.NoError(block.Accept())
 
 			args := api.GetBlockArgs{
 				BlockID:  block.ID(),
@@ -829,22 +826,20 @@ func TestGetBlock(t *testing.T) {
 			}
 			response := api.GetBlockResponse{}
 			err = service.GetBlock(nil, &args, &response)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 
 			switch {
 			case test.encoding == formatting.JSON:
-				require.Equal(t, statelessBlock, response.Block)
+				require.Equal(statelessBlock, response.Block)
 
 				_, err = stdjson.Marshal(response)
-				require.NoError(t, err)
+				require.NoError(err)
 			default:
 				decoded, _ := formatting.Decode(response.Encoding, response.Block.(string))
-				require.Equal(t, block.Bytes(), decoded)
+				require.Equal(block.Bytes(), decoded)
 			}
 
-			require.Equal(t, test.encoding, response.Encoding)
+			require.Equal(test.encoding, response.Encoding)
 		})
 	}
 }
