@@ -63,6 +63,7 @@ func TestGossipTracker_Contains(t *testing.T) {
 
 			for _, add := range test.add {
 				r.True(g.Add(add))
+				r.True(g.Contains(add))
 			}
 
 			r.Equal(test.expected, g.Contains(test.contains))
@@ -105,6 +106,7 @@ func TestGossipTracker_Add(t *testing.T) {
 
 			for i, p := range test.toAdd {
 				r.Equal(test.expected[i], g.Add(p))
+				r.True(g.Contains(p))
 			}
 		})
 	}
@@ -157,6 +159,7 @@ func TestGossipTracker_Remove(t *testing.T) {
 
 			for _, add := range test.toAdd {
 				r.True(g.Add(add))
+				r.True(g.Contains(add))
 			}
 
 			for i, p := range test.toRemove {
@@ -230,6 +233,7 @@ func TestGossipTracker_UpdateKnown(t *testing.T) {
 
 			for _, add := range test.add {
 				r.True(g.Add(add))
+				r.True(g.Contains(add))
 			}
 
 			r.Equal(test.expected, g.UpdateKnown(test.args.id, test.args.known))
@@ -243,6 +247,7 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 		peer          ids.NodeID
 		validators    []ids.NodeID
 		nonValidators []ids.NodeID
+		limit         int
 		expected      []ids.NodeID
 	}{
 		{
@@ -250,6 +255,7 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 			peer:          id0,
 			validators:    []ids.NodeID{id1},
 			nonValidators: []ids.NodeID{},
+			limit:         100,
 			expected:      []ids.NodeID{id1},
 		},
 		{
@@ -257,6 +263,7 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 			peer:          id0,
 			validators:    []ids.NodeID{},
 			nonValidators: []ids.NodeID{id1},
+			limit:         100,
 			expected:      []ids.NodeID{},
 		},
 		{
@@ -264,39 +271,68 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 			peer:          id0,
 			validators:    []ids.NodeID{id1},
 			nonValidators: []ids.NodeID{id2},
+			limit:         100,
+			expected:      []ids.NodeID{id1},
+		},
+		{
+			name:          "less than limit",
+			peer:          id0,
+			validators:    []ids.NodeID{id1},
+			nonValidators: []ids.NodeID{},
+			limit:         2,
+			expected:      []ids.NodeID{id1},
+		},
+		{
+			name:          "same as limit",
+			peer:          id0,
+			validators:    []ids.NodeID{id1, id2},
+			nonValidators: []ids.NodeID{},
+			limit:         2,
+			expected:      []ids.NodeID{id1, id2},
+		},
+		{
+			name:          "greater than limit",
+			peer:          id0,
+			validators:    []ids.NodeID{id1, id2},
+			nonValidators: []ids.NodeID{},
+			limit:         1,
 			expected:      []ids.NodeID{id1},
 		},
 	}
 
 	for _, test := range tests {
 		r := require.New(t)
+		t.Run(test.name, func(t *testing.T) {
+			cfg := GossipTrackerConfig{
+				ValidatorManager: validators.NewManager(),
+				Registerer:       prometheus.NewRegistry(),
+				Namespace:        "foobar",
+			}
 
-		cfg := GossipTrackerConfig{
-			ValidatorManager: validators.NewManager(),
-			Registerer:       prometheus.NewRegistry(),
-			Namespace:        "foobar",
-		}
+			g, err := NewGossipTracker(cfg)
+			r.NoError(err)
 
-		g, err := NewGossipTracker(cfg)
-		r.NoError(err)
+			// start tracking our validators
+			for _, validator := range test.validators {
+				r.NoError(cfg.ValidatorManager.AddWeight(constants.PrimaryNetworkID, validator, 1))
+				r.True(g.Add(validator))
+				r.True(g.Contains(validator))
+			}
 
-		// start tracking our validators
-		for _, validator := range test.validators {
-			r.NoError(cfg.ValidatorManager.AddWeight(constants.PrimaryNetworkID, validator, 1))
-			r.True(g.Add(validator))
-		}
+			// start tracking our non validators
+			for _, nonValidator := range test.nonValidators {
+				r.True(g.Add(nonValidator))
+				r.True(g.Contains(nonValidator))
+			}
 
-		// start tracking our non validators
-		for _, nonValidator := range test.nonValidators {
-			r.True(g.Add(nonValidator))
-		}
+			// start tracking our peer
+			r.True(g.Add(test.peer))
+			r.True(g.Contains(test.peer))
 
-		// start tracking our peer
-		r.True(g.Add(test.peer))
-
-		result, ok := g.GetUnknown(test.peer, limit)
-		r.True(ok)
-		r.EqualValues(test.expected, result)
+			result, ok := g.GetUnknown(test.peer, test.limit)
+			r.True(ok)
+			r.EqualValues(test.expected, result)
+		})
 	}
 }
 
@@ -326,7 +362,9 @@ func TestGossipTracker_GetUnknown_E2E(t *testing.T) {
 	// we should get a unknown of [id0, id1] since we know about id0 and id1,
 	// but id0 and id1 both don't know anything yet
 	g.Add(id0)
+	g.Contains(id0)
 	g.Add(id1)
+	g.Contains(id1)
 
 	// check id0's unknown
 	unknown, ok = g.GetUnknown(id0, limit)
@@ -364,6 +402,7 @@ func TestGossipTracker_GetUnknown_E2E(t *testing.T) {
 	// id0 and id1 don't know of id2
 	p2 := []ids.NodeID{id0, id1, id2}
 	g.Add(id2)
+	r.True(g.Contains(id2))
 	r.True(g.UpdateKnown(id2, p2))
 
 	// id0 doesn't know about [id1, id2]
@@ -402,50 +441,4 @@ func TestGossipTracker_GetUnknown_E2E(t *testing.T) {
 	unknown, ok = g.GetUnknown(id2, limit)
 	r.Empty(unknown)
 	r.True(ok)
-}
-
-// Tests that the limit parameter limits the amount of data returned from
-// GetUnknown
-func TestGossipTracker_GetUnknown_Limit(t *testing.T) {
-	r := require.New(t)
-
-	cfg := GossipTrackerConfig{
-		ValidatorManager: validators.NewManager(),
-		Registerer:       prometheus.NewRegistry(),
-		Namespace:        "foobar",
-	}
-
-	// [id0, id1, id2] are validators
-	_ = cfg.ValidatorManager.AddWeight(constants.PrimaryNetworkID, id0, 1)
-	_ = cfg.ValidatorManager.AddWeight(constants.PrimaryNetworkID, id1, 1)
-	_ = cfg.ValidatorManager.AddWeight(constants.PrimaryNetworkID, id2, 1)
-
-	g, err := NewGossipTracker(cfg)
-	r.NoError(err)
-
-	r.True(g.Add(id0))
-	r.True(g.Add(id1))
-	r.True(g.Add(id2))
-
-	// id2 doesn't know about anybody, but we should filter out anything
-	// over the limit
-	unknown, ok := g.GetUnknown(id2, 1)
-	r.True(ok)
-	r.Len(unknown, 1)
-
-	unknown, ok = g.GetUnknown(id2, 2)
-	r.True(ok)
-	r.Len(unknown, 2)
-
-	// nothing should be filtered here, since we're asking for exactly as many
-	// as are unknown by id2
-	unknown, ok = g.GetUnknown(id2, 3)
-	r.True(ok)
-	r.Len(unknown, 3)
-
-	// sanity-check that asking for more than what is unknown still returns
-	// the same info
-	unknown, ok = g.GetUnknown(id2, 4)
-	r.True(ok)
-	r.Len(unknown, 3)
 }
