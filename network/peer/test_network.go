@@ -78,7 +78,7 @@ func (n *testNetwork) Version() (message.OutboundMessage, error) {
 	)
 }
 
-func (n *testNetwork) Peers(Peer) (message.OutboundMessage, error) {
+func (n *testNetwork) Peers(ids.NodeID) (message.OutboundMessage, error) {
 	return n.mc.PeerList(nil, true)
 }
 
