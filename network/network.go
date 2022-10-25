@@ -220,7 +220,13 @@ func NewNetwork(
 		ResourceTracker:      config.ResourceTracker,
 	}
 
-	gossipTracker, err := NewGossipTracker(metricsRegisterer, config.Namespace)
+	gossipTracker, err := NewGossipTracker(
+		GossipTrackerConfig{
+			ValidatorManager: config.Validators,
+			Registerer:       metricsRegisterer,
+			Namespace:        config.Namespace,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing gossip traker failed with: %w", err)
 	}
@@ -635,11 +641,6 @@ func (n *network) TracksSubnet(nodeID ids.NodeID, subnetID ids.ID) bool {
 // validatorsToGossipFor returns a subset of the peers that [p] doesn't know
 // about yet.
 func (n *network) validatorsToGossipFor(p peer.Peer) ([]ips.ClaimedIPPort, []ids.NodeID) {
-	// peers should validate the primary network
-	if !n.config.Validators.Contains(constants.PrimaryNetworkID, p.ID()) {
-		return []ips.ClaimedIPPort{}, []ids.NodeID{}
-	}
-
 	unknown, ok := n.gossipTracker.GetUnknown(p.ID(), int(n.config.PeerListNumValidatorIPs))
 	if !ok {
 		n.peerConfig.Log.Debug(
