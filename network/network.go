@@ -495,7 +495,7 @@ func (n *network) Version() (message.OutboundMessage, error) {
 
 func (n *network) Peers(p peer.Peer) (message.OutboundMessage, error) {
 	peers, _ := n.validatorsToGossipFor(p)
-	return n.peerConfig.GetMessageCreator().PeerList(peers, true)
+	return n.peerConfig.MessageCreator.PeerList(peers, true)
 }
 
 func (n *network) Pong(nodeID ids.NodeID) (message.OutboundMessage, error) {
@@ -686,12 +686,12 @@ func (n *network) validatorsToGossipFor(p peer.Peer) ([]ips.ClaimedIPPort, []ids
 
 // getPeers returns a slice of connected peers from a set of [nodeIDs].
 //
-// - [nodeIDs] the IDs of the peers that should be returned if they are
-//   connected.
-// - [subnetID] the subnetID whose membership should be considered if
-//   [validatorOnly] is set to true.
-// - [validatorOnly] is the flag to drop any nodes from [nodeIDs] that are not
-//   validators in [subnetID].
+//   - [nodeIDs] the IDs of the peers that should be returned if they are
+//     connected.
+//   - [subnetID] the subnetID whose membership should be considered if
+//     [validatorOnly] is set to true.
+//   - [validatorOnly] is the flag to drop any nodes from [nodeIDs] that are not
+//     validators in [subnetID].
 func (n *network) getPeers(
 	nodeIDs ids.NodeIDSet,
 	subnetID ids.ID,
@@ -1211,7 +1211,7 @@ func (n *network) gossipPeerLists() {
 			)
 			continue
 		}
-		msg, err := n.peerConfig.GetMessageCreator().PeerList(validatorIPs, false)
+		msg, err := n.peerConfig.MessageCreator.PeerList(validatorIPs, false)
 		if err != nil {
 			n.peerConfig.Log.Error(
 				"failed to create PeerList",
@@ -1226,7 +1226,7 @@ func (n *network) gossipPeerLists() {
 		// If we didn't send any PeerList gossip to this peer, we should
 		// not update the gossip tracker, so we can retry it on the next
 		// iteration.
-		if received.Len() == 0 {
+		if sent.Len() == 0 {
 			continue
 		}
 
