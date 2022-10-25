@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/coreth/params"
 
 	"github.com/ava-labs/avalanchego/snow"
@@ -15,15 +16,21 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-// waitBlockTime is the amount of time to wait for BuildBlock to be
-// called by the engine before deciding whether or not to gossip the
-// transaction that triggered the PendingTxs message to the engine.
-//
-// This is done to reduce contention in the network when there is no
-// preferred producer. If we did not wait here, we may gossip a new
-// transaction to a peer while building a block that will conflict with
-// whatever the peer makes.
-const waitBlockTime = 100 * time.Millisecond
+const (
+	// waitBlockTime is the amount of time to wait for BuildBlock to be
+	// called by the engine before deciding whether or not to gossip the
+	// transaction that triggered the PendingTxs message to the engine.
+	//
+	// This is done to reduce contention in the network when there is no
+	// preferred producer. If we did not wait here, we may gossip a new
+	// transaction to a peer while building a block that will conflict with
+	// whatever the peer makes.
+	waitBlockTime = 100 * time.Millisecond
+
+	// Minimum amount of time to wait after building a block before attempting to build a block
+	// a second time without changing the contents of the mempool.
+	minBlockBuildingRetryDelay = 500 * time.Millisecond
+)
 
 type blockBuilder struct {
 	ctx         *snow.Context
@@ -46,10 +53,16 @@ type blockBuilder struct {
 	// buildSent is true iff we have sent a PendingTxs message to the consensus message and
 	// are still waiting for buildBlock to be called.
 	buildSent bool
+
+	// buildBlockTimer is a timer used to delay retrying block building a minimum amount of time
+	// with the same contents of the mempool.
+	// If the mempool receives a new transaction, the block builder will send a new notification to
+	// the engine and cancel the timer.
+	buildBlockTimer *timer.Timer
 }
 
 func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *blockBuilder {
-	return &blockBuilder{
+	b := &blockBuilder{
 		ctx:                  vm.ctx,
 		chainConfig:          vm.chainConfig,
 		txPool:               vm.txPool,
@@ -59,11 +72,31 @@ func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *bl
 		shutdownWg:           &vm.shutdownWg,
 		notifyBuildBlockChan: notifyBuildBlockChan,
 	}
+	b.handleBlockBuilding()
+	return b
 }
 
-// handleGenerateBlock should be called immediately after [BuildBlock].
-// [handleGenerateBlock] invocation could lead to quiesence, building a block with
-// some delay, or attempting to build another block immediately.
+// handleBlockBuilding dispatches a timer used to delay block building retry attempts when the contents
+// of the mempool has not been changed since the last attempt.
+func (b *blockBuilder) handleBlockBuilding() {
+	b.buildBlockTimer = timer.NewTimer(b.buildBlockTimerCallback)
+	go b.ctx.Log.RecoverAndPanic(b.buildBlockTimer.Dispatch)
+}
+
+// buildBlockTimerCallback is the timer callback that will send a PendingTxs notification
+// to the consensus engine if there are transactions in the mempool.
+func (b *blockBuilder) buildBlockTimerCallback() {
+	b.buildBlockLock.Lock()
+	defer b.buildBlockLock.Unlock()
+
+	// If there are still transactions in the mempool, send another notification to
+	// the engine to retry BuildBlock.
+	if b.needToBuild() {
+		b.markBuilding()
+	}
+}
+
+// handleGenerateBlock is called from the VM immediately after BuildBlock.
 func (b *blockBuilder) handleGenerateBlock() {
 	b.buildBlockLock.Lock()
 	defer b.buildBlockLock.Unlock()
@@ -71,11 +104,8 @@ func (b *blockBuilder) handleGenerateBlock() {
 	// Reset buildSent now that the engine has called BuildBlock.
 	b.buildSent = false
 
-	// Check if there are transactions in the mempool signifying the VM
-	// is already ready to build another block.
-	if b.needToBuild() {
-		b.markBuilding()
-	}
+	// Set a timer to check if calling build block a second time is needed.
+	b.buildBlockTimer.SetTimeoutIn(minBlockBuildingRetryDelay)
 }
 
 // needToBuild returns true if there are outstanding transactions to be issued
@@ -85,8 +115,15 @@ func (b *blockBuilder) needToBuild() bool {
 	return size > 0 || b.mempool.Len() > 0
 }
 
+// markBuilding adds a PendingTxs message to the toEngine channel.
 // markBuilding assumes the [buildBlockLock] is held.
 func (b *blockBuilder) markBuilding() {
+	// If the engine has not called BuildBlock, no need to send another message.
+	if b.buildSent {
+		return
+	}
+	b.buildBlockTimer.Cancel() // Cancel any future attempt from the timer to send a PendingTxs message
+
 	select {
 	case b.notifyBuildBlockChan <- commonEng.PendingTxs:
 		b.buildSent = true
@@ -95,21 +132,15 @@ func (b *blockBuilder) markBuilding() {
 	}
 }
 
-// signalTxsReady notifies the engine and sets the status to [building] if the
-// status is [dontBuild]. Otherwise, the attempt has already begun and this notification
-// can be safely skipped.
+// signalTxsReady sends a PendingTxs notification to the consensus engine.
+// If BuildBlock has not been called since the last PendingTxs message was sent,
+// signalTxsReady will not send a duplicate.
 func (b *blockBuilder) signalTxsReady() {
 	b.buildBlockLock.Lock()
 	defer b.buildBlockLock.Unlock()
 
-	// If we have already signalled the engine, that we're ready to build a block
-	// do not send a second notification.
-	if b.buildSent {
-		return
-	}
-
 	// We take a naive approach here and signal the engine that we should build
-	// a block as soon as we receive at least one transaction.
+	// a block as soon as we receive at least one new transaction.
 	//
 	// In the future, we may wish to add optimization here to only signal the
 	// engine if the sum of the projected tips in the mempool satisfies the
@@ -166,6 +197,7 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 					}
 				}
 			case <-b.shutdownChan:
+				b.buildBlockTimer.Stop()
 				return
 			}
 		}
