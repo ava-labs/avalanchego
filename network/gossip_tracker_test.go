@@ -63,7 +63,6 @@ func TestGossipTracker_Contains(t *testing.T) {
 
 			for _, add := range test.add {
 				r.True(g.Add(add))
-				r.True(g.Contains(add))
 			}
 
 			r.Equal(test.expected, g.Contains(test.contains))
