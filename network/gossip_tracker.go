@@ -186,11 +186,9 @@ func (g *gossipTracker) Remove(id ids.NodeID) bool {
 	return true
 }
 
-// UpdateKnown adds to the peers that a peer knows about
-// invariants:
-//  1. [id] and [learned] should only contain nodeIDs that have been tracked with
-//     Add(). Trying to add nodeIDs that aren't tracked yet will result in a noop
-//     and this will return [false].
+// UpdateKnown invariant: [id] and [learned] SHOULD only contain nodeIDs that
+// have been tracked with Add(). Trying to add nodeIDs that aren't tracked yet
+// will result in a noop and this will return [false].
 func (g *gossipTracker) UpdateKnown(id ids.NodeID, learned []ids.NodeID) bool {
 	g.lock.Lock()
 	defer g.lock.Unlock()
