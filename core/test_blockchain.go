@@ -1695,6 +1695,7 @@ func TestStatefulPrecompiles(t *testing.T, create func(db ethdb.Database, chainC
 	if err := blockchain.Accept(chain[0]); err != nil {
 		t.Fatal(err)
 	}
+	blockchain.DrainAcceptorQueue()
 
 	genesisState, err := blockchain.StateAt(blockchain.Genesis().Root())
 	if err != nil {
@@ -1718,6 +1719,5 @@ func TestStatefulPrecompiles(t *testing.T, create func(db ethdb.Database, chainC
 	}
 
 	// This tests that the precompiles work as expected when they are enabled
-
 	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkState)
 }
