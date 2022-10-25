@@ -7,9 +7,9 @@ import (
 	stdcontext "context"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var _ Signer = &txSigner{}
@@ -25,11 +25,11 @@ type SignerBackend interface {
 }
 
 type txSigner struct {
-	kc      *secp256k1fx.Keychain
+	kc      keychain.Keychain
 	backend SignerBackend
 }
 
-func NewSigner(kc *secp256k1fx.Keychain, backend SignerBackend) Signer {
+func NewSigner(kc keychain.Keychain, backend SignerBackend) Signer {
 	return &txSigner{
 		kc:      kc,
 		backend: backend,

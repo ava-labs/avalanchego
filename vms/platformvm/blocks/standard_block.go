@@ -68,6 +68,9 @@ func (b *ApricotStandardBlock) InitCtx(ctx *snow.Context) {
 func (b *ApricotStandardBlock) Txs() []*txs.Tx        { return b.Transactions }
 func (b *ApricotStandardBlock) Visit(v Visitor) error { return v.ApricotStandardBlock(b) }
 
+// NewApricotStandardBlock is kept for testing purposes only.
+// Following Banff activation and subsequent code cleanup, Apricot Standard blocks
+// should be only verified (upon bootstrap), never created anymore
 func NewApricotStandardBlock(
 	parentID ids.ID,
 	height uint64,

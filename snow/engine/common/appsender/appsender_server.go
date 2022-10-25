@@ -26,6 +26,24 @@ func NewServer(appSender common.AppSender) *Server {
 	return &Server{appSender: appSender}
 }
 
+func (s *Server) SendCrossChainAppRequest(ctx context.Context, msg *appsenderpb.SendCrossChainAppRequestMsg) (*emptypb.Empty, error) {
+	chainID, err := ids.ToID(msg.ChainId)
+	if err != nil {
+		return &emptypb.Empty{}, err
+	}
+
+	return &emptypb.Empty{}, s.appSender.SendCrossChainAppRequest(chainID, msg.RequestId, msg.Request)
+}
+
+func (s *Server) SendCrossChainAppResponse(ctx context.Context, msg *appsenderpb.SendCrossChainAppResponseMsg) (*emptypb.Empty, error) {
+	chainID, err := ids.ToID(msg.ChainId)
+	if err != nil {
+		return &emptypb.Empty{}, err
+	}
+
+	return &emptypb.Empty{}, s.appSender.SendCrossChainAppResponse(chainID, msg.RequestId, msg.Response)
+}
+
 func (s *Server) SendAppRequest(_ context.Context, req *appsenderpb.SendAppRequestMsg) (*emptypb.Empty, error) {
 	nodeIDs := ids.NewNodeIDSet(len(req.NodeIds))
 	for _, nodeIDBytes := range req.NodeIds {

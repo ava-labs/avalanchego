@@ -21,7 +21,7 @@ import (
 )
 
 func TestNewImportTx(t *testing.T) {
-	env := newEnvironment()
+	env := newEnvironment( /*postBanff*/ false)
 	defer func() {
 		if err := shutdownEnvironment(env); err != nil {
 			t.Fatal(err)
@@ -135,22 +135,7 @@ func TestNewImportTx(t *testing.T) {
 			shouldVerify: true,
 		},
 		{
-			description:   "attempting to import non-avax from X-chain pre-banff",
-			sourceChainID: env.ctx.XChainID,
-			sharedMemory: fundedSharedMemory(
-				env.ctx.XChainID,
-				map[ids.ID]uint64{
-					env.ctx.AVAXAssetID: env.config.TxFee,
-					customAssetID:       1,
-				},
-			),
-			sourceKeys:   []*crypto.PrivateKeySECP256K1R{sourceKey},
-			timestamp:    env.config.BanffTime.Add(-time.Second),
-			shouldErr:    false,
-			shouldVerify: false,
-		},
-		{
-			description:   "attempting to import non-avax from X-chain post-banff",
+			description:   "attempting to import non-avax from X-chain",
 			sourceChainID: env.ctx.XChainID,
 			sharedMemory: fundedSharedMemory(
 				env.ctx.XChainID,

@@ -28,7 +28,7 @@ var (
 
 type adaptiveTimeout struct {
 	index    int           // Index in the wait queue
-	id       ids.ID        // Unique ID of this timeout
+	id       ids.RequestID // Unique ID of this timeout
 	handler  func()        // Function to execute if timed out
 	duration time.Duration // How long this timeout was set for
 	deadline time.Time     // When this timeout should be fired
@@ -87,10 +87,10 @@ type AdaptiveTimeoutManager interface {
 	TimeoutDuration() time.Duration
 	// Registers a timeout for the item with the given [id].
 	// If the timeout occurs before the item is Removed, [timeoutHandler] is called.
-	Put(id ids.ID, op message.Op, timeoutHandler func())
+	Put(id ids.RequestID, op message.Op, timeoutHandler func())
 	// Remove the timeout associated with [id].
 	// Its timeout handler will not be called.
-	Remove(id ids.ID)
+	Remove(id ids.RequestID)
 	// ObserveLatency manually registers a response latency.
 	// We use this to pretend that it a query to a benched validator
 	// timed out when actually, we never even sent them a request.
@@ -112,7 +112,7 @@ type adaptiveTimeoutManager struct {
 	minimumTimeout     time.Duration
 	maximumTimeout     time.Duration
 	currentTimeout     time.Duration // Amount of time before a timeout
-	timeoutMap         map[ids.ID]*adaptiveTimeout
+	timeoutMap         map[ids.RequestID]*adaptiveTimeout
 	timeoutQueue       timeoutQueue
 	timer              *Timer // Timer that will fire to clear the timeouts
 }
@@ -158,7 +158,7 @@ func NewAdaptiveTimeoutManager(
 		maximumTimeout:     config.MaximumTimeout,
 		currentTimeout:     config.InitialTimeout,
 		timeoutCoefficient: config.TimeoutCoefficient,
-		timeoutMap:         make(map[ids.ID]*adaptiveTimeout),
+		timeoutMap:         make(map[ids.RequestID]*adaptiveTimeout),
 	}
 	tm.timer = NewTimer(tm.timeout)
 	tm.averager = math.NewAverager(float64(config.InitialTimeout), config.TimeoutHalflife, tm.clock.Time())
@@ -184,7 +184,7 @@ func (tm *adaptiveTimeoutManager) Dispatch() { tm.timer.Dispatch() }
 
 func (tm *adaptiveTimeoutManager) Stop() { tm.timer.Stop() }
 
-func (tm *adaptiveTimeoutManager) Put(id ids.ID, op message.Op, timeoutHandler func()) {
+func (tm *adaptiveTimeoutManager) Put(id ids.RequestID, op message.Op, timeoutHandler func()) {
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
 
@@ -192,7 +192,7 @@ func (tm *adaptiveTimeoutManager) Put(id ids.ID, op message.Op, timeoutHandler f
 }
 
 // Assumes [tm.lock] is held
-func (tm *adaptiveTimeoutManager) put(id ids.ID, op message.Op, handler func()) {
+func (tm *adaptiveTimeoutManager) put(id ids.RequestID, op message.Op, handler func()) {
 	now := tm.clock.Time()
 	tm.remove(id, now)
 
@@ -210,7 +210,7 @@ func (tm *adaptiveTimeoutManager) put(id ids.ID, op message.Op, handler func()) 
 	tm.setNextTimeoutTime()
 }
 
-func (tm *adaptiveTimeoutManager) Remove(id ids.ID) {
+func (tm *adaptiveTimeoutManager) Remove(id ids.RequestID) {
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
 
@@ -218,7 +218,7 @@ func (tm *adaptiveTimeoutManager) Remove(id ids.ID) {
 }
 
 // Assumes [tm.lock] is held
-func (tm *adaptiveTimeoutManager) remove(id ids.ID, now time.Time) {
+func (tm *adaptiveTimeoutManager) remove(id ids.RequestID, now time.Time) {
 	timeout, exists := tm.timeoutMap[id]
 	if !exists {
 		return

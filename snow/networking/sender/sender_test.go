@@ -62,8 +62,6 @@ func TestTimeout(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
 	require.NoError(t, err)
-	mcProto, err := message.NewCreatorWithProto(metrics, "dummyNamespace", true, 10*time.Second)
-	require.NoError(t, err)
 
 	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	require.NoError(t, err)
@@ -72,7 +70,7 @@ func TestTimeout(t *testing.T) {
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(context, mc, mcProto, time.Now().Add(time.Hour) /* TODO: test with banff accepted */, externalSender, &chainRouter, tm, defaultGossipConfig)
+	sender, err := New(context, mc, externalSender, &chainRouter, tm, defaultGossipConfig)
 	require.NoError(t, err)
 
 	wg := sync.WaitGroup{}
@@ -156,8 +154,6 @@ func TestReliableMessages(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
 	require.NoError(t, err)
-	mcProto, err := message.NewCreatorWithProto(metrics, "dummyNamespace", true, 10*time.Second)
-	require.NoError(t, err)
 
 	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	require.NoError(t, err)
@@ -167,7 +163,7 @@ func TestReliableMessages(t *testing.T) {
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(context, mc, mcProto, time.Now().Add(time.Hour) /* TODO: test with banff accepted */, externalSender, &chainRouter, tm, defaultGossipConfig)
+	sender, err := New(context, mc, externalSender, &chainRouter, tm, defaultGossipConfig)
 	require.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
@@ -255,8 +251,6 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	metrics := prometheus.NewRegistry()
 	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
 	require.NoError(t, err)
-	mcProto, err := message.NewCreatorWithProto(metrics, "dummyNamespace", true, 10*time.Second)
-	require.NoError(t, err)
 
 	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	require.NoError(t, err)
@@ -266,7 +260,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(context, mc, mcProto, time.Now().Add(time.Hour) /* TODO: test with banff accepted */, externalSender, &chainRouter, tm, defaultGossipConfig)
+	sender, err := New(context, mc, externalSender, &chainRouter, tm, defaultGossipConfig)
 	require.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()

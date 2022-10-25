@@ -39,7 +39,7 @@ type Manager interface {
 		nodeID ids.NodeID,
 		chainID ids.ID,
 		op message.Op,
-		requestID ids.ID,
+		requestID ids.RequestID,
 		timeoutHandler func(),
 	)
 	// Registers that we would have sent a request to a validator but they
@@ -55,13 +55,13 @@ type Manager interface {
 	RegisterResponse(
 		nodeID ids.NodeID,
 		chainID ids.ID,
-		requestID ids.ID,
+		requestID ids.RequestID,
 		op message.Op,
 		latency time.Duration,
 	)
 	// Mark that we no longer expect a response to this request we sent.
 	// Does not modify the timeout.
-	RemoveRequest(requestID ids.ID)
+	RemoveRequest(requestID ids.RequestID)
 }
 
 func NewManager(
@@ -121,7 +121,7 @@ func (m *manager) RegisterRequest(
 	nodeID ids.NodeID,
 	chainID ids.ID,
 	op message.Op,
-	requestID ids.ID,
+	requestID ids.RequestID,
 	timeoutHandler func(),
 ) {
 	newTimeoutHandler := func() {
@@ -137,7 +137,7 @@ func (m *manager) RegisterRequest(
 func (m *manager) RegisterResponse(
 	nodeID ids.NodeID,
 	chainID ids.ID,
-	requestID ids.ID,
+	requestID ids.RequestID,
 	op message.Op,
 	latency time.Duration,
 ) {
@@ -146,7 +146,7 @@ func (m *manager) RegisterResponse(
 	m.tm.Remove(requestID)
 }
 
-func (m *manager) RemoveRequest(requestID ids.ID) {
+func (m *manager) RemoveRequest(requestID ids.RequestID) {
 	m.tm.Remove(requestID)
 }
 

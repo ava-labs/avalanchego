@@ -5,7 +5,6 @@ package proposervm
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -53,8 +52,6 @@ var (
 	_ block.StateSyncableVM      = &VM{}
 
 	dbPrefix = []byte("proposervm")
-
-	errBanffBlockBeforeBanff = errors.New("block requiring Banff issued before Banff activated")
 )
 
 type VM struct {
@@ -65,8 +62,6 @@ type VM struct {
 
 	activationTime      time.Time
 	minimumPChainHeight uint64
-
-	banffActivationTime time.Time
 
 	state.State
 	hIndexer                indexer.HeightIndexer
@@ -102,15 +97,12 @@ type VM struct {
 
 	// lastAcceptedHeight is set to the last accepted PostForkBlock's height.
 	lastAcceptedHeight uint64
-
-	activationTimeBanff time.Time
 }
 
 func New(
 	vm block.ChainVM,
 	activationTime time.Time,
 	minimumPChainHeight uint64,
-	banffActivationTime time.Time,
 ) *VM {
 	bVM, _ := vm.(block.BatchedChainVM)
 	hVM, _ := vm.(block.HeightIndexedChainVM)
@@ -123,8 +115,6 @@ func New(
 
 		activationTime:      activationTime,
 		minimumPChainHeight: minimumPChainHeight,
-
-		banffActivationTime: banffActivationTime,
 	}
 }
 
@@ -618,16 +608,9 @@ func (vm *VM) setLastAcceptedMetadata() error {
 }
 
 func (vm *VM) parsePostForkBlock(b []byte) (PostForkBlock, error) {
-	statelessBlock, requireBanff, err := statelessblock.Parse(b)
+	statelessBlock, err := statelessblock.Parse(b)
 	if err != nil {
 		return nil, err
-	}
-
-	if requireBanff {
-		banffActivated := vm.Clock.Time().After(vm.activationTimeBanff)
-		if !banffActivated {
-			return nil, errBanffBlockBeforeBanff
-		}
 	}
 
 	// if the block already exists, then make sure the status is set correctly
@@ -741,6 +724,7 @@ func (vm *VM) storePostForkBlock(blk PostForkBlock) error {
 }
 
 func (vm *VM) verifyAndRecordInnerBlk(postFork PostForkBlock) error {
+	postForkID := postFork.ID()
 	// If inner block's Verify returned true, don't call it again.
 	//
 	// Note that if [innerBlk.Verify] returns nil, this method returns nil. This
@@ -752,11 +736,11 @@ func (vm *VM) verifyAndRecordInnerBlk(postFork PostForkBlock) error {
 			return err
 		}
 		vm.Tree.Add(currentInnerBlk)
+		vm.innerBlkCache.Put(postForkID, currentInnerBlk)
 	} else {
 		postFork.setInnerBlk(originalInnerBlk)
 	}
-
-	vm.verifiedBlocks[postFork.ID()] = postFork
+	vm.verifiedBlocks[postForkID] = postFork
 	return nil
 }
 
@@ -776,7 +760,7 @@ func (vm *VM) optimalPChainHeight(minPChainHeight uint64) (uint64, error) {
 		return 0, err
 	}
 
-	return math.Max64(minimumHeight, minPChainHeight), nil
+	return math.Max(minimumHeight, minPChainHeight), nil
 }
 
 // parseInnerBlock attempts to parse the provided bytes as an inner block. If
@@ -798,7 +782,7 @@ func (vm *VM) parseInnerBlock(outerBlkID ids.ID, innerBlkBytes []byte) (snowman.
 // Caches proposervm block ID --> inner block if the inner block's height
 // is within [innerBlkCacheSize] of the last accepted block's height.
 func (vm *VM) cacheInnerBlock(outerBlkID ids.ID, innerBlk snowman.Block) {
-	diff := math.Diff64(innerBlk.Height(), vm.lastAcceptedHeight)
+	diff := math.AbsDiff(innerBlk.Height(), vm.lastAcceptedHeight)
 	if diff < innerBlkCacheSize {
 		vm.innerBlkCache.Put(outerBlkID, innerBlk)
 	}

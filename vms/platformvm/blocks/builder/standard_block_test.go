@@ -5,7 +5,6 @@ package builder
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -74,8 +73,6 @@ func TestAtomicTxImports(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	)
 	require.NoError(err)
-
-	env.state.SetTimestamp(env.config.ApricotPhase5Time.Add(100 * time.Second))
 
 	require.NoError(env.Builder.Add(tx))
 	b, err := env.Builder.BuildBlock()

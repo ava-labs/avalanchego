@@ -21,14 +21,14 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
-	avengmocks "github.com/ava-labs/avalanchego/snow/engine/avalanche/mocks"
-	avvtxmocks "github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex/mocks"
+	aveng "github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	smblockmocks "github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
-	smengmocks "github.com/ava-labs/avalanchego/snow/engine/snowman/mocks"
 )
 
 var _ server.PathAdder = &apiServerMock{}
@@ -162,9 +162,9 @@ func TestIndexer(t *testing.T) {
 
 	// Register this chain, creating a new index
 	chainVM := smblockmocks.NewMockChainVM(ctrl)
-	chainEngine := &smengmocks.Engine{}
-	chainEngine.On("Context").Return(chain1Ctx)
-	chainEngine.On("GetVM").Return(chainVM)
+	chainEngine := snowman.NewMockEngine(ctrl)
+	chainEngine.EXPECT().Context().AnyTimes().Return(chain1Ctx)
+	chainEngine.EXPECT().GetVM().AnyTimes().Return(chainVM)
 
 	idxr.RegisterChain("chain1", chainEngine)
 	isIncomplete, err = idxr.isIncomplete(chain1Ctx.ChainID)
@@ -267,10 +267,10 @@ func TestIndexer(t *testing.T) {
 	previouslyIndexed, err = idxr.previouslyIndexed(chain2Ctx.ChainID)
 	require.NoError(err)
 	require.False(previouslyIndexed)
-	dagVM := &avvtxmocks.DAGVM{}
-	dagEngine := &avengmocks.Engine{}
-	dagEngine.On("Context").Return(chain2Ctx)
-	dagEngine.On("GetVM").Return(dagVM).Once()
+	dagVM := vertex.NewMockDAGVM(ctrl)
+	dagEngine := aveng.NewMockEngine(ctrl)
+	dagEngine.EXPECT().Context().AnyTimes().Return(chain2Ctx)
+	dagEngine.EXPECT().GetVM().AnyTimes().Return(dagVM)
 	idxr.RegisterChain("chain2", dagEngine)
 	require.NoError(err)
 	server = config.APIServer.(*apiServerMock)
@@ -290,7 +290,7 @@ func TestIndexer(t *testing.T) {
 		Timestamp: now.UnixNano(),
 	}
 	// Mocked VM knows about this block now
-	dagEngine.On("GetVtx", vtxID).Return(
+	dagEngine.EXPECT().GetVtx(vtxID).Return(
 		&avalanche.TestVertex{
 			TestDecidable: choices.TestDecidable{
 				StatusV: choices.Accepted,
@@ -298,7 +298,7 @@ func TestIndexer(t *testing.T) {
 			},
 			BytesV: vtxBytes,
 		}, nil,
-	).Once()
+	).AnyTimes()
 
 	require.NoError(config.ConsensusAcceptorGroup.Accept(chain2Ctx, vtxID, blkBytes))
 
@@ -339,7 +339,7 @@ func TestIndexer(t *testing.T) {
 		Timestamp: now.UnixNano(),
 	}
 	// Mocked VM knows about this tx now
-	dagVM.On("GetTx", txID).Return(
+	dagVM.EXPECT().GetTx(txID).Return(
 		&snowstorm.TestTx{
 			TestDecidable: choices.TestDecidable{
 				IDV:     txID,
@@ -347,7 +347,7 @@ func TestIndexer(t *testing.T) {
 			},
 			BytesV: txBytes,
 		}, nil,
-	).Once()
+	).AnyTimes()
 
 	require.NoError(config.DecisionAcceptorGroup.Accept(chain2Ctx, txID, blkBytes))
 
@@ -450,8 +450,8 @@ func TestIncompleteIndex(t *testing.T) {
 	previouslyIndexed, err := idxr.previouslyIndexed(chain1Ctx.ChainID)
 	require.NoError(err)
 	require.False(previouslyIndexed)
-	chainEngine := &smengmocks.Engine{}
-	chainEngine.On("Context").Return(chain1Ctx)
+	chainEngine := snowman.NewMockEngine(ctrl)
+	chainEngine.EXPECT().Context().AnyTimes().Return(chain1Ctx)
 	idxr.RegisterChain("chain1", chainEngine)
 	isIncomplete, err = idxr.isIncomplete(chain1Ctx.ChainID)
 	require.NoError(err)
@@ -533,9 +533,9 @@ func TestIgnoreNonDefaultChains(t *testing.T) {
 
 	// RegisterChain should return without adding an index for this chain
 	chainVM := smblockmocks.NewMockChainVM(ctrl)
-	chainEngine := &smengmocks.Engine{}
-	chainEngine.On("Context").Return(chain1Ctx)
-	chainEngine.On("GetVM").Return(chainVM)
+	chainEngine := snowman.NewMockEngine(ctrl)
+	chainEngine.EXPECT().Context().AnyTimes().Return(chain1Ctx)
+	chainEngine.EXPECT().GetVM().AnyTimes().Return(chainVM)
 	idxr.RegisterChain("chain1", chainEngine)
 	require.Len(idxr.blockIndices, 0)
 }

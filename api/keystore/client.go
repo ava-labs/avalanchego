@@ -33,18 +33,17 @@ type client struct {
 
 func NewClient(uri string) Client {
 	return &client{requester: rpc.NewEndpointRequester(
-		uri+"/ext/keystore",
-		"keystore",
+		uri + "/ext/keystore",
 	)}
 }
 
 func (c *client) CreateUser(ctx context.Context, user api.UserPass, options ...rpc.Option) error {
-	return c.requester.SendRequest(ctx, "createUser", &user, &api.EmptyReply{}, options...)
+	return c.requester.SendRequest(ctx, "keystore.createUser", &user, &api.EmptyReply{}, options...)
 }
 
 func (c *client) ListUsers(ctx context.Context, options ...rpc.Option) ([]string, error) {
 	res := &ListUsersReply{}
-	err := c.requester.SendRequest(ctx, "listUsers", struct{}{}, res, options...)
+	err := c.requester.SendRequest(ctx, "keystore.listUsers", struct{}{}, res, options...)
 	return res.Users, err
 }
 
@@ -52,7 +51,7 @@ func (c *client) ExportUser(ctx context.Context, user api.UserPass, options ...r
 	res := &ExportUserReply{
 		Encoding: formatting.Hex,
 	}
-	err := c.requester.SendRequest(ctx, "exportUser", &user, res, options...)
+	err := c.requester.SendRequest(ctx, "keystore.exportUser", &user, res, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +64,7 @@ func (c *client) ImportUser(ctx context.Context, user api.UserPass, account []by
 		return err
 	}
 
-	return c.requester.SendRequest(ctx, "importUser", &ImportUserArgs{
+	return c.requester.SendRequest(ctx, "keystore.importUser", &ImportUserArgs{
 		UserPass: user,
 		User:     accountStr,
 		Encoding: formatting.Hex,
@@ -73,5 +72,5 @@ func (c *client) ImportUser(ctx context.Context, user api.UserPass, account []by
 }
 
 func (c *client) DeleteUser(ctx context.Context, user api.UserPass, options ...rpc.Option) error {
-	return c.requester.SendRequest(ctx, "deleteUser", &user, &api.EmptyReply{}, options...)
+	return c.requester.SendRequest(ctx, "keystore.deleteUser", &user, &api.EmptyReply{}, options...)
 }

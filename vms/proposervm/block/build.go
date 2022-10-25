@@ -9,32 +9,12 @@ import (
 	"crypto/x509"
 	"time"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-func BuildUnsignedApricot(
-	parentID ids.ID,
-	timestamp time.Time,
-	pChainHeight uint64,
-	blockBytes []byte,
-) (SignedBlock, error) {
-	return buildUnsigned(apricotCodec, parentID, timestamp, pChainHeight, blockBytes)
-}
-
-func BuildUnsignedBanff(
-	parentID ids.ID,
-	timestamp time.Time,
-	pChainHeight uint64,
-	blockBytes []byte,
-) (SignedBlock, error) {
-	return buildUnsigned(banffCodec, parentID, timestamp, pChainHeight, blockBytes)
-}
-
-func buildUnsigned(
-	cm codec.Manager,
+func BuildUnsigned(
 	parentID ids.ID,
 	timestamp time.Time,
 	pChainHeight uint64,
@@ -51,39 +31,14 @@ func buildUnsigned(
 		timestamp: timestamp,
 	}
 
-	bytes, err := cm.Marshal(codecVersion, &block)
+	bytes, err := c.Marshal(codecVersion, &block)
 	if err != nil {
 		return nil, err
 	}
 	return block, block.initialize(bytes)
 }
 
-func BuildApricot(
-	parentID ids.ID,
-	timestamp time.Time,
-	pChainHeight uint64,
-	cert *x509.Certificate,
-	blockBytes []byte,
-	chainID ids.ID,
-	key crypto.Signer,
-) (SignedBlock, error) {
-	return build(apricotCodec, parentID, timestamp, pChainHeight, cert, blockBytes, chainID, key)
-}
-
-func BuildBanff(
-	parentID ids.ID,
-	timestamp time.Time,
-	pChainHeight uint64,
-	cert *x509.Certificate,
-	blockBytes []byte,
-	chainID ids.ID,
-	key crypto.Signer,
-) (SignedBlock, error) {
-	return build(banffCodec, parentID, timestamp, pChainHeight, cert, blockBytes, chainID, key)
-}
-
-func build(
-	cm codec.Manager,
+func Build(
 	parentID ids.ID,
 	timestamp time.Time,
 	pChainHeight uint64,
@@ -106,7 +61,7 @@ func build(
 	}
 	var blockIntf SignedBlock = block
 
-	unsignedBytesWithEmptySignature, err := cm.Marshal(codecVersion, &blockIntf)
+	unsignedBytesWithEmptySignature, err := c.Marshal(codecVersion, &blockIntf)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +85,7 @@ func build(
 		return nil, err
 	}
 
-	block.bytes, err = cm.Marshal(codecVersion, &blockIntf)
+	block.bytes, err = c.Marshal(codecVersion, &blockIntf)
 	return block, err
 }
 
@@ -145,7 +100,7 @@ func BuildHeader(
 		Body:   bodyID,
 	}
 
-	bytes, err := banffCodec.Marshal(codecVersion, &header)
+	bytes, err := c.Marshal(codecVersion, &header)
 	header.bytes = bytes
 	return &header, err
 }
@@ -162,7 +117,7 @@ func BuildOption(
 		InnerBytes: innerBytes,
 	}
 
-	bytes, err := banffCodec.Marshal(codecVersion, &block)
+	bytes, err := c.Marshal(codecVersion, &block)
 	if err != nil {
 		return nil, err
 	}

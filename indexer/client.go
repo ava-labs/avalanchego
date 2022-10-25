@@ -47,13 +47,13 @@ type client struct {
 //   - http://1.2.3.4:9650/ext/index/X/tx
 func NewClient(uri string) Client {
 	return &client{
-		requester: rpc.NewEndpointRequester(uri, "index"),
+		requester: rpc.NewEndpointRequester(uri),
 	}
 }
 
 func (c *client) GetContainerRange(ctx context.Context, startIndex uint64, numToFetch int, options ...rpc.Option) ([]Container, error) {
 	var fcs GetContainerRangeResponse
-	err := c.requester.SendRequest(ctx, "getContainerRange", &GetContainerRangeArgs{
+	err := c.requester.SendRequest(ctx, "index.getContainerRange", &GetContainerRangeArgs{
 		StartIndex: json.Uint64(startIndex),
 		NumToFetch: json.Uint64(numToFetch),
 		Encoding:   formatting.Hex,
@@ -79,7 +79,7 @@ func (c *client) GetContainerRange(ctx context.Context, startIndex uint64, numTo
 
 func (c *client) GetContainerByIndex(ctx context.Context, index uint64, options ...rpc.Option) (Container, error) {
 	var fc FormattedContainer
-	err := c.requester.SendRequest(ctx, "getContainerByIndex", &GetContainerByIndexArgs{
+	err := c.requester.SendRequest(ctx, "index.getContainerByIndex", &GetContainerByIndexArgs{
 		Index:    json.Uint64(index),
 		Encoding: formatting.Hex,
 	}, &fc, options...)
@@ -100,7 +100,7 @@ func (c *client) GetContainerByIndex(ctx context.Context, index uint64, options 
 
 func (c *client) GetLastAccepted(ctx context.Context, options ...rpc.Option) (Container, error) {
 	var fc FormattedContainer
-	err := c.requester.SendRequest(ctx, "getLastAccepted", &GetLastAcceptedArgs{
+	err := c.requester.SendRequest(ctx, "index.getLastAccepted", &GetLastAcceptedArgs{
 		Encoding: formatting.Hex,
 	}, &fc, options...)
 	if err != nil {
@@ -120,7 +120,7 @@ func (c *client) GetLastAccepted(ctx context.Context, options ...rpc.Option) (Co
 
 func (c *client) GetIndex(ctx context.Context, id ids.ID, options ...rpc.Option) (uint64, error) {
 	var index GetIndexResponse
-	err := c.requester.SendRequest(ctx, "getIndex", &GetIndexArgs{
+	err := c.requester.SendRequest(ctx, "index.getIndex", &GetIndexArgs{
 		ID: id,
 	}, &index, options...)
 	return uint64(index.Index), err
@@ -128,7 +128,7 @@ func (c *client) GetIndex(ctx context.Context, id ids.ID, options ...rpc.Option)
 
 func (c *client) IsAccepted(ctx context.Context, id ids.ID, options ...rpc.Option) (bool, error) {
 	var res IsAcceptedResponse
-	err := c.requester.SendRequest(ctx, "isAccepted", &IsAcceptedArgs{
+	err := c.requester.SendRequest(ctx, "index.isAccepted", &IsAcceptedArgs{
 		ID: id,
 	}, &res, options...)
 	return res.IsAccepted, err
@@ -136,7 +136,7 @@ func (c *client) IsAccepted(ctx context.Context, id ids.ID, options ...rpc.Optio
 
 func (c *client) GetContainerByID(ctx context.Context, id ids.ID, options ...rpc.Option) (Container, error) {
 	var fc FormattedContainer
-	err := c.requester.SendRequest(ctx, "getContainerByID", &GetContainerByIDArgs{
+	err := c.requester.SendRequest(ctx, "index.getContainerByID", &GetContainerByIDArgs{
 		ID:       id,
 		Encoding: formatting.Hex,
 	}, &fc, options...)

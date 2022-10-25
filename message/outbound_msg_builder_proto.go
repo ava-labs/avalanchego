@@ -12,24 +12,24 @@ import (
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
-var _ OutboundMsgBuilder = &outMsgBuilderWithProto{}
+var _ OutboundMsgBuilder = &outMsgBuilder{}
 
-type outMsgBuilderWithProto struct {
+type outMsgBuilder struct {
 	compress bool // set to "true" if compression is enabled
 
-	protoBuilder *msgBuilderProtobuf
+	builder *msgBuilder
 }
 
-// Use "message.NewCreatorWithProto" to import this function
-// since we do not expose "msgBuilderProtobuf" yet
-func newOutboundBuilderWithProto(enableCompression bool, protoBuilder *msgBuilderProtobuf) OutboundMsgBuilder {
-	return &outMsgBuilderWithProto{
-		compress:     enableCompression,
-		protoBuilder: protoBuilder,
+// Use "message.NewCreator" to import this function
+// since we do not expose "msgBuilder" yet
+func newOutboundBuilder(enableCompression bool, builder *msgBuilder) OutboundMsgBuilder {
+	return &outMsgBuilder{
+		compress: enableCompression,
+		builder:  builder,
 	}
 }
 
-func (b *outMsgBuilderWithProto) Version(
+func (b *outMsgBuilder) Version(
 	networkID uint32,
 	myTime uint64,
 	ip ips.IPPort,
@@ -43,7 +43,7 @@ func (b *outMsgBuilderWithProto) Version(
 		copy := containerID
 		subnetIDBytes[i] = copy[:]
 	}
-	return b.protoBuilder.createOutbound(
+	return b.builder.createOutbound(
 		Version,
 		&p2ppb.Message{
 			Message: &p2ppb.Message_Version{
@@ -64,10 +64,9 @@ func (b *outMsgBuilderWithProto) Version(
 	)
 }
 
-func (b *outMsgBuilderWithProto) PeerList(peers []ips.ClaimedIPPort, bypassThrottling bool) (OutboundMessage, error) {
+func (b *outMsgBuilder) PeerList(peers []ips.ClaimedIPPort, bypassThrottling bool) (OutboundMessage, error) {
 	claimIPPorts := make([]*p2ppb.ClaimedIpPort, len(peers))
 	for i, p := range peers {
-		// ref. "wrappers.TryPackClaimedIPPortList", "PackX509Certificate"
 		claimIPPorts[i] = &p2ppb.ClaimedIpPort{
 			// the inbound message parser will call "x509.ParseCertificate(p.X509Certificate)"
 			// to decode this message
@@ -78,7 +77,7 @@ func (b *outMsgBuilderWithProto) PeerList(peers []ips.ClaimedIPPort, bypassThrot
 			Signature:       p.Signature,
 		}
 	}
-	return b.protoBuilder.createOutbound(
+	return b.builder.createOutbound(
 		PeerList,
 		&p2ppb.Message{
 			Message: &p2ppb.Message_PeerList{
@@ -92,8 +91,8 @@ func (b *outMsgBuilderWithProto) PeerList(peers []ips.ClaimedIPPort, bypassThrot
 	)
 }
 
-func (b *outMsgBuilderWithProto) Ping() (OutboundMessage, error) {
-	return b.protoBuilder.createOutbound(
+func (b *outMsgBuilder) Ping() (OutboundMessage, error) {
+	return b.builder.createOutbound(
 		Ping,
 		&p2ppb.Message{
 			Message: &p2ppb.Message_Ping{
@@ -105,8 +104,8 @@ func (b *outMsgBuilderWithProto) Ping() (OutboundMessage, error) {
 	)
 }
 
-func (b *outMsgBuilderWithProto) Pong(uptimePercentage uint8) (OutboundMessage, error) {
-	return b.protoBuilder.createOutbound(
+func (b *outMsgBuilder) Pong(uptimePercentage uint8) (OutboundMessage, error) {
+	return b.builder.createOutbound(
 		Pong,
 		&p2ppb.Message{
 			Message: &p2ppb.Message_Pong{
@@ -120,12 +119,12 @@ func (b *outMsgBuilderWithProto) Pong(uptimePercentage uint8) (OutboundMessage, 
 	)
 }
 
-func (b *outMsgBuilderWithProto) GetStateSummaryFrontier(
+func (b *outMsgBuilder) GetStateSummaryFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
 ) (OutboundMessage, error) {
-	return b.protoBuilder.createOutbound(
+	return b.builder.createOutbound(
 		GetStateSummaryFrontier,
 		&p2ppb.Message{
 			Message: &p2ppb.Message_GetStateSummaryFrontier{
@@ -141,12 +140,12 @@ func (b *outMsgBuilderWithProto) GetStateSummaryFrontier(
 	)
 }
 
-func (b *outMsgBuilderWithProto) StateSummaryFrontier(
+func (b *outMsgBuilder) StateSummaryFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	summary []byte,
 ) (OutboundMessage, error) {
-	return b.protoBuilder.createOutbound(
+	return b.builder.createOutbound(
 		StateSummaryFrontier,
 		&p2ppb.Message{
 			Message: &p2ppb.Message_StateSummaryFrontier_{
@@ -162,13 +161,13 @@ func (b *outMsgBuilderWithProto) StateSummaryFrontier(
 	)
 }
 
-func (b *outMsgBuilderWithProto) GetAcceptedStateSummary(
+func (b *outMsgBuilder) GetAcceptedStateSummary(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
 	heights []uint64,
 ) (OutboundMessage, error) {
-	return b.protoBuilder.createOutbound(
+	return b.builder.createOutbound(
 		GetAcceptedStateSummary,
 		&p2ppb.Message{
 			Message: &p2ppb.Message_GetAcceptedStateSummary{
@@ -185,14 +184,14 @@ func (b *outMsgBuilderWithProto) GetAcceptedStateSummary(
 	)
 }
 
-func (b *outMsgBuilderWithProto) AcceptedStateSummary(
+func (b *outMsgBuilder) AcceptedStateSummary(
 	chainID ids.ID,
 	requestID uint32,
 	summaryIDs []ids.ID,
 ) (OutboundMessage, error) {
 	summaryIDBytes := make([][]byte, len(summaryIDs))
 	encodeIDs(summaryIDs, summaryIDBytes)
-	return b.protoBuilder.createOutbound(
+	return b.builder.createOutbound(
 		AcceptedStateSummary,
 		&p2ppb.Message{
 			Message: &p2ppb.Message_AcceptedStateSummary_{
@@ -208,12 +207,12 @@ func (b *outMsgBuilderWithProto) AcceptedStateSummary(
 	)
 }
 
-func (b *outMsgBuilderWithProto) GetAcceptedFrontier(
+func (b *outMsgBuilder) GetAcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
 ) (OutboundMessage, error) {
-	return b.protoBuilder.createOutbound(
+	return b.builder.createOutbound(
 		GetAcceptedFrontier,
 		&p2ppb.Message{
 			Message: &p2ppb.Message_GetAcceptedFrontier{
@@ -229,14 +228,14 @@ func (b *outMsgBuilderWithProto) GetAcceptedFrontier(
 	)
 }
 
-func (b *outMsgBuilderWithProto) AcceptedFrontier(
+func (b *outMsgBuilder) AcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
 ) (OutboundMessage, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	encodeIDs(containerIDs, containerIDBytes)
-	return b.protoBuilder.createOutbound(
+	return b.builder.createOutbound(
 		AcceptedFrontier,
 		&p2ppb.Message{
 			Message: &p2ppb.Message_AcceptedFrontier_{
@@ -252,7 +251,7 @@ func (b *outMsgBuilderWithProto) AcceptedFrontier(
 	)
 }
 
-func (b *outMsgBuilderWithProto) GetAccepted(
+func (b *outMsgBuilder) GetAccepted(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
@@ -260,7 +259,7 @@ func (b *outMsgBuilderWithProto) GetAccepted(
 ) (OutboundMessage, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	encodeIDs(containerIDs, containerIDBytes)
-	return b.protoBuilder.createOutbound(
+	return b.builder.createOutbound(
 		GetAccepted,
 		&p2ppb.Message{
 			Message: &p2ppb.Message_GetAccepted{
@@ -277,14 +276,14 @@ func (b *outMsgBuilderWithProto) GetAccepted(
 	)
 }
 
-func (b *outMsgBuilderWithProto) Accepted(
+func (b *outMsgBuilder) Accepted(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
 ) (OutboundMessage, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	encodeIDs(containerIDs, containerIDBytes)
-	return b.protoBuilder.createOutbound(
+	return b.builder.createOutbound(
 		Accepted,
 		&p2ppb.Message{
 			Message: &p2ppb.Message_Accepted_{
@@ -300,13 +299,13 @@ func (b *outMsgBuilderWithProto) Accepted(
 	)
 }
 
-func (b *outMsgBuilderWithProto) GetAncestors(
+func (b *outMsgBuilder) GetAncestors(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
 	containerID ids.ID,
 ) (OutboundMessage, error) {
-	return b.protoBuilder.createOutbound(
+	return b.builder.createOutbound(
 		GetAncestors,
 		&p2ppb.Message{
 			Message: &p2ppb.Message_GetAncestors{
@@ -323,12 +322,12 @@ func (b *outMsgBuilderWithProto) GetAncestors(
 	)
 }
 
-func (b *outMsgBuilderWithProto) Ancestors(
+func (b *outMsgBuilder) Ancestors(
 	chainID ids.ID,
 	requestID uint32,
 	containers [][]byte,
 ) (OutboundMessage, error) {
-	return b.protoBuilder.createOutbound(
+	return b.builder.createOutbound(
 		Ancestors,
 		&p2ppb.Message{
 			Message: &p2ppb.Message_Ancestors_{
@@ -344,13 +343,13 @@ func (b *outMsgBuilderWithProto) Ancestors(
 	)
 }
 
-func (b *outMsgBuilderWithProto) Get(
+func (b *outMsgBuilder) Get(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
 	containerID ids.ID,
 ) (OutboundMessage, error) {
-	return b.protoBuilder.createOutbound(
+	return b.builder.createOutbound(
 		Get,
 		&p2ppb.Message{
 			Message: &p2ppb.Message_Get{
@@ -367,12 +366,12 @@ func (b *outMsgBuilderWithProto) Get(
 	)
 }
 
-func (b *outMsgBuilderWithProto) Put(
+func (b *outMsgBuilder) Put(
 	chainID ids.ID,
 	requestID uint32,
 	container []byte,
 ) (OutboundMessage, error) {
-	return b.protoBuilder.createOutbound(
+	return b.builder.createOutbound(
 		Put,
 		&p2ppb.Message{
 			Message: &p2ppb.Message_Put{
@@ -388,13 +387,13 @@ func (b *outMsgBuilderWithProto) Put(
 	)
 }
 
-func (b *outMsgBuilderWithProto) PushQuery(
+func (b *outMsgBuilder) PushQuery(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
 	container []byte,
 ) (OutboundMessage, error) {
-	return b.protoBuilder.createOutbound(
+	return b.builder.createOutbound(
 		PushQuery,
 		&p2ppb.Message{
 			Message: &p2ppb.Message_PushQuery{
@@ -411,13 +410,13 @@ func (b *outMsgBuilderWithProto) PushQuery(
 	)
 }
 
-func (b *outMsgBuilderWithProto) PullQuery(
+func (b *outMsgBuilder) PullQuery(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
 	containerID ids.ID,
 ) (OutboundMessage, error) {
-	return b.protoBuilder.createOutbound(
+	return b.builder.createOutbound(
 		PullQuery,
 		&p2ppb.Message{
 			Message: &p2ppb.Message_PullQuery{
@@ -434,14 +433,14 @@ func (b *outMsgBuilderWithProto) PullQuery(
 	)
 }
 
-func (b *outMsgBuilderWithProto) Chits(
+func (b *outMsgBuilder) Chits(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
 ) (OutboundMessage, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	encodeIDs(containerIDs, containerIDBytes)
-	return b.protoBuilder.createOutbound(
+	return b.builder.createOutbound(
 		Chits,
 		&p2ppb.Message{
 			Message: &p2ppb.Message_Chits{
@@ -458,13 +457,13 @@ func (b *outMsgBuilderWithProto) Chits(
 }
 
 // Application level request
-func (b *outMsgBuilderWithProto) AppRequest(
+func (b *outMsgBuilder) AppRequest(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
 	msg []byte,
 ) (OutboundMessage, error) {
-	return b.protoBuilder.createOutbound(
+	return b.builder.createOutbound(
 		AppRequest,
 		&p2ppb.Message{
 			Message: &p2ppb.Message_AppRequest{
@@ -482,8 +481,8 @@ func (b *outMsgBuilderWithProto) AppRequest(
 }
 
 // Application level response
-func (b *outMsgBuilderWithProto) AppResponse(chainID ids.ID, requestID uint32, msg []byte) (OutboundMessage, error) {
-	return b.protoBuilder.createOutbound(
+func (b *outMsgBuilder) AppResponse(chainID ids.ID, requestID uint32, msg []byte) (OutboundMessage, error) {
+	return b.builder.createOutbound(
 		AppResponse,
 		&p2ppb.Message{
 			Message: &p2ppb.Message_AppResponse{
@@ -500,8 +499,8 @@ func (b *outMsgBuilderWithProto) AppResponse(chainID ids.ID, requestID uint32, m
 }
 
 // Application level gossiped message
-func (b *outMsgBuilderWithProto) AppGossip(chainID ids.ID, msg []byte) (OutboundMessage, error) {
-	return b.protoBuilder.createOutbound(
+func (b *outMsgBuilder) AppGossip(chainID ids.ID, msg []byte) (OutboundMessage, error) {
+	return b.builder.createOutbound(
 		AppGossip,
 		&p2ppb.Message{
 			Message: &p2ppb.Message_AppGossip{

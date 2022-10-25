@@ -199,7 +199,7 @@ func New(file string, configBytes []byte, log logging.Logger, namespace string, 
 		}
 	}
 
-	log.Info("creating new leveldb",
+	log.Info("creating leveldb",
 		zap.Reflect("config", parsedConfig),
 	)
 
