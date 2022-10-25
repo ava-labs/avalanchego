@@ -686,12 +686,12 @@ func (n *network) validatorsToGossipFor(p peer.Peer) ([]ips.ClaimedIPPort, []ids
 
 // getPeers returns a slice of connected peers from a set of [nodeIDs].
 //
-//   - [nodeIDs] the IDs of the peers that should be returned if they are
-//     connected.
-//   - [subnetID] the subnetID whose membership should be considered if
-//     [validatorOnly] is set to true.
-//   - [validatorOnly] is the flag to drop any nodes from [nodeIDs] that are not
-//     validators in [subnetID].
+// - [nodeIDs] the IDs of the peers that should be returned if they are
+//   connected.
+// - [subnetID] the subnetID whose membership should be considered if
+//   [validatorOnly] is set to true.
+// - [validatorOnly] is the flag to drop any nodes from [nodeIDs] that are not
+//   validators in [subnetID].
 func (n *network) getPeers(
 	nodeIDs ids.NodeIDSet,
 	subnetID ids.ID,
