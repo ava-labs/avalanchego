@@ -656,7 +656,7 @@ func (n *network) validatorsToGossipFor(p peer.Peer) ([]ips.ClaimedIPPort, []ids
 	peerIPs := make([]ips.ClaimedIPPort, 0, len(unknown))
 	nodeIDs := make([]ids.NodeID, 0, len(unknown))
 
-	// Only select validators that we haven't already sent this peer
+	// Only select validators that we haven't already sent to this peer
 	for _, peerID := range unknown {
 		n.peersLock.RLock()
 		peer, ok := n.connectedPeers.GetByID(peerID)
