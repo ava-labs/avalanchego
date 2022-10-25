@@ -639,7 +639,7 @@ func (n *network) TracksSubnet(nodeID ids.NodeID, subnetID ids.ID) bool {
 	return subnetID == constants.PrimaryNetworkID || trackedSubnets.Contains(subnetID)
 }
 
-// validatorsToGossipFor returns a subset of the peers that [p] doesn't know
+// validatorsToGossipFor returns a subset of the validators that [p] doesn't know
 // about yet.
 func (n *network) validatorsToGossipFor(p peer.Peer) ([]ips.ClaimedIPPort, []ids.NodeID) {
 	unknown, ok := n.gossipTracker.GetUnknown(p.ID(), int(n.config.PeerListNumValidatorIPs))
