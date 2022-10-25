@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
 var (
@@ -49,7 +50,14 @@ func TestGossipTracker_Contains(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			r := require.New(t)
-			g, err := NewGossipTracker(prometheus.NewRegistry(), "foobar")
+
+			cfg := GossipTrackerConfig{
+				ValidatorManager: validators.NewManager(),
+				Registerer:       prometheus.NewRegistry(),
+				Namespace:        "foobar",
+			}
+
+			g, err := NewGossipTracker(cfg)
 			r.NoError(err)
 
 			for _, add := range test.add {
@@ -84,11 +92,18 @@ func TestGossipTracker_Add(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			r := require.New(t)
-			gossipTracker, err := NewGossipTracker(prometheus.NewRegistry(), "foobar")
+
+			cfg := GossipTrackerConfig{
+				ValidatorManager: validators.NewManager(),
+				Registerer:       prometheus.NewRegistry(),
+				Namespace:        "foobar",
+			}
+
+			g, err := NewGossipTracker(cfg)
 			r.NoError(err)
 
 			for i, p := range test.toAdd {
-				r.Equal(test.expected[i], gossipTracker.Add(p))
+				r.Equal(test.expected[i], g.Add(p))
 			}
 		})
 	}
@@ -129,7 +144,14 @@ func TestGossipTracker_Remove(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			r := require.New(t)
-			g, err := NewGossipTracker(prometheus.NewRegistry(), "foobar")
+
+			cfg := GossipTrackerConfig{
+				ValidatorManager: validators.NewManager(),
+				Registerer:       prometheus.NewRegistry(),
+				Namespace:        "foobar",
+			}
+
+			g, err := NewGossipTracker(cfg)
 			r.NoError(err)
 
 			for _, add := range test.toAdd {
@@ -195,7 +217,14 @@ func TestGossipTracker_UpdateKnown(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			r := require.New(t)
-			g, err := NewGossipTracker(prometheus.NewRegistry(), "foobar")
+
+			cfg := GossipTrackerConfig{
+				ValidatorManager: validators.NewManager(),
+				Registerer:       prometheus.NewRegistry(),
+				Namespace:        "foobar",
+			}
+
+			g, err := NewGossipTracker(cfg)
 			r.NoError(err)
 
 			for _, add := range test.add {
@@ -209,7 +238,14 @@ func TestGossipTracker_UpdateKnown(t *testing.T) {
 
 func TestGossipTracker_GetUnknown(t *testing.T) {
 	r := require.New(t)
-	g, err := NewGossipTracker(prometheus.NewRegistry(), "foobar")
+
+	cfg := GossipTrackerConfig{
+		ValidatorManager: validators.NewManager(),
+		Registerer:       prometheus.NewRegistry(),
+		Namespace:        "foobar",
+	}
+
+	g, err := NewGossipTracker(cfg)
 	r.NoError(err)
 
 	// we should get an empty unknown since we're not tracking anything
@@ -302,7 +338,14 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 // GetUnknown
 func TestGossipTracker_GetUnknown_Limit(t *testing.T) {
 	r := require.New(t)
-	g, err := NewGossipTracker(prometheus.NewRegistry(), "foobar")
+
+	cfg := GossipTrackerConfig{
+		ValidatorManager: validators.NewManager(),
+		Registerer:       prometheus.NewRegistry(),
+		Namespace:        "foobar",
+	}
+
+	g, err := NewGossipTracker(cfg)
 	r.NoError(err)
 
 	r.True(g.Add(id0))

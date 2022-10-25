@@ -10,6 +10,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 // GossipTracker tracks the peers that we're currently aware of, as well as the
@@ -64,6 +66,9 @@ type GossipTracker interface {
 }
 
 type gossipTracker struct {
+	// the validator set
+	validators validators.Manager
+
 	// a bitset of the peers that we are aware of
 	local ids.BigBitSet
 
@@ -78,14 +83,21 @@ type gossipTracker struct {
 	metrics gossipTrackerMetrics
 }
 
+type GossipTrackerConfig struct {
+	ValidatorManager validators.Manager
+	Registerer       prometheus.Registerer
+	Namespace        string
+}
+
 // NewGossipTracker returns an instance of gossipTracker
-func NewGossipTracker(registerer prometheus.Registerer, namespace string) (GossipTracker, error) {
-	m, err := newGossipTrackerMetrics(registerer, fmt.Sprintf("%s_gossip_tracker", namespace))
+func NewGossipTracker(config GossipTrackerConfig) (GossipTracker, error) {
+	m, err := newGossipTrackerMetrics(config.Registerer, fmt.Sprintf("%s_gossip_tracker", config.Namespace))
 	if err != nil {
 		return nil, err
 	}
 
 	return &gossipTracker{
+		validators:     config.ValidatorManager,
 		local:          ids.NewBigBitSet(),
 		knownPeers:     make(map[ids.NodeID]ids.BigBitSet),
 		peersToIndices: make(map[ids.NodeID]int),
@@ -232,8 +244,8 @@ func (g *gossipTracker) GetUnknown(id ids.NodeID, limit int) ([]ids.NodeID, bool
 	// where a subset of nodes might be "flickering" offline/online, resulting
 	// in the same diff being sent over each time.
 	for i := 0; i < unknown.Len(); i++ {
-		// skip the bits that aren't set
-		if !unknown.Contains(i) {
+		// skip if the bit isn't set or if this bit isn't a validator
+		if !unknown.Contains(i) || !g.validators.Contains(constants.PrimaryNetworkID, g.indicesToPeers[i]) {
 			continue
 		}
 		// stop if we exceed the max specified elements to return
