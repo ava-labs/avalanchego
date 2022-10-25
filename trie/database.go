@@ -31,7 +31,6 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-	"runtime"
 	"sync"
 	"time"
 
@@ -921,16 +920,6 @@ func (db *Database) saveCache(dir string, threads int) error {
 	return nil
 }
 
-// SaveCache atomically saves fast cache data to the given dir using half
-// available CPU cores.
-func (db *Database) SaveCache(dir string) error {
-	concurrency := runtime.GOMAXPROCS(0) / 2
-	if concurrency == 0 {
-		concurrency = 1
-	}
-	return db.saveCache(dir, concurrency)
-}
-
 // SaveCachePeriodically atomically saves fast cache data to the given dir with
 // the specified interval. All dump operation will only use a single CPU core.
 func (db *Database) SaveCachePeriodically(dir string, interval time.Duration, stopCh <-chan struct{}) {
@@ -942,13 +931,6 @@ func (db *Database) SaveCachePeriodically(dir string, interval time.Duration, st
 		case <-ticker.C:
 			db.saveCache(dir, 1)
 		case <-stopCh:
-			// Write the latest contents of the cache to disk after receiving a stop request.
-			// Note: this is different than geth, which requires an explicit
-			// call to save the cache on shutdown.
-			err := db.SaveCache(dir)
-			if err != nil {
-				log.Warn("Failed to save cache after stop requested", "err", err)
-			}
 			return
 		}
 	}
