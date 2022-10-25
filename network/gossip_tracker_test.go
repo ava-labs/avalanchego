@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 var (
@@ -237,6 +238,69 @@ func TestGossipTracker_UpdateKnown(t *testing.T) {
 }
 
 func TestGossipTracker_GetUnknown(t *testing.T) {
+	tests := []struct {
+		name          string
+		peer          ids.NodeID
+		validators    []ids.NodeID
+		nonValidators []ids.NodeID
+		expected      []ids.NodeID
+	}{
+		{
+			name:          "only validators",
+			peer:          id0,
+			validators:    []ids.NodeID{id1},
+			nonValidators: []ids.NodeID{},
+			expected:      []ids.NodeID{id1},
+		},
+		{
+			name:          "only non-validators",
+			peer:          id0,
+			validators:    []ids.NodeID{},
+			nonValidators: []ids.NodeID{id1},
+			expected:      []ids.NodeID{},
+		},
+		{
+			name:          "validators and non-validators",
+			peer:          id0,
+			validators:    []ids.NodeID{id1},
+			nonValidators: []ids.NodeID{id2},
+			expected:      []ids.NodeID{id1},
+		},
+	}
+
+	for _, test := range tests {
+		r := require.New(t)
+
+		cfg := GossipTrackerConfig{
+			ValidatorManager: validators.NewManager(),
+			Registerer:       prometheus.NewRegistry(),
+			Namespace:        "foobar",
+		}
+
+		g, err := NewGossipTracker(cfg)
+		r.NoError(err)
+
+		// start tracking our validators
+		for _, validator := range test.validators {
+			r.NoError(cfg.ValidatorManager.AddWeight(constants.PrimaryNetworkID, validator, 1))
+			r.True(g.Add(validator))
+		}
+
+		// start tracking our non validators
+		for _, nonValidator := range test.nonValidators {
+			r.True(g.Add(nonValidator))
+		}
+
+		// start tracking our peer
+		r.True(g.Add(test.peer))
+
+		result, ok := g.GetUnknown(test.peer, limit)
+		r.True(ok)
+		r.EqualValues(test.expected, result)
+	}
+}
+
+func TestGossipTracker_GetUnknown_E2E(t *testing.T) {
 	r := require.New(t)
 
 	cfg := GossipTrackerConfig{
@@ -245,7 +309,13 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 		Namespace:        "foobar",
 	}
 
+	// [id0, id1, id2] are validators
+	_ = cfg.ValidatorManager.AddWeight(constants.PrimaryNetworkID, id0, 1)
+	_ = cfg.ValidatorManager.AddWeight(constants.PrimaryNetworkID, id1, 1)
+	_ = cfg.ValidatorManager.AddWeight(constants.PrimaryNetworkID, id2, 1)
+
 	g, err := NewGossipTracker(cfg)
+
 	r.NoError(err)
 
 	// we should get an empty unknown since we're not tracking anything
@@ -344,6 +414,11 @@ func TestGossipTracker_GetUnknown_Limit(t *testing.T) {
 		Registerer:       prometheus.NewRegistry(),
 		Namespace:        "foobar",
 	}
+
+	// [id0, id1, id2] are validators
+	_ = cfg.ValidatorManager.AddWeight(constants.PrimaryNetworkID, id0, 1)
+	_ = cfg.ValidatorManager.AddWeight(constants.PrimaryNetworkID, id1, 1)
+	_ = cfg.ValidatorManager.AddWeight(constants.PrimaryNetworkID, id2, 1)
 
 	g, err := NewGossipTracker(cfg)
 	r.NoError(err)
