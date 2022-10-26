@@ -29,7 +29,7 @@ const (
 type Config struct {
 	ExporterConfig `json:"exporterConfig"`
 
-	// If false, use a no-op tracer. All other fields are ignored.
+	// Used to flag if tracing should be performed
 	Enabled bool `json:"enabled"`
 
 	// The fraction of traces to sample.
