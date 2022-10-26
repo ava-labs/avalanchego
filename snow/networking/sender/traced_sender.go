@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/trace"
 )
 
-var _ common.Sender = &tracedSender{}
+var _ common.Sender = (*tracedSender)(nil)
 
 type tracedSender struct {
 	sender common.Sender

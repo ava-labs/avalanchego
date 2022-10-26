@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-var _ Engine = &tracedEngine{}
+var _ Engine = (*tracedEngine)(nil)
 
 type tracedEngine struct {
 	engine Engine

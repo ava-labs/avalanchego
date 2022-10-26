@@ -5,7 +5,7 @@ package common
 
 import "github.com/ava-labs/avalanchego/trace"
 
-var _ StateSyncer = &tracedStateSyncer{}
+var _ StateSyncer = (*tracedStateSyncer)(nil)
 
 type tracedStateSyncer struct {
 	Engine

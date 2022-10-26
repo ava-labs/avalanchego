@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-var _ Router = &tracedRouter{}
+var _ Router = (*tracedRouter)(nil)
 
 type tracedRouter struct {
 	router Router

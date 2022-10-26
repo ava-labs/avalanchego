@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/trace"
 )
 
-var _ Engine = &tracedEngine{}
+var _ Engine = (*tracedEngine)(nil)
 
 type tracedEngine struct {
 	common.Engine
