@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/trace"
 )
 
-var _ BootstrapableEngine = &tracedBootstrapableEngine{}
+var _ BootstrapableEngine = (*tracedBootstrapableEngine)(nil)
 
 type tracedBootstrapableEngine struct {
 	Engine
