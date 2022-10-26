@@ -148,10 +148,11 @@ type ChainConfig struct {
 }
 
 type ManagerConfig struct {
-	StakingEnabled              bool            // True iff the network has staking enabled
-	StakingCert                 tls.Certificate // needed to sign snowman++ blocks
-	StakingBLSKey               *bls.SecretKey
-	TracingEnabled              bool
+	StakingEnabled bool            // True iff the network has staking enabled
+	StakingCert    tls.Certificate // needed to sign snowman++ blocks
+	StakingBLSKey  *bls.SecretKey
+	TracingEnabled bool
+	// Must not be used unless [TracingEnabled] is true as this may be nil.
 	Tracer                      trace.Tracer
 	Log                         logging.Logger
 	LogFactory                  logging.Factory
