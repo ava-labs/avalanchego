@@ -24,7 +24,7 @@ import (
 
 const nonVerifiedCacheSize = 128
 
-var _ Engine = &Transitive{}
+var _ Engine = (*Transitive)(nil)
 
 func New(config Config) (Engine, error) {
 	return newTransitive(config)

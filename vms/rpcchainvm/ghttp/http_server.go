@@ -21,8 +21,8 @@ import (
 )
 
 var (
-	_ httppb.HTTPServer   = &Server{}
-	_ http.ResponseWriter = &ResponseWriter{}
+	_ httppb.HTTPServer   = (*Server)(nil)
+	_ http.ResponseWriter = (*ResponseWriter)(nil)
 )
 
 // Server is an http.Handler that is managed over RPC.

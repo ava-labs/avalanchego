@@ -14,7 +14,7 @@ var (
 	errVerifyHeightIndex  = errors.New("unexpectedly called VerifyHeightIndex")
 	errGetBlockIDAtHeight = errors.New("unexpectedly called GetBlockIDAtHeight")
 
-	_ HeightIndexedChainVM = &TestHeightIndexedVM{}
+	_ HeightIndexedChainVM = (*TestHeightIndexedVM)(nil)
 )
 
 // TestBatchedVM is a BatchedVM that is useful for testing.

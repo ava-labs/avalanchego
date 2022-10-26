@@ -15,7 +15,7 @@ import (
 
 const txCacheSize = 8192
 
-var _ TxState = &txState{}
+var _ TxState = (*txState)(nil)
 
 // TxState is a thin wrapper around a database to provide, caching,
 // serialization, and de-serialization of transactions.

@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	_ Factory = &noEarlyTermFactory{}
-	_ Poll    = &noEarlyTermPoll{}
+	_ Factory = (*noEarlyTermFactory)(nil)
+	_ Poll    = (*noEarlyTermPoll)(nil)
 )
 
 type noEarlyTermFactory struct{}

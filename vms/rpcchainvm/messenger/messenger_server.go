@@ -15,7 +15,7 @@ import (
 var (
 	errFullQueue = errors.New("full message queue")
 
-	_ messengerpb.MessengerServer = &Server{}
+	_ messengerpb.MessengerServer = (*Server)(nil)
 )
 
 // Server is a messenger that is managed over RPC.

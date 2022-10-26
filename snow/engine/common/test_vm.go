@@ -33,7 +33,7 @@ var (
 	errCrossChainAppResponse      = errors.New("unexpectedly called CrossChainAppResponse")
 	errCrossChainAppRequestFailed = errors.New("unexpectedly called CrossChainAppRequestFailed")
 
-	_ VM = &TestVM{}
+	_ VM = (*TestVM)(nil)
 )
 
 // TestVM is a test vm

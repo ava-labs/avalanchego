@@ -21,7 +21,7 @@ import (
 )
 
 // Get requests are always served, regardless node state (bootstrapping or normal operations).
-var _ common.AllGetsServer = &getter{}
+var _ common.AllGetsServer = (*getter)(nil)
 
 func New(storage vertex.Storage, commonCfg common.Config) (common.AllGetsServer, error) {
 	gh := &getter{

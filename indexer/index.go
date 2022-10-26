@@ -37,7 +37,7 @@ var (
 	errNoneAccepted        = errors.New("no containers have been accepted")
 	errNumToFetchZero      = fmt.Errorf("numToFetch must be in [1,%d]", MaxFetchedByRange)
 
-	_ Index = &index{}
+	_ Index = (*index)(nil)
 )
 
 // Index indexes containers in their order of acceptance

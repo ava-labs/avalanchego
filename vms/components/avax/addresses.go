@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 )
 
-var _ AddressManager = &addressManager{}
+var _ AddressManager = (*addressManager)(nil)
 
 type AddressManager interface {
 	// ParseLocalAddress takes in an address for this chain and produces the ID

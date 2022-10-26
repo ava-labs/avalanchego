@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	_ UnsignedTx = &ImportTx{}
+	_ UnsignedTx = (*ImportTx)(nil)
 
 	errNoImportInputs = errors.New("tx has no imported inputs")
 )

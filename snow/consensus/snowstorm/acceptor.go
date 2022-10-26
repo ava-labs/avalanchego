@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-var _ events.Blockable = &acceptor{}
+var _ events.Blockable = (*acceptor)(nil)
 
 type acceptor struct {
 	g        *Directed

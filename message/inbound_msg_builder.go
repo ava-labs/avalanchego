@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
-var _ InboundMsgBuilder = &inMsgBuilder{}
+var _ InboundMsgBuilder = (*inMsgBuilder)(nil)
 
 type InboundMsgBuilder interface {
 	SetTime(t time.Time) // useful in UTs

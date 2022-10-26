@@ -8,7 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 )
 
-var _ Manager = MockManager{}
+var _ Manager = (*MockManager)(nil)
 
 // MockManager implements Manager but does nothing. Always returns nil error.
 // To be used only in tests

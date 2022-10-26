@@ -11,7 +11,7 @@ import (
 	aliasreaderpb "github.com/ava-labs/avalanchego/proto/pb/aliasreader"
 )
 
-var _ ids.AliaserReader = &Client{}
+var _ ids.AliaserReader = (*Client)(nil)
 
 // Client implements alias lookups that talk over RPC.
 type Client struct {

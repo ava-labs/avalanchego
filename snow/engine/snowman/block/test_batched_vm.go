@@ -16,7 +16,7 @@ var (
 	errGetAncestor       = errors.New("unexpectedly called GetAncestor")
 	errBatchedParseBlock = errors.New("unexpectedly called BatchedParseBlock")
 
-	_ BatchedChainVM = &TestBatchedVM{}
+	_ BatchedChainVM = (*TestBatchedVM)(nil)
 )
 
 // TestBatchedVM is a BatchedVM that is useful for testing.

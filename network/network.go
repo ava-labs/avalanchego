@@ -44,8 +44,8 @@ const (
 )
 
 var (
-	_                      sender.ExternalSender = &network{}
-	_                      Network               = &network{}
+	_                      sender.ExternalSender = (*network)(nil)
+	_                      Network               = (*network)(nil)
 	errNoPrimaryValidators                       = errors.New("no default subnet validators")
 )
 

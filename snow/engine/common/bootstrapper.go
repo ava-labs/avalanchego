@@ -27,7 +27,7 @@ const (
 	MaxOutstandingBroadcastRequests = 50
 )
 
-var _ Bootstrapper = &bootstrapper{}
+var _ Bootstrapper = (*bootstrapper)(nil)
 
 type Bootstrapper interface {
 	AcceptedFrontierHandler

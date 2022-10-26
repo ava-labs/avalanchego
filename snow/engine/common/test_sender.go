@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	_ Sender = &SenderTest{}
+	_ Sender = (*SenderTest)(nil)
 
 	errAccept                = errors.New("unexpectedly called Accept")
 	errSendAppRequest        = errors.New("unexpectedly called SendAppRequest")

@@ -30,7 +30,7 @@ const (
 	numDispatchersToClose = 3
 )
 
-var _ Handler = &handler{}
+var _ Handler = (*handler)(nil)
 
 type Handler interface {
 	common.Timer

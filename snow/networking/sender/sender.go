@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-var _ common.Sender = &sender{}
+var _ common.Sender = (*sender)(nil)
 
 type GossipConfig struct {
 	AcceptedFrontierValidatorSize    uint `json:"gossipAcceptedFrontierValidatorSize" yaml:"gossipAcceptedFrontierValidatorSize"`

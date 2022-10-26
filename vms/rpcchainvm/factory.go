@@ -23,7 +23,7 @@ import (
 var (
 	errWrongVM = errors.New("wrong vm type")
 
-	_ vms.Factory = &factory{}
+	_ vms.Factory = (*factory)(nil)
 )
 
 type factory struct {

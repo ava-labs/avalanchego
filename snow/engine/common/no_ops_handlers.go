@@ -15,15 +15,15 @@ import (
 )
 
 var (
-	_ StateSummaryFrontierHandler = &noOpStateSummaryFrontierHandler{}
-	_ AcceptedStateSummaryHandler = &noOpAcceptedStateSummaryHandler{}
-	_ AcceptedFrontierHandler     = &noOpAcceptedFrontierHandler{}
-	_ AcceptedHandler             = &noOpAcceptedHandler{}
-	_ AncestorsHandler            = &noOpAncestorsHandler{}
-	_ PutHandler                  = &noOpPutHandler{}
-	_ QueryHandler                = &noOpQueryHandler{}
-	_ ChitsHandler                = &noOpChitsHandler{}
-	_ AppHandler                  = &noOpAppHandler{}
+	_ StateSummaryFrontierHandler = (*noOpStateSummaryFrontierHandler)(nil)
+	_ AcceptedStateSummaryHandler = (*noOpAcceptedStateSummaryHandler)(nil)
+	_ AcceptedFrontierHandler     = (*noOpAcceptedFrontierHandler)(nil)
+	_ AcceptedHandler             = (*noOpAcceptedHandler)(nil)
+	_ AncestorsHandler            = (*noOpAncestorsHandler)(nil)
+	_ PutHandler                  = (*noOpPutHandler)(nil)
+	_ QueryHandler                = (*noOpQueryHandler)(nil)
+	_ ChitsHandler                = (*noOpChitsHandler)(nil)
+	_ AppHandler                  = (*noOpAppHandler)(nil)
 )
 
 type noOpStateSummaryFrontierHandler struct {

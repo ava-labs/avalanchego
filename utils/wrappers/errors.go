@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-var _ error = &aggregate{}
+var _ error = (*aggregate)(nil)
 
 type Errs struct{ Err error }
 

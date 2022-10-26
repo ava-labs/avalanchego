@@ -15,7 +15,7 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-var _ Factory = &factory{}
+var _ Factory = (*factory)(nil)
 
 // Factory creates new instances of different types of Logger
 type Factory interface {

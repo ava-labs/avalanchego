@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ txs.Visitor = &MempoolTxVerifier{}
+var _ txs.Visitor = (*MempoolTxVerifier)(nil)
 
 type MempoolTxVerifier struct {
 	*Backend

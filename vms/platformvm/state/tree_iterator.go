@@ -11,7 +11,7 @@ import (
 
 const defaultTreeDegree = 2
 
-var _ StakerIterator = &treeIterator{}
+var _ StakerIterator = (*treeIterator)(nil)
 
 type treeIterator struct {
 	current     *Staker

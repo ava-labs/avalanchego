@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	_ Bootstrapable = &BootstrapableTest{}
+	_ Bootstrapable = (*BootstrapableTest)(nil)
 
 	errForceAccepted = errors.New("unexpectedly called ForceAccepted")
 	errClear         = errors.New("unexpectedly called Clear")

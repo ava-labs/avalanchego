@@ -33,8 +33,8 @@ var (
 		"vm": &vmPlugin{},
 	}
 
-	_ plugin.Plugin     = &vmPlugin{}
-	_ plugin.GRPCPlugin = &vmPlugin{}
+	_ plugin.Plugin     = (*vmPlugin)(nil)
+	_ plugin.GRPCPlugin = (*vmPlugin)(nil)
 )
 
 type vmPlugin struct {

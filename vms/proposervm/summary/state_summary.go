@@ -7,7 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ StateSummary = &stateSummary{}
+var _ StateSummary = (*stateSummary)(nil)
 
 type StateSummary interface {
 	ID() ids.ID

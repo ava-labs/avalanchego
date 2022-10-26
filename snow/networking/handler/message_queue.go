@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
-var _ MessageQueue = &messageQueue{}
+var _ MessageQueue = (*messageQueue)(nil)
 
 type MessageQueue interface {
 	// Add a message.

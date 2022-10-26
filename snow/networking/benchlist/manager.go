@@ -17,7 +17,7 @@ import (
 var (
 	errUnknownValidators = errors.New("unknown validator set for provided chain")
 
-	_ Manager = &manager{}
+	_ Manager = (*manager)(nil)
 )
 
 // Manager provides an interface for a benchlist to register whether

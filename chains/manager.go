@@ -72,7 +72,7 @@ var (
 	errCreatePlatformVM = errors.New("attempted to create a chain running the PlatformVM")
 	errNotBootstrapped  = errors.New("chains not bootstrapped")
 
-	_ Manager = &manager{}
+	_ Manager = (*manager)(nil)
 )
 
 // Manager manages the chains running on this node.

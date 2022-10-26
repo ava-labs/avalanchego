@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	_ InboundConnUpgradeThrottler = &inboundConnUpgradeThrottler{}
-	_ InboundConnUpgradeThrottler = &noInboundConnUpgradeThrottler{}
+	_ InboundConnUpgradeThrottler = (*inboundConnUpgradeThrottler)(nil)
+	_ InboundConnUpgradeThrottler = (*noInboundConnUpgradeThrottler)(nil)
 )
 
 // InboundConnUpgradeThrottler returns whether we should upgrade an inbound connection from IP [ipStr].

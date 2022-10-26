@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 )
 
-var _ txs.Visitor = &txInit{}
+var _ txs.Visitor = (*txInit)(nil)
 
 // Init initializes FxID where required
 type txInit struct {

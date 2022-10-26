@@ -21,7 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-var _ common.StateSyncer = &stateSyncer{}
+var _ common.StateSyncer = (*stateSyncer)(nil)
 
 // summary content as received from network, along with accumulated weight.
 type weightedSummary struct {

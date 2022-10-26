@@ -17,7 +17,7 @@ import (
 var (
 	errNilUTXOID = errors.New("nil utxo ID is not valid")
 
-	_ verify.Verifiable = &UTXOID{}
+	_ verify.Verifiable = (*UTXOID)(nil)
 )
 
 type UTXOID struct {

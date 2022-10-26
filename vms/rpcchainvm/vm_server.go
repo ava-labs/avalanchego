@@ -48,7 +48,7 @@ import (
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
 
-var _ vmpb.VMServer = &VMServer{}
+var _ vmpb.VMServer = (*VMServer)(nil)
 
 // VMServer is a VM that is managed over RPC.
 type VMServer struct {

@@ -61,7 +61,7 @@ var (
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 	errInsufficientFunds         = errors.New("insufficient funds")
 
-	_ vertex.DAGVM = &VM{}
+	_ vertex.DAGVM = (*VM)(nil)
 )
 
 type VM struct {

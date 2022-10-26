@@ -16,7 +16,7 @@ import (
 )
 
 // Get requests are always served, regardless node state (bootstrapping or normal operations).
-var _ common.AllGetsServer = &getter{}
+var _ common.AllGetsServer = (*getter)(nil)
 
 func New(
 	vm block.ChainVM,

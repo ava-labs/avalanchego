@@ -5,7 +5,7 @@ package txs
 
 import "github.com/ava-labs/avalanchego/vms/components/avax"
 
-var _ Visitor = &utxoGetter{}
+var _ Visitor = (*utxoGetter)(nil)
 
 // Allow vm to execute custom logic against the underlying transaction types.
 type Visitor interface {

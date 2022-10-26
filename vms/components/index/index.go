@@ -27,8 +27,8 @@ var (
 	errIndexingRequiredFromGenesis = errors.New("running would create incomplete index. Allow incomplete indices or re-sync from genesis with indexing enabled")
 	errCausesIncompleteIndex       = errors.New("running would create incomplete index. Allow incomplete indices or enable indexing")
 
-	_ AddressTxsIndexer = &indexer{}
-	_ AddressTxsIndexer = &noIndexer{}
+	_ AddressTxsIndexer = (*indexer)(nil)
+	_ AddressTxsIndexer = (*noIndexer)(nil)
 )
 
 // AddressTxsIndexer maintains information about which transactions changed

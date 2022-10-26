@@ -7,7 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var _ Height = &height{}
+var _ Height = (*height)(nil)
 
 // Height reports the last accepted height
 type Height interface {

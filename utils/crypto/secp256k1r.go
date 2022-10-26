@@ -54,9 +54,9 @@ var (
 	errMissingKeyPrefix        = fmt.Errorf("private key missing %s prefix", PrivateKeyPrefix)
 	errInvalidPrivateKeyLength = fmt.Errorf("private key has unexpected length, expected %d", SECP256K1RSKLen)
 
-	_ RecoverableFactory = &FactorySECP256K1R{}
-	_ PublicKey          = &PublicKeySECP256K1R{}
-	_ PrivateKey         = &PrivateKeySECP256K1R{}
+	_ RecoverableFactory = (*FactorySECP256K1R)(nil)
+	_ PublicKey          = (*PublicKeySECP256K1R)(nil)
+	_ PrivateKey         = (*PrivateKeySECP256K1R)(nil)
 )
 
 type FactorySECP256K1R struct{ Cache cache.LRU }

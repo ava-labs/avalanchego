@@ -26,23 +26,23 @@ import (
 var (
 	errUnknownAssetType = errors.New("unknown asset type")
 
-	_ avax.TransferableIn  = &secp256k1fx.TransferInput{}
-	_ verify.State         = &secp256k1fx.MintOutput{}
-	_ avax.TransferableOut = &secp256k1fx.TransferOutput{}
-	_ fxs.FxOperation      = &secp256k1fx.MintOperation{}
-	_ verify.Verifiable    = &secp256k1fx.Credential{}
+	_ avax.TransferableIn  = (*secp256k1fx.TransferInput)(nil)
+	_ verify.State         = (*secp256k1fx.MintOutput)(nil)
+	_ avax.TransferableOut = (*secp256k1fx.TransferOutput)(nil)
+	_ fxs.FxOperation      = (*secp256k1fx.MintOperation)(nil)
+	_ verify.Verifiable    = (*secp256k1fx.Credential)(nil)
 
-	_ verify.State      = &nftfx.MintOutput{}
-	_ verify.State      = &nftfx.TransferOutput{}
-	_ fxs.FxOperation   = &nftfx.MintOperation{}
-	_ fxs.FxOperation   = &nftfx.TransferOperation{}
-	_ verify.Verifiable = &nftfx.Credential{}
+	_ verify.State      = (*nftfx.MintOutput)(nil)
+	_ verify.State      = (*nftfx.TransferOutput)(nil)
+	_ fxs.FxOperation   = (*nftfx.MintOperation)(nil)
+	_ fxs.FxOperation   = (*nftfx.TransferOperation)(nil)
+	_ verify.Verifiable = (*nftfx.Credential)(nil)
 
-	_ verify.State      = &propertyfx.MintOutput{}
-	_ verify.State      = &propertyfx.OwnedOutput{}
-	_ fxs.FxOperation   = &propertyfx.MintOperation{}
-	_ fxs.FxOperation   = &propertyfx.BurnOperation{}
-	_ verify.Verifiable = &propertyfx.Credential{}
+	_ verify.State      = (*propertyfx.MintOutput)(nil)
+	_ verify.State      = (*propertyfx.OwnedOutput)(nil)
+	_ fxs.FxOperation   = (*propertyfx.MintOperation)(nil)
+	_ fxs.FxOperation   = (*propertyfx.BurnOperation)(nil)
+	_ verify.Verifiable = (*propertyfx.Credential)(nil)
 )
 
 // StaticService defines the base service for the asset vm

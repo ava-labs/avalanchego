@@ -34,7 +34,7 @@ const (
 )
 
 var (
-	_ common.BootstrapableEngine = &bootstrapper{}
+	_ common.BootstrapableEngine = (*bootstrapper)(nil)
 
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )

@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var _ net.Listener = &MockListener{}
+var _ net.Listener = (*MockListener)(nil)
 
 type MockListener struct {
 	t         *testing.T

@@ -13,7 +13,7 @@ import (
 var (
 	errParse = errors.New("unexpectedly called Parse")
 
-	_ Parser = &TestParser{}
+	_ Parser = (*TestParser)(nil)
 )
 
 type TestParser struct {

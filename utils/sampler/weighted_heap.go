@@ -9,7 +9,7 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var _ Weighted = &weightedHeap{}
+var _ Weighted = (*weightedHeap)(nil)
 
 type weightedHeapElement struct {
 	weight           uint64

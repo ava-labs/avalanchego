@@ -31,7 +31,7 @@ const (
 )
 
 var (
-	_ txs.Visitor = &ProposalTxExecutor{}
+	_ txs.Visitor = (*ProposalTxExecutor)(nil)
 
 	errChildBlockNotAfterParent      = errors.New("proposed timestamp not after current chain time")
 	errInvalidState                  = errors.New("generated output isn't valid state")

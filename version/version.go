@@ -16,7 +16,7 @@ var (
 		Patch: 0,
 	}
 
-	_ fmt.Stringer = &Semantic{}
+	_ fmt.Stringer = (*Semantic)(nil)
 )
 
 type Semantic struct {

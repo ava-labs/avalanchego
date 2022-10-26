@@ -15,7 +15,7 @@ import (
 var (
 	errDuplicatedRegister = errors.New("duplicated register")
 
-	_ OptionalGatherer = &optionalGatherer{}
+	_ OptionalGatherer = (*optionalGatherer)(nil)
 )
 
 // OptionalGatherer extends the Gatherer interface by allowing the optional

@@ -11,10 +11,10 @@ import (
 )
 
 var (
-	_ Factory   = &TreeFactory{}
-	_ Consensus = &Tree{}
-	_ node      = &unaryNode{}
-	_ node      = &binaryNode{}
+	_ Factory   = (*TreeFactory)(nil)
+	_ Consensus = (*Tree)(nil)
+	_ node      = (*unaryNode)(nil)
+	_ node      = (*binaryNode)(nil)
 )
 
 // TreeFactory implements Factory by returning a tree struct

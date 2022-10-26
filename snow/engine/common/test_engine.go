@@ -41,7 +41,7 @@ var (
 	errChits                         = errors.New("unexpectedly called Chits")
 	errStart                         = errors.New("unexpectedly called Start")
 
-	_ Engine = &EngineTest{}
+	_ Engine = (*EngineTest)(nil)
 )
 
 // EngineTest is a test engine

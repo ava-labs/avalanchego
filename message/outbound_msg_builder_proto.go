@@ -12,7 +12,7 @@ import (
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
-var _ OutboundMsgBuilder = &outMsgBuilder{}
+var _ OutboundMsgBuilder = (*outMsgBuilder)(nil)
 
 type outMsgBuilder struct {
 	compress bool // set to "true" if compression is enabled

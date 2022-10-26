@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm"
 )
 
-var _ Context = &context{}
+var _ Context = (*context)(nil)
 
 type Context interface {
 	NetworkID() uint32

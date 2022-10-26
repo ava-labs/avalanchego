@@ -38,7 +38,7 @@ var (
 	errUnknownLockOption = errors.New("invalid lock options")
 
 	_ PathAdder = readPathAdder{}
-	_ Server    = &server{}
+	_ Server    = (*server)(nil)
 )
 
 type PathAdder interface {

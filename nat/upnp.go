@@ -18,7 +18,7 @@ const (
 	soapRequestTimeout = 10 * time.Second
 )
 
-var _ Router = &upnpRouter{}
+var _ Router = (*upnpRouter)(nil)
 
 // upnpClient is the interface used by goupnp for their client implementations
 type upnpClient interface {

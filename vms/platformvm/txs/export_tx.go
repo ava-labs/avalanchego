@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	_ UnsignedTx = &ExportTx{}
+	_ UnsignedTx = (*ExportTx)(nil)
 
 	ErrWrongLocktime   = errors.New("wrong locktime reported")
 	errNoExportOutputs = errors.New("no export outputs")

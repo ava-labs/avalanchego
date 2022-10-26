@@ -21,8 +21,8 @@ import (
 )
 
 var (
-	_ Factory   = &DirectedFactory{}
-	_ Consensus = &Directed{}
+	_ Factory   = (*DirectedFactory)(nil)
+	_ Consensus = (*Directed)(nil)
 )
 
 // DirectedFactory implements Factory by returning a directed struct

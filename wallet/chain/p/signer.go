@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ Signer = &txSigner{}
+var _ Signer = (*txSigner)(nil)
 
 type Signer interface {
 	SignUnsigned(ctx stdcontext.Context, tx txs.UnsignedTx) (*txs.Tx, error)

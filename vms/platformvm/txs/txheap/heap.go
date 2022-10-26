@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ Heap = &txHeap{}
+var _ Heap = (*txHeap)(nil)
 
 type Heap interface {
 	Add(tx *txs.Tx)

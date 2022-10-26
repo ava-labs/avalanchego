@@ -29,8 +29,8 @@ import (
 var (
 	errUnknownChain = errors.New("received message for unknown chain")
 
-	_ Router              = &ChainRouter{}
-	_ benchlist.Benchable = &ChainRouter{}
+	_ Router              = (*ChainRouter)(nil)
+	_ benchlist.Benchable = (*ChainRouter)(nil)
 )
 
 type requestEntry struct {

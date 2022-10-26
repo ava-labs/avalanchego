@@ -25,7 +25,7 @@ const (
 	recentCacheSize = 512
 )
 
-var _ Network = &network{}
+var _ Network = (*network)(nil)
 
 type Network interface {
 	common.AppHandler
