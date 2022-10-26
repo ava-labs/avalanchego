@@ -26,7 +26,7 @@ var (
 	errUnsupportedFlushing  = errors.New("response writer doesn't support flushing")
 	errUnsupportedHijacking = errors.New("response writer doesn't support hijacking")
 
-	_ responsewriterpb.WriterServer = &Server{}
+	_ responsewriterpb.WriterServer = (*Server)(nil)
 )
 
 // Server is an http.ResponseWriter that is managed over RPC.

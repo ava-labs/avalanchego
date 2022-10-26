@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	_ verify.State = &OutputOwners{}
+	_ verify.State = (*OutputOwners)(nil)
 
 	errNoValueOutput = errors.New("output has no value")
 )

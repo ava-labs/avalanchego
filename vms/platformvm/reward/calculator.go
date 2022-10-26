@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-var _ Calculator = &calculator{}
+var _ Calculator = (*calculator)(nil)
 
 type Calculator interface {
 	Calculate(stakedDuration time.Duration, stakedAmount, currentSupply uint64) uint64

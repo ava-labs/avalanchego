@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
-var _ blocks.Visitor = &acceptor{}
+var _ blocks.Visitor = (*acceptor)(nil)
 
 // acceptor handles the logic for accepting a block.
 // All errors returned by this struct are fatal and should result in the chain

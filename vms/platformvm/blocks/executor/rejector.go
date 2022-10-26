@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 )
 
-var _ blocks.Visitor = &rejector{}
+var _ blocks.Visitor = (*rejector)(nil)
 
 // rejector handles the logic for rejecting a block.
 // All errors returned by this struct are fatal and should result in the chain

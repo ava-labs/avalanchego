@@ -20,7 +20,7 @@ const cacheSize = 1000
 var (
 	errWrongType = errors.New("value in the database was the wrong type")
 
-	_ State = &state{}
+	_ State = (*state)(nil)
 )
 
 // State is a key-value store where every value is associated with a "type ID".

@@ -13,7 +13,7 @@ import (
 var (
 	errIncompatible = errors.New("peers version is incompatible")
 
-	_ Compatibility = &compatibility{}
+	_ Compatibility = (*compatibility)(nil)
 )
 
 // Compatibility a utility for checking the compatibility of peer versions

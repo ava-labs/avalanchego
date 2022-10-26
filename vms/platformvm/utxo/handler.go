@@ -25,7 +25,7 @@ import (
 )
 
 var (
-	_ Handler = &handler{}
+	_ Handler = (*handler)(nil)
 
 	errCantSign                     = errors.New("can't sign")
 	errLockedFundsNotMarkedAsLocked = errors.New("locked funds not marked as locked")

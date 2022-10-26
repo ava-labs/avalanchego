@@ -14,9 +14,9 @@ import (
 )
 
 var (
-	_ Fx = &secp256k1fx.Fx{}
-	_ Fx = &nftfx.Fx{}
-	_ Fx = &propertyfx.Fx{}
+	_ Fx = (*secp256k1fx.Fx)(nil)
+	_ Fx = (*nftfx.Fx)(nil)
+	_ Fx = (*propertyfx.Fx)(nil)
 )
 
 type ParsedFx struct {

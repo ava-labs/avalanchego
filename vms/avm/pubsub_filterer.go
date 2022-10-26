@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
-var _ pubsub.Filterer = &filterer{}
+var _ pubsub.Filterer = (*filterer)(nil)
 
 type filterer struct {
 	tx *txs.Tx

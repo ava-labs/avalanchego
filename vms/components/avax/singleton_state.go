@@ -13,7 +13,7 @@ const (
 
 var (
 	isInitializedKey                = []byte{IsInitializedKey}
-	_                SingletonState = &singletonState{}
+	_                SingletonState = (*singletonState)(nil)
 )
 
 // SingletonState is a thin wrapper around a database to provide, caching,

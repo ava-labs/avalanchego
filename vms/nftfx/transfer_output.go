@@ -22,7 +22,7 @@ const (
 var (
 	errNilTransferOutput              = errors.New("nil transfer output")
 	errPayloadTooLarge                = errors.New("payload too large")
-	_                    verify.State = &TransferOutput{}
+	_                    verify.State = (*TransferOutput)(nil)
 )
 
 type TransferOutput struct {

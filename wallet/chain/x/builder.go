@@ -24,7 +24,7 @@ var (
 	errNoChangeAddress   = errors.New("no possible change address")
 	errInsufficientFunds = errors.New("insufficient funds")
 
-	_ Builder = &builder{}
+	_ Builder = (*builder)(nil)
 )
 
 // Builder provides a convenient interface for building unsigned X-chain

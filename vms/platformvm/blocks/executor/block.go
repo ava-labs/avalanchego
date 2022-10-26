@@ -16,8 +16,8 @@ import (
 )
 
 var (
-	_ snowman.Block       = &Block{}
-	_ snowman.OracleBlock = &Block{}
+	_ snowman.Block       = (*Block)(nil)
+	_ snowman.OracleBlock = (*Block)(nil)
 )
 
 // Exported for testing in platformvm package.

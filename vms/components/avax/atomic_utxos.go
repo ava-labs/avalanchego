@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ AtomicUTXOManager = &atomicUTXOManager{}
+var _ AtomicUTXOManager = (*atomicUTXOManager)(nil)
 
 type AtomicUTXOManager interface {
 	// GetAtomicUTXOs returns exported UTXOs such that at least one of the

@@ -14,7 +14,7 @@ import (
 	appsenderpb "github.com/ava-labs/avalanchego/proto/pb/appsender"
 )
 
-var _ appsenderpb.AppSenderServer = &Server{}
+var _ appsenderpb.AppSenderServer = (*Server)(nil)
 
 type Server struct {
 	appsenderpb.UnsafeAppSenderServer

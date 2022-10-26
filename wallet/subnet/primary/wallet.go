@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-var _ Wallet = &wallet{}
+var _ Wallet = (*wallet)(nil)
 
 // Wallet provides chain wallets for the primary network.
 type Wallet interface {

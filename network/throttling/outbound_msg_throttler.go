@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	_ OutboundMsgThrottler = &outboundMsgThrottler{}
-	_ OutboundMsgThrottler = &noOutboundMsgThrottler{}
+	_ OutboundMsgThrottler = (*outboundMsgThrottler)(nil)
+	_ OutboundMsgThrottler = (*noOutboundMsgThrottler)(nil)
 )
 
 // Rate-limits outgoing messages

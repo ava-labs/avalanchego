@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-var _ WalletClient = &client{}
+var _ WalletClient = (*client)(nil)
 
 // interface of an AVM wallet client for interacting with avm managed wallet on [chain]
 type WalletClient interface {

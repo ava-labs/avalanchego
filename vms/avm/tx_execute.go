@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
-var _ txs.Visitor = &executeTx{}
+var _ txs.Visitor = (*executeTx)(nil)
 
 type executeTx struct {
 	tx           *txs.Tx

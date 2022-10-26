@@ -29,7 +29,7 @@ var (
 	errInsufficientAuthorization = errors.New("insufficient authorization")
 	errInsufficientFunds         = errors.New("insufficient funds")
 
-	_ Builder = &builder{}
+	_ Builder = (*builder)(nil)
 )
 
 // Builder provides a convenient interface for building unsigned P-chain

@@ -25,8 +25,8 @@ var (
 	errNilTransferableFxInput = errors.New("nil transferable feature extension input is not valid")
 	errInputsNotSortedUnique  = errors.New("inputs not sorted and unique")
 
-	_ verify.Verifiable = &TransferableOutput{}
-	_ verify.Verifiable = &TransferableInput{}
+	_ verify.Verifiable = (*TransferableOutput)(nil)
+	_ verify.Verifiable = (*TransferableInput)(nil)
 )
 
 // Amounter is a data structure that has an amount of something associated with it

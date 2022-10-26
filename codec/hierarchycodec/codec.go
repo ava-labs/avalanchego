@@ -19,10 +19,10 @@ const (
 )
 
 var (
-	_ Codec              = &hierarchyCodec{}
-	_ codec.Codec        = &hierarchyCodec{}
-	_ codec.Registry     = &hierarchyCodec{}
-	_ codec.GeneralCodec = &hierarchyCodec{}
+	_ Codec              = (*hierarchyCodec)(nil)
+	_ codec.Codec        = (*hierarchyCodec)(nil)
+	_ codec.Registry     = (*hierarchyCodec)(nil)
+	_ codec.GeneralCodec = (*hierarchyCodec)(nil)
 )
 
 // Codec marshals and unmarshals

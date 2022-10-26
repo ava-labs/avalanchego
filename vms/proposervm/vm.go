@@ -46,10 +46,10 @@ const (
 )
 
 var (
-	_ block.ChainVM              = &VM{}
-	_ block.BatchedChainVM       = &VM{}
-	_ block.HeightIndexedChainVM = &VM{}
-	_ block.StateSyncableVM      = &VM{}
+	_ block.ChainVM              = (*VM)(nil)
+	_ block.BatchedChainVM       = (*VM)(nil)
+	_ block.HeightIndexedChainVM = (*VM)(nil)
+	_ block.StateSyncableVM      = (*VM)(nil)
 
 	dbPrefix = []byte("proposervm")
 )

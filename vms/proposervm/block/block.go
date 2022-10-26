@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	_ SignedBlock = &statelessBlock{}
+	_ SignedBlock = (*statelessBlock)(nil)
 
 	errUnexpectedProposer = errors.New("expected no proposer but one was provided")
 	errMissingProposer    = errors.New("expected proposer but none was provided")

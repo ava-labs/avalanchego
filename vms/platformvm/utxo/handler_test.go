@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var _ txs.UnsignedTx = &dummyUnsignedTx{}
+var _ txs.UnsignedTx = (*dummyUnsignedTx)(nil)
 
 type dummyUnsignedTx struct {
 	txs.BaseTx

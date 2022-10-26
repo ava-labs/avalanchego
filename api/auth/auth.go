@@ -53,7 +53,7 @@ var (
 	errNoEndpoints                 = errors.New("must name at least one endpoint")
 	errTooManyEndpoints            = fmt.Errorf("can only name at most %d endpoints", maxEndpoints)
 
-	_ Auth = &auth{}
+	_ Auth = (*auth)(nil)
 )
 
 type Auth interface {

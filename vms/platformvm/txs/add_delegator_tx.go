@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	_ DelegatorTx = &AddDelegatorTx{}
+	_ DelegatorTx = (*AddDelegatorTx)(nil)
 
 	errDelegatorWeightMismatch = errors.New("delegator weight is not equal to total stake weight")
 )

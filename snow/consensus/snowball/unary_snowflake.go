@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-var _ UnarySnowflake = &unarySnowflake{}
+var _ UnarySnowflake = (*unarySnowflake)(nil)
 
 // unarySnowflake is the implementation of a unary snowflake instance
 type unarySnowflake struct {

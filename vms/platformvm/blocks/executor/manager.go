@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
-var _ Manager = &manager{}
+var _ Manager = (*manager)(nil)
 
 type Manager interface {
 	state.Versions

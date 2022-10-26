@@ -10,7 +10,7 @@ import (
 
 const minCacheSize = 32
 
-var _ Cacher = &LRU{}
+var _ Cacher = (*LRU)(nil)
 
 type entry struct {
 	Key   interface{}

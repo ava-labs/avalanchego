@@ -19,8 +19,8 @@ import (
 const initialQueueSize = 64
 
 var (
-	_ MessageQueue = &throttledMessageQueue{}
-	_ MessageQueue = &blockingMessageQueue{}
+	_ MessageQueue = (*throttledMessageQueue)(nil)
+	_ MessageQueue = (*blockingMessageQueue)(nil)
 )
 
 type SendFailedCallback interface {

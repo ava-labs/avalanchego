@@ -30,7 +30,7 @@ import (
 var (
 	errClosed = errors.New("closed")
 
-	_ Peer = &peer{}
+	_ Peer = (*peer)(nil)
 )
 
 // Peer encapsulates all of the functionality required to send and receive

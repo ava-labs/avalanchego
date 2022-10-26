@@ -22,8 +22,8 @@ const minMapSize = 16
 var (
 	errNoLeaves = errors.New("couldn't pop a leaf from leaf set")
 
-	_ Factory   = &TopologicalFactory{}
-	_ Consensus = &Topological{}
+	_ Factory   = (*TopologicalFactory)(nil)
+	_ Consensus = (*Topological)(nil)
 )
 
 // TopologicalFactory implements Factory by returning a topological struct

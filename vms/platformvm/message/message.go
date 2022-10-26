@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	_ Message = &Tx{}
+	_ Message = (*Tx)(nil)
 
 	errUnexpectedCodecVersion = errors.New("unexpected codec version")
 )

@@ -13,7 +13,7 @@ import (
 var (
 	errWeightsTooLarge = errors.New("total weight is too large")
 
-	_ Weighted = &weightedUniform{}
+	_ Weighted = (*weightedUniform)(nil)
 )
 
 // Sampling is performed by indexing into the array to find the correct index.

@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	_ ValidatorTx = &AddPermissionlessValidatorTx{}
+	_ ValidatorTx = (*AddPermissionlessValidatorTx)(nil)
 
 	errEmptyNodeID             = errors.New("validator nodeID cannot be empty")
 	errNoStake                 = errors.New("no stake")

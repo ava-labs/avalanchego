@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ txs.Visitor = &AtomicTxExecutor{}
+var _ txs.Visitor = (*AtomicTxExecutor)(nil)
 
 // atomicTxExecutor is used to execute atomic transactions pre-AP5. After AP5
 // the execution was moved to be performed inside of the standardTxExecutor.

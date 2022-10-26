@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-var _ Resolver = &ifConfigResolver{}
+var _ Resolver = (*ifConfigResolver)(nil)
 
 // ifConfigResolver resolves our public IP using ifconfig's format.
 type ifConfigResolver struct {

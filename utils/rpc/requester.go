@@ -8,7 +8,7 @@ import (
 	"net/url"
 )
 
-var _ EndpointRequester = &avalancheEndpointRequester{}
+var _ EndpointRequester = (*avalancheEndpointRequester)(nil)
 
 type EndpointRequester interface {
 	SendRequest(ctx context.Context, method string, params interface{}, reply interface{}, options ...Option) error

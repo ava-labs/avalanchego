@@ -10,9 +10,9 @@ import (
 )
 
 var (
-	_ StakerDiffIterator = &stakerDiffIterator{}
-	_ StakerIterator     = &mutableStakerIterator{}
-	_ heap.Interface     = &mutableStakerIterator{}
+	_ StakerDiffIterator = (*stakerDiffIterator)(nil)
+	_ StakerIterator     = (*mutableStakerIterator)(nil)
+	_ heap.Interface     = (*mutableStakerIterator)(nil)
 )
 
 // StakerDiffIterator is an iterator that iterates over the events that will be

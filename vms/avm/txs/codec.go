@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	_ codec.Registry = &codecRegistry{}
-	_ secp256k1fx.VM = &fxVM{}
+	_ codec.Registry = (*codecRegistry)(nil)
+	_ secp256k1fx.VM = (*fxVM)(nil)
 )
 
 type codecRegistry struct {

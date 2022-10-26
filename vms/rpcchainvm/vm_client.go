@@ -70,15 +70,15 @@ var (
 	errUnsupportedFXs                       = errors.New("unsupported feature extensions")
 	errBatchedParseBlockWrongNumberOfBlocks = errors.New("BatchedParseBlock returned different number of blocks than expected")
 
-	_ block.ChainVM              = &VMClient{}
-	_ block.BatchedChainVM       = &VMClient{}
-	_ block.HeightIndexedChainVM = &VMClient{}
-	_ block.StateSyncableVM      = &VMClient{}
-	_ prometheus.Gatherer        = &VMClient{}
+	_ block.ChainVM              = (*VMClient)(nil)
+	_ block.BatchedChainVM       = (*VMClient)(nil)
+	_ block.HeightIndexedChainVM = (*VMClient)(nil)
+	_ block.StateSyncableVM      = (*VMClient)(nil)
+	_ prometheus.Gatherer        = (*VMClient)(nil)
 
-	_ snowman.Block = &blockClient{}
+	_ snowman.Block = (*blockClient)(nil)
 
-	_ block.StateSummary = &summaryClient{}
+	_ block.StateSummary = (*summaryClient)(nil)
 )
 
 // VMClient is an implementation of a VM that talks over RPC.

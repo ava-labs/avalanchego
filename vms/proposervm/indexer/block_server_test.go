@@ -15,7 +15,7 @@ var (
 	errGetWrappingBlk = errors.New("unexpectedly called GetWrappingBlk")
 	errCommit         = errors.New("unexpectedly called Commit")
 
-	_ BlockServer = &TestBlockServer{}
+	_ BlockServer = (*TestBlockServer)(nil)
 )
 
 // TestBatchedVM is a BatchedVM that is useful for testing.

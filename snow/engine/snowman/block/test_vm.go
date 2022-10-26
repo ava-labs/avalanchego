@@ -17,7 +17,7 @@ var (
 	errGetBlock     = errors.New("unexpectedly called GetBlock")
 	errLastAccepted = errors.New("unexpectedly called LastAccepted")
 
-	_ ChainVM = &TestVM{}
+	_ ChainVM = (*TestVM)(nil)
 )
 
 // TestVM is a ChainVM that is useful for testing.

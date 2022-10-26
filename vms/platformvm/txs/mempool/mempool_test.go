@@ -22,7 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var _ BlockTimer = &noopBlkTimer{}
+var _ BlockTimer = (*noopBlkTimer)(nil)
 
 type noopBlkTimer struct{}
 
