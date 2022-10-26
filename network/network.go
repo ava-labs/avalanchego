@@ -928,16 +928,6 @@ func (n *network) dial(ctx context.Context, nodeID ids.NodeID, ip *trackedIP) {
 // connection will be used to create a new peer. Otherwise the connection will
 // be immediately closed.
 func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader) error {
-	if conn, ok := conn.(*net.TCPConn); ok {
-		// If a connection is closed, we shouldn't bother keeping any messages
-		// in memory.
-		if err := conn.SetLinger(0); err != nil {
-			n.peerConfig.Log.Warn("failed to set no linger",
-				zap.Error(err),
-			)
-		}
-	}
-
 	upgradeTimeout := n.peerConfig.Clock.Time().Add(n.config.ReadHandshakeTimeout)
 	if err := conn.SetReadDeadline(upgradeTimeout); err != nil {
 		_ = conn.Close()
