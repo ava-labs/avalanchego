@@ -197,6 +197,7 @@ const (
 	VMAliasesContentKey                                = "vm-aliases-file-content"
 	TracingEnabledKey                                  = "tracing-enabled"
 	TracingEndpointKey                                 = "tracing-endpoint"
+	TracingInsecureKey                                 = "tracing-insecure"
 	TracingSampleRateKey                               = "tracing-sample-rate"
 	TracingExporterTypeKey                             = "tracing-exporter-type"
 )

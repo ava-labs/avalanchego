@@ -24,23 +24,34 @@ type ExporterConfig struct {
 
 	// Headers to send with metrics
 	Headers map[string]string `json:"headers"`
+
+	// If true, don't use TLS
+	Insecure bool `json:"insecure"`
 }
 
 func newExporter(config ExporterConfig) (sdktrace.SpanExporter, error) {
 	var client otlptrace.Client
 	switch config.Type {
 	case GRPC:
-		client = otlptracegrpc.NewClient(
+		opts := []otlptracegrpc.Option{
 			otlptracegrpc.WithEndpoint(config.Endpoint),
 			otlptracegrpc.WithHeaders(config.Headers),
 			otlptracegrpc.WithTimeout(tracerExportTimeout),
-		)
+		}
+		if config.Insecure {
+			opts = append(opts, otlptracegrpc.WithInsecure())
+		}
+		client = otlptracegrpc.NewClient(opts...)
 	case HTTP:
-		client = otlptracehttp.NewClient(
+		opts := []otlptracehttp.Option{
 			otlptracehttp.WithEndpoint(config.Endpoint),
 			otlptracehttp.WithHeaders(config.Headers),
 			otlptracehttp.WithTimeout(tracerExportTimeout),
-		)
+		}
+		if config.Insecure {
+			opts = append(opts, otlptracehttp.WithInsecure())
+		}
+		client = otlptracehttp.NewClient(opts...)
 	default:
 		return nil, errUnknownExporterType
 	}

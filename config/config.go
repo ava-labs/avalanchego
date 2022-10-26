@@ -1225,6 +1225,7 @@ func getTraceConfig(v *viper.Viper) (trace.Config, error) {
 		ExporterConfig: trace.ExporterConfig{
 			Type:     exporterType,
 			Endpoint: endpoint,
+			Insecure: v.GetBool(TracingInsecureKey),
 			// TODO add support for headers
 		},
 		Enabled:         true,
