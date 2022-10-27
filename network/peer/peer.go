@@ -360,7 +360,7 @@ func (p *peer) readMessages() {
 		)
 
 		// If the peer is shutting down, there's no need to read the message.
-		if p.onClosingCtx.Err() != nil {
+		if err := p.onClosingCtx.Err(); err != nil {
 			onFinishedHandling()
 			return
 		}
@@ -596,7 +596,7 @@ func (p *peer) handle(msg message.InboundMessage) {
 	}
 
 	// Consensus and app-level messages
-	p.Router.HandleInbound(msg)
+	p.Router.HandleInbound(context.Background(), msg)
 }
 
 func (p *peer) handlePing(_ message.InboundMessage) {
@@ -884,7 +884,6 @@ func (p *peer) handlePeerList(msg message.InboundMessage) {
 		return
 	}
 	ips := ipsIntf.([]ips.ClaimedIPPort)
-
 	for _, ip := range ips {
 		if !p.Network.Track(ip) {
 			p.Metrics.NumUselessPeerListBytes.Add(float64(ip.BytesLen()))

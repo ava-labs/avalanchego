@@ -4,6 +4,7 @@
 package common
 
 import (
+	"context"
 	stdmath "math"
 
 	"go.uber.org/zap"
@@ -77,7 +78,7 @@ func NewCommonBootstrapper(config Config) Bootstrapper {
 	}
 }
 
-func (b *bootstrapper) AcceptedFrontier(nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
+func (b *bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
 	// ignores any late responses
 	if requestID != b.Config.SharedCfg.RequestID {
 		b.Ctx.Log.Debug("received out-of-sync AcceptedFrontier message",
@@ -102,7 +103,7 @@ func (b *bootstrapper) AcceptedFrontier(nodeID ids.NodeID, requestID uint32, con
 	// frontier we got from others
 	b.acceptedFrontierSet.Add(containerIDs...)
 
-	b.sendGetAcceptedFrontiers()
+	b.sendGetAcceptedFrontiers(ctx)
 
 	// still waiting on requests
 	if b.pendingReceiveAcceptedFrontier.Len() != 0 {
@@ -151,7 +152,7 @@ func (b *bootstrapper) AcceptedFrontier(nodeID ids.NodeID, requestID uint32, con
 	return nil
 }
 
-func (b *bootstrapper) GetAcceptedFrontierFailed(nodeID ids.NodeID, requestID uint32) error {
+func (b *bootstrapper) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	// ignores any late responses
 	if requestID != b.Config.SharedCfg.RequestID {
 		b.Ctx.Log.Debug("received out-of-sync GetAcceptedFrontierFailed message",
@@ -165,10 +166,10 @@ func (b *bootstrapper) GetAcceptedFrontierFailed(nodeID ids.NodeID, requestID ui
 	// If we can't get a response from [nodeID], act as though they said their
 	// accepted frontier is empty and we add the validator to the failed list
 	b.failedAcceptedFrontier.Add(nodeID)
-	return b.AcceptedFrontier(nodeID, requestID, nil)
+	return b.AcceptedFrontier(ctx, nodeID, requestID, nil)
 }
 
-func (b *bootstrapper) Accepted(nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
+func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
 	// ignores any late responses
 	if requestID != b.Config.SharedCfg.RequestID {
 		b.Ctx.Log.Debug("received out-of-sync Accepted message",
@@ -254,10 +255,10 @@ func (b *bootstrapper) Accepted(nodeID ids.NodeID, requestID uint32, containerID
 		)
 	}
 
-	return b.Bootstrapable.ForceAccepted(accepted)
+	return b.Bootstrapable.ForceAccepted(ctx, accepted)
 }
 
-func (b *bootstrapper) GetAcceptedFailed(nodeID ids.NodeID, requestID uint32) error {
+func (b *bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	// ignores any late responses
 	if requestID != b.Config.SharedCfg.RequestID {
 		b.Ctx.Log.Debug("received out-of-sync GetAcceptedFailed message",
@@ -272,7 +273,7 @@ func (b *bootstrapper) GetAcceptedFailed(nodeID ids.NodeID, requestID uint32) er
 	// they think none of the containers we sent them in GetAccepted are
 	// accepted
 	b.failedAccepted.Add(nodeID)
-	return b.Accepted(nodeID, requestID, nil)
+	return b.Accepted(ctx, nodeID, requestID, nil)
 }
 
 func (b *bootstrapper) Startup() error {
@@ -312,11 +313,11 @@ func (b *bootstrapper) Startup() error {
 		b.Ctx.Log.Info("bootstrapping skipped",
 			zap.String("reason", "no provided bootstraps"),
 		)
-		return b.Bootstrapable.ForceAccepted(nil)
+		return b.Bootstrapable.ForceAccepted(context.TODO(), nil)
 	}
 
 	b.Config.SharedCfg.RequestID++
-	b.sendGetAcceptedFrontiers()
+	b.sendGetAcceptedFrontiers(context.TODO())
 	return nil
 }
 
@@ -341,7 +342,7 @@ func (b *bootstrapper) Restart(reset bool) error {
 
 // Ask up to [MaxOutstandingBroadcastRequests] bootstrap validators to send
 // their accepted frontier with the current accepted frontier
-func (b *bootstrapper) sendGetAcceptedFrontiers() {
+func (b *bootstrapper) sendGetAcceptedFrontiers(ctx context.Context) {
 	vdrs := ids.NewNodeIDSet(1)
 	for b.pendingSendAcceptedFrontier.Len() > 0 && b.pendingReceiveAcceptedFrontier.Len() < MaxOutstandingBroadcastRequests {
 		vdr, _ := b.pendingSendAcceptedFrontier.Pop()
@@ -352,7 +353,7 @@ func (b *bootstrapper) sendGetAcceptedFrontiers() {
 	}
 
 	if vdrs.Len() > 0 {
-		b.Sender.SendGetAcceptedFrontier(vdrs, b.Config.SharedCfg.RequestID)
+		b.Sender.SendGetAcceptedFrontier(ctx, vdrs, b.Config.SharedCfg.RequestID)
 	}
 }
 
@@ -373,6 +374,6 @@ func (b *bootstrapper) sendGetAccepted() {
 			zap.Int("numSent", vdrs.Len()),
 			zap.Int("numPending", b.pendingSendAccepted.Len()),
 		)
-		b.Sender.SendGetAccepted(vdrs, b.Config.SharedCfg.RequestID, b.acceptedFrontier)
+		b.Sender.SendGetAccepted(context.TODO(), vdrs, b.Config.SharedCfg.RequestID, b.acceptedFrontier)
 	}
 }

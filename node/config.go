@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/ips"
@@ -222,6 +223,8 @@ type Config struct {
 
 	RequiredAvailableDiskSpace         uint64 `json:"requiredAvailableDiskSpace"`
 	WarningThresholdAvailableDiskSpace uint64 `json:"warningThresholdAvailableDiskSpace"`
+
+	TraceConfig trace.Config `json:"traceConfig"`
 
 	// See comment on [MinPercentConnectedStakeHealthy] in platformvm.Config
 	MinPercentConnectedStakeHealthy map[ids.ID]float64 `json:"minPercentConnectedStakeHealthy"`

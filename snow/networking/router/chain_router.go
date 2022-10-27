@@ -4,6 +4,7 @@
 package router
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -133,6 +134,7 @@ func (cr *ChainRouter) Initialize(
 // This method registers a timeout that calls such methods if we don't get a
 // reply in time.
 func (cr *ChainRouter) RegisterRequest(
+	ctx context.Context,
 	nodeID ids.NodeID,
 	requestingChainID ids.ID,
 	respondingChainID ids.ID,
@@ -174,11 +176,11 @@ func (cr *ChainRouter) RegisterRequest(
 	// Register a timeout to fire if we don't get a reply in time.
 	cr.timeoutManager.RegisterRequest(nodeID, respondingChainID, op, uniqueRequestID, func() {
 		msg := cr.msgCreator.InternalFailedRequest(failedOp, nodeID, respondingChainID, requestingChainID, requestID)
-		cr.HandleInbound(msg)
+		cr.HandleInbound(ctx, msg)
 	})
 }
 
-func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
+func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMessage) {
 	nodeID := msg.NodeID()
 	op := msg.Op()
 
@@ -274,28 +276,26 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 			zap.Stringer("chainID", destinationChainID),
 			zap.Error(errUnknownChain),
 		)
-
 		msg.OnFinishedHandling()
 		return
 	}
 
-	ctx := chain.Context()
+	chainCtx := chain.Context()
 
 	// TODO: [requestID] can overflow, which means a timeout on the request
 	//       before the overflow may not be handled properly.
 	if _, notRequested := message.UnrequestedOps[op]; notRequested ||
 		(op == message.Put && requestID == constants.GossipMsgRequestID) {
-		if ctx.IsExecuting() {
+		if chainCtx.IsExecuting() {
 			cr.log.Debug("dropping message and skipping queue",
 				zap.String("reason", "the chain is currently executing"),
 				zap.Stringer("messageOp", op),
 			)
 			cr.metrics.droppedRequests.Inc()
-
 			msg.OnFinishedHandling()
 			return
 		}
-		chain.Push(msg)
+		chain.Push(ctx, msg)
 		return
 	}
 
@@ -313,17 +313,16 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 		cr.timeoutManager.RemoveRequest(uniqueRequestID)
 
 		// Pass the failure to the chain
-		chain.Push(msg)
+		chain.Push(ctx, msg)
 		return
 	}
 
-	if ctx.IsExecuting() {
+	if chainCtx.IsExecuting() {
 		cr.log.Debug("dropping message and skipping queue",
 			zap.String("reason", "the chain is currently executing"),
 			zap.Stringer("messageOp", op),
 		)
 		cr.metrics.droppedRequests.Inc()
-
 		msg.OnFinishedHandling()
 		return
 	}
@@ -342,7 +341,7 @@ func (cr *ChainRouter) HandleInbound(msg message.InboundMessage) {
 	cr.timeoutManager.RegisterResponse(nodeID, destinationChainID, uniqueRequestID, req.op, latency)
 
 	// Pass the response to the chain
-	chain.Push(msg)
+	chain.Push(ctx, msg)
 }
 
 // Shutdown shuts down this router
@@ -391,7 +390,7 @@ func (cr *ChainRouter) AddChain(chain handler.Handler) {
 		// If this validator is benched on any chain, treat them as disconnected on all chains
 		if _, benched := cr.benched[validatorID]; !benched && peer.trackedSubnets.Contains(subnetID) {
 			msg := cr.msgCreator.InternalConnected(validatorID, peer.version)
-			chain.Push(msg)
+			chain.Push(context.TODO(), msg)
 		}
 	}
 }
@@ -421,7 +420,7 @@ func (cr *ChainRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Applica
 	// we cannot put a subnet-only validator check here since Disconnected would not be handled properly.
 	for _, chain := range cr.chains {
 		if subnetID == chain.Context().SubnetID {
-			chain.Push(msg)
+			chain.Push(context.TODO(), msg)
 		}
 	}
 }
@@ -443,7 +442,7 @@ func (cr *ChainRouter) Disconnected(nodeID ids.NodeID) {
 	// we cannot put a subnet-only validator check here since if a validator connects then it leaves validator-set, it would not be disconnected properly.
 	for _, chain := range cr.chains {
 		if peer.trackedSubnets.Contains(chain.Context().SubnetID) {
-			chain.Push(msg)
+			chain.Push(context.TODO(), msg)
 		}
 	}
 }
@@ -466,7 +465,7 @@ func (cr *ChainRouter) Benched(chainID ids.ID, nodeID ids.NodeID) {
 
 	for _, chain := range cr.chains {
 		if peer.trackedSubnets.Contains(chain.Context().SubnetID) {
-			chain.Push(msg)
+			chain.Push(context.TODO(), msg)
 		}
 	}
 }
@@ -494,7 +493,7 @@ func (cr *ChainRouter) Unbenched(chainID ids.ID, nodeID ids.NodeID) {
 
 	for _, chain := range cr.chains {
 		if peer.trackedSubnets.Contains(chain.Context().SubnetID) {
-			chain.Push(msg)
+			chain.Push(context.TODO(), msg)
 		}
 	}
 }

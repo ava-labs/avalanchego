@@ -4,6 +4,7 @@
 package events
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -34,39 +35,39 @@ func (b *Blocker) Len() int {
 
 // Fulfill notifies all objects blocking on the event whose ID is <id> that
 // the event has happened
-func (b *Blocker) Fulfill(id ids.ID) {
+func (b *Blocker) Fulfill(ctx context.Context, id ids.ID) {
 	b.init()
 
 	blocking := (*b)[id]
 	delete(*b, id)
 
 	for _, pending := range blocking {
-		pending.Fulfill(id)
+		pending.Fulfill(ctx, id)
 	}
 }
 
 // Abandon notifies all objects blocking on the event whose ID is <id> that
 // the event has been abandoned
-func (b *Blocker) Abandon(id ids.ID) {
+func (b *Blocker) Abandon(ctx context.Context, id ids.ID) {
 	b.init()
 
 	blocking := (*b)[id]
 	delete(*b, id)
 
 	for _, pending := range blocking {
-		pending.Abandon(id)
+		pending.Abandon(ctx, id)
 	}
 }
 
 // Register a new Blockable and its dependencies
-func (b *Blocker) Register(pending Blockable) {
+func (b *Blocker) Register(ctx context.Context, pending Blockable) {
 	b.init()
 
 	for pendingID := range pending.Dependencies() {
 		(*b)[pendingID] = append((*b)[pendingID], pending)
 	}
 
-	pending.Update()
+	pending.Update(ctx)
 }
 
 // PrefixedString returns the same value as the String function, with all the

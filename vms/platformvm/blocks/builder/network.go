@@ -6,6 +6,7 @@
 package builder
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -56,43 +57,43 @@ func NewNetwork(
 	}
 }
 
-func (n *network) CrossChainAppRequestFailed(chainID ids.ID, requestID uint32) error {
+func (n *network) CrossChainAppRequestFailed(_ context.Context, chainID ids.ID, requestID uint32) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (n *network) CrossChainAppRequest(chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+func (n *network) CrossChainAppRequest(_ context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (n *network) CrossChainAppResponse(chainID ids.ID, requestID uint32, response []byte) error {
+func (n *network) CrossChainAppResponse(_ context.Context, chainID ids.ID, requestID uint32, response []byte) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (n *network) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
+func (n *network) AppRequestFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (n *network) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, msgBytes []byte) error {
+func (n *network) AppRequest(_ context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msgBytes []byte) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (n *network) AppResponse(nodeID ids.NodeID, requestID uint32, msgBytes []byte) error {
+func (n *network) AppResponse(_ context.Context, nodeID ids.NodeID, requestID uint32, msgBytes []byte) error {
 	// This VM currently only supports gossiping of txs, so there are no
 	// requests.
 	return nil
 }
 
-func (n *network) AppGossip(nodeID ids.NodeID, msgBytes []byte) error {
+func (n *network) AppGossip(_ context.Context, nodeID ids.NodeID, msgBytes []byte) error {
 	n.ctx.Log.Debug("called AppGossip message handler",
 		zap.Stringer("nodeID", nodeID),
 		zap.Int("messageLen", len(msgBytes)),
@@ -163,5 +164,5 @@ func (n *network) GossipTx(tx *txs.Tx) error {
 	if err != nil {
 		return fmt.Errorf("GossipTx: failed to build Tx message: %w", err)
 	}
-	return n.appSender.SendAppGossip(msgBytes)
+	return n.appSender.SendAppGossip(context.TODO(), msgBytes)
 }

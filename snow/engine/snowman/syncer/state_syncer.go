@@ -4,6 +4,7 @@
 package syncer
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -105,7 +106,7 @@ func New(
 	}
 }
 
-func (ss *stateSyncer) StateSummaryFrontier(nodeID ids.NodeID, requestID uint32, summaryBytes []byte) error {
+func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryBytes []byte) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync StateSummaryFrontier message",
@@ -149,10 +150,10 @@ func (ss *stateSyncer) StateSummaryFrontier(nodeID ids.NodeID, requestID uint32,
 		)
 	}
 
-	return ss.receivedStateSummaryFrontier()
+	return ss.receivedStateSummaryFrontier(ctx)
 }
 
-func (ss *stateSyncer) GetStateSummaryFrontierFailed(nodeID ids.NodeID, requestID uint32) error {
+func (ss *stateSyncer) GetStateSummaryFrontierFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync GetStateSummaryFrontierFailed message",
@@ -167,11 +168,11 @@ func (ss *stateSyncer) GetStateSummaryFrontierFailed(nodeID ids.NodeID, requestI
 	ss.failedSeeders.Add(nodeID)
 	ss.pendingSeeders.Remove(nodeID)
 
-	return ss.receivedStateSummaryFrontier()
+	return ss.receivedStateSummaryFrontier(ctx)
 }
 
-func (ss *stateSyncer) receivedStateSummaryFrontier() error {
-	ss.sendGetStateSummaryFrontiers()
+func (ss *stateSyncer) receivedStateSummaryFrontier(ctx context.Context) error {
+	ss.sendGetStateSummaryFrontiers(ctx)
 
 	// still waiting on requests
 	if ss.pendingSeeders.Len() != 0 {
@@ -205,11 +206,11 @@ func (ss *stateSyncer) receivedStateSummaryFrontier() error {
 	}
 
 	ss.requestID++
-	ss.sendGetAcceptedStateSummaries()
+	ss.sendGetAcceptedStateSummaries(ctx)
 	return nil
 }
 
-func (ss *stateSyncer) AcceptedStateSummary(nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error {
+func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync AcceptedStateSummary message",
@@ -254,7 +255,7 @@ func (ss *stateSyncer) AcceptedStateSummary(nodeID ids.NodeID, requestID uint32,
 		ws.weight = newWeight
 	}
 
-	ss.sendGetAcceptedStateSummaries()
+	ss.sendGetAcceptedStateSummaries(ctx)
 
 	// wait on pending responses
 	if ss.pendingVoters.Len() != 0 {
@@ -351,7 +352,7 @@ func (ss *stateSyncer) selectSyncableStateSummary() block.StateSummary {
 	return preferredStateSummary
 }
 
-func (ss *stateSyncer) GetAcceptedStateSummaryFailed(nodeID ids.NodeID, requestID uint32) error {
+func (ss *stateSyncer) GetAcceptedStateSummaryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	// ignores any late responses
 	if requestID != ss.requestID {
 		ss.Ctx.Log.Debug("received out-of-sync GetAcceptedStateSummaryFailed message",
@@ -367,7 +368,7 @@ func (ss *stateSyncer) GetAcceptedStateSummaryFailed(nodeID ids.NodeID, requestI
 	// accepted
 	ss.failedVoters.Add(nodeID)
 
-	return ss.AcceptedStateSummary(nodeID, requestID, nil)
+	return ss.AcceptedStateSummary(ctx, nodeID, requestID, nil)
 }
 
 func (ss *stateSyncer) Start(startReqID uint32) error {
@@ -458,7 +459,7 @@ func (ss *stateSyncer) startup() error {
 	}
 
 	ss.requestID++
-	ss.sendGetStateSummaryFrontiers()
+	ss.sendGetStateSummaryFrontiers(context.TODO())
 	return nil
 }
 
@@ -475,7 +476,7 @@ func (ss *stateSyncer) restart() error {
 // Ask up to [common.MaxOutstandingBroadcastRequests] state sync validators at a time
 // to send their accepted state summary. It is called again until there are
 // no more seeders to be reached in the pending set
-func (ss *stateSyncer) sendGetStateSummaryFrontiers() {
+func (ss *stateSyncer) sendGetStateSummaryFrontiers(ctx context.Context) {
 	vdrs := ids.NewNodeIDSet(1)
 	for ss.targetSeeders.Len() > 0 && ss.pendingSeeders.Len() < common.MaxOutstandingBroadcastRequests {
 		vdr, _ := ss.targetSeeders.Pop()
@@ -484,14 +485,14 @@ func (ss *stateSyncer) sendGetStateSummaryFrontiers() {
 	}
 
 	if vdrs.Len() > 0 {
-		ss.Sender.SendGetStateSummaryFrontier(vdrs, ss.requestID)
+		ss.Sender.SendGetStateSummaryFrontier(ctx, vdrs, ss.requestID)
 	}
 }
 
 // Ask up to [common.MaxOutstandingStateSyncRequests] syncers validators to send
 // their filtered accepted frontier. It is called again until there are
 // no more voters to be reached in the pending set.
-func (ss *stateSyncer) sendGetAcceptedStateSummaries() {
+func (ss *stateSyncer) sendGetAcceptedStateSummaries(ctx context.Context) {
 	vdrs := ids.NewNodeIDSet(1)
 	for ss.targetVoters.Len() > 0 && ss.pendingVoters.Len() < common.MaxOutstandingBroadcastRequests {
 		vdr, _ := ss.targetVoters.Pop()
@@ -500,7 +501,7 @@ func (ss *stateSyncer) sendGetAcceptedStateSummaries() {
 	}
 
 	if len(vdrs) > 0 {
-		ss.Sender.SendGetAcceptedStateSummary(vdrs, ss.requestID, ss.uniqueSummariesHeights)
+		ss.Sender.SendGetAcceptedStateSummary(ctx, vdrs, ss.requestID, ss.uniqueSummariesHeights)
 		ss.Ctx.Log.Debug("sent GetAcceptedStateSummary messages",
 			zap.Int("numSent", vdrs.Len()),
 			zap.Int("numPending", ss.targetVoters.Len()),
@@ -508,16 +509,16 @@ func (ss *stateSyncer) sendGetAcceptedStateSummaries() {
 	}
 }
 
-func (ss *stateSyncer) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
-	return ss.VM.AppRequest(nodeID, requestID, deadline, request)
+func (ss *stateSyncer) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
+	return ss.VM.AppRequest(ctx, nodeID, requestID, deadline, request)
 }
 
-func (ss *stateSyncer) AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
-	return ss.VM.AppResponse(nodeID, requestID, response)
+func (ss *stateSyncer) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
+	return ss.VM.AppResponse(ctx, nodeID, requestID, response)
 }
 
-func (ss *stateSyncer) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
-	return ss.VM.AppRequestFailed(nodeID, requestID)
+func (ss *stateSyncer) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	return ss.VM.AppRequestFailed(ctx, nodeID, requestID)
 }
 
 func (ss *stateSyncer) Notify(msg common.Message) error {

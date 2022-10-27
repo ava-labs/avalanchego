@@ -32,7 +32,7 @@ func (s *Server) SendCrossChainAppRequest(ctx context.Context, msg *appsenderpb.
 		return &emptypb.Empty{}, err
 	}
 
-	return &emptypb.Empty{}, s.appSender.SendCrossChainAppRequest(chainID, msg.RequestId, msg.Request)
+	return &emptypb.Empty{}, s.appSender.SendCrossChainAppRequest(ctx, chainID, msg.RequestId, msg.Request)
 }
 
 func (s *Server) SendCrossChainAppResponse(ctx context.Context, msg *appsenderpb.SendCrossChainAppResponseMsg) (*emptypb.Empty, error) {
@@ -41,10 +41,10 @@ func (s *Server) SendCrossChainAppResponse(ctx context.Context, msg *appsenderpb
 		return &emptypb.Empty{}, err
 	}
 
-	return &emptypb.Empty{}, s.appSender.SendCrossChainAppResponse(chainID, msg.RequestId, msg.Response)
+	return &emptypb.Empty{}, s.appSender.SendCrossChainAppResponse(ctx, chainID, msg.RequestId, msg.Response)
 }
 
-func (s *Server) SendAppRequest(_ context.Context, req *appsenderpb.SendAppRequestMsg) (*emptypb.Empty, error) {
+func (s *Server) SendAppRequest(ctx context.Context, req *appsenderpb.SendAppRequestMsg) (*emptypb.Empty, error) {
 	nodeIDs := ids.NewNodeIDSet(len(req.NodeIds))
 	for _, nodeIDBytes := range req.NodeIds {
 		nodeID, err := ids.ToNodeID(nodeIDBytes)
@@ -53,25 +53,25 @@ func (s *Server) SendAppRequest(_ context.Context, req *appsenderpb.SendAppReque
 		}
 		nodeIDs.Add(nodeID)
 	}
-	err := s.appSender.SendAppRequest(nodeIDs, req.RequestId, req.Request)
+	err := s.appSender.SendAppRequest(ctx, nodeIDs, req.RequestId, req.Request)
 	return &emptypb.Empty{}, err
 }
 
-func (s *Server) SendAppResponse(_ context.Context, req *appsenderpb.SendAppResponseMsg) (*emptypb.Empty, error) {
+func (s *Server) SendAppResponse(ctx context.Context, req *appsenderpb.SendAppResponseMsg) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}
-	err = s.appSender.SendAppResponse(nodeID, req.RequestId, req.Response)
+	err = s.appSender.SendAppResponse(ctx, nodeID, req.RequestId, req.Response)
 	return &emptypb.Empty{}, err
 }
 
-func (s *Server) SendAppGossip(_ context.Context, req *appsenderpb.SendAppGossipMsg) (*emptypb.Empty, error) {
-	err := s.appSender.SendAppGossip(req.Msg)
+func (s *Server) SendAppGossip(ctx context.Context, req *appsenderpb.SendAppGossipMsg) (*emptypb.Empty, error) {
+	err := s.appSender.SendAppGossip(ctx, req.Msg)
 	return &emptypb.Empty{}, err
 }
 
-func (s *Server) SendAppGossipSpecific(_ context.Context, req *appsenderpb.SendAppGossipSpecificMsg) (*emptypb.Empty, error) {
+func (s *Server) SendAppGossipSpecific(ctx context.Context, req *appsenderpb.SendAppGossipSpecificMsg) (*emptypb.Empty, error) {
 	nodeIDs := ids.NewNodeIDSet(len(req.NodeIds))
 	for _, nodeIDBytes := range req.NodeIds {
 		nodeID, err := ids.ToNodeID(nodeIDBytes)
@@ -80,6 +80,6 @@ func (s *Server) SendAppGossipSpecific(_ context.Context, req *appsenderpb.SendA
 		}
 		nodeIDs.Add(nodeID)
 	}
-	err := s.appSender.SendAppGossipSpecific(nodeIDs, req.Msg)
+	err := s.appSender.SendAppGossipSpecific(ctx, nodeIDs, req.Msg)
 	return &emptypb.Empty{}, err
 }
