@@ -89,7 +89,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 			reqCount++
 			// Fail all requests after number 50 to interrupt the sync
 			if reqCount > 50 {
-				if err := syncerVM.AppRequestFailed(nodeID, requestID); err != nil {
+				if err := syncerVM.AppRequestFailed(context.Background(), nodeID, requestID); err != nil {
 					panic(err)
 				}
 				cancel := syncerVM.StateSyncClient.(*stateSyncerClient).cancel
@@ -99,7 +99,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 					t.Fatal("state sync client not populated correctly")
 				}
 			} else {
-				syncerVM.AppResponse(nodeID, requestID, response)
+				syncerVM.AppResponse(context.Background(), nodeID, requestID, response)
 			}
 		},
 		expectedErr: context.Canceled,
@@ -116,13 +116,13 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 
 	syncDisabledVM := &VM{}
 	appSender := &commonEng.SenderTest{T: t}
-	appSender.SendAppGossipF = func([]byte) error { return nil }
-	appSender.SendAppRequestF = func(nodeSet ids.NodeIDSet, requestID uint32, request []byte) error {
+	appSender.SendAppGossipF = func(context.Context, []byte) error { return nil }
+	appSender.SendAppRequestF = func(ctx context.Context, nodeSet ids.NodeIDSet, requestID uint32, request []byte) error {
 		nodeID, hasItem := nodeSet.Pop()
 		if !hasItem {
 			t.Fatal("expected nodeSet to contain at least 1 nodeID")
 		}
-		go vmSetup.serverVM.AppRequest(nodeID, requestID, time.Now().Add(1*time.Second), request)
+		go vmSetup.serverVM.AppRequest(ctx, nodeID, requestID, time.Now().Add(1*time.Second), request)
 		return nil
 	}
 	// Disable metrics to prevent duplicate registerer
@@ -202,9 +202,9 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	}
 
 	// override [serverVM]'s SendAppResponse function to trigger AppResponse on [syncerVM]
-	vmSetup.serverAppSender.SendAppResponseF = func(nodeID ids.NodeID, requestID uint32, response []byte) error {
+	vmSetup.serverAppSender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 		if test.responseIntercept == nil {
-			go syncReEnabledVM.AppResponse(nodeID, requestID, response)
+			go syncReEnabledVM.AppResponse(ctx, nodeID, requestID, response)
 		} else {
 			go test.responseIntercept(syncReEnabledVM, nodeID, requestID, response)
 		}
@@ -363,9 +363,9 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest) *syncVMSetup {
 	syncerVM.atomicTrie.(*atomicTrie).commitInterval = test.syncableInterval
 
 	// override [serverVM]'s SendAppResponse function to trigger AppResponse on [syncerVM]
-	serverAppSender.SendAppResponseF = func(nodeID ids.NodeID, requestID uint32, response []byte) error {
+	serverAppSender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 		if test.responseIntercept == nil {
-			go syncerVM.AppResponse(nodeID, requestID, response)
+			go syncerVM.AppResponse(ctx, nodeID, requestID, response)
 		} else {
 			go test.responseIntercept(syncerVM, nodeID, requestID, response)
 		}
@@ -377,12 +377,12 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest) *syncVMSetup {
 	assert.NoError(t, syncerVM.Connected(serverVM.ctx.NodeID, statesyncclient.StateSyncVersion))
 
 	// override [syncerVM]'s SendAppRequest function to trigger AppRequest on [serverVM]
-	syncerAppSender.SendAppRequestF = func(nodeSet ids.NodeIDSet, requestID uint32, request []byte) error {
+	syncerAppSender.SendAppRequestF = func(ctx context.Context, nodeSet ids.NodeIDSet, requestID uint32, request []byte) error {
 		nodeID, hasItem := nodeSet.Pop()
 		if !hasItem {
 			t.Fatal("expected nodeSet to contain at least 1 nodeID")
 		}
-		go serverVM.AppRequest(nodeID, requestID, time.Now().Add(1*time.Second), request)
+		go serverVM.AppRequest(ctx, nodeID, requestID, time.Now().Add(1*time.Second), request)
 		return nil
 	}
 

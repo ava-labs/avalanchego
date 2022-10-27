@@ -62,7 +62,7 @@ func TestRequestAnyRequestsRoutingAndResponse(t *testing.T) {
 			senderWg.Add(1)
 			go func() {
 				defer senderWg.Done()
-				if err := net.AppRequest(nodeID, requestID, time.Now().Add(5*time.Second), requestBytes); err != nil {
+				if err := net.AppRequest(context.Background(), nodeID, requestID, time.Now().Add(5*time.Second), requestBytes); err != nil {
 					panic(err)
 				}
 			}()
@@ -72,7 +72,7 @@ func TestRequestAnyRequestsRoutingAndResponse(t *testing.T) {
 			senderWg.Add(1)
 			go func() {
 				defer senderWg.Done()
-				if err := net.AppResponse(nodeID, requestID, responseBytes); err != nil {
+				if err := net.AppResponse(context.Background(), nodeID, requestID, responseBytes); err != nil {
 					panic(err)
 				}
 				atomic.AddUint32(&callNum, 1)
@@ -136,7 +136,7 @@ func TestRequestRequestsRoutingAndResponse(t *testing.T) {
 			senderWg.Add(1)
 			go func() {
 				defer senderWg.Done()
-				if err := net.AppRequest(nodeID, requestID, time.Now().Add(5*time.Second), requestBytes); err != nil {
+				if err := net.AppRequest(context.Background(), nodeID, requestID, time.Now().Add(5*time.Second), requestBytes); err != nil {
 					panic(err)
 				}
 			}()
@@ -146,7 +146,7 @@ func TestRequestRequestsRoutingAndResponse(t *testing.T) {
 			senderWg.Add(1)
 			go func() {
 				defer senderWg.Done()
-				if err := net.AppResponse(nodeID, requestID, responseBytes); err != nil {
+				if err := net.AppResponse(context.Background(), nodeID, requestID, responseBytes); err != nil {
 					panic(err)
 				}
 				atomic.AddUint32(&callNum, 1)
@@ -234,7 +234,7 @@ func TestRequestMinVersion(t *testing.T) {
 				if err != nil {
 					panic(err)
 				}
-				err = net.AppResponse(nodeID, reqID, responseBytes)
+				err = net.AppResponse(context.Background(), nodeID, reqID, responseBytes)
 				assert.NoError(t, err)
 			}()
 			return nil
@@ -308,13 +308,13 @@ func TestOnRequestHonoursDeadline(t *testing.T) {
 
 	requestHandler.response, err = marshalStruct(codecManager, TestMessage{Message: "hi there"})
 	assert.NoError(t, err)
-	err = net.AppRequest(nodeID, 1, time.Now().Add(1*time.Millisecond), requestBytes)
+	err = net.AppRequest(context.Background(), nodeID, 1, time.Now().Add(1*time.Millisecond), requestBytes)
 	assert.NoError(t, err)
 	// ensure the handler didn't get called (as peer.Network would've dropped the request)
 	assert.EqualValues(t, requestHandler.calls, 0)
 
 	requestHandler.processingDuration = 0
-	err = net.AppRequest(nodeID, 2, time.Now().Add(250*time.Millisecond), requestBytes)
+	err = net.AppRequest(context.Background(), nodeID, 2, time.Now().Add(250*time.Millisecond), requestBytes)
 	assert.NoError(t, err)
 	assert.True(t, responded)
 	assert.EqualValues(t, requestHandler.calls, 1)
@@ -332,7 +332,7 @@ func TestGossip(t *testing.T) {
 		sendAppGossipFn: func(msg []byte) error {
 			go func() {
 				defer wg.Done()
-				err := clientNetwork.AppGossip(nodeID, msg)
+				err := clientNetwork.AppGossip(context.Background(), nodeID, msg)
 				assert.NoError(t, err)
 			}()
 			sentGossip = true
@@ -391,22 +391,22 @@ func TestHandleInvalidMessages(t *testing.T) {
 	var nilResponse []byte
 
 	// Check for edge cases
-	assert.NoError(t, clientNetwork.AppGossip(nodeID, gossipMsg))
-	assert.NoError(t, clientNetwork.AppGossip(nodeID, requestMessage))
-	assert.NoError(t, clientNetwork.AppGossip(nodeID, garbageResponse))
-	assert.NoError(t, clientNetwork.AppGossip(nodeID, emptyResponse))
-	assert.NoError(t, clientNetwork.AppGossip(nodeID, nilResponse))
-	assert.NoError(t, clientNetwork.AppRequest(nodeID, requestID, time.Now().Add(time.Second), gossipMsg))
-	assert.NoError(t, clientNetwork.AppRequest(nodeID, requestID, time.Now().Add(time.Second), requestMessage))
-	assert.NoError(t, clientNetwork.AppRequest(nodeID, requestID, time.Now().Add(time.Second), garbageResponse))
-	assert.NoError(t, clientNetwork.AppRequest(nodeID, requestID, time.Now().Add(time.Second), emptyResponse))
-	assert.NoError(t, clientNetwork.AppRequest(nodeID, requestID, time.Now().Add(time.Second), nilResponse))
-	assert.NoError(t, clientNetwork.AppResponse(nodeID, requestID, gossipMsg))
-	assert.NoError(t, clientNetwork.AppResponse(nodeID, requestID, requestMessage))
-	assert.NoError(t, clientNetwork.AppResponse(nodeID, requestID, garbageResponse))
-	assert.NoError(t, clientNetwork.AppResponse(nodeID, requestID, emptyResponse))
-	assert.NoError(t, clientNetwork.AppResponse(nodeID, requestID, nilResponse))
-	assert.NoError(t, clientNetwork.AppRequestFailed(nodeID, requestID))
+	assert.NoError(t, clientNetwork.AppGossip(context.Background(), nodeID, gossipMsg))
+	assert.NoError(t, clientNetwork.AppGossip(context.Background(), nodeID, requestMessage))
+	assert.NoError(t, clientNetwork.AppGossip(context.Background(), nodeID, garbageResponse))
+	assert.NoError(t, clientNetwork.AppGossip(context.Background(), nodeID, emptyResponse))
+	assert.NoError(t, clientNetwork.AppGossip(context.Background(), nodeID, nilResponse))
+	assert.NoError(t, clientNetwork.AppRequest(context.Background(), nodeID, requestID, time.Now().Add(time.Second), gossipMsg))
+	assert.NoError(t, clientNetwork.AppRequest(context.Background(), nodeID, requestID, time.Now().Add(time.Second), requestMessage))
+	assert.NoError(t, clientNetwork.AppRequest(context.Background(), nodeID, requestID, time.Now().Add(time.Second), garbageResponse))
+	assert.NoError(t, clientNetwork.AppRequest(context.Background(), nodeID, requestID, time.Now().Add(time.Second), emptyResponse))
+	assert.NoError(t, clientNetwork.AppRequest(context.Background(), nodeID, requestID, time.Now().Add(time.Second), nilResponse))
+	assert.NoError(t, clientNetwork.AppResponse(context.Background(), nodeID, requestID, gossipMsg))
+	assert.NoError(t, clientNetwork.AppResponse(context.Background(), nodeID, requestID, requestMessage))
+	assert.NoError(t, clientNetwork.AppResponse(context.Background(), nodeID, requestID, garbageResponse))
+	assert.NoError(t, clientNetwork.AppResponse(context.Background(), nodeID, requestID, emptyResponse))
+	assert.NoError(t, clientNetwork.AppResponse(context.Background(), nodeID, requestID, nilResponse))
+	assert.NoError(t, clientNetwork.AppRequestFailed(context.Background(), nodeID, requestID))
 }
 
 func TestNetworkPropagatesRequestHandlerError(t *testing.T) {
@@ -429,7 +429,7 @@ func TestNetworkPropagatesRequestHandlerError(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Check that if the request handler returns an error, it is propagated as a fatal error.
-	assert.Error(t, clientNetwork.AppRequest(nodeID, requestID, time.Now().Add(time.Second), requestMessage))
+	assert.Error(t, clientNetwork.AppRequest(context.Background(), nodeID, requestID, time.Now().Add(time.Second), requestMessage))
 }
 
 func buildCodec(t *testing.T, types ...interface{}) codec.Manager {
@@ -460,27 +460,27 @@ type testAppSender struct {
 	sendAppGossipFn             func([]byte) error
 }
 
-func (t testAppSender) SendCrossChainAppRequest(chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
+func (t testAppSender) SendCrossChainAppRequest(_ context.Context, chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
 	return t.sendCrossChainAppRequestFn(chainID, requestID, appRequestBytes)
 }
 
-func (t testAppSender) SendCrossChainAppResponse(chainID ids.ID, requestID uint32, appResponseBytes []byte) error {
+func (t testAppSender) SendCrossChainAppResponse(_ context.Context, chainID ids.ID, requestID uint32, appResponseBytes []byte) error {
 	return t.sendCrossChainAppResponseFn(chainID, requestID, appResponseBytes)
 }
 
-func (t testAppSender) SendAppGossipSpecific(ids.NodeIDSet, []byte) error {
+func (t testAppSender) SendAppGossipSpecific(context.Context, ids.NodeIDSet, []byte) error {
 	panic("not implemented")
 }
 
-func (t testAppSender) SendAppRequest(nodeIDs ids.NodeIDSet, requestID uint32, message []byte) error {
+func (t testAppSender) SendAppRequest(_ context.Context, nodeIDs ids.NodeIDSet, requestID uint32, message []byte) error {
 	return t.sendAppRequestFn(nodeIDs, requestID, message)
 }
 
-func (t testAppSender) SendAppResponse(nodeID ids.NodeID, requestID uint32, message []byte) error {
+func (t testAppSender) SendAppResponse(_ context.Context, nodeID ids.NodeID, requestID uint32, message []byte) error {
 	return t.sendAppResponseFn(nodeID, requestID, message)
 }
 
-func (t testAppSender) SendAppGossip(message []byte) error {
+func (t testAppSender) SendAppGossip(_ context.Context, message []byte) error {
 	return t.sendAppGossipFn(message)
 }
 
