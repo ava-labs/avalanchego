@@ -160,7 +160,7 @@ func (n *network) request(nodeID ids.NodeID, request []byte, responseHandler mes
 	// on failure: release the activeRequests slot, mark message as processed and return fatal error
 	// Send app request to [nodeID].
 	// On failure, release the slot from active requests and [outstandingRequestHandlers].
-	if err := n.appSender.SendAppRequest(nodeIDs, requestID, request); err != nil {
+	if err := n.appSender.SendAppRequest(context.TODO(), nodeIDs, requestID, request); err != nil {
 		n.activeRequests.Release(1)
 		delete(n.outstandingRequestHandlers, requestID)
 		return err
@@ -170,15 +170,15 @@ func (n *network) request(nodeID ids.NodeID, request []byte, responseHandler mes
 	return nil
 }
 
-func (n *network) CrossChainAppRequest(requestingChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+func (n *network) CrossChainAppRequest(_ context.Context, requestingChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
 	return nil
 }
 
-func (n *network) CrossChainAppRequestFailed(respondingChainID ids.ID, requestID uint32) error {
+func (n *network) CrossChainAppRequestFailed(_ context.Context, respondingChainID ids.ID, requestID uint32) error {
 	return nil
 }
 
-func (n *network) CrossChainAppResponse(respondingChainID ids.ID, requestID uint32, response []byte) error {
+func (n *network) CrossChainAppResponse(_ context.Context, respondingChainID ids.ID, requestID uint32, response []byte) error {
 	return nil
 }
 
@@ -187,7 +187,7 @@ func (n *network) CrossChainAppResponse(respondingChainID ids.ID, requestID uint
 // returns error if the requestHandler returns an error
 // sends a response back to the sender if length of response returned by the handler is >0
 // expects the deadline to not have been passed
-func (n *network) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
+func (n *network) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	n.lock.RLock()
 	defer n.lock.RUnlock()
 
@@ -217,15 +217,17 @@ func (n *network) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.
 	}
 
 	log.Debug("processing incoming request", "nodeID", nodeID, "requestID", requestID, "req", req)
-	ctx, cancel := context.WithDeadline(context.Background(), bufferedDeadline)
+	// We make a new context here because we don't want to cancel the context
+	// passed into n.AppSender.SendAppResponse below
+	handleCtx, cancel := context.WithDeadline(context.Background(), bufferedDeadline)
 	defer cancel()
 
-	responseBytes, err := req.Handle(ctx, nodeID, requestID, n.requestHandler)
+	responseBytes, err := req.Handle(handleCtx, nodeID, requestID, n.requestHandler)
 	switch {
 	case err != nil && err != context.DeadlineExceeded:
 		return err // Return a fatal error
 	case responseBytes != nil:
-		return n.appSender.SendAppResponse(nodeID, requestID, responseBytes) // Propagate fatal error
+		return n.appSender.SendAppResponse(ctx, nodeID, requestID, responseBytes) // Propagate fatal error
 	default:
 		return nil
 	}
@@ -235,7 +237,7 @@ func (n *network) AppRequest(nodeID ids.NodeID, requestID uint32, deadline time.
 // Error returned by this function is expected to be treated as fatal by the engine
 // If [requestID] is not known, this function will emit a log and return a nil error.
 // If the response handler returns an error it is propagated as a fatal error.
-func (n *network) AppResponse(nodeID ids.NodeID, requestID uint32, response []byte) error {
+func (n *network) AppResponse(_ context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
@@ -257,7 +259,7 @@ func (n *network) AppResponse(nodeID ids.NodeID, requestID uint32, response []by
 // - timeout
 // error returned by this function is expected to be treated as fatal by the engine
 // returns error only when the response handler returns an error
-func (n *network) AppRequestFailed(nodeID ids.NodeID, requestID uint32) error {
+func (n *network) AppRequestFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 	log.Debug("received AppRequestFailed from peer", "nodeID", nodeID, "requestID", requestID)
@@ -288,13 +290,13 @@ func (n *network) getRequestHandler(requestID uint32) (message.ResponseHandler, 
 
 // Gossip sends given gossip message to peers
 func (n *network) Gossip(gossip []byte) error {
-	return n.appSender.SendAppGossip(gossip)
+	return n.appSender.SendAppGossip(context.TODO(), gossip)
 }
 
 // AppGossip is called by avalanchego -> VM when there is an incoming AppGossip from a peer
 // error returned by this function is expected to be treated as fatal by the engine
 // returns error if request could not be parsed as message.Request or when the requestHandler returns an error
-func (n *network) AppGossip(nodeID ids.NodeID, gossipBytes []byte) error {
+func (n *network) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes []byte) error {
 	var gossipMsg message.GossipMessage
 	if _, err := n.codec.Unmarshal(gossipBytes, &gossipMsg); err != nil {
 		log.Debug("could not parse app gossip", "nodeID", nodeID, "gossipLen", len(gossipBytes), "err", err)
