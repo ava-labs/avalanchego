@@ -38,7 +38,7 @@ require (
 	github.com/tklauser/numcpus v0.2.2 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa // indirect
-	golang.org/x/sys v0.0.0-20220727055044-e65921a090b8 // indirect
+	golang.org/x/sys v0.0.0-20220908164124-27713097b956 // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

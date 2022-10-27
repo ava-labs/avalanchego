@@ -347,10 +347,8 @@ func NewBlockChain(
 
 	// If periodic cache journal is required, spin it up.
 	if bc.cacheConfig.TrieCleanRejournal > 0 && len(bc.cacheConfig.TrieCleanJournal) > 0 {
-		if bc.cacheConfig.TrieCleanRejournal < time.Minute {
-			log.Warn("Sanitizing invalid trie cache journal time", "provided", bc.cacheConfig.TrieCleanRejournal, "updated", time.Minute)
-			bc.cacheConfig.TrieCleanRejournal = time.Minute
-		}
+		log.Info("Starting to save trie clean cache periodically", "journalDir", bc.cacheConfig.TrieCleanJournal, "freq", bc.cacheConfig.TrieCleanRejournal)
+
 		triedb := bc.stateCache.TrieDB()
 		bc.rejournalWg.Add(1)
 		go func() {
