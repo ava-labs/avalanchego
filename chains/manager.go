@@ -110,7 +110,8 @@ type Manager interface {
 	// Returns true iff the chain with the given ID exists and is finished bootstrapping
 	IsBootstrapped(ids.ID) bool
 
-	// Starts the chain creator with the initial platform chain parameters, must be called once
+	// Starts the chain creator with the initial platform chain parameters, must
+	// be called once.
 	StartChainCreator(platformChain ChainParameters)
 
 	Shutdown()
@@ -1041,13 +1042,17 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 
 // Starts chain creation loop to process queued chains
 func (m *manager) StartChainCreator(platform ChainParameters) {
+	// The P-chain is created synchronously to ensure that `VM.Initialize` has
+	// finished before returning from this function. This is required because
+	// the P-chain initializes state that the rest of the node initialization
+	// depends on.
+	m.createChain(platform)
+
 	m.Log.Info("starting chain creator")
-	go m.dispatchChainCreator(platform)
+	go m.dispatchChainCreator()
 }
 
-func (m *manager) dispatchChainCreator(platform ChainParameters) {
-	m.createChain(platform) // create initial platform chain
-
+func (m *manager) dispatchChainCreator() {
 	select {
 	// This channel will be closed when Shutdown is called on the manager.
 	case <-m.chainCreatorShutdownCh:
