@@ -10,7 +10,9 @@
 - Record block height when performing state sync
 - Add support for VM-to-VM messaging
 - Move `eth_getChainConfig` under the `BlockChainAPI`
-- Remove block builder timer logic to rely on ProposerVM to meter block production
+- Simplify block builder timer logic to a simple retry delay
+- Add Opentelemetry support
+- Simplify caching logic for gas price estimation
 
 ## [v0.11.0](https://github.com/ava-labs/coreth/releases/tag/v0.11.0)
 
