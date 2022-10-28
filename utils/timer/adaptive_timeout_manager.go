@@ -22,8 +22,8 @@ import (
 var (
 	errNonPositiveHalflife = errors.New("timeout halflife must be positive")
 
-	_ heap.Interface         = &timeoutQueue{}
-	_ AdaptiveTimeoutManager = &adaptiveTimeoutManager{}
+	_ heap.Interface         = (*timeoutQueue)(nil)
+	_ AdaptiveTimeoutManager = (*adaptiveTimeoutManager)(nil)
 )
 
 type adaptiveTimeout struct {

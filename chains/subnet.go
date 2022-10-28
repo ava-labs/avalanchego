@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 )
 
-var _ Subnet = &subnet{}
+var _ Subnet = (*subnet)(nil)
 
 // Subnet keeps track of the currently bootstrapping chains in a subnet. If no
 // chains in the subnet are currently bootstrapping, the subnet is considered

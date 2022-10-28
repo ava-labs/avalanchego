@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-var _ bandwidthThrottler = &bandwidthThrottlerImpl{}
+var _ bandwidthThrottler = (*bandwidthThrottlerImpl)(nil)
 
 // Returns a bandwidth throttler that uses a token bucket
 // model, where each token is 1 byte, to rate-limit bandwidth usage.

@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	_ Diff = &diff{}
+	_ Diff = (*diff)(nil)
 
 	ErrMissingParentState = errors.New("missing parent state")
 )

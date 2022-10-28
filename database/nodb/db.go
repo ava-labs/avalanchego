@@ -8,9 +8,9 @@ import (
 )
 
 var (
-	_ database.Database = &Database{}
-	_ database.Batch    = &Batch{}
-	_ database.Iterator = &Iterator{}
+	_ database.Database = (*Database)(nil)
+	_ database.Batch    = (*Batch)(nil)
+	_ database.Iterator = (*Iterator)(nil)
 )
 
 // Database is a lightning fast key value store with probabilistic operations.

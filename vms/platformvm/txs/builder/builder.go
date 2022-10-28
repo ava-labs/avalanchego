@@ -28,7 +28,7 @@ import (
 const MaxPageSize = 1024
 
 var (
-	_ Builder = &builder{}
+	_ Builder = (*builder)(nil)
 
 	errNoFunds = errors.New("no spendable funds were found")
 )

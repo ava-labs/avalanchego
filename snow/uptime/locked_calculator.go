@@ -15,7 +15,7 @@ import (
 var (
 	errNotReady = errors.New("should not be called")
 
-	_ LockedCalculator = &lockedCalculator{}
+	_ LockedCalculator = (*lockedCalculator)(nil)
 )
 
 type LockedCalculator interface {

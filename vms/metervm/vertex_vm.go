@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	_ vertex.DAGVM = &vertexVM{}
-	_ snowstorm.Tx = &meterTx{}
+	_ vertex.DAGVM = (*vertexVM)(nil)
+	_ snowstorm.Tx = (*meterTx)(nil)
 )
 
 func NewVertexVM(vm vertex.DAGVM) vertex.DAGVM {

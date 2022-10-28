@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	_ UnsignedTx             = &BaseTx{}
-	_ secp256k1fx.UnsignedTx = &BaseTx{}
+	_ UnsignedTx             = (*BaseTx)(nil)
+	_ secp256k1fx.UnsignedTx = (*BaseTx)(nil)
 )
 
 // BaseTx is the basis of all transactions.

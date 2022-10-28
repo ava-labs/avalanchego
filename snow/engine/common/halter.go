@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 )
 
-var _ Haltable = &Halter{}
+var _ Haltable = (*Halter)(nil)
 
 type Haltable interface {
 	Halt()

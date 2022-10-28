@@ -29,8 +29,8 @@ var (
 		Name: &appPlugin{},
 	}
 
-	_ plugin.Plugin     = &appPlugin{}
-	_ plugin.GRPCPlugin = &appPlugin{}
+	_ plugin.Plugin     = (*appPlugin)(nil)
+	_ plugin.GRPCPlugin = (*appPlugin)(nil)
 )
 
 type appPlugin struct {

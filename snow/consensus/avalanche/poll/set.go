@@ -19,8 +19,8 @@ import (
 )
 
 var (
-	_ Set  = &set{}
-	_ Poll = &poll{}
+	_ Set  = (*set)(nil)
+	_ Poll = (*poll)(nil)
 )
 
 type pollHolder interface {

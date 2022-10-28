@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	_ UTXOs      = &utxos{}
-	_ ChainUTXOs = &chainUTXOs{}
+	_ UTXOs      = (*utxos)(nil)
+	_ ChainUTXOs = (*chainUTXOs)(nil)
 
 	// TODO: refactor ChainUTXOs definition to allow the client implementations
 	//       to perform their own assertions.

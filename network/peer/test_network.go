@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-var _ Network = &testNetwork{}
+var _ Network = (*testNetwork)(nil)
 
 // testNetwork is a network definition for a TestPeer
 type testNetwork struct {

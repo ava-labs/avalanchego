@@ -3,7 +3,7 @@
 
 package compression
 
-var _ Compressor = &noCompressor{}
+var _ Compressor = (*noCompressor)(nil)
 
 type noCompressor struct{}
 

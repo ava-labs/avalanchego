@@ -17,9 +17,9 @@ import (
 var (
 	errWrongKeyType = errors.New("wrong key type")
 
-	_ Factory    = &FactoryRSA{}
-	_ PublicKey  = &PublicKeyRSA{}
-	_ PrivateKey = &PrivateKeyRSA{}
+	_ Factory    = (*FactoryRSA)(nil)
+	_ PublicKey  = (*PublicKeyRSA)(nil)
+	_ PrivateKey = (*PrivateKeyRSA)(nil)
 )
 
 const rsaSize = 3072

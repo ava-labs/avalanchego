@@ -21,7 +21,7 @@ const (
 	MaxDelay       = MaxWindows * WindowDuration
 )
 
-var _ Windower = &windower{}
+var _ Windower = (*windower)(nil)
 
 type Windower interface {
 	Delay(

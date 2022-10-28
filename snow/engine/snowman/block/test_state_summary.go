@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	_ StateSummary = &TestStateSummary{}
+	_ StateSummary = (*TestStateSummary)(nil)
 
 	errAccept = errors.New("unexpectedly called Accept")
 )

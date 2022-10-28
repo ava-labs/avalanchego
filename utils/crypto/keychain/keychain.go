@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	_ Keychain = &ledgerKeychain{}
-	_ Signer   = &ledgerSigner{}
+	_ Keychain = (*ledgerKeychain)(nil)
+	_ Signer   = (*ledgerSigner)(nil)
 
 	ErrInvalidNumAddrsToDerive = errors.New("number of addresses to derive should be greater than 0")
 	ErrInvalidNumAddrsDerived  = errors.New("incorrect number of ledger derived addresses")

@@ -4,6 +4,8 @@
 package avalanche
 
 import (
+	"context"
+
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -21,30 +23,30 @@ type issuer struct {
 }
 
 // Register that a vertex we were waiting on has been issued to consensus.
-func (i *issuer) FulfillVtx(id ids.ID) {
+func (i *issuer) FulfillVtx(ctx context.Context, id ids.ID) {
 	i.vtxDeps.Remove(id)
-	i.Update()
+	i.Update(ctx)
 }
 
 // Register that a transaction we were waiting on has been issued to consensus.
-func (i *issuer) FulfillTx(id ids.ID) {
+func (i *issuer) FulfillTx(ctx context.Context, id ids.ID) {
 	i.txDeps.Remove(id)
-	i.Update()
+	i.Update(ctx)
 }
 
 // Abandon this attempt to issue
-func (i *issuer) Abandon() {
+func (i *issuer) Abandon(ctx context.Context) {
 	if !i.abandoned {
 		vtxID := i.vtx.ID()
 		i.t.pending.Remove(vtxID)
 		i.abandoned = true
-		i.t.vtxBlocked.Abandon(vtxID) // Inform vertices waiting on this vtx that it won't be issued
+		i.t.vtxBlocked.Abandon(ctx, vtxID) // Inform vertices waiting on this vtx that it won't be issued
 		i.t.metrics.blockerVtxs.Set(float64(i.t.vtxBlocked.Len()))
 	}
 }
 
 // Issue the poll when all dependencies are met
-func (i *issuer) Update() {
+func (i *issuer) Update(ctx context.Context) {
 	if i.abandoned || i.issued || i.vtxDeps.Len() != 0 || i.txDeps.Len() != 0 || i.t.Consensus.VertexIssued(i.vtx) || i.t.errs.Errored() {
 		return
 	}
@@ -73,7 +75,7 @@ func (i *issuer) Update() {
 			)
 		}
 
-		i.t.vtxBlocked.Abandon(vtxID)
+		i.t.vtxBlocked.Abandon(ctx, vtxID)
 		return
 	}
 
@@ -93,7 +95,7 @@ func (i *issuer) Update() {
 				zap.Stringer("txID", txID),
 				zap.Error(err),
 			)
-			i.t.txBlocked.Abandon(txID)
+			i.t.txBlocked.Abandon(ctx, txID)
 		} else {
 			validTxs = append(validTxs, tx)
 		}
@@ -106,10 +108,10 @@ func (i *issuer) Update() {
 			zap.String("reason", "transaction verification failed"),
 			zap.Stringer("vtxID", vtxID),
 		)
-		if _, err := i.t.batch(validTxs, batchOption{}); err != nil {
+		if _, err := i.t.batch(ctx, validTxs, batchOption{}); err != nil {
 			i.t.errs.Add(err)
 		}
-		i.t.vtxBlocked.Abandon(vtxID)
+		i.t.vtxBlocked.Abandon(ctx, vtxID)
 		i.t.metrics.blockerVtxs.Set(float64(i.t.vtxBlocked.Len()))
 		return
 	}
@@ -146,6 +148,7 @@ func (i *issuer) Update() {
 			numPushTo = i.t.Params.MixedQueryNumPushNonVdr
 		}
 		common.SendMixedQuery(
+			ctx,
 			i.t.Sender,
 			vdrBag.List(), // Note that this doesn't contain duplicates; length may be < k
 			numPushTo,
@@ -156,9 +159,9 @@ func (i *issuer) Update() {
 	}
 
 	// Notify vertices waiting on this one that it (and its transactions) have been issued.
-	i.t.vtxBlocked.Fulfill(vtxID)
+	i.t.vtxBlocked.Fulfill(ctx, vtxID)
 	for _, tx := range txs {
-		i.t.txBlocked.Fulfill(tx.ID())
+		i.t.txBlocked.Fulfill(ctx, tx.ID())
 	}
 	i.t.metrics.blockerTxs.Set(float64(i.t.txBlocked.Len()))
 	i.t.metrics.blockerVtxs.Set(float64(i.t.vtxBlocked.Len()))
@@ -171,19 +174,19 @@ func (i *issuer) Update() {
 	}
 
 	// Issue a repoll
-	i.t.repoll()
+	i.t.repoll(ctx)
 }
 
 type vtxIssuer struct{ i *issuer }
 
-func (vi *vtxIssuer) Dependencies() ids.Set { return vi.i.vtxDeps }
-func (vi *vtxIssuer) Fulfill(id ids.ID)     { vi.i.FulfillVtx(id) }
-func (vi *vtxIssuer) Abandon(ids.ID)        { vi.i.Abandon() }
-func (vi *vtxIssuer) Update()               { vi.i.Update() }
+func (vi *vtxIssuer) Dependencies() ids.Set                  { return vi.i.vtxDeps }
+func (vi *vtxIssuer) Fulfill(ctx context.Context, id ids.ID) { vi.i.FulfillVtx(ctx, id) }
+func (vi *vtxIssuer) Abandon(ctx context.Context, _ ids.ID)  { vi.i.Abandon(ctx) }
+func (vi *vtxIssuer) Update(ctx context.Context)             { vi.i.Update(ctx) }
 
 type txIssuer struct{ i *issuer }
 
-func (ti *txIssuer) Dependencies() ids.Set { return ti.i.txDeps }
-func (ti *txIssuer) Fulfill(id ids.ID)     { ti.i.FulfillTx(id) }
-func (ti *txIssuer) Abandon(ids.ID)        { ti.i.Abandon() }
-func (ti *txIssuer) Update()               { ti.i.Update() }
+func (ti *txIssuer) Dependencies() ids.Set                  { return ti.i.txDeps }
+func (ti *txIssuer) Fulfill(ctx context.Context, id ids.ID) { ti.i.FulfillTx(ctx, id) }
+func (ti *txIssuer) Abandon(ctx context.Context, _ ids.ID)  { ti.i.Abandon(ctx) }
+func (ti *txIssuer) Update(ctx context.Context)             { ti.i.Update(ctx) }

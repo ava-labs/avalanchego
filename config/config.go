@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
@@ -74,6 +75,7 @@ var (
 	errCannotWhitelistPrimaryNetwork = errors.New("cannot whitelist primary network")
 	errStakingKeyContentUnset        = fmt.Errorf("%s key not set but %s set", StakingTLSKeyContentKey, StakingCertContentKey)
 	errStakingCertContentUnset       = fmt.Errorf("%s key set but %s not set", StakingTLSKeyContentKey, StakingCertContentKey)
+	errTracingEndpointEmpty          = fmt.Errorf("%s cannot be empty", TracingEndpointKey)
 )
 
 func GetRunnerConfig(v *viper.Viper) (runner.Config, error) {
@@ -1200,6 +1202,37 @@ func getDiskTargeterConfig(v *viper.Viper) (tracker.TargeterConfig, error) {
 	}
 }
 
+func getTraceConfig(v *viper.Viper) (trace.Config, error) {
+	enabled := v.GetBool(TracingEnabledKey)
+	if !enabled {
+		return trace.Config{
+			Enabled: false,
+		}, nil
+	}
+
+	exporterTypeStr := v.GetString(TracingExporterTypeKey)
+	exporterType, err := trace.ExporterTypeFromString(exporterTypeStr)
+	if err != nil {
+		return trace.Config{}, err
+	}
+
+	endpoint := v.GetString(TracingEndpointKey)
+	if endpoint == "" {
+		return trace.Config{}, errTracingEndpointEmpty
+	}
+
+	return trace.Config{
+		ExporterConfig: trace.ExporterConfig{
+			Type:     exporterType,
+			Endpoint: endpoint,
+			Insecure: v.GetBool(TracingInsecureKey),
+			// TODO add support for headers
+		},
+		Enabled:         true,
+		TraceSampleRate: v.GetFloat64(TracingSampleRateKey),
+	}, nil
+}
+
 func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig := node.Config{}
 
@@ -1380,6 +1413,11 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	}
 
 	nodeConfig.DiskTargeterConfig, err = getDiskTargeterConfig(v)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	nodeConfig.TraceConfig, err = getTraceConfig(v)
 	return nodeConfig, err
 }
 

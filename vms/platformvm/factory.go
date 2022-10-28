@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 )
 
-var _ vms.Factory = &Factory{}
+var _ vms.Factory = (*Factory)(nil)
 
 // Factory can create new instances of the Platform Chain
 type Factory struct {

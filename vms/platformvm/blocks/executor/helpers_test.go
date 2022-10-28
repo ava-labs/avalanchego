@@ -66,7 +66,7 @@ const (
 )
 
 var (
-	_ mempool.BlockTimer = &environment{}
+	_ mempool.BlockTimer = (*environment)(nil)
 
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour

@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
-var _ UnsignedTx = &AdvanceTimeTx{}
+var _ UnsignedTx = (*AdvanceTimeTx)(nil)
 
 // AdvanceTimeTx is a transaction to increase the chain's timestamp.
 // When the chain's timestamp is updated (a AdvanceTimeTx is accepted and

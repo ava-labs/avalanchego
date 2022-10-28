@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	_ vms.Factory = &Factory{}
+	_ vms.Factory = (*Factory)(nil)
 
 	// ID that this Fx uses when labeled
 	ID = ids.ID{'n', 'f', 't', 'f', 'x'}

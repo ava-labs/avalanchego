@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	_ txs.Visitor = &issuer{}
+	_ txs.Visitor = (*issuer)(nil)
 
 	errCantIssueAdvanceTimeTx     = errors.New("can not issue an advance time tx")
 	errCantIssueRewardValidatorTx = errors.New("can not issue a reward validator tx")

@@ -15,7 +15,7 @@ var (
 	errNilMetadata           = errors.New("nil metadata is not valid")
 	errMetadataNotInitialize = errors.New("metadata was never initialized and is not valid")
 
-	_ verify.Verifiable = &Metadata{}
+	_ verify.Verifiable = (*Metadata)(nil)
 )
 
 // TODO: Delete this once the downstream dependencies have been updated.

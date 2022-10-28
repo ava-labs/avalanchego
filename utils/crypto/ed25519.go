@@ -18,9 +18,9 @@ var (
 )
 
 var (
-	_ Factory    = &FactoryED25519{}
-	_ PublicKey  = &PublicKeyED25519{}
-	_ PrivateKey = &PrivateKeyED25519{}
+	_ Factory    = (*FactoryED25519)(nil)
+	_ PublicKey  = (*PublicKeyED25519)(nil)
+	_ PrivateKey = (*PrivateKeyED25519)(nil)
 )
 
 type FactoryED25519 struct{}

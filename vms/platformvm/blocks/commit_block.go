@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	_ BanffBlock = &BanffCommitBlock{}
-	_ Block      = &ApricotCommitBlock{}
+	_ BanffBlock = (*BanffCommitBlock)(nil)
+	_ Block      = (*ApricotCommitBlock)(nil)
 )
 
 type BanffCommitBlock struct {

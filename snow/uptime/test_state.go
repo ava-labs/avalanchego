@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ State = &TestState{}
+var _ State = (*TestState)(nil)
 
 type uptime struct {
 	upDuration  time.Duration

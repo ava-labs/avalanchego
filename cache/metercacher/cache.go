@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
-var _ cache.Cacher = &Cache{}
+var _ cache.Cacher = (*Cache)(nil)
 
 type Cache struct {
 	metrics

@@ -19,7 +19,7 @@ import (
 var (
 	errNotAccepted = errors.New("not accepted")
 
-	_ Wallet = &wallet{}
+	_ Wallet = (*wallet)(nil)
 )
 
 type Wallet interface {

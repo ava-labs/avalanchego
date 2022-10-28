@@ -55,6 +55,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
@@ -153,6 +154,8 @@ type Node struct {
 
 	// This node's configuration
 	Config *Config
+
+	tracer trace.Tracer
 
 	// ensures that we only close the node once.
 	shutdownOnce sync.Once
@@ -738,6 +741,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		ApricotPhase4MinPChainHeight:            version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
 		ResourceTracker:                         n.resourceTracker,
 		StateSyncBeacons:                        n.Config.StateSyncIDs,
+		TracingEnabled:                          n.Config.TraceConfig.Enabled,
+		Tracer:                                  n.tracer,
 	})
 
 	// Notify the API server when new chains are created
@@ -1233,6 +1238,16 @@ func (n *Node) Initialize(
 		return fmt.Errorf("problem initializing node beacons: %w", err)
 	}
 
+	// Set up tracer
+	n.tracer, err = trace.New(n.Config.TraceConfig)
+	if err != nil {
+		return fmt.Errorf("couldn't initialize tracer: %w", err)
+	}
+
+	if n.Config.TraceConfig.Enabled {
+		n.Config.ConsensusRouter = router.Trace(n.Config.ConsensusRouter, n.tracer)
+	}
+
 	if err := n.initAPIServer(); err != nil { // Start the API Server
 		return fmt.Errorf("couldn't initialize API server: %w", err)
 	}
@@ -1399,6 +1414,16 @@ func (n *Node) shutdown() {
 				zap.Error(err),
 			)
 		}
+	}
+
+	if n.Config.TraceConfig.Enabled {
+		n.Log.Info("shutting down tracing")
+	}
+
+	if err := n.tracer.Close(); err != nil {
+		n.Log.Warn("error during tracer shutdown",
+			zap.Error(err),
+		)
 	}
 
 	n.DoneShuttingDown.Done()

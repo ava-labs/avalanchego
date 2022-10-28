@@ -16,7 +16,7 @@ import (
 var (
 	errNoValidWeightedSamplers = errors.New("no valid weighted samplers found")
 
-	_ Weighted = &weightedBest{}
+	_ Weighted = (*weightedBest)(nil)
 )
 
 // Sampling is performed by using another implementation of the Weighted

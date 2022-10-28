@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	_ Factory   = &FlatFactory{}
-	_ Consensus = &Flat{}
+	_ Factory   = (*FlatFactory)(nil)
+	_ Consensus = (*Flat)(nil)
 )
 
 // FlatFactory implements Factory by returning a flat struct

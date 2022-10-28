@@ -34,7 +34,7 @@ var (
 	usersPrefix = []byte("users")
 	bcsPrefix   = []byte("bcs")
 
-	_ Keystore = &keystore{}
+	_ Keystore = (*keystore)(nil)
 )
 
 type Keystore interface {

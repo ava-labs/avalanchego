@@ -15,7 +15,7 @@ const (
 var (
 	lastAcceptedKey = []byte{lastAcceptedByte}
 
-	_ ChainState = &chainState{}
+	_ ChainState = (*chainState)(nil)
 )
 
 type ChainState interface {

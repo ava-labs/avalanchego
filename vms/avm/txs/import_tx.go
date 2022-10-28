@@ -16,8 +16,8 @@ import (
 var (
 	errNoImportInputs = errors.New("no import inputs")
 
-	_ UnsignedTx             = &ImportTx{}
-	_ secp256k1fx.UnsignedTx = &ImportTx{}
+	_ UnsignedTx             = (*ImportTx)(nil)
+	_ secp256k1fx.UnsignedTx = (*ImportTx)(nil)
 )
 
 // ImportTx is a transaction that imports an asset from another blockchain.

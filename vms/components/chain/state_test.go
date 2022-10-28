@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-var _ Block = &TestBlock{}
+var _ Block = (*TestBlock)(nil)
 
 type TestBlock struct {
 	*snowman.TestBlock

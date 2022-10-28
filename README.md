@@ -195,17 +195,9 @@ docker run -t -i -v $(pwd):/opt/avalanche -w/opt/avalanche avalanche:protobuf_co
 
 ### Running mock codegen
 
-Going forward, AvalancheGo will use [gomock](https://github.com/golang/mock) for mocking in unit tests.
+To regenerate the [gomock](https://github.com/golang/mock) code, run `scripts/mock.gen.sh` from the root of the repo.
 
-Example usage:
-
-```sh
-mockgen -destination vms/platformvm/state/mock_diff.go -package state github.com/ava-labs/avalanchego/vms/platformvm/state Diff
-```
-
-This makes a mock implementation of the `Diff` interface from `github.com/ava-labs/avalanchego/vms/platformvm/state`and puts it at `vms/platformvm/state/mock_diff.go`. The struct implementing the mock will be in the `state` package.
-
-See `gomock` documentation for more information.
+This should only be necessary when modifying exported interfaces or after modifying `scripts/mock.mockgen.txt`.
 
 ## Supported Platforms
 

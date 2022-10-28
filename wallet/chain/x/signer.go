@@ -34,7 +34,7 @@ var (
 
 	emptySig [crypto.SECP256K1RSigLen]byte
 
-	_ Signer = &signer{}
+	_ Signer = (*signer)(nil)
 )
 
 type Signer interface {

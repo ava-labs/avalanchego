@@ -5,7 +5,7 @@ package registry
 
 import "github.com/ava-labs/avalanchego/ids"
 
-var _ VMRegistry = &vmRegistry{}
+var _ VMRegistry = (*vmRegistry)(nil)
 
 // VMRegistry defines functionality to get any new virtual machines on the node,
 // and install them if they're not already installed.

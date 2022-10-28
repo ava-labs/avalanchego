@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	_ DialThrottler = &dialThrottler{}
-	_ DialThrottler = &noDialThrottler{}
+	_ DialThrottler = (*dialThrottler)(nil)
+	_ DialThrottler = (*noDialThrottler)(nil)
 )
 
 type DialThrottler interface {

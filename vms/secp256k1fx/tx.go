@@ -8,7 +8,7 @@ type UnsignedTx interface {
 	Bytes() []byte
 }
 
-var _ UnsignedTx = &TestTx{}
+var _ UnsignedTx = (*TestTx)(nil)
 
 // TestTx is a minimal implementation of a Tx
 type TestTx struct{ UnsignedBytes []byte }

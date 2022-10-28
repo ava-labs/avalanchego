@@ -8,7 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms"
 )
 
-var _ vms.Factory = &Factory{}
+var _ vms.Factory = (*Factory)(nil)
 
 type Factory struct {
 	TxFee            uint64

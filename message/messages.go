@@ -25,8 +25,8 @@ import (
 )
 
 var (
-	_ InboundMessage  = &inboundExternalMessage{}
-	_ OutboundMessage = &outboundMessage{}
+	_ InboundMessage  = (*inboundExternalMessage)(nil)
+	_ OutboundMessage = (*outboundMessage)(nil)
 
 	errUnknownMessageTypeForOp = errors.New("unknown message type for Op")
 	errUnexpectedCompressedOp  = errors.New("unexpected compressed Op")

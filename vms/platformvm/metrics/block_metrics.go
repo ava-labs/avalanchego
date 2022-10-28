@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 )
 
-var _ blocks.Visitor = &blockMetrics{}
+var _ blocks.Visitor = (*blockMetrics)(nil)
 
 type blockMetrics struct {
 	txMetrics *txMetrics

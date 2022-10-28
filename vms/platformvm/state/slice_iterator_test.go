@@ -3,7 +3,7 @@
 
 package state
 
-var _ StakerIterator = &sliceIterator{}
+var _ StakerIterator = (*sliceIterator)(nil)
 
 type sliceIterator struct {
 	index   int

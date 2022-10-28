@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-var _ Block = &preForkBlock{}
+var _ Block = (*preForkBlock)(nil)
 
 type preForkBlock struct {
 	snowman.Block

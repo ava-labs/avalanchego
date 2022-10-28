@@ -11,7 +11,7 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var _ Validator = &validator{}
+var _ Validator = (*validator)(nil)
 
 // Validator is the minimal description of someone that can be sampled.
 type Validator interface {

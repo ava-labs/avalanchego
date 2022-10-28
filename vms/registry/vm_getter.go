@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	_ VMGetter = &vmGetter{}
+	_ VMGetter = (*vmGetter)(nil)
 
 	errInvalidVMID = errors.New("invalid vmID")
 )
