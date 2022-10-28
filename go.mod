@@ -33,8 +33,8 @@ require (
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0
 	github.com/mr-tron/base58 v1.2.0
 	github.com/nbutton23/zxcvbn-go v0.0.0-20180912185939-ae427f1e4c1d
-	github.com/onsi/ginkgo/v2 v2.1.4
-	github.com/onsi/gomega v1.19.0
+	github.com/onsi/ginkgo/v2 v2.4.0
+	github.com/onsi/gomega v1.23.0
 	github.com/prometheus/client_golang v1.12.2
 	github.com/prometheus/client_model v0.2.0
 	github.com/rs/cors v1.7.0
@@ -54,9 +54,9 @@ require (
 	go.uber.org/zap v1.21.0
 	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d
 	golang.org/x/exp v0.0.0-20220426173459-3bcf042a4bf5
-	golang.org/x/net v0.0.0-20220708220712-1185a9018129
+	golang.org/x/net v0.1.0
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
+	golang.org/x/term v0.1.0
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	gonum.org/v1/gonum v0.11.0
 	google.golang.org/genproto v0.0.0-20220712132514-bdd2acd4974d
@@ -94,6 +94,7 @@ require (
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
+	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/uuid v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.7.0 // indirect
 	github.com/hashicorp/go-bexpr v0.1.10 // indirect
@@ -137,8 +138,8 @@ require (
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
-	golang.org/x/sys v0.0.0-20220919091848-fb04ddd9f9c8 // indirect
-	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/sys v0.1.0 // indirect
+	golang.org/x/text v0.4.0 // indirect
 	gopkg.in/ini.v1 v1.66.4 // indirect
 	gopkg.in/urfave/cli.v1 v1.20.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
