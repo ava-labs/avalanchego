@@ -1,5 +1,43 @@
 # Release Notes
 
+## [v1.9.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.1)
+
+This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0). It is optional, but encouraged. The supported plugin version is `18`.
+
+### Features
+
+- Added cross-chain messaging support to the VM interface
+- Added Ledger support to the Primary Network wallet
+- Converted Bionic builds to Jammy builds
+- Added `mock.gen.sh` to programmatically generate mock implementations
+- Added BLS signer to the `snow.Context`
+- Moved `base` from `rpc.NewEndpointRequester` to be included in the `method` in `SendRequest`
+- Converted `UnboundedQueue` to `UnboundedDeque`
+
+### Observability
+
+- Added support for OpenTelemetry tracing
+- Converted periodic bootstrapping status update to be time-based
+- Removed duplicated fields from the json format of the node config
+- Configured min connected stake health check based on the consensus parameters
+- Added new consensus metrics
+- Documented how chain time is advanced in the PlatformVM with `chain_time_update.md`
+
+### Cleanup
+
+- Converted chain creation to be handled asynchronously from the P-chain's execution environment
+- Removed `SetLinger` usage of P2P TCP connections
+- Removed `Banff` upgrade flow
+- Fixed ProposerVM inner block caching after verification
+- Fixed PlatformVM mempool verification to use an updated chain time
+- Removed deprecated CLI flags: `--dynamic-update-duration`, `--dynamic-public-ip`
+- Added unexpected Put bytes tests to the Avalanche and Snowman consensus engines
+- Removed mockery generated mock implementations
+- Converted safe math functions to use generics where possible
+- Added linting to prevent usage of `assert` in unit tests
+- Converted empty struct usage to `nil` for interface compliance checks
+- Added CODEOWNERs to own first rounds of PR review
+
 ## [v1.9.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0)
 
 This upgrade adds support for creating Proof-of-Stake Subnets.
