@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"encoding/json"
 	"fmt"
@@ -101,7 +102,7 @@ func TestMempoolTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 	wg2.Add(1)
 	sender.CantSendAppGossip = false
 	seen := 0
-	sender.SendAppGossipF = func(gossipedBytes []byte) error {
+	sender.SendAppGossipF = func(_ context.Context, gossipedBytes []byte) error {
 		if seen == 0 {
 			notifyMsgIntf, err := message.ParseGossipMessage(vm.networkCodec, gossipedBytes)
 			assert.NoError(err)
@@ -186,7 +187,7 @@ func TestMempoolTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 	wg.Add(2)
 	sender.CantSendAppGossip = false
 	seen := map[common.Hash]struct{}{}
-	sender.SendAppGossipF = func(gossipedBytes []byte) error {
+	sender.SendAppGossipF = func(_ context.Context, gossipedBytes []byte) error {
 		notifyMsgIntf, err := message.ParseGossipMessage(vm.networkCodec, gossipedBytes)
 		assert.NoError(err)
 
@@ -244,12 +245,12 @@ func TestMempoolTxsAppGossipHandling(t *testing.T) {
 		txRequested bool
 	)
 	sender.CantSendAppGossip = false
-	sender.SendAppRequestF = func(_ ids.NodeIDSet, _ uint32, _ []byte) error {
+	sender.SendAppRequestF = func(context.Context, ids.NodeIDSet, uint32, []byte) error {
 		txRequested = true
 		return nil
 	}
 	wg.Add(1)
-	sender.SendAppGossipF = func(_ []byte) error {
+	sender.SendAppGossipF = func(context.Context, []byte) error {
 		wg.Done()
 		return nil
 	}
@@ -267,7 +268,7 @@ func TestMempoolTxsAppGossipHandling(t *testing.T) {
 	assert.NoError(err)
 
 	nodeID := ids.GenerateTestNodeID()
-	err = vm.AppGossip(nodeID, msgBytes)
+	err = vm.AppGossip(context.Background(), nodeID, msgBytes)
 	assert.NoError(err)
 	assert.False(txRequested, "tx should not be requested")
 
