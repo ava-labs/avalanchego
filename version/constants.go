@@ -11,10 +11,13 @@ import (
 
 // These are globals that describe network upgrades and node versions
 var (
+	// GitCommit will be set with -X during build step
+	GitCommit string
+
 	Current = &Semantic{
-		Major: 1,
-		Minor: 9,
-		Patch: 1,
+		Major: 0,
+		Minor: 2,
+		Patch: 0,
 	}
 	CurrentApp = &Application{
 		Major: Current.Major,
@@ -22,13 +25,13 @@ var (
 		Patch: Current.Patch,
 	}
 	MinimumCompatibleVersion = &Application{
-		Major: 1,
-		Minor: 9,
+		Major: 0,
+		Minor: 2,
 		Patch: 0,
 	}
 	PrevMinimumCompatibleVersion = &Application{
-		Major: 1,
-		Minor: 8,
+		Major: 0,
+		Minor: 2,
 		Patch: 0,
 	}
 
@@ -68,6 +71,9 @@ var (
 		constants.FujiID:    time.Date(2021, time.November, 24, 15, 0, 0, 0, time.UTC),
 	}
 	ApricotPhase5DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
+
+	SunrisePhase0Times       = map[uint32]time.Time{}
+	SunrisePhase0DefaultTime = time.Date(2022, time.May, 16, 8, 0, 0, 0, time.UTC)
 
 	ApricotPhase6Times = map[uint32]time.Time{
 		constants.MainnetID: time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC),
@@ -115,6 +121,13 @@ func GetApricotPhase5Time(networkID uint32) time.Time {
 		return upgradeTime
 	}
 	return ApricotPhase5DefaultTime
+}
+
+func GetSunrisePhase0Time(networkID uint32) time.Time {
+	if upgradeTime, exists := SunrisePhase0Times[networkID]; exists {
+		return upgradeTime
+	}
+	return SunrisePhase0DefaultTime
 }
 
 func GetApricotPhase6Time(networkID uint32) time.Time {

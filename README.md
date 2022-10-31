@@ -4,103 +4,17 @@
 
 ---
 
-Node implementation for the [Camino](https://chain4travel.com) network -
+SDK for the [Camino](https://chain4travel.com) network -
 a blockchains platform for the touristic market.
 
-## Installation
+## Introduction
 
-Camino is an quite lightweight protocol which requires only modest minimum computer requirements.
+Beginning with v0.2.0 CaminoGo does not any longer build binaries.
+Instead it is used as the core SDK for other components in the Camino environment
+like [camino-node](https://github.com/chain4travel/camino-node), [caminoethvm](https://github.com/chain4travel/caminoethvm), [camino-network-runner](https://github.com/chain4travel/camino-network-runner) ....
 
-The minimum recommended hardware specification for nodes connected to Mainnet is:
-
-- CPU: Equivalent of 8 AWS vCPU
-- RAM: 16 GiB
-- Storage: 1 TiB
-- OS: Ubuntu 20.04/22.04 or macOS >= 12
-- Network: Reliable IPv4 or IPv6 network connection, with an open public port.
-
-If you plan to build CaminoGo from source, you will also need the following software:
-
-- [Go](https://golang.org/doc/install) version >= 1.18.1
-- [gcc](https://gcc.gnu.org/)
-- g++
-
-### Native Install
-
-Clone the CaminoGo repository:
-
-```sh
-git clone git@github.com:chain4travel/caminogo.git
-cd caminogo
-```
-
-This will clone and checkout to `chain4travel` branch.
-
-#### Building the Camino Executable
-
-Build Camino using the build script:
-
-```sh
-./scripts/build.sh
-```
-
-The Camino binary, named `caminogo`, is in the `build` directory.
-
-### Binary Install
-
-Download the [latest build](https://github.com/chain4travel/caminogo/releases/latest) for your operating system and architecture.
-
-The Camino binary to be executed is named `caminogo`.
-
-### Docker Install
-
-Make sure docker is installed on the machine - so commands like `docker run` etc. are available.
-
-Building the docker image of latest caminogo branch can be done by running:
-
-```sh
-./scripts/build_image.sh
-```
-
-To check the built image, run:
-
-```sh
-docker image ls
-```
-
-The image should be tagged as `chain4travel/caminogo:xxxxxxxx`, where `xxxxxxxx` is the shortened commit of the Camino source it was built from. To run the Camino node, run:
-
-```sh
-docker run -ti -p 9650:9650 -p 9651:9651 chain4travel/caminogo:xxxxxxxx /caminogo/build/caminogo
-```
-
-## Running Camino
-
-### Connecting to Columbus Testnet
-
-To connect to the Columbus Testnet, run:
-
-```sh
-./build/caminogo --network-id=columbus
-```
-
-You should see some pretty ASCII art and log messages.
-
-You can use `Ctrl+C` to kill the node.
-
-### Connecting to Camino Mainnet
-
-Not yet launched
-
-### Creating a Local Testnet
-
-See [this tutorial.](https://docs.camino.foundation/build/tutorials/platform/create-a-local-test-network/)
-
-## Bootstrapping
-
-A node needs to catch up to the latest network state before it can participate in consensus and serve API calls.
-
-A node will not [report healthy](https://docs.camino.foundation/build/caminogo-apis/health) until it is done bootstrapping.
+Reason is, that there have been circular dependencies between the different go
+modules which made it hard to deploy binaries based on the same caminogo implementation
 
 ## Generating Code
 
@@ -153,7 +67,7 @@ This should only be necessary when modifying exported interfaces or after modify
 
 ## Supported Platforms
 
-CaminoGo can run on different platforms, with different support tiers:
+CaminoGo can be used on different platforms, with different support tiers:
 
 - **Tier 1**: Fully supported by the maintainers, guaranteed to pass all tests including e2e and stress tests.
 - **Tier 2**: Passes all unit and integration tests but not necessarily e2e tests.

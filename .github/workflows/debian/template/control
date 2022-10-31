@@ -1,8 +1,0 @@
-Package: caminogo
-Version: 0.1.0
-Section: misc
-Priority: optional
-Architecture: arm64
-Depends:
-Maintainer: devop <devop@chain4travel.com>
-Description: The Camino platform binaries

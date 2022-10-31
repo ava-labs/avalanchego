@@ -43,22 +43,9 @@ db*
 
 .coverage
 
-bin/
-build/
-
 keys/staker.*
 
 !*.go
 !*.proto
 
-plugins/
-
-scripts/ansible/*inventory.yml
 scripts/.build_image_gopath/
-
-tests/e2e/e2e.test
-tests/upgrade/upgrade.test
-
-vendor
-
-launch.sh
