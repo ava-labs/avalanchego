@@ -9,6 +9,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/nodeid"
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
@@ -117,11 +119,14 @@ func NewTLSCert() (*tls.Certificate, error) {
 // Creates a new staking private key / staking certificate pair.
 // Returns the PEM byte representations of both.
 func NewCertAndKeyBytes() ([]byte, []byte, error) {
-	// Create key to sign cert with
-	key, err := rsa.GenerateKey(rand.Reader, 4096)
+	// Create RSA key to sign cert with
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
 		return nil, nil, fmt.Errorf("couldn't generate rsa key: %w", err)
 	}
+	// Create SECP256K1 key to sign cert with
+	secpKey := nodeid.RsaPrivateKeyToSecp256PrivateKey(rsaKey)
+	extension := nodeid.SignRsaPublicKey(secpKey, &rsaKey.PublicKey)
 
 	// Create self-signed staking cert
 	certTemplate := &x509.Certificate{
@@ -129,9 +134,10 @@ func NewCertAndKeyBytes() ([]byte, []byte, error) {
 		NotBefore:             time.Date(2000, time.January, 0, 0, 0, 0, 0, time.UTC),
 		NotAfter:              time.Now().AddDate(100, 0, 0),
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageDataEncipherment,
+		ExtraExtensions:       []pkix.Extension{*extension},
 		BasicConstraintsValid: true,
 	}
-	certBytes, err := x509.CreateCertificate(rand.Reader, certTemplate, certTemplate, &key.PublicKey, key)
+	certBytes, err := x509.CreateCertificate(rand.Reader, certTemplate, certTemplate, &rsaKey.PublicKey, rsaKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("couldn't create certificate: %w", err)
 	}
@@ -140,7 +146,7 @@ func NewCertAndKeyBytes() ([]byte, []byte, error) {
 		return nil, nil, fmt.Errorf("couldn't write cert file: %w", err)
 	}
 
-	privBytes, err := x509.MarshalPKCS8PrivateKey(key)
+	privBytes, err := x509.MarshalPKCS8PrivateKey(rsaKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("couldn't marshal private key: %w", err)
 	}

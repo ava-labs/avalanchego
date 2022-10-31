@@ -35,5 +35,10 @@ func getTLS(t *testing.T, index int) (ids.NodeID, *tls.Certificate, *tls.Config)
 	}
 
 	cert := tlsCerts[index]
-	return ids.NodeIDFromCert(cert.Leaf), cert, tlsConfigs[index]
+	nodeID, err := peer.CertToID(cert.Leaf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return nodeID, cert, tlsConfigs[index]
 }

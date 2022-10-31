@@ -139,3 +139,9 @@ func (c *client) GetConfig(ctx context.Context, options ...rpc.Option) (interfac
 	err := c.requester.SendRequest(ctx, "admin.getConfig", struct{}{}, &res, options...)
 	return res, err
 }
+
+func (c *client) GetNodeSigner(ctx context.Context, chain string, options ...rpc.Option) (*GetNodeSignerReply, error) {
+	res := &GetNodeSignerReply{}
+	err := c.requester.SendRequest(ctx, "getNodeSigner", nil, res, options...)
+	return res, err
+}

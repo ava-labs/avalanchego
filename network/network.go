@@ -377,7 +377,13 @@ func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 }
 
 func (n *network) Track(claimedIPPort ips.ClaimedIPPort) bool {
-	nodeID := ids.NodeIDFromCert(claimedIPPort.Cert)
+	nodeID, err := peer.CertToID(claimedIPPort.Cert)
+	if err != nil {
+		n.peerConfig.Log.Debug("failed to create nodeID from certificate: %s",
+			err,
+		)
+		return false
+	}
 
 	// Verify that we do want to attempt to make a connection to this peer
 	// before verifying that the IP has been correctly signed.

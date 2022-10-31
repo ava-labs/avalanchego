@@ -10,6 +10,7 @@ import (
 	"net"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/nodeid"
 )
 
 var (
@@ -62,5 +63,15 @@ func connToIDAndCert(conn *tls.Conn) (ids.NodeID, net.Conn, *x509.Certificate, e
 		return ids.NodeID{}, nil, nil, errNoCert
 	}
 	peerCert := state.PeerCertificates[0]
-	return ids.NodeIDFromCert(peerCert), conn, peerCert, nil
+
+	nodeID, err := CertToID(peerCert)
+	return nodeID, conn, peerCert, err
+}
+
+func CertToID(cert *x509.Certificate) (ids.NodeID, error) {
+	pubKeyBytes, err := nodeid.RecoverSecp256PublicKey(cert)
+	if err != nil {
+		return ids.ShortID{}, err
+	}
+	return ids.ToNodeID(pubKeyBytes)
 }

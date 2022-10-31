@@ -4,6 +4,7 @@
 package admin
 
 import (
+	"crypto/rsa"
 	"errors"
 	"net/http"
 	"path"
@@ -16,11 +17,15 @@ import (
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/nodeid"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/vms"
@@ -312,4 +317,34 @@ func (service *Admin) LoadVMs(_ *http.Request, _ *struct{}, reply *LoadVMsReply)
 	reply.FailedVMs = failedVMsParsed
 	reply.NewVMs, err = ids.GetRelevantAliases(service.VMManager, loadedVMs)
 	return err
+}
+
+// See GetNodeSigner
+type GetNodeSignerReply struct {
+	PrivateKey string `json:"privateKey"`
+	PublicKey  string `json:"publicKey"`
+}
+
+func (service *Admin) GetNodeSigner(_ *http.Request, _ *struct{}, reply *GetNodeSignerReply) error {
+	service.Log.Debug("Admin: GetNodeSigner called")
+
+	config := service.Config.NodeConfig.(*node.Config)
+
+	rsaPrivKey := config.StakingTLSCert.PrivateKey.(*rsa.PrivateKey)
+	privKey := nodeid.RsaPrivateKeyToSecp256PrivateKey(rsaPrivKey)
+	pubKeyBytes := hashing.PubkeyBytesToAddress(privKey.PubKey().SerializeCompressed())
+	nodeID, err := ids.ToShortID(pubKeyBytes)
+	if err != nil {
+		return err
+	}
+
+	privKeyStr, err := cb58.Encode(privKey.Serialize())
+	if err != nil {
+		return err
+	}
+
+	reply.PrivateKey = constants.SecretKeyPrefix + privKeyStr
+	reply.PublicKey = nodeID.String()
+
+	return nil
 }
