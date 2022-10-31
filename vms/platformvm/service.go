@@ -2452,8 +2452,10 @@ type GetConfigurationReply struct {
 	MinConsumptionRate json.Uint64 `json:"minConsumptionRate"`
 	// The maximum consumption rate
 	MaxConsumptionRate json.Uint64 `json:"maxConsumptionRate"`
-	// The supply cap for the native tolen (AVAX)
+	// The supply cap for the native token (AVAX)
 	SupplyCap json.Uint64 `json:"supplyCap"`
+	// The codec version used for serializing
+	CodecVersion json.Uint16 `json:"codecVersion"`
 }
 
 // GetMinStake returns the minimum staking amount in nAVAX.
@@ -2487,6 +2489,9 @@ func (service *Service) GetConfiguration(_ *http.Request, _ *struct{}, reply *Ge
 	reply.MaxConsumptionRate = json.Uint64(service.vm.RewardConfig.MaxConsumptionRate)
 
 	reply.SupplyCap = json.Uint64(service.vm.RewardConfig.SupplyCap)
+
+	// Codec information
+	reply.CodecVersion = json.Uint16(txs.Version)
 
 	return nil
 }
