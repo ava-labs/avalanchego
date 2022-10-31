@@ -6,4 +6,4 @@
   become: yes
   hosts: all
   roles:
-    - name: public-ami
+    - name: camino_stop

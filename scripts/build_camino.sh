@@ -5,7 +5,7 @@ set -o nounset
 set -o pipefail
 
 # Changes to the minimum golang version must also be replicated in
-# scripts/build_avalanche.sh (here)
+# scripts/build_camino.sh (here)
 # scripts/local.Dockerfile
 # Dockerfile
 # README.md
@@ -29,16 +29,16 @@ version_lt() {
 }
 
 if version_lt "$(go_version)" "$go_version_minimum"; then
-    echo "AvalancheGo requires Go >= $go_version_minimum, Go $(go_version) found." >&2
+    echo "CaminoGo requires Go >= $go_version_minimum, Go $(go_version) found." >&2
     exit 1
 fi
 
-# Avalanchego root folder
-AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
+# Caminogogo root folder
+CAMINO_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 # Load the versions
-source "$AVALANCHE_PATH"/scripts/versions.sh
+source "$CAMINO_PATH"/scripts/versions.sh
 # Load the constants
-source "$AVALANCHE_PATH"/scripts/constants.sh
+source "$CAMINO_PATH"/scripts/constants.sh
 
-echo "Building AvalancheGo..."
-go build -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit $static_ld_flags" -o "$avalanchego_path" "$AVALANCHE_PATH/main/"*.go
+echo "Building CaminoGo..."
+go build -ldflags "-X github.com/chain4travel/caminogo/version.GitCommit=$git_commit $static_ld_flags" -o "$caminogo_path" "$CAMINO_PATH/main/"*.go

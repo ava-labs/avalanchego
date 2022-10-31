@@ -11,15 +11,8 @@ import (
 
 	"github.com/onsi/gomega"
 
-	"github.com/ava-labs/avalanchego/tests/e2e"
-
+	"github.com/chain4travel/caminogo/tests/e2e"
 	// ensure test packages are scanned by ginkgo
-	_ "github.com/ava-labs/avalanchego/tests/e2e/banff"
-	_ "github.com/ava-labs/avalanchego/tests/e2e/p"
-	_ "github.com/ava-labs/avalanchego/tests/e2e/ping"
-	_ "github.com/ava-labs/avalanchego/tests/e2e/static-handlers"
-	_ "github.com/ava-labs/avalanchego/tests/e2e/x/transfer"
-	_ "github.com/ava-labs/avalanchego/tests/e2e/x/whitelist-vtx"
 )
 
 func TestE2E(t *testing.T) {
@@ -31,9 +24,9 @@ var (
 	// helpers to parse test flags
 	logLevel string
 
-	networkRunnerGRPCEp              string
-	networkRunnerAvalancheGoExecPath string
-	networkRunnerAvalancheGoLogLevel string
+	networkRunnerGRPCEp           string
+	networkRunnerCaminoGoExecPath string
+	networkRunnerCaminoGoLogLevel string
 
 	uris string
 
@@ -55,13 +48,13 @@ func init() {
 		"[optional] gRPC server endpoint for network-runner (only required for local network-runner tests)",
 	)
 	flag.StringVar(
-		&networkRunnerAvalancheGoExecPath,
-		"network-runner-avalanchego-path",
+		&networkRunnerCaminoGoExecPath,
+		"caminogo-path",
 		"",
-		"[optional] avalanchego executable path (only required for local network-runner tests)",
+		"[optional] caminogo executable path (only required for local network-runner tests)",
 	)
 	flag.StringVar(
-		&networkRunnerAvalancheGoLogLevel,
+		&networkRunnerCaminoGoLogLevel,
 		"network-runner-avalanchego-log-level",
 		"INFO",
 		"[optional] avalanchego log-level (only required for local network-runner tests)",
@@ -88,8 +81,8 @@ var _ = ginkgo.BeforeSuite(func() {
 	err := e2e.Env.ConfigCluster(
 		logLevel,
 		networkRunnerGRPCEp,
-		networkRunnerAvalancheGoExecPath,
-		networkRunnerAvalancheGoLogLevel,
+		networkRunnerCaminoGoExecPath,
+		networkRunnerCaminoGoLogLevel,
 		uris,
 		testKeysFile,
 	)

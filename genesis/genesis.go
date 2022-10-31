@@ -1,3 +1,13 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -175,7 +185,7 @@ func validateConfig(networkID uint32, config *Config) error {
 // 1) The ID of the new network. [networkID]
 // 2) The location of a custom genesis config to load. [filepath]
 //
-// If [filepath] is empty or the given network ID is Mainnet, Testnet, or Local, returns error.
+// If [filepath] is empty or the given network ID is Camino, Testnet, or Local, returns error.
 // If [filepath] is non-empty and networkID isn't Mainnet, Testnet, or Local,
 // loads the network genesis data from the config at [filepath].
 //
@@ -185,7 +195,7 @@ func validateConfig(networkID uint32, config *Config) error {
 //  2. The asset ID of AVAX
 func FromFile(networkID uint32, filepath string) ([]byte, ids.ID, error) {
 	switch networkID {
-	case constants.MainnetID, constants.TestnetID, constants.LocalID:
+	case constants.MainnetID, constants.CaminoID, constants.TestnetID, constants.LocalID:
 		return nil, ids.ID{}, fmt.Errorf(
 			"cannot override genesis config for standard network %s (%d)",
 			constants.NetworkName(networkID),
@@ -226,7 +236,7 @@ func FromFile(networkID uint32, filepath string) ([]byte, ids.ID, error) {
 //  2. The asset ID of AVAX
 func FromFlag(networkID uint32, genesisContent string) ([]byte, ids.ID, error) {
 	switch networkID {
-	case constants.MainnetID, constants.TestnetID, constants.LocalID:
+	case constants.MainnetID, constants.CaminoID, constants.TestnetID, constants.LocalID:
 		return nil, ids.ID{}, fmt.Errorf(
 			"cannot override genesis config for standard network %s (%d)",
 			constants.NetworkName(networkID),
@@ -262,8 +272,8 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	}
 	{
 		avax := avm.AssetDefinition{
-			Name:         "Avalanche",
-			Symbol:       "AVAX",
+			Name:         constants.TokenName(config.NetworkID),
+			Symbol:       constants.TokenSymbol(config.NetworkID),
 			Denomination: 9,
 			InitialState: map[string][]interface{}{},
 		}
@@ -296,7 +306,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 			return nil, ids.Empty, fmt.Errorf("couldn't parse memo bytes to string: %w", err)
 		}
 		avmArgs.GenesisData = map[string]avm.AssetDefinition{
-			"AVAX": avax, // The AVM starts out with one asset: AVAX
+			avax.Symbol: avax, // The AVM starts out with one asset
 		}
 	}
 	avmReply := avm.BuildGenesisReply{}

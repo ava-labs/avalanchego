@@ -2,11 +2,10 @@ name: e2e Tests + Publish Docker Image
 
 on:
   push:
-    tags-ignore:
-      - "*" # Ignores all tags
-    branches-ignore:
-      - master
-      - dev
+    #branches: [chain4travel]
+    #tags-ignore:
+    #  - "*" # Ignores all tags
+    branches-ignore: ["*"]
 
 jobs:
   run_e2e_tests_plus_publish_image:
@@ -20,7 +19,7 @@ jobs:
           DOCKER_USERNAME: ${{ secrets.docker_username }}
           DOCKER_PASS: ${{ secrets.docker_pass }}
           DOCKER_REPO: ${{ secrets.docker_repo }}
-        run: .github/workflows/run_e2e_tests.sh avalanchego-basic --parallelism 2 --client-id $KURTOSIS_CLIENT_ID --client-secret $KURTOSIS_CLIENT_SECRET
+        run: .github/workflows/run_e2e_tests.sh caminogo-basic --parallelism 2 --client-id $KURTOSIS_CLIENT_ID --client-secret $KURTOSIS_CLIENT_SECRET
 
       - name: Publish image to DockerHub
         env:

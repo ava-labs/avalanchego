@@ -2,8 +2,10 @@ name: build-amd64-debian-packages
 
 on:
   push:
-    tags:
-      - "*"
+    #branches: [chain4travel]
+    #tags:
+    #  - "*"
+    branches-ignore: ["*"]
 
 jobs:
   build-jammy-amd64-package:
@@ -17,7 +19,7 @@ jobs:
           check-latest: true
       - run: go version
 
-      - name: Build the avalanchego binaries
+      - name: Build the caminogo binaries
         run: ./scripts/build.sh
 
       - name: Install aws cli
@@ -57,7 +59,7 @@ jobs:
           check-latest: true
       - run: go version
 
-      - name: Build the avalanchego binaries
+      - name: Build the caminogo binaries
         run: ./scripts/build.sh
 
       - name: Install aws cli

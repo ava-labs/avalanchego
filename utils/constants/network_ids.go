@@ -1,3 +1,13 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -14,29 +24,28 @@ import (
 // Const variables to be exported
 const (
 	MainnetID uint32 = 1
-	CascadeID uint32 = 2
-	DenaliID  uint32 = 3
-	EverestID uint32 = 4
 	FujiID    uint32 = 5
 
-	TestnetID  uint32 = FujiID
+	CaminoID   uint32 = 1000
+	ColumbusID uint32 = 1001
+
+	TestnetID  uint32 = ColumbusID
 	UnitTestID uint32 = 10
 	LocalID    uint32 = 12345
 
-	MainnetName  = "mainnet"
-	CascadeName  = "cascade"
-	DenaliName   = "denali"
-	EverestName  = "everest"
-	FujiName     = "fuji"
+	MainnetName = "mainnet"
+	FujiName    = "fuji"
+
+	CaminoName   = "camino"
+	ColumbusName = "columbus"
 	TestnetName  = "testnet"
 	UnitTestName = "testing"
 	LocalName    = "local"
 
 	MainnetHRP  = "avax"
-	CascadeHRP  = "cascade"
-	DenaliHRP   = "denali"
-	EverestHRP  = "everest"
 	FujiHRP     = "fuji"
+	CaminoHRP   = "camino"
+	ColumbusHRP = "columbus"
 	UnitTestHRP = "testing"
 	LocalHRP    = "local"
 	FallbackHRP = "custom"
@@ -49,19 +58,17 @@ var (
 
 	NetworkIDToNetworkName = map[uint32]string{
 		MainnetID:  MainnetName,
-		CascadeID:  CascadeName,
-		DenaliID:   DenaliName,
-		EverestID:  EverestName,
 		FujiID:     FujiName,
+		CaminoID:   CaminoName,
+		ColumbusID: ColumbusName,
 		UnitTestID: UnitTestName,
 		LocalID:    LocalName,
 	}
 	NetworkNameToNetworkID = map[string]uint32{
 		MainnetName:  MainnetID,
-		CascadeName:  CascadeID,
-		DenaliName:   DenaliID,
-		EverestName:  EverestID,
 		FujiName:     FujiID,
+		CaminoName:   CaminoID,
+		ColumbusName: ColumbusID,
 		TestnetName:  TestnetID,
 		UnitTestName: UnitTestID,
 		LocalName:    LocalID,
@@ -69,19 +76,17 @@ var (
 
 	NetworkIDToHRP = map[uint32]string{
 		MainnetID:  MainnetHRP,
-		CascadeID:  CascadeHRP,
-		DenaliID:   DenaliHRP,
-		EverestID:  EverestHRP,
 		FujiID:     FujiHRP,
+		CaminoID:   CaminoHRP,
+		ColumbusID: ColumbusHRP,
 		UnitTestID: UnitTestHRP,
 		LocalID:    LocalHRP,
 	}
 	NetworkHRPToNetworkID = map[string]uint32{
 		MainnetHRP:  MainnetID,
-		CascadeHRP:  CascadeID,
-		DenaliHRP:   DenaliID,
-		EverestHRP:  EverestID,
 		FujiHRP:     FujiID,
+		CaminoHRP:   CaminoID,
+		ColumbusHRP: ColumbusID,
 		UnitTestHRP: UnitTestID,
 		LocalHRP:    LocalID,
 	}
@@ -122,4 +127,11 @@ func NetworkID(networkName string) (uint32, error) {
 		return 0, fmt.Errorf("failed to parse %q as a network name", networkName)
 	}
 	return uint32(id), nil
+}
+
+func IsActiveNetwork(networkID uint32) bool {
+	return networkID == MainnetID ||
+		networkID == FujiID ||
+		networkID == ColumbusID ||
+		networkID == CaminoID
 }

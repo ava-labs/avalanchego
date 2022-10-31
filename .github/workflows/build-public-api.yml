@@ -2,8 +2,10 @@ name: build-public-ami
 
 on:
   push:
-    tags:
-      - "*"
+    #branches: [chain4travel]
+    #tags:
+    #  - "*"
+    branches-ignore: ["*"]
   workflow_dispatch:
     inputs:
       tag:

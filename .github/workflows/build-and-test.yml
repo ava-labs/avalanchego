@@ -2,6 +2,9 @@ name: Build + Unit Tests
 
 on:
   push:
+    branches: [chain4travel]
+  pull_request:
+    branches: [chain4travel]
 
 jobs:
   run_build_unit_tests:

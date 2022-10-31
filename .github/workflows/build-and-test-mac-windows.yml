@@ -2,11 +2,7 @@ name: Build + Test Mac-Windows
 
 on:
   push:
-    tags:
-      - "*" # Push events to every tag
-    branches:
-      - dev
-      - master
+    tags: ["*"] # Push events to every tag
 
 jobs:
   run_build_tests:

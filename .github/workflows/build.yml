@@ -4,6 +4,8 @@ name: Build on supported platforms
 
 on:
   push:
+    #tags: ["*"]
+    branches-ignore: ["*"]
 
 permissions:
   contents: write
@@ -28,9 +30,7 @@ jobs:
           version: latest
           # TODO: automate github release page announce and artifact uploads
           # https://goreleaser.com/cmd/goreleaser_release/
-          args: release --rm-dist --skip-announce --skip-publish
-
-        # to automate release announcement
-        # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#about-the-github_token-secret
-        # env:
-        # GITHUB_TOKEN: ...
+          args: release --rm-dist --skip-announce
+        env:
+          # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#about-the-github_token-secret
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -35,7 +35,10 @@ const (
 
 var (
 	// [defaultUnexpandedDataDir] will be expanded when reading the flags
-	defaultDataDir              = filepath.Join("$HOME", ".avalanchego")
+	defaultNetworkName          = constants.CaminoName
+	homeDir                     = os.ExpandEnv("$HOME")
+	prefixedAppName             = fmt.Sprintf(".%s", constants.AppName)
+	defaultDataDir              = filepath.Join("$HOME", prefixedAppName)
 	defaultDBDir                = filepath.Join(defaultUnexpandedDataDir, "db")
 	defaultLogDir               = filepath.Join(defaultUnexpandedDataDir, "logs")
 	defaultProfileDir           = filepath.Join(defaultUnexpandedDataDir, "profiles")
