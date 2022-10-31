@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
-=======
 // Copyright (C) 2022, Chain4Travel AG. All rights reserved.
 //
 // This file is a derived work, based on ava-labs code whose
@@ -11,8 +8,7 @@
 //
 // Much love to the original authors for their work.
 // **********************************************************
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
->>>>>>> 3a6ff2f65... Camino build steps
+// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package constants

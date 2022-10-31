@@ -71,7 +71,7 @@ func connToIDAndCert(conn *tls.Conn) (ids.NodeID, net.Conn, *x509.Certificate, e
 func CertToID(cert *x509.Certificate) (ids.NodeID, error) {
 	pubKeyBytes, err := nodeid.RecoverSecp256PublicKey(cert)
 	if err != nil {
-		return ids.ShortID{}, err
+		return ids.EmptyNodeID, err
 	}
 	return ids.ToNodeID(pubKeyBytes)
 }

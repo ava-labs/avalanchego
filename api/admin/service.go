@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -343,7 +344,7 @@ func (service *Admin) GetNodeSigner(_ *http.Request, _ *struct{}, reply *GetNode
 		return err
 	}
 
-	reply.PrivateKey = constants.SecretKeyPrefix + privKeyStr
+	reply.PrivateKey = crypto.PrivateKeyPrefix + privKeyStr
 	reply.PublicKey = nodeID.String()
 
 	return nil

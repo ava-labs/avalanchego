@@ -380,7 +380,8 @@ func (n *network) Track(claimedIPPort ips.ClaimedIPPort) bool {
 	nodeID, err := peer.CertToID(claimedIPPort.Cert)
 	if err != nil {
 		n.peerConfig.Log.Debug("failed to create nodeID from certificate: %s",
-			err,
+			zap.Stringer("nodeID", nodeID),
+			zap.Error(err),
 		)
 		return false
 	}

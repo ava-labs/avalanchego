@@ -67,7 +67,7 @@ func newCertAndKeyBytesWithNoExt() ([]byte, []byte, error) {
 }
 
 func getPublicKey(t *testing.T, tlsCert *tls.Certificate) []byte {
-	pubKey, err := nodeid.RecoverSecp256PublicKey(tlsCert)
+	pubKey, err := RecoverSecp256PublicKey(tlsCert.Leaf)
 	require.NoError(t, err)
 	return pubKey
 }
