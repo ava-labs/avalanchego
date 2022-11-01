@@ -46,8 +46,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const testHead = 32
-
 var (
 	key, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 	addr   = crypto.PubkeyToAddress(key.PublicKey)
@@ -76,14 +74,6 @@ func (b *testBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumber)
 
 func (b *testBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
 	return b.chain.GetReceiptsByHash(hash), nil
-}
-
-func (b *testBackend) PendingBlockAndReceipts() (*types.Block, types.Receipts) {
-	if b.pending {
-		block := b.chain.GetBlockByNumber(testHead + 1)
-		return block, b.chain.GetReceiptsByHash(block.Hash())
-	}
-	return nil, nil
 }
 
 func (b *testBackend) ChainConfig() *params.ChainConfig {
