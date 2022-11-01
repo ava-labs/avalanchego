@@ -16,7 +16,7 @@ import (
 	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
 )
 
-var _ keystore.BlockchainKeystore = &Client{}
+var _ keystore.BlockchainKeystore = (*Client)(nil)
 
 // Client is a snow.Keystore that talks over RPC.
 type Client struct {

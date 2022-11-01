@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	_ Set = &set{}
+	_ Set = (*set)(nil)
 
 	errDuplicateID = errors.New("duplicated ID")
 	errDuplicateIP = errors.New("duplicated IP")

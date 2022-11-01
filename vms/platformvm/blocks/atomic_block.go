@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ Block = &ApricotAtomicBlock{}
+var _ Block = (*ApricotAtomicBlock)(nil)
 
 // ApricotAtomicBlock being accepted results in the atomic transaction contained
 // in the block to be accepted and committed to the chain.

@@ -14,7 +14,7 @@ import (
 	sharedmemorypb "github.com/ava-labs/avalanchego/proto/pb/sharedmemory"
 )
 
-var _ sharedmemorypb.SharedMemoryServer = &Server{}
+var _ sharedmemorypb.SharedMemoryServer = (*Server)(nil)
 
 // Server is shared memory that is managed over RPC.
 type Server struct {

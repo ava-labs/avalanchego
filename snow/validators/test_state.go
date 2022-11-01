@@ -16,7 +16,7 @@ var (
 	errGetValidatorSet = errors.New("unexpectedly called GetValidatorSet")
 )
 
-var _ State = &TestState{}
+var _ State = (*TestState)(nil)
 
 type TestState struct {
 	T *testing.T

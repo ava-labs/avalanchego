@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var _ DelegatorTx = &AddPermissionlessDelegatorTx{}
+var _ DelegatorTx = (*AddPermissionlessDelegatorTx)(nil)
 
 // AddPermissionlessDelegatorTx is an unsigned addPermissionlessDelegatorTx
 type AddPermissionlessDelegatorTx struct {

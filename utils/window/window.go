@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
-var _ Window[struct{}] = &window[struct{}]{}
+var _ Window[struct{}] = (*window[struct{}])(nil)
 
 // Window is an interface which represents a sliding window of elements.
 type Window[T any] interface {

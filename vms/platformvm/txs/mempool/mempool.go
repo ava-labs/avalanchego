@@ -31,7 +31,7 @@ const (
 )
 
 var (
-	_ Mempool = &mempool{}
+	_ Mempool = (*mempool)(nil)
 
 	errMempoolFull = errors.New("mempool is full")
 )

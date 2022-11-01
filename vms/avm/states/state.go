@@ -18,7 +18,7 @@ var (
 	singletonPrefix = []byte("singleton")
 	txPrefix        = []byte("tx")
 
-	_ State = &state{}
+	_ State = (*state)(nil)
 )
 
 // State persistently maintains a set of UTXOs, transaction, statuses, and

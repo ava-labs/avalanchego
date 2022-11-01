@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	_ database.Database = &Database{}
-	_ database.Batch    = &batch{}
+	_ database.Database = (*Database)(nil)
+	_ database.Batch    = (*batch)(nil)
 )
 
 // CorruptableDB is a wrapper around Database

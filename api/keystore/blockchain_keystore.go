@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var _ BlockchainKeystore = &blockchainKeystore{}
+var _ BlockchainKeystore = (*blockchainKeystore)(nil)
 
 type BlockchainKeystore interface {
 	// Get a database that is able to read and write unencrypted values from the

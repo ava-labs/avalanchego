@@ -15,7 +15,7 @@ import (
 var (
 	errRefused = errors.New("connection refused")
 
-	_ dialer.Dialer = &testDialer{}
+	_ dialer.Dialer = (*testDialer)(nil)
 )
 
 type testDialer struct {

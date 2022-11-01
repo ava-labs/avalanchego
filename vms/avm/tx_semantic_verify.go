@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
-var _ txs.Visitor = &txSemanticVerify{}
+var _ txs.Visitor = (*txSemanticVerify)(nil)
 
 // SemanticVerify that this transaction is well-formed.
 type txSemanticVerify struct {

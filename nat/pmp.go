@@ -18,7 +18,7 @@ var (
 	errInvalidLifetime = errors.New("invalid mapping duration range")
 
 	pmpClientTimeout        = 500 * time.Millisecond
-	_                Router = &pmpRouter{}
+	_                Router = (*pmpRouter)(nil)
 )
 
 // pmpRouter adapts the NAT-PMP protocol implementation so it conforms to the

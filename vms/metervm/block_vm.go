@@ -17,10 +17,10 @@ import (
 )
 
 var (
-	_ block.ChainVM              = &blockVM{}
-	_ block.BatchedChainVM       = &blockVM{}
-	_ block.HeightIndexedChainVM = &blockVM{}
-	_ block.StateSyncableVM      = &blockVM{}
+	_ block.ChainVM              = (*blockVM)(nil)
+	_ block.BatchedChainVM       = (*blockVM)(nil)
+	_ block.HeightIndexedChainVM = (*blockVM)(nil)
+	_ block.StateSyncableVM      = (*blockVM)(nil)
 )
 
 type blockVM struct {

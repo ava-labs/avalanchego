@@ -18,7 +18,7 @@ const (
 var (
 	errOpenDNSNoIP = errors.New("openDNS returned no ip")
 
-	_ Resolver = &openDNSResolver{}
+	_ Resolver = (*openDNSResolver)(nil)
 )
 
 // IFConfigResolves resolves our public IP using openDNS

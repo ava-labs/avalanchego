@@ -4,6 +4,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -60,11 +61,11 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	}
 	bootstrapper.Default(false)
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
-	bootstrapper.GetAcceptedFrontierF = func(nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.GetAcceptedFrontierF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 		t.Fatalf("GetAcceptedFrontier message should have timed out")
 		return nil
 	}
-	bootstrapper.GetAcceptedF = func(nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
+	bootstrapper.GetAcceptedF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
 		called <- struct{}{}
 		return nil
 	}
@@ -80,7 +81,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	deadline := time.Nanosecond
 	chainID := ids.ID{}
 	msg := mc.InboundGetAcceptedFrontier(chainID, reqID, deadline, nodeID)
-	handler.Push(msg)
+	handler.Push(context.Background(), msg)
 
 	currentTime := time.Now().Add(time.Second)
 	mc.SetTime(currentTime)
@@ -88,7 +89,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 
 	reqID++
 	msg = mc.InboundGetAccepted(chainID, reqID, deadline, nil, nodeID)
-	handler.Push(msg)
+	handler.Push(context.Background(), msg)
 
 	bootstrapper.StartF = func(startReqID uint32) error { return nil }
 
@@ -143,7 +144,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	}
 	bootstrapper.Default(false)
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
-	bootstrapper.GetAcceptedFrontierF = func(nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.GetAcceptedFrontierF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 		return errors.New("Engine error should cause handler to close")
 	}
 	handler.SetBootstrapper(bootstrapper)
@@ -165,7 +166,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	reqID := uint32(1)
 	deadline := time.Nanosecond
 	msg := mc.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline, nodeID)
-	handler.Push(msg)
+	handler.Push(context.Background(), msg)
 
 	ticker := time.NewTicker(time.Second)
 	select {
@@ -209,7 +210,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	}
 	bootstrapper.Default(false)
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
-	bootstrapper.GetFailedF = func(nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.GetFailedF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 		closed <- struct{}{}
 		return nil
 	}
@@ -224,7 +225,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	chainID := ids.Empty
 	reqID := uint32(1)
 	inMsg := mc.InternalFailedRequest(message.GetFailed, nodeID, chainID, chainID, reqID)
-	handler.Push(inMsg)
+	handler.Push(context.Background(), inMsg)
 
 	ticker := time.NewTicker(time.Second)
 	select {

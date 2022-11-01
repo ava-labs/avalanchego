@@ -19,7 +19,7 @@ import (
 
 const epsilon = 1e-9
 
-var _ ResourceTracker = &resourceTracker{}
+var _ ResourceTracker = (*resourceTracker)(nil)
 
 type Tracker interface {
 	// Returns the current usage for the given node.

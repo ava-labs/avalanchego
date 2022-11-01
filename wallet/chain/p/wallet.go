@@ -21,7 +21,7 @@ import (
 var (
 	errNotCommitted = errors.New("not committed")
 
-	_ Wallet = &wallet{}
+	_ Wallet = (*wallet)(nil)
 )
 
 type Wallet interface {

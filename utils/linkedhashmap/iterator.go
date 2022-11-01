@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-var _ Iter[int, struct{}] = &iterator[int, struct{}]{}
+var _ Iter[int, struct{}] = (*iterator[int, struct{}])(nil)
 
 // Iterates over the keys and values in a LinkedHashmap
 // from oldest to newest elements.

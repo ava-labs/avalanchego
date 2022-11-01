@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
-var _ Block = &TestBlock{}
+var _ Block = (*TestBlock)(nil)
 
 // TestBlock is a useful test block
 type TestBlock struct {

@@ -42,8 +42,8 @@ import (
 )
 
 var (
-	_ plugin.Plugin     = &testVMPlugin{}
-	_ plugin.GRPCPlugin = &testVMPlugin{}
+	_ plugin.Plugin     = (*testVMPlugin)(nil)
+	_ plugin.GRPCPlugin = (*testVMPlugin)(nil)
 )
 
 // Test_VMServerInterface ensures that the RPCs methods defined by VMServer

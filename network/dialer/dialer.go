@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var _ Dialer = &dialer{}
+var _ Dialer = (*dialer)(nil)
 
 // Dialer attempts to create a connection with the provided IP/port pair
 type Dialer interface {

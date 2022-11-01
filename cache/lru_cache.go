@@ -10,7 +10,7 @@ import (
 
 const minCacheSize = 32
 
-var _ Cacher[struct{}, struct{}] = &LRU[struct{}, struct{}]{}
+var _ Cacher[struct{}, struct{}] = (*LRU[struct{}, struct{}])(nil)
 
 type entry[K comparable, V any] struct {
 	Key   K

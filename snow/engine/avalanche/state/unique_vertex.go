@@ -20,8 +20,8 @@ import (
 )
 
 var (
-	_ cache.Evictable[ids.ID] = &uniqueVertex{}
-	_ avalanche.Vertex        = &uniqueVertex{}
+	_ cache.Evictable[ids.ID] = (*uniqueVertex)(nil)
+	_ avalanche.Vertex        = (*uniqueVertex)(nil)
 )
 
 // uniqueVertex acts as a cache for vertices in the database.

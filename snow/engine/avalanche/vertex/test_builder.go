@@ -15,7 +15,7 @@ import (
 var (
 	errBuild = errors.New("unexpectedly called Build")
 
-	_ Builder = &TestBuilder{}
+	_ Builder = (*TestBuilder)(nil)
 )
 
 type TestBuilder struct {

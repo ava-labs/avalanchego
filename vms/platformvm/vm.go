@@ -60,9 +60,9 @@ const (
 )
 
 var (
-	_ block.ChainVM    = &VM{}
-	_ secp256k1fx.VM   = &VM{}
-	_ validators.State = &VM{}
+	_ block.ChainVM    = (*VM)(nil)
+	_ secp256k1fx.VM   = (*VM)(nil)
+	_ validators.State = (*VM)(nil)
 
 	errWrongCacheType      = errors.New("unexpectedly cached type")
 	errMissingValidatorSet = errors.New("missing validator set")

@@ -15,10 +15,10 @@ import (
 
 var (
 	_ Acceptor = noOpAcceptor{}
-	_ Acceptor = &AcceptorTracker{}
+	_ Acceptor = (*AcceptorTracker)(nil)
 	_ Acceptor = acceptorWrapper{}
 
-	_ AcceptorGroup = &acceptorGroup{}
+	_ AcceptorGroup = (*acceptorGroup)(nil)
 )
 
 // Acceptor is implemented when a struct is monitoring if a message is accepted

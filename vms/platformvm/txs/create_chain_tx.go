@@ -20,7 +20,7 @@ const (
 )
 
 var (
-	_ UnsignedTx = &CreateChainTx{}
+	_ UnsignedTx = (*CreateChainTx)(nil)
 
 	ErrCantValidatePrimaryNetwork = errors.New("new blockchain can't be validated by primary network")
 

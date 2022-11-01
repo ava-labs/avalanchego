@@ -12,7 +12,7 @@ import (
 var (
 	errDifferentMajor = errors.New("different major version")
 
-	_ fmt.Stringer = &Semantic{}
+	_ fmt.Stringer = (*Semantic)(nil)
 )
 
 type Application struct {

@@ -28,7 +28,7 @@ const (
 )
 
 var (
-	_ HeightIndex = &heightIndex{}
+	_ HeightIndex = (*heightIndex)(nil)
 
 	heightPrefix   = []byte("height")
 	metadataPrefix = []byte("metadata")

@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	_ blocks.Visitor = &verifier{}
+	_ blocks.Visitor = (*verifier)(nil)
 
 	errApricotBlockIssuedAfterFork                = errors.New("apricot block issued after fork")
 	errBanffProposalBlockWithMultipleTransactions = errors.New("BanffProposalBlock contains multiple transactions")

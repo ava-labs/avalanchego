@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	_ StakerIterator = &mergedIterator{}
-	_ heap.Interface = &mergedIterator{}
+	_ StakerIterator = (*mergedIterator)(nil)
+	_ heap.Interface = (*mergedIterator)(nil)
 )
 
 type mergedIterator struct {

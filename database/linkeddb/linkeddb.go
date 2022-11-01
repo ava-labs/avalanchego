@@ -18,8 +18,8 @@ const (
 var (
 	headKey = []byte{0x01}
 
-	_ LinkedDB          = &linkedDB{}
-	_ database.Iterator = &iterator{}
+	_ LinkedDB          = (*linkedDB)(nil)
+	_ database.Iterator = (*iterator)(nil)
 )
 
 // LinkedDB provides a key value interface while allowing iteration.

@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-var _ Deduplicator[struct{}, testEvictable] = &EvictableLRU[struct{}, testEvictable]{}
+var _ Deduplicator[struct{}, testEvictable] = (*EvictableLRU[struct{}, testEvictable])(nil)
 
 // Only used for the type assertion above
 type testEvictable struct{}

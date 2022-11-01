@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ Consensus = &Byzantine{}
+var _ Consensus = (*Byzantine)(nil)
 
 // Byzantine is a naive implementation of a multi-choice snowball instance
 type Byzantine struct {

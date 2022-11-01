@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	_ BanffBlock = &BanffAbortBlock{}
-	_ Block      = &ApricotAbortBlock{}
+	_ BanffBlock = (*BanffAbortBlock)(nil)
+	_ Block      = (*ApricotAbortBlock)(nil)
 )
 
 type BanffAbortBlock struct {

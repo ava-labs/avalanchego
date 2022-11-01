@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-var _ Latency = &latency{}
+var _ Latency = (*latency)(nil)
 
 type Latency interface {
 	// Issued marks the item as having been issued.

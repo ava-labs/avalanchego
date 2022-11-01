@@ -13,7 +13,7 @@ import (
 var (
 	errClosed = errors.New("closed")
 
-	_ net.Listener = &testListener{}
+	_ net.Listener = (*testListener)(nil)
 )
 
 type testListener struct {

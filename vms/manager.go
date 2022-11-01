@@ -15,7 +15,7 @@ import (
 var (
 	ErrNotFound = errors.New("not found")
 
-	_ Manager = &manager{}
+	_ Manager = (*manager)(nil)
 )
 
 // A Factory creates new instances of a VM

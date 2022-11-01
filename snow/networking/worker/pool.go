@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-var _ Pool = &pool{}
+var _ Pool = (*pool)(nil)
 
 type Request func()
 

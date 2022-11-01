@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	_ txs.Visitor = &StandardTxExecutor{}
+	_ txs.Visitor = (*StandardTxExecutor)(nil)
 
 	errEmptyNodeID              = errors.New("validator nodeID cannot be empty")
 	errMaxStakeDurationTooLarge = errors.New("max stake duration must be less than or equal to the global max stake duration")

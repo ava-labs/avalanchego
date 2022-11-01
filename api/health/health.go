@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var _ Health = &health{}
+var _ Health = (*health)(nil)
 
 // Health defines the full health service interface for registering, reporting
 // and refreshing health checks.

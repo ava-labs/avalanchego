@@ -27,7 +27,7 @@ var (
 	errExtraSpace   = errors.New("trailing buffer space")
 )
 
-var _ codec.Codec = &genericCodec{}
+var _ codec.Codec = (*genericCodec)(nil)
 
 type TypeCodec interface {
 	// UnpackPrefix unpacks the prefix of an interface from the given packer.

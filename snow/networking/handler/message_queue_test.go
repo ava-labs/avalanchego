@@ -4,6 +4,7 @@
 package handler
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -51,65 +52,65 @@ func TestQueue(t *testing.T) {
 	// Push then pop should work regardless of usage when there are no other
 	// messages on [u.msgs]
 	cpuTracker.EXPECT().Usage(vdr1ID, gomock.Any()).Return(0.1).Times(1)
-	u.Push(msg1)
+	u.Push(context.Background(), msg1)
 	require.EqualValues(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	require.EqualValues(1, u.Len())
-	gotMsg1, ok := u.Pop()
+	_, gotMsg1, ok := u.Pop()
 	require.True(ok)
 	require.Len(u.nodeToUnprocessedMsgs, 0)
 	require.EqualValues(0, u.Len())
 	require.EqualValues(msg1, gotMsg1)
 
 	cpuTracker.EXPECT().Usage(vdr1ID, gomock.Any()).Return(0.0).Times(1)
-	u.Push(msg1)
+	u.Push(context.Background(), msg1)
 	require.EqualValues(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	require.EqualValues(1, u.Len())
-	gotMsg1, ok = u.Pop()
+	_, gotMsg1, ok = u.Pop()
 	require.True(ok)
 	require.Len(u.nodeToUnprocessedMsgs, 0)
 	require.EqualValues(0, u.Len())
 	require.EqualValues(msg1, gotMsg1)
 
 	cpuTracker.EXPECT().Usage(vdr1ID, gomock.Any()).Return(1.0).Times(1)
-	u.Push(msg1)
+	u.Push(context.Background(), msg1)
 	require.EqualValues(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	require.EqualValues(1, u.Len())
-	gotMsg1, ok = u.Pop()
+	_, gotMsg1, ok = u.Pop()
 	require.True(ok)
 	require.Len(u.nodeToUnprocessedMsgs, 0)
 	require.EqualValues(0, u.Len())
 	require.EqualValues(msg1, gotMsg1)
 
 	cpuTracker.EXPECT().Usage(vdr1ID, gomock.Any()).Return(0.0).Times(1)
-	u.Push(msg1)
+	u.Push(context.Background(), msg1)
 	require.EqualValues(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	require.EqualValues(1, u.Len())
-	gotMsg1, ok = u.Pop()
+	_, gotMsg1, ok = u.Pop()
 	require.True(ok)
 	require.Len(u.nodeToUnprocessedMsgs, 0)
 	require.EqualValues(0, u.Len())
 	require.EqualValues(msg1, gotMsg1)
 
 	// Push msg1 from vdr1ID
-	u.Push(msg1)
+	u.Push(context.Background(), msg1)
 	require.EqualValues(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	require.EqualValues(1, u.Len())
 
 	msg2 := mc.InboundGet(ids.Empty, 0, 0, ids.Empty, vdr2ID)
 
 	// Push msg2 from vdr2ID
-	u.Push(msg2)
+	u.Push(context.Background(), msg2)
 	require.EqualValues(2, u.Len())
 	require.EqualValues(1, u.nodeToUnprocessedMsgs[vdr2ID])
 	// Set vdr1's usage to 99% and vdr2's to .01
 	cpuTracker.EXPECT().Usage(vdr1ID, gomock.Any()).Return(.99).Times(2)
 	cpuTracker.EXPECT().Usage(vdr2ID, gomock.Any()).Return(.01).Times(1)
 	// Pop should return msg2 first because vdr1 has exceeded it's portion of CPU time
-	gotMsg2, ok := u.Pop()
+	_, gotMsg2, ok := u.Pop()
 	require.True(ok)
 	require.EqualValues(1, u.Len())
 	require.EqualValues(msg2, gotMsg2)
-	gotMsg1, ok = u.Pop()
+	_, gotMsg1, ok = u.Pop()
 	require.True(ok)
 	require.EqualValues(msg1, gotMsg1)
 	require.Len(u.nodeToUnprocessedMsgs, 0)
@@ -120,9 +121,9 @@ func TestQueue(t *testing.T) {
 	nonVdrNodeID1, nonVdrNodeID2 := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 	msg3 := mc.InboundPullQuery(ids.Empty, 0, 0, ids.Empty, nonVdrNodeID1)
 	msg4 := mc.InboundPushQuery(ids.Empty, 0, 0, nil, nonVdrNodeID2)
-	u.Push(msg3)
-	u.Push(msg4)
-	u.Push(msg1)
+	u.Push(context.Background(), msg3)
+	u.Push(context.Background(), msg4)
+	u.Push(context.Background(), msg1)
 	require.EqualValues(3, u.Len())
 
 	// msg1 should get popped first because nonVdrNodeID1 and nonVdrNodeID2
@@ -132,16 +133,16 @@ func TestQueue(t *testing.T) {
 	cpuTracker.EXPECT().Usage(vdr1ID, gomock.Any()).Return(0.0).Times(1)
 
 	// u.msgs is [msg3, msg4, msg1]
-	gotMsg1, ok = u.Pop()
+	_, gotMsg1, ok = u.Pop()
 	require.True(ok)
 	require.EqualValues(msg1, gotMsg1)
 	// u.msgs is [msg3, msg4]
 	cpuTracker.EXPECT().Usage(nonVdrNodeID1, gomock.Any()).Return(.51).Times(2)
-	gotMsg4, ok := u.Pop()
+	_, gotMsg4, ok := u.Pop()
 	require.True(ok)
 	require.EqualValues(msg4, gotMsg4)
 	// u.msgs is [msg3]
-	gotMsg3, ok := u.Pop()
+	_, gotMsg3, ok := u.Pop()
 	require.True(ok)
 	require.EqualValues(msg3, gotMsg3)
 	require.EqualValues(0, u.Len())

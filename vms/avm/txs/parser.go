@@ -19,7 +19,7 @@ import (
 
 const CodecVersion = 0
 
-var _ Parser = &parser{}
+var _ Parser = (*parser)(nil)
 
 type Parser interface {
 	Codec() codec.Manager

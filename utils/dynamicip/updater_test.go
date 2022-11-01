@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var _ Resolver = &mockResolver{}
+var _ Resolver = (*mockResolver)(nil)
 
 type mockResolver struct {
 	onResolve func() (net.IP, error)

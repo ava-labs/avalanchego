@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-var _ Creator = &creator{}
+var _ Creator = (*creator)(nil)
 
 type Creator interface {
 	OutboundMsgBuilder

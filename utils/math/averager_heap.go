@@ -11,7 +11,7 @@ import (
 
 var (
 	_ AveragerHeap   = averagerHeap{}
-	_ heap.Interface = &averagerHeapBackend{}
+	_ heap.Interface = (*averagerHeapBackend)(nil)
 )
 
 // AveragerHeap maintains a heap of the averagers.

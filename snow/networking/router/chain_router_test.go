@@ -4,6 +4,7 @@
 package router
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -187,7 +188,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.NodeID, nodeVersion *version.Application) error { return nil }
 	bootstrapper.HaltF = func() {}
-	bootstrapper.AncestorsF = func(nodeID ids.NodeID, requestID uint32, containers [][]byte) error {
+	bootstrapper.AncestorsF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) error {
 		// Ancestors blocks for two seconds
 		time.Sleep(2 * time.Second)
 		bootstrapFinished <- struct{}{}
@@ -213,7 +214,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	go func() {
 		chainID := ids.ID{}
 		msg := mc.InboundAncestors(chainID, 1, nil, nodeID)
-		handler.Push(msg)
+		handler.Push(context.Background(), msg)
 
 		time.Sleep(50 * time.Millisecond) // Pause to ensure message gets processed
 
@@ -296,13 +297,17 @@ func TestRouterTimeout(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.NodeID, nodeVersion *version.Application) error { return nil }
 	bootstrapper.HaltF = func() {}
-	bootstrapper.GetFailedF = func(nodeID ids.NodeID, requestID uint32) error { wg.Done(); calledGetFailed = true; return nil }
-	bootstrapper.GetAncestorsFailedF = func(nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.GetFailedF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+		wg.Done()
+		calledGetFailed = true
+		return nil
+	}
+	bootstrapper.GetAncestorsFailedF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 		defer wg.Done()
 		calledGetAncestorsFailed = true
 		return nil
 	}
-	bootstrapper.QueryFailedF = func(nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.QueryFailedF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 		defer wg.Done()
 		if !calledQueryFailed {
 			calledQueryFailed = true
@@ -311,17 +316,17 @@ func TestRouterTimeout(t *testing.T) {
 		calledQueryFailed2 = true
 		return nil
 	}
-	bootstrapper.GetAcceptedFailedF = func(nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.GetAcceptedFailedF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 		defer wg.Done()
 		calledGetAcceptedFailed = true
 		return nil
 	}
-	bootstrapper.GetAcceptedFrontierFailedF = func(nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.GetAcceptedFrontierFailedF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 		defer wg.Done()
 		calledGetAcceptedFrontierFailed = true
 		return nil
 	}
-	bootstrapper.CrossChainAppRequestFailedF = func(chainID ids.ID, requestID uint32) error {
+	bootstrapper.CrossChainAppRequestFailedF = func(ctx context.Context, chainID ids.ID, requestID uint32) error {
 		defer wg.Done()
 		calledCrossChainAppRequestFailed = true
 		return nil
@@ -348,7 +353,7 @@ func TestRouterTimeout(t *testing.T) {
 	wg.Add(len(msgs))
 
 	for i, msg := range msgs {
-		chainRouter.RegisterRequest(ids.GenerateTestNodeID(), ctx.ChainID, ctx.ChainID, uint32(i), msg)
+		chainRouter.RegisterRequest(context.Background(), ids.GenerateTestNodeID(), ctx.ChainID, ctx.ChainID, uint32(i), msg)
 	}
 
 	wg.Wait()
@@ -444,7 +449,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 
 	vID := ids.GenerateTestNodeID()
 	for i, op := range ops {
-		chainRouter.RegisterRequest(vID, ctx.ChainID, ctx.ChainID, uint32(i), op)
+		chainRouter.RegisterRequest(context.Background(), vID, ctx.ChainID, ctx.ChainID, uint32(i), op)
 	}
 
 	// Clear each timeout by simulating responses to the queries
@@ -453,23 +458,23 @@ func TestRouterClearTimeouts(t *testing.T) {
 
 	// Put
 	inMsg = mc.InboundPut(ctx.ChainID, 0, nil, vID)
-	chainRouter.HandleInbound(inMsg)
+	chainRouter.HandleInbound(context.Background(), inMsg)
 
 	// Ancestors
 	inMsg = mc.InboundAncestors(ctx.ChainID, 1, nil, vID)
-	chainRouter.HandleInbound(inMsg)
+	chainRouter.HandleInbound(context.Background(), inMsg)
 
 	// Chits
 	inMsg = mc.InboundChits(ctx.ChainID, 2, nil, vID)
-	chainRouter.HandleInbound(inMsg)
+	chainRouter.HandleInbound(context.Background(), inMsg)
 
 	// Accepted
 	inMsg = mc.InboundAccepted(ctx.ChainID, 3, nil, vID)
-	chainRouter.HandleInbound(inMsg)
+	chainRouter.HandleInbound(context.Background(), inMsg)
 
 	// Accepted Frontier
 	inMsg = mc.InboundAcceptedFrontier(ctx.ChainID, 4, nil, vID)
-	chainRouter.HandleInbound(inMsg)
+	chainRouter.HandleInbound(context.Background(), inMsg)
 
 	require.Equal(t, chainRouter.timedRequests.Len(), 0)
 }
@@ -535,7 +540,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	}
 	bootstrapper.Default(false)
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
-	bootstrapper.PullQueryF = func(nodeID ids.NodeID, requestID uint32, containerID ids.ID) error {
+	bootstrapper.PullQueryF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error {
 		defer wg.Done()
 		calledF = true
 		return nil
@@ -564,7 +569,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	inMsg = mc.InboundPullQuery(ctx.ChainID, reqID, time.Hour, dummyContainerID,
 		nID,
 	)
-	chainRouter.HandleInbound(inMsg)
+	chainRouter.HandleInbound(context.Background(), inMsg)
 
 	require.False(t, calledF) // should not be called
 
@@ -575,14 +580,14 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		vID,
 	)
 	wg.Add(1)
-	chainRouter.HandleInbound(inMsg)
+	chainRouter.HandleInbound(context.Background(), inMsg)
 
 	wg.Wait()
 	require.True(t, calledF) // should be called since this is a validator request
 
 	// register a validator request
 	reqID++
-	chainRouter.RegisterRequest(vID, ctx.ChainID, ctx.ChainID, reqID, message.Get)
+	chainRouter.RegisterRequest(context.Background(), vID, ctx.ChainID, ctx.ChainID, reqID, message.Get)
 	require.Equal(t, 1, chainRouter.timedRequests.Len())
 
 	// remove it from validators
@@ -590,7 +595,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	require.NoError(t, err)
 
 	inMsg = mc.InboundPut(ctx.ChainID, reqID, nil, nID)
-	chainRouter.HandleInbound(inMsg)
+	chainRouter.HandleInbound(context.Background(), inMsg)
 
 	// shouldn't clear out timed request, as the request should be cleared when
 	// the GetFailed message is sent
@@ -675,13 +680,13 @@ func TestRouterCrossChainMessages(t *testing.T) {
 
 	// Requester sends a request to the responder
 	msg := []byte("foobar")
-	chainRouter.HandleInbound(mc.InternalCrossChainAppRequest(requester.NodeID, requester.ChainID, responder.ChainID, uint32(1), time.Minute, msg))
+	chainRouter.HandleInbound(context.Background(), mc.InternalCrossChainAppRequest(requester.NodeID, requester.ChainID, responder.ChainID, uint32(1), time.Minute, msg))
 	require.Equal(t, 2, chainRouter.chains[responder.ChainID].Len())
 
 	// We register the cross-chain response on the requester-side so we don't
 	// drop it.
-	chainRouter.RegisterRequest(nodeID, requester.ChainID, responder.ChainID, uint32(1), message.CrossChainAppResponse)
+	chainRouter.RegisterRequest(context.Background(), nodeID, requester.ChainID, responder.ChainID, uint32(1), message.CrossChainAppResponse)
 	// Responder sends a response back to the requester.
-	chainRouter.HandleInbound(mc.InternalCrossChainAppResponse(nodeID, responder.ChainID, requester.ChainID, uint32(1), msg))
+	chainRouter.HandleInbound(context.Background(), mc.InternalCrossChainAppResponse(nodeID, responder.ChainID, requester.ChainID, uint32(1), msg))
 	require.Equal(t, 2, chainRouter.chains[requester.ChainID].Len())
 }

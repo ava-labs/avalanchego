@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
-var _ Client = &client{}
+var _ Client = (*client)(nil)
 
 // Client interface for an Info API Client
 type Client interface {

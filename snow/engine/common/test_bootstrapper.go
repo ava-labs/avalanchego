@@ -4,8 +4,8 @@
 package common
 
 var (
-	_ Engine        = &BootstrapperTest{}
-	_ Bootstrapable = &BootstrapperTest{}
+	_ Engine        = (*BootstrapperTest)(nil)
+	_ Bootstrapable = (*BootstrapperTest)(nil)
 )
 
 // EngineTest is a test engine

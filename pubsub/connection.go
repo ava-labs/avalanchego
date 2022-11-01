@@ -22,7 +22,7 @@ var (
 	ErrAddressLimit                = errors.New("address limit exceeded")
 	ErrInvalidFilterParam          = errors.New("invalid bloom filter params")
 	ErrInvalidCommand              = errors.New("invalid command")
-	_                       Filter = &connection{}
+	_                       Filter = (*connection)(nil)
 )
 
 type Filter interface {

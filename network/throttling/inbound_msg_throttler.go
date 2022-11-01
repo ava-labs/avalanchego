@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var _ InboundMsgThrottler = &inboundMsgThrottler{}
+var _ InboundMsgThrottler = (*inboundMsgThrottler)(nil)
 
 // InboundMsgThrottler rate-limits inbound messages from the network.
 type InboundMsgThrottler interface {

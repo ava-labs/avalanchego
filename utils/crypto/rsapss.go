@@ -14,9 +14,9 @@ import (
 )
 
 var (
-	_ Factory    = &FactoryRSAPSS{}
-	_ PublicKey  = &PublicKeyRSAPSS{}
-	_ PrivateKey = &PrivateKeyRSAPSS{}
+	_ Factory    = (*FactoryRSAPSS)(nil)
+	_ PublicKey  = (*PublicKeyRSAPSS)(nil)
+	_ PrivateKey = (*PrivateKeyRSAPSS)(nil)
 )
 
 const rsaPSSSize = 3072
