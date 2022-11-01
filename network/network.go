@@ -494,8 +494,20 @@ func (n *network) Version() (message.OutboundMessage, error) {
 }
 
 func (n *network) Peers(peerID ids.NodeID) (message.OutboundMessage, error) {
-	peers, _ := n.validatorsToGossipFor(peerID)
-	return n.peerConfig.MessageCreator.PeerList(peers, true)
+	claimedIPPorts, peerIDs := n.validatorsToGossipFor(peerID)
+	msg, err := n.peerConfig.MessageCreator.PeerList(claimedIPPorts, true)
+	if err != nil {
+		return nil, err
+	}
+
+	n.peersLock.Lock()
+	defer n.peersLock.Unlock()
+
+	if !n.gossipTracker.UpdateKnown(peerID, peerIDs) {
+		return nil, fmt.Errorf("peer not found in gossip tracker")
+	}
+
+	return msg, nil
 }
 
 func (n *network) Pong(nodeID ids.NodeID) (message.OutboundMessage, error) {
