@@ -11,19 +11,16 @@ import (
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
 
-// protocolVersion should be bumped anytime changes are made which require
-// the plugin vm to upgrade to latest avalanchego release to be compatible.
-const protocolVersion = 18
-
 var (
 	// Handshake is a common handshake that is shared by plugin and host.
 	Handshake = plugin.HandshakeConfig{
-		ProtocolVersion:  protocolVersion,
+		ProtocolVersion:  version.RPCChainVMProtocol,
 		MagicCookieKey:   "VM_PLUGIN",
 		MagicCookieValue: "dynamic",
 	}
