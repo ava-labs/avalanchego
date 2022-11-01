@@ -3,7 +3,9 @@
 
 package version
 
-import "fmt"
+import (
+	"fmt"
+)
 
 var (
 	// String is displayed when CLI arg --version is used
@@ -14,10 +16,11 @@ var (
 )
 
 func init() {
-	format := "%s [database=%s"
+	format := "%s [database=%s, rpcchainvm=%d"
 	args := []interface{}{
 		CurrentApp,
 		CurrentDatabase,
+		RPCChainVMProtocol,
 	}
 	if GitCommit != "" {
 		format += ", commit=%s"

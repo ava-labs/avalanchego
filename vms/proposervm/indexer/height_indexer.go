@@ -25,7 +25,7 @@ const (
 	sleepDurationMultiplier = 5
 )
 
-var _ HeightIndexer = &heightIndexer{}
+var _ HeightIndexer = (*heightIndexer)(nil)
 
 type HeightIndexer interface {
 	// Returns whether the height index is fully repaired.

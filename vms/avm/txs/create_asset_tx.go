@@ -36,8 +36,8 @@ var (
 	errUnexpectedWhitespace         = errors.New("unexpected whitespace provided")
 	errDenominationTooLarge         = errors.New("denomination is too large")
 
-	_ UnsignedTx             = &CreateAssetTx{}
-	_ secp256k1fx.UnsignedTx = &CreateAssetTx{}
+	_ UnsignedTx             = (*CreateAssetTx)(nil)
+	_ secp256k1fx.UnsignedTx = (*CreateAssetTx)(nil)
 )
 
 // CreateAssetTx is a transaction that creates a new asset.

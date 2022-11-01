@@ -16,7 +16,7 @@ import (
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-var _ block.BatchedChainVM = &VM{}
+var _ block.BatchedChainVM = (*VM)(nil)
 
 func (vm *VM) GetAncestors(
 	blkID ids.ID,

@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	_ http.ResponseWriter = &lockedWriter{}
-	_ http.Flusher        = &lockedWriter{}
-	_ http.Hijacker       = &lockedWriter{}
+	_ http.ResponseWriter = (*lockedWriter)(nil)
+	_ http.Flusher        = (*lockedWriter)(nil)
+	_ http.Hijacker       = (*lockedWriter)(nil)
 )
 
 type lockedWriter struct {

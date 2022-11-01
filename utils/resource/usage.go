@@ -16,7 +16,7 @@ import (
 var (
 	lnHalf = math.Log(.5)
 
-	_ Manager = &manager{}
+	_ Manager = (*manager)(nil)
 )
 
 type CPUUser interface {

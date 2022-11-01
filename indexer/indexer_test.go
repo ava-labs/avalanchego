@@ -31,7 +31,7 @@ import (
 	smblockmocks "github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 )
 
-var _ server.PathAdder = &apiServerMock{}
+var _ server.PathAdder = (*apiServerMock)(nil)
 
 type apiServerMock struct {
 	timesCalled int

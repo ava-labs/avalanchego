@@ -4,6 +4,7 @@
 package network
 
 import (
+	"context"
 	"crypto"
 	"net"
 	"sync"
@@ -293,13 +294,13 @@ func TestSend(t *testing.T) {
 	nodeIDs, networks, wg := newFullyConnectedTestNetwork(
 		t,
 		[]router.InboundHandler{
-			router.InboundHandlerFunc(func(message.InboundMessage) {
+			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
 				t.Fatal("unexpected message received")
 			}),
-			router.InboundHandlerFunc(func(msg message.InboundMessage) {
+			router.InboundHandlerFunc(func(_ context.Context, msg message.InboundMessage) {
 				received <- msg
 			}),
-			router.InboundHandlerFunc(func(message.InboundMessage) {
+			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
 				t.Fatal("unexpected message received")
 			}),
 		},

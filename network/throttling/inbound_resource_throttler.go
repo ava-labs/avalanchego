@@ -21,7 +21,7 @@ import (
 const epsilon = time.Millisecond
 
 var (
-	_ SystemThrottler = &systemThrottler{}
+	_ SystemThrottler = (*systemThrottler)(nil)
 	_ SystemThrottler = noSystemThrottler{}
 )
 

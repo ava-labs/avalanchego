@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-var _ Polls = &polls{}
+var _ Polls = (*polls)(nil)
 
 // Polls reports commonly used consensus poll metrics.
 type Polls interface {

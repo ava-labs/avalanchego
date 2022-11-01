@@ -4,6 +4,7 @@
 package common
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -11,7 +12,7 @@ import (
 )
 
 var (
-	_ Bootstrapable = &BootstrapableTest{}
+	_ Bootstrapable = (*BootstrapableTest)(nil)
 
 	errForceAccepted = errors.New("unexpectedly called ForceAccepted")
 	errClear         = errors.New("unexpectedly called Clear")
@@ -24,7 +25,7 @@ type BootstrapableTest struct {
 	CantForceAccepted, CantClear bool
 
 	ClearF         func() error
-	ForceAcceptedF func(acceptedContainerIDs []ids.ID) error
+	ForceAcceptedF func(ctx context.Context, acceptedContainerIDs []ids.ID) error
 }
 
 // Default sets the default on call handling
@@ -44,9 +45,9 @@ func (b *BootstrapableTest) Clear() error {
 	return nil
 }
 
-func (b *BootstrapableTest) ForceAccepted(containerIDs []ids.ID) error {
+func (b *BootstrapableTest) ForceAccepted(ctx context.Context, containerIDs []ids.ID) error {
 	if b.ForceAcceptedF != nil {
-		return b.ForceAcceptedF(containerIDs)
+		return b.ForceAcceptedF(ctx, containerIDs)
 	} else if b.CantForceAccepted {
 		if b.T != nil {
 			b.T.Fatalf("Unexpectedly called ForceAccepted")

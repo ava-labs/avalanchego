@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-var _ Client = &client{}
+var _ Client = (*client)(nil)
 
 // Client interface for Avalanche Keystore API Endpoint
 type Client interface {

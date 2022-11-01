@@ -22,7 +22,7 @@ const blockCacheSize = 8192
 var (
 	errBlockWrongVersion = errors.New("wrong version")
 
-	_ BlockState = &blockState{}
+	_ BlockState = (*blockState)(nil)
 )
 
 type BlockState interface {

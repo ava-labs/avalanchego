@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-var _ Deduplicator = &EvictableLRU{}
+var _ Deduplicator = (*EvictableLRU)(nil)
 
 // EvictableLRU is an LRU cache that notifies the objects when they are evicted.
 type EvictableLRU struct {

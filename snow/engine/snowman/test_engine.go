@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	_ Engine = &EngineTest{}
+	_ Engine = (*EngineTest)(nil)
 
 	errGetBlock = errors.New("unexpectedly called GetBlock")
 )

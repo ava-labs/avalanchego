@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	_ Compressor = &gzipCompressor{}
+	_ Compressor = (*gzipCompressor)(nil)
 
 	ErrInvalidMaxSizeGzipCompressor = errors.New("invalid gzip compressor max size")
 )

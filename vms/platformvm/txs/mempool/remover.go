@@ -5,7 +5,7 @@ package mempool
 
 import "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
-var _ txs.Visitor = &remover{}
+var _ txs.Visitor = (*remover)(nil)
 
 type remover struct {
 	m  *mempool

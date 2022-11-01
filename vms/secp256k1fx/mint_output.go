@@ -7,7 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
-var _ verify.State = &MintOutput{}
+var _ verify.State = (*MintOutput)(nil)
 
 type MintOutput struct {
 	OutputOwners `serialize:"true"`

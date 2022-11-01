@@ -17,6 +17,8 @@ var (
 	errMaxMessageLengthExceeded  = errors.New("maximum message length exceeded")
 )
 
+// Used to mask the most significant bit to indicate that the message format
+// uses protocol buffers.
 const bitmaskCodec = uint32(1 << 31)
 
 // Assumes the specified [msgLen] will never >= 1<<31.
@@ -29,7 +31,11 @@ func writeMsgLen(msgLen uint32, maxMsgLen uint32) ([wrappers.IntLen]byte, error)
 	}
 
 	x := msgLen
-	// mask most significant bit to denote it's using proto
+
+	// Mask the most significant bit to denote it's using proto. This bit isn't
+	// read anymore, because all the messages use proto. However, it is set for
+	// backwards compatibility.
+	// TODO: Once the v1.10 is activated, this mask should be removed.
 	x |= bitmaskCodec
 
 	b := [wrappers.IntLen]byte{}
@@ -47,7 +53,9 @@ func readMsgLen(b []byte, maxMsgLen uint32) (uint32, error) {
 	// parse the message length
 	msgLen := binary.BigEndian.Uint32(b)
 
-	// zero the proto flag
+	// Because we always use proto messages, there's no need to check the most
+	// significant bit to inspect the message format. So, we just zero the proto
+	// flag.
 	msgLen &^= bitmaskCodec
 
 	if msgLen > maxMsgLen {

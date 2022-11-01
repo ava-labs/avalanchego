@@ -7,7 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
-var _ Signer = &Empty{}
+var _ Signer = (*Empty)(nil)
 
 type Empty struct{}
 

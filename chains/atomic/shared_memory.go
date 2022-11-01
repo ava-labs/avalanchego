@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-var _ SharedMemory = &sharedMemory{}
+var _ SharedMemory = (*sharedMemory)(nil)
 
 type Requests struct {
 	RemoveRequests [][]byte   `serialize:"true"`

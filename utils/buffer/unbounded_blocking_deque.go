@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-var _ BlockingDeque[int] = &unboundedBlockingDeque[int]{}
+var _ BlockingDeque[int] = (*unboundedBlockingDeque[int])(nil)
 
 type BlockingDeque[T any] interface {
 	Deque[T]

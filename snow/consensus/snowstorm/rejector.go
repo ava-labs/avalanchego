@@ -4,12 +4,14 @@
 package snowstorm
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/events"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-var _ events.Blockable = &rejector{}
+var _ events.Blockable = (*rejector)(nil)
 
 type rejector struct {
 	g        *Directed
@@ -21,7 +23,7 @@ type rejector struct {
 
 func (r *rejector) Dependencies() ids.Set { return r.deps }
 
-func (r *rejector) Fulfill(ids.ID) {
+func (r *rejector) Fulfill(context.Context, ids.ID) {
 	if r.rejected || r.errs.Errored() {
 		return
 	}
@@ -31,5 +33,5 @@ func (r *rejector) Fulfill(ids.ID) {
 	r.errs.Add(r.g.reject(asSet))
 }
 
-func (*rejector) Abandon(ids.ID) {}
-func (*rejector) Update()        {}
+func (*rejector) Abandon(context.Context, ids.ID) {}
+func (*rejector) Update(context.Context)          {}

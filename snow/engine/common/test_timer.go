@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-var _ Timer = &TimerTest{}
+var _ Timer = (*TimerTest)(nil)
 
 // TimerTest is a test timer
 type TimerTest struct {

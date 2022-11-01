@@ -31,7 +31,7 @@ var (
 	stakingPortName = fmt.Sprintf("%s-staking", constants.AppName)
 	httpPortName    = fmt.Sprintf("%s-http", constants.AppName)
 
-	_ app.App = &process{}
+	_ app.App = (*process)(nil)
 )
 
 // process is a wrapper around a node that runs in this process

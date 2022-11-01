@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	_ UnsignedTx = &TransformSubnetTx{}
+	_ UnsignedTx = (*TransformSubnetTx)(nil)
 
 	errCantTransformPrimaryNetwork       = errors.New("cannot transform primary network")
 	errEmptyAssetID                      = errors.New("empty asset ID is not valid")

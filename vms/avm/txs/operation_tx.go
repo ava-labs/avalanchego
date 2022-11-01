@@ -18,8 +18,8 @@ var (
 	errNoOperations              = errors.New("an operationTx must have at least one operation")
 	errDoubleSpend               = errors.New("inputs attempt to double spend an input")
 
-	_ UnsignedTx             = &OperationTx{}
-	_ secp256k1fx.UnsignedTx = &OperationTx{}
+	_ UnsignedTx             = (*OperationTx)(nil)
+	_ secp256k1fx.UnsignedTx = (*OperationTx)(nil)
 )
 
 // OperationTx is a transaction with no credentials.

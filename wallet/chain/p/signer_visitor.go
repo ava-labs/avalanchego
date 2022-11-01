@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	_ txs.Visitor = &signerVisitor{}
+	_ txs.Visitor = (*signerVisitor)(nil)
 
 	errUnsupportedTxType     = errors.New("unsupported tx type")
 	errUnknownInputType      = errors.New("unknown input type")

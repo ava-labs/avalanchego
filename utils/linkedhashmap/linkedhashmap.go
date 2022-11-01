@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-var _ LinkedHashmap[int, struct{}] = &linkedHashmap[int, struct{}]{}
+var _ LinkedHashmap[int, struct{}] = (*linkedHashmap[int, struct{}])(nil)
 
 // Hashmap provides an O(1) mapping from a comparable key to any value.
 // Comparable is defined by https://golang.org/ref/spec#Comparison_operators.

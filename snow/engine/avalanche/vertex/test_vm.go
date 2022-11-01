@@ -14,7 +14,7 @@ import (
 var (
 	errPending = errors.New("unexpectedly called Pending")
 
-	_ DAGVM = &TestVM{}
+	_ DAGVM = (*TestVM)(nil)
 )
 
 type TestVM struct {

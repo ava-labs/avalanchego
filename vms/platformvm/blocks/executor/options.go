@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 )
 
-var _ blocks.Visitor = &verifier{}
+var _ blocks.Visitor = (*verifier)(nil)
 
 // options supports build new option blocks
 type options struct {

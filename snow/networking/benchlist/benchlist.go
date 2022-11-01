@@ -23,7 +23,7 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var _ heap.Interface = &benchedQueue{}
+var _ heap.Interface = (*benchedQueue)(nil)
 
 // If a peer consistently does not respond to queries, it will
 // increase latencies on the network whenever that peer is polled.

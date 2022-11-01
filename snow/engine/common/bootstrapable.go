@@ -4,6 +4,8 @@
 package common
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -16,7 +18,7 @@ type BootstrapableEngine interface {
 type Bootstrapable interface {
 	// Force the provided containers to be accepted. Only returns fatal errors
 	// if they occur.
-	ForceAccepted(acceptedContainerIDs []ids.ID) error
+	ForceAccepted(ctx context.Context, acceptedContainerIDs []ids.ID) error
 
 	// Clear removes all containers to be processed upon bootstrapping
 	Clear() error

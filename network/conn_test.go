@@ -7,7 +7,7 @@ import (
 	"net"
 )
 
-var _ net.Conn = &testConn{}
+var _ net.Conn = (*testConn)(nil)
 
 type testConn struct {
 	net.Conn

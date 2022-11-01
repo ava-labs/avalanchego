@@ -18,7 +18,7 @@ const (
 	TagValue = "true"
 )
 
-var _ StructFielder = &structFielder{}
+var _ StructFielder = (*structFielder)(nil)
 
 type FieldDesc struct {
 	Index       int

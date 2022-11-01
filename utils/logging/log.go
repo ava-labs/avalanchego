@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-var _ Logger = &log{}
+var _ Logger = (*log)(nil)
 
 type log struct {
 	wrappedCores   []WrappedCore

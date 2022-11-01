@@ -20,7 +20,7 @@ import (
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
 
-var _ Client = &client{}
+var _ Client = (*client)(nil)
 
 // Client for interacting with an AVM (X-Chain) instance
 type Client interface {

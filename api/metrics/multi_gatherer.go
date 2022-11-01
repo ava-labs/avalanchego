@@ -17,7 +17,7 @@ import (
 var (
 	errDuplicatedPrefix = errors.New("duplicated prefix")
 
-	_ MultiGatherer = &multiGatherer{}
+	_ MultiGatherer = (*multiGatherer)(nil)
 )
 
 // MultiGatherer extends the Gatherer interface by allowing additional gatherers

@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	_ ValidatorTx = &AddValidatorTx{}
+	_ ValidatorTx = (*AddValidatorTx)(nil)
 
 	errTooManyShares = fmt.Errorf("a staker can only require at most %d shares from delegators", reward.PercentDenominator)
 )

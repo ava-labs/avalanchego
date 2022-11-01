@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 )
 
-var _ snowstorm.Tx = &transactionVertex{}
+var _ snowstorm.Tx = (*transactionVertex)(nil)
 
 // newTransactionVertex returns a new transactionVertex initialized with a
 // processing status.

@@ -12,7 +12,7 @@ import (
 	subnetlookuppb "github.com/ava-labs/avalanchego/proto/pb/subnetlookup"
 )
 
-var _ subnetlookuppb.SubnetLookupServer = &Server{}
+var _ subnetlookuppb.SubnetLookupServer = (*Server)(nil)
 
 // Server is a subnet lookup that is managed over RPC.
 type Server struct {

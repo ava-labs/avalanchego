@@ -8,6 +8,10 @@ import (
 	"sync/atomic"
 )
 
+// RPCChainVMProtocol should be bumped anytime changes are made which require
+// the plugin vm to upgrade to latest avalanchego release to be compatible.
+const RPCChainVMProtocol uint = 18
+
 var (
 	// V1_0_0 is a useful version to use in tests
 	Semantic1_0_0 = &Semantic{
@@ -16,7 +20,7 @@ var (
 		Patch: 0,
 	}
 
-	_ fmt.Stringer = &Semantic{}
+	_ fmt.Stringer = (*Semantic)(nil)
 )
 
 type Semantic struct {

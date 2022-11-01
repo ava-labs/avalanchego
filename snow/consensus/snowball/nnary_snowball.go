@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ NnarySnowball = &nnarySnowball{}
+var _ NnarySnowball = (*nnarySnowball)(nil)
 
 // nnarySnowball is a naive implementation of a multi-color snowball instance
 type nnarySnowball struct {

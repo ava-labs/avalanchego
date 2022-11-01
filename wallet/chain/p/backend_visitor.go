@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ txs.Visitor = &backendVisitor{}
+var _ txs.Visitor = (*backendVisitor)(nil)
 
 // backendVisitor handles accepting of transactions for the backend
 type backendVisitor struct {

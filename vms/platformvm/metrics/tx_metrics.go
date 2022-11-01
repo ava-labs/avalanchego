@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ txs.Visitor = &txMetrics{}
+var _ txs.Visitor = (*txMetrics)(nil)
 
 type txMetrics struct {
 	numAddDelegatorTxs,

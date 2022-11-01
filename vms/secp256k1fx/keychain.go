@@ -18,7 +18,7 @@ import (
 var (
 	errCantSpend = errors.New("unable to spend this UTXO")
 
-	_ keychain.Keychain = &Keychain{}
+	_ keychain.Keychain = (*Keychain)(nil)
 )
 
 // Keychain is a collection of keys that can be used to spend outputs

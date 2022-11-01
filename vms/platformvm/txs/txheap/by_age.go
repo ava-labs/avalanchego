@@ -3,7 +3,7 @@
 
 package txheap
 
-var _ Heap = &byAge{}
+var _ Heap = (*byAge)(nil)
 
 type byAge struct {
 	txHeap

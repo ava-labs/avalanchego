@@ -19,10 +19,10 @@ const (
 )
 
 var (
-	_ Codec              = &linearCodec{}
-	_ codec.Codec        = &linearCodec{}
-	_ codec.Registry     = &linearCodec{}
-	_ codec.GeneralCodec = &linearCodec{}
+	_ Codec              = (*linearCodec)(nil)
+	_ codec.Codec        = (*linearCodec)(nil)
+	_ codec.Registry     = (*linearCodec)(nil)
+	_ codec.GeneralCodec = (*linearCodec)(nil)
 )
 
 // Codec marshals and unmarshals

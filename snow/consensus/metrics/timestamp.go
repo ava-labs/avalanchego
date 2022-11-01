@@ -9,7 +9,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var _ Timestamp = &timestamp{}
+var _ Timestamp = (*timestamp)(nil)
 
 // Timestamp reports the last accepted block time,
 // to track it in unix seconds.

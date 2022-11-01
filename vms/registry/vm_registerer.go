@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms"
 )
 
-var _ VMRegisterer = &vmRegisterer{}
+var _ VMRegisterer = (*vmRegisterer)(nil)
 
 // VMRegisterer defines functionality to install a virtual machine.
 type VMRegisterer interface {
