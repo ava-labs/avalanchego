@@ -500,9 +500,6 @@ func (n *network) Peers(peerID ids.NodeID) (message.OutboundMessage, error) {
 		return nil, err
 	}
 
-	n.peersLock.Lock()
-	defer n.peersLock.Unlock()
-
 	// Invariant:
 	//
 	// We update our gossip tracker so after the handshake is complete we
