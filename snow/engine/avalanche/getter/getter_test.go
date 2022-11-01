@@ -4,6 +4,7 @@
 package getter
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -81,11 +82,11 @@ func TestAcceptedFrontier(t *testing.T) {
 	}
 
 	var accepted []ids.ID
-	sender.SendAcceptedFrontierF = func(_ ids.NodeID, _ uint32, frontier []ids.ID) {
+	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.NodeID, _ uint32, frontier []ids.ID) {
 		accepted = frontier
 	}
 
-	if err := bs.GetAcceptedFrontier(ids.EmptyNodeID, 0); err != nil {
+	if err := bs.GetAcceptedFrontier(context.Background(), ids.EmptyNodeID, 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -146,11 +147,11 @@ func TestFilterAccepted(t *testing.T) {
 	}
 
 	var accepted []ids.ID
-	sender.SendAcceptedF = func(_ ids.NodeID, _ uint32, frontier []ids.ID) {
+	sender.SendAcceptedF = func(_ context.Context, _ ids.NodeID, _ uint32, frontier []ids.ID) {
 		accepted = frontier
 	}
 
-	if err := bs.GetAccepted(ids.EmptyNodeID, 0, vtxIDs); err != nil {
+	if err := bs.GetAccepted(context.Background(), ids.EmptyNodeID, 0, vtxIDs); err != nil {
 		t.Fatal(err)
 	}
 

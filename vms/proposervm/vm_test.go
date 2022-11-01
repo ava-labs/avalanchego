@@ -35,9 +35,9 @@ import (
 )
 
 var (
-	_ block.ChainVM              = &fullVM{}
-	_ block.HeightIndexedChainVM = &fullVM{}
-	_ block.StateSyncableVM      = &fullVM{}
+	_ block.ChainVM              = (*fullVM)(nil)
+	_ block.HeightIndexedChainVM = (*fullVM)(nil)
+	_ block.StateSyncableVM      = (*fullVM)(nil)
 )
 
 type fullVM struct {

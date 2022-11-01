@@ -10,7 +10,7 @@ import (
 	readerpb "github.com/ava-labs/avalanchego/proto/pb/io/reader"
 )
 
-var _ readerpb.ReaderServer = &Server{}
+var _ readerpb.ReaderServer = (*Server)(nil)
 
 // Server is an io.Reader that is managed over RPC.
 type Server struct {

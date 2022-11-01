@@ -49,8 +49,8 @@ var MultipleTagsTests = []func(c GeneralCodec, t testing.TB){
 // for the sake of testing
 
 var (
-	_ Foo = &MyInnerStruct{}
-	_ Foo = &MyInnerStruct2{}
+	_ Foo = (*MyInnerStruct)(nil)
+	_ Foo = (*MyInnerStruct2)(nil)
 )
 
 type Foo interface {

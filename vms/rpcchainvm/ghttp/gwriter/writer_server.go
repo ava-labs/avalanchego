@@ -10,7 +10,7 @@ import (
 	writerpb "github.com/ava-labs/avalanchego/proto/pb/io/writer"
 )
 
-var _ writerpb.WriterServer = &Server{}
+var _ writerpb.WriterServer = (*Server)(nil)
 
 // Server is an http.Handler that is managed over RPC.
 type Server struct {

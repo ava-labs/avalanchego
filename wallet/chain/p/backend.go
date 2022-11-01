@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ Backend = &backend{}
+var _ Backend = (*backend)(nil)
 
 type ChainUTXOs interface {
 	AddUTXO(ctx stdcontext.Context, destinationChainID ids.ID, utxo *avax.UTXO) error

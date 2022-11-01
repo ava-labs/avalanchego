@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	_ StateSyncableVM = &TestStateSyncableVM{}
+	_ StateSyncableVM = (*TestStateSyncableVM)(nil)
 
 	errStateSyncEnabled           = errors.New("unexpectedly called StateSyncEnabled")
 	errStateSyncGetOngoingSummary = errors.New("unexpectedly called StateSyncGetOngoingSummary")

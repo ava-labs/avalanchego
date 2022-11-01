@@ -20,7 +20,7 @@ import (
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
-var _ Client = &client{}
+var _ Client = (*client)(nil)
 
 // Client interface for interacting with the P Chain endpoint
 type Client interface {

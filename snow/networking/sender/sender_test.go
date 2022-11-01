@@ -4,6 +4,7 @@
 package sender
 
 import (
+	"context"
 	"math/rand"
 	"sync"
 	"testing"
@@ -67,22 +68,22 @@ func TestTimeout(t *testing.T) {
 	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, set.Set[ids.ID]{}, set.Set[ids.ID]{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	require.NoError(t, err)
 
-	context := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(context, mc, externalSender, &chainRouter, tm, defaultGossipConfig)
+	sender, err := New(ctx, mc, externalSender, &chainRouter, tm, defaultGossipConfig)
 	require.NoError(t, err)
 
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 	failedVDRs := set.Set[ids.NodeID]{}
-	ctx := snow.DefaultConsensusContextTest()
+	ctx2 := snow.DefaultConsensusContextTest()
 	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
 	require.NoError(t, err)
 	handler, err := handler.New(
 		mc,
-		ctx,
+		ctx2,
 		vdrs,
 		nil,
 		nil,
@@ -103,13 +104,13 @@ func TestTimeout(t *testing.T) {
 	bootstrapper.CantGossip = false
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ConnectedF = func(nodeID ids.NodeID, nodeVersion *version.Application) error { return nil }
-	bootstrapper.QueryFailedF = func(nodeID ids.NodeID, _ uint32) error {
+	bootstrapper.QueryFailedF = func(ctx context.Context, nodeID ids.NodeID, _ uint32) error {
 		failedVDRs.Add(nodeID)
 		wg.Done()
 		return nil
 	}
 	handler.SetBootstrapper(bootstrapper)
-	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
+	ctx2.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
 	chainRouter.AddChain(handler)
 
@@ -120,7 +121,7 @@ func TestTimeout(t *testing.T) {
 	vdrIDs.Add(ids.NodeID{255})
 	vdrIDs.Add(ids.NodeID{254})
 
-	sender.SendPullQuery(vdrIDs, 0, ids.Empty)
+	sender.SendPullQuery(context.Background(), vdrIDs, 0, ids.Empty)
 
 	wg.Wait()
 
@@ -159,20 +160,20 @@ func TestReliableMessages(t *testing.T) {
 	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, set.Set[ids.ID]{}, set.Set[ids.ID]{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	require.NoError(t, err)
 
-	context := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(context, mc, externalSender, &chainRouter, tm, defaultGossipConfig)
+	sender, err := New(ctx, mc, externalSender, &chainRouter, tm, defaultGossipConfig)
 	require.NoError(t, err)
 
-	ctx := snow.DefaultConsensusContextTest()
+	ctx2 := snow.DefaultConsensusContextTest()
 	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
 	require.NoError(t, err)
 	handler, err := handler.New(
 		mc,
-		ctx,
+		ctx2,
 		vdrs,
 		nil,
 		nil,
@@ -191,20 +192,20 @@ func TestReliableMessages(t *testing.T) {
 	}
 	bootstrapper.Default(true)
 	bootstrapper.CantGossip = false
-	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
+	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx2 }
 	bootstrapper.ConnectedF = func(nodeID ids.NodeID, nodeVersion *version.Application) error { return nil }
 	queriesToSend := 1000
 	awaiting := make([]chan struct{}, queriesToSend)
 	for i := 0; i < queriesToSend; i++ {
 		awaiting[i] = make(chan struct{}, 1)
 	}
-	bootstrapper.QueryFailedF = func(nodeID ids.NodeID, reqID uint32) error {
+	bootstrapper.QueryFailedF = func(ctx context.Context, nodeID ids.NodeID, reqID uint32) error {
 		close(awaiting[int(reqID)])
 		return nil
 	}
 	bootstrapper.CantGossip = false
 	handler.SetBootstrapper(bootstrapper)
-	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
+	ctx2.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
 	chainRouter.AddChain(handler)
 
@@ -216,7 +217,7 @@ func TestReliableMessages(t *testing.T) {
 			vdrIDs := set.Set[ids.NodeID]{}
 			vdrIDs.Add(ids.NodeID{1})
 
-			sender.SendPullQuery(vdrIDs, uint32(i), ids.Empty)
+			sender.SendPullQuery(context.Background(), vdrIDs, uint32(i), ids.Empty)
 			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
 		}
 	}()
@@ -256,20 +257,20 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, set.Set[ids.ID]{}, set.Set[ids.ID]{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
 	require.NoError(t, err)
 
-	context := snow.DefaultConsensusContextTest()
+	ctx := snow.DefaultConsensusContextTest()
 
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(context, mc, externalSender, &chainRouter, tm, defaultGossipConfig)
+	sender, err := New(ctx, mc, externalSender, &chainRouter, tm, defaultGossipConfig)
 	require.NoError(t, err)
 
-	ctx := snow.DefaultConsensusContextTest()
+	ctx2 := snow.DefaultConsensusContextTest()
 	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
 	require.NoError(t, err)
 	handler, err := handler.New(
 		mc,
-		ctx,
+		ctx2,
 		vdrs,
 		nil,
 		nil,
@@ -288,19 +289,19 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	}
 	bootstrapper.Default(true)
 	bootstrapper.CantGossip = false
-	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
+	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx2 }
 	bootstrapper.ConnectedF = func(nodeID ids.NodeID, nodeVersion *version.Application) error { return nil }
 	queriesToSend := 2
 	awaiting := make([]chan struct{}, queriesToSend)
 	for i := 0; i < queriesToSend; i++ {
 		awaiting[i] = make(chan struct{}, 1)
 	}
-	bootstrapper.QueryFailedF = func(nodeID ids.NodeID, reqID uint32) error {
+	bootstrapper.QueryFailedF = func(ctx context.Context, nodeID ids.NodeID, reqID uint32) error {
 		close(awaiting[int(reqID)])
 		return nil
 	}
 	handler.SetBootstrapper(bootstrapper)
-	ctx.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
+	ctx2.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
 	chainRouter.AddChain(handler)
 
@@ -314,7 +315,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			// a query failed message
 			vdrIDs := set.Set[ids.NodeID]{}
 			vdrIDs.Add(ids.GenerateTestNodeID())
-			sender.SendPullQuery(vdrIDs, uint32(i), ids.Empty)
+			sender.SendPullQuery(context.Background(), vdrIDs, uint32(i), ids.Empty)
 		}
 	}()
 

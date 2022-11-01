@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	_ Hashable = &testKey{}
+	_ Hashable = (*testKey)(nil)
 
 	// nodes
 	node1 = testKey{key: "node-1", hash: 1}

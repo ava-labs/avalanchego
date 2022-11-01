@@ -4,6 +4,7 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -30,11 +31,13 @@ func TestSendMixedQuery(t *testing.T) {
 			senderF: func() *MockSender {
 				s := NewMockSender(ctrl)
 				s.EXPECT().SendPushQuery(
+					gomock.Any(),
 					set.Set[ids.NodeID]{vdr1: struct{}{}, vdr2: struct{}{}, vdr3: struct{}{}},
 					reqID,
 					containerBytes,
 				).Times(1)
 				s.EXPECT().SendPullQuery(
+					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
@@ -48,11 +51,13 @@ func TestSendMixedQuery(t *testing.T) {
 			senderF: func() *MockSender {
 				s := NewMockSender(ctrl)
 				s.EXPECT().SendPushQuery(
+					gomock.Any(),
 					set.Set[ids.NodeID]{vdr1: struct{}{}},
 					reqID,
 					containerBytes,
 				).Times(1)
 				s.EXPECT().SendPullQuery(
+					gomock.Any(),
 					set.Set[ids.NodeID]{vdr2: struct{}{}, vdr3: struct{}{}},
 					reqID,
 					containerID,
@@ -66,11 +71,13 @@ func TestSendMixedQuery(t *testing.T) {
 			senderF: func() *MockSender {
 				s := NewMockSender(ctrl)
 				s.EXPECT().SendPushQuery(
+					gomock.Any(),
 					set.Set[ids.NodeID]{vdr1: struct{}{}, vdr2: struct{}{}},
 					reqID,
 					containerBytes,
 				).Times(1)
 				s.EXPECT().SendPullQuery(
+					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
@@ -85,10 +92,12 @@ func TestSendMixedQuery(t *testing.T) {
 				s := NewMockSender(ctrl)
 				s.EXPECT().SendPushQuery(
 					gomock.Any(),
+					gomock.Any(),
 					reqID,
 					containerBytes,
 				).Times(0)
 				s.EXPECT().SendPullQuery(
+					gomock.Any(),
 					set.Set[ids.NodeID]{vdr1: struct{}{}},
 					reqID,
 					containerID,
@@ -102,11 +111,13 @@ func TestSendMixedQuery(t *testing.T) {
 			senderF: func() *MockSender {
 				s := NewMockSender(ctrl)
 				s.EXPECT().SendPushQuery(
+					gomock.Any(),
 					set.Set[ids.NodeID]{vdr1: struct{}{}, vdr2: struct{}{}},
 					reqID,
 					containerBytes,
 				).Times(1)
 				s.EXPECT().SendPullQuery(
+					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
@@ -124,6 +135,7 @@ func TestSendMixedQuery(t *testing.T) {
 			func(t *testing.T) {
 				sender := tt.senderF()
 				SendMixedQuery(
+					context.Background(),
 					sender,
 					tt.vdrs,
 					tt.numPushTo,

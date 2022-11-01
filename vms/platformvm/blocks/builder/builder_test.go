@@ -4,6 +4,7 @@
 package builder
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -47,7 +48,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	tx := getValidTx(env.txBuilder, t)
 	txID := tx.ID()
 
-	env.sender.SendAppGossipF = func(b []byte) error { return nil }
+	env.sender.SendAppGossipF = func(_ context.Context, b []byte) error { return nil }
 	err := env.Builder.AddUnverifiedTx(tx)
 	require.NoError(err, "couldn't add tx to mempool")
 

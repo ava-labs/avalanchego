@@ -15,8 +15,8 @@ import (
 var (
 	errNoCert = errors.New("tls handshake finished with no peer certificate")
 
-	_ Upgrader = &tlsServerUpgrader{}
-	_ Upgrader = &tlsClientUpgrader{}
+	_ Upgrader = (*tlsServerUpgrader)(nil)
+	_ Upgrader = (*tlsClientUpgrader)(nil)
 )
 
 type Upgrader interface {

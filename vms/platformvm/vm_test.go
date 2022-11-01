@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -355,7 +356,7 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 	_, genesisBytes := defaultGenesis()
 	appSender := &common.SenderTest{}
 	appSender.CantSendAppGossip = true
-	appSender.SendAppGossipF = func([]byte) error { return nil }
+	appSender.SendAppGossipF = func(context.Context, []byte) error { return nil }
 
 	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
 		panic(err)
@@ -433,7 +434,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 	defer ctx.Lock.Unlock()
 	appSender := &common.SenderTest{T: t}
 	appSender.CantSendAppGossip = true
-	appSender.SendAppGossipF = func([]byte) error { return nil }
+	appSender.SendAppGossipF = func(context.Context, []byte) error { return nil }
 	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
 		t.Fatal(err)
 	}
@@ -1847,7 +1848,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	frontier := []ids.ID{advanceTimeBlkID}
-	if err := bootstrapper.AcceptedFrontier(peerID, reqID, frontier); err != nil {
+	if err := bootstrapper.AcceptedFrontier(context.Background(), peerID, reqID, frontier); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1876,12 +1877,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return nodeIDs
 	}
 
-	require.NoError(bootstrapper.Accepted(peerID, reqID, frontier))
+	require.NoError(bootstrapper.Accepted(context.Background(), peerID, reqID, frontier))
 
 	externalSender.SendF = nil
 	externalSender.CantSend = false
 
-	require.NoError(bootstrapper.Ancestors(peerID, reqID, [][]byte{advanceTimeBlkBytes}))
+	require.NoError(bootstrapper.Ancestors(context.Background(), peerID, reqID, [][]byte{advanceTimeBlkBytes}))
 
 	preferred, err = vm.Builder.Preferred()
 	require.NoError(err)

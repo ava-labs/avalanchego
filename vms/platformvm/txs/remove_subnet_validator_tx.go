@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	_ UnsignedTx = &RemoveSubnetValidatorTx{}
+	_ UnsignedTx = (*RemoveSubnetValidatorTx)(nil)
 
 	errRemovePrimaryNetworkValidator = errors.New("can't remove primary network validator with RemoveSubnetValidatorTx")
 )

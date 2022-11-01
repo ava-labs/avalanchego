@@ -23,7 +23,7 @@ var (
 	errAddrsNotSortedUnique = errors.New("addresses not sorted and unique")
 	errMarshal              = errors.New("cannot marshal without ctx")
 
-	_ verify.State = &OutputOwners{}
+	_ verify.State = (*OutputOwners)(nil)
 )
 
 type OutputOwners struct {

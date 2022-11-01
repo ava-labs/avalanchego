@@ -257,7 +257,7 @@ func TestSamplerMasked(t *testing.T) {
 	}
 }
 
-var _ SetCallbackListener = &callbackListener{}
+var _ SetCallbackListener = (*callbackListener)(nil)
 
 type callbackListener struct {
 	t         *testing.T

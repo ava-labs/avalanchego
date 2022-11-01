@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-var _ Startup = &startup{}
+var _ Startup = (*startup)(nil)
 
 type Startup interface {
 	Peers

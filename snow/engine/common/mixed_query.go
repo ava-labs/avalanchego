@@ -4,6 +4,8 @@
 package common
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -15,6 +17,7 @@ import (
 // [containerID] and [container] are the ID and body of the container being queried.
 // [sender] is used to actually send the queries.
 func SendMixedQuery(
+	ctx context.Context,
 	sender Sender,
 	vdrs []ids.NodeID,
 	numPushTo int,
@@ -28,11 +31,11 @@ func SendMixedQuery(
 	if numPushTo > 0 {
 		sendPushQueryTo := set.NewSet[ids.NodeID](numPushTo)
 		sendPushQueryTo.Add(vdrs[:numPushTo]...)
-		sender.SendPushQuery(sendPushQueryTo, reqID, container)
+		sender.SendPushQuery(ctx, sendPushQueryTo, reqID, container)
 	}
 	if numPullTo := len(vdrs) - numPushTo; numPullTo > 0 {
 		sendPullQueryTo := set.NewSet[ids.NodeID](numPullTo)
 		sendPullQueryTo.Add(vdrs[numPushTo:]...)
-		sender.SendPullQuery(sendPullQueryTo, reqID, containerID)
+		sender.SendPullQuery(ctx, sendPullQueryTo, reqID, containerID)
 	}
 }

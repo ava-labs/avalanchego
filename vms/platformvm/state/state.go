@@ -47,7 +47,7 @@ const (
 )
 
 var (
-	_ State = &state{}
+	_ State = (*state)(nil)
 
 	ErrDelegatorSubset = errors.New("delegator's time range must be a subset of the validator's time range")
 

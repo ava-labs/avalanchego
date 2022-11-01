@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	_ Signer = &ProofOfPossession{}
+	_ Signer = (*ProofOfPossession)(nil)
 
 	errInvalidProofOfPossession = errors.New("invalid proof of possession")
 )

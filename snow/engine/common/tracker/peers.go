@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-var _ Peers = &peers{}
+var _ Peers = (*peers)(nil)
 
 type Peers interface {
 	validators.SetCallbackListener

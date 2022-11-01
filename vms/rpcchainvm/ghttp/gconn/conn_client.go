@@ -17,7 +17,7 @@ import (
 	connpb "github.com/ava-labs/avalanchego/proto/pb/net/conn"
 )
 
-var _ net.Conn = &Client{}
+var _ net.Conn = (*Client)(nil)
 
 // Client is an implementation of a connection that talks over RPC.
 type Client struct {

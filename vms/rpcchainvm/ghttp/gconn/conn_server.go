@@ -15,7 +15,7 @@ import (
 	connpb "github.com/ava-labs/avalanchego/proto/pb/net/conn"
 )
 
-var _ connpb.ConnServer = &Server{}
+var _ connpb.ConnServer = (*Server)(nil)
 
 // Server is an http.Conn that is managed over RPC.
 type Server struct {

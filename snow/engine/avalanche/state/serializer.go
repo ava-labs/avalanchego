@@ -32,7 +32,7 @@ var (
 	errWrongChainID  = errors.New("wrong ChainID in vertex")
 )
 
-var _ vertex.Manager = &Serializer{}
+var _ vertex.Manager = (*Serializer)(nil)
 
 // Serializer manages the state of multiple vertices
 type Serializer struct {

@@ -52,7 +52,7 @@ var (
 	previouslyIndexedPrefix = byte(0x05)
 	hasRunKey               = []byte{0x07}
 
-	_ Indexer = &indexer{}
+	_ Indexer = (*indexer)(nil)
 )
 
 // Config for an indexer

@@ -15,7 +15,7 @@ import (
 
 var (
 	_ InternalMsgBuilder = internalMsgBuilder{}
-	_ InboundMessage     = &internalMessage{}
+	_ InboundMessage     = (*internalMessage)(nil)
 )
 
 type InternalMsgBuilder interface {

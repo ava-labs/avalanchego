@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var _ Manager = &manager{}
+var _ Manager = (*manager)(nil)
 
 // Manager holds the validator set of each subnet
 type Manager interface {

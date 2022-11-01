@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -73,7 +74,7 @@ var (
 	errCreatePlatformVM = errors.New("attempted to create a chain running the PlatformVM")
 	errNotBootstrapped  = errors.New("chains not bootstrapped")
 
-	_ Manager = &manager{}
+	_ Manager = (*manager)(nil)
 )
 
 // Manager manages the chains running on this node.
@@ -110,7 +111,8 @@ type Manager interface {
 	// Returns true iff the chain with the given ID exists and is finished bootstrapping
 	IsBootstrapped(ids.ID) bool
 
-	// Starts the chain creator with the initial platform chain parameters, must be called once
+	// Starts the chain creator with the initial platform chain parameters, must
+	// be called once.
 	StartChainCreator(platformChain ChainParameters)
 
 	Shutdown()
@@ -148,9 +150,12 @@ type ChainConfig struct {
 }
 
 type ManagerConfig struct {
-	StakingEnabled              bool            // True iff the network has staking enabled
-	StakingCert                 tls.Certificate // needed to sign snowman++ blocks
-	StakingBLSKey               *bls.SecretKey
+	StakingEnabled bool            // True iff the network has staking enabled
+	StakingCert    tls.Certificate // needed to sign snowman++ blocks
+	StakingBLSKey  *bls.SecretKey
+	TracingEnabled bool
+	// Must not be used unless [TracingEnabled] is true as this may be nil.
+	Tracer                      trace.Tracer
 	Log                         logging.Logger
 	LogFactory                  logging.Factory
 	VMManager                   vms.Manager // Manage mappings from vm ID --> vm
@@ -575,7 +580,7 @@ func (m *manager) createAvalancheChain(
 	}
 
 	// Passes messages from the consensus engine to the network
-	sender, err := sender.New(
+	messageSender, err := sender.New(
 		ctx,
 		m.MsgCreator,
 		m.Net,
@@ -587,7 +592,11 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
 	}
 
-	if err := m.ConsensusAcceptorGroup.RegisterAcceptor(ctx.ChainID, "gossip", sender, false); err != nil { // Set up the event dipatcher
+	if m.TracingEnabled {
+		messageSender = sender.Trace(messageSender, m.Tracer)
+	}
+
+	if err := m.ConsensusAcceptorGroup.RegisterAcceptor(ctx.ChainID, "gossip", messageSender, false); err != nil { // Set up the event dipatcher
 		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
 
@@ -619,7 +628,7 @@ func (m *manager) createAvalancheChain(
 		chainConfig.Config,
 		msgChan,
 		fxs,
-		sender,
+		messageSender,
 	); err != nil {
 		return nil, fmt.Errorf("error during vm's Initialize: %w", err)
 	}
@@ -654,7 +663,7 @@ func (m *manager) createAvalancheChain(
 		SampleK:                        sampleK,
 		StartupTracker:                 startupTracker,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
-		Sender:                         sender,
+		Sender:                         messageSender,
 		Subnet:                         sb,
 		Timer:                          handler,
 		RetryBootstrap:                 m.RetryBootstrap,
@@ -688,6 +697,11 @@ func (m *manager) createAvalancheChain(
 	if err != nil {
 		return nil, fmt.Errorf("error initializing avalanche bootstrapper: %w", err)
 	}
+
+	if m.TracingEnabled {
+		bootstrapper = common.TraceBootstrapableEngine(bootstrapper, m.Tracer)
+	}
+
 	handler.SetBootstrapper(bootstrapper)
 
 	// create engine gear
@@ -705,6 +719,11 @@ func (m *manager) createAvalancheChain(
 	if err != nil {
 		return nil, fmt.Errorf("error initializing avalanche engine: %w", err)
 	}
+
+	if m.TracingEnabled {
+		engine = aveng.TraceEngine(engine, m.Tracer)
+	}
+
 	handler.SetConsensus(engine)
 
 	// Register health check for this chain
@@ -764,7 +783,7 @@ func (m *manager) createSnowmanChain(
 	}
 
 	// Passes messages from the consensus engine to the network
-	sender, err := sender.New(
+	messageSender, err := sender.New(
 		ctx,
 		m.MsgCreator,
 		m.Net,
@@ -776,7 +795,11 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
 	}
 
-	if err := m.ConsensusAcceptorGroup.RegisterAcceptor(ctx.ChainID, "gossip", sender, false); err != nil { // Set up the event dipatcher
+	if m.TracingEnabled {
+		messageSender = sender.Trace(messageSender, m.Tracer)
+	}
+
+	if err := m.ConsensusAcceptorGroup.RegisterAcceptor(ctx.ChainID, "gossip", messageSender, false); err != nil { // Set up the event dipatcher
 		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
 
@@ -830,7 +853,7 @@ func (m *manager) createSnowmanChain(
 		chainConfig.Config,
 		msgChan,
 		fxs,
-		sender,
+		messageSender,
 	); err != nil {
 		return nil, err
 	}
@@ -865,7 +888,7 @@ func (m *manager) createSnowmanChain(
 		SampleK:                        sampleK,
 		StartupTracker:                 startupTracker,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
-		Sender:                         sender,
+		Sender:                         messageSender,
 		Subnet:                         sb,
 		Timer:                          handler,
 		RetryBootstrap:                 m.RetryBootstrap,
@@ -896,6 +919,11 @@ func (m *manager) createSnowmanChain(
 	if err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}
+
+	if m.TracingEnabled {
+		engine = smeng.TraceEngine(engine, m.Tracer)
+	}
+
 	handler.SetConsensus(engine)
 
 	// create bootstrap gear
@@ -913,6 +941,11 @@ func (m *manager) createSnowmanChain(
 	if err != nil {
 		return nil, fmt.Errorf("error initializing snowman bootstrapper: %w", err)
 	}
+
+	if m.TracingEnabled {
+		bootstrapper = common.TraceBootstrapableEngine(bootstrapper, m.Tracer)
+	}
+
 	handler.SetBootstrapper(bootstrapper)
 
 	// create state sync gear
@@ -929,6 +962,11 @@ func (m *manager) createSnowmanChain(
 		stateSyncCfg,
 		bootstrapper.Start,
 	)
+
+	if m.TracingEnabled {
+		stateSyncer = common.TraceStateSyncer(stateSyncer, m.Tracer)
+	}
+
 	handler.SetStateSyncer(stateSyncer)
 
 	// Register health checks
@@ -1005,13 +1043,17 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 
 // Starts chain creation loop to process queued chains
 func (m *manager) StartChainCreator(platform ChainParameters) {
+	// The P-chain is created synchronously to ensure that `VM.Initialize` has
+	// finished before returning from this function. This is required because
+	// the P-chain initializes state that the rest of the node initialization
+	// depends on.
+	m.createChain(platform)
+
 	m.Log.Info("starting chain creator")
-	go m.dispatchChainCreator(platform)
+	go m.dispatchChainCreator()
 }
 
-func (m *manager) dispatchChainCreator(platform ChainParameters) {
-	m.createChain(platform) // create initial platform chain
-
+func (m *manager) dispatchChainCreator() {
 	select {
 	// This channel will be closed when Shutdown is called on the manager.
 	case <-m.chainCreatorShutdownCh:

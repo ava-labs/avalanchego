@@ -8,7 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 )
 
-var _ UnsignedTx = &CreateSubnetTx{}
+var _ UnsignedTx = (*CreateSubnetTx)(nil)
 
 // CreateSubnetTx is an unsigned proposal to create a new subnet
 type CreateSubnetTx struct {

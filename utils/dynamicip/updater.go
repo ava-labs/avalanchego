@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var _ Updater = &updater{}
+var _ Updater = (*updater)(nil)
 
 // Updater periodically updates this node's public IP.
 // Dispatch() and Stop() should only be called once.

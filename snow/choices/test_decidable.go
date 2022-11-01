@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ Decidable = &TestDecidable{}
+var _ Decidable = (*TestDecidable)(nil)
 
 // TestDecidable is a test Decidable
 type TestDecidable struct {

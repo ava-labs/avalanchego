@@ -8,7 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 )
 
-var _ block.StateSummary = &stateSummary{}
+var _ block.StateSummary = (*stateSummary)(nil)
 
 // stateSummary implements block.StateSummary by layering three objects:
 // 1. [statelessSummary] carries all summary marshallable content along with

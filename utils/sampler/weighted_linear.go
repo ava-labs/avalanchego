@@ -8,7 +8,7 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var _ Weighted = &weightedLinear{}
+var _ Weighted = (*weightedLinear)(nil)
 
 type weightedLinearElement struct {
 	cumulativeWeight uint64

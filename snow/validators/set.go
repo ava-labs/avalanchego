@@ -27,7 +27,7 @@ const (
 	capacityReductionFactor = 2
 )
 
-var _ Set = &vdrSet{}
+var _ Set = (*vdrSet)(nil)
 
 // Set of validators that can be sampled
 type Set interface {

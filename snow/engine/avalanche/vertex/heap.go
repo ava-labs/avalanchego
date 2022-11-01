@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	_ Heap           = &maxHeightVertexHeap{}
-	_ heap.Interface = &priorityQueue{}
+	_ Heap           = (*maxHeightVertexHeap)(nil)
+	_ heap.Interface = (*priorityQueue)(nil)
 )
 
 type priorityQueue []avalanche.Vertex

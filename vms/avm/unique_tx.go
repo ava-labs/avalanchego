@@ -26,8 +26,8 @@ var (
 )
 
 var (
-	_ snowstorm.Tx    = &UniqueTx{}
-	_ cache.Evictable = &UniqueTx{}
+	_ snowstorm.Tx    = (*UniqueTx)(nil)
+	_ cache.Evictable = (*UniqueTx)(nil)
 )
 
 // UniqueTx provides a de-duplication service for txs. This only provides a

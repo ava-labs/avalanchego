@@ -14,7 +14,7 @@ import (
 var (
 	errNoValidUniformSamplers = errors.New("no valid uniform samplers found")
 
-	_ Uniform = &uniformBest{}
+	_ Uniform = (*uniformBest)(nil)
 )
 
 // Sampling is performed by using another implementation of the Uniform

@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
-var _ Manager = &manager{}
+var _ Manager = (*manager)(nil)
 
 // Manages timeouts for requests sent to peers.
 type Manager interface {

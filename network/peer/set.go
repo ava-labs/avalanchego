@@ -8,7 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
-var _ Set = &peerSet{}
+var _ Set = (*peerSet)(nil)
 
 func NoPrecondition(Peer) bool { return true }
 

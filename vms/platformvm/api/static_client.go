@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-var _ StaticClient = &staticClient{}
+var _ StaticClient = (*staticClient)(nil)
 
 // StaticClient for interacting with the platformvm static api
 type StaticClient interface {

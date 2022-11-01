@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	_ Ring       = &hashRing{}
-	_ btree.Item = &ringItem{}
+	_ Ring       = (*hashRing)(nil)
+	_ btree.Item = (*ringItem)(nil)
 
 	errEmptyRing = errors.New("ring doesn't have any members")
 )

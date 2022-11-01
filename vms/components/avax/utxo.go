@@ -13,7 +13,7 @@ var (
 	errNilUTXO   = errors.New("nil utxo is not valid")
 	errEmptyUTXO = errors.New("empty utxo is not valid")
 
-	_ verify.Verifiable = &UTXO{}
+	_ verify.Verifiable = (*UTXO)(nil)
 )
 
 type UTXO struct {

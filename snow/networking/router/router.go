@@ -4,6 +4,7 @@
 package router
 
 import (
+	"context"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -47,6 +48,7 @@ type InternalHandler interface {
 	benchlist.Benchable
 
 	RegisterRequest(
+		ctx context.Context,
 		nodeID ids.NodeID,
 		sourceChainID ids.ID,
 		destinationChainID ids.ID,

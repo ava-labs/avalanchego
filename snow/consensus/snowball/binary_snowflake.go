@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-var _ BinarySnowflake = &binarySnowflake{}
+var _ BinarySnowflake = (*binarySnowflake)(nil)
 
 // binarySnowflake is the implementation of a binary snowflake instance
 type binarySnowflake struct {

@@ -10,7 +10,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-var _ net.Listener = &throttledListener{}
+var _ net.Listener = (*throttledListener)(nil)
 
 // Wraps [listener] and returns a net.Listener that will accept at most
 // [maxConnsPerSec] connections per second.

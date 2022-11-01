@@ -6,8 +6,8 @@ package metervm
 import "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 
 var (
-	_ snowman.Block       = &meterBlock{}
-	_ snowman.OracleBlock = &meterBlock{}
+	_ snowman.Block       = (*meterBlock)(nil)
+	_ snowman.OracleBlock = (*meterBlock)(nil)
 )
 
 type meterBlock struct {

@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var _ snowstorm.Tx = &transactionVertex{}
+var _ snowstorm.Tx = (*transactionVertex)(nil)
 
 // newTransactionVertex returns a new transactionVertex initialized with a
 // processing status.

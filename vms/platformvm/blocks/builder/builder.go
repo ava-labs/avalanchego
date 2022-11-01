@@ -31,7 +31,7 @@ import (
 const targetBlockSize = 128 * units.KiB
 
 var (
-	_ Builder = &builder{}
+	_ Builder = (*builder)(nil)
 
 	errEndOfTime       = errors.New("program time is suspiciously far in the future")
 	errNoPendingBlocks = errors.New("no pending blocks")

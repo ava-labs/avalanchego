@@ -4,6 +4,8 @@
 package snowman
 
 import (
+	"context"
+
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -22,15 +24,15 @@ type voter struct {
 func (v *voter) Dependencies() set.Set[ids.ID] { return v.deps }
 
 // Mark that a dependency has been met.
-func (v *voter) Fulfill(id ids.ID) {
+func (v *voter) Fulfill(ctx context.Context, id ids.ID) {
 	v.deps.Remove(id)
-	v.Update()
+	v.Update(ctx)
 }
 
 // Abandon this attempt to record chits.
-func (v *voter) Abandon(id ids.ID) { v.Fulfill(id) }
+func (v *voter) Abandon(ctx context.Context, id ids.ID) { v.Fulfill(ctx, id) }
 
-func (v *voter) Update() {
+func (v *voter) Update(ctx context.Context) {
 	if v.deps.Len() != 0 || v.t.errs.Errored() {
 		return
 	}
@@ -78,7 +80,7 @@ func (v *voter) Update() {
 	}
 
 	v.t.Ctx.Log.Debug("Snowman engine can't quiesce")
-	v.t.repoll()
+	v.t.repoll(ctx)
 }
 
 // bubbleVotes bubbles the [votes] a set of the number of votes for specific

@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-var _ UnarySnowball = &unarySnowball{}
+var _ UnarySnowball = (*unarySnowball)(nil)
 
 // unarySnowball is the implementation of a unary snowball instance
 type unarySnowball struct {

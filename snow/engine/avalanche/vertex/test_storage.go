@@ -16,7 +16,7 @@ var (
 	errEdge               = errors.New("unexpectedly called Edge")
 	errStopVertexAccepted = errors.New("unexpectedly called StopVertexAccepted")
 
-	_ Storage = &TestStorage{}
+	_ Storage = (*TestStorage)(nil)
 )
 
 type TestStorage struct {

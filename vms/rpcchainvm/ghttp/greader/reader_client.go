@@ -11,7 +11,7 @@ import (
 	readerpb "github.com/ava-labs/avalanchego/proto/pb/io/reader"
 )
 
-var _ io.Reader = &Client{}
+var _ io.Reader = (*Client)(nil)
 
 // Client is a reader that talks over RPC.
 type Client struct{ client readerpb.ReaderClient }

@@ -5,7 +5,7 @@ package vertex
 
 import "testing"
 
-var _ Manager = &TestManager{}
+var _ Manager = (*TestManager)(nil)
 
 type TestManager struct {
 	TestBuilder

@@ -8,7 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
-var _ Beacon = &beacon{}
+var _ Beacon = (*beacon)(nil)
 
 type Beacon interface {
 	ID() ids.NodeID

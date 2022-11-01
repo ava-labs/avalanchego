@@ -23,9 +23,9 @@ import (
 )
 
 var (
-	_ http.ResponseWriter = &Client{}
-	_ http.Flusher        = &Client{}
-	_ http.Hijacker       = &Client{}
+	_ http.ResponseWriter = (*Client)(nil)
+	_ http.Flusher        = (*Client)(nil)
+	_ http.Hijacker       = (*Client)(nil)
 )
 
 // Client is an http.ResponseWriter that talks over RPC.

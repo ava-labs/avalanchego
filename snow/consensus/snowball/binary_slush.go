@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-var _ BinarySlush = &binarySlush{}
+var _ BinarySlush = (*binarySlush)(nil)
 
 // binarySlush is the implementation of a binary slush instance
 type binarySlush struct {

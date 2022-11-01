@@ -4,6 +4,8 @@
 package events
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -14,9 +16,9 @@ type Blockable interface {
 	// IDs that this object is blocking on
 	Dependencies() set.Set[ids.ID]
 	// Notify this object that an event has been fulfilled
-	Fulfill(ids.ID)
+	Fulfill(context.Context, ids.ID)
 	// Notify this object that an event has been abandoned
-	Abandon(ids.ID)
+	Abandon(context.Context, ids.ID)
 	// Update the state of this object without changing the status of any events
-	Update()
+	Update(context.Context)
 }

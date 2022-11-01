@@ -11,8 +11,8 @@ import (
 var (
 	convertEToBase2 = math.Log(2)
 
-	_ Factory = &ContinuousFactory{}
-	_ Meter   = &continuousMeter{}
+	_ Factory = (*ContinuousFactory)(nil)
+	_ Meter   = (*continuousMeter)(nil)
 )
 
 // ContinuousFactory implements the Factory interface by returning a continuous

@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	_ BanffBlock = &BanffProposalBlock{}
-	_ Block      = &ApricotProposalBlock{}
+	_ BanffBlock = (*BanffProposalBlock)(nil)
+	_ Block      = (*ApricotProposalBlock)(nil)
 )
 
 type BanffProposalBlock struct {

@@ -22,8 +22,8 @@ import (
 var (
 	errDuplicateAdd = errors.New("duplicate block add")
 
-	_ Factory   = &TopologicalFactory{}
-	_ Consensus = &Topological{}
+	_ Factory   = (*TopologicalFactory)(nil)
+	_ Consensus = (*Topological)(nil)
 )
 
 // TopologicalFactory implements Factory by returning a topological struct

@@ -26,7 +26,7 @@ var (
 
 	errMaxAddresses = fmt.Errorf("keystore user has reached its limit of %d addresses", maxKeystoreAddresses)
 
-	_ User = &user{}
+	_ User = (*user)(nil)
 )
 
 type User interface {

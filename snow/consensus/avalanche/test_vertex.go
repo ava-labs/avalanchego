@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var _ Vertex = &TestVertex{}
+var _ Vertex = (*TestVertex)(nil)
 
 // TestVertex is a useful test vertex
 type TestVertex struct {

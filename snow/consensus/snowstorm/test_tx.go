@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var _ Tx = &TestTx{}
+var _ Tx = (*TestTx)(nil)
 
 // TestTx is a useful test tx
 type TestTx struct {
