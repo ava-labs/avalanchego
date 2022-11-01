@@ -56,10 +56,28 @@ import (
 )
 
 var (
-	acceptorQueueGauge           = metrics.NewRegisteredGauge("blockchain/acceptor/queue/size", nil)
-	processedBlockGasUsedCounter = metrics.NewRegisteredCounter("blockchain/blocks/gas/used/processed", nil)
-	acceptedBlockGasUsedCounter  = metrics.NewRegisteredCounter("blockchain/blocks/gas/used/accepted", nil)
-	badBlockCounter              = metrics.NewRegisteredCounter("blockchain/blocks/bad/count", nil)
+	accountReadTimer         = metrics.NewRegisteredTimer("chain/account/reads", nil)
+	accountHashTimer         = metrics.NewRegisteredTimer("chain/account/hashes", nil)
+	accountUpdateTimer       = metrics.NewRegisteredTimer("chain/account/updates", nil)
+	accountCommitTimer       = metrics.NewRegisteredTimer("chain/account/commits", nil)
+	storageReadTimer         = metrics.NewRegisteredTimer("chain/storage/reads", nil)
+	storageHashTimer         = metrics.NewRegisteredTimer("chain/storage/hashes", nil)
+	storageUpdateTimer       = metrics.NewRegisteredTimer("chain/storage/updates", nil)
+	storageCommitTimer       = metrics.NewRegisteredTimer("chain/storage/commits", nil)
+	snapshotAccountReadTimer = metrics.NewRegisteredTimer("chain/snapshot/account/reads", nil)
+	snapshotStorageReadTimer = metrics.NewRegisteredTimer("chain/snapshot/storage/reads", nil)
+	snapshotCommitTimer      = metrics.NewRegisteredTimer("chain/snapshot/commits", nil)
+	triedbCommitTimer        = metrics.NewRegisteredTimer("chain/triedb/commits", nil)
+
+	blockInsertTimer     = metrics.NewRegisteredTimer("chain/inserts", nil)
+	blockValidationTimer = metrics.NewRegisteredTimer("chain/validation", nil)
+	blockExecutionTimer  = metrics.NewRegisteredTimer("chain/execution", nil)
+	blockWriteTimer      = metrics.NewRegisteredTimer("chain/write", nil)
+
+	acceptorQueueGauge           = metrics.NewRegisteredGauge("chain/acceptor/queue/size", nil)
+	processedBlockGasUsedCounter = metrics.NewRegisteredCounter("chain/blocks/gas/used/processed", nil)
+	acceptedBlockGasUsedCounter  = metrics.NewRegisteredCounter("chain/blocks/gas/used/accepted", nil)
+	badBlockCounter              = metrics.NewRegisteredCounter("chain/blocks/bad/count", nil)
 
 	ErrRefuseToCorruptArchiver = errors.New("node has operated with pruning disabled, shutting down to prevent missing tries")
 
@@ -1119,8 +1137,6 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 
 	// Retrieve the parent block and its state to execute on top
 	start := time.Now()
-
-	// Retrieve the parent block and its state to execute block
 	parent := bc.GetHeader(block.ParentHash(), block.NumberU64()-1)
 	statedb, err := state.New(parent.Root, bc.stateCache, bc.snaps)
 	if err != nil {
@@ -1134,6 +1150,7 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 	// If we have a followup block, run that against the current state to pre-cache
 	// transactions and probabilistically some of the account/storage trie nodes.
 	// Process block using the parent state as reference point
+	substart := time.Now()
 	receipts, logs, usedGas, err := bc.processor.Process(block, parent, statedb, bc.vmConfig)
 	if serr := statedb.Error(); serr != nil {
 		log.Error("statedb error encountered", "err", serr, "number", block.Number(), "hash", block.Hash())
@@ -1143,11 +1160,29 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 		return err
 	}
 
+	// Update the metrics touched during block processing
+	accountReadTimer.Update(statedb.AccountReads)                 // Account reads are complete, we can mark them
+	storageReadTimer.Update(statedb.StorageReads)                 // Storage reads are complete, we can mark them
+	accountUpdateTimer.Update(statedb.AccountUpdates)             // Account updates are complete, we can mark them
+	storageUpdateTimer.Update(statedb.StorageUpdates)             // Storage updates are complete, we can mark them
+	snapshotAccountReadTimer.Update(statedb.SnapshotAccountReads) // Account reads are complete, we can mark them
+	snapshotStorageReadTimer.Update(statedb.SnapshotStorageReads) // Storage reads are complete, we can mark them
+	triehash := statedb.AccountHashes + statedb.StorageHashes     // Save to not double count in validation
+	trieproc := statedb.SnapshotAccountReads + statedb.AccountReads + statedb.AccountUpdates
+	trieproc += statedb.SnapshotStorageReads + statedb.StorageReads + statedb.StorageUpdates
+	blockExecutionTimer.Update(time.Since(substart) - trieproc - triehash)
+
 	// Validate the state using the default validator
+	substart = time.Now()
 	if err := bc.validator.ValidateState(block, statedb, receipts, usedGas); err != nil {
 		bc.reportBlock(block, receipts, err)
 		return err
 	}
+
+	// Update the metrics touched during block validation
+	accountHashTimer.Update(statedb.AccountHashes) // Account hashes are complete, we can mark them
+	storageHashTimer.Update(statedb.StorageHashes) // Storage hashes are complete, we can mark them
+	blockValidationTimer.Update(time.Since(substart) - (statedb.AccountHashes + statedb.StorageHashes - triehash))
 
 	// If [writes] are disabled, skip [writeBlockWithState] so that we do not write the block
 	// or the state trie to disk.
@@ -1160,9 +1195,19 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 	// writeBlockWithState (called within writeBlockAndSethead) creates a reference that
 	// will be cleaned up in Accept/Reject so we need to ensure an error cannot occur
 	// later in verification, since that would cause the referenced root to never be dereferenced.
+	substart = time.Now()
 	if err := bc.writeBlockAndSetHead(block, receipts, logs, statedb); err != nil {
 		return err
 	}
+
+	// Update the metrics touched during block commit
+	accountCommitTimer.Update(statedb.AccountCommits)   // Account commits are complete, we can mark them
+	storageCommitTimer.Update(statedb.StorageCommits)   // Storage commits are complete, we can mark them
+	snapshotCommitTimer.Update(statedb.SnapshotCommits) // Snapshot commits are complete, we can mark them
+	triedbCommitTimer.Update(statedb.TrieDBCommits)     // Triedb commits are complete, we can mark them
+	blockWriteTimer.Update(time.Since(substart) - statedb.AccountCommits - statedb.StorageCommits - statedb.SnapshotCommits - statedb.TrieDBCommits)
+	blockInsertTimer.UpdateSince(start)
+
 	log.Debug("Inserted new block", "number", block.Number(), "hash", block.Hash(),
 		"parentHash", block.ParentHash(),
 		"uncles", len(block.Uncles()), "txs", len(block.Transactions()), "gas", block.GasUsed(),
