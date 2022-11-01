@@ -503,8 +503,17 @@ func (n *network) Peers(peerID ids.NodeID) (message.OutboundMessage, error) {
 	n.peersLock.Lock()
 	defer n.peersLock.Unlock()
 
+	// Invariant:
+	//
+	// We update our gossip tracker so after the handshake is complete we
+	// don't re-gossip the same validators.
+	//
+	// If the caller fails to send this PeerList [msg] to [peerID], we are okay
+	// with the gossip tracker having incorrect information because a failed
+	// handshake will result in [Disconnected] being called for [peerID]
+	// which will remove [peerID] from the gossip tracker.
 	if !n.gossipTracker.UpdateKnown(peerID, peerIDs) {
-		return nil, fmt.Errorf("peer not found in gossip tracker")
+		return nil, fmt.Errorf("peer %s not found in gossip tracker", peerID)
 	}
 
 	return msg, nil
