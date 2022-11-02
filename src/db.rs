@@ -829,20 +829,24 @@ impl<'a> WriteBatch<'a> {
             if !acc.code.is_null() {
                 blob_stash.free_blob(acc.code).map_err(DBError::Blob)?;
             }
-            Ok(acc.set_code(
+            acc.set_code(
                 Hash(sha3::Keccak256::digest(code).into()),
                 blob_stash
                     .new_blob(Blob::Code(code.to_vec()))
                     .map_err(DBError::Blob)?
                     .as_ptr(),
-            ))
+            );
+            Ok(())
         })?;
         Ok(self)
     }
 
     /// Set nonce of the account.
     pub fn set_nonce(mut self, key: &[u8], nonce: u64) -> Result<Self, DBError> {
-        self.change_account(key, |acc, _| Ok(acc.nonce = nonce))?;
+        self.change_account(key, |acc, _| {
+            acc.nonce = nonce;
+            Ok(())
+        })?;
         Ok(self)
     }
 
@@ -850,7 +854,7 @@ impl<'a> WriteBatch<'a> {
     pub fn set_state(mut self, key: &[u8], sub_key: &[u8], val: Vec<u8>) -> Result<Self, DBError> {
         let (header, merkle, _) = self.m.latest.borrow_split();
         let mut acc = match merkle.get(key, header.acc_root) {
-            Ok(Some(r)) => Account::deserialize(&*r),
+            Ok(Some(r)) => Account::deserialize(&r),
             Ok(None) => Account::default(),
             Err(e) => return Err(DBError::Merkle(e)),
         };

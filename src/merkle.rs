@@ -106,7 +106,7 @@ impl PartialPath {
 #[test]
 fn test_partial_path_encoding() {
     let check = |steps: &[u8], term| {
-        let (d, t) = PartialPath::decode(&PartialPath(steps.to_vec()).encode(term));
+        let (d, t) = PartialPath::decode(PartialPath(steps.to_vec()).encode(term));
         assert_eq!(d.0, steps);
         assert_eq!(t, term);
     };
@@ -264,12 +264,11 @@ enum NodeType {
 
 impl NodeType {
     fn calc_eth_rlp<T: ValueTransformer>(&self, store: &dyn ShaleStore<Node>) -> Vec<u8> {
-        let eth_rlp = match &self {
+        match &self {
             NodeType::Leaf(n) => n.calc_eth_rlp::<T>(),
             NodeType::Extension(n) => n.calc_eth_rlp::<T>(store),
             NodeType::Branch(n) => n.calc_eth_rlp::<T>(store),
-        };
-        eth_rlp
+        }
     }
 }
 
@@ -413,8 +412,7 @@ impl MummyItem for Node {
                 cur.read_exact(&mut buff).map_err(|_| ShaleError::DecodeError)?;
                 let ptr = u64::from_le_bytes(buff);
                 let nibbles: Vec<_> = to_nibbles(
-                    &*mem
-                        .get_view(addr + META_SIZE + ext_header_size, len)
+                    &mem.get_view(addr + META_SIZE + ext_header_size, len)
                         .ok_or(ShaleError::LinearMemStoreError)?,
                 )
                 .collect();
@@ -502,7 +500,7 @@ impl MummyItem for Node {
                 match &n.value {
                     Some(val) => {
                         cur.write_all(&(val.len() as u32).to_le_bytes()).unwrap();
-                        cur.write_all(&val).unwrap();
+                        cur.write_all(val).unwrap();
                     }
                     None => {
                         cur.write_all(&u32::MAX.to_le_bytes()).unwrap();
@@ -608,7 +606,7 @@ impl Merkle {
     }
 
     pub fn init_root(root: &mut ObjPtr<Node>, store: &dyn ShaleStore<Node>) -> Result<(), MerkleError> {
-        Ok(*root = store
+        *root = store
             .put_item(
                 Node::new(NodeType::Branch(BranchNode {
                     chd: [None; NBRANCH],
@@ -617,7 +615,8 @@ impl Merkle {
                 Node::max_branch_node_size(),
             )
             .map_err(MerkleError::Shale)?
-            .as_ptr())
+            .as_ptr();
+        Ok(())
     }
 
     pub fn get_store(&self) -> &dyn ShaleStore<Node> {
@@ -664,7 +663,7 @@ impl Merkle {
             "{} => {}: ",
             u,
             match u_ref.root_hash.get() {
-                Some(h) => hex::encode(&**h),
+                Some(h) => hex::encode(**h),
                 None => "<lazy>".to_string(),
             }
         )
@@ -688,11 +687,12 @@ impl Merkle {
     }
 
     pub fn dump(&self, root: ObjPtr<Node>, w: &mut dyn Write) -> Result<(), MerkleError> {
-        Ok(if root.is_null() {
+        if root.is_null() {
             write!(w, "<Empty>").map_err(MerkleError::Format)?;
         } else {
             self.dump_(root, w)?;
-        })
+        };
+        Ok(())
     }
 
     fn set_parent<'b>(&self, new_chd: ObjPtr<Node>, parents: &mut [(ObjRef<'b, Node>, u8)]) {
@@ -774,10 +774,13 @@ impl Merkle {
                                 NodeType::Extension(u) => {
                                     match (|| {
                                         let mut b_ref = self.get_node(u.1)?;
-                                        if let None = b_ref.write(|b| {
-                                            b.inner.as_branch_mut().unwrap().value = Some(Data(val));
-                                            b.rehash()
-                                        }) {
+                                        if b_ref
+                                            .write(|b| {
+                                                b.inner.as_branch_mut().unwrap().value = Some(Data(val));
+                                                b.rehash()
+                                            })
+                                            .is_none()
+                                        {
                                             u.1 = self.new_node(b_ref.clone())?.as_ptr();
                                             deleted.push(b_ref.as_ptr());
                                         }
@@ -1109,16 +1112,19 @@ impl Merkle {
                             // from: [p: Branch] -> [b]x*
                             //                           \____[Leaf]x
                             // to: [p: Branch] -> [Leaf/Ext]
-                            let c_ptr = if c_ref.write(|c| {
-                                (match &mut c.inner {
-                                    NodeType::Leaf(n) => &mut n.0,
-                                    NodeType::Extension(n) => &mut n.0,
-                                    _ => unreachable!(),
+                            let c_ptr = if c_ref
+                                .write(|c| {
+                                    (match &mut c.inner {
+                                        NodeType::Leaf(n) => &mut n.0,
+                                        NodeType::Extension(n) => &mut n.0,
+                                        _ => unreachable!(),
+                                    })
+                                    .0
+                                    .insert(0, idx);
+                                    c.rehash()
                                 })
-                                .0
-                                .insert(0, idx);
-                                c.rehash()
-                            }).is_none() {
+                                .is_none()
+                            {
                                 deleted.push(c_ptr);
                                 self.new_node(c_ref.clone())?.as_ptr()
                             } else {
@@ -1223,16 +1229,19 @@ impl Merkle {
                 NodeType::Branch(_) => {
                     // from: [Branch] -> [Branch]x -> [Leaf/Ext]
                     // to: [Branch] -> [Leaf/Ext]
-                    let c_ptr = if c_ref.write(|c| {
-                        match &mut c.inner {
-                            NodeType::Leaf(n) => &mut n.0,
-                            NodeType::Extension(n) => &mut n.0,
-                            _ => unreachable!(),
-                        }
-                        .0
-                        .insert(0, idx);
-                        c.rehash()
-                    }).is_none() {
+                    let c_ptr = if c_ref
+                        .write(|c| {
+                            match &mut c.inner {
+                                NodeType::Leaf(n) => &mut n.0,
+                                NodeType::Extension(n) => &mut n.0,
+                                _ => unreachable!(),
+                            }
+                            .0
+                            .insert(0, idx);
+                            c.rehash()
+                        })
+                        .is_none()
+                    {
                         deleted.push(c_ptr);
                         self.new_node(c_ref.clone())?.as_ptr()
                     } else {
@@ -1249,18 +1258,21 @@ impl Merkle {
                 NodeType::Extension(n) => {
                     // from: P -> [Ext] -> [Branch]x -> [Leaf/Ext]
                     // to: P -> [Leaf/Ext]
-                    let c_ptr = if c_ref.write(|c| {
-                        let mut path = n.0.clone().into_inner();
-                        path.push(idx);
-                        let path0 = match &mut c.inner {
-                            NodeType::Leaf(n) => &mut n.0,
-                            NodeType::Extension(n) => &mut n.0,
-                            _ => unreachable!(),
-                        };
-                        path.extend(&**path0);
-                        *path0 = PartialPath(path);
-                        c.rehash()
-                    }).is_none() {
+                    let c_ptr = if c_ref
+                        .write(|c| {
+                            let mut path = n.0.clone().into_inner();
+                            path.push(idx);
+                            let path0 = match &mut c.inner {
+                                NodeType::Leaf(n) => &mut n.0,
+                                NodeType::Extension(n) => &mut n.0,
+                                _ => unreachable!(),
+                            };
+                            path.extend(&**path0);
+                            *path0 = PartialPath(path);
+                            c.rehash()
+                        })
+                        .is_none()
+                    {
                         deleted.push(c_ptr);
                         self.new_node(c_ref.clone())?.as_ptr()
                     } else {
@@ -1441,7 +1453,7 @@ impl Merkle {
         let u_ptr = u_ref.as_ptr();
         match &u_ref.inner {
             NodeType::Branch(n) => {
-                if let Some(_) = n.value.as_ref() {
+                if n.value.as_ref().is_some() {
                     drop(u_ref);
                     return Ok(Some(RefMut::new(u_ptr, parents, self)))
                 }

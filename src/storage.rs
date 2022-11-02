@@ -524,7 +524,7 @@ fn test_from_ash() {
     use rand::{rngs::StdRng, Rng, SeedableRng};
     let mut rng = StdRng::seed_from_u64(42);
     let min = rng.gen_range(0..2 * PAGE_SIZE);
-    let max = rng.gen_range(min + 1 * PAGE_SIZE..min + 100 * PAGE_SIZE);
+    let max = rng.gen_range(min + PAGE_SIZE..min + 100 * PAGE_SIZE);
     for _ in 0..2000 {
         let n = 20;
         let mut canvas = Vec::new();
@@ -610,7 +610,7 @@ impl CachedSpace {
 impl CachedSpaceInner {
     fn fetch_page(&mut self, space_id: SpaceID, pid: u64) -> Result<Box<Page>, StoreError> {
         if let Some(p) = self.disk_buffer.get_page(space_id, pid) {
-            return Ok(Box::new((*p)))
+            return Ok(Box::new(*p))
         }
         let file_nbit = self.files.get_file_nbit();
         let file_size = 1 << file_nbit;
@@ -742,7 +742,7 @@ impl FilePool {
             rootfd,
         };
         let f0 = s.get_file(0)?;
-        if let Err(_) = flock(f0.get_fd(), FlockArg::LockExclusiveNonblock) {
+        if flock(f0.get_fd(), FlockArg::LockExclusiveNonblock).is_err() {
             return Err(StoreError::InitError("the store is busy".into()))
         }
         Ok(s)
@@ -908,7 +908,7 @@ impl DiskBuffer {
         match self.pending.entry(page_key) {
             Occupied(mut e) => {
                 let slot = e.get_mut();
-                for notifier in std::mem::replace(&mut slot.writing_notifiers, Vec::new()) {
+                for notifier in std::mem::take(&mut slot.writing_notifiers) {
                     notifier.add_permits(1)
                 }
                 if slot.staging_notifiers.is_empty() {
@@ -957,7 +957,7 @@ impl DiskBuffer {
                             let fid = offset >> file_nbit;
                             nix::sys::uio::pwrite(
                                 file_pool.get_file(fid).map_err(|_| ())?.get_fd(),
-                                &*data,
+                                &data,
                                 (offset & file_mask) as nix::libc::off_t,
                             )
                             .map_err(|_| ())?;
