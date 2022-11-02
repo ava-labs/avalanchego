@@ -6,6 +6,8 @@ package genesis
 import (
 	"time"
 
+	_ "embed"
+
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
