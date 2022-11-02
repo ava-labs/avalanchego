@@ -513,10 +513,13 @@ func addPendingValidator(
 		return nil, err
 	}
 
-	staker := state.NewPendingStaker(
+	staker, err := state.NewPendingStaker(
 		addPendingValidatorTx.ID(),
 		addPendingValidatorTx.Unsigned.(*txs.AddValidatorTx),
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	env.state.PutPendingValidator(staker)
 	env.state.AddTx(addPendingValidatorTx, status.Committed)

@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -49,11 +50,12 @@ func (tx *AddDelegatorTx) InitCtx(ctx *snow.Context) {
 	tx.DelegationRewardsOwner.InitCtx(ctx)
 }
 
-func (tx *AddDelegatorTx) SubnetID() ids.ID     { return constants.PrimaryNetworkID }
-func (tx *AddDelegatorTx) NodeID() ids.NodeID   { return tx.Validator.NodeID }
-func (tx *AddDelegatorTx) StartTime() time.Time { return tx.Validator.StartTime() }
-func (tx *AddDelegatorTx) EndTime() time.Time   { return tx.Validator.EndTime() }
-func (tx *AddDelegatorTx) Weight() uint64       { return tx.Validator.Wght }
+func (tx *AddDelegatorTx) SubnetID() ids.ID                         { return constants.PrimaryNetworkID }
+func (tx *AddDelegatorTx) NodeID() ids.NodeID                       { return tx.Validator.NodeID }
+func (tx *AddDelegatorTx) PublicKey() (*bls.PublicKey, bool, error) { return nil, false, nil }
+func (tx *AddDelegatorTx) StartTime() time.Time                     { return tx.Validator.StartTime() }
+func (tx *AddDelegatorTx) EndTime() time.Time                       { return tx.Validator.EndTime() }
+func (tx *AddDelegatorTx) Weight() uint64                           { return tx.Validator.Wght }
 func (tx *AddDelegatorTx) PendingPriority() Priority {
 	return PrimaryNetworkDelegatorApricotPendingPriority
 }

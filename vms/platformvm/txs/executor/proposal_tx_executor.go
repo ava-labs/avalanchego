@@ -112,7 +112,11 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	// Produce the UTXOs
 	utxo.Produce(e.OnCommitState, txID, tx.Outs)
 
-	newStaker := state.NewPendingStaker(txID, tx)
+	newStaker, err := state.NewPendingStaker(txID, tx)
+	if err != nil {
+		return err
+	}
+
 	e.OnCommitState.PutPendingValidator(newStaker)
 
 	// Set up the state if this tx is aborted
@@ -156,7 +160,11 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	// Produce the UTXOs
 	utxo.Produce(e.OnCommitState, txID, tx.Outs)
 
-	newStaker := state.NewPendingStaker(txID, tx)
+	newStaker, err := state.NewPendingStaker(txID, tx)
+	if err != nil {
+		return err
+	}
+
 	e.OnCommitState.PutPendingValidator(newStaker)
 
 	// Set up the state if this tx is aborted
@@ -201,7 +209,11 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	// Produce the UTXOs
 	utxo.Produce(e.OnCommitState, txID, tx.Outs)
 
-	newStaker := state.NewPendingStaker(txID, tx)
+	newStaker, err := state.NewPendingStaker(txID, tx)
+	if err != nil {
+		return err
+	}
+
 	e.OnCommitState.PutPendingDelegator(newStaker)
 
 	// Set up the state if this tx is aborted

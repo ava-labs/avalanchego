@@ -26,7 +26,6 @@ github.com/ava-labs/avalanchego/vms/platformvm/state=State=vms/platformvm/state/
 github.com/ava-labs/avalanchego/vms/platformvm/state=Versions=vms/platformvm/state/mock_versions.go
 github.com/ava-labs/avalanchego/vms/platformvm/txs/builder=Builder=vms/platformvm/txs/builder/mock_builder.go
 github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool=Mempool=vms/platformvm/txs/mempool/mock_mempool.go
-github.com/ava-labs/avalanchego/vms/platformvm/txs=Staker=vms/platformvm/txs/mock_staker.go
 github.com/ava-labs/avalanchego/vms/platformvm/txs=UnsignedTx=vms/platformvm/txs/mock_unsigned_tx.go
 github.com/ava-labs/avalanchego/vms/platformvm/utxo=Verifier=vms/platformvm/utxo/mock_verifier.go
 github.com/ava-labs/avalanchego/vms/proposervm/state=State=vms/proposervm/state/mock_state.go
