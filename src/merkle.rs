@@ -844,7 +844,7 @@ impl Merkle {
                 let branch_ptr = self
                     .new_node(Node::new(NodeType::Branch(BranchNode { chd, value: v })))?
                     .as_ptr();
-                if prefix.len() > 0 {
+                if !prefix.is_empty() {
                     self.new_node(Node::new(NodeType::Extension(ExtNode(
                         PartialPath(prefix.to_vec()),
                         branch_ptr,
@@ -1024,7 +1024,7 @@ impl Merkle {
                 .unwrap();
             let b_inner = b_ref.inner.as_branch().unwrap();
             let (b_chd, has_chd) = b_inner.single_child();
-            if (has_chd && (b_chd.is_none() || b_inner.value.is_some())) || parents.len() < 1 {
+            if (has_chd && (b_chd.is_none() || b_inner.value.is_some())) || parents.is_empty() {
                 return Ok(())
             }
             deleted.push(b_ref.as_ptr());
@@ -1109,7 +1109,7 @@ impl Merkle {
                             // from: [p: Branch] -> [b]x*
                             //                           \____[Leaf]x
                             // to: [p: Branch] -> [Leaf/Ext]
-                            let c_ptr = if let None = c_ref.write(|c| {
+                            let c_ptr = if c_ref.write(|c| {
                                 (match &mut c.inner {
                                     NodeType::Leaf(n) => &mut n.0,
                                     NodeType::Extension(n) => &mut n.0,
@@ -1118,7 +1118,7 @@ impl Merkle {
                                 .0
                                 .insert(0, idx);
                                 c.rehash()
-                            }) {
+                            }).is_none() {
                                 deleted.push(c_ptr);
                                 self.new_node(c_ref.clone())?.as_ptr()
                             } else {
@@ -1205,7 +1205,8 @@ impl Merkle {
                                 }
                                 _ => unreachable!(),
                             }
-                            Ok(b.rehash())
+                            b.rehash();
+                            Ok(())
                         })() {
                             Err(e) => err = Some(Err(e)),
                             _ => (),
@@ -1222,7 +1223,7 @@ impl Merkle {
                 NodeType::Branch(_) => {
                     // from: [Branch] -> [Branch]x -> [Leaf/Ext]
                     // to: [Branch] -> [Leaf/Ext]
-                    let c_ptr = if let None = c_ref.write(|c| {
+                    let c_ptr = if c_ref.write(|c| {
                         match &mut c.inner {
                             NodeType::Leaf(n) => &mut n.0,
                             NodeType::Extension(n) => &mut n.0,
@@ -1231,7 +1232,7 @@ impl Merkle {
                         .0
                         .insert(0, idx);
                         c.rehash()
-                    }) {
+                    }).is_none() {
                         deleted.push(c_ptr);
                         self.new_node(c_ref.clone())?.as_ptr()
                     } else {
@@ -1248,7 +1249,7 @@ impl Merkle {
                 NodeType::Extension(n) => {
                     // from: P -> [Ext] -> [Branch]x -> [Leaf/Ext]
                     // to: P -> [Leaf/Ext]
-                    let c_ptr = if let None = c_ref.write(|c| {
+                    let c_ptr = if c_ref.write(|c| {
                         let mut path = n.0.clone().into_inner();
                         path.push(idx);
                         let path0 = match &mut c.inner {
@@ -1259,7 +1260,7 @@ impl Merkle {
                         path.extend(&**path0);
                         *path0 = PartialPath(path);
                         c.rehash()
-                    }) {
+                    }).is_none() {
                         deleted.push(c_ptr);
                         self.new_node(c_ref.clone())?.as_ptr()
                     } else {
@@ -1300,7 +1301,7 @@ impl Merkle {
                     None => return Ok(None),
                 },
                 NodeType::Leaf(n) => {
-                    if &chunks[i..] != &*n.0 {
+                    if chunks[i..] != *n.0 {
                         return Ok(None)
                     }
                     found = Some(n.1.clone());
@@ -1479,7 +1480,7 @@ impl Merkle {
                     None => return Ok(None),
                 },
                 NodeType::Leaf(n) => {
-                    if &chunks[i..] != &*n.0 {
+                    if chunks[i..] != *n.0 {
                         return Ok(None)
                     }
                     return Ok(Some(Ref(u_ref)))
@@ -1499,7 +1500,7 @@ impl Merkle {
 
         match &u_ref.inner {
             NodeType::Branch(n) => {
-                if let Some(_) = n.value.as_ref() {
+                if n.value.as_ref().is_some() {
                     return Ok(Some(Ref(u_ref)))
                 }
             }

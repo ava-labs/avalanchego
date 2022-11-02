@@ -60,7 +60,7 @@ impl growthring::wal::Record for AshRecord {
         let mut bytes = Vec::new();
         bytes.extend((self.0.len() as u64).to_le_bytes());
         for (space_id, w) in self.0.iter() {
-            bytes.extend((*space_id as u8).to_le_bytes());
+            bytes.extend((*space_id).to_le_bytes());
             bytes.extend((w.old.len() as u32).to_le_bytes());
             for (sw_old, sw_new) in w.old.iter().zip(w.new.iter()) {
                 bytes.extend(sw_old.offset.to_le_bytes());
@@ -186,7 +186,7 @@ impl StoreDelta {
         create_dirty_pages!(head, tail);
 
         let psize = PAGE_SIZE as usize;
-        for w in writes.into_iter() {
+        for w in writes.iter() {
             let mut l = 0;
             let mut r = deltas.len();
             while r - l > 1 {
@@ -206,9 +206,9 @@ impl StoreDelta {
                 deltas[l].data_mut().copy_from_slice(&data[..psize]);
                 data = &data[psize..];
             }
-            if data.len() > 0 {
+            if !data.is_empty() {
                 l += 1;
-                deltas[l].data_mut()[..data.len()].copy_from_slice(&data);
+                deltas[l].data_mut()[..data.len()].copy_from_slice(data);
             }
         }
         Self(deltas)
@@ -230,7 +230,7 @@ impl fmt::Debug for StoreRev {
         for d in self.delta.iter() {
             write!(f, " 0x{:x}", d.0)?;
         }
-        write!(f, ">\n")
+        writeln!(f, ">")
     }
 }
 
@@ -434,7 +434,7 @@ impl MemStore for StoreRevMut {
                 };
                 for p in s_pid + 1..e_pid {
                     match deltas.get(&p) {
-                        Some(p) => data.extend(&**p),
+                        Some(p) => data.extend(**p),
                         None => data.extend(&self.prev.get_slice(p << PAGE_SIZE_NBIT, PAGE_SIZE)?),
                     };
                 }
@@ -610,7 +610,7 @@ impl CachedSpace {
 impl CachedSpaceInner {
     fn fetch_page(&mut self, space_id: SpaceID, pid: u64) -> Result<Box<Page>, StoreError> {
         if let Some(p) = self.disk_buffer.get_page(space_id, pid) {
-            return Ok(Box::new((*p).clone()))
+            return Ok(Box::new((*p)))
         }
         let file_nbit = self.files.get_file_nbit();
         let file_size = 1 << file_nbit;
