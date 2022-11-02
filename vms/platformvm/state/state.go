@@ -813,7 +813,30 @@ func (s *state) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 }
 
 func (s *state) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
-	return s.utxoState.UTXOIDs(addr, start, limit)
+	ret, err := s.utxoState.UTXOIDs(addr, start, limit)
+	if err != nil {
+		return nil, err
+	}
+	// loop through modified tx
+	var utxoSet ids.Set
+	for utxoId, utxo := range s.modifiedUTXOs {
+		if utxo == nil || !utxo.MatchAddresses(addr) {
+			continue
+		}
+		if utxoSet == nil {
+			utxoSet = ids.NewSet(len(ret))
+			utxoSet.Add(ret...)
+		}
+
+		// Add utxoID
+		utxoSet.Add(utxoId)
+	}
+
+	if utxoSet == nil {
+		return ret, nil
+	} else {
+		return utxoSet.List(), nil
+	}
 }
 
 func (s *state) AddUTXO(utxo *avax.UTXO) {
