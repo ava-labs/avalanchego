@@ -1194,15 +1194,12 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 	// Update the metrics touched during block processing
 	accountReadTimer.Inc(statedb.AccountReads.Milliseconds())                 // Account reads are complete, we can mark them
 	storageReadTimer.Inc(statedb.StorageReads.Milliseconds())                 // Storage reads are complete, we can mark them
-	accountUpdateTimer.Inc(statedb.AccountUpdates.Milliseconds())             // Account updates are complete, we can mark them
-	storageUpdateTimer.Inc(statedb.StorageUpdates.Milliseconds())             // Storage updates are complete, we can mark them
 	snapshotAccountReadTimer.Inc(statedb.SnapshotAccountReads.Milliseconds()) // Account reads are complete, we can mark them
 	snapshotStorageReadTimer.Inc(statedb.SnapshotStorageReads.Milliseconds()) // Storage reads are complete, we can mark them
-	triehash := statedb.AccountHashes + statedb.StorageHashes                 // Save to not double count in validation
-	trieproc := statedb.SnapshotAccountReads + statedb.AccountReads + statedb.AccountUpdates
+	trieproc := statedb.AccountHashes + statedb.StorageHashes                 // Save to not double count in validation
+	trieproc += statedb.SnapshotAccountReads + statedb.AccountReads + statedb.AccountUpdates
 	trieproc += statedb.SnapshotStorageReads + statedb.StorageReads + statedb.StorageUpdates
-	blockExecutionTimer.Inc((time.Since(substart) - trieproc - triehash).Milliseconds())
-	blockTrieOpsTimer.Inc((trieproc + triehash).Milliseconds())
+	blockExecutionTimer.Inc((time.Since(substart) - trieproc).Milliseconds())
 
 	// Validate the state using the default validator
 	substart = time.Now()
@@ -1212,9 +1209,13 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 	}
 
 	// Update the metrics touched during block validation
-	accountHashTimer.Inc(statedb.AccountHashes.Milliseconds()) // Account hashes are complete, we can mark them
-	storageHashTimer.Inc(statedb.StorageHashes.Milliseconds()) // Storage hashes are complete, we can mark them
-	blockStateValidationTimer.Inc((time.Since(substart) - (statedb.AccountHashes + statedb.StorageHashes - triehash)).Milliseconds())
+	accountUpdateTimer.Inc(statedb.AccountUpdates.Milliseconds()) // Account updates are complete, we can mark them
+	storageUpdateTimer.Inc(statedb.StorageUpdates.Milliseconds()) // Storage updates are complete, we can mark them
+	accountHashTimer.Inc(statedb.AccountHashes.Milliseconds())    // Account hashes are complete, we can mark them
+	storageHashTimer.Inc(statedb.StorageHashes.Milliseconds())    // Storage hashes are complete, we can mark them
+	additionalTrieProc := statedb.AccountHashes + statedb.StorageHashes + statedb.AccountUpdates + statedb.StorageUpdates - trieproc
+	blockStateValidationTimer.Inc((time.Since(substart) - additionalTrieProc).Milliseconds())
+	blockTrieOpsTimer.Inc((trieproc + additionalTrieProc).Milliseconds())
 
 	// If [writes] are disabled, skip [writeBlockWithState] so that we do not write the block
 	// or the state trie to disk.

@@ -394,10 +394,21 @@ func (db *Database) EncodedNode(h common.Hash) node {
 func (db *Database) node(hash common.Hash) ([]byte, *cachedNode, error) {
 	// Retrieve the node from the clean cache if available
 	if db.cleans != nil {
-		if enc := db.cleans.Get(nil, hash[:]); enc != nil {
-			memcacheCleanHitMeter.Mark(1)
-			memcacheCleanReadMeter.Mark(int64(len(enc)))
-			return enc, nil, nil
+		k := hash[:]
+		enc, found := db.cleans.HasGet(nil, k)
+		if found {
+			if len(enc) > 0 {
+				memcacheCleanHitMeter.Mark(1)
+				memcacheCleanReadMeter.Mark(int64(len(enc)))
+				return enc, nil, nil
+			} else {
+				// Delete anything from cache that may have been added incorrectly
+				//
+				// This will prevent a panic as callers of this function assume the raw
+				// or cached node is populated.
+				log.Debug("removing empty value found in cleans cache", "k", k)
+				db.cleans.Del(k)
+			}
 		}
 	}
 	// Retrieve the node from the dirty cache if available
@@ -414,7 +425,7 @@ func (db *Database) node(hash common.Hash) ([]byte, *cachedNode, error) {
 
 	// Content unavailable in memory, attempt to retrieve from disk
 	enc := rawdb.ReadTrieNode(db.diskdb, hash)
-	if len(enc) != 0 {
+	if len(enc) > 0 {
 		if db.cleans != nil {
 			db.cleans.Set(hash[:], enc)
 			memcacheCleanMissMeter.Mark(1)
@@ -561,7 +572,7 @@ type flushItem struct {
 // writeFlushItems writes all items in [toFlush] to disk in batches of
 // [ethdb.IdealBatchSize]. This function does not access any variables inside
 // of [Database] and does not need to be synchronized.
-func (db *Database) writeFlushItems(toFlush []flushItem) error {
+func (db *Database) writeFlushItems(toFlush []*flushItem) error {
 	batch := db.diskdb.NewBatch()
 	for _, item := range toFlush {
 		rlp := item.node.rlp()
@@ -618,12 +629,12 @@ func (db *Database) Cap(limit common.StorageSize) error {
 	}
 
 	// Keep removing nodes from the flush-list until we're below allowance
-	toFlush := make([]flushItem, 0, 128)
+	toFlush := make([]*flushItem, 0, 128)
 	oldest := db.oldest
 	for pendingSize > limit && oldest != (common.Hash{}) {
 		// Fetch the oldest referenced node and push into the batch
 		node := db.dirties[oldest]
-		toFlush = append(toFlush, flushItem{oldest, node, nil})
+		toFlush = append(toFlush, &flushItem{oldest, node, nil})
 
 		// Iterate to the next flush item, or abort if the size cap was achieved. Size
 		// is the total size, including the useful cached data (hash -> blob), the
@@ -689,7 +700,7 @@ func (db *Database) Commit(node common.Hash, report bool, callback func(common.H
 	db.lock.RLock()
 	lockStart := time.Now()
 	nodes, storage := len(db.dirties), db.dirtiesSize
-	toFlush, err := db.commit(node, make([]flushItem, 0, 128), callback)
+	toFlush, err := db.commit(node, make([]*flushItem, 0, 128), callback)
 	if err != nil {
 		log.Error("Failed to commit trie from trie database", "err", err)
 		return err
@@ -739,7 +750,7 @@ func (db *Database) Commit(node common.Hash, report bool, callback func(common.H
 //
 // [callback] will be invoked as soon as it is determined a trie node will be
 // flushed to disk (before it is actually written).
-func (db *Database) commit(hash common.Hash, toFlush []flushItem, callback func(common.Hash)) ([]flushItem, error) {
+func (db *Database) commit(hash common.Hash, toFlush []*flushItem, callback func(common.Hash)) ([]*flushItem, error) {
 	// If the node does not exist, it's a previously committed node
 	node, ok := db.dirties[hash]
 	if !ok {
@@ -757,7 +768,7 @@ func (db *Database) commit(hash common.Hash, toFlush []flushItem, callback func(
 	// By processing the children of each node before the node itself, we ensure
 	// that children are committed before their parents (an invariant of this
 	// package).
-	toFlush = append(toFlush, flushItem{hash, node, nil})
+	toFlush = append(toFlush, &flushItem{hash, node, nil})
 	if callback != nil {
 		callback(hash)
 	}
