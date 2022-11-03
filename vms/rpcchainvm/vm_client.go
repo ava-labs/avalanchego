@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/validators/gvalidators"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -56,6 +57,7 @@ import (
 	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
 	sharedmemorypb "github.com/ava-labs/avalanchego/proto/pb/sharedmemory"
 	subnetlookuppb "github.com/ava-labs/avalanchego/proto/pb/subnetlookup"
+	validatorstatepb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
 
@@ -89,12 +91,13 @@ type VMClient struct {
 	pid            int
 	processTracker resource.ProcessTracker
 
-	messenger    *messenger.Server
-	keystore     *gkeystore.Server
-	sharedMemory *gsharedmemory.Server
-	bcLookup     *galiasreader.Server
-	snLookup     *gsubnetlookup.Server
-	appSender    *appsender.Server
+	messenger            *messenger.Server
+	keystore             *gkeystore.Server
+	sharedMemory         *gsharedmemory.Server
+	bcLookup             *galiasreader.Server
+	snLookup             *gsubnetlookup.Server
+	appSender            *appsender.Server
+	validatorStateServer *gvalidators.Server
 
 	serverCloser grpcutils.ServerCloser
 	conns        []*grpc.ClientConn
@@ -181,6 +184,7 @@ func (vm *VMClient) Initialize(
 	vm.bcLookup = galiasreader.NewServer(ctx.BCLookup)
 	vm.snLookup = gsubnetlookup.NewServer(ctx.SNLookup)
 	vm.appSender = appsender.NewServer(appSender)
+	vm.validatorStateServer = gvalidators.NewServer(ctx.ValidatorState)
 
 	serverListener, err := grpcutils.NewListener()
 	if err != nil {
@@ -306,20 +310,15 @@ func (vm *VMClient) getInitServer(opts []grpc.ServerOption) *grpc.Server {
 
 	vm.serverCloser.Add(server)
 
-	// register the messenger service
+	// register the services
 	messengerpb.RegisterMessengerServer(server, vm.messenger)
-	// register the keystore service
 	keystorepb.RegisterKeystoreServer(server, vm.keystore)
-	// register the shared memory service
 	sharedmemorypb.RegisterSharedMemoryServer(server, vm.sharedMemory)
-	// register the blockchain alias service
 	aliasreaderpb.RegisterAliasReaderServer(server, vm.bcLookup)
-	// register the subnet alias service
 	subnetlookuppb.RegisterSubnetLookupServer(server, vm.snLookup)
-	// register the app sender service
 	appsenderpb.RegisterAppSenderServer(server, vm.appSender)
-	// register the health service
 	healthpb.RegisterHealthServer(server, grpcHealth)
+	validatorstatepb.RegisterValidatorStateServer(server, vm.validatorStateServer)
 
 	// Ensure metric counters are zeroed on restart
 	grpc_prometheus.Register(server)
