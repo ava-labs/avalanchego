@@ -45,8 +45,6 @@ const (
 
 var (
 	// [defaultUnexpandedDataDir] will be expanded when reading the flags
-	defaultNetworkName          = constants.CaminoName
-	homeDir                     = os.ExpandEnv("$HOME")
 	prefixedAppName             = fmt.Sprintf(".%s", constants.AppName)
 	defaultDataDir              = filepath.Join("$HOME", prefixedAppName)
 	defaultDBDir                = filepath.Join(defaultUnexpandedDataDir, "db")
@@ -111,7 +109,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(GenesisConfigContentKey, "", "Specifies base64 encoded genesis content")
 
 	// Network ID
-	fs.String(NetworkNameKey, constants.MainnetName, "Network ID this node will connect to")
+	fs.String(NetworkNameKey, constants.CaminoName, "Network ID this node will connect to")
 
 	// AVAX fees
 	fs.Uint64(TxFeeKey, genesis.LocalParams.TxFee, "Transaction fee, in nAVAX")
