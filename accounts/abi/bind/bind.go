@@ -658,7 +658,7 @@ func decapitalise(input string) string {
 func convertToNil(input abi.Type) string {
 	switch input.T {
 	case abi.IntTy, abi.UintTy:
-		return "0"
+		return "big.NewInt(0)"
 	case abi.StringTy:
 		return "\"\""
 	case abi.BoolTy:
