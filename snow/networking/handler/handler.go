@@ -32,6 +32,9 @@ import (
 const (
 	threadPoolSize        = 2
 	numDispatchersToClose = 3
+	// If a consensus message takes longer than this to process, the handler
+	// will log a warning.
+	syncProcessingTimeWarnLimit = time.Second
 )
 
 var _ Handler = (*handler)(nil)
@@ -394,15 +397,23 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 		h.ctx.Lock.Unlock()
 
 		var (
-			endTime   = h.clock.Time()
-			histogram = h.metrics.messages[op]
+			endTime        = h.clock.Time()
+			histogram      = h.metrics.messages[op]
+			processingTime = endTime.Sub(startTime)
 		)
 		h.resourceTracker.StopProcessing(nodeID, endTime)
-		histogram.Observe(float64(endTime.Sub(startTime)))
+		histogram.Observe(float64(processingTime))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("finished handling sync message",
 			zap.Stringer("messageOp", op),
 		)
+		if processingTime > syncProcessingTimeWarnLimit && h.ctx.GetState() == snow.NormalOp {
+			h.ctx.Log.Warn("handling sync message took longer than expected",
+				zap.Duration("processingTime", processingTime),
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("message", msg),
+			)
+		}
 	}()
 
 	engine, err := h.getEngine()
