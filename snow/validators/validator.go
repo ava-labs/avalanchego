@@ -28,6 +28,11 @@ type Validator interface {
 type validator struct {
 	nodeID ids.NodeID
 	weight uint64
+
+	// index is used to efficiently remove validators from the validator set. It
+	// represents the index of this validator in the vdrSlice and weights
+	// arrays.
+	index int
 }
 
 func (v *validator) ID() ids.NodeID { return v.nodeID }

@@ -10,9 +10,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
@@ -30,8 +29,7 @@ var _ Set = (*set)(nil)
 
 // Set of validators that can be sampled
 type Set interface {
-	fmt.Stringer
-	PrefixedString(string) string
+	formatting.PrefixedStringer
 
 	// Set removes all the current validators and adds all the provided
 	// validators to the set.
@@ -66,14 +64,9 @@ type Set interface {
 	// If sampling the requested size isn't possible, an error will be returned.
 	Sample(size int) ([]Validator, error)
 
-	// MaskValidator hides the named validator from future samplings
-	MaskValidator(ids.NodeID) error
-
 	// When a validator's weight changes, or a validator is added/removed,
 	// this listener is called.
 	RegisterCallbackListener(SetCallbackListener)
-
-	RevealValidator(ids.NodeID) error
 }
 
 type SetCallbackListener interface {
@@ -85,7 +78,7 @@ type SetCallbackListener interface {
 // NewSet returns a new, empty set of validators.
 func NewSet() Set {
 	return &set{
-		vdrMap:  make(map[ids.NodeID]int),
+		vdrs:    make(map[ids.NodeID]*validator),
 		sampler: sampler.NewWeightedWithoutReplacement(),
 	}
 }
@@ -93,7 +86,7 @@ func NewSet() Set {
 // NewBestSet returns a new, empty set of validators.
 func NewBestSet(expectedSampleSize int) Set {
 	return &set{
-		vdrMap:  make(map[ids.NodeID]int),
+		vdrs:    make(map[ids.NodeID]*validator),
 		sampler: sampler.NewBestWeightedWithoutReplacement(expectedSampleSize),
 	}
 }
@@ -102,15 +95,15 @@ func NewBestSet(expectedSampleSize int) Set {
 // update a validators weight, one should ensure to call add with the updated
 // validator.
 type set struct {
-	initialized       bool
-	lock              sync.RWMutex
-	vdrMap            map[ids.NodeID]int
-	vdrSlice          []*validator
-	vdrWeights        []uint64
-	vdrMaskedWeights  []uint64
-	sampler           sampler.WeightedWithoutReplacement
-	totalWeight       uint64
-	maskedVdrs        ids.NodeIDSet
+	lock        sync.RWMutex
+	vdrs        map[ids.NodeID]*validator
+	vdrSlice    []*validator
+	weights     []uint64
+	totalWeight uint64
+
+	samplerInitialized bool
+	sampler            sampler.WeightedWithoutReplacement
+
 	callbackListeners []SetCallbackListener
 }
 
@@ -132,22 +125,22 @@ func (s *set) set(vdrs []Validator) error {
 		nodesInResultSet.Add(vdrID)
 
 		newWeight := vdr.Weight()
-		index, contains := s.vdrMap[vdrID]
+		vdr, contains := s.vdrs[vdrID]
 		if !contains {
 			s.callValidatorAddedCallbacks(vdrID, newWeight)
 			continue
 		}
 
-		existingWeight := s.vdrWeights[index]
+		existingWeight := vdr.weight
 		if existingWeight != newWeight {
 			s.callWeightChangeCallbacks(vdrID, existingWeight, newWeight)
 		}
 	}
 
 	// find all nodes that are going to be removed
-	for nodeID, index := range s.vdrMap {
-		if !nodesInResultSet.Contains(nodeID) {
-			s.callValidatorRemovedCallbacks(nodeID, s.vdrWeights[index])
+	for _, vdr := range s.vdrSlice {
+		if !nodesInResultSet.Contains(vdr.nodeID) {
+			s.callValidatorRemovedCallbacks(vdr.nodeID, vdr.weight)
 		}
 	}
 
@@ -160,16 +153,15 @@ func (s *set) set(vdrs []Validator) error {
 			newCap = lenVdrs
 		}
 		s.vdrSlice = make([]*validator, 0, newCap)
-		s.vdrWeights = make([]uint64, 0, newCap)
-		s.vdrMaskedWeights = make([]uint64, 0, newCap)
+		s.weights = make([]uint64, 0, newCap)
 	} else {
 		s.vdrSlice = s.vdrSlice[:0]
-		s.vdrWeights = s.vdrWeights[:0]
-		s.vdrMaskedWeights = s.vdrMaskedWeights[:0]
+		s.weights = s.weights[:0]
 	}
-	s.vdrMap = make(map[ids.NodeID]int, lenVdrs)
+
+	s.vdrs = make(map[ids.NodeID]*validator, lenVdrs)
 	s.totalWeight = 0
-	s.initialized = false
+	s.samplerInitialized = false
 
 	for _, vdr := range vdrs {
 		vdrID := vdr.ID()
@@ -181,21 +173,16 @@ func (s *set) set(vdrs []Validator) error {
 			continue // This validator would never be sampled anyway
 		}
 
-		i := len(s.vdrSlice)
-		s.vdrMap[vdrID] = i
-		s.vdrSlice = append(s.vdrSlice, &validator{
-			nodeID: vdr.ID(),
-			weight: vdr.Weight(),
-		})
-		s.vdrWeights = append(s.vdrWeights, w)
-		s.vdrMaskedWeights = append(s.vdrMaskedWeights, 0)
-
-		if s.maskedVdrs.Contains(vdrID) {
-			continue
+		newVdr := &validator{
+			nodeID: vdrID,
+			weight: w,
+			index:  len(s.vdrSlice),
 		}
-		s.vdrMaskedWeights[len(s.vdrMaskedWeights)-1] = w
+		s.vdrs[vdrID] = newVdr
+		s.vdrSlice = append(s.vdrSlice, newVdr)
+		s.weights = append(s.weights, w)
 
-		newTotalWeight, err := safemath.Add64(s.totalWeight, w)
+		newTotalWeight, err := math.Add64(s.totalWeight, w)
 		if err != nil {
 			return err
 		}
@@ -208,6 +195,7 @@ func (s *set) AddWeight(vdrID ids.NodeID, weight uint64) error {
 	if weight == 0 {
 		return nil // This validator would never be sampled anyway
 	}
+
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -215,41 +203,33 @@ func (s *set) AddWeight(vdrID ids.NodeID, weight uint64) error {
 }
 
 func (s *set) addWeight(vdrID ids.NodeID, weight uint64) error {
-	var vdr *validator
-	i, nodeExists := s.vdrMap[vdrID]
+	vdr, nodeExists := s.vdrs[vdrID]
 	if !nodeExists {
 		vdr = &validator{
 			nodeID: vdrID,
+			index:  len(s.vdrSlice),
 		}
-		i = len(s.vdrSlice)
+		s.vdrs[vdrID] = vdr
 		s.vdrSlice = append(s.vdrSlice, vdr)
-		s.vdrWeights = append(s.vdrWeights, 0)
-		s.vdrMaskedWeights = append(s.vdrMaskedWeights, 0)
-		s.vdrMap[vdrID] = i
+		s.weights = append(s.weights, 0)
+
 		s.callValidatorAddedCallbacks(vdrID, weight)
-	} else {
-		vdr = s.vdrSlice[i]
 	}
 
-	oldWeight := s.vdrWeights[i]
-	s.vdrWeights[i] += weight
+	oldWeight := vdr.weight
+	s.weights[vdr.index] += weight
 	vdr.addWeight(weight)
 
 	if nodeExists {
 		s.callWeightChangeCallbacks(vdrID, oldWeight, vdr.weight)
 	}
 
-	if s.maskedVdrs.Contains(vdrID) {
-		return nil
-	}
-	s.vdrMaskedWeights[i] += weight
-
-	newTotalWeight, err := safemath.Add64(s.totalWeight, weight)
+	newTotalWeight, err := math.Add64(s.totalWeight, weight)
 	if err != nil {
 		return nil
 	}
 	s.totalWeight = newTotalWeight
-	s.initialized = false
+	s.samplerInitialized = false
 	return nil
 }
 
@@ -261,8 +241,8 @@ func (s *set) GetWeight(vdrID ids.NodeID) (uint64, bool) {
 }
 
 func (s *set) getWeight(vdrID ids.NodeID) (uint64, bool) {
-	if index, ok := s.vdrMap[vdrID]; ok {
-		return s.vdrMaskedWeights[index], true
+	if vdr, ok := s.vdrs[vdrID]; ok {
+		return vdr.weight, true
 	}
 	return 0, false
 }
@@ -277,7 +257,7 @@ func (s *set) SubsetWeight(subset ids.NodeIDSet) (uint64, error) {
 		if !ok {
 			continue
 		}
-		newWeight, err := safemath.Add64(totalWeight, weight)
+		newWeight, err := math.Add64(totalWeight, weight)
 		if err != nil {
 			return 0, err
 		}
@@ -290,6 +270,7 @@ func (s *set) RemoveWeight(vdrID ids.NodeID, weight uint64) error {
 	if weight == 0 {
 		return nil
 	}
+
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -297,22 +278,18 @@ func (s *set) RemoveWeight(vdrID ids.NodeID, weight uint64) error {
 }
 
 func (s *set) removeWeight(vdrID ids.NodeID, weight uint64) error {
-	i, ok := s.vdrMap[vdrID]
+	vdr, ok := s.vdrs[vdrID]
 	if !ok {
 		return nil
 	}
 
 	// Validator exists
-	vdr := s.vdrSlice[i]
 
-	oldWeight := s.vdrWeights[i]
-	weight = safemath.Min(oldWeight, weight)
-	s.vdrWeights[i] -= weight
+	oldWeight := vdr.weight
+	weight = math.Min(oldWeight, weight)
+	s.weights[vdr.index] -= weight
 	vdr.removeWeight(weight)
-	if !s.maskedVdrs.Contains(vdrID) {
-		s.totalWeight -= weight
-		s.vdrMaskedWeights[i] -= weight
-	}
+	s.totalWeight -= weight
 
 	if vdr.Weight() == 0 {
 		s.callValidatorRemovedCallbacks(vdrID, oldWeight)
@@ -322,7 +299,7 @@ func (s *set) removeWeight(vdrID ids.NodeID, weight uint64) error {
 	} else {
 		s.callWeightChangeCallbacks(vdrID, oldWeight, vdr.weight)
 	}
-	s.initialized = false
+	s.samplerInitialized = false
 	return nil
 }
 
@@ -334,46 +311,38 @@ func (s *set) Get(vdrID ids.NodeID) (Validator, bool) {
 }
 
 func (s *set) get(vdrID ids.NodeID) (Validator, bool) {
-	index, ok := s.vdrMap[vdrID]
-	if !ok {
-		return nil, false
-	}
-	return s.vdrSlice[index], true
+	vdr, ok := s.vdrs[vdrID]
+	return vdr, ok
 }
 
 func (s *set) remove(vdrID ids.NodeID) error {
 	// Get the element to remove
-	i, contains := s.vdrMap[vdrID]
+	vdrToRemove, contains := s.vdrs[vdrID]
 	if !contains {
 		return nil
 	}
 
 	// Get the last element
-	e := len(s.vdrSlice) - 1
-	eVdr := s.vdrSlice[e]
+	lastIndex := len(s.vdrSlice) - 1
+	vdrToSwap := s.vdrSlice[lastIndex]
 
-	// Move e -> i
-	iElem := s.vdrSlice[i]
-	s.vdrMap[eVdr.ID()] = i
-	s.vdrSlice[i] = eVdr
-	s.vdrWeights[i] = s.vdrWeights[e]
-	s.vdrMaskedWeights[i] = s.vdrMaskedWeights[e]
+	// Move element at last index --> index of removed validator
+	vdrToSwap.index = vdrToRemove.index
+	s.vdrSlice[vdrToRemove.index] = vdrToSwap
+	s.weights[vdrToRemove.index] = vdrToSwap.weight
 
-	// Remove i
-	delete(s.vdrMap, vdrID)
-	s.vdrSlice[e] = nil
-	s.vdrSlice = s.vdrSlice[:e]
-	s.vdrWeights = s.vdrWeights[:e]
-	s.vdrMaskedWeights = s.vdrMaskedWeights[:e]
+	// Remove validator
+	delete(s.vdrs, vdrID)
+	s.vdrSlice[lastIndex] = nil
+	s.vdrSlice = s.vdrSlice[:lastIndex]
+	s.weights = s.weights[:lastIndex]
 
-	if !s.maskedVdrs.Contains(vdrID) {
-		newTotalWeight, err := safemath.Sub(s.totalWeight, iElem.Weight())
-		if err != nil {
-			return err
-		}
-		s.totalWeight = newTotalWeight
+	newTotalWeight, err := math.Sub(s.totalWeight, vdrToRemove.weight)
+	if err != nil {
+		return err
 	}
-	s.initialized = false
+	s.totalWeight = newTotalWeight
+	s.samplerInitialized = false
 	return nil
 }
 
@@ -385,7 +354,7 @@ func (s *set) Contains(vdrID ids.NodeID) bool {
 }
 
 func (s *set) contains(vdrID ids.NodeID) bool {
-	_, contains := s.vdrMap[vdrID]
+	_, contains := s.vdrs[vdrID]
 	return contains
 }
 
@@ -417,6 +386,7 @@ func (s *set) Sample(size int) ([]Validator, error) {
 	if size == 0 {
 		return nil, nil
 	}
+
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -424,12 +394,13 @@ func (s *set) Sample(size int) ([]Validator, error) {
 }
 
 func (s *set) sample(size int) ([]Validator, error) {
-	if !s.initialized {
-		if err := s.sampler.Initialize(s.vdrMaskedWeights); err != nil {
+	if !s.samplerInitialized {
+		if err := s.sampler.Initialize(s.weights); err != nil {
 			return nil, err
 		}
-		s.initialized = true
+		s.samplerInitialized = true
 	}
+
 	indices, err := s.sampler.Sample(size)
 	if err != nil {
 		return nil, err
@@ -463,85 +434,21 @@ func (s *set) PrefixedString(prefix string) string {
 func (s *set) prefixedString(prefix string) string {
 	sb := strings.Builder{}
 
-	totalWeight := uint64(0)
-	for _, weight := range s.vdrWeights {
-		totalWeight += weight
-	}
-
-	sb.WriteString(fmt.Sprintf("Validator Set: (Size = %d, SampleableWeight = %d, Weight = %d)",
+	sb.WriteString(fmt.Sprintf("Validator Set: (Size = %d, Weight = %d)",
 		len(s.vdrSlice),
 		s.totalWeight,
-		totalWeight,
 	))
-	format := fmt.Sprintf("\n%s    Validator[%s]: %%33s, %%d/%%d", prefix, formatting.IntFormat(len(s.vdrSlice)-1))
+	format := fmt.Sprintf("\n%s    Validator[%s]: %%33s, %%d", prefix, formatting.IntFormat(len(s.vdrSlice)-1))
 	for i, vdr := range s.vdrSlice {
-		sb.WriteString(fmt.Sprintf(format,
+		sb.WriteString(fmt.Sprintf(
+			format,
 			i,
 			vdr.ID(),
-			s.vdrMaskedWeights[i],
-			vdr.Weight()))
+			vdr.Weight(),
+		))
 	}
 
 	return sb.String()
-}
-
-func (s *set) MaskValidator(vdrID ids.NodeID) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	return s.maskValidator(vdrID)
-}
-
-func (s *set) maskValidator(vdrID ids.NodeID) error {
-	if s.maskedVdrs.Contains(vdrID) {
-		return nil
-	}
-
-	s.maskedVdrs.Add(vdrID)
-
-	// Get the element to mask
-	i, contains := s.vdrMap[vdrID]
-	if !contains {
-		return nil
-	}
-
-	s.vdrMaskedWeights[i] = 0
-	s.totalWeight -= s.vdrWeights[i]
-	s.initialized = false
-
-	return nil
-}
-
-func (s *set) RevealValidator(vdrID ids.NodeID) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	return s.revealValidator(vdrID)
-}
-
-func (s *set) revealValidator(vdrID ids.NodeID) error {
-	if !s.maskedVdrs.Contains(vdrID) {
-		return nil
-	}
-
-	s.maskedVdrs.Remove(vdrID)
-
-	// Get the element to reveal
-	i, contains := s.vdrMap[vdrID]
-	if !contains {
-		return nil
-	}
-
-	weight := s.vdrWeights[i]
-	s.vdrMaskedWeights[i] = weight
-	newTotalWeight, err := safemath.Add64(s.totalWeight, weight)
-	if err != nil {
-		return err
-	}
-	s.totalWeight = newTotalWeight
-	s.initialized = false
-
-	return nil
 }
 
 func (s *set) RegisterCallbackListener(callbackListener SetCallbackListener) {
@@ -549,8 +456,8 @@ func (s *set) RegisterCallbackListener(callbackListener SetCallbackListener) {
 	defer s.lock.Unlock()
 
 	s.callbackListeners = append(s.callbackListeners, callbackListener)
-	for node, index := range s.vdrMap {
-		callbackListener.OnValidatorAdded(node, s.vdrWeights[index])
+	for _, vdr := range s.vdrSlice {
+		callbackListener.OnValidatorAdded(vdr.nodeID, vdr.weight)
 	}
 }
 
