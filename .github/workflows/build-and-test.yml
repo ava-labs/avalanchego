@@ -9,16 +9,12 @@ on:
 jobs:
   run_build_unit_tests:
     name: build_unit_test
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [macos-11, macos-12, ubuntu-20.04, ubuntu-22.04, windows-latest, [self-hosted, linux, ARM64, focal],[self-hosted, linux, ARM64, jammy]]
+    runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
         with:
-          go-version: '1.18'
-          check-latest: true
-      - name: build_test
+          go-version: "1.18" # The Go version to download (if necessary) and use.
+      - name: test
         shell: bash
         run: scripts/test.sh
