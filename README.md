@@ -1,4 +1,3 @@
-
 # Subnet EVM
 
 [![Build + Test + Release](https://github.com/ava-labs/subnet-evm/actions/workflows/lint-tests-release.yml/badge.svg)](https://github.com/ava-labs/subnet-evm/actions/workflows/lint-tests-release.yml)
@@ -19,20 +18,21 @@ The Subnet EVM runs in a separate process from the main AvalancheGo process and 
 ### AvalancheGo Compatibility
 
 ```text
-[v0.1.0] AvalancheGo@v1.7.0-v1.7.4
-[v0.1.1-v0.1.2] AvalancheGo@v1.7.5-v1.7.6
-[v0.2.0] AvalancheGo@v1.7.7-v1.7.9
-[v0.2.1] AvalancheGo@v1.7.10
-[v0.2.2] AvalancheGo@v1.7.11-v1.7.12
-[v0.2.3] AvalancheGo@v1.7.13-v1.7.16
-[v0.2.4] AvalancheGo@v1.7.13-v1.7.16
-[v0.2.5] AvalancheGo@v1.7.13-v1.7.16
-[v0.2.6] AvalancheGo@v1.7.13-v1.7.16
-[v0.2.7] AvalancheGo@v1.7.13-v1.7.16
-[v0.2.8] AvalancheGo@v1.7.13-v1.7.18
-[v0.2.9] AvalancheGo@v1.7.13-v1.7.18
-[v0.3.0] AvalancheGo@v1.8.0-v1.8.6
-[v0.4.0] AvalancheGo@v1.9.0
+[v0.1.0] AvalancheGo@v1.7.0-v1.7.4 (Protocol Version: 9)
+[v0.1.1-v0.1.2] AvalancheGo@v1.7.5-v1.7.6 (Protocol Version: 10)
+[v0.2.0] AvalancheGo@v1.7.7-v1.7.9 (Protocol Version: 11)
+[v0.2.1] AvalancheGo@v1.7.10 (Protocol Version: 12)
+[v0.2.2] AvalancheGo@v1.7.11-v1.7.12 (Protocol Version: 14)
+[v0.2.3] AvalancheGo@v1.7.13-v1.7.16 (Protocol Version: 15)
+[v0.2.4] AvalancheGo@v1.7.13-v1.7.16 (Protocol Version: 15)
+[v0.2.5] AvalancheGo@v1.7.13-v1.7.16 (Protocol Version: 15)
+[v0.2.6] AvalancheGo@v1.7.13-v1.7.16 (Protocol Version: 15)
+[v0.2.7] AvalancheGo@v1.7.13-v1.7.16 (Protocol Version: 15)
+[v0.2.8] AvalancheGo@v1.7.13-v1.7.18 (Protocol Version: 15)
+[v0.2.9] AvalancheGo@v1.7.13-v1.7.18 (Protocol Version: 15)
+[v0.3.0] AvalancheGo@v1.8.0-v1.8.6 (Protocol Version: 16)
+[v0.4.0] AvalancheGo@v1.9.0 (Protocol Version: 17)
+[v0.4.1] AvalancheGo@v1.9.1 (Protocol Version: 18)
 ```
 
 ## API
