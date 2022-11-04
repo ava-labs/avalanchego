@@ -802,8 +802,8 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
 
-	var bootstrapFunc func()
 	// first vm to be init is P-Chain once, which provides validator interface to all ProposerVMs
+	var bootstrapFunc func()
 	if m.validatorState == nil {
 		valState, ok := vm.(validators.State)
 		if !ok {
@@ -826,6 +826,9 @@ func (m *manager) createSnowmanChain(
 		}
 
 		// Set this func only for platform
+		//
+		// The snowman bootstrapper ensures this function is only executed once, so
+		// we don't need to be concerned about closing this channel multiple times.
 		bootstrapFunc = func() { close(m.unblockChainCreatorCh) }
 	}
 

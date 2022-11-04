@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -72,6 +73,10 @@ type bootstrapper struct {
 	// empty. This is to attempt to prevent requesting containers from that peer
 	// again.
 	fetchFrom ids.NodeIDSet
+
+	// bootstrappedOnce ensures that the [Bootstrapped] callback is only invoked
+	// once, even if bootstrapping is retried.
+	bootstrappedOnce sync.Once
 }
 
 func New(config Config, onFinished func(lastReqID uint32) error) (common.BootstrapableEngine, error) {
@@ -559,7 +564,9 @@ func (b *bootstrapper) checkFinish() error {
 	// If there is an additional callback, notify them that this chain has been
 	// synced.
 	if b.Bootstrapped != nil {
-		b.Bootstrapped()
+		b.bootstrappedOnce.Do(func() {
+			b.Bootstrapped()
+		})
 	}
 
 	// Notify the subnet that this chain is synced
