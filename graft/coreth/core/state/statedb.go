@@ -129,6 +129,7 @@ type StateDB struct {
 	SnapshotAccountReads time.Duration
 	SnapshotStorageReads time.Duration
 	SnapshotCommits      time.Duration
+	TrieDBCommits        time.Duration
 
 	AccountUpdated int
 	StorageUpdated int
@@ -1068,6 +1069,9 @@ func (s *StateDB) commit(deleteEmptyObjects bool, snaps *snapshot.Tree, blockHas
 		}
 	}
 	s.originalRoot = root
+	if metrics.EnabledExpensive {
+		s.TrieDBCommits += time.Since(start)
+	}
 	return root, err
 }
 
