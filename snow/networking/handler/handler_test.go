@@ -37,10 +37,14 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	err = vdrs.AddWeight(vdr0, 1)
 	require.NoError(t, err)
 
-	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	resourceTracker, err := tracker.NewResourceTracker(
+		prometheus.NewRegistry(),
+		resource.NoUsage,
+		meter.ContinuousFactory{},
+		time.Second,
+	)
 	require.NoError(t, err)
 	handlerIntf, err := New(
-		mc,
 		ctx,
 		vdrs,
 		nil,
@@ -73,22 +77,19 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
 
 	pastTime := time.Now()
-	mc.SetTime(pastTime)
 	handler.clock.Set(pastTime)
 
 	nodeID := ids.EmptyNodeID
 	reqID := uint32(1)
-	deadline := time.Nanosecond
 	chainID := ids.ID{}
-	msg := mc.InboundGetAcceptedFrontier(chainID, reqID, deadline, nodeID)
+	msg := mc.InboundGetAcceptedFrontier(chainID, reqID, 0*time.Second, nodeID)
 	handler.Push(context.Background(), msg)
 
 	currentTime := time.Now().Add(time.Second)
-	mc.SetTime(currentTime)
 	handler.clock.Set(currentTime)
 
 	reqID++
-	msg = mc.InboundGetAccepted(chainID, reqID, deadline, nil, nodeID)
+	msg = mc.InboundGetAccepted(chainID, reqID, 1*time.Second, nil, nodeID)
 	handler.Push(context.Background(), msg)
 
 	bootstrapper.StartF = func(startReqID uint32) error { return nil }
@@ -115,10 +116,14 @@ func TestHandlerClosesOnError(t *testing.T) {
 	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
 	require.NoError(t, err)
 
-	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	resourceTracker, err := tracker.NewResourceTracker(
+		prometheus.NewRegistry(),
+		resource.NoUsage,
+		meter.ContinuousFactory{},
+		time.Second,
+	)
 	require.NoError(t, err)
 	handlerIntf, err := New(
-		mc,
 		ctx,
 		vdrs,
 		nil,
@@ -183,11 +188,14 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	err := vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
 	require.NoError(t, err)
 
-	mc := message.NewInternalBuilder()
-	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	resourceTracker, err := tracker.NewResourceTracker(
+		prometheus.NewRegistry(),
+		resource.NoUsage,
+		meter.ContinuousFactory{},
+		time.Second,
+	)
 	require.NoError(t, err)
 	handlerIntf, err := New(
-		mc,
 		ctx,
 		vdrs,
 		nil,
@@ -224,7 +232,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	nodeID := ids.EmptyNodeID
 	chainID := ids.Empty
 	reqID := uint32(1)
-	inMsg := mc.InternalFailedRequest(message.GetFailed, nodeID, chainID, chainID, reqID)
+	inMsg := message.InternalGetFailed(nodeID, chainID, reqID)
 	handler.Push(context.Background(), inMsg)
 
 	ticker := time.NewTicker(time.Second)
@@ -244,11 +252,14 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	err := vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
 	require.NoError(t, err)
 
-	mc := message.NewInternalBuilder()
-	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	resourceTracker, err := tracker.NewResourceTracker(
+		prometheus.NewRegistry(),
+		resource.NoUsage,
+		meter.ContinuousFactory{},
+		time.Second,
+	)
 	require.NoError(t, err)
 	handler, err := New(
-		mc,
 		ctx,
 		vdrs,
 		msgFromVMChan,

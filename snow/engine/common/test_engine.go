@@ -180,7 +180,10 @@ func (e *EngineTest) Start(startReqID uint32) error {
 	if e.StartF != nil {
 		return e.StartF(startReqID)
 	}
-	if e.CantStart && e.T != nil {
+	if !e.CantStart {
+		return nil
+	}
+	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called Start")
 	}
 	return errStart
@@ -190,7 +193,10 @@ func (e *EngineTest) Context() *snow.ConsensusContext {
 	if e.ContextF != nil {
 		return e.ContextF()
 	}
-	if e.CantContext && e.T != nil {
+	if !e.CantContext {
+		return nil
+	}
+	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called Context")
 	}
 	return nil
@@ -225,7 +231,9 @@ func (e *EngineTest) Gossip() error {
 func (e *EngineTest) Halt() {
 	if e.HaltF != nil {
 		e.HaltF()
-	} else if e.CantHalt && e.T != nil {
+		return
+	}
+	if e.CantHalt && e.T != nil {
 		e.T.Fatalf("Unexpectedly called Halt")
 	}
 }
@@ -260,7 +268,10 @@ func (e *EngineTest) GetStateSummaryFrontier(ctx context.Context, validatorID id
 	if e.GetStateSummaryFrontierF != nil {
 		return e.GetStateSummaryFrontierF(ctx, validatorID, requestID)
 	}
-	if e.CantGetStateSummaryFrontier && e.T != nil {
+	if !e.CantGetStateSummaryFrontier {
+		return nil
+	}
+	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called GetStateSummaryFrontier")
 	}
 	return errGetStateSummaryFrontier
@@ -270,7 +281,10 @@ func (e *EngineTest) StateSummaryFrontier(ctx context.Context, validatorID ids.N
 	if e.StateSummaryFrontierF != nil {
 		return e.StateSummaryFrontierF(ctx, validatorID, requestID, summary)
 	}
-	if e.CantGetStateSummaryFrontier && e.T != nil {
+	if !e.CantStateSummaryFrontier {
+		return nil
+	}
+	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called CantStateSummaryFrontier")
 	}
 	return errStateSummaryFrontier
@@ -280,7 +294,10 @@ func (e *EngineTest) GetStateSummaryFrontierFailed(ctx context.Context, validato
 	if e.GetStateSummaryFrontierFailedF != nil {
 		return e.GetStateSummaryFrontierFailedF(ctx, validatorID, requestID)
 	}
-	if e.CantGetStateSummaryFrontierFailed && e.T != nil {
+	if !e.CantGetStateSummaryFrontierFailed {
+		return nil
+	}
+	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called GetStateSummaryFrontierFailed")
 	}
 	return errGetStateSummaryFrontierFailed
@@ -290,7 +307,10 @@ func (e *EngineTest) GetAcceptedStateSummary(ctx context.Context, validatorID id
 	if e.GetAcceptedStateSummaryF != nil {
 		return e.GetAcceptedStateSummaryF(ctx, validatorID, requestID, keys)
 	}
-	if e.CantGetAcceptedStateSummary && e.T != nil {
+	if !e.CantGetAcceptedStateSummary {
+		return nil
+	}
+	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called GetAcceptedStateSummary")
 	}
 	return errGetAcceptedStateSummary
@@ -300,7 +320,10 @@ func (e *EngineTest) AcceptedStateSummary(ctx context.Context, validatorID ids.N
 	if e.AcceptedStateSummaryF != nil {
 		return e.AcceptedStateSummaryF(ctx, validatorID, requestID, summaryIDs)
 	}
-	if e.CantAcceptedStateSummary && e.T != nil {
+	if !e.CantAcceptedStateSummary {
+		return nil
+	}
+	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called AcceptedStateSummary")
 	}
 	return errAcceptedStateSummary
@@ -310,7 +333,10 @@ func (e *EngineTest) GetAcceptedStateSummaryFailed(ctx context.Context, validato
 	if e.GetAcceptedStateSummaryFailedF != nil {
 		return e.GetAcceptedStateSummaryFailedF(ctx, validatorID, requestID)
 	}
-	if e.CantGetAcceptedStateSummaryFailed && e.T != nil {
+	if !e.CantGetAcceptedStateSummaryFailed {
+		return nil
+	}
+	if e.T != nil {
 		e.T.Fatalf("Unexpectedly called GetAcceptedStateSummaryFailed")
 	}
 	return errGetAcceptedStateSummaryFailed
@@ -521,7 +547,6 @@ func (e *EngineTest) CrossChainAppRequest(ctx context.Context, chainID ids.ID, r
 	if e.T != nil {
 		e.T.Fatal(errCrossChainAppRequest)
 	}
-
 	return errCrossChainAppRequest
 }
 
@@ -535,7 +560,6 @@ func (e *EngineTest) CrossChainAppRequestFailed(ctx context.Context, chainID ids
 	if e.T != nil {
 		e.T.Fatal(errCrossChainAppRequestFailed)
 	}
-
 	return errCrossChainAppRequestFailed
 }
 
@@ -549,7 +573,6 @@ func (e *EngineTest) CrossChainAppResponse(ctx context.Context, chainID ids.ID, 
 	if e.T != nil {
 		e.T.Fatal(errCrossChainAppResponse)
 	}
-
 	return errCrossChainAppResponse
 }
 
@@ -648,7 +671,10 @@ func (e *EngineTest) HealthCheck() (interface{}, error) {
 	if e.HealthF != nil {
 		return e.HealthF()
 	}
-	if e.CantHealth && e.T != nil {
+	if !e.CantHealth {
+		return nil, nil
+	}
+	if e.T != nil {
 		e.T.Fatal(errHealthCheck)
 	}
 	return nil, errHealthCheck

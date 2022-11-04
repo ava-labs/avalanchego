@@ -35,7 +35,6 @@ func Trace(router Router, tracer trace.Tracer) Router {
 func (r *tracedRouter) Initialize(
 	nodeID ids.NodeID,
 	log logging.Logger,
-	msgCreator message.InternalMsgBuilder,
 	timeoutManager timeout.Manager,
 	closeTimeout time.Duration,
 	criticalChains ids.Set,
@@ -48,7 +47,6 @@ func (r *tracedRouter) Initialize(
 	return r.router.Initialize(
 		nodeID,
 		log,
-		msgCreator,
 		timeoutManager,
 		closeTimeout,
 		criticalChains,
@@ -67,6 +65,7 @@ func (r *tracedRouter) RegisterRequest(
 	respondingChainID ids.ID,
 	requestID uint32,
 	op message.Op,
+	failedMsg message.InboundMessage,
 ) {
 	r.router.RegisterRequest(
 		ctx,
@@ -75,6 +74,7 @@ func (r *tracedRouter) RegisterRequest(
 		respondingChainID,
 		requestID,
 		op,
+		failedMsg,
 	)
 }
 

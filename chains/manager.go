@@ -659,7 +659,6 @@ func (m *manager) createAvalancheChain(
 
 	// Asynchronously passes messages from the network to the consensus engine
 	handler, err := handler.New(
-		m.MsgCreator,
 		ctx,
 		vdrs,
 		msgChan,
@@ -887,7 +886,6 @@ func (m *manager) createSnowmanChain(
 
 	// Asynchronously passes messages from the network to the consensus engine
 	handler, err := handler.New(
-		m.MsgCreator,
 		ctx,
 		vdrs,
 		msgChan,

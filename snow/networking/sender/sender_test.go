@@ -61,27 +61,54 @@ func TestTimeout(t *testing.T) {
 	chainRouter := router.ChainRouter{}
 
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
+	mc, err := message.NewCreator(
+		metrics,
+		"dummyNamespace",
+		true,
+		10*time.Second,
+	)
 	require.NoError(t, err)
 
-	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(
+		ids.EmptyNodeID,
+		logging.NoLog{},
+		tm,
+		time.Second,
+		ids.Set{},
+		ids.Set{},
+		nil,
+		router.HealthConfig{},
+		"",
+		prometheus.NewRegistry(),
+	)
 	require.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(ctx, mc, externalSender, &chainRouter, tm, defaultGossipConfig)
+	sender, err := New(
+		ctx,
+		mc,
+		externalSender,
+		&chainRouter,
+		tm,
+		defaultGossipConfig,
+	)
 	require.NoError(t, err)
 
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 	failedVDRs := ids.NodeIDSet{}
 	ctx2 := snow.DefaultConsensusContextTest()
-	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	resourceTracker, err := tracker.NewResourceTracker(
+		prometheus.NewRegistry(),
+		resource.NoUsage,
+		meter.ContinuousFactory{},
+		time.Second,
+	)
 	require.NoError(t, err)
 	handler, err := handler.New(
-		mc,
 		ctx2,
 		vdrs,
 		nil,
@@ -153,10 +180,26 @@ func TestReliableMessages(t *testing.T) {
 	chainRouter := router.ChainRouter{}
 
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
+	mc, err := message.NewCreator(
+		metrics,
+		"dummyNamespace",
+		true,
+		10*time.Second,
+	)
 	require.NoError(t, err)
 
-	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(
+		ids.EmptyNodeID,
+		logging.NoLog{},
+		tm,
+		time.Second,
+		ids.Set{},
+		ids.Set{},
+		nil,
+		router.HealthConfig{},
+		"",
+		prometheus.NewRegistry(),
+	)
 	require.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
@@ -164,14 +207,25 @@ func TestReliableMessages(t *testing.T) {
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(ctx, mc, externalSender, &chainRouter, tm, defaultGossipConfig)
+	sender, err := New(
+		ctx,
+		mc,
+		externalSender,
+		&chainRouter,
+		tm,
+		defaultGossipConfig,
+	)
 	require.NoError(t, err)
 
 	ctx2 := snow.DefaultConsensusContextTest()
-	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	resourceTracker, err := tracker.NewResourceTracker(
+		prometheus.NewRegistry(),
+		resource.NoUsage,
+		meter.ContinuousFactory{},
+		time.Second,
+	)
 	require.NoError(t, err)
 	handler, err := handler.New(
-		mc,
 		ctx2,
 		vdrs,
 		nil,
@@ -250,10 +304,26 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	chainRouter := router.ChainRouter{}
 
 	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
+	mc, err := message.NewCreator(
+		metrics,
+		"dummyNamespace",
+		true,
+		10*time.Second,
+	)
 	require.NoError(t, err)
 
-	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, tm, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(
+		ids.EmptyNodeID,
+		logging.NoLog{},
+		tm,
+		time.Second,
+		ids.Set{},
+		ids.Set{},
+		nil,
+		router.HealthConfig{},
+		"",
+		prometheus.NewRegistry(),
+	)
 	require.NoError(t, err)
 
 	ctx := snow.DefaultConsensusContextTest()
@@ -265,10 +335,14 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx2 := snow.DefaultConsensusContextTest()
-	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	resourceTracker, err := tracker.NewResourceTracker(
+		prometheus.NewRegistry(),
+		resource.NoUsage,
+		meter.ContinuousFactory{},
+		time.Second,
+	)
 	require.NoError(t, err)
 	handler, err := handler.New(
-		mc,
 		ctx2,
 		vdrs,
 		nil,

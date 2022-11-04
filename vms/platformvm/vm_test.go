@@ -57,6 +57,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
@@ -1700,7 +1701,18 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
 	require.NoError(err)
 
-	err = chainRouter.Initialize(ids.EmptyNodeID, logging.NoLog{}, mc, timeoutManager, time.Second, ids.Set{}, ids.Set{}, nil, router.HealthConfig{}, "", prometheus.NewRegistry())
+	err = chainRouter.Initialize(
+		ids.EmptyNodeID,
+		logging.NoLog{},
+		timeoutManager,
+		time.Second,
+		ids.Set{},
+		ids.Set{},
+		nil,
+		router.HealthConfig{},
+		"",
+		prometheus.NewRegistry(),
+	)
 	require.NoError(err)
 
 	externalSender := &sender.ExternalSenderTest{TB: t}
@@ -1726,11 +1738,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
 		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		require.NoError(err)
-		require.Equal(message.GetAcceptedFrontier, inMsg.Op())
+		require.Equal(message.GetAcceptedFrontierOp, inMsg.Op())
 
-		requestIDIntf, err := inMsg.Get(message.RequestID)
-		require.NoError(err)
-		requestID, ok := requestIDIntf.(uint32)
+		requestID, ok := message.GetRequestID(inMsg.Message())
 		require.True(ok)
 
 		reqID = requestID
@@ -1775,11 +1785,15 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	// Asynchronously passes messages from the network to the consensus engine
-	cpuTracker, err := timetracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	cpuTracker, err := timetracker.NewResourceTracker(
+		prometheus.NewRegistry(),
+		resource.NoUsage,
+		meter.ContinuousFactory{},
+		time.Second,
+	)
 	require.NoError(err)
 
 	handler, err := handler.New(
-		mc,
 		bootstrapConfig.Ctx,
 		vdrs,
 		msgChan,
@@ -1832,17 +1846,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
-		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		require.NoError(err)
-		require.Equal(message.GetAccepted, inMsg.Op())
+		require.Equal(message.GetAcceptedOp, inMsgIntf.Op())
+		inMsg := inMsgIntf.Message().(*p2ppb.GetAccepted)
 
-		requestIDIntf, err := inMsg.Get(message.RequestID)
-		require.NoError(err)
-
-		requestID, ok := requestIDIntf.(uint32)
-		require.True(ok)
-
-		reqID = requestID
+		reqID = inMsg.RequestId
 		return nodeIDs
 	}
 
@@ -1852,22 +1861,14 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
-		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
+		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		require.NoError(err)
-		require.Equal(message.GetAncestors, inMsg.Op())
+		require.Equal(message.GetAncestorsOp, inMsgIntf.Op())
+		inMsg := inMsgIntf.Message().(*p2ppb.GetAncestors)
 
-		requestIDIntf, err := inMsg.Get(message.RequestID)
-		require.NoError(err)
-		requestID, ok := requestIDIntf.(uint32)
-		require.True(ok)
+		reqID = inMsg.RequestId
 
-		reqID = requestID
-
-		containerIDIntf, err := inMsg.Get(message.ContainerID)
-		require.NoError(err)
-		containerIDBytes, ok := containerIDIntf.([]byte)
-		require.True(ok)
-		containerID, err := ids.ToID(containerIDBytes)
+		containerID, err := ids.ToID(inMsg.ContainerId)
 		require.NoError(err)
 		if containerID != advanceTimeBlkID {
 			t.Fatalf("wrong block requested")

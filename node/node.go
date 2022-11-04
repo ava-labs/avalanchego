@@ -686,7 +686,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	err = n.Config.ConsensusRouter.Initialize(
 		n.ID,
 		n.Log,
-		n.msgCreator,
 		timeoutManager,
 		n.Config.ConsensusShutdownTimeout,
 		criticalChains,

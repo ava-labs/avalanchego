@@ -24,9 +24,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/networking/worker"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/version"
+
+	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
 const (
@@ -71,7 +71,6 @@ type handler struct {
 	clock mockable.Clock
 
 	ctx *snow.ConsensusContext
-	mc  message.InternalMsgBuilder
 	// The validator set that validates this chain
 	validators validators.Set
 	// Receives messages from the VM
@@ -109,7 +108,6 @@ type handler struct {
 // Initialize this consensus handler
 // [engine] must be initialized before initializing this handler
 func New(
-	mc message.InternalMsgBuilder,
 	ctx *snow.ConsensusContext,
 	validators validators.Set,
 	msgFromVMChan <-chan common.Message,
@@ -119,7 +117,6 @@ func New(
 ) (Handler, error) {
 	h := &handler{
 		ctx:              ctx,
-		mc:               mc,
 		validators:       validators,
 		msgFromVMChan:    msgFromVMChan,
 		preemptTimeouts:  preemptTimeouts,
@@ -239,8 +236,8 @@ func (h *handler) HealthCheck() (interface{}, error) {
 // Push the message onto the handler's queue
 func (h *handler) Push(ctx context.Context, msg message.InboundMessage) {
 	switch msg.Op() {
-	case message.AppRequest, message.AppGossip, message.AppRequestFailed, message.AppResponse,
-		message.CrossChainAppRequest, message.CrossChainAppRequestFailed, message.CrossChainAppResponse:
+	case message.AppRequestOp, message.AppRequestFailedOp, message.AppResponseOp, message.AppGossipOp,
+		message.CrossChainAppRequestOp, message.CrossChainAppRequestFailedOp, message.CrossChainAppResponseOp:
 		h.asyncMessageQueue.Push(ctx, msg)
 	default:
 		h.syncMessageQueue.Push(ctx, msg)
@@ -360,13 +357,13 @@ func (h *handler) dispatchChans() {
 			return
 
 		case vmMSG := <-h.msgFromVMChan:
-			msg = h.mc.InternalVMMessage(h.ctx.NodeID, uint32(vmMSG))
+			msg = message.InternalVMMessage(h.ctx.NodeID, uint32(vmMSG))
 
 		case <-gossiper.C:
-			msg = h.mc.InternalGossipRequest(h.ctx.NodeID)
+			msg = message.InternalGossipRequest(h.ctx.NodeID)
 
 		case <-h.timeouts:
-			msg = h.mc.InternalTimeout(h.ctx.NodeID)
+			msg = message.InternalTimeout(h.ctx.NodeID)
 		}
 
 		if err := h.handleChanMsg(msg); err != nil {
@@ -383,7 +380,7 @@ func (h *handler) dispatchChans() {
 // Any returned error is treated as fatal
 func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage) error {
 	h.ctx.Log.Debug("forwarding sync message to consensus",
-		zap.Stringer("messageString", msg),
+		zap.Any("message", msg),
 	)
 
 	var (
@@ -411,7 +408,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 			h.ctx.Log.Warn("handling sync message took longer than expected",
 				zap.Duration("processingTime", processingTime),
 				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("message", msg),
+				zap.Any("message", msg),
 			)
 		}
 	}()
@@ -427,424 +424,189 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 	//            the timeout has already been cleared. This means the engine
 	//            should be invoked with a failure message if parsing of the
 	//            response fails.
-	switch op {
-	case message.GetStateSummaryFrontier:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
+	switch msg := msg.Message().(type) {
+	case *p2ppb.GetStateSummaryFrontier:
+		return engine.GetStateSummaryFrontier(ctx, nodeID, msg.RequestId)
+
+	case *p2ppb.StateSummaryFrontier:
+		return engine.StateSummaryFrontier(ctx, nodeID, msg.RequestId, msg.Summary)
+
+	case *message.GetStateSummaryFrontierFailed:
+		return engine.GetStateSummaryFrontierFailed(ctx, nodeID, msg.RequestID)
+
+	case *p2ppb.GetAcceptedStateSummary:
+		if !isUnique(msg.Heights) {
+			h.ctx.Log.Debug("message with invalid field",
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("messageOp", message.GetAcceptedStateSummaryOp),
+				zap.Uint32("requestID", msg.RequestId),
+				zap.String("field", "Heights"),
+				zap.Error(err),
+			)
+			return engine.GetAcceptedStateSummaryFailed(ctx, nodeID, msg.RequestId)
 		}
-		requestID := requestIDIntf.(uint32)
 
-		return engine.GetStateSummaryFrontier(ctx, nodeID, requestID)
+		return engine.GetAcceptedStateSummary(
+			ctx,
+			nodeID,
+			msg.RequestId,
+			msg.Heights,
+		)
 
-	case message.StateSummaryFrontier:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
-
-		summaryIntf, err := msg.Get(message.SummaryBytes)
+	case *p2ppb.AcceptedStateSummary:
+		summaryIDs, err := getIDs(msg.SummaryIds)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
 				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.SummaryBytes),
+				zap.Stringer("messageOp", message.AcceptedStateSummaryOp),
+				zap.Uint32("requestID", msg.RequestId),
+				zap.String("field", "SummaryIDs"),
 				zap.Error(err),
 			)
-			return engine.GetStateSummaryFrontierFailed(ctx, nodeID, requestID)
-		}
-		summary := summaryIntf.([]byte)
-
-		return engine.StateSummaryFrontier(ctx, nodeID, requestID, summary)
-
-	case message.GetStateSummaryFrontierFailed:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
-
-		return engine.GetStateSummaryFrontierFailed(ctx, nodeID, requestID)
-
-	case message.GetAcceptedStateSummary:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
-
-		summaryHeights, err := getSummaryHeights(msg)
-		if err != nil {
-			h.ctx.Log.Debug("dropping message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.SummaryHeights),
-				zap.Error(err),
-			)
-			return nil
+			return engine.GetAcceptedStateSummaryFailed(ctx, nodeID, msg.RequestId)
 		}
 
-		return engine.GetAcceptedStateSummary(ctx, nodeID, requestID, summaryHeights)
+		return engine.AcceptedStateSummary(ctx, nodeID, msg.RequestId, summaryIDs)
 
-	case message.AcceptedStateSummary:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
+	case *message.GetAcceptedStateSummaryFailed:
+		return engine.GetAcceptedStateSummaryFailed(ctx, nodeID, msg.RequestID)
 
-		summaryIDs, err := getIDs(message.SummaryIDs, msg)
+	case *p2ppb.GetAcceptedFrontier:
+		return engine.GetAcceptedFrontier(ctx, nodeID, msg.RequestId)
+
+	case *p2ppb.AcceptedFrontier:
+		containerIDs, err := getIDs(msg.ContainerIds)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
 				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.SummaryIDs),
+				zap.Stringer("messageOp", message.AcceptedFrontierOp),
+				zap.Uint32("requestID", msg.RequestId),
+				zap.String("field", "ContainerIDs"),
 				zap.Error(err),
 			)
-			return engine.GetAcceptedStateSummaryFailed(ctx, nodeID, requestID)
+			return engine.GetAcceptedFrontierFailed(ctx, nodeID, msg.RequestId)
 		}
 
-		return engine.AcceptedStateSummary(ctx, nodeID, requestID, summaryIDs)
+		return engine.AcceptedFrontier(ctx, nodeID, msg.RequestId, containerIDs)
 
-	case message.GetAcceptedStateSummaryFailed:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
+	case *message.GetAcceptedFrontierFailed:
+		return engine.GetAcceptedFrontierFailed(ctx, nodeID, msg.RequestID)
 
-		return engine.GetAcceptedStateSummaryFailed(ctx, nodeID, requestID)
-
-	case message.GetAcceptedFrontier:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
-
-		return engine.GetAcceptedFrontier(ctx, nodeID, requestID)
-
-	case message.AcceptedFrontier:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
-
-		containerIDs, err := getIDs(message.ContainerIDs, msg)
+	case *p2ppb.GetAccepted:
+		containerIDs, err := getIDs(msg.ContainerIds)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
 				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.ContainerIDs),
-				zap.Error(err),
-			)
-			return engine.GetAcceptedFrontierFailed(ctx, nodeID, requestID)
-		}
-
-		return engine.AcceptedFrontier(ctx, nodeID, requestID, containerIDs)
-
-	case message.GetAcceptedFrontierFailed:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
-
-		return engine.GetAcceptedFrontierFailed(ctx, nodeID, requestID)
-
-	case message.GetAccepted:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
-
-		containerIDs, err := getIDs(message.ContainerIDs, msg)
-		if err != nil {
-			h.ctx.Log.Debug("dropping message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.ContainerIDs),
+				zap.Stringer("messageOp", message.GetAcceptedOp),
+				zap.Uint32("requestID", msg.RequestId),
+				zap.String("field", "ContainerIDs"),
 				zap.Error(err),
 			)
 			return nil
 		}
 
-		return engine.GetAccepted(ctx, nodeID, requestID, containerIDs)
+		return engine.GetAccepted(ctx, nodeID, msg.RequestId, containerIDs)
 
-	case message.Accepted:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
-
-		containerIDs, err := getIDs(message.ContainerIDs, msg)
+	case *p2ppb.Accepted:
+		containerIDs, err := getIDs(msg.ContainerIds)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
 				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.ContainerIDs),
+				zap.Stringer("messageOp", message.AcceptedOp),
+				zap.Uint32("requestID", msg.RequestId),
+				zap.String("field", "ContainerIDs"),
 				zap.Error(err),
 			)
-			return engine.GetAcceptedFailed(ctx, nodeID, requestID)
+			return engine.GetAcceptedFailed(ctx, nodeID, msg.RequestId)
 		}
 
-		return engine.Accepted(ctx, nodeID, requestID, containerIDs)
+		return engine.Accepted(ctx, nodeID, msg.RequestId, containerIDs)
 
-	case message.GetAcceptedFailed:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
+	case *message.GetAcceptedFailed:
+		return engine.GetAcceptedFailed(ctx, nodeID, msg.RequestID)
 
-		return engine.GetAcceptedFailed(ctx, nodeID, requestID)
-
-	case message.GetAncestors:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
-
-		containerIDIntf, err := msg.Get(message.ContainerID)
+	case *p2ppb.GetAncestors:
+		containerID, err := ids.ToID(msg.ContainerId)
 		if err != nil {
 			h.ctx.Log.Debug("dropping message with invalid field",
 				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.ContainerID),
-				zap.Error(err),
-			)
-			return nil
-		}
-		containerIDBytes := containerIDIntf.([]byte)
-		containerID, err := ids.ToID(containerIDBytes)
-		if err != nil {
-			h.ctx.Log.Debug("dropping message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.ContainerID),
+				zap.Stringer("messageOp", message.GetAncestorsOp),
+				zap.Uint32("requestID", msg.RequestId),
+				zap.String("field", "ContainerID"),
 				zap.Error(err),
 			)
 			return nil
 		}
 
-		return engine.GetAncestors(ctx, nodeID, requestID, containerID)
+		return engine.GetAncestors(ctx, nodeID, msg.RequestId, containerID)
 
-	case message.GetAncestorsFailed:
-		requestIDIntf, err := msg.Get(message.RequestID)
+	case *message.GetAncestorsFailed:
+		return engine.GetAncestorsFailed(ctx, nodeID, msg.RequestID)
+
+	case *p2ppb.Ancestors:
+		return engine.Ancestors(ctx, nodeID, msg.RequestId, msg.Containers)
+
+	case *p2ppb.Get:
+		containerID, err := ids.ToID(msg.ContainerId)
 		if err != nil {
-			return err
+			h.ctx.Log.Debug("dropping message with invalid field",
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("messageOp", message.GetOp),
+				zap.Uint32("requestID", msg.RequestId),
+				zap.String("field", "ContainerID"),
+				zap.Error(err),
+			)
+			return nil
 		}
-		requestID := requestIDIntf.(uint32)
 
-		return engine.GetAncestorsFailed(ctx, nodeID, requestID)
+		return engine.Get(ctx, nodeID, msg.RequestId, containerID)
 
-	case message.Ancestors:
-		requestIDIntf, err := msg.Get(message.RequestID)
+	case *message.GetFailed:
+		return engine.GetFailed(ctx, nodeID, msg.RequestID)
+
+	case *p2ppb.Put:
+		return engine.Put(ctx, nodeID, msg.RequestId, msg.Container)
+
+	case *p2ppb.PushQuery:
+		return engine.PushQuery(ctx, nodeID, msg.RequestId, msg.Container)
+
+	case *p2ppb.PullQuery:
+		containerID, err := ids.ToID(msg.ContainerId)
 		if err != nil {
-			return err
+			h.ctx.Log.Debug("dropping message with invalid field",
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("messageOp", message.PullQueryOp),
+				zap.Uint32("requestID", msg.RequestId),
+				zap.String("field", "ContainerID"),
+				zap.Error(err),
+			)
+			return nil
 		}
-		requestID := requestIDIntf.(uint32)
 
-		containersIntf, err := msg.Get(message.MultiContainerBytes)
+		return engine.PullQuery(ctx, nodeID, msg.RequestId, containerID)
+
+	case *p2ppb.Chits:
+		votes, err := getIDs(msg.ContainerIds)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
 				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.MultiContainerBytes),
+				zap.Stringer("messageOp", message.ChitsOp),
+				zap.Uint32("requestID", msg.RequestId),
+				zap.String("field", "ContainerIDs"),
 				zap.Error(err),
 			)
-			return engine.GetAncestorsFailed(ctx, nodeID, requestID)
-		}
-		containers := containersIntf.([][]byte)
-
-		return engine.Ancestors(ctx, nodeID, requestID, containers)
-
-	case message.Get:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
-
-		containerIDIntf, err := msg.Get(message.ContainerID)
-		if err != nil {
-			h.ctx.Log.Debug("dropping message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.ContainerID),
-				zap.Error(err),
-			)
-			return nil
-		}
-		containerIDBytes := containerIDIntf.([]byte)
-		containerID, err := ids.ToID(containerIDBytes)
-		if err != nil {
-			h.ctx.Log.Debug("dropping message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.ContainerID),
-				zap.Error(err),
-			)
-			return nil
+			return engine.QueryFailed(ctx, nodeID, msg.RequestId)
 		}
 
-		return engine.Get(ctx, nodeID, requestID, containerID)
+		return engine.Chits(ctx, nodeID, msg.RequestId, votes)
 
-	case message.GetFailed:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
+	case *message.QueryFailed:
+		return engine.QueryFailed(ctx, nodeID, msg.RequestID)
 
-		return engine.GetFailed(ctx, nodeID, requestID)
+	case *message.Connected:
+		return engine.Connected(nodeID, msg.NodeVersion)
 
-	case message.Put:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
-
-		containerIntf, err := msg.Get(message.ContainerBytes)
-		if err != nil {
-			// TODO: [requestID] can overflow, which means a timeout on the
-			//       request before the overflow may not be handled properly.
-			if requestID == constants.GossipMsgRequestID {
-				h.ctx.Log.Debug("dropping message with invalid field",
-					zap.Stringer("nodeID", nodeID),
-					zap.Stringer("messageOp", op),
-					zap.Uint32("requestID", requestID),
-					zap.Stringer("field", message.ContainerBytes),
-					zap.Error(err),
-				)
-				return nil
-			}
-
-			h.ctx.Log.Debug("message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.ContainerBytes),
-				zap.Error(err),
-			)
-			return engine.GetFailed(ctx, nodeID, requestID)
-		}
-		container := containerIntf.([]byte)
-
-		return engine.Put(ctx, nodeID, requestID, container)
-
-	case message.PushQuery:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
-
-		containerIntf, err := msg.Get(message.ContainerBytes)
-		if err != nil {
-			h.ctx.Log.Debug("dropping message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.ContainerBytes),
-				zap.Error(err),
-			)
-			return nil
-		}
-		container := containerIntf.([]byte)
-
-		return engine.PushQuery(ctx, nodeID, requestID, container)
-
-	case message.PullQuery:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
-
-		containerIDIntf, err := msg.Get(message.ContainerID)
-		if err != nil {
-			h.ctx.Log.Debug("dropping message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.ContainerID),
-				zap.Error(err),
-			)
-			return nil
-		}
-		containerIDBytes := containerIDIntf.([]byte)
-		containerID, err := ids.ToID(containerIDBytes)
-		if err != nil {
-			h.ctx.Log.Debug("dropping message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.ContainerID),
-				zap.Error(err),
-			)
-			return nil
-		}
-
-		return engine.PullQuery(ctx, nodeID, requestID, containerID)
-
-	case message.Chits:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
-
-		votes, err := getIDs(message.ContainerIDs, msg)
-		if err != nil {
-			h.ctx.Log.Debug("message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.ContainerIDs),
-				zap.Error(err),
-			)
-			return engine.QueryFailed(ctx, nodeID, requestID)
-		}
-
-		return engine.Chits(ctx, nodeID, requestID, votes)
-
-	case message.QueryFailed:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
-
-		return engine.QueryFailed(ctx, nodeID, requestID)
-
-	case message.Connected:
-		peerVersionIntf, err := msg.Get(message.VersionStruct)
-		if err != nil {
-			return err
-		}
-		peerVersion := peerVersionIntf.(*version.Application)
-
-		return engine.Connected(nodeID, peerVersion)
-
-	case message.Disconnected:
+	case *message.Disconnected:
 		return engine.Disconnected(nodeID)
 
 	default:
@@ -870,7 +632,7 @@ func (h *handler) handleAsyncMsg(ctx context.Context, msg message.InboundMessage
 // Any returned error is treated as fatal
 func (h *handler) executeAsyncMsg(ctx context.Context, msg message.InboundMessage) error {
 	h.ctx.Log.Debug("forwarding async message to consensus",
-		zap.Stringer("messageString", msg),
+		zap.Any("message", msg),
 	)
 
 	var (
@@ -897,157 +659,48 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg message.InboundMessag
 		return err
 	}
 
-	switch op {
-	case message.AppRequest:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
+	switch m := msg.Message().(type) {
+	case *p2ppb.AppRequest:
+		return engine.AppRequest(
+			ctx,
+			nodeID,
+			m.RequestId,
+			msg.Expiration(),
+			m.AppBytes,
+		)
 
-		appBytesIntf, err := msg.Get(message.AppBytes)
-		if err != nil {
-			h.ctx.Log.Debug("dropping message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.AppBytes),
-				zap.Error(err),
-			)
-			return nil
-		}
-		appBytes := appBytesIntf.([]byte)
+	case *p2ppb.AppResponse:
+		return engine.AppResponse(ctx, nodeID, m.RequestId, m.AppBytes)
 
-		return engine.AppRequest(ctx, nodeID, requestID, msg.ExpirationTime(), appBytes)
+	case *message.AppRequestFailed:
+		return engine.AppRequestFailed(ctx, nodeID, m.RequestID)
 
-	case message.AppResponse:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
+	case *p2ppb.AppGossip:
+		return engine.AppGossip(ctx, nodeID, m.AppBytes)
 
-		appBytesIntf, err := msg.Get(message.AppBytes)
-		if err != nil {
-			h.ctx.Log.Debug("message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.AppBytes),
-				zap.Error(err),
-			)
-			return engine.AppRequestFailed(ctx, nodeID, requestID)
-		}
-		appBytes := appBytesIntf.([]byte)
+	case *message.CrossChainAppRequest:
+		return engine.CrossChainAppRequest(
+			ctx,
+			m.SourceChainID,
+			m.RequestID,
+			msg.Expiration(),
+			m.Message,
+		)
 
-		return engine.AppResponse(ctx, nodeID, requestID, appBytes)
+	case *message.CrossChainAppResponse:
+		return engine.CrossChainAppResponse(
+			ctx,
+			m.SourceChainID,
+			m.RequestID,
+			m.Message,
+		)
 
-	case message.AppRequestFailed:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
-
-		return engine.AppRequestFailed(ctx, nodeID, requestID)
-
-	case message.AppGossip:
-		appBytesIntf, err := msg.Get(message.AppBytes)
-		if err != nil {
-			h.ctx.Log.Debug("dropping message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Stringer("field", message.AppBytes),
-				zap.Error(err),
-			)
-			return nil
-		}
-		appBytes := appBytesIntf.([]byte)
-
-		return engine.AppGossip(ctx, nodeID, appBytes)
-
-	case message.CrossChainAppRequest:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
-		sourceChainIDIntf, err := msg.Get(message.SourceChainID)
-		if err != nil {
-			h.ctx.Log.Debug("dropping message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Stringer("field", message.SourceChainID),
-				zap.Error(err),
-			)
-			return nil
-		}
-		sourceChainID, err := ids.ToID(sourceChainIDIntf.([]byte))
-		if err != nil {
-			h.ctx.Log.Debug("dropping message with invalid chain id",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Uint32("requestID", requestID),
-				zap.Error(err),
-			)
-			return nil
-		}
-		appBytesIntf, err := msg.Get(message.AppBytes)
-		if err != nil {
-			h.ctx.Log.Debug("dropping message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Stringer("field", message.AppBytes),
-				zap.Error(err),
-			)
-			return nil
-		}
-		appBytes := appBytesIntf.([]byte)
-		return engine.CrossChainAppRequest(ctx, sourceChainID, requestID, msg.ExpirationTime(), appBytes)
-
-	case message.CrossChainAppResponse:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
-		sourceChainIDIntf, err := msg.Get(message.SourceChainID)
-		if err != nil {
-			return err
-		}
-		sourceChainID, err := ids.ToID(sourceChainIDIntf.([]byte))
-		if err != nil {
-			return err
-		}
-		appBytesIntf, err := msg.Get(message.AppBytes)
-		if err != nil {
-			h.ctx.Log.Debug("dropping message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", op),
-				zap.Stringer("field", message.AppBytes),
-				zap.Error(err),
-			)
-			return engine.CrossChainAppRequestFailed(ctx, sourceChainID, requestID)
-		}
-		appBytes := appBytesIntf.([]byte)
-		return engine.CrossChainAppResponse(ctx, sourceChainID, requestID, appBytes)
-
-	case message.CrossChainAppRequestFailed:
-		requestIDIntf, err := msg.Get(message.RequestID)
-		if err != nil {
-			return err
-		}
-		requestID := requestIDIntf.(uint32)
-		sourceChainIDIntf, err := msg.Get(message.SourceChainID)
-		if err != nil {
-			return err
-		}
-		sourceChainID, err := ids.ToID(sourceChainIDIntf.([]byte))
-		if err != nil {
-			return err
-		}
-		return engine.CrossChainAppRequestFailed(ctx, sourceChainID, requestID)
+	case *message.CrossChainAppRequestFailed:
+		return engine.CrossChainAppRequestFailed(
+			ctx,
+			m.SourceChainID,
+			m.RequestID,
+		)
 
 	default:
 		return fmt.Errorf(
@@ -1060,7 +713,7 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg message.InboundMessag
 // Any returned error is treated as fatal
 func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 	h.ctx.Log.Debug("forwarding chan message to consensus",
-		zap.Stringer("messageString", msg),
+		zap.Any("message", msg),
 	)
 
 	var (
@@ -1087,20 +740,14 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 		return err
 	}
 
-	switch op := msg.Op(); op {
-	case message.Notify:
-		vmMsgIntf, err := msg.Get(message.VMMessage)
-		if err != nil {
-			return err
-		}
-		vmMsg := vmMsgIntf.(uint32)
+	switch msg := msg.Message().(type) {
+	case *message.VMMessage:
+		return engine.Notify(common.Message(msg.Notification))
 
-		return engine.Notify(common.Message(vmMsg))
-
-	case message.GossipRequest:
+	case *message.GossipRequest:
 		return engine.Gossip()
 
-	case message.Timeout:
+	case *message.Timeout:
 		return engine.Timeout()
 
 	default:
@@ -1135,11 +782,11 @@ func (h *handler) popUnexpiredMsg(queue MessageQueue, expired prometheus.Counter
 		}
 
 		// If this message's deadline has passed, don't process it.
-		if expirationTime := msg.ExpirationTime(); !expirationTime.IsZero() && h.clock.Time().After(expirationTime) {
-			h.ctx.Log.Verbo("dropping message",
+		if expiration := msg.Expiration(); h.clock.Time().After(expiration) {
+			h.ctx.Log.Debug("dropping message",
 				zap.String("reason", "timeout"),
 				zap.Stringer("nodeID", msg.NodeID()),
-				zap.Stringer("messageString", msg),
+				zap.Stringer("messageOp", msg.Op()),
 			)
 			span := trace.SpanFromContext(ctx)
 			span.AddEvent("dropping message", trace.WithAttributes(

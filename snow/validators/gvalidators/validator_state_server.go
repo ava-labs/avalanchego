@@ -14,7 +14,7 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
 )
 
-var _ pb.ValidatorStateServer = &Server{}
+var _ pb.ValidatorStateServer = (*Server)(nil)
 
 type Server struct {
 	pb.UnsafeValidatorStateServer
