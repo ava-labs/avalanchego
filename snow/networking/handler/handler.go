@@ -34,7 +34,7 @@ const (
 	numDispatchersToClose = 3
 	// If a consensus message takes longer than this to process, the handler
 	// will log a warning.
-	syncProcessingTimeWarnLimit = time.Second
+	syncProcessingTimeWarnLimit = 30 * time.Second
 )
 
 var _ Handler = (*handler)(nil)
@@ -379,14 +379,15 @@ func (h *handler) dispatchChans() {
 
 // Any returned error is treated as fatal
 func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage) error {
-	h.ctx.Log.Debug("forwarding sync message to consensus",
-		zap.Any("message", msg),
-	)
-
 	var (
 		nodeID    = msg.NodeID()
 		op        = msg.Op()
 		startTime = h.clock.Time()
+	)
+	h.ctx.Log.Debug("forwarding sync message to consensus",
+		zap.Stringer("nodeID", nodeID),
+		zap.Stringer("messageOp", op),
+		zap.Any("message", msg),
 	)
 	h.resourceTracker.StartProcessing(nodeID, startTime)
 	h.ctx.Lock.Lock()
@@ -408,6 +409,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 			h.ctx.Log.Warn("handling sync message took longer than expected",
 				zap.Duration("processingTime", processingTime),
 				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("messageOp", op),
 				zap.Any("message", msg),
 			)
 		}
@@ -631,14 +633,15 @@ func (h *handler) handleAsyncMsg(ctx context.Context, msg message.InboundMessage
 
 // Any returned error is treated as fatal
 func (h *handler) executeAsyncMsg(ctx context.Context, msg message.InboundMessage) error {
-	h.ctx.Log.Debug("forwarding async message to consensus",
-		zap.Any("message", msg),
-	)
-
 	var (
 		nodeID    = msg.NodeID()
 		op        = msg.Op()
 		startTime = h.clock.Time()
+	)
+	h.ctx.Log.Debug("forwarding async message to consensus",
+		zap.Stringer("nodeID", nodeID),
+		zap.Stringer("messageOp", op),
+		zap.Any("message", msg),
 	)
 	h.resourceTracker.StartProcessing(nodeID, startTime)
 	defer func() {
@@ -712,13 +715,13 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg message.InboundMessag
 
 // Any returned error is treated as fatal
 func (h *handler) handleChanMsg(msg message.InboundMessage) error {
-	h.ctx.Log.Debug("forwarding chan message to consensus",
-		zap.Any("message", msg),
-	)
-
 	var (
 		op        = msg.Op()
 		startTime = h.clock.Time()
+	)
+	h.ctx.Log.Debug("forwarding chan message to consensus",
+		zap.Stringer("messageOp", op),
+		zap.Any("message", msg),
 	)
 	h.ctx.Lock.Lock()
 	defer func() {

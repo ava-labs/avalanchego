@@ -13,7 +13,7 @@ require (
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/ava-labs/avalanche-ledger-go v0.0.11
 	github.com/ava-labs/avalanche-network-runner-sdk v0.2.0
-	github.com/ava-labs/coreth v0.11.1-rc.7
+	github.com/ava-labs/coreth v0.11.2-rc.0
 	github.com/btcsuite/btcd v0.23.1
 	github.com/btcsuite/btcd/btcutil v1.1.1
 	github.com/decred/dcrd/dcrec/secp256k1/v3 v3.0.0-20200627015759-01fd2de07837
@@ -86,7 +86,7 @@ require (
 	github.com/ethereum/go-ethereum v1.10.25 // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5 // indirect
-	github.com/fsnotify/fsnotify v1.5.4 // indirect
+	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
