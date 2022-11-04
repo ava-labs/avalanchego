@@ -93,6 +93,8 @@ type Config struct {
 
 	// TrieDB and snapshot options
 	TrieCleanCache        int
+	TrieCleanJournal      string
+	TrieCleanRejournal    time.Duration
 	TrieDirtyCache        int
 	TrieDirtyCommitTarget int
 	SnapshotCache         int

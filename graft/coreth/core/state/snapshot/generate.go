@@ -33,15 +33,20 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/VictoriaMetrics/fastcache"
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/trie"
+	"github.com/ava-labs/coreth/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+)
+
+const (
+	snapshotCacheNamespace            = "state/snapshot/clean/fastcache" // prefix for detailed stats from the snapshot fastcache
+	snapshotCacheStatsUpdateFrequency = 1000                             // update stats from the snapshot fastcache once per 1000 ops
 )
 
 var (
@@ -155,7 +160,7 @@ func generateSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache i
 		triedb:     triedb,
 		blockHash:  blockHash,
 		root:       root,
-		cache:      fastcache.New(cache * 1024 * 1024),
+		cache:      newMeteredSnapshotCache(cache * 1024 * 1024),
 		genMarker:  genMarker,
 		genPending: make(chan struct{}),
 		genAbort:   make(chan chan struct{}),
@@ -398,4 +403,8 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 	// Someone will be looking for us, wait it out
 	abort := <-dl.genAbort
 	close(abort)
+}
+
+func newMeteredSnapshotCache(size int) *utils.MeteredCache {
+	return utils.NewMeteredCache(size, "", snapshotCacheNamespace, snapshotCacheStatsUpdateFrequency)
 }
