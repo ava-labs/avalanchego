@@ -258,7 +258,7 @@ func (m *manager) QueueChainCreation(chainParams ChainParameters) {
 	m.subnetsLock.Lock()
 	sb, exists := m.subnets[chainParams.SubnetID]
 	if !exists {
-		sb := newSubnet()
+		sb = newSubnet()
 		m.subnets[chainParams.SubnetID] = sb
 	}
 	addedChain := sb.addChain(chainParams.ID)
