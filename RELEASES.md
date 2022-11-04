@@ -1,5 +1,11 @@
 # Release Notes
 
+## [v0.11.2](https://github.com/ava-labs/coreth/releases/tag/v0.11.2)
+
+- Add trie clean cache journaling to disk to improve processing time on restart
+- Fix regression where snapshot could be marked as stale by async acceptor during block processing
+- Add fine-grained block processing metrics
+
 ## [v0.11.1](https://github.com/ava-labs/coreth/releases/tag/v0.11.1)
 
 - Add cache size config parameters for `trie-clean-cache`, `trie-dirty-cache`, `trie-dirty-commit-target`, and `snapshot-cache`
