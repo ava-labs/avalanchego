@@ -71,7 +71,7 @@ var (
 	errUnknownChainID   = errors.New("unknown chain ID")
 	errUnknownVMType    = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
 	errCreatePlatformVM = errors.New("attempted to create a chain running the PlatformVM")
-	errNotBootstrapped  = errors.New("chains not bootstrapped")
+	errNotBootstrapped  = errors.New("subnets not bootstrapped")
 
 	_ Manager = (*manager)(nil)
 )
@@ -222,6 +222,7 @@ type manager struct {
 	unblockChainCreatorCh  chan struct{}
 	chainCreatorShutdownCh chan struct{}
 
+	subnetsLock sync.Mutex
 	// Key: Subnet's ID
 	// Value: Subnet description
 	subnets map[ids.ID]Subnet
@@ -254,38 +255,48 @@ func (m *manager) Router() router.Router { return m.ManagerConfig.Router }
 // QueueChainCreation queues a chain creation request
 // Invariant: Whitelisted Subnet must be checked before calling this function
 func (m *manager) QueueChainCreation(chainParams ChainParameters) {
-	if ok := m.chainsQueue.PushRight(chainParams); !ok {
-		m.Log.Debug("cannot enqueue new chain",
+	m.subnetsLock.Lock()
+	sb, exists := m.subnets[chainParams.SubnetID]
+	if !exists {
+		sb := newSubnet()
+		m.subnets[chainParams.SubnetID] = sb
+	}
+	addedChain := sb.addChain(chainParams.ID)
+	m.subnetsLock.Unlock()
+
+	if !addedChain {
+		m.Log.Debug("skipping chain creation",
+			zap.String("reason", "chain already staged"),
+			zap.Stringer("subnetID", chainParams.SubnetID),
 			zap.Stringer("chainID", chainParams.ID),
+			zap.Stringer("vmID", chainParams.VMID),
+		)
+		return
+	}
+
+	if ok := m.chainsQueue.PushRight(chainParams); !ok {
+		m.Log.Warn("skipping chain creation",
+			zap.String("reason", "couldn't enqueue chain"),
+			zap.Stringer("subnetID", chainParams.SubnetID),
+			zap.Stringer("chainID", chainParams.ID),
+			zap.Stringer("vmID", chainParams.VMID),
 		)
 	}
 }
 
 // createChain creates and starts the chain
+// Note: it is expected for the subnet to already have the chain registered as
+//       bootstrapping before this function is called
 func (m *manager) createChain(chainParams ChainParameters) {
-	// Assert that there isn't already a chain with an alias in [chain].Aliases
-	// (Recall that the string representation of a chain's ID is also an alias
-	//  for a chain)
-	if alias, isRepeat := m.isChainWithAlias(chainParams.ID.String()); isRepeat {
-		m.Log.Debug("skipping chain creation",
-			zap.String("reason", "there is already a chain with same alias"),
-			zap.String("alias", alias),
-		)
-		return
-	}
-
 	m.Log.Info("creating chain",
+		zap.Stringer("subnetID", chainParams.SubnetID),
 		zap.Stringer("chainID", chainParams.ID),
 		zap.Stringer("vmID", chainParams.VMID),
 	)
 
-	sb, exists := m.subnets[chainParams.SubnetID]
-	if !exists {
-		sb = newSubnet()
-		m.subnets[chainParams.SubnetID] = sb
-	}
-
-	sb.addChain(chainParams.ID)
+	m.subnetsLock.Lock()
+	sb := m.subnets[chainParams.SubnetID]
+	m.subnetsLock.Unlock()
 
 	// Note: buildChain builds all chain's relevant objects (notably engine and handler)
 	// but does not start their operations. Starting of the handler (which could potentially
@@ -294,11 +305,12 @@ func (m *manager) createChain(chainParams ChainParameters) {
 	// upon start is dropped.
 	chain, err := m.buildChain(chainParams, sb)
 	if err != nil {
-		sb.removeChain(chainParams.ID)
 		if m.CriticalChains.Contains(chainParams.ID) {
 			// Shut down if we fail to create a required chain (i.e. X, P or C)
 			m.Log.Fatal("error creating required chain",
+				zap.Stringer("subnetID", chainParams.SubnetID),
 				zap.Stringer("chainID", chainParams.ID),
+				zap.Stringer("vmID", chainParams.VMID),
 				zap.Error(err),
 			)
 			go m.ShutdownNodeFunc(1)
@@ -307,7 +319,10 @@ func (m *manager) createChain(chainParams ChainParameters) {
 
 		chainAlias := m.PrimaryAliasOrDefault(chainParams.ID)
 		m.Log.Error("error creating chain",
+			zap.Stringer("subnetID", chainParams.SubnetID),
+			zap.Stringer("chainID", chainParams.ID),
 			zap.String("chainAlias", chainAlias),
+			zap.Stringer("vmID", chainParams.VMID),
 			zap.Error(err),
 		)
 
@@ -320,7 +335,10 @@ func (m *manager) createChain(chainParams ChainParameters) {
 			return nil, healthCheckErr
 		})); err != nil {
 			m.Log.Error("failed to register failing health check",
+				zap.Stringer("subnetID", chainParams.SubnetID),
+				zap.Stringer("chainID", chainParams.ID),
 				zap.String("chainAlias", chainAlias),
+				zap.Stringer("vmID", chainParams.VMID),
 				zap.Error(err),
 			)
 		}
@@ -334,7 +352,9 @@ func (m *manager) createChain(chainParams ChainParameters) {
 	// Associate the newly created chain with its default alias
 	if err := m.Alias(chainParams.ID, chainParams.ID.String()); err != nil {
 		m.Log.Error("failed to alias the new chain with itself",
+			zap.Stringer("subnetID", chainParams.SubnetID),
 			zap.Stringer("chainID", chainParams.ID),
+			zap.Stringer("vmID", chainParams.VMID),
 			zap.Error(err),
 		)
 	}
@@ -1007,32 +1027,26 @@ func (m *manager) IsBootstrapped(id ids.ID) bool {
 	return chain.Context().GetState() == snow.NormalOp
 }
 
-func (m *manager) chainsNotBootstrapped() []ids.ID {
-	m.chainsLock.Lock()
-	defer m.chainsLock.Unlock()
+func (m *manager) subnetsNotBootstrapped() []ids.ID {
+	m.subnetsLock.Lock()
+	defer m.subnetsLock.Unlock()
 
-	chainsBootstrapping := make([]ids.ID, 0, len(m.chains))
-	for chainID, chain := range m.chains {
-		if chain.Context().GetState() == snow.NormalOp {
-			continue
+	subnetsBootstrapping := make([]ids.ID, 0, len(m.subnets))
+	for subnetID, subnet := range m.subnets {
+		if !subnet.IsBootstrapped() {
+			subnetsBootstrapping = append(subnetsBootstrapping, subnetID)
 		}
-		chainsBootstrapping = append(chainsBootstrapping, chainID)
 	}
-	return chainsBootstrapping
+	return subnetsBootstrapping
 }
 
 func (m *manager) registerBootstrappedHealthChecks() error {
 	bootstrappedCheck := health.CheckerFunc(func() (interface{}, error) {
-		chains := m.chainsNotBootstrapped()
-		aliases := make([]string, len(chains))
-		for i, chain := range chains {
-			aliases[i] = m.PrimaryAliasOrDefault(chain)
+		subnetIDs := m.subnetsNotBootstrapped()
+		if len(subnetIDs) != 0 {
+			return subnetIDs, errNotBootstrapped
 		}
-
-		if len(aliases) != 0 {
-			return aliases, errNotBootstrapped
-		}
-		return aliases, nil
+		return subnetIDs, nil
 	})
 	if err := m.Health.RegisterReadinessCheck("bootstrapped", bootstrappedCheck); err != nil {
 		return fmt.Errorf("couldn't register bootstrapped readiness check: %w", err)
@@ -1045,6 +1059,12 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 
 // Starts chain creation loop to process queued chains
 func (m *manager) StartChainCreator(platform ChainParameters) {
+	m.subnetsLock.Lock()
+	sb := newSubnet()
+	m.subnets[platform.SubnetID] = sb
+	sb.addChain(platform.ID)
+	m.subnetsLock.Unlock()
+
 	// The P-chain is created synchronously to ensure that `VM.Initialize` has
 	// finished before returning from this function. This is required because
 	// the P-chain initializes state that the rest of the node initialization
@@ -1099,18 +1119,6 @@ func (m *manager) notifyRegistrants(name string, engine common.Engine) {
 	for _, registrant := range m.registrants {
 		registrant.RegisterChain(name, engine)
 	}
-}
-
-// Returns:
-// 1) the alias that already exists, or the empty string if there is none
-// 2) true iff there exists a chain such that the chain has an alias in [aliases]
-func (m *manager) isChainWithAlias(aliases ...string) (string, bool) {
-	for _, alias := range aliases {
-		if _, err := m.Lookup(alias); err == nil {
-			return alias, true
-		}
-	}
-	return "", false
 }
 
 // getChainConfig returns value of a entry by looking at ID key and alias key
