@@ -2,8 +2,8 @@ github.com/VictoriaMetrics/fastcache v1.10.0 h1:5hDJnLsKLpnUEToub7ETuRu8RCkb40wo
 github.com/VictoriaMetrics/fastcache v1.10.0/go.mod h1:tjiYeEfYXCqacuvYw/7UoDIeJaNxq6132xHICNP77w8=
 github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156 h1:eMwmnE/GDgah4HI848JfFxHt+iPb26b4zyfspmqY0/8=
 github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156/go.mod h1:Cb/ax3seSYIx7SuZdm2G2xzfwmv3TPSk2ucNfQESPXM=
-github.com/ava-labs/avalanchego v1.9.1 h1:TJLvoA5kHAwsaBG80x57hCMnwJYWFDnHOoI/fw+Off8=
-github.com/ava-labs/avalanchego v1.9.1/go.mod h1:EwV2l8rFtFObM9jKwAWX2uhDkUw9UEGkUlXo3ICG1yk=
+github.com/ava-labs/avalanchego v1.9.2 h1:cMjFqnnePfx+Hq94j89B3EcWr3r5eORt/EnmZbBoYdc=
+github.com/ava-labs/avalanchego v1.9.2/go.mod h1:ezcsL6vzAu1eL3Ws8QNobEAqadXFCheEogk1d2+bir4=
 github.com/btcsuite/btcd v0.23.1 h1:IB8cVQcC2X5mHbnfirLG5IZnkWYNTPlLZVrxUYSotbE=
 github.com/btcsuite/btcd/btcec/v2 v2.2.0 h1:fzn1qaOt32TuLjFlkzYSsBC35Q3KUjT1SwPxiMSCF5k=
 github.com/btcsuite/btcd/btcec/v2 v2.2.0/go.mod h1:U7MHm051Al6XmscBQ0BoNydpOTsFAn707034b5nY8zU=

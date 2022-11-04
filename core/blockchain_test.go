@@ -105,6 +105,7 @@ func awaitWatcherEventsSubside(watcher *fsnotify.Watcher, subsideTimeout time.Du
 }
 
 func TestTrieCleanJournal(t *testing.T) {
+	t.Skip("FLAKY")
 	require := require.New(t)
 	assert := assert.New(t)
 
