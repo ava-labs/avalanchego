@@ -1,3 +1,13 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -19,6 +29,7 @@ type Genesis struct {
 	UTXOs         []*UTXO   `serialize:"true"`
 	Validators    []*txs.Tx `serialize:"true"`
 	Chains        []*txs.Tx `serialize:"true"`
+	Camino        Camino    `serialize:"true"`
 	Timestamp     uint64    `serialize:"true"`
 	InitialSupply uint64    `serialize:"true"`
 	Message       string    `serialize:"true"`
@@ -47,6 +58,7 @@ type State struct {
 	UTXOs         []*avax.UTXO
 	Validators    []*txs.Tx
 	Chains        []*txs.Tx
+	Camino        Camino
 	Timestamp     uint64
 	InitialSupply uint64
 }
@@ -66,6 +78,7 @@ func ParseState(genesisBytes []byte) (*State, error) {
 		UTXOs:         utxos,
 		Validators:    genesis.Validators,
 		Chains:        genesis.Chains,
+		Camino:        genesis.Camino,
 		Timestamp:     genesis.Timestamp,
 		InitialSupply: genesis.InitialSupply,
 	}, nil

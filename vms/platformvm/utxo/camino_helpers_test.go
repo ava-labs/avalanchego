@@ -73,6 +73,10 @@ func defaultConfig() *config.Config {
 		ApricotPhase3Time: defaultValidateEndTime,
 		ApricotPhase5Time: defaultValidateEndTime,
 		BanffTime:         mockable.MaxTime,
+		CaminoConfig: config.CaminoConfig{
+			ValidatorBondAmount:   2 * units.KiloAvax,
+			DaoProposalBondAmount: 100 * units.Avax,
+		},
 	}
 }
 

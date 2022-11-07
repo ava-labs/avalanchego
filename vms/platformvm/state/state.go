@@ -226,6 +226,8 @@ type state struct {
 	currentStakers *baseStakers
 	pendingStakers *baseStakers
 
+	caminoState CaminoState
+
 	currentHeight uint64
 
 	addedBlocks map[ids.ID]stateBlk // map of blockID -> Block
@@ -492,6 +494,8 @@ func new(
 
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
+
+		caminoState: newCaminoState(),
 
 		uptimes:        make(map[ids.NodeID]*uptimeAndReward),
 		updatedUptimes: make(map[ids.NodeID]struct{}),
@@ -1360,6 +1364,11 @@ func (s *state) init(genesisBytes []byte) error {
 	if err != nil {
 		return err
 	}
+
+	if err := s.caminoState.SyncGenesis(genesisState); err != nil {
+		return err
+	}
+
 	if err := s.syncGenesis(genesisBlock, genesisState); err != nil {
 		return err
 	}

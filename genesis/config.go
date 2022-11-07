@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -81,11 +82,12 @@ type Config struct {
 
 	Allocations []Allocation `json:"allocations"`
 
-	StartTime                  uint64        `json:"startTime"`
-	InitialStakeDuration       uint64        `json:"initialStakeDuration"`
-	InitialStakeDurationOffset uint64        `json:"initialStakeDurationOffset"`
-	InitialStakedFunds         []ids.ShortID `json:"initialStakedFunds"`
-	InitialStakers             []Staker      `json:"initialStakers"`
+	StartTime                  uint64         `json:"startTime"`
+	InitialStakeDuration       uint64         `json:"initialStakeDuration"`
+	InitialStakeDurationOffset uint64         `json:"initialStakeDurationOffset"`
+	InitialStakedFunds         []ids.ShortID  `json:"initialStakedFunds"`
+	InitialStakers             []Staker       `json:"initialStakers"`
+	Camino                     genesis.Camino `json:"camino"`
 
 	CChainGenesis string `json:"cChainGenesis"`
 

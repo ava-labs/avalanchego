@@ -23,6 +23,10 @@
             ]
         }
     ],
+    "camino": {
+        "verifyNodeSignature": true,
+        "lockModeBondDeposit": true
+    },
     "startTime": 1647388800,
     "initialStakeDuration": 31536000,
     "initialStakeDurationOffset": 5400,

@@ -383,6 +383,7 @@ func BuildFlagSet() *flag.FlagSet {
 	fs := flag.NewFlagSet(constants.AppName, flag.ContinueOnError)
 	addProcessFlags(fs)
 	addNodeFlags(fs)
+	addCaminoFlags(fs)
 	return fs
 }
 

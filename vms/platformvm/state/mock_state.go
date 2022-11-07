@@ -17,7 +17,8 @@ import (
 	validators "github.com/ava-labs/avalanchego/snow/validators"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
 	blocks "github.com/ava-labs/avalanchego/vms/platformvm/blocks"
-	lock "github.com/ava-labs/avalanchego/vms/platformvm/locked"
+	genesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	locked "github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	gomock "github.com/golang/mock/gomock"
@@ -140,6 +141,21 @@ func (m *MockState) AddUTXO(arg0 *avax.UTXO) {
 func (mr *MockStateMockRecorder) AddUTXO(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddUTXO", reflect.TypeOf((*MockState)(nil).AddUTXO), arg0)
+}
+
+// CaminoGenesisState mocks base method.
+func (m *MockState) CaminoGenesisState() (*genesis.Camino, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CaminoGenesisState")
+	ret0, _ := ret[0].(*genesis.Camino)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CaminoGenesisState indicates an expected call of CaminoGenesisState.
+func (mr *MockStateMockRecorder) CaminoGenesisState() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CaminoGenesisState", reflect.TypeOf((*MockState)(nil).CaminoGenesisState))
 }
 
 // Close mocks base method.
@@ -532,7 +548,7 @@ func (mr *MockStateMockRecorder) GetValidatorWeightDiffs(arg0, arg1 interface{})
 }
 
 // LockedUTXOs mocks base method.
-func (m *MockState) LockedUTXOs(arg0 ids.Set, arg1 ids.ShortSet, arg2 lock.State) ([]*avax.UTXO, error) {
+func (m *MockState) LockedUTXOs(arg0 ids.Set, arg1 ids.ShortSet, arg2 locked.State) ([]*avax.UTXO, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "LockedUTXOs", arg0, arg1, arg2)
 	ret0, _ := ret[0].([]*avax.UTXO)
