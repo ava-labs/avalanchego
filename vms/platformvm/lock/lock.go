@@ -109,6 +109,19 @@ func (lock *LockIDs) FixLockID(txID ids.ID) {
 	}
 }
 
+func (lock *LockIDs) Match(lockState LockState, txIDs ids.Set) bool {
+	switch lockState {
+	case LockStateDeposited:
+		return txIDs.Contains(lock.DepositTxID)
+	case LockStateBonded:
+		return txIDs.Contains(lock.BondTxID)
+	case LockStateDepositedBonded:
+		return lock.BondTxID == lock.DepositTxID && txIDs.Contains(lock.DepositTxID)
+	default:
+		return false
+	}
+}
+
 type LockedOut struct {
 	LockIDs              `serialize:"true" json:"lockIDs"`
 	avax.TransferableOut `serialize:"true" json:"output"`
