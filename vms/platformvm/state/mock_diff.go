@@ -13,6 +13,7 @@ import (
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
+	lock "github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	gomock "github.com/golang/mock/gomock"
@@ -393,6 +394,21 @@ func (m *MockDiff) GetUTXO(arg0 ids.ID) (*avax.UTXO, error) {
 func (mr *MockDiffMockRecorder) GetUTXO(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUTXO", reflect.TypeOf((*MockDiff)(nil).GetUTXO), arg0)
+}
+
+// LockedUTXOs mocks base method.
+func (m *MockDiff) LockedUTXOs(arg0 ids.Set, arg1 ids.ShortSet, arg2 lock.State) ([]*avax.UTXO, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LockedUTXOs", arg0, arg1, arg2)
+	ret0, _ := ret[0].([]*avax.UTXO)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LockedUTXOs indicates an expected call of LockedUTXOs.
+func (mr *MockDiffMockRecorder) LockedUTXOs(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LockedUTXOs", reflect.TypeOf((*MockDiff)(nil).LockedUTXOs), arg0, arg1, arg2)
 }
 
 // PutCurrentDelegator mocks base method.

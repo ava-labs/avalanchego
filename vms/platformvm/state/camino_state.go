@@ -8,10 +8,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/lock"
+	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 )
 
-func (s *state) LockedUTXOs(txIDs ids.Set, addresses ids.ShortSet, lockState lock.LockState) ([]*avax.UTXO, error) {
+func (s *state) LockedUTXOs(txIDs ids.Set, addresses ids.ShortSet, lockState locked.State) ([]*avax.UTXO, error) {
 	retUtxos := []*avax.UTXO{}
 	for address := range addresses {
 		utxoIDs, err := s.UTXOIDs(address.Bytes(), ids.ID{}, math.MaxInt)
@@ -26,7 +26,7 @@ func (s *state) LockedUTXOs(txIDs ids.Set, addresses ids.ShortSet, lockState loc
 			if utxo == nil {
 				continue
 			}
-			if lockedOut, ok := utxo.Out.(*lock.LockedOut); ok && lockedOut.LockIDs.Match(lockState, txIDs) {
+			if lockedOut, ok := utxo.Out.(*locked.Out); ok && lockedOut.IDs.Match(lockState, txIDs) {
 				retUtxos = append(retUtxos, utxo)
 			}
 		}

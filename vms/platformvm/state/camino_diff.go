@@ -8,10 +8,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/lock"
+	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 )
 
-func (d *diff) LockedUTXOs(txIDs ids.Set, addresses ids.ShortSet, lockState lock.LockState) ([]*avax.UTXO, error) {
+func (d *diff) LockedUTXOs(txIDs ids.Set, addresses ids.ShortSet, lockState locked.State) ([]*avax.UTXO, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
@@ -43,7 +43,7 @@ func (d *diff) LockedUTXOs(txIDs ids.Set, addresses ids.ShortSet, lockState lock
 	for utxoID := range remaining {
 		utxo := d.modifiedUTXOs[utxoID].utxo
 		if utxo != nil {
-			if lockedOut, ok := utxo.Out.(*lock.LockedOut); ok && lockedOut.LockIDs.Match(lockState, txIDs) {
+			if lockedOut, ok := utxo.Out.(*locked.Out); ok && lockedOut.IDs.Match(lockState, txIDs) {
 				retUtxos = append(retUtxos, utxo)
 			}
 		}
