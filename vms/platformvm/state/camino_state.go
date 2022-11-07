@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 )
 
@@ -32,4 +33,8 @@ func (s *state) LockedUTXOs(txIDs ids.Set, addresses ids.ShortSet, lockState loc
 		}
 	}
 	return retUtxos, nil
+}
+
+func (s *state) CaminoGenesisState() (*genesis.Camino, error) {
+	return s.caminoState.GenesisState(), nil
 }

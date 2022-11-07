@@ -13,7 +13,8 @@ import (
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
-	lock "github.com/ava-labs/avalanchego/vms/platformvm/locked"
+	genesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	locked "github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	gomock "github.com/golang/mock/gomock"
@@ -112,6 +113,21 @@ func (m *MockChain) AddUTXO(arg0 *avax.UTXO) {
 func (mr *MockChainMockRecorder) AddUTXO(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddUTXO", reflect.TypeOf((*MockChain)(nil).AddUTXO), arg0)
+}
+
+// CaminoGenesisState mocks base method.
+func (m *MockChain) CaminoGenesisState() (*genesis.Camino, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CaminoGenesisState")
+	ret0, _ := ret[0].(*genesis.Camino)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CaminoGenesisState indicates an expected call of CaminoGenesisState.
+func (mr *MockChainMockRecorder) CaminoGenesisState() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CaminoGenesisState", reflect.TypeOf((*MockChain)(nil).CaminoGenesisState))
 }
 
 // DeleteCurrentDelegator mocks base method.
@@ -385,7 +401,7 @@ func (mr *MockChainMockRecorder) GetUTXO(arg0 interface{}) *gomock.Call {
 }
 
 // LockedUTXOs mocks base method.
-func (m *MockChain) LockedUTXOs(arg0 ids.Set, arg1 ids.ShortSet, arg2 lock.State) ([]*avax.UTXO, error) {
+func (m *MockChain) LockedUTXOs(arg0 ids.Set, arg1 ids.ShortSet, arg2 locked.State) ([]*avax.UTXO, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "LockedUTXOs", arg0, arg1, arg2)
 	ret0, _ := ret[0].([]*avax.UTXO)
