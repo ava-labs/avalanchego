@@ -21,6 +21,7 @@ var Tests = []func(t *testing.T, db Database){
 	TestSimpleKeyValue,
 	TestKeyEmptyValue,
 	TestSimpleKeyValueClosed,
+	TestNewBatchClosed,
 	TestBatchPut,
 	TestBatchDelete,
 	TestBatchReset,
@@ -199,6 +200,28 @@ func TestMemorySafetyDatabase(t *testing.T, db Database) {
 	} else if !bytes.Equal(gotVal, value) {
 		t.Fatal("got the wrong value")
 	}
+}
+
+// TestNewBatchClosed tests to make sure that calling NewBatch on a closed
+// database returns a batch that errors correctly.
+func TestNewBatchClosed(t *testing.T, db Database) {
+	require := require.New(t)
+
+	err := db.Close()
+	require.NoError(err)
+
+	batch := db.NewBatch()
+	require.NotNil(batch)
+
+	key := []byte("hello")
+	value := []byte("world")
+
+	err = batch.Put(key, value)
+	require.NoError(err)
+	require.Greater(batch.Size(), 0)
+
+	err = batch.Write()
+	require.ErrorIs(err, ErrClosed)
 }
 
 // TestBatchPut tests to make sure that batched writes work as expected.
