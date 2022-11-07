@@ -1,5 +1,7 @@
 # Release Notes
 
+## [v0.11.3](https://github.com/ava-labs/coreth/releases/tag/v0.11.3)
+
 ## [v0.11.2](https://github.com/ava-labs/coreth/releases/tag/v0.11.2)
 
 - Add trie clean cache journaling to disk to improve processing time on restart
