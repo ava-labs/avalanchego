@@ -17,6 +17,7 @@ import (
 	validators "github.com/ava-labs/avalanchego/snow/validators"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
 	blocks "github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	lock "github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	gomock "github.com/golang/mock/gomock"
@@ -528,6 +529,21 @@ func (m *MockState) GetValidatorWeightDiffs(arg0 uint64, arg1 ids.ID) (map[ids.N
 func (mr *MockStateMockRecorder) GetValidatorWeightDiffs(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetValidatorWeightDiffs", reflect.TypeOf((*MockState)(nil).GetValidatorWeightDiffs), arg0, arg1)
+}
+
+// LockedUTXOs mocks base method.
+func (m *MockState) LockedUTXOs(arg0 ids.Set, arg1 ids.ShortSet, arg2 lock.State) ([]*avax.UTXO, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LockedUTXOs", arg0, arg1, arg2)
+	ret0, _ := ret[0].([]*avax.UTXO)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LockedUTXOs indicates an expected call of LockedUTXOs.
+func (mr *MockStateMockRecorder) LockedUTXOs(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LockedUTXOs", reflect.TypeOf((*MockState)(nil).LockedUTXOs), arg0, arg1, arg2)
 }
 
 // PutCurrentDelegator mocks base method.
