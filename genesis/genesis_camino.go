@@ -9,6 +9,7 @@ import (
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
@@ -37,6 +38,10 @@ var (
 				MinConsumptionRate: .10 * reward.PercentDenominator,
 				MintingPeriod:      365 * 24 * time.Hour,
 				SupplyCap:          1000 * units.MegaAvax,
+			},
+			CaminoConfig: config.CaminoConfig{
+				ValidatorBondAmount:   100 * units.KiloAvax,
+				DaoProposalBondAmount: 1 * units.KiloAvax,
 			},
 		},
 	}
