@@ -86,7 +86,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	innerVM.GetBlockF = func(i ids.ID) (snowman.Block, error) { return innerGenesisBlk, nil }
 
 	// createVM
-	vm := New(innerVM, time.Time{}, 0)
+	vm := New(innerVM, time.Time{}, 0, DefaultMinBlockDelay)
 
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
