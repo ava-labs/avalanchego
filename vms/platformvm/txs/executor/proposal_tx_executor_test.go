@@ -45,11 +45,14 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		staker := state.NewCurrentStaker(
+		staker, err := state.NewCurrentStaker(
 			tx.ID(),
 			tx.Unsigned.(*txs.AddValidatorTx),
 			0,
 		)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		target.state.PutCurrentValidator(staker)
 		target.state.AddTx(tx, status.Committed)
@@ -76,11 +79,14 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		staker := state.NewCurrentStaker(
+		staker, err := state.NewCurrentStaker(
 			tx.ID(),
 			tx.Unsigned.(*txs.AddValidatorTx),
 			0,
 		)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		target.state.PutCurrentValidator(staker)
 		target.state.AddTx(tx, status.Committed)
@@ -460,11 +466,14 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		}
 	}
 
-	staker := state.NewCurrentStaker(
+	staker, err := state.NewCurrentStaker(
 		addDSTx.ID(),
 		addDSTx.Unsigned.(*txs.AddValidatorTx),
 		0,
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(addDSTx, status.Committed)
@@ -649,11 +658,14 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	staker = state.NewCurrentStaker(
+	staker, err = state.NewCurrentStaker(
 		subnetTx.ID(),
 		subnetTx.Unsigned.(*txs.AddSubnetValidatorTx),
 		0,
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(subnetTx, status.Committed)
@@ -845,11 +857,14 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		staker = state.NewCurrentStaker(
+		staker, err = state.NewCurrentStaker(
 			subnetTx.ID(),
 			subnetTx.Unsigned.(*txs.AddSubnetValidatorTx),
 			0,
 		)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		env.state.PutCurrentValidator(staker)
 		env.state.AddTx(tx, status.Committed)
@@ -1023,11 +1038,14 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		staker := state.NewCurrentStaker(
+		staker, err := state.NewCurrentStaker(
 			tx.ID(),
 			tx.Unsigned.(*txs.AddValidatorTx),
 			0,
 		)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		env.state.PutCurrentValidator(staker)
 		env.state.AddTx(tx, status.Committed)

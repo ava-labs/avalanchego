@@ -1,5 +1,42 @@
 # Release Notes
 
+## [v1.9.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.2)
+
+This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0). It is optional, but encouraged. The supported plugin version is `19`.
+
+### Coreth
+
+- Added trie clean cache journaling to disk to improve processing time after restart
+- Fixed regression where a snapshot could be marked as stale by the async acceptor during block processing
+- Added fine-grained block processing metrics
+
+### RPCChainVM
+
+- Added `validators.State` to the rpcchainvm server's `snow.Context`
+- Added `rpcProtocolVersion` to the output of `info.getNodeVersion`
+- Added `rpcchainvm` protocol version to the output of the `--version` flag
+- Added `version.RPCChainVMProtocolCompatibility` map to easily compare plugin compatibility against avalanchego versions
+
+### Builds
+
+- Downgraded `ubuntu` release binaries from `jammy` to `focal`
+- Updated macos github runners to `macos-12`
+- Added workflow dispatch to build release binaries
+
+### BLS
+
+- Added bls proof of possession to `platform.getCurrentValidators` and `platform.getPendingValidators`
+- Added bls public key to in-memory staker objects
+- Improved memory clearing of bls secret keys
+
+### Cleanup
+
+- Fixed issue where the chain manager would attempt to start chain creation multiple times
+- Fixed race that caused the P-chain to finish bootstrapping before the primary network finished bootstrapping
+- Converted inbound message handling to expect usage of types rather than maps of fields
+- Simplified the `validators.Set` implementation
+- Added a warning if synchronous consensus messages take too long
+
 ## [v1.9.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.1)
 
 This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0). It is optional, but encouraged. The supported plugin version is `18`.

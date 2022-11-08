@@ -542,11 +542,12 @@ func TestGetStake(t *testing.T) {
 	)
 	require.NoError(err)
 
-	staker := state.NewCurrentStaker(
+	staker, err := state.NewCurrentStaker(
 		tx.ID(),
 		tx.Unsigned.(*txs.AddDelegatorTx),
 		0,
 	)
+	require.NoError(err)
 
 	service.vm.state.PutCurrentDelegator(staker)
 	service.vm.state.AddTx(tx, status.Committed)
@@ -590,10 +591,11 @@ func TestGetStake(t *testing.T) {
 	)
 	require.NoError(err)
 
-	staker = state.NewPendingStaker(
+	staker, err = state.NewPendingStaker(
 		tx.ID(),
 		tx.Unsigned.(*txs.AddValidatorTx),
 	)
+	require.NoError(err)
 
 	service.vm.state.PutPendingValidator(staker)
 	service.vm.state.AddTx(tx, status.Committed)
@@ -697,11 +699,14 @@ func TestGetCurrentValidators(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	staker := state.NewCurrentStaker(
+	staker, err := state.NewCurrentStaker(
 		tx.ID(),
 		tx.Unsigned.(*txs.AddDelegatorTx),
 		0,
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	service.vm.state.PutCurrentDelegator(staker)
 	service.vm.state.AddTx(tx, status.Committed)

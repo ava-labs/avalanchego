@@ -519,10 +519,11 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 				)
 				require.NoError(err)
 
-				staker := state.NewPendingStaker(
+				staker, err := state.NewPendingStaker(
 					tx.ID(),
 					tx.Unsigned.(*txs.AddSubnetValidatorTx),
 				)
+				require.NoError(err)
 
 				env.state.PutPendingValidator(staker)
 				env.state.AddTx(tx, status.Committed)
@@ -608,11 +609,12 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 
-	staker := state.NewCurrentStaker(
+	staker, err := state.NewCurrentStaker(
 		tx.ID(),
 		tx.Unsigned.(*txs.AddSubnetValidatorTx),
 		0,
 	)
+	require.NoError(err)
 
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(tx, status.Committed)
@@ -633,10 +635,11 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 
-	staker = state.NewPendingStaker(
+	staker, err = state.NewPendingStaker(
 		tx.ID(),
 		tx.Unsigned.(*txs.AddSubnetValidatorTx),
 	)
+	require.NoError(err)
 
 	env.state.PutPendingValidator(staker)
 	env.state.AddTx(tx, status.Committed)
@@ -705,10 +708,11 @@ func TestBanffStandardBlockWhitelistedSubnet(t *testing.T) {
 			)
 			require.NoError(err)
 
-			staker := state.NewPendingStaker(
+			staker, err := state.NewPendingStaker(
 				tx.ID(),
 				tx.Unsigned.(*txs.AddSubnetValidatorTx),
 			)
+			require.NoError(err)
 
 			env.state.PutPendingValidator(staker)
 			env.state.AddTx(tx, status.Committed)
@@ -805,10 +809,11 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 	)
 	require.NoError(err)
 
-	staker := state.NewPendingStaker(
+	staker, err := state.NewPendingStaker(
 		addDelegatorTx.ID(),
 		addDelegatorTx.Unsigned.(*txs.AddDelegatorTx),
 	)
+	require.NoError(err)
 
 	env.state.PutPendingDelegator(staker)
 	env.state.AddTx(addDelegatorTx, status.Committed)

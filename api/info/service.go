@@ -92,10 +92,11 @@ func NewService(
 
 // GetNodeVersionReply are the results from calling GetNodeVersion
 type GetNodeVersionReply struct {
-	Version         string            `json:"version"`
-	DatabaseVersion string            `json:"databaseVersion"`
-	GitCommit       string            `json:"gitCommit"`
-	VMVersions      map[string]string `json:"vmVersions"`
+	Version            string            `json:"version"`
+	DatabaseVersion    string            `json:"databaseVersion"`
+	RPCProtocolVersion json.Uint32       `json:"rpcProtocolVersion"`
+	GitCommit          string            `json:"gitCommit"`
+	VMVersions         map[string]string `json:"vmVersions"`
 }
 
 // GetNodeVersion returns the version this node is running
@@ -109,6 +110,7 @@ func (service *Info) GetNodeVersion(_ *http.Request, _ *struct{}, reply *GetNode
 
 	reply.Version = service.Version.String()
 	reply.DatabaseVersion = version.CurrentDatabase.String()
+	reply.RPCProtocolVersion = json.Uint32(version.RPCChainVMProtocol)
 	reply.GitCommit = version.GitCommit
 	reply.VMVersions = vmVersions
 	return nil

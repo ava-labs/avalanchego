@@ -34,6 +34,7 @@ type Database struct {
 	codec  codec.Manager
 	cipher cipher.AEAD
 	db     database.Database
+	closed bool
 }
 
 // New returns a new encrypted database
@@ -56,7 +57,7 @@ func (db *Database) Has(key []byte) (bool, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	if db.db == nil {
+	if db.closed {
 		return false, database.ErrClosed
 	}
 	return db.db.Has(key)
@@ -66,7 +67,7 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	if db.db == nil {
+	if db.closed {
 		return nil, database.ErrClosed
 	}
 	encVal, err := db.db.Get(key)
@@ -80,7 +81,7 @@ func (db *Database) Put(key, value []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	if db.db == nil {
+	if db.closed {
 		return database.ErrClosed
 	}
 
@@ -95,7 +96,7 @@ func (db *Database) Delete(key []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	if db.db == nil {
+	if db.closed {
 		return database.ErrClosed
 	}
 	return db.db.Delete(key)
@@ -124,7 +125,7 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	if db.db == nil {
+	if db.closed {
 		return &nodb.Iterator{Err: database.ErrClosed}
 	}
 	return &iterator{
@@ -137,7 +138,7 @@ func (db *Database) Compact(start, limit []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	if db.db == nil {
+	if db.closed {
 		return database.ErrClosed
 	}
 	return db.db.Compact(start, limit)
@@ -147,10 +148,10 @@ func (db *Database) Close() error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	if db.db == nil {
+	if db.closed {
 		return database.ErrClosed
 	}
-	db.db = nil
+	db.closed = true
 	return nil
 }
 
@@ -158,14 +159,14 @@ func (db *Database) isClosed() bool {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	return db.db == nil
+	return db.closed
 }
 
 func (db *Database) HealthCheck() (interface{}, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	if db.db == nil {
+	if db.closed {
 		return nil, database.ErrClosed
 	}
 	return db.db.HealthCheck()
@@ -202,7 +203,7 @@ func (b *batch) Write() error {
 	b.db.lock.Lock()
 	defer b.db.lock.Unlock()
 
-	if b.db.db == nil {
+	if b.db.closed {
 		return database.ErrClosed
 	}
 

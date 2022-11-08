@@ -271,8 +271,11 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	}
 
 	txID := e.Tx.ID()
+	newStaker, err := state.NewPendingStaker(txID, tx)
+	if err != nil {
+		return err
+	}
 
-	newStaker := state.NewPendingStaker(txID, tx)
 	e.State.PutPendingValidator(newStaker)
 	utxo.Consume(e.State, tx.Ins)
 	utxo.Produce(e.State, txID, tx.Outs)
@@ -291,8 +294,11 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	}
 
 	txID := e.Tx.ID()
+	newStaker, err := state.NewPendingStaker(txID, tx)
+	if err != nil {
+		return err
+	}
 
-	newStaker := state.NewPendingStaker(txID, tx)
 	e.State.PutPendingValidator(newStaker)
 	utxo.Consume(e.State, tx.Ins)
 	utxo.Produce(e.State, txID, tx.Outs)
@@ -311,7 +317,11 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	}
 
 	txID := e.Tx.ID()
-	newStaker := state.NewPendingStaker(txID, tx)
+	newStaker, err := state.NewPendingStaker(txID, tx)
+	if err != nil {
+		return err
+	}
+
 	e.State.PutPendingDelegator(newStaker)
 	utxo.Consume(e.State, tx.Ins)
 	utxo.Produce(e.State, txID, tx.Outs)
@@ -407,8 +417,11 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 	}
 
 	txID := e.Tx.ID()
+	newStaker, err := state.NewPendingStaker(txID, tx)
+	if err != nil {
+		return err
+	}
 
-	newStaker := state.NewPendingStaker(txID, tx)
 	e.State.PutPendingValidator(newStaker)
 	utxo.Consume(e.State, tx.Ins)
 	utxo.Produce(e.State, txID, tx.Outs)
@@ -427,8 +440,11 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 	}
 
 	txID := e.Tx.ID()
+	newStaker, err := state.NewPendingStaker(txID, tx)
+	if err != nil {
+		return err
+	}
 
-	newStaker := state.NewPendingStaker(txID, tx)
 	e.State.PutPendingDelegator(newStaker)
 	utxo.Consume(e.State, tx.Ins)
 	utxo.Produce(e.State, txID, tx.Outs)

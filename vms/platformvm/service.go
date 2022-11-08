@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -765,7 +766,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				}
 			}
 
-			reply.Validators = append(reply.Validators, platformapi.PermissionlessValidator{
+			vdr := platformapi.PermissionlessValidator{
 				Staker: platformapi.Staker{
 					TxID:        txID,
 					NodeID:      nodeID,
@@ -780,7 +781,16 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				ValidationRewardOwner: validationRewardOwner,
 				DelegationRewardOwner: delegationRewardOwner,
 				DelegationFee:         delegationFee,
-			})
+			}
+
+			if staker, ok := staker.(*txs.AddPermissionlessValidatorTx); ok {
+				if signer, ok := staker.Signer.(*signer.ProofOfPossession); ok {
+					vdr.Signer = signer
+				}
+			}
+
+			reply.Validators = append(reply.Validators, vdr)
+
 		case txs.DelegatorTx:
 			var rewardOwner *platformapi.Owner
 			owner, ok := staker.RewardsOwner().(*secp256k1fx.OutputOwners)
@@ -904,7 +914,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 
 			connected := service.vm.uptimeManager.IsConnected(nodeID)
 			tracksSubnet := args.SubnetID == constants.PrimaryNetworkID || service.vm.SubnetTracker.TracksSubnet(nodeID, args.SubnetID)
-			reply.Validators = append(reply.Validators, platformapi.PermissionlessValidator{
+			vdr := platformapi.PermissionlessValidator{
 				Staker: platformapi.Staker{
 					TxID:        txID,
 					NodeID:      nodeID,
@@ -914,7 +924,15 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 				},
 				DelegationFee: delegationFee,
 				Connected:     connected && tracksSubnet,
-			})
+			}
+
+			if staker, ok := staker.(*txs.AddPermissionlessValidatorTx); ok {
+				if signer, ok := staker.Signer.(*signer.ProofOfPossession); ok {
+					vdr.Signer = signer
+				}
+			}
+
+			reply.Validators = append(reply.Validators, vdr)
 
 		case txs.DelegatorTx:
 			reply.Delegators = append(reply.Delegators, platformapi.Staker{

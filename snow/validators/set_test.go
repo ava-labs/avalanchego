@@ -126,9 +126,9 @@ func TestSamplerString(t *testing.T) {
 	err = s.AddWeight(vdr1, math.MaxInt64-1)
 	require.NoError(t, err)
 
-	expected := "Validator Set: (Size = 2, SampleableWeight = 9223372036854775807, Weight = 9223372036854775807)\n" +
-		"    Validator[0]: NodeID-111111111111111111116DBWJs, 1/1\n" +
-		"    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806/9223372036854775806"
+	expected := "Validator Set: (Size = 2, Weight = 9223372036854775807)\n" +
+		"    Validator[0]: NodeID-111111111111111111116DBWJs, 1\n" +
+		"    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806"
 	result := s.String()
 	require.Equal(t, expected, result, "wrong string returned")
 }
@@ -177,83 +177,6 @@ func TestSetSubsetWeight(t *testing.T) {
 	}
 	expectedWeight := weight0 + weight1
 	require.Equal(t, expectedWeight, subsetWeight, "wrong subset weight")
-}
-
-func TestSamplerMasked(t *testing.T) {
-	vdr0 := ids.EmptyNodeID
-	vdr1 := ids.NodeID{
-		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-	}
-
-	s := NewSet()
-	err := s.AddWeight(vdr0, 1)
-	require.NoError(t, err)
-
-	err = s.MaskValidator(vdr1)
-	require.NoError(t, err)
-
-	{
-		expected := "Validator Set: (Size = 1, SampleableWeight = 1, Weight = 1)\n" +
-			"    Validator[0]: NodeID-111111111111111111116DBWJs, 1/1"
-		result := s.String()
-		require.Equal(t, expected, result, "wrong string returned")
-	}
-
-	err = s.AddWeight(vdr1, math.MaxInt64-1)
-	require.NoError(t, err)
-
-	{
-		expected := "Validator Set: (Size = 2, SampleableWeight = 1, Weight = 9223372036854775807)\n" +
-			"    Validator[0]: NodeID-111111111111111111116DBWJs, 1/1\n" +
-			"    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 0/9223372036854775806"
-		result := s.String()
-		require.Equal(t, expected, result, "wrong string returned")
-	}
-
-	err = s.RevealValidator(vdr1)
-	require.NoError(t, err)
-
-	{
-		expected := "Validator Set: (Size = 2, SampleableWeight = 9223372036854775807, Weight = 9223372036854775807)\n" +
-			"    Validator[0]: NodeID-111111111111111111116DBWJs, 1/1\n" +
-			"    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806/9223372036854775806"
-		result := s.String()
-		require.Equal(t, expected, result, "wrong string returned")
-	}
-
-	err = s.MaskValidator(vdr1)
-	require.NoError(t, err)
-
-	{
-		expected := "Validator Set: (Size = 2, SampleableWeight = 1, Weight = 9223372036854775807)\n" +
-			"    Validator[0]: NodeID-111111111111111111116DBWJs, 1/1\n" +
-			"    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 0/9223372036854775806"
-		result := s.String()
-		require.Equal(t, expected, result, "wrong string returned")
-	}
-
-	err = s.RevealValidator(vdr1)
-	require.NoError(t, err)
-
-	{
-		expected := "Validator Set: (Size = 2, SampleableWeight = 9223372036854775807, Weight = 9223372036854775807)\n" +
-			"    Validator[0]: NodeID-111111111111111111116DBWJs, 1/1\n" +
-			"    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806/9223372036854775806"
-		result := s.String()
-		require.Equal(t, expected, result, "wrong string returned")
-	}
-
-	err = s.RevealValidator(vdr1)
-	require.NoError(t, err)
-
-	{
-		expected := "Validator Set: (Size = 2, SampleableWeight = 9223372036854775807, Weight = 9223372036854775807)\n" +
-			"    Validator[0]: NodeID-111111111111111111116DBWJs, 1/1\n" +
-			"    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806/9223372036854775806"
-		result := s.String()
-		require.Equal(t, expected, result, "wrong string returned")
-	}
 }
 
 var _ SetCallbackListener = (*callbackListener)(nil)

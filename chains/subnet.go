@@ -22,8 +22,7 @@ type Subnet interface {
 
 	afterBootstrapped() chan struct{}
 
-	addChain(chainID ids.ID)
-	removeChain(chainID ids.ID)
+	addChain(chainID ids.ID) bool
 }
 
 type SubnetConfig struct {
@@ -37,6 +36,7 @@ type SubnetConfig struct {
 type subnet struct {
 	lock             sync.RWMutex
 	bootstrapping    ids.Set
+	bootstrapped     ids.Set
 	once             sync.Once
 	bootstrappedSema chan struct{}
 }
@@ -59,6 +59,7 @@ func (s *subnet) Bootstrapped(chainID ids.ID) {
 	defer s.lock.Unlock()
 
 	s.bootstrapping.Remove(chainID)
+	s.bootstrapped.Add(chainID)
 	if s.bootstrapping.Len() > 0 {
 		return
 	}
@@ -72,16 +73,14 @@ func (s *subnet) afterBootstrapped() chan struct{} {
 	return s.bootstrappedSema
 }
 
-func (s *subnet) addChain(chainID ids.ID) {
+func (s *subnet) addChain(chainID ids.ID) bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+
+	if s.bootstrapping.Contains(chainID) || s.bootstrapped.Contains(chainID) {
+		return false
+	}
 
 	s.bootstrapping.Add(chainID)
-}
-
-func (s *subnet) removeChain(chainID ids.ID) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	s.bootstrapping.Remove(chainID)
+	return true
 }

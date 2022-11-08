@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 )
@@ -52,6 +53,9 @@ type PermissionlessStaker interface {
 type Staker interface {
 	SubnetID() ids.ID
 	NodeID() ids.NodeID
+	// PublicKey returns the BLS public key registered by this transaction. If
+	// there was no key registered by this transaction, it will return false.
+	PublicKey() (*bls.PublicKey, bool, error)
 	StartTime() time.Time
 	EndTime() time.Time
 	Weight() uint64

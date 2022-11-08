@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/validators/gvalidators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -45,6 +46,7 @@ import (
 	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
 	sharedmemorypb "github.com/ava-labs/avalanchego/proto/pb/sharedmemory"
 	subnetlookuppb "github.com/ava-labs/avalanchego/proto/pb/subnetlookup"
+	validatorstatepb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
 
@@ -170,6 +172,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmpb.InitializeRequest) (
 	bcLookupClient := galiasreader.NewClient(aliasreaderpb.NewAliasReaderClient(clientConn))
 	snLookupClient := gsubnetlookup.NewClient(subnetlookuppb.NewSubnetLookupClient(clientConn))
 	appSenderClient := appsender.NewClient(appsenderpb.NewAppSenderClient(clientConn))
+	validatorStateClient := gvalidators.NewClient(validatorstatepb.NewValidatorStateClient(clientConn))
 
 	toEngine := make(chan common.Message, 1)
 	vm.closed = make(chan struct{})
@@ -204,7 +207,8 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmpb.InitializeRequest) (
 		SNLookup:     snLookupClient,
 		Metrics:      metrics.NewOptionalGatherer(),
 
-		// TODO: support snowman++ fields
+		ValidatorState: validatorStateClient,
+		// TODO: support remaining snowman++ fields
 	}
 
 	if err := vm.vm.Initialize(vm.ctx, dbManager, req.GenesisBytes, req.UpgradeBytes, req.ConfigBytes, toEngine, nil, appSenderClient); err != nil {

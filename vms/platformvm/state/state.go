@@ -996,7 +996,11 @@ func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) err
 			return err
 		}
 
-		staker := NewCurrentStaker(vdrTx.ID(), tx, potentialReward)
+		staker, err := NewCurrentStaker(vdrTx.ID(), tx, potentialReward)
+		if err != nil {
+			return err
+		}
+
 		s.PutCurrentValidator(staker)
 		s.AddTx(vdrTx, status.Committed)
 		s.SetCurrentSupply(constants.PrimaryNetworkID, newCurrentSupply)
@@ -1085,7 +1089,11 @@ func (s *state) loadCurrentValidators() error {
 			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 		}
 
-		staker := NewCurrentStaker(txID, stakerTx, uptime.PotentialReward)
+		staker, err := NewCurrentStaker(txID, stakerTx, uptime.PotentialReward)
+		if err != nil {
+			return err
+		}
+
 		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker
 
@@ -1123,7 +1131,11 @@ func (s *state) loadCurrentValidators() error {
 			return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 		}
 
-		staker := NewCurrentStaker(txID, stakerTx, potentialReward)
+		staker, err := NewCurrentStaker(txID, stakerTx, potentialReward)
+		if err != nil {
+			return err
+		}
+
 		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker
 
@@ -1159,7 +1171,11 @@ func (s *state) loadCurrentValidators() error {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
 
-			staker := NewCurrentStaker(txID, stakerTx, potentialReward)
+			staker, err := NewCurrentStaker(txID, stakerTx, potentialReward)
+			if err != nil {
+				return err
+			}
+
 			validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 			if validator.delegators == nil {
 				validator.delegators = btree.New(defaultTreeDegree)
@@ -1206,7 +1222,11 @@ func (s *state) loadPendingValidators() error {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
 
-			staker := NewPendingStaker(txID, stakerTx)
+			staker, err := NewPendingStaker(txID, stakerTx)
+			if err != nil {
+				return err
+			}
+
 			validator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 			validator.validator = staker
 
@@ -1237,7 +1257,11 @@ func (s *state) loadPendingValidators() error {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
 
-			staker := NewPendingStaker(txID, stakerTx)
+			staker, err := NewPendingStaker(txID, stakerTx)
+			if err != nil {
+				return err
+			}
+
 			validator := s.pendingStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 			if validator.delegators == nil {
 				validator.delegators = btree.New(defaultTreeDegree)

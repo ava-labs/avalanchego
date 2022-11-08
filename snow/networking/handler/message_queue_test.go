@@ -41,11 +41,11 @@ func TestQueue(t *testing.T) {
 	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
 	require.NoError(err)
 
-	mc.SetTime(currentTime)
-	msg1 := mc.InboundPut(
+	msg1 := mc.InboundPullQuery(
 		ids.Empty,
 		0,
-		nil,
+		time.Second,
+		ids.GenerateTestID(),
 		vdr1ID,
 	)
 
@@ -96,7 +96,13 @@ func TestQueue(t *testing.T) {
 	require.EqualValues(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	require.EqualValues(1, u.Len())
 
-	msg2 := mc.InboundGet(ids.Empty, 0, 0, ids.Empty, vdr2ID)
+	msg2 := mc.InboundPullQuery(
+		ids.Empty,
+		0,
+		time.Second,
+		ids.GenerateTestID(),
+		vdr2ID,
+	)
 
 	// Push msg2 from vdr2ID
 	u.Push(context.Background(), msg2)

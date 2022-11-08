@@ -90,7 +90,12 @@ func StartTestPeer(
 		IP:   net.IPv6zero,
 		Port: 0,
 	}
-	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, 10*time.Second)
+	resourceTracker, err := tracker.NewResourceTracker(
+		prometheus.NewRegistry(),
+		resource.NoUsage,
+		meter.ContinuousFactory{},
+		10*time.Second,
+	)
 	if err != nil {
 		return nil, err
 	}
