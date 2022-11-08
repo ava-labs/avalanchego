@@ -18,6 +18,7 @@ github.com/ava-labs/avalanchego/utils/hashing=Hasher=utils/hashing/mock_hasher.g
 github.com/ava-labs/avalanchego/utils/logging=Logger=utils/logging/mock_logger.go
 github.com/ava-labs/avalanchego/utils/resource=User=utils/resource/mock_user.go
 github.com/ava-labs/avalanchego/vms/components/avax=TransferableOut=vms/components/avax/mock_transferable_out.go
+github.com/ava-labs/avalanchego/vms/components/avax=TransferableIn=vms/components/avax/mock_transferable_in.go
 github.com/ava-labs/avalanchego/vms/components/verify=Verifiable=vms/components/verify/mock_verifiable.go
 github.com/ava-labs/avalanchego/vms/platformvm/blocks=Block=vms/platformvm/blocks/mock_block.go
 github.com/ava-labs/avalanchego/vms/platformvm/fx=Fx,Owner=vms/platformvm/fx/mock_fx.go
