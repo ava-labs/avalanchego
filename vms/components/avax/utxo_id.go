@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
@@ -15,7 +17,10 @@ import (
 )
 
 var (
-	errNilUTXOID = errors.New("nil utxo ID is not valid")
+	errNilUTXOID                 = errors.New("nil utxo ID is not valid")
+	errMalformedUTXOIDString     = errors.New("unexpected number of tokens in string")
+	errFailedDecodingUTXOIDTxID  = errors.New("failed decoding UTXOID TxID")
+	errFailedDecodingUTXOIDIndex = errors.New("failed decoding UTXOID index")
 
 	_ verify.Verifiable = (*UTXOID)(nil)
 )
@@ -48,6 +53,29 @@ func (utxo *UTXOID) Symbolic() bool { return utxo.Symbol }
 
 func (utxo *UTXOID) String() string {
 	return fmt.Sprintf("%s:%d", utxo.TxID, utxo.OutputIndex)
+}
+
+// UTXOIDFromString attempts to parse a string into a UTXOID
+func UTXOIDFromString(s string) (*UTXOID, error) {
+	ss := strings.Split(s, ":")
+	if len(ss) != 2 {
+		return nil, errMalformedUTXOIDString
+	}
+
+	txID, err := ids.FromString(ss[0])
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", errFailedDecodingUTXOIDTxID, err)
+	}
+
+	idx, err := strconv.ParseUint(ss[1], 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", errFailedDecodingUTXOIDIndex, err)
+	}
+
+	return &UTXOID{
+		TxID:        txID,
+		OutputIndex: uint32(idx),
+	}, nil
 }
 
 func (utxo *UTXOID) Verify() error {

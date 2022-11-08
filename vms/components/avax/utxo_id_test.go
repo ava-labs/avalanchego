@@ -4,7 +4,10 @@
 package avax
 
 import (
+	"math"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -56,5 +59,102 @@ func TestUTXOID(t *testing.T) {
 
 	if utxoID.InputID() != newUTXOID.InputID() {
 		t.Fatalf("Parsing returned the wrong UTXO ID")
+	}
+}
+
+func TestUTXOIDFromString(t *testing.T) {
+	tests := []struct {
+		description string
+		utxoID      *UTXOID
+		expectedStr string
+		parseErr    error
+	}{
+		{
+			description: "empty utxoID",
+			utxoID:      &UTXOID{},
+			expectedStr: "11111111111111111111111111111111LpoYY:0",
+			parseErr:    nil,
+		},
+		{
+			description: "a random utxoID",
+			utxoID: &UTXOID{
+				TxID:        ids.Empty.Prefix(2022),
+				OutputIndex: 2022,
+			},
+			expectedStr: "PkHybKBmFvBkfumRvJZToECJp4oCiziLu95p86rU1THx1WAqa:2022",
+			parseErr:    nil,
+		},
+		{
+			description: "max output index utxoID",
+			utxoID: &UTXOID{
+				TxID:        ids.Empty.Prefix(1789),
+				OutputIndex: math.MaxUint32,
+			},
+			expectedStr: "Y3sXNphGY121uVzj37rA8ooUAHrfuDZahzLrTq6UauAZTEqoX:4294967295",
+			parseErr:    nil,
+		},
+		{
+			description: "not enough tokens",
+			utxoID:      &UTXOID{},
+			expectedStr: "11111111111111111111111111111111LpoYY",
+			parseErr:    errMalformedUTXOIDString,
+		},
+		{
+			description: "not enough tokens",
+			utxoID:      &UTXOID{},
+			expectedStr: "11111111111111111111111111111111LpoYY:10:10",
+			parseErr:    errMalformedUTXOIDString,
+		},
+		{
+			description: "missing TxID",
+			utxoID:      &UTXOID{},
+			expectedStr: ":2022",
+			parseErr:    errFailedDecodingUTXOIDTxID,
+		},
+		{
+			description: "non TxID",
+			utxoID:      &UTXOID{},
+			expectedStr: "11:NOT_AN_INDEX",
+			parseErr:    errFailedDecodingUTXOIDTxID,
+		},
+		{
+			description: "missing index",
+			utxoID:      &UTXOID{},
+			expectedStr: "11111111111111111111111111111111LpoYY:",
+			parseErr:    errFailedDecodingUTXOIDIndex,
+		},
+		{
+			description: "non index",
+			utxoID:      &UTXOID{},
+			expectedStr: "11111111111111111111111111111111LpoYY:NOT_AN_INDEX",
+			parseErr:    errFailedDecodingUTXOIDIndex,
+		},
+		{
+			description: "negative index",
+			utxoID:      &UTXOID{},
+			expectedStr: "11111111111111111111111111111111LpoYY:-1",
+			parseErr:    errFailedDecodingUTXOIDIndex,
+		},
+		{
+			description: "index too large",
+			utxoID:      &UTXOID{},
+			expectedStr: "11111111111111111111111111111111LpoYY:4294967296",
+			parseErr:    errFailedDecodingUTXOIDIndex,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			require := require.New(t)
+
+			retrievedUTXOID, err := UTXOIDFromString(test.expectedStr)
+			require.ErrorIs(err, test.parseErr)
+
+			if err == nil {
+				require.Equal(test.utxoID.InputID(), retrievedUTXOID.InputID())
+				require.Equal(test.utxoID, retrievedUTXOID)
+				require.Equal(test.utxoID.String(), retrievedUTXOID.String())
+			}
+		})
 	}
 }
