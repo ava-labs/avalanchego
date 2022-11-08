@@ -4,6 +4,7 @@
 package precompile
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -138,6 +139,12 @@ func (c *FeeConfigManagerConfig) Verify() error {
 	}
 
 	return c.InitialFeeConfig.Verify()
+}
+
+// String returns a string representation of the FeeConfigManagerConfig.
+func (c *FeeConfigManagerConfig) String() string {
+	bytes, _ := json.Marshal(c)
+	return string(bytes)
 }
 
 // GetFeeConfigManagerStatus returns the role of [address] for the fee config manager list.

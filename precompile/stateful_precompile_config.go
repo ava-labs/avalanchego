@@ -4,6 +4,7 @@
 package precompile
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -37,6 +38,8 @@ type StatefulPrecompileConfig interface {
 	Contract() StatefulPrecompiledContract
 	// Verify is called on startup and an error is treated as fatal. Configure can assume the Config has passed verification.
 	Verify() error
+
+	fmt.Stringer
 }
 
 // Configure sets the nonce and code to non-empty values then calls Configure on [precompileConfig] to make the necessary

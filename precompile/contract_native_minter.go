@@ -4,6 +4,7 @@
 package precompile
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -132,6 +133,12 @@ func (c *ContractNativeMinterConfig) Equal(s StatefulPrecompileConfig) bool {
 	}
 
 	return true
+}
+
+// String returns a string representation of the ContractNativeMinterConfig.
+func (c *ContractNativeMinterConfig) String() string {
+	bytes, _ := json.Marshal(c)
+	return string(bytes)
 }
 
 // GetContractNativeMinterStatus returns the role of [address] for the minter list.

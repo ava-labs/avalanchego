@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ava-labs/subnet-evm/utils"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // precompileKey is a helper type used to reference each of the
@@ -24,6 +25,26 @@ const (
 	// ADD YOUR PRECOMPILE HERE
 	// {yourPrecompile}Key
 )
+
+// TODO: Move this to the interface or PrecompileConfig struct
+func (k precompileKey) String() string {
+	switch k {
+	case contractDeployerAllowListKey:
+		return "contractDeployerAllowList"
+	case contractNativeMinterKey:
+		return "contractNativeMinter"
+	case txAllowListKey:
+		return "txAllowList"
+	case feeManagerKey:
+		return "feeManager"
+		// ADD YOUR PRECOMPILE HERE
+		/*
+			case {yourPrecompile}Key:
+				return "{yourPrecompile}"
+		*/
+	}
+	return "unknown"
+}
 
 // ADD YOUR PRECOMPILE HERE
 var precompileKeys = []precompileKey{contractDeployerAllowListKey, contractNativeMinterKey, txAllowListKey, feeManagerKey /* {yourPrecompile}Key */}
@@ -320,6 +341,7 @@ func (c *ChainConfig) CheckConfigurePrecompiles(parentTimestamp *big.Int, blockC
 			// If this transition activates the upgrade, configure the stateful precompile.
 			// (or deconfigure it if it is being disabled.)
 			if config.IsDisabled() {
+				log.Info("Disabling precompile", "name", key)
 				statedb.Suicide(config.Address())
 				// Calling Finalise here effectively commits Suicide call and wipes the contract state.
 				// This enables re-configuration of the same contract state in the same block.
@@ -327,6 +349,7 @@ func (c *ChainConfig) CheckConfigurePrecompiles(parentTimestamp *big.Int, blockC
 				// since Suicide will be committed after the reconfiguration.
 				statedb.Finalise(true)
 			} else {
+				log.Info("Activating new precompile", "name", key, "config", config)
 				precompile.Configure(c, blockContext, config, statedb)
 			}
 		}

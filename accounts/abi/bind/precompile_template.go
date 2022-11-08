@@ -69,7 +69,7 @@ const (
 )
 
 // CUSTOM CODE STARTS HERE
-// Reference imports to suppress errors from unused imports. This code and any unnecessary imports can be removed. 
+// Reference imports to suppress errors from unused imports. This code and any unnecessary imports can be removed.
 var (
 	_ = errors.New
 	_ = big.NewInt
@@ -176,6 +176,12 @@ func (c *{{.Contract.Type}}Config) Equal(s StatefulPrecompileConfig) bool {
 	// if {{.Contract.Type}}Config contains only UpgradeableConfig {{if .Contract.AllowList}} and AllowListConfig {{end}} you can skip modifying it.
 	equals := c.UpgradeableConfig.Equal(&other.UpgradeableConfig) {{if .Contract.AllowList}} && c.AllowListConfig.Equal(&other.AllowListConfig) {{end}}
 	return equals
+}
+
+// String returns a string representation of the {{.Contract.Type}}Config.
+func (c *{{.Contract.Type}}Config) String() string {
+	bytes, _ := json.Marshal(c)
+	return string(bytes)
 }
 
 // Address returns the address of the {{.Contract.Type}}. Addresses reside under the precompile/params.go

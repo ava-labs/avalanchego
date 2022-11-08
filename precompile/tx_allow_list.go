@@ -4,6 +4,7 @@
 package precompile
 
 import (
+	"encoding/json"
 	"errors"
 	"math/big"
 
@@ -71,6 +72,12 @@ func (c *TxAllowListConfig) Equal(s StatefulPrecompileConfig) bool {
 		return false
 	}
 	return c.UpgradeableConfig.Equal(&other.UpgradeableConfig) && c.AllowListConfig.Equal(&other.AllowListConfig)
+}
+
+// String returns a string representation of the TxAllowListConfig.
+func (c *TxAllowListConfig) String() string {
+	bytes, _ := json.Marshal(c)
+	return string(bytes)
 }
 
 // GetTxAllowListStatus returns the role of [address] for the contract deployer

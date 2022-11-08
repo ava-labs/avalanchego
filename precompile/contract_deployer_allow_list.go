@@ -4,6 +4,7 @@
 package precompile
 
 import (
+	"encoding/json"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -68,6 +69,12 @@ func (c *ContractDeployerAllowListConfig) Equal(s StatefulPrecompileConfig) bool
 		return false
 	}
 	return c.UpgradeableConfig.Equal(&other.UpgradeableConfig) && c.AllowListConfig.Equal(&other.AllowListConfig)
+}
+
+// String returns a string representation of the ContractDeployerAllowListConfig.
+func (c *ContractDeployerAllowListConfig) String() string {
+	bytes, _ := json.Marshal(c)
+	return string(bytes)
 }
 
 // GetContractDeployerAllowListStatus returns the role of [address] for the contract deployer
