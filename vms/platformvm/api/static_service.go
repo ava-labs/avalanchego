@@ -4,7 +4,6 @@
 package api
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"net/http"
@@ -34,6 +33,8 @@ var (
 	errUTXOHasNoValue       = errors.New("genesis UTXO has no value")
 	errValidatorAddsNoValue = errors.New("validator would have already unstaked")
 	errStakeOverflow        = errors.New("validator stake exceeds limit")
+
+	_ utils.Sortable[UTXO] = UTXO{}
 )
 
 // StaticService defines the static API methods exposed by the platform VM
@@ -71,7 +72,7 @@ func (utxo UTXO) Less(other UTXO) bool {
 		return false
 	}
 
-	return bytes.Compare(utxoAddr.Bytes(), otherAddr.Bytes()) == -1
+	return utxoAddr.Less(otherAddr)
 }
 
 // TODO: Refactor APIStaker, APIValidators and merge them together for

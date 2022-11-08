@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var _ Sortable[sortable] = sortable(0)
+
 type sortable int
 
 func (s sortable) Less(other sortable) bool {

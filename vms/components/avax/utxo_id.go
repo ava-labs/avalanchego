@@ -9,13 +9,15 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 var (
 	errNilUTXOID = errors.New("nil utxo ID is not valid")
 
-	_ verify.Verifiable = (*UTXOID)(nil)
+	_ verify.Verifiable       = (*UTXOID)(nil)
+	_ utils.Sortable[*UTXOID] = (*UTXOID)(nil)
 )
 
 type UTXOID struct {

@@ -8,12 +8,17 @@ import (
 	"crypto/x509"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 const NodeIDPrefix = "NodeID-"
 
-var EmptyNodeID = NodeID{}
+var (
+	EmptyNodeID = NodeID{}
+
+	_ utils.Sortable[NodeID] = NodeID{}
+)
 
 type NodeID ShortID
 

@@ -9,9 +9,10 @@ import (
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"golang.org/x/exp/slices"
 
 	dto "github.com/prometheus/client_model/go"
+
+	"golang.org/x/exp/slices"
 )
 
 var (
@@ -85,5 +86,7 @@ func (g *multiGatherer) Register(namespace string, gatherer prometheus.Gatherer)
 }
 
 func sortMetrics(m []*dto.MetricFamily) {
-	slices.SortFunc(m, func(i, j *dto.MetricFamily) bool { return *i.Name < *j.Name })
+	slices.SortFunc(m, func(i, j *dto.MetricFamily) bool {
+		return *i.Name < *j.Name
+	})
 }

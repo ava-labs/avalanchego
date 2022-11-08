@@ -4,7 +4,6 @@
 package snowstorm
 
 import (
-	"bytes"
 	"fmt"
 	"strings"
 
@@ -12,6 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 )
+
+var _ utils.Sortable[*snowballNode] = (*snowballNode)(nil)
 
 type snowballNode struct {
 	txID               ids.ID
@@ -27,7 +28,7 @@ func (sb *snowballNode) String() string {
 }
 
 func (sb *snowballNode) Less(other *snowballNode) bool {
-	return bytes.Compare(sb.txID[:], other.txID[:]) == -1
+	return sb.txID.Less(other.txID)
 }
 
 // consensusString converts a list of snowball nodes into a human-readable

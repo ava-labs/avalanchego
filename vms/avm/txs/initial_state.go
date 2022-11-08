@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
@@ -19,6 +20,8 @@ var (
 	errNilFxOutput      = errors.New("nil feature extension output is not valid")
 	errOutputsNotSorted = errors.New("outputs not sorted")
 	errUnknownFx        = errors.New("unknown feature extension")
+
+	_ utils.Sortable[*InitialState] = (*InitialState)(nil)
 )
 
 type InitialState struct {

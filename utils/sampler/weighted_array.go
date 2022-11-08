@@ -5,10 +5,13 @@ package sampler
 
 import (
 	"github.com/ava-labs/avalanchego/utils"
-	safemath "github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/math"
 )
 
-var _ Weighted = (*weightedArray)(nil)
+var (
+	_ Weighted                             = (*weightedArray)(nil)
+	_ utils.Sortable[weightedArrayElement] = weightedArrayElement{}
+)
 
 type weightedArrayElement struct {
 	cumulativeWeight uint64
@@ -63,7 +66,7 @@ func (s *weightedArray) Initialize(weights []uint64) error {
 
 	cumulativeWeight := uint64(0)
 	for i := 0; i < len(s.arr); i++ {
-		newWeight, err := safemath.Add64(
+		newWeight, err := math.Add64(
 			cumulativeWeight,
 			s.arr[i].cumulativeWeight,
 		)

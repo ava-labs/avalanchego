@@ -9,8 +9,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 func TestID(t *testing.T) {
@@ -224,7 +225,7 @@ func TestIDLess(t *testing.T) {
 	require.False(id2.Less(id1))
 
 	id1 = ID{1}
-	id2 = ID{}
+	id2 = ID{0}
 	require.False(id1.Less(id2))
 	require.True(id2.Less(id1))
 
@@ -233,7 +234,7 @@ func TestIDLess(t *testing.T) {
 	require.False(id1.Less(id2))
 	require.False(id2.Less(id1))
 
-	id1 = ID{1}
+	id1 = ID{1, 0}
 	id2 = ID{1, 2}
 	require.True(id1.Less(id2))
 	require.False(id2.Less(id1))

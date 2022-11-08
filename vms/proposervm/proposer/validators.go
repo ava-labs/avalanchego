@@ -4,10 +4,11 @@
 package proposer
 
 import (
-	"bytes"
-
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 )
+
+var _ utils.Sortable[validatorData] = validatorData{}
 
 type validatorData struct {
 	id     ids.NodeID
@@ -15,5 +16,5 @@ type validatorData struct {
 }
 
 func (d validatorData) Less(other validatorData) bool {
-	return bytes.Compare(d.id[:], other.id[:]) == -1
+	return d.id.Less(other.id)
 }

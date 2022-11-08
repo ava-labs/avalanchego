@@ -7,9 +7,10 @@ import (
 	"bytes"
 	"sort"
 
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"golang.org/x/exp/constraints"
 	"golang.org/x/exp/slices"
+
+	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 // TODO can we handle sorting where the Less function relies on a codec?
@@ -28,7 +29,9 @@ func SortSliceSortable[T Sortable[T]](s []T) {
 // Sorts the elements of [s] based on their hashes.
 func SortByHash[T ~[]byte](s []T) {
 	slices.SortFunc(s, func(i, j T) bool {
-		return bytes.Compare(hashing.ComputeHash256(i), hashing.ComputeHash256(j)) == -1
+		iHash := hashing.ComputeHash256(i)
+		jHash := hashing.ComputeHash256(i)
+		return bytes.Compare(iHash, jHash) == -1
 	})
 }
 
