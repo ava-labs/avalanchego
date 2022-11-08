@@ -9,10 +9,10 @@ if (existsSync("./dynamic_rpc.json")) {
   testRpc = importedRpc.rpc
 }
 
-let localRPC = ""
+var localConf
 if (existsSync("./local_rpc.json")) {
   const importedRpc = require("./local_rpc.json")
-  localRPC = importedRpc.rpc
+  localConf = importedRpc
 }
 
 export default {
@@ -39,8 +39,8 @@ export default {
     local: {
       //"http://{ip}:{port}/ext/bc/{chainID}/rpc
       // modify this in the local_rpc.json
-      url: localRPC,
-      chainId: 43214,
+      url: localConf.rpc,
+      chainId: localConf.chainId,
       accounts: [
         "0x56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027",
         "0x7b4198529994b0dc604278c99d153cfd069d594753d471171a1d102a10438e07",
