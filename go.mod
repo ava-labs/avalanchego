@@ -11,7 +11,7 @@ go 1.18
 require (
 	github.com/Microsoft/go-winio v0.5.2
 	github.com/NYTimes/gziphandler v1.1.1
-	github.com/ava-labs/avalanche-ledger-go v0.0.11
+	github.com/ava-labs/avalanche-ledger-go v0.0.12
 	github.com/ava-labs/avalanche-network-runner-sdk v0.2.0
 	github.com/ava-labs/coreth v0.11.2-rc.0
 	github.com/btcsuite/btcd v0.23.1
