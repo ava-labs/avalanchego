@@ -38,9 +38,10 @@ import (
 )
 
 const (
-	// minBlockDelay should be kept as whole seconds because block timestamps
-	// are only specific to the second.
-	minBlockDelay         = time.Second
+	// DefaultMinBlockDelay should be kept as whole seconds because block
+	// timestamps are only specific to the second.
+	DefaultMinBlockDelay = time.Second
+
 	checkIndexedFrequency = 10 * time.Second
 	innerBlkCacheSize     = 512
 )
@@ -62,6 +63,7 @@ type VM struct {
 
 	activationTime      time.Time
 	minimumPChainHeight uint64
+	minBlkDelay         time.Duration
 
 	state.State
 	hIndexer                indexer.HeightIndexer
@@ -99,10 +101,13 @@ type VM struct {
 	lastAcceptedHeight uint64
 }
 
+// New performs best when [minBlkDelay] is whole seconds. This is because block
+// timestamps are only specific to the second.
 func New(
 	vm block.ChainVM,
 	activationTime time.Time,
 	minimumPChainHeight uint64,
+	minBlkDelay time.Duration,
 ) *VM {
 	bVM, _ := vm.(block.BatchedChainVM)
 	hVM, _ := vm.(block.HeightIndexedChainVM)
@@ -115,6 +120,7 @@ func New(
 
 		activationTime:      activationTime,
 		minimumPChainHeight: minimumPChainHeight,
+		minBlkDelay:         minBlkDelay,
 	}
 }
 
@@ -284,8 +290,15 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 		// until the P-chain's height has advanced.
 		return nil
 	}
-	if minDelay < minBlockDelay {
-		minDelay = minBlockDelay
+
+	// Note: The P-chain does not currently try to target any block time. It
+	// notifies the consensus engine as soon as a new block may be built. To
+	// avoid fast runs of blocks there is an additional minimum delay that
+	// validators can specify. This delay may be an issue for high performance,
+	// custom VMs. Until the P-chain is modified to target a specific block
+	// time, ProposerMinBlockDelay can be configured in the subnet config.
+	if minDelay < vm.minBlkDelay {
+		minDelay = vm.minBlkDelay
 	}
 
 	preferredTime := blk.Timestamp()

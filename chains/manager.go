@@ -857,10 +857,20 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("error while fetching chain config: %w", err)
 	}
 
+	minBlockDelay := proposervm.DefaultMinBlockDelay
+	if subnetCfg, ok := m.SubnetConfigs[ctx.SubnetID]; ok {
+		minBlockDelay = subnetCfg.ProposerMinBlockDelay
+	}
+	m.Log.Info("creating proposervm wrapper",
+		zap.Time("activationTime", m.ApricotPhase4Time),
+		zap.Uint64("minPChainHeight", m.ApricotPhase4MinPChainHeight),
+		zap.Duration("minBlockDelay", minBlockDelay),
+	)
 	vm = proposervm.New(
 		vm,
 		m.ApricotPhase4Time,
 		m.ApricotPhase4MinPChainHeight,
+		minBlockDelay,
 	)
 
 	if m.MeterVMEnabled {

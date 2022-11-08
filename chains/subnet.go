@@ -5,6 +5,7 @@ package chains
 
 import (
 	"sync"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
@@ -31,6 +32,11 @@ type SubnetConfig struct {
 	// ValidatorOnly indicates that this Subnet's Chains are available to only subnet validators.
 	ValidatorOnly       bool                 `json:"validatorOnly" yaml:"validatorOnly"`
 	ConsensusParameters avalanche.Parameters `json:"consensusParameters" yaml:"consensusParameters"`
+
+	// ProposerMinBlockDelay is the minimum delay this node will enforce when
+	// building a snowman++ block.
+	// TODO: Remove this flag once all VMs throttle their own block production.
+	ProposerMinBlockDelay time.Duration `json:"proposerMinBlockDelay" yaml:"proposerMinBlockDelay"`
 }
 
 type subnet struct {
