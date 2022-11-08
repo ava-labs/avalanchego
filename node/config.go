@@ -228,4 +228,7 @@ type Config struct {
 
 	// See comment on [MinPercentConnectedStakeHealthy] in platformvm.Config
 	MinPercentConnectedStakeHealthy map[ids.ID]float64 `json:"minPercentConnectedStakeHealthy"`
+
+	// ProvidedFlags contains all the flags set by the user
+	ProvidedFlags map[string]interface{} `json:"-"`
 }

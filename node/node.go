@@ -1230,6 +1230,7 @@ func (n *Node) Initialize(
 		zap.Stringer("version", version.CurrentApp),
 		zap.Stringer("nodeID", n.ID),
 		zap.Reflect("nodePOP", pop),
+		zap.Reflect("providedFlags", n.Config.ProvidedFlags),
 		zap.Reflect("config", n.Config),
 	)
 

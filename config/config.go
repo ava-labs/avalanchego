@@ -1420,7 +1420,12 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	}
 
 	nodeConfig.TraceConfig, err = getTraceConfig(v)
-	return nodeConfig, err
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	nodeConfig.ProvidedFlags = providedFlags(v)
+	return nodeConfig, nil
 }
 
 // calcMinConnectedStake takes [consensusParams] as input and calculates the
@@ -1430,4 +1435,15 @@ func calcMinConnectedStake(consensusParams snowball.Parameters) float64 {
 	k := consensusParams.K
 	r := float64(alpha) / float64(k)
 	return r*(1-constants.MinConnectedStakeBuffer) + constants.MinConnectedStakeBuffer
+}
+
+func providedFlags(v *viper.Viper) map[string]interface{} {
+	settings := v.AllSettings()
+	customSettings := make(map[string]interface{}, len(settings))
+	for key, val := range settings {
+		if v.IsSet(key) {
+			customSettings[key] = val
+		}
+	}
+	return customSettings
 }
