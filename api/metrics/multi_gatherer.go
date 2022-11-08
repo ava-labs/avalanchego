@@ -6,10 +6,10 @@ package metrics
 import (
 	"errors"
 	"fmt"
-	"sort"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/exp/slices"
 
 	dto "github.com/prometheus/client_model/go"
 )
@@ -85,5 +85,5 @@ func (g *multiGatherer) Register(namespace string, gatherer prometheus.Gatherer)
 }
 
 func sortMetrics(m []*dto.MetricFamily) {
-	sort.Slice(m, func(i, j int) bool { return *m[i].Name < *m[j].Name })
+	slices.SortFunc(m, func(i, j *dto.MetricFamily) bool { return *i.Name < *j.Name })
 }
