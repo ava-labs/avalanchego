@@ -278,7 +278,7 @@ impl DBRev {
             Ok(None) => Account::default(),
             Err(e) => return Err(DBError::Merkle(e)),
         };
-        writeln!(w, "{:?}", acc).unwrap();
+        writeln!(w, "{acc:?}").unwrap();
         if !acc.root.is_null() {
             self.merkle.dump(acc.root, w).map_err(DBError::Merkle)?;
         }

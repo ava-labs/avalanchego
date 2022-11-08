@@ -537,12 +537,12 @@ fn test_from_ash() {
             for (idx, byte) in (l..r).zip(data.iter()) {
                 canvas[(idx - min) as usize] = *byte;
             }
-            println!("[0x{:x}, 0x{:x})", l, r);
+            println!("[0x{l:x}, 0x{r:x})");
             writes.push(SpaceWrite { offset: l, data });
         }
         let z = Rc::new(ZeroStore::new());
         let rev = StoreRevShared::from_ash(z, &writes);
-        println!("{:?}", rev);
+        println!("{rev:?}");
         assert_eq!(&**rev.get_view(min, max - min).unwrap(), &canvas);
         for _ in 0..2 * n {
             let l = rng.gen_range(min..max);

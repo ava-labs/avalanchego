@@ -1,4 +1,4 @@
-use firewood::merkle::*;
+use firewood::{merkle::*, proof::Proof};
 use shale::{MemStore, MummyObj, ObjPtr};
 use std::rc::Rc;
 
@@ -32,6 +32,15 @@ impl MerkleSetup {
         let mut s = Vec::new();
         self.merkle.dump(self.root, &mut s).unwrap();
         String::from_utf8(s).unwrap()
+    }
+
+    fn prove<K: AsRef<[u8]>>(&self, key: K) -> Proof {
+        self.merkle.prove::<K, IdTrans>(key, self.root).unwrap()
+    }
+
+    fn verify_proof<K: AsRef<[u8]>>(&self, key: K, proof: &Proof) -> Option<Vec<u8>> {
+        let hash: [u8; 32] = self.root_hash().0;
+        proof.verify_proof(key, hash).unwrap()
     }
 }
 
@@ -236,4 +245,97 @@ fn test_root_hash_random_deletions() {
         }
         println!("i = {i}");
     }
+}
+
+#[test]
+fn test_one_element_proof() {
+    let items = vec![("k", "v")];
+    let merkle = merkle_build_test(items, 0x10000, 0x10000);
+    let key = "k";
+
+    let proof = merkle.prove(key);
+    assert!(!proof.0.is_empty());
+
+    let verify_proof = merkle.verify_proof(key, &proof);
+    assert!(verify_proof.is_some());
+}
+
+#[test]
+/// Verify the proofs that end with leaf node with the given key.
+fn test_proof_end_with_leaf() {
+    let items = vec![
+        ("do", "verb"),
+        ("doe", "reindeer"),
+        ("dog", "puppy"),
+        ("doge", "coin"),
+        ("horse", "stallion"),
+        ("ddd", "ok"),
+    ];
+    let merkle = merkle_build_test(items, 0x10000, 0x10000);
+    let key = "doe";
+
+    let proof = merkle.prove(key);
+    assert!(!proof.0.is_empty());
+
+    let verify_proof = merkle.verify_proof(key, &proof);
+    assert!(verify_proof.is_some());
+}
+
+#[test]
+/// Verify the proofs that end with branch node with the given key.
+fn test_proof_end_with_branch() {
+    let items = vec![("d", "verb"), ("do", "verb"), ("doe", "reindeer"), ("e", "coin")];
+    let merkle = merkle_build_test(items, 0x10000, 0x10000);
+    let key = "d";
+
+    let proof = merkle.prove(key);
+    assert!(!proof.0.is_empty());
+
+    let verify_proof = merkle.verify_proof(key, &proof);
+    assert!(verify_proof.is_some());
+}
+
+#[test]
+#[should_panic]
+fn test_bad_proof() {
+    let items = vec![
+        ("do", "verb"),
+        ("doe", "reindeer"),
+        ("dog", "puppy"),
+        ("doge", "coin"),
+        ("horse", "stallion"),
+        ("ddd", "ok"),
+    ];
+    let merkle = merkle_build_test(items, 0x10000, 0x10000);
+    let key = "ddd";
+
+    let mut proof = merkle.prove(key);
+    assert!(!proof.0.is_empty());
+
+    // Delete an entry from the generated proofs.
+    let new_proof = Proof(proof.0.drain().take(1).collect());
+    merkle.verify_proof(key, &new_proof);
+}
+
+#[test]
+fn test_missing_key_proof() {
+    let items = vec![("k", "v")];
+    let merkle = merkle_build_test(items, 0x10000, 0x10000);
+    let key = "x";
+
+    let proof = merkle.prove(key);
+    assert!(!proof.0.is_empty());
+
+    let verify_proof = merkle.verify_proof(key, &proof);
+    assert!(verify_proof.is_none());
+}
+
+#[test]
+fn test_empty_tree_proof() {
+    let items: Vec<(&str, &str)> = Vec::new();
+    let merkle = merkle_build_test(items, 0x10000, 0x10000);
+    let key = "x";
+
+    let proof = merkle.prove(key);
+    assert!(proof.0.is_empty());
 }

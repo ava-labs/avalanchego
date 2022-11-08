@@ -1,9 +1,12 @@
+use crate::proof::Proof;
+
 use enum_as_inner::EnumAsInner;
 use once_cell::unsync::OnceCell;
 use sha3::Digest;
 use shale::{MemStore, MummyItem, ObjPtr, ObjRef, ShaleError, ShaleStore};
 
 use std::cell::Cell;
+use std::collections::HashMap;
 use std::fmt::{self, Debug};
 use std::io::{Cursor, Read, Write};
 
@@ -48,7 +51,7 @@ impl MummyItem for Hash {
 
 /// PartialPath keeps a list of nibbles to represent a path on the MPT.
 #[derive(PartialEq, Eq, Clone)]
-struct PartialPath(Vec<u8>);
+pub struct PartialPath(Vec<u8>);
 
 impl Debug for PartialPath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
@@ -67,7 +70,7 @@ impl std::ops::Deref for PartialPath {
 }
 
 impl PartialPath {
-    fn into_inner(self) -> Vec<u8> {
+    pub fn into_inner(self) -> Vec<u8> {
         self.0
     }
 
@@ -79,7 +82,7 @@ impl PartialPath {
         res
     }
 
-    fn decode<R: AsRef<[u8]>>(raw: R) -> (Self, bool) {
+    pub fn decode<R: AsRef<[u8]>>(raw: R) -> (Self, bool) {
         let raw = raw.as_ref();
         let term = raw[0] > 1;
         let odd_len = raw[0] & 1;
@@ -144,7 +147,7 @@ impl Debug for BranchNode {
         write!(f, "[Branch")?;
         for (i, c) in self.chd.iter().enumerate() {
             if let Some(c) = c {
-                write!(f, " ({:x} {})", i, c)?;
+                write!(f, " ({i:x} {c})")?;
             }
         }
         write!(
@@ -535,7 +538,7 @@ fn test_merkle_node_encoding() {
 
         let mem = shale::PlainMem::new(bytes.len() as u64, 0x0);
         mem.write(0, &bytes);
-        println!("{:?}", bytes);
+        println!("{bytes:?}");
         let node_ = Node::hydrate(0, &mem).unwrap();
         assert!(node == node_);
     };
@@ -670,16 +673,16 @@ impl Merkle {
         .map_err(MerkleError::Format)?;
         match &u_ref.inner {
             NodeType::Branch(n) => {
-                writeln!(w, "{:?}", n).map_err(MerkleError::Format)?;
+                writeln!(w, "{n:?}").map_err(MerkleError::Format)?;
                 for c in n.chd.iter() {
                     if let Some(c) = c {
                         self.dump_(*c, w)?
                     }
                 }
             }
-            NodeType::Leaf(n) => writeln!(w, "{:?}", n).unwrap(),
+            NodeType::Leaf(n) => writeln!(w, "{n:?}").unwrap(),
             NodeType::Extension(n) => {
-                writeln!(w, "{:?}", n).map_err(MerkleError::Format)?;
+                writeln!(w, "{n:?}").map_err(MerkleError::Format)?;
                 self.dump_(n.1, w)?
             }
         }
@@ -1470,6 +1473,87 @@ impl Merkle {
         Ok(None)
     }
 
+    /// Constructs a merkle proof for key. The result contains all encoded nodes
+    /// on the path to the value at key. The value itself is also included in the
+    /// last node and can be retrieved by verifying the proof.
+    ///
+    /// If the trie does not contain a value for key, the returned proof contains
+    /// all nodes of the longest existing prefix of the key, ending with the node
+    /// that proves the absence of the key (at least the root node).
+    pub fn prove<K: AsRef<[u8]>, T: ValueTransformer>(&self, key: K, root: ObjPtr<Node>) -> Result<Proof, MerkleError> {
+        let mut chunks = Vec::new();
+        chunks.extend(to_nibbles(key.as_ref()));
+
+        let mut proofs: HashMap<[u8; 32], Vec<u8>> = HashMap::new();
+        if root.is_null() {
+            return Ok(Proof(proofs))
+        }
+
+        // Skip the sentinel root
+        let root = self
+            .get_node(root)?
+            .inner
+            .as_branch()
+            .ok_or(MerkleError::NotBranchNode)?
+            .chd[0];
+        let mut u_ref = match root {
+            Some(root) => self.get_node(root)?,
+            None => return Ok(Proof(proofs)),
+        };
+
+        let mut nskip = 0;
+        let mut nodes: Vec<ObjPtr<Node>> = Vec::new();
+        for (i, nib) in chunks.iter().enumerate() {
+            if nskip > 0 {
+                nskip -= 1;
+                continue
+            }
+            nodes.push(u_ref.as_ptr());
+            let next_ptr: ObjPtr<Node> = match &u_ref.inner {
+                NodeType::Branch(n) => match n.chd[*nib as usize] {
+                    Some(c) => c,
+                    None => break,
+                },
+                NodeType::Leaf(_) => break,
+                NodeType::Extension(n) => {
+                    let n_path = &*n.0;
+                    let remaining_path = &chunks[i..];
+                    if remaining_path.len() < n_path.len() || &remaining_path[..n_path.len()] != n_path {
+                        break
+                    } else {
+                        nskip = n_path.len() - 1;
+                        n.1
+                    }
+                }
+            };
+            u_ref = self.get_node(next_ptr)?;
+        }
+
+        match &u_ref.inner {
+            NodeType::Branch(n) => {
+                if n.value.as_ref().is_some() {
+                    nodes.push(u_ref.as_ptr());
+                }
+            }
+            NodeType::Leaf(n) => {
+                if n.0.len() == 0 {
+                    nodes.push(u_ref.as_ptr());
+                }
+            }
+            _ => (),
+        }
+
+        drop(u_ref);
+        // Get the hashes of the nodes.
+        for node in nodes {
+            let node = self.get_node(node)?;
+            let rlp = node.get_eth_rlp::<T>(self.store.as_ref()).clone();
+            let hash: [u8; 32] = sha3::Keccak256::digest(rlp).into();
+            proofs.insert(hash, rlp.to_vec());
+        }
+        Ok(Proof(proofs))
+    }
+
     pub fn get<K: AsRef<[u8]>>(&self, key: K, root: ObjPtr<Node>) -> Result<Option<Ref>, MerkleError> {
         let mut chunks = vec![0];
         chunks.extend(to_nibbles(key.as_ref()));
@@ -1603,11 +1687,11 @@ impl ValueTransformer for IdTrans {
     }
 }
 
-fn to_nibbles<'a>(bytes: &'a [u8]) -> impl Iterator<Item = u8> + 'a {
+pub fn to_nibbles<'a>(bytes: &'a [u8]) -> impl Iterator<Item = u8> + 'a {
     bytes.iter().flat_map(|b| [(b >> 4) & 0xf, b & 0xf].into_iter())
 }
 
-fn from_nibbles<'a>(nibbles: &'a [u8]) -> impl Iterator<Item = u8> + 'a {
+pub fn from_nibbles<'a>(nibbles: &'a [u8]) -> impl Iterator<Item = u8> + 'a {
     assert!(nibbles.len() & 1 == 0);
     nibbles.chunks_exact(2).map(|p| (p[0] << 4) | p[1])
 }

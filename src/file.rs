@@ -35,7 +35,7 @@ impl File {
     }
 
     fn _get_fname(fid: u64) -> String {
-        format!("{:08x}.fw", fid)
+        format!("{fid:08x}.fw")
     }
 
     pub fn new(fid: u64, flen: u64, rootfd: Fd) -> nix::Result<Self> {

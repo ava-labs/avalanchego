@@ -76,7 +76,7 @@ fn test_revisions() {
             let a = &kv_dump!(rev);
             let b = &dumped[j];
             if a != b {
-                print!("{}\n{}", a, b);
+                print!("{a}\n{b}");
                 panic!("not the same");
             }
         }
