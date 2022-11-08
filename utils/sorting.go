@@ -66,8 +66,14 @@ func IsSortedAndUniqueOrdered[T constraints.Ordered](s []T) bool {
 // Returns true iff the elements in [s] are unique and sorted
 // based by their hashes.
 func IsSortedAndUniqueByHash[T ~[]byte](s []T) bool {
-	for i := 0; i < len(s)-1; i++ {
-		if bytes.Compare(hashing.ComputeHash256(s[i]), hashing.ComputeHash256(s[i+1])) != -1 {
+	if len(s) <= 1 {
+		return true
+	}
+	rightHash := hashing.ComputeHash256(s[0])
+	for i := 1; i < len(s); i++ {
+		leftHash := rightHash
+		rightHash = hashing.ComputeHash256(s[i])
+		if bytes.Compare(leftHash, rightHash) != -1 {
 			return false
 		}
 	}
