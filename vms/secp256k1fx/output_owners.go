@@ -135,7 +135,7 @@ func (out *OutputOwners) Verify() error {
 
 func (out *OutputOwners) VerifyState() error { return out.Verify() }
 
-func (out *OutputOwners) Sort() { utils.SortSliceSortable(out.Addrs) }
+func (out *OutputOwners) Sort() { utils.Sort(out.Addrs) }
 
 // formatAddress formats a given [addr] into human readable format using
 // [ChainID] and [NetworkID] from the provided [ctx].

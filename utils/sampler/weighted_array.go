@@ -53,7 +53,7 @@ func (s *weightedArray) Initialize(weights []uint64) error {
 	}
 
 	// Optimize so that the array is closer to the uniform distribution
-	utils.SortSliceSortable(s.arr)
+	utils.Sort(s.arr)
 
 	maxIndex := len(s.arr) - 1
 	oneIfOdd := 1 & maxIndex

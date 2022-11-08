@@ -60,7 +60,7 @@ func (s *weightedHeap) Initialize(weights []uint64) error {
 	}
 
 	// Optimize so that the most probable values are at the top of the heap
-	utils.SortSliceSortable(s.heap)
+	utils.Sort(s.heap)
 
 	// Initialize the heap
 	for i := len(s.heap) - 1; i > 0; i-- {

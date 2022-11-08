@@ -35,7 +35,7 @@ func (sb *snowballNode) Less(other *snowballNode) bool {
 // string.
 func consensusString(nodes []*snowballNode) string {
 	// Sort the nodes so that the string representation is canonical
-	utils.SortSliceSortable(nodes)
+	utils.Sort(nodes)
 
 	sb := strings.Builder{}
 	sb.WriteString("DG(")

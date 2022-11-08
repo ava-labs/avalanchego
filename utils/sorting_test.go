@@ -21,39 +21,39 @@ func TestSortSliceSortable(t *testing.T) {
 	require := require.New(t)
 
 	var s []sortable
-	SortSliceSortable(s)
+	Sort(s)
 	require.True(IsSortedAndUniqueSortable(s))
 	require.Equal(0, len(s))
 
 	s = []sortable{1}
-	SortSliceSortable(s)
+	Sort(s)
 	require.True(IsSortedAndUniqueSortable(s))
 	require.Equal([]sortable{1}, s)
 
 	s = []sortable{1, 1}
-	SortSliceSortable(s)
+	Sort(s)
 	require.Equal([]sortable{1, 1}, s)
 
 	s = []sortable{1, 2}
-	SortSliceSortable(s)
+	Sort(s)
 	require.True(IsSortedAndUniqueSortable(s))
 	require.Equal([]sortable{1, 2}, s)
 
 	s = []sortable{2, 1}
-	SortSliceSortable(s)
+	Sort(s)
 	require.True(IsSortedAndUniqueSortable(s))
 	require.Equal([]sortable{1, 2}, s)
 
 	s = []sortable{1, 2, 1}
-	SortSliceSortable(s)
+	Sort(s)
 	require.Equal([]sortable{1, 1, 2}, s)
 
 	s = []sortable{2, 1, 2}
-	SortSliceSortable(s)
+	Sort(s)
 	require.Equal([]sortable{1, 2, 2}, s)
 
 	s = []sortable{3, 1, 2}
-	SortSliceSortable(s)
+	Sort(s)
 	require.Equal([]sortable{1, 2, 3}, s)
 }
 

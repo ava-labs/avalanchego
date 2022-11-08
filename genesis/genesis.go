@@ -273,7 +273,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 				xAllocations = append(xAllocations, allocation)
 			}
 		}
-		utils.SortSliceSortable(xAllocations)
+		utils.Sort(xAllocations)
 
 		for _, allocation := range xAllocations {
 			addr, err := address.FormatBech32(hrp, allocation.AVAXAddr.Bytes())

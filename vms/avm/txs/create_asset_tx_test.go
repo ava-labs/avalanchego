@@ -924,7 +924,7 @@ func TestCreateAssetTxSyntacticVerifyInitialStates(t *testing.T) {
 		},
 	}
 
-	utils.SortSliceSortable(uniqueStates)
+	utils.Sort(uniqueStates)
 
 	// Put states in unsorted order
 	tx.States = []*InitialState{

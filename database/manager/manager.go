@@ -180,7 +180,7 @@ func new(
 
 		return filepath.SkipDir
 	})
-	utils.SortSliceSortable(manager.databases)
+	utils.Sort(manager.databases)
 
 	// If an error occurred walking [dbDirPath] close the
 	// database manager and return the original error here.
@@ -210,7 +210,7 @@ func NewManagerFromDBs(dbs []*VersionedDatabase) (Manager, error) {
 	if len(dbs) == 0 {
 		return nil, errNoDBs
 	}
-	utils.SortSliceSortable(dbs)
+	utils.Sort(dbs)
 	sortedAndUnique := utils.IsSortedAndUniqueSortable(dbs)
 	if !sortedAndUnique {
 		return nil, errNonSortedAndUniqueDBs

@@ -245,7 +245,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	for _, vdr := range args.Validators {
 		weight := uint64(0)
 		stake := make([]*avax.TransferableOutput, len(vdr.Staked))
-		utils.SortSliceSortable(vdr.Staked)
+		utils.Sort(vdr.Staked)
 		for i, apiUTXO := range vdr.Staked {
 			addrID, err := bech32ToID(apiUTXO.Address)
 			if err != nil {
@@ -296,7 +296,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			}
 			owner.Addrs = append(owner.Addrs, addrID)
 		}
-		utils.SortSliceSortable(owner.Addrs)
+		utils.Sort(owner.Addrs)
 
 		delegationFee := uint32(0)
 		if vdr.ExactDelegationFee != nil {

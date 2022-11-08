@@ -248,7 +248,7 @@ func TestTransferableInputSorting(t *testing.T) {
 	if utils.IsSortedAndUniqueSortable(ins) {
 		t.Fatalf("Shouldn't be sorted")
 	}
-	utils.SortSliceSortable(ins)
+	utils.Sort(ins)
 	if !utils.IsSortedAndUniqueSortable(ins) {
 		t.Fatalf("Should be sorted")
 	}

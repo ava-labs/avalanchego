@@ -79,7 +79,7 @@ func (w *windower) Delay(chainHeight, pChainHeight uint64, validatorID ids.NodeI
 	// canonically sort validators
 	// Note: validators are sorted by ID, sorting by weight would not create a
 	// canonically sorted list
-	utils.SortSliceSortable(validators)
+	utils.Sort(validators)
 
 	// convert the slice of validators to a slice of weights
 	validatorWeights := make([]uint64, len(validators))
