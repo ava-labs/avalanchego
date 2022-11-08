@@ -4,13 +4,13 @@
 package memdb
 
 import (
-	"sort"
 	"strings"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/nodb"
 	"github.com/ava-labs/avalanchego/utils"
+	"golang.org/x/exp/slices"
 )
 
 const (
@@ -135,7 +135,7 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 			keys = append(keys, key)
 		}
 	}
-	sort.Strings(keys) // Keys need to be in sorted order
+	slices.Sort(keys) // Keys need to be in sorted order
 	values := make([][]byte, 0, len(keys))
 	for _, key := range keys {
 		values = append(values, db.db[key])

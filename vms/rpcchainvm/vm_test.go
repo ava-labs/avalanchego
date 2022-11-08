@@ -12,15 +12,14 @@ import (
 	"net/http"
 	"os"
 	"reflect"
-	"sort"
 	"testing"
 
 	stdjson "encoding/json"
 
 	"github.com/golang/mock/gomock"
-
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	"golang.org/x/exp/slices"
 
 	gorillarpc "github.com/gorilla/rpc/v2"
 
@@ -54,13 +53,13 @@ func Test_VMServerInterface(t *testing.T) {
 	for i := 0; i < pb.NumMethod()-1; i++ {
 		wantMethods = append(wantMethods, pb.Method(i).Name)
 	}
-	sort.Strings(wantMethods)
+	slices.Sort(wantMethods)
 
 	impl := reflect.TypeOf(&VMServer{})
 	for i := 0; i < impl.NumMethod(); i++ {
 		gotMethods = append(gotMethods, impl.Method(i).Name)
 	}
-	sort.Strings(gotMethods)
+	slices.Sort(gotMethods)
 
 	if !reflect.DeepEqual(gotMethods, wantMethods) {
 		t.Errorf("\ngot: %q\nwant: %q", gotMethods, wantMethods)
