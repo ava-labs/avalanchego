@@ -302,7 +302,7 @@ func (dg *Directed) Add(ctx context.Context, tx Tx) error {
 		}
 	}
 	if tx.HasWhitelist() {
-		whitelist, err := tx.Whitelist()
+		whitelist, err := tx.Whitelist(ctx)
 		if err != nil {
 			return err
 		}

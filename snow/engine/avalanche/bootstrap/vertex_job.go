@@ -28,8 +28,8 @@ type vtxParser struct {
 	manager                 vertex.Manager
 }
 
-func (p *vtxParser) Parse(_ context.Context, vtxBytes []byte) (queue.Job, error) {
-	vtx, err := p.manager.ParseVtx(vtxBytes)
+func (p *vtxParser) Parse(ctx context.Context, vtxBytes []byte) (queue.Job, error) {
+	vtx, err := p.manager.ParseVtx(ctx, vtxBytes)
 	if err != nil {
 		return nil, err
 	}

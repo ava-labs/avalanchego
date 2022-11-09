@@ -99,7 +99,7 @@ func (t *Transitive) Put(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)
-	vtx, err := t.Manager.ParseVtx(vtxBytes)
+	vtx, err := t.Manager.ParseVtx(ctx, vtxBytes)
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse vertex",
 			zap.Stringer("nodeID", nodeID),
@@ -185,7 +185,7 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 	// Immediately respond to the query with the current consensus preferences.
 	t.Sender.SendChits(ctx, nodeID, requestID, t.Consensus.Preferences().List())
 
-	vtx, err := t.Manager.ParseVtx(vtxBytes)
+	vtx, err := t.Manager.ParseVtx(ctx, vtxBytes)
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse vertex",
 			zap.Stringer("nodeID", nodeID),
@@ -276,7 +276,7 @@ func (t *Transitive) Disconnected(ctx context.Context, nodeID ids.NodeID) error 
 	return t.VM.Disconnected(ctx, nodeID)
 }
 
-func (t *Transitive) Timeout() error { return nil }
+func (t *Transitive) Timeout(context.Context) error { return nil }
 
 func (t *Transitive) Gossip() error {
 	edge := t.Manager.Edge()
@@ -507,7 +507,7 @@ func (t *Transitive) issue(ctx context.Context, vtx avalanche.Vertex) error {
 		}
 	}
 
-	txs, err := vtx.Txs()
+	txs, err := vtx.Txs(ctx)
 	if err != nil {
 		return err
 	}
@@ -676,7 +676,7 @@ func (t *Transitive) issueBatch(ctx context.Context, txs []snowstorm.Tx) error {
 		parentIDs[i] = virtuousIDs[int(index)]
 	}
 
-	vtx, err := t.Manager.BuildVtx(parentIDs, txs)
+	vtx, err := t.Manager.BuildVtx(ctx, parentIDs, txs)
 	if err != nil {
 		t.Ctx.Log.Warn("error building new vertex",
 			zap.Int("numParents", len(parentIDs)),
@@ -693,7 +693,7 @@ func (t *Transitive) issueBatch(ctx context.Context, txs []snowstorm.Tx) error {
 func (t *Transitive) issueStopVtx(ctx context.Context) error {
 	// use virtuous frontier (accepted) as parents
 	virtuousSet := t.Consensus.Virtuous()
-	vtx, err := t.Manager.BuildStopVtx(virtuousSet.List())
+	vtx, err := t.Manager.BuildStopVtx(ctx, virtuousSet.List())
 	if err != nil {
 		t.Ctx.Log.Warn("error building new stop vertex",
 			zap.Int("numParents", virtuousSet.Len()),

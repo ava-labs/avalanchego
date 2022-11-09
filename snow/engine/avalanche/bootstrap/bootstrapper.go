@@ -40,7 +40,7 @@ var (
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
 
-func New(ctx context.Context, config Config, onFinished func(lastReqID uint32) error) (common.BootstrapableEngine, error) {
+func New(ctx context.Context, config Config, onFinished func(ctx context.Context, lastReqID uint32) error) (common.BootstrapableEngine, error) {
 	b := &bootstrapper{
 		Config: config,
 
@@ -148,7 +148,7 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 	}
 
 	requestedVtxID, requested := b.OutstandingRequests.Remove(nodeID, requestID)
-	vtx, err := b.Manager.ParseVtx(vtxs[0]) // first vertex should be the one we requested in GetAncestors request
+	vtx, err := b.Manager.ParseVtx(ctx, vtxs[0]) // first vertex should be the one we requested in GetAncestors request
 	if err != nil {
 		if !requested {
 			b.Ctx.Log.Debug("failed to parse unrequested vertex",
@@ -211,7 +211,7 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 	}
 
 	for _, vtxBytes := range vtxs[1:] { // Parse/persist all the vertices
-		vtx, err := b.Manager.ParseVtx(vtxBytes) // Persists the vtx
+		vtx, err := b.Manager.ParseVtx(ctx, vtxBytes) // Persists the vtx
 		if err != nil {
 			b.Ctx.Log.Debug("failed to parse vertex",
 				zap.Stringer("nodeID", nodeID),
@@ -293,7 +293,7 @@ func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) erro
 	return b.StartupTracker.Disconnected(ctx, nodeID)
 }
 
-func (b *bootstrapper) Timeout() error {
+func (b *bootstrapper) Timeout(ctx context.Context) error {
 	if !b.awaitingTimeout {
 		return errUnexpectedTimeout
 	}
@@ -302,7 +302,7 @@ func (b *bootstrapper) Timeout() error {
 	if !b.Config.Subnet.IsBootstrapped() {
 		return b.Restart(true)
 	}
-	return b.OnFinished(b.Config.SharedCfg.RequestID)
+	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
 }
 
 func (b *bootstrapper) Gossip() error { return nil }
@@ -602,5 +602,5 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 		b.awaitingTimeout = true
 		return nil
 	}
-	return b.OnFinished(b.Config.SharedCfg.RequestID)
+	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
 }

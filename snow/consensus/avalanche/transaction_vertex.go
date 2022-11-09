@@ -80,10 +80,12 @@ func (tv *transactionVertex) Dependencies() ([]snowstorm.Tx, error) {
 }
 
 // InputIDs must return a non-empty slice to avoid having the snowstorm engine
-// vaciously accept it. A slice is returned containing just the vertexID in
+// vacuously accept it. A slice is returned containing just the vertexID in
 // order to produce no conflicts based on the consumed input.
 func (tv *transactionVertex) InputIDs() []ids.ID { return []ids.ID{tv.vtx.ID()} }
 
 func (tv *transactionVertex) HasWhitelist() bool { return tv.vtx.HasWhitelist() }
 
-func (tv *transactionVertex) Whitelist() (ids.Set, error) { return tv.vtx.Whitelist() }
+func (tv *transactionVertex) Whitelist(ctx context.Context) (ids.Set, error) {
+	return tv.vtx.Whitelist(ctx)
+}

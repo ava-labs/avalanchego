@@ -140,7 +140,10 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	bs, err := New(
 		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(_ context.Context, lastReqID uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -167,7 +170,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		}
 	}
 
-	manager.ParseVtxF = func(vtxBytes []byte) (avalanche.Vertex, error) {
+	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(vtxBytes, vtxBytes0):
 			return vtx0, nil
@@ -240,7 +243,10 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	bs, err := New(
 		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(_ context.Context, lastReqID uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -279,7 +285,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		reqVtxID = vtxID
 	}
 
-	manager.ParseVtxF = func(vtxBytes []byte) (avalanche.Vertex, error) {
+	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(vtxBytes, vtxBytes0):
 			vtx0.StatusV = choices.Processing
@@ -415,7 +421,10 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	bs, err := New(
 		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(_ context.Context, lastReqID uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -428,7 +437,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 
 	acceptedIDs := []ids.ID{vtxID1}
 
-	manager.ParseVtxF = func(vtxBytes []byte) (avalanche.Vertex, error) {
+	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(vtxBytes, vtxBytes1):
 			return vtx1, nil
@@ -468,7 +477,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager.ParseVtxF = func(vtxBytes []byte) (avalanche.Vertex, error) {
+	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(vtxBytes, vtxBytes1):
 			return vtx1, nil
@@ -556,7 +565,10 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 	bs, err := New(
 		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(_ context.Context, lastReqID uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -580,7 +592,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 			panic(errUnknownVertex)
 		}
 	}
-	manager.ParseVtxF = func(vtxBytes []byte) (avalanche.Vertex, error) {
+	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(vtxBytes, vtxBytes1):
 			return vtx1, nil
@@ -674,7 +686,10 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	bs, err := New(
 		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(_ context.Context, lastReqID uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -700,7 +715,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 			panic(errUnknownVertex)
 		}
 	}
-	manager.ParseVtxF = func(vtxBytes []byte) (avalanche.Vertex, error) {
+	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(vtxBytes, vtxBytes0):
 			vtx0.StatusV = choices.Processing
@@ -791,7 +806,10 @@ func TestBootstrapperFinalized(t *testing.T) {
 	bs, err := New(
 		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(_ context.Context, lastReqID uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -823,7 +841,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 			panic(errUnknownVertex)
 		}
 	}
-	manager.ParseVtxF = func(vtxBytes []byte) (avalanche.Vertex, error) {
+	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(vtxBytes, vtxBytes0):
 			vtx0.StatusV = choices.Processing
@@ -919,7 +937,10 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	bs, err := New(
 		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(_ context.Context, lastReqID uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -957,7 +978,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 		}
 		return nil, errUnknownVertex
 	}
-	manager.ParseVtxF = func(vtxBytes []byte) (avalanche.Vertex, error) {
+	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(vtxBytes, vtxBytes0):
 			vtx0.StatusV = choices.Processing
@@ -1083,7 +1104,10 @@ func TestRestartBootstrapping(t *testing.T) {
 	bsIntf, err := New(
 		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(_ context.Context, lastReqID uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1138,7 +1162,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		}
 		return nil, errUnknownVertex
 	}
-	manager.ParseVtxF = func(vtxBytes []byte) (avalanche.Vertex, error) {
+	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(vtxBytes, vtxBytes0):
 			vtx0.StatusV = choices.Processing

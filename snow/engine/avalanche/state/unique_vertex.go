@@ -42,7 +42,7 @@ type uniqueVertex struct {
 
 // newUniqueVertex returns a uniqueVertex instance from [b] by checking the cache
 // and then parsing the vertex bytes on a cache miss.
-func newUniqueVertex(s *Serializer, b []byte) (*uniqueVertex, error) {
+func newUniqueVertex(ctx context.Context, s *Serializer, b []byte) (*uniqueVertex, error) {
 	vtx := &uniqueVertex{
 		id:         hashing.ComputeHash256Array(b),
 		serializer: s,
@@ -66,7 +66,7 @@ func newUniqueVertex(s *Serializer, b []byte) (*uniqueVertex, error) {
 	unparsedTxs := innerVertex.Txs()
 	txs := make([]snowstorm.Tx, len(unparsedTxs))
 	for i, txBytes := range unparsedTxs {
-		tx, err := vtx.serializer.VM.ParseTx(txBytes)
+		tx, err := vtx.serializer.VM.ParseTx(ctx, txBytes)
 		if err != nil {
 			return nil, err
 		}
@@ -131,7 +131,7 @@ func (vtx *uniqueVertex) Evict() {
 	}
 }
 
-func (vtx *uniqueVertex) setVertex(innerVtx vertex.StatelessVertex) error {
+func (vtx *uniqueVertex) setVertex(ctx context.Context, innerVtx vertex.StatelessVertex) error {
 	vtx.shallowRefresh()
 	vtx.v.vtx = innerVtx
 
@@ -139,7 +139,7 @@ func (vtx *uniqueVertex) setVertex(innerVtx vertex.StatelessVertex) error {
 		return nil
 	}
 
-	if _, err := vtx.Txs(); err != nil {
+	if _, err := vtx.Txs(ctx); err != nil {
 		return err
 	}
 
@@ -370,7 +370,7 @@ func (vtx *uniqueVertex) HasWhitelist() bool {
 
 // "uniqueVertex" itself implements "Whitelist" traversal iff its underlying
 // "vertex.StatelessVertex" is marked as a stop vertex.
-func (vtx *uniqueVertex) Whitelist() (ids.Set, error) {
+func (vtx *uniqueVertex) Whitelist(ctx context.Context) (ids.Set, error) {
 	if !vtx.v.vtx.StopVertex() {
 		return nil, nil
 	}
@@ -396,7 +396,7 @@ func (vtx *uniqueVertex) Whitelist() (ids.Set, error) {
 		}
 		visitedVtx.Add(curID)
 
-		txs, err := cur.Txs()
+		txs, err := cur.Txs(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -466,7 +466,7 @@ func (vtx *uniqueVertex) String() string {
 		sb.WriteString(fmt.Sprintf("Vertex(ID = %s, Error=error while retrieving vertex parents: %s)", vtx.ID(), err))
 		return sb.String()
 	}
-	txs, err := vtx.Txs()
+	txs, err := vtx.Txs(context.Background())
 	if err != nil {
 		sb.WriteString(fmt.Sprintf("Vertex(ID = %s, Error=error while retrieving vertex txs: %s)", vtx.ID(), err))
 		return sb.String()

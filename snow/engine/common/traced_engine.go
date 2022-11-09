@@ -357,8 +357,11 @@ func (e *tracedEngine) Disconnected(ctx context.Context, nodeID ids.NodeID) erro
 	return e.engine.Disconnected(ctx, nodeID)
 }
 
-func (e *tracedEngine) Timeout() error {
-	return e.engine.Timeout()
+func (e *tracedEngine) Timeout(ctx context.Context) error {
+	ctx, span := e.tracer.Start(ctx, "tracedEngine.Timeout")
+	defer span.End()
+
+	return e.engine.Timeout(ctx)
 }
 
 func (e *tracedEngine) Gossip() error {
