@@ -71,7 +71,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	}
 
 	blkTx := txs.NewMockUnsignedTx(ctrl)
-	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.ProposalTxExecutor{})).Return(nil).Times(1)
+	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.CaminoProposalTxExecutor{})).Return(nil).Times(1)
 
 	// We can't serialize [blkTx] because it isn't
 	// registered with the blocks.Codec.
@@ -261,8 +261,8 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 			},
 		},
 	}
-	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.StandardTxExecutor{})).DoAndReturn(
-		func(e *executor.StandardTxExecutor) error {
+	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.CaminoStandardTxExecutor{})).DoAndReturn(
+		func(e *executor.CaminoStandardTxExecutor) error {
 			e.OnAccept = func() {}
 			e.Inputs = ids.Set{}
 			e.AtomicRequests = atomicRequests
@@ -747,8 +747,8 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 			},
 		},
 	}
-	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.StandardTxExecutor{})).DoAndReturn(
-		func(e *executor.StandardTxExecutor) error {
+	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.CaminoStandardTxExecutor{})).DoAndReturn(
+		func(e *executor.CaminoStandardTxExecutor) error {
 			e.OnAccept = func() {}
 			e.Inputs = atomicInputs
 			e.AtomicRequests = atomicRequests

@@ -65,10 +65,12 @@ func (e *AtomicTxExecutor) atomicTx(tx txs.UnsignedTx) error {
 	}
 	e.OnAccept = onAccept
 
-	executor := StandardTxExecutor{
-		Backend: e.Backend,
-		State:   e.OnAccept,
-		Tx:      e.Tx,
+	executor := CaminoStandardTxExecutor{
+		StandardTxExecutor{
+			Backend: e.Backend,
+			State:   e.OnAccept,
+			Tx:      e.Tx,
+		},
 	}
 	err = tx.Visit(&executor)
 	e.Inputs = executor.Inputs
