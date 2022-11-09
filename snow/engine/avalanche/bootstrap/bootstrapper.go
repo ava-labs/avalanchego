@@ -305,7 +305,7 @@ func (b *bootstrapper) Timeout(ctx context.Context) error {
 	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
 }
 
-func (b *bootstrapper) Gossip() error { return nil }
+func (b *bootstrapper) Gossip(context.Context) error { return nil }
 
 func (b *bootstrapper) Shutdown(ctx context.Context) error {
 	b.Ctx.Log.Info("shutting down bootstrapper")
@@ -359,7 +359,7 @@ func (b *bootstrapper) fetch(ctx context.Context, vtxIDs ...ids.ID) error {
 		}
 
 		// Make sure we don't already have this vertex
-		if _, err := b.Manager.GetVtx(vtxID); err == nil {
+		if _, err := b.Manager.GetVtx(ctx, vtxID); err == nil {
 			continue
 		}
 
@@ -516,7 +516,7 @@ func (b *bootstrapper) ForceAccepted(ctx context.Context, acceptedContainerIDs [
 	)
 	toProcess := make([]avalanche.Vertex, 0, len(pendingContainerIDs))
 	for _, vtxID := range pendingContainerIDs {
-		if vtx, err := b.Manager.GetVtx(vtxID); err == nil {
+		if vtx, err := b.Manager.GetVtx(ctx, vtxID); err == nil {
 			if vtx.Status() == choices.Accepted {
 				b.VtxBlocked.RemoveMissingID(vtxID)
 			} else {

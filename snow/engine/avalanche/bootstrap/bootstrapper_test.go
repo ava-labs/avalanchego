@@ -156,7 +156,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 
 	acceptedIDs := []ids.ID{vtxID0, vtxID1, vtxID2}
 
-	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch vtxID {
 		case vtxID0:
 			return vtx0, nil
@@ -259,7 +259,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 
 	acceptedIDs := []ids.ID{vtxID1}
 
-	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch vtxID {
 		case vtxID1:
 			return vtx1, nil
@@ -319,7 +319,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	}
 
 	oldReqID = *requestID
-	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch vtxID {
 		case vtxID1:
 			return vtx1, nil
@@ -447,7 +447,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		t.Fatal(errParsedUnknownVertex)
 		return nil, errParsedUnknownVertex
 	}
-	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch vtxID {
 		case vtxID1:
 			return vtx1, nil
@@ -581,7 +581,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 
 	acceptedIDs := []ids.ID{vtxID1}
 
-	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch vtxID {
 		case vtxID1:
 			return vtx1, nil
@@ -702,7 +702,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 
 	acceptedIDs := []ids.ID{vtxID2}
 
-	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case vtxID == vtxID0:
 			return nil, errUnknownVertex
@@ -824,7 +824,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 
 	parsedVtx0 := false
 	parsedVtx1 := false
-	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch vtxID {
 		case vtxID0:
 			if parsedVtx0 {
@@ -956,7 +956,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	parsedVtx0 := false
 	parsedVtx1 := false
 	parsedVtx2 := false
-	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch vtxID {
 		case vtxID0:
 			if parsedVtx0 {
@@ -1128,7 +1128,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	parsedVtx3 := false
 	parsedVtx4 := false
 	parsedVtx5 := false
-	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch vtxID {
 		case vtxID0:
 			if parsedVtx0 {

@@ -77,7 +77,7 @@ func (n *Network) AddNode(sm Consensus) error {
 			},
 			ParentV: myDep,
 			HeightV: blk.Height(),
-			VerifyV: blk.Verify(),
+			VerifyV: blk.Verify(context.Background()),
 			BytesV:  blk.Bytes(),
 		}
 		if err := sm.Add(context.Background(), myVtx); err != nil {

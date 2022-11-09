@@ -278,8 +278,8 @@ func (t *Transitive) Disconnected(ctx context.Context, nodeID ids.NodeID) error 
 
 func (t *Transitive) Timeout(context.Context) error { return nil }
 
-func (t *Transitive) Gossip() error {
-	edge := t.Manager.Edge()
+func (t *Transitive) Gossip(ctx context.Context) error {
+	edge := t.Manager.Edge(ctx)
 	if len(edge) == 0 {
 		t.Ctx.Log.Verbo("dropping gossip request as no vertices have been accepted")
 		return nil
@@ -293,7 +293,7 @@ func (t *Transitive) Gossip() error {
 		return err // Also should never really happen because the edge has positive length
 	}
 	vtxID := edge[int(indices[0])]
-	vtx, err := t.Manager.GetVtx(vtxID)
+	vtx, err := t.Manager.GetVtx(ctx, vtxID)
 	if err != nil {
 		t.Ctx.Log.Warn("dropping gossip request",
 			zap.String("reason", "couldn't load vertex"),
@@ -348,10 +348,10 @@ func (t *Transitive) Context() *snow.ConsensusContext {
 func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 	t.RequestID = startReqID
 	// Load the vertices that were last saved as the accepted frontier
-	edge := t.Manager.Edge()
+	edge := t.Manager.Edge(ctx)
 	frontier := make([]avalanche.Vertex, 0, len(edge))
 	for _, vtxID := range edge {
-		if vtx, err := t.Manager.GetVtx(vtxID); err == nil {
+		if vtx, err := t.Manager.GetVtx(ctx, vtxID); err == nil {
 			frontier = append(frontier, vtx)
 		} else {
 			t.Ctx.Log.Error("failed to load vertex from the frontier",
@@ -394,10 +394,10 @@ func (t *Transitive) GetVM() common.VM {
 	return t.VM
 }
 
-func (t *Transitive) GetVtx(vtxID ids.ID) (avalanche.Vertex, error) {
+func (t *Transitive) GetVtx(ctx context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 	// GetVtx returns a vertex by its ID.
 	// Returns database.ErrNotFound if unknown.
-	return t.Manager.GetVtx(vtxID)
+	return t.Manager.GetVtx(ctx, vtxID)
 }
 
 func (t *Transitive) attemptToIssueTxs(ctx context.Context) error {
@@ -424,7 +424,7 @@ func (t *Transitive) repoll(ctx context.Context) {
 // Fetches [vtxID] if we don't have it locally.
 // Returns true if [vtx] has been added to consensus (now or previously)
 func (t *Transitive) issueFromByID(ctx context.Context, nodeID ids.NodeID, vtxID ids.ID) (bool, error) {
-	vtx, err := t.Manager.GetVtx(vtxID)
+	vtx, err := t.Manager.GetVtx(ctx, vtxID)
 	if err != nil {
 		// We don't have [vtxID]. Request it.
 		t.sendRequest(ctx, nodeID, vtxID)

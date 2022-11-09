@@ -364,8 +364,11 @@ func (e *tracedEngine) Timeout(ctx context.Context) error {
 	return e.engine.Timeout(ctx)
 }
 
-func (e *tracedEngine) Gossip() error {
-	return e.engine.Gossip()
+func (e *tracedEngine) Gossip(ctx context.Context) error {
+	ctx, span := e.tracer.Start(ctx, "tracedEngine.Gossip")
+	defer span.End()
+
+	return e.engine.Gossip(ctx)
 }
 
 func (e *tracedEngine) Halt() {

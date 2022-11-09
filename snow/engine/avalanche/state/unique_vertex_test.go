@@ -349,7 +349,7 @@ func TestParseVertexWithInvalidTxs(t *testing.T) {
 	}
 
 	id := hashing.ComputeHash256Array(vtxBytes)
-	if _, err := s.GetVtx(id); err == nil {
+	if _, err := s.GetVtx(context.Background(), id); err == nil {
 		t.Fatal("should have failed to lookup invalid vertex after previously error on parsing invalid transactions")
 	}
 

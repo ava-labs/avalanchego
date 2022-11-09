@@ -50,7 +50,7 @@ func (v *voter) Update(ctx context.Context) {
 	// To prevent any potential deadlocks with un-disclosed dependencies, votes
 	// must be bubbled to the nearest valid block
 	for i, result := range results {
-		results[i] = v.bubbleVotes(result)
+		results[i] = v.bubbleVotes(ctx, result)
 	}
 
 	for _, result := range results {
@@ -59,7 +59,7 @@ func (v *voter) Update(ctx context.Context) {
 		v.t.Ctx.Log.Debug("finishing poll",
 			zap.Stringer("result", &result),
 		)
-		if err := v.t.Consensus.RecordPoll(result); err != nil {
+		if err := v.t.Consensus.RecordPoll(ctx, result); err != nil {
 			v.t.errs.Add(err)
 		}
 	}
@@ -68,7 +68,7 @@ func (v *voter) Update(ctx context.Context) {
 		return
 	}
 
-	if err := v.t.VM.SetPreference(v.t.Consensus.Preference()); err != nil {
+	if err := v.t.VM.SetPreference(ctx, v.t.Consensus.Preference()); err != nil {
 		v.t.errs.Add(err)
 		return
 	}
@@ -89,7 +89,7 @@ func (v *voter) Update(ctx context.Context) {
 // Note: bubbleVotes does not bubbleVotes to all of the ancestors in consensus,
 // just the most recent one. bubbling to the rest of the ancestors, which may
 // also be in consensus is handled in RecordPoll.
-func (v *voter) bubbleVotes(votes ids.Bag) ids.Bag {
+func (v *voter) bubbleVotes(ctx context.Context, votes ids.Bag) ids.Bag {
 	bubbledVotes := ids.Bag{}
 
 votesLoop:
@@ -103,7 +103,7 @@ votesLoop:
 			zap.Stringer("parentID", rootID),
 		)
 
-		blk, err := v.t.GetBlock(rootID)
+		blk, err := v.t.GetBlock(ctx, rootID)
 		// If we cannot retrieve the block, drop [vote]
 		if err != nil {
 			v.t.Ctx.Log.Debug("dropping vote(s)",
@@ -138,7 +138,7 @@ votesLoop:
 			)
 
 			blkID = parentID
-			blk, err = v.t.GetBlock(blkID)
+			blk, err = v.t.GetBlock(ctx, blkID)
 			// If we cannot retrieve the block, drop [vote]
 			if err != nil {
 				v.t.Ctx.Log.Debug("dropping vote(s)",

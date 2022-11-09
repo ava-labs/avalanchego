@@ -539,7 +539,7 @@ type InternalHandler interface {
 	Timeout(context.Context) error
 
 	// Gossip to the network a container on the accepted frontier
-	Gossip() error
+	Gossip(context.Context) error
 
 	// Halt this engine.
 	//

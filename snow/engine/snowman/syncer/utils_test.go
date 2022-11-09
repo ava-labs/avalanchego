@@ -4,6 +4,7 @@
 package syncer
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -90,7 +91,7 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 	require.True(t, ok)
 	require.True(t, syncer.stateSyncVM != nil)
 
-	fullVM.GetOngoingSyncStateSummaryF = func() (block.StateSummary, error) {
+	fullVM.GetOngoingSyncStateSummaryF = func(context.Context) (block.StateSummary, error) {
 		return nil, database.ErrNotFound
 	}
 

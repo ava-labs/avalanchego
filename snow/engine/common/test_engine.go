@@ -109,8 +109,7 @@ type EngineTest struct {
 	IsBootstrappedF                                    func() bool
 	ContextF                                           func() *snow.ConsensusContext
 	HaltF                                              func()
-	TimeoutF, ShutdownF                                func(ctx context.Context) error
-	GossipF                                            func() error
+	TimeoutF, GossipF, ShutdownF                       func(ctx context.Context) error
 	NotifyF                                            func(context.Context, Message) error
 	GetF, GetAncestorsF, PullQueryF                    func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error
 	PutF, PushQueryF                                   func(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte) error
@@ -216,9 +215,9 @@ func (e *EngineTest) Timeout(ctx context.Context) error {
 	return errTimeout
 }
 
-func (e *EngineTest) Gossip() error {
+func (e *EngineTest) Gossip(ctx context.Context) error {
 	if e.GossipF != nil {
-		return e.GossipF()
+		return e.GossipF(ctx)
 	}
 	if !e.CantGossip {
 		return nil

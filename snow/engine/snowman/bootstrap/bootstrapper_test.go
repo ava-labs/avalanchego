@@ -160,8 +160,11 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	}
 
 	// create bootstrapper
-	dummyCallback := func(lastReqID uint32) error { cfg.Ctx.SetState(snow.NormalOp); return nil }
-	bs, err := New(cfg, dummyCallback)
+	dummyCallback := func(_ context.Context, lastReqID uint32) error {
+		cfg.Ctx.SetState(snow.NormalOp)
+		return nil
+	}
+	bs, err := New(context.Background(), cfg, dummyCallback)
 	require.NoError(err)
 
 	vm.CantSetState = false
@@ -229,8 +232,12 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	}
 
 	bs, err := New(
+		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(ctx context.Context, lastReqID uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -327,8 +334,12 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	}
 
 	bs, err := New(
+		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(ctx context.Context, lastReqID uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -482,8 +493,12 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	}
 
 	bs, err := New(
+		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(ctx context.Context, lastReqID uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -640,8 +655,12 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	}
 
 	bs, err := New(
+		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(ctx context.Context, lastReqID uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -820,8 +839,12 @@ func TestBootstrapperAncestors(t *testing.T) {
 	}
 
 	bs, err := New(
+		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(ctx context.Context, lastReqID uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -957,8 +980,12 @@ func TestBootstrapperFinalized(t *testing.T) {
 		return blk0, nil
 	}
 	bs, err := New(
+		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(ctx context.Context, lastReqID uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1161,8 +1188,12 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	bsIntf, err := New(
+		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(ctx context.Context, lastReqID uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1295,8 +1326,12 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 	}
 
 	bsIntf, err := New(
+		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(ctx context.Context, lastReqID uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1376,8 +1411,12 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) { return blk0.ID(), nil }
 
 	bsIntf, err := New(
+		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(ctx context.Context, lastReqID uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)

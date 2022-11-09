@@ -72,7 +72,7 @@ func (gh *getter) GetAcceptedStateSummary(_ context.Context, nodeID ids.NodeID, 
 }
 
 func (gh *getter) GetAcceptedFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32) error {
-	acceptedFrontier := gh.storage.Edge()
+	acceptedFrontier := gh.storage.Edge(ctx)
 	gh.sender.SendAcceptedFrontier(ctx, validatorID, requestID, acceptedFrontier)
 	return nil
 }
@@ -80,7 +80,7 @@ func (gh *getter) GetAcceptedFrontier(ctx context.Context, validatorID ids.NodeI
 func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
 	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, vtxID := range containerIDs {
-		if vtx, err := gh.storage.GetVtx(vtxID); err == nil && vtx.Status() == choices.Accepted {
+		if vtx, err := gh.storage.GetVtx(ctx, vtxID); err == nil && vtx.Status() == choices.Accepted {
 			acceptedVtxIDs = append(acceptedVtxIDs, vtxID)
 		}
 	}
@@ -95,7 +95,7 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 		zap.Uint32("requestID", requestID),
 		zap.Stringer("vtxID", vtxID),
 	)
-	vertex, err := gh.storage.GetVtx(vtxID)
+	vertex, err := gh.storage.GetVtx(ctx, vtxID)
 	if err != nil || vertex.Status() == choices.Unknown {
 		gh.log.Verbo("dropping getAncestors")
 		return nil // Don't have the requested vertex. Drop message.
@@ -142,7 +142,7 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 
 func (gh *getter) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
 	// If this engine has access to the requested vertex, provide it
-	if vtx, err := gh.storage.GetVtx(vtxID); err == nil {
+	if vtx, err := gh.storage.GetVtx(ctx, vtxID); err == nil {
 		gh.sender.SendPut(ctx, nodeID, requestID, vtx.Bytes())
 	}
 	return nil

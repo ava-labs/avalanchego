@@ -4,6 +4,7 @@
 package snowman
 
 import (
+	"context"
 	"sort"
 	"time"
 
@@ -24,11 +25,11 @@ type TestBlock struct {
 	BytesV     []byte
 }
 
-func (b *TestBlock) Parent() ids.ID       { return b.ParentV }
-func (b *TestBlock) Height() uint64       { return b.HeightV }
-func (b *TestBlock) Timestamp() time.Time { return b.TimestampV }
-func (b *TestBlock) Verify() error        { return b.VerifyV }
-func (b *TestBlock) Bytes() []byte        { return b.BytesV }
+func (b *TestBlock) Parent() ids.ID               { return b.ParentV }
+func (b *TestBlock) Height() uint64               { return b.HeightV }
+func (b *TestBlock) Timestamp() time.Time         { return b.TimestampV }
+func (b *TestBlock) Verify(context.Context) error { return b.VerifyV }
+func (b *TestBlock) Bytes() []byte                { return b.BytesV }
 
 type sortBlocks []*TestBlock
 

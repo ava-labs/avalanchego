@@ -165,12 +165,12 @@ func (h *handler) Consensus() common.Engine          { return h.engine }
 
 func (h *handler) SetOnStopped(onStopped func()) { h.onStopped = onStopped }
 
-func (h *handler) selectStartingGear() (common.Engine, error) {
+func (h *handler) selectStartingGear(ctx context.Context) (common.Engine, error) {
 	if h.stateSyncer == nil {
 		return h.bootstrapper, nil
 	}
 
-	stateSyncEnabled, err := h.stateSyncer.IsEnabled()
+	stateSyncEnabled, err := h.stateSyncer.IsEnabled(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -184,11 +184,11 @@ func (h *handler) selectStartingGear() (common.Engine, error) {
 	return h.stateSyncer, h.bootstrapper.Clear()
 }
 
-func (h *handler) Start(recoverPanic bool) {
+func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 	h.ctx.Lock.Lock()
 	defer h.ctx.Lock.Unlock()
 
-	gear, err := h.selectStartingGear()
+	gear, err := h.selectStartingGear(ctx)
 	if err != nil {
 		h.ctx.Log.Error("chain failed to select starting gear",
 			zap.Error(err),
@@ -197,7 +197,7 @@ func (h *handler) Start(recoverPanic bool) {
 		return
 	}
 
-	if err := gear.Start(0); err != nil {
+	if err := gear.Start(ctx, 0); err != nil {
 		h.ctx.Log.Error("chain failed to start",
 			zap.Error(err),
 		)
@@ -222,7 +222,7 @@ func (h *handler) Start(recoverPanic bool) {
 	}
 }
 
-func (h *handler) HealthCheck() (interface{}, error) {
+func (h *handler) HealthCheck(ctx context.Context) (interface{}, error) {
 	h.ctx.Lock.Lock()
 	defer h.ctx.Lock.Unlock()
 
@@ -230,7 +230,7 @@ func (h *handler) HealthCheck() (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	return engine.HealthCheck()
+	return engine.HealthCheck(ctx)
 }
 
 // Push the message onto the handler's queue

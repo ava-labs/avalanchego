@@ -79,7 +79,7 @@ type bootstrapper struct {
 	bootstrappedOnce sync.Once
 }
 
-func New(config Config, onFinished func(lastReqID uint32) error) (common.BootstrapableEngine, error) {
+func New(ctx context.Context, config Config, onFinished func(ctx context.Context, lastReqID uint32) error) (common.BootstrapableEngine, error) {
 	metrics, err := newMetrics("bs", config.Ctx.Registerer)
 	if err != nil {
 		return nil, err
@@ -107,7 +107,7 @@ func New(config Config, onFinished func(lastReqID uint32) error) (common.Bootstr
 		numDropped:  b.numDropped,
 		vm:          b.VM,
 	}
-	if err := b.Blocked.SetParser(b.parser); err != nil {
+	if err := b.Blocked.SetParser(ctx, b.parser); err != nil {
 		return nil, err
 	}
 
@@ -269,7 +269,7 @@ func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) erro
 	return nil
 }
 
-func (b *bootstrapper) Timeout() error {
+func (b *bootstrapper) Timeout(ctx context.Context) error {
 	if !b.awaitingTimeout {
 		return errUnexpectedTimeout
 	}
@@ -279,17 +279,17 @@ func (b *bootstrapper) Timeout() error {
 		return b.Restart(true)
 	}
 	b.fetchETA.Set(0)
-	return b.OnFinished(b.Config.SharedCfg.RequestID)
+	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
 }
 
-func (b *bootstrapper) Gossip() error { return nil }
+func (b *bootstrapper) Gossip(context.Context) error { return nil }
 
 func (b *bootstrapper) Shutdown(ctx context.Context) error {
 	b.Ctx.Log.Info("shutting down bootstrapper")
 	return b.VM.Shutdown(ctx)
 }
 
-func (b *bootstrapper) Notify(common.Message) error { return nil }
+func (b *bootstrapper) Notify(context.Context, common.Message) error { return nil }
 
 func (b *bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
 	vmIntf, vmErr := b.VM.HealthCheck(ctx)
@@ -341,7 +341,7 @@ func (b *bootstrapper) ForceAccepted(ctx context.Context, acceptedContainerIDs [
 		}
 	}
 
-	return b.checkFinish()
+	return b.checkFinish(ctx)
 }
 
 // Get block [blkID] and its ancestors from a validator
@@ -353,7 +353,7 @@ func (b *bootstrapper) fetch(ctx context.Context, blkID ids.ID) error {
 
 	// Make sure we don't already have this block
 	if _, err := b.VM.GetBlock(ctx, blkID); err == nil {
-		return b.checkFinish()
+		return b.checkFinish(ctx)
 	}
 
 	validatorID, ok := b.fetchFrom.Peek()
@@ -427,7 +427,7 @@ func (b *bootstrapper) process(ctx context.Context, blk snowman.Block, processin
 			if err := b.Blocked.Commit(); err != nil {
 				return err
 			}
-			return b.checkFinish()
+			return b.checkFinish(ctx)
 		}
 
 		// If this block is going to be accepted, make sure to update the
@@ -436,7 +436,7 @@ func (b *bootstrapper) process(ctx context.Context, blk snowman.Block, processin
 			b.tipHeight = blkHeight
 		}
 
-		pushed, err := b.Blocked.Push(&blockJob{
+		pushed, err := b.Blocked.Push(ctx, &blockJob{
 			parser:      b.parser,
 			log:         b.Ctx.Log,
 			numAccepted: b.numAccepted,
@@ -454,7 +454,7 @@ func (b *bootstrapper) process(ctx context.Context, blk snowman.Block, processin
 			if err := b.Blocked.Commit(); err != nil {
 				return err
 			}
-			return b.checkFinish()
+			return b.checkFinish(ctx)
 		}
 
 		// We added a new block to the queue, so track that it was fetched
@@ -515,13 +515,13 @@ func (b *bootstrapper) process(ctx context.Context, blk snowman.Block, processin
 		if err := b.Blocked.Commit(); err != nil {
 			return err
 		}
-		return b.checkFinish()
+		return b.checkFinish(ctx)
 	}
 }
 
 // checkFinish repeatedly executes pending transactions and requests new frontier vertices until there aren't any new ones
 // after which it finishes the bootstrap process
-func (b *bootstrapper) checkFinish() error {
+func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	if numPending := b.Blocked.NumMissingIDs(); numPending != 0 {
 		return nil
 	}
@@ -541,6 +541,7 @@ func (b *bootstrapper) checkFinish() error {
 	}
 
 	executedBlocks, err := b.Blocked.ExecuteAll(
+		ctx,
 		b.Config.Ctx,
 		b,
 		b.Config.SharedCfg.Restarted,
@@ -587,5 +588,5 @@ func (b *bootstrapper) checkFinish() error {
 		return nil
 	}
 	b.fetchETA.Set(0)
-	return b.OnFinished(b.Config.SharedCfg.RequestID)
+	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
 }

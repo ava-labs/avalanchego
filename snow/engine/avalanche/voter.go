@@ -43,7 +43,7 @@ func (v *voter) Update(ctx context.Context) {
 		return
 	}
 	for _, result := range results {
-		_, err := v.bubbleVotes(result)
+		_, err := v.bubbleVotes(ctx, result)
 		if err != nil {
 			v.t.errs.Add(err)
 			return
@@ -93,10 +93,10 @@ func (v *voter) Update(ctx context.Context) {
 	v.t.repoll(ctx)
 }
 
-func (v *voter) bubbleVotes(votes ids.UniqueBag) (ids.UniqueBag, error) {
+func (v *voter) bubbleVotes(ctx context.Context, votes ids.UniqueBag) (ids.UniqueBag, error) {
 	vertexHeap := vertex.NewHeap()
 	for vote, set := range votes {
-		vtx, err := v.t.Manager.GetVtx(vote)
+		vtx, err := v.t.Manager.GetVtx(ctx, vote)
 		if err != nil {
 			v.t.Ctx.Log.Debug("dropping vote(s)",
 				zap.String("reason", "failed to fetch vertex"),

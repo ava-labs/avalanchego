@@ -169,7 +169,7 @@ func (vtx *uniqueVertex) setStatus(status choices.Status) error {
 func (vtx *uniqueVertex) ID() ids.ID       { return vtx.id }
 func (vtx *uniqueVertex) Key() interface{} { return vtx.id }
 
-func (vtx *uniqueVertex) Accept(context.Context) error {
+func (vtx *uniqueVertex) Accept(ctx context.Context) error {
 	if err := vtx.setStatus(choices.Accepted); err != nil {
 		return err
 	}
@@ -184,7 +184,7 @@ func (vtx *uniqueVertex) Accept(context.Context) error {
 		vtx.serializer.edge.Remove(parent.ID())
 	}
 
-	if err := vtx.serializer.state.SetEdge(vtx.serializer.Edge()); err != nil {
+	if err := vtx.serializer.state.SetEdge(vtx.serializer.Edge(ctx)); err != nil {
 		return fmt.Errorf("failed to set edge while accepting vertex %s due to %w", vtx.id, err)
 	}
 
@@ -263,7 +263,7 @@ func (vtx *uniqueVertex) Verify(ctx context.Context) error {
 
 	// MUST error if stop vertex has already been accepted (can't be accepted twice)
 	// regardless of whether the underlying vertex is stop vertex or not
-	stopVtxAccepted, err := vtx.serializer.StopVertexAccepted()
+	stopVtxAccepted, err := vtx.serializer.StopVertexAccepted(ctx)
 	if err != nil {
 		return err
 	}
@@ -346,7 +346,7 @@ func (vtx *uniqueVertex) Verify(ctx context.Context) error {
 	}
 
 	acceptedEdges := ids.NewSet(0)
-	acceptedEdges.Add(vtx.serializer.Edge()...)
+	acceptedEdges.Add(vtx.serializer.Edge(ctx)...)
 
 	// stop vertex should be able to reach all IDs
 	// that are returned by the "Edge"
