@@ -92,9 +92,9 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	msg = mc.InboundGetAccepted(chainID, reqID, 1*time.Second, nil, nodeID)
 	handler.Push(context.Background(), msg)
 
-	bootstrapper.StartF = func(startReqID uint32) error { return nil }
+	bootstrapper.StartF = func(_ context.Context, startReqID uint32) error { return nil }
 
-	handler.Start(false)
+	handler.Start(context.Background(), false)
 
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -163,9 +163,9 @@ func TestHandlerClosesOnError(t *testing.T) {
 	// should normally be handled
 	ctx.SetState(snow.Bootstrapping)
 
-	bootstrapper.StartF = func(startReqID uint32) error { return nil }
+	bootstrapper.StartF = func(_ context.Context, startReqID uint32) error { return nil }
 
-	handler.Start(false)
+	handler.Start(context.Background(), false)
 
 	nodeID := ids.EmptyNodeID
 	reqID := uint32(1)
@@ -225,9 +225,9 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	handler.SetBootstrapper(bootstrapper)
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
 
-	bootstrapper.StartF = func(startReqID uint32) error { return nil }
+	bootstrapper.StartF = func(_ context.Context, startReqID uint32) error { return nil }
 
-	handler.Start(false)
+	handler.Start(context.Background(), false)
 
 	nodeID := ids.EmptyNodeID
 	chainID := ids.Empty
@@ -283,16 +283,16 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	engine := &common.EngineTest{T: t}
 	engine.Default(false)
 	engine.ContextF = func() *snow.ConsensusContext { return ctx }
-	engine.NotifyF = func(common.Message) error {
+	engine.NotifyF = func(context.Context, common.Message) error {
 		calledNotify <- struct{}{}
 		return nil
 	}
 	handler.SetConsensus(engine)
 	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
 
-	bootstrapper.StartF = func(startReqID uint32) error { return nil }
+	bootstrapper.StartF = func(_ context.Context, startReqID uint32) error { return nil }
 
-	handler.Start(false)
+	handler.Start(context.Background(), false)
 	msgFromVMChan <- 0
 
 	select {
