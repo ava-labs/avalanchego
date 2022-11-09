@@ -40,7 +40,7 @@ var (
 	errUnexpectedTimeout = errors.New("unexpected timeout fired")
 )
 
-func New(config Config, onFinished func(lastReqID uint32) error) (common.BootstrapableEngine, error) {
+func New(ctx context.Context, config Config, onFinished func(lastReqID uint32) error) (common.BootstrapableEngine, error) {
 	b := &bootstrapper{
 		Config: config,
 
@@ -60,7 +60,7 @@ func New(config Config, onFinished func(lastReqID uint32) error) (common.Bootstr
 		return nil, err
 	}
 
-	if err := b.VtxBlocked.SetParser(&vtxParser{
+	if err := b.VtxBlocked.SetParser(ctx, &vtxParser{
 		log:         config.Ctx.Log,
 		numAccepted: b.numAcceptedVts,
 		numDropped:  b.numDroppedVts,
@@ -312,7 +312,7 @@ func (b *bootstrapper) Shutdown(ctx context.Context) error {
 	return b.VM.Shutdown(ctx)
 }
 
-func (b *bootstrapper) Notify(common.Message) error { return nil }
+func (b *bootstrapper) Notify(context.Context, common.Message) error { return nil }
 
 func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.Log.Info("starting bootstrap")
@@ -373,7 +373,7 @@ func (b *bootstrapper) fetch(ctx context.Context, vtxIDs ...ids.ID) error {
 		b.OutstandingRequests.Add(validatorID, b.Config.SharedCfg.RequestID, vtxID)
 		b.Config.Sender.SendGetAncestors(ctx, validatorID, b.Config.SharedCfg.RequestID, vtxID) // request vertex and ancestors
 	}
-	return b.checkFinish()
+	return b.checkFinish(ctx)
 }
 
 // Process the vertices in [vtxs].
@@ -413,33 +413,38 @@ func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 			b.VtxBlocked.RemoveMissingID(vtxID)
 
 			// Add to queue of vertices to execute when bootstrapping finishes.
-			if pushed, err := b.VtxBlocked.Push(&vertexJob{
+			pushed, err := b.VtxBlocked.Push(ctx, &vertexJob{
 				log:         b.Ctx.Log,
 				numAccepted: b.numAcceptedVts,
 				numDropped:  b.numDroppedVts,
 				vtx:         vtx,
-			}); err != nil {
+			})
+			if err != nil {
 				return err
-			} else if !pushed {
+			}
+			if !pushed {
 				// If the vertex is already on the queue, then we have already
 				// pushed [vtx]'s transactions and traversed into its parents.
 				continue
 			}
 
-			txs, err := vtx.Txs()
+			txs, err := vtx.Txs(ctx)
 			if err != nil {
 				return err
 			}
+
 			for _, tx := range txs {
 				// Add to queue of txs to execute when bootstrapping finishes.
-				if pushed, err := b.TxBlocked.Push(&txJob{
+				pushed, err := b.TxBlocked.Push(ctx, &txJob{
 					log:         b.Ctx.Log,
 					numAccepted: b.numAcceptedTxs,
 					numDropped:  b.numDroppedTxs,
 					tx:          tx,
-				}); err != nil {
+				})
+				if err != nil {
 					return err
-				} else if pushed {
+				}
+				if pushed {
 					b.numFetchedTxs.Inc()
 				}
 			}
@@ -527,7 +532,7 @@ func (b *bootstrapper) ForceAccepted(ctx context.Context, acceptedContainerIDs [
 
 // checkFinish repeatedly executes pending transactions and requests new frontier blocks until there aren't any new ones
 // after which it finishes the bootstrap process
-func (b *bootstrapper) checkFinish() error {
+func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	// If there are outstanding requests for vertices or we still need to fetch vertices, we can't finish
 	pendingJobs := b.VtxBlocked.MissingIDs()
 	if b.IsBootstrapped() || len(pendingJobs) > 0 || b.awaitingTimeout {
@@ -540,7 +545,13 @@ func (b *bootstrapper) checkFinish() error {
 		b.Ctx.Log.Debug("executing transactions")
 	}
 
-	_, err := b.TxBlocked.ExecuteAll(b.Config.Ctx, b, b.Config.SharedCfg.Restarted, b.Ctx.DecisionAcceptor)
+	_, err := b.TxBlocked.ExecuteAll(
+		ctx,
+		b.Config.Ctx,
+		b,
+		b.Config.SharedCfg.Restarted,
+		b.Ctx.DecisionAcceptor,
+	)
 	if err != nil || b.Halted() {
 		return err
 	}
@@ -551,7 +562,13 @@ func (b *bootstrapper) checkFinish() error {
 		b.Ctx.Log.Debug("executing vertices")
 	}
 
-	executedVts, err := b.VtxBlocked.ExecuteAll(b.Config.Ctx, b, b.Config.SharedCfg.Restarted, b.Ctx.ConsensusAcceptor)
+	executedVts, err := b.VtxBlocked.ExecuteAll(
+		ctx,
+		b.Config.Ctx,
+		b,
+		b.Config.SharedCfg.Restarted,
+		b.Ctx.ConsensusAcceptor,
+	)
 	if err != nil || b.Halted() {
 		return err
 	}

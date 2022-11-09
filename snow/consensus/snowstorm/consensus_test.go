@@ -93,10 +93,10 @@ func Setup() {
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		Red.Verify(),
-		Green.Verify(),
-		Blue.Verify(),
-		Alpha.Verify(),
+		Red.Verify(context.Background()),
+		Green.Verify(context.Background()),
+		Blue.Verify(context.Background()),
+		Alpha.Verify(context.Background()),
 	)
 	if errs.Errored() {
 		panic(errs.Err)

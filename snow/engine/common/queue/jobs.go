@@ -102,7 +102,13 @@ func (j *Jobs) Push(ctx context.Context, job Job) (bool, error) {
 	return true, nil
 }
 
-func (j *Jobs) ExecuteAll(ctx context.Context, chainCtx *snow.ConsensusContext, halter common.Haltable, restarted bool, acceptors ...snow.Acceptor) (int, error) {
+func (j *Jobs) ExecuteAll(
+	ctx context.Context,
+	chainCtx *snow.ConsensusContext,
+	halter common.Haltable,
+	restarted bool,
+	acceptors ...snow.Acceptor,
+) (int, error) {
 	chainCtx.Executing(true)
 	defer chainCtx.Executing(false)
 
@@ -127,7 +133,7 @@ func (j *Jobs) ExecuteAll(ctx context.Context, chainCtx *snow.ConsensusContext, 
 			return numExecuted, nil
 		}
 
-		job, err := j.state.RemoveRunnableJob()
+		job, err := j.state.RemoveRunnableJob(ctx)
 		if err == database.ErrNotFound {
 			break
 		}
@@ -157,7 +163,7 @@ func (j *Jobs) ExecuteAll(ctx context.Context, chainCtx *snow.ConsensusContext, 
 		}
 
 		for _, dependentID := range dependentIDs {
-			job, err := j.state.GetJob(dependentID)
+			job, err := j.state.GetJob(ctx, dependentID)
 			if err != nil {
 				return 0, fmt.Errorf("failed to get job %s from blocking jobs due to %w", dependentID, err)
 			}
@@ -381,7 +387,7 @@ func (jm *JobsWithMissing) cleanRunnableStack(ctx context.Context) error {
 			return fmt.Errorf("failed to convert jobID bytes into ID due to: %w", err)
 		}
 
-		job, err := jm.state.GetJob(jobID)
+		job, err := jm.state.GetJob(ctx, jobID)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve job on runnnable stack due to: %w", err)
 		}

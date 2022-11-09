@@ -4,6 +4,8 @@
 package snowstorm
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
@@ -46,7 +48,7 @@ type Tx interface {
 	//
 	// It is guaranteed that when Verify is called, all the dependencies of
 	// this transaction have already been successfully verified.
-	Verify() error
+	Verify(context.Context) error
 
 	// Bytes returns the binary representation of this transaction.
 	//

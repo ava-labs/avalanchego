@@ -16,13 +16,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/getter"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
-
-	avagetter "github.com/ava-labs/avalanchego/snow/engine/avalanche/getter"
 )
 
 var (
@@ -86,7 +85,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 		SharedCfg:                      &common.SharedConfig{},
 	}
 
-	avaGetHandler, err := avagetter.New(manager, commonConfig)
+	avaGetHandler, err := getter.New(manager, commonConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,6 +138,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	}
 
 	bs, err := New(
+		context.Background(),
 		config,
 		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
@@ -147,7 +147,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	if err := bs.Start(0); err != nil {
+	if err := bs.Start(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -238,6 +238,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	}
 
 	bs, err := New(
+		context.Background(),
 		config,
 		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
@@ -246,7 +247,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	if err := bs.Start(0); err != nil {
+	if err := bs.Start(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -380,7 +381,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 
 	vtxBytes0 := []byte{2}
 	vtxBytes1 := []byte{3}
-	vm.ParseTxF = func(b []byte) (snowstorm.Tx, error) {
+	vm.ParseTxF = func(_ context.Context, b []byte) (snowstorm.Tx, error) {
 		switch {
 		case bytes.Equal(b, txBytes0):
 			return tx0, nil
@@ -412,6 +413,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	}
 
 	bs, err := New(
+		context.Background(),
 		config,
 		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
@@ -420,7 +422,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	if err := bs.Start(0); err != nil {
+	if err := bs.Start(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -552,6 +554,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 	}
 
 	bs, err := New(
+		context.Background(),
 		config,
 		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
@@ -560,7 +563,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	if err := bs.Start(0); err != nil {
+	if err := bs.Start(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -669,6 +672,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	}
 
 	bs, err := New(
+		context.Background(),
 		config,
 		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
@@ -677,7 +681,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	if err := bs.Start(0); err != nil {
+	if err := bs.Start(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -785,6 +789,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	}
 
 	bs, err := New(
+		context.Background(),
 		config,
 		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
@@ -793,7 +798,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	if err := bs.Start(0); err != nil {
+	if err := bs.Start(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -912,6 +917,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	}
 
 	bs, err := New(
+		context.Background(),
 		config,
 		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
@@ -920,7 +926,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	if err := bs.Start(0); err != nil {
+	if err := bs.Start(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1075,6 +1081,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	bsIntf, err := New(
+		context.Background(),
 		config,
 		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
 	)
@@ -1087,7 +1094,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	if err := bs.Start(0); err != nil {
+	if err := bs.Start(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 

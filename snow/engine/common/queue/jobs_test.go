@@ -116,7 +116,7 @@ func TestPushAndExecute(t *testing.T) {
 	require.NoError(err)
 	require.True(hasNext)
 
-	parser.ParseF = func(b []byte) (Job, error) {
+	parser.ParseF = func(_ context.Context, b []byte) (Job, error) {
 		require.Equal([]byte{0}, b)
 		return job, nil
 	}
@@ -177,7 +177,7 @@ func TestRemoveDependency(t *testing.T) {
 	require.NoError(err)
 	require.True(hasNext)
 
-	parser.ParseF = func(b []byte) (Job, error) {
+	parser.ParseF = func(_ context.Context, b []byte) (Job, error) {
 		switch {
 		case bytes.Equal(b, []byte{0}):
 			return job0, nil
@@ -362,7 +362,7 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	require.NoError(err)
 	require.True(hasNext)
 
-	parser.ParseF = func(b []byte) (Job, error) {
+	parser.ParseF = func(_ context.Context, b []byte) (Job, error) {
 		switch {
 		case bytes.Equal(b, []byte{0}):
 			return job0, nil
@@ -500,7 +500,7 @@ func TestClearAll(t *testing.T) {
 	require.True(pushed)
 	require.NoError(err)
 
-	parser.ParseF = func(b []byte) (Job, error) {
+	parser.ParseF = func(_ context.Context, b []byte) (Job, error) {
 		switch {
 		case bytes.Equal(b, []byte{0}):
 			return job0, nil

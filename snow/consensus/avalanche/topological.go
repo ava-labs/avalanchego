@@ -154,7 +154,7 @@ func (ta *Topological) Add(ctx context.Context, vtx Vertex) error {
 		return nil // Already inserted this vertex
 	}
 
-	txs, err := vtx.Txs()
+	txs, err := vtx.Txs(ctx)
 	if err != nil {
 		return err
 	}
@@ -246,7 +246,7 @@ func (ta *Topological) RecordPoll(ctx context.Context, responses ids.UniqueBag) 
 	}
 
 	// Collect the votes for each transaction: O(|Live Set|)
-	votes, err := ta.pushVotes()
+	votes, err := ta.pushVotes(ctx)
 	if err != nil {
 		return err
 	}
@@ -382,7 +382,7 @@ func (ta *Topological) markAncestorInDegrees(
 
 // Count the number of votes for each operation by pushing votes upwards through
 // vertex ancestors.
-func (ta *Topological) pushVotes() (ids.Bag, error) {
+func (ta *Topological) pushVotes(ctx context.Context) (ids.Bag, error) {
 	ta.votes.Clear()
 	txConflicts := make(map[ids.ID]ids.Set, minMapSize)
 
@@ -402,7 +402,7 @@ func (ta *Topological) pushVotes() (ids.Bag, error) {
 
 		if tv := ta.nodes[leaf]; tv != nil {
 			vtx := tv.vtx
-			txs, err := vtx.Txs()
+			txs, err := vtx.Txs(ctx)
 			if err != nil {
 				return ids.Bag{}, err
 			}
@@ -497,7 +497,7 @@ func (ta *Topological) update(ctx context.Context, vtx Vertex) error {
 		return nil
 	}
 
-	txs, err := vtx.Txs()
+	txs, err := vtx.Txs(ctx)
 	if err != nil {
 		return err
 	}

@@ -61,7 +61,7 @@ func (tv *transactionVertex) Status() choices.Status { return tv.status }
 
 // Verify isn't called in the consensus code. So this implementation doesn't
 // really matter. However it's used to implement the tx interface.
-func (tv *transactionVertex) Verify() error { return nil }
+func (tv *transactionVertex) Verify(context.Context) error { return nil }
 
 // Dependencies returns the currently processing transaction vertices of this
 // vertex's parents.
