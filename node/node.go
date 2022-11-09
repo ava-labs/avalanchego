@@ -4,6 +4,7 @@
 package node
 
 import (
+	"context"
 	"crypto"
 	"errors"
 	"fmt"
@@ -1030,7 +1031,7 @@ func (n *Node) initHealthAPI() error {
 		return fmt.Errorf("couldn't register database health check: %w", err)
 	}
 
-	diskSpaceCheck := health.CheckerFunc(func() (interface{}, error) {
+	diskSpaceCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
 		// confirm that the node has enough disk space to continue operating
 		// if there is too little disk space remaining, first report unhealthy and then shutdown the node
 
@@ -1333,7 +1334,7 @@ func (n *Node) Initialize(
 		return fmt.Errorf("couldn't initialize indexer: %w", err)
 	}
 
-	n.health.Start(n.Config.HealthCheckFreq)
+	n.health.Start(context.TODO(), n.Config.HealthCheckFreq)
 	n.initProfiler()
 
 	// Start the Platform chain
@@ -1358,7 +1359,7 @@ func (n *Node) shutdown() {
 
 	if n.health != nil {
 		// Passes if the node is not shutting down
-		shuttingDownCheck := health.CheckerFunc(func() (interface{}, error) {
+		shuttingDownCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
 			return map[string]interface{}{
 				"isShuttingDown": true,
 			}, errShuttingDown

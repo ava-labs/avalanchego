@@ -275,7 +275,7 @@ func (n *network) Gossip(
 // HealthCheck returns information about several network layer health checks.
 // 1) Information about health check results
 // 2) An error if the health check reports unhealthy
-func (n *network) HealthCheck() (interface{}, error) {
+func (n *network) HealthCheck(context.Context) (interface{}, error) {
 	n.peersLock.RLock()
 	connectedTo := n.connectedPeers.Len()
 	n.peersLock.RUnlock()
