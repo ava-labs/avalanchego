@@ -75,10 +75,12 @@ func (v *MempoolTxVerifier) standardTx(tx txs.UnsignedTx) error {
 		return err
 	}
 
-	executor := StandardTxExecutor{
-		Backend: v.Backend,
-		State:   baseState,
-		Tx:      v.Tx,
+	executor := CaminoStandardTxExecutor{
+		StandardTxExecutor{
+			Backend: v.Backend,
+			State:   baseState,
+			Tx:      v.Tx,
+		},
 	}
 	err = tx.Visit(&executor)
 	// We ignore [errFutureStakeTime] here because the time will be advanced
