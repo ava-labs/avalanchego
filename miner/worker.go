@@ -52,7 +52,9 @@ import (
 )
 
 const (
-	targetTxsSize = 192 * units.KiB
+	// Leaves 256 KBs for other sections of the block (limit is 2MB).
+	// This should suffice for atomic txs, proposervm header, and serialization overhead.
+	targetTxsSize = 1792 * units.KiB
 )
 
 // environment is the worker's current environment and holds all of the current state information.
