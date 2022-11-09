@@ -28,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txheap"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
@@ -159,7 +158,7 @@ type BuildGenesisArgs struct {
 	UTXOs         []UTXO                    `json:"utxos"`
 	Validators    []PermissionlessValidator `json:"validators"`
 	Chains        []Chain                   `json:"chains"`
-	Camino        state.Camino              `json:"camino"`
+	Camino        genesis.Camino            `json:"camino"`
 	Time          json.Uint64               `json:"time"`
 	InitialSupply json.Uint64               `json:"initialSupply"`
 	Message       string                    `json:"message"`
@@ -343,6 +342,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		UTXOs:         utxos,
 		Validators:    validatorTxs,
 		Chains:        chains,
+		Camino:        args.Camino,
 		Timestamp:     uint64(args.Time),
 		InitialSupply: uint64(args.InitialSupply),
 		Message:       args.Message,
