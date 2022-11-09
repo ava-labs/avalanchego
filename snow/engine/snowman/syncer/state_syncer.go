@@ -48,7 +48,7 @@ type stateSyncer struct {
 	requestID uint32
 
 	stateSyncVM        block.StateSyncableVM
-	onDoneStateSyncing func(lastReqID uint32) error
+	onDoneStateSyncing func(ctx context.Context, lastReqID uint32) error
 
 	// we track the (possibly nil) local summary to help engine
 	// choosing among multiple validated summaries
@@ -89,7 +89,7 @@ type stateSyncer struct {
 
 func New(
 	cfg Config,
-	onDoneStateSyncing func(lastReqID uint32) error,
+	onDoneStateSyncing func(context.Context, uint32) error,
 ) common.StateSyncer {
 	ssVM, _ := cfg.VM.(block.StateSyncableVM)
 	return &stateSyncer{
@@ -305,7 +305,7 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 		)
 
 		// if we do not restart state sync, move on to bootstrapping.
-		return ss.onDoneStateSyncing(ss.requestID)
+		return ss.onDoneStateSyncing(ctx, ss.requestID)
 	}
 
 	preferredStateSummary := ss.selectSyncableStateSummary()
@@ -325,7 +325,7 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 	}
 
 	// VM did not accept the summary, move on to bootstrapping.
-	return ss.onDoneStateSyncing(ss.requestID)
+	return ss.onDoneStateSyncing(ctx, ss.requestID)
 }
 
 // selectSyncableStateSummary chooses a state summary from all
@@ -455,7 +455,7 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	ss.attempts++
 	if ss.targetSeeders.Len() == 0 {
 		ss.Ctx.Log.Info("State syncing skipped due to no provided syncers")
-		return ss.onDoneStateSyncing(ss.requestID)
+		return ss.onDoneStateSyncing(ctx, ss.requestID)
 	}
 
 	ss.requestID++
@@ -528,7 +528,7 @@ func (ss *stateSyncer) Notify(ctx context.Context, msg common.Message) error {
 		)
 		return nil
 	}
-	return ss.onDoneStateSyncing(ss.requestID)
+	return ss.onDoneStateSyncing(ctx, ss.requestID)
 }
 
 func (ss *stateSyncer) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
