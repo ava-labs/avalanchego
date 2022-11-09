@@ -457,7 +457,7 @@ func (cr *ChainRouter) Unbenched(chainID ids.ID, nodeID ids.NodeID) {
 // HealthCheck returns results of router health checks. Returns:
 // 1) Information about health check results
 // 2) An error if the health check reports unhealthy
-func (cr *ChainRouter) HealthCheck() (interface{}, error) {
+func (cr *ChainRouter) HealthCheck(context.Context) (interface{}, error) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 

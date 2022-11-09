@@ -129,7 +129,7 @@ func TestTimeout(t *testing.T) {
 	bootstrapper.Default(true)
 	bootstrapper.CantGossip = false
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
-	bootstrapper.ConnectedF = func(nodeID ids.NodeID, nodeVersion *version.Application) error { return nil }
+	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error { return nil }
 	bootstrapper.QueryFailedF = func(ctx context.Context, nodeID ids.NodeID, _ uint32) error {
 		failedVDRs.Add(nodeID)
 		wg.Done()
@@ -140,8 +140,8 @@ func TestTimeout(t *testing.T) {
 
 	chainRouter.AddChain(handler)
 
-	bootstrapper.StartF = func(startReqID uint32) error { return nil }
-	handler.Start(false)
+	bootstrapper.StartF = func(context.Context, uint32) error { return nil }
+	handler.Start(context.Background(), false)
 
 	vdrIDs := ids.NodeIDSet{}
 	vdrIDs.Add(ids.NodeID{255})
@@ -246,7 +246,7 @@ func TestReliableMessages(t *testing.T) {
 	bootstrapper.Default(true)
 	bootstrapper.CantGossip = false
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx2 }
-	bootstrapper.ConnectedF = func(nodeID ids.NodeID, nodeVersion *version.Application) error { return nil }
+	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error { return nil }
 	queriesToSend := 1000
 	awaiting := make([]chan struct{}, queriesToSend)
 	for i := 0; i < queriesToSend; i++ {
@@ -262,8 +262,8 @@ func TestReliableMessages(t *testing.T) {
 
 	chainRouter.AddChain(handler)
 
-	bootstrapper.StartF = func(startReqID uint32) error { return nil }
-	handler.Start(false)
+	bootstrapper.StartF = func(context.Context, uint32) error { return nil }
+	handler.Start(context.Background(), false)
 
 	go func() {
 		for i := 0; i < queriesToSend; i++ {
@@ -363,7 +363,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	bootstrapper.Default(true)
 	bootstrapper.CantGossip = false
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx2 }
-	bootstrapper.ConnectedF = func(nodeID ids.NodeID, nodeVersion *version.Application) error { return nil }
+	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error { return nil }
 	queriesToSend := 2
 	awaiting := make([]chan struct{}, queriesToSend)
 	for i := 0; i < queriesToSend; i++ {
@@ -378,8 +378,8 @@ func TestReliableMessagesToMyself(t *testing.T) {
 
 	chainRouter.AddChain(handler)
 
-	bootstrapper.StartF = func(startReqID uint32) error { return nil }
-	handler.Start(false)
+	bootstrapper.StartF = func(context.Context, uint32) error { return nil }
+	handler.Start(context.Background(), false)
 
 	go func() {
 		for i := 0; i < queriesToSend; i++ {
