@@ -105,12 +105,13 @@ type EngineTest struct {
 
 	CantGetVM bool
 
-	StartF                                             func(startReqID uint32) error
+	StartF                                             func(ctx context.Context, startReqID uint32) error
 	IsBootstrappedF                                    func() bool
 	ContextF                                           func() *snow.ConsensusContext
 	HaltF                                              func()
-	TimeoutF, GossipF, ShutdownF                       func() error
-	NotifyF                                            func(Message) error
+	TimeoutF, GossipF                                  func() error
+	ShutdownF                                          func(ctx context.Context) error
+	NotifyF                                            func(context.Context, Message) error
 	GetF, GetAncestorsF, PullQueryF                    func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error
 	PutF, PushQueryF                                   func(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte) error
 	AncestorsF                                         func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) error
@@ -122,9 +123,9 @@ type EngineTest struct {
 	StateSummaryFrontierF                         func(ctx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) error
 	GetAcceptedStateSummaryF                      func(ctx context.Context, nodeID ids.NodeID, requestID uint32, keys []uint64) error
 	AcceptedStateSummaryF                         func(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) error
-	ConnectedF                                    func(nodeID ids.NodeID, nodeVersion *version.Application) error
-	DisconnectedF                                 func(nodeID ids.NodeID) error
-	HealthF                                       func() (interface{}, error)
+	ConnectedF                                    func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
+	DisconnectedF                                 func(ctx context.Context, nodeID ids.NodeID) error
+	HealthF                                       func(ctx context.Context) (interface{}, error)
 	GetVMF                                        func() VM
 	AppRequestF, AppResponseF                     func(ctx context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error
 	AppGossipF                                    func(ctx context.Context, nodeID ids.NodeID, msg []byte) error
@@ -176,9 +177,9 @@ func (e *EngineTest) Default(cant bool) {
 	e.CantCrossChainAppResponse = cant
 }
 
-func (e *EngineTest) Start(startReqID uint32) error {
+func (e *EngineTest) Start(ctx context.Context, startReqID uint32) error {
 	if e.StartF != nil {
-		return e.StartF(startReqID)
+		return e.StartF(ctx, startReqID)
 	}
 	if !e.CantStart {
 		return nil
@@ -238,9 +239,9 @@ func (e *EngineTest) Halt() {
 	}
 }
 
-func (e *EngineTest) Shutdown() error {
+func (e *EngineTest) Shutdown(ctx context.Context) error {
 	if e.ShutdownF != nil {
-		return e.ShutdownF()
+		return e.ShutdownF(ctx)
 	}
 	if !e.CantShutdown {
 		return nil
@@ -251,9 +252,9 @@ func (e *EngineTest) Shutdown() error {
 	return errShutdown
 }
 
-func (e *EngineTest) Notify(msg Message) error {
+func (e *EngineTest) Notify(ctx context.Context, msg Message) error {
 	if e.NotifyF != nil {
-		return e.NotifyF(msg)
+		return e.NotifyF(ctx, msg)
 	}
 	if !e.CantNotify {
 		return nil
@@ -641,9 +642,9 @@ func (e *EngineTest) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 	return errChits
 }
 
-func (e *EngineTest) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
+func (e *EngineTest) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
 	if e.ConnectedF != nil {
-		return e.ConnectedF(nodeID, nodeVersion)
+		return e.ConnectedF(ctx, nodeID, nodeVersion)
 	}
 	if !e.CantConnected {
 		return nil
@@ -654,9 +655,9 @@ func (e *EngineTest) Connected(nodeID ids.NodeID, nodeVersion *version.Applicati
 	return errConnected
 }
 
-func (e *EngineTest) Disconnected(nodeID ids.NodeID) error {
+func (e *EngineTest) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	if e.DisconnectedF != nil {
-		return e.DisconnectedF(nodeID)
+		return e.DisconnectedF(ctx, nodeID)
 	}
 	if !e.CantDisconnected {
 		return nil
@@ -667,9 +668,9 @@ func (e *EngineTest) Disconnected(nodeID ids.NodeID) error {
 	return errDisconnected
 }
 
-func (e *EngineTest) HealthCheck() (interface{}, error) {
+func (e *EngineTest) HealthCheck(ctx context.Context) (interface{}, error) {
 	if e.HealthF != nil {
-		return e.HealthF()
+		return e.HealthF(ctx)
 	}
 	if !e.CantHealth {
 		return nil, nil

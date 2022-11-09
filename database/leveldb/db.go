@@ -5,6 +5,7 @@ package leveldb
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -356,7 +357,7 @@ func (db *Database) Close() error {
 	return updateError(db.DB.Close())
 }
 
-func (db *Database) HealthCheck() (interface{}, error) {
+func (db *Database) HealthCheck(context.Context) (interface{}, error) {
 	if db.closed.GetValue() {
 		return nil, database.ErrClosed
 	}

@@ -268,12 +268,12 @@ func (t *Transitive) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byt
 	return t.VM.AppGossip(ctx, nodeID, msg)
 }
 
-func (t *Transitive) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
-	return t.VM.Connected(nodeID, nodeVersion)
+func (t *Transitive) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
+	return t.VM.Connected(ctx, nodeID, nodeVersion)
 }
 
-func (t *Transitive) Disconnected(nodeID ids.NodeID) error {
-	return t.VM.Disconnected(nodeID)
+func (t *Transitive) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+	return t.VM.Disconnected(ctx, nodeID)
 }
 
 func (t *Transitive) Timeout() error { return nil }
@@ -312,21 +312,26 @@ func (t *Transitive) Gossip() error {
 
 func (t *Transitive) Halt() {}
 
-func (t *Transitive) Shutdown() error {
+func (t *Transitive) Shutdown(ctx context.Context) error {
 	t.Ctx.Log.Info("shutting down consensus engine")
-	return t.VM.Shutdown()
+	return t.VM.Shutdown(ctx)
 }
 
-func (t *Transitive) Notify(msg common.Message) error {
+func (t *Transitive) Notify(ctx context.Context, msg common.Message) error {
 	switch msg {
 	case common.PendingTxs:
-		t.pendingTxs = append(t.pendingTxs, t.VM.PendingTxs()...)
+		txs, err := t.VM.PendingTxs(ctx)
+		if err != nil {
+			return err
+		}
+
+		t.pendingTxs = append(t.pendingTxs, txs...)
 		t.metrics.pendingTxs.Set(float64(len(t.pendingTxs)))
-		return t.attemptToIssueTxs(context.TODO())
+		return t.attemptToIssueTxs(ctx)
 
 	case common.StopVertex:
 		// stop vertex doesn't have any txs, issue directly!
-		return t.issueStopVtx(context.TODO())
+		return t.issueStopVtx(ctx)
 
 	default:
 		t.Ctx.Log.Warn("received an unexpected message from the VM",
@@ -340,7 +345,7 @@ func (t *Transitive) Context() *snow.ConsensusContext {
 	return t.Ctx
 }
 
-func (t *Transitive) Start(startReqID uint32) error {
+func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 	t.RequestID = startReqID
 	// Load the vertices that were last saved as the accepted frontier
 	edge := t.Manager.Edge()
@@ -362,16 +367,16 @@ func (t *Transitive) Start(startReqID uint32) error {
 	t.metrics.bootstrapFinished.Set(1)
 
 	t.Ctx.SetState(snow.NormalOp)
-	if err := t.VM.SetState(snow.NormalOp); err != nil {
+	if err := t.VM.SetState(ctx, snow.NormalOp); err != nil {
 		return fmt.Errorf("failed to notify VM that consensus has started: %w",
 			err)
 	}
-	return t.Consensus.Initialize(t.Ctx, t.Params, frontier)
+	return t.Consensus.Initialize(ctx, t.Ctx, t.Params, frontier)
 }
 
-func (t *Transitive) HealthCheck() (interface{}, error) {
+func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {
 	consensusIntf, consensusErr := t.Consensus.HealthCheck()
-	vmIntf, vmErr := t.VM.HealthCheck()
+	vmIntf, vmErr := t.VM.HealthCheck(ctx)
 	intf := map[string]interface{}{
 		"consensus": consensusIntf,
 		"vm":        vmIntf,

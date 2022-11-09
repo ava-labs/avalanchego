@@ -4,6 +4,7 @@
 package snowman
 
 import (
+	"context"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -31,7 +32,7 @@ type Consensus interface {
 
 	// Adds a new decision. Assumes the dependency has already been added.
 	// Returns if a critical error has occurred.
-	Add(Block) error
+	Add(context.Context, Block) error
 
 	// Decided returns true if the block has been decided.
 	Decided(Block) bool
@@ -49,7 +50,7 @@ type Consensus interface {
 
 	// RecordPoll collects the results of a network poll. Assumes all decisions
 	// have been previously added. Returns if a critical error has occurred.
-	RecordPoll(ids.Bag) error
+	RecordPoll(context.Context, ids.Bag) error
 
 	// Finalized returns true if all decisions that have been added have been
 	// finalized. Note, it is possible that after returning finalized, a new

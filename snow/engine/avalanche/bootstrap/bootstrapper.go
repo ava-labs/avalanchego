@@ -264,12 +264,16 @@ func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID
 	return b.fetch(ctx, vtxID)
 }
 
-func (b *bootstrapper) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
-	if err := b.VM.Connected(nodeID, nodeVersion); err != nil {
+func (b *bootstrapper) Connected(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	nodeVersion *version.Application,
+) error {
+	if err := b.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
 		return err
 	}
 
-	if err := b.StartupTracker.Connected(nodeID, nodeVersion); err != nil {
+	if err := b.StartupTracker.Connected(ctx, nodeID, nodeVersion); err != nil {
 		return err
 	}
 
@@ -281,12 +285,12 @@ func (b *bootstrapper) Connected(nodeID ids.NodeID, nodeVersion *version.Applica
 	return b.Startup()
 }
 
-func (b *bootstrapper) Disconnected(nodeID ids.NodeID) error {
-	if err := b.VM.Disconnected(nodeID); err != nil {
+func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+	if err := b.VM.Disconnected(ctx, nodeID); err != nil {
 		return err
 	}
 
-	return b.StartupTracker.Disconnected(nodeID)
+	return b.StartupTracker.Disconnected(ctx, nodeID)
 }
 
 func (b *bootstrapper) Timeout() error {
@@ -303,18 +307,18 @@ func (b *bootstrapper) Timeout() error {
 
 func (b *bootstrapper) Gossip() error { return nil }
 
-func (b *bootstrapper) Shutdown() error {
+func (b *bootstrapper) Shutdown(ctx context.Context) error {
 	b.Ctx.Log.Info("shutting down bootstrapper")
-	return b.VM.Shutdown()
+	return b.VM.Shutdown(ctx)
 }
 
 func (b *bootstrapper) Notify(common.Message) error { return nil }
 
-func (b *bootstrapper) Start(startReqID uint32) error {
+func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.Log.Info("starting bootstrap")
 
 	b.Ctx.SetState(snow.Bootstrapping)
-	if err := b.VM.SetState(snow.Bootstrapping); err != nil {
+	if err := b.VM.SetState(ctx, snow.Bootstrapping); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
 			err)
 	}
@@ -329,8 +333,8 @@ func (b *bootstrapper) Start(startReqID uint32) error {
 	return b.Startup()
 }
 
-func (b *bootstrapper) HealthCheck() (interface{}, error) {
-	vmIntf, vmErr := b.VM.HealthCheck()
+func (b *bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
+	vmIntf, vmErr := b.VM.HealthCheck(ctx)
 	intf := map[string]interface{}{
 		"consensus": struct{}{},
 		"vm":        vmIntf,

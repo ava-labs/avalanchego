@@ -53,7 +53,7 @@ func TestEngineShutdown(t *testing.T) {
 	vmShutdownCalled := false
 	vm := &vertex.TestVM{}
 	vm.T = t
-	vm.ShutdownF = func() error { vmShutdownCalled = true; return nil }
+	vm.ShutdownF = func(context.Context) error { vmShutdownCalled = true; return nil }
 	engCfg.VM = vm
 
 	transitive, err := newTransitive(engCfg)

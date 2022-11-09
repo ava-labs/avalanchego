@@ -4,12 +4,11 @@
 package throttling
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
-	"golang.org/x/net/context"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"

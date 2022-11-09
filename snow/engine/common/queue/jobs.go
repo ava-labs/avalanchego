@@ -4,6 +4,7 @@
 package queue
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -67,7 +68,7 @@ func (j *Jobs) PendingJobs() uint64 { return j.state.numJobs }
 
 // Push adds a new job to the queue. Returns true if [job] was added to the queue and false
 // if [job] was already in the queue.
-func (j *Jobs) Push(job Job) (bool, error) {
+func (j *Jobs) Push(ctx context.Context, job Job) (bool, error) {
 	jobID := job.ID()
 	if has, err := j.state.HasJob(jobID); err != nil {
 		return false, fmt.Errorf("failed to check for existing job %s due to %w", jobID, err)
@@ -75,7 +76,7 @@ func (j *Jobs) Push(job Job) (bool, error) {
 		return false, nil
 	}
 
-	deps, err := job.MissingDependencies()
+	deps, err := job.MissingDependencies(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -101,9 +102,9 @@ func (j *Jobs) Push(job Job) (bool, error) {
 	return true, nil
 }
 
-func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, restarted bool, acceptors ...snow.Acceptor) (int, error) {
-	ctx.Executing(true)
-	defer ctx.Executing(false)
+func (j *Jobs) ExecuteAll(ctx context.Context, chainCtx *snow.ConsensusContext, halter common.Haltable, restarted bool, acceptors ...snow.Acceptor) (int, error) {
+	chainCtx.Executing(true)
+	defer chainCtx.Executing(false)
 
 	numExecuted := 0
 	numToExecute := j.state.numJobs
@@ -120,7 +121,7 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 	j.state.DisableCaching()
 	for {
 		if halter.Halted() {
-			ctx.Log.Info("interrupted execution",
+			chainCtx.Log.Info("interrupted execution",
 				zap.Int("numExecuted", numExecuted),
 			)
 			return numExecuted, nil
@@ -135,18 +136,18 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 		}
 
 		jobID := job.ID()
-		ctx.Log.Debug("executing",
+		chainCtx.Log.Debug("executing",
 			zap.Stringer("jobID", jobID),
 		)
 		jobBytes := job.Bytes()
 		// Note that acceptor.Accept must be called before executing [job] to
 		// honor Acceptor.Accept's invariant.
 		for _, acceptor := range acceptors {
-			if err := acceptor.Accept(ctx, jobID, jobBytes); err != nil {
+			if err := acceptor.Accept(chainCtx, jobID, jobBytes); err != nil {
 				return numExecuted, err
 			}
 		}
-		if err := job.Execute(); err != nil {
+		if err := job.Execute(ctx); err != nil {
 			return 0, fmt.Errorf("failed to execute job %s due to %w", jobID, err)
 		}
 
@@ -160,7 +161,7 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 			if err != nil {
 				return 0, fmt.Errorf("failed to get job %s from blocking jobs due to %w", dependentID, err)
 			}
-			hasMissingDeps, err := job.HasMissingDependencies()
+			hasMissingDeps, err := job.HasMissingDependencies(ctx)
 			if err != nil {
 				return 0, fmt.Errorf("failed to get missing dependencies for %s due to %w", dependentID, err)
 			}
@@ -185,13 +186,13 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 			j.etaMetric.Set(float64(eta))
 
 			if !restarted {
-				ctx.Log.Info("executing operations",
+				chainCtx.Log.Info("executing operations",
 					zap.Int("numExecuted", numExecuted),
 					zap.Uint64("numToExecute", numToExecute),
 					zap.Duration("eta", eta),
 				)
 			} else {
-				ctx.Log.Debug("executing operations",
+				chainCtx.Log.Debug("executing operations",
 					zap.Int("numExecuted", numExecuted),
 					zap.Uint64("numToExecute", numToExecute),
 					zap.Duration("eta", eta),
@@ -206,11 +207,11 @@ func (j *Jobs) ExecuteAll(ctx *snow.ConsensusContext, halter common.Haltable, re
 	j.etaMetric.Set(0)
 
 	if !restarted {
-		ctx.Log.Info("executed operations",
+		chainCtx.Log.Info("executed operations",
 			zap.Int("numExecuted", numExecuted),
 		)
 	} else {
-		ctx.Log.Debug("executed operations",
+		chainCtx.Log.Debug("executed operations",
 			zap.Int("numExecuted", numExecuted),
 		)
 	}
@@ -255,9 +256,9 @@ func NewWithMissing(
 }
 
 // SetParser tells this job queue how to parse jobs from the database.
-func (jm *JobsWithMissing) SetParser(parser Parser) error {
+func (jm *JobsWithMissing) SetParser(ctx context.Context, parser Parser) error {
 	jm.state.parser = parser
-	return jm.cleanRunnableStack()
+	return jm.cleanRunnableStack(ctx)
 }
 
 func (jm *JobsWithMissing) Clear() error {
@@ -282,7 +283,7 @@ func (jm *JobsWithMissing) Has(jobID ids.ID) (bool, error) {
 
 // Push adds a new job to the queue. Returns true if [job] was added to the queue and false
 // if [job] was already in the queue.
-func (jm *JobsWithMissing) Push(job Job) (bool, error) {
+func (jm *JobsWithMissing) Push(ctx context.Context, job Job) (bool, error) {
 	jobID := job.ID()
 	if has, err := jm.Has(jobID); err != nil {
 		return false, fmt.Errorf("failed to check for existing job %s due to %w", jobID, err)
@@ -290,7 +291,7 @@ func (jm *JobsWithMissing) Push(job Job) (bool, error) {
 		return false, nil
 	}
 
-	deps, err := job.MissingDependencies()
+	deps, err := job.MissingDependencies(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -369,7 +370,7 @@ func (jm *JobsWithMissing) Commit() error {
 // without writing the state transition to the VM's database. When the node restarts, the
 // VM will not have marked the first block (the proposal block as accepted), but it could
 // have already been removed from the jobs queue. cleanRunnableStack handles this case.
-func (jm *JobsWithMissing) cleanRunnableStack() error {
+func (jm *JobsWithMissing) cleanRunnableStack(ctx context.Context) error {
 	runnableJobsIter := jm.state.runnableJobIDs.NewIterator()
 	defer runnableJobsIter.Release()
 
@@ -384,7 +385,7 @@ func (jm *JobsWithMissing) cleanRunnableStack() error {
 		if err != nil {
 			return fmt.Errorf("failed to retrieve job on runnnable stack due to: %w", err)
 		}
-		deps, err := job.MissingDependencies()
+		deps, err := job.MissingDependencies(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve missing dependencies of job on runnable stack due to: %w", err)
 		}

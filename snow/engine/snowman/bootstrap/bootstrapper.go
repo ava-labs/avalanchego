@@ -117,21 +117,21 @@ func New(config Config, onFinished func(lastReqID uint32) error) (common.Bootstr
 	return b, nil
 }
 
-func (b *bootstrapper) Start(startReqID uint32) error {
+func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.Log.Info("starting bootstrapper")
 
 	b.Ctx.SetState(snow.Bootstrapping)
-	if err := b.VM.SetState(snow.Bootstrapping); err != nil {
+	if err := b.VM.SetState(ctx, snow.Bootstrapping); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
 			err)
 	}
 
 	// Set the starting height
-	lastAcceptedID, err := b.VM.LastAccepted()
+	lastAcceptedID, err := b.VM.LastAccepted(ctx)
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted ID: %w", err)
 	}
-	lastAccepted, err := b.VM.GetBlock(lastAcceptedID)
+	lastAccepted, err := b.VM.GetBlock(ctx, lastAcceptedID)
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted block: %w", err)
 	}
@@ -184,7 +184,7 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 		)
 	}
 
-	blocks, err := block.BatchedParseBlock(b.VM, blks)
+	blocks, err := block.BatchedParseBlock(ctx, b.VM, blks)
 	if err != nil { // the provided blocks couldn't be parsed
 		b.Ctx.Log.Debug("failed to parse blocks in Ancestors",
 			zap.Stringer("nodeID", nodeID),
@@ -235,12 +235,12 @@ func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID
 	return b.fetch(ctx, blkID)
 }
 
-func (b *bootstrapper) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
-	if err := b.VM.Connected(nodeID, nodeVersion); err != nil {
+func (b *bootstrapper) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
+	if err := b.VM.Connected(ctx, nodeID, nodeVersion); err != nil {
 		return err
 	}
 
-	if err := b.StartupTracker.Connected(nodeID, nodeVersion); err != nil {
+	if err := b.StartupTracker.Connected(ctx, nodeID, nodeVersion); err != nil {
 		return err
 	}
 	// Ensure fetchFrom reflects proper validator list
@@ -256,12 +256,12 @@ func (b *bootstrapper) Connected(nodeID ids.NodeID, nodeVersion *version.Applica
 	return b.Startup()
 }
 
-func (b *bootstrapper) Disconnected(nodeID ids.NodeID) error {
-	if err := b.VM.Disconnected(nodeID); err != nil {
+func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+	if err := b.VM.Disconnected(ctx, nodeID); err != nil {
 		return err
 	}
 
-	if err := b.StartupTracker.Disconnected(nodeID); err != nil {
+	if err := b.StartupTracker.Disconnected(ctx, nodeID); err != nil {
 		return err
 	}
 
@@ -284,15 +284,15 @@ func (b *bootstrapper) Timeout() error {
 
 func (b *bootstrapper) Gossip() error { return nil }
 
-func (b *bootstrapper) Shutdown() error {
+func (b *bootstrapper) Shutdown(ctx context.Context) error {
 	b.Ctx.Log.Info("shutting down bootstrapper")
-	return b.VM.Shutdown()
+	return b.VM.Shutdown(ctx)
 }
 
 func (b *bootstrapper) Notify(common.Message) error { return nil }
 
-func (b *bootstrapper) HealthCheck() (interface{}, error) {
-	vmIntf, vmErr := b.VM.HealthCheck()
+func (b *bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
+	vmIntf, vmErr := b.VM.HealthCheck(ctx)
 	intf := map[string]interface{}{
 		"consensus": struct{}{},
 		"vm":        vmIntf,
@@ -321,7 +321,7 @@ func (b *bootstrapper) ForceAccepted(ctx context.Context, acceptedContainerIDs [
 
 		// TODO: if `GetBlock` returns an error other than
 		// `database.ErrNotFound`, then the error should be propagated.
-		blk, err := b.VM.GetBlock(blkID)
+		blk, err := b.VM.GetBlock(ctx, blkID)
 		if err != nil {
 			if err := b.fetch(context.Background(), blkID); err != nil {
 				return err
@@ -352,7 +352,7 @@ func (b *bootstrapper) fetch(ctx context.Context, blkID ids.ID) error {
 	}
 
 	// Make sure we don't already have this block
-	if _, err := b.VM.GetBlock(blkID); err == nil {
+	if _, err := b.VM.GetBlock(ctx, blkID); err == nil {
 		return b.checkFinish()
 	}
 
@@ -498,7 +498,7 @@ func (b *bootstrapper) process(ctx context.Context, blk snowman.Block, processin
 
 		// If the parent is not available in processing blocks, attempt to get
 		// the block from the vm
-		parent, err = b.VM.GetBlock(parentID)
+		parent, err = b.VM.GetBlock(ctx, parentID)
 		if err == nil {
 			blk = parent
 			continue

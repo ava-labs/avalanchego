@@ -121,7 +121,7 @@ func (i *issuer) Update(ctx context.Context) {
 	)
 
 	// Add this vertex to consensus.
-	if err := i.t.Consensus.Add(i.vtx); err != nil {
+	if err := i.t.Consensus.Add(ctx, i.vtx); err != nil {
 		i.t.errs.Add(err)
 		return
 	}

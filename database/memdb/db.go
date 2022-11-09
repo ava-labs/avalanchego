@@ -4,6 +4,7 @@
 package memdb
 
 import (
+	"context"
 	"sort"
 	"strings"
 	"sync"
@@ -157,7 +158,7 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 	return nil
 }
 
-func (db *Database) HealthCheck() (interface{}, error) {
+func (db *Database) HealthCheck(context.Context) (interface{}, error) {
 	if db.isClosed() {
 		return nil, database.ErrClosed
 	}

@@ -21,7 +21,7 @@ type Engine interface {
 	Context() *snow.ConsensusContext
 
 	// Start engine operations from given request ID
-	Start(startReqID uint32) error
+	Start(ctx context.Context, startReqID uint32) error
 
 	// Returns nil if the engine is healthy.
 	// Periodically called and reported through the health API
@@ -551,8 +551,8 @@ type InternalHandler interface {
 	// Shutdown this engine.
 	//
 	// This function will be called when the environment is exiting.
-	Shutdown() error
+	Shutdown(ctx context.Context) error
 
 	// Notify this engine of a message from the virtual machine.
-	Notify(Message) error
+	Notify(context.Context, Message) error
 }

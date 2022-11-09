@@ -125,7 +125,7 @@ func TestHealthCheck(t *testing.T) {
 			require.NoError(scenario.testFn(db))
 
 			// check db HealthCheck
-			_, err := db.HealthCheck()
+			_, err := db.HealthCheck(context.Background())
 			if err == nil && scenario.wantErr {
 				t.Fatalf("wanted error got nil")
 				return
@@ -137,7 +137,7 @@ func TestHealthCheck(t *testing.T) {
 			require.Nil(err)
 
 			// check rpc HealthCheck
-			_, err = baseDB.client.HealthCheck()
+			_, err = baseDB.client.HealthCheck(context.Background())
 			if err == nil && scenario.wantErr {
 				t.Fatalf("wanted error got nil")
 				return

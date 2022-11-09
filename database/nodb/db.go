@@ -4,6 +4,8 @@
 package nodb
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/database"
 )
 
@@ -52,7 +54,7 @@ func (*Database) Compact(_, _ []byte) error { return database.ErrClosed }
 func (*Database) Close() error { return database.ErrClosed }
 
 // HealthCheck returns error
-func (*Database) HealthCheck() (interface{}, error) { return nil, database.ErrClosed }
+func (*Database) HealthCheck(context.Context) (interface{}, error) { return nil, database.ErrClosed }
 
 // Batch does nothing
 type Batch struct{}

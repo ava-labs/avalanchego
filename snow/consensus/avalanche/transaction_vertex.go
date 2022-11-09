@@ -4,6 +4,8 @@
 package avalanche
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
@@ -45,12 +47,12 @@ func (tv *transactionVertex) ID() ids.ID {
 	return tv.vtx.ID()
 }
 
-func (tv *transactionVertex) Accept() error {
+func (tv *transactionVertex) Accept(context.Context) error {
 	tv.status = choices.Accepted
 	return nil
 }
 
-func (tv *transactionVertex) Reject() error {
+func (tv *transactionVertex) Reject(context.Context) error {
 	tv.status = choices.Rejected
 	return nil
 }

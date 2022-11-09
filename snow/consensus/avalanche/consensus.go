@@ -4,6 +4,8 @@
 package avalanche
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
@@ -23,7 +25,7 @@ type Consensus interface {
 	// called, the status maps should be immediately updated accordingly.
 	// Assumes each element in the accepted frontier will return accepted from
 	// the join status map.
-	Initialize(*snow.ConsensusContext, Parameters, []Vertex) error
+	Initialize(context.Context, *snow.ConsensusContext, Parameters, []Vertex) error
 
 	// Returns the parameters that describe this avalanche instance
 	Parameters() Parameters
@@ -38,7 +40,7 @@ type Consensus interface {
 	// Adds a new decision. Assumes the dependencies have already been added.
 	// Assumes that mutations don't conflict with themselves. Returns if a
 	// critical error has occurred.
-	Add(Vertex) error
+	Add(context.Context, Vertex) error
 
 	// VertexIssued returns true iff Vertex has been added
 	VertexIssued(Vertex) bool
@@ -59,7 +61,7 @@ type Consensus interface {
 	// RecordPoll collects the results of a network poll. If a result has not
 	// been added, the result is dropped. Returns if a critical error has
 	// occurred.
-	RecordPoll(ids.UniqueBag) error
+	RecordPoll(context.Context, ids.UniqueBag) error
 
 	// Quiesce is guaranteed to return true if the instance is finalized. It
 	// may, but doesn't need to, return true if all processing vertices are
