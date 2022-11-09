@@ -394,7 +394,7 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 	// to maintain the invariant that oracle blocks are issued in the correct
 	// preferences, we need to handle the case that we are bootstrapping into an oracle block
 	if oracleBlk, ok := lastAccepted.(snowman.OracleBlock); ok {
-		options, err := oracleBlk.Options()
+		options, err := oracleBlk.Options(ctx)
 		switch {
 		case err == snowman.ErrNotOracle:
 			// if there aren't blocks we need to deliver on startup, we need to set
@@ -791,7 +791,7 @@ func (t *Transitive) deliver(ctx context.Context, blk snowman.Block) error {
 	added := []snowman.Block{}
 	dropped := []snowman.Block{}
 	if blk, ok := blk.(snowman.OracleBlock); ok {
-		options, err := blk.Options()
+		options, err := blk.Options(ctx)
 		if err != snowman.ErrNotOracle {
 			if err != nil {
 				return err

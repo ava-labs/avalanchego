@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -22,7 +23,7 @@ func TestHealthCheckPrimaryNetwork(t *testing.T) {
 	vm.ctx.Lock.Lock()
 
 	defer func() {
-		require.NoError(vm.Shutdown())
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 	genesisState, _ := defaultGenesis()
@@ -60,7 +61,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 			vm, _, _ := defaultVM()
 			vm.ctx.Lock.Lock()
 			defer func() {
-				require.NoError(vm.Shutdown())
+				require.NoError(vm.Shutdown(context.Background()))
 				vm.ctx.Lock.Unlock()
 			}()
 			subnetID := ids.GenerateTestID()

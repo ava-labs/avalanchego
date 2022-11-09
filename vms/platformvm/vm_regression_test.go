@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -42,7 +43,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		require.NoError(vm.Shutdown())
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -207,7 +208,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 
 			vm.ctx.Lock.Lock()
 			defer func() {
-				err := vm.Shutdown()
+				err := vm.Shutdown(context.Background())
 				require.NoError(err)
 
 				vm.ctx.Lock.Unlock()
@@ -368,7 +369,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	ctx := defaultContext()
 	ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		ctx.Lock.Unlock()
@@ -471,7 +472,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	vm, baseDB, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
+		err := vm.Shutdown(context.Background())
 		require.NoError(err)
 
 		vm.ctx.Lock.Unlock()
@@ -690,7 +691,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	vm, baseDB, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
+		err := vm.Shutdown(context.Background())
 		require.NoError(err)
 
 		vm.ctx.Lock.Unlock()
@@ -1014,7 +1015,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
+		err := vm.Shutdown(context.Background())
 		require.NoError(err)
 
 		vm.ctx.Lock.Unlock()
@@ -1154,7 +1155,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
+		err := vm.Shutdown(context.Background())
 		require.NoError(err)
 
 		vm.ctx.Lock.Unlock()

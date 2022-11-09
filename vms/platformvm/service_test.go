@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -135,7 +136,7 @@ func TestExportKey(t *testing.T) {
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		if err := service.vm.Shutdown(); err != nil {
+		if err := service.vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		service.vm.ctx.Lock.Unlock()
@@ -162,7 +163,7 @@ func TestImportKey(t *testing.T) {
 	service, _ := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		if err := service.vm.Shutdown(); err != nil {
+		if err := service.vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		service.vm.ctx.Lock.Unlock()
@@ -183,7 +184,7 @@ func TestGetTxStatus(t *testing.T) {
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		if err := service.vm.Shutdown(); err != nil {
+		if err := service.vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		service.vm.ctx.Lock.Unlock()
@@ -407,7 +408,7 @@ func TestGetTx(t *testing.T) {
 				}
 			}
 
-			if err := service.vm.Shutdown(); err != nil {
+			if err := service.vm.Shutdown(context.Background()); err != nil {
 				t.Fatal(err)
 			}
 			service.vm.ctx.Lock.Unlock()
@@ -421,7 +422,7 @@ func TestGetBalance(t *testing.T) {
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		if err := service.vm.Shutdown(); err != nil {
+		if err := service.vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		service.vm.ctx.Lock.Unlock()
@@ -460,7 +461,7 @@ func TestGetStake(t *testing.T) {
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		require.NoError(service.vm.Shutdown())
+		require.NoError(service.vm.Shutdown(context.Background()))
 		service.vm.ctx.Lock.Unlock()
 	}()
 
@@ -625,7 +626,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		if err := service.vm.Shutdown(); err != nil {
+		if err := service.vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		service.vm.ctx.Lock.Unlock()
@@ -758,7 +759,7 @@ func TestGetTimestamp(t *testing.T) {
 	service, _ := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		require.NoError(service.vm.Shutdown())
+		require.NoError(service.vm.Shutdown(context.Background()))
 		service.vm.ctx.Lock.Unlock()
 	}()
 

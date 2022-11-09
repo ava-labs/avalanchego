@@ -4,6 +4,8 @@
 package metervm
 
 import (
+	"context"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
@@ -46,7 +48,8 @@ func NewBlockVM(vm block.ChainVM) block.ChainVM {
 }
 
 func (vm *blockVM) Initialize(
-	ctx *snow.Context,
+	ctx context.Context,
+	chainCtx *snow.Context,
 	db manager.Manager,
 	genesisBytes,
 	upgradeBytes,
@@ -75,17 +78,17 @@ func (vm *blockVM) Initialize(
 	if err := multiGatherer.Register("", optionalGatherer); err != nil {
 		return err
 	}
-	if err := ctx.Metrics.Register(multiGatherer); err != nil {
+	if err := chainCtx.Metrics.Register(multiGatherer); err != nil {
 		return err
 	}
-	ctx.Metrics = optionalGatherer
+	chainCtx.Metrics = optionalGatherer
 
-	return vm.ChainVM.Initialize(ctx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender)
+	return vm.ChainVM.Initialize(ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender)
 }
 
-func (vm *blockVM) BuildBlock() (snowman.Block, error) {
+func (vm *blockVM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 	start := vm.clock.Time()
-	blk, err := vm.ChainVM.BuildBlock()
+	blk, err := vm.ChainVM.BuildBlock(ctx)
 	end := vm.clock.Time()
 	duration := float64(end.Sub(start))
 	if err != nil {
@@ -99,9 +102,9 @@ func (vm *blockVM) BuildBlock() (snowman.Block, error) {
 	}, nil
 }
 
-func (vm *blockVM) ParseBlock(b []byte) (snowman.Block, error) {
+func (vm *blockVM) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error) {
 	start := vm.clock.Time()
-	blk, err := vm.ChainVM.ParseBlock(b)
+	blk, err := vm.ChainVM.ParseBlock(ctx, b)
 	end := vm.clock.Time()
 	duration := float64(end.Sub(start))
 	if err != nil {
@@ -115,9 +118,9 @@ func (vm *blockVM) ParseBlock(b []byte) (snowman.Block, error) {
 	}, nil
 }
 
-func (vm *blockVM) GetBlock(id ids.ID) (snowman.Block, error) {
+func (vm *blockVM) GetBlock(ctx context.Context, id ids.ID) (snowman.Block, error) {
 	start := vm.clock.Time()
-	blk, err := vm.ChainVM.GetBlock(id)
+	blk, err := vm.ChainVM.GetBlock(ctx, id)
 	end := vm.clock.Time()
 	duration := float64(end.Sub(start))
 	if err != nil {
@@ -131,17 +134,17 @@ func (vm *blockVM) GetBlock(id ids.ID) (snowman.Block, error) {
 	}, nil
 }
 
-func (vm *blockVM) SetPreference(id ids.ID) error {
+func (vm *blockVM) SetPreference(ctx context.Context, id ids.ID) error {
 	start := vm.clock.Time()
-	err := vm.ChainVM.SetPreference(id)
+	err := vm.ChainVM.SetPreference(ctx, id)
 	end := vm.clock.Time()
 	vm.blockMetrics.setPreference.Observe(float64(end.Sub(start)))
 	return err
 }
 
-func (vm *blockVM) LastAccepted() (ids.ID, error) {
+func (vm *blockVM) LastAccepted(ctx context.Context) (ids.ID, error) {
 	start := vm.clock.Time()
-	lastAcceptedID, err := vm.ChainVM.LastAccepted()
+	lastAcceptedID, err := vm.ChainVM.LastAccepted(ctx)
 	end := vm.clock.Time()
 	vm.blockMetrics.lastAccepted.Observe(float64(end.Sub(start)))
 	return lastAcceptedID, err

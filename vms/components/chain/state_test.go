@@ -5,6 +5,7 @@ package chain
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -267,14 +268,14 @@ func TestState(t *testing.T) {
 	if err != nil {
 		t.Fatal("Failed to parse blk1 due to: %w", err)
 	}
-	if err := parsedBlk1.Verify(); err != nil {
+	if err := parsedBlk1.Verify(context.Background()); err != nil {
 		t.Fatal("Parsed blk1 failed verification unexpectedly due to %w", err)
 	}
 	parsedBlk2, err := chainState.ParseBlock(blk2.Bytes())
 	if err != nil {
 		t.Fatalf("Failed to parse blk2 due to: %s", err)
 	}
-	if err := parsedBlk2.Verify(); err != nil {
+	if err := parsedBlk2.Verify(context.Background()); err != nil {
 		t.Fatalf("Parsed blk2 failed verification unexpectedly due to %s", err)
 	}
 
@@ -299,7 +300,7 @@ func TestState(t *testing.T) {
 		t.Fatalf("Expected State to have 2 processing blocks, but found: %d", numProcessing)
 	}
 
-	if err := parsedBlk3.Verify(); err != nil {
+	if err := parsedBlk3.Verify(context.Background()); err != nil {
 		t.Fatalf("Parsed blk3 failed verification unexpectedly due to %s", err)
 	}
 	// Check that blk3 has been added to processing blocks.
@@ -308,13 +309,13 @@ func TestState(t *testing.T) {
 	}
 
 	// Decide the blocks and ensure they are removed from the processing blocks map
-	if err := parsedBlk1.Accept(); err != nil {
+	if err := parsedBlk1.Accept(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if err := parsedBlk2.Accept(); err != nil {
+	if err := parsedBlk2.Accept(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if err := parsedBlk3.Reject(); err != nil {
+	if err := parsedBlk3.Reject(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -373,14 +374,14 @@ func TestBuildBlock(t *testing.T) {
 	}
 	require.Len(t, chainState.verifiedBlocks, 0)
 
-	if err := builtBlk.Verify(); err != nil {
+	if err := builtBlk.Verify(context.Background()); err != nil {
 		t.Fatalf("Built block failed verification due to %s", err)
 	}
 	require.Len(t, chainState.verifiedBlocks, 1)
 
 	checkProcessingBlock(t, chainState, builtBlk)
 
-	if err := builtBlk.Accept(); err != nil {
+	if err := builtBlk.Accept(context.Background()); err != nil {
 		t.Fatalf("Unexpected error while accepting built block %s", err)
 	}
 
@@ -415,7 +416,7 @@ func TestStateDecideBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := badBlk.Verify(); err == nil {
+	if err := badBlk.Verify(context.Background()); err == nil {
 		t.Fatal("Bad block should have failed verification")
 	}
 	// Ensure a block that fails verification is not marked as processing
@@ -426,12 +427,12 @@ func TestStateDecideBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := badBlk.Verify(); err != nil {
+	if err := badBlk.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	require.Len(t, chainState.verifiedBlocks, 1)
 
-	if err := badBlk.Accept(); err == nil {
+	if err := badBlk.Accept(context.Background()); err == nil {
 		t.Fatal("Block should have errored on Accept")
 	}
 
@@ -440,7 +441,7 @@ func TestStateDecideBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := badBlk.Verify(); err != nil {
+	if err := badBlk.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	// Note: an error during block Accept/Reject is fatal, so it is undefined whether
@@ -450,7 +451,7 @@ func TestStateDecideBlock(t *testing.T) {
 		t.Fatalf("Expected number of processing blocks to be either 1 or 2, but found %d", numProcessing)
 	}
 
-	if err := badBlk.Reject(); err == nil {
+	if err := badBlk.Reject(context.Background()); err == nil {
 		t.Fatal("Block should have errored on Reject")
 	}
 }
@@ -788,10 +789,10 @@ func TestSetLastAcceptedBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal("Failed to parse postSetBlk2 due to: %w", err)
 	}
-	if err := parsedpostSetBlk2.Verify(); err != nil {
+	if err := parsedpostSetBlk2.Verify(context.Background()); err != nil {
 		t.Fatal("Parsed postSetBlk2 failed verification unexpectedly due to %w", err)
 	}
-	if err := parsedpostSetBlk2.Accept(); err != nil {
+	if err := parsedpostSetBlk2.Accept(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	lastAcceptedID, err = chainState.LastAccepted()
@@ -840,7 +841,7 @@ func TestSetLastAcceptedBlockWithProcessingBlocksErrors(t *testing.T) {
 	}
 	require.Len(t, chainState.verifiedBlocks, 0)
 
-	if err := builtBlk.Verify(); err != nil {
+	if err := builtBlk.Verify(context.Background()); err != nil {
 		t.Fatalf("Built block failed verification due to %s", err)
 	}
 	require.Len(t, chainState.verifiedBlocks, 1)
