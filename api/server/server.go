@@ -231,7 +231,7 @@ func (s *server) registerChain(chainName string, engine common.Engine) {
 
 	ctx := engine.Context()
 	ctx.Lock.Lock()
-	handlers, err = engine.GetVM().CreateHandlers()
+	handlers, err = engine.GetVM().CreateHandlers(context.TODO())
 	ctx.Lock.Unlock()
 	if err != nil {
 		s.log.Error("failed to create handlers",
