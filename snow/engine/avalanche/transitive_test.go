@@ -771,7 +771,7 @@ func TestEngineAbandonResponse(t *testing.T) {
 		TxsV:     []snowstorm.Tx{tx0},
 	}
 
-	manager.GetVtxF = func(_ context.Context, id ids.ID) (avalanche.Vertex, error) {
+	manager.GetVtxF = func(context.Context, ids.ID) (avalanche.Vertex, error) {
 		return nil, errUnknownVertex
 	}
 
