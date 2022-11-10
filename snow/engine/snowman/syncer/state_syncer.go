@@ -565,7 +565,7 @@ func (ss *stateSyncer) Shutdown(ctx context.Context) error {
 
 func (ss *stateSyncer) Halt() {}
 
-func (ss *stateSyncer) Timeout(ctx context.Context) error { return nil }
+func (ss *stateSyncer) Timeout(context.Context) error { return nil }
 
 func (ss *stateSyncer) HealthCheck(ctx context.Context) (interface{}, error) {
 	vmIntf, vmErr := ss.VM.HealthCheck(ctx)
