@@ -113,7 +113,7 @@ func TestShutdown(t *testing.T) {
 
 	chainRouter.AddChain(handler)
 
-	bootstrapper.StartF = func(_ context.Context, startReqID uint32) error { return nil }
+	bootstrapper.StartF = func(context.Context, uint32) error { return nil }
 	handler.Start(context.Background(), false)
 
 	chainRouter.Shutdown()

@@ -92,7 +92,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	msg = mc.InboundGetAccepted(chainID, reqID, 1*time.Second, nil, nodeID)
 	handler.Push(context.Background(), msg)
 
-	bootstrapper.StartF = func(_ context.Context, startReqID uint32) error { return nil }
+	bootstrapper.StartF = func(context.Context, uint32) error { return nil }
 
 	handler.Start(context.Background(), false)
 
@@ -163,7 +163,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	// should normally be handled
 	ctx.SetState(snow.Bootstrapping)
 
-	bootstrapper.StartF = func(_ context.Context, startReqID uint32) error { return nil }
+	bootstrapper.StartF = func(context.Context, uint32) error { return nil }
 
 	handler.Start(context.Background(), false)
 
@@ -225,7 +225,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	handler.SetBootstrapper(bootstrapper)
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
 
-	bootstrapper.StartF = func(_ context.Context, startReqID uint32) error { return nil }
+	bootstrapper.StartF = func(context.Context, uint32) error { return nil }
 
 	handler.Start(context.Background(), false)
 
@@ -290,7 +290,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	handler.SetConsensus(engine)
 	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
 
-	bootstrapper.StartF = func(_ context.Context, startReqID uint32) error { return nil }
+	bootstrapper.StartF = func(context.Context, uint32) error { return nil }
 
 	handler.Start(context.Background(), false)
 	msgFromVMChan <- 0
