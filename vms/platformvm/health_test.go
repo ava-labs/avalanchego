@@ -28,9 +28,9 @@ func TestHealthCheckPrimaryNetwork(t *testing.T) {
 	}()
 	genesisState, _ := defaultGenesis()
 	for index, validator := range genesisState.Validators {
-		err := vm.Connected(validator.NodeID, version.CurrentApp)
+		err := vm.Connected(context.Background(), validator.NodeID, version.CurrentApp)
 		require.NoError(err)
-		details, err := vm.HealthCheck()
+		details, err := vm.HealthCheck(context.Background())
 		if float64((index+1)*20) >= defaultMinConnectedStake*100 {
 			require.NoError(err)
 		} else {
@@ -78,7 +78,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 			// connect to all primary network validators first
 			genesisState, _ := defaultGenesis()
 			for _, validator := range genesisState.Validators {
-				err := vm.Connected(validator.NodeID, version.CurrentApp)
+				err := vm.Connected(context.Background(), validator.NodeID, version.CurrentApp)
 				require.NoError(err)
 			}
 			var expectedMinStake float64
@@ -91,9 +91,9 @@ func TestHealthCheckSubnet(t *testing.T) {
 				}
 			}
 			for index, validator := range vals.List() {
-				err := vm.Connected(validator.ID(), version.CurrentApp)
+				err := vm.Connected(context.Background(), validator.ID(), version.CurrentApp)
 				require.NoError(err)
-				details, err := vm.HealthCheck()
+				details, err := vm.HealthCheck(context.Background())
 				connectedPerc := float64((index + 1) * (100 / testVdrCount))
 				if connectedPerc >= expectedMinStake*100 {
 					require.NoError(err)

@@ -886,6 +886,7 @@ func (m *manager) createSnowmanChain(
 		vm = metervm.NewBlockVM(vm)
 	}
 	if err := vm.Initialize(
+		context.TODO(),
 		ctx.Context,
 		vmDBManager,
 		genesisData,

@@ -4,19 +4,21 @@
 package platformvm
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"go.uber.org/zap"
+
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 const fallbackMinPercentConnected = 0.8
 
 var errNotEnoughStake = errors.New("not connected to enough stake")
 
-func (vm *VM) HealthCheck() (interface{}, error) {
+func (vm *VM) HealthCheck(context.Context) (interface{}, error) {
 	// Returns nil if this node is connected to > alpha percent of the Primary Network's stake
 	primaryPercentConnected, err := vm.getPercentConnected(constants.PrimaryNetworkID)
 	if err != nil {

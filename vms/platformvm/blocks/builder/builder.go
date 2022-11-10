@@ -4,6 +4,7 @@
 package builder
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -53,7 +54,7 @@ type Builder interface {
 
 	// BuildBlock is called on timer clock to attempt to create
 	// next block
-	BuildBlock() (snowman.Block, error)
+	BuildBlock(context.Context) (snowman.Block, error)
 
 	// Shutdown cleanly shuts Builder down
 	Shutdown()
@@ -150,7 +151,7 @@ func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 // BuildBlock builds a block to be added to consensus.
 // This method removes the transactions from the returned
 // blocks from the mempool.
-func (b *builder) BuildBlock() (snowman.Block, error) {
+func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	b.Mempool.DisableAdding()
 	defer func() {
 		b.Mempool.EnableAdding()

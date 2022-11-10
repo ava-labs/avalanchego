@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -325,7 +326,7 @@ func (vm *VM) SetState(state snow.State) error {
 }
 
 // Shutdown this blockchain
-func (vm *VM) Shutdown() error {
+func (vm *VM) Shutdown(context.Context) error {
 	if vm.dbManager == nil {
 		return nil
 	}
@@ -370,7 +371,7 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	return vm.manager.NewBlock(statelessBlk), nil
 }
 
-func (vm *VM) GetBlock(blkID ids.ID) (snowman.Block, error) {
+func (vm *VM) GetBlock(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 	return vm.manager.GetBlock(blkID)
 }
 
@@ -392,7 +393,7 @@ func (vm *VM) Version() (string, error) {
 // CreateHandlers returns a map where:
 // * keys are API endpoint extensions
 // * values are API handlers
-func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
+func (vm *VM) CreateHandlers(context.Context) (map[string]*common.HTTPHandler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
@@ -418,7 +419,7 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 // CreateStaticHandlers returns a map where:
 // * keys are API endpoint extensions
 // * values are API handlers
-func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
+func (vm *VM) CreateStaticHandlers(context.Context) (map[string]*common.HTTPHandler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
@@ -434,11 +435,11 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	}, nil
 }
 
-func (vm *VM) Connected(vdrID ids.NodeID, _ *version.Application) error {
+func (vm *VM) Connected(_ context.Context, vdrID ids.NodeID, _ *version.Application) error {
 	return vm.uptimeManager.Connect(vdrID)
 }
 
-func (vm *VM) Disconnected(vdrID ids.NodeID) error {
+func (vm *VM) Disconnected(_ context.Context, vdrID ids.NodeID) error {
 	if err := vm.uptimeManager.Disconnect(vdrID); err != nil {
 		return err
 	}
