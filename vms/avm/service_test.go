@@ -970,7 +970,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(txs) != 2 {
-		t.Fatalf("Should have returned %d tx(s)", 1)
+		t.Fatalf("Should have returned %d tx(s)", 2)
 	}
 
 	reply := api.GetTxReply{}
@@ -1083,7 +1083,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(txs) != 2 {
-		t.Fatalf("Should have returned %d tx(s)", 1)
+		t.Fatalf("Should have returned %d tx(s)", 2)
 	}
 
 	reply := api.GetTxReply{}
@@ -1192,7 +1192,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(txs) != 2 {
-		t.Fatalf("Should have returned %d tx(s)", 1)
+		t.Fatalf("Should have returned %d tx(s)", 2)
 	}
 
 	reply := api.GetTxReply{}
@@ -1307,7 +1307,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(txs) != 2 {
-		t.Fatalf("Should have returned %d tx(s)", 1)
+		t.Fatalf("Should have returned %d tx(s)", 2)
 	}
 
 	reply := api.GetTxReply{}
@@ -1416,7 +1416,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(txs) != 2 {
-		t.Fatalf("Should have returned %d tx(s)", 1)
+		t.Fatalf("Should have returned %d tx(s)", 2)
 	}
 
 	reply := api.GetTxReply{}
@@ -1530,7 +1530,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 		t.Fatal(err)
 	}
 	if len(txs) != 2 {
-		t.Fatalf("Should have returned %d tx(s)", 1)
+		t.Fatalf("Should have returned %d tx(s)", 2)
 	}
 
 	reply := api.GetTxReply{}
