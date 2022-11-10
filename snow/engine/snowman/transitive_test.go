@@ -176,7 +176,7 @@ func TestEngineAdd(t *testing.T) {
 		t.Fatalf("Should have been blocking on request")
 	}
 
-	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+	vm.ParseBlockF = func(context.Context, []byte) (snowman.Block, error) {
 		return nil, errUnknownBytes
 	}
 
