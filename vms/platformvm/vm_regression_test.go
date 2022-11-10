@@ -73,7 +73,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require.NoError(err)
 	require.NoError(addValidatorBlock.Verify(context.Background()))
 	require.NoError(addValidatorBlock.Accept(context.Background()))
-	require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	vm.clock.Set(validatorStartTime)
 
@@ -81,7 +81,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require.NoError(err)
 	require.NoError(firstAdvanceTimeBlock.Verify(context.Background()))
 	require.NoError(firstAdvanceTimeBlock.Accept(context.Background()))
-	require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	firstDelegatorStartTime := validatorStartTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	firstDelegatorEndTime := firstDelegatorStartTime.Add(vm.MinStakeDuration)
@@ -105,7 +105,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require.NoError(err)
 	require.NoError(addFirstDelegatorBlock.Verify(context.Background()))
 	require.NoError(addFirstDelegatorBlock.Accept(context.Background()))
-	require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	vm.clock.Set(firstDelegatorStartTime)
 
@@ -113,7 +113,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require.NoError(err)
 	require.NoError(secondAdvanceTimeBlock.Verify(context.Background()))
 	require.NoError(secondAdvanceTimeBlock.Accept(context.Background()))
-	require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	secondDelegatorStartTime := firstDelegatorEndTime.Add(2 * time.Second)
 	secondDelegatorEndTime := secondDelegatorStartTime.Add(vm.MinStakeDuration)
@@ -139,7 +139,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require.NoError(err)
 	require.NoError(addSecondDelegatorBlock.Verify(context.Background()))
 	require.NoError(addSecondDelegatorBlock.Accept(context.Background()))
-	require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	thirdDelegatorStartTime := firstDelegatorEndTime.Add(-time.Second)
 	thirdDelegatorEndTime := thirdDelegatorStartTime.Add(vm.MinStakeDuration)
@@ -242,7 +242,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 			require.NoError(addValidatorBlock.Verify(context.Background()))
 			require.NoError(addValidatorBlock.Accept(context.Background()))
-			require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+			require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 			// create valid tx
 			addFirstDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -265,7 +265,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 			require.NoError(addFirstDelegatorBlock.Verify(context.Background()))
 			require.NoError(addFirstDelegatorBlock.Accept(context.Background()))
-			require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+			require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 			// create valid tx
 			addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -288,7 +288,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 			require.NoError(addSecondDelegatorBlock.Verify(context.Background()))
 			require.NoError(addSecondDelegatorBlock.Accept(context.Background()))
-			require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+			require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 			// create valid tx
 			addThirdDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -311,7 +311,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 			require.NoError(addThirdDelegatorBlock.Verify(context.Background()))
 			require.NoError(addThirdDelegatorBlock.Accept(context.Background()))
-			require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+			require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 			// create valid tx
 			addFourthDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -340,7 +340,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 			require.NoError(addFourthDelegatorBlock.Verify(context.Background()))
 			require.NoError(addFourthDelegatorBlock.Accept(context.Background()))
-			require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+			require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 		})
 	}
 }
@@ -376,7 +376,18 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	}()
 
 	msgChan := make(chan common.Message, 1)
-	if err := vm.Initialize(ctx, baseDBManager, genesisBytes, nil, nil, msgChan, nil, nil); err != nil {
+	err := vm.Initialize(
+		context.Background(),
+		ctx,
+		baseDBManager,
+		genesisBytes,
+		nil,
+		nil,
+		msgChan,
+		nil,
+		nil,
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -450,13 +461,13 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	require.NoError(err)
 	addSubnetBlk2 := vm.manager.NewBlock(statelessStandardBlk)
 
-	_, err = vm.ParseBlock(addSubnetBlk0.Bytes())
+	_, err = vm.ParseBlock(context.Background(), addSubnetBlk0.Bytes())
 	require.NoError(err)
 
-	_, err = vm.ParseBlock(addSubnetBlk1.Bytes())
+	_, err = vm.ParseBlock(context.Background(), addSubnetBlk1.Bytes())
 	require.NoError(err)
 
-	_, err = vm.ParseBlock(addSubnetBlk2.Bytes())
+	_, err = vm.ParseBlock(context.Background(), addSubnetBlk2.Bytes())
 	require.NoError(err)
 
 	require.NoError(addSubnetBlk0.Verify(context.Background()))
@@ -1078,7 +1089,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	addValidatorProposalBlk0 := vm.manager.NewBlock(statelessStandardBlk)
 	require.NoError(addValidatorProposalBlk0.Verify(context.Background()))
 	require.NoError(addValidatorProposalBlk0.Accept(context.Background()))
-	require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	currentHeight, err = vm.GetCurrentHeight()
 	require.NoError(err)
@@ -1111,7 +1122,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	advanceTimeProposalBlk0 := vm.manager.NewBlock(statelessStandardBlk)
 	require.NoError(advanceTimeProposalBlk0.Verify(context.Background()))
 	require.NoError(advanceTimeProposalBlk0.Accept(context.Background()))
-	require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	currentHeight, err = vm.GetCurrentHeight()
 	require.NoError(err)
@@ -1189,7 +1200,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	require.NoError(err)
 	require.NoError(addValidatorBlock.Verify(context.Background()))
 	require.NoError(addValidatorBlock.Accept(context.Background()))
-	require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	// create valid tx
 	addFirstDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -1212,7 +1223,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	require.NoError(err)
 	require.NoError(addFirstDelegatorBlock.Verify(context.Background()))
 	require.NoError(addFirstDelegatorBlock.Accept(context.Background()))
-	require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	// create valid tx
 	addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(

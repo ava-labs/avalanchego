@@ -84,7 +84,7 @@ type GetHeightResponse struct {
 // GetHeight returns the height of the last accepted block
 func (service *Service) GetHeight(r *http.Request, args *struct{}, response *GetHeightResponse) error {
 	ctx := r.Context()
-	lastAcceptedID, err := service.vm.LastAccepted()
+	lastAcceptedID, err := service.vm.LastAccepted(ctx)
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted block ID: %w", err)
 	}
@@ -1739,7 +1739,7 @@ func (service *Service) GetBlockchainStatus(r *http.Request, args *GetBlockchain
 	}
 
 	ctx := r.Context()
-	lastAcceptedID, err := service.vm.LastAccepted()
+	lastAcceptedID, err := service.vm.LastAccepted(ctx)
 	if err != nil {
 		return fmt.Errorf("problem loading last accepted ID: %w", err)
 	}
