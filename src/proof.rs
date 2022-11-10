@@ -16,6 +16,9 @@ pub enum ProofError {
     ProofNodeMissing,
 }
 
+const EXT_NODE_SIZE: usize = 2;
+const BRANCH_NODE_SIZE: usize = 17;
+
 /// SubProof contains the RLP encoding and the hash value of a node that maps
 /// to a single proof step. If reaches an end step during proof verification,
 /// the hash value will be none, and the RLP encoding will be the value of the
@@ -65,7 +68,7 @@ impl Proof {
         let rlp = rlp::Rlp::new(buf);
         let size = rlp.item_count().unwrap();
         match size {
-            2 => {
+            EXT_NODE_SIZE => {
                 let cur_key_path: Vec<_> = to_nibbles(&rlp.at(0).unwrap().as_val::<Vec<u8>>().unwrap()).collect();
                 let (cur_key_path, term) = PartialPath::decode(cur_key_path);
                 let cur_key = cur_key_path.into_inner();
@@ -87,7 +90,7 @@ impl Proof {
                     self.generate_subproof(data).map(|subproof| (subproof, cur_key.len()))
                 }
             }
-            17 => {
+            BRANCH_NODE_SIZE => {
                 if key.is_empty() {
                     return Err(ProofError::NoSuchNode)
                 }

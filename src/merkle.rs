@@ -1480,7 +1480,11 @@ impl Merkle {
     /// If the trie does not contain a value for key, the returned proof contains
     /// all nodes of the longest existing prefix of the key, ending with the node
     /// that proves the absence of the key (at least the root node).
-    pub fn prove<K: AsRef<[u8]>, T: ValueTransformer>(&self, key: K, root: ObjPtr<Node>) -> Result<Proof, MerkleError> {
+    pub fn prove<K, T>(&self, key: K, root: ObjPtr<Node>) -> Result<Proof, MerkleError>
+    where
+        K: AsRef<[u8]>,
+        T: ValueTransformer,
+    {
         let mut chunks = Vec::new();
         chunks.extend(to_nibbles(key.as_ref()));
 
