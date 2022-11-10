@@ -79,7 +79,7 @@ type stateSyncer struct {
 	weightedSummaries map[ids.ID]*weightedSummary
 
 	// summaries received may be different even if referring to the same height
-	// we keep a list of deduplcated height ready for voting
+	// we keep a list of deduplicated height ready for voting
 	summariesHeights       map[uint64]struct{}
 	uniqueSummariesHeights []uint64
 
@@ -89,7 +89,7 @@ type stateSyncer struct {
 
 func New(
 	cfg Config,
-	onDoneStateSyncing func(context.Context, uint32) error,
+	onDoneStateSyncing func(ctx context.Context, lastReqID uint32) error,
 ) common.StateSyncer {
 	ssVM, _ := cfg.VM.(block.StateSyncableVM)
 	return &stateSyncer{
