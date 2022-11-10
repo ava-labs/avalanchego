@@ -772,7 +772,7 @@ func (n *Node) initVMs() error {
 	// Register the VMs that Avalanche supports
 	errs := wrappers.Errs{}
 	errs.Add(
-		vmRegisterer.Register(constants.PlatformVMID, &platformvm.Factory{
+		vmRegisterer.Register(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
 			Config: config.Config{
 				Chains:                          n.chainManager,
 				Validators:                      vdrs,
@@ -803,11 +803,11 @@ func (n *Node) initVMs() error {
 				MinPercentConnectedStakeHealthy: n.Config.MinPercentConnectedStakeHealthy,
 			},
 		}),
-		vmRegisterer.Register(constants.AVMID, &avm.Factory{
+		vmRegisterer.Register(context.TODO(), constants.AVMID, &avm.Factory{
 			TxFee:            n.Config.TxFee,
 			CreateAssetTxFee: n.Config.CreateAssetTxFee,
 		}),
-		vmRegisterer.Register(constants.EVMID, &coreth.Factory{}),
+		vmRegisterer.Register(context.TODO(), constants.EVMID, &coreth.Factory{}),
 		n.Config.VMManager.RegisterFactory(context.TODO(), secp256k1fx.ID, &secp256k1fx.Factory{}),
 		n.Config.VMManager.RegisterFactory(context.TODO(), nftfx.ID, &nftfx.Factory{}),
 		n.Config.VMManager.RegisterFactory(context.TODO(), propertyfx.ID, &propertyfx.Factory{}),
@@ -828,7 +828,7 @@ func (n *Node) initVMs() error {
 	})
 
 	// register any vms that need to be installed as plugins from disk
-	_, failedVMs, err := n.VMRegistry.Reload()
+	_, failedVMs, err := n.VMRegistry.Reload(context.TODO())
 	for failedVM, err := range failedVMs {
 		n.Log.Error("failed to register VM",
 			zap.Stringer("vmID", failedVM),
