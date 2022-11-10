@@ -234,7 +234,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	bs, err := New(
 		context.Background(),
 		config,
-		func(ctx context.Context, lastReqID uint32) error {
+		func(context.Context, uint32) error {
 			config.Ctx.SetState(snow.NormalOp)
 			return nil
 		},
@@ -336,7 +336,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	bs, err := New(
 		context.Background(),
 		config,
-		func(ctx context.Context, lastReqID uint32) error {
+		func(context.Context, uint32) error {
 			config.Ctx.SetState(snow.NormalOp)
 			return nil
 		},
@@ -495,7 +495,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	bs, err := New(
 		context.Background(),
 		config,
-		func(ctx context.Context, lastReqID uint32) error {
+		func(context.Context, uint32) error {
 			config.Ctx.SetState(snow.NormalOp)
 			return nil
 		},
@@ -657,7 +657,7 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	bs, err := New(
 		context.Background(),
 		config,
-		func(ctx context.Context, lastReqID uint32) error {
+		func(context.Context, uint32) error {
 			config.Ctx.SetState(snow.NormalOp)
 			return nil
 		},
@@ -841,7 +841,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 	bs, err := New(
 		context.Background(),
 		config,
-		func(ctx context.Context, lastReqID uint32) error {
+		func(context.Context, uint32) error {
 			config.Ctx.SetState(snow.NormalOp)
 			return nil
 		},
@@ -982,7 +982,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	bs, err := New(
 		context.Background(),
 		config,
-		func(ctx context.Context, lastReqID uint32) error {
+		func(context.Context, uint32) error {
 			config.Ctx.SetState(snow.NormalOp)
 			return nil
 		},
@@ -1190,7 +1190,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	bsIntf, err := New(
 		context.Background(),
 		config,
-		func(ctx context.Context, lastReqID uint32) error {
+		func(context.Context, uint32) error {
 			config.Ctx.SetState(snow.NormalOp)
 			return nil
 		},
@@ -1328,7 +1328,7 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 	bsIntf, err := New(
 		context.Background(),
 		config,
-		func(ctx context.Context, lastReqID uint32) error {
+		func(context.Context, uint32) error {
 			config.Ctx.SetState(snow.NormalOp)
 			return nil
 		},
@@ -1413,7 +1413,7 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 	bsIntf, err := New(
 		context.Background(),
 		config,
-		func(ctx context.Context, lastReqID uint32) error {
+		func(context.Context, uint32) error {
 			config.Ctx.SetState(snow.NormalOp)
 			return nil
 		},
