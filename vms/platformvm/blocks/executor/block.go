@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -26,7 +27,7 @@ type Block struct {
 	manager *manager
 }
 
-func (b *Block) Verify() error {
+func (b *Block) Verify(context.Context) error {
 	blkID := b.ID()
 	if _, ok := b.manager.blkIDToState[blkID]; ok {
 		// This block has already been verified.
@@ -36,11 +37,11 @@ func (b *Block) Verify() error {
 	return b.Visit(b.manager.verifier)
 }
 
-func (b *Block) Accept() error {
+func (b *Block) Accept(context.Context) error {
 	return b.Visit(b.manager.acceptor)
 }
 
-func (b *Block) Reject() error {
+func (b *Block) Reject(context.Context) error {
 	return b.Visit(b.manager.rejector)
 }
 
@@ -81,7 +82,7 @@ func (b *Block) Timestamp() time.Time {
 	return b.manager.getTimestamp(b.ID())
 }
 
-func (b *Block) Options() ([2]snowman.Block, error) {
+func (b *Block) Options(context.Context) ([2]snowman.Block, error) {
 	options := options{}
 	if err := b.Block.Visit(&options); err != nil {
 		return [2]snowman.Block{}, err

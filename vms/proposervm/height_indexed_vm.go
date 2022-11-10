@@ -4,6 +4,7 @@
 package proposervm
 
 import (
+	"context"
 	"fmt"
 
 	"go.uber.org/zap"
@@ -17,7 +18,7 @@ import (
 // checkpoint if repairing is needed.
 //
 // vm.ctx.Lock should be held
-func (vm *VM) shouldHeightIndexBeRepaired() (bool, error) {
+func (vm *VM) shouldHeightIndexBeRepaired(ctx context.Context) (bool, error) {
 	_, err := vm.State.GetCheckpoint()
 	if err != database.ErrNotFound {
 		return true, err
@@ -33,7 +34,7 @@ func (vm *VM) shouldHeightIndexBeRepaired() (bool, error) {
 		return false, err
 	}
 
-	lastAcceptedBlk, err := vm.getPostForkBlock(latestProBlkID)
+	lastAcceptedBlk, err := vm.getPostForkBlock(ctx, latestProBlkID)
 	if err != nil {
 		// Could not retrieve last accepted block.
 		return false, err
@@ -51,7 +52,7 @@ func (vm *VM) shouldHeightIndexBeRepaired() (bool, error) {
 }
 
 // vm.ctx.Lock should be held
-func (vm *VM) VerifyHeightIndex() error {
+func (vm *VM) VerifyHeightIndex(context.Context) error {
 	if vm.hVM == nil {
 		return block.ErrHeightIndexedVMNotImplemented
 	}
@@ -63,7 +64,7 @@ func (vm *VM) VerifyHeightIndex() error {
 }
 
 // vm.ctx.Lock should be held
-func (vm *VM) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
+func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
 	if !vm.hIndexer.IsRepaired() {
 		return ids.Empty, block.ErrIndexIncomplete
 	}
@@ -73,13 +74,13 @@ func (vm *VM) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	switch forkHeight, err := vm.State.GetForkHeight(); err {
 	case nil:
 		if height < forkHeight {
-			return vm.hVM.GetBlockIDAtHeight(height)
+			return vm.hVM.GetBlockIDAtHeight(ctx, height)
 		}
 		return vm.State.GetBlockIDAtHeight(height)
 
 	case database.ErrNotFound:
 		// fork not reached yet. Block must be pre-fork
-		return vm.hVM.GetBlockIDAtHeight(height)
+		return vm.hVM.GetBlockIDAtHeight(ctx, height)
 
 	default:
 		return ids.Empty, err
