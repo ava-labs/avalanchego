@@ -84,9 +84,29 @@ func (vm *TestVM) Default(cant bool) {
 	vm.CantCrossChainAppResponse = cant
 }
 
-func (vm *TestVM) Initialize(ctx context.Context, chainCtx *snow.Context, db manager.Manager, genesisBytes, upgradeBytes, configBytes []byte, msgChan chan<- Message, fxs []*Fx, appSender AppSender) error {
+func (vm *TestVM) Initialize(
+	ctx context.Context,
+	chainCtx *snow.Context,
+	db manager.Manager,
+	genesisBytes,
+	upgradeBytes,
+	configBytes []byte,
+	msgChan chan<- Message,
+	fxs []*Fx,
+	appSender AppSender,
+) error {
 	if vm.InitializeF != nil {
-		return vm.InitializeF(ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, msgChan, fxs, appSender)
+		return vm.InitializeF(
+			ctx,
+			chainCtx,
+			db,
+			genesisBytes,
+			upgradeBytes,
+			configBytes,
+			msgChan,
+			fxs,
+			appSender,
+		)
 	}
 	if vm.CantInitialize && vm.T != nil {
 		vm.T.Fatal(errInitialize)
