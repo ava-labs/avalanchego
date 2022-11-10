@@ -16,7 +16,7 @@ type StateSyncableVM interface {
 	// StateSyncEnabled indicates whether the state sync is enabled for this VM.
 	// If StateSyncableVM is not implemented, as it may happen with a wrapper
 	// VM, StateSyncEnabled should return false, nil
-	StateSyncEnabled(ctx context.Context) (bool, error)
+	StateSyncEnabled(context.Context) (bool, error)
 
 	// GetOngoingSyncStateSummary returns an in-progress state summary if it
 	// exists.
@@ -26,12 +26,12 @@ type StateSyncableVM interface {
 	// sync or start over.
 	//
 	// Returns database.ErrNotFound if there is no in-progress sync.
-	GetOngoingSyncStateSummary(ctx context.Context) (StateSummary, error)
+	GetOngoingSyncStateSummary(context.Context) (StateSummary, error)
 
 	// GetLastStateSummary returns the latest state summary.
 	//
 	// Returns database.ErrNotFound if no summary is available.
-	GetLastStateSummary(ctx context.Context) (StateSummary, error)
+	GetLastStateSummary(context.Context) (StateSummary, error)
 
 	// ParseStateSummary parses a state summary out of [summaryBytes].
 	ParseStateSummary(ctx context.Context, summaryBytes []byte) (StateSummary, error)
