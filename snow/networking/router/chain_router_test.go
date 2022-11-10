@@ -97,7 +97,7 @@ func TestShutdown(t *testing.T) {
 	bootstrapper.CantGossip = false
 	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
 	bootstrapper.ShutdownF = func(context.Context) error { shutdownCalled <- struct{}{}; return nil }
-	bootstrapper.ConnectedF = func(_ context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error { return nil }
+	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error { return nil }
 	bootstrapper.HaltF = func() {}
 	handler.SetBootstrapper(bootstrapper)
 
@@ -106,7 +106,7 @@ func TestShutdown(t *testing.T) {
 	engine.CantGossip = false
 	engine.ContextF = func() *snow.ConsensusContext { return ctx }
 	engine.ShutdownF = func(context.Context) error { shutdownCalled <- struct{}{}; return nil }
-	engine.ConnectedF = func(_ context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error { return nil }
+	engine.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error { return nil }
 	engine.HaltF = func() {}
 	handler.SetConsensus(engine)
 	ctx.SetState(snow.NormalOp) // assumed bootstrap is done
