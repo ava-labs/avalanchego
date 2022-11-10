@@ -8,6 +8,7 @@
 package proposervm
 
 import (
+	context "context"
 	reflect "reflect"
 	time "time"
 
@@ -42,17 +43,17 @@ func (m *MockPostForkBlock) EXPECT() *MockPostForkBlockMockRecorder {
 }
 
 // Accept mocks base method.
-func (m *MockPostForkBlock) Accept() error {
+func (m *MockPostForkBlock) Accept(arg0 context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Accept")
+	ret := m.ctrl.Call(m, "Accept", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Accept indicates an expected call of Accept.
-func (mr *MockPostForkBlockMockRecorder) Accept() *gomock.Call {
+func (mr *MockPostForkBlockMockRecorder) Accept(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Accept", reflect.TypeOf((*MockPostForkBlock)(nil).Accept))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Accept", reflect.TypeOf((*MockPostForkBlock)(nil).Accept), arg0)
 }
 
 // Bytes mocks base method.
@@ -112,17 +113,17 @@ func (mr *MockPostForkBlockMockRecorder) Parent() *gomock.Call {
 }
 
 // Reject mocks base method.
-func (m *MockPostForkBlock) Reject() error {
+func (m *MockPostForkBlock) Reject(arg0 context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Reject")
+	ret := m.ctrl.Call(m, "Reject", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Reject indicates an expected call of Reject.
-func (mr *MockPostForkBlockMockRecorder) Reject() *gomock.Call {
+func (mr *MockPostForkBlockMockRecorder) Reject(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reject", reflect.TypeOf((*MockPostForkBlock)(nil).Reject))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reject", reflect.TypeOf((*MockPostForkBlock)(nil).Reject), arg0)
 }
 
 // Status mocks base method.
@@ -154,31 +155,31 @@ func (mr *MockPostForkBlockMockRecorder) Timestamp() *gomock.Call {
 }
 
 // Verify mocks base method.
-func (m *MockPostForkBlock) Verify() error {
+func (m *MockPostForkBlock) Verify(arg0 context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Verify")
+	ret := m.ctrl.Call(m, "Verify", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Verify indicates an expected call of Verify.
-func (mr *MockPostForkBlockMockRecorder) Verify() *gomock.Call {
+func (mr *MockPostForkBlockMockRecorder) Verify(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verify", reflect.TypeOf((*MockPostForkBlock)(nil).Verify))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verify", reflect.TypeOf((*MockPostForkBlock)(nil).Verify), arg0)
 }
 
 // acceptInnerBlk mocks base method.
-func (m *MockPostForkBlock) acceptInnerBlk() error {
+func (m *MockPostForkBlock) acceptInnerBlk(arg0 context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "acceptInnerBlk")
+	ret := m.ctrl.Call(m, "acceptInnerBlk", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // acceptInnerBlk indicates an expected call of acceptInnerBlk.
-func (mr *MockPostForkBlockMockRecorder) acceptInnerBlk() *gomock.Call {
+func (mr *MockPostForkBlockMockRecorder) acceptInnerBlk(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "acceptInnerBlk", reflect.TypeOf((*MockPostForkBlock)(nil).acceptInnerBlk))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "acceptInnerBlk", reflect.TypeOf((*MockPostForkBlock)(nil).acceptInnerBlk), arg0)
 }
 
 // acceptOuterBlk mocks base method.
@@ -196,18 +197,18 @@ func (mr *MockPostForkBlockMockRecorder) acceptOuterBlk() *gomock.Call {
 }
 
 // buildChild mocks base method.
-func (m *MockPostForkBlock) buildChild() (Block, error) {
+func (m *MockPostForkBlock) buildChild(arg0 context.Context) (Block, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "buildChild")
+	ret := m.ctrl.Call(m, "buildChild", arg0)
 	ret0, _ := ret[0].(Block)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // buildChild indicates an expected call of buildChild.
-func (mr *MockPostForkBlockMockRecorder) buildChild() *gomock.Call {
+func (mr *MockPostForkBlockMockRecorder) buildChild(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "buildChild", reflect.TypeOf((*MockPostForkBlock)(nil).buildChild))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "buildChild", reflect.TypeOf((*MockPostForkBlock)(nil).buildChild), arg0)
 }
 
 // getInnerBlk mocks base method.
@@ -239,18 +240,18 @@ func (mr *MockPostForkBlockMockRecorder) getStatelessBlk() *gomock.Call {
 }
 
 // pChainHeight mocks base method.
-func (m *MockPostForkBlock) pChainHeight() (uint64, error) {
+func (m *MockPostForkBlock) pChainHeight(arg0 context.Context) (uint64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "pChainHeight")
+	ret := m.ctrl.Call(m, "pChainHeight", arg0)
 	ret0, _ := ret[0].(uint64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // pChainHeight indicates an expected call of pChainHeight.
-func (mr *MockPostForkBlockMockRecorder) pChainHeight() *gomock.Call {
+func (mr *MockPostForkBlockMockRecorder) pChainHeight(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "pChainHeight", reflect.TypeOf((*MockPostForkBlock)(nil).pChainHeight))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "pChainHeight", reflect.TypeOf((*MockPostForkBlock)(nil).pChainHeight), arg0)
 }
 
 // setInnerBlk mocks base method.
@@ -278,43 +279,43 @@ func (mr *MockPostForkBlockMockRecorder) setStatus(arg0 interface{}) *gomock.Cal
 }
 
 // verifyPostForkChild mocks base method.
-func (m *MockPostForkBlock) verifyPostForkChild(arg0 *postForkBlock) error {
+func (m *MockPostForkBlock) verifyPostForkChild(arg0 context.Context, arg1 *postForkBlock) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "verifyPostForkChild", arg0)
+	ret := m.ctrl.Call(m, "verifyPostForkChild", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // verifyPostForkChild indicates an expected call of verifyPostForkChild.
-func (mr *MockPostForkBlockMockRecorder) verifyPostForkChild(arg0 interface{}) *gomock.Call {
+func (mr *MockPostForkBlockMockRecorder) verifyPostForkChild(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "verifyPostForkChild", reflect.TypeOf((*MockPostForkBlock)(nil).verifyPostForkChild), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "verifyPostForkChild", reflect.TypeOf((*MockPostForkBlock)(nil).verifyPostForkChild), arg0, arg1)
 }
 
 // verifyPostForkOption mocks base method.
-func (m *MockPostForkBlock) verifyPostForkOption(arg0 *postForkOption) error {
+func (m *MockPostForkBlock) verifyPostForkOption(arg0 context.Context, arg1 *postForkOption) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "verifyPostForkOption", arg0)
+	ret := m.ctrl.Call(m, "verifyPostForkOption", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // verifyPostForkOption indicates an expected call of verifyPostForkOption.
-func (mr *MockPostForkBlockMockRecorder) verifyPostForkOption(arg0 interface{}) *gomock.Call {
+func (mr *MockPostForkBlockMockRecorder) verifyPostForkOption(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "verifyPostForkOption", reflect.TypeOf((*MockPostForkBlock)(nil).verifyPostForkOption), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "verifyPostForkOption", reflect.TypeOf((*MockPostForkBlock)(nil).verifyPostForkOption), arg0, arg1)
 }
 
 // verifyPreForkChild mocks base method.
-func (m *MockPostForkBlock) verifyPreForkChild(arg0 *preForkBlock) error {
+func (m *MockPostForkBlock) verifyPreForkChild(arg0 context.Context, arg1 *preForkBlock) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "verifyPreForkChild", arg0)
+	ret := m.ctrl.Call(m, "verifyPreForkChild", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // verifyPreForkChild indicates an expected call of verifyPreForkChild.
-func (mr *MockPostForkBlockMockRecorder) verifyPreForkChild(arg0 interface{}) *gomock.Call {
+func (mr *MockPostForkBlockMockRecorder) verifyPreForkChild(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "verifyPreForkChild", reflect.TypeOf((*MockPostForkBlock)(nil).verifyPreForkChild), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "verifyPreForkChild", reflect.TypeOf((*MockPostForkBlock)(nil).verifyPreForkChild), arg0, arg1)
 }
