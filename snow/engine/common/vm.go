@@ -59,10 +59,10 @@ type VM interface {
 	SetState(ctx context.Context, state snow.State) error
 
 	// Shutdown is called when the node is shutting down.
-	Shutdown(ctx context.Context) error
+	Shutdown(context.Context) error
 
 	// Version returns the version of the VM this node is running.
-	Version(ctx context.Context) (string, error)
+	Version(context.Context) (string, error)
 
 	// Creates the HTTP handlers for custom VM network calls.
 	//
@@ -76,7 +76,7 @@ type VM interface {
 	//
 	// For example, it might make sense to have an extension for creating
 	// genesis bytes this VM can interpret.
-	CreateStaticHandlers(ctx context.Context) (map[string]*HTTPHandler, error)
+	CreateStaticHandlers(context.Context) (map[string]*HTTPHandler, error)
 
 	// Creates the HTTP handlers for custom chain network calls.
 	//
@@ -91,5 +91,5 @@ type VM interface {
 	// For example, if this VM implements an account-based payments system,
 	// it have an extension called `accounts`, where clients could get
 	// information about their accounts.
-	CreateHandlers(ctx context.Context) (map[string]*HTTPHandler, error)
+	CreateHandlers(context.Context) (map[string]*HTTPHandler, error)
 }
