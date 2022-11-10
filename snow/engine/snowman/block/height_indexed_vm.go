@@ -22,7 +22,7 @@ type HeightIndexedChainVM interface {
 	// - ErrIndexIncomplete if the height index is not currently available.
 	// - Any other non-standard error that may have occurred when verifying the
 	//   index.
-	VerifyHeightIndex(ctx context.Context) error
+	VerifyHeightIndex(context.Context) error
 
 	// GetBlockIDAtHeight returns:
 	// - The ID of the block that was accepted with [height].
