@@ -88,7 +88,12 @@ func (p *postForkCommonComponents) Height() uint64 {
 // 7) [child]'s timestamp is within its proposer's window
 // 8) [child] has a valid signature from its proposer
 // 9) [child]'s inner block is valid
-func (p *postForkCommonComponents) Verify(ctx context.Context, parentTimestamp time.Time, parentPChainHeight uint64, child *postForkBlock) error {
+func (p *postForkCommonComponents) Verify(
+	ctx context.Context,
+	parentTimestamp time.Time,
+	parentPChainHeight uint64,
+	child *postForkBlock,
+) error {
 	if err := verifyIsNotOracleBlock(ctx, p.innerBlk); err != nil {
 		return err
 	}
