@@ -13,10 +13,10 @@ type Checker interface {
 	// error
 	//
 	// It is expected that the results are json marshallable.
-	HealthCheck(ctx context.Context) (interface{}, error)
+	HealthCheck(context.Context) (interface{}, error)
 }
 
-type CheckerFunc func(ctx context.Context) (interface{}, error)
+type CheckerFunc func(context.Context) (interface{}, error)
 
 func (f CheckerFunc) HealthCheck(ctx context.Context) (interface{}, error) {
 	return f(ctx)
