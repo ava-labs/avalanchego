@@ -21,13 +21,15 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
+var _ snowman.OracleBlock = (*TestOptionsBlock)(nil)
+
 type TestOptionsBlock struct {
 	snowman.TestBlock
 	opts    [2]snowman.Block
 	optsErr error
 }
 
-func (tob TestOptionsBlock) Options() ([2]snowman.Block, error) {
+func (tob TestOptionsBlock) Options(context.Context) ([2]snowman.Block, error) {
 	return tob.opts, tob.optsErr
 }
 
