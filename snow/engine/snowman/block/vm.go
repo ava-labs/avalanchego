@@ -35,7 +35,7 @@ type ChainVM interface {
 	//
 	// If the VM doesn't want to issue a new block, an error should be
 	// returned.
-	BuildBlock(ctx context.Context) (snowman.Block, error)
+	BuildBlock(context.Context) (snowman.Block, error)
 
 	// Notify the VM of the currently preferred block.
 	//
