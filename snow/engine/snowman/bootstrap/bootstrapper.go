@@ -143,7 +143,7 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	}
 
 	b.started = true
-	return b.Startup()
+	return b.Startup(ctx)
 }
 
 // Ancestors handles the receipt of multiple containers. Should be received in
@@ -253,7 +253,7 @@ func (b *bootstrapper) Connected(ctx context.Context, nodeID ids.NodeID, nodeVer
 	}
 
 	b.started = true
-	return b.Startup()
+	return b.Startup(ctx)
 }
 
 func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
@@ -276,7 +276,7 @@ func (b *bootstrapper) Timeout(ctx context.Context) error {
 	b.awaitingTimeout = false
 
 	if !b.Config.Subnet.IsBootstrapped() {
-		return b.Restart(true)
+		return b.Restart(ctx, true)
 	}
 	b.fetchETA.Set(0)
 	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
@@ -559,7 +559,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	// so that the bootstrapping process will terminate even as new blocks are
 	// being issued.
 	if b.Config.RetryBootstrap && executedBlocks > 0 && executedBlocks < previouslyExecuted/2 {
-		return b.Restart(true)
+		return b.Restart(ctx, true)
 	}
 
 	// If there is an additional callback, notify them that this chain has been

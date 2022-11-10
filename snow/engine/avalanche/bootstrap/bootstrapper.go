@@ -282,7 +282,7 @@ func (b *bootstrapper) Connected(
 	}
 
 	b.started = true
-	return b.Startup()
+	return b.Startup(ctx)
 }
 
 func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
@@ -300,7 +300,7 @@ func (b *bootstrapper) Timeout(ctx context.Context) error {
 	b.awaitingTimeout = false
 
 	if !b.Config.Subnet.IsBootstrapped() {
-		return b.Restart(true)
+		return b.Restart(ctx, true)
 	}
 	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
 }
@@ -330,7 +330,7 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	}
 
 	b.started = true
-	return b.Startup()
+	return b.Startup(ctx)
 }
 
 func (b *bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
@@ -581,7 +581,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	// issued.
 	if executedVts > 0 && executedVts < previouslyExecuted/2 && b.Config.RetryBootstrap {
 		b.Ctx.Log.Debug("checking for more vertices before finishing bootstrapping")
-		return b.Restart(true)
+		return b.Restart(ctx, true)
 	}
 
 	// Notify the subnet that this chain is synced

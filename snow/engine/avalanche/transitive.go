@@ -306,7 +306,7 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 	t.Ctx.Log.Verbo("gossiping accepted vertex to the network",
 		zap.Stringer("vtxID", vtxID),
 	)
-	t.Sender.SendGossip(context.TODO(), vtx.Bytes())
+	t.Sender.SendGossip(ctx, vtx.Bytes())
 	return nil
 }
 

@@ -407,7 +407,7 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 		default:
 			for _, blk := range options {
 				// note that deliver will set the VM's preference
-				if err := t.deliver(context.TODO(), blk); err != nil {
+				if err := t.deliver(ctx, blk); err != nil {
 					return err
 				}
 			}
