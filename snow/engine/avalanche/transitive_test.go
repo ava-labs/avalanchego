@@ -156,7 +156,7 @@ func TestEngineAdd(t *testing.T) {
 		t.Fatalf("Should have been blocking on request")
 	}
 
-	manager.ParseVtxF = func(_ context.Context, b []byte) (avalanche.Vertex, error) {
+	manager.ParseVtxF = func(context.Context, []byte) (avalanche.Vertex, error) {
 		return nil, errFailedParsing
 	}
 
