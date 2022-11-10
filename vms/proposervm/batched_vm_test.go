@@ -121,13 +121,7 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 	// ...Call GetAncestors on them ...
 	// Note: we assumed that if blkID is not known, that's NOT an error.
 	// Simply return an empty result
-	coreVM.GetAncestorsF = func(
-		_ context.Context,
-		blkID ids.ID,
-		maxBlocksNum,
-		maxBlocksSize int,
-		maxBlocksRetrivalTime time.Duration,
-	) ([][]byte, error) {
+	coreVM.GetAncestorsF = func(_ context.Context, blkID ids.ID, _, _ int, _ time.Duration) ([][]byte, error) {
 		res := make([][]byte, 0, 3)
 		switch blkID {
 		case coreBlk3.ID():
@@ -255,13 +249,7 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 	// ...Call GetAncestors on them ...
 	// Note: we assumed that if blkID is not known, that's NOT an error.
 	// Simply return an empty result
-	coreVM.GetAncestorsF = func(
-		_ context.Context,
-		blkID ids.ID,
-		maxBlocksNum,
-		maxBlocksSize int,
-		maxBlocksRetrivalTime time.Duration,
-	) ([][]byte, error) {
+	coreVM.GetAncestorsF = func(_ context.Context, blkID ids.ID, _, _ int, _ time.Duration) ([][]byte, error) {
 		res := make([][]byte, 0, 3)
 		switch blkID {
 		case coreBlk3.ID():
@@ -449,13 +437,7 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 	// ...Call GetAncestors on them ...
 	// Note: we assumed that if blkID is not known, that's NOT an error.
 	// Simply return an empty result
-	coreVM.GetAncestorsF = func(
-		_ context.Context,
-		blkID ids.ID,
-		maxBlocksNum,
-		maxBlocksSize int,
-		maxBlocksRetrivalTime time.Duration,
-	) ([][]byte, error) {
+	coreVM.GetAncestorsF = func(_ context.Context, blkID ids.ID, _, _ int, _ time.Duration) ([][]byte, error) {
 		res := make([][]byte, 0, 3)
 		switch blkID {
 		case coreBlk4.ID():
