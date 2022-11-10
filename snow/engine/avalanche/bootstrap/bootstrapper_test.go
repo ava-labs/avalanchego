@@ -140,7 +140,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	bs, err := New(
 		context.Background(),
 		config,
-		func(_ context.Context, lastReqID uint32) error {
+		func(context.Context, uint32) error {
 			config.Ctx.SetState(snow.NormalOp)
 			return nil
 		},
@@ -243,7 +243,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	bs, err := New(
 		context.Background(),
 		config,
-		func(_ context.Context, lastReqID uint32) error {
+		func(context.Context, uint32) error {
 			config.Ctx.SetState(snow.NormalOp)
 			return nil
 		},
@@ -421,7 +421,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	bs, err := New(
 		context.Background(),
 		config,
-		func(_ context.Context, lastReqID uint32) error {
+		func(context.Context, uint32) error {
 			config.Ctx.SetState(snow.NormalOp)
 			return nil
 		},
@@ -565,7 +565,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 	bs, err := New(
 		context.Background(),
 		config,
-		func(_ context.Context, lastReqID uint32) error {
+		func(context.Context, uint32) error {
 			config.Ctx.SetState(snow.NormalOp)
 			return nil
 		},
@@ -686,7 +686,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	bs, err := New(
 		context.Background(),
 		config,
-		func(_ context.Context, lastReqID uint32) error {
+		func(context.Context, uint32) error {
 			config.Ctx.SetState(snow.NormalOp)
 			return nil
 		},
@@ -806,7 +806,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	bs, err := New(
 		context.Background(),
 		config,
-		func(_ context.Context, lastReqID uint32) error {
+		func(context.Context, uint32) error {
 			config.Ctx.SetState(snow.NormalOp)
 			return nil
 		},
@@ -937,7 +937,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	bs, err := New(
 		context.Background(),
 		config,
-		func(_ context.Context, lastReqID uint32) error {
+		func(context.Context, uint32) error {
 			config.Ctx.SetState(snow.NormalOp)
 			return nil
 		},
@@ -1104,7 +1104,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	bsIntf, err := New(
 		context.Background(),
 		config,
-		func(_ context.Context, lastReqID uint32) error {
+		func(context.Context, uint32) error {
 			config.Ctx.SetState(snow.NormalOp)
 			return nil
 		},
