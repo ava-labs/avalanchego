@@ -551,7 +551,7 @@ type InternalHandler interface {
 	// Shutdown this engine.
 	//
 	// This function will be called when the environment is exiting.
-	Shutdown(ctx context.Context) error
+	Shutdown(context.Context) error
 
 	// Notify this engine of a message from the virtual machine.
 	Notify(context.Context, Message) error
