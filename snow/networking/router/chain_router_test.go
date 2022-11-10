@@ -333,47 +333,47 @@ func TestRouterTimeout(t *testing.T) {
 	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error { return nil }
 	bootstrapper.HaltF = func() {}
 
-	bootstrapper.GetStateSummaryFrontierFailedF = func(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.GetStateSummaryFrontierFailedF = func(context.Context, ids.NodeID, uint32) error {
 		defer wg.Done()
 		calledGetStateSummaryFrontierFailed = true
 		return nil
 	}
-	bootstrapper.GetAcceptedStateSummaryFailedF = func(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.GetAcceptedStateSummaryFailedF = func(context.Context, ids.NodeID, uint32) error {
 		defer wg.Done()
 		calledGetAcceptedStateSummaryFailed = true
 		return nil
 	}
-	bootstrapper.GetAcceptedFrontierFailedF = func(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.GetAcceptedFrontierFailedF = func(context.Context, ids.NodeID, uint32) error {
 		defer wg.Done()
 		calledGetAcceptedFrontierFailed = true
 		return nil
 	}
-	bootstrapper.GetAncestorsFailedF = func(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.GetAncestorsFailedF = func(context.Context, ids.NodeID, uint32) error {
 		defer wg.Done()
 		calledGetAncestorsFailed = true
 		return nil
 	}
-	bootstrapper.GetAcceptedFailedF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.GetAcceptedFailedF = func(context.Context, ids.NodeID, uint32) error {
 		defer wg.Done()
 		calledGetAcceptedFailed = true
 		return nil
 	}
-	bootstrapper.GetFailedF = func(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.GetFailedF = func(context.Context, ids.NodeID, uint32) error {
 		defer wg.Done()
 		calledGetFailed = true
 		return nil
 	}
-	bootstrapper.QueryFailedF = func(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.QueryFailedF = func(context.Context, ids.NodeID, uint32) error {
 		defer wg.Done()
 		calledQueryFailed = true
 		return nil
 	}
-	bootstrapper.AppRequestFailedF = func(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+	bootstrapper.AppRequestFailedF = func(context.Context, ids.NodeID, uint32) error {
 		defer wg.Done()
 		calledAppRequestFailed = true
 		return nil
 	}
-	bootstrapper.CrossChainAppRequestFailedF = func(_ context.Context, chainID ids.ID, requestID uint32) error {
+	bootstrapper.CrossChainAppRequestFailedF = func(context.Context, ids.ID, uint32) error {
 		defer wg.Done()
 		calledCrossChainAppRequestFailed = true
 		return nil
