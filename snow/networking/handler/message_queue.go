@@ -114,7 +114,7 @@ func (m *messageQueue) Pop() (context.Context, message.InboundMessage, bool) {
 
 	for {
 		if m.closed {
-			return context.Background(), nil, false
+			return nil, nil, false
 		}
 		if len(m.msgAndCtxs) != 0 {
 			break

@@ -784,7 +784,7 @@ func (h *handler) popUnexpiredMsg(queue MessageQueue, expired prometheus.Counter
 		// down, we may fail to pop a message.
 		ctx, msg, ok := queue.Pop()
 		if !ok {
-			return context.Background(), nil, false
+			return nil, nil, false
 		}
 
 		// If this message's deadline has passed, don't process it.

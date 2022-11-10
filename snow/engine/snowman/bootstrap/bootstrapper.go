@@ -323,7 +323,7 @@ func (b *bootstrapper) ForceAccepted(ctx context.Context, acceptedContainerIDs [
 		// `database.ErrNotFound`, then the error should be propagated.
 		blk, err := b.VM.GetBlock(ctx, blkID)
 		if err != nil {
-			if err := b.fetch(context.Background(), blkID); err != nil {
+			if err := b.fetch(ctx, blkID); err != nil {
 				return err
 			}
 			continue

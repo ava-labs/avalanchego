@@ -183,7 +183,7 @@ func (vm *VM) Initialize(
 	})
 
 	vm.verifiedBlocks = make(map[ids.ID]PostForkBlock)
-	context, cancel := context.WithCancel(context.Background())
+	context, cancel := context.WithCancel(ctx)
 	vm.context = context
 	vm.onShutdown = cancel
 
