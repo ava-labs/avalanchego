@@ -160,7 +160,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	}
 
 	// create bootstrapper
-	dummyCallback := func(_ context.Context, lastReqID uint32) error {
+	dummyCallback := func(context.Context, uint32) error {
 		cfg.Ctx.SetState(snow.NormalOp)
 		return nil
 	}
