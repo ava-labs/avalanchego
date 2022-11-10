@@ -69,7 +69,7 @@ func TestLoadVMsSuccess(t *testing.T) {
 	}
 
 	resources.mockLog.EXPECT().Debug(gomock.Any()).Times(1)
-	resources.mockVMRegistry.EXPECT().ReloadWithReadLock().Times(1).Return(newVMs, failedVMs, nil)
+	resources.mockVMRegistry.EXPECT().ReloadWithReadLock(gomock.Any()).Times(1).Return(newVMs, failedVMs, nil)
 	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
 	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(alias2, nil)
 
@@ -88,7 +88,7 @@ func TestLoadVMsReloadFails(t *testing.T) {
 
 	resources.mockLog.EXPECT().Debug(gomock.Any()).Times(1)
 	// Reload fails
-	resources.mockVMRegistry.EXPECT().ReloadWithReadLock().Times(1).Return(nil, nil, errOops)
+	resources.mockVMRegistry.EXPECT().ReloadWithReadLock(gomock.Any()).Times(1).Return(nil, nil, errOops)
 
 	reply := LoadVMsReply{}
 	err := resources.admin.LoadVMs(nil, nil, &reply)
@@ -111,7 +111,7 @@ func TestLoadVMsGetAliasesFails(t *testing.T) {
 	alias1 := []string{id1.String(), "vm1-alias-1", "vm1-alias-2"}
 
 	resources.mockLog.EXPECT().Debug(gomock.Any()).Times(1)
-	resources.mockVMRegistry.EXPECT().ReloadWithReadLock().Times(1).Return(newVMs, failedVMs, nil)
+	resources.mockVMRegistry.EXPECT().ReloadWithReadLock(gomock.Any()).Times(1).Return(newVMs, failedVMs, nil)
 	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
 	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(nil, errOops)
 

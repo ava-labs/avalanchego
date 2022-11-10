@@ -2211,6 +2211,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 		gomock.Any(),
 		gomock.Any(),
 		gomock.Any(),
+		gomock.Any(),
 	).Return(nil)
 
 	ctx := snow.DefaultContextTest()
@@ -2253,7 +2254,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 	// We will ask the inner VM to parse.
 	mockInnerBlkNearTip := snowman.NewMockBlock(ctrl)
 	mockInnerBlkNearTip.EXPECT().Height().Return(uint64(1)).Times(2)
-	innerVM.EXPECT().ParseBlock(blkNearTipInnerBytes).Return(mockInnerBlkNearTip, nil).Times(2)
+	innerVM.EXPECT().ParseBlock(gomock.Any(), blkNearTipInnerBytes).Return(mockInnerBlkNearTip, nil).Times(2)
 	_, err = vm.ParseBlock(context.Background(), blkNearTip.Bytes())
 	require.NoError(err)
 
@@ -2272,7 +2273,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 
 	// Parse the block again. This time it shouldn't be cached
 	// because it's not close to the tip.
-	_, err = vm.ParseBlock(blkNearTip.Bytes())
+	_, err = vm.ParseBlock(context.Background(), blkNearTip.Bytes())
 	require.NoError(err)
 
 	_, ok = vm.innerBlkCache.Get(blkNearTip.ID())
@@ -2294,7 +2295,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 	blk := NewMockPostForkBlock(ctrl)
 	blk.EXPECT().ID().Return(blkNearTip.ID())
 	blk.EXPECT().getInnerBlk().Return(newInnerBlock)
-	newInnerBlock.EXPECT().Verify().Return(nil)
+	newInnerBlock.EXPECT().Verify(gomock.Any()).Return(nil)
 
 	// When we verify [blk] we see that the inner block isn't in the tree
 	// (hasn't been verified) so we verify it and put it in the cahce.

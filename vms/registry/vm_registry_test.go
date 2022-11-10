@@ -47,11 +47,11 @@ func TestReload_Success(t *testing.T) {
 		Times(1).
 		Return(registeredVms, unregisteredVms, nil)
 	resources.mockVMRegisterer.EXPECT().
-		Register(id3, factory3).
+		Register(gomock.Any(), id3, factory3).
 		Times(1).
 		Return(nil)
 	resources.mockVMRegisterer.EXPECT().
-		Register(id4, factory4).
+		Register(gomock.Any(), id4, factory4).
 		Times(1).
 		Return(nil)
 
@@ -99,11 +99,11 @@ func TestReload_PartialRegisterFailure(t *testing.T) {
 		Times(1).
 		Return(registeredVms, unregisteredVms, nil)
 	resources.mockVMRegisterer.EXPECT().
-		Register(id3, factory3).
+		Register(gomock.Any(), id3, factory3).
 		Times(1).
 		Return(errOops)
 	resources.mockVMRegisterer.EXPECT().
-		Register(id4, factory4).
+		Register(gomock.Any(), id4, factory4).
 		Times(1).
 		Return(nil)
 
@@ -141,11 +141,11 @@ func TestReloadWithReadLock_Success(t *testing.T) {
 		Times(1).
 		Return(registeredVms, unregisteredVms, nil)
 	resources.mockVMRegisterer.EXPECT().
-		RegisterWithReadLock(id3, factory3).
+		RegisterWithReadLock(gomock.Any(), id3, factory3).
 		Times(1).
 		Return(nil)
 	resources.mockVMRegisterer.EXPECT().
-		RegisterWithReadLock(id4, factory4).
+		RegisterWithReadLock(gomock.Any(), id4, factory4).
 		Times(1).
 		Return(nil)
 
@@ -193,11 +193,11 @@ func TestReloadWithReadLock_PartialRegisterFailure(t *testing.T) {
 		Times(1).
 		Return(registeredVms, unregisteredVms, nil)
 	resources.mockVMRegisterer.EXPECT().
-		RegisterWithReadLock(id3, factory3).
+		RegisterWithReadLock(gomock.Any(), id3, factory3).
 		Times(1).
 		Return(errOops)
 	resources.mockVMRegisterer.EXPECT().
-		RegisterWithReadLock(id4, factory4).
+		RegisterWithReadLock(gomock.Any(), id4, factory4).
 		Times(1).
 		Return(nil)
 
