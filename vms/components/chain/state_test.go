@@ -61,7 +61,11 @@ func NewTestBlocks(numBlocks uint64) []*TestBlock {
 	return blks
 }
 
-func createInternalBlockFuncs(t *testing.T, blks []*TestBlock) (func(id ids.ID) (snowman.Block, error), func(b []byte) (snowman.Block, error), func(height uint64) (ids.ID, error)) {
+func createInternalBlockFuncs(t *testing.T, blks []*TestBlock) (
+	func(ctx context.Context, blkID ids.ID) (snowman.Block, error),
+	func(ctx context.Context, b []byte) (snowman.Block, error),
+	func(height uint64) (ids.ID, error),
+) {
 	blkMap := make(map[ids.ID]*TestBlock)
 	blkByteMap := make(map[byte]*TestBlock)
 	for _, blk := range blks {
@@ -73,7 +77,7 @@ func createInternalBlockFuncs(t *testing.T, blks []*TestBlock) (func(id ids.ID) 
 		blkByteMap[blkBytes[0]] = blk
 	}
 
-	getBlock := func(id ids.ID) (snowman.Block, error) {
+	getBlock := func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		blk, ok := blkMap[id]
 		if !ok || !blk.Status().Fetched() {
 			return nil, database.ErrNotFound
@@ -82,7 +86,7 @@ func createInternalBlockFuncs(t *testing.T, blks []*TestBlock) (func(id ids.ID) 
 		return blk, nil
 	}
 
-	parseBlk := func(b []byte) (snowman.Block, error) {
+	parseBlk := func(_ context.Context, b []byte) (snowman.Block, error) {
 		if len(b) != 1 {
 			return nil, fmt.Errorf("expected block bytes to be length 1, but found %d", len(b))
 		}
@@ -115,7 +119,7 @@ func createInternalBlockFuncs(t *testing.T, blks []*TestBlock) (func(id ids.ID) 
 	return getBlock, parseBlk, getAcceptedBlockIDAtHeight
 }
 
-func cantBuildBlock() (snowman.Block, error) {
+func cantBuildBlock(context.Context) (snowman.Block, error) {
 	return nil, errors.New("can't build new block")
 }
 
@@ -126,7 +130,7 @@ func checkProcessingBlock(t *testing.T, s *State, blk snowman.Block) {
 		t.Fatalf("Expected block to be of type (*BlockWrapper)")
 	}
 
-	parsedBlk, err := s.ParseBlock(blk.Bytes())
+	parsedBlk, err := s.ParseBlock(context.Background(), blk.Bytes())
 	if err != nil {
 		t.Fatalf("Failed to parse verified block due to %s", err)
 	}
@@ -143,7 +147,7 @@ func checkProcessingBlock(t *testing.T, s *State, blk snowman.Block) {
 		t.Fatalf("Expected parsed block to return a uniquified block")
 	}
 
-	getBlk, err := s.GetBlock(blk.ID())
+	getBlk, err := s.GetBlock(context.Background(), blk.ID())
 	if err != nil {
 		t.Fatalf("Unexpected error during GetBlock for processing block %s", err)
 	}
@@ -159,7 +163,7 @@ func checkDecidedBlock(t *testing.T, s *State, blk snowman.Block, expectedStatus
 		t.Fatalf("Expected block to be of type (*BlockWrapper)")
 	}
 
-	parsedBlk, err := s.ParseBlock(blk.Bytes())
+	parsedBlk, err := s.ParseBlock(context.Background(), blk.Bytes())
 	if err != nil {
 		t.Fatalf("Unexpected error parsing decided block %s", err)
 	}
@@ -177,7 +181,7 @@ func checkDecidedBlock(t *testing.T, s *State, blk snowman.Block, expectedStatus
 		t.Fatalf("Expected parsed block to have been cached, but retrieved non-unique decided block")
 	}
 
-	getBlk, err := s.GetBlock(blk.ID())
+	getBlk, err := s.GetBlock(context.Background(), blk.ID())
 	if err != nil {
 		t.Fatalf("Unexpected error during GetBlock for decided block %s", err)
 	}
@@ -242,7 +246,7 @@ func TestState(t *testing.T) {
 		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
-	lastAccepted, err := chainState.LastAccepted()
+	lastAccepted, err := chainState.LastAccepted(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,28 +254,28 @@ func TestState(t *testing.T) {
 		t.Fatal("Expected last accepted block to be the genesis block")
 	}
 
-	wrappedGenesisBlk, err := chainState.GetBlock(genesisBlock.ID())
+	wrappedGenesisBlk, err := chainState.GetBlock(context.Background(), genesisBlock.ID())
 	if err != nil {
 		t.Fatalf("Failed to get genesis block due to: %s", err)
 	}
 
 	// Check that a cache miss on a block is handled correctly
-	if _, err := chainState.GetBlock(blk1.ID()); err == nil {
+	if _, err := chainState.GetBlock(context.Background(), blk1.ID()); err == nil {
 		t.Fatal("expected GetBlock to return an error for blk1 before it's been parsed")
 	}
-	if _, err := chainState.GetBlock(blk1.ID()); err == nil {
+	if _, err := chainState.GetBlock(context.Background(), blk1.ID()); err == nil {
 		t.Fatal("expected GetBlock to return an error for blk1 before it's been parsed")
 	}
 
 	// Parse and verify blk1 and blk2
-	parsedBlk1, err := chainState.ParseBlock(blk1.Bytes())
+	parsedBlk1, err := chainState.ParseBlock(context.Background(), blk1.Bytes())
 	if err != nil {
 		t.Fatal("Failed to parse blk1 due to: %w", err)
 	}
 	if err := parsedBlk1.Verify(context.Background()); err != nil {
 		t.Fatal("Parsed blk1 failed verification unexpectedly due to %w", err)
 	}
-	parsedBlk2, err := chainState.ParseBlock(blk2.Bytes())
+	parsedBlk2, err := chainState.ParseBlock(context.Background(), blk2.Bytes())
 	if err != nil {
 		t.Fatalf("Failed to parse blk2 due to: %s", err)
 	}
@@ -284,11 +288,11 @@ func TestState(t *testing.T) {
 		t.Fatalf("Expected chain state to have 2 processing blocks, but found: %d", numProcessing)
 	}
 
-	parsedBlk3, err := chainState.ParseBlock(blk3.Bytes())
+	parsedBlk3, err := chainState.ParseBlock(context.Background(), blk3.Bytes())
 	if err != nil {
 		t.Fatalf("Failed to parse blk3 due to %s", err)
 	}
-	getBlk3, err := chainState.GetBlock(blk3.ID())
+	getBlk3, err := chainState.GetBlock(context.Background(), blk3.ID())
 	if err != nil {
 		t.Fatalf("Failed to get blk3 due to %s", err)
 	}
@@ -324,7 +328,7 @@ func TestState(t *testing.T) {
 	}
 
 	// Check that the last accepted block was updated correctly
-	lastAcceptedID, err := chainState.LastAccepted()
+	lastAcceptedID, err := chainState.LastAccepted(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -350,7 +354,7 @@ func TestBuildBlock(t *testing.T) {
 	blk1 := testBlks[1]
 
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
-	buildBlock := func() (snowman.Block, error) {
+	buildBlock := func(context.Context) (snowman.Block, error) {
 		// Once the block is built, mark it as processing
 		blk1.SetStatus(choices.Processing)
 		return blk1, nil
@@ -368,7 +372,7 @@ func TestBuildBlock(t *testing.T) {
 		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
-	builtBlk, err := chainState.BuildBlock()
+	builtBlk, err := chainState.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -412,7 +416,7 @@ func TestStateDecideBlock(t *testing.T) {
 	})
 
 	// Parse badVerifyBlk (which should fail verification)
-	badBlk, err := chainState.ParseBlock(badVerifyBlk.Bytes())
+	badBlk, err := chainState.ParseBlock(context.Background(), badVerifyBlk.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -423,7 +427,7 @@ func TestStateDecideBlock(t *testing.T) {
 	require.Len(t, chainState.verifiedBlocks, 0)
 
 	// Ensure that an error during block acceptance is propagated correctly
-	badBlk, err = chainState.ParseBlock(badAcceptBlk.Bytes())
+	badBlk, err = chainState.ParseBlock(context.Background(), badAcceptBlk.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -437,7 +441,7 @@ func TestStateDecideBlock(t *testing.T) {
 	}
 
 	// Ensure that an error during block reject is propagated correctly
-	badBlk, err = chainState.ParseBlock(badRejectBlk.Bytes())
+	badBlk, err = chainState.ParseBlock(context.Background(), badRejectBlk.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -476,31 +480,31 @@ func TestStateParent(t *testing.T) {
 		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
-	parsedBlk2, err := chainState.ParseBlock(blk2.Bytes())
+	parsedBlk2, err := chainState.ParseBlock(context.Background(), blk2.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	missingBlk1ID := parsedBlk2.Parent()
 
-	if _, err := chainState.GetBlock(missingBlk1ID); err == nil {
+	if _, err := chainState.GetBlock(context.Background(), missingBlk1ID); err == nil {
 		t.Fatalf("Expected  parent of blk2 to be not found")
 	}
 
-	parsedBlk1, err := chainState.ParseBlock(blk1.Bytes())
+	parsedBlk1, err := chainState.ParseBlock(context.Background(), blk1.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	genesisBlkParentID := parsedBlk1.Parent()
-	genesisBlkParent, err := chainState.GetBlock(genesisBlkParentID)
+	genesisBlkParent, err := chainState.GetBlock(context.Background(), genesisBlkParentID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	checkAcceptedBlock(t, chainState, genesisBlkParent, true)
 
 	parentBlk1ID := parsedBlk2.Parent()
-	parentBlk1, err := chainState.GetBlock(parentBlk1ID)
+	parentBlk1, err := chainState.GetBlock(context.Background(), parentBlk1ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -533,7 +537,7 @@ func TestGetBlockInternal(t *testing.T) {
 		t.Fatalf("Expected LastAcceptedBlockInternal to be blk %s, but found %s", genesisBlock.ID(), genesisBlockInternal.ID())
 	}
 
-	blk, err := chainState.GetBlockInternal(genesisBlock.ID())
+	blk, err := chainState.GetBlockInternal(context.Background(), genesisBlock.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -553,8 +557,8 @@ func TestGetBlockError(t *testing.T) {
 	blk1 := testBlks[1]
 
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
-	wrappedGetBlock := func(id ids.ID) (snowman.Block, error) {
-		blk, err := getBlock(id)
+	wrappedGetBlock := func(ctx context.Context, id ids.ID) (snowman.Block, error) {
+		blk, err := getBlock(ctx, id)
 		if err != nil {
 			return nil, fmt.Errorf("wrapping error to prevent caching miss: %w", err)
 		}
@@ -572,7 +576,7 @@ func TestGetBlockError(t *testing.T) {
 		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
-	_, err := chainState.GetBlock(blk1.ID())
+	_, err := chainState.GetBlock(context.Background(), blk1.ID())
 	if err == nil {
 		t.Fatal("Expected GetBlock to return an error for unknown block")
 	}
@@ -580,7 +584,7 @@ func TestGetBlockError(t *testing.T) {
 	// Update the status to Processing, so that it will be returned by the internal get block
 	// function.
 	blk1.SetStatus(choices.Processing)
-	blk, err := chainState.GetBlock(blk1.ID())
+	blk, err := chainState.GetBlock(context.Background(), blk1.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -608,7 +612,7 @@ func TestParseBlockError(t *testing.T) {
 		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
-	blk, err := chainState.ParseBlock([]byte{255})
+	blk, err := chainState.ParseBlock(context.Background(), []byte{255})
 	if err == nil {
 		t.Fatalf("Expected ParseBlock to return an error parsing an invalid block but found block of type %T", blk)
 	}
@@ -632,7 +636,7 @@ func TestBuildBlockError(t *testing.T) {
 		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
-	blk, err := chainState.BuildBlock()
+	blk, err := chainState.BuildBlock(context.Background())
 	if err == nil {
 		t.Fatalf("Expected BuildBlock to return an error but found block of type %T", blk)
 	}
@@ -676,7 +680,7 @@ func TestStateBytesToIDCache(t *testing.T) {
 	blk2 := testBlks[2]
 
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
-	buildBlock := func() (snowman.Block, error) {
+	buildBlock := func(context.Context) (snowman.Block, error) {
 		t.Fatal("shouldn't have been called")
 		return nil, errors.New("")
 	}
@@ -694,13 +698,13 @@ func TestStateBytesToIDCache(t *testing.T) {
 	})
 
 	// Shouldn't have blk1 ID to start with
-	_, err := chainState.GetBlock(blk1.ID())
+	_, err := chainState.GetBlock(context.Background(), blk1.ID())
 	require.Error(t, err)
 	_, ok := chainState.bytesToIDCache.Get(string(blk1.Bytes()))
 	require.False(t, ok)
 
 	// Parse blk1 from bytes
-	_, err = chainState.ParseBlock(blk1.Bytes())
+	_, err = chainState.ParseBlock(context.Background(), blk1.Bytes())
 	require.NoError(t, err)
 
 	// blk1 should be in cache now
@@ -708,7 +712,7 @@ func TestStateBytesToIDCache(t *testing.T) {
 	require.True(t, ok)
 
 	// Parse another block
-	_, err = chainState.ParseBlock(blk2.Bytes())
+	_, err = chainState.ParseBlock(context.Background(), blk2.Bytes())
 	require.NoError(t, err)
 
 	// Should have bumped blk1 from cache
@@ -761,7 +765,7 @@ func TestSetLastAcceptedBlock(t *testing.T) {
 		BuildBlock:         cantBuildBlock,
 		GetBlockIDAtHeight: getCanonicalBlockID,
 	})
-	lastAcceptedID, err := chainState.LastAccepted()
+	lastAcceptedID, err := chainState.LastAccepted(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -773,7 +777,7 @@ func TestSetLastAcceptedBlock(t *testing.T) {
 	if err := chainState.SetLastAcceptedBlock(postSetBlk1); err != nil {
 		t.Fatal(err)
 	}
-	lastAcceptedID, err = chainState.LastAccepted()
+	lastAcceptedID, err = chainState.LastAccepted(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -785,7 +789,7 @@ func TestSetLastAcceptedBlock(t *testing.T) {
 	}
 
 	// ensure further blocks can be accepted
-	parsedpostSetBlk2, err := chainState.ParseBlock(postSetBlk2.Bytes())
+	parsedpostSetBlk2, err := chainState.ParseBlock(context.Background(), postSetBlk2.Bytes())
 	if err != nil {
 		t.Fatal("Failed to parse postSetBlk2 due to: %w", err)
 	}
@@ -795,7 +799,7 @@ func TestSetLastAcceptedBlock(t *testing.T) {
 	if err := parsedpostSetBlk2.Accept(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	lastAcceptedID, err = chainState.LastAccepted()
+	lastAcceptedID, err = chainState.LastAccepted(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -817,7 +821,7 @@ func TestSetLastAcceptedBlockWithProcessingBlocksErrors(t *testing.T) {
 	resetBlk := testBlks[4]
 
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
-	buildBlock := func() (snowman.Block, error) {
+	buildBlock := func(context.Context) (snowman.Block, error) {
 		// Once the block is built, mark it as processing
 		blk1.SetStatus(choices.Processing)
 		return blk1, nil
@@ -835,7 +839,7 @@ func TestSetLastAcceptedBlockWithProcessingBlocksErrors(t *testing.T) {
 		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
-	builtBlk, err := chainState.BuildBlock()
+	builtBlk, err := chainState.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -872,7 +876,7 @@ func TestStateParseTransitivelyAcceptedBlock(t *testing.T) {
 		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
-	parsedBlk1, err := chainState.ParseBlock(blk1.Bytes())
+	parsedBlk1, err := chainState.ParseBlock(context.Background(), blk1.Bytes())
 	if err != nil {
 		t.Fatalf("Failed to parse blk1 due to: %s", err)
 	}

@@ -4,6 +4,7 @@
 package chain
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -21,14 +22,14 @@ import (
 type State struct {
 	// getBlock retrieves a block from the VM's storage. If getBlock returns
 	// a nil error, then the returned block must not have the status Unknown
-	getBlock func(ids.ID) (snowman.Block, error)
+	getBlock func(context.Context, ids.ID) (snowman.Block, error)
 	// unmarshals [b] into a block
-	unmarshalBlock func([]byte) (snowman.Block, error)
+	unmarshalBlock func(context.Context, []byte) (snowman.Block, error)
 	// buildBlock attempts to build a block on top of the currently preferred block
 	// buildBlock should always return a block with status Processing since it should never
 	// create an unknown block, and building on top of the preferred block should never yield
 	// a block that has already been decided.
-	buildBlock func() (snowman.Block, error)
+	buildBlock func(context.Context) (snowman.Block, error)
 
 	// getStatus returns the status of the block
 	getStatus func(snowman.Block) (choices.Status, error)
@@ -57,9 +58,9 @@ type Config struct {
 	DecidedCacheSize, MissingCacheSize, UnverifiedCacheSize, BytesToIDCacheSize int
 
 	LastAcceptedBlock  snowman.Block
-	GetBlock           func(ids.ID) (snowman.Block, error)
-	UnmarshalBlock     func([]byte) (snowman.Block, error)
-	BuildBlock         func() (snowman.Block, error)
+	GetBlock           func(context.Context, ids.ID) (snowman.Block, error)
+	UnmarshalBlock     func(context.Context, []byte) (snowman.Block, error)
+	BuildBlock         func(context.Context) (snowman.Block, error)
 	GetBlockIDAtHeight func(uint64) (ids.ID, error)
 }
 
@@ -221,7 +222,7 @@ func (s *State) Flush() {
 }
 
 // GetBlock returns the BlockWrapper as snowman.Block corresponding to [blkID]
-func (s *State) GetBlock(blkID ids.ID) (snowman.Block, error) {
+func (s *State) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
 	if blk, ok := s.getCachedBlock(blkID); ok {
 		return blk, nil
 	}
@@ -230,7 +231,7 @@ func (s *State) GetBlock(blkID ids.ID) (snowman.Block, error) {
 		return nil, database.ErrNotFound
 	}
 
-	blk, err := s.getBlock(blkID)
+	blk, err := s.getBlock(ctx, blkID)
 	// If getBlock returns [database.ErrNotFound], State considers
 	// this a cacheable miss.
 	if err == database.ErrNotFound {
@@ -264,8 +265,8 @@ func (s *State) getCachedBlock(blkID ids.ID) (snowman.Block, bool) {
 }
 
 // GetBlockInternal returns the internal representation of [blkID]
-func (s *State) GetBlockInternal(blkID ids.ID) (snowman.Block, error) {
-	wrappedBlk, err := s.GetBlock(blkID)
+func (s *State) GetBlockInternal(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
+	wrappedBlk, err := s.GetBlock(ctx, blkID)
 	if err != nil {
 		return nil, err
 	}
@@ -275,7 +276,7 @@ func (s *State) GetBlockInternal(blkID ids.ID) (snowman.Block, error) {
 
 // ParseBlock attempts to parse [b] into an internal Block and adds it to the appropriate
 // caching layer if successful.
-func (s *State) ParseBlock(b []byte) (snowman.Block, error) {
+func (s *State) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error) {
 	// See if we've cached this block's ID by its byte repr.
 	blkIDIntf, blkIDCached := s.bytesToIDCache.Get(string(b))
 	if blkIDCached {
@@ -288,7 +289,7 @@ func (s *State) ParseBlock(b []byte) (snowman.Block, error) {
 
 	// We don't have this block cached by its byte repr.
 	// Parse the block from bytes
-	blk, err := s.unmarshalBlock(b)
+	blk, err := s.unmarshalBlock(ctx, b)
 	if err != nil {
 		return nil, err
 	}
@@ -314,8 +315,8 @@ func (s *State) ParseBlock(b []byte) (snowman.Block, error) {
 
 // BuildBlock attempts to build a new internal Block, wraps it, and adds it
 // to the appropriate caching layer if successful.
-func (s *State) BuildBlock() (snowman.Block, error) {
-	blk, err := s.buildBlock()
+func (s *State) BuildBlock(ctx context.Context) (snowman.Block, error) {
+	blk, err := s.buildBlock(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -362,7 +363,7 @@ func (s *State) addBlockOutsideConsensus(blk snowman.Block) (snowman.Block, erro
 	return wrappedBlk, nil
 }
 
-func (s *State) LastAccepted() (ids.ID, error) {
+func (s *State) LastAccepted(context.Context) (ids.ID, error) {
 	return s.lastAcceptedBlock.ID(), nil
 }
 
