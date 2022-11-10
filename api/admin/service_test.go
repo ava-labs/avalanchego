@@ -5,6 +5,7 @@ package admin
 
 import (
 	"errors"
+	"net/http"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -75,7 +76,7 @@ func TestLoadVMsSuccess(t *testing.T) {
 
 	// execute test
 	reply := LoadVMsReply{}
-	err := resources.admin.LoadVMs(nil, nil, &reply)
+	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)
 
 	require.Equal(t, expectedVMRegistry, reply.NewVMs)
 	require.Equal(t, err, nil)
@@ -91,7 +92,7 @@ func TestLoadVMsReloadFails(t *testing.T) {
 	resources.mockVMRegistry.EXPECT().ReloadWithReadLock(gomock.Any()).Times(1).Return(nil, nil, errOops)
 
 	reply := LoadVMsReply{}
-	err := resources.admin.LoadVMs(nil, nil, &reply)
+	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)
 
 	require.Equal(t, err, errOops)
 }
@@ -116,7 +117,7 @@ func TestLoadVMsGetAliasesFails(t *testing.T) {
 	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(nil, errOops)
 
 	reply := LoadVMsReply{}
-	err := resources.admin.LoadVMs(nil, nil, &reply)
+	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)
 
 	require.Equal(t, err, errOops)
 }
