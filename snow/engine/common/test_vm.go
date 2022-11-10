@@ -47,19 +47,19 @@ type TestVM struct {
 	CantAppRequest, CantAppResponse, CantAppGossip, CantAppRequestFailed,
 	CantCrossChainAppRequest, CantCrossChainAppResponse, CantCrossChainAppRequestFailed bool
 
-	InitializeF                 func(context.Context, *snow.Context, manager.Manager, []byte, []byte, []byte, chan<- Message, []*Fx, AppSender) error
-	SetStateF                   func(context.Context, snow.State) error
-	ShutdownF                   func(ctx context.Context) error
-	CreateHandlersF             func(ctx context.Context) (map[string]*HTTPHandler, error)
-	CreateStaticHandlersF       func(ctx context.Context) (map[string]*HTTPHandler, error)
+	InitializeF                 func(ctx context.Context, chainCtx *snow.Context, db manager.Manager, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, msgChan chan<- Message, fxs []*Fx, appSender AppSender) error
+	SetStateF                   func(ctx context.Context, state snow.State) error
+	ShutdownF                   func(context.Context) error
+	CreateHandlersF             func(context.Context) (map[string]*HTTPHandler, error)
+	CreateStaticHandlersF       func(context.Context) (map[string]*HTTPHandler, error)
 	ConnectedF                  func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
 	DisconnectedF               func(ctx context.Context, nodeID ids.NodeID) error
-	HealthCheckF                func(ctx context.Context) (interface{}, error)
+	HealthCheckF                func(context.Context) (interface{}, error)
 	AppRequestF                 func(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
 	AppResponseF                func(ctx context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error
 	AppGossipF                  func(ctx context.Context, nodeID ids.NodeID, msg []byte) error
 	AppRequestFailedF           func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
-	VersionF                    func(ctx context.Context) (string, error)
+	VersionF                    func(context.Context) (string, error)
 	CrossChainAppRequestF       func(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, msg []byte) error
 	CrossChainAppResponseF      func(ctx context.Context, chainID ids.ID, requestID uint32, msg []byte) error
 	CrossChainAppRequestFailedF func(ctx context.Context, chainID ids.ID, requestID uint32) error
