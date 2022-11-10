@@ -24,12 +24,12 @@ type Decidable interface {
 	// Accept this element.
 	//
 	// This element will be accepted by every correct node in the network.
-	Accept(ctx context.Context) error
+	Accept(context.Context) error
 
 	// Reject this element.
 	//
 	// This element will not be accepted by any correct node in the network.
-	Reject(ctx context.Context) error
+	Reject(context.Context) error
 
 	// Status returns this element's current status.
 	//
