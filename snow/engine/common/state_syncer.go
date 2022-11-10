@@ -14,5 +14,5 @@ type StateSyncer interface {
 
 	// IsEnabled returns true if the underlying VM wants to perform state sync.
 	// Any returned error will be considered fatal.
-	IsEnabled(ctx context.Context) (bool, error)
+	IsEnabled(context.Context) (bool, error)
 }
