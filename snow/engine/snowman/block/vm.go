@@ -47,7 +47,7 @@ type ChainVM interface {
 	// If no blocks have been accepted by consensus yet, it is assumed there is
 	// a definitionally accepted block, the Genesis block, that will be
 	// returned.
-	LastAccepted(ctx context.Context) (ids.ID, error)
+	LastAccepted(context.Context) (ids.ID, error)
 }
 
 // Getter defines the functionality for fetching a block by its ID.
