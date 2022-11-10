@@ -4,6 +4,7 @@
 package registry
 
 import (
+	"context"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -54,7 +55,7 @@ func TestReload_Success(t *testing.T) {
 		Times(1).
 		Return(nil)
 
-	installedVMs, failedVMs, err := resources.vmRegistry.Reload()
+	installedVMs, failedVMs, err := resources.vmRegistry.Reload(context.Background())
 	require.ElementsMatch(t, []ids.ID{id3, id4}, installedVMs)
 	require.Empty(t, failedVMs)
 	require.Nil(t, err)
@@ -67,7 +68,7 @@ func TestReload_GetNewVMsFails(t *testing.T) {
 
 	resources.mockVMGetter.EXPECT().Get().Times(1).Return(nil, nil, errOops)
 
-	installedVMs, failedVMs, err := resources.vmRegistry.Reload()
+	installedVMs, failedVMs, err := resources.vmRegistry.Reload(context.Background())
 	require.Nil(t, installedVMs)
 	require.Empty(t, failedVMs)
 	require.Equal(t, err, errOops)
@@ -106,13 +107,13 @@ func TestReload_PartialRegisterFailure(t *testing.T) {
 		Times(1).
 		Return(nil)
 
-	installedVMs, failedVMs, err := resources.vmRegistry.Reload()
+	installedVMs, failedVMs, err := resources.vmRegistry.Reload(context.Background())
 
 	require.Len(t, failedVMs, 1)
 	require.Equal(t, failedVMs[id3], errOops)
 	require.Len(t, installedVMs, 1)
 	require.Equal(t, installedVMs[0], id4)
-	require.Nil(t, err)
+	require.NoError(t, err)
 }
 
 // Tests the happy case where Reload succeeds.
@@ -148,7 +149,7 @@ func TestReloadWithReadLock_Success(t *testing.T) {
 		Times(1).
 		Return(nil)
 
-	installedVMs, failedVMs, err := resources.vmRegistry.ReloadWithReadLock()
+	installedVMs, failedVMs, err := resources.vmRegistry.ReloadWithReadLock(context.Background())
 	require.ElementsMatch(t, []ids.ID{id3, id4}, installedVMs)
 	require.Empty(t, failedVMs)
 	require.Nil(t, err)
@@ -161,7 +162,7 @@ func TestReloadWithReadLock_GetNewVMsFails(t *testing.T) {
 
 	resources.mockVMGetter.EXPECT().Get().Times(1).Return(nil, nil, errOops)
 
-	installedVMs, failedVMs, err := resources.vmRegistry.ReloadWithReadLock()
+	installedVMs, failedVMs, err := resources.vmRegistry.ReloadWithReadLock(context.Background())
 	require.Nil(t, installedVMs)
 	require.Empty(t, failedVMs)
 	require.Equal(t, err, errOops)
@@ -200,7 +201,7 @@ func TestReloadWithReadLock_PartialRegisterFailure(t *testing.T) {
 		Times(1).
 		Return(nil)
 
-	installedVMs, failedVMs, err := resources.vmRegistry.ReloadWithReadLock()
+	installedVMs, failedVMs, err := resources.vmRegistry.ReloadWithReadLock(context.Background())
 
 	require.Len(t, failedVMs, 1)
 	require.Equal(t, failedVMs[id3], errOops)
