@@ -516,15 +516,21 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, lastHeight *big.Int, 
 	if isForkIncompatible(c.ApricotPhase5BlockTimestamp, newcfg.ApricotPhase5BlockTimestamp, lastTimestamp) {
 		return newCompatError("ApricotPhase5 fork block timestamp", c.ApricotPhase5BlockTimestamp, newcfg.ApricotPhase5BlockTimestamp)
 	}
-	// TODO: add Phase 6 checks
-
-	// TODO activate isForkIncompatible checks
-	// if isForkIncompatible(c.BanffBlockTimestamp, newcfg.BanffBlockTimestamp, lastTimestamp) {
-	// 	return newCompatError("Banff fork block timestamp", c.BanffBlockTimestamp, newcfg.BanffBlockTimestamp)
-	// }
-	// if isForkIncompatible(c.CortinaBlockTimestamp, newcfg.CortinaBlockTimestamp, lastTimestamp) {
-	// 	return newCompatError("Cortina fork block timestamp", c.CortinaBlockTimestamp, newcfg.CortinaBlockTimestamp)
-	// }
+	if isForkIncompatible(c.ApricotPhasePre6BlockTimestamp, newcfg.ApricotPhasePre6BlockTimestamp, lastTimestamp) {
+		return newCompatError("ApricotPhasePre6 fork block timestamp", c.ApricotPhasePre6BlockTimestamp, newcfg.ApricotPhasePre6BlockTimestamp)
+	}
+	if isForkIncompatible(c.ApricotPhase6BlockTimestamp, newcfg.ApricotPhase6BlockTimestamp, lastTimestamp) {
+		return newCompatError("ApricotPhase6 fork block timestamp", c.ApricotPhase6BlockTimestamp, newcfg.ApricotPhase6BlockTimestamp)
+	}
+	if isForkIncompatible(c.ApricotPhasePost6BlockTimestamp, newcfg.ApricotPhasePost6BlockTimestamp, lastTimestamp) {
+		return newCompatError("ApricotPhasePost6 fork block timestamp", c.ApricotPhasePost6BlockTimestamp, newcfg.ApricotPhasePost6BlockTimestamp)
+	}
+	if isForkIncompatible(c.BanffBlockTimestamp, newcfg.BanffBlockTimestamp, lastTimestamp) {
+		return newCompatError("Banff fork block timestamp", c.BanffBlockTimestamp, newcfg.BanffBlockTimestamp)
+	}
+	if isForkIncompatible(c.CortinaBlockTimestamp, newcfg.CortinaBlockTimestamp, lastTimestamp) {
+		return newCompatError("Cortina fork block timestamp", c.CortinaBlockTimestamp, newcfg.CortinaBlockTimestamp)
+	}
 	return nil
 }
 
