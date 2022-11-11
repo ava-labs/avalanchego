@@ -740,3 +740,67 @@ func TestVerifyLockMode(t *testing.T) {
 		})
 	}
 }
+
+func TestVerifyNoLocks(t *testing.T) {
+	tx := &dummyUnsignedTx{txs.BaseTx{}}
+	tx.Initialize([]byte{0})
+
+	outputOwners, _ := generateOwnersAndSig(tx)
+	assetID := ids.GenerateTestID()
+	lockTxID := ids.GenerateTestID()
+	sigIndices := []uint32{0}
+
+	tests := map[string]struct {
+		ins         []*avax.TransferableInput
+		outs        []*avax.TransferableOutput
+		expectedErr error
+	}{
+		"OK": {
+			ins: []*avax.TransferableInput{
+				generateTestIn(assetID, 10, ids.Empty, ids.Empty, sigIndices),
+			},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(assetID, 10, outputOwners, ids.Empty, ids.Empty),
+			},
+			expectedErr: nil,
+		},
+		"fail: locked.In": {
+			ins: []*avax.TransferableInput{
+				generateTestIn(assetID, 11, lockTxID, ids.Empty, sigIndices),
+			},
+			outs:        []*avax.TransferableOutput{},
+			expectedErr: errWrongInType,
+		},
+		"fail: locked.Out": {
+			ins: []*avax.TransferableInput{},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(assetID, 11, outputOwners, lockTxID, ids.Empty),
+			},
+			expectedErr: errWrongOutType,
+		},
+		"fail: stakeable.LockIn": {
+			ins: []*avax.TransferableInput{
+				generateTestStakeableIn(assetID, 11, 1, sigIndices),
+			},
+			outs:        []*avax.TransferableOutput{},
+			expectedErr: errWrongInType,
+		},
+		"fail: stakeable.LockOut": {
+			ins: []*avax.TransferableInput{},
+			outs: []*avax.TransferableOutput{
+				generateTestStakeableOut(assetID, 11, 1, outputOwners),
+			},
+			expectedErr: errWrongOutType,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := VerifyNoLocks(
+				test.ins,
+				test.outs,
+			)
+			require.ErrorIs(t, err, test.expectedErr)
+		})
+	}
+}
