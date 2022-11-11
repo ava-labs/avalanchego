@@ -1,3 +1,13 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -18,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -58,7 +69,7 @@ func Produce(
 }
 
 // TODO: Stake and Authorize should be replaced by similar methods in the
-//       P-chain wallet
+//	P-chain wallet
 type Spender interface {
 	// Spend the provided amount while deducting the provided fee.
 	// Arguments:
@@ -95,6 +106,27 @@ type Spender interface {
 	) (
 		verify.Verifiable, // Input that names owners
 		[]*crypto.PrivateKeySECP256K1R, // Keys that prove ownership
+		error,
+	)
+
+	// Lock the provided amount while deducting the provided fee.
+	// Arguments:
+	// - [keys] are the owners of the funds
+	// - [totalAmountToLock] is the amount of funds that are trying to be locked with [appliedLockState]
+	// - [totalAmountToBurn] is the amount of AVAX that should be burned
+	// Returns:
+	// - [inputs] the inputs that should be consumed to fund the outputs
+	// - [outputs] the outputs that should be returned to the UTXO set
+	// - [signers] the proof of ownership of the funds being moved
+	Lock(
+		keys []*crypto.PrivateKeySECP256K1R,
+		totalAmountToLock uint64,
+		totalAmountToBurn uint64,
+		appliedLockState locked.State,
+	) (
+		[]*avax.TransferableInput, // inputs
+		[]*avax.TransferableOutput, // outputs
+		[][]*crypto.PrivateKeySECP256K1R, // signers
 		error,
 	)
 }
@@ -137,6 +169,27 @@ type Verifier interface {
 		outs []*avax.TransferableOutput,
 		creds []verify.Verifiable,
 		unlockedProduced map[ids.ID]uint64,
+	) error
+
+	// Verify that [tx] is semantically valid.
+	// [ins] and [outs] are the inputs and outputs of [tx].
+	// [creds] are the credentials of [tx], which allow [ins] to be spent.
+	// The [ins] must have at least [burnedAmount] more than the [outs].
+	// [assetID] is id of allowed asset, ins/outs with other assets will return error
+	// [appliedLockState] are lockState that was applied to [ins] lockState to produce [outs]
+	//
+	// Precondition: [tx] has already been syntactically verified.
+	//
+	// Note: [unlockedProduced] is modified by this method.
+	VerifyLock(
+		tx txs.UnsignedTx,
+		utxoDB state.UTXOGetter,
+		ins []*avax.TransferableInput,
+		outs []*avax.TransferableOutput,
+		creds []verify.Verifiable,
+		burnedAmount uint64,
+		assetID ids.ID,
+		appliedLockState locked.State,
 	) error
 }
 

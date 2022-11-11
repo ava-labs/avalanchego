@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -199,6 +200,20 @@ func generateTestUTXO(txID ids.ID, assetID ids.ID, amount uint64, outputOwners s
 	}
 }
 
+func generateTestStakeableUTXO(txID ids.ID, assetID ids.ID, amount, locktime uint64, outputOwners secp256k1fx.OutputOwners) *avax.UTXO {
+	return &avax.UTXO{
+		UTXOID: avax.UTXOID{TxID: txID},
+		Asset:  avax.Asset{ID: assetID},
+		Out: &stakeable.LockOut{
+			Locktime: locktime,
+			TransferableOut: &secp256k1fx.TransferOutput{
+				Amt:          amount,
+				OutputOwners: outputOwners,
+			},
+		},
+	}
+}
+
 func generateTestInFromUTXO(utxo *avax.UTXO, sigIndices []uint32) *avax.TransferableInput {
 	var in avax.TransferableIn
 	switch out := utxo.Out.(type) {
@@ -250,6 +265,21 @@ func generateTestIn(assetID ids.ID, amount uint64, depositTxID, bondTxID ids.ID,
 	}
 }
 
+func generateTestStakeableIn(assetID ids.ID, amount, locktime uint64, sigIndices []uint32) *avax.TransferableInput {
+	return &avax.TransferableInput{
+		Asset: avax.Asset{ID: assetID},
+		In: &stakeable.LockIn{
+			Locktime: locktime,
+			TransferableIn: &secp256k1fx.TransferInput{
+				Amt: amount,
+				Input: secp256k1fx.Input{
+					SigIndices: sigIndices,
+				},
+			},
+		},
+	}
+}
+
 func generateTestOut(assetID ids.ID, amount uint64, outputOwners secp256k1fx.OutputOwners, depositTxID, bondTxID ids.ID) *avax.TransferableOutput {
 	var out avax.TransferableOut = &secp256k1fx.TransferOutput{
 		Amt:          amount,
@@ -270,7 +300,20 @@ func generateTestOut(assetID ids.ID, amount uint64, outputOwners secp256k1fx.Out
 	}
 }
 
-func generateKeyAndSig(tx txs.UnsignedTx) (secp256k1fx.OutputOwners, *secp256k1fx.Credential) {
+func generateTestStakeableOut(assetID ids.ID, amount, locktime uint64, outputOwners secp256k1fx.OutputOwners) *avax.TransferableOutput {
+	return &avax.TransferableOutput{
+		Asset: avax.Asset{ID: assetID},
+		Out: &stakeable.LockOut{
+			Locktime: locktime,
+			TransferableOut: &secp256k1fx.TransferOutput{
+				Amt:          amount,
+				OutputOwners: outputOwners,
+			},
+		},
+	}
+}
+
+func generateOwnersAndSig(tx txs.UnsignedTx) (secp256k1fx.OutputOwners, *secp256k1fx.Credential) {
 	txHash := hashing.ComputeHash256(tx.Bytes())
 
 	cryptFactory := crypto.FactorySECP256K1R{}

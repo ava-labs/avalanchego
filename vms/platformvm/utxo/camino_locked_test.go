@@ -393,9 +393,10 @@ func TestLock(t *testing.T) {
 				[]*crypto.PrivateKeySECP256K1R{secpKey},
 				tt.args.totalAmountToSpend,
 				tt.args.totalAmountToBurn,
-				address,
 				tt.args.appliedLockState,
 			)
+
+			avax.SortTransferableOutputs(want.outs, txs.Codec)
 
 			require.ErrorIs(err, tt.expectError, tt.msg)
 			require.Equal(want.ins, ins)
@@ -428,8 +429,8 @@ func TestVerifyLockUTXOs(t *testing.T) {
 	tx := &dummyUnsignedTx{txs.BaseTx{}}
 	tx.Initialize([]byte{0})
 
-	outputOwners1, cred1 := generateKeyAndSig(tx)
-	outputOwners2, cred2 := generateKeyAndSig(tx)
+	outputOwners1, cred1 := generateOwnersAndSig(tx)
+	outputOwners2, cred2 := generateOwnersAndSig(tx)
 
 	sigIndices := []uint32{0}
 	existingTxID := ids.GenerateTestID()
@@ -458,7 +459,7 @@ func TestVerifyLockUTXOs(t *testing.T) {
 				generateTestIn(assetID, 10, ids.Empty, ids.Empty, sigIndices),
 				generateTestIn(assetID, 10, existingTxID, ids.Empty, sigIndices),
 			},
-			outs: []*avax.TransferableOutput{ // burn 1u:1, 2u:1
+			outs: []*avax.TransferableOutput{
 				generateTestOut(assetID, 9, outputOwners1, ids.Empty, ids.Empty),
 				generateTestOut(assetID, 10, outputOwners1, existingTxID, ids.Empty),
 				generateTestOut(assetID, 9, outputOwners2, ids.Empty, ids.Empty),
@@ -505,7 +506,7 @@ func TestVerifyLockUTXOs(t *testing.T) {
 				generateTestIn(assetID, 3, ids.Empty, ids.Empty, sigIndices),
 				generateTestIn(assetID, 3, existingTxID, ids.Empty, sigIndices),
 			},
-			outs: []*avax.TransferableOutput{ // burn 1u:1, 2u:1
+			outs: []*avax.TransferableOutput{
 				generateTestOut(assetID, 1, outputOwners1, ids.Empty, ids.Empty),
 				generateTestOut(assetID, 2, outputOwners1, existingTxID, ids.Empty),
 				generateTestOut(assetID, 3, outputOwners2, ids.Empty, ids.Empty),
@@ -529,7 +530,7 @@ func TestVerifyLockUTXOs(t *testing.T) {
 				generateTestIn(assetID, 10, ids.Empty, ids.Empty, sigIndices),
 				generateTestIn(assetID, 10, existingTxID, ids.Empty, sigIndices),
 			},
-			outs: []*avax.TransferableOutput{ // burn 1u:1, 2u:1; lock 1u:4, 1d:10, 2d: 5
+			outs: []*avax.TransferableOutput{
 				generateTestOut(assetID, 5, outputOwners1, ids.Empty, ids.Empty),
 				generateTestOut(assetID, 4, outputOwners1, ids.Empty, locked.ThisTxID),
 				generateTestOut(assetID, 10, outputOwners1, existingTxID, locked.ThisTxID),
@@ -591,6 +592,51 @@ func TestVerifyLockUTXOs(t *testing.T) {
 			appliedLockState: locked.StateBonded,
 			expectedErr:      errWrongProducedAmount,
 		},
+		"utxos have stakable.LockedOut": {
+			utxos: []*avax.UTXO{
+				generateTestStakeableUTXO(ids.ID{1}, assetID, 10, 0, outputOwners1),
+			},
+			ins: []*avax.TransferableInput{
+				generateTestIn(assetID, 10, ids.Empty, ids.Empty, sigIndices),
+			},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(assetID, 10, outputOwners1, ids.Empty, ids.Empty),
+			},
+			burnedAmount:     2,
+			creds:            []verify.Verifiable{cred1},
+			appliedLockState: locked.StateBonded,
+			expectedErr:      errWrongUTXOOutType,
+		},
+		"outs have stakable.LockedOut": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, assetID, 10, outputOwners1, ids.Empty, ids.Empty),
+			},
+			ins: []*avax.TransferableInput{
+				generateTestIn(assetID, 10, ids.Empty, ids.Empty, sigIndices),
+			},
+			outs: []*avax.TransferableOutput{
+				generateTestStakeableOut(assetID, 10, 0, outputOwners1),
+			},
+			burnedAmount:     2,
+			creds:            []verify.Verifiable{cred1},
+			appliedLockState: locked.StateBonded,
+			expectedErr:      errWrongOutType,
+		},
+		"ins have stakable.LockedIn": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, assetID, 10, outputOwners1, ids.Empty, ids.Empty),
+			},
+			ins: []*avax.TransferableInput{
+				generateTestStakeableIn(assetID, 10, 0, sigIndices),
+			},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(assetID, 10, outputOwners1, ids.Empty, ids.Empty),
+			},
+			burnedAmount:     2,
+			creds:            []verify.Verifiable{cred1},
+			appliedLockState: locked.StateBonded,
+			expectedErr:      errWrongInType,
+		},
 	}
 
 	for name, test := range tests {
@@ -604,6 +650,91 @@ func TestVerifyLockUTXOs(t *testing.T) {
 				test.burnedAmount,
 				assetID,
 				test.appliedLockState,
+			)
+			require.ErrorIs(t, err, test.expectedErr)
+		})
+	}
+}
+
+func TestVerifyLockMode(t *testing.T) {
+	tx := &dummyUnsignedTx{txs.BaseTx{}}
+	tx.Initialize([]byte{0})
+
+	outputOwners, _ := generateOwnersAndSig(tx)
+	assetID := ids.GenerateTestID()
+	lockTxID := ids.GenerateTestID()
+	sigIndices := []uint32{0}
+
+	tests := map[string]struct {
+		ins                    []*avax.TransferableInput
+		outs                   []*avax.TransferableOutput
+		lockModeDepositBonding bool
+		expectedErr            error
+	}{
+		"OK (lockModeDepositBonding false)": {
+			ins: []*avax.TransferableInput{
+				generateTestIn(assetID, 10, ids.Empty, ids.Empty, sigIndices),
+				generateTestStakeableIn(assetID, 10, 0, sigIndices),
+			},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(assetID, 10, outputOwners, ids.Empty, ids.Empty),
+				generateTestStakeableOut(assetID, 10, 0, outputOwners),
+			},
+			lockModeDepositBonding: false,
+			expectedErr:            nil,
+		},
+		"OK (lockModeDepositBonding true)": {
+			ins: []*avax.TransferableInput{
+				generateTestIn(assetID, 10, ids.Empty, ids.Empty, sigIndices),
+				generateTestIn(assetID, 10, lockTxID, ids.Empty, sigIndices),
+			},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(assetID, 10, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(assetID, 10, outputOwners, lockTxID, ids.Empty),
+			},
+			lockModeDepositBonding: true,
+			expectedErr:            nil,
+		},
+		"fail (lockModeDepositBonding false): wrong input type": {
+			ins: []*avax.TransferableInput{
+				generateTestIn(assetID, 10, lockTxID, ids.Empty, sigIndices),
+			},
+			outs:                   []*avax.TransferableOutput{},
+			lockModeDepositBonding: false,
+			expectedErr:            errWrongInType,
+		},
+		"fail (lockModeDepositBonding false): wrong output type": {
+			ins: []*avax.TransferableInput{},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(assetID, 10, outputOwners, lockTxID, ids.Empty),
+			},
+			lockModeDepositBonding: false,
+			expectedErr:            errWrongOutType,
+		},
+		"fail (lockModeDepositBonding true): wrong input type": {
+			ins: []*avax.TransferableInput{
+				generateTestStakeableIn(assetID, 10, 0, sigIndices),
+			},
+			outs:                   []*avax.TransferableOutput{},
+			lockModeDepositBonding: true,
+			expectedErr:            errWrongInType,
+		},
+		"fail (lockModeDepositBonding true): wrong output type": {
+			ins: []*avax.TransferableInput{},
+			outs: []*avax.TransferableOutput{
+				generateTestStakeableOut(assetID, 10, 0, outputOwners),
+			},
+			lockModeDepositBonding: true,
+			expectedErr:            errWrongOutType,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := VerifyLockMode(
+				test.ins,
+				test.outs,
+				test.lockModeDepositBonding,
 			)
 			require.ErrorIs(t, err, test.expectedErr)
 		})
