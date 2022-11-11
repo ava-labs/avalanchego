@@ -535,7 +535,7 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 		t.Fatal("could not accept block")
 	}
 
-	coreVM.LastAcceptedF = func(_ context.Context) (ids.ID, error) {
+	coreVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
 		if coreBlk.Status() == choices.Accepted {
 			return coreBlk.ID(), nil
 		}
