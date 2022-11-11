@@ -486,7 +486,7 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 		BytesV:     []byte{1},
 		TimestampV: proVM.Time(),
 	}
-	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+	coreVM.ParseBlockF = func(context.Context, []byte) (snowman.Block, error) {
 		return nil, errMarshallingFailed
 	}
 	slb, err := statelessblock.Build(
