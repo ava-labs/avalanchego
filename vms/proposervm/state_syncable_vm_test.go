@@ -391,7 +391,7 @@ func TestParseStateSummary(t *testing.T) {
 		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
 	}
 	innerVM.ParseStateSummaryF = func(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
-		require.True(bytes.Equal(summaryBytes, innerSummary.Bytes()))
+		require.Equal(summaryBytes, innerSummary.Bytes())
 		return innerSummary, nil
 	}
 	innerVM.GetStateSummaryF = func(_ context.Context, h uint64) (block.StateSummary, error) {

@@ -381,7 +381,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	summary := []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
 	isSummaryDecoded := false
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
+	fullVM.ParseStateSummaryF = func(context.Context, []byte) (block.StateSummary, error) {
 		isSummaryDecoded = true
 		return nil, errors.New("invalid state summary")
 	}
@@ -455,7 +455,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 
 	fullVM.CantParseStateSummary = true
 	fullVM.ParseStateSummaryF = func(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
-		require.True(len(summaryBytes) == 0)
+		require.Empty(summaryBytes)
 		return nil, errors.New("empty summary")
 	}
 
@@ -1080,7 +1080,7 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 		T:       t,
 	}
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
+	fullVM.ParseStateSummaryF = func(context.Context, []byte) (block.StateSummary, error) {
 		return minoritySummary, nil
 	}
 

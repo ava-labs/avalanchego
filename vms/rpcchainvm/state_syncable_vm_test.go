@@ -188,21 +188,21 @@ func acceptStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (plugin.P
 		gomock.InOrder(
 			ssVM.MockStateSyncableVM.EXPECT().GetStateSummary(gomock.Any(), gomock.Any()).Return(mockedSummary, nil).Times(1),
 			ssVM.MockStateSyncableVM.EXPECT().ParseStateSummary(gomock.Any(), gomock.Any()).DoAndReturn(
-				func(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
+				func(context.Context, []byte) (block.StateSummary, error) {
 					// setup summary to be accepted before returning it
 					mockedSummary.AcceptF = func(context.Context) (bool, error) { return true, nil }
 					return mockedSummary, nil
 				},
 			).Times(1),
 			ssVM.MockStateSyncableVM.EXPECT().ParseStateSummary(gomock.Any(), gomock.Any()).DoAndReturn(
-				func(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
+				func(context.Context, []byte) (block.StateSummary, error) {
 					// setup summary to be skipped before returning it
 					mockedSummary.AcceptF = func(context.Context) (bool, error) { return false, nil }
 					return mockedSummary, nil
 				},
 			).Times(1),
 			ssVM.MockStateSyncableVM.EXPECT().ParseStateSummary(gomock.Any(), gomock.Any()).DoAndReturn(
-				func(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
+				func(context.Context, []byte) (block.StateSummary, error) {
 					// setup summary to fail accept
 					mockedSummary.AcceptF = func(context.Context) (bool, error) { return false, errBrokenConnectionOrSomething }
 					return mockedSummary, nil
@@ -235,7 +235,7 @@ func lastAcceptedBlockPostStateSummaryAcceptTestPlugin(t *testing.T, loadExpecta
 			ssVM.MockChainVM.EXPECT().GetBlock(gomock.Any(), gomock.Any()).Return(preSummaryBlk, nil).Times(1),
 
 			ssVM.MockStateSyncableVM.EXPECT().ParseStateSummary(gomock.Any(), gomock.Any()).DoAndReturn(
-				func(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
+				func(context.Context, []byte) (block.StateSummary, error) {
 					// setup summary to be accepted before returning it
 					mockedSummary.AcceptF = func(context.Context) (bool, error) { return true, nil }
 					return mockedSummary, nil
