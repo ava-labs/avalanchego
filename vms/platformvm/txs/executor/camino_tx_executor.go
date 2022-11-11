@@ -169,7 +169,7 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 		return err
 	}
 
-	if err := utxo.VerifyLockMode(tx.Ins, tx.Outs, caminoGenesis.LockModeBondDeposit); err != nil {
+	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoGenesis.LockModeBondDeposit); err != nil {
 		return err
 	}
 
@@ -213,7 +213,7 @@ func (e *CaminoStandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidat
 		return err
 	}
 
-	if err := utxo.VerifyLockMode(tx.Ins, tx.Outs, false); err != nil {
+	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, false); err != nil {
 		return err
 	}
 
