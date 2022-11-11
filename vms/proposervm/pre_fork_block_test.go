@@ -560,7 +560,7 @@ func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
 		ParentV: coreGenBlk.ID(),
 		HeightV: coreGenBlk.Height() + 1,
 	}
-	coreVM.BuildBlockF = func(_ context.Context) (snowman.Block, error) { return coreBlk, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return coreBlk, nil }
 
 	sb, err := proVM.BuildBlock(context.Background())
 	if err != nil {
