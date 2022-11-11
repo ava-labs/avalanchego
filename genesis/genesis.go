@@ -367,7 +367,6 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	endStakingTime := genesisTime.Add(time.Duration(config.InitialStakeDuration) * time.Second)
 	stakingOffset := time.Duration(0)
 	for i, staker := range config.InitialStakers {
-		nodeAllocations := allNodeAllocations[i]
 		endStakingTime := endStakingTime.Add(-stakingOffset)
 		stakingOffset += time.Duration(config.InitialStakeDurationOffset) * time.Second
 
@@ -377,23 +376,29 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		}
 
 		utxos := []api.UTXO(nil)
-		for _, allocation := range nodeAllocations {
-			addr, err := address.FormatBech32(hrp, allocation.AVAXAddr.Bytes())
-			if err != nil {
-				return nil, ids.ID{}, err
-			}
-			for _, unlock := range allocation.UnlockSchedule {
-				msgStr, err := formatting.Encode(defaultEncoding, allocation.ETHAddr.Bytes())
+		// The allNodeAllocations array may not have the same number of splits as
+		// the InitialStakers array, if, for example, there are no unlock events.
+		// This code prevents a panic for accessing the array at i.
+		if i < len(allNodeAllocations) {
+			nodeAllocations := allNodeAllocations[i]
+			for _, allocation := range nodeAllocations {
+				addr, err := address.FormatBech32(hrp, allocation.AVAXAddr.Bytes())
 				if err != nil {
-					return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
+					return nil, ids.ID{}, err
 				}
-				utxos = append(utxos, api.UTXO{
-					Locktime: json.Uint64(unlock.Locktime),
-					Amount:   json.Uint64(unlock.Amount),
-					Address:  addr,
-					Message:  msgStr,
-				})
-				amount += unlock.Amount
+				for _, unlock := range allocation.UnlockSchedule {
+					msgStr, err := formatting.Encode(defaultEncoding, allocation.ETHAddr.Bytes())
+					if err != nil {
+						return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
+					}
+					utxos = append(utxos, api.UTXO{
+						Locktime: json.Uint64(unlock.Locktime),
+						Amount:   json.Uint64(unlock.Amount),
+						Address:  addr,
+						Message:  msgStr,
+					})
+					amount += unlock.Amount
+				}
 			}
 		}
 
