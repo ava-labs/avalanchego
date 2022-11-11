@@ -64,7 +64,7 @@ func NewTestBlocks(numBlocks uint64) []*TestBlock {
 func createInternalBlockFuncs(t *testing.T, blks []*TestBlock) (
 	func(ctx context.Context, blkID ids.ID) (snowman.Block, error),
 	func(ctx context.Context, b []byte) (snowman.Block, error),
-	func(height uint64) (ids.ID, error),
+	func(ctx context.Context, height uint64) (ids.ID, error),
 ) {
 	blkMap := make(map[ids.ID]*TestBlock)
 	blkByteMap := make(map[byte]*TestBlock)
@@ -102,7 +102,7 @@ func createInternalBlockFuncs(t *testing.T, blks []*TestBlock) (
 
 		return blk, nil
 	}
-	getAcceptedBlockIDAtHeight := func(height uint64) (ids.ID, error) {
+	getAcceptedBlockIDAtHeight := func(_ context.Context, height uint64) (ids.ID, error) {
 		for _, blk := range blks {
 			if blk.Height() != height {
 				continue
