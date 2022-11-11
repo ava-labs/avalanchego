@@ -30,6 +30,7 @@ var (
 	errNotEnoughBalance          = errors.New("not enough balance to lock")
 	errWrongInType               = errors.New("wrong input type")
 	errWrongOutType              = errors.New("wrong output type")
+	errWrongUTXOOutType          = errors.New("wrong utxo output type")
 	errWrongProducedAmount       = errors.New("produced more tokens, than input had")
 	errInputsCredentialsMismatch = errors.New("number of inputs is different from number of credentials")
 	errInputsUTXOSMismatch       = errors.New("number of inputs is different from number of utxos")
@@ -72,11 +73,60 @@ func ProduceLocked(
 	return nil
 }
 
+// Verifies that all [outs] and [ins] have allowed types depending on [lockModeBonding].
+// If lockModeBonding is true, than outs and ins can't be stakeable types.
+// If lockModeBonding is false, than outs and ins can't be locked types.
+func VerifyLockMode(
+	ins []*avax.TransferableInput,
+	outs []*avax.TransferableOutput,
+	lockModeBonding bool,
+) error {
+	for _, input := range ins {
+		in := input.In
+
+		if lockModeBonding {
+			if inner, ok := in.(*locked.In); ok {
+				in = inner.TransferableIn
+			}
+			if _, ok := in.(*stakeable.LockIn); ok {
+				return errWrongInType
+			}
+		} else {
+			if inner, ok := in.(*stakeable.LockIn); ok {
+				in = inner.TransferableIn
+			}
+			if _, ok := in.(*locked.In); ok {
+				return errWrongInType
+			}
+		}
+	}
+
+	for _, output := range outs {
+		out := output.Out
+		if lockModeBonding {
+			if inner, ok := out.(*locked.Out); ok {
+				out = inner.TransferableOut
+			}
+			if _, ok := out.(*stakeable.LockOut); ok {
+				return errWrongOutType
+			}
+		} else {
+			if inner, ok := out.(*stakeable.LockOut); ok {
+				out = inner.TransferableOut
+			}
+			if _, ok := out.(*locked.Out); ok {
+				return errWrongOutType
+			}
+		}
+	}
+
+	return nil
+}
+
 func (h *handler) Lock(
 	keys []*crypto.PrivateKeySECP256K1R,
 	totalAmountToLock uint64,
 	totalAmountToBurn uint64,
-	changeAddr ids.ShortID,
 	appliedLockState locked.State,
 ) (
 	[]*avax.TransferableInput, // inputs
@@ -293,12 +343,8 @@ func (h *handler) Lock(
 					outs = append(outs, &avax.TransferableOutput{
 						Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 						Out: &secp256k1fx.TransferOutput{
-							Amt: amounts.remained,
-							OutputOwners: secp256k1fx.OutputOwners{
-								Locktime:  0,
-								Threshold: 1,
-								Addrs:     []ids.ShortID{changeAddr},
-							},
+							Amt:          amounts.remained,
+							OutputOwners: ownerAmounts.owners,
 						},
 					})
 				}
@@ -533,7 +579,7 @@ func (h *handler) VerifyLockUTXOs(
 
 		out := utxo.Out
 		if _, ok := out.(*stakeable.LockOut); ok {
-			return errWrongOutType
+			return errWrongUTXOOutType
 		}
 
 		lockIDs := locked.IDs{}
