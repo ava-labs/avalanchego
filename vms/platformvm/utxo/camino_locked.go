@@ -73,50 +73,89 @@ func ProduceLocked(
 	return nil
 }
 
-// Verifies that all [outs] and [ins] have allowed types depending on [lockModeBonding].
-// If lockModeBonding is true, than outs and ins can't be stakeable types.
-// If lockModeBonding is false, than outs and ins can't be locked types.
+// Verifies that [ins] and [outs] have allowed types depending on [lockModeBonding].
+// If lockModeBonding is true, than ins and outs can't be stakeable types.
+// If lockModeBonding is false, than ins and outs can't be locked types.
 func VerifyLockMode(
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
-	lockModeBonding bool,
+	lockModeDepositBond bool,
 ) error {
-	for _, input := range ins {
-		in := input.In
+	if lockModeDepositBond {
+		for _, input := range ins {
+			in := input.In
 
-		if lockModeBonding {
-			if inner, ok := in.(*locked.In); ok {
-				in = inner.TransferableIn
+			if outerIn, ok := in.(*locked.In); ok {
+				in = outerIn.TransferableIn
 			}
+
 			if _, ok := in.(*stakeable.LockIn); ok {
 				return errWrongInType
 			}
-		} else {
-			if inner, ok := in.(*stakeable.LockIn); ok {
-				in = inner.TransferableIn
+		}
+
+		for _, output := range outs {
+			out := output.Out
+
+			if outerOut, ok := out.(*locked.Out); ok {
+				out = outerOut.TransferableOut
 			}
-			if _, ok := in.(*locked.In); ok {
-				return errWrongInType
+
+			if _, ok := out.(*stakeable.LockOut); ok {
+				return errWrongOutType
 			}
+		}
+
+		return nil
+	}
+
+	for _, input := range ins {
+		in := input.In
+
+		if outerIn, ok := in.(*stakeable.LockIn); ok {
+			in = outerIn.TransferableIn
+		}
+
+		if _, ok := in.(*locked.In); ok {
+			return errWrongInType
 		}
 	}
 
 	for _, output := range outs {
 		out := output.Out
-		if lockModeBonding {
-			if inner, ok := out.(*locked.Out); ok {
-				out = inner.TransferableOut
-			}
-			if _, ok := out.(*stakeable.LockOut); ok {
-				return errWrongOutType
-			}
-		} else {
-			if inner, ok := out.(*stakeable.LockOut); ok {
-				out = inner.TransferableOut
-			}
-			if _, ok := out.(*locked.Out); ok {
-				return errWrongOutType
-			}
+
+		if outerOut, ok := out.(*stakeable.LockOut); ok {
+			out = outerOut.TransferableOut
+		}
+
+		if _, ok := out.(*locked.Out); ok {
+			return errWrongOutType
+		}
+	}
+
+	return nil
+}
+
+// Verifies that [ins] and [outs] aren't stakeable or locked types.
+func VerifyNoLocks(
+	ins []*avax.TransferableInput,
+	outs []*avax.TransferableOutput,
+) error {
+	for _, input := range ins {
+		if _, ok := input.In.(*locked.In); ok {
+			return errWrongInType
+		}
+		if _, ok := input.In.(*stakeable.LockIn); ok {
+			return errWrongInType
+		}
+	}
+
+	for _, output := range outs {
+		if _, ok := output.Out.(*locked.Out); ok {
+			return errWrongOutType
+		}
+		if _, ok := output.Out.(*stakeable.LockOut); ok {
+			return errWrongOutType
 		}
 	}
 
