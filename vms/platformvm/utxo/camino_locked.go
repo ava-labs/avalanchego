@@ -78,6 +78,7 @@ func (h *handler) Lock(
 	totalAmountToLock uint64,
 	totalAmountToBurn uint64,
 	appliedLockState locked.State,
+	changeAddr ids.ShortID,
 ) (
 	[]*avax.TransferableInput, // inputs
 	[]*avax.TransferableOutput, // outputs
@@ -290,11 +291,21 @@ func (h *handler) Lock(
 						},
 					})
 				} else {
+					var owners secp256k1fx.OutputOwners
+					if changeAddr != ids.ShortEmpty {
+						owners = secp256k1fx.OutputOwners{
+							Locktime:  0,
+							Threshold: 1,
+							Addrs:     []ids.ShortID{changeAddr},
+						}
+					} else {
+						owners = ownerAmounts.owners
+					}
 					outs = append(outs, &avax.TransferableOutput{
 						Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
 						Out: &secp256k1fx.TransferOutput{
 							Amt:          amounts.remained,
-							OutputOwners: ownerAmounts.owners,
+							OutputOwners: owners,
 						},
 					})
 				}
@@ -564,29 +575,32 @@ func (h *handler) VerifyLockUTXOs(
 			return fmt.Errorf("failed to verify transfer: %w", err)
 		}
 
-		ownerID, err := GetOwnerID(out)
-		if err != nil {
-			return err
+		otherLockTxID := &lockIDs.DepositTxID
+		if appliedLockState == locked.StateDeposited {
+			otherLockTxID = &lockIDs.BondTxID
+		}
+
+		ownerID := &ids.Empty
+		if *otherLockTxID != ids.Empty {
+			id, err := GetOwnerID(out)
+			if err != nil {
+				return err
+			}
+			ownerID = &id
 		}
 
 		amount := in.Amount()
-
-		consumedOwnerAmounts, ok := consumed[ownerID]
+		consumedOwnerAmounts, ok := consumed[*ownerID]
 		if !ok {
 			consumedOwnerAmounts = make(map[ids.ID]uint64)
-			consumed[ownerID] = consumedOwnerAmounts
+			consumed[*ownerID] = consumedOwnerAmounts
 		}
 
-		otherLockTxID := lockIDs.DepositTxID
-		if appliedLockState == locked.StateDeposited {
-			otherLockTxID = lockIDs.BondTxID
-		}
-
-		newAmount, err := math.Add64(consumedOwnerAmounts[otherLockTxID], amount)
+		newAmount, err := math.Add64(consumedOwnerAmounts[*otherLockTxID], amount)
 		if err != nil {
 			return err
 		}
-		consumedOwnerAmounts[otherLockTxID] = newAmount
+		consumedOwnerAmounts[*otherLockTxID] = newAmount
 	}
 
 	for _, output := range outs {
@@ -601,22 +615,25 @@ func (h *handler) VerifyLockUTXOs(
 			out = lockedOut.TransferableOut
 		}
 
-		ownerID, err := GetOwnerID(out)
-		if err != nil {
-			return err
+		otherLockTxID := &lockIDs.DepositTxID
+		if appliedLockState == locked.StateDeposited {
+			otherLockTxID = &lockIDs.BondTxID
+		}
+
+		ownerID := &ids.Empty
+		if *otherLockTxID != ids.Empty {
+			id, err := GetOwnerID(out)
+			if err != nil {
+				return err
+			}
+			ownerID = &id
 		}
 
 		producedAmount := out.Amount()
-
-		otherLockTxID := lockIDs.DepositTxID
-		if appliedLockState == locked.StateDeposited {
-			otherLockTxID = lockIDs.BondTxID
-		}
-
 		consumedAmount := uint64(0)
-		consumedOwnerAmounts, ok := consumed[ownerID]
+		consumedOwnerAmounts, ok := consumed[*ownerID]
 		if ok {
-			consumedAmount = consumedOwnerAmounts[otherLockTxID]
+			consumedAmount = consumedOwnerAmounts[*otherLockTxID]
 		}
 
 		if consumedAmount < producedAmount {
@@ -631,7 +648,7 @@ func (h *handler) VerifyLockUTXOs(
 			)
 		}
 
-		consumedOwnerAmounts[otherLockTxID] = consumedAmount - producedAmount
+		consumedOwnerAmounts[*otherLockTxID] = consumedAmount - producedAmount
 	}
 
 	amountToBurn := burnedAmount

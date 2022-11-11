@@ -123,6 +123,7 @@ type Spender interface {
 		totalAmountToLock uint64,
 		totalAmountToBurn uint64,
 		appliedLockState locked.State,
+		changeAddr ids.ShortID,
 	) (
 		[]*avax.TransferableInput, // inputs
 		[]*avax.TransferableOutput, // outputs

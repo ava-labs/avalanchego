@@ -199,6 +199,7 @@ func TestLock(t *testing.T) {
 		totalAmountToSpend uint64
 		totalAmountToBurn  uint64
 		appliedLockState   locked.State
+		changeAddr         ids.ShortID
 	}
 	type want struct {
 		ins  []*avax.TransferableInput
@@ -394,6 +395,7 @@ func TestLock(t *testing.T) {
 				tt.args.totalAmountToSpend,
 				tt.args.totalAmountToBurn,
 				tt.args.appliedLockState,
+				tt.args.changeAddr,
 			)
 
 			avax.SortTransferableOutputs(want.outs, txs.Codec)
