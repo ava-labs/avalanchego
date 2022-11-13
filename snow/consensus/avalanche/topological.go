@@ -267,7 +267,7 @@ func (ta *Topological) Quiesce() bool { return ta.virtuousVoting.Len() == 0 }
 func (ta *Topological) Finalized() bool { return ta.cg.Finalized() }
 
 // HealthCheck returns information about the consensus health.
-func (ta *Topological) HealthCheck() (interface{}, error) {
+func (ta *Topological) HealthCheck(ctx context.Context) (interface{}, error) {
 	numOutstandingVtx := ta.Latency.NumProcessing()
 	isOutstandingVtx := numOutstandingVtx <= ta.params.MaxOutstandingItems
 	healthy := isOutstandingVtx
@@ -275,7 +275,7 @@ func (ta *Topological) HealthCheck() (interface{}, error) {
 		"outstandingVertices": numOutstandingVtx,
 	}
 
-	snowstormReport, err := ta.cg.HealthCheck()
+	snowstormReport, err := ta.cg.HealthCheck(ctx)
 	healthy = healthy && err == nil
 	details["snowstorm"] = snowstormReport
 

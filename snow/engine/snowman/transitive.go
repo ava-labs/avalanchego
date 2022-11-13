@@ -430,7 +430,7 @@ func (t *Transitive) Start(ctx context.Context, startReqID uint32) error {
 }
 
 func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {
-	consensusIntf, consensusErr := t.Consensus.HealthCheck()
+	consensusIntf, consensusErr := t.Consensus.HealthCheck(ctx)
 	vmIntf, vmErr := t.VM.HealthCheck(ctx)
 	intf := map[string]interface{}{
 		"consensus": consensusIntf,

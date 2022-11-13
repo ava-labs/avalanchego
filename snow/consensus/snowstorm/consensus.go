@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 
@@ -18,6 +19,7 @@ import (
 // should call collect with the responses.
 type Consensus interface {
 	fmt.Stringer
+	health.Checker
 
 	// Takes in the context, alpha, betaVirtuous, and betaRogue
 	Initialize(*snow.ConsensusContext, sbcon.Parameters) error
@@ -67,7 +69,4 @@ type Consensus interface {
 	// possible that after returning finalized, a new decision may be added such
 	// that this instance is no longer finalized.
 	Finalized() bool
-
-	// HealthCheck returns information about the consensus health.
-	HealthCheck() (interface{}, error)
 }
