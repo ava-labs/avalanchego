@@ -731,6 +731,11 @@ func (m *manager) createAvalancheChain(
 
 	handler.SetBootstrapper(bootstrapper)
 
+	var consensus avcon.Consensus = &avcon.Topological{}
+	if m.TracingEnabled {
+		consensus = avcon.Trace(consensus, m.Tracer)
+	}
+
 	// create engine gear
 	engineConfig := aveng.Config{
 		Ctx:           bootstrapperConfig.Ctx,
@@ -740,7 +745,7 @@ func (m *manager) createAvalancheChain(
 		Sender:        bootstrapperConfig.Sender,
 		Validators:    vdrs,
 		Params:        consensusParams,
-		Consensus:     &avcon.Topological{},
+		Consensus:     consensus,
 	}
 	engine, err := aveng.New(engineConfig)
 	if err != nil {
@@ -944,6 +949,11 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
 	}
 
+	var consensus smcon.Consensus = &smcon.Topological{}
+	if m.TracingEnabled {
+		consensus = smcon.Trace(consensus, m.Tracer)
+	}
+
 	// Create engine, bootstrapper and state-syncer in this order,
 	// to make sure start callbacks are duly initialized
 	engineConfig := smeng.Config{
@@ -953,7 +963,7 @@ func (m *manager) createSnowmanChain(
 		Sender:        commonCfg.Sender,
 		Validators:    vdrs,
 		Params:        consensusParams,
-		Consensus:     &smcon.Topological{},
+		Consensus:     consensus,
 	}
 	engine, err := smeng.New(engineConfig)
 	if err != nil {
