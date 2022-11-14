@@ -89,7 +89,7 @@ func (t *Tree) RecordPoll(votes ids.Bag) bool {
 func (t *Tree) RecordUnsuccessfulPoll() { t.shouldReset = true }
 
 func (t *Tree) String() string {
-	builder := strings.Builder{}
+	sb := strings.Builder{}
 
 	prefixes := []string{""}
 	nodes := []node{t.node}
@@ -105,9 +105,9 @@ func (t *Tree) String() string {
 
 		s, newNodes := node.Printable()
 
-		builder.WriteString(prefix)
-		builder.WriteString(s)
-		builder.WriteString("\n")
+		sb.WriteString(prefix)
+		sb.WriteString(s)
+		sb.WriteString("\n")
 
 		newPrefix := prefix + "    "
 		for range newNodes {
@@ -116,7 +116,7 @@ func (t *Tree) String() string {
 		nodes = append(nodes, newNodes...)
 	}
 
-	return strings.TrimSuffix(builder.String(), "\n")
+	return strings.TrimSuffix(sb.String(), "\n")
 }
 
 type node interface {

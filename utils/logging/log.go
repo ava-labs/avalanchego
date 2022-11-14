@@ -53,6 +53,7 @@ func NewLogger(prefix string, wrappedCores ...WrappedCore) Logger {
 	}
 }
 
+// TODO: return errors here
 func (l *log) Write(p []byte) (int, error) {
 	for _, wc := range l.wrappedCores {
 		if wc.WriterDisabled {
@@ -63,9 +64,10 @@ func (l *log) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
+// TODO: return errors here
 func (l *log) Stop() {
 	for _, wc := range l.wrappedCores {
-		wc.Writer.Close()
+		_ = wc.Writer.Close()
 	}
 }
 
