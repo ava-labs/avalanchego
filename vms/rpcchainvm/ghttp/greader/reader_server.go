@@ -23,7 +23,7 @@ func NewServer(reader io.Reader) *Server {
 	return &Server{reader: reader}
 }
 
-func (s *Server) Read(ctx context.Context, req *readerpb.ReadRequest) (*readerpb.ReadResponse, error) {
+func (s *Server) Read(_ context.Context, req *readerpb.ReadRequest) (*readerpb.ReadResponse, error) {
 	buf := make([]byte, int(req.Length))
 	n, err := s.reader.Read(buf)
 	resp := &readerpb.ReadResponse{

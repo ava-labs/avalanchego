@@ -556,16 +556,16 @@ func (ss *stateSyncer) Disconnected(ctx context.Context, nodeID ids.NodeID) erro
 	return ss.StartupTracker.Disconnected(ctx, nodeID)
 }
 
-func (ss *stateSyncer) Gossip(context.Context) error { return nil }
+func (*stateSyncer) Gossip(context.Context) error { return nil }
 
 func (ss *stateSyncer) Shutdown(ctx context.Context) error {
 	ss.Config.Ctx.Log.Info("shutting down state syncer")
 	return ss.VM.Shutdown(ctx)
 }
 
-func (ss *stateSyncer) Halt() {}
+func (*stateSyncer) Halt() {}
 
-func (ss *stateSyncer) Timeout(context.Context) error { return nil }
+func (*stateSyncer) Timeout(context.Context) error { return nil }
 
 func (ss *stateSyncer) HealthCheck(ctx context.Context) (interface{}, error) {
 	vmIntf, vmErr := ss.VM.HealthCheck(ctx)

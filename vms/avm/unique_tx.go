@@ -283,12 +283,12 @@ func (tx *UniqueTx) InputIDs() []ids.ID {
 }
 
 // Whitelist is not supported by this transaction type, so [false] is returned.
-func (tx *UniqueTx) HasWhitelist() bool {
+func (*UniqueTx) HasWhitelist() bool {
 	return false
 }
 
 // Whitelist is not supported by this transaction type, so [false] is returned.
-func (tx *UniqueTx) Whitelist(context.Context) (ids.Set, error) {
+func (*UniqueTx) Whitelist(context.Context) (ids.Set, error) {
 	return nil, nil
 }
 

@@ -74,7 +74,7 @@ func (fx *Fx) InitializeVM(vmIntf interface{}) error {
 	return nil
 }
 
-func (fx *Fx) Bootstrapping() error { return nil }
+func (*Fx) Bootstrapping() error { return nil }
 
 func (fx *Fx) Bootstrapped() error { fx.bootstrapped = true; return nil }
 
@@ -208,7 +208,7 @@ func (fx *Fx) VerifyCredentials(utx UnsignedTx, in *Input, cred *Credential, out
 
 // CreateOutput creates a new output with the provided control group worth
 // the specified amount
-func (fx *Fx) CreateOutput(amount uint64, ownerIntf interface{}) (interface{}, error) {
+func (*Fx) CreateOutput(amount uint64, ownerIntf interface{}) (interface{}, error) {
 	owner, ok := ownerIntf.(*OutputOwners)
 	if !ok {
 		return nil, errWrongOwnerType

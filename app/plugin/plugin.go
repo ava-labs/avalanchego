@@ -51,6 +51,6 @@ func (p *appPlugin) GRPCServer(_ *plugin.GRPCBroker, s *grpc.Server) error {
 }
 
 // GRPCClient returns a new GRPC client
-func (p *appPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
+func (*appPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
 	return NewClient(pluginpb.NewNodeClient(c)), nil
 }

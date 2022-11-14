@@ -93,12 +93,12 @@ func (m *txMetrics) CreateSubnetTx(*txs.CreateSubnetTx) error {
 	return nil
 }
 
-func (m *txMetrics) ImportTx(tx *txs.ImportTx) error {
+func (m *txMetrics) ImportTx(*txs.ImportTx) error {
 	m.numImportTxs.Inc()
 	return nil
 }
 
-func (m *txMetrics) ExportTx(tx *txs.ExportTx) error {
+func (m *txMetrics) ExportTx(*txs.ExportTx) error {
 	m.numExportTxs.Inc()
 	return nil
 }

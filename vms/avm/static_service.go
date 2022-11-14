@@ -75,7 +75,7 @@ type BuildGenesisReply struct {
 
 // BuildGenesis returns the UTXOs such that at least one address in [args.Addresses] is
 // referenced in the UTXO.
-func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
+func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 	parser, err := txs.NewParser([]fxs.Fx{
 		&secp256k1fx.Fx{},
 		&nftfx.Fx{},

@@ -379,7 +379,7 @@ func BenchmarkInterface(b *testing.B) {
 			baseDB := memdb.New()
 			db := New(baseDB)
 			bench(b, db, "versiondb", keys, values)
-			db.Close()
+			_ = db.Close()
 		}
 	}
 }

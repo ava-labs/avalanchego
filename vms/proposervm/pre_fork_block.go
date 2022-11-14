@@ -29,7 +29,7 @@ func (b *preForkBlock) Accept(ctx context.Context) error {
 	return b.acceptInnerBlk(ctx)
 }
 
-func (b *preForkBlock) acceptOuterBlk() error {
+func (*preForkBlock) acceptOuterBlk() error {
 	return nil
 }
 
@@ -156,7 +156,7 @@ func (b *preForkBlock) verifyPostForkChild(ctx context.Context, child *postForkB
 	return b.vm.verifyAndRecordInnerBlk(ctx, child)
 }
 
-func (b *preForkBlock) verifyPostForkOption(context.Context, *postForkOption) error {
+func (*preForkBlock) verifyPostForkOption(context.Context, *postForkOption) error {
 	return errUnexpectedBlockType
 }
 
@@ -229,7 +229,7 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 	return blk, nil
 }
 
-func (b *preForkBlock) pChainHeight(context.Context) (uint64, error) {
+func (*preForkBlock) pChainHeight(context.Context) (uint64, error) {
 	return 0, nil
 }
 

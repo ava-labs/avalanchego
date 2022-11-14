@@ -49,7 +49,7 @@ func NewAcceptorTracker() *AcceptorTracker {
 	}
 }
 
-func (a *AcceptorTracker) Accept(ctx *ConsensusContext, containerID ids.ID, container []byte) error {
+func (a *AcceptorTracker) Accept(_ *ConsensusContext, containerID ids.ID, _ []byte) error {
 	a.lock.Lock()
 	a.accepted[containerID]++
 	a.lock.Unlock()

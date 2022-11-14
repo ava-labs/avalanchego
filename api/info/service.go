@@ -300,7 +300,7 @@ type GetTxFeeResponse struct {
 }
 
 // GetTxFee returns the transaction fee in nAVAX.
-func (service *Info) GetTxFee(_ *http.Request, args *struct{}, reply *GetTxFeeResponse) error {
+func (service *Info) GetTxFee(_ *http.Request, _ *struct{}, reply *GetTxFeeResponse) error {
 	reply.TxFee = json.Uint64(service.TxFee)
 	reply.CreationTxFee = json.Uint64(service.CreateAssetTxFee)
 	reply.CreateAssetTxFee = json.Uint64(service.CreateAssetTxFee)

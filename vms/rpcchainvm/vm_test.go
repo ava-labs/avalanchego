@@ -331,7 +331,7 @@ func (p *testVMPlugin) GRPCServer(_ *plugin.GRPCBroker, s *grpc.Server) error {
 	return nil
 }
 
-func (p *testVMPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
+func (*testVMPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
 	return NewTestClient(vmpb.NewVMClient(c)), nil
 }
 
@@ -339,7 +339,7 @@ type TestSubnetVM struct {
 	logger hclog.Logger
 }
 
-func (vm *TestSubnetVM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
+func (*TestSubnetVM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	apis := make(map[string]*common.HTTPHandler)
 
 	testEchoMsgCount := 5
@@ -374,7 +374,7 @@ type testResult struct {
 	Result PingReply `json:"result"`
 }
 
-func (p *PingService) Ping(_ *http.Request, _ *struct{}, reply *PingReply) (err error) {
+func (*PingService) Ping(_ *http.Request, _ *struct{}, reply *PingReply) (err error) {
 	reply.Success = true
 	return nil
 }
