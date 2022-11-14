@@ -53,6 +53,9 @@ linters:
 linters-settings:
   revive:
     rules:
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#struct-tag
+      - name: struct-tag
+        disabled: false
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unexported-naming
       - name: unexported-naming
         disabled: false
