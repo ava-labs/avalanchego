@@ -32,7 +32,7 @@ func NewServer(conn net.Conn, closer *grpcutils.ServerCloser) *Server {
 	}
 }
 
-func (s *Server) Read(ctx context.Context, req *connpb.ReadRequest) (*connpb.ReadResponse, error) {
+func (s *Server) Read(_ context.Context, req *connpb.ReadRequest) (*connpb.ReadResponse, error) {
 	buf := make([]byte, int(req.Length))
 	n, err := s.conn.Read(buf)
 	resp := &connpb.ReadResponse{
@@ -45,7 +45,7 @@ func (s *Server) Read(ctx context.Context, req *connpb.ReadRequest) (*connpb.Rea
 	return resp, nil
 }
 
-func (s *Server) Write(ctx context.Context, req *connpb.WriteRequest) (*connpb.WriteResponse, error) {
+func (s *Server) Write(_ context.Context, req *connpb.WriteRequest) (*connpb.WriteResponse, error) {
 	n, err := s.conn.Write(req.Payload)
 	if err != nil {
 		return nil, err
@@ -55,13 +55,13 @@ func (s *Server) Write(ctx context.Context, req *connpb.WriteRequest) (*connpb.W
 	}, nil
 }
 
-func (s *Server) Close(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
+func (s *Server) Close(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	err := s.conn.Close()
 	s.closer.Stop()
 	return &emptypb.Empty{}, err
 }
 
-func (s *Server) SetDeadline(ctx context.Context, req *connpb.SetDeadlineRequest) (*emptypb.Empty, error) {
+func (s *Server) SetDeadline(_ context.Context, req *connpb.SetDeadlineRequest) (*emptypb.Empty, error) {
 	deadline := time.Time{}
 	err := deadline.UnmarshalBinary(req.Time)
 	if err != nil {
@@ -70,7 +70,7 @@ func (s *Server) SetDeadline(ctx context.Context, req *connpb.SetDeadlineRequest
 	return &emptypb.Empty{}, s.conn.SetDeadline(deadline)
 }
 
-func (s *Server) SetReadDeadline(ctx context.Context, req *connpb.SetDeadlineRequest) (*emptypb.Empty, error) {
+func (s *Server) SetReadDeadline(_ context.Context, req *connpb.SetDeadlineRequest) (*emptypb.Empty, error) {
 	deadline := time.Time{}
 	err := deadline.UnmarshalBinary(req.Time)
 	if err != nil {
@@ -79,7 +79,7 @@ func (s *Server) SetReadDeadline(ctx context.Context, req *connpb.SetDeadlineReq
 	return &emptypb.Empty{}, s.conn.SetReadDeadline(deadline)
 }
 
-func (s *Server) SetWriteDeadline(ctx context.Context, req *connpb.SetDeadlineRequest) (*emptypb.Empty, error) {
+func (s *Server) SetWriteDeadline(_ context.Context, req *connpb.SetDeadlineRequest) (*emptypb.Empty, error) {
 	deadline := time.Time{}
 	err := deadline.UnmarshalBinary(req.Time)
 	if err != nil {

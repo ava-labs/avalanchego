@@ -26,7 +26,7 @@ func (noRouter) SupportsNAT() bool {
 	return false
 }
 
-func (noRouter) MapPort(_ string, intPort, extPort uint16, _ string, _ time.Duration) error {
+func (noRouter) MapPort(string, uint16, uint16, string, time.Duration) error {
 	return errNoRouterCantMapPorts
 }
 

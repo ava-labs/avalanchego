@@ -10,11 +10,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/avalanchego/ids"
 )
 
-func Test_newInboundBuilder(t *testing.T) {
+func Test_newMsgBuilder(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 
@@ -24,13 +22,5 @@ func Test_newInboundBuilder(t *testing.T) {
 		10*time.Second,
 	)
 	require.NoError(err)
-
-	builder := newInboundBuilder(mb)
-
-	_ = builder.InboundAccepted(
-		ids.GenerateTestID(),
-		12345,
-		[]ids.ID{ids.GenerateTestID()},
-		ids.GenerateTestNodeID(),
-	)
+	require.NotNil(mb)
 }

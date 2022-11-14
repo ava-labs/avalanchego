@@ -26,7 +26,7 @@ var _ BlockTimer = (*noopBlkTimer)(nil)
 
 type noopBlkTimer struct{}
 
-func (bt *noopBlkTimer) ResetBlockTimer() {}
+func (*noopBlkTimer) ResetBlockTimer() {}
 
 var preFundedKeys = crypto.BuildTestKeys()
 

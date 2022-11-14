@@ -121,7 +121,7 @@ func (b *postForkBlock) Options(ctx context.Context) ([2]snowman.Block, error) {
 }
 
 // A post-fork block can never have a pre-fork child
-func (b *postForkBlock) verifyPreForkChild(context.Context, *preForkBlock) error {
+func (*postForkBlock) verifyPreForkChild(context.Context, *preForkBlock) error {
 	return errUnsignedChild
 }
 

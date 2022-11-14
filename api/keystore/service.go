@@ -39,7 +39,7 @@ type ListUsersReply struct {
 	Users []string `json:"users"`
 }
 
-func (s *service) ListUsers(_ *http.Request, args *struct{}, reply *ListUsersReply) error {
+func (s *service) ListUsers(_ *http.Request, _ *struct{}, reply *ListUsersReply) error {
 	s.ks.log.Debug("Keystore: ListUsers called")
 
 	var err error
@@ -56,7 +56,7 @@ type ImportUserArgs struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
-func (s *service) ImportUser(r *http.Request, args *ImportUserArgs, _ *api.EmptyReply) error {
+func (s *service) ImportUser(_ *http.Request, args *ImportUserArgs, _ *api.EmptyReply) error {
 	s.ks.log.Debug("Keystore: ImportUser called",
 		logging.UserString("username", args.Username),
 	)

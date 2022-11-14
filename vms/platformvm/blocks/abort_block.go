@@ -50,8 +50,7 @@ func (b *ApricotAbortBlock) initialize(bytes []byte) error {
 	return nil
 }
 
-func (*ApricotAbortBlock) InitCtx(ctx *snow.Context) {}
-
+func (*ApricotAbortBlock) InitCtx(*snow.Context)   {}
 func (*ApricotAbortBlock) Txs() []*txs.Tx          { return nil }
 func (b *ApricotAbortBlock) Visit(v Visitor) error { return v.ApricotAbortBlock(b) }
 

@@ -21,7 +21,7 @@ type mockClient struct {
 	onSendRequestF func(reply interface{}) error
 }
 
-func (mc *mockClient) SendRequest(ctx context.Context, method string, _ interface{}, reply interface{}, options ...rpc.Option) error {
+func (mc *mockClient) SendRequest(_ context.Context, method string, _ interface{}, reply interface{}, _ ...rpc.Option) error {
 	mc.require.Equal(mc.expectedMethod, method)
 	return mc.onSendRequestF(reply)
 }

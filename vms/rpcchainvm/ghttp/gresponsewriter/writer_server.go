@@ -42,7 +42,10 @@ func NewServer(writer http.ResponseWriter) *Server {
 	}
 }
 
-func (s *Server) Write(ctx context.Context, req *responsewriterpb.WriteRequest) (*responsewriterpb.WriteResponse, error) {
+func (s *Server) Write(
+	_ context.Context,
+	req *responsewriterpb.WriteRequest,
+) (*responsewriterpb.WriteResponse, error) {
 	headers := s.writer.Header()
 	for key := range headers {
 		delete(headers, key)
@@ -60,7 +63,10 @@ func (s *Server) Write(ctx context.Context, req *responsewriterpb.WriteRequest) 
 	}, nil
 }
 
-func (s *Server) WriteHeader(ctx context.Context, req *responsewriterpb.WriteHeaderRequest) (*emptypb.Empty, error) {
+func (s *Server) WriteHeader(
+	_ context.Context,
+	req *responsewriterpb.WriteHeaderRequest,
+) (*emptypb.Empty, error) {
 	headers := s.writer.Header()
 	for key := range headers {
 		delete(headers, key)
@@ -72,7 +78,7 @@ func (s *Server) WriteHeader(ctx context.Context, req *responsewriterpb.WriteHea
 	return &emptypb.Empty{}, nil
 }
 
-func (s *Server) Flush(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
+func (s *Server) Flush(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	flusher, ok := s.writer.(http.Flusher)
 	if !ok {
 		return nil, errUnsupportedFlushing
@@ -81,7 +87,7 @@ func (s *Server) Flush(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty,
 	return &emptypb.Empty{}, nil
 }
 
-func (s *Server) Hijack(ctx context.Context, req *emptypb.Empty) (*responsewriterpb.HijackResponse, error) {
+func (s *Server) Hijack(context.Context, *emptypb.Empty) (*responsewriterpb.HijackResponse, error) {
 	hijacker, ok := s.writer.(http.Hijacker)
 	if !ok {
 		return nil, errUnsupportedHijacking

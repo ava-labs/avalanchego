@@ -282,14 +282,14 @@ func (b *bootstrapper) Timeout(ctx context.Context) error {
 	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
 }
 
-func (b *bootstrapper) Gossip(context.Context) error { return nil }
+func (*bootstrapper) Gossip(context.Context) error { return nil }
 
 func (b *bootstrapper) Shutdown(ctx context.Context) error {
 	b.Ctx.Log.Info("shutting down bootstrapper")
 	return b.VM.Shutdown(ctx)
 }
 
-func (b *bootstrapper) Notify(context.Context, common.Message) error { return nil }
+func (*bootstrapper) Notify(context.Context, common.Message) error { return nil }
 
 func (b *bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
 	vmIntf, vmErr := b.VM.HealthCheck(ctx)

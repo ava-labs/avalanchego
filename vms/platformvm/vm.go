@@ -113,8 +113,8 @@ func (vm *VM) Initialize(
 	chainCtx *snow.Context,
 	dbManager manager.Manager,
 	genesisBytes []byte,
-	upgradeBytes []byte,
-	configBytes []byte,
+	_ []byte,
+	_ []byte,
 	toEngine chan<- common.Message,
 	_ []*common.Fx,
 	appSender common.AppSender,
@@ -387,7 +387,7 @@ func (vm *VM) SetPreference(_ context.Context, blkID ids.ID) error {
 	return nil
 }
 
-func (vm *VM) Version(context.Context) (string, error) {
+func (*VM) Version(context.Context) (string, error) {
 	return version.Current.String(), nil
 }
 
@@ -420,7 +420,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]*common.HTTPHandler, e
 // CreateStaticHandlers returns a map where:
 // * keys are API endpoint extensions
 // * values are API handlers
-func (vm *VM) CreateStaticHandlers(context.Context) (map[string]*common.HTTPHandler, error) {
+func (*VM) CreateStaticHandlers(context.Context) (map[string]*common.HTTPHandler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")

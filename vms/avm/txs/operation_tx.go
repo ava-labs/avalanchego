@@ -99,7 +99,7 @@ func (t *OperationTx) SyntacticVerify(
 	}
 
 	for _, op := range t.Ops {
-		if err := op.Verify(c); err != nil {
+		if err := op.Verify(); err != nil {
 			return err
 		}
 		for _, utxoID := range op.UTXOIDs {

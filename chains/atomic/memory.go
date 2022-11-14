@@ -102,7 +102,7 @@ func (m *Memory) releaseLock(sharedID ids.ID) *sync.Mutex {
 }
 
 // sharedID calculates the ID of the shared memory space
-func (m *Memory) sharedID(id1, id2 ids.ID) ids.ID {
+func sharedID(id1, id2 ids.ID) ids.ID {
 	// Swap IDs locally to ensure id1 <= id2.
 	if bytes.Compare(id1[:], id2[:]) == 1 {
 		id1, id2 = id2, id1

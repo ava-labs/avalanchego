@@ -20,102 +20,6 @@ type InboundMsgBuilder interface {
 		nodeID ids.NodeID,
 		onFinishedHandling func(),
 	) (InboundMessage, error)
-
-	InboundGetStateSummaryFrontier(
-		chainID ids.ID,
-		requestID uint32,
-		deadline time.Duration,
-		nodeID ids.NodeID,
-	) InboundMessage
-
-	InboundStateSummaryFrontier(
-		chainID ids.ID,
-		requestID uint32,
-		summary []byte,
-		nodeID ids.NodeID,
-	) InboundMessage
-
-	InboundGetAcceptedStateSummary(
-		chainID ids.ID,
-		requestID uint32,
-		heights []uint64,
-		deadline time.Duration,
-		nodeID ids.NodeID,
-	) InboundMessage
-
-	InboundAcceptedStateSummary(
-		chainID ids.ID,
-		requestID uint32,
-		summaryIDs []ids.ID,
-		nodeID ids.NodeID,
-	) InboundMessage
-
-	InboundGetAcceptedFrontier(
-		chainID ids.ID,
-		requestID uint32,
-		deadline time.Duration,
-		nodeID ids.NodeID,
-	) InboundMessage
-
-	InboundAcceptedFrontier(
-		chainID ids.ID,
-		requestID uint32,
-		containerIDs []ids.ID,
-		nodeID ids.NodeID,
-	) InboundMessage
-
-	InboundGetAccepted(
-		chainID ids.ID,
-		requestID uint32,
-		deadline time.Duration,
-		containerIDs []ids.ID,
-		nodeID ids.NodeID,
-	) InboundMessage
-
-	InboundAccepted(
-		chainID ids.ID,
-		requestID uint32,
-		containerIDs []ids.ID,
-		nodeID ids.NodeID,
-	) InboundMessage
-
-	InboundPushQuery(
-		chainID ids.ID,
-		requestID uint32,
-		deadline time.Duration,
-		container []byte,
-		nodeID ids.NodeID,
-	) InboundMessage
-
-	InboundPullQuery(
-		chainID ids.ID,
-		requestID uint32,
-		deadline time.Duration,
-		containerID ids.ID,
-		nodeID ids.NodeID,
-	) InboundMessage
-
-	InboundChits(
-		chainID ids.ID,
-		requestID uint32,
-		containerIDs []ids.ID,
-		nodeID ids.NodeID,
-	) InboundMessage
-
-	InboundAppRequest(
-		chainID ids.ID,
-		requestID uint32,
-		deadline time.Duration,
-		msg []byte,
-		nodeID ids.NodeID,
-	) InboundMessage
-
-	InboundAppResponse(
-		chainID ids.ID,
-		requestID uint32,
-		msg []byte,
-		nodeID ids.NodeID,
-	) InboundMessage
 }
 
 type inMsgBuilder struct {
@@ -132,7 +36,7 @@ func (b *inMsgBuilder) Parse(bytes []byte, nodeID ids.NodeID, onFinishedHandling
 	return b.builder.parseInbound(bytes, nodeID, onFinishedHandling)
 }
 
-func (b *inMsgBuilder) InboundGetStateSummaryFrontier(
+func InboundGetStateSummaryFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
@@ -150,7 +54,7 @@ func (b *inMsgBuilder) InboundGetStateSummaryFrontier(
 	}
 }
 
-func (b *inMsgBuilder) InboundStateSummaryFrontier(
+func InboundStateSummaryFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	summary []byte,
@@ -168,7 +72,7 @@ func (b *inMsgBuilder) InboundStateSummaryFrontier(
 	}
 }
 
-func (b *inMsgBuilder) InboundGetAcceptedStateSummary(
+func InboundGetAcceptedStateSummary(
 	chainID ids.ID,
 	requestID uint32,
 	heights []uint64,
@@ -188,7 +92,7 @@ func (b *inMsgBuilder) InboundGetAcceptedStateSummary(
 	}
 }
 
-func (b *inMsgBuilder) InboundAcceptedStateSummary(
+func InboundAcceptedStateSummary(
 	chainID ids.ID,
 	requestID uint32,
 	summaryIDs []ids.ID,
@@ -208,7 +112,7 @@ func (b *inMsgBuilder) InboundAcceptedStateSummary(
 	}
 }
 
-func (b *inMsgBuilder) InboundGetAcceptedFrontier(
+func InboundGetAcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
@@ -226,7 +130,7 @@ func (b *inMsgBuilder) InboundGetAcceptedFrontier(
 	}
 }
 
-func (b *inMsgBuilder) InboundAcceptedFrontier(
+func InboundAcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
@@ -246,7 +150,7 @@ func (b *inMsgBuilder) InboundAcceptedFrontier(
 	}
 }
 
-func (b *inMsgBuilder) InboundGetAccepted(
+func InboundGetAccepted(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
@@ -268,7 +172,7 @@ func (b *inMsgBuilder) InboundGetAccepted(
 	}
 }
 
-func (b *inMsgBuilder) InboundAccepted(
+func InboundAccepted(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
@@ -288,7 +192,7 @@ func (b *inMsgBuilder) InboundAccepted(
 	}
 }
 
-func (b *inMsgBuilder) InboundPushQuery(
+func InboundPushQuery(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
@@ -308,7 +212,7 @@ func (b *inMsgBuilder) InboundPushQuery(
 	}
 }
 
-func (b *inMsgBuilder) InboundPullQuery(
+func InboundPullQuery(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
@@ -328,7 +232,7 @@ func (b *inMsgBuilder) InboundPullQuery(
 	}
 }
 
-func (b *inMsgBuilder) InboundChits(
+func InboundChits(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
@@ -348,7 +252,7 @@ func (b *inMsgBuilder) InboundChits(
 	}
 }
 
-func (b *inMsgBuilder) InboundAppRequest(
+func InboundAppRequest(
 	chainID ids.ID,
 	requestID uint32,
 	deadline time.Duration,
@@ -368,7 +272,7 @@ func (b *inMsgBuilder) InboundAppRequest(
 	}
 }
 
-func (b *inMsgBuilder) InboundAppResponse(
+func InboundAppResponse(
 	chainID ids.ID,
 	requestID uint32,
 	msg []byte,

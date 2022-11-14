@@ -58,7 +58,7 @@ func TestReload_Success(t *testing.T) {
 	installedVMs, failedVMs, err := resources.vmRegistry.Reload(context.Background())
 	require.ElementsMatch(t, []ids.ID{id3, id4}, installedVMs)
 	require.Empty(t, failedVMs)
-	require.Nil(t, err)
+	require.NoError(t, err)
 }
 
 // Tests that we fail if we're not able to get the vms on disk
@@ -69,9 +69,9 @@ func TestReload_GetNewVMsFails(t *testing.T) {
 	resources.mockVMGetter.EXPECT().Get().Times(1).Return(nil, nil, errOops)
 
 	installedVMs, failedVMs, err := resources.vmRegistry.Reload(context.Background())
-	require.Nil(t, installedVMs)
+	require.Empty(t, installedVMs)
 	require.Empty(t, failedVMs)
-	require.Equal(t, err, errOops)
+	require.ErrorIs(t, err, errOops)
 }
 
 // Tests that if we fail to register a VM, we fail.
@@ -110,9 +110,9 @@ func TestReload_PartialRegisterFailure(t *testing.T) {
 	installedVMs, failedVMs, err := resources.vmRegistry.Reload(context.Background())
 
 	require.Len(t, failedVMs, 1)
-	require.Equal(t, failedVMs[id3], errOops)
+	require.ErrorIs(t, failedVMs[id3], errOops)
 	require.Len(t, installedVMs, 1)
-	require.Equal(t, installedVMs[0], id4)
+	require.Equal(t, id4, installedVMs[0])
 	require.NoError(t, err)
 }
 
@@ -152,7 +152,7 @@ func TestReloadWithReadLock_Success(t *testing.T) {
 	installedVMs, failedVMs, err := resources.vmRegistry.ReloadWithReadLock(context.Background())
 	require.ElementsMatch(t, []ids.ID{id3, id4}, installedVMs)
 	require.Empty(t, failedVMs)
-	require.Nil(t, err)
+	require.NoError(t, err)
 }
 
 // Tests that we fail if we're not able to get the vms on disk
@@ -163,9 +163,9 @@ func TestReloadWithReadLock_GetNewVMsFails(t *testing.T) {
 	resources.mockVMGetter.EXPECT().Get().Times(1).Return(nil, nil, errOops)
 
 	installedVMs, failedVMs, err := resources.vmRegistry.ReloadWithReadLock(context.Background())
-	require.Nil(t, installedVMs)
+	require.Empty(t, installedVMs)
 	require.Empty(t, failedVMs)
-	require.Equal(t, err, errOops)
+	require.ErrorIs(t, err, errOops)
 }
 
 // Tests that if we fail to register a VM, we fail.
@@ -204,10 +204,10 @@ func TestReloadWithReadLock_PartialRegisterFailure(t *testing.T) {
 	installedVMs, failedVMs, err := resources.vmRegistry.ReloadWithReadLock(context.Background())
 
 	require.Len(t, failedVMs, 1)
-	require.Equal(t, failedVMs[id3], errOops)
+	require.ErrorIs(t, failedVMs[id3], errOops)
 	require.Len(t, installedVMs, 1)
-	require.Equal(t, installedVMs[0], id4)
-	require.Nil(t, err)
+	require.Equal(t, id4, installedVMs[0])
+	require.NoError(t, err)
 }
 
 type registryTestResources struct {
