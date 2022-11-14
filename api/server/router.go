@@ -87,12 +87,13 @@ func (r *router) forceAddRouter(base, endpoint string, handler http.Handler) err
 
 	endpoints[endpoint] = handler
 	r.routes[base] = endpoints
+
 	// Name routes based on their URL for easy retrieval in the future
-	if route := r.router.Handle(url, handler); route != nil {
-		route.Name(url)
-	} else {
+	route := r.router.Handle(url, handler)
+	if route == nil {
 		return fmt.Errorf("failed to create new route for %s", url)
 	}
+	route.Name(url)
 
 	var err error
 	if aliases, exists := r.aliases[base]; exists {
