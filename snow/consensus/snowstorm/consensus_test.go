@@ -77,18 +77,18 @@ func Setup() {
 		color.BytesV = []byte{byte(i)}
 	}
 
-	X := ids.Empty.Prefix(4)
-	Y := ids.Empty.Prefix(5)
-	Z := ids.Empty.Prefix(6)
+	x := ids.Empty.Prefix(4)
+	y := ids.Empty.Prefix(5)
+	z := ids.Empty.Prefix(6)
 
-	Red.InputIDsV = append(Red.InputIDsV, X)
-	Green.InputIDsV = append(Green.InputIDsV, X)
-	Green.InputIDsV = append(Green.InputIDsV, Y)
+	Red.InputIDsV = append(Red.InputIDsV, x)
+	Green.InputIDsV = append(Green.InputIDsV, x)
+	Green.InputIDsV = append(Green.InputIDsV, y)
 
-	Blue.InputIDsV = append(Blue.InputIDsV, Y)
-	Blue.InputIDsV = append(Blue.InputIDsV, Z)
+	Blue.InputIDsV = append(Blue.InputIDsV, y)
+	Blue.InputIDsV = append(Blue.InputIDsV, z)
 
-	Alpha.InputIDsV = append(Alpha.InputIDsV, Z)
+	Alpha.InputIDsV = append(Alpha.InputIDsV, z)
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -1566,20 +1566,20 @@ func ErrorOnAcceptedTest(t *testing.T, factory Factory) {
 func ErrorOnRejectingLowerConfidenceConflictTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
-	X := ids.Empty.Prefix(4)
+	x := ids.Empty.Prefix(4)
 
 	purple := &TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(7),
 		StatusV: choices.Processing,
 	}}
-	purple.InputIDsV = append(purple.InputIDsV, X)
+	purple.InputIDsV = append(purple.InputIDsV, x)
 
 	pink := &TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(8),
 		RejectV: errors.New(""),
 		StatusV: choices.Processing,
 	}}
-	pink.InputIDsV = append(pink.InputIDsV, X)
+	pink.InputIDsV = append(pink.InputIDsV, x)
 
 	params := sbcon.Parameters{
 		K:                     1,
@@ -1612,20 +1612,20 @@ func ErrorOnRejectingLowerConfidenceConflictTest(t *testing.T, factory Factory) 
 func ErrorOnRejectingHigherConfidenceConflictTest(t *testing.T, factory Factory) {
 	graph := factory.New()
 
-	X := ids.Empty.Prefix(4)
+	x := ids.Empty.Prefix(4)
 
 	purple := &TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(7),
 		StatusV: choices.Processing,
 	}}
-	purple.InputIDsV = append(purple.InputIDsV, X)
+	purple.InputIDsV = append(purple.InputIDsV, x)
 
 	pink := &TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(8),
 		RejectV: errors.New(""),
 		StatusV: choices.Processing,
 	}}
-	pink.InputIDsV = append(pink.InputIDsV, X)
+	pink.InputIDsV = append(pink.InputIDsV, x)
 
 	params := sbcon.Parameters{
 		K:                     1,

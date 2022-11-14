@@ -346,11 +346,11 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	}
 
 	// block can arrive within submission window
-	AtSubWindowEnd := proVM.Time().Add(proposer.MaxDelay)
-	proVM.Clock.Set(AtSubWindowEnd)
+	atSubWindowEnd := proVM.Time().Add(proposer.MaxDelay)
+	proVM.Clock.Set(atSubWindowEnd)
 	childSlb, err = block.BuildUnsigned(
 		prntProBlk.ID(),
-		AtSubWindowEnd,
+		atSubWindowEnd,
 		pChainHeight,
 		childCoreBlk.Bytes(),
 	)
