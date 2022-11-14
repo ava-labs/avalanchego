@@ -433,12 +433,12 @@ func (cr *ChainRouter) Unbenched(chainID ids.ID, nodeID ids.NodeID) {
 
 	benchedChains := cr.benched[nodeID]
 	benchedChains.Remove(chainID)
-	if benchedChains.Len() == 0 {
-		delete(cr.benched, nodeID)
-	} else {
+	if benchedChains.Len() != 0 {
 		cr.benched[nodeID] = benchedChains
 		return // This node is still benched
 	}
+
+	delete(cr.benched, nodeID)
 
 	peer, found := cr.peers[nodeID]
 	if !found {
