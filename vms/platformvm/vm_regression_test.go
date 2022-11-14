@@ -1038,7 +1038,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	nodeID3 := ids.NodeID(keys[3].PublicKey().Address())
 	nodeID4 := ids.NodeID(keys[4].PublicKey().Address())
 
-	currentHeight, err := vm.GetCurrentHeight()
+	currentHeight, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(err)
 	require.EqualValues(1, currentHeight)
 
@@ -1049,7 +1049,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 		nodeID3: defaultWeight,
 		nodeID4: defaultWeight,
 	}
-	validators, err := vm.GetValidatorSet(1, constants.PrimaryNetworkID)
+	validators, err := vm.GetValidatorSet(context.Background(), 1, constants.PrimaryNetworkID)
 	require.NoError(err)
 	require.Equal(expectedValidators1, validators)
 
@@ -1091,12 +1091,12 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	require.NoError(addValidatorProposalBlk0.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	currentHeight, err = vm.GetCurrentHeight()
+	currentHeight, err = vm.GetCurrentHeight(context.Background())
 	require.NoError(err)
 	require.EqualValues(2, currentHeight)
 
 	for i := uint64(1); i <= 2; i++ {
-		validators, err = vm.GetValidatorSet(i, constants.PrimaryNetworkID)
+		validators, err = vm.GetValidatorSet(context.Background(), i, constants.PrimaryNetworkID)
 		require.NoError(err)
 		require.Equal(expectedValidators1, validators)
 	}
@@ -1124,12 +1124,12 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	require.NoError(advanceTimeProposalBlk0.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	currentHeight, err = vm.GetCurrentHeight()
+	currentHeight, err = vm.GetCurrentHeight(context.Background())
 	require.NoError(err)
 	require.EqualValues(3, currentHeight)
 
 	for i := uint64(1); i <= 2; i++ {
-		validators, err = vm.GetValidatorSet(i, constants.PrimaryNetworkID)
+		validators, err = vm.GetValidatorSet(context.Background(), i, constants.PrimaryNetworkID)
 		require.NoError(err)
 		require.Equal(expectedValidators1, validators)
 	}
@@ -1142,7 +1142,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 		nodeID4: defaultWeight,
 		nodeID5: vm.MaxValidatorStake,
 	}
-	validators, err = vm.GetValidatorSet(3, constants.PrimaryNetworkID)
+	validators, err = vm.GetValidatorSet(context.Background(), 3, constants.PrimaryNetworkID)
 	require.NoError(err)
 	require.Equal(expectedValidators2, validators)
 }
