@@ -59,6 +59,9 @@ linters-settings:
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unused-receiver
       - name: unused-receiver
         disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#useless-break
+      - name: useless-break
+        disabled: false
   staticcheck:
     go: "1.18"
     # https://staticcheck.io/docs/options#checks
