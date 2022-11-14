@@ -59,7 +59,7 @@ fn test_revisions() {
                 dumped.pop_back();
             }
             dumped.push_front(kv_dump!(db));
-            for i in 1..dumped.len() {
+            for (i, _) in dumped.iter().enumerate().skip(1) {
                 let rev = db.get_revision(i, None).unwrap();
                 let a = &kv_dump!(rev);
                 let b = &dumped[i];
@@ -71,7 +71,7 @@ fn test_revisions() {
         }
         drop(db);
         let db = DB::new("test_revisions_db", &cfg.clone().truncate(false).build()).unwrap();
-        for j in 1..dumped.len() {
+        for (j, _) in dumped.iter().enumerate().skip(1) {
             let rev = db.get_revision(j, None).unwrap();
             let a = &kv_dump!(rev);
             let b = &dumped[j];

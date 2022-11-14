@@ -666,14 +666,14 @@ struct PageRef {
     store: CachedSpace,
 }
 
-impl<'a> std::ops::Deref for PageRef {
+impl std::ops::Deref for PageRef {
     type Target = [u8];
     fn deref(&self) -> &[u8] {
         self.data
     }
 }
 
-impl<'a> std::ops::DerefMut for PageRef {
+impl std::ops::DerefMut for PageRef {
     fn deref_mut(&mut self) -> &mut [u8] {
         self.data
     }

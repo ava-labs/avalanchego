@@ -64,7 +64,7 @@ impl Proof {
         }
     }
 
-    fn locate_subproof(&self, key: &[u8], buf: &Vec<u8>) -> Result<(Option<SubProof>, usize), ProofError> {
+    fn locate_subproof(&self, key: &[u8], buf: &[u8]) -> Result<(Option<SubProof>, usize), ProofError> {
         let rlp = rlp::Rlp::new(buf);
         let size = rlp.item_count().unwrap();
         match size {

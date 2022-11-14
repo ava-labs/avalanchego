@@ -239,7 +239,7 @@ fn test_root_hash_random_deletions() {
             }
             let h = triehash::trie_root::<keccak_hasher::KeccakHasher, Vec<_>, _, _>(items.iter().collect());
             let h0 = merkle.root_hash();
-            if &h[..] != &*h0 {
+            if h[..] != *h0 {
                 println!("{} != {}", hex::encode(h), hex::encode(*h0));
             }
         }

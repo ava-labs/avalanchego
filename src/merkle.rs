@@ -544,8 +544,8 @@ fn test_merkle_node_encoding() {
     };
     let chd0 = [None; NBRANCH];
     let mut chd1 = chd0;
-    for i in 0..NBRANCH / 2 {
-        chd1[i] = Some(unsafe { ObjPtr::new_from_addr(0xa) });
+    for node in chd1.iter_mut().take(NBRANCH / 2) {
+        *node = Some(unsafe { ObjPtr::new_from_addr(0xa) });
     }
     for node in [
         Node::new_from_hash(
@@ -674,10 +674,8 @@ impl Merkle {
         match &u_ref.inner {
             NodeType::Branch(n) => {
                 writeln!(w, "{n:?}").map_err(MerkleError::Format)?;
-                for c in n.chd.iter() {
-                    if let Some(c) = c {
-                        self.dump_(*c, w)?
-                    }
+                for c in n.chd.iter().flatten() {
+                    self.dump_(*c, w)?
                 }
             }
             NodeType::Leaf(n) => writeln!(w, "{n:?}").unwrap(),
@@ -800,7 +798,7 @@ impl Merkle {
                         parents,
                         deleted
                     );
-                    return err.unwrap_or(Ok(None))
+                    return err.unwrap_or_else(|| Ok(None))
                 }
                 let (leaf_ptr, prefix, idx, v) = if rem_path.len() < n_path.len() {
                     // key path is a prefix of the path to u
@@ -948,7 +946,7 @@ impl Merkle {
                 let mut u = u_ref.take().unwrap();
                 write_node!(
                     self,
-                    &mut u,
+                    u,
                     |u| {
                         info = match &mut u.inner {
                             NodeType::Branch(n) => {
@@ -1384,10 +1382,8 @@ impl Merkle {
         let u_ref = self.get_node(u)?;
         match &u_ref.inner {
             NodeType::Branch(n) => {
-                for c in n.chd.iter() {
-                    if let Some(c) = c {
-                        self.remove_tree_(*c, deleted)?
-                    }
+                for c in n.chd.iter().flatten() {
+                    self.remove_tree_(*c, deleted)?
                 }
             }
             NodeType::Leaf(_) => (),
@@ -1433,7 +1429,7 @@ impl Merkle {
                     None => return Ok(None),
                 },
                 NodeType::Leaf(n) => {
-                    if &chunks[i..] != &*n.0 {
+                    if chunks[i..] != *n.0 {
                         return Ok(None)
                     }
                     drop(u_ref);
@@ -1644,7 +1640,7 @@ impl<'a> RefMut<'a> {
         Self { ptr, parents, merkle }
     }
 
-    pub fn get<'b>(&'b self) -> Ref<'b> {
+    pub fn get(&self) -> Ref {
         Ref(self.merkle.get_node(self.ptr).unwrap())
     }
 
@@ -1691,11 +1687,11 @@ impl ValueTransformer for IdTrans {
     }
 }
 
-pub fn to_nibbles<'a>(bytes: &'a [u8]) -> impl Iterator<Item = u8> + 'a {
+pub fn to_nibbles(bytes: &[u8]) -> impl Iterator<Item = u8> + '_ {
     bytes.iter().flat_map(|b| [(b >> 4) & 0xf, b & 0xf].into_iter())
 }
 
-pub fn from_nibbles<'a>(nibbles: &'a [u8]) -> impl Iterator<Item = u8> + 'a {
+pub fn from_nibbles(nibbles: &[u8]) -> impl Iterator<Item = u8> + '_ {
     assert!(nibbles.len() & 1 == 0);
     nibbles.chunks_exact(2).map(|p| (p[0] << 4) | p[1])
 }
