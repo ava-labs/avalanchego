@@ -118,7 +118,7 @@ func (r *vmRegisterer) createStaticEndpoints(pathAdder server.PathAdder, handler
 		)
 		if err := pathAdder.AddRoute(service, lock, defaultEndpoint, extension); err != nil {
 			return fmt.Errorf(
-				"failed to add static API endpoint %s%s: %s",
+				"failed to add static API endpoint %s%s: %w",
 				defaultEndpoint,
 				extension,
 				err,
