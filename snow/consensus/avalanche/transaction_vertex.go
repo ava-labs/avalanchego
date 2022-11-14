@@ -34,7 +34,7 @@ type transactionVertex struct {
 	status choices.Status
 }
 
-func (tv *transactionVertex) Bytes() []byte {
+func (*transactionVertex) Bytes() []byte {
 	// Snowstorm uses the bytes of the transaction to broadcast through the
 	// decision dispatcher. Because this is an internal transaction type, we
 	// don't want to have this transaction broadcast. So, we return nil here.
@@ -59,7 +59,7 @@ func (tv *transactionVertex) Status() choices.Status { return tv.status }
 
 // Verify isn't called in the consensus code. So this implementation doesn't
 // really matter. However it's used to implement the tx interface.
-func (tv *transactionVertex) Verify() error { return nil }
+func (*transactionVertex) Verify() error { return nil }
 
 // Dependencies returns the currently processing transaction vertices of this
 // vertex's parents.

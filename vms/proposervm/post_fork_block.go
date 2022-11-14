@@ -119,7 +119,7 @@ func (b *postForkBlock) Options() ([2]snowman.Block, error) {
 }
 
 // A post-fork block can never have a pre-fork child
-func (b *postForkBlock) verifyPreForkChild(child *preForkBlock) error {
+func (*postForkBlock) verifyPreForkChild(child *preForkBlock) error {
 	return errUnsignedChild
 }
 

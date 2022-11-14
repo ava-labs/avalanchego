@@ -113,11 +113,11 @@ type VM struct {
 	uniqueTxs cache.Deduplicator
 }
 
-func (vm *VM) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
+func (*VM) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
 	return nil
 }
 
-func (vm *VM) Disconnected(nodeID ids.NodeID) error {
+func (*VM) Disconnected(nodeID ids.NodeID) error {
 	return nil
 }
 
@@ -292,7 +292,7 @@ func (vm *VM) Shutdown() error {
 	return vm.baseDB.Close()
 }
 
-func (vm *VM) Version() (string, error) {
+func (*VM) Version() (string, error) {
 	return version.Current.String(), nil
 }
 
@@ -324,7 +324,7 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	}, err
 }
 
-func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
+func (*VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := json.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
@@ -1047,35 +1047,35 @@ func (vm *VM) lookupAssetID(asset string) (ids.ID, error) {
 	return ids.ID{}, fmt.Errorf("asset '%s' not found", asset)
 }
 
-func (vm *VM) CrossChainAppRequest(_ context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+func (*VM) CrossChainAppRequest(_ context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
 	return nil
 }
 
-func (vm *VM) CrossChainAppRequestFailed(_ context.Context, chainID ids.ID, requestID uint32) error {
+func (*VM) CrossChainAppRequestFailed(_ context.Context, chainID ids.ID, requestID uint32) error {
 	return nil
 }
 
-func (vm *VM) CrossChainAppResponse(_ context.Context, chainID ids.ID, requestID uint32, response []byte) error {
-	return nil
-}
-
-// This VM doesn't (currently) have any app-specific messages
-func (vm *VM) AppRequest(_ context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
+func (*VM) CrossChainAppResponse(_ context.Context, chainID ids.ID, requestID uint32, response []byte) error {
 	return nil
 }
 
 // This VM doesn't (currently) have any app-specific messages
-func (vm *VM) AppResponse(_ context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
+func (*VM) AppRequest(_ context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	return nil
 }
 
 // This VM doesn't (currently) have any app-specific messages
-func (vm *VM) AppRequestFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (*VM) AppResponse(_ context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 	return nil
 }
 
 // This VM doesn't (currently) have any app-specific messages
-func (vm *VM) AppGossip(_ context.Context, nodeID ids.NodeID, msg []byte) error {
+func (*VM) AppRequestFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+	return nil
+}
+
+// This VM doesn't (currently) have any app-specific messages
+func (*VM) AppGossip(_ context.Context, nodeID ids.NodeID, msg []byte) error {
 	return nil
 }
 

@@ -4,6 +4,7 @@ run:
   # skip auto-generated files.
   skip-files:
     - ".*\\.pb\\.go$"
+    - ".*mock.*"
 
 issues:
   # Maximum count of issues with the same text. Set to 0 to disable. Default is 3.
@@ -50,6 +51,11 @@ linters:
     # - noctx
 
 linters-settings:
+  revive:
+    rules:
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unused-receiver
+      - name: unused-receiver
+        disabled: false
   staticcheck:
     go: "1.18"
     # https://staticcheck.io/docs/options#checks

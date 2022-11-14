@@ -41,7 +41,7 @@ type GossipConfig struct {
 // fires a timeout if we don't get a response to the request.
 type sender struct {
 	ctx        *snow.ConsensusContext
-	msgCreator message.Creator
+	msgCreator message.OutboundMsgBuilder
 
 	sender   ExternalSender // Actually does the sending over the network
 	router   router.Router
@@ -56,7 +56,7 @@ type sender struct {
 
 func New(
 	ctx *snow.ConsensusContext,
-	msgCreator message.Creator,
+	msgCreator message.OutboundMsgBuilder,
 	externalSender ExternalSender,
 	router router.Router,
 	timeouts timeout.Manager,
@@ -118,7 +118,7 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs ids.No
 	// Just put it right into the router. Asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
-		inMsg := s.msgCreator.InboundGetStateSummaryFrontier(
+		inMsg := message.InboundGetStateSummaryFrontier(
 			s.ctx.ChainID,
 			requestID,
 			deadline,
@@ -168,7 +168,7 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs ids.No
 func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) {
 	// Sending this message to myself.
 	if nodeID == s.ctx.NodeID {
-		inMsg := s.msgCreator.InboundStateSummaryFrontier(
+		inMsg := message.InboundStateSummaryFrontier(
 			s.ctx.ChainID,
 			requestID,
 			summary,
@@ -252,7 +252,7 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs ids.No
 	// Just put it right into the router. Asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
-		inMsg := s.msgCreator.InboundGetAcceptedStateSummary(
+		inMsg := message.InboundGetAcceptedStateSummary(
 			s.ctx.ChainID,
 			requestID,
 			heights,
@@ -304,7 +304,7 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs ids.No
 
 func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) {
 	if nodeID == s.ctx.NodeID {
-		inMsg := s.msgCreator.InboundAcceptedStateSummary(
+		inMsg := message.InboundAcceptedStateSummary(
 			s.ctx.ChainID,
 			requestID,
 			summaryIDs,
@@ -382,7 +382,7 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs ids.NodeID
 	// Just put it right into the router. Asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
-		inMsg := s.msgCreator.InboundGetAcceptedFrontier(
+		inMsg := message.InboundGetAcceptedFrontier(
 			s.ctx.ChainID,
 			requestID,
 			deadline,
@@ -432,7 +432,7 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs ids.NodeID
 func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
 	// Sending this message to myself.
 	if nodeID == s.ctx.NodeID {
-		inMsg := s.msgCreator.InboundAcceptedFrontier(
+		inMsg := message.InboundAcceptedFrontier(
 			s.ctx.ChainID,
 			requestID,
 			containerIDs,
@@ -510,7 +510,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs ids.NodeIDSet, req
 	// Just put it right into the router. Asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
-		inMsg := s.msgCreator.InboundGetAccepted(
+		inMsg := message.InboundGetAccepted(
 			s.ctx.ChainID,
 			requestID,
 			deadline,
@@ -562,7 +562,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs ids.NodeIDSet, req
 
 func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
 	if nodeID == s.ctx.NodeID {
-		inMsg := s.msgCreator.InboundAccepted(
+		inMsg := message.InboundAccepted(
 			s.ctx.ChainID,
 			requestID,
 			containerIDs,
@@ -885,7 +885,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs ids.NodeIDSet, reque
 	// put it right into the router. Do so asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
-		inMsg := s.msgCreator.InboundPushQuery(
+		inMsg := message.InboundPushQuery(
 			s.ctx.ChainID,
 			requestID,
 			deadline,
@@ -1006,7 +1006,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs ids.NodeIDSet, reque
 	// put it right into the router. Do so asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
-		inMsg := s.msgCreator.InboundPullQuery(
+		inMsg := message.InboundPullQuery(
 			s.ctx.ChainID,
 			requestID,
 			deadline,
@@ -1090,7 +1090,7 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 	// If [nodeID] is myself, send this message directly
 	// to my own router rather than sending it over the network
 	if nodeID == s.ctx.NodeID {
-		inMsg := s.msgCreator.InboundChits(
+		inMsg := message.InboundChits(
 			s.ctx.ChainID,
 			requestID,
 			votes,
@@ -1209,7 +1209,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs ids.NodeIDSet, requ
 	// put it right into the router. Do so asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
-		inMsg := s.msgCreator.InboundAppRequest(
+		inMsg := message.InboundAppRequest(
 			s.ctx.ChainID,
 			requestID,
 			deadline,
@@ -1300,7 +1300,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs ids.NodeIDSet, requ
 // given node
 func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
 	if nodeID == s.ctx.NodeID {
-		inMsg := s.msgCreator.InboundAppResponse(
+		inMsg := message.InboundAppResponse(
 			s.ctx.ChainID,
 			requestID,
 			appResponseBytes,

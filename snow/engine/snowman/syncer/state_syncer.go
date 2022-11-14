@@ -556,16 +556,16 @@ func (ss *stateSyncer) Disconnected(nodeID ids.NodeID) error {
 	return ss.StartupTracker.Disconnected(nodeID)
 }
 
-func (ss *stateSyncer) Gossip() error { return nil }
+func (*stateSyncer) Gossip() error { return nil }
 
 func (ss *stateSyncer) Shutdown() error {
 	ss.Config.Ctx.Log.Info("shutting down state syncer")
 	return ss.VM.Shutdown()
 }
 
-func (ss *stateSyncer) Halt() {}
+func (*stateSyncer) Halt() {}
 
-func (ss *stateSyncer) Timeout() error { return nil }
+func (*stateSyncer) Timeout() error { return nil }
 
 func (ss *stateSyncer) HealthCheck() (interface{}, error) {
 	vmIntf, vmErr := ss.VM.HealthCheck()

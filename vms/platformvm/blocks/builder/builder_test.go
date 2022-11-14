@@ -290,8 +290,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 			defer ctrl.Finish()
 
 			state := tt.stateF(ctrl)
-			b := builder{}
-			txID, shouldReward, err := b.getNextStakerToReward(tt.timestamp, state)
+			txID, shouldReward, err := getNextStakerToReward(tt.timestamp, state)
 			if tt.expectedErr != nil {
 				require.Equal(tt.expectedErr, err)
 				return

@@ -67,12 +67,12 @@ func (r *remover) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegato
 	return nil
 }
 
-func (r *remover) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+func (*remover) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
 	// this tx is never in mempool
 	return nil
 }
 
-func (r *remover) RewardValidatorTx(*txs.RewardValidatorTx) error {
+func (*remover) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	// this tx is never in mempool
 	return nil
 }

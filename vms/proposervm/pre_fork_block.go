@@ -28,7 +28,7 @@ func (b *preForkBlock) Accept() error {
 	return b.acceptInnerBlk()
 }
 
-func (b *preForkBlock) acceptOuterBlk() error {
+func (*preForkBlock) acceptOuterBlk() error {
 	return nil
 }
 
@@ -155,7 +155,7 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 	return b.vm.verifyAndRecordInnerBlk(child)
 }
 
-func (b *preForkBlock) verifyPostForkOption(child *postForkOption) error {
+func (*preForkBlock) verifyPostForkOption(child *postForkOption) error {
 	return errUnexpectedBlockType
 }
 
@@ -228,7 +228,7 @@ func (b *preForkBlock) buildChild() (Block, error) {
 	return blk, nil
 }
 
-func (b *preForkBlock) pChainHeight() (uint64, error) {
+func (*preForkBlock) pChainHeight() (uint64, error) {
 	return 0, nil
 }
 

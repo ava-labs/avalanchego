@@ -46,7 +46,7 @@ func (a *apiServerMock) AddRoute(_ *common.HTTPHandler, _ *sync.RWMutex, base, e
 	return nil
 }
 
-func (a *apiServerMock) AddAliases(string, ...string) error {
+func (*apiServerMock) AddAliases(string, ...string) error {
 	return errors.New("unimplemented")
 }
 

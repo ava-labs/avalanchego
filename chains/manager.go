@@ -161,14 +161,14 @@ type ManagerConfig struct {
 	DecisionAcceptorGroup       snow.AcceptorGroup
 	ConsensusAcceptorGroup      snow.AcceptorGroup
 	DBManager                   dbManager.Manager
-	MsgCreator                  message.Creator    // message creator, shared with network
-	Router                      router.Router      // Routes incoming messages to the appropriate chain
-	Net                         network.Network    // Sends consensus messages to other validators
-	ConsensusParams             avcon.Parameters   // The consensus parameters (alpha, beta, etc.) for new chains
-	Validators                  validators.Manager // Validators validating on this chain
-	NodeID                      ids.NodeID         // The ID of this node
-	NetworkID                   uint32             // ID of the network this node is connected to
-	Server                      server.Server      // Handles HTTP API calls
+	MsgCreator                  message.OutboundMsgBuilder // message creator, shared with network
+	Router                      router.Router              // Routes incoming messages to the appropriate chain
+	Net                         network.Network            // Sends consensus messages to other validators
+	ConsensusParams             avcon.Parameters           // The consensus parameters (alpha, beta, etc.) for new chains
+	Validators                  validators.Manager         // Validators validating on this chain
+	NodeID                      ids.NodeID                 // The ID of this node
+	NetworkID                   uint32                     // ID of the network this node is connected to
+	Server                      server.Server              // Handles HTTP API calls
 	Keystore                    keystore.Keystore
 	AtomicMemory                *atomic.Memory
 	AVAXAssetID                 ids.ID

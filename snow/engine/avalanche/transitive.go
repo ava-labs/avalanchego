@@ -276,7 +276,7 @@ func (t *Transitive) Disconnected(nodeID ids.NodeID) error {
 	return t.VM.Disconnected(nodeID)
 }
 
-func (t *Transitive) Timeout() error { return nil }
+func (*Transitive) Timeout() error { return nil }
 
 func (t *Transitive) Gossip() error {
 	edge := t.Manager.Edge()
@@ -310,7 +310,7 @@ func (t *Transitive) Gossip() error {
 	return nil
 }
 
-func (t *Transitive) Halt() {}
+func (*Transitive) Halt() {}
 
 func (t *Transitive) Shutdown() error {
 	t.Ctx.Log.Info("shutting down consensus engine")

@@ -87,7 +87,7 @@ func (b *postForkOption) Verify() error {
 	return parent.verifyPostForkOption(b)
 }
 
-func (b *postForkOption) verifyPreForkChild(child *preForkBlock) error {
+func (*postForkOption) verifyPreForkChild(child *preForkBlock) error {
 	// A *preForkBlock's parent must be a *preForkBlock
 	return errUnsignedChild
 }
@@ -105,7 +105,7 @@ func (b *postForkOption) verifyPostForkChild(child *postForkBlock) error {
 	)
 }
 
-func (b *postForkOption) verifyPostForkOption(child *postForkOption) error {
+func (*postForkOption) verifyPostForkOption(child *postForkOption) error {
 	// A *postForkOption's parent can't be a *postForkOption
 	return errUnexpectedBlockType
 }

@@ -301,14 +301,14 @@ func (b *bootstrapper) Timeout() error {
 	return b.OnFinished(b.Config.SharedCfg.RequestID)
 }
 
-func (b *bootstrapper) Gossip() error { return nil }
+func (*bootstrapper) Gossip() error { return nil }
 
 func (b *bootstrapper) Shutdown() error {
 	b.Ctx.Log.Info("shutting down bootstrapper")
 	return b.VM.Shutdown()
 }
 
-func (b *bootstrapper) Notify(common.Message) error { return nil }
+func (*bootstrapper) Notify(common.Message) error { return nil }
 
 func (b *bootstrapper) Start(startReqID uint32) error {
 	b.Ctx.Log.Info("starting bootstrap")

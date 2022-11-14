@@ -20,7 +20,7 @@ type testOperable struct {
 	Outputs []verify.State `serialize:"true"`
 }
 
-func (o *testOperable) InitCtx(ctx *snow.Context) {}
+func (*testOperable) InitCtx(ctx *snow.Context) {}
 
 func (o *testOperable) Outs() []verify.State { return o.Outputs }
 

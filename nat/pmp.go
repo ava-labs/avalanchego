@@ -27,7 +27,7 @@ type pmpRouter struct {
 	client *natpmp.Client
 }
 
-func (r *pmpRouter) SupportsNAT() bool {
+func (*pmpRouter) SupportsNAT() bool {
 	return true
 }
 

@@ -234,41 +234,6 @@ func (b *builder) ResetBlockTimer() {
 	b.timer.SetTimeoutIn(0)
 }
 
-// getNextStakerToReward returns the next staker txID to remove from the staking
-// set with a RewardValidatorTx rather than an AdvanceTimeTx. [chainTimestamp]
-// is the timestamp of the chain at the time this validator would be getting
-// removed and is used to calculate [shouldReward].
-// Returns:
-// - [txID] of the next staker to reward
-// - [shouldReward] if the txID exists and is ready to be rewarded
-// - [err] if something bad happened
-func (b *builder) getNextStakerToReward(
-	chainTimestamp time.Time,
-	preferredState state.Chain,
-) (ids.ID, bool, error) {
-	if !chainTimestamp.Before(mockable.MaxTime) {
-		return ids.Empty, false, errEndOfTime
-	}
-
-	currentStakerIterator, err := preferredState.GetCurrentStakerIterator()
-	if err != nil {
-		return ids.Empty, false, err
-	}
-	defer currentStakerIterator.Release()
-
-	for currentStakerIterator.Next() {
-		currentStaker := currentStakerIterator.Value()
-		priority := currentStaker.Priority
-		// If the staker is a permissionless staker (not a permissioned subnet
-		// validator), it's the next staker we will want to remove with a
-		// RewardValidatorTx rather than an AdvanceTimeTx.
-		if priority != txs.SubnetPermissionedValidatorCurrentPriority {
-			return currentStaker.TxID, chainTimestamp.Equal(currentStaker.EndTime), nil
-		}
-	}
-	return ids.Empty, false, nil
-}
-
 // dropExpiredStakerTxs drops add validator/delegator transactions in the
 // mempool whose start time is not sufficiently far in the future
 // (i.e. within local time plus [MaxFutureStartFrom]).
@@ -374,7 +339,7 @@ func buildBlock(
 	// Try rewarding stakers whose staking period ends at the new chain time.
 	// This is done first to prioritize advancing the timestamp as quickly as
 	// possible.
-	stakerTxID, shouldReward, err := builder.getNextStakerToReward(timestamp, parentState)
+	stakerTxID, shouldReward, err := getNextStakerToReward(timestamp, parentState)
 	if err != nil {
 		return nil, fmt.Errorf("could not find next staker to reward: %w", err)
 	}
@@ -408,4 +373,39 @@ func buildBlock(
 		height,
 		builder.Mempool.PeekTxs(targetBlockSize),
 	)
+}
+
+// getNextStakerToReward returns the next staker txID to remove from the staking
+// set with a RewardValidatorTx rather than an AdvanceTimeTx. [chainTimestamp]
+// is the timestamp of the chain at the time this validator would be getting
+// removed and is used to calculate [shouldReward].
+// Returns:
+// - [txID] of the next staker to reward
+// - [shouldReward] if the txID exists and is ready to be rewarded
+// - [err] if something bad happened
+func getNextStakerToReward(
+	chainTimestamp time.Time,
+	preferredState state.Chain,
+) (ids.ID, bool, error) {
+	if !chainTimestamp.Before(mockable.MaxTime) {
+		return ids.Empty, false, errEndOfTime
+	}
+
+	currentStakerIterator, err := preferredState.GetCurrentStakerIterator()
+	if err != nil {
+		return ids.Empty, false, err
+	}
+	defer currentStakerIterator.Release()
+
+	for currentStakerIterator.Next() {
+		currentStaker := currentStakerIterator.Value()
+		priority := currentStaker.Priority
+		// If the staker is a permissionless staker (not a permissioned subnet
+		// validator), it's the next staker we will want to remove with a
+		// RewardValidatorTx rather than an AdvanceTimeTx.
+		if priority != txs.SubnetPermissionedValidatorCurrentPriority {
+			return currentStaker.TxID, chainTimestamp.Equal(currentStaker.EndTime), nil
+		}
+	}
+	return ids.Empty, false, nil
 }

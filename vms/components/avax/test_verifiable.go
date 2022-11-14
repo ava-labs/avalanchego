@@ -7,10 +7,9 @@ import "github.com/ava-labs/avalanchego/snow"
 
 type TestVerifiable struct{ Err error }
 
-func (v *TestVerifiable) InitCtx(ctx *snow.Context) {}
-func (v *TestVerifiable) Verify() error             { return v.Err }
-
-func (v *TestVerifiable) VerifyState() error { return v.Err }
+func (*TestVerifiable) InitCtx(ctx *snow.Context) {}
+func (v *TestVerifiable) Verify() error           { return v.Err }
+func (v *TestVerifiable) VerifyState() error      { return v.Err }
 
 type TestTransferable struct {
 	TestVerifiable
@@ -18,13 +17,9 @@ type TestTransferable struct {
 	Val uint64 `serialize:"true"`
 }
 
-func (t *TestTransferable) InitCtx(*snow.Context) {
-	// no op
-}
-
-func (t *TestTransferable) Amount() uint64 { return t.Val }
-
-func (t *TestTransferable) Cost() (uint64, error) { return 0, nil }
+func (*TestTransferable) InitCtx(*snow.Context) {}
+func (t *TestTransferable) Amount() uint64      { return t.Val }
+func (*TestTransferable) Cost() (uint64, error) { return 0, nil }
 
 type TestAddressable struct {
 	TestTransferable `serialize:"true"`

@@ -50,7 +50,7 @@ func (tx *AddPermissionlessDelegatorTx) InitCtx(ctx *snow.Context) {
 func (tx *AddPermissionlessDelegatorTx) SubnetID() ids.ID   { return tx.Subnet }
 func (tx *AddPermissionlessDelegatorTx) NodeID() ids.NodeID { return tx.Validator.NodeID }
 
-func (tx *AddPermissionlessDelegatorTx) PublicKey() (*bls.PublicKey, bool, error) {
+func (*AddPermissionlessDelegatorTx) PublicKey() (*bls.PublicKey, bool, error) {
 	return nil, false, nil
 }
 

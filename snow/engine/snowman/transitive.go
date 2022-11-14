@@ -323,7 +323,7 @@ func (t *Transitive) Disconnected(nodeID ids.NodeID) error {
 	return t.VM.Disconnected(nodeID)
 }
 
-func (t *Transitive) Timeout() error { return nil }
+func (*Transitive) Timeout() error { return nil }
 
 func (t *Transitive) Gossip() error {
 	blkID, err := t.VM.LastAccepted()
@@ -347,7 +347,7 @@ func (t *Transitive) Gossip() error {
 	return nil
 }
 
-func (t *Transitive) Halt() {}
+func (*Transitive) Halt() {}
 
 func (t *Transitive) Shutdown() error {
 	t.Ctx.Log.Info("shutting down consensus engine")

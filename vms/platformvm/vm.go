@@ -385,7 +385,7 @@ func (vm *VM) SetPreference(blkID ids.ID) error {
 	return nil
 }
 
-func (vm *VM) Version() (string, error) {
+func (*VM) Version() (string, error) {
 	return version.Current.String(), nil
 }
 
@@ -418,7 +418,7 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 // CreateStaticHandlers returns a map where:
 // * keys are API endpoint extensions
 // * values are API handlers
-func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
+func (*VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")

@@ -2101,58 +2101,6 @@ type GetStakeReply struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
-// Takes in a staker and a set of addresses
-// Returns:
-// 1) The total amount staked by addresses in [addrs]
-// 2) The staked outputs
-func (service *Service) getStakeHelper(tx *txs.Tx, addrs ids.ShortSet, totalAmountStaked map[ids.ID]uint64) []avax.TransferableOutput {
-	staker, ok := tx.Unsigned.(txs.PermissionlessStaker)
-	if !ok {
-		return nil
-	}
-
-	stake := staker.Stake()
-	stakedOuts := make([]avax.TransferableOutput, 0, len(stake))
-	// Go through all of the staked outputs
-	for _, output := range stake {
-		out := output.Out
-		if lockedOut, ok := out.(*stakeable.LockOut); ok {
-			// This output can only be used for staking until [stakeOnlyUntil]
-			out = lockedOut.TransferableOut
-		}
-		secpOut, ok := out.(*secp256k1fx.TransferOutput)
-		if !ok {
-			continue
-		}
-
-		// Check whether this output is owned by one of the given addresses
-		contains := false
-		for _, addr := range secpOut.Addrs {
-			if addrs.Contains(addr) {
-				contains = true
-				break
-			}
-		}
-		if !contains {
-			// This output isn't owned by one of the given addresses. Ignore.
-			continue
-		}
-
-		assetID := output.AssetID()
-		newAmount, err := math.Add64(totalAmountStaked[assetID], secpOut.Amt)
-		if err != nil {
-			newAmount = stdmath.MaxUint64
-		}
-		totalAmountStaked[assetID] = newAmount
-
-		stakedOuts = append(
-			stakedOuts,
-			*output,
-		)
-	}
-	return stakedOuts
-}
-
 // GetStake returns the amount of nAVAX that [args.Addresses] have cumulatively
 // staked on the Primary Network.
 //
@@ -2191,7 +2139,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 			return err
 		}
 
-		stakedOuts = append(stakedOuts, service.getStakeHelper(tx, addrs, totalAmountStaked)...)
+		stakedOuts = append(stakedOuts, getStakeHelper(tx, addrs, totalAmountStaked)...)
 	}
 
 	pendingStakerIterator, err := service.vm.state.GetPendingStakerIterator()
@@ -2208,7 +2156,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 			return err
 		}
 
-		stakedOuts = append(stakedOuts, service.getStakeHelper(tx, addrs, totalAmountStaked)...)
+		stakedOuts = append(stakedOuts, getStakeHelper(tx, addrs, totalAmountStaked)...)
 	}
 
 	response.Stakeds = newJSONBalanceMap(totalAmountStaked)
@@ -2449,4 +2397,56 @@ func (service *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, respon
 	}
 
 	return nil
+}
+
+// Takes in a staker and a set of addresses
+// Returns:
+// 1) The total amount staked by addresses in [addrs]
+// 2) The staked outputs
+func getStakeHelper(tx *txs.Tx, addrs ids.ShortSet, totalAmountStaked map[ids.ID]uint64) []avax.TransferableOutput {
+	staker, ok := tx.Unsigned.(txs.PermissionlessStaker)
+	if !ok {
+		return nil
+	}
+
+	stake := staker.Stake()
+	stakedOuts := make([]avax.TransferableOutput, 0, len(stake))
+	// Go through all of the staked outputs
+	for _, output := range stake {
+		out := output.Out
+		if lockedOut, ok := out.(*stakeable.LockOut); ok {
+			// This output can only be used for staking until [stakeOnlyUntil]
+			out = lockedOut.TransferableOut
+		}
+		secpOut, ok := out.(*secp256k1fx.TransferOutput)
+		if !ok {
+			continue
+		}
+
+		// Check whether this output is owned by one of the given addresses
+		contains := false
+		for _, addr := range secpOut.Addrs {
+			if addrs.Contains(addr) {
+				contains = true
+				break
+			}
+		}
+		if !contains {
+			// This output isn't owned by one of the given addresses. Ignore.
+			continue
+		}
+
+		assetID := output.AssetID()
+		newAmount, err := math.Add64(totalAmountStaked[assetID], secpOut.Amt)
+		if err != nil {
+			newAmount = stdmath.MaxUint64
+		}
+		totalAmountStaked[assetID] = newAmount
+
+		stakedOuts = append(
+			stakedOuts,
+			*output,
+		)
+	}
+	return stakedOuts
 }

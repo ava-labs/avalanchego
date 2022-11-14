@@ -26,15 +26,11 @@ import (
 func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	called := make(chan struct{})
 
-	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
-	require.NoError(t, err)
-
 	ctx := snow.DefaultConsensusContextTest()
 
 	vdrs := validators.NewSet()
 	vdr0 := ids.GenerateTestNodeID()
-	err = vdrs.AddWeight(vdr0, 1)
+	err := vdrs.AddWeight(vdr0, 1)
 	require.NoError(t, err)
 
 	resourceTracker, err := tracker.NewResourceTracker(
@@ -82,14 +78,14 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	nodeID := ids.EmptyNodeID
 	reqID := uint32(1)
 	chainID := ids.ID{}
-	msg := mc.InboundGetAcceptedFrontier(chainID, reqID, 0*time.Second, nodeID)
+	msg := message.InboundGetAcceptedFrontier(chainID, reqID, 0*time.Second, nodeID)
 	handler.Push(context.Background(), msg)
 
 	currentTime := time.Now().Add(time.Second)
 	handler.clock.Set(currentTime)
 
 	reqID++
-	msg = mc.InboundGetAccepted(chainID, reqID, 1*time.Second, nil, nodeID)
+	msg = message.InboundGetAccepted(chainID, reqID, 1*time.Second, nil, nodeID)
 	handler.Push(context.Background(), msg)
 
 	bootstrapper.StartF = func(startReqID uint32) error { return nil }
@@ -111,9 +107,6 @@ func TestHandlerClosesOnError(t *testing.T) {
 
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
-	require.NoError(t, err)
-	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
 	require.NoError(t, err)
 
 	resourceTracker, err := tracker.NewResourceTracker(
@@ -170,7 +163,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	nodeID := ids.EmptyNodeID
 	reqID := uint32(1)
 	deadline := time.Nanosecond
-	msg := mc.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline, nodeID)
+	msg := message.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline, nodeID)
 	handler.Push(context.Background(), msg)
 
 	ticker := time.NewTicker(time.Second)

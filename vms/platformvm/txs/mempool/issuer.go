@@ -21,11 +21,11 @@ type issuer struct {
 	tx *txs.Tx
 }
 
-func (i *issuer) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
+func (*issuer) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 	return errCantIssueAdvanceTimeTx
 }
 
-func (i *issuer) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
+func (*issuer) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
 	return errCantIssueRewardValidatorTx
 }
 

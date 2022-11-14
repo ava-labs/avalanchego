@@ -86,7 +86,7 @@ func (s *signer) signBaseTx(ctx stdcontext.Context, tx *txs.Tx, utx *txs.BaseTx)
 	if err != nil {
 		return err
 	}
-	return s.sign(tx, txCreds, txSigners)
+	return sign(tx, txCreds, txSigners)
 }
 
 func (s *signer) signCreateAssetTx(ctx stdcontext.Context, tx *txs.Tx, utx *txs.CreateAssetTx) error {
@@ -94,7 +94,7 @@ func (s *signer) signCreateAssetTx(ctx stdcontext.Context, tx *txs.Tx, utx *txs.
 	if err != nil {
 		return err
 	}
-	return s.sign(tx, txCreds, txSigners)
+	return sign(tx, txCreds, txSigners)
 }
 
 func (s *signer) signOperationTx(ctx stdcontext.Context, tx *txs.Tx, utx *txs.OperationTx) error {
@@ -108,7 +108,7 @@ func (s *signer) signOperationTx(ctx stdcontext.Context, tx *txs.Tx, utx *txs.Op
 	}
 	txCreds = append(txCreds, txOpsCreds...)
 	txSigners = append(txSigners, txOpsSigners...)
-	return s.sign(tx, txCreds, txSigners)
+	return sign(tx, txCreds, txSigners)
 }
 
 func (s *signer) signImportTx(ctx stdcontext.Context, tx *txs.Tx, utx *txs.ImportTx) error {
@@ -122,7 +122,7 @@ func (s *signer) signImportTx(ctx stdcontext.Context, tx *txs.Tx, utx *txs.Impor
 	}
 	txCreds = append(txCreds, txImportCreds...)
 	txSigners = append(txSigners, txImportSigners...)
-	return s.sign(tx, txCreds, txSigners)
+	return sign(tx, txCreds, txSigners)
 }
 
 func (s *signer) signExportTx(ctx stdcontext.Context, tx *txs.Tx, utx *txs.ExportTx) error {
@@ -130,7 +130,7 @@ func (s *signer) signExportTx(ctx stdcontext.Context, tx *txs.Tx, utx *txs.Expor
 	if err != nil {
 		return err
 	}
-	return s.sign(tx, txCreds, txSigners)
+	return sign(tx, txCreds, txSigners)
 }
 
 func (s *signer) getSigners(ctx stdcontext.Context, sourceChainID ids.ID, ins []*avax.TransferableInput) ([]verify.Verifiable, [][]keychain.Signer, error) {
@@ -256,7 +256,7 @@ func (s *signer) getOpsSigners(ctx stdcontext.Context, sourceChainID ids.ID, ops
 	return txCreds, txSigners, nil
 }
 
-func (s *signer) sign(tx *txs.Tx, creds []verify.Verifiable, txSigners [][]keychain.Signer) error {
+func sign(tx *txs.Tx, creds []verify.Verifiable, txSigners [][]keychain.Signer) error {
 	codec := Parser.Codec()
 	unsignedBytes, err := codec.Marshal(txs.CodecVersion, &tx.Unsigned)
 	if err != nil {
