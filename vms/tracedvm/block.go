@@ -23,7 +23,7 @@ type tracedBlock struct {
 }
 
 func (b *tracedBlock) Verify(ctx context.Context) error {
-	ctx, span := b.vm.tracer.Start(ctx, "tracedBlock.Verify", oteltrace.WithAttributes(
+	ctx, span := b.vm.tracer.Start(ctx, b.vm.verify, oteltrace.WithAttributes(
 		attribute.Stringer("blkID", b.ID()),
 		attribute.Int64("height", int64(b.Height())),
 	))
@@ -33,7 +33,7 @@ func (b *tracedBlock) Verify(ctx context.Context) error {
 }
 
 func (b *tracedBlock) Accept(ctx context.Context) error {
-	ctx, span := b.vm.tracer.Start(ctx, "tracedBlock.Accept", oteltrace.WithAttributes(
+	ctx, span := b.vm.tracer.Start(ctx, b.vm.accept, oteltrace.WithAttributes(
 		attribute.Stringer("blkID", b.ID()),
 		attribute.Int64("height", int64(b.Height())),
 	))
@@ -43,7 +43,7 @@ func (b *tracedBlock) Accept(ctx context.Context) error {
 }
 
 func (b *tracedBlock) Reject(ctx context.Context) error {
-	ctx, span := b.vm.tracer.Start(ctx, "tracedBlock.Reject", oteltrace.WithAttributes(
+	ctx, span := b.vm.tracer.Start(ctx, b.vm.reject, oteltrace.WithAttributes(
 		attribute.Stringer("blkID", b.ID()),
 		attribute.Int64("height", int64(b.Height())),
 	))
@@ -58,7 +58,7 @@ func (b *tracedBlock) Options(ctx context.Context) ([2]snowman.Block, error) {
 		return [2]snowman.Block{}, snowman.ErrNotOracle
 	}
 
-	ctx, span := b.vm.tracer.Start(ctx, "tracedBlock.Options", oteltrace.WithAttributes(
+	ctx, span := b.vm.tracer.Start(ctx, b.vm.options, oteltrace.WithAttributes(
 		attribute.Stringer("blkID", b.ID()),
 		attribute.Int64("height", int64(b.Height())),
 	))
