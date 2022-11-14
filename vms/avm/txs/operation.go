@@ -30,7 +30,7 @@ type Operation struct {
 	Op         fxs.FxOperation `serialize:"true" json:"operation"`
 }
 
-func (op *Operation) Verify(c codec.Manager) error {
+func (op *Operation) Verify() error {
 	switch {
 	case op == nil:
 		return errNilOperation

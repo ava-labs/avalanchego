@@ -7,9 +7,9 @@ import "github.com/ava-labs/avalanchego/snow"
 
 type TestVerifiable struct{ Err error }
 
-func (*TestVerifiable) InitCtx(ctx *snow.Context) {}
-func (v *TestVerifiable) Verify() error           { return v.Err }
-func (v *TestVerifiable) VerifyState() error      { return v.Err }
+func (*TestVerifiable) InitCtx(*snow.Context) {}
+func (v *TestVerifiable) Verify() error       { return v.Err }
+func (v *TestVerifiable) VerifyState() error  { return v.Err }
 
 type TestTransferable struct {
 	TestVerifiable

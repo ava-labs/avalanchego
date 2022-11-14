@@ -28,7 +28,7 @@ func (a *acceptor) Fulfill(ctx context.Context, id ids.ID) {
 	a.Update(ctx)
 }
 
-func (a *acceptor) Abandon(_ context.Context, id ids.ID) { a.rejected = true }
+func (a *acceptor) Abandon(context.Context, ids.ID) { a.rejected = true }
 
 func (a *acceptor) Update(context.Context) {
 	// If I was rejected or I am still waiting on dependencies to finish or an

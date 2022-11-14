@@ -65,7 +65,7 @@ type Server struct {
 	subscribedConnections *connections
 }
 
-func New(networkID uint32, log logging.Logger) *Server {
+func New(log logging.Logger) *Server {
 	return &Server{
 		log:                   log,
 		conns:                 make(map[*connection]struct{}),

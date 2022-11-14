@@ -147,7 +147,7 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	}
 }
 
-func (db *Database) Compact(start []byte, limit []byte) error {
+func (db *Database) Compact(_, _ []byte) error {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 

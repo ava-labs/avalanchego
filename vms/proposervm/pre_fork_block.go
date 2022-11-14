@@ -155,7 +155,7 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 	return b.vm.verifyAndRecordInnerBlk(child)
 }
 
-func (*preForkBlock) verifyPostForkOption(child *postForkOption) error {
+func (*preForkBlock) verifyPostForkOption(*postForkOption) error {
 	return errUnexpectedBlockType
 }
 

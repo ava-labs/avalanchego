@@ -35,7 +35,7 @@ func (r *pmpRouter) MapPort(
 	networkProtocol string,
 	newInternalPort uint16,
 	newExternalPort uint16,
-	mappingName string,
+	_ string,
 	mappingDuration time.Duration,
 ) error {
 	protocol := networkProtocol

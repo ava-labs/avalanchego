@@ -46,7 +46,7 @@ func TestDelayFromSetTime(t *testing.T) {
 	}
 }
 
-func TestReceipt(t *testing.T) {
+func TestReceipt(*testing.T) {
 	toEngine := make(chan common.Message, 10)
 	now := time.Now()
 	startTime := now.Add(50 * time.Millisecond)

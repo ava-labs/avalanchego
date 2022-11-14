@@ -50,8 +50,7 @@ func (b *ApricotCommitBlock) initialize(bytes []byte) error {
 	return nil
 }
 
-func (*ApricotCommitBlock) InitCtx(ctx *snow.Context) {}
-
+func (*ApricotCommitBlock) InitCtx(*snow.Context)   {}
 func (*ApricotCommitBlock) Txs() []*txs.Tx          { return nil }
 func (b *ApricotCommitBlock) Visit(v Visitor) error { return v.ApricotCommitBlock(b) }
 

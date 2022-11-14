@@ -41,7 +41,7 @@ func (*Database) NewIteratorWithStart([]byte) database.Iterator { return &Iterat
 func (*Database) NewIteratorWithPrefix([]byte) database.Iterator { return &Iterator{} }
 
 // NewIteratorWithStartAndPrefix returns a new empty iterator
-func (*Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
+func (*Database) NewIteratorWithStartAndPrefix(_, _ []byte) database.Iterator {
 	return &Iterator{}
 }
 

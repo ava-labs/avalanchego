@@ -437,7 +437,7 @@ func (vm *VMServer) SetPreference(_ context.Context, req *vmpb.SetPreferenceRequ
 	return &emptypb.Empty{}, vm.vm.SetPreference(id)
 }
 
-func (vm *VMServer) Health(ctx context.Context, req *emptypb.Empty) (*vmpb.HealthResponse, error) {
+func (vm *VMServer) Health(context.Context, *emptypb.Empty) (*vmpb.HealthResponse, error) {
 	vmHealth, err := vm.vm.HealthCheck()
 	if err != nil {
 		return &vmpb.HealthResponse{}, err
@@ -616,7 +616,10 @@ func (vm *VMServer) VerifyHeightIndex(context.Context, *emptypb.Empty) (*vmpb.Ve
 	}, errorToRPCError(err)
 }
 
-func (vm *VMServer) GetBlockIDAtHeight(ctx context.Context, req *vmpb.GetBlockIDAtHeightRequest) (*vmpb.GetBlockIDAtHeightResponse, error) {
+func (vm *VMServer) GetBlockIDAtHeight(
+	_ context.Context,
+	req *vmpb.GetBlockIDAtHeightRequest,
+) (*vmpb.GetBlockIDAtHeightResponse, error) {
 	var (
 		blkID ids.ID
 		err   error
@@ -676,10 +679,7 @@ func (vm *VMServer) GetOngoingSyncStateSummary(
 	}, nil
 }
 
-func (vm *VMServer) GetLastStateSummary(
-	ctx context.Context,
-	empty *emptypb.Empty,
-) (*vmpb.GetLastStateSummaryResponse, error) {
+func (vm *VMServer) GetLastStateSummary(context.Context, *emptypb.Empty) (*vmpb.GetLastStateSummaryResponse, error) {
 	var (
 		summary block.StateSummary
 		err     error
@@ -705,7 +705,7 @@ func (vm *VMServer) GetLastStateSummary(
 }
 
 func (vm *VMServer) ParseStateSummary(
-	ctx context.Context,
+	_ context.Context,
 	req *vmpb.ParseStateSummaryRequest,
 ) (*vmpb.ParseStateSummaryResponse, error) {
 	var (
@@ -732,7 +732,7 @@ func (vm *VMServer) ParseStateSummary(
 }
 
 func (vm *VMServer) GetStateSummary(
-	ctx context.Context,
+	_ context.Context,
 	req *vmpb.GetStateSummaryRequest,
 ) (*vmpb.GetStateSummaryResponse, error) {
 	var (

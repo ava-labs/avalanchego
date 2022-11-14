@@ -25,13 +25,13 @@ func (b *Byzantine) Initialize(params Parameters, choice ids.ID) {
 	b.preference = choice
 }
 
-func (b *Byzantine) Parameters() Parameters      { return b.params }
-func (*Byzantine) Add(choice ids.ID)             {}
-func (b *Byzantine) Preference() ids.ID          { return b.preference }
-func (*Byzantine) RecordPoll(votes ids.Bag) bool { return false }
-func (*Byzantine) RecordUnsuccessfulPoll()       {}
-func (*Byzantine) Finalized() bool               { return true }
-func (b *Byzantine) String() string              { return b.preference.String() }
+func (b *Byzantine) Parameters() Parameters { return b.params }
+func (*Byzantine) Add(ids.ID)               {}
+func (b *Byzantine) Preference() ids.ID     { return b.preference }
+func (*Byzantine) RecordPoll(ids.Bag) bool  { return false }
+func (*Byzantine) RecordUnsuccessfulPoll()  {}
+func (*Byzantine) Finalized() bool          { return true }
+func (b *Byzantine) String() string         { return b.preference.String() }
 
 var (
 	Red   = ids.Empty.Prefix(0)

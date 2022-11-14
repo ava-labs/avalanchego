@@ -20,7 +20,7 @@ type executeTx struct {
 	parser       txs.Parser
 }
 
-func (et *executeTx) BaseTx(t *txs.BaseTx) error {
+func (et *executeTx) BaseTx(*txs.BaseTx) error {
 	return et.batch.Write()
 }
 

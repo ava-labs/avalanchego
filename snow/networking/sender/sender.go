@@ -687,7 +687,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 // SendAncestors sends an Ancestors message to the consensus engine running on
 // the specified chain on the specified node.
 // The Ancestors message gives the recipient the contents of several containers.
-func (s *sender) SendAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) {
+func (s *sender) SendAncestors(_ context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.Ancestors(s.ctx.ChainID, requestID, containers)
 	if err != nil {
@@ -809,7 +809,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 // chain on the specified node.
 // The Put message signifies that this consensus engine is giving to the
 // recipient the contents of the specified container.
-func (s *sender) SendPut(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte) {
+func (s *sender) SendPut(_ context.Context, nodeID ids.NodeID, requestID uint32, container []byte) {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.Put(s.ctx.ChainID, requestID, container)
 	if err != nil {
@@ -1354,7 +1354,7 @@ func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, request
 	return nil
 }
 
-func (s *sender) SendAppGossipSpecific(ctx context.Context, nodeIDs ids.NodeIDSet, appGossipBytes []byte) error {
+func (s *sender) SendAppGossipSpecific(_ context.Context, nodeIDs ids.NodeIDSet, appGossipBytes []byte) error {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
 	if err != nil {
@@ -1395,7 +1395,7 @@ func (s *sender) SendAppGossipSpecific(ctx context.Context, nodeIDs ids.NodeIDSe
 }
 
 // SendAppGossip sends an application-level gossip message.
-func (s *sender) SendAppGossip(ctx context.Context, appGossipBytes []byte) error {
+func (s *sender) SendAppGossip(_ context.Context, appGossipBytes []byte) error {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.AppGossip(s.ctx.ChainID, appGossipBytes)
 	if err != nil {
@@ -1435,7 +1435,7 @@ func (s *sender) SendAppGossip(ctx context.Context, appGossipBytes []byte) error
 }
 
 // SendGossip gossips the provided container
-func (s *sender) SendGossip(ctx context.Context, container []byte) {
+func (s *sender) SendGossip(_ context.Context, container []byte) {
 	// Create the outbound message.
 	outMsg, err := s.msgCreator.Put(
 		s.ctx.ChainID,

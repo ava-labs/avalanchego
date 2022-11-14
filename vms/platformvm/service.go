@@ -81,7 +81,7 @@ type GetHeightResponse struct {
 }
 
 // GetHeight returns the height of the last accepted block
-func (service *Service) GetHeight(r *http.Request, args *struct{}, response *GetHeightResponse) error {
+func (service *Service) GetHeight(_ *http.Request, _ *struct{}, response *GetHeightResponse) error {
 	lastAcceptedID, err := service.vm.LastAccepted()
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted block ID: %w", err)
@@ -107,7 +107,7 @@ type ExportKeyReply struct {
 }
 
 // ExportKey returns a private key from the provided user
-func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *ExportKeyReply) error {
+func (service *Service) ExportKey(_ *http.Request, args *ExportKeyArgs, reply *ExportKeyReply) error {
 	service.vm.ctx.Log.Debug("Platform: ExportKey called")
 
 	address, err := avax.ParseServiceAddress(service.addrManager, args.Address)
@@ -137,7 +137,7 @@ type ImportKeyArgs struct {
 }
 
 // ImportKey adds a private key to the provided user
-func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JSONAddress) error {
+func (service *Service) ImportKey(_ *http.Request, args *ImportKeyArgs, reply *api.JSONAddress) error {
 	service.vm.ctx.Log.Debug("Platform: ImportKey called",
 		logging.UserString("username", args.Username),
 	)
@@ -1905,7 +1905,7 @@ type GetBlockchainsResponse struct {
 }
 
 // GetBlockchains returns all of the blockchains that exist
-func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response *GetBlockchainsResponse) error {
+func (service *Service) GetBlockchains(_ *http.Request, _ *struct{}, response *GetBlockchainsResponse) error {
 	service.vm.ctx.Log.Debug("Platform: GetBlockchains called")
 
 	subnets, err := service.vm.state.GetSubnets()
@@ -2338,7 +2338,7 @@ type GetTimestampReply struct {
 }
 
 // GetTimestamp returns the current timestamp on chain.
-func (service *Service) GetTimestamp(_ *http.Request, args *struct{}, reply *GetTimestampReply) error {
+func (service *Service) GetTimestamp(_ *http.Request, _ *struct{}, reply *GetTimestampReply) error {
 	service.vm.ctx.Log.Debug("Platform: GetTimestamp called")
 
 	reply.Timestamp = service.vm.state.GetTimestamp()

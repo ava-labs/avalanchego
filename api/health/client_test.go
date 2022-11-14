@@ -19,7 +19,7 @@ type mockClient struct {
 	onCall func()
 }
 
-func (mc *mockClient) SendRequest(ctx context.Context, method string, params interface{}, replyIntf interface{}, options ...rpc.Option) error {
+func (mc *mockClient) SendRequest(_ context.Context, _ string, _ interface{}, replyIntf interface{}, _ ...rpc.Option) error {
 	reply := replyIntf.(*APIHealthReply)
 	*reply = mc.reply
 	mc.onCall()
