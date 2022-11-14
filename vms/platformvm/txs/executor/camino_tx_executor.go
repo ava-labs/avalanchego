@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -176,7 +177,14 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 	_, ok := e.Tx.Unsigned.(*txs.CaminoAddValidatorTx)
 
 	if !caminoGenesis.LockModeBondDeposit && !ok {
-		return e.StandardTxExecutor.AddValidatorTx(tx)
+		if caminoGenesis.VerifyNodeSignature {
+			creds := removeCreds(e.Tx, 1)
+			err = e.StandardTxExecutor.AddValidatorTx(tx)
+			addCreds(e.Tx, creds)
+		} else {
+			err = e.StandardTxExecutor.AddValidatorTx(tx)
+		}
+		return err
 	}
 
 	if !caminoGenesis.LockModeBondDeposit || !ok {
@@ -213,9 +221,135 @@ func (e *CaminoStandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidat
 		return err
 	}
 
-	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, false); err != nil {
+	if err := locked.VerifyNoLocks(tx.Ins, tx.Outs); err != nil {
+		return err
+	}
+	caminoGenesis, err := e.State.CaminoGenesisState()
+	if err != nil {
 		return err
 	}
 
-	return e.StandardTxExecutor.AddSubnetValidatorTx(tx)
+	if caminoGenesis.VerifyNodeSignature {
+		creds := removeCreds(e.Tx, 1)
+		err = e.StandardTxExecutor.AddSubnetValidatorTx(tx)
+		addCreds(e.Tx, creds)
+	} else {
+		err = e.StandardTxExecutor.AddSubnetValidatorTx(tx)
+	}
+
+	return err
+}
+
+func (e *CaminoStandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
+	caminoGenesis, err := e.State.CaminoGenesisState()
+	if err != nil {
+		return err
+	}
+
+	if caminoGenesis.LockModeBondDeposit {
+		return errWrongTxType
+	}
+
+	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoGenesis.LockModeBondDeposit); err != nil {
+		return err
+	}
+
+	return e.StandardTxExecutor.AddDelegatorTx(tx)
+}
+
+func (e *CaminoStandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+	caminoGenesis, err := e.State.CaminoGenesisState()
+	if err != nil {
+		return err
+	}
+
+	if caminoGenesis.LockModeBondDeposit {
+		return errWrongTxType
+	}
+
+	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoGenesis.LockModeBondDeposit); err != nil {
+		return err
+	}
+
+	return e.StandardTxExecutor.AddPermissionlessValidatorTx(tx)
+}
+
+func (e *CaminoStandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+	caminoGenesis, err := e.State.CaminoGenesisState()
+	if err != nil {
+		return err
+	}
+
+	if caminoGenesis.LockModeBondDeposit {
+		return errWrongTxType
+	}
+
+	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoGenesis.LockModeBondDeposit); err != nil {
+		return err
+	}
+
+	return e.StandardTxExecutor.AddPermissionlessDelegatorTx(tx)
+}
+
+func (e *CaminoStandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
+	if err := locked.VerifyNoLocks(tx.Ins, tx.Outs); err != nil {
+		return err
+	}
+
+	return e.StandardTxExecutor.CreateChainTx(tx)
+}
+
+func (e *CaminoStandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
+	if err := locked.VerifyNoLocks(tx.Ins, tx.Outs); err != nil {
+		return err
+	}
+
+	return e.StandardTxExecutor.CreateSubnetTx(tx)
+}
+
+func (e *CaminoStandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
+	if err := locked.VerifyNoLocks(tx.Ins, tx.Outs); err != nil {
+		return err
+	}
+
+	if err := locked.VerifyNoLocks(nil, tx.ExportedOutputs); err != nil {
+		return err
+	}
+
+	return e.StandardTxExecutor.ExportTx(tx)
+}
+
+func (e *CaminoStandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
+	if err := locked.VerifyNoLocks(tx.Ins, tx.Outs); err != nil {
+		return err
+	}
+
+	return e.StandardTxExecutor.ImportTx(tx)
+}
+
+func (e *CaminoStandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
+	if err := locked.VerifyNoLocks(tx.Ins, tx.Outs); err != nil {
+		return err
+	}
+
+	return e.StandardTxExecutor.RemoveSubnetValidatorTx(tx)
+}
+
+func (e *CaminoStandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
+	if err := locked.VerifyNoLocks(tx.Ins, tx.Outs); err != nil {
+		return err
+	}
+
+	return e.StandardTxExecutor.TransformSubnetTx(tx)
+}
+
+func removeCreds(tx *txs.Tx, num int) []verify.Verifiable {
+	newCredsLen := len(tx.Creds) - num
+	removedCreds := tx.Creds[newCredsLen:len(tx.Creds)]
+	tx.Creds = tx.Creds[:newCredsLen]
+	return removedCreds
+}
+
+func addCreds(tx *txs.Tx, creds []verify.Verifiable) {
+	tx.Creds = append(tx.Creds, creds...)
 }
