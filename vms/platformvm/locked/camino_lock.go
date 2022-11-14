@@ -56,10 +56,14 @@ func (ls State) IsDeposited() bool {
 	return StateDeposited&ls == StateDeposited
 }
 
+/**********************  IDs *********************/
+
 type IDs struct {
 	DepositTxID ids.ID `serialize:"true" json:"depositTxID"`
 	BondTxID    ids.ID `serialize:"true" json:"bondTxID"`
 }
+
+var IDsEmpty = IDs{ids.Empty, ids.Empty}
 
 func (lock IDs) LockState() State {
 	lockState := StateUnlocked
@@ -136,6 +140,8 @@ func (lock *IDs) Match(lockState State, txIDs ids.Set) bool {
 	}
 	return false
 }
+
+/**********************  In / Out *********************/
 
 type Out struct {
 	IDs                  `serialize:"true" json:"lockIDs"`
