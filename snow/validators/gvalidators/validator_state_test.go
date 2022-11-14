@@ -84,16 +84,16 @@ func TestGetMinimumHeight(t *testing.T) {
 
 	// Happy path
 	expectedHeight := uint64(1337)
-	state.server.EXPECT().GetMinimumHeight().Return(expectedHeight, nil)
+	state.server.EXPECT().GetMinimumHeight(gomock.Any()).Return(expectedHeight, nil)
 
-	height, err := state.client.GetMinimumHeight()
+	height, err := state.client.GetMinimumHeight(context.Background())
 	require.NoError(err)
 	require.Equal(expectedHeight, height)
 
 	// Error path
-	state.server.EXPECT().GetMinimumHeight().Return(expectedHeight, errCustom)
+	state.server.EXPECT().GetMinimumHeight(gomock.Any()).Return(expectedHeight, errCustom)
 
-	_, err = state.client.GetMinimumHeight()
+	_, err = state.client.GetMinimumHeight(context.Background())
 	require.Error(err)
 }
 
@@ -107,16 +107,16 @@ func TestGetCurrentHeight(t *testing.T) {
 
 	// Happy path
 	expectedHeight := uint64(1337)
-	state.server.EXPECT().GetCurrentHeight().Return(expectedHeight, nil)
+	state.server.EXPECT().GetCurrentHeight(gomock.Any()).Return(expectedHeight, nil)
 
-	height, err := state.client.GetCurrentHeight()
+	height, err := state.client.GetCurrentHeight(context.Background())
 	require.NoError(err)
 	require.Equal(expectedHeight, height)
 
 	// Error path
-	state.server.EXPECT().GetCurrentHeight().Return(expectedHeight, errCustom)
+	state.server.EXPECT().GetCurrentHeight(gomock.Any()).Return(expectedHeight, errCustom)
 
-	_, err = state.client.GetCurrentHeight()
+	_, err = state.client.GetCurrentHeight(context.Background())
 	require.Error(err)
 }
 
@@ -137,15 +137,15 @@ func TestGetValidatorSet(t *testing.T) {
 	}
 	height := uint64(1337)
 	subnetID := ids.GenerateTestID()
-	state.server.EXPECT().GetValidatorSet(height, subnetID).Return(expectedVdrs, nil)
+	state.server.EXPECT().GetValidatorSet(gomock.Any(), height, subnetID).Return(expectedVdrs, nil)
 
-	vdrs, err := state.client.GetValidatorSet(height, subnetID)
+	vdrs, err := state.client.GetValidatorSet(context.Background(), height, subnetID)
 	require.NoError(err)
 	require.Equal(expectedVdrs, vdrs)
 
 	// Error path
-	state.server.EXPECT().GetValidatorSet(height, subnetID).Return(expectedVdrs, errCustom)
+	state.server.EXPECT().GetValidatorSet(gomock.Any(), height, subnetID).Return(expectedVdrs, errCustom)
 
-	_, err = state.client.GetValidatorSet(height, subnetID)
+	_, err = state.client.GetValidatorSet(context.Background(), height, subnetID)
 	require.Error(err)
 }

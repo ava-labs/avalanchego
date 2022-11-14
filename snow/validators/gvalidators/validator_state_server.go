@@ -25,23 +25,23 @@ func NewServer(state validators.State) *Server {
 	return &Server{state: state}
 }
 
-func (s *Server) GetMinimumHeight(context.Context, *emptypb.Empty) (*pb.GetMinimumHeightResponse, error) {
-	height, err := s.state.GetMinimumHeight()
+func (s *Server) GetMinimumHeight(ctx context.Context, _ *emptypb.Empty) (*pb.GetMinimumHeightResponse, error) {
+	height, err := s.state.GetMinimumHeight(ctx)
 	return &pb.GetMinimumHeightResponse{Height: height}, err
 }
 
-func (s *Server) GetCurrentHeight(context.Context, *emptypb.Empty) (*pb.GetCurrentHeightResponse, error) {
-	height, err := s.state.GetCurrentHeight()
+func (s *Server) GetCurrentHeight(ctx context.Context, _ *emptypb.Empty) (*pb.GetCurrentHeightResponse, error) {
+	height, err := s.state.GetCurrentHeight(ctx)
 	return &pb.GetCurrentHeightResponse{Height: height}, err
 }
 
-func (s *Server) GetValidatorSet(_ context.Context, req *pb.GetValidatorSetRequest) (*pb.GetValidatorSetResponse, error) {
+func (s *Server) GetValidatorSet(ctx context.Context, req *pb.GetValidatorSetRequest) (*pb.GetValidatorSetResponse, error) {
 	subnetID, err := ids.ToID(req.SubnetId)
 	if err != nil {
 		return nil, err
 	}
 
-	vdrs, err := s.state.GetValidatorSet(req.Height, subnetID)
+	vdrs, err := s.state.GetValidatorSet(ctx, req.Height, subnetID)
 	if err != nil {
 		return nil, err
 	}
