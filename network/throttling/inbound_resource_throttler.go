@@ -12,7 +12,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -91,7 +90,6 @@ func NewSystemThrottler(
 	namespace string,
 	reg prometheus.Registerer,
 	config SystemThrottlerConfig,
-	vdrs validators.Set,
 	tracker tracker.Tracker,
 	targeter tracker.Targeter,
 ) (SystemThrottler, error) {

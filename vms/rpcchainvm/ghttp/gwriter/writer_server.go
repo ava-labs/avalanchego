@@ -23,7 +23,7 @@ func NewServer(writer io.Writer) *Server {
 	return &Server{writer: writer}
 }
 
-func (s *Server) Write(ctx context.Context, req *writerpb.WriteRequest) (*writerpb.WriteResponse, error) {
+func (s *Server) Write(_ context.Context, req *writerpb.WriteRequest) (*writerpb.WriteResponse, error) {
 	n, err := s.writer.Write(req.Payload)
 	resp := &writerpb.WriteResponse{
 		Written: int32(n),

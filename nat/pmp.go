@@ -27,7 +27,7 @@ type pmpRouter struct {
 	client *natpmp.Client
 }
 
-func (r *pmpRouter) SupportsNAT() bool {
+func (*pmpRouter) SupportsNAT() bool {
 	return true
 }
 
@@ -35,7 +35,7 @@ func (r *pmpRouter) MapPort(
 	networkProtocol string,
 	newInternalPort uint16,
 	newExternalPort uint16,
-	mappingName string,
+	_ string,
 	mappingDuration time.Duration,
 ) error {
 	protocol := networkProtocol

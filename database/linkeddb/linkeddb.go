@@ -419,7 +419,7 @@ func (it *iterator) Next() bool {
 func (it *iterator) Error() error  { return it.err }
 func (it *iterator) Key() []byte   { return it.key }
 func (it *iterator) Value() []byte { return it.value }
-func (it *iterator) Release()      {}
+func (*iterator) Release()         {}
 
 func nodeKey(key []byte) []byte {
 	newKey := make([]byte, len(key)+1)

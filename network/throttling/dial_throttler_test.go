@@ -43,7 +43,6 @@ func TestDialThrottler(t *testing.T) {
 
 	select {
 	case <-time.After(25 * time.Millisecond):
-		break
 	case <-acquiredChan:
 		t.Fatal("should not have been able to acquire immediately")
 	}

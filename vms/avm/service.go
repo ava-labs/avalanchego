@@ -62,7 +62,7 @@ type FormattedAssetID struct {
 }
 
 // IssueTx attempts to issue a transaction into consensus
-func (service *Service) IssueTx(r *http.Request, args *api.FormattedTx, reply *api.JSONTxID) error {
+func (service *Service) IssueTx(_ *http.Request, args *api.FormattedTx, reply *api.JSONTxID) error {
 	service.vm.ctx.Log.Debug("AVM: IssueTx called",
 		logging.UserString("tx", args.Tx),
 	)
@@ -80,7 +80,7 @@ func (service *Service) IssueTx(r *http.Request, args *api.FormattedTx, reply *a
 	return nil
 }
 
-func (service *Service) IssueStopVertex(_ *http.Request, _ *struct{}, _ *struct{}) error {
+func (service *Service) IssueStopVertex(_ *http.Request, _, _ *struct{}) error {
 	return service.vm.issueStopVertex()
 }
 
@@ -106,7 +106,7 @@ type GetAddressTxsReply struct {
 }
 
 // GetAddressTxs returns list of transactions for a given address
-func (service *Service) GetAddressTxs(r *http.Request, args *GetAddressTxsArgs, reply *GetAddressTxsReply) error {
+func (service *Service) GetAddressTxs(_ *http.Request, args *GetAddressTxsArgs, reply *GetAddressTxsReply) error {
 	cursor := uint64(args.Cursor)
 	pageSize := uint64(args.PageSize)
 	service.vm.ctx.Log.Debug("AVM: GetAddressTxs called",
@@ -159,7 +159,7 @@ func (service *Service) GetAddressTxs(r *http.Request, args *GetAddressTxsArgs, 
 }
 
 // GetTxStatus returns the status of the specified transaction
-func (service *Service) GetTxStatus(r *http.Request, args *api.JSONTxID, reply *GetTxStatusReply) error {
+func (service *Service) GetTxStatus(_ *http.Request, args *api.JSONTxID, reply *GetTxStatusReply) error {
 	service.vm.ctx.Log.Debug("AVM: GetTxStatus called",
 		zap.Stringer("txID", args.TxID),
 	)
@@ -178,7 +178,7 @@ func (service *Service) GetTxStatus(r *http.Request, args *api.JSONTxID, reply *
 }
 
 // GetTx returns the specified transaction
-func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.GetTxReply) error {
+func (service *Service) GetTx(_ *http.Request, args *api.GetTxArgs, reply *api.GetTxReply) error {
 	service.vm.ctx.Log.Debug("AVM: GetTx called",
 		zap.Stringer("txID", args.TxID),
 	)
@@ -216,7 +216,7 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.G
 }
 
 // GetUTXOs gets all utxos for passed in addresses
-func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply *api.GetUTXOsReply) error {
+func (service *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, reply *api.GetUTXOsReply) error {
 	service.vm.ctx.Log.Debug("AVM: GetUTXOs called",
 		logging.UserStrings("addresses", args.Addresses),
 	)
@@ -374,7 +374,7 @@ type GetBalanceReply struct {
 // (1 out of 1 multisig) by the address and with a locktime in the past.
 // Otherwise, returned balance includes assets held only partially by the
 // address, and includes balances with locktime in the future.
-func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply *GetBalanceReply) error {
+func (service *Service) GetBalance(_ *http.Request, args *GetBalanceArgs, reply *GetBalanceReply) error {
 	service.vm.ctx.Log.Debug("AVM: GetBalance called",
 		logging.UserString("address", args.Address),
 		logging.UserString("assetID", args.AssetID),
@@ -445,7 +445,7 @@ type GetAllBalancesReply struct {
 // If ![args.IncludePartial], returns only unlocked balance/UTXOs with a 1-out-of-1 multisig.
 // Otherwise, returned balance/UTXOs includes assets held only partially by the
 // address, and includes balances with locktime in the future.
-func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs, reply *GetAllBalancesReply) error {
+func (service *Service) GetAllBalances(_ *http.Request, args *GetAllBalancesArgs, reply *GetAllBalancesReply) error {
 	service.vm.ctx.Log.Debug("AVM: GetAllBalances called",
 		logging.UserString("address", args.Address),
 	)
@@ -529,7 +529,7 @@ type AssetIDChangeAddr struct {
 }
 
 // CreateAsset returns ID of the newly created asset
-func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, reply *AssetIDChangeAddr) error {
+func (service *Service) CreateAsset(_ *http.Request, args *CreateAssetArgs, reply *AssetIDChangeAddr) error {
 	service.vm.ctx.Log.Debug("AVM: CreateAsset called",
 		logging.UserString("name", args.Name),
 		logging.UserString("symbol", args.Symbol),
@@ -649,7 +649,7 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 }
 
 // CreateFixedCapAsset returns ID of the newly created asset
-func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateAssetArgs, reply *AssetIDChangeAddr) error {
+func (service *Service) CreateFixedCapAsset(_ *http.Request, args *CreateAssetArgs, reply *AssetIDChangeAddr) error {
 	service.vm.ctx.Log.Debug("AVM: CreateFixedCapAsset called",
 		logging.UserString("name", args.Name),
 		logging.UserString("symbol", args.Symbol),
@@ -660,7 +660,7 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateAssetAr
 }
 
 // CreateVariableCapAsset returns ID of the newly created asset
-func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateAssetArgs, reply *AssetIDChangeAddr) error {
+func (service *Service) CreateVariableCapAsset(_ *http.Request, args *CreateAssetArgs, reply *AssetIDChangeAddr) error {
 	service.vm.ctx.Log.Debug("AVM: CreateVariableCapAsset called",
 		logging.UserString("name", args.Name),
 		logging.UserString("symbol", args.Symbol),
@@ -679,7 +679,7 @@ type CreateNFTAssetArgs struct {
 }
 
 // CreateNFTAsset returns ID of the newly created asset
-func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs, reply *AssetIDChangeAddr) error {
+func (service *Service) CreateNFTAsset(_ *http.Request, args *CreateNFTAssetArgs, reply *AssetIDChangeAddr) error {
 	service.vm.ctx.Log.Debug("AVM: CreateNFTAsset called",
 		logging.UserString("name", args.Name),
 		logging.UserString("symbol", args.Symbol),
@@ -785,7 +785,7 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 }
 
 // CreateAddress creates an address for the user [args.Username]
-func (service *Service) CreateAddress(r *http.Request, args *api.UserPass, reply *api.JSONAddress) error {
+func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, reply *api.JSONAddress) error {
 	service.vm.ctx.Log.Debug("AVM: CreateAddress called",
 		logging.UserString("username", args.Username),
 	)
@@ -857,7 +857,7 @@ type ExportKeyReply struct {
 }
 
 // ExportKey returns a private key from the provided user
-func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *ExportKeyReply) error {
+func (service *Service) ExportKey(_ *http.Request, args *ExportKeyArgs, reply *ExportKeyReply) error {
 	service.vm.ctx.Log.Debug("AVM: ExportKey called",
 		logging.UserString("username", args.Username),
 	)
@@ -895,7 +895,7 @@ type ImportKeyReply struct {
 }
 
 // ImportKey adds a private key to the provided user
-func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JSONAddress) error {
+func (service *Service) ImportKey(_ *http.Request, args *ImportKeyArgs, reply *api.JSONAddress) error {
 	service.vm.ctx.Log.Debug("AVM: ImportKey called",
 		logging.UserString("username", args.Username),
 	)
@@ -969,7 +969,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JSONTxI
 }
 
 // SendMultiple sends a transaction with multiple outputs.
-func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, reply *api.JSONTxIDChangeAddr) error {
+func (service *Service) SendMultiple(_ *http.Request, args *SendMultipleArgs, reply *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Debug("AVM: SendMultiple called",
 		logging.UserString("username", args.Username),
 	)
@@ -1119,7 +1119,7 @@ type MintArgs struct {
 }
 
 // Mint issues a transaction that mints more of the asset
-func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JSONTxIDChangeAddr) error {
+func (service *Service) Mint(_ *http.Request, args *MintArgs, reply *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Debug("AVM: Mint called",
 		logging.UserString("username", args.Username),
 	)
@@ -1236,7 +1236,7 @@ type SendNFTArgs struct {
 }
 
 // SendNFT sends an NFT
-func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.JSONTxIDChangeAddr) error {
+func (service *Service) SendNFT(_ *http.Request, args *SendNFTArgs, reply *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Debug("AVM: SendNFT called",
 		logging.UserString("username", args.Username),
 	)
@@ -1347,7 +1347,7 @@ type MintNFTArgs struct {
 }
 
 // MintNFT issues a MintNFT transaction and returns the ID of the newly created transaction
-func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.JSONTxIDChangeAddr) error {
+func (service *Service) MintNFT(_ *http.Request, args *MintNFTArgs, reply *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Debug("AVM: MintNFT called",
 		logging.UserString("username", args.Username),
 	)
