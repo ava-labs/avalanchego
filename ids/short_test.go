@@ -39,20 +39,20 @@ func TestShortString(t *testing.T) {
 
 func TestIsUniqueShortIDs(t *testing.T) {
 	ids := []ShortID{}
-	if IsUniqueShortIDs(ids) == false {
+	if !IsUniqueShortIDs(ids) {
 		t.Fatal("should be unique")
 	}
 	id1 := GenerateTestShortID()
 	ids = append(ids, id1)
-	if IsUniqueShortIDs(ids) == false {
+	if !IsUniqueShortIDs(ids) {
 		t.Fatal("should be unique")
 	}
 	ids = append(ids, GenerateTestShortID())
-	if IsUniqueShortIDs(ids) == false {
+	if !IsUniqueShortIDs(ids) {
 		t.Fatal("should be unique")
 	}
 	ids = append(ids, id1)
-	if IsUniqueShortIDs(ids) == true {
+	if IsUniqueShortIDs(ids) {
 		t.Fatal("should not be unique")
 	}
 }
