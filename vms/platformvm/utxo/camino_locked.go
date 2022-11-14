@@ -38,6 +38,7 @@ var (
 	errNotBurnedEnough           = errors.New("burned less tokens, than needed to")
 	errAssetIDMismatch           = errors.New("input assetID is different from utxo asset id")
 	errLockIDsMismatch           = errors.New("input lock ids is different from utxo lock ids")
+	errLockAmountNotZero         = errors.New("lockAmount must be 0 for StateUnlocked")
 )
 
 // Creates UTXOs from [outs] and adds them to the UTXO set.
@@ -85,8 +86,16 @@ func (h *handler) Lock(
 	[][]*crypto.PrivateKeySECP256K1R, // signers
 	error,
 ) {
-	if appliedLockState != locked.StateBonded && appliedLockState != locked.StateDeposited {
+	switch appliedLockState {
+	case locked.StateBonded,
+		locked.StateDeposited,
+		locked.StateUnlocked:
+	default:
 		return nil, nil, nil, errInvalidTargetLockState
+	}
+
+	if appliedLockState == locked.StateUnlocked && totalAmountToLock > 0 {
+		return nil, nil, nil, errLockAmountNotZero
 	}
 
 	addrs := ids.NewShortSet(len(keys)) // The addresses controlled by [keys]
@@ -144,8 +153,9 @@ func (h *handler) Lock(
 		}
 
 		out := utxo.Out
-		lockIDs := locked.IDs{}
+		lockIDs := locked.IDsEmpty
 		if lockedOut, ok := utxo.Out.(*locked.Out); ok {
+			// Resolves to true for StateUnlocked
 			if lockedOut.IsLockedWith(appliedLockState) {
 				// This output can't be locked with target lockState,
 				// and because utxos are sorted we can skip other utxos
@@ -683,47 +693,52 @@ func (sort *innerSortUTXOs) Less(i, j int) bool {
 	iUTXO := sort.utxos[i]
 	jUTXO := sort.utxos[j]
 
-	iAssetID := iUTXO.AssetID()
-	jAssetID := jUTXO.AssetID()
-
-	if iAssetID == sort.allowedAssetID && jAssetID != sort.allowedAssetID {
+	if iUTXO.AssetID() == sort.allowedAssetID && jUTXO.AssetID() != sort.allowedAssetID {
 		return true
 	}
 
 	iOut := iUTXO.Out
-	iLockIDs := locked.IDs{}
+	iLockIDs := &locked.IDsEmpty
 	if lockedOut, ok := iOut.(*locked.Out); ok {
 		iOut = lockedOut.TransferableOut
-		iLockIDs = lockedOut.IDs
+		iLockIDs = &lockedOut.IDs
 	}
 
 	jOut := jUTXO.Out
-	jLockIDs := locked.IDs{}
+	jLockIDs := &locked.IDsEmpty
 	if lockedOut, ok := jOut.(*locked.Out); ok {
 		jOut = lockedOut.TransferableOut
-		jLockIDs = lockedOut.IDs
+		jLockIDs = &lockedOut.IDs
 	}
 
-	iLockTxID := iLockIDs.DepositTxID
-	jLockTxID := jLockIDs.DepositTxID
-	iOtherLockTxID := iLockIDs.BondTxID
-	jOtherLockTxID := jLockIDs.BondTxID
-	if sort.lockState == locked.StateBonded {
-		iLockTxID = iLockIDs.BondTxID
-		jLockTxID = jLockIDs.BondTxID
-		iOtherLockTxID = iLockIDs.DepositTxID
-		jOtherLockTxID = jLockIDs.DepositTxID
-	}
+	if sort.lockState == locked.StateUnlocked {
+		// Sort all locks last
+		iEmpty := *iLockIDs == locked.IDsEmpty
+		if iEmpty != (*jLockIDs == locked.IDsEmpty) {
+			return iEmpty
+		}
+	} else {
+		iLockTxID := &iLockIDs.DepositTxID
+		jLockTxID := &jLockIDs.DepositTxID
+		iOtherLockTxID := &iLockIDs.BondTxID
+		jOtherLockTxID := &jLockIDs.BondTxID
+		if sort.lockState == locked.StateBonded {
+			iLockTxID = &iLockIDs.BondTxID
+			jLockTxID = &jLockIDs.BondTxID
+			iOtherLockTxID = &iLockIDs.DepositTxID
+			jOtherLockTxID = &jLockIDs.DepositTxID
+		}
 
-	if iLockTxID == ids.Empty && jLockTxID != ids.Empty {
-		return true
-	}
+		if *iLockTxID == ids.Empty && *jLockTxID != ids.Empty {
+			return true
+		}
 
-	switch bytes.Compare(iOtherLockTxID[:], jOtherLockTxID[:]) {
-	case -1:
-		return false
-	case 1:
-		return true
+		switch bytes.Compare(iOtherLockTxID[:], jOtherLockTxID[:]) {
+		case -1:
+			return false
+		case 1:
+			return true
+		}
 	}
 
 	iAmount := uint64(0)
