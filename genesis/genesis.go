@@ -344,6 +344,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		InitialSupply: json.Uint64(initialSupply),
 		Message:       config.Message,
 		Encoding:      defaultEncoding,
+		Camino:        config.Camino,
 	}
 	for _, allocation := range config.Allocations {
 		if initiallyStaked.Contains(allocation.AVAXAddr) {

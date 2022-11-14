@@ -131,6 +131,9 @@ func (c Config) Unparse() (UnparsedConfig, error) {
 		}
 		uc.InitialStakers[i] = uis
 	}
+	if err := uc.Camino.Unparse(c.Camino, c.NetworkID); err != nil {
+		return uc, err
+	}
 
 	return uc, nil
 }

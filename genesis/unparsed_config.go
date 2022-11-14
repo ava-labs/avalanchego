@@ -88,6 +88,7 @@ type UnparsedConfig struct {
 	InitialStakeDurationOffset uint64           `json:"initialStakeDurationOffset"`
 	InitialStakedFunds         []string         `json:"initialStakedFunds"`
 	InitialStakers             []UnparsedStaker `json:"initialStakers"`
+	Camino                     UnparsedCamino   `json:"camino"`
 
 	CChainGenesis string `json:"cChainGenesis"`
 
@@ -130,6 +131,11 @@ func (uc UnparsedConfig) Parse() (Config, error) {
 			return c, err
 		}
 		c.InitialStakers[i] = is
+	}
+	var err error
+	c.Camino, err = uc.Camino.Parse()
+	if err != nil {
+		return c, err
 	}
 	return c, nil
 }

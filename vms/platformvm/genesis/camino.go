@@ -5,6 +5,6 @@ package genesis
 
 // Camino genesis args
 type Camino struct {
-	VerifyNodeSignature bool `json:"verifyNodeSignature"`
-	LockModeBondDeposit bool `json:"lockModeBondDeposit"`
+	VerifyNodeSignature bool `serialize:"true" json:"verifyNodeSignature"`
+	LockModeBondDeposit bool `serialize:"true" json:"lockModeBondDeposit"`
 }
