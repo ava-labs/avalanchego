@@ -490,13 +490,13 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	pendingDSValidatorID := ids.NodeID(key.PublicKey().Address())
 
 	// starts validating primary network 10 seconds after genesis
-	DSStartTime := defaultGenesisTime.Add(10 * time.Second)
-	DSEndTime := DSStartTime.Add(5 * defaultMinStakingDuration)
+	dsStartTime := defaultGenesisTime.Add(10 * time.Second)
+	dsEndTime := dsStartTime.Add(5 * defaultMinStakingDuration)
 
 	addDSTx, err := env.txBuilder.NewAddValidatorTx(
 		env.config.MinValidatorStake, // stake amount
-		uint64(DSStartTime.Unix()),   // start time
-		uint64(DSEndTime.Unix()),     // end time
+		uint64(dsStartTime.Unix()),   // start time
+		uint64(dsEndTime.Unix()),     // end time
 		pendingDSValidatorID,         // node ID
 		nodeID,                       // reward address
 		reward.PercentDenominator,    // shares
@@ -511,8 +511,8 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		// Case: Proposed validator isn't in pending or current validator sets
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 			defaultWeight,
-			uint64(DSStartTime.Unix()), // start validating subnet before primary network
-			uint64(DSEndTime.Unix()),
+			uint64(dsStartTime.Unix()), // start validating subnet before primary network
+			uint64(dsEndTime.Unix()),
 			pendingDSValidatorID,
 			testSubnet1.ID(),
 			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -562,8 +562,8 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		// but starts validating subnet before primary network
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 			defaultWeight,
-			uint64(DSStartTime.Unix())-1, // start validating subnet before primary network
-			uint64(DSEndTime.Unix()),
+			uint64(dsStartTime.Unix())-1, // start validating subnet before primary network
+			uint64(dsEndTime.Unix()),
 			pendingDSValidatorID,
 			testSubnet1.ID(),
 			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -594,8 +594,8 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		// but stops validating subnet after primary network
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 			defaultWeight,
-			uint64(DSStartTime.Unix()),
-			uint64(DSEndTime.Unix())+1, // stop validating subnet after stopping validating primary network
+			uint64(dsStartTime.Unix()),
+			uint64(dsEndTime.Unix())+1, // stop validating subnet after stopping validating primary network
 			pendingDSValidatorID,
 			testSubnet1.ID(),
 			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -626,8 +626,8 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		// period validating subnet is subset of time validating primary network
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 			defaultWeight,
-			uint64(DSStartTime.Unix()), // same start time as for primary network
-			uint64(DSEndTime.Unix()),   // same end time as for primary network
+			uint64(dsStartTime.Unix()), // same start time as for primary network
+			uint64(dsEndTime.Unix()),   // same end time as for primary network
 			pendingDSValidatorID,
 			testSubnet1.ID(),
 			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},

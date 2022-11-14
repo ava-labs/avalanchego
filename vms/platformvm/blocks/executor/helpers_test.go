@@ -122,7 +122,7 @@ type environment struct {
 	backend        *executor.Backend
 }
 
-func (t *environment) ResetBlockTimer() {
+func (*environment) ResetBlockTimer() {
 	// dummy call, do nothing for now
 }
 

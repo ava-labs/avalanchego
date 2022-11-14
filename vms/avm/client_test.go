@@ -21,11 +21,11 @@ type mockClient struct {
 }
 
 func (mc *mockClient) SendRequest(
-	ctx context.Context,
-	method string,
+	_ context.Context,
+	_ string,
 	inData interface{},
-	reply interface{},
-	options ...rpc.Option,
+	_ interface{},
+	_ ...rpc.Option,
 ) error {
 	mc.require.Equal(inData, mc.expectedInData)
 	return nil

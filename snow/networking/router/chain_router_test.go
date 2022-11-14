@@ -157,9 +157,6 @@ func TestShutdownTimesOut(t *testing.T) {
 
 	chainRouter := ChainRouter{}
 
-	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
-	require.NoError(t, err)
-
 	err = chainRouter.Initialize(
 		ids.EmptyNodeID,
 		logging.NoLog{},
@@ -231,7 +228,7 @@ func TestShutdownTimesOut(t *testing.T) {
 
 	go func() {
 		chainID := ids.ID{}
-		msg := mc.InboundPullQuery(chainID, 1, time.Hour, ids.GenerateTestID(), nodeID)
+		msg := message.InboundPullQuery(chainID, 1, time.Hour, ids.GenerateTestID(), nodeID)
 		handler.Push(context.Background(), msg)
 
 		time.Sleep(50 * time.Millisecond) // Pause to ensure message gets processed
@@ -585,11 +582,6 @@ func TestRouterClearTimeouts(t *testing.T) {
 
 	// Create a router
 	chainRouter := ChainRouter{}
-
-	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
-	require.NoError(t, err)
-
 	err = chainRouter.Initialize(
 		ids.EmptyNodeID,
 		logging.NoLog{},
@@ -666,7 +658,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 				requestID,
 			),
 		)
-		msg := mc.InboundStateSummaryFrontier(
+		msg := message.InboundStateSummaryFrontier(
 			ctx.ChainID,
 			requestID,
 			nil,
@@ -690,7 +682,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 				requestID,
 			),
 		)
-		msg := mc.InboundAcceptedStateSummary(
+		msg := message.InboundAcceptedStateSummary(
 			ctx.ChainID,
 			requestID,
 			nil,
@@ -714,7 +706,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 				requestID,
 			),
 		)
-		msg := mc.InboundAcceptedFrontier(
+		msg := message.InboundAcceptedFrontier(
 			ctx.ChainID,
 			requestID,
 			nil,
@@ -738,7 +730,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 				requestID,
 			),
 		)
-		msg := mc.InboundAccepted(
+		msg := message.InboundAccepted(
 			ctx.ChainID,
 			requestID,
 			nil,
@@ -762,7 +754,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 				requestID,
 			),
 		)
-		msg := mc.InboundChits(
+		msg := message.InboundChits(
 			ctx.ChainID,
 			requestID,
 			nil,
@@ -786,7 +778,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 				requestID,
 			),
 		)
-		msg := mc.InboundAppResponse(
+		msg := message.InboundAppResponse(
 			ctx.ChainID,
 			requestID,
 			nil,
@@ -844,11 +836,6 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 
 	// Create a router
 	chainRouter := ChainRouter{}
-
-	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
-	require.NoError(t, err)
-
 	err = chainRouter.Initialize(
 		ids.EmptyNodeID,
 		logging.NoLog{},
@@ -926,7 +913,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	nID := ids.GenerateTestNodeID()
 
 	calledF = false
-	inMsg = mc.InboundPullQuery(ctx.ChainID, reqID, time.Hour, dummyContainerID,
+	inMsg = message.InboundPullQuery(ctx.ChainID, reqID, time.Hour, dummyContainerID,
 		nID,
 	)
 	chainRouter.HandleInbound(context.Background(), inMsg)
@@ -936,7 +923,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	// Validator case
 	calledF = false
 	reqID++
-	inMsg = mc.InboundPullQuery(ctx.ChainID, reqID, time.Hour, dummyContainerID,
+	inMsg = message.InboundPullQuery(ctx.ChainID, reqID, time.Hour, dummyContainerID,
 		vID,
 	)
 	wg.Add(1)
@@ -962,7 +949,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	err = vdrs.Set(validators.NewSet().List())
 	require.NoError(t, err)
 
-	inMsg = mc.InboundChits(ctx.ChainID, reqID, nil, nID)
+	inMsg = message.InboundChits(ctx.ChainID, reqID, nil, nID)
 	chainRouter.HandleInbound(context.Background(), inMsg)
 
 	// shouldn't clear out timed request, as the request should be cleared when

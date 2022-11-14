@@ -31,18 +31,18 @@ type AddSubnetValidatorTx struct {
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
 
-func (tx *AddSubnetValidatorTx) SubnetID() ids.ID                         { return tx.Validator.Subnet }
-func (tx *AddSubnetValidatorTx) NodeID() ids.NodeID                       { return tx.Validator.NodeID }
-func (tx *AddSubnetValidatorTx) PublicKey() (*bls.PublicKey, bool, error) { return nil, false, nil }
-func (tx *AddSubnetValidatorTx) StartTime() time.Time                     { return tx.Validator.StartTime() }
-func (tx *AddSubnetValidatorTx) EndTime() time.Time                       { return tx.Validator.EndTime() }
-func (tx *AddSubnetValidatorTx) Weight() uint64                           { return tx.Validator.Wght }
+func (tx *AddSubnetValidatorTx) SubnetID() ids.ID                      { return tx.Validator.Subnet }
+func (tx *AddSubnetValidatorTx) NodeID() ids.NodeID                    { return tx.Validator.NodeID }
+func (*AddSubnetValidatorTx) PublicKey() (*bls.PublicKey, bool, error) { return nil, false, nil }
+func (tx *AddSubnetValidatorTx) StartTime() time.Time                  { return tx.Validator.StartTime() }
+func (tx *AddSubnetValidatorTx) EndTime() time.Time                    { return tx.Validator.EndTime() }
+func (tx *AddSubnetValidatorTx) Weight() uint64                        { return tx.Validator.Wght }
 
-func (tx *AddSubnetValidatorTx) PendingPriority() Priority {
+func (*AddSubnetValidatorTx) PendingPriority() Priority {
 	return SubnetPermissionedValidatorPendingPriority
 }
 
-func (tx *AddSubnetValidatorTx) CurrentPriority() Priority {
+func (*AddSubnetValidatorTx) CurrentPriority() Priority {
 	return SubnetPermissionedValidatorCurrentPriority
 }
 
