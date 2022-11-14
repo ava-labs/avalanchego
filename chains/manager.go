@@ -881,7 +881,7 @@ func (m *manager) createSnowmanChain(
 	)
 
 	if m.TracingEnabled {
-		vm = tracedvm.NewBlockVM(vm, m.Tracer)
+		vm = tracedvm.NewBlockVM(vm, "vm", m.Tracer)
 	}
 
 	vm = proposervm.New(
@@ -895,7 +895,7 @@ func (m *manager) createSnowmanChain(
 		vm = metervm.NewBlockVM(vm)
 	}
 	if m.TracingEnabled {
-		vm = tracedvm.NewBlockVM(vm, m.Tracer)
+		vm = tracedvm.NewBlockVM(vm, "proposervm", m.Tracer)
 	}
 
 	if err := vm.Initialize(
