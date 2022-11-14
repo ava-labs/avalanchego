@@ -300,7 +300,7 @@ func (ts *Topological) RecordPoll(ctx context.Context, voteBag ids.Bag) error {
 func (ts *Topological) Finalized() bool { return len(ts.blocks) == 1 }
 
 // HealthCheck returns information about the consensus health.
-func (ts *Topological) HealthCheck() (interface{}, error) {
+func (ts *Topological) HealthCheck(context.Context) (interface{}, error) {
 	numOutstandingBlks := ts.Latency.NumProcessing()
 	isOutstandingBlks := numOutstandingBlks <= ts.params.MaxOutstandingItems
 	healthy := isOutstandingBlks

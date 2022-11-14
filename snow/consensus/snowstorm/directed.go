@@ -171,7 +171,7 @@ func (dg *Directed) Finalized() bool {
 }
 
 // HealthCheck returns information about the consensus health.
-func (dg *Directed) HealthCheck() (interface{}, error) {
+func (dg *Directed) HealthCheck(context.Context) (interface{}, error) {
 	numOutstandingTxs := dg.Latency.NumProcessing()
 	isOutstandingTxs := numOutstandingTxs <= dg.params.MaxOutstandingItems
 	details := map[string]interface{}{

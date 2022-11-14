@@ -6,6 +6,7 @@ package avalanche
 import (
 	"context"
 
+	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
@@ -20,6 +21,8 @@ import (
 // Consensus represents a general avalanche instance that can be used directly
 // to process a series of partially ordered elements.
 type Consensus interface {
+	health.Checker
+
 	// Takes in alpha, beta1, beta2, the accepted frontier, the join statuses,
 	// the mutation statuses, and the consumer statuses. If accept or reject is
 	// called, the status maps should be immediately updated accordingly.
@@ -73,7 +76,4 @@ type Consensus interface {
 	// finalized. Note, it is possible that after returning finalized, a new
 	// decision may be added such that this instance is no longer finalized.
 	Finalized() bool
-
-	// HealthCheck returns information about the consensus health.
-	HealthCheck() (interface{}, error)
 }

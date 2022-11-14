@@ -7,6 +7,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
@@ -15,6 +16,8 @@ import (
 // Consensus represents a general snowman instance that can be used directly to
 // process a series of dependent operations.
 type Consensus interface {
+	health.Checker
+
 	// Takes in the context, snowball parameters, and the last accepted block.
 	Initialize(
 		ctx *snow.ConsensusContext,
@@ -56,7 +59,4 @@ type Consensus interface {
 	// finalized. Note, it is possible that after returning finalized, a new
 	// decision may be added such that this instance is no longer finalized.
 	Finalized() bool
-
-	// HealthCheck returns information about the consensus health.
-	HealthCheck() (interface{}, error)
 }
