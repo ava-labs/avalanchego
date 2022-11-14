@@ -361,7 +361,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(TracingExporterTypeKey, trace.GRPC.String(), fmt.Sprintf("Type of exporter to use for tracing. Options are [%s, %s]", trace.GRPC, trace.HTTP))
 	fs.String(TracingEndpointKey, "localhost:4317", "The endpoint to send trace data to")
 	fs.Bool(TracingInsecureKey, true, "If true, don't use TLS when sending trace data")
-	fs.Float64(TracingSampleRateKey, 0.1, "The fraction of traces to sample. If >= 1, always sample. If <= 0, never sample")
+	fs.Float64(TracingSampleRateKey, 1, "The fraction of traces to sample. If >= 1, always sample. If <= 0, never sample")
 	// TODO add flag to take in headers to send from exporter
 }
 
