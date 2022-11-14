@@ -9,6 +9,10 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.opentelemetry.io/otel/attribute"
+
+	oteltrace "go.opentelemetry.io/otel/trace"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
@@ -79,7 +83,25 @@ func (r *tracedRouter) RegisterRequest(
 }
 
 func (r *tracedRouter) HandleInbound(ctx context.Context, msg message.InboundMessage) {
-	ctx, span := r.tracer.Start(ctx, "tracedRouter.HandleInbound")
+	m := msg.Message()
+	destinationChainID, err := message.GetChainID(m)
+	if err != nil {
+		r.router.HandleInbound(ctx, msg)
+		return
+	}
+
+	sourceChainID, err := message.GetSourceChainID(m)
+	if err != nil {
+		r.router.HandleInbound(ctx, msg)
+		return
+	}
+
+	ctx, span := r.tracer.Start(ctx, "tracedRouter.HandleInbound", oteltrace.WithAttributes(
+		attribute.Stringer("nodeID", msg.NodeID()),
+		attribute.Stringer("messageOp", msg.Op()),
+		attribute.Stringer("chainID", destinationChainID),
+		attribute.Stringer("sourceChainID", sourceChainID),
+	))
 	defer span.End()
 
 	r.router.HandleInbound(ctx, msg)
