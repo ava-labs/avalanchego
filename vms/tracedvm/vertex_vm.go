@@ -44,6 +44,9 @@ func (vm *vertexVM) Initialize(
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
+	ctx, span := vm.tracer.Start(ctx, "vertexVM.Initialize")
+	defer span.End()
+
 	return vm.DAGVM.Initialize(
 		ctx,
 		chainCtx,
@@ -72,8 +75,8 @@ func (vm *vertexVM) ParseTx(ctx context.Context, txBytes []byte) (snowstorm.Tx, 
 
 	tx, err := vm.DAGVM.ParseTx(ctx, txBytes)
 	return &tracedTx{
-		Tx: tx,
-		vm: vm,
+		Tx:     tx,
+		tracer: vm.tracer,
 	}, err
 }
 
@@ -85,7 +88,7 @@ func (vm *vertexVM) GetTx(ctx context.Context, txID ids.ID) (snowstorm.Tx, error
 
 	tx, err := vm.DAGVM.GetTx(ctx, txID)
 	return &tracedTx{
-		Tx: tx,
-		vm: vm,
+		Tx:     tx,
+		tracer: vm.tracer,
 	}, err
 }

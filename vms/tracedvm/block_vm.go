@@ -82,7 +82,17 @@ func (vm *blockVM) Initialize(
 	ctx, span := vm.tracer.Start(ctx, vm.initialize)
 	defer span.End()
 
-	return vm.ChainVM.Initialize(ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender)
+	return vm.ChainVM.Initialize(
+		ctx,
+		chainCtx,
+		db,
+		genesisBytes,
+		upgradeBytes,
+		configBytes,
+		toEngine,
+		fxs,
+		appSender,
+	)
 }
 
 func (vm *blockVM) BuildBlock(ctx context.Context) (snowman.Block, error) {
