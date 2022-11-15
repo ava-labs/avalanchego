@@ -107,6 +107,7 @@ func RegisterUnsignedTxsTypes(targetCodec codec.Registry) error {
 		targetCodec.RegisterType(&locked.Out{}),
 
 		targetCodec.RegisterType(&CaminoAddValidatorTx{}),
+		targetCodec.RegisterType(&AddAddressStateTx{}),
 	)
 	return errs.Err
 }

@@ -481,6 +481,11 @@ func new(
 		return nil, err
 	}
 
+	caminoState, err := newCaminoState(baseDB, metricsReg)
+	if err != nil {
+		return nil, err
+	}
+
 	return &state{
 		cfg:     cfg,
 		ctx:     ctx,
@@ -495,7 +500,7 @@ func new(
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
 
-		caminoState: newCaminoState(),
+		caminoState: caminoState,
 
 		uptimes:        make(map[ids.NodeID]*uptimeAndReward),
 		updatedUptimes: make(map[ids.NodeID]struct{}),
@@ -1042,6 +1047,7 @@ func (s *state) load() error {
 		s.loadMetadata(),
 		s.loadCurrentValidators(),
 		s.loadPendingValidators(),
+		s.caminoState.Load(),
 	)
 	return errs.Err
 }
@@ -1290,6 +1296,7 @@ func (s *state) write(height uint64) error {
 		s.writeSubnetSupplies(),
 		s.writeChains(),
 		s.writeMetadata(),
+		s.caminoState.Write(),
 	)
 	return errs.Err
 }
@@ -1365,7 +1372,7 @@ func (s *state) init(genesisBytes []byte) error {
 		return err
 	}
 
-	if err := s.caminoState.SyncGenesis(genesisState); err != nil {
+	if err := s.caminoState.SyncGenesis(s, genesisState); err != nil {
 		return err
 	}
 

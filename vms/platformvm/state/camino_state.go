@@ -38,3 +38,11 @@ func (s *state) LockedUTXOs(txIDs ids.Set, addresses ids.ShortSet, lockState loc
 func (s *state) CaminoGenesisState() (*genesis.Camino, error) {
 	return s.caminoState.GenesisState(), nil
 }
+
+func (s *state) SetAddressStates(address ids.ShortID, states uint64) {
+	s.caminoState.SetAddressStates(address, states)
+}
+
+func (s *state) GetAddressStates(address ids.ShortID) (uint64, error) {
+	return s.caminoState.GetAddressStates(address)
+}

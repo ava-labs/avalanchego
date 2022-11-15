@@ -127,6 +127,18 @@ func (mr *MockDiffMockRecorder) Apply(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Apply", reflect.TypeOf((*MockDiff)(nil).Apply), arg0)
 }
 
+// ApplyCaminoState mocks base method.
+func (m *MockDiff) ApplyCaminoState(arg0 State) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "ApplyCaminoState", arg0)
+}
+
+// ApplyCaminoState indicates an expected call of ApplyCaminoState.
+func (mr *MockDiffMockRecorder) ApplyCaminoState(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyCaminoState", reflect.TypeOf((*MockDiff)(nil).ApplyCaminoState), arg0)
+}
+
 // CaminoGenesisState mocks base method.
 func (m *MockDiff) CaminoGenesisState() (*genesis.Camino, error) {
 	m.ctrl.T.Helper()
@@ -200,6 +212,21 @@ func (m *MockDiff) DeleteUTXO(arg0 ids.ID) {
 func (mr *MockDiffMockRecorder) DeleteUTXO(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUTXO", reflect.TypeOf((*MockDiff)(nil).DeleteUTXO), arg0)
+}
+
+// GetAddressStates mocks base method.
+func (m *MockDiff) GetAddressStates(arg0 ids.ShortID) (uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAddressStates", arg0)
+	ret0, _ := ret[0].(uint64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetAddressStates indicates an expected call of GetAddressStates.
+func (mr *MockDiffMockRecorder) GetAddressStates(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAddressStates", reflect.TypeOf((*MockDiff)(nil).GetAddressStates), arg0)
 }
 
 // GetChains mocks base method.
@@ -473,6 +500,18 @@ func (m *MockDiff) PutPendingValidator(arg0 *Staker) {
 func (mr *MockDiffMockRecorder) PutPendingValidator(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutPendingValidator", reflect.TypeOf((*MockDiff)(nil).PutPendingValidator), arg0)
+}
+
+// SetAddressStates mocks base method.
+func (m *MockDiff) SetAddressStates(arg0 ids.ShortID, arg1 uint64) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetAddressStates", arg0, arg1)
+}
+
+// SetAddressStates indicates an expected call of SetAddressStates.
+func (mr *MockDiffMockRecorder) SetAddressStates(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetAddressStates", reflect.TypeOf((*MockDiff)(nil).SetAddressStates), arg0, arg1)
 }
 
 // SetCurrentSupply mocks base method.

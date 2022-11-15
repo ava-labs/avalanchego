@@ -25,7 +25,8 @@
     ],
     "camino": {
         "verifyNodeSignature": true,
-        "lockModeBondDeposit": true
+        "lockModeBondDeposit": true,
+        "initialAdmin": "X-camino1m4nr983lhd4p4nfsqk3a6a9mejugnn73f83vuy"
     },
     "startTime": 1647388800,
     "initialStakeDuration": 31536000,
