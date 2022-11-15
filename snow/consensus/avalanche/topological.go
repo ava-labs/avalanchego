@@ -142,10 +142,6 @@ func (ta *Topological) NumProcessing() int {
 	return len(ta.nodes)
 }
 
-func (ta *Topological) Parameters() Parameters {
-	return ta.params
-}
-
 func (ta *Topological) IsVirtuous(tx snowstorm.Tx) bool {
 	return ta.cg.IsVirtuous(tx)
 }

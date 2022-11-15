@@ -101,9 +101,7 @@ func InitializeTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	if p := sm.Parameters(); p != params {
-		t.Fatalf("Wrong returned parameters")
-	} else if pref := sm.Preference(); pref != GenesisID {
+	if pref := sm.Preference(); pref != GenesisID {
 		t.Fatalf("Wrong preference returned")
 	} else if !sm.Finalized() {
 		t.Fatalf("Wrong should have marked the instance as being finalized")

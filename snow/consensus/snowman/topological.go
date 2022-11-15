@@ -132,7 +132,7 @@ func (ts *Topological) Initialize(ctx *snow.ConsensusContext, params snowball.Pa
 	ts.head = rootID
 	ts.height = rootHeight
 	ts.blocks = map[ids.ID]*snowmanBlock{
-		rootID: {sm: ts},
+		rootID: {params: ts.params},
 	}
 	ts.tail = rootID
 
@@ -141,10 +141,6 @@ func (ts *Topological) Initialize(ctx *snow.ConsensusContext, params snowball.Pa
 	ts.Timestamp.Accepted(rootTime)
 
 	return nil
-}
-
-func (ts *Topological) Parameters() snowball.Parameters {
-	return ts.params
 }
 
 func (ts *Topological) NumProcessing() int {
@@ -181,8 +177,8 @@ func (ts *Topological) Add(blk Block) error {
 	// add the block as a child of its parent, and add the block to the tree
 	parentNode.AddChild(blk)
 	ts.blocks[blkID] = &snowmanBlock{
-		sm:  ts,
-		blk: blk,
+		params: ts.params,
+		blk:    blk,
 	}
 
 	// If we are extending the tail, this is the new tail

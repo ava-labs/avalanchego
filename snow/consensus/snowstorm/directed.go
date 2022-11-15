@@ -148,10 +148,6 @@ func (dg *Directed) Initialize(
 	return params.Verify()
 }
 
-func (dg *Directed) Parameters() sbcon.Parameters {
-	return dg.params
-}
-
 func (dg *Directed) Virtuous() ids.Set {
 	return dg.virtuous
 }

@@ -25,7 +25,6 @@ type testFunc func(*testing.T, Factory)
 
 var testFuncs = []testFunc{
 	MetricsTest,
-	ParamsTest,
 	NumProcessingTest,
 	AddTest,
 	VertexIssuedTest,
@@ -139,44 +138,6 @@ func MetricsTest(t *testing.T, factory Factory) {
 		if err := avl.Initialize(ctx, params, nil); err == nil {
 			t.Fatalf("should have failed due to registering a duplicated statistic")
 		}
-	}
-}
-
-func ParamsTest(t *testing.T, factory Factory) {
-	avl := factory.New()
-
-	ctx := snow.DefaultConsensusContextTest()
-	params := Parameters{
-		Parameters: snowball.Parameters{
-			K:                     2,
-			Alpha:                 2,
-			BetaVirtuous:          1,
-			BetaRogue:             2,
-			ConcurrentRepolls:     1,
-			OptimalProcessing:     1,
-			MaxOutstandingItems:   1,
-			MaxItemProcessingTime: 1,
-		},
-		Parents:   2,
-		BatchSize: 1,
-	}
-
-	if err := avl.Initialize(ctx, params, nil); err != nil {
-		t.Fatal(err)
-	}
-
-	p := avl.Parameters()
-	switch {
-	case p.K != params.K:
-		t.Fatalf("Wrong K parameter")
-	case p.Alpha != params.Alpha:
-		t.Fatalf("Wrong Alpha parameter")
-	case p.BetaVirtuous != params.BetaVirtuous:
-		t.Fatalf("Wrong Beta1 parameter")
-	case p.BetaRogue != params.BetaRogue:
-		t.Fatalf("Wrong Beta2 parameter")
-	case p.Parents != params.Parents:
-		t.Fatalf("Wrong Parents parameter")
 	}
 }
 

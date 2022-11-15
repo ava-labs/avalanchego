@@ -21,9 +21,6 @@ type Consensus interface {
 	// Takes in the context, alpha, betaVirtuous, and betaRogue
 	Initialize(*snow.ConsensusContext, sbcon.Parameters) error
 
-	// Returns the parameters that describe this snowstorm instance
-	Parameters() sbcon.Parameters
-
 	// Returns true if transaction <Tx> is virtuous.
 	// That is, no transaction has been added that conflicts with <Tx>
 	IsVirtuous(Tx) bool

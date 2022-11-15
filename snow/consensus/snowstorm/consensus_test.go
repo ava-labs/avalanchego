@@ -29,7 +29,6 @@ type testFunc func(*testing.T, Factory)
 var (
 	testFuncs = []testFunc{
 		MetricsTest,
-		ParamsTest,
 		IssuedTest,
 		LeftoverInputTest,
 		LowerConfidenceTest,
@@ -178,35 +177,6 @@ func MetricsTest(t *testing.T, factory Factory) {
 		if err := graph.Initialize(ctx, params); err == nil {
 			t.Fatalf("should have errored due to a duplicated metric")
 		}
-	}
-}
-
-func ParamsTest(t *testing.T, factory Factory) {
-	graph := factory.New()
-
-	params := sbcon.Parameters{
-		K:                     2,
-		Alpha:                 2,
-		BetaVirtuous:          1,
-		BetaRogue:             2,
-		ConcurrentRepolls:     1,
-		OptimalProcessing:     1,
-		MaxOutstandingItems:   1,
-		MaxItemProcessingTime: 1,
-	}
-	err := graph.Initialize(snow.DefaultConsensusContextTest(), params)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if p := graph.Parameters(); p.K != params.K {
-		t.Fatalf("Wrong K parameter")
-	} else if p := graph.Parameters(); p.Alpha != params.Alpha {
-		t.Fatalf("Wrong Alpha parameter")
-	} else if p := graph.Parameters(); p.BetaVirtuous != params.BetaVirtuous {
-		t.Fatalf("Wrong Beta1 parameter")
-	} else if p := graph.Parameters(); p.BetaRogue != params.BetaRogue {
-		t.Fatalf("Wrong Beta2 parameter")
 	}
 }
 

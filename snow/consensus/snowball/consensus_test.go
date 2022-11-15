@@ -4,29 +4,25 @@
 package snowball
 
 import (
-	"testing"
-
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ Consensus = (*Byzantine)(nil)
+var (
+	Red   = ids.Empty.Prefix(0)
+	Blue  = ids.Empty.Prefix(1)
+	Green = ids.Empty.Prefix(2)
+
+	_ Consensus = (*Byzantine)(nil)
+)
 
 // Byzantine is a naive implementation of a multi-choice snowball instance
 type Byzantine struct {
-	// params contains all the configurations of a snowball instance
-	params Parameters
-
 	// Hardcode the preference
 	preference ids.ID
 }
 
-func (b *Byzantine) Initialize(params Parameters, choice ids.ID) {
-	b.params = params
+func (b *Byzantine) Initialize(_ Parameters, choice ids.ID) {
 	b.preference = choice
-}
-
-func (b *Byzantine) Parameters() Parameters {
-	return b.params
 }
 
 func (*Byzantine) Add(ids.ID) {}
@@ -47,33 +43,4 @@ func (*Byzantine) Finalized() bool {
 
 func (b *Byzantine) String() string {
 	return b.preference.String()
-}
-
-var (
-	Red   = ids.Empty.Prefix(0)
-	Blue  = ids.Empty.Prefix(1)
-	Green = ids.Empty.Prefix(2)
-)
-
-func ParamsTest(t *testing.T, factory Factory) {
-	sb := factory.New()
-
-	params := Parameters{
-		K: 2, Alpha: 2, BetaVirtuous: 1, BetaRogue: 2, ConcurrentRepolls: 1,
-	}
-	sb.Initialize(params, Red)
-
-	p := sb.Parameters()
-	switch {
-	case p.K != params.K:
-		t.Fatalf("Wrong K parameter")
-	case p.Alpha != params.Alpha:
-		t.Fatalf("Wrong Alpha parameter")
-	case p.BetaVirtuous != params.BetaVirtuous:
-		t.Fatalf("Wrong Beta1 parameter")
-	case p.BetaRogue != params.BetaRogue:
-		t.Fatalf("Wrong Beta2 parameter")
-	case p.ConcurrentRepolls != params.ConcurrentRepolls:
-		t.Fatalf("Wrong Repoll parameter")
-	}
 }
