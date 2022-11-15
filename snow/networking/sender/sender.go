@@ -1186,7 +1186,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs ids.NodeIDSet, requ
 	// the internet.
 	for nodeID := range nodeIDs {
 		inMsg := message.InternalAppRequestFailed(
-			s.ctx.NodeID,
+			nodeID,
 			s.ctx.ChainID,
 			requestID,
 		)
@@ -1231,7 +1231,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs ids.NodeIDSet, requ
 			// Immediately register a failure. Do so asynchronously to avoid
 			// deadlock.
 			inMsg := message.InternalAppRequestFailed(
-				s.ctx.NodeID,
+				nodeID,
 				s.ctx.ChainID,
 				requestID,
 			)
@@ -1286,7 +1286,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs ids.NodeIDSet, requ
 			// Register failures for nodes we didn't send a request to.
 			s.timeouts.RegisterRequestToUnreachableValidator()
 			inMsg := message.InternalAppRequestFailed(
-				s.ctx.NodeID,
+				nodeID,
 				s.ctx.ChainID,
 				requestID,
 			)

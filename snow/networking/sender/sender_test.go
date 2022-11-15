@@ -39,9 +39,10 @@ var defaultGossipConfig = GossipConfig{
 }
 
 func TestTimeout(t *testing.T) {
+	require := require.New(t)
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
-	require.NoError(t, err)
+	require.NoError(err)
 	benchlist := benchlist.NewNoBenchlist()
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -55,7 +56,7 @@ func TestTimeout(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 	go tm.Dispatch()
 
 	chainRouter := router.ChainRouter{}
@@ -67,7 +68,7 @@ func TestTimeout(t *testing.T) {
 		true,
 		10*time.Second,
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	err = chainRouter.Initialize(
 		ids.EmptyNodeID,
@@ -81,7 +82,7 @@ func TestTimeout(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	ctx := snow.DefaultConsensusContextTest()
 	externalSender := &ExternalSenderTest{TB: t}
@@ -95,11 +96,8 @@ func TestTimeout(t *testing.T) {
 		tm,
 		defaultGossipConfig,
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 
-	wg := sync.WaitGroup{}
-	wg.Add(2)
-	failedVDRs := ids.NodeIDSet{}
 	ctx2 := snow.DefaultConsensusContextTest()
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
@@ -107,7 +105,7 @@ func TestTimeout(t *testing.T) {
 		meter.ContinuousFactory{},
 		time.Second,
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 	handler, err := handler.New(
 		ctx2,
 		vdrs,
@@ -116,7 +114,7 @@ func TestTimeout(t *testing.T) {
 		time.Hour,
 		resourceTracker,
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	bootstrapper := &common.BootstrapperTest{
 		BootstrapableTest: common.BootstrapableTest{
@@ -134,11 +132,6 @@ func TestTimeout(t *testing.T) {
 	bootstrapper.ConnectedF = func(ids.NodeID, *version.Application) error {
 		return nil
 	}
-	bootstrapper.QueryFailedF = func(_ context.Context, nodeID ids.NodeID, _ uint32) error {
-		failedVDRs.Add(nodeID)
-		wg.Done()
-		return nil
-	}
 	handler.SetBootstrapper(bootstrapper)
 	ctx2.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
@@ -149,17 +142,147 @@ func TestTimeout(t *testing.T) {
 	}
 	handler.Start(false)
 
-	vdrIDs := ids.NodeIDSet{}
-	vdrIDs.Add(ids.NodeID{255})
-	vdrIDs.Add(ids.NodeID{254})
+	var (
+		wg           = sync.WaitGroup{}
+		vdrIDs       = ids.NodeIDSet{}
+		chains       = ids.Set{}
+		requestID    uint32
+		failedLock   sync.Mutex
+		failedVDRs   = ids.NodeIDSet{}
+		failedChains = ids.Set{}
+	)
 
-	sender.SendPullQuery(context.Background(), vdrIDs, 0, ids.Empty)
+	failed := func(_ context.Context, nodeID ids.NodeID, _ uint32) error {
+		failedLock.Lock()
+		defer failedLock.Unlock()
+
+		failedVDRs.Add(nodeID)
+		wg.Done()
+		return nil
+	}
+
+	bootstrapper.GetStateSummaryFrontierFailedF = failed
+	bootstrapper.GetAcceptedStateSummaryFailedF = failed
+	bootstrapper.GetAcceptedFrontierFailedF = failed
+	bootstrapper.GetAcceptedFailedF = failed
+	bootstrapper.GetAncestorsFailedF = failed
+	bootstrapper.GetFailedF = failed
+	bootstrapper.QueryFailedF = failed
+	bootstrapper.AppRequestFailedF = failed
+	bootstrapper.CrossChainAppRequestFailedF = func(_ context.Context, chainID ids.ID, _ uint32) error {
+		failedLock.Lock()
+		defer failedLock.Unlock()
+
+		failedChains.Add(chainID)
+		wg.Done()
+		return nil
+	}
+
+	sendAll := func() {
+		{
+			nodeIDs := ids.NodeIDSet{
+				ids.GenerateTestNodeID(): struct{}{},
+			}
+			vdrIDs.Union(nodeIDs)
+			wg.Add(1)
+			requestID++
+			sender.SendGetStateSummaryFrontier(context.Background(), nodeIDs, requestID)
+		}
+		{
+			nodeIDs := ids.NodeIDSet{
+				ids.GenerateTestNodeID(): struct{}{},
+			}
+			vdrIDs.Union(nodeIDs)
+			wg.Add(1)
+			requestID++
+			sender.SendGetAcceptedStateSummary(context.Background(), nodeIDs, requestID, nil)
+		}
+		{
+			nodeIDs := ids.NodeIDSet{
+				ids.GenerateTestNodeID(): struct{}{},
+			}
+			vdrIDs.Union(nodeIDs)
+			wg.Add(1)
+			requestID++
+			sender.SendGetAcceptedFrontier(context.Background(), nodeIDs, requestID)
+		}
+		{
+			nodeIDs := ids.NodeIDSet{
+				ids.GenerateTestNodeID(): struct{}{},
+			}
+			vdrIDs.Union(nodeIDs)
+			wg.Add(1)
+			requestID++
+			sender.SendGetAccepted(context.Background(), nodeIDs, requestID, nil)
+		}
+		{
+			nodeID := ids.GenerateTestNodeID()
+			vdrIDs.Add(nodeID)
+			wg.Add(1)
+			requestID++
+			sender.SendGetAncestors(context.Background(), nodeID, requestID, ids.Empty)
+		}
+		{
+			nodeID := ids.GenerateTestNodeID()
+			vdrIDs.Add(nodeID)
+			wg.Add(1)
+			requestID++
+			sender.SendGet(context.Background(), nodeID, requestID, ids.Empty)
+		}
+		{
+			nodeIDs := ids.NodeIDSet{
+				ids.GenerateTestNodeID(): struct{}{},
+			}
+			vdrIDs.Union(nodeIDs)
+			wg.Add(1)
+			requestID++
+			sender.SendPullQuery(context.Background(), nodeIDs, requestID, ids.Empty)
+		}
+		{
+			nodeIDs := ids.NodeIDSet{
+				ids.GenerateTestNodeID(): struct{}{},
+			}
+			vdrIDs.Union(nodeIDs)
+			wg.Add(1)
+			requestID++
+			sender.SendPushQuery(context.Background(), nodeIDs, requestID, nil)
+		}
+		{
+			nodeIDs := ids.NodeIDSet{
+				ids.GenerateTestNodeID(): struct{}{},
+			}
+			vdrIDs.Union(nodeIDs)
+			wg.Add(1)
+			requestID++
+			err := sender.SendAppRequest(context.Background(), nodeIDs, requestID, nil)
+			require.NoError(err)
+		}
+		{
+			chainID := ids.GenerateTestID()
+			chains.Add(chainID)
+			wg.Add(1)
+			requestID++
+			err := sender.SendCrossChainAppRequest(context.Background(), chainID, requestID, nil)
+			require.NoError(err)
+		}
+	}
+
+	// Send messages to disconnected peers
+	externalSender.SendF = func(_ message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
+		return nil
+	}
+	sendAll()
+
+	// Send messages to connected peers
+	externalSender.SendF = func(_ message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
+		return nodeIDs
+	}
+	sendAll()
 
 	wg.Wait()
 
-	if !failedVDRs.Equals(vdrIDs) {
-		t.Fatalf("Timeouts should have fired")
-	}
+	require.Equal(vdrIDs, failedVDRs)
+	require.Equal(chains, failedChains)
 }
 
 func TestReliableMessages(t *testing.T) {
