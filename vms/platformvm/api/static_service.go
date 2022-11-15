@@ -227,9 +227,12 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	// Specify the validators that are validating the primary network at genesis.
 	vdrs := txheap.NewByEndTime()
 	if args.Camino.LockModeBondDeposit {
-		if err := getCaminoValidators(args, vdrs, utxos); err != nil {
+		caminoVdrs, updatedUTXOs, err := getCaminoValidators(args, vdrs, utxos)
+		if err != nil {
 			return err
 		}
+		vdrs = caminoVdrs
+		utxos = updatedUTXOs
 	} else {
 		for _, vdr := range args.Validators {
 			weight := uint64(0)
