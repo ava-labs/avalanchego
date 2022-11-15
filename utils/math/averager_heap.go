@@ -111,7 +111,9 @@ func (h averagerHeap) Len() int {
 	return len(h.b.entries)
 }
 
-func (h *averagerHeapBackend) Len() int { return len(h.entries) }
+func (h *averagerHeapBackend) Len() int {
+	return len(h.entries)
+}
 
 func (h *averagerHeapBackend) Less(i, j int) bool {
 	if h.isMaxHeap {

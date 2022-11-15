@@ -35,8 +35,13 @@ func (b *BanffProposalBlock) InitCtx(ctx *snow.Context) {
 	b.ApricotProposalBlock.InitCtx(ctx)
 }
 
-func (b *BanffProposalBlock) Timestamp() time.Time  { return time.Unix(int64(b.Time), 0) }
-func (b *BanffProposalBlock) Visit(v Visitor) error { return v.BanffProposalBlock(b) }
+func (b *BanffProposalBlock) Timestamp() time.Time {
+	return time.Unix(int64(b.Time), 0)
+}
+
+func (b *BanffProposalBlock) Visit(v Visitor) error {
+	return v.BanffProposalBlock(b)
+}
 
 func NewBanffProposalBlock(
 	timestamp time.Time,
@@ -74,8 +79,13 @@ func (b *ApricotProposalBlock) InitCtx(ctx *snow.Context) {
 	b.Tx.Unsigned.InitCtx(ctx)
 }
 
-func (b *ApricotProposalBlock) Txs() []*txs.Tx        { return []*txs.Tx{b.Tx} }
-func (b *ApricotProposalBlock) Visit(v Visitor) error { return v.ApricotProposalBlock(b) }
+func (b *ApricotProposalBlock) Txs() []*txs.Tx {
+	return []*txs.Tx{b.Tx}
+}
+
+func (b *ApricotProposalBlock) Visit(v Visitor) error {
+	return v.ApricotProposalBlock(b)
+}
 
 // NewApricotProposalBlock is kept for testing purposes only.
 // Following Banff activation and subsequent code cleanup, Apricot Proposal blocks

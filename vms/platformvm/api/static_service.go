@@ -378,7 +378,14 @@ func (s innerSortUTXO) Less(i, j int) bool {
 	return bytes.Compare(iAddrID.Bytes(), jAddrID.Bytes()) == -1
 }
 
-func (s innerSortUTXO) Len() int      { return len(s) }
-func (s innerSortUTXO) Swap(i, j int) { s[j], s[i] = s[i], s[j] }
+func (s innerSortUTXO) Len() int {
+	return len(s)
+}
 
-func sortUTXOs(utxos []UTXO) { sort.Sort(innerSortUTXO(utxos)) }
+func (s innerSortUTXO) Swap(i, j int) {
+	s[j], s[i] = s[i], s[j]
+}
+
+func sortUTXOs(utxos []UTXO) {
+	sort.Sort(innerSortUTXO(utxos))
+}

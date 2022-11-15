@@ -55,7 +55,9 @@ func New(tagNames []string, maxSliceLen uint32) Codec {
 }
 
 // NewDefault is a convenience constructor; it returns a new codec with reasonable default values
-func NewDefault() Codec { return New([]string{reflectcodec.DefaultTagName}, defaultMaxSliceLength) }
+func NewDefault() Codec {
+	return New([]string{reflectcodec.DefaultTagName}, defaultMaxSliceLength)
+}
 
 // NewCustomMaxLength is a convenience constructor; it returns a new codec with custom max length and default tags
 func NewCustomMaxLength(maxSliceLen uint32) Codec {

@@ -74,9 +74,14 @@ func (fx *Fx) InitializeVM(vmIntf interface{}) error {
 	return nil
 }
 
-func (*Fx) Bootstrapping() error { return nil }
+func (*Fx) Bootstrapping() error {
+	return nil
+}
 
-func (fx *Fx) Bootstrapped() error { fx.bootstrapped = true; return nil }
+func (fx *Fx) Bootstrapped() error {
+	fx.bootstrapped = true
+	return nil
+}
 
 // VerifyPermission returns nil iff [credIntf] proves that [controlGroup] assents to [txIntf]
 func (fx *Fx) VerifyPermission(txIntf, inIntf, credIntf, ownerIntf interface{}) error {

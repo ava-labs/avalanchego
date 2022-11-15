@@ -32,8 +32,13 @@ func (b *ApricotAtomicBlock) InitCtx(ctx *snow.Context) {
 	b.Tx.Unsigned.InitCtx(ctx)
 }
 
-func (b *ApricotAtomicBlock) Txs() []*txs.Tx        { return []*txs.Tx{b.Tx} }
-func (b *ApricotAtomicBlock) Visit(v Visitor) error { return v.ApricotAtomicBlock(b) }
+func (b *ApricotAtomicBlock) Txs() []*txs.Tx {
+	return []*txs.Tx{b.Tx}
+}
+
+func (b *ApricotAtomicBlock) Visit(v Visitor) error {
+	return v.ApricotAtomicBlock(b)
+}
 
 func NewApricotAtomicBlock(
 	parentID ids.ID,

@@ -11,8 +11,8 @@ import (
 
 // Tracks the state of a snowman block
 type snowmanBlock struct {
-	// pointer to the snowman instance this node is managed by
-	sm Consensus
+	// parameters to initialize the snowball instance with
+	params snowball.Parameters
 
 	// block that this node contains. For the genesis, this value will be nil
 	blk Block
@@ -39,7 +39,7 @@ func (n *snowmanBlock) AddChild(child Block) {
 	// should be initialized.
 	if n.sb == nil {
 		n.sb = &snowball.Tree{}
-		n.sb.Initialize(n.sm.Parameters(), childID)
+		n.sb.Initialize(n.params, childID)
 		n.children = make(map[ids.ID]Block)
 	} else {
 		n.sb.Add(childID)

@@ -198,7 +198,9 @@ func (s *set) Drop(requestID uint32, vdr ids.NodeID) []ids.Bag {
 }
 
 // Len returns the number of outstanding polls
-func (s *set) Len() int { return s.polls.Len() }
+func (s *set) Len() int {
+	return s.polls.Len()
+}
 
 func (s *set) String() string {
 	sb := strings.Builder{}

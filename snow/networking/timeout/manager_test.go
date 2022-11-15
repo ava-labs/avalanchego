@@ -74,7 +74,9 @@ func TestManagerCancel(t *testing.T) {
 	fired := new(bool)
 
 	id := ids.RequestID{}
-	manager.RegisterRequest(ids.NodeID{}, ids.ID{}, true, id, func() { *fired = true })
+	manager.RegisterRequest(ids.NodeID{}, ids.ID{}, true, id, func() {
+		*fired = true
+	})
 
 	manager.RegisterResponse(ids.NodeID{}, ids.ID{}, id, message.PutOp, 1*time.Second)
 

@@ -30,8 +30,13 @@ type Message interface {
 
 type message []byte
 
-func (m *message) initialize(bytes []byte) { *m = bytes }
-func (m *message) Bytes() []byte           { return *m }
+func (m *message) initialize(bytes []byte) {
+	*m = bytes
+}
+
+func (m *message) Bytes() []byte {
+	return *m
+}
 
 type Tx struct {
 	message

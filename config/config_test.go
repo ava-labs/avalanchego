@@ -265,7 +265,7 @@ func TestGetVMAliasesFromFile(t *testing.T) {
 		"wrong vm id": {
 			givenJSON:  `{"wrongVmId": ["vm1","vm2"]}`,
 			expected:   nil,
-			errMessage: "problem unmarshaling vmAliases",
+			errMessage: "problem unmarshaling vm aliases",
 		},
 		"vm id": {
 			givenJSON: `{"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": ["vm1","vm2"],
@@ -312,7 +312,7 @@ func TestGetVMAliasesFromFlag(t *testing.T) {
 		"wrong vm id": {
 			givenJSON:  `{"wrongVmId": ["vm1","vm2"]}`,
 			expected:   nil,
-			errMessage: "problem unmarshaling vmAliases",
+			errMessage: "problem unmarshaling vm aliases",
 		},
 		"vm id": {
 			givenJSON: `{"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": ["vm1","vm2"],
@@ -381,7 +381,7 @@ func TestGetVMAliasesDirNotExists(t *testing.T) {
 	vmAliases, err := getVMAliases(v)
 	require.Nil(vmAliases)
 	require.Error(err)
-	require.Contains(err.Error(), "vm alias file does not exist")
+	require.Contains(err.Error(), "vm aliases file does not exist")
 
 	// do not set it explicitly
 	configJSON = "{}"

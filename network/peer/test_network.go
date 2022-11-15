@@ -49,10 +49,17 @@ func NewTestNetwork(
 	}
 }
 
-func (*testNetwork) Connected(ids.NodeID)            {}
-func (*testNetwork) AllowConnection(ids.NodeID) bool { return true }
-func (*testNetwork) Track(ips.ClaimedIPPort) bool    { return true }
-func (*testNetwork) Disconnected(ids.NodeID)         {}
+func (*testNetwork) Connected(ids.NodeID) {}
+
+func (*testNetwork) AllowConnection(ids.NodeID) bool {
+	return true
+}
+
+func (*testNetwork) Track(ips.ClaimedIPPort) bool {
+	return true
+}
+
+func (*testNetwork) Disconnected(ids.NodeID) {}
 
 func (n *testNetwork) Version() (message.OutboundMessage, error) {
 	now := uint64(time.Now().Unix())
