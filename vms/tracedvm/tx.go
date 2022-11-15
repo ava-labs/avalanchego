@@ -40,7 +40,7 @@ func (t *tracedTx) Accept(ctx context.Context) error {
 }
 
 func (t *tracedTx) Reject(ctx context.Context) error {
-	ctx, span := t.vm.tracer.Start(ctx, "tracedTx.Accept", oteltrace.WithAttributes(
+	ctx, span := t.vm.tracer.Start(ctx, "tracedTx.Reject", oteltrace.WithAttributes(
 		attribute.Stringer("txID", t.ID()),
 	))
 	defer span.End()
