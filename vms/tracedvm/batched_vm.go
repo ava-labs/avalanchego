@@ -55,6 +55,10 @@ func (vm *blockVM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snow
 	defer span.End()
 
 	blocks, err := vm.bVM.BatchedParseBlock(ctx, blks)
+	if err != nil {
+		return nil, err
+	}
+
 	wrappedBlocks := make([]snowman.Block, len(blocks))
 	for i, block := range blocks {
 		wrappedBlocks[i] = &tracedBlock{
@@ -62,5 +66,5 @@ func (vm *blockVM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snow
 			vm:    vm,
 		}
 	}
-	return wrappedBlocks, err
+	return wrappedBlocks, nil
 }
