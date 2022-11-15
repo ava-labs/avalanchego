@@ -50,7 +50,7 @@ func (d *diff) LockedUTXOs(txIDs ids.Set, addresses ids.ShortSet, lockState lock
 		}
 	}
 
-	return nil, nil
+	return retUtxos, nil
 }
 
 func (d *diff) CaminoGenesisState() (*genesis.Camino, error) {

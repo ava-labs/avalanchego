@@ -18,7 +18,7 @@ var _ ValidatorTx = (*CaminoAddValidatorTx)(nil)
 
 // CaminoAddValidatorTx is an unsigned caminoAddValidatorTx
 type CaminoAddValidatorTx struct {
-	AddValidatorTx
+	AddValidatorTx `serialize:"true"`
 }
 
 // SyntacticVerify returns nil iff [tx] is valid

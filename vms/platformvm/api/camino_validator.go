@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func getCaminoValidators(args *BuildGenesisArgs, vdrs txheap.TimedHeap, utxos []*genesis.UTXO) error {
+func getCaminoValidators(args *BuildGenesisArgs, vdrs txheap.TimedHeap, utxos []*genesis.UTXO) (txheap.TimedHeap, []*genesis.UTXO, error) {
 	for _, vdr := range args.Validators {
 		weight := uint64(0)
 		bond := make([]*avax.TransferableOutput, len(vdr.Staked))
@@ -26,7 +26,7 @@ func getCaminoValidators(args *BuildGenesisArgs, vdrs txheap.TimedHeap, utxos []
 		for i, apiUTXO := range vdr.Staked {
 			addrID, err := bech32ToID(apiUTXO.Address)
 			if err != nil {
-				return err
+				return nil, nil, err
 			}
 
 			output := &avax.TransferableOutput{
@@ -48,16 +48,16 @@ func getCaminoValidators(args *BuildGenesisArgs, vdrs txheap.TimedHeap, utxos []
 
 			newWeight, err := math.Add64(weight, uint64(apiUTXO.Amount))
 			if err != nil {
-				return errStakeOverflow
+				return nil, nil, errStakeOverflow
 			}
 			weight = newWeight
 		}
 
 		if weight == 0 {
-			return errValidatorAddsNoValue
+			return nil, nil, errValidatorAddsNoValue
 		}
 		if uint64(vdr.EndTime) <= uint64(args.Time) {
-			return errValidatorAddsNoValue
+			return nil, nil, errValidatorAddsNoValue
 		}
 
 		owner := &secp256k1fx.OutputOwners{
@@ -67,7 +67,7 @@ func getCaminoValidators(args *BuildGenesisArgs, vdrs txheap.TimedHeap, utxos []
 		for _, addrStr := range vdr.RewardOwner.Addresses {
 			addrID, err := bech32ToID(addrStr)
 			if err != nil {
-				return err
+				return nil, nil, err
 			}
 			owner.Addrs = append(owner.Addrs, addrID)
 		}
@@ -96,7 +96,7 @@ func getCaminoValidators(args *BuildGenesisArgs, vdrs txheap.TimedHeap, utxos []
 			},
 		}}
 		if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
-			return err
+			return nil, nil, err
 		}
 
 		txID := tx.ID()
@@ -104,7 +104,7 @@ func getCaminoValidators(args *BuildGenesisArgs, vdrs txheap.TimedHeap, utxos []
 		for i, output := range bond {
 			messageBytes, err := formatting.Decode(args.Encoding, vdr.Staked[i].Message)
 			if err != nil {
-				return fmt.Errorf("problem decoding UTXO message bytes: %w", err)
+				return nil, nil, fmt.Errorf("problem decoding UTXO message bytes: %w", err)
 			}
 
 			out := output.Out
@@ -130,5 +130,5 @@ func getCaminoValidators(args *BuildGenesisArgs, vdrs txheap.TimedHeap, utxos []
 		vdrs.Add(tx)
 	}
 
-	return nil
+	return vdrs, utxos, nil
 }
