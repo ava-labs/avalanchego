@@ -600,6 +600,8 @@ func (n *Node) initAPIServer() error {
 			n.Config.APIAllowedOrigins,
 			n.Config.ShutdownTimeout,
 			n.ID,
+			n.Config.TraceConfig.Enabled,
+			n.tracer,
 		)
 		return nil
 	}
@@ -617,6 +619,8 @@ func (n *Node) initAPIServer() error {
 		n.Config.APIAllowedOrigins,
 		n.Config.ShutdownTimeout,
 		n.ID,
+		n.Config.TraceConfig.Enabled,
+		n.tracer,
 		a,
 	)
 
