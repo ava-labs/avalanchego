@@ -328,9 +328,17 @@ type fxVMInt struct {
 	log      logging.Logger
 }
 
-func (fvi *fxVMInt) CodecRegistry() codec.Registry { return fvi.registry }
-func (fvi *fxVMInt) Clock() *mockable.Clock        { return fvi.clk }
-func (fvi *fxVMInt) Logger() logging.Logger        { return fvi.log }
+func (fvi *fxVMInt) CodecRegistry() codec.Registry {
+	return fvi.registry
+}
+
+func (fvi *fxVMInt) Clock() *mockable.Clock {
+	return fvi.clk
+}
+
+func (fvi *fxVMInt) Logger() logging.Logger {
+	return fvi.log
+}
 
 func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.Fx {
 	fxVMInt := &fxVMInt{
@@ -404,7 +412,7 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 	buildGenesisResponse := api.BuildGenesisReply{}
 	platformvmSS := api.StaticService{}
 	if err := platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse); err != nil {
-		panic(fmt.Errorf("problem while building platform chain's genesis state: %v", err))
+		panic(fmt.Errorf("problem while building platform chain's genesis state: %w", err))
 	}
 
 	genesisBytes, err := formatting.Decode(buildGenesisResponse.Encoding, buildGenesisResponse.Bytes)

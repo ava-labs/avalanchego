@@ -20,7 +20,9 @@ var (
 // TreeFactory implements Factory by returning a tree struct
 type TreeFactory struct{}
 
-func (TreeFactory) New() Consensus { return &Tree{} }
+func (TreeFactory) New() Consensus {
+	return &Tree{}
+}
 
 // Tree implements the snowball interface by using a modified patricia tree.
 type Tree struct {
@@ -57,7 +59,9 @@ func (t *Tree) Initialize(params Parameters, choice ids.ID) {
 	}
 }
 
-func (t *Tree) Parameters() Parameters { return t.params }
+func (t *Tree) Parameters() Parameters {
+	return t.params
+}
 
 func (t *Tree) Add(choice ids.ID) {
 	prefix := t.node.DecidedPrefix()
@@ -86,7 +90,9 @@ func (t *Tree) RecordPoll(votes ids.Bag) bool {
 	return successful
 }
 
-func (t *Tree) RecordUnsuccessfulPoll() { t.shouldReset = true }
+func (t *Tree) RecordUnsuccessfulPoll() {
+	t.shouldReset = true
+}
 
 func (t *Tree) String() string {
 	sb := strings.Builder{}
@@ -165,8 +171,13 @@ type unaryNode struct {
 	child node
 }
 
-func (u *unaryNode) Preference() ids.ID { return u.preference }
-func (u *unaryNode) DecidedPrefix() int { return u.decidedPrefix }
+func (u *unaryNode) Preference() ids.ID {
+	return u.preference
+}
+
+func (u *unaryNode) DecidedPrefix() int {
+	return u.decidedPrefix
+}
 
 // This is by far the most complicated function in this algorithm.
 // The intuition is that this instance represents a series of consecutive unary
@@ -439,7 +450,9 @@ func (u *unaryNode) RecordPoll(votes ids.Bag, reset bool) (node, bool) {
 	return u, true
 }
 
-func (u *unaryNode) Finalized() bool { return u.snowball.Finalized() }
+func (u *unaryNode) Finalized() bool {
+	return u.snowball.Finalized()
+}
 
 func (u *unaryNode) Printable() (string, []node) {
 	s := fmt.Sprintf("%s Bits = [%d, %d)",
@@ -475,8 +488,13 @@ type binaryNode struct {
 	children [2]node
 }
 
-func (b *binaryNode) Preference() ids.ID { return b.preferences[b.snowball.Preference()] }
-func (b *binaryNode) DecidedPrefix() int { return b.bit }
+func (b *binaryNode) Preference() ids.ID {
+	return b.preferences[b.snowball.Preference()]
+}
+
+func (b *binaryNode) DecidedPrefix() int {
+	return b.bit
+}
 
 func (b *binaryNode) Add(id ids.ID) node {
 	bit := id.Bit(uint(b.bit))
@@ -544,7 +562,9 @@ func (b *binaryNode) RecordPoll(votes ids.Bag, reset bool) (node, bool) {
 	return b, true
 }
 
-func (b *binaryNode) Finalized() bool { return b.snowball.Finalized() }
+func (b *binaryNode) Finalized() bool {
+	return b.snowball.Finalized()
+}
 
 func (b *binaryNode) Printable() (string, []node) {
 	s := fmt.Sprintf("%s Bit = %d", b.snowball, b.bit)

@@ -897,7 +897,9 @@ type outer struct {
 
 type innerInterface struct{}
 
-func (*innerInterface) ToInt() int { return 0 }
+func (*innerInterface) ToInt() int {
+	return 0
+}
 
 type innerNoInterface struct{}
 

@@ -19,7 +19,9 @@ type TestDecidable struct {
 	StatusV          Status
 }
 
-func (d *TestDecidable) ID() ids.ID { return d.IDV }
+func (d *TestDecidable) ID() ids.ID {
+	return d.IDV
+}
 
 func (d *TestDecidable) Accept(context.Context) error {
 	switch d.StatusV {
@@ -43,4 +45,6 @@ func (d *TestDecidable) Reject(context.Context) error {
 	}
 }
 
-func (d *TestDecidable) Status() Status { return d.StatusV }
+func (d *TestDecidable) Status() Status {
+	return d.StatusV
+}

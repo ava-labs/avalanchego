@@ -63,14 +63,29 @@ type ProposalTxExecutor struct {
 	PrefersCommit bool
 }
 
-func (*ProposalTxExecutor) CreateChainTx(*txs.CreateChainTx) error   { return errWrongTxType }
-func (*ProposalTxExecutor) CreateSubnetTx(*txs.CreateSubnetTx) error { return errWrongTxType }
-func (*ProposalTxExecutor) ImportTx(*txs.ImportTx) error             { return errWrongTxType }
-func (*ProposalTxExecutor) ExportTx(*txs.ExportTx) error             { return errWrongTxType }
+func (*ProposalTxExecutor) CreateChainTx(*txs.CreateChainTx) error {
+	return errWrongTxType
+}
+
+func (*ProposalTxExecutor) CreateSubnetTx(*txs.CreateSubnetTx) error {
+	return errWrongTxType
+}
+
+func (*ProposalTxExecutor) ImportTx(*txs.ImportTx) error {
+	return errWrongTxType
+}
+
+func (*ProposalTxExecutor) ExportTx(*txs.ExportTx) error {
+	return errWrongTxType
+}
+
 func (*ProposalTxExecutor) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
 	return errWrongTxType
 }
-func (*ProposalTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error { return errWrongTxType }
+
+func (*ProposalTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error {
+	return errWrongTxType
+}
 
 func (*ProposalTxExecutor) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
 	return errWrongTxType

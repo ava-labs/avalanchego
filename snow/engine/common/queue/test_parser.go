@@ -20,7 +20,9 @@ type TestParser struct {
 	ParseF func(context.Context, []byte) (Job, error)
 }
 
-func (p *TestParser) Default(cant bool) { p.CantParse = cant }
+func (p *TestParser) Default(cant bool) {
+	p.CantParse = cant
+}
 
 func (p *TestParser) Parse(ctx context.Context, b []byte) (Job, error) {
 	if p.ParseF != nil {

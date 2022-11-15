@@ -56,9 +56,13 @@ func (b *UniqueBag) Difference(diff *UniqueBag) {
 	}
 }
 
-func (b *UniqueBag) GetSet(id ID) BitSet64 { return (*b)[id] }
+func (b *UniqueBag) GetSet(id ID) BitSet64 {
+	return (*b)[id]
+}
 
-func (b *UniqueBag) RemoveSet(id ID) { delete(*b, id) }
+func (b *UniqueBag) RemoveSet(id ID) {
+	delete(*b, id)
+}
 
 func (b *UniqueBag) List() []ID {
 	idList := make([]ID, len(*b))
@@ -92,7 +96,9 @@ func (b *UniqueBag) PrefixedString(prefix string) string {
 	return sb.String()
 }
 
-func (b *UniqueBag) String() string { return b.PrefixedString("") }
+func (b *UniqueBag) String() string {
+	return b.PrefixedString("")
+}
 
 func (b *UniqueBag) Clear() {
 	for id := range *b {

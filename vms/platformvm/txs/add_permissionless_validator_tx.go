@@ -72,8 +72,13 @@ func (tx *AddPermissionlessValidatorTx) InitCtx(ctx *snow.Context) {
 	tx.DelegatorRewardsOwner.InitCtx(ctx)
 }
 
-func (tx *AddPermissionlessValidatorTx) SubnetID() ids.ID   { return tx.Subnet }
-func (tx *AddPermissionlessValidatorTx) NodeID() ids.NodeID { return tx.Validator.NodeID }
+func (tx *AddPermissionlessValidatorTx) SubnetID() ids.ID {
+	return tx.Subnet
+}
+
+func (tx *AddPermissionlessValidatorTx) NodeID() ids.NodeID {
+	return tx.Validator.NodeID
+}
 
 func (tx *AddPermissionlessValidatorTx) PublicKey() (*bls.PublicKey, bool, error) {
 	if err := tx.Signer.Verify(); err != nil {
@@ -83,9 +88,17 @@ func (tx *AddPermissionlessValidatorTx) PublicKey() (*bls.PublicKey, bool, error
 	return key, key != nil, nil
 }
 
-func (tx *AddPermissionlessValidatorTx) StartTime() time.Time { return tx.Validator.StartTime() }
-func (tx *AddPermissionlessValidatorTx) EndTime() time.Time   { return tx.Validator.EndTime() }
-func (tx *AddPermissionlessValidatorTx) Weight() uint64       { return tx.Validator.Wght }
+func (tx *AddPermissionlessValidatorTx) StartTime() time.Time {
+	return tx.Validator.StartTime()
+}
+
+func (tx *AddPermissionlessValidatorTx) EndTime() time.Time {
+	return tx.Validator.EndTime()
+}
+
+func (tx *AddPermissionlessValidatorTx) Weight() uint64 {
+	return tx.Validator.Wght
+}
 
 func (tx *AddPermissionlessValidatorTx) PendingPriority() Priority {
 	if tx.Subnet == constants.PrimaryNetworkID {

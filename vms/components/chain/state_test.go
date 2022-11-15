@@ -28,7 +28,9 @@ type TestBlock struct {
 }
 
 // SetStatus sets the status of the Block.
-func (b *TestBlock) SetStatus(status choices.Status) { b.TestBlock.TestDecidable.StatusV = status }
+func (b *TestBlock) SetStatus(status choices.Status) {
+	b.TestBlock.TestDecidable.StatusV = status
+}
 
 // NewTestBlock returns a new test block with height, bytes, and ID derived from [i]
 // and using [parentID] as the parent block ID

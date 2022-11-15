@@ -77,8 +77,13 @@ func (c *Client) Close() error {
 	return errs.Err
 }
 
-func (c *Client) LocalAddr() net.Addr  { return c.local }
-func (c *Client) RemoteAddr() net.Addr { return c.remote }
+func (c *Client) LocalAddr() net.Addr {
+	return c.local
+}
+
+func (c *Client) RemoteAddr() net.Addr {
+	return c.remote
+}
 
 func (c *Client) SetDeadline(t time.Time) error {
 	bytes, err := t.MarshalBinary()

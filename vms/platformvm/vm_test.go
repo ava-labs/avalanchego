@@ -356,7 +356,9 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 	_, genesisBytes := defaultGenesis()
 	appSender := &common.SenderTest{}
 	appSender.CantSendAppGossip = true
-	appSender.SendAppGossipF = func(context.Context, []byte) error { return nil }
+	appSender.SendAppGossipF = func(context.Context, []byte) error {
+		return nil
+	}
 
 	err := vm.Initialize(
 		context.Background(),
@@ -446,7 +448,9 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 	defer ctx.Lock.Unlock()
 	appSender := &common.SenderTest{T: t}
 	appSender.CantSendAppGossip = true
-	appSender.SendAppGossipF = func(context.Context, []byte) error { return nil }
+	appSender.SendAppGossipF = func(context.Context, []byte) error {
+		return nil
+	}
 	err := vm.Initialize(
 		context.Background(),
 		ctx,
@@ -1804,9 +1808,13 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	isBootstrapped := false
 	subnet := &common.SubnetTest{
-		T:               t,
-		IsBootstrappedF: func() bool { return isBootstrapped },
-		BootstrappedF:   func(ids.ID) { isBootstrapped = true },
+		T: t,
+		IsBootstrappedF: func() bool {
+			return isBootstrapped
+		},
+		BootstrappedF: func(ids.ID) {
+			isBootstrapped = true
+		},
 	}
 
 	peers := tracker.NewPeers()

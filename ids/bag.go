@@ -85,7 +85,9 @@ func (b *Bag) Count(id ID) int {
 }
 
 // Len returns the number of times an id has been added.
-func (b *Bag) Len() int { return b.size }
+func (b *Bag) Len() int {
+	return b.size
+}
 
 // List returns a list of all ids that have been added.
 func (b *Bag) List() []ID {
@@ -114,10 +116,14 @@ func (b *Bag) Equals(oIDs Bag) bool {
 // Mode returns the id that has been seen the most and the number of times it
 // has been seen. Ties are broken by the first id to be seen the reported number
 // of times.
-func (b *Bag) Mode() (ID, int) { return b.mode, b.modeFreq }
+func (b *Bag) Mode() (ID, int) {
+	return b.mode, b.modeFreq
+}
 
 // Threshold returns the ids that have been seen at least threshold times.
-func (b *Bag) Threshold() Set { return b.metThreshold }
+func (b *Bag) Threshold() Set {
+	return b.metThreshold
+}
 
 // Filter returns the bag of ids with the same counts as this bag, except all
 // the ids in the returned bag must have the same bits in the range [start, end)
@@ -155,4 +161,6 @@ func (b *Bag) PrefixedString(prefix string) string {
 	return sb.String()
 }
 
-func (b *Bag) String() string { return b.PrefixedString("") }
+func (b *Bag) String() string {
+	return b.PrefixedString("")
+}

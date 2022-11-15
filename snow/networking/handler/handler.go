@@ -146,7 +146,9 @@ func New(
 	return h, nil
 }
 
-func (h *handler) Context() *snow.ConsensusContext { return h.ctx }
+func (h *handler) Context() *snow.ConsensusContext {
+	return h.ctx
+}
 
 func (h *handler) IsValidator(nodeID ids.NodeID) bool {
 	return !h.ctx.IsValidatorOnly() ||
@@ -154,16 +156,33 @@ func (h *handler) IsValidator(nodeID ids.NodeID) bool {
 		h.validators.Contains(nodeID)
 }
 
-func (h *handler) SetStateSyncer(engine common.StateSyncer) { h.stateSyncer = engine }
-func (h *handler) StateSyncer() common.StateSyncer          { return h.stateSyncer }
+func (h *handler) SetStateSyncer(engine common.StateSyncer) {
+	h.stateSyncer = engine
+}
 
-func (h *handler) SetBootstrapper(engine common.BootstrapableEngine) { h.bootstrapper = engine }
-func (h *handler) Bootstrapper() common.BootstrapableEngine          { return h.bootstrapper }
+func (h *handler) StateSyncer() common.StateSyncer {
+	return h.stateSyncer
+}
 
-func (h *handler) SetConsensus(engine common.Engine) { h.engine = engine }
-func (h *handler) Consensus() common.Engine          { return h.engine }
+func (h *handler) SetBootstrapper(engine common.BootstrapableEngine) {
+	h.bootstrapper = engine
+}
 
-func (h *handler) SetOnStopped(onStopped func()) { h.onStopped = onStopped }
+func (h *handler) Bootstrapper() common.BootstrapableEngine {
+	return h.bootstrapper
+}
+
+func (h *handler) SetConsensus(engine common.Engine) {
+	h.engine = engine
+}
+
+func (h *handler) Consensus() common.Engine {
+	return h.engine
+}
+
+func (h *handler) SetOnStopped(onStopped func()) {
+	h.onStopped = onStopped
+}
 
 func (h *handler) selectStartingGear(ctx context.Context) (common.Engine, error) {
 	if h.stateSyncer == nil {
@@ -205,9 +224,15 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 		return
 	}
 
-	dispatchSync := func() { h.dispatchSync(ctx) }
-	dispatchAsync := func() { h.dispatchAsync(ctx) }
-	dispatchChans := func() { h.dispatchChans(ctx) }
+	dispatchSync := func() {
+		h.dispatchSync(ctx)
+	}
+	dispatchAsync := func() {
+		h.dispatchAsync(ctx)
+	}
+	dispatchChans := func() {
+		h.dispatchChans(ctx)
+	}
 	if recoverPanic {
 		go h.ctx.Log.RecoverAndExit(dispatchSync, func() {
 			h.ctx.Log.Error("chain was shutdown due to a panic in the sync dispatcher")
@@ -300,7 +325,9 @@ func (h *handler) StopWithError(err error) {
 	h.Stop()
 }
 
-func (h *handler) Stopped() chan struct{} { return h.closed }
+func (h *handler) Stopped() chan struct{} {
+	return h.closed
+}
 
 func (h *handler) dispatchSync(ctx context.Context) {
 	defer h.closeDispatcher(ctx)

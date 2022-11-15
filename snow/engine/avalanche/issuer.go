@@ -179,14 +179,36 @@ func (i *issuer) Update(ctx context.Context) {
 
 type vtxIssuer struct{ i *issuer }
 
-func (vi *vtxIssuer) Dependencies() ids.Set                  { return vi.i.vtxDeps }
-func (vi *vtxIssuer) Fulfill(ctx context.Context, id ids.ID) { vi.i.FulfillVtx(ctx, id) }
-func (vi *vtxIssuer) Abandon(ctx context.Context, _ ids.ID)  { vi.i.Abandon(ctx) }
-func (vi *vtxIssuer) Update(ctx context.Context)             { vi.i.Update(ctx) }
+func (vi *vtxIssuer) Dependencies() ids.Set {
+	return vi.i.vtxDeps
+}
+
+func (vi *vtxIssuer) Fulfill(ctx context.Context, id ids.ID) {
+	vi.i.FulfillVtx(ctx, id)
+}
+
+func (vi *vtxIssuer) Abandon(ctx context.Context, _ ids.ID) {
+	vi.i.Abandon(ctx)
+}
+
+func (vi *vtxIssuer) Update(ctx context.Context) {
+	vi.i.Update(ctx)
+}
 
 type txIssuer struct{ i *issuer }
 
-func (ti *txIssuer) Dependencies() ids.Set                  { return ti.i.txDeps }
-func (ti *txIssuer) Fulfill(ctx context.Context, id ids.ID) { ti.i.FulfillTx(ctx, id) }
-func (ti *txIssuer) Abandon(ctx context.Context, _ ids.ID)  { ti.i.Abandon(ctx) }
-func (ti *txIssuer) Update(ctx context.Context)             { ti.i.Update(ctx) }
+func (ti *txIssuer) Dependencies() ids.Set {
+	return ti.i.txDeps
+}
+
+func (ti *txIssuer) Fulfill(ctx context.Context, id ids.ID) {
+	ti.i.FulfillTx(ctx, id)
+}
+
+func (ti *txIssuer) Abandon(ctx context.Context, _ ids.ID) {
+	ti.i.Abandon(ctx)
+}
+
+func (ti *txIssuer) Update(ctx context.Context) {
+	ti.i.Update(ctx)
+}

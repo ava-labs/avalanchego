@@ -195,6 +195,8 @@ const (
 	UptimeMetricFreqKey                                = "uptime-metric-freq"
 	VMAliasesFileKey                                   = "vm-aliases-file"
 	VMAliasesContentKey                                = "vm-aliases-file-content"
+	ChainAliasesFileKey                                = "chain-aliases-file"
+	ChainAliasesContentKey                             = "chain-aliases-file-content"
 	TracingEnabledKey                                  = "tracing-enabled"
 	TracingEndpointKey                                 = "tracing-endpoint"
 	TracingInsecureKey                                 = "tracing-insecure"

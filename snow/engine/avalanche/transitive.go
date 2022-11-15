@@ -276,7 +276,9 @@ func (t *Transitive) Disconnected(ctx context.Context, nodeID ids.NodeID) error 
 	return t.VM.Disconnected(ctx, nodeID)
 }
 
-func (*Transitive) Timeout(context.Context) error { return nil }
+func (*Transitive) Timeout(context.Context) error {
+	return nil
+}
 
 func (t *Transitive) Gossip(ctx context.Context) error {
 	edge := t.Manager.Edge(ctx)
@@ -387,7 +389,7 @@ func (t *Transitive) HealthCheck(ctx context.Context) (interface{}, error) {
 	if vmErr == nil {
 		return intf, consensusErr
 	}
-	return intf, fmt.Errorf("vm: %s ; consensus: %s", vmErr, consensusErr)
+	return intf, fmt.Errorf("vm: %w ; consensus: %s", vmErr, consensusErr)
 }
 
 func (t *Transitive) GetVM() common.VM {

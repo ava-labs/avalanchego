@@ -95,25 +95,41 @@ func TestShutdown(t *testing.T) {
 	}
 	bootstrapper.Default(true)
 	bootstrapper.CantGossip = false
-	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
-	bootstrapper.ShutdownF = func(context.Context) error { shutdownCalled <- struct{}{}; return nil }
-	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error { return nil }
+	bootstrapper.ContextF = func() *snow.ConsensusContext {
+		return ctx
+	}
+	bootstrapper.ShutdownF = func(context.Context) error {
+		shutdownCalled <- struct{}{}
+		return nil
+	}
+	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
+		return nil
+	}
 	bootstrapper.HaltF = func() {}
 	handler.SetBootstrapper(bootstrapper)
 
 	engine := &common.EngineTest{T: t}
 	engine.Default(true)
 	engine.CantGossip = false
-	engine.ContextF = func() *snow.ConsensusContext { return ctx }
-	engine.ShutdownF = func(context.Context) error { shutdownCalled <- struct{}{}; return nil }
-	engine.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error { return nil }
+	engine.ContextF = func() *snow.ConsensusContext {
+		return ctx
+	}
+	engine.ShutdownF = func(context.Context) error {
+		shutdownCalled <- struct{}{}
+		return nil
+	}
+	engine.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
+		return nil
+	}
 	engine.HaltF = func() {}
 	handler.SetConsensus(engine)
 	ctx.SetState(snow.NormalOp) // assumed bootstrap is done
 
 	chainRouter.AddChain(handler)
 
-	bootstrapper.StartF = func(context.Context, uint32) error { return nil }
+	bootstrapper.StartF = func(context.Context, uint32) error {
+		return nil
+	}
 	handler.Start(context.Background(), false)
 
 	chainRouter.Shutdown()
@@ -200,8 +216,12 @@ func TestShutdownTimesOut(t *testing.T) {
 	}
 	bootstrapper.Default(true)
 	bootstrapper.CantGossip = false
-	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
-	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error { return nil }
+	bootstrapper.ContextF = func() *snow.ConsensusContext {
+		return ctx
+	}
+	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
+		return nil
+	}
 	bootstrapper.HaltF = func() {}
 	bootstrapper.PullQueryF = func(context.Context, ids.NodeID, uint32, ids.ID) error {
 		// Ancestors blocks for two seconds
@@ -213,15 +233,22 @@ func TestShutdownTimesOut(t *testing.T) {
 
 	engine := &common.EngineTest{T: t}
 	engine.Default(false)
-	engine.ContextF = func() *snow.ConsensusContext { return ctx }
+	engine.ContextF = func() *snow.ConsensusContext {
+		return ctx
+	}
 	closed := new(int)
-	engine.ShutdownF = func(context.Context) error { *closed++; return nil }
+	engine.ShutdownF = func(context.Context) error {
+		*closed++
+		return nil
+	}
 	handler.SetConsensus(engine)
 	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
 
 	chainRouter.AddChain(handler)
 
-	bootstrapper.StartF = func(context.Context, uint32) error { return nil }
+	bootstrapper.StartF = func(context.Context, uint32) error {
+		return nil
+	}
 	handler.Start(context.Background(), false)
 
 	shutdownFinished := make(chan struct{}, 1)
@@ -326,8 +353,12 @@ func TestRouterTimeout(t *testing.T) {
 	}
 	bootstrapper.Default(true)
 	bootstrapper.CantGossip = false
-	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
-	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error { return nil }
+	bootstrapper.ContextF = func() *snow.ConsensusContext {
+		return ctx
+	}
+	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
+		return nil
+	}
 	bootstrapper.HaltF = func() {}
 
 	bootstrapper.GetStateSummaryFrontierFailedF = func(context.Context, ids.NodeID, uint32) error {
@@ -380,7 +411,9 @@ func TestRouterTimeout(t *testing.T) {
 
 	chainRouter.AddChain(handler)
 
-	bootstrapper.StartF = func(context.Context, uint32) error { return nil }
+	bootstrapper.StartF = func(context.Context, uint32) error {
+		return nil
+	}
 	handler.Start(context.Background(), false)
 
 	nodeID := ids.GenerateTestNodeID()
@@ -628,18 +661,24 @@ func TestRouterClearTimeouts(t *testing.T) {
 		},
 	}
 	bootstrapper.Default(false)
-	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
+	bootstrapper.ContextF = func() *snow.ConsensusContext {
+		return ctx
+	}
 	handler.SetBootstrapper(bootstrapper)
 
 	engine := &common.EngineTest{T: t}
 	engine.Default(false)
-	engine.ContextF = func() *snow.ConsensusContext { return ctx }
+	engine.ContextF = func() *snow.ConsensusContext {
+		return ctx
+	}
 	handler.SetConsensus(engine)
 	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
 
 	chainRouter.AddChain(handler)
 
-	bootstrapper.StartF = func(context.Context, uint32) error { return nil }
+	bootstrapper.StartF = func(context.Context, uint32) error {
+		return nil
+	}
 	handler.Start(context.Background(), false)
 
 	nodeID := ids.GenerateTestNodeID()
@@ -886,8 +925,10 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		},
 	}
 	bootstrapper.Default(false)
-	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
-	bootstrapper.PullQueryF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error {
+	bootstrapper.ContextF = func() *snow.ConsensusContext {
+		return ctx
+	}
+	bootstrapper.PullQueryF = func(context.Context, ids.NodeID, uint32, ids.ID) error {
 		defer wg.Done()
 		calledF = true
 		return nil
@@ -896,13 +937,17 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
 
 	engine := &common.EngineTest{T: t}
-	engine.ContextF = func() *snow.ConsensusContext { return ctx }
+	engine.ContextF = func() *snow.ConsensusContext {
+		return ctx
+	}
 	engine.Default(false)
 	handler.SetConsensus(engine)
 
 	chainRouter.AddChain(handler)
 
-	bootstrapper.StartF = func(context.Context, uint32) error { return nil }
+	bootstrapper.StartF = func(context.Context, uint32) error {
+		return nil
+	}
 	handler.Start(context.Background(), false)
 
 	var inMsg message.InboundMessage

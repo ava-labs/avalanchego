@@ -64,7 +64,9 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp(),
 	}
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return coreBlk1, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk1, nil
+	}
 	builtBlk1, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err, "Could not build preFork block")
 
@@ -89,7 +91,9 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 		HeightV:    coreBlk1.Height() + 1,
 		TimestampV: coreBlk1.Timestamp(),
 	}
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return coreBlk2, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk2, nil
+	}
 	builtBlk2, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err, "Could not build proposer block")
 
@@ -114,7 +118,9 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 		HeightV:    coreBlk2.Height() + 1,
 		TimestampV: coreBlk2.Timestamp(),
 	}
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return coreBlk3, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk3, nil
+	}
 	builtBlk3, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err, "Could not build proposer block")
 
@@ -201,7 +207,9 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp(),
 	}
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return coreBlk1, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk1, nil
+	}
 	builtBlk1, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err, "Could not build preFork block")
 
@@ -220,7 +228,9 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 		HeightV:    coreBlk1.Height() + 1,
 		TimestampV: coreBlk1.Timestamp().Add(proposer.MaxDelay),
 	}
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return coreBlk2, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk2, nil
+	}
 	builtBlk2, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err, "Could not build proposer block")
 
@@ -239,7 +249,9 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 		HeightV:    coreBlk2.Height() + 1,
 		TimestampV: coreBlk2.Timestamp(),
 	}
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return coreBlk3, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk3, nil
+	}
 	builtBlk3, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err, "Could not build proposer block")
 
@@ -350,7 +362,9 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: preForkTime,
 	}
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return coreBlk1, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk1, nil
+	}
 	builtBlk1, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err, "Could not build preFork block")
 	_, ok := builtBlk1.(*preForkBlock)
@@ -377,7 +391,9 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 		HeightV:    coreBlk1.Height() + 1,
 		TimestampV: postForkTime,
 	}
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return coreBlk2, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk2, nil
+	}
 	builtBlk2, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err, "Could not build proposer block")
 	_, ok = builtBlk2.(*preForkBlock)
@@ -406,7 +422,9 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 		HeightV:    coreBlk2.Height() + 1,
 		TimestampV: postForkTime.Add(proposer.MaxDelay),
 	}
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return coreBlk3, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk3, nil
+	}
 	builtBlk3, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err, "Could not build proposer block")
 	_, ok = builtBlk3.(*postForkBlock)
@@ -427,7 +445,9 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 		HeightV:    coreBlk3.Height() + 1,
 		TimestampV: postForkTime,
 	}
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return coreBlk4, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk4, nil
+	}
 	builtBlk4, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err, "Could not build proposer block")
 	_, ok = builtBlk4.(*postForkBlock)
@@ -524,7 +544,9 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp(),
 	}
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return coreBlk1, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk1, nil
+	}
 	builtBlk1, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err, "Could not build preFork block")
 
@@ -549,7 +571,9 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 		HeightV:    coreBlk1.Height() + 1,
 		TimestampV: coreBlk1.Timestamp(),
 	}
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return coreBlk2, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk2, nil
+	}
 	builtBlk2, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err, "Could not build proposer block")
 
@@ -574,7 +598,9 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 		HeightV:    coreBlk2.Height() + 1,
 		TimestampV: coreBlk2.Timestamp(),
 	}
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return coreBlk3, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk3, nil
+	}
 	builtBlk3, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err, "Could not build proposer block")
 
@@ -636,7 +662,9 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp(),
 	}
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return coreBlk1, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk1, nil
+	}
 	builtBlk1, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err, "Could not build preFork block")
 
@@ -655,7 +683,9 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 		HeightV:    coreBlk1.Height() + 1,
 		TimestampV: coreBlk1.Timestamp().Add(proposer.MaxDelay),
 	}
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return coreBlk2, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk2, nil
+	}
 	builtBlk2, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err, "Could not build proposer block")
 
@@ -674,7 +704,9 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 		HeightV:    coreBlk2.Height() + 1,
 		TimestampV: coreBlk2.Timestamp(),
 	}
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return coreBlk3, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk3, nil
+	}
 	builtBlk3, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err, "Could not build proposer block")
 
@@ -742,7 +774,9 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: preForkTime,
 	}
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return coreBlk1, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk1, nil
+	}
 	builtBlk1, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err, "Could not build preFork block")
 	_, ok := builtBlk1.(*preForkBlock)
@@ -769,7 +803,9 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 		HeightV:    coreBlk1.Height() + 1,
 		TimestampV: postForkTime,
 	}
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return coreBlk2, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk2, nil
+	}
 	builtBlk2, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err, "Could not build proposer block")
 	_, ok = builtBlk2.(*preForkBlock)
@@ -798,7 +834,9 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 		HeightV:    coreBlk2.Height() + 1,
 		TimestampV: postForkTime.Add(proposer.MaxDelay),
 	}
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return coreBlk3, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk3, nil
+	}
 	builtBlk3, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err, "Could not build proposer block")
 	_, ok = builtBlk3.(*postForkBlock)
@@ -819,7 +857,9 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 		HeightV:    coreBlk3.Height() + 1,
 		TimestampV: postForkTime,
 	}
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return coreBlk4, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk4, nil
+	}
 	builtBlk4, err := proRemoteVM.BuildBlock(context.Background())
 	require.NoError(err, "Could not build proposer block")
 	_, ok = builtBlk4.(*postForkBlock)
@@ -920,7 +960,9 @@ func initTestRemoteProposerVM(
 	) error {
 		return nil
 	}
-	coreVM.LastAcceptedF = func(context.Context) (ids.ID, error) { return coreGenBlk.ID(), nil }
+	coreVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return coreGenBlk.ID(), nil
+	}
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch {
 		case blkID == coreGenBlk.ID():
@@ -943,9 +985,13 @@ func initTestRemoteProposerVM(
 	valState := &validators.TestState{
 		T: t,
 	}
-	valState.GetMinimumHeightF = func() (uint64, error) { return coreGenBlk.Height(), nil }
-	valState.GetCurrentHeightF = func() (uint64, error) { return defaultPChainHeight, nil }
-	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+	valState.GetMinimumHeightF = func() (uint64, error) {
+		return coreGenBlk.Height(), nil
+	}
+	valState.GetCurrentHeightF = func() (uint64, error) {
+		return defaultPChainHeight, nil
+	}
+	valState.GetValidatorSetF = func(uint64, ids.ID) (map[ids.NodeID]uint64, error) {
 		res := make(map[ids.NodeID]uint64)
 		res[proVM.ctx.NodeID] = uint64(10)
 		res[ids.NodeID{1}] = uint64(5)

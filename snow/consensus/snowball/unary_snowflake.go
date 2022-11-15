@@ -24,16 +24,22 @@ type unarySnowflake struct {
 	finalized bool
 }
 
-func (sf *unarySnowflake) Initialize(beta int) { sf.beta = beta }
+func (sf *unarySnowflake) Initialize(beta int) {
+	sf.beta = beta
+}
 
 func (sf *unarySnowflake) RecordSuccessfulPoll() {
 	sf.confidence++
 	sf.finalized = sf.finalized || sf.confidence >= sf.beta
 }
 
-func (sf *unarySnowflake) RecordUnsuccessfulPoll() { sf.confidence = 0 }
+func (sf *unarySnowflake) RecordUnsuccessfulPoll() {
+	sf.confidence = 0
+}
 
-func (sf *unarySnowflake) Finalized() bool { return sf.finalized }
+func (sf *unarySnowflake) Finalized() bool {
+	return sf.finalized
+}
 
 func (sf *unarySnowflake) Extend(beta int, choice int) BinarySnowflake {
 	return &binarySnowflake{
