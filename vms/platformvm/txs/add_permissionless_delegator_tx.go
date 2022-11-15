@@ -47,16 +47,29 @@ func (tx *AddPermissionlessDelegatorTx) InitCtx(ctx *snow.Context) {
 	tx.DelegationRewardsOwner.InitCtx(ctx)
 }
 
-func (tx *AddPermissionlessDelegatorTx) SubnetID() ids.ID   { return tx.Subnet }
-func (tx *AddPermissionlessDelegatorTx) NodeID() ids.NodeID { return tx.Validator.NodeID }
+func (tx *AddPermissionlessDelegatorTx) SubnetID() ids.ID {
+	return tx.Subnet
+}
+
+func (tx *AddPermissionlessDelegatorTx) NodeID() ids.NodeID {
+	return tx.Validator.NodeID
+}
 
 func (*AddPermissionlessDelegatorTx) PublicKey() (*bls.PublicKey, bool, error) {
 	return nil, false, nil
 }
 
-func (tx *AddPermissionlessDelegatorTx) StartTime() time.Time { return tx.Validator.StartTime() }
-func (tx *AddPermissionlessDelegatorTx) EndTime() time.Time   { return tx.Validator.EndTime() }
-func (tx *AddPermissionlessDelegatorTx) Weight() uint64       { return tx.Validator.Wght }
+func (tx *AddPermissionlessDelegatorTx) StartTime() time.Time {
+	return tx.Validator.StartTime()
+}
+
+func (tx *AddPermissionlessDelegatorTx) EndTime() time.Time {
+	return tx.Validator.EndTime()
+}
+
+func (tx *AddPermissionlessDelegatorTx) Weight() uint64 {
+	return tx.Validator.Wght
+}
 
 func (tx *AddPermissionlessDelegatorTx) PendingPriority() Priority {
 	if tx.Subnet == constants.PrimaryNetworkID {

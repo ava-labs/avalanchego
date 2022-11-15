@@ -21,7 +21,9 @@ func (noopMetrics) MarkOptionVoteWon() {}
 
 func (noopMetrics) MarkOptionVoteLost() {}
 
-func (noopMetrics) MarkAccepted(blocks.Block) error { return nil }
+func (noopMetrics) MarkAccepted(blocks.Block) error {
+	return nil
+}
 
 func (noopMetrics) InterceptRequest(i *rpc.RequestInfo) *http.Request {
 	return i.Request

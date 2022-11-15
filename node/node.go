@@ -556,7 +556,9 @@ func (n *Node) initIndexer() error {
 		DecisionAcceptorGroup:  n.DecisionAcceptorGroup,
 		ConsensusAcceptorGroup: n.ConsensusAcceptorGroup,
 		APIServer:              n.APIServer,
-		ShutdownF:              func() { n.Shutdown(0) }, // TODO put exit code here
+		ShutdownF: func() {
+			n.Shutdown(0) // TODO put exit code here
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("couldn't create index for txs: %w", err)
@@ -1143,6 +1145,15 @@ func (n *Node) initChainAliases(genesisBytes []byte) error {
 			}
 		}
 	}
+
+	for chainID, aliases := range n.Config.ChainAliases {
+		for _, alias := range aliases {
+			if err := n.chainManager.Alias(chainID, alias); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 

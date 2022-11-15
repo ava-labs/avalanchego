@@ -66,5 +66,10 @@ func (it *iterator[K, V]) Next() bool {
 	return true
 }
 
-func (it *iterator[K, V]) Key() K   { return it.key }
-func (it *iterator[K, V]) Value() V { return it.value }
+func (it *iterator[K, V]) Key() K {
+	return it.key
+}
+
+func (it *iterator[K, V]) Value() V {
+	return it.value
+}

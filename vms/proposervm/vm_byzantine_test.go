@@ -41,7 +41,9 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 		HeightV:    gBlock.Height() + 1,
 		TimestampV: gBlock.Timestamp().Add(proposer.MaxDelay),
 	}
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return xBlock, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return xBlock, nil
+	}
 
 	aBlock, err := proVM.BuildBlock(context.Background())
 	if err != nil {
@@ -135,7 +137,9 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 		},
 	}
 
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return xBlock, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return xBlock, nil
+	}
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -231,7 +235,9 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 		HeightV:    gBlock.Height() + 1,
 		TimestampV: gBlock.Timestamp().Add(proposer.MaxDelay),
 	}
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return xBlock, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return xBlock, nil
+	}
 
 	aBlock, err := proVM.BuildBlock(context.Background())
 	if err != nil {
@@ -357,7 +363,9 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 		},
 	}
 
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return xBlock, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return xBlock, nil
+	}
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -526,7 +534,9 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 	}
 
 	// generate A from X and O2
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return xBlock, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return xBlock, nil
+	}
 	aBlock, err := proVM.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -592,7 +602,9 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		},
 	}
 
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return zBlock, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return zBlock, nil
+	}
 	cBlock, err := proVM.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -629,7 +641,7 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 
 	// Make sure that we will be sampled to perform the proposals.
-	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+	valState.GetValidatorSetF = func(uint64, ids.ID) (map[ids.NodeID]uint64, error) {
 		res := make(map[ids.NodeID]uint64)
 		res[proVM.ctx.NodeID] = uint64(10)
 		return res, nil
@@ -686,7 +698,9 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 	}
 
 	// Build the first proposal block
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return coreBlk0, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk0, nil
+	}
 
 	builtBlk0, err := proVM.BuildBlock(context.Background())
 	if err != nil {

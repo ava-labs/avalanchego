@@ -371,8 +371,11 @@ func (e *tracedEngine) Gossip(ctx context.Context) error {
 	return e.engine.Gossip(ctx)
 }
 
-func (e *tracedEngine) Halt() {
-	e.engine.Halt()
+func (e *tracedEngine) Halt(ctx context.Context) {
+	ctx, span := e.tracer.Start(ctx, "tracedEngine.Halt")
+	defer span.End()
+
+	e.engine.Halt(ctx)
 }
 
 func (e *tracedEngine) Shutdown(ctx context.Context) error {

@@ -18,4 +18,6 @@ var (
 
 type Factory struct{}
 
-func (*Factory) New(*snow.Context) (interface{}, error) { return &Fx{}, nil }
+func (*Factory) New(*snow.Context) (interface{}, error) {
+	return &Fx{}, nil
+}

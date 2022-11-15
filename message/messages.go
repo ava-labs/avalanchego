@@ -55,16 +55,31 @@ type inboundMessage struct {
 	bytesSavedCompression int
 }
 
-func (m *inboundMessage) NodeID() ids.NodeID    { return m.nodeID }
-func (m *inboundMessage) Op() Op                { return m.op }
-func (m *inboundMessage) Message() any          { return m.message }
-func (m *inboundMessage) Expiration() time.Time { return m.expiration }
+func (m *inboundMessage) NodeID() ids.NodeID {
+	return m.nodeID
+}
+
+func (m *inboundMessage) Op() Op {
+	return m.op
+}
+
+func (m *inboundMessage) Message() any {
+	return m.message
+}
+
+func (m *inboundMessage) Expiration() time.Time {
+	return m.expiration
+}
+
 func (m *inboundMessage) OnFinishedHandling() {
 	if m.onFinishedHandling != nil {
 		m.onFinishedHandling()
 	}
 }
-func (m *inboundMessage) BytesSavedCompression() int { return m.bytesSavedCompression }
+
+func (m *inboundMessage) BytesSavedCompression() int {
+	return m.bytesSavedCompression
+}
 
 // OutboundMessage represents a set of fields for an outbound message that can
 // be serialized into a byte stream
@@ -88,10 +103,21 @@ type outboundMessage struct {
 	bytesSavedCompression int
 }
 
-func (m *outboundMessage) BypassThrottling() bool     { return m.bypassThrottling }
-func (m *outboundMessage) Op() Op                     { return m.op }
-func (m *outboundMessage) Bytes() []byte              { return m.bytes }
-func (m *outboundMessage) BytesSavedCompression() int { return m.bytesSavedCompression }
+func (m *outboundMessage) BypassThrottling() bool {
+	return m.bypassThrottling
+}
+
+func (m *outboundMessage) Op() Op {
+	return m.op
+}
+
+func (m *outboundMessage) Bytes() []byte {
+	return m.bytes
+}
+
+func (m *outboundMessage) BytesSavedCompression() int {
+	return m.bytesSavedCompression
+}
 
 // TODO: add other compression algorithms with extended interface
 type msgBuilder struct {

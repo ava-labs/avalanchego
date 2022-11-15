@@ -915,25 +915,25 @@ func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, e
 	}, nil
 }
 
-func getVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
+func getAliases(v *viper.Viper, name string, contentKey string, fileKey string) (map[ids.ID][]string, error) {
 	var fileBytes []byte
-	if v.IsSet(VMAliasesContentKey) {
+	if v.IsSet(contentKey) {
 		var err error
-		aliasFlagContent := v.GetString(VMAliasesContentKey)
+		aliasFlagContent := v.GetString(contentKey)
 		fileBytes, err = base64.StdEncoding.DecodeString(aliasFlagContent)
 		if err != nil {
-			return nil, fmt.Errorf("unable to decode base64 content: %w", err)
+			return nil, fmt.Errorf("unable to decode base64 content for %s: %w", name, err)
 		}
 	} else {
-		aliasFilePath := filepath.Clean(v.GetString(VMAliasesFileKey))
+		aliasFilePath := filepath.Clean(GetExpandedArg(v, fileKey))
 		exists, err := storage.FileExists(aliasFilePath)
 		if err != nil {
 			return nil, err
 		}
 
 		if !exists {
-			if v.IsSet(VMAliasesFileKey) {
-				return nil, fmt.Errorf("vm alias file does not exist in %v", aliasFilePath)
+			if v.IsSet(fileKey) {
+				return nil, fmt.Errorf("%s file does not exist in %v", name, aliasFilePath)
 			}
 			return nil, nil
 		}
@@ -944,11 +944,19 @@ func getVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
 		}
 	}
 
-	vmAliasMap := make(map[ids.ID][]string)
-	if err := json.Unmarshal(fileBytes, &vmAliasMap); err != nil {
-		return nil, fmt.Errorf("problem unmarshaling vmAliases: %w", err)
+	aliasMap := make(map[ids.ID][]string)
+	if err := json.Unmarshal(fileBytes, &aliasMap); err != nil {
+		return nil, fmt.Errorf("problem unmarshaling %s: %w", name, err)
 	}
-	return vmAliasMap, nil
+	return aliasMap, nil
+}
+
+func getVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
+	return getAliases(v, "vm aliases", VMAliasesContentKey, VMAliasesFileKey)
+}
+
+func getChainAliases(v *viper.Viper) (map[ids.ID][]string, error) {
+	return getAliases(v, "chain aliases", ChainAliasesContentKey, ChainAliasesFileKey)
 }
 
 func getVMManager(v *viper.Viper) (vms.Manager, error) {
@@ -1395,6 +1403,11 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 
 	// VM Aliases
 	nodeConfig.VMManager, err = getVMManager(v)
+	if err != nil {
+		return node.Config{}, err
+	}
+	// Chain aliases
+	nodeConfig.ChainAliases, err = getChainAliases(v)
 	if err != nil {
 		return node.Config{}, err
 	}

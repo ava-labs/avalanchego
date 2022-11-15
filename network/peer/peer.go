@@ -191,9 +191,13 @@ func Start(
 	return p
 }
 
-func (p *peer) ID() ids.NodeID { return p.id }
+func (p *peer) ID() ids.NodeID {
+	return p.id
+}
 
-func (p *peer) Cert() *x509.Certificate { return p.cert }
+func (p *peer) Cert() *x509.Certificate {
+	return p.cert
+}
 
 func (p *peer) LastSent() time.Time {
 	return time.Unix(
@@ -209,7 +213,9 @@ func (p *peer) LastReceived() time.Time {
 	)
 }
 
-func (p *peer) Ready() bool { return p.finishedHandshake.GetValue() }
+func (p *peer) Ready() bool {
+	return p.finishedHandshake.GetValue()
+}
 
 func (p *peer) AwaitReady(ctx context.Context) error {
 	select {
@@ -239,11 +245,17 @@ func (p *peer) Info() Info {
 	}
 }
 
-func (p *peer) IP() *SignedIP { return p.ip }
+func (p *peer) IP() *SignedIP {
+	return p.ip
+}
 
-func (p *peer) Version() *version.Application { return p.version }
+func (p *peer) Version() *version.Application {
+	return p.version
+}
 
-func (p *peer) TrackedSubnets() ids.Set { return p.trackedSubnets }
+func (p *peer) TrackedSubnets() ids.Set {
+	return p.trackedSubnets
+}
 
 func (p *peer) ObservedUptime() uint32 {
 	p.observedUptimeLock.RLock()

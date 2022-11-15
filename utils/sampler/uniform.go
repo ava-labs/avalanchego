@@ -16,4 +16,6 @@ type Uniform interface {
 }
 
 // NewUniform returns a new sampler
-func NewUniform() Uniform { return &uniformReplacer{} }
+func NewUniform() Uniform {
+	return &uniformReplacer{}
+}

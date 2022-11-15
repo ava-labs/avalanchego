@@ -29,7 +29,9 @@ var (
 // TopologicalFactory implements Factory by returning a topological struct
 type TopologicalFactory struct{}
 
-func (TopologicalFactory) New() Consensus { return &Topological{} }
+func (TopologicalFactory) New() Consensus {
+	return &Topological{}
+}
 
 // Topological implements the Snowman interface by using a tree tracking the
 // strongly preferred branch. This tree structure amortizes network polls to
@@ -142,9 +144,13 @@ func (ts *Topological) Initialize(ctx *snow.ConsensusContext, params snowball.Pa
 	return nil
 }
 
-func (ts *Topological) Parameters() snowball.Parameters { return ts.params }
+func (ts *Topological) Parameters() snowball.Parameters {
+	return ts.params
+}
 
-func (ts *Topological) NumProcessing() int { return len(ts.blocks) - 1 }
+func (ts *Topological) NumProcessing() int {
+	return len(ts.blocks) - 1
+}
 
 func (ts *Topological) Add(ctx context.Context, blk Block) error {
 	blkID := blk.ID()
@@ -218,7 +224,9 @@ func (ts *Topological) IsPreferred(blk Block) bool {
 	return ts.preferredIDs.Contains(blk.ID())
 }
 
-func (ts *Topological) Preference() ids.ID { return ts.tail }
+func (ts *Topological) Preference() ids.ID {
+	return ts.tail
+}
 
 // The votes bag contains at most K votes for blocks in the tree. If there is a
 // vote for a block that isn't in the tree, the vote is dropped.
@@ -297,7 +305,9 @@ func (ts *Topological) RecordPoll(ctx context.Context, voteBag ids.Bag) error {
 	return nil
 }
 
-func (ts *Topological) Finalized() bool { return len(ts.blocks) == 1 }
+func (ts *Topological) Finalized() bool {
+	return len(ts.blocks) == 1
+}
 
 // HealthCheck returns information about the consensus health.
 func (ts *Topological) HealthCheck(context.Context) (interface{}, error) {

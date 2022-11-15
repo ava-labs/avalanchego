@@ -14,4 +14,7 @@ type BurnOperation struct {
 }
 
 func (*BurnOperation) InitCtx(*snow.Context) {}
-func (*BurnOperation) Outs() []verify.State  { return nil }
+
+func (*BurnOperation) Outs() []verify.State {
+	return nil
+}

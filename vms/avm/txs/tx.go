@@ -65,10 +65,14 @@ func (t *Tx) Initialize(unsignedBytes, signedBytes []byte) {
 }
 
 // ID returns the unique ID of this tx
-func (t *Tx) ID() ids.ID { return t.id }
+func (t *Tx) ID() ids.ID {
+	return t.id
+}
 
 // Bytes returns the binary representation of this tx
-func (t *Tx) Bytes() []byte { return t.bytes }
+func (t *Tx) Bytes() []byte {
+	return t.bytes
+}
 
 // UTXOs returns the UTXOs transaction is producing.
 func (t *Tx) UTXOs() []*avax.UTXO {
