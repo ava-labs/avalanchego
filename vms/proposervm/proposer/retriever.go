@@ -13,6 +13,8 @@ const (
 
 type Retriever interface {
 	GetCurrentProposers() (ids.NodeIDSet, error)
+	SetChainHeight(uint64)
+	SetPChainHeight(uint64)
 }
 
 type retriever struct {

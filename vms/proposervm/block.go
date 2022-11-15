@@ -132,6 +132,8 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 
 		childHeight := child.Height()
 		proposerID := child.Proposer()
+		p.vm.Retriever.SetChainHeight(childHeight)
+		p.vm.Retriever.SetPChainHeight(parentPChainHeight)
 		minDelay, err := p.vm.Windower.Delay(childHeight, parentPChainHeight, proposerID)
 		if err != nil {
 			return err
@@ -182,6 +184,8 @@ func (p *postForkCommonComponents) buildChild(
 	if delay < proposer.MaxDelay {
 		parentHeight := p.innerBlk.Height()
 		proposerID := p.vm.ctx.NodeID
+		p.vm.Retriever.SetChainHeight(parentHeight+1)
+		p.vm.Retriever.SetPChainHeight(parentPChainHeight)
 		minDelay, err := p.vm.Windower.Delay(parentHeight+1, parentPChainHeight, proposerID)
 		if err != nil {
 			return nil, err
