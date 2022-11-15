@@ -42,9 +42,13 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 
 	isBootstrapped := false
 	subnet := &common.SubnetTest{
-		T:               t,
-		IsBootstrappedF: func() bool { return isBootstrapped },
-		BootstrappedF:   func(ids.ID) { isBootstrapped = true },
+		T: t,
+		IsBootstrappedF: func() bool {
+			return isBootstrapped
+		},
+		BootstrappedF: func(ids.ID) {
+			isBootstrapped = true
+		},
 	}
 
 	sender.Default(true)
@@ -140,7 +144,10 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 
 	bs, err := New(
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -239,7 +246,10 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 
 	bs, err := New(
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -413,7 +423,10 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 
 	bs, err := New(
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -553,7 +566,10 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 
 	bs, err := New(
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -670,7 +686,10 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 
 	bs, err := New(
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -786,7 +805,10 @@ func TestBootstrapperFinalized(t *testing.T) {
 
 	bs, err := New(
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -913,7 +935,10 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 
 	bs, err := New(
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1076,7 +1101,10 @@ func TestRestartBootstrapping(t *testing.T) {
 
 	bsIntf, err := New(
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)

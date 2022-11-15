@@ -60,7 +60,9 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		},
 	}
 	bootstrapper.Default(false)
-	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
+	bootstrapper.ContextF = func() *snow.ConsensusContext {
+		return ctx
+	}
 	bootstrapper.GetAcceptedFrontierF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 		t.Fatalf("GetAcceptedFrontier message should have timed out")
 		return nil
@@ -88,7 +90,9 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	msg = message.InboundGetAccepted(chainID, reqID, 1*time.Second, nil, nodeID)
 	handler.Push(context.Background(), msg)
 
-	bootstrapper.StartF = func(startReqID uint32) error { return nil }
+	bootstrapper.StartF = func(uint32) error {
+		return nil
+	}
 
 	handler.Start(false)
 
@@ -141,7 +145,9 @@ func TestHandlerClosesOnError(t *testing.T) {
 		},
 	}
 	bootstrapper.Default(false)
-	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
+	bootstrapper.ContextF = func() *snow.ConsensusContext {
+		return ctx
+	}
 	bootstrapper.GetAcceptedFrontierF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 		return errors.New("Engine error should cause handler to close")
 	}
@@ -149,14 +155,18 @@ func TestHandlerClosesOnError(t *testing.T) {
 
 	engine := &common.EngineTest{T: t}
 	engine.Default(false)
-	engine.ContextF = func() *snow.ConsensusContext { return ctx }
+	engine.ContextF = func() *snow.ConsensusContext {
+		return ctx
+	}
 	handler.SetConsensus(engine)
 
 	// assume bootstrapping is ongoing so that InboundGetAcceptedFrontier
 	// should normally be handled
 	ctx.SetState(snow.Bootstrapping)
 
-	bootstrapper.StartF = func(startReqID uint32) error { return nil }
+	bootstrapper.StartF = func(uint32) error {
+		return nil
+	}
 
 	handler.Start(false)
 
@@ -210,7 +220,9 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		},
 	}
 	bootstrapper.Default(false)
-	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
+	bootstrapper.ContextF = func() *snow.ConsensusContext {
+		return ctx
+	}
 	bootstrapper.GetFailedF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 		closed <- struct{}{}
 		return nil
@@ -218,7 +230,9 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	handler.SetBootstrapper(bootstrapper)
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
 
-	bootstrapper.StartF = func(startReqID uint32) error { return nil }
+	bootstrapper.StartF = func(uint32) error {
+		return nil
+	}
 
 	handler.Start(false)
 
@@ -275,7 +289,9 @@ func TestHandlerDispatchInternal(t *testing.T) {
 
 	engine := &common.EngineTest{T: t}
 	engine.Default(false)
-	engine.ContextF = func() *snow.ConsensusContext { return ctx }
+	engine.ContextF = func() *snow.ConsensusContext {
+		return ctx
+	}
 	engine.NotifyF = func(common.Message) error {
 		calledNotify <- struct{}{}
 		return nil
@@ -283,7 +299,9 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	handler.SetConsensus(engine)
 	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
 
-	bootstrapper.StartF = func(startReqID uint32) error { return nil }
+	bootstrapper.StartF = func(uint32) error {
+		return nil
+	}
 
 	handler.Start(false)
 	msgFromVMChan <- 0

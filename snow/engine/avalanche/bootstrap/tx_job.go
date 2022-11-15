@@ -46,7 +46,10 @@ type txJob struct {
 	tx                      snowstorm.Tx
 }
 
-func (t *txJob) ID() ids.ID { return t.tx.ID() }
+func (t *txJob) ID() ids.ID {
+	return t.tx.ID()
+}
+
 func (t *txJob) MissingDependencies() (ids.Set, error) {
 	missing := ids.Set{}
 	deps, err := t.tx.Dependencies()
@@ -114,4 +117,7 @@ func (t *txJob) Execute() error {
 	}
 	return nil
 }
-func (t *txJob) Bytes() []byte { return t.tx.Bytes() }
+
+func (t *txJob) Bytes() []byte {
+	return t.tx.Bytes()
+}

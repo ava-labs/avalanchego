@@ -79,10 +79,14 @@ func (id *ShortID) UnmarshalText(text []byte) error {
 
 // Bytes returns the 20 byte hash as a slice. It is assumed this slice is not
 // modified.
-func (id ShortID) Bytes() []byte { return id[:] }
+func (id ShortID) Bytes() []byte {
+	return id[:]
+}
 
 // Hex returns a hex encoded string of this id.
-func (id ShortID) Hex() string { return hex.EncodeToString(id.Bytes()) }
+func (id ShortID) Hex() string {
+	return hex.EncodeToString(id.Bytes())
+}
 
 func (id ShortID) String() string {
 	// We assume that the maximum size of a byte slice that
@@ -107,11 +111,19 @@ func (ids sortShortIDData) Less(i, j int) bool {
 		ids[i].Bytes(),
 		ids[j].Bytes()) == -1
 }
-func (ids sortShortIDData) Len() int      { return len(ids) }
-func (ids sortShortIDData) Swap(i, j int) { ids[j], ids[i] = ids[i], ids[j] }
+
+func (ids sortShortIDData) Len() int {
+	return len(ids)
+}
+
+func (ids sortShortIDData) Swap(i, j int) {
+	ids[j], ids[i] = ids[i], ids[j]
+}
 
 // SortShortIDs sorts the ids lexicographically
-func SortShortIDs(ids []ShortID) { sort.Sort(sortShortIDData(ids)) }
+func SortShortIDs(ids []ShortID) {
+	sort.Sort(sortShortIDData(ids))
+}
 
 // IsSortedAndUniqueShortIDs returns true if the ids are sorted and unique
 func IsSortedAndUniqueShortIDs(ids []ShortID) bool {

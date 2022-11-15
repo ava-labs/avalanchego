@@ -29,7 +29,9 @@ var (
 // TopologicalFactory implements Factory by returning a topological struct
 type TopologicalFactory struct{}
 
-func (TopologicalFactory) New() Consensus { return &Topological{} }
+func (TopologicalFactory) New() Consensus {
+	return &Topological{}
+}
 
 // TODO: Implement pruning of decisions.
 // To perfectly preserve the protocol, this implementation will need to store
@@ -136,11 +138,17 @@ func (ta *Topological) Initialize(
 	return ta.updateFrontiers()
 }
 
-func (ta *Topological) NumProcessing() int { return len(ta.nodes) }
+func (ta *Topological) NumProcessing() int {
+	return len(ta.nodes)
+}
 
-func (ta *Topological) Parameters() Parameters { return ta.params }
+func (ta *Topological) Parameters() Parameters {
+	return ta.params
+}
 
-func (ta *Topological) IsVirtuous(tx snowstorm.Tx) bool { return ta.cg.IsVirtuous(tx) }
+func (ta *Topological) IsVirtuous(tx snowstorm.Tx) bool {
+	return ta.cg.IsVirtuous(tx)
+}
 
 func (ta *Topological) Add(vtx Vertex) error {
 	if vtx.Status().Decided() {
@@ -208,13 +216,21 @@ func (ta *Topological) VertexIssued(vtx Vertex) bool {
 	return ok
 }
 
-func (ta *Topological) TxIssued(tx snowstorm.Tx) bool { return ta.cg.Issued(tx) }
+func (ta *Topological) TxIssued(tx snowstorm.Tx) bool {
+	return ta.cg.Issued(tx)
+}
 
-func (ta *Topological) Orphans() ids.Set { return ta.orphans }
+func (ta *Topological) Orphans() ids.Set {
+	return ta.orphans
+}
 
-func (ta *Topological) Virtuous() ids.Set { return ta.virtuous }
+func (ta *Topological) Virtuous() ids.Set {
+	return ta.virtuous
+}
 
-func (ta *Topological) Preferences() ids.Set { return ta.preferred }
+func (ta *Topological) Preferences() ids.Set {
+	return ta.preferred
+}
 
 func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
 	// Register a new poll call
@@ -260,9 +276,13 @@ func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
 	return ta.updateFrontiers()
 }
 
-func (ta *Topological) Quiesce() bool { return ta.virtuousVoting.Len() == 0 }
+func (ta *Topological) Quiesce() bool {
+	return ta.virtuousVoting.Len() == 0
+}
 
-func (ta *Topological) Finalized() bool { return ta.cg.Finalized() }
+func (ta *Topological) Finalized() bool {
+	return ta.cg.Finalized()
+}
 
 // HealthCheck returns information about the consensus health.
 func (ta *Topological) HealthCheck() (interface{}, error) {

@@ -109,7 +109,9 @@ func initTestProposerVM(
 	) error {
 		return nil
 	}
-	coreVM.LastAcceptedF = func() (ids.ID, error) { return coreGenBlk.ID(), nil }
+	coreVM.LastAcceptedF = func() (ids.ID, error) {
+		return coreGenBlk.ID(), nil
+	}
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch {
 		case blkID == coreGenBlk.ID():
@@ -132,9 +134,13 @@ func initTestProposerVM(
 	valState := &validators.TestState{
 		T: t,
 	}
-	valState.GetMinimumHeightF = func() (uint64, error) { return coreGenBlk.HeightV, nil }
-	valState.GetCurrentHeightF = func() (uint64, error) { return defaultPChainHeight, nil }
-	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+	valState.GetMinimumHeightF = func() (uint64, error) {
+		return coreGenBlk.HeightV, nil
+	}
+	valState.GetCurrentHeightF = func() (uint64, error) {
+		return defaultPChainHeight, nil
+	}
+	valState.GetValidatorSetF = func(uint64, ids.ID) (map[ids.NodeID]uint64, error) {
 		res := make(map[ids.NodeID]uint64)
 		res[proVM.ctx.NodeID] = uint64(10)
 		res[ids.NodeID{1}] = uint64(5)
@@ -191,7 +197,9 @@ func TestBuildBlockTimestampAreRoundedToSeconds(t *testing.T) {
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
 	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return coreBlk, nil
+	}
 
 	// test
 	builtBlk, err := proVM.BuildBlock()
@@ -218,7 +226,9 @@ func TestBuildBlockIsIdempotent(t *testing.T) {
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
 	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return coreBlk, nil
+	}
 
 	// test
 	builtBlk1, err := proVM.BuildBlock()
@@ -250,7 +260,9 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
 	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return coreBlk, nil
+	}
 
 	// test
 	snowBlock, err := proVM.BuildBlock()
@@ -284,7 +296,9 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp(),
 	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk1, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return coreBlk1, nil
+	}
 	proBlk1, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatalf("Could not build proBlk1 due to %s", err)
@@ -300,7 +314,9 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp(),
 	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk2, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return coreBlk2, nil
+	}
 	proBlk2, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("Could not build proBlk2")
@@ -355,7 +371,9 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 		HeightV:    prefcoreBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp(),
 	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk3, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return coreBlk3, nil
+	}
 
 	proVM.Set(proVM.Time().Add(proposer.MaxDelay))
 	builtBlk, err := proVM.BuildBlock()
@@ -382,7 +400,9 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp(),
 	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk1, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return coreBlk1, nil
+	}
 	proBlk1, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("Could not build proBlk1")
@@ -398,7 +418,9 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp(),
 	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk2, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return coreBlk2, nil
+	}
 	proBlk2, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("Could not build proBlk2")
@@ -453,7 +475,9 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 		HeightV:    wronglyPreferredcoreBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp(),
 	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk3, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return coreBlk3, nil
+	}
 
 	proVM.Set(proVM.Time().Add(proposer.MaxDelay))
 	blk, err := proVM.BuildBlock()
@@ -474,7 +498,7 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 		BytesV:     []byte{1},
 		TimestampV: proVM.Time(),
 	}
-	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	coreVM.ParseBlockF = func([]byte) (snowman.Block, error) {
 		return nil, errMarshallingFailed
 	}
 	slb, err := statelessblock.Build(
@@ -696,7 +720,9 @@ func TestPreFork_BuildBlock(t *testing.T) {
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
 	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return coreBlk, nil
+	}
 
 	// test
 	builtBlk, err := proVM.BuildBlock()
@@ -714,7 +740,9 @@ func TestPreFork_BuildBlock(t *testing.T) {
 	}
 
 	// test
-	coreVM.GetBlockF = func(id ids.ID) (snowman.Block, error) { return coreBlk, nil }
+	coreVM.GetBlockF = func(ids.ID) (snowman.Block, error) {
+		return coreBlk, nil
+	}
 	storedBlk, err := proVM.GetBlock(builtBlk.ID())
 	if err != nil {
 		t.Fatal("proposerVM has not cached built block")
@@ -784,7 +812,9 @@ func TestPreFork_SetPreference(t *testing.T) {
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp(),
 	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk0, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return coreBlk0, nil
+	}
 	builtBlk, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("Could not build proposer block")
@@ -824,7 +854,9 @@ func TestPreFork_SetPreference(t *testing.T) {
 		HeightV:    coreBlk0.Height() + 1,
 		TimestampV: coreBlk0.Timestamp(),
 	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk1, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return coreBlk1, nil
+	}
 	nextBlk, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatalf("Could not build proposer block %s", err)
@@ -848,7 +880,9 @@ func TestExpiredBuildBlock(t *testing.T) {
 	coreVM := &block.TestVM{}
 	coreVM.T = t
 
-	coreVM.LastAcceptedF = func() (ids.ID, error) { return coreGenBlk.ID(), nil }
+	coreVM.LastAcceptedF = func() (ids.ID, error) {
+		return coreGenBlk.ID(), nil
+	}
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -871,9 +905,13 @@ func TestExpiredBuildBlock(t *testing.T) {
 	valState := &validators.TestState{
 		T: t,
 	}
-	valState.GetMinimumHeightF = func() (uint64, error) { return coreGenBlk.Height(), nil }
-	valState.GetCurrentHeightF = func() (uint64, error) { return defaultPChainHeight, nil }
-	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+	valState.GetMinimumHeightF = func() (uint64, error) {
+		return coreGenBlk.Height(), nil
+	}
+	valState.GetCurrentHeightF = func() (uint64, error) {
+		return defaultPChainHeight, nil
+	}
+	valState.GetValidatorSetF = func(uint64, ids.ID) (map[ids.NodeID]uint64, error) {
 		return map[ids.NodeID]uint64{
 			{1}: 100,
 		}, nil
@@ -1147,8 +1185,10 @@ func TestInnerVMRollback(t *testing.T) {
 	valState := &validators.TestState{
 		T: t,
 	}
-	valState.GetCurrentHeightF = func() (uint64, error) { return defaultPChainHeight, nil }
-	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+	valState.GetCurrentHeightF = func() (uint64, error) {
+		return defaultPChainHeight, nil
+	}
+	valState.GetValidatorSetF = func(uint64, ids.ID) (map[ids.NodeID]uint64, error) {
 		return map[ids.NodeID]uint64{
 			{1}: 100,
 		}, nil
@@ -1157,7 +1197,9 @@ func TestInnerVMRollback(t *testing.T) {
 	coreVM := &block.TestVM{}
 	coreVM.T = t
 
-	coreVM.LastAcceptedF = func() (ids.ID, error) { return coreGenBlk.ID(), nil }
+	coreVM.LastAcceptedF = func() (ids.ID, error) {
+		return coreGenBlk.ID(), nil
+	}
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -1315,7 +1357,7 @@ func TestInnerVMRollback(t *testing.T) {
 func TestBuildBlockDuringWindow(t *testing.T) {
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
-	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+	valState.GetValidatorSetF = func(uint64, ids.ID) (map[ids.NodeID]uint64, error) {
 		return map[ids.NodeID]uint64{
 			proVM.ctx.NodeID: 10,
 		}, nil
@@ -1441,7 +1483,9 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 		TimestampV: gBlock.Timestamp(),
 	}
 
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return xBlock, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return xBlock, nil
+	}
 	aBlock, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatalf("proposerVM could not build block due to %s", err)
@@ -1498,7 +1542,9 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 		TimestampV: yBlock.Timestamp(),
 	}
 
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return zBlock, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return zBlock, nil
+	}
 	if err := proVM.SetPreference(bBlock.ID()); err != nil {
 		t.Fatal(err)
 	}
@@ -1565,7 +1611,9 @@ func TestTooFarAdvanced(t *testing.T) {
 		TimestampV: xBlock.Timestamp(),
 	}
 
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return xBlock, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return xBlock, nil
+	}
 	aBlock, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatalf("proposerVM could not build block due to %s", err)
@@ -1670,7 +1718,9 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 		},
 	}
 
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return xBlock, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return xBlock, nil
+	}
 	aBlockIntf, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("could not build post fork oracle block")
@@ -1739,7 +1789,9 @@ func TestLaggedPChainHeight(t *testing.T) {
 		TimestampV: coreGenBlk.Timestamp(),
 	}
 
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return innerBlock, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return innerBlock, nil
+	}
 	blockIntf, err := proVM.BuildBlock()
 	require.NoError(err)
 
@@ -1778,8 +1830,10 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 			},
 		},
 		TestHeightIndexedVM: block.TestHeightIndexedVM{
-			T:                  t,
-			VerifyHeightIndexF: func() error { return nil },
+			T: t,
+			VerifyHeightIndexF: func() error {
+				return nil
+			},
 			GetBlockIDAtHeightF: func(height uint64) (ids.ID, error) {
 				if height >= uint64(len(coreHeights)) {
 					return ids.ID{}, errors.New("too high")
@@ -1795,7 +1849,9 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	) error {
 		return nil
 	}
-	coreVM.LastAcceptedF = func() (ids.ID, error) { return coreGenBlk.ID(), nil }
+	coreVM.LastAcceptedF = func() (ids.ID, error) {
+		return coreGenBlk.ID(), nil
+	}
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch {
 		case blkID == coreGenBlk.ID():
@@ -1818,9 +1874,13 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	valState := &validators.TestState{
 		T: t,
 	}
-	valState.GetMinimumHeightF = func() (uint64, error) { return coreGenBlk.HeightV, nil }
-	valState.GetCurrentHeightF = func() (uint64, error) { return defaultPChainHeight, nil }
-	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+	valState.GetMinimumHeightF = func() (uint64, error) {
+		return coreGenBlk.HeightV, nil
+	}
+	valState.GetCurrentHeightF = func() (uint64, error) {
+		return defaultPChainHeight, nil
+	}
+	valState.GetValidatorSetF = func(uint64, ids.ID) (map[ids.NodeID]uint64, error) {
 		res := make(map[ids.NodeID]uint64)
 		res[proVM.ctx.NodeID] = uint64(10)
 		res[ids.NodeID{1}] = uint64(5)
@@ -1870,7 +1930,9 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		TimestampV: coreGenBlk.Timestamp(),
 	}
 
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return xBlock, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return xBlock, nil
+	}
 	aBlock, err := proVM.BuildBlock()
 	require.NoError(err)
 
@@ -1956,8 +2018,10 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 			},
 		},
 		TestHeightIndexedVM: block.TestHeightIndexedVM{
-			T:                  t,
-			VerifyHeightIndexF: func() error { return nil },
+			T: t,
+			VerifyHeightIndexF: func() error {
+				return nil
+			},
 			GetBlockIDAtHeightF: func(height uint64) (ids.ID, error) {
 				if height >= uint64(len(coreHeights)) {
 					return ids.ID{}, errors.New("too high")
@@ -1973,7 +2037,9 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	) error {
 		return nil
 	}
-	coreVM.LastAcceptedF = func() (ids.ID, error) { return coreGenBlk.ID(), nil }
+	coreVM.LastAcceptedF = func() (ids.ID, error) {
+		return coreGenBlk.ID(), nil
+	}
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch {
 		case blkID == coreGenBlk.ID():
@@ -1996,9 +2062,13 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	valState := &validators.TestState{
 		T: t,
 	}
-	valState.GetMinimumHeightF = func() (uint64, error) { return coreGenBlk.HeightV, nil }
-	valState.GetCurrentHeightF = func() (uint64, error) { return defaultPChainHeight, nil }
-	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+	valState.GetMinimumHeightF = func() (uint64, error) {
+		return coreGenBlk.HeightV, nil
+	}
+	valState.GetCurrentHeightF = func() (uint64, error) {
+		return defaultPChainHeight, nil
+	}
+	valState.GetValidatorSetF = func(uint64, ids.ID) (map[ids.NodeID]uint64, error) {
 		res := make(map[ids.NodeID]uint64)
 		res[proVM.ctx.NodeID] = uint64(10)
 		res[ids.NodeID{1}] = uint64(5)
@@ -2069,7 +2139,9 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		},
 	}
 
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return xBlock, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return xBlock, nil
+	}
 	aBlockIntf, err := proVM.BuildBlock()
 	require.NoError(err)
 

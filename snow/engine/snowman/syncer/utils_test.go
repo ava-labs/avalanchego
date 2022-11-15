@@ -85,7 +85,9 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 
 	cfg, err := NewConfig(*commonCfg, nil, dummyGetter, fullVM)
 	require.NoError(t, err)
-	commonSyncer := New(cfg, func(lastReqID uint32) error { return nil })
+	commonSyncer := New(cfg, func(uint32) error {
+		return nil
+	})
 	syncer, ok := commonSyncer.(*stateSyncer)
 	require.True(t, ok)
 	require.True(t, syncer.stateSyncVM != nil)

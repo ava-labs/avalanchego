@@ -14,4 +14,6 @@ type Checker interface {
 
 type CheckerFunc func() (interface{}, error)
 
-func (f CheckerFunc) HealthCheck() (interface{}, error) { return f() }
+func (f CheckerFunc) HealthCheck() (interface{}, error) {
+	return f()
+}

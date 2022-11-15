@@ -105,13 +105,42 @@ func NewContext(
 	}
 }
 
-func (c *context) NetworkID() uint32                     { return c.networkID }
-func (c *context) AVAXAssetID() ids.ID                   { return c.avaxAssetID }
-func (c *context) BaseTxFee() uint64                     { return c.baseTxFee }
-func (c *context) CreateSubnetTxFee() uint64             { return c.createSubnetTxFee }
-func (c *context) TransformSubnetTxFee() uint64          { return c.transformSubnetTxFee }
-func (c *context) CreateBlockchainTxFee() uint64         { return c.createBlockchainTxFee }
-func (c *context) AddPrimaryNetworkValidatorFee() uint64 { return c.addPrimaryNetworkValidatorFee }
-func (c *context) AddPrimaryNetworkDelegatorFee() uint64 { return c.addPrimaryNetworkDelegatorFee }
-func (c *context) AddSubnetValidatorFee() uint64         { return c.addSubnetValidatorFee }
-func (c *context) AddSubnetDelegatorFee() uint64         { return c.addSubnetDelegatorFee }
+func (c *context) NetworkID() uint32 {
+	return c.networkID
+}
+
+func (c *context) AVAXAssetID() ids.ID {
+	return c.avaxAssetID
+}
+
+func (c *context) BaseTxFee() uint64 {
+	return c.baseTxFee
+}
+
+func (c *context) CreateSubnetTxFee() uint64 {
+	return c.createSubnetTxFee
+}
+
+func (c *context) TransformSubnetTxFee() uint64 {
+	return c.transformSubnetTxFee
+}
+
+func (c *context) CreateBlockchainTxFee() uint64 {
+	return c.createBlockchainTxFee
+}
+
+func (c *context) AddPrimaryNetworkValidatorFee() uint64 {
+	return c.addPrimaryNetworkValidatorFee
+}
+
+func (c *context) AddPrimaryNetworkDelegatorFee() uint64 {
+	return c.addPrimaryNetworkDelegatorFee
+}
+
+func (c *context) AddSubnetValidatorFee() uint64 {
+	return c.addSubnetValidatorFee
+}
+
+func (c *context) AddSubnetDelegatorFee() uint64 {
+	return c.addSubnetDelegatorFee
+}

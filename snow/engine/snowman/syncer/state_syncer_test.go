@@ -43,7 +43,9 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 
 	cfg, err := NewConfig(*commonCfg, nil, dummyGetter, nonStateSyncableVM)
 	require.NoError(err)
-	syncer := New(cfg, func(lastReqID uint32) error { return nil })
+	syncer := New(cfg, func(uint32) error {
+		return nil
+	})
 
 	enabled, err := syncer.IsEnabled()
 	require.NoError(err)
@@ -65,16 +67,22 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 
 	cfg, err = NewConfig(*commonCfg, nil, dummyGetter, fullVM)
 	require.NoError(err)
-	syncer = New(cfg, func(lastReqID uint32) error { return nil })
+	syncer = New(cfg, func(uint32) error {
+		return nil
+	})
 
 	// test: VM does not support state syncing
-	fullVM.StateSyncEnabledF = func() (bool, error) { return false, nil }
+	fullVM.StateSyncEnabledF = func() (bool, error) {
+		return false, nil
+	}
 	enabled, err = syncer.IsEnabled()
 	require.NoError(err)
 	require.False(enabled)
 
 	// test: VM does support state syncing
-	fullVM.StateSyncEnabledF = func() (bool, error) { return true, nil }
+	fullVM.StateSyncEnabledF = func() (bool, error) {
+		return true, nil
+	}
 	enabled, err = syncer.IsEnabled()
 	require.NoError(err)
 	require.True(enabled)
@@ -1261,7 +1269,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 	}
 
 	stateSyncFullyDone := false
-	syncer.onDoneStateSyncing = func(lastReqID uint32) error {
+	syncer.onDoneStateSyncing = func(uint32) error {
 		stateSyncFullyDone = true
 		return nil
 	}
@@ -1326,7 +1334,7 @@ func TestStateSyncIsDoneOnceVMNotifies(t *testing.T) {
 	_ = fullVM
 
 	stateSyncFullyDone := false
-	syncer.onDoneStateSyncing = func(lastReqID uint32) error {
+	syncer.onDoneStateSyncing = func(uint32) error {
 		stateSyncFullyDone = true
 		return nil
 	}

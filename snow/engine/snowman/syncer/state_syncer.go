@@ -556,7 +556,9 @@ func (ss *stateSyncer) Disconnected(nodeID ids.NodeID) error {
 	return ss.StartupTracker.Disconnected(nodeID)
 }
 
-func (*stateSyncer) Gossip() error { return nil }
+func (*stateSyncer) Gossip() error {
+	return nil
+}
 
 func (ss *stateSyncer) Shutdown() error {
 	ss.Config.Ctx.Log.Info("shutting down state syncer")
@@ -565,7 +567,9 @@ func (ss *stateSyncer) Shutdown() error {
 
 func (*stateSyncer) Halt() {}
 
-func (*stateSyncer) Timeout() error { return nil }
+func (*stateSyncer) Timeout() error {
+	return nil
+}
 
 func (ss *stateSyncer) HealthCheck() (interface{}, error) {
 	vmIntf, vmErr := ss.VM.HealthCheck()
@@ -576,7 +580,9 @@ func (ss *stateSyncer) HealthCheck() (interface{}, error) {
 	return intf, vmErr
 }
 
-func (ss *stateSyncer) GetVM() common.VM { return ss.VM }
+func (ss *stateSyncer) GetVM() common.VM {
+	return ss.VM
+}
 
 func (ss *stateSyncer) IsEnabled() (bool, error) {
 	if ss.stateSyncVM == nil {

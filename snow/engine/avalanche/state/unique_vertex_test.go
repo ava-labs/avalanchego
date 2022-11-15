@@ -606,7 +606,9 @@ func TestStopVertexVerifyNotAllowedTimestamp(t *testing.T) {
 	ts.XChainMigrationTime = version.XChainMigrationDefaultTime
 
 	svtx := newTestUniqueVertex(t, ts, nil, nil, true)
-	svtx.time = func() time.Time { return version.XChainMigrationDefaultTime.Add(-time.Second) }
+	svtx.time = func() time.Time {
+		return version.XChainMigrationDefaultTime.Add(-time.Second)
+	}
 
 	if verr := svtx.Verify(); !errors.Is(verr, errStopVertexNotAllowedTimestamp) {
 		t.Fatalf("stop vertex 'Verify' expected %v, got %v", errStopVertexNotAllowedTimestamp, verr)

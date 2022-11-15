@@ -1146,7 +1146,9 @@ func TestTxNotCached(t *testing.T) {
 		*called = true
 		return nil, errors.New("")
 	}
-	db.OnPut = func([]byte, []byte) error { return nil }
+	db.OnPut = func([]byte, []byte) error {
+		return nil
+	}
 
 	registerer := prometheus.NewRegistry()
 	require.NoError(t, err)

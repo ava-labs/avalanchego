@@ -323,7 +323,9 @@ func (t *Transitive) Disconnected(nodeID ids.NodeID) error {
 	return t.VM.Disconnected(nodeID)
 }
 
-func (*Transitive) Timeout() error { return nil }
+func (*Transitive) Timeout() error {
+	return nil
+}
 
 func (t *Transitive) Gossip() error {
 	blkID, err := t.VM.LastAccepted()

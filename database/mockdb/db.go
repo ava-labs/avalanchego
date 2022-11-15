@@ -39,7 +39,9 @@ type Database struct {
 }
 
 // New returns a new mock database
-func New() *Database { return &Database{} }
+func New() *Database {
+	return &Database{}
+}
 
 func (db *Database) Has(k []byte) (bool, error) {
 	if db.OnHas == nil {

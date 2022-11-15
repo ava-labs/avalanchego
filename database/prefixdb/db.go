@@ -345,9 +345,13 @@ func (it *iterator) Next() bool {
 	return hasNext
 }
 
-func (it *iterator) Key() []byte { return it.key }
+func (it *iterator) Key() []byte {
+	return it.key
+}
 
-func (it *iterator) Value() []byte { return it.val }
+func (it *iterator) Value() []byte {
+	return it.val
+}
 
 // Error returns [database.ErrClosed] if the underlying db was closed
 // otherwise it returns the normal iterator error.

@@ -29,7 +29,9 @@ var (
 // DirectedFactory implements Factory by returning a directed struct
 type DirectedFactory struct{}
 
-func (DirectedFactory) New() Consensus { return &Directed{} }
+func (DirectedFactory) New() Consensus {
+	return &Directed{}
+}
 
 // Directed is an implementation of a multi-color, non-transitive, snowball
 // instance
@@ -146,13 +148,21 @@ func (dg *Directed) Initialize(
 	return params.Verify()
 }
 
-func (dg *Directed) Parameters() sbcon.Parameters { return dg.params }
+func (dg *Directed) Parameters() sbcon.Parameters {
+	return dg.params
+}
 
-func (dg *Directed) Virtuous() ids.Set { return dg.virtuous }
+func (dg *Directed) Virtuous() ids.Set {
+	return dg.virtuous
+}
 
-func (dg *Directed) Preferences() ids.Set { return dg.preferences }
+func (dg *Directed) Preferences() ids.Set {
+	return dg.preferences
+}
 
-func (dg *Directed) VirtuousVoting() ids.Set { return dg.virtuousVoting }
+func (dg *Directed) VirtuousVoting() ids.Set {
+	return dg.virtuousVoting
+}
 
 func (dg *Directed) Quiesce() bool {
 	numVirtuous := dg.virtuousVoting.Len()

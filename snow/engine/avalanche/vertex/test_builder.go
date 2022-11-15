@@ -25,7 +25,9 @@ type TestBuilder struct {
 	BuildStopVtxF func(parentIDs []ids.ID) (avalanche.Vertex, error)
 }
 
-func (b *TestBuilder) Default(cant bool) { b.CantBuildVtx = cant }
+func (b *TestBuilder) Default(cant bool) {
+	b.CantBuildVtx = cant
+}
 
 func (b *TestBuilder) BuildVtx(parentIDs []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
 	if b.BuildVtxF != nil {

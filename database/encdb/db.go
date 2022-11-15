@@ -275,9 +275,13 @@ func (it *iterator) Error() error {
 	return it.Iterator.Error()
 }
 
-func (it *iterator) Key() []byte { return it.key }
+func (it *iterator) Key() []byte {
+	return it.key
+}
 
-func (it *iterator) Value() []byte { return it.val }
+func (it *iterator) Value() []byte {
+	return it.val
+}
 
 type encryptedValue struct {
 	Ciphertext []byte `serialize:"true"`

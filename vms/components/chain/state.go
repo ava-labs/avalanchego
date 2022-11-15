@@ -115,7 +115,9 @@ func (s *State) initialize(config *Config) {
 	s.buildBlock = config.BuildBlock
 	s.unmarshalBlock = config.UnmarshalBlock
 	if config.GetBlockIDAtHeight == nil {
-		s.getStatus = func(blk snowman.Block) (choices.Status, error) { return blk.Status(), nil }
+		s.getStatus = func(blk snowman.Block) (choices.Status, error) {
+			return blk.Status(), nil
+		}
 	} else {
 		s.getStatus = produceGetStatus(s, config.GetBlockIDAtHeight)
 	}

@@ -59,6 +59,9 @@ linters-settings:
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#early-return
       - name: early-return
         disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#empty-lines
+      - name: empty-lines
+        disabled: false
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#struct-tag
       - name: struct-tag
         disabled: false

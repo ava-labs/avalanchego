@@ -10,8 +10,14 @@ var NoUsage User = noUsage{}
 
 type noUsage struct{}
 
-func (noUsage) CPUUsage() float64 { return 0 }
+func (noUsage) CPUUsage() float64 {
+	return 0
+}
 
-func (noUsage) DiskUsage() (float64, float64) { return 0, 0 }
+func (noUsage) DiskUsage() (float64, float64) {
+	return 0, 0
+}
 
-func (noUsage) AvailableDiskBytes() uint64 { return math.MaxUint64 }
+func (noUsage) AvailableDiskBytes() uint64 {
+	return math.MaxUint64
+}

@@ -58,12 +58,19 @@ func New(
 }
 
 // SetParser tells this job queue how to parse jobs from the database.
-func (j *Jobs) SetParser(parser Parser) error { j.state.parser = parser; return nil }
+func (j *Jobs) SetParser(parser Parser) error {
+	j.state.parser = parser
+	return nil
+}
 
-func (j *Jobs) Has(jobID ids.ID) (bool, error) { return j.state.HasJob(jobID) }
+func (j *Jobs) Has(jobID ids.ID) (bool, error) {
+	return j.state.HasJob(jobID)
+}
 
 // Returns how many pending jobs are waiting in the queue.
-func (j *Jobs) PendingJobs() uint64 { return j.state.numJobs }
+func (j *Jobs) PendingJobs() uint64 {
+	return j.state.numJobs
+}
 
 // Push adds a new job to the queue. Returns true if [job] was added to the queue and false
 // if [job] was already in the queue.
@@ -338,9 +345,13 @@ func (jm *JobsWithMissing) RemoveMissingID(jobIDs ...ids.ID) {
 	}
 }
 
-func (jm *JobsWithMissing) MissingIDs() []ids.ID { return jm.missingIDs.List() }
+func (jm *JobsWithMissing) MissingIDs() []ids.ID {
+	return jm.missingIDs.List()
+}
 
-func (jm *JobsWithMissing) NumMissingIDs() int { return jm.missingIDs.Len() }
+func (jm *JobsWithMissing) NumMissingIDs() int {
+	return jm.missingIDs.Len()
+}
 
 // Commit the versionDB to the underlying database.
 func (jm *JobsWithMissing) Commit() error {

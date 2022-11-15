@@ -53,7 +53,10 @@ func TestEngineShutdown(t *testing.T) {
 	vmShutdownCalled := false
 	vm := &vertex.TestVM{}
 	vm.T = t
-	vm.ShutdownF = func() error { vmShutdownCalled = true; return nil }
+	vm.ShutdownF = func() error {
+		vmShutdownCalled = true
+		return nil
+	}
 	engCfg.VM = vm
 
 	transitive, err := newTransitive(engCfg)
@@ -156,7 +159,9 @@ func TestEngineAdd(t *testing.T) {
 		t.Fatalf("Should have been blocking on request")
 	}
 
-	manager.ParseVtxF = func(b []byte) (avalanche.Vertex, error) { return nil, errFailedParsing }
+	manager.ParseVtxF = func(b []byte) (avalanche.Vertex, error) {
+		return nil, errFailedParsing
+	}
 
 	if err := te.Put(context.Background(), vdr, *reqID, nil); err != nil {
 		t.Fatal(err)
@@ -220,7 +225,9 @@ func TestEngineQuery(t *testing.T) {
 		BytesV:   []byte{0, 1, 2, 3},
 	}
 
-	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	manager.EdgeF = func() []ids.ID {
+		return []ids.ID{vts[0].ID(), vts[1].ID()}
+	}
 	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch id {
 		case gVtx.ID():
@@ -511,7 +518,9 @@ func TestEngineMultipleQuery(t *testing.T) {
 	vts := []avalanche.Vertex{gVtx, mVtx}
 	utxos := []ids.ID{ids.GenerateTestID()}
 
-	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	manager.EdgeF = func() []ids.ID {
+		return []ids.ID{vts[0].ID(), vts[1].ID()}
+	}
 	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch id {
 		case gVtx.ID():
@@ -769,7 +778,9 @@ func TestEngineAbandonResponse(t *testing.T) {
 		TxsV:     []snowstorm.Tx{tx0},
 	}
 
-	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) { return nil, errUnknownVertex }
+	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
+		return nil, errUnknownVertex
+	}
 
 	te, err := newTransitive(engCfg)
 	if err != nil {
@@ -947,7 +958,9 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 	}
 	tx1.InputIDsV = append(tx1.InputIDsV, utxos[0])
 
-	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
+	manager.EdgeF = func() []ids.ID {
+		return []ids.ID{gVtx.ID(), mVtx.ID()}
+	}
 	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch id {
 		case gVtx.ID():
@@ -983,7 +996,9 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 
 	vm.CantSetState = true
 	sender.CantSendPushQuery = false
-	vm.PendingTxsF = func() []snowstorm.Tx { return []snowstorm.Tx{tx0, tx1} }
+	vm.PendingTxsF = func() []snowstorm.Tx {
+		return []snowstorm.Tx{tx0, tx1}
+	}
 	if err := te.Notify(common.PendingTxs); err != nil {
 		t.Fatal(err)
 	}
@@ -1049,7 +1064,9 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 	}
 	tx1.InputIDsV = append(tx1.InputIDsV, utxos[0])
 
-	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
+	manager.EdgeF = func() []ids.ID {
+		return []ids.ID{gVtx.ID(), mVtx.ID()}
+	}
 	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch id {
 		case gVtx.ID():
@@ -1087,12 +1104,16 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 
 	sender.CantSendPushQuery = false
 
-	vm.PendingTxsF = func() []snowstorm.Tx { return []snowstorm.Tx{tx0} }
+	vm.PendingTxsF = func() []snowstorm.Tx {
+		return []snowstorm.Tx{tx0}
+	}
 	if err := te.Notify(common.PendingTxs); err != nil {
 		t.Fatal(err)
 	}
 
-	vm.PendingTxsF = func() []snowstorm.Tx { return []snowstorm.Tx{tx1} }
+	vm.PendingTxsF = func() []snowstorm.Tx {
+		return []snowstorm.Tx{tx1}
+	}
 	if err := te.Notify(common.PendingTxs); err != nil {
 		t.Fatal(err)
 	}
@@ -1129,7 +1150,9 @@ func TestEngineIssueRepoll(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
+	manager.EdgeF = func() []ids.ID {
+		return []ids.ID{gVtx.ID(), mVtx.ID()}
+	}
 	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch id {
 		case gVtx.ID():
@@ -1258,7 +1281,9 @@ func TestEngineReissue(t *testing.T) {
 		BytesV:   []byte{42},
 	}
 
-	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
+	manager.EdgeF = func() []ids.ID {
+		return []ids.ID{gVtx.ID(), mVtx.ID()}
+	}
 	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch id {
 		case gVtx.ID():
@@ -1310,7 +1335,9 @@ func TestEngineReissue(t *testing.T) {
 		*queryRequestID = requestID
 	}
 
-	vm.PendingTxsF = func() []snowstorm.Tx { return []snowstorm.Tx{tx0, tx1} }
+	vm.PendingTxsF = func() []snowstorm.Tx {
+		return []snowstorm.Tx{tx0, tx1}
+	}
 	if err := te.Notify(common.PendingTxs); err != nil {
 		t.Fatal(err)
 	}
@@ -1333,7 +1360,9 @@ func TestEngineReissue(t *testing.T) {
 	}
 	manager.ParseVtxF = nil
 
-	vm.PendingTxsF = func() []snowstorm.Tx { return []snowstorm.Tx{tx3} }
+	vm.PendingTxsF = func() []snowstorm.Tx {
+		return []snowstorm.Tx{tx3}
+	}
 	if err := te.Notify(common.PendingTxs); err != nil {
 		t.Fatal(err)
 	}
@@ -1411,7 +1440,9 @@ func TestEngineLargeIssue(t *testing.T) {
 	}
 	tx1.InputIDsV = append(tx1.InputIDsV, utxos[1])
 
-	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
+	manager.EdgeF = func() []ids.ID {
+		return []ids.ID{gVtx.ID(), mVtx.ID()}
+	}
 	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch id {
 		case gVtx.ID():
@@ -1451,7 +1482,9 @@ func TestEngineLargeIssue(t *testing.T) {
 
 	sender.CantSendPushQuery = false
 
-	vm.PendingTxsF = func() []snowstorm.Tx { return []snowstorm.Tx{tx0, tx1} }
+	vm.PendingTxsF = func() []snowstorm.Tx {
+		return []snowstorm.Tx{tx0, tx1}
+	}
 	if err := te.Notify(common.PendingTxs); err != nil {
 		t.Fatal(err)
 	}
@@ -1489,7 +1522,9 @@ func TestEngineGetVertex(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
+	manager.EdgeF = func() []ids.ID {
+		return []ids.ID{gVtx.ID(), mVtx.ID()}
+	}
 	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch id {
 		case gVtx.ID():
@@ -1560,7 +1595,9 @@ func TestEngineInsufficientValidators(t *testing.T) {
 		BytesV:   []byte{0, 1, 2, 3},
 	}
 
-	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	manager.EdgeF = func() []ids.ID {
+		return []ids.ID{vts[0].ID(), vts[1].ID()}
+	}
 	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch id {
 		case gVtx.ID():
@@ -1636,7 +1673,9 @@ func TestEnginePushGossip(t *testing.T) {
 		BytesV:   []byte{0, 1, 2, 3},
 	}
 
-	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	manager.EdgeF = func() []ids.ID {
+		return []ids.ID{vts[0].ID(), vts[1].ID()}
+	}
 	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch id {
 		case gVtx.ID():
@@ -1724,7 +1763,9 @@ func TestEngineSingleQuery(t *testing.T) {
 		BytesV:   []byte{0, 1, 2, 3},
 	}
 
-	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	manager.EdgeF = func() []ids.ID {
+		return []ids.ID{vts[0].ID(), vts[1].ID()}
+	}
 	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch id {
 		case gVtx.ID():
@@ -1816,7 +1857,9 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 		BytesV:   []byte{0, 1, 2, 3},
 	}
 
-	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	manager.EdgeF = func() []ids.ID {
+		return []ids.ID{vts[0].ID(), vts[1].ID()}
+	}
 	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch id {
 		case gVtx.ID():
@@ -1902,7 +1945,9 @@ func TestEngineAbandonChit(t *testing.T) {
 		BytesV:   []byte{0, 1, 2, 3},
 	}
 
-	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	manager.EdgeF = func() []ids.ID {
+		return []ids.ID{vts[0].ID(), vts[1].ID()}
+	}
 	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch id {
 		case gVtx.ID():
@@ -1998,7 +2043,9 @@ func TestEngineAbandonChitWithUnexpectedPutVertex(t *testing.T) {
 		BytesV:   []byte{0, 1, 2, 3},
 	}
 
-	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	manager.EdgeF = func() []ids.ID {
+		return []ids.ID{vts[0].ID(), vts[1].ID()}
+	}
 	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch id {
 		case gVtx.ID():
@@ -2115,7 +2162,9 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 		BytesV:   []byte{2, 1, 2, 3},
 	}
 
-	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	manager.EdgeF = func() []ids.ID {
+		return []ids.ID{vts[0].ID(), vts[1].ID()}
+	}
 	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch id {
 		case gVtx.ID():
@@ -2237,7 +2286,9 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		BytesV:   []byte{2, 1, 2, 3},
 	}
 
-	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	manager.EdgeF = func() []ids.ID {
+		return []ids.ID{vts[0].ID(), vts[1].ID()}
+	}
 	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch id {
 		case gVtx.ID():
@@ -2370,7 +2421,9 @@ func TestEngineMissingTx(t *testing.T) {
 		BytesV:   []byte{2, 1, 2, 3},
 	}
 
-	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	manager.EdgeF = func() []ids.ID {
+		return []ids.ID{vts[0].ID(), vts[1].ID()}
+	}
 	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch id {
 		case gVtx.ID():
@@ -3568,7 +3621,9 @@ func TestEngineGossip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID()} }
+	manager.EdgeF = func() []ids.ID {
+		return []ids.ID{gVtx.ID()}
+	}
 	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
 		if vtxID == gVtx.ID() {
 			return gVtx, nil
@@ -3979,10 +4034,14 @@ func TestEngineAggressivePolling(t *testing.T) {
 	}
 
 	numPushQueries := new(int)
-	sender.SendPushQueryF = func(context.Context, ids.NodeIDSet, uint32, []byte) { *numPushQueries++ }
+	sender.SendPushQueryF = func(context.Context, ids.NodeIDSet, uint32, []byte) {
+		*numPushQueries++
+	}
 
 	numPullQueries := new(int)
-	sender.SendPullQueryF = func(context.Context, ids.NodeIDSet, uint32, ids.ID) { *numPullQueries++ }
+	sender.SendPullQueryF = func(context.Context, ids.NodeIDSet, uint32, ids.ID) {
+		*numPullQueries++
+	}
 
 	vm.CantPendingTxs = false
 
@@ -4051,7 +4110,9 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 	}
 	tx.InputIDsV = append(tx.InputIDsV, utxos[0])
 
-	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
+	manager.EdgeF = func() []ids.ID {
+		return []ids.ID{gVtx.ID(), mVtx.ID()}
+	}
 	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch id {
 		case gVtx.ID():
@@ -4091,7 +4152,9 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 
 	sender.CantSendPushQuery = false
 
-	vm.PendingTxsF = func() []snowstorm.Tx { return []snowstorm.Tx{tx} }
+	vm.PendingTxsF = func() []snowstorm.Tx {
+		return []snowstorm.Tx{tx}
+	}
 	if err := te.Notify(common.PendingTxs); err != nil {
 		t.Fatal(err)
 	}
@@ -4168,7 +4231,9 @@ func TestEngineDoubleChit(t *testing.T) {
 		BytesV:   []byte{1, 1, 2, 3},
 	}
 
-	manager.EdgeF = func() []ids.ID { return []ids.ID{vts[0].ID(), vts[1].ID()} }
+	manager.EdgeF = func() []ids.ID {
+		return []ids.ID{vts[0].ID(), vts[1].ID()}
+	}
 	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch id {
 		case gVtx.ID():
@@ -4326,7 +4391,9 @@ func TestEngineBubbleVotes(t *testing.T) {
 		BytesV:   []byte{2},
 	}
 
-	manager.EdgeF = func() []ids.ID { return nil }
+	manager.EdgeF = func() []ids.ID {
+		return nil
+	}
 	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch id {
 		case vtx.ID():
@@ -4450,7 +4517,9 @@ func TestEngineIssue(t *testing.T) {
 		InputIDsV:     utxos[1:],
 	}
 
-	manager.EdgeF = func() []ids.ID { return []ids.ID{gVtx.ID(), mVtx.ID()} }
+	manager.EdgeF = func() []ids.ID {
+		return []ids.ID{gVtx.ID(), mVtx.ID()}
+	}
 	manager.GetVtxF = func(id ids.ID) (avalanche.Vertex, error) {
 		switch id {
 		case gVtx.ID():
@@ -4509,7 +4578,9 @@ func TestEngineIssue(t *testing.T) {
 		queryRequestID = requestID
 	}
 
-	vm.PendingTxsF = func() []snowstorm.Tx { return []snowstorm.Tx{tx0, tx1} }
+	vm.PendingTxsF = func() []snowstorm.Tx {
+		return []snowstorm.Tx{tx0, tx1}
+	}
 	if err := te.Notify(common.PendingTxs); err != nil {
 		t.Fatal(err)
 	}

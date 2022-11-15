@@ -21,7 +21,9 @@ type rejector struct {
 	txID     ids.ID
 }
 
-func (r *rejector) Dependencies() ids.Set { return r.deps }
+func (r *rejector) Dependencies() ids.Set {
+	return r.deps
+}
 
 func (r *rejector) Fulfill(context.Context, ids.ID) {
 	if r.rejected || r.errs.Errored() {
@@ -34,4 +36,5 @@ func (r *rejector) Fulfill(context.Context, ids.ID) {
 }
 
 func (*rejector) Abandon(context.Context, ids.ID) {}
-func (*rejector) Update(context.Context)          {}
+
+func (*rejector) Update(context.Context) {}

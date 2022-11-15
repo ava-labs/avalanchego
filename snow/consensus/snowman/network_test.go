@@ -89,7 +89,9 @@ func (n *Network) AddNode(sm Consensus) error {
 	return nil
 }
 
-func (n *Network) Finalized() bool { return len(n.running) == 0 }
+func (n *Network) Finalized() bool {
+	return len(n.running) == 0
+}
 
 func (n *Network) Round() error {
 	if len(n.running) == 0 {

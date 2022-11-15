@@ -36,8 +36,14 @@ type adaptiveTimeout struct {
 
 type timeoutQueue []*adaptiveTimeout
 
-func (tq timeoutQueue) Len() int           { return len(tq) }
-func (tq timeoutQueue) Less(i, j int) bool { return tq[i].deadline.Before(tq[j].deadline) }
+func (tq timeoutQueue) Len() int {
+	return len(tq)
+}
+
+func (tq timeoutQueue) Less(i, j int) bool {
+	return tq[i].deadline.Before(tq[j].deadline)
+}
+
 func (tq timeoutQueue) Swap(i, j int) {
 	tq[i], tq[j] = tq[j], tq[i]
 	tq[i].index = i
@@ -179,9 +185,13 @@ func (tm *adaptiveTimeoutManager) TimeoutDuration() time.Duration {
 	return tm.currentTimeout
 }
 
-func (tm *adaptiveTimeoutManager) Dispatch() { tm.timer.Dispatch() }
+func (tm *adaptiveTimeoutManager) Dispatch() {
+	tm.timer.Dispatch()
+}
 
-func (tm *adaptiveTimeoutManager) Stop() { tm.timer.Stop() }
+func (tm *adaptiveTimeoutManager) Stop() {
+	tm.timer.Stop()
+}
 
 func (tm *adaptiveTimeoutManager) Put(id ids.RequestID, measureLatency bool, timeoutHandler func()) {
 	tm.lock.Lock()

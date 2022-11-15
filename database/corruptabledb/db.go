@@ -70,7 +70,9 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 	return db.handleError(db.Database.Compact(start, limit))
 }
 
-func (db *Database) Close() error { return db.handleError(db.Database.Close()) }
+func (db *Database) Close() error {
+	return db.handleError(db.Database.Close())
+}
 
 func (db *Database) HealthCheck() (interface{}, error) {
 	if err := db.corrupted(); err != nil {

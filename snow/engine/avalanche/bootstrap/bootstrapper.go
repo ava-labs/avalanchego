@@ -301,14 +301,18 @@ func (b *bootstrapper) Timeout() error {
 	return b.OnFinished(b.Config.SharedCfg.RequestID)
 }
 
-func (*bootstrapper) Gossip() error { return nil }
+func (*bootstrapper) Gossip() error {
+	return nil
+}
 
 func (b *bootstrapper) Shutdown() error {
 	b.Ctx.Log.Info("shutting down bootstrapper")
 	return b.VM.Shutdown()
 }
 
-func (*bootstrapper) Notify(common.Message) error { return nil }
+func (*bootstrapper) Notify(common.Message) error {
+	return nil
+}
 
 func (b *bootstrapper) Start(startReqID uint32) error {
 	b.Ctx.Log.Info("starting bootstrap")
@@ -338,7 +342,9 @@ func (b *bootstrapper) HealthCheck() (interface{}, error) {
 	return intf, vmErr
 }
 
-func (b *bootstrapper) GetVM() common.VM { return b.VM }
+func (b *bootstrapper) GetVM() common.VM {
+	return b.VM
+}
 
 // Add the vertices in [vtxIDs] to the set of vertices that we need to fetch,
 // and then fetch vertices (and their ancestors) until either there are no more

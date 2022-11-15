@@ -36,8 +36,13 @@ type StandardTxExecutor struct {
 	AtomicRequests map[ids.ID]*atomic.Requests // may be nil
 }
 
-func (*StandardTxExecutor) AdvanceTimeTx(*txs.AdvanceTimeTx) error         { return errWrongTxType }
-func (*StandardTxExecutor) RewardValidatorTx(*txs.RewardValidatorTx) error { return errWrongTxType }
+func (*StandardTxExecutor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+	return errWrongTxType
+}
+
+func (*StandardTxExecutor) RewardValidatorTx(*txs.RewardValidatorTx) error {
+	return errWrongTxType
+}
 
 func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
@@ -76,7 +81,9 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 
 	// If this proposal is committed and this node is a member of the subnet
 	// that validates the blockchain, create the blockchain
-	e.OnAccept = func() { e.Config.CreateChain(txID, tx) }
+	e.OnAccept = func() {
+		e.Config.CreateChain(txID, tx)
+	}
 	return nil
 }
 

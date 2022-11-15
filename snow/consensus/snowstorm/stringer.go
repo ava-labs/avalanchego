@@ -31,8 +31,14 @@ type sortSnowballNodeData []*snowballNode
 func (sb sortSnowballNodeData) Less(i, j int) bool {
 	return bytes.Compare(sb[i].txID[:], sb[j].txID[:]) == -1
 }
-func (sb sortSnowballNodeData) Len() int      { return len(sb) }
-func (sb sortSnowballNodeData) Swap(i, j int) { sb[j], sb[i] = sb[i], sb[j] }
+
+func (sb sortSnowballNodeData) Len() int {
+	return len(sb)
+}
+
+func (sb sortSnowballNodeData) Swap(i, j int) {
+	sb[j], sb[i] = sb[i], sb[j]
+}
 
 func sortSnowballNodes(nodes []*snowballNode) {
 	sort.Sort(sortSnowballNodeData(nodes))

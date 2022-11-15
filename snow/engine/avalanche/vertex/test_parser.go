@@ -22,7 +22,9 @@ type TestParser struct {
 	ParseVtxF    func([]byte) (avalanche.Vertex, error)
 }
 
-func (p *TestParser) Default(cant bool) { p.CantParseVtx = cant }
+func (p *TestParser) Default(cant bool) {
+	p.CantParseVtx = cant
+}
 
 func (p *TestParser) ParseVtx(b []byte) (avalanche.Vertex, error) {
 	if p.ParseVtxF != nil {

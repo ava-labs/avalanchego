@@ -22,7 +22,7 @@ func TestWindowerNoValidators(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	vdrState := &validators.TestState{
 		T: t,
-		GetValidatorSetF: func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+		GetValidatorSetF: func(uint64, ids.ID) (map[ids.NodeID]uint64, error) {
 			return nil, nil
 		},
 	}
@@ -43,7 +43,7 @@ func TestWindowerRepeatedValidator(t *testing.T) {
 	nonValidatorID := ids.GenerateTestNodeID()
 	vdrState := &validators.TestState{
 		T: t,
-		GetValidatorSetF: func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+		GetValidatorSetF: func(uint64, ids.ID) (map[ids.NodeID]uint64, error) {
 			return map[ids.NodeID]uint64{
 				validatorID: 10,
 			}, nil
@@ -72,7 +72,7 @@ func TestWindowerChangeByHeight(t *testing.T) {
 	}
 	vdrState := &validators.TestState{
 		T: t,
-		GetValidatorSetF: func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+		GetValidatorSetF: func(uint64, ids.ID) (map[ids.NodeID]uint64, error) {
 			validators := make(map[ids.NodeID]uint64, MaxWindows)
 			for _, id := range validatorIDs {
 				validators[id] = 1
@@ -131,7 +131,7 @@ func TestWindowerChangeByChain(t *testing.T) {
 	}
 	vdrState := &validators.TestState{
 		T: t,
-		GetValidatorSetF: func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+		GetValidatorSetF: func(uint64, ids.ID) (map[ids.NodeID]uint64, error) {
 			validators := make(map[ids.NodeID]uint64, MaxWindows)
 			for _, id := range validatorIDs {
 				validators[id] = 1

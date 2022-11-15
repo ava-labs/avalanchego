@@ -32,9 +32,13 @@ func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Co
 
 	isBootstrapped := false
 	subnet := &common.SubnetTest{
-		T:               t,
-		IsBootstrappedF: func() bool { return isBootstrapped },
-		BootstrappedF:   func(ids.ID) { isBootstrapped = true },
+		T: t,
+		IsBootstrappedF: func() bool {
+			return isBootstrapped
+		},
+		BootstrappedF: func(ids.ID) {
+			isBootstrapped = true
+		},
 	}
 
 	commonConfig := common.Config{

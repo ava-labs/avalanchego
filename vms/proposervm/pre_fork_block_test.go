@@ -74,7 +74,9 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 		},
 	}
 
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return oracleCoreBlk, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return oracleCoreBlk, nil
+	}
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -123,7 +125,9 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 			ParentV: oracleCoreBlk.opts[0].ID(),
 		},
 	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return lastCoreBlk, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return lastCoreBlk, nil
+	}
 
 	preForkChild, err := proVM.BuildBlock()
 	if err != nil {
@@ -173,7 +177,9 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 		},
 	}
 
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return oracleCoreBlk, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return oracleCoreBlk, nil
+	}
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -222,7 +228,9 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 			ParentV: oracleCoreBlk.opts[0].ID(),
 		},
 	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return lastCoreBlk, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return lastCoreBlk, nil
+	}
 
 	postForkChild, err := proVM.BuildBlock()
 	if err != nil {
@@ -251,7 +259,9 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 		ParentV:    coreGenBlk.ID(),
 		TimestampV: coreGenBlk.Timestamp(),
 	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return prntCoreBlk, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return prntCoreBlk, nil
+	}
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -326,7 +336,9 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 		TimestampV: preActivationTime,
 		VerifyV:    nil,
 	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return coreBlk, nil
+	}
 
 	// preFork block verifies if parent is before fork activation time
 	preForkChild, err := proVM.BuildBlock()
@@ -373,7 +385,9 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	postActivationTime := activationTime.Add(time.Second)
 	proVM.Set(postActivationTime)
 
-	coreVM.SetPreferenceF = func(id ids.ID) error { return nil }
+	coreVM.SetPreferenceF = func(id ids.ID) error {
+		return nil
+	}
 	if err := proVM.SetPreference(preForkChild.ID()); err != nil {
 		t.Fatal("could not set preference")
 	}
@@ -387,7 +401,9 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 		TimestampV: postActivationTime,
 		VerifyV:    nil,
 	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return secondCoreBlk, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return secondCoreBlk, nil
+	}
 	coreVM.GetBlockF = func(id ids.ID) (snowman.Block, error) {
 		switch id {
 		case coreGenBlk.ID():
@@ -423,7 +439,9 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 		TimestampV: postActivationTime,
 		VerifyV:    nil,
 	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return thirdCoreBlk, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return thirdCoreBlk, nil
+	}
 	coreVM.GetBlockF = func(id ids.ID) (snowman.Block, error) {
 		switch id {
 		case coreGenBlk.ID():
@@ -466,7 +484,9 @@ func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
 		TimestampV: coreGenBlk.Timestamp(),
 		VerifyV:    nil,
 	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlock, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return coreBlock, nil
+	}
 
 	// postFork block verifies if parent is after fork activation time
 	postForkChild, err := proVM.BuildBlock()
@@ -502,7 +522,9 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 		BytesV:  []byte{1},
 		ParentV: coreGenBlk.ID(),
 	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return coreBlk, nil
+	}
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -559,7 +581,9 @@ func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
 		ParentV: coreGenBlk.ID(),
 		HeightV: coreGenBlk.Height() + 1,
 	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return coreBlk, nil
+	}
 
 	sb, err := proVM.BuildBlock()
 	if err != nil {

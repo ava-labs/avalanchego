@@ -50,7 +50,10 @@ type blockJob struct {
 	vm                      block.Getter
 }
 
-func (b *blockJob) ID() ids.ID { return b.blk.ID() }
+func (b *blockJob) ID() ids.ID {
+	return b.blk.ID()
+}
+
 func (b *blockJob) MissingDependencies() (ids.Set, error) {
 	missing := ids.Set{}
 	parentID := b.blk.Parent()
@@ -107,4 +110,7 @@ func (b *blockJob) Execute() error {
 	}
 	return nil
 }
-func (b *blockJob) Bytes() []byte { return b.blk.Bytes() }
+
+func (b *blockJob) Bytes() []byte {
+	return b.blk.Bytes()
+}

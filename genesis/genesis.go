@@ -566,7 +566,14 @@ func (xa innerSortXAllocation) Less(i, j int) bool {
 			bytes.Compare(xa[i].AVAXAddr.Bytes(), xa[j].AVAXAddr.Bytes()) == -1)
 }
 
-func (xa innerSortXAllocation) Len() int      { return len(xa) }
-func (xa innerSortXAllocation) Swap(i, j int) { xa[j], xa[i] = xa[i], xa[j] }
+func (xa innerSortXAllocation) Len() int {
+	return len(xa)
+}
 
-func sortXAllocation(a []Allocation) { sort.Sort(innerSortXAllocation(a)) }
+func (xa innerSortXAllocation) Swap(i, j int) {
+	xa[j], xa[i] = xa[i], xa[j]
+}
+
+func sortXAllocation(a []Allocation) {
+	sort.Sort(innerSortXAllocation(a))
+}

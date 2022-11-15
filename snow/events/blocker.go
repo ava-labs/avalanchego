@@ -87,4 +87,6 @@ func (b *Blocker) PrefixedString(prefix string) string {
 	return strings.TrimSuffix(sb.String(), "\n")
 }
 
-func (b *Blocker) String() string { return b.PrefixedString("") }
+func (b *Blocker) String() string {
+	return b.PrefixedString("")
+}

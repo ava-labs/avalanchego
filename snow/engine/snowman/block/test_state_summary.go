@@ -26,9 +26,17 @@ type TestStateSummary struct {
 	AcceptF    func() (bool, error)
 }
 
-func (s *TestStateSummary) ID() ids.ID     { return s.IDV }
-func (s *TestStateSummary) Height() uint64 { return s.HeightV }
-func (s *TestStateSummary) Bytes() []byte  { return s.BytesV }
+func (s *TestStateSummary) ID() ids.ID {
+	return s.IDV
+}
+
+func (s *TestStateSummary) Height() uint64 {
+	return s.HeightV
+}
+
+func (s *TestStateSummary) Bytes() []byte {
+	return s.BytesV
+}
 
 func (s *TestStateSummary) Accept() (bool, error) {
 	if s.AcceptF != nil {

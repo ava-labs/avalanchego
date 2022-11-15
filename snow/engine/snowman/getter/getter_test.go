@@ -48,9 +48,13 @@ func testSetup(
 
 	isBootstrapped := false
 	subnet := &common.SubnetTest{
-		T:               t,
-		IsBootstrappedF: func() bool { return isBootstrapped },
-		BootstrappedF:   func(ids.ID) { isBootstrapped = true },
+		T: t,
+		IsBootstrappedF: func() bool {
+			return isBootstrapped
+		},
+		BootstrappedF: func(ids.ID) {
+			isBootstrapped = true
+		},
 	}
 
 	sender.CantSendGetAcceptedFrontier = false
@@ -94,7 +98,9 @@ func TestAcceptedFrontier(t *testing.T) {
 		BytesV:  []byte{1, 2, 3},
 	}
 	vm.CantLastAccepted = false
-	vm.LastAcceptedF = func() (ids.ID, error) { return blkID, nil }
+	vm.LastAcceptedF = func() (ids.ID, error) {
+		return blkID, nil
+	}
 	vm.GetBlockF = func(bID ids.ID) (snowman.Block, error) {
 		require.Equal(t, blkID, bID)
 		return dummyBlk, nil
@@ -146,7 +152,9 @@ func TestFilterAccepted(t *testing.T) {
 	}}
 
 	vm.CantLastAccepted = false
-	vm.LastAcceptedF = func() (ids.ID, error) { return blk1.ID(), nil }
+	vm.LastAcceptedF = func() (ids.ID, error) {
+		return blk1.ID(), nil
+	}
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		require.Equal(t, blk1.ID(), blkID)
 		return blk1, nil

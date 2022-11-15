@@ -189,21 +189,27 @@ func acceptStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (plugin.P
 			ssVM.MockStateSyncableVM.EXPECT().ParseStateSummary(gomock.Any()).DoAndReturn(
 				func(summaryBytes []byte) (block.StateSummary, error) {
 					// setup summary to be accepted before returning it
-					mockedSummary.AcceptF = func() (bool, error) { return true, nil }
+					mockedSummary.AcceptF = func() (bool, error) {
+						return true, nil
+					}
 					return mockedSummary, nil
 				},
 			).Times(1),
 			ssVM.MockStateSyncableVM.EXPECT().ParseStateSummary(gomock.Any()).DoAndReturn(
 				func(summaryBytes []byte) (block.StateSummary, error) {
 					// setup summary to be skipped before returning it
-					mockedSummary.AcceptF = func() (bool, error) { return false, nil }
+					mockedSummary.AcceptF = func() (bool, error) {
+						return false, nil
+					}
 					return mockedSummary, nil
 				},
 			).Times(1),
 			ssVM.MockStateSyncableVM.EXPECT().ParseStateSummary(gomock.Any()).DoAndReturn(
 				func(summaryBytes []byte) (block.StateSummary, error) {
 					// setup summary to fail accept
-					mockedSummary.AcceptF = func() (bool, error) { return false, errBrokenConnectionOrSomething }
+					mockedSummary.AcceptF = func() (bool, error) {
+						return false, errBrokenConnectionOrSomething
+					}
 					return mockedSummary, nil
 				},
 			).Times(1),
@@ -235,7 +241,9 @@ func lastAcceptedBlockPostStateSummaryAcceptTestPlugin(t *testing.T, loadExpecta
 			ssVM.MockStateSyncableVM.EXPECT().ParseStateSummary(gomock.Any()).DoAndReturn(
 				func(summaryBytes []byte) (block.StateSummary, error) {
 					// setup summary to be accepted before returning it
-					mockedSummary.AcceptF = func() (bool, error) { return true, nil }
+					mockedSummary.AcceptF = func() (bool, error) {
+						return true, nil
+					}
 					return mockedSummary, nil
 				},
 			).Times(2),

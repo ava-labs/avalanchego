@@ -589,11 +589,17 @@ func (vm *VM) updateValidators() error {
 	return nil
 }
 
-func (vm *VM) CodecRegistry() codec.Registry { return vm.codecRegistry }
+func (vm *VM) CodecRegistry() codec.Registry {
+	return vm.codecRegistry
+}
 
-func (vm *VM) Clock() *mockable.Clock { return &vm.clock }
+func (vm *VM) Clock() *mockable.Clock {
+	return &vm.clock
+}
 
-func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
+func (vm *VM) Logger() logging.Logger {
+	return vm.ctx.Log
+}
 
 // Returns the percentage of the total stake of the subnet connected to this
 // node.
