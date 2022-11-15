@@ -372,7 +372,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 	// Allows messages to be routed to the new chain. If the handler hasn't been
 	// started and a message is forwarded, then the message will block until the
 	// handler is started.
-	m.ManagerConfig.Router.AddChain(chain.Handler)
+	m.ManagerConfig.Router.AddChain(context.TODO(), chain.Handler)
 
 	// Register bootstrapped health checks after P chain has been added to
 	// chains.
@@ -382,7 +382,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 	//       the manager.
 	if chainParams.ID == constants.PlatformChainID {
 		if err := m.registerBootstrappedHealthChecks(); err != nil {
-			chain.Handler.StopWithError(err)
+			chain.Handler.StopWithError(context.TODO(), err)
 		}
 	}
 
@@ -1132,7 +1132,7 @@ func (m *manager) closeChainCreator() {
 func (m *manager) Shutdown() {
 	m.Log.Info("shutting down chain manager")
 	m.closeChainCreator()
-	m.ManagerConfig.Router.Shutdown()
+	m.ManagerConfig.Router.Shutdown(context.TODO())
 }
 
 // LookupVM returns the ID of the VM associated with an alias

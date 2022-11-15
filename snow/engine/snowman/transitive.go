@@ -349,7 +349,7 @@ func (t *Transitive) Gossip(ctx context.Context) error {
 	return nil
 }
 
-func (*Transitive) Halt() {}
+func (*Transitive) Halt(context.Context) {}
 
 func (t *Transitive) Shutdown(ctx context.Context) error {
 	t.Ctx.Log.Info("shutting down consensus engine")

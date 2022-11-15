@@ -1457,7 +1457,7 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 		case blk0.ID():
 			return blk0, nil
 		case blk1.ID():
-			bs.Halt()
+			bs.Halt(context.Background())
 			return blk1, nil
 		case blk2.ID():
 			return blk2, nil

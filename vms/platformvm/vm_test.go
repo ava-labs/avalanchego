@@ -1899,7 +1899,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	handler.SetBootstrapper(bootstrapper)
 
 	// Allow incoming messages to be routed to the new chain
-	chainRouter.AddChain(handler)
+	chainRouter.AddChain(context.Background(), handler)
 	ctx.Lock.Unlock()
 
 	handler.Start(context.Background(), false)
@@ -1959,7 +1959,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 	ctx.Lock.Unlock()
 
-	chainRouter.Shutdown()
+	chainRouter.Shutdown(context.Background())
 }
 
 func TestUnverifiedParent(t *testing.T) {

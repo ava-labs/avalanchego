@@ -108,7 +108,7 @@ type EngineTest struct {
 	StartF                                             func(ctx context.Context, startReqID uint32) error
 	IsBootstrappedF                                    func() bool
 	ContextF                                           func() *snow.ConsensusContext
-	HaltF                                              func()
+	HaltF                                              func(ctx context.Context)
 	TimeoutF, GossipF, ShutdownF                       func(context.Context) error
 	NotifyF                                            func(context.Context, Message) error
 	GetF, GetAncestorsF, PullQueryF                    func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error
@@ -230,9 +230,9 @@ func (e *EngineTest) Gossip(ctx context.Context) error {
 	return errGossip
 }
 
-func (e *EngineTest) Halt() {
+func (e *EngineTest) Halt(ctx context.Context) {
 	if e.HaltF != nil {
-		e.HaltF()
+		e.HaltF(ctx)
 		return
 	}
 	if e.CantHalt && e.T != nil {

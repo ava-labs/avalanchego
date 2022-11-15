@@ -565,7 +565,7 @@ func (ss *stateSyncer) Shutdown(ctx context.Context) error {
 	return ss.VM.Shutdown(ctx)
 }
 
-func (*stateSyncer) Halt() {}
+func (*stateSyncer) Halt(context.Context) {}
 
 func (*stateSyncer) Timeout(context.Context) error {
 	return nil
