@@ -72,7 +72,9 @@ func (out *TransferableOutput) InitCtx(ctx *snow.Context) {
 }
 
 // Output returns the feature extension output that this Output is using.
-func (out *TransferableOutput) Output() TransferableOut { return out.Out }
+func (out *TransferableOutput) Output() TransferableOut {
+	return out.Out
+}
 
 func (out *TransferableOutput) Verify() error {
 	switch {
@@ -114,8 +116,15 @@ func (outs *innerSortTransferableOutputs) Less(i, j int) bool {
 	}
 	return bytes.Compare(iBytes, jBytes) == -1
 }
-func (outs *innerSortTransferableOutputs) Len() int      { return len(outs.outs) }
-func (outs *innerSortTransferableOutputs) Swap(i, j int) { o := outs.outs; o[j], o[i] = o[i], o[j] }
+
+func (outs *innerSortTransferableOutputs) Len() int {
+	return len(outs.outs)
+}
+
+func (outs *innerSortTransferableOutputs) Swap(i, j int) {
+	o := outs.outs
+	o[j], o[i] = o[i], o[j]
+}
 
 // SortTransferableOutputs sorts output objects
 func SortTransferableOutputs(outs []*TransferableOutput, c codec.Manager) {
@@ -136,7 +145,9 @@ type TransferableInput struct {
 }
 
 // Input returns the feature extension input that this Input is using.
-func (in *TransferableInput) Input() TransferableIn { return in.In }
+func (in *TransferableInput) Input() TransferableIn {
+	return in.In
+}
 
 func (in *TransferableInput) Verify() error {
 	switch {
@@ -164,10 +175,18 @@ func (ins innerSortTransferableInputs) Less(i, j int) bool {
 		return false
 	}
 }
-func (ins innerSortTransferableInputs) Len() int      { return len(ins) }
-func (ins innerSortTransferableInputs) Swap(i, j int) { ins[j], ins[i] = ins[i], ins[j] }
 
-func SortTransferableInputs(ins []*TransferableInput) { sort.Sort(innerSortTransferableInputs(ins)) }
+func (ins innerSortTransferableInputs) Len() int {
+	return len(ins)
+}
+
+func (ins innerSortTransferableInputs) Swap(i, j int) {
+	ins[j], ins[i] = ins[i], ins[j]
+}
+
+func SortTransferableInputs(ins []*TransferableInput) {
+	sort.Sort(innerSortTransferableInputs(ins))
+}
 
 func IsSortedAndUniqueTransferableInputs(ins []*TransferableInput) bool {
 	return utils.IsSortedAndUnique(innerSortTransferableInputs(ins))
@@ -191,7 +210,11 @@ func (ins *innerSortTransferableInputsWithSigners) Less(i, j int) bool {
 		return false
 	}
 }
-func (ins *innerSortTransferableInputsWithSigners) Len() int { return len(ins.ins) }
+
+func (ins *innerSortTransferableInputsWithSigners) Len() int {
+	return len(ins.ins)
+}
+
 func (ins *innerSortTransferableInputsWithSigners) Swap(i, j int) {
 	ins.ins[j], ins.ins[i] = ins.ins[i], ins.ins[j]
 	ins.signers[j], ins.signers[i] = ins.signers[i], ins.signers[j]

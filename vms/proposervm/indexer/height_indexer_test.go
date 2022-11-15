@@ -75,7 +75,9 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 			}
 			return blk, nil
 		},
-		CommitF: func() error { return nil },
+		CommitF: func() error {
+			return nil
+		},
 	}
 
 	hIndex := newHeightIndexer(blkSrv,
@@ -153,7 +155,9 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 			}
 			return blk, nil
 		},
-		CommitF: func() error { return nil },
+		CommitF: func() error {
+			return nil
+		},
 	}
 
 	hIndex := newHeightIndexer(blkSrv,
@@ -235,7 +239,9 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 			}
 			return blk, nil
 		},
-		CommitF: func() error { return nil },
+		CommitF: func() error {
+			return nil
+		},
 	}
 
 	hIndex := newHeightIndexer(blkSrv,

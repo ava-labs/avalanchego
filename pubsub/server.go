@@ -52,7 +52,9 @@ type errorMsg struct {
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  readBufferSize,
 	WriteBufferSize: writeBufferSize,
-	CheckOrigin:     func(*http.Request) bool { return true },
+	CheckOrigin: func(*http.Request) bool {
+		return true
+	},
 }
 
 // Server maintains the set of active clients and sends messages to the clients.

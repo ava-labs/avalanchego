@@ -63,7 +63,9 @@ func (ids *ShortSet) Contains(id ShortID) bool {
 }
 
 // Len returns the number of ids in this set
-func (ids ShortSet) Len() int { return len(ids) }
+func (ids ShortSet) Len() int {
+	return len(ids)
+}
 
 // Remove all the id from this set, if the id isn't in the set, nothing happens
 func (ids *ShortSet) Remove(idList ...ShortID) {
@@ -74,7 +76,9 @@ func (ids *ShortSet) Remove(idList ...ShortID) {
 }
 
 // Clear empties this set
-func (ids *ShortSet) Clear() { *ids = nil }
+func (ids *ShortSet) Clear() {
+	*ids = nil
+}
 
 // CappedList returns a list of length at most [size].
 // Size should be >= 0. If size < 0, returns nil.

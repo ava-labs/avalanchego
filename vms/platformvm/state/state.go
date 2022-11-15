@@ -853,10 +853,21 @@ func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 	return staker.StartTime, nil
 }
 
-func (s *state) GetTimestamp() time.Time             { return s.timestamp }
-func (s *state) SetTimestamp(tm time.Time)           { s.timestamp = tm }
-func (s *state) GetLastAccepted() ids.ID             { return s.lastAccepted }
-func (s *state) SetLastAccepted(lastAccepted ids.ID) { s.lastAccepted = lastAccepted }
+func (s *state) GetTimestamp() time.Time {
+	return s.timestamp
+}
+
+func (s *state) SetTimestamp(tm time.Time) {
+	s.timestamp = tm
+}
+
+func (s *state) GetLastAccepted() ids.ID {
+	return s.lastAccepted
+}
+
+func (s *state) SetLastAccepted(lastAccepted ids.ID) {
+	s.lastAccepted = lastAccepted
+}
 
 func (s *state) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
 	if subnetID == constants.PrimaryNetworkID {

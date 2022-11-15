@@ -106,8 +106,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			stateF: func(*gomock.Controller) state.Chain {
 				return nil
 			},
-			sTxF:        func() *txs.Tx { return nil },
-			txF:         func() *txs.AddPermissionlessValidatorTx { return nil },
+			sTxF: func() *txs.Tx {
+				return nil
+			},
+			txF: func() *txs.AddPermissionlessValidatorTx {
+				return nil
+			},
 			expectedErr: txs.ErrNilSignedTx,
 		},
 		{
@@ -121,8 +125,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			stateF: func(ctrl *gomock.Controller) state.Chain {
 				return nil
 			},
-			sTxF:        func() *txs.Tx { return &verifiedSignedTx },
-			txF:         func() *txs.AddPermissionlessValidatorTx { return nil },
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.AddPermissionlessValidatorTx {
+				return nil
+			},
 			expectedErr: nil,
 		},
 		{
@@ -140,8 +148,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				state.EXPECT().GetTimestamp().Return(verifiedTx.StartTime())
 				return state
 			},
-			sTxF:        func() *txs.Tx { return &verifiedSignedTx },
-			txF:         func() *txs.AddPermissionlessValidatorTx { return &verifiedTx },
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.AddPermissionlessValidatorTx {
+				return &verifiedTx
+			},
 			expectedErr: errTimestampNotBeforeStartTime,
 		},
 		{
@@ -160,7 +172,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				state.EXPECT().GetSubnetTransformation(subnetID).Return(&transformTx, nil)
 				return state
 			},
-			sTxF: func() *txs.Tx { return &verifiedSignedTx },
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
 			txF: func() *txs.AddPermissionlessValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
 				tx.Validator.Wght = unsignedTransformTx.MinValidatorStake - 1
@@ -184,7 +198,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				state.EXPECT().GetSubnetTransformation(subnetID).Return(&transformTx, nil)
 				return state
 			},
-			sTxF: func() *txs.Tx { return &verifiedSignedTx },
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
 			txF: func() *txs.AddPermissionlessValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
 				tx.Validator.Wght = unsignedTransformTx.MaxValidatorStake + 1
@@ -208,7 +224,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				state.EXPECT().GetSubnetTransformation(subnetID).Return(&transformTx, nil)
 				return state
 			},
-			sTxF: func() *txs.Tx { return &verifiedSignedTx },
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
 			txF: func() *txs.AddPermissionlessValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
 				tx.Validator.Wght = unsignedTransformTx.MaxValidatorStake
@@ -233,7 +251,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				state.EXPECT().GetSubnetTransformation(subnetID).Return(&transformTx, nil)
 				return state
 			},
-			sTxF: func() *txs.Tx { return &verifiedSignedTx },
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
 			txF: func() *txs.AddPermissionlessValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
 				tx.Validator.Wght = unsignedTransformTx.MaxValidatorStake
@@ -261,7 +281,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				state.EXPECT().GetSubnetTransformation(subnetID).Return(&transformTx, nil)
 				return state
 			},
-			sTxF: func() *txs.Tx { return &verifiedSignedTx },
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
 			txF: func() *txs.AddPermissionlessValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
 				tx.Validator.Wght = unsignedTransformTx.MaxValidatorStake
@@ -289,7 +311,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				state.EXPECT().GetSubnetTransformation(subnetID).Return(&transformTx, nil)
 				return state
 			},
-			sTxF: func() *txs.Tx { return &verifiedSignedTx },
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
 			txF: func() *txs.AddPermissionlessValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
 				tx.StakeOuts = []*avax.TransferableOutput{
@@ -321,7 +345,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				state.EXPECT().GetCurrentValidator(subnetID, verifiedTx.NodeID()).Return(nil, nil)
 				return state
 			},
-			sTxF: func() *txs.Tx { return &verifiedSignedTx },
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
 			txF: func() *txs.AddPermissionlessValidatorTx {
 				return &verifiedTx
 			},
@@ -351,7 +377,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				mockState.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(primaryNetworkVdr, nil)
 				return mockState
 			},
-			sTxF: func() *txs.Tx { return &verifiedSignedTx },
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
 			txF: func() *txs.AddPermissionlessValidatorTx {
 				return &verifiedTx
 			},
@@ -395,7 +423,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				mockState.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(primaryNetworkVdr, nil)
 				return mockState
 			},
-			sTxF: func() *txs.Tx { return &verifiedSignedTx },
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
 			txF: func() *txs.AddPermissionlessValidatorTx {
 				return &verifiedTx
 			},
@@ -439,7 +469,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				mockState.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(primaryNetworkVdr, nil)
 				return mockState
 			},
-			sTxF: func() *txs.Tx { return &verifiedSignedTx },
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
 			txF: func() *txs.AddPermissionlessValidatorTx {
 				// Note this copies [verifiedTx]
 				tx := verifiedTx
@@ -487,7 +519,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				mockState.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(primaryNetworkVdr, nil)
 				return mockState
 			},
-			sTxF: func() *txs.Tx { return &verifiedSignedTx },
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
 			txF: func() *txs.AddPermissionlessValidatorTx {
 				return &verifiedTx
 			},

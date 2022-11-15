@@ -166,8 +166,13 @@ func (vtx *uniqueVertex) setStatus(status choices.Status) error {
 	return vtx.serializer.state.SetStatus(vtx.ID(), status)
 }
 
-func (vtx *uniqueVertex) ID() ids.ID       { return vtx.id }
-func (vtx *uniqueVertex) Key() interface{} { return vtx.id }
+func (vtx *uniqueVertex) ID() ids.ID {
+	return vtx.id
+}
+
+func (vtx *uniqueVertex) Key() interface{} {
+	return vtx.id
+}
 
 func (vtx *uniqueVertex) Accept(ctx context.Context) error {
 	if err := vtx.setStatus(choices.Accepted); err != nil {
@@ -210,7 +215,10 @@ func (vtx *uniqueVertex) Reject(context.Context) error {
 // TODO: run performance test to see if shallow refreshing
 // (which will mean that refresh must be called in Bytes and Verify)
 // improves performance
-func (vtx *uniqueVertex) Status() choices.Status { vtx.refresh(); return vtx.v.status }
+func (vtx *uniqueVertex) Status() choices.Status {
+	vtx.refresh()
+	return vtx.v.status
+}
 
 func (vtx *uniqueVertex) Parents() ([]avalanche.Vertex, error) {
 	vtx.refresh()
@@ -456,7 +464,9 @@ func (vtx *uniqueVertex) Txs(ctx context.Context) ([]snowstorm.Tx, error) {
 	return vtx.v.txs, nil
 }
 
-func (vtx *uniqueVertex) Bytes() []byte { return vtx.v.vtx.Bytes() }
+func (vtx *uniqueVertex) Bytes() []byte {
+	return vtx.v.vtx.Bytes()
+}
 
 func (vtx *uniqueVertex) String() string {
 	sb := strings.Builder{}

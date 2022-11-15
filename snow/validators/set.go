@@ -365,7 +365,9 @@ func (s *set) Len() int {
 	return s.len()
 }
 
-func (s *set) len() int { return len(s.vdrSlice) }
+func (s *set) len() int {
+	return len(s.vdrSlice)
+}
 
 func (s *set) List() []Validator {
 	s.lock.RLock()

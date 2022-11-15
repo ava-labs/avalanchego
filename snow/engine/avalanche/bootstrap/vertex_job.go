@@ -47,7 +47,9 @@ type vertexJob struct {
 	vtx                     avalanche.Vertex
 }
 
-func (v *vertexJob) ID() ids.ID { return v.vtx.ID() }
+func (v *vertexJob) ID() ids.ID {
+	return v.vtx.ID()
+}
 
 func (v *vertexJob) MissingDependencies(context.Context) (ids.Set, error) {
 	missing := ids.Set{}
@@ -114,4 +116,6 @@ func (v *vertexJob) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (v *vertexJob) Bytes() []byte { return v.vtx.Bytes() }
+func (v *vertexJob) Bytes() []byte {
+	return v.vtx.Bytes()
+}

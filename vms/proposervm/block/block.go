@@ -59,10 +59,21 @@ type statelessBlock struct {
 	bytes     []byte
 }
 
-func (b *statelessBlock) ID() ids.ID       { return b.id }
-func (b *statelessBlock) ParentID() ids.ID { return b.StatelessBlock.ParentID }
-func (b *statelessBlock) Block() []byte    { return b.StatelessBlock.Block }
-func (b *statelessBlock) Bytes() []byte    { return b.bytes }
+func (b *statelessBlock) ID() ids.ID {
+	return b.id
+}
+
+func (b *statelessBlock) ParentID() ids.ID {
+	return b.StatelessBlock.ParentID
+}
+
+func (b *statelessBlock) Block() []byte {
+	return b.StatelessBlock.Block
+}
+
+func (b *statelessBlock) Bytes() []byte {
+	return b.bytes
+}
 
 func (b *statelessBlock) initialize(bytes []byte) error {
 	b.bytes = bytes
@@ -93,9 +104,17 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 	return nil
 }
 
-func (b *statelessBlock) PChainHeight() uint64 { return b.StatelessBlock.PChainHeight }
-func (b *statelessBlock) Timestamp() time.Time { return b.timestamp }
-func (b *statelessBlock) Proposer() ids.NodeID { return b.proposer }
+func (b *statelessBlock) PChainHeight() uint64 {
+	return b.StatelessBlock.PChainHeight
+}
+
+func (b *statelessBlock) Timestamp() time.Time {
+	return b.timestamp
+}
+
+func (b *statelessBlock) Proposer() ids.NodeID {
+	return b.proposer
+}
 
 func (b *statelessBlock) Verify(shouldHaveProposer bool, chainID ids.ID) error {
 	if !shouldHaveProposer {

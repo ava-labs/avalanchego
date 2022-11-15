@@ -46,10 +46,14 @@ type Config struct {
 	SharedCfg *SharedConfig
 }
 
-func (c *Config) Context() *snow.ConsensusContext { return c.Ctx }
+func (c *Config) Context() *snow.ConsensusContext {
+	return c.Ctx
+}
 
 // IsBootstrapped returns true iff this chain is done bootstrapping
-func (c *Config) IsBootstrapped() bool { return c.Ctx.GetState() == snow.NormalOp }
+func (c *Config) IsBootstrapped() bool {
+	return c.Ctx.GetState() == snow.NormalOp
+}
 
 // Shared among common.bootstrapper and snowman/avalanche bootstrapper
 type SharedConfig struct {

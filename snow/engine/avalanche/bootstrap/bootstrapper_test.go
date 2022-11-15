@@ -41,9 +41,13 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 
 	isBootstrapped := false
 	subnet := &common.SubnetTest{
-		T:               t,
-		IsBootstrappedF: func() bool { return isBootstrapped },
-		BootstrappedF:   func(ids.ID) { isBootstrapped = true },
+		T: t,
+		IsBootstrappedF: func() bool {
+			return isBootstrapped
+		},
+		BootstrappedF: func(ids.ID) {
+			isBootstrapped = true
+		},
 	}
 
 	sender.Default(true)

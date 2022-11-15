@@ -41,7 +41,9 @@ func (h *txHeap) initialize(self heap.Interface) {
 	h.txIDToIndex = make(map[ids.ID]int)
 }
 
-func (h *txHeap) Add(tx *txs.Tx) { heap.Push(h.self, tx) }
+func (h *txHeap) Add(tx *txs.Tx) {
+	heap.Push(h.self, tx)
+}
 
 func (h *txHeap) Get(txID ids.ID) *txs.Tx {
 	index, exists := h.txIDToIndex[txID]
@@ -67,11 +69,17 @@ func (h *txHeap) Remove(txID ids.ID) *txs.Tx {
 	return heap.Remove(h.self, index).(*txs.Tx)
 }
 
-func (h *txHeap) Peek() *txs.Tx { return h.txs[0].tx }
+func (h *txHeap) Peek() *txs.Tx {
+	return h.txs[0].tx
+}
 
-func (h *txHeap) RemoveTop() *txs.Tx { return heap.Pop(h.self).(*txs.Tx) }
+func (h *txHeap) RemoveTop() *txs.Tx {
+	return heap.Pop(h.self).(*txs.Tx)
+}
 
-func (h *txHeap) Len() int { return len(h.txs) }
+func (h *txHeap) Len() int {
+	return len(h.txs)
+}
 
 func (h *txHeap) Swap(i, j int) {
 	// The follow "i"s and "j"s are intentionally swapped to perform the actual

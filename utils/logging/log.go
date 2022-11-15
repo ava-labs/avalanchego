@@ -114,7 +114,10 @@ func (l *log) StopOnPanic() {
 	}
 }
 
-func (l *log) RecoverAndPanic(f func()) { defer l.StopOnPanic(); f() }
+func (l *log) RecoverAndPanic(f func()) {
+	defer l.StopOnPanic()
+	f()
+}
 
 func (l *log) stopAndExit(exit func()) {
 	if r := recover(); r != nil {
@@ -124,4 +127,7 @@ func (l *log) stopAndExit(exit func()) {
 	}
 }
 
-func (l *log) RecoverAndExit(f, exit func()) { defer l.stopAndExit(exit); f() }
+func (l *log) RecoverAndExit(f, exit func()) {
+	defer l.stopAndExit(exit)
+	f()
+}

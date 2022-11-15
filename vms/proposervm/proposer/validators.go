@@ -16,8 +16,13 @@ type validatorData struct {
 
 type validatorsSlice []validatorData
 
-func (d validatorsSlice) Len() int      { return len(d) }
-func (d validatorsSlice) Swap(i, j int) { d[i], d[j] = d[j], d[i] }
+func (d validatorsSlice) Len() int {
+	return len(d)
+}
+
+func (d validatorsSlice) Swap(i, j int) {
+	d[i], d[j] = d[j], d[i]
+}
 
 func (d validatorsSlice) Less(i, j int) bool {
 	iID := d[i].id

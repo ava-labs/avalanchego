@@ -64,7 +64,9 @@ func TestNewUpdater(t *testing.T) {
 		Port: uint16(originalPort),
 	}
 	require.Eventually(
-		func() bool { return expectedIP.Equal(dynamicIP.IPPort()) },
+		func() bool {
+			return expectedIP.Equal(dynamicIP.IPPort())
+		},
 		5*time.Second,
 		updateFreq,
 	)

@@ -54,8 +54,14 @@ type benchData struct {
 // Each element is a benched validator
 type benchedQueue []*benchData
 
-func (bq benchedQueue) Len() int           { return len(bq) }
-func (bq benchedQueue) Less(i, j int) bool { return bq[i].benchedUntil.Before(bq[j].benchedUntil) }
+func (bq benchedQueue) Len() int {
+	return len(bq)
+}
+
+func (bq benchedQueue) Less(i, j int) bool {
+	return bq[i].benchedUntil.Before(bq[j].benchedUntil)
+}
+
 func (bq benchedQueue) Swap(i, j int) {
 	bq[i], bq[j] = bq[j], bq[i]
 	bq[i].index = i

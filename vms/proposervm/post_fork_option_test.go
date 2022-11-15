@@ -71,7 +71,9 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 		},
 	}
 
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return oracleCoreBlk, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return oracleCoreBlk, nil
+	}
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -148,7 +150,9 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 		BytesV:     []byte{4},
 		TimestampV: oracleCoreBlk.opts[0].Timestamp().Add(proposer.MaxDelay),
 	}
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return childCoreBlk, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return childCoreBlk, nil
+	}
 	proVM.Set(childCoreBlk.Timestamp())
 
 	proChild, err := proVM.BuildBlock(context.Background())
@@ -204,7 +208,9 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 		coreOpt1,
 	}
 
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return oracleCoreBlk, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return oracleCoreBlk, nil
+	}
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -318,7 +324,9 @@ func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 		},
 	}
 
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return oracleCoreBlk, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return oracleCoreBlk, nil
+	}
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -436,7 +444,9 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 		},
 	}
 
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return oracleCoreBlk, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return oracleCoreBlk, nil
+	}
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -544,7 +554,9 @@ func TestBlockVerify_PostForkOption_ParentIsNotOracleWithError(t *testing.T) {
 		TimestampV: coreBlk.Timestamp(),
 	}
 
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) { return coreBlk, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk, nil
+	}
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -744,7 +756,9 @@ func TestOptionTimestampValidity(t *testing.T) {
 	) error {
 		return nil
 	}
-	coreVM.LastAcceptedF = func(context.Context) (ids.ID, error) { return coreOracleBlk.opts[0].ID(), nil }
+	coreVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return coreOracleBlk.opts[0].ID(), nil
+	}
 
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
