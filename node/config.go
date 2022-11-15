@@ -196,6 +196,7 @@ type Config struct {
 
 	// ChainConfigs
 	ChainConfigs map[string]chains.ChainConfig `json:"-"`
+	ChainAliases map[ids.ID][]string           `json:"chainAliases"`
 
 	// VM management
 	VMManager vms.Manager `json:"-"`

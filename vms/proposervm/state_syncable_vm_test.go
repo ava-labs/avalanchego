@@ -45,7 +45,9 @@ func stopHeightReindexing(t *testing.T, coreVM *fullVM, dbMan manager.Manager) {
 		t.Fatal("could not commit preloaded key")
 	}
 
-	coreVM.VerifyHeightIndexF = func(context.Context) error { return nil }
+	coreVM.VerifyHeightIndexF = func(context.Context) error {
+		return nil
+	}
 }
 
 func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
@@ -82,9 +84,15 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	) error {
 		return nil
 	}
-	innerVM.VerifyHeightIndexF = func(context.Context) error { return nil }
-	innerVM.LastAcceptedF = func(context.Context) (ids.ID, error) { return innerGenesisBlk.ID(), nil }
-	innerVM.GetBlockF = func(context.Context, ids.ID) (snowman.Block, error) { return innerGenesisBlk, nil }
+	innerVM.VerifyHeightIndexF = func(context.Context) error {
+		return nil
+	}
+	innerVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return innerGenesisBlk.ID(), nil
+	}
+	innerVM.GetBlockF = func(context.Context, ids.ID) (snowman.Block, error) {
+		return innerGenesisBlk, nil
+	}
 
 	// createVM
 	vm := New(innerVM, time.Time{}, 0, DefaultMinBlockDelay)
@@ -119,13 +127,17 @@ func TestStateSyncEnabled(t *testing.T) {
 
 	// ProposerVM State Sync disabled if innerVM State sync is disabled
 	vm.hIndexer.MarkRepaired(true)
-	innerVM.StateSyncEnabledF = func(context.Context) (bool, error) { return false, nil }
+	innerVM.StateSyncEnabledF = func(context.Context) (bool, error) {
+		return false, nil
+	}
 	enabled, err := vm.StateSyncEnabled(context.Background())
 	require.NoError(err)
 	require.False(enabled)
 
 	// ProposerVM State Sync enabled if innerVM State sync is enabled
-	innerVM.StateSyncEnabledF = func(context.Context) (bool, error) { return true, nil }
+	innerVM.StateSyncEnabledF = func(context.Context) (bool, error) {
+		return true, nil
+	}
 	enabled, err = vm.StateSyncEnabled(context.Background())
 	require.NoError(err)
 	require.True(enabled)
@@ -509,13 +521,17 @@ func TestStateSummaryAccept(t *testing.T) {
 	require.NoError(err)
 
 	// test Accept accepted
-	innerSummary.AcceptF = func(context.Context) (bool, error) { return true, nil }
+	innerSummary.AcceptF = func(context.Context) (bool, error) {
+		return true, nil
+	}
 	accepted, err := summary.Accept(context.Background())
 	require.NoError(err)
 	require.True(accepted)
 
 	// test Accept skipped
-	innerSummary.AcceptF = func(context.Context) (bool, error) { return false, nil }
+	innerSummary.AcceptF = func(context.Context) (bool, error) {
+		return false, nil
+	}
 	accepted, err = summary.Accept(context.Background())
 	require.NoError(err)
 	require.False(accepted)
@@ -579,7 +595,9 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 	require.NoError(err)
 
 	// test Accept skipped
-	innerSummary.AcceptF = func(context.Context) (bool, error) { return true, nil }
+	innerSummary.AcceptF = func(context.Context) (bool, error) {
+		return true, nil
+	}
 	accepted, err := summary.Accept(context.Background())
 	require.NoError(err)
 	require.False(accepted)

@@ -60,7 +60,9 @@ func (kc Keychain) Get(id ids.ShortID) (keychain.Signer, bool) {
 }
 
 // Addresses returns a list of addresses this keychain manages
-func (kc Keychain) Addresses() ids.ShortSet { return kc.Addrs }
+func (kc Keychain) Addresses() ids.ShortSet {
+	return kc.Addrs
+}
 
 // New returns a newly generated private key
 func (kc *Keychain) New() (*crypto.PrivateKeySECP256K1R, error) {
@@ -135,7 +137,9 @@ func (kc *Keychain) PrefixedString(prefix string) string {
 	return strings.TrimSuffix(sb.String(), "\n")
 }
 
-func (kc *Keychain) String() string { return kc.PrefixedString("") }
+func (kc *Keychain) String() string {
+	return kc.PrefixedString("")
+}
 
 // to avoid internals type assertions
 func (kc Keychain) get(id ids.ShortID) (*crypto.PrivateKeySECP256K1R, bool) {

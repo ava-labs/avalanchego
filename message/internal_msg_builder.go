@@ -49,8 +49,13 @@ type GetStateSummaryFrontierFailed struct {
 	RequestID uint32
 }
 
-func (m *GetStateSummaryFrontierFailed) GetChainId() []byte   { return m.ChainID[:] }
-func (m *GetStateSummaryFrontierFailed) GetRequestId() uint32 { return m.RequestID }
+func (m *GetStateSummaryFrontierFailed) GetChainId() []byte {
+	return m.ChainID[:]
+}
+
+func (m *GetStateSummaryFrontierFailed) GetRequestId() uint32 {
+	return m.RequestID
+}
 
 func InternalGetStateSummaryFrontierFailed(
 	nodeID ids.NodeID,
@@ -73,8 +78,13 @@ type GetAcceptedStateSummaryFailed struct {
 	RequestID uint32
 }
 
-func (m *GetAcceptedStateSummaryFailed) GetChainId() []byte   { return m.ChainID[:] }
-func (m *GetAcceptedStateSummaryFailed) GetRequestId() uint32 { return m.RequestID }
+func (m *GetAcceptedStateSummaryFailed) GetChainId() []byte {
+	return m.ChainID[:]
+}
+
+func (m *GetAcceptedStateSummaryFailed) GetRequestId() uint32 {
+	return m.RequestID
+}
 
 func InternalGetAcceptedStateSummaryFailed(
 	nodeID ids.NodeID,
@@ -97,8 +107,13 @@ type GetAcceptedFrontierFailed struct {
 	RequestID uint32
 }
 
-func (m *GetAcceptedFrontierFailed) GetChainId() []byte   { return m.ChainID[:] }
-func (m *GetAcceptedFrontierFailed) GetRequestId() uint32 { return m.RequestID }
+func (m *GetAcceptedFrontierFailed) GetChainId() []byte {
+	return m.ChainID[:]
+}
+
+func (m *GetAcceptedFrontierFailed) GetRequestId() uint32 {
+	return m.RequestID
+}
 
 func InternalGetAcceptedFrontierFailed(
 	nodeID ids.NodeID,
@@ -121,8 +136,13 @@ type GetAcceptedFailed struct {
 	RequestID uint32
 }
 
-func (m *GetAcceptedFailed) GetChainId() []byte   { return m.ChainID[:] }
-func (m *GetAcceptedFailed) GetRequestId() uint32 { return m.RequestID }
+func (m *GetAcceptedFailed) GetChainId() []byte {
+	return m.ChainID[:]
+}
+
+func (m *GetAcceptedFailed) GetRequestId() uint32 {
+	return m.RequestID
+}
 
 func InternalGetAcceptedFailed(
 	nodeID ids.NodeID,
@@ -145,8 +165,13 @@ type GetAncestorsFailed struct {
 	RequestID uint32
 }
 
-func (m *GetAncestorsFailed) GetChainId() []byte   { return m.ChainID[:] }
-func (m *GetAncestorsFailed) GetRequestId() uint32 { return m.RequestID }
+func (m *GetAncestorsFailed) GetChainId() []byte {
+	return m.ChainID[:]
+}
+
+func (m *GetAncestorsFailed) GetRequestId() uint32 {
+	return m.RequestID
+}
 
 func InternalGetAncestorsFailed(
 	nodeID ids.NodeID,
@@ -169,8 +194,13 @@ type GetFailed struct {
 	RequestID uint32
 }
 
-func (m *GetFailed) GetChainId() []byte   { return m.ChainID[:] }
-func (m *GetFailed) GetRequestId() uint32 { return m.RequestID }
+func (m *GetFailed) GetChainId() []byte {
+	return m.ChainID[:]
+}
+
+func (m *GetFailed) GetRequestId() uint32 {
+	return m.RequestID
+}
 
 func InternalGetFailed(
 	nodeID ids.NodeID,
@@ -193,8 +223,13 @@ type QueryFailed struct {
 	RequestID uint32
 }
 
-func (m *QueryFailed) GetChainId() []byte   { return m.ChainID[:] }
-func (m *QueryFailed) GetRequestId() uint32 { return m.RequestID }
+func (m *QueryFailed) GetChainId() []byte {
+	return m.ChainID[:]
+}
+
+func (m *QueryFailed) GetRequestId() uint32 {
+	return m.RequestID
+}
 
 func InternalQueryFailed(
 	nodeID ids.NodeID,
@@ -217,8 +252,13 @@ type AppRequestFailed struct {
 	RequestID uint32
 }
 
-func (m *AppRequestFailed) GetChainId() []byte   { return m.ChainID[:] }
-func (m *AppRequestFailed) GetRequestId() uint32 { return m.RequestID }
+func (m *AppRequestFailed) GetChainId() []byte {
+	return m.ChainID[:]
+}
+
+func (m *AppRequestFailed) GetRequestId() uint32 {
+	return m.RequestID
+}
 
 func InternalAppRequestFailed(
 	nodeID ids.NodeID,
@@ -243,9 +283,17 @@ type CrossChainAppRequest struct {
 	Message            []byte
 }
 
-func (m *CrossChainAppRequest) GetSourceChainID() ids.ID { return m.SourceChainID }
-func (m *CrossChainAppRequest) GetChainId() []byte       { return m.DestinationChainID[:] }
-func (m *CrossChainAppRequest) GetRequestId() uint32     { return m.RequestID }
+func (m *CrossChainAppRequest) GetSourceChainID() ids.ID {
+	return m.SourceChainID
+}
+
+func (m *CrossChainAppRequest) GetChainId() []byte {
+	return m.DestinationChainID[:]
+}
+
+func (m *CrossChainAppRequest) GetRequestId() uint32 {
+	return m.RequestID
+}
 
 func InternalCrossChainAppRequest(
 	nodeID ids.NodeID,
@@ -274,9 +322,17 @@ type CrossChainAppRequestFailed struct {
 	RequestID          uint32
 }
 
-func (m *CrossChainAppRequestFailed) GetSourceChainID() ids.ID { return m.SourceChainID }
-func (m *CrossChainAppRequestFailed) GetChainId() []byte       { return m.DestinationChainID[:] }
-func (m *CrossChainAppRequestFailed) GetRequestId() uint32     { return m.RequestID }
+func (m *CrossChainAppRequestFailed) GetSourceChainID() ids.ID {
+	return m.SourceChainID
+}
+
+func (m *CrossChainAppRequestFailed) GetChainId() []byte {
+	return m.DestinationChainID[:]
+}
+
+func (m *CrossChainAppRequestFailed) GetRequestId() uint32 {
+	return m.RequestID
+}
 
 func InternalCrossChainAppRequestFailed(
 	nodeID ids.NodeID,
@@ -303,9 +359,17 @@ type CrossChainAppResponse struct {
 	Message            []byte
 }
 
-func (m *CrossChainAppResponse) GetSourceChainID() ids.ID { return m.SourceChainID }
-func (m *CrossChainAppResponse) GetChainId() []byte       { return m.DestinationChainID[:] }
-func (m *CrossChainAppResponse) GetRequestId() uint32     { return m.RequestID }
+func (m *CrossChainAppResponse) GetSourceChainID() ids.ID {
+	return m.SourceChainID
+}
+
+func (m *CrossChainAppResponse) GetChainId() []byte {
+	return m.DestinationChainID[:]
+}
+
+func (m *CrossChainAppResponse) GetRequestId() uint32 {
+	return m.RequestID
+}
 
 func InternalCrossChainAppResponse(
 	nodeID ids.NodeID,

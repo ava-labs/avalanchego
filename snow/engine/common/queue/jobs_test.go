@@ -25,8 +25,10 @@ const bootstrapProgressCheckpointSize = 55
 
 func testJob(t *testing.T, jobID ids.ID, executed *bool, parentID ids.ID, parentExecuted *bool) *TestJob {
 	return &TestJob{
-		T:   t,
-		IDF: func() ids.ID { return jobID },
+		T: t,
+		IDF: func() ids.ID {
+			return jobID
+		},
 		MissingDependenciesF: func(context.Context) (ids.Set, error) {
 			if parentID != ids.Empty && !*parentExecuted {
 				return ids.Set{parentID: struct{}{}}, nil
@@ -45,7 +47,9 @@ func testJob(t *testing.T, jobID ids.ID, executed *bool, parentID ids.ID, parent
 			}
 			return nil
 		},
-		BytesF: func() []byte { return []byte{0} },
+		BytesF: func() []byte {
+			return []byte{0}
+		},
 	}
 }
 
@@ -159,7 +163,9 @@ func TestRemoveDependency(t *testing.T) {
 
 	job0 := testJob(t, job0ID, &executed0, ids.Empty, nil)
 	job1 := testJob(t, job1ID, &executed1, job0ID, &executed0)
-	job1.BytesF = func() []byte { return []byte{1} }
+	job1.BytesF = func() []byte {
+		return []byte{1}
+	}
 
 	pushed, err := jobs.Push(context.Background(), job1)
 	require.True(pushed)
@@ -343,8 +349,14 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	job1ID, executed1 := ids.GenerateTestID(), false
 	job0 := testJob(t, job0ID, &executed0, ids.Empty, nil)
 	job1 := testJob(t, job1ID, &executed1, job0ID, &executed0)
-	job1.ExecuteF = func(context.Context) error { return database.ErrClosed } // job1 fails to execute the first time due to a closed database
-	job1.BytesF = func() []byte { return []byte{1} }
+
+	// job1 fails to execute the first time due to a closed database
+	job1.ExecuteF = func(context.Context) error {
+		return database.ErrClosed
+	}
+	job1.BytesF = func() []byte {
+		return []byte{1}
+	}
 
 	pushed, err := jobs.Push(context.Background(), job1)
 	require.True(pushed)
@@ -382,7 +394,10 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	require.False(executed1)
 
 	executed0 = false
-	job1.ExecuteF = func(context.Context) error { executed1 = true; return nil } // job1 succeeds the second time
+	job1.ExecuteF = func(context.Context) error {
+		executed1 = true // job1 succeeds the second time
+		return nil
+	}
 
 	// Create jobs queue from the same database and ensure that the jobs queue
 	// recovers correctly.
@@ -433,18 +448,34 @@ func TestInitializeNumJobs(t *testing.T) {
 	job0 := &TestJob{
 		T: t,
 
-		IDF:                     func() ids.ID { return job0ID },
-		MissingDependenciesF:    func(context.Context) (ids.Set, error) { return nil, nil },
-		HasMissingDependenciesF: func(context.Context) (bool, error) { return false, nil },
-		BytesF:                  func() []byte { return []byte{0} },
+		IDF: func() ids.ID {
+			return job0ID
+		},
+		MissingDependenciesF: func(context.Context) (ids.Set, error) {
+			return nil, nil
+		},
+		HasMissingDependenciesF: func(context.Context) (bool, error) {
+			return false, nil
+		},
+		BytesF: func() []byte {
+			return []byte{0}
+		},
 	}
 	job1 := &TestJob{
 		T: t,
 
-		IDF:                     func() ids.ID { return job1ID },
-		MissingDependenciesF:    func(context.Context) (ids.Set, error) { return nil, nil },
-		HasMissingDependenciesF: func(context.Context) (bool, error) { return false, nil },
-		BytesF:                  func() []byte { return []byte{1} },
+		IDF: func() ids.ID {
+			return job1ID
+		},
+		MissingDependenciesF: func(context.Context) (ids.Set, error) {
+			return nil, nil
+		},
+		HasMissingDependenciesF: func(context.Context) (bool, error) {
+			return false, nil
+		},
+		BytesF: func() []byte {
+			return []byte{1}
+		},
 	}
 
 	pushed, err := jobs.Push(context.Background(), job0)
@@ -490,7 +521,9 @@ func TestClearAll(t *testing.T) {
 	job1ID, executed1 := ids.GenerateTestID(), false
 	job0 := testJob(t, job0ID, &executed0, ids.Empty, nil)
 	job1 := testJob(t, job1ID, &executed1, job0ID, &executed0)
-	job1.BytesF = func() []byte { return []byte{1} }
+	job1.BytesF = func() []byte {
+		return []byte{1}
+	}
 
 	pushed, err := jobs.Push(context.Background(), job0)
 	require.NoError(err)

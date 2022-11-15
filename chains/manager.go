@@ -251,7 +251,9 @@ func New(config *ManagerConfig) Manager {
 }
 
 // Router that this chain manager is using to route consensus messages to chains
-func (m *manager) Router() router.Router { return m.ManagerConfig.Router }
+func (m *manager) Router() router.Router {
+	return m.ManagerConfig.Router
+}
 
 // QueueChainCreation queues a chain creation request
 // Invariant: Whitelisted Subnet must be checked before calling this function
@@ -370,7 +372,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 	// Allows messages to be routed to the new chain. If the handler hasn't been
 	// started and a message is forwarded, then the message will block until the
 	// handler is started.
-	m.ManagerConfig.Router.AddChain(chain.Handler)
+	m.ManagerConfig.Router.AddChain(context.TODO(), chain.Handler)
 
 	// Register bootstrapped health checks after P chain has been added to
 	// chains.
@@ -380,7 +382,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 	//       the manager.
 	if chainParams.ID == constants.PlatformChainID {
 		if err := m.registerBootstrappedHealthChecks(); err != nil {
-			chain.Handler.StopWithError(err)
+			chain.Handler.StopWithError(context.TODO(), err)
 		}
 	}
 
@@ -553,7 +555,9 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	return chain, nil
 }
 
-func (m *manager) AddRegistrant(r Registrant) { m.registrants = append(m.registrants, r) }
+func (m *manager) AddRegistrant(r Registrant) {
+	m.registrants = append(m.registrants, r)
+}
 
 // Create a DAG-based blockchain that uses Avalanche
 func (m *manager) createAvalancheChain(
@@ -862,7 +866,9 @@ func (m *manager) createSnowmanChain(
 		//
 		// The snowman bootstrapper ensures this function is only executed once, so
 		// we don't need to be concerned about closing this channel multiple times.
-		bootstrapFunc = func() { close(m.unblockChainCreatorCh) }
+		bootstrapFunc = func() {
+			close(m.unblockChainCreatorCh)
+		}
 	}
 
 	// Initialize the ProposerVM and the vm wrapped inside it
@@ -1131,11 +1137,13 @@ func (m *manager) closeChainCreator() {
 func (m *manager) Shutdown() {
 	m.Log.Info("shutting down chain manager")
 	m.closeChainCreator()
-	m.ManagerConfig.Router.Shutdown()
+	m.ManagerConfig.Router.Shutdown(context.TODO())
 }
 
 // LookupVM returns the ID of the VM associated with an alias
-func (m *manager) LookupVM(alias string) (ids.ID, error) { return m.VMManager.Lookup(alias) }
+func (m *manager) LookupVM(alias string) (ids.ID, error) {
+	return m.VMManager.Lookup(alias)
+}
 
 // Notify registrants [those who want to know about the creation of chains]
 // that the specified chain has been created

@@ -546,7 +546,7 @@ type InternalHandler interface {
 	// This function will be called before the environment starts exiting. This
 	// function is slightly special, in that it does not expect the chain's
 	// context lock to be held before calling this function.
-	Halt()
+	Halt(context.Context)
 
 	// Shutdown this engine.
 	//

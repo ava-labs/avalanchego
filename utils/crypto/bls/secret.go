@@ -50,7 +50,9 @@ func SecretKeyFromBytes(skBytes []byte) (*SecretKey, error) {
 	if sk == nil {
 		return nil, errFailedSecretKeyDeserialize
 	}
-	runtime.SetFinalizer(sk, func(sk *SecretKey) { sk.Zeroize() })
+	runtime.SetFinalizer(sk, func(sk *SecretKey) {
+		sk.Zeroize()
+	})
 	return sk, nil
 }
 

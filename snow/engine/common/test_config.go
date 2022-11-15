@@ -14,8 +14,12 @@ import (
 func DefaultConfigTest() Config {
 	isBootstrapped := false
 	subnet := &SubnetTest{
-		IsBootstrappedF: func() bool { return isBootstrapped },
-		BootstrappedF:   func(ids.ID) { isBootstrapped = true },
+		IsBootstrappedF: func() bool {
+			return isBootstrapped
+		},
+		BootstrappedF: func(ids.ID) {
+			isBootstrapped = true
+		},
 	}
 
 	beacons := validators.NewSet()

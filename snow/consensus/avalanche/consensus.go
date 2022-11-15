@@ -30,9 +30,6 @@ type Consensus interface {
 	// the join status map.
 	Initialize(context.Context, *snow.ConsensusContext, Parameters, []Vertex) error
 
-	// Returns the parameters that describe this avalanche instance
-	Parameters() Parameters
-
 	// Returns the number of vertices processing
 	NumProcessing() int
 

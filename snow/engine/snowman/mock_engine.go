@@ -465,15 +465,15 @@ func (mr *MockEngineMockRecorder) Gossip(arg0 interface{}) *gomock.Call {
 }
 
 // Halt mocks base method.
-func (m *MockEngine) Halt() {
+func (m *MockEngine) Halt(arg0 context.Context) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Halt")
+	m.ctrl.Call(m, "Halt", arg0)
 }
 
 // Halt indicates an expected call of Halt.
-func (mr *MockEngineMockRecorder) Halt() *gomock.Call {
+func (mr *MockEngineMockRecorder) Halt(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Halt", reflect.TypeOf((*MockEngine)(nil).Halt))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Halt", reflect.TypeOf((*MockEngine)(nil).Halt), arg0)
 }
 
 // HealthCheck mocks base method.

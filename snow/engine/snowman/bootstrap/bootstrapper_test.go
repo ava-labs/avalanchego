@@ -47,9 +47,13 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 
 	isBootstrapped := false
 	subnet := &common.SubnetTest{
-		T:               t,
-		IsBootstrappedF: func() bool { return isBootstrapped },
-		BootstrappedF:   func(ids.ID) { isBootstrapped = true },
+		T: t,
+		IsBootstrappedF: func() bool {
+			return isBootstrapped
+		},
+		BootstrappedF: func(ids.ID) {
+			isBootstrapped = true
+		},
 	}
 
 	sender.CantSendGetAcceptedFrontier = false
@@ -153,7 +157,9 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 		BytesV:  blkBytes0,
 	}
 	vm.CantLastAccepted = false
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) { return blk0.ID(), nil }
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return blk0.ID(), nil
+	}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		require.Equal(blk0.ID(), blkID)
 		return blk0, nil
@@ -169,7 +175,9 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	vm.CantSetState = false
 	vm.CantConnected = true
-	vm.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error { return nil }
+	vm.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
+		return nil
+	}
 
 	frontierRequested := false
 	sender.CantSendGetAcceptedFrontier = false
@@ -225,7 +233,9 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	}
 
 	vm.CantLastAccepted = false
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) { return blk0.ID(), nil }
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return blk0.ID(), nil
+	}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		require.Equal(t, blk0.ID(), blkID)
 		return blk0, nil
@@ -327,7 +337,9 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 
 	vm.CantSetState = false
 	vm.CantLastAccepted = false
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) { return blk0.ID(), nil }
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return blk0.ID(), nil
+	}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		require.Equal(t, blk0.ID(), blkID)
 		return blk0, nil
@@ -486,7 +498,9 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 	}
 
 	vm.CantLastAccepted = false
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) { return blk0.ID(), nil }
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return blk0.ID(), nil
+	}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		require.Equal(t, blk0.ID(), blkID)
 		return blk0, nil
@@ -648,7 +662,9 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 	}
 
 	vm.CantLastAccepted = false
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) { return blk0.ID(), nil }
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return blk0.ID(), nil
+	}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		require.Equal(t, blk0.ID(), blkID)
 		return blk0, nil
@@ -832,7 +848,9 @@ func TestBootstrapperAncestors(t *testing.T) {
 
 	vm.CantSetState = false
 	vm.CantLastAccepted = false
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) { return blk0.ID(), nil }
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return blk0.ID(), nil
+	}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		require.Equal(t, blk0.ID(), blkID)
 		return blk0, nil
@@ -974,7 +992,9 @@ func TestBootstrapperFinalized(t *testing.T) {
 	}
 
 	vm.CantLastAccepted = false
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) { return blk0.ID(), nil }
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return blk0.ID(), nil
+	}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		require.Equal(t, blk0.ID(), blkID)
 		return blk0, nil
@@ -1128,7 +1148,9 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	vm.CantLastAccepted = false
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) { return blk0.ID(), nil }
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return blk0.ID(), nil
+	}
 	parsedBlk1 := false
 	parsedBlk2 := false
 	parsedBlk3 := false
@@ -1302,7 +1324,9 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 		BytesV:  utils.RandomBytes(32),
 	}
 
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) { return blk1.ID(), nil }
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return blk1.ID(), nil
+	}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case blk0.ID():
@@ -1408,7 +1432,9 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 		BytesV:  utils.RandomBytes(32),
 	}
 
-	vm.LastAcceptedF = func(context.Context) (ids.ID, error) { return blk0.ID(), nil }
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return blk0.ID(), nil
+	}
 
 	bsIntf, err := New(
 		context.Background(),
@@ -1431,7 +1457,7 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 		case blk0.ID():
 			return blk0, nil
 		case blk1.ID():
-			bs.Halt()
+			bs.Halt(context.Background())
 			return blk1, nil
 		case blk2.ID():
 			return blk2, nil

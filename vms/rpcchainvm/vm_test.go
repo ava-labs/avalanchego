@@ -181,7 +181,7 @@ func testHTTPPingRequest(target, endpoint string, payload []byte) error {
 	httpClient := new(http.Client)
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to dial test server: %v", err)
+		return fmt.Errorf("failed to dial test server: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -384,7 +384,7 @@ func getTestRPCServer() (*gorillarpc.Server, error) {
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
 	if err := server.RegisterService(&PingService{}, "subnet"); err != nil {
-		return nil, fmt.Errorf("failed to create rpc server %v", err)
+		return nil, fmt.Errorf("failed to create rpc server %w", err)
 	}
 	return server, nil
 }

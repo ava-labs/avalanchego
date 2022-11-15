@@ -86,8 +86,18 @@ func (g *multiGatherer) Register(namespace string, gatherer prometheus.Gatherer)
 
 type sortMetricsData []*dto.MetricFamily
 
-func (m sortMetricsData) Less(i, j int) bool { return *m[i].Name < *m[j].Name }
-func (m sortMetricsData) Len() int           { return len(m) }
-func (m sortMetricsData) Swap(i, j int)      { m[j], m[i] = m[i], m[j] }
+func (m sortMetricsData) Less(i, j int) bool {
+	return *m[i].Name < *m[j].Name
+}
 
-func sortMetrics(m []*dto.MetricFamily) { sort.Sort(sortMetricsData(m)) }
+func (m sortMetricsData) Len() int {
+	return len(m)
+}
+
+func (m sortMetricsData) Swap(i, j int) {
+	m[j], m[i] = m[i], m[j]
+}
+
+func sortMetrics(m []*dto.MetricFamily) {
+	sort.Sort(sortMetricsData(m))
+}
