@@ -18,6 +18,7 @@ linters:
     - asciicheck
     - depguard
     - errcheck
+    - errorlint
     - exportloopref
     - goconst
     - gocritic
@@ -51,6 +52,11 @@ linters:
     # - noctx
 
 linters-settings:
+  errorlint:
+    # Check for plain type assertions and type switches.
+    asserts: false
+    # Check for plain error comparisons.
+    comparison: false
   revive:
     rules:
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#bool-literal-in-expr
