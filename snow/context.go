@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -55,6 +56,8 @@ type Context struct {
 	ValidatorState    validators.State  // interface for P-Chain validators
 	StakingLeafSigner crypto.Signer     // block signer
 	StakingCertLeaf   *x509.Certificate // block certificate
+
+	ProposerRetriever proposer.Retriever
 }
 
 // Expose gatherer interface for unit testing.

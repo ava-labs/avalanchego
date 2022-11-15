@@ -127,4 +127,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/ava-labs/coreth v0.11.1 => github.com/tedim52/coreth 0.1.1
+replace github.com/ava-labs/coreth v0.11.1 => github.com/tedim52/coreth v0.0.0-20221103014814-6e09ec18b961
