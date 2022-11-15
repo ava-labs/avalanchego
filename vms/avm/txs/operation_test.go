@@ -22,7 +22,9 @@ type testOperable struct {
 
 func (*testOperable) InitCtx(*snow.Context) {}
 
-func (o *testOperable) Outs() []verify.State { return o.Outputs }
+func (o *testOperable) Outs() []verify.State {
+	return o.Outputs
+}
 
 func TestOperationVerifyNil(t *testing.T) {
 	op := (*Operation)(nil)

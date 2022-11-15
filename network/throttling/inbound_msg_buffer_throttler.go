@@ -69,7 +69,9 @@ func (t *inboundMsgBufferThrottler) Acquire(ctx context.Context, nodeID ids.Node
 	if t.nodeToNumProcessingMsgs[nodeID] < t.maxProcessingMsgsPerNode {
 		t.nodeToNumProcessingMsgs[nodeID]++
 		t.lock.Unlock()
-		return func() { t.release(nodeID) }
+		return func() {
+			t.release(nodeID)
+		}
 	}
 
 	// We're currently processing the maximum number of
@@ -89,7 +91,9 @@ func (t *inboundMsgBufferThrottler) Acquire(ctx context.Context, nodeID ids.Node
 	case <-closeOnAcquireChan:
 		t.lock.Lock()
 		t.nodeToNumProcessingMsgs[nodeID]++
-		releaseFunc = func() { t.release(nodeID) }
+		releaseFunc = func() {
+			t.release(nodeID)
+		}
 	case <-ctx.Done():
 		t.lock.Lock()
 		delete(t.awaitingAcquire, nodeID)

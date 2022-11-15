@@ -101,7 +101,7 @@ func TestMarkHasRunAndShutdown(t *testing.T) {
 		DecisionAcceptorGroup:  snow.NewAcceptorGroup(logging.NoLog{}),
 		ConsensusAcceptorGroup: snow.NewAcceptorGroup(logging.NoLog{}),
 		APIServer:              &apiServerMock{},
-		ShutdownF:              func() { shutdown.Done() },
+		ShutdownF:              shutdown.Done,
 	}
 
 	idxrIntf, err := NewIndexer(config)

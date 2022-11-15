@@ -38,7 +38,9 @@ func (t *OperationTx) InitCtx(ctx *snow.Context) {
 
 // Operations track which ops this transaction is performing. The returned array
 // should not be modified.
-func (t *OperationTx) Operations() []*Operation { return t.Ops }
+func (t *OperationTx) Operations() []*Operation {
+	return t.Ops
+}
 
 func (t *OperationTx) InputUTXOs() []*avax.UTXOID {
 	utxos := t.BaseTx.InputUTXOs()

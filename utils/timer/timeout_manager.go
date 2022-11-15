@@ -34,10 +34,14 @@ func (tm *TimeoutManager) Initialize(duration time.Duration) {
 	tm.timer = NewTimer(tm.Timeout)
 }
 
-func (tm *TimeoutManager) Dispatch() { tm.timer.Dispatch() }
+func (tm *TimeoutManager) Dispatch() {
+	tm.timer.Dispatch()
+}
 
 // Stop executing timeouts
-func (tm *TimeoutManager) Stop() { tm.timer.Stop() }
+func (tm *TimeoutManager) Stop() {
+	tm.timer.Stop()
+}
 
 // Put puts hash into the hash map
 func (tm *TimeoutManager) Put(id ids.ID, handler func()) {

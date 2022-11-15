@@ -36,11 +36,15 @@ type Database struct {
 }
 
 // New returns a map with the Database interface methods implemented.
-func New() *Database { return NewWithSize(DefaultSize) }
+func New() *Database {
+	return NewWithSize(DefaultSize)
+}
 
 // NewWithSize returns a map pre-allocated to the provided size with the
 // Database interface methods implemented.
-func NewWithSize(size int) *Database { return &Database{db: make(map[string][]byte, size)} }
+func NewWithSize(size int) *Database {
+	return &Database{db: make(map[string][]byte, size)}
+}
 
 func (db *Database) Close() error {
 	db.lock.Lock()
@@ -106,7 +110,9 @@ func (db *Database) Delete(key []byte) error {
 	return nil
 }
 
-func (db *Database) NewBatch() database.Batch { return &batch{db: db} }
+func (db *Database) NewBatch() database.Batch {
+	return &batch{db: db}
+}
 
 func (db *Database) NewIterator() database.Iterator {
 	return db.NewIteratorWithStartAndPrefix(nil, nil)
@@ -189,7 +195,9 @@ func (b *batch) Delete(key []byte) error {
 	return nil
 }
 
-func (b *batch) Size() int { return b.size }
+func (b *batch) Size() int {
+	return b.size
+}
 
 func (b *batch) Write() error {
 	b.db.lock.Lock()
@@ -233,7 +241,9 @@ func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
 }
 
 // Inner returns itself
-func (b *batch) Inner() database.Batch { return b }
+func (b *batch) Inner() database.Batch {
+	return b
+}
 
 type iterator struct {
 	db          *Database
@@ -267,7 +277,9 @@ func (it *iterator) Next() bool {
 	return len(it.keys) > 0
 }
 
-func (it *iterator) Error() error { return it.err }
+func (it *iterator) Error() error {
+	return it.err
+}
 
 func (it *iterator) Key() []byte {
 	if len(it.keys) > 0 {
@@ -283,4 +295,7 @@ func (it *iterator) Value() []byte {
 	return nil
 }
 
-func (it *iterator) Release() { it.keys = nil; it.values = nil }
+func (it *iterator) Release() {
+	it.keys = nil
+	it.values = nil
+}

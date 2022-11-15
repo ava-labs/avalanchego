@@ -43,7 +43,9 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 
 	cfg, err := NewConfig(*commonCfg, nil, dummyGetter, nonStateSyncableVM)
 	require.NoError(err)
-	syncer := New(cfg, func(context.Context, uint32) error { return nil })
+	syncer := New(cfg, func(context.Context, uint32) error {
+		return nil
+	})
 
 	enabled, err := syncer.IsEnabled(context.Background())
 	require.NoError(err)
@@ -65,16 +67,22 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 
 	cfg, err = NewConfig(*commonCfg, nil, dummyGetter, fullVM)
 	require.NoError(err)
-	syncer = New(cfg, func(context.Context, uint32) error { return nil })
+	syncer = New(cfg, func(context.Context, uint32) error {
+		return nil
+	})
 
 	// test: VM does not support state syncing
-	fullVM.StateSyncEnabledF = func(context.Context) (bool, error) { return false, nil }
+	fullVM.StateSyncEnabledF = func(context.Context) (bool, error) {
+		return false, nil
+	}
 	enabled, err = syncer.IsEnabled(context.Background())
 	require.NoError(err)
 	require.False(enabled)
 
 	// test: VM does support state syncing
-	fullVM.StateSyncEnabledF = func(context.Context) (bool, error) { return true, nil }
+	fullVM.StateSyncEnabledF = func(context.Context) (bool, error) {
+		return true, nil
+	}
 	enabled, err = syncer.IsEnabled(context.Background())
 	require.NoError(err)
 	require.True(enabled)

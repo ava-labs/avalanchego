@@ -149,7 +149,9 @@ func (s *Serializer) GetVtx(_ context.Context, vtxID ids.ID) (avalanche.Vertex, 
 	return s.getUniqueVertex(vtxID)
 }
 
-func (s *Serializer) Edge(context.Context) []ids.ID { return s.edge.List() }
+func (s *Serializer) Edge(context.Context) []ids.ID {
+	return s.edge.List()
+}
 
 func (s *Serializer) parseVertex(b []byte) (vertex.StatelessVertex, error) {
 	vtx, err := vertex.Parse(b)

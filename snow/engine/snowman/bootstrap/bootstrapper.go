@@ -282,14 +282,18 @@ func (b *bootstrapper) Timeout(ctx context.Context) error {
 	return b.OnFinished(ctx, b.Config.SharedCfg.RequestID)
 }
 
-func (*bootstrapper) Gossip(context.Context) error { return nil }
+func (*bootstrapper) Gossip(context.Context) error {
+	return nil
+}
 
 func (b *bootstrapper) Shutdown(ctx context.Context) error {
 	b.Ctx.Log.Info("shutting down bootstrapper")
 	return b.VM.Shutdown(ctx)
 }
 
-func (*bootstrapper) Notify(context.Context, common.Message) error { return nil }
+func (*bootstrapper) Notify(context.Context, common.Message) error {
+	return nil
+}
 
 func (b *bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
 	vmIntf, vmErr := b.VM.HealthCheck(ctx)
@@ -300,7 +304,9 @@ func (b *bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
 	return intf, vmErr
 }
 
-func (b *bootstrapper) GetVM() common.VM { return b.VM }
+func (b *bootstrapper) GetVM() common.VM {
+	return b.VM
+}
 
 func (b *bootstrapper) ForceAccepted(ctx context.Context, acceptedContainerIDs []ids.ID) error {
 	pendingContainerIDs := b.Blocked.MissingIDs()

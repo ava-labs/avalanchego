@@ -839,7 +839,9 @@ type blockClient struct {
 	time     time.Time
 }
 
-func (b *blockClient) ID() ids.ID { return b.id }
+func (b *blockClient) ID() ids.ID {
+	return b.id
+}
 
 func (b *blockClient) Accept(ctx context.Context) error {
 	b.status = choices.Accepted
@@ -857,9 +859,13 @@ func (b *blockClient) Reject(ctx context.Context) error {
 	return err
 }
 
-func (b *blockClient) Status() choices.Status { return b.status }
+func (b *blockClient) Status() choices.Status {
+	return b.status
+}
 
-func (b *blockClient) Parent() ids.ID { return b.parentID }
+func (b *blockClient) Parent() ids.ID {
+	return b.parentID
+}
 
 func (b *blockClient) Verify(ctx context.Context) error {
 	resp, err := b.vm.client.BlockVerify(ctx, &vmpb.BlockVerifyRequest{
@@ -873,9 +879,17 @@ func (b *blockClient) Verify(ctx context.Context) error {
 	return err
 }
 
-func (b *blockClient) Bytes() []byte        { return b.bytes }
-func (b *blockClient) Height() uint64       { return b.height }
-func (b *blockClient) Timestamp() time.Time { return b.time }
+func (b *blockClient) Bytes() []byte {
+	return b.bytes
+}
+
+func (b *blockClient) Height() uint64 {
+	return b.height
+}
+
+func (b *blockClient) Timestamp() time.Time {
+	return b.time
+}
 
 type summaryClient struct {
 	vm *VMClient
@@ -885,9 +899,17 @@ type summaryClient struct {
 	bytes  []byte
 }
 
-func (s *summaryClient) ID() ids.ID     { return s.id }
-func (s *summaryClient) Height() uint64 { return s.height }
-func (s *summaryClient) Bytes() []byte  { return s.bytes }
+func (s *summaryClient) ID() ids.ID {
+	return s.id
+}
+
+func (s *summaryClient) Height() uint64 {
+	return s.height
+}
+
+func (s *summaryClient) Bytes() []byte {
+	return s.bytes
+}
 
 func (s *summaryClient) Accept(ctx context.Context) (bool, error) {
 	resp, err := s.vm.client.StateSummaryAccept(

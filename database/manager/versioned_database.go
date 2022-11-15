@@ -28,7 +28,14 @@ func (dbs innerSortDescendingVersionedDBs) Less(i, j int) bool {
 	return dbs[i].Version.Compare(dbs[j].Version) > 0
 }
 
-func (dbs innerSortDescendingVersionedDBs) Len() int      { return len(dbs) }
-func (dbs innerSortDescendingVersionedDBs) Swap(i, j int) { dbs[j], dbs[i] = dbs[i], dbs[j] }
+func (dbs innerSortDescendingVersionedDBs) Len() int {
+	return len(dbs)
+}
 
-func SortDescending(dbs []*VersionedDatabase) { sort.Sort(innerSortDescendingVersionedDBs(dbs)) }
+func (dbs innerSortDescendingVersionedDBs) Swap(i, j int) {
+	dbs[j], dbs[i] = dbs[i], dbs[j]
+}
+
+func SortDescending(dbs []*VersionedDatabase) {
+	sort.Sort(innerSortDescendingVersionedDBs(dbs))
+}

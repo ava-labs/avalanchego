@@ -67,8 +67,13 @@ func (tx *Tx) Initialize(unsignedBytes, signedBytes []byte) {
 	tx.id = hashing.ComputeHash256Array(signedBytes)
 }
 
-func (tx *Tx) Bytes() []byte { return tx.bytes }
-func (tx *Tx) ID() ids.ID    { return tx.id }
+func (tx *Tx) Bytes() []byte {
+	return tx.bytes
+}
+
+func (tx *Tx) ID() ids.ID {
+	return tx.id
+}
 
 // UTXOs returns the UTXOs transaction is producing.
 func (tx *Tx) UTXOs() []*avax.UTXO {
