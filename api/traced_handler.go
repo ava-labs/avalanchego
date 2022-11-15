@@ -7,6 +7,10 @@ import (
 	"fmt"
 	"net/http"
 
+	"go.opentelemetry.io/otel/attribute"
+
+	oteltrace "go.opentelemetry.io/otel/trace"
+
 	"github.com/ava-labs/avalanchego/trace"
 )
 
@@ -28,7 +32,14 @@ func TraceHandler(h http.Handler, name string, tracer trace.Tracer) http.Handler
 
 func (h *tracedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	ctx, span := h.tracer.Start(ctx, h.serveHTTP)
+	ctx, span := h.tracer.Start(ctx, h.serveHTTP, oteltrace.WithAttributes(
+		attribute.String("method", r.Method),
+		attribute.String("url", r.URL.Redacted()),
+		attribute.String("proto", r.Proto),
+		attribute.String("host", r.Host),
+		attribute.String("remoteAddr", r.RemoteAddr),
+		attribute.String("requestURI", r.RequestURI),
+	))
 	defer span.End()
 
 	r = r.WithContext(ctx)
