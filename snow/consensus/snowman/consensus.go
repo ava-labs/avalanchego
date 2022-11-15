@@ -27,9 +27,6 @@ type Consensus interface {
 		lastAcceptedTime time.Time,
 	) error
 
-	// Returns the parameters that describe this snowman instance
-	Parameters() snowball.Parameters
-
 	// Returns the number of blocks processing
 	NumProcessing() int
 

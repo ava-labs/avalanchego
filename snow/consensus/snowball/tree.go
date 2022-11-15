@@ -59,10 +59,6 @@ func (t *Tree) Initialize(params Parameters, choice ids.ID) {
 	}
 }
 
-func (t *Tree) Parameters() Parameters {
-	return t.params
-}
-
 func (t *Tree) Add(choice ids.ID) {
 	prefix := t.node.DecidedPrefix()
 	// Make sure that we haven't already decided against this new id
