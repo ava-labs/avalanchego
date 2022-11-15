@@ -127,8 +127,7 @@ func (i *issuer) Update(ctx context.Context) {
 	}
 
 	// Issue a poll for this vertex.
-	p := i.t.Consensus.Parameters()
-	vdrs, err := i.t.Validators.Sample(p.K) // Validators to sample
+	vdrs, err := i.t.Validators.Sample(i.t.Params.K) // Validators to sample
 	if err != nil {
 		i.t.Ctx.Log.Error("dropped query",
 			zap.String("reason", "insufficient number of validators"),
