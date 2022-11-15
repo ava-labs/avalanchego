@@ -1,4 +1,4 @@
-FROM bufbuild/buf:1.7.0 AS builder
+FROM bufbuild/buf:1.9.0 AS builder
 
 FROM ubuntu:20.04
 
