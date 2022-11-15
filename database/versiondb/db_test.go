@@ -18,6 +18,13 @@ func TestInterface(t *testing.T) {
 	}
 }
 
+func FuzzInterface(f *testing.F) {
+	for _, test := range database.FuzzTests {
+		baseDB := memdb.New()
+		test(f, New(baseDB))
+	}
+}
+
 func TestIterate(t *testing.T) {
 	baseDB := memdb.New()
 	db := New(baseDB)

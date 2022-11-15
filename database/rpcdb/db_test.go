@@ -79,6 +79,15 @@ func TestInterface(t *testing.T) {
 	}
 }
 
+func FuzzInterface(f *testing.F) {
+	for _, test := range database.FuzzTests {
+		db := setupDB(f)
+		test(f, db.client)
+
+		db.closeFn()
+	}
+}
+
 func BenchmarkInterface(b *testing.B) {
 	for _, size := range database.BenchmarkSizes {
 		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])

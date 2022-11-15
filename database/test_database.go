@@ -51,6 +51,10 @@ var Tests = []func(t *testing.T, db Database){
 	TestManySmallConcurrentKVPairBatches,
 }
 
+var FuzzTests = []func(*testing.F, Database){
+	FuzzKeyValue,
+}
+
 // TestSimpleKeyValue tests to make sure that simple Put + Get + Delete + Has
 // calls return the expected values.
 func TestSimpleKeyValue(t *testing.T, db Database) {
@@ -1328,4 +1332,31 @@ func runConcurrentBatches(
 		eg.Go(batch.Write)
 	}
 	return eg.Wait()
+}
+
+func FuzzKeyValue(f *testing.F, db Database) {
+	f.Fuzz(func(t *testing.T, key []byte, value []byte) {
+		require := require.New(t)
+
+		err := db.Put(key, value)
+		require.NoError(err)
+
+		exists, err := db.Has(key)
+		require.NoError(err)
+		require.True(exists)
+
+		gotVal, err := db.Get(key)
+		require.NoError(err)
+		require.True(bytes.Equal(value, gotVal))
+
+		err = db.Delete(key)
+		require.NoError(err)
+
+		exists, err = db.Has(key)
+		require.NoError(err)
+		require.False(exists)
+
+		_, err = db.Get(key)
+		require.ErrorIs(err, ErrNotFound)
+	})
 }
