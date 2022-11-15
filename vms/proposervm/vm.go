@@ -72,6 +72,7 @@ type VM struct {
 	hIndexer                indexer.HeightIndexer
 	resetHeightIndexOngoing utils.AtomicBool
 
+	proposer.Retriever
 	proposer.Windower
 	tree.Tree
 	scheduler.Scheduler
@@ -160,6 +161,12 @@ func (vm *VM) Initialize(
 	prefixDB := prefixdb.New(dbPrefix, rawDB)
 	vm.db = versiondb.New(prefixDB)
 	vm.State = state.New(vm.db)
+
+	// Initialize the proposer retriever for VM and context
+	proposerRetriever := proposer.NewRetriever(ctx.ValidatorState, ctx.SubnetID, ctx.ChainID)
+	vm.Retriever = proposerRetriever
+	vm.ctx.ProposerRetriever = proposerRetriever
+
 	vm.Windower = proposer.New(ctx.ValidatorState, ctx.SubnetID, ctx.ChainID)
 	vm.Tree = tree.New()
 	innerBlkCache, err := metercacher.New(
