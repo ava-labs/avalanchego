@@ -135,13 +135,13 @@ func initTestProposerVM(
 	valState := &validators.TestState{
 		T: t,
 	}
-	valState.GetMinimumHeightF = func() (uint64, error) {
+	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
 		return coreGenBlk.HeightV, nil
 	}
-	valState.GetCurrentHeightF = func() (uint64, error) {
+	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return defaultPChainHeight, nil
 	}
-	valState.GetValidatorSetF = func(uint64, ids.ID) (map[ids.NodeID]uint64, error) {
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]uint64, error) {
 		res := make(map[ids.NodeID]uint64)
 		res[proVM.ctx.NodeID] = uint64(10)
 		res[ids.NodeID{1}] = uint64(5)
@@ -666,7 +666,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 		}
 	}
 
-	pChainHeight, err := proVM.ctx.ValidatorState.GetCurrentHeight()
+	pChainHeight, err := proVM.ctx.ValidatorState.GetCurrentHeight(context.Background())
 	if err != nil {
 		t.Fatal("could not retrieve pChain height")
 	}
@@ -917,13 +917,13 @@ func TestExpiredBuildBlock(t *testing.T) {
 	valState := &validators.TestState{
 		T: t,
 	}
-	valState.GetMinimumHeightF = func() (uint64, error) {
+	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
 		return coreGenBlk.Height(), nil
 	}
-	valState.GetCurrentHeightF = func() (uint64, error) {
+	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return defaultPChainHeight, nil
 	}
-	valState.GetValidatorSetF = func(uint64, ids.ID) (map[ids.NodeID]uint64, error) {
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]uint64, error) {
 		return map[ids.NodeID]uint64{
 			{1}: 100,
 		}, nil
@@ -1209,10 +1209,10 @@ func TestInnerVMRollback(t *testing.T) {
 	valState := &validators.TestState{
 		T: t,
 	}
-	valState.GetCurrentHeightF = func() (uint64, error) {
+	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return defaultPChainHeight, nil
 	}
-	valState.GetValidatorSetF = func(uint64, ids.ID) (map[ids.NodeID]uint64, error) {
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]uint64, error) {
 		return map[ids.NodeID]uint64{
 			{1}: 100,
 		}, nil
@@ -1404,7 +1404,7 @@ func TestInnerVMRollback(t *testing.T) {
 func TestBuildBlockDuringWindow(t *testing.T) {
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
-	valState.GetValidatorSetF = func(uint64, ids.ID) (map[ids.NodeID]uint64, error) {
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]uint64, error) {
 		return map[ids.NodeID]uint64{
 			proVM.ctx.NodeID: 10,
 		}, nil
@@ -1921,13 +1921,13 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	valState := &validators.TestState{
 		T: t,
 	}
-	valState.GetMinimumHeightF = func() (uint64, error) {
+	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
 		return coreGenBlk.HeightV, nil
 	}
-	valState.GetCurrentHeightF = func() (uint64, error) {
+	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return defaultPChainHeight, nil
 	}
-	valState.GetValidatorSetF = func(uint64, ids.ID) (map[ids.NodeID]uint64, error) {
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]uint64, error) {
 		res := make(map[ids.NodeID]uint64)
 		res[proVM.ctx.NodeID] = uint64(10)
 		res[ids.NodeID{1}] = uint64(5)
@@ -2119,13 +2119,13 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	valState := &validators.TestState{
 		T: t,
 	}
-	valState.GetMinimumHeightF = func() (uint64, error) {
+	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
 		return coreGenBlk.HeightV, nil
 	}
-	valState.GetCurrentHeightF = func() (uint64, error) {
+	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return defaultPChainHeight, nil
 	}
-	valState.GetValidatorSetF = func(uint64, ids.ID) (map[ids.NodeID]uint64, error) {
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]uint64, error) {
 		res := make(map[ids.NodeID]uint64)
 		res[proVM.ctx.NodeID] = uint64(10)
 		res[ids.NodeID{1}] = uint64(5)

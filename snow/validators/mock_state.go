@@ -8,6 +8,7 @@
 package validators
 
 import (
+	context "context"
 	reflect "reflect"
 
 	ids "github.com/ava-labs/avalanchego/ids"
@@ -38,46 +39,46 @@ func (m *MockState) EXPECT() *MockStateMockRecorder {
 }
 
 // GetCurrentHeight mocks base method.
-func (m *MockState) GetCurrentHeight() (uint64, error) {
+func (m *MockState) GetCurrentHeight(arg0 context.Context) (uint64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetCurrentHeight")
+	ret := m.ctrl.Call(m, "GetCurrentHeight", arg0)
 	ret0, _ := ret[0].(uint64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetCurrentHeight indicates an expected call of GetCurrentHeight.
-func (mr *MockStateMockRecorder) GetCurrentHeight() *gomock.Call {
+func (mr *MockStateMockRecorder) GetCurrentHeight(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentHeight", reflect.TypeOf((*MockState)(nil).GetCurrentHeight))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentHeight", reflect.TypeOf((*MockState)(nil).GetCurrentHeight), arg0)
 }
 
 // GetMinimumHeight mocks base method.
-func (m *MockState) GetMinimumHeight() (uint64, error) {
+func (m *MockState) GetMinimumHeight(arg0 context.Context) (uint64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetMinimumHeight")
+	ret := m.ctrl.Call(m, "GetMinimumHeight", arg0)
 	ret0, _ := ret[0].(uint64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetMinimumHeight indicates an expected call of GetMinimumHeight.
-func (mr *MockStateMockRecorder) GetMinimumHeight() *gomock.Call {
+func (mr *MockStateMockRecorder) GetMinimumHeight(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMinimumHeight", reflect.TypeOf((*MockState)(nil).GetMinimumHeight))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMinimumHeight", reflect.TypeOf((*MockState)(nil).GetMinimumHeight), arg0)
 }
 
 // GetValidatorSet mocks base method.
-func (m *MockState) GetValidatorSet(arg0 uint64, arg1 ids.ID) (map[ids.NodeID]uint64, error) {
+func (m *MockState) GetValidatorSet(arg0 context.Context, arg1 uint64, arg2 ids.ID) (map[ids.NodeID]uint64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetValidatorSet", arg0, arg1)
+	ret := m.ctrl.Call(m, "GetValidatorSet", arg0, arg1, arg2)
 	ret0, _ := ret[0].(map[ids.NodeID]uint64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetValidatorSet indicates an expected call of GetValidatorSet.
-func (mr *MockStateMockRecorder) GetValidatorSet(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockStateMockRecorder) GetValidatorSet(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetValidatorSet", reflect.TypeOf((*MockState)(nil).GetValidatorSet), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetValidatorSet", reflect.TypeOf((*MockState)(nil).GetValidatorSet), arg0, arg1, arg2)
 }

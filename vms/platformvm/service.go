@@ -2361,15 +2361,16 @@ type GetValidatorsAtReply struct {
 
 // GetValidatorsAt returns the weights of the validator set of a provided subnet
 // at the specified height.
-func (service *Service) GetValidatorsAt(_ *http.Request, args *GetValidatorsAtArgs, reply *GetValidatorsAtReply) error {
+func (service *Service) GetValidatorsAt(r *http.Request, args *GetValidatorsAtArgs, reply *GetValidatorsAtReply) error {
 	height := uint64(args.Height)
 	service.vm.ctx.Log.Debug("Platform: GetValidatorsAt called",
 		zap.Uint64("height", height),
 		zap.Stringer("subnetID", args.SubnetID),
 	)
 
+	ctx := r.Context()
 	var err error
-	reply.Validators, err = service.vm.GetValidatorSet(height, args.SubnetID)
+	reply.Validators, err = service.vm.GetValidatorSet(ctx, height, args.SubnetID)
 	if err != nil {
 		return fmt.Errorf("couldn't get validator set: %w", err)
 	}

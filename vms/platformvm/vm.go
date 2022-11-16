@@ -449,7 +449,7 @@ func (vm *VM) Disconnected(_ context.Context, vdrID ids.NodeID) error {
 
 // GetValidatorSet returns the validator set at the specified height for the
 // provided subnetID.
-func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
 	validatorSetsCache, exists := vm.validatorSetCaches[subnetID]
 	if !exists {
 		validatorSetsCache = &cache.LRU{Size: validatorSetsCacheSize}
@@ -468,7 +468,7 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.NodeID]ui
 		return validatorSet, nil
 	}
 
-	lastAcceptedHeight, err := vm.GetCurrentHeight()
+	lastAcceptedHeight, err := vm.GetCurrentHeight(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -543,10 +543,10 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.NodeID]ui
 // in the case of a process restart, we default to the lastAccepted block's
 // height which is likely (but not guaranteed) to also be older than the
 // window's configured TTL.
-func (vm *VM) GetMinimumHeight() (uint64, error) {
+func (vm *VM) GetMinimumHeight(ctx context.Context) (uint64, error) {
 	oldest, ok := vm.recentlyAccepted.Oldest()
 	if !ok {
-		return vm.GetCurrentHeight()
+		return vm.GetCurrentHeight(ctx)
 	}
 
 	blk, err := vm.manager.GetBlock(oldest)
@@ -558,7 +558,7 @@ func (vm *VM) GetMinimumHeight() (uint64, error) {
 }
 
 // GetCurrentHeight returns the height of the last accepted block
-func (vm *VM) GetCurrentHeight() (uint64, error) {
+func (vm *VM) GetCurrentHeight(context.Context) (uint64, error) {
 	lastAccepted, err := vm.manager.GetBlock(vm.state.GetLastAccepted())
 	if err != nil {
 		return 0, err

@@ -104,7 +104,7 @@ func (b *preForkBlock) verifyPostForkChild(ctx context.Context, child *postForkB
 
 	childID := child.ID()
 	childPChainHeight := child.PChainHeight()
-	currentPChainHeight, err := b.vm.ctx.ValidatorState.GetCurrentHeight()
+	currentPChainHeight, err := b.vm.ctx.ValidatorState.GetCurrentHeight(ctx)
 	if err != nil {
 		b.vm.ctx.Log.Error("block verification failed",
 			zap.String("reason", "failed to get current P-Chain height"),
@@ -191,7 +191,7 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 
 	// The child's P-Chain height is proposed as the optimal P-Chain height that
 	// is at least the minimum height
-	pChainHeight, err := b.vm.optimalPChainHeight(b.vm.minimumPChainHeight)
+	pChainHeight, err := b.vm.optimalPChainHeight(ctx, b.vm.minimumPChainHeight)
 	if err != nil {
 		return nil, err
 	}

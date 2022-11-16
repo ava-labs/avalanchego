@@ -90,7 +90,7 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	pChainHeight := uint64(100)
-	valState.GetCurrentHeightF = func() (uint64, error) {
+	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return pChainHeight, nil
 	}
 
@@ -198,7 +198,7 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	pChainHeight := uint64(100)
-	valState.GetCurrentHeightF = func() (uint64, error) {
+	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return pChainHeight, nil
 	}
 
@@ -289,7 +289,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	}
 
 	// block cannot arrive before its creator window starts
-	blkWinDelay, err := proVM.Delay(childCoreBlk.Height(), pChainHeight, proVM.ctx.NodeID)
+	blkWinDelay, err := proVM.Delay(context.Background(), childCoreBlk.Height(), pChainHeight, proVM.ctx.NodeID)
 	if err != nil {
 		t.Fatal("Could not calculate submission window")
 	}
@@ -396,7 +396,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	pChainHeight := uint64(100)
-	valState.GetCurrentHeightF = func() (uint64, error) {
+	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return pChainHeight, nil
 	}
 
@@ -520,7 +520,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	}
 
 	// block P-Chain height can be equal to current P-Chain height
-	currPChainHeight, _ := proVM.ctx.ValidatorState.GetCurrentHeight()
+	currPChainHeight, _ := proVM.ctx.ValidatorState.GetCurrentHeight(context.Background())
 	childSlb, err = block.BuildUnsigned(
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
@@ -554,7 +554,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T) {
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	pChainHeight := uint64(100)
-	valState.GetCurrentHeightF = func() (uint64, error) {
+	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return pChainHeight, nil
 	}
 	// proVM.SetStartTime(timer.MaxTime) // switch off scheduler for current test
@@ -726,7 +726,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 	}
 
 	// block P-Chain height can be equal to current P-Chain height
-	currPChainHeight, _ := proVM.ctx.ValidatorState.GetCurrentHeight()
+	currPChainHeight, _ := proVM.ctx.ValidatorState.GetCurrentHeight(context.Background())
 	childSlb, err = block.BuildUnsigned(
 		parentBlk.ID(),
 		childCoreBlk.Timestamp(),
@@ -762,7 +762,7 @@ func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	// Show that other verify call would not call coreBlk.Verify()
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	pChainHeight := uint64(2000)
-	valState.GetCurrentHeightF = func() (uint64, error) {
+	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return pChainHeight, nil
 	}
 
@@ -826,7 +826,7 @@ func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 	// setup
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	pChainHeight := uint64(2000)
-	valState.GetCurrentHeightF = func() (uint64, error) {
+	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return pChainHeight, nil
 	}
 
@@ -889,7 +889,7 @@ func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t *testing.T) {
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	var minimumHeight uint64
-	valState.GetMinimumHeightF = func() (uint64, error) {
+	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
 		return minimumHeight, nil
 	}
 
