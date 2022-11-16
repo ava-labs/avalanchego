@@ -6,6 +6,7 @@ package evm
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -64,6 +65,7 @@ type stateSyncerClient struct {
 	resumableSummary message.SyncSummary
 
 	cancel context.CancelFunc
+	wg     sync.WaitGroup
 
 	// State Sync results
 	syncSummary  message.SyncSummary
@@ -140,11 +142,7 @@ func (client *stateSyncerClient) ParseStateSummary(summaryBytes []byte) (block.S
 
 // stateSync blockingly performs the state sync for the EVM state and the atomic state
 // to [client.syncSummary]. returns an error if one occurred.
-func (client *stateSyncerClient) stateSync() error {
-	ctx, cancel := context.WithCancel(context.Background())
-	client.cancel = cancel
-	defer cancel()
-
+func (client *stateSyncerClient) stateSync(ctx context.Context) error {
 	if err := client.syncBlocks(ctx, client.syncSummary.BlockHash, client.syncSummary.BlockNumber, parentsToGet); err != nil {
 		return err
 	}
@@ -206,8 +204,16 @@ func (client *stateSyncerClient) acceptSyncSummary(proposedSummary message.SyncS
 	}
 
 	log.Info("Starting state sync", "summary", proposedSummary)
+
+	// create a cancellable ctx for the state sync goroutine
+	ctx, cancel := context.WithCancel(context.Background())
+	client.cancel = cancel
+	client.wg.Add(1) // track the state sync goroutine so we can wait for it on shutdown
 	go func() {
-		if err := client.stateSync(); err != nil {
+		defer client.wg.Done()
+		defer cancel()
+
+		if err := client.stateSync(ctx); err != nil {
 			client.stateSyncErr = err
 		} else {
 			client.stateSyncErr = client.finishSync()
@@ -311,6 +317,7 @@ func (client *stateSyncerClient) Shutdown() error {
 	if client.cancel != nil {
 		client.cancel()
 	}
+	client.wg.Wait() // wait for the background goroutine to exit
 	return nil
 }
 
