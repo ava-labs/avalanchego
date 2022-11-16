@@ -7,20 +7,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/ava-labs/avalanche-network-runner/client"
-	"github.com/ava-labs/avalanche-network-runner/rpcpb"
+	client "github.com/ava-labs/avalanche-network-runner-sdk"
+	"github.com/ava-labs/avalanche-network-runner-sdk/rpcpb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/subnet-evm/tests/e2e/utils"
-	"github.com/onsi/ginkgo/v2/formatter"
 
 	"sigs.k8s.io/yaml"
-)
-
-var (
-	execPath string
-
-	cli client.Client
 )
 
 type clusterInfo struct {
@@ -40,38 +32,17 @@ func (ci clusterInfo) Save(p string) error {
 	return os.WriteFile(p, ob, fsModeWrite)
 }
 
-func GetClient() client.Client {
-	return cli
-}
-
-func InitializeRunner(execPath_ string, grpcEp string, networkRunnerLogLevel string) error {
-	execPath = execPath_
-
-	// Create the logger
-	logLevel, err := logging.ToLevel(networkRunnerLogLevel)
-	if err != nil {
-		return err
-	}
-
-	logFactory := logging.NewFactory(logging.Config{
-		DisplayLevel: logLevel,
-		LogLevel:     logging.Off, // Disable writing logs to files in favor of only writing logs to display
-	})
-	log, err := logFactory.Make("main")
-	if err != nil {
-		return err
-	}
-
-	cli, err = client.New(client.Config{
+func startRunner(grpcEp string, execPath string, vmName string, genesisPath string, pluginDir string) error {
+	cli, err := client.New(client.Config{
+		LogLevel:    "info",
 		Endpoint:    grpcEp,
 		DialTimeout: 10 * time.Second,
-	}, log)
-	return err
-}
+	})
+	if err != nil {
+		return err
+	}
 
-func startRunner(vmName string, genesisPath string, pluginDir string) error {
-	fmt.Println("calling start API via network runner")
-	outf("{{green}}sending 'start' with binary path:{{/}} %q\n", execPath)
+	utils.Outf("{{green}}tests/e2e/runner sending 'start' with binary path:{{/}} %q\n", execPath)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	resp, err := cli.Start(
 		ctx,
@@ -88,11 +59,20 @@ func startRunner(vmName string, genesisPath string, pluginDir string) error {
 	if err != nil {
 		return err
 	}
-	outf("{{green}}successfully started:{{/}} %+v\n", resp.ClusterInfo.NodeNames)
+	utils.Outf("{{green}}successfully started:{{/}} %+v\n", resp.ClusterInfo.NodeNames)
 	return nil
 }
 
-func WaitForCustomVm(vmId ids.ID) (string, string, int, error) {
+func WaitForCustomVm(grpcEp string, vmId ids.ID) (string, string, int, error) {
+	cli, err := client.New(client.Config{
+		LogLevel:    "info",
+		Endpoint:    grpcEp,
+		DialTimeout: 10 * time.Second,
+	})
+	if err != nil {
+		return "", "", 0, err
+	}
+
 	blockchainID, logsDir := "", ""
 	pid := 0
 
@@ -106,7 +86,7 @@ done:
 		case <-time.After(5 * time.Second):
 		}
 
-		outf("{{magenta}}checking custom VM status{{/}}\n")
+		utils.Outf("{{magenta}}checking custom VM status{{/}}\n")
 		cctx, ccancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		resp, err := cli.Health(cctx)
 		ccancel()
@@ -132,12 +112,12 @@ done:
 		for chainID, chainInfo := range resp.ClusterInfo.CustomChains {
 			if chainInfo.VmId == vmId.String() {
 				blockchainID = chainID
-				outf("{{blue}}subnet-evm is ready:{{/}} %+v\n", chainInfo)
+				utils.Outf("{{blue}}subnet-evm is ready:{{/}} %+v\n", chainInfo)
 				break done
 			}
 		}
 	}
-	err := ctx.Err()
+	err = ctx.Err()
 	if err != nil {
 		cancel()
 		return "", "", 0, err
@@ -156,20 +136,29 @@ done:
 	return blockchainID, logsDir, pid, nil
 }
 
-func SaveClusterInfo(blockchainId string, logsDir string, pid int) (clusterInfo, error) {
+func SaveClusterInfo(grpcEp string, blockchainId string, logsDir string, pid int) (clusterInfo, error) {
+	cli, err := client.New(client.Config{
+		LogLevel:    "info",
+		Endpoint:    grpcEp,
+		DialTimeout: 10 * time.Second,
+	})
+	if err != nil {
+		return clusterInfo{}, err
+	}
+
 	cctx, ccancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	uris, err := cli.URIs(cctx)
 	ccancel()
 	if err != nil {
 		return clusterInfo{}, err
 	}
-	outf("{{blue}}avalanche HTTP RPCs URIs:{{/}} %q\n", uris)
+	utils.Outf("{{blue}}avalanche HTTP RPCs URIs:{{/}} %q\n", uris)
 
 	subnetEVMRPCEps := make([]string, 0)
 	for _, u := range uris {
 		rpcEP := fmt.Sprintf("%s/ext/bc/%s/rpc", u, blockchainId)
 		subnetEVMRPCEps = append(subnetEVMRPCEps, rpcEP)
-		outf("{{blue}}avalanche subnet-evm RPC:{{/}} %q\n", rpcEP)
+		utils.Outf("{{blue}}avalanche subnet-evm RPC:{{/}} %q\n", rpcEP)
 	}
 
 	ci := clusterInfo{
@@ -185,40 +174,53 @@ func SaveClusterInfo(blockchainId string, logsDir string, pid int) (clusterInfo,
 	return ci, nil
 }
 
-func StartNetwork(vmId ids.ID, vmName string, genesisPath string, pluginDir string) (clusterInfo, error) {
+func StartNetwork(grpcEp string, execPath string, vmId ids.ID, vmName string, genesisPath string, pluginDir string) (clusterInfo, error) {
 	fmt.Println("Starting network")
-	startRunner(vmName, genesisPath, pluginDir)
+	startRunner(grpcEp, execPath, vmName, genesisPath, pluginDir)
 
-	blockchainId, logsDir, pid, err := WaitForCustomVm(vmId)
+	blockchainId, logsDir, pid, err := WaitForCustomVm(grpcEp, vmId)
 	if err != nil {
 		return clusterInfo{}, err
 	}
 	fmt.Println("Got custom vm")
 
-	return SaveClusterInfo(blockchainId, logsDir, pid)
+	return SaveClusterInfo(grpcEp, blockchainId, logsDir, pid)
 }
 
-func StopNetwork() error {
-	outf("{{red}}shutting down network{{/}}\n")
+func StopNetwork(grpcEp string) error {
+	cli, err := client.New(client.Config{
+		LogLevel:    "info",
+		Endpoint:    grpcEp,
+		DialTimeout: 10 * time.Second,
+	})
+	if err != nil {
+		return err
+	}
+
+	utils.Outf("{{red}}shutting down network{{/}}\n")
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	_, err := cli.Stop(ctx)
+	_, err = cli.Stop(ctx)
 	cancel()
 	return err
 }
 
 func ShutdownClient() error {
-	outf("{{red}}shutting down client{{/}}\n")
-	return cli.Close()
+	utils.Outf("{{red}}shutting down client{{/}}\n")
+	return nil
 }
 
-func outf(format string, args ...interface{}) {
-	s := formatter.F(format, args...)
-	fmt.Fprint(formatter.ColorableStdOut, s)
-}
+func IsRunnerUp(grpcEp string) bool {
+	cli, err := client.New(client.Config{
+		LogLevel:    "info",
+		Endpoint:    grpcEp,
+		DialTimeout: 10 * time.Second,
+	})
+	if err != nil {
+		return false
+	}
 
-func IsRunnerUp() bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	_, err := cli.Health(ctx)
+	_, err = cli.Health(ctx)
 	cancel()
 	return err == nil
 }

@@ -47,3 +47,12 @@ issues:
     - path: cmd/faucet/
       linters:
         - deadcode
+    - path: core/types/gen_account_rlp.go
+      linters:
+        - goimports
+    - path: core/types/gen_header_rlp.go
+      linters:
+        - goimports
+    - path: core/types/gen_log_rlp.go
+      linters:
+        - goimports

@@ -97,7 +97,7 @@ This will clone and checkout to `master` branch.
 and creates a `subnet-evm` genesis file. The usage of this script is
 
 ```bash
-./scripts/run.sh [AVALANCHEGO VERSION] [GENESIS_ADDRESS]
+DEFAULT_ACCOUNT=[GENESIS_ADDRESS] ./scripts/run.sh [AVALANCHEGO VERSION]
 ```
 
 ```bash
@@ -105,8 +105,11 @@ and creates a `subnet-evm` genesis file. The usage of this script is
 cd ${HOME}/go/src/github.com/ava-labs/subnet-evm
 git pull
 
-# TODO: update the "avalanchego" version to latest
-SKIP_NETWORK_RUNNER_SHUTDOWN=true ./scripts/run.sh 1.7.17 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
+# to use the latest version "scripts/versions.sh"
+./scripts/run.sh
+
+# to specify the version and default account for genesis
+DEFAULT_ACCOUNT=0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC ./scripts/run.sh 1.9.2
 ```
 
 Note: make sure you check the version compatibility above between AvalancheGo and Subnet-evm and use the proper version of AvalancheGo.
@@ -226,7 +229,7 @@ Once your config is specified, you can run the tool by either invoking `go run m
 
 To make getting started easier, the ewoq key `0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC`
 has been pre-added to the simulator key directory and can be added to genesis during local network
-creation (`./scripts/run.sh [AVALANCHEGO VERSION] 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC`).
+creation (`DEFAULT_ACCOUNT=[GENESIS_ADDRESS] ./scripts/run.sh [AVALANCHEGO VERSION]`).
 If you do not add this key to genesis, you'll need to manually fund the
 `master` account when prompted in the terminal.
 

@@ -39,6 +39,7 @@ type rpcFile struct {
 
 const (
 	DYNAMIC_RPC_FILE = "contract-examples/dynamic_rpc.json"
+	LOCAL_RPC_FILE   = "contract-examples/local_rpc.json"
 )
 
 func writeRPC(rpcUrl string) error {
@@ -52,6 +53,10 @@ func writeRPC(rpcUrl string) error {
 	}
 
 	err = ioutil.WriteFile(DYNAMIC_RPC_FILE, file, 0644)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(LOCAL_RPC_FILE, file, 0644)
 	return err
 }
 

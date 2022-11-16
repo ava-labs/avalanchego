@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v3
-      - run: ./scripts/lint_allowed_geth_imports.sh 
+      - run: ./scripts/lint_allowed_geth_imports.sh
         shell: bash
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
@@ -79,12 +79,16 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: 1.18
+      - name: Install dependencies with go module
+        shell: bash
+        run: go mod download
       - name: Run simulator tests
         shell: bash
+        # skip shutdown so external simulator binary can run against the existing cluster
         run: SKIP_NETWORK_RUNNER_SHUTDOWN=true RUN_SIMULATOR=true scripts/run.sh
 
   release:
-    # needs: [lint_test, simulator_test] # TODO: re-add after flaky tests are fixed (unit_test, e2e_test)
+    # needs: [lint_test, unit_test, e2e_test, simulator_test]
     runs-on: ubuntu-latest
     steps:
       - name: Git checkout

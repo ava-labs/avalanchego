@@ -35,7 +35,7 @@ var (
 	keysDir string
 
 	clusterInfoYamlPath string
-	rpcEndpoints            []string
+	rpcEndpoints        []string
 
 	concurrency int
 	baseFee     uint64
