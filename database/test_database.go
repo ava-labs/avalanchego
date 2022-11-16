@@ -49,6 +49,7 @@ var Tests = []func(t *testing.T, db Database){
 	TestModifyValueAfterBatchPutReplay,
 	TestConcurrentBatches,
 	TestManySmallConcurrentKVPairBatches,
+	TestPutGetEmpty,
 }
 
 var FuzzTests = []func(*testing.F, Database){
@@ -1332,6 +1333,26 @@ func runConcurrentBatches(
 		eg.Go(batch.Write)
 	}
 	return eg.Wait()
+}
+
+func TestPutGetEmpty(t *testing.T, db Database) {
+	require := require.New(t)
+
+	key := []byte("hello")
+
+	err := db.Put(key, nil)
+	require.NoError(err)
+
+	value, err := db.Get(key)
+	require.NoError(err)
+	require.Empty(value) // May be nil or empty byte slice.
+
+	err = db.Put(key, []byte{})
+	require.NoError(err)
+
+	value, err = db.Get(key)
+	require.NoError(err)
+	require.Empty(value) // May be nil or empty byte slice.
 }
 
 func FuzzKeyValue(f *testing.F, db Database) {
