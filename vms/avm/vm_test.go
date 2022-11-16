@@ -5,6 +5,7 @@ package avm
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"math"
 	"testing"
@@ -311,6 +312,7 @@ func GenesisVMWithArgs(tb testing.TB, additionalFxs []*common.Fx, args *BuildGen
 		tb.Fatal("should not have caused error in creating avm config bytes")
 	}
 	err = vm.Initialize(
+		context.Background(),
 		ctx,
 		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
@@ -337,11 +339,11 @@ func GenesisVMWithArgs(tb testing.TB, additionalFxs []*common.Fx, args *BuildGen
 	}
 	vm.batchTimeout = 0
 
-	if err := vm.SetState(snow.Bootstrapping); err != nil {
+	if err := vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
 		tb.Fatal(err)
 	}
 
-	if err := vm.SetState(snow.NormalOp); err != nil {
+	if err := vm.SetState(context.Background(), snow.NormalOp); err != nil {
 		tb.Fatal(err)
 	}
 
@@ -465,13 +467,14 @@ func TestInvalidGenesis(t *testing.T) {
 	ctx := NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		ctx.Lock.Unlock()
 	}()
 
 	err := vm.Initialize(
+		context.Background(),
 		ctx,                                     // context
 		manager.NewMemDB(version.Semantic1_0_0), // dbManager
 		nil,                                     // genesisState
@@ -491,7 +494,7 @@ func TestInvalidFx(t *testing.T) {
 	ctx := NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		ctx.Lock.Unlock()
@@ -499,6 +502,7 @@ func TestInvalidFx(t *testing.T) {
 
 	genesisBytes := BuildGenesisTest(t)
 	err := vm.Initialize(
+		context.Background(),
 		ctx,                                     // context
 		manager.NewMemDB(version.Semantic1_0_0), // dbManager
 		genesisBytes,                            // genesisState
@@ -520,7 +524,7 @@ func TestFxInitializationFailure(t *testing.T) {
 	ctx := NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		ctx.Lock.Unlock()
@@ -528,6 +532,7 @@ func TestFxInitializationFailure(t *testing.T) {
 
 	genesisBytes := BuildGenesisTest(t)
 	err := vm.Initialize(
+		context.Background(),
 		ctx,                                     // context
 		manager.NewMemDB(version.Semantic1_0_0), // dbManager
 		genesisBytes,                            // genesisState
@@ -553,7 +558,7 @@ func TestIssueTx(t *testing.T) {
 	genesisBytes, issuer, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		ctx.Lock.Unlock()
@@ -576,7 +581,8 @@ func TestIssueTx(t *testing.T) {
 	}
 	ctx.Lock.Lock()
 
-	if txs := vm.PendingTxs(); len(txs) != 1 {
+	txs := vm.PendingTxs(context.Background())
+	if len(txs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)
 	}
 }
@@ -586,7 +592,7 @@ func TestIssueTx(t *testing.T) {
 func TestIssueDependentTx(t *testing.T) {
 	issuer, vm, ctx, txs := setupIssueTx(t)
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		ctx.Lock.Unlock()
@@ -610,7 +616,8 @@ func TestIssueDependentTx(t *testing.T) {
 	}
 	ctx.Lock.Lock()
 
-	if txs := vm.PendingTxs(); len(txs) != 2 {
+	pendingTxs := vm.PendingTxs(context.Background())
+	if len(pendingTxs) != 2 {
 		t.Fatalf("Should have returned %d tx(s)", 2)
 	}
 }
@@ -621,7 +628,7 @@ func TestIssueNFT(t *testing.T) {
 	ctx := NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		ctx.Lock.Unlock()
@@ -630,6 +637,7 @@ func TestIssueNFT(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
+		context.Background(),
 		ctx,
 		manager.NewMemDB(version.Semantic1_0_0),
 		genesisBytes,
@@ -653,12 +661,12 @@ func TestIssueNFT(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	err = vm.SetState(snow.Bootstrapping)
+	err = vm.SetState(context.Background(), snow.Bootstrapping)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(snow.NormalOp)
+	err = vm.SetState(context.Background(), snow.NormalOp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -769,7 +777,7 @@ func TestIssueProperty(t *testing.T) {
 	ctx := NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		ctx.Lock.Unlock()
@@ -778,6 +786,7 @@ func TestIssueProperty(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
+		context.Background(),
 		ctx,
 		manager.NewMemDB(version.Semantic1_0_0),
 		genesisBytes,
@@ -805,12 +814,12 @@ func TestIssueProperty(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	err = vm.SetState(snow.Bootstrapping)
+	err = vm.SetState(context.Background(), snow.Bootstrapping)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(snow.NormalOp)
+	err = vm.SetState(context.Background(), snow.NormalOp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -969,7 +978,7 @@ func TestIssueTxWithFeeAsset(t *testing.T) {
 	genesisBytes, issuer, vm, _ := setupTxFeeAssets(t)
 	ctx := vm.ctx
 	defer func() {
-		err := vm.Shutdown()
+		err := vm.Shutdown(context.Background())
 		require.NoError(t, err)
 		ctx.Lock.Unlock()
 	}()
@@ -986,15 +995,16 @@ func TestIssueTxWithFeeAsset(t *testing.T) {
 	require.Equal(t, msg, common.PendingTxs)
 
 	ctx.Lock.Lock()
-	require.Len(t, vm.PendingTxs(), 1)
-	t.Log(vm.PendingTxs())
+	txs := vm.PendingTxs(context.Background())
+	require.Len(t, txs, 1)
+	t.Log(txs)
 }
 
 func TestIssueTxWithAnotherAsset(t *testing.T) {
 	genesisBytes, issuer, vm, _ := setupTxFeeAssets(t)
 	ctx := vm.ctx
 	defer func() {
-		err := vm.Shutdown()
+		err := vm.Shutdown(context.Background())
 		require.NoError(t, err)
 		ctx.Lock.Unlock()
 	}()
@@ -1057,13 +1067,14 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 	require.Equal(t, msg, common.PendingTxs)
 
 	ctx.Lock.Lock()
-	require.Len(t, vm.PendingTxs(), 1)
+	txs := vm.PendingTxs(context.Background())
+	require.Len(t, txs, 1)
 }
 
 func TestVMFormat(t *testing.T) {
 	_, _, vm, _ := GenesisVM(t)
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		vm.ctx.Lock.Unlock()
@@ -1092,7 +1103,7 @@ func TestTxCached(t *testing.T) {
 	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		ctx.Lock.Unlock()
@@ -1101,7 +1112,7 @@ func TestTxCached(t *testing.T) {
 	newTx := NewTx(t, genesisBytes, vm)
 	txBytes := newTx.Bytes()
 
-	_, err := vm.ParseTx(txBytes)
+	_, err := vm.ParseTx(context.Background(), txBytes)
 	require.NoError(t, err)
 
 	db := mockdb.New()
@@ -1119,7 +1130,7 @@ func TestTxCached(t *testing.T) {
 	vm.state, err = states.New(prefixdb.New([]byte("tx"), db), vm.parser, registerer)
 	require.NoError(t, err)
 
-	_, err = vm.ParseTx(txBytes)
+	_, err = vm.ParseTx(context.Background(), txBytes)
 	require.NoError(t, err)
 	require.False(t, *called, "shouldn't have called the DB")
 }
@@ -1128,7 +1139,7 @@ func TestTxNotCached(t *testing.T) {
 	genesisBytes, _, vm, _ := GenesisVM(t)
 	ctx := vm.ctx
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		ctx.Lock.Unlock()
@@ -1137,7 +1148,7 @@ func TestTxNotCached(t *testing.T) {
 	newTx := NewTx(t, genesisBytes, vm)
 	txBytes := newTx.Bytes()
 
-	_, err := vm.ParseTx(txBytes)
+	_, err := vm.ParseTx(context.Background(), txBytes)
 	require.NoError(t, err)
 
 	db := mockdb.New()
@@ -1161,7 +1172,7 @@ func TestTxNotCached(t *testing.T) {
 
 	vm.uniqueTxs.Flush()
 
-	_, err = vm.ParseTx(txBytes)
+	_, err = vm.ParseTx(context.Background(), txBytes)
 	require.NoError(t, err)
 	require.True(t, *called, "should have called the DB")
 }
@@ -1169,24 +1180,24 @@ func TestTxNotCached(t *testing.T) {
 func TestTxVerifyAfterIssueTx(t *testing.T) {
 	issuer, vm, ctx, issueTxs := setupIssueTx(t)
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		ctx.Lock.Unlock()
 	}()
 	firstTx := issueTxs[1]
 	secondTx := issueTxs[2]
-	parsedSecondTx, err := vm.ParseTx(secondTx.Bytes())
+	parsedSecondTx, err := vm.ParseTx(context.Background(), secondTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := parsedSecondTx.Verify(); err != nil {
+	if err := parsedSecondTx.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
-	if err := parsedSecondTx.Accept(); err != nil {
+	if err := parsedSecondTx.Accept(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	ctx.Lock.Unlock()
@@ -1197,13 +1208,13 @@ func TestTxVerifyAfterIssueTx(t *testing.T) {
 	}
 	ctx.Lock.Lock()
 
-	txs := vm.PendingTxs()
+	txs := vm.PendingTxs(context.Background())
 	if len(txs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)
 	}
 	parsedFirstTx := txs[0]
 
-	if err := parsedFirstTx.Verify(); err == nil {
+	if err := parsedFirstTx.Verify(context.Background()); err == nil {
 		t.Fatalf("Should have erred due to a missing UTXO")
 	}
 }
@@ -1211,7 +1222,7 @@ func TestTxVerifyAfterIssueTx(t *testing.T) {
 func TestTxVerifyAfterGet(t *testing.T) {
 	_, vm, ctx, issueTxs := setupIssueTx(t)
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		ctx.Lock.Unlock()
@@ -1219,24 +1230,24 @@ func TestTxVerifyAfterGet(t *testing.T) {
 	firstTx := issueTxs[1]
 	secondTx := issueTxs[2]
 
-	parsedSecondTx, err := vm.ParseTx(secondTx.Bytes())
+	parsedSecondTx, err := vm.ParseTx(context.Background(), secondTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := parsedSecondTx.Verify(); err != nil {
+	if err := parsedSecondTx.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
-	parsedFirstTx, err := vm.GetTx(firstTx.ID())
+	parsedFirstTx, err := vm.GetTx(context.Background(), firstTx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := parsedSecondTx.Accept(); err != nil {
+	if err := parsedSecondTx.Accept(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if err := parsedFirstTx.Verify(); err == nil {
+	if err := parsedFirstTx.Verify(context.Background()); err == nil {
 		t.Fatalf("Should have erred due to a missing UTXO")
 	}
 }
@@ -1244,7 +1255,7 @@ func TestTxVerifyAfterGet(t *testing.T) {
 func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 	_, vm, ctx, issueTxs := setupIssueTx(t)
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		ctx.Lock.Unlock()
@@ -1286,11 +1297,11 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parsedSecondTx, err := vm.ParseTx(secondTx.Bytes())
+	parsedSecondTx, err := vm.ParseTx(context.Background(), secondTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := parsedSecondTx.Verify(); err != nil {
+	if err := parsedSecondTx.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
@@ -1299,14 +1310,14 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 	if _, err := vm.IssueTx(firstTxDescendant.Bytes()); err != nil {
 		t.Fatal(err)
 	}
-	parsedFirstTx, err := vm.GetTx(firstTx.ID())
+	parsedFirstTx, err := vm.GetTx(context.Background(), firstTx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := parsedSecondTx.Accept(); err != nil {
+	if err := parsedSecondTx.Accept(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if err := parsedFirstTx.Verify(); err == nil {
+	if err := parsedFirstTx.Verify(context.Background()); err == nil {
 		t.Fatalf("Should have erred due to a missing UTXO")
 	}
 }
@@ -1502,6 +1513,7 @@ func TestIssueImportTx(t *testing.T) {
 	require.NoError(t, err)
 	vm := &VM{}
 	err = vm.Initialize(
+		context.Background(),
 		ctx,
 		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
@@ -1519,11 +1531,11 @@ func TestIssueImportTx(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	if err = vm.SetState(snow.Bootstrapping); err != nil {
+	if err = vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(snow.NormalOp)
+	err = vm.SetState(context.Background(), snow.NormalOp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1618,23 +1630,23 @@ func TestIssueImportTx(t *testing.T) {
 
 	ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		ctx.Lock.Unlock()
 	}()
 
-	txs := vm.PendingTxs()
+	txs := vm.PendingTxs(context.Background())
 	if len(txs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)
 	}
 
 	parsedTx := txs[0]
-	if err := parsedTx.Verify(); err != nil {
+	if err := parsedTx.Verify(context.Background()); err != nil {
 		t.Fatal("Failed verify", err)
 	}
 
-	if err := parsedTx.Accept(); err != nil {
+	if err := parsedTx.Accept(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1664,12 +1676,13 @@ func TestForceAcceptImportTx(t *testing.T) {
 	vm := &VM{}
 	ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		ctx.Lock.Unlock()
 	}()
 	err := vm.Initialize(
+		context.Background(),
 		ctx,
 		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
@@ -1687,11 +1700,11 @@ func TestForceAcceptImportTx(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	if err = vm.SetState(snow.Bootstrapping); err != nil {
+	if err = vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(snow.NormalOp)
+	err = vm.SetState(context.Background(), snow.NormalOp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1729,16 +1742,16 @@ func TestForceAcceptImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parsedTx, err := vm.ParseTx(tx.Bytes())
+	parsedTx, err := vm.ParseTx(context.Background(), tx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := parsedTx.Verify(); err == nil {
+	if err := parsedTx.Verify(context.Background()); err == nil {
 		t.Fatalf("Should have failed verification")
 	}
 
-	if err := parsedTx.Accept(); err != nil {
+	if err := parsedTx.Accept(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1774,6 +1787,7 @@ func TestIssueExportTx(t *testing.T) {
 	ctx.Lock.Lock()
 	vm := &VM{}
 	if err := vm.Initialize(
+		context.Background(),
 		ctx,
 		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
@@ -1789,11 +1803,11 @@ func TestIssueExportTx(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	if err := vm.SetState(snow.Bootstrapping); err != nil {
+	if err := vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm.SetState(snow.NormalOp); err != nil {
+	if err := vm.SetState(context.Background(), snow.NormalOp); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1844,21 +1858,21 @@ func TestIssueExportTx(t *testing.T) {
 
 	ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		ctx.Lock.Unlock()
 	}()
 
-	txs := vm.PendingTxs()
+	txs := vm.PendingTxs(context.Background())
 	if len(txs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)
 	}
 
 	parsedTx := txs[0]
-	if err := parsedTx.Verify(); err != nil {
+	if err := parsedTx.Verify(context.Background()); err != nil {
 		t.Fatal(err)
-	} else if err := parsedTx.Accept(); err != nil {
+	} else if err := parsedTx.Accept(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1905,6 +1919,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	require.NoError(t, err)
 	vm := &VM{}
 	err = vm.Initialize(
+		context.Background(),
 		ctx,
 		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
@@ -1922,11 +1937,11 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	if err = vm.SetState(snow.Bootstrapping); err != nil {
+	if err = vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
-	err = vm.SetState(snow.NormalOp)
+	err = vm.SetState(context.Background(), snow.NormalOp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1979,19 +1994,19 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 
 	ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		ctx.Lock.Unlock()
 	}()
 
-	txs := vm.PendingTxs()
+	txs := vm.PendingTxs(context.Background())
 	if len(txs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)
 	}
 
 	parsedTx := txs[0]
-	if err := parsedTx.Verify(); err != nil {
+	if err := parsedTx.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2006,7 +2021,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := parsedTx.Accept(); err != nil {
+	if err := parsedTx.Accept(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 

@@ -4,6 +4,7 @@
 package snowman
 
 import (
+	"context"
 	"sort"
 	"time"
 
@@ -36,7 +37,7 @@ func (b *TestBlock) Timestamp() time.Time {
 	return b.TimestampV
 }
 
-func (b *TestBlock) Verify() error {
+func (b *TestBlock) Verify(context.Context) error {
 	return b.VerifyV
 }
 

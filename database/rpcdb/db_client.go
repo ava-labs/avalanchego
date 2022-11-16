@@ -145,8 +145,8 @@ func (db *DatabaseClient) Close() error {
 	return errCodeToError[resp.Err]
 }
 
-func (db *DatabaseClient) HealthCheck() (interface{}, error) {
-	health, err := db.client.HealthCheck(context.Background(), &emptypb.Empty{})
+func (db *DatabaseClient) HealthCheck(ctx context.Context) (interface{}, error) {
+	health, err := db.client.HealthCheck(ctx, &emptypb.Empty{})
 	if err != nil {
 		return nil, err
 	}

@@ -4,6 +4,7 @@
 package versiondb
 
 import (
+	"context"
 	"sort"
 	"strings"
 	"sync"
@@ -274,14 +275,14 @@ func (db *Database) isClosed() bool {
 	return db.db == nil
 }
 
-func (db *Database) HealthCheck() (interface{}, error) {
+func (db *Database) HealthCheck(ctx context.Context) (interface{}, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
 	if db.mem == nil {
 		return nil, database.ErrClosed
 	}
-	return db.db.HealthCheck()
+	return db.db.HealthCheck(ctx)
 }
 
 type keyValue struct {

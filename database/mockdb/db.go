@@ -4,6 +4,7 @@
 package mockdb
 
 import (
+	"context"
 	"errors"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -35,7 +36,7 @@ type Database struct {
 	OnNewIteratorWithStartAndPrefix func([]byte, []byte) database.Iterator
 	OnCompact                       func([]byte, []byte) error
 	OnClose                         func() error
-	OnHealthCheck                   func() (interface{}, error)
+	OnHealthCheck                   func(context.Context) (interface{}, error)
 }
 
 // New returns a new mock database
@@ -120,9 +121,9 @@ func (db *Database) Close() error {
 	return db.OnClose()
 }
 
-func (db *Database) HealthCheck() (interface{}, error) {
+func (db *Database) HealthCheck(ctx context.Context) (interface{}, error) {
 	if db.OnHealthCheck == nil {
 		return nil, errNoFunction
 	}
-	return db.OnHealthCheck()
+	return db.OnHealthCheck(ctx)
 }

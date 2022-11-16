@@ -57,7 +57,7 @@ func (i *issuer) Update(ctx context.Context) {
 	i.issued = true
 
 	// check stop vertex validity
-	err := i.vtx.Verify()
+	err := i.vtx.Verify(ctx)
 	if err != nil {
 		if i.vtx.HasWhitelist() {
 			// do not update "i.t.errs" since it's only used for critical errors
@@ -82,14 +82,14 @@ func (i *issuer) Update(ctx context.Context) {
 	i.t.pending.Remove(vtxID) // Remove from set of vertices waiting to be issued.
 
 	// Make sure the transactions in this vertex are valid
-	txs, err := i.vtx.Txs()
+	txs, err := i.vtx.Txs(ctx)
 	if err != nil {
 		i.t.errs.Add(err)
 		return
 	}
 	validTxs := make([]snowstorm.Tx, 0, len(txs))
 	for _, tx := range txs {
-		if err := tx.Verify(); err != nil {
+		if err := tx.Verify(ctx); err != nil {
 			txID := tx.ID()
 			i.t.Ctx.Log.Debug("transaction verification failed",
 				zap.Stringer("txID", txID),
@@ -121,7 +121,7 @@ func (i *issuer) Update(ctx context.Context) {
 	)
 
 	// Add this vertex to consensus.
-	if err := i.t.Consensus.Add(i.vtx); err != nil {
+	if err := i.t.Consensus.Add(ctx, i.vtx); err != nil {
 		i.t.errs.Add(err)
 		return
 	}

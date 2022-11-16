@@ -4,6 +4,7 @@
 package chains
 
 import (
+	"context"
 	"crypto"
 	"crypto/tls"
 	"errors"
@@ -333,9 +334,13 @@ func (m *manager) createChain(chainParams ChainParameters) {
 		// node may not be properly validating the subnet they expect to be
 		// validating.
 		healthCheckErr := fmt.Errorf("failed to create chain on subnet: %s", chainParams.SubnetID)
-		if err := m.Health.RegisterHealthCheck(chainAlias, health.CheckerFunc(func() (interface{}, error) {
-			return nil, healthCheckErr
-		})); err != nil {
+		err := m.Health.RegisterHealthCheck(
+			chainAlias,
+			health.CheckerFunc(func(context.Context) (interface{}, error) {
+				return nil, healthCheckErr
+			}),
+		)
+		if err != nil {
 			m.Log.Error("failed to register failing health check",
 				zap.Stringer("subnetID", chainParams.SubnetID),
 				zap.Stringer("chainID", chainParams.ID),
@@ -367,7 +372,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 	// Allows messages to be routed to the new chain. If the handler hasn't been
 	// started and a message is forwarded, then the message will block until the
 	// handler is started.
-	m.ManagerConfig.Router.AddChain(chain.Handler)
+	m.ManagerConfig.Router.AddChain(context.TODO(), chain.Handler)
 
 	// Register bootstrapped health checks after P chain has been added to
 	// chains.
@@ -377,13 +382,13 @@ func (m *manager) createChain(chainParams ChainParameters) {
 	//       the manager.
 	if chainParams.ID == constants.PlatformChainID {
 		if err := m.registerBootstrappedHealthChecks(); err != nil {
-			chain.Handler.StopWithError(err)
+			chain.Handler.StopWithError(context.TODO(), err)
 		}
 	}
 
 	// Tell the chain to start processing messages.
 	// If the X, P, or C Chain panics, do not attempt to recover
-	chain.Handler.Start(!m.CriticalChains.Contains(chainParams.ID))
+	chain.Handler.Start(context.TODO(), !m.CriticalChains.Contains(chainParams.ID))
 }
 
 // Create a chain
@@ -643,7 +648,9 @@ func (m *manager) createAvalancheChain(
 			XChainMigrationTime: version.GetXChainMigrationTime(ctx.NetworkID),
 		},
 	)
-	if err := vm.Initialize(
+
+	err = vm.Initialize(
+		context.TODO(),
 		ctx.Context,
 		vmDBManager,
 		genesisData,
@@ -652,7 +659,8 @@ func (m *manager) createAvalancheChain(
 		msgChan,
 		fxs,
 		messageSender,
-	); err != nil {
+	)
+	if err != nil {
 		return nil, fmt.Errorf("error during vm's Initialize: %w", err)
 	}
 
@@ -711,9 +719,10 @@ func (m *manager) createAvalancheChain(
 		VM:            vm,
 	}
 	bootstrapper, err := avbootstrap.New(
+		context.TODO(),
 		bootstrapperConfig,
-		func(lastReqID uint32) error {
-			return handler.Consensus().Start(lastReqID + 1)
+		func(ctx context.Context, lastReqID uint32) error {
+			return handler.Consensus().Start(ctx, lastReqID+1)
 		},
 	)
 	if err != nil {
@@ -883,6 +892,7 @@ func (m *manager) createSnowmanChain(
 		vm = metervm.NewBlockVM(vm)
 	}
 	if err := vm.Initialize(
+		context.TODO(),
 		ctx.Context,
 		vmDBManager,
 		genesisData,
@@ -971,6 +981,7 @@ func (m *manager) createSnowmanChain(
 		Bootstrapped:  bootstrapFunc,
 	}
 	bootstrapper, err := smbootstrap.New(
+		context.TODO(),
 		bootstrapCfg,
 		engine.Start,
 	)
@@ -1055,7 +1066,7 @@ func (m *manager) subnetsNotBootstrapped() []ids.ID {
 }
 
 func (m *manager) registerBootstrappedHealthChecks() error {
-	bootstrappedCheck := health.CheckerFunc(func() (interface{}, error) {
+	bootstrappedCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
 		subnetIDs := m.subnetsNotBootstrapped()
 		if len(subnetIDs) != 0 {
 			return subnetIDs, errNotBootstrapped
@@ -1121,7 +1132,7 @@ func (m *manager) closeChainCreator() {
 func (m *manager) Shutdown() {
 	m.Log.Info("shutting down chain manager")
 	m.closeChainCreator()
-	m.ManagerConfig.Router.Shutdown()
+	m.ManagerConfig.Router.Shutdown(context.TODO())
 }
 
 // LookupVM returns the ID of the VM associated with an alias

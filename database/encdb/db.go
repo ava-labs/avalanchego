@@ -4,6 +4,7 @@
 package encdb
 
 import (
+	"context"
 	"crypto/cipher"
 	"crypto/rand"
 	"sync"
@@ -162,14 +163,14 @@ func (db *Database) isClosed() bool {
 	return db.closed
 }
 
-func (db *Database) HealthCheck() (interface{}, error) {
+func (db *Database) HealthCheck(ctx context.Context) (interface{}, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
 	if db.closed {
 		return nil, database.ErrClosed
 	}
-	return db.db.HealthCheck()
+	return db.db.HealthCheck(ctx)
 }
 
 type keyValue struct {

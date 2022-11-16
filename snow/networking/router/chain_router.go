@@ -301,7 +301,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 }
 
 // Shutdown shuts down this router
-func (cr *ChainRouter) Shutdown() {
+func (cr *ChainRouter) Shutdown(ctx context.Context) {
 	cr.log.Info("shutting down chain router")
 	cr.lock.Lock()
 	prevChains := cr.chains
@@ -309,7 +309,7 @@ func (cr *ChainRouter) Shutdown() {
 	cr.lock.Unlock()
 
 	for _, chain := range prevChains {
-		chain.Stop()
+		chain.Stop(ctx)
 	}
 
 	ticker := time.NewTicker(cr.closeTimeout)
@@ -327,7 +327,7 @@ func (cr *ChainRouter) Shutdown() {
 
 // AddChain registers the specified chain so that incoming
 // messages can be routed to it
-func (cr *ChainRouter) AddChain(chain handler.Handler) {
+func (cr *ChainRouter) AddChain(ctx context.Context, chain handler.Handler) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -336,7 +336,7 @@ func (cr *ChainRouter) AddChain(chain handler.Handler) {
 		zap.Stringer("chainID", chainID),
 	)
 	chain.SetOnStopped(func() {
-		cr.removeChain(chainID)
+		cr.removeChain(ctx, chainID)
 	})
 	cr.chains[chainID] = chain
 
@@ -346,7 +346,7 @@ func (cr *ChainRouter) AddChain(chain handler.Handler) {
 		// If this validator is benched on any chain, treat them as disconnected on all chains
 		if _, benched := cr.benched[validatorID]; !benched && peer.trackedSubnets.Contains(subnetID) {
 			msg := message.InternalConnected(validatorID, peer.version)
-			chain.Push(context.TODO(), msg)
+			chain.Push(ctx, msg)
 		}
 	}
 }
@@ -457,7 +457,7 @@ func (cr *ChainRouter) Unbenched(chainID ids.ID, nodeID ids.NodeID) {
 // HealthCheck returns results of router health checks. Returns:
 // 1) Information about health check results
 // 2) An error if the health check reports unhealthy
-func (cr *ChainRouter) HealthCheck() (interface{}, error) {
+func (cr *ChainRouter) HealthCheck(context.Context) (interface{}, error) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -496,7 +496,7 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 
 // RemoveChain removes the specified chain so that incoming
 // messages can't be routed to it
-func (cr *ChainRouter) removeChain(chainID ids.ID) {
+func (cr *ChainRouter) removeChain(ctx context.Context, chainID ids.ID) {
 	cr.lock.Lock()
 	chain, exists := cr.chains[chainID]
 	if !exists {
@@ -509,7 +509,7 @@ func (cr *ChainRouter) removeChain(chainID ids.ID) {
 	delete(cr.chains, chainID)
 	cr.lock.Unlock()
 
-	chain.Stop()
+	chain.Stop(ctx)
 
 	ticker := time.NewTicker(cr.closeTimeout)
 	defer ticker.Stop()

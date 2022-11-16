@@ -4,6 +4,7 @@
 package block
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -20,16 +21,18 @@ var ErrRemoteVMNotImplemented = errors.New("vm does not implement RemoteVM inter
 // operations since calls over network can be duly batched
 type BatchedChainVM interface {
 	GetAncestors(
+		ctx context.Context,
 		blkID ids.ID, // first requested block
 		maxBlocksNum int, // max number of blocks to be retrieved
 		maxBlocksSize int, // max cumulated byte size of retrieved blocks
 		maxBlocksRetrivalTime time.Duration, // max duration of retrival operation
 	) ([][]byte, error)
 
-	BatchedParseBlock(blks [][]byte) ([]snowman.Block, error)
+	BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.Block, error)
 }
 
 func GetAncestors(
+	ctx context.Context,
 	vm Getter, // fetch blocks
 	blkID ids.ID, // first requested block
 	maxBlocksNum int, // max number of blocks to be retrieved
@@ -39,6 +42,7 @@ func GetAncestors(
 	// Try and batch GetBlock requests
 	if vm, ok := vm.(BatchedChainVM); ok {
 		blocks, err := vm.GetAncestors(
+			ctx,
 			blkID,
 			maxBlocksNum,
 			maxBlocksSize,
@@ -54,7 +58,7 @@ func GetAncestors(
 
 	// RemoteVM did not work, try local logic
 	startTime := time.Now()
-	blk, err := vm.GetBlock(blkID)
+	blk, err := vm.GetBlock(ctx, blkID)
 	if err == database.ErrNotFound {
 		// special case ErrNotFound as an empty response: this signals
 		// the client to avoid contacting this node for further ancestors
@@ -70,7 +74,7 @@ func GetAncestors(
 	ancestorsBytesLen := len(blk.Bytes()) + wrappers.IntLen // length, in bytes, of all elements of ancestors
 
 	for numFetched := 1; numFetched < maxBlocksNum && time.Since(startTime) < maxBlocksRetrivalTime; numFetched++ {
-		if blk, err = vm.GetBlock(blk.Parent()); err != nil {
+		if blk, err = vm.GetBlock(ctx, blk.Parent()); err != nil {
 			break
 		}
 		blkBytes := blk.Bytes()
@@ -88,10 +92,14 @@ func GetAncestors(
 	return ancestorsBytes, nil
 }
 
-func BatchedParseBlock(vm Parser, blks [][]byte) ([]snowman.Block, error) {
+func BatchedParseBlock(
+	ctx context.Context,
+	vm Parser,
+	blks [][]byte,
+) ([]snowman.Block, error) {
 	// Try and batch ParseBlock requests
 	if vm, ok := vm.(BatchedChainVM); ok {
-		blocks, err := vm.BatchedParseBlock(blks)
+		blocks, err := vm.BatchedParseBlock(ctx, blks)
 		if err == nil {
 			return blocks, nil
 		}
@@ -104,7 +112,7 @@ func BatchedParseBlock(vm Parser, blks [][]byte) ([]snowman.Block, error) {
 	// time.
 	blocks := make([]snowman.Block, len(blks))
 	for i, blockBytes := range blks {
-		block, err := vm.ParseBlock(blockBytes)
+		block, err := vm.ParseBlock(ctx, blockBytes)
 		if err != nil {
 			return nil, err
 		}

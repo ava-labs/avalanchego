@@ -19,7 +19,7 @@ func TestVotingFinishesWithAbandonedDep(t *testing.T) {
 	engCfg.Manager = mngr
 	transitive, err := newTransitive(engCfg)
 	require.NoError(t, err)
-	require.NoError(t, transitive.Start( /*startReqID*/ 0))
+	require.NoError(t, transitive.Start(context.Background(), 0 /*=startReqID*/))
 
 	// prepare 3 validators
 	vdr1 := ids.NodeID{1}
@@ -110,7 +110,7 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 	engCfg.Manager = mngr
 	transitive, err := newTransitive(engCfg)
 	require.NoError(t, err)
-	require.NoError(t, transitive.Start( /*startReqID*/ 0))
+	require.NoError(t, transitive.Start(context.Background(), 0 /*=startReqID*/))
 
 	// prepare 3 validators
 	vdr1 := ids.NodeID{1}
@@ -244,7 +244,7 @@ func TestSharedDependency(t *testing.T) {
 	engCfg.Manager = mngr
 	transitive, err := newTransitive(engCfg)
 	require.NoError(t, err)
-	require.NoError(t, transitive.Start( /*startReqID*/ 0))
+	require.NoError(t, transitive.Start(context.Background(), 0 /*=startReqID*/))
 
 	// prepare 3 validators
 	vdr1 := ids.NodeID{1}

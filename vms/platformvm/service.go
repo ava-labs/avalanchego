@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -81,12 +82,13 @@ type GetHeightResponse struct {
 }
 
 // GetHeight returns the height of the last accepted block
-func (service *Service) GetHeight(_ *http.Request, _ *struct{}, response *GetHeightResponse) error {
-	lastAcceptedID, err := service.vm.LastAccepted()
+func (service *Service) GetHeight(r *http.Request, _ *struct{}, response *GetHeightResponse) error {
+	ctx := r.Context()
+	lastAcceptedID, err := service.vm.LastAccepted(ctx)
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted block ID: %w", err)
 	}
-	lastAccepted, err := service.vm.GetBlock(lastAcceptedID)
+	lastAccepted, err := service.vm.GetBlock(ctx, lastAcceptedID)
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted block: %w", err)
 	}
@@ -1713,7 +1715,7 @@ type GetBlockchainStatusReply struct {
 }
 
 // GetBlockchainStatus gets the status of a blockchain with the ID [args.BlockchainID].
-func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchainStatusArgs, reply *GetBlockchainStatusReply) error {
+func (service *Service) GetBlockchainStatus(r *http.Request, args *GetBlockchainStatusArgs, reply *GetBlockchainStatusReply) error {
 	service.vm.ctx.Log.Debug("Platform: GetBlockchainStatus called")
 
 	if args.BlockchainID == "" {
@@ -1736,12 +1738,13 @@ func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchain
 		return fmt.Errorf("problem parsing blockchainID %q: %w", args.BlockchainID, err)
 	}
 
-	lastAcceptedID, err := service.vm.LastAccepted()
+	ctx := r.Context()
+	lastAcceptedID, err := service.vm.LastAccepted(ctx)
 	if err != nil {
 		return fmt.Errorf("problem loading last accepted ID: %w", err)
 	}
 
-	exists, err := service.chainExists(lastAcceptedID, blockchainID)
+	exists, err := service.chainExists(ctx, lastAcceptedID, blockchainID)
 	if err != nil {
 		return fmt.Errorf("problem looking up blockchain: %w", err)
 	}
@@ -1754,7 +1757,7 @@ func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchain
 	if err != nil {
 		return fmt.Errorf("could not retrieve preferred block, err %w", err)
 	}
-	preferred, err := service.chainExists(preferredBlk.ID(), blockchainID)
+	preferred, err := service.chainExists(ctx, preferredBlk.ID(), blockchainID)
 	if err != nil {
 		return fmt.Errorf("problem looking up blockchain: %w", err)
 	}
@@ -1785,10 +1788,10 @@ func (service *Service) nodeValidates(blockchainID ids.ID) bool {
 	return validators.Contains(service.vm.ctx.NodeID)
 }
 
-func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error) {
+func (service *Service) chainExists(ctx context.Context, blockID ids.ID, chainID ids.ID) (bool, error) {
 	state, ok := service.vm.manager.GetState(blockID)
 	if !ok {
-		block, err := service.vm.GetBlock(blockID)
+		block, err := service.vm.GetBlock(ctx, blockID)
 		if err != nil {
 			return false, err
 		}

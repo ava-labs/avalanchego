@@ -47,7 +47,7 @@ func (v *voter) Update(ctx context.Context) {
 		return
 	}
 	for _, result := range results {
-		_, err := v.bubbleVotes(result)
+		_, err := v.bubbleVotes(ctx, result)
 		if err != nil {
 			v.t.errs.Add(err)
 			return
@@ -60,7 +60,7 @@ func (v *voter) Update(ctx context.Context) {
 		v.t.Ctx.Log.Debug("finishing poll",
 			zap.Stringer("result", &result),
 		)
-		if err := v.t.Consensus.RecordPoll(result); err != nil {
+		if err := v.t.Consensus.RecordPoll(ctx, result); err != nil {
 			v.t.errs.Add(err)
 			return
 		}
@@ -69,7 +69,7 @@ func (v *voter) Update(ctx context.Context) {
 	orphans := v.t.Consensus.Orphans()
 	txs := make([]snowstorm.Tx, 0, orphans.Len())
 	for orphanID := range orphans {
-		if tx, err := v.t.VM.GetTx(orphanID); err == nil {
+		if tx, err := v.t.VM.GetTx(ctx, orphanID); err == nil {
 			txs = append(txs, tx)
 		} else {
 			v.t.Ctx.Log.Warn("failed to fetch tx during attempted re-issuance",
@@ -97,10 +97,10 @@ func (v *voter) Update(ctx context.Context) {
 	v.t.repoll(ctx)
 }
 
-func (v *voter) bubbleVotes(votes ids.UniqueBag) (ids.UniqueBag, error) {
+func (v *voter) bubbleVotes(ctx context.Context, votes ids.UniqueBag) (ids.UniqueBag, error) {
 	vertexHeap := vertex.NewHeap()
 	for vote, set := range votes {
-		vtx, err := v.t.Manager.GetVtx(vote)
+		vtx, err := v.t.Manager.GetVtx(ctx, vote)
 		if err != nil {
 			v.t.Ctx.Log.Debug("dropping vote(s)",
 				zap.String("reason", "failed to fetch vertex"),

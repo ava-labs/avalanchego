@@ -13,7 +13,7 @@ require (
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/ava-labs/avalanche-ledger-go v0.0.13
 	github.com/ava-labs/avalanche-network-runner-sdk v0.3.0
-	github.com/ava-labs/coreth v0.11.2-rc.0
+	github.com/ava-labs/coreth v0.11.3-rc.0
 	github.com/btcsuite/btcd v0.23.1
 	github.com/btcsuite/btcd/btcutil v1.1.1
 	github.com/decred/dcrd/dcrec/secp256k1/v3 v3.0.0-20200627015759-01fd2de07837
@@ -54,7 +54,6 @@ require (
 	go.uber.org/zap v1.23.0
 	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d
 	golang.org/x/exp v0.0.0-20220426173459-3bcf042a4bf5
-	golang.org/x/net v0.1.0
 	golang.org/x/sync v0.1.0
 	golang.org/x/term v0.1.0
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
@@ -84,7 +83,7 @@ require (
 	github.com/decred/dcrd/crypto/blake256 v1.0.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/decred/dcrd/lru v1.1.1 // indirect
-	github.com/ethereum/go-ethereum v1.10.25 // indirect
+	github.com/ethereum/go-ethereum v1.10.26 // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
@@ -139,6 +138,7 @@ require (
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
+	golang.org/x/net v0.1.0 // indirect
 	golang.org/x/sys v0.1.0 // indirect
 	golang.org/x/text v0.4.0 // indirect
 	gopkg.in/ini.v1 v1.66.4 // indirect

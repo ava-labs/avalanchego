@@ -54,11 +54,11 @@ type Handler interface {
 	Consensus() common.Engine
 
 	SetOnStopped(onStopped func())
-	Start(recoverPanic bool)
+	Start(ctx context.Context, recoverPanic bool)
 	Push(ctx context.Context, msg message.InboundMessage)
 	Len() int
-	Stop()
-	StopWithError(err error)
+	Stop(ctx context.Context)
+	StopWithError(ctx context.Context, err error)
 	Stopped() chan struct{}
 }
 
@@ -184,12 +184,12 @@ func (h *handler) SetOnStopped(onStopped func()) {
 	h.onStopped = onStopped
 }
 
-func (h *handler) selectStartingGear() (common.Engine, error) {
+func (h *handler) selectStartingGear(ctx context.Context) (common.Engine, error) {
 	if h.stateSyncer == nil {
 		return h.bootstrapper, nil
 	}
 
-	stateSyncEnabled, err := h.stateSyncer.IsEnabled()
+	stateSyncEnabled, err := h.stateSyncer.IsEnabled(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -203,45 +203,54 @@ func (h *handler) selectStartingGear() (common.Engine, error) {
 	return h.stateSyncer, h.bootstrapper.Clear()
 }
 
-func (h *handler) Start(recoverPanic bool) {
+func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 	h.ctx.Lock.Lock()
 	defer h.ctx.Lock.Unlock()
 
-	gear, err := h.selectStartingGear()
+	gear, err := h.selectStartingGear(ctx)
 	if err != nil {
 		h.ctx.Log.Error("chain failed to select starting gear",
 			zap.Error(err),
 		)
-		h.shutdown()
+		h.shutdown(ctx)
 		return
 	}
 
-	if err := gear.Start(0); err != nil {
+	if err := gear.Start(ctx, 0); err != nil {
 		h.ctx.Log.Error("chain failed to start",
 			zap.Error(err),
 		)
-		h.shutdown()
+		h.shutdown(ctx)
 		return
 	}
 
+	dispatchSync := func() {
+		h.dispatchSync(ctx)
+	}
+	dispatchAsync := func() {
+		h.dispatchAsync(ctx)
+	}
+	dispatchChans := func() {
+		h.dispatchChans(ctx)
+	}
 	if recoverPanic {
-		go h.ctx.Log.RecoverAndExit(h.dispatchSync, func() {
+		go h.ctx.Log.RecoverAndExit(dispatchSync, func() {
 			h.ctx.Log.Error("chain was shutdown due to a panic in the sync dispatcher")
 		})
-		go h.ctx.Log.RecoverAndExit(h.dispatchAsync, func() {
+		go h.ctx.Log.RecoverAndExit(dispatchAsync, func() {
 			h.ctx.Log.Error("chain was shutdown due to a panic in the async dispatcher")
 		})
-		go h.ctx.Log.RecoverAndExit(h.dispatchChans, func() {
+		go h.ctx.Log.RecoverAndExit(dispatchChans, func() {
 			h.ctx.Log.Error("chain was shutdown due to a panic in the chan dispatcher")
 		})
 	} else {
-		go h.ctx.Log.RecoverAndPanic(h.dispatchSync)
-		go h.ctx.Log.RecoverAndPanic(h.dispatchAsync)
-		go h.ctx.Log.RecoverAndPanic(h.dispatchChans)
+		go h.ctx.Log.RecoverAndPanic(dispatchSync)
+		go h.ctx.Log.RecoverAndPanic(dispatchAsync)
+		go h.ctx.Log.RecoverAndPanic(dispatchChans)
 	}
 }
 
-func (h *handler) HealthCheck() (interface{}, error) {
+func (h *handler) HealthCheck(ctx context.Context) (interface{}, error) {
 	h.ctx.Lock.Lock()
 	defer h.ctx.Lock.Unlock()
 
@@ -249,7 +258,7 @@ func (h *handler) HealthCheck() (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	return engine.HealthCheck()
+	return engine.HealthCheck(ctx)
 }
 
 // Push the message onto the handler's queue
@@ -287,7 +296,7 @@ func (h *handler) RegisterTimeout(d time.Duration) {
 	}()
 }
 
-func (h *handler) Stop() {
+func (h *handler) Stop(ctx context.Context) {
 	h.closeOnce.Do(func() {
 		// Must hold the locks here to ensure there's no race condition in where
 		// we check the value of [h.closing] after the call to [Signal].
@@ -304,24 +313,24 @@ func (h *handler) Stop() {
 		// [h.ctx.Lock] until the engine finished executing state transitions,
 		// which may take a long time. As a result, the router would time out on
 		// shutting down this chain.
-		h.bootstrapper.Halt()
+		h.bootstrapper.Halt(ctx)
 	})
 }
 
-func (h *handler) StopWithError(err error) {
+func (h *handler) StopWithError(ctx context.Context, err error) {
 	h.ctx.Log.Fatal("shutting down chain",
 		zap.String("reason", "received an unexpected error"),
 		zap.Error(err),
 	)
-	h.Stop()
+	h.Stop(ctx)
 }
 
 func (h *handler) Stopped() chan struct{} {
 	return h.closed
 }
 
-func (h *handler) dispatchSync() {
-	defer h.closeDispatcher()
+func (h *handler) dispatchSync(ctx context.Context) {
+	defer h.closeDispatcher(ctx)
 
 	// Handle sync messages from the router
 	for {
@@ -334,7 +343,7 @@ func (h *handler) dispatchSync() {
 
 		// If there is an error handling the message, shut down the chain
 		if err := h.handleSyncMsg(ctx, msg); err != nil {
-			h.StopWithError(fmt.Errorf(
+			h.StopWithError(ctx, fmt.Errorf(
 				"%w while processing sync message: %s",
 				err,
 				msg,
@@ -344,10 +353,10 @@ func (h *handler) dispatchSync() {
 	}
 }
 
-func (h *handler) dispatchAsync() {
+func (h *handler) dispatchAsync(ctx context.Context) {
 	defer func() {
 		h.asyncMessagePool.Shutdown()
-		h.closeDispatcher()
+		h.closeDispatcher(ctx)
 	}()
 
 	// Handle async messages from the router
@@ -363,11 +372,11 @@ func (h *handler) dispatchAsync() {
 	}
 }
 
-func (h *handler) dispatchChans() {
+func (h *handler) dispatchChans(ctx context.Context) {
 	gossiper := time.NewTicker(h.gossipFrequency)
 	defer func() {
 		gossiper.Stop()
-		h.closeDispatcher()
+		h.closeDispatcher(ctx)
 	}()
 
 	// Handle messages generated by the handler and the VM
@@ -388,7 +397,7 @@ func (h *handler) dispatchChans() {
 		}
 
 		if err := h.handleChanMsg(msg); err != nil {
-			h.StopWithError(fmt.Errorf(
+			h.StopWithError(ctx, fmt.Errorf(
 				"%w while processing async message: %s",
 				err,
 				msg,
@@ -627,10 +636,10 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 		return engine.QueryFailed(ctx, nodeID, msg.RequestID)
 
 	case *message.Connected:
-		return engine.Connected(nodeID, msg.NodeVersion)
+		return engine.Connected(ctx, nodeID, msg.NodeVersion)
 
 	case *message.Disconnected:
-		return engine.Disconnected(nodeID)
+		return engine.Disconnected(ctx, nodeID)
 
 	default:
 		return fmt.Errorf(
@@ -643,7 +652,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 func (h *handler) handleAsyncMsg(ctx context.Context, msg message.InboundMessage) {
 	h.asyncMessagePool.Send(func() {
 		if err := h.executeAsyncMsg(ctx, msg); err != nil {
-			h.StopWithError(fmt.Errorf(
+			h.StopWithError(ctx, fmt.Errorf(
 				"%w while processing async message: %s",
 				err,
 				msg,
@@ -766,13 +775,13 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 
 	switch msg := msg.Message().(type) {
 	case *message.VMMessage:
-		return engine.Notify(common.Message(msg.Notification))
+		return engine.Notify(context.TODO(), common.Message(msg.Notification))
 
 	case *message.GossipRequest:
-		return engine.Gossip()
+		return engine.Gossip(context.TODO())
 
 	case *message.Timeout:
-		return engine.Timeout()
+		return engine.Timeout(context.TODO())
 
 	default:
 		return fmt.Errorf(
@@ -802,7 +811,7 @@ func (h *handler) popUnexpiredMsg(queue MessageQueue, expired prometheus.Counter
 		// down, we may fail to pop a message.
 		ctx, msg, ok := queue.Pop()
 		if !ok {
-			return context.Background(), nil, false
+			return nil, nil, false
 		}
 
 		// If this message's deadline has passed, don't process it.
@@ -825,7 +834,7 @@ func (h *handler) popUnexpiredMsg(queue MessageQueue, expired prometheus.Counter
 	}
 }
 
-func (h *handler) closeDispatcher() {
+func (h *handler) closeDispatcher(ctx context.Context) {
 	h.ctx.Lock.Lock()
 	defer h.ctx.Lock.Unlock()
 
@@ -834,10 +843,10 @@ func (h *handler) closeDispatcher() {
 		return
 	}
 
-	h.shutdown()
+	h.shutdown(ctx)
 }
 
-func (h *handler) shutdown() {
+func (h *handler) shutdown(ctx context.Context) {
 	defer func() {
 		if h.onStopped != nil {
 			go h.onStopped()
@@ -853,7 +862,7 @@ func (h *handler) shutdown() {
 		return
 	}
 
-	if err := currentEngine.Shutdown(); err != nil {
+	if err := currentEngine.Shutdown(ctx); err != nil {
 		h.ctx.Log.Error("failed while shutting down the chain",
 			zap.Error(err),
 		)

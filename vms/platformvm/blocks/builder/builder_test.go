@@ -58,7 +58,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	require.True(has, "valid tx not recorded into mempool")
 
 	// show that build block include that tx and removes it from mempool
-	blkIntf, err := env.Builder.BuildBlock()
+	blkIntf, err := env.Builder.BuildBlock(context.Background())
 	require.NoError(err, "couldn't build block out of mempool")
 
 	blk, ok := blkIntf.(*blockexecutor.Block)

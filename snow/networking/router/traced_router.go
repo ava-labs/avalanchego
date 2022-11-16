@@ -107,12 +107,22 @@ func (r *tracedRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	r.router.HandleInbound(ctx, msg)
 }
 
-func (r *tracedRouter) Shutdown() {
-	r.router.Shutdown()
+func (r *tracedRouter) Shutdown(ctx context.Context) {
+	ctx, span := r.tracer.Start(ctx, "tracedRouter.Shutdown")
+	defer span.End()
+
+	r.router.Shutdown(ctx)
 }
 
-func (r *tracedRouter) AddChain(chain handler.Handler) {
-	r.router.AddChain(chain)
+func (r *tracedRouter) AddChain(ctx context.Context, chain handler.Handler) {
+	chainCtx := chain.Context()
+	ctx, span := r.tracer.Start(ctx, "tracedRouter.AddChain", oteltrace.WithAttributes(
+		attribute.Stringer("subnetID", chainCtx.SubnetID),
+		attribute.Stringer("chainID", chainCtx.ChainID),
+	))
+	defer span.End()
+
+	r.router.AddChain(ctx, chain)
 }
 
 func (r *tracedRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
@@ -131,6 +141,9 @@ func (r *tracedRouter) Unbenched(chainID ids.ID, nodeID ids.NodeID) {
 	r.router.Unbenched(chainID, nodeID)
 }
 
-func (r *tracedRouter) HealthCheck() (interface{}, error) {
-	return r.router.HealthCheck()
+func (r *tracedRouter) HealthCheck(ctx context.Context) (interface{}, error) {
+	ctx, span := r.tracer.Start(ctx, "tracedRouter.HealthCheck")
+	defer span.End()
+
+	return r.router.HealthCheck(ctx)
 }

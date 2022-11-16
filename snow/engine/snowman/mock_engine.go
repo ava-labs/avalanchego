@@ -170,17 +170,17 @@ func (mr *MockEngineMockRecorder) Chits(arg0, arg1, arg2, arg3 interface{}) *gom
 }
 
 // Connected mocks base method.
-func (m *MockEngine) Connected(arg0 ids.NodeID, arg1 *version.Application) error {
+func (m *MockEngine) Connected(arg0 context.Context, arg1 ids.NodeID, arg2 *version.Application) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Connected", arg0, arg1)
+	ret := m.ctrl.Call(m, "Connected", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Connected indicates an expected call of Connected.
-func (mr *MockEngineMockRecorder) Connected(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockEngineMockRecorder) Connected(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Connected", reflect.TypeOf((*MockEngine)(nil).Connected), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Connected", reflect.TypeOf((*MockEngine)(nil).Connected), arg0, arg1, arg2)
 }
 
 // Context mocks base method.
@@ -240,17 +240,17 @@ func (mr *MockEngineMockRecorder) CrossChainAppResponse(arg0, arg1, arg2, arg3 i
 }
 
 // Disconnected mocks base method.
-func (m *MockEngine) Disconnected(arg0 ids.NodeID) error {
+func (m *MockEngine) Disconnected(arg0 context.Context, arg1 ids.NodeID) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Disconnected", arg0)
+	ret := m.ctrl.Call(m, "Disconnected", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Disconnected indicates an expected call of Disconnected.
-func (mr *MockEngineMockRecorder) Disconnected(arg0 interface{}) *gomock.Call {
+func (mr *MockEngineMockRecorder) Disconnected(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Disconnected", reflect.TypeOf((*MockEngine)(nil).Disconnected), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Disconnected", reflect.TypeOf((*MockEngine)(nil).Disconnected), arg0, arg1)
 }
 
 // Get mocks base method.
@@ -380,18 +380,18 @@ func (mr *MockEngineMockRecorder) GetAncestorsFailed(arg0, arg1, arg2 interface{
 }
 
 // GetBlock mocks base method.
-func (m *MockEngine) GetBlock(arg0 ids.ID) (snowman.Block, error) {
+func (m *MockEngine) GetBlock(arg0 context.Context, arg1 ids.ID) (snowman.Block, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBlock", arg0)
+	ret := m.ctrl.Call(m, "GetBlock", arg0, arg1)
 	ret0, _ := ret[0].(snowman.Block)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetBlock indicates an expected call of GetBlock.
-func (mr *MockEngineMockRecorder) GetBlock(arg0 interface{}) *gomock.Call {
+func (mr *MockEngineMockRecorder) GetBlock(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlock", reflect.TypeOf((*MockEngine)(nil).GetBlock), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlock", reflect.TypeOf((*MockEngine)(nil).GetBlock), arg0, arg1)
 }
 
 // GetFailed mocks base method.
@@ -451,58 +451,58 @@ func (mr *MockEngineMockRecorder) GetVM() *gomock.Call {
 }
 
 // Gossip mocks base method.
-func (m *MockEngine) Gossip() error {
+func (m *MockEngine) Gossip(arg0 context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Gossip")
+	ret := m.ctrl.Call(m, "Gossip", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Gossip indicates an expected call of Gossip.
-func (mr *MockEngineMockRecorder) Gossip() *gomock.Call {
+func (mr *MockEngineMockRecorder) Gossip(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Gossip", reflect.TypeOf((*MockEngine)(nil).Gossip))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Gossip", reflect.TypeOf((*MockEngine)(nil).Gossip), arg0)
 }
 
 // Halt mocks base method.
-func (m *MockEngine) Halt() {
+func (m *MockEngine) Halt(arg0 context.Context) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Halt")
+	m.ctrl.Call(m, "Halt", arg0)
 }
 
 // Halt indicates an expected call of Halt.
-func (mr *MockEngineMockRecorder) Halt() *gomock.Call {
+func (mr *MockEngineMockRecorder) Halt(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Halt", reflect.TypeOf((*MockEngine)(nil).Halt))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Halt", reflect.TypeOf((*MockEngine)(nil).Halt), arg0)
 }
 
 // HealthCheck mocks base method.
-func (m *MockEngine) HealthCheck() (interface{}, error) {
+func (m *MockEngine) HealthCheck(arg0 context.Context) (interface{}, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HealthCheck")
+	ret := m.ctrl.Call(m, "HealthCheck", arg0)
 	ret0, _ := ret[0].(interface{})
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // HealthCheck indicates an expected call of HealthCheck.
-func (mr *MockEngineMockRecorder) HealthCheck() *gomock.Call {
+func (mr *MockEngineMockRecorder) HealthCheck(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HealthCheck", reflect.TypeOf((*MockEngine)(nil).HealthCheck))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HealthCheck", reflect.TypeOf((*MockEngine)(nil).HealthCheck), arg0)
 }
 
 // Notify mocks base method.
-func (m *MockEngine) Notify(arg0 common.Message) error {
+func (m *MockEngine) Notify(arg0 context.Context, arg1 common.Message) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Notify", arg0)
+	ret := m.ctrl.Call(m, "Notify", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Notify indicates an expected call of Notify.
-func (mr *MockEngineMockRecorder) Notify(arg0 interface{}) *gomock.Call {
+func (mr *MockEngineMockRecorder) Notify(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Notify", reflect.TypeOf((*MockEngine)(nil).Notify), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Notify", reflect.TypeOf((*MockEngine)(nil).Notify), arg0, arg1)
 }
 
 // PullQuery mocks base method.
@@ -562,31 +562,31 @@ func (mr *MockEngineMockRecorder) QueryFailed(arg0, arg1, arg2 interface{}) *gom
 }
 
 // Shutdown mocks base method.
-func (m *MockEngine) Shutdown() error {
+func (m *MockEngine) Shutdown(arg0 context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Shutdown")
+	ret := m.ctrl.Call(m, "Shutdown", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Shutdown indicates an expected call of Shutdown.
-func (mr *MockEngineMockRecorder) Shutdown() *gomock.Call {
+func (mr *MockEngineMockRecorder) Shutdown(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Shutdown", reflect.TypeOf((*MockEngine)(nil).Shutdown))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Shutdown", reflect.TypeOf((*MockEngine)(nil).Shutdown), arg0)
 }
 
 // Start mocks base method.
-func (m *MockEngine) Start(arg0 uint32) error {
+func (m *MockEngine) Start(arg0 context.Context, arg1 uint32) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Start", arg0)
+	ret := m.ctrl.Call(m, "Start", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Start indicates an expected call of Start.
-func (mr *MockEngineMockRecorder) Start(arg0 interface{}) *gomock.Call {
+func (mr *MockEngineMockRecorder) Start(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockEngine)(nil).Start), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockEngine)(nil).Start), arg0, arg1)
 }
 
 // StateSummaryFrontier mocks base method.
@@ -604,15 +604,15 @@ func (mr *MockEngineMockRecorder) StateSummaryFrontier(arg0, arg1, arg2, arg3 in
 }
 
 // Timeout mocks base method.
-func (m *MockEngine) Timeout() error {
+func (m *MockEngine) Timeout(arg0 context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Timeout")
+	ret := m.ctrl.Call(m, "Timeout", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Timeout indicates an expected call of Timeout.
-func (mr *MockEngineMockRecorder) Timeout() *gomock.Call {
+func (mr *MockEngineMockRecorder) Timeout(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Timeout", reflect.TypeOf((*MockEngine)(nil).Timeout))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Timeout", reflect.TypeOf((*MockEngine)(nil).Timeout), arg0)
 }

@@ -4,6 +4,8 @@
 package avalanche
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
@@ -45,12 +47,12 @@ func (tv *transactionVertex) ID() ids.ID {
 	return tv.vtx.ID()
 }
 
-func (tv *transactionVertex) Accept() error {
+func (tv *transactionVertex) Accept(context.Context) error {
 	tv.status = choices.Accepted
 	return nil
 }
 
-func (tv *transactionVertex) Reject() error {
+func (tv *transactionVertex) Reject(context.Context) error {
 	tv.status = choices.Rejected
 	return nil
 }
@@ -61,7 +63,7 @@ func (tv *transactionVertex) Status() choices.Status {
 
 // Verify isn't called in the consensus code. So this implementation doesn't
 // really matter. However it's used to implement the tx interface.
-func (*transactionVertex) Verify() error {
+func (*transactionVertex) Verify(context.Context) error {
 	return nil
 }
 
@@ -82,7 +84,7 @@ func (tv *transactionVertex) Dependencies() ([]snowstorm.Tx, error) {
 }
 
 // InputIDs must return a non-empty slice to avoid having the snowstorm engine
-// vaciously accept it. A slice is returned containing just the vertexID in
+// vacuously accept it. A slice is returned containing just the vertexID in
 // order to produce no conflicts based on the consumed input.
 func (tv *transactionVertex) InputIDs() []ids.ID {
 	return []ids.ID{tv.vtx.ID()}
@@ -92,6 +94,6 @@ func (tv *transactionVertex) HasWhitelist() bool {
 	return tv.vtx.HasWhitelist()
 }
 
-func (tv *transactionVertex) Whitelist() (ids.Set, error) {
-	return tv.vtx.Whitelist()
+func (tv *transactionVertex) Whitelist(ctx context.Context) (ids.Set, error) {
+	return tv.vtx.Whitelist(ctx)
 }

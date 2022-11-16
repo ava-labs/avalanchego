@@ -129,18 +129,18 @@ func TestTimeout(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
-	bootstrapper.ConnectedF = func(ids.NodeID, *version.Application) error {
+	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
 		return nil
 	}
 	handler.SetBootstrapper(bootstrapper)
 	ctx2.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
-	chainRouter.AddChain(handler)
+	chainRouter.AddChain(context.Background(), handler)
 
-	bootstrapper.StartF = func(uint32) error {
+	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
 	}
-	handler.Start(false)
+	handler.Start(context.Background(), false)
 
 	var (
 		wg           = sync.WaitGroup{}
@@ -377,7 +377,7 @@ func TestReliableMessages(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx2
 	}
-	bootstrapper.ConnectedF = func(ids.NodeID, *version.Application) error {
+	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
 		return nil
 	}
 	queriesToSend := 1000
@@ -393,12 +393,12 @@ func TestReliableMessages(t *testing.T) {
 	handler.SetBootstrapper(bootstrapper)
 	ctx2.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
-	chainRouter.AddChain(handler)
+	chainRouter.AddChain(context.Background(), handler)
 
-	bootstrapper.StartF = func(uint32) error {
+	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
 	}
-	handler.Start(false)
+	handler.Start(context.Background(), false)
 
 	go func() {
 		for i := 0; i < queriesToSend; i++ {
@@ -500,7 +500,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	bootstrapper.ContextF = func() *snow.ConsensusContext {
 		return ctx2
 	}
-	bootstrapper.ConnectedF = func(ids.NodeID, *version.Application) error {
+	bootstrapper.ConnectedF = func(context.Context, ids.NodeID, *version.Application) error {
 		return nil
 	}
 	queriesToSend := 2
@@ -515,12 +515,12 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	handler.SetBootstrapper(bootstrapper)
 	ctx2.SetState(snow.Bootstrapping) // assumed bootstrap is ongoing
 
-	chainRouter.AddChain(handler)
+	chainRouter.AddChain(context.Background(), handler)
 
-	bootstrapper.StartF = func(uint32) error {
+	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
 	}
-	handler.Start(false)
+	handler.Start(context.Background(), false)
 
 	go func() {
 		for i := 0; i < queriesToSend; i++ {

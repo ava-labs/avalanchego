@@ -4,6 +4,8 @@
 package snowstorm
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
@@ -36,11 +38,11 @@ func (t *TestTx) HasWhitelist() bool {
 	return t.HasWhitelistV
 }
 
-func (t *TestTx) Whitelist() (ids.Set, error) {
+func (t *TestTx) Whitelist(context.Context) (ids.Set, error) {
 	return t.WhitelistV, t.WhitelistErrV
 }
 
-func (t *TestTx) Verify() error {
+func (t *TestTx) Verify(context.Context) error {
 	return t.VerifyV
 }
 

@@ -68,7 +68,7 @@ func TestHeightBlockIndexPostFork(t *testing.T) {
 		CantGetFullPostForkBlock: true,
 		CantCommit:               true,
 
-		GetFullPostForkBlockF: func(blkID ids.ID) (snowman.Block, error) {
+		GetFullPostForkBlockF: func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 			blk, found := proBlks[blkID]
 			if !found {
 				return nil, database.ErrNotFound
@@ -148,7 +148,7 @@ func TestHeightBlockIndexAcrossFork(t *testing.T) {
 		CantGetFullPostForkBlock: true,
 		CantCommit:               true,
 
-		GetFullPostForkBlockF: func(blkID ids.ID) (snowman.Block, error) {
+		GetFullPostForkBlockF: func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 			blk, found := proBlks[blkID]
 			if !found {
 				return nil, database.ErrNotFound
@@ -232,7 +232,7 @@ func TestHeightBlockIndexResumeFromCheckPoint(t *testing.T) {
 		CantGetFullPostForkBlock: true,
 		CantCommit:               true,
 
-		GetFullPostForkBlockF: func(blkID ids.ID) (snowman.Block, error) {
+		GetFullPostForkBlockF: func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 			blk, found := proBlks[blkID]
 			if !found {
 				return nil, database.ErrNotFound

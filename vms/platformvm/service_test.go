@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -135,7 +136,7 @@ func TestExportKey(t *testing.T) {
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		if err := service.vm.Shutdown(); err != nil {
+		if err := service.vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		service.vm.ctx.Lock.Unlock()
@@ -162,7 +163,7 @@ func TestImportKey(t *testing.T) {
 	service, _ := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		if err := service.vm.Shutdown(); err != nil {
+		if err := service.vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		service.vm.ctx.Lock.Unlock()
@@ -183,7 +184,7 @@ func TestGetTxStatus(t *testing.T) {
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		if err := service.vm.Shutdown(); err != nil {
+		if err := service.vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		service.vm.ctx.Lock.Unlock()
@@ -264,13 +265,13 @@ func TestGetTxStatus(t *testing.T) {
 
 	if err := service.vm.Builder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
-	} else if block, err := service.vm.BuildBlock(); err != nil {
+	} else if block, err := service.vm.BuildBlock(context.Background()); err != nil {
 		t.Fatal(err)
 	} else if blk, ok := block.(*blockexecutor.Block); !ok {
 		t.Fatalf("should be *blockexecutor.Block but is %T", block)
-	} else if err := blk.Verify(); err != nil {
+	} else if err := blk.Verify(context.Background()); err != nil {
 		t.Fatal(err)
-	} else if err := blk.Accept(); err != nil {
+	} else if err := blk.Accept(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -359,18 +360,18 @@ func TestGetTx(t *testing.T) {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 			}
 
-			block, err := service.vm.BuildBlock()
+			block, err := service.vm.BuildBlock(context.Background())
 			if err != nil {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 			}
-			if err := block.Verify(); err != nil {
+			if err := block.Verify(context.Background()); err != nil {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 			}
-			if err := block.Accept(); err != nil {
+			if err := block.Accept(context.Background()); err != nil {
 				t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 			}
 			if blk, ok := block.(snowman.OracleBlock); ok { // For proposal blocks, commit them
-				options, err := blk.Options()
+				options, err := blk.Options(context.Background())
 				if !errors.Is(err, snowman.ErrNotOracle) {
 					if err != nil {
 						t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
@@ -379,10 +380,10 @@ func TestGetTx(t *testing.T) {
 					if _, ok := commit.Block.(*blocks.BanffCommitBlock); !ok {
 						t.Fatalf("failed test '%s - %s': should prefer to commit", test.description, encoding.String())
 					}
-					if err := commit.Verify(); err != nil {
+					if err := commit.Verify(context.Background()); err != nil {
 						t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 					}
-					if err := commit.Accept(); err != nil {
+					if err := commit.Accept(context.Background()); err != nil {
 						t.Fatalf("failed test '%s - %s': %s", test.description, encoding.String(), err)
 					}
 				}
@@ -407,7 +408,7 @@ func TestGetTx(t *testing.T) {
 				}
 			}
 
-			if err := service.vm.Shutdown(); err != nil {
+			if err := service.vm.Shutdown(context.Background()); err != nil {
 				t.Fatal(err)
 			}
 			service.vm.ctx.Lock.Unlock()
@@ -421,7 +422,7 @@ func TestGetBalance(t *testing.T) {
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		if err := service.vm.Shutdown(); err != nil {
+		if err := service.vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		service.vm.ctx.Lock.Unlock()
@@ -460,7 +461,7 @@ func TestGetStake(t *testing.T) {
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		require.NoError(service.vm.Shutdown())
+		require.NoError(service.vm.Shutdown(context.Background()))
 		service.vm.ctx.Lock.Unlock()
 	}()
 
@@ -625,7 +626,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		if err := service.vm.Shutdown(); err != nil {
+		if err := service.vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		service.vm.ctx.Lock.Unlock()
@@ -758,7 +759,7 @@ func TestGetTimestamp(t *testing.T) {
 	service, _ := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		require.NoError(service.vm.Shutdown())
+		require.NoError(service.vm.Shutdown(context.Background()))
 		service.vm.ctx.Lock.Unlock()
 	}()
 
@@ -822,8 +823,8 @@ func TestGetBlock(t *testing.T) {
 
 			block := service.vm.manager.NewBlock(statelessBlock)
 
-			require.NoError(block.Verify())
-			require.NoError(block.Accept())
+			require.NoError(block.Verify(context.Background()))
+			require.NoError(block.Accept(context.Background()))
 
 			args := api.GetBlockArgs{
 				BlockID:  block.ID(),

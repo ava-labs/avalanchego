@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -42,7 +43,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		require.NoError(vm.Shutdown())
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -68,19 +69,19 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	// trigger block creation
 	require.NoError(vm.Builder.AddUnverifiedTx(addValidatorTx))
 
-	addValidatorBlock, err := vm.Builder.BuildBlock()
+	addValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
-	require.NoError(addValidatorBlock.Verify())
-	require.NoError(addValidatorBlock.Accept())
-	require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+	require.NoError(addValidatorBlock.Verify(context.Background()))
+	require.NoError(addValidatorBlock.Accept(context.Background()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	vm.clock.Set(validatorStartTime)
 
-	firstAdvanceTimeBlock, err := vm.Builder.BuildBlock()
+	firstAdvanceTimeBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
-	require.NoError(firstAdvanceTimeBlock.Verify())
-	require.NoError(firstAdvanceTimeBlock.Accept())
-	require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+	require.NoError(firstAdvanceTimeBlock.Verify(context.Background()))
+	require.NoError(firstAdvanceTimeBlock.Accept(context.Background()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	firstDelegatorStartTime := validatorStartTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	firstDelegatorEndTime := firstDelegatorStartTime.Add(vm.MinStakeDuration)
@@ -100,19 +101,19 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	// trigger block creation
 	require.NoError(vm.Builder.AddUnverifiedTx(addFirstDelegatorTx))
 
-	addFirstDelegatorBlock, err := vm.Builder.BuildBlock()
+	addFirstDelegatorBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
-	require.NoError(addFirstDelegatorBlock.Verify())
-	require.NoError(addFirstDelegatorBlock.Accept())
-	require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+	require.NoError(addFirstDelegatorBlock.Verify(context.Background()))
+	require.NoError(addFirstDelegatorBlock.Accept(context.Background()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	vm.clock.Set(firstDelegatorStartTime)
 
-	secondAdvanceTimeBlock, err := vm.Builder.BuildBlock()
+	secondAdvanceTimeBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
-	require.NoError(secondAdvanceTimeBlock.Verify())
-	require.NoError(secondAdvanceTimeBlock.Accept())
-	require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+	require.NoError(secondAdvanceTimeBlock.Verify(context.Background()))
+	require.NoError(secondAdvanceTimeBlock.Accept(context.Background()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	secondDelegatorStartTime := firstDelegatorEndTime.Add(2 * time.Second)
 	secondDelegatorEndTime := secondDelegatorStartTime.Add(vm.MinStakeDuration)
@@ -134,11 +135,11 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	// trigger block creation
 	require.NoError(vm.Builder.AddUnverifiedTx(addSecondDelegatorTx))
 
-	addSecondDelegatorBlock, err := vm.Builder.BuildBlock()
+	addSecondDelegatorBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
-	require.NoError(addSecondDelegatorBlock.Verify())
-	require.NoError(addSecondDelegatorBlock.Accept())
-	require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+	require.NoError(addSecondDelegatorBlock.Verify(context.Background()))
+	require.NoError(addSecondDelegatorBlock.Accept(context.Background()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	thirdDelegatorStartTime := firstDelegatorEndTime.Add(-time.Second)
 	thirdDelegatorEndTime := thirdDelegatorStartTime.Add(vm.MinStakeDuration)
@@ -207,7 +208,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 
 			vm.ctx.Lock.Lock()
 			defer func() {
-				err := vm.Shutdown()
+				err := vm.Shutdown(context.Background())
 				require.NoError(err)
 
 				vm.ctx.Lock.Unlock()
@@ -237,11 +238,11 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 
 			// trigger block creation for the validator tx
-			addValidatorBlock, err := vm.Builder.BuildBlock()
+			addValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
 			require.NoError(err)
-			require.NoError(addValidatorBlock.Verify())
-			require.NoError(addValidatorBlock.Accept())
-			require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+			require.NoError(addValidatorBlock.Verify(context.Background()))
+			require.NoError(addValidatorBlock.Accept(context.Background()))
+			require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 			// create valid tx
 			addFirstDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -260,11 +261,11 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 
 			// trigger block creation for the first add delegator tx
-			addFirstDelegatorBlock, err := vm.Builder.BuildBlock()
+			addFirstDelegatorBlock, err := vm.Builder.BuildBlock(context.Background())
 			require.NoError(err)
-			require.NoError(addFirstDelegatorBlock.Verify())
-			require.NoError(addFirstDelegatorBlock.Accept())
-			require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+			require.NoError(addFirstDelegatorBlock.Verify(context.Background()))
+			require.NoError(addFirstDelegatorBlock.Accept(context.Background()))
+			require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 			// create valid tx
 			addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -283,11 +284,11 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 
 			// trigger block creation for the second add delegator tx
-			addSecondDelegatorBlock, err := vm.Builder.BuildBlock()
+			addSecondDelegatorBlock, err := vm.Builder.BuildBlock(context.Background())
 			require.NoError(err)
-			require.NoError(addSecondDelegatorBlock.Verify())
-			require.NoError(addSecondDelegatorBlock.Accept())
-			require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+			require.NoError(addSecondDelegatorBlock.Verify(context.Background()))
+			require.NoError(addSecondDelegatorBlock.Accept(context.Background()))
+			require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 			// create valid tx
 			addThirdDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -306,11 +307,11 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 
 			// trigger block creation for the third add delegator tx
-			addThirdDelegatorBlock, err := vm.Builder.BuildBlock()
+			addThirdDelegatorBlock, err := vm.Builder.BuildBlock(context.Background())
 			require.NoError(err)
-			require.NoError(addThirdDelegatorBlock.Verify())
-			require.NoError(addThirdDelegatorBlock.Accept())
-			require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+			require.NoError(addThirdDelegatorBlock.Verify(context.Background()))
+			require.NoError(addThirdDelegatorBlock.Accept(context.Background()))
+			require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 			// create valid tx
 			addFourthDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -329,7 +330,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 
 			// trigger block creation for the fourth add delegator tx
-			addFourthDelegatorBlock, err := vm.Builder.BuildBlock()
+			addFourthDelegatorBlock, err := vm.Builder.BuildBlock(context.Background())
 
 			if test.shouldFail {
 				require.Error(err, "should have failed to allow new delegator")
@@ -337,9 +338,9 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			}
 
 			require.NoError(err)
-			require.NoError(addFourthDelegatorBlock.Verify())
-			require.NoError(addFourthDelegatorBlock.Accept())
-			require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+			require.NoError(addFourthDelegatorBlock.Verify(context.Background()))
+			require.NoError(addFourthDelegatorBlock.Accept(context.Background()))
+			require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 		})
 	}
 }
@@ -368,14 +369,25 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	ctx := defaultContext()
 	ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		ctx.Lock.Unlock()
 	}()
 
 	msgChan := make(chan common.Message, 1)
-	if err := vm.Initialize(ctx, baseDBManager, genesisBytes, nil, nil, msgChan, nil, nil); err != nil {
+	err := vm.Initialize(
+		context.Background(),
+		ctx,
+		baseDBManager,
+		genesisBytes,
+		nil,
+		nil,
+		msgChan,
+		nil,
+		nil,
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -449,20 +461,20 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	require.NoError(err)
 	addSubnetBlk2 := vm.manager.NewBlock(statelessStandardBlk)
 
-	_, err = vm.ParseBlock(addSubnetBlk0.Bytes())
+	_, err = vm.ParseBlock(context.Background(), addSubnetBlk0.Bytes())
 	require.NoError(err)
 
-	_, err = vm.ParseBlock(addSubnetBlk1.Bytes())
+	_, err = vm.ParseBlock(context.Background(), addSubnetBlk1.Bytes())
 	require.NoError(err)
 
-	_, err = vm.ParseBlock(addSubnetBlk2.Bytes())
+	_, err = vm.ParseBlock(context.Background(), addSubnetBlk2.Bytes())
 	require.NoError(err)
 
-	require.NoError(addSubnetBlk0.Verify())
-	require.NoError(addSubnetBlk0.Accept())
+	require.NoError(addSubnetBlk0.Verify(context.Background()))
+	require.NoError(addSubnetBlk0.Accept(context.Background()))
 
 	// Doesn't matter what verify returns as long as it's not panicking.
-	_ = addSubnetBlk2.Verify()
+	_ = addSubnetBlk2.Verify(context.Background())
 }
 
 func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
@@ -471,7 +483,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	vm, baseDB, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
+		err := vm.Shutdown(context.Background())
 		require.NoError(err)
 
 		vm.ctx.Lock.Unlock()
@@ -515,7 +527,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	require.NoError(err)
 
 	addValidatorStandardBlk := vm.manager.NewBlock(statelessBlk)
-	err = addValidatorStandardBlk.Verify()
+	err = addValidatorStandardBlk.Verify(context.Background())
 	require.NoError(err)
 
 	// Verify that the new validator now in pending validator set
@@ -582,7 +594,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Because the shared memory UTXO hasn't been populated, this block is
 	// currently invalid.
-	err = importBlk.Verify()
+	err = importBlk.Verify(context.Background())
 	require.Error(err)
 
 	// Because we no longer ever reject a block in verification, the status
@@ -616,7 +628,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Because the shared memory UTXO has now been populated, the block should
 	// pass verification.
-	err = importBlk.Verify()
+	err = importBlk.Verify(context.Background())
 	require.NoError(err)
 
 	// The status shouldn't have been changed during a successful verification.
@@ -641,7 +653,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	require.NoError(err)
 
 	advanceTimeStandardBlk := vm.manager.NewBlock(statelessAdvanceTimeStandardBlk)
-	err = advanceTimeStandardBlk.Verify()
+	err = advanceTimeStandardBlk.Verify(context.Background())
 	require.NoError(err)
 
 	// Accept all the blocks
@@ -651,7 +663,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		advanceTimeStandardBlk,
 	}
 	for _, blk := range allBlocks {
-		err = blk.Accept()
+		err = blk.Accept(context.Background())
 		require.NoError(err)
 
 		status := blk.Status()
@@ -690,7 +702,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	vm, baseDB, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
+		err := vm.Shutdown(context.Background())
 		require.NoError(err)
 
 		vm.ctx.Lock.Unlock()
@@ -733,7 +745,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require.NoError(err)
 
 	addValidatorStandardBlk0 := vm.manager.NewBlock(statelessAddValidatorStandardBlk0)
-	err = addValidatorStandardBlk0.Verify()
+	err = addValidatorStandardBlk0.Verify(context.Background())
 	require.NoError(err)
 
 	// Verify that first new validator now in pending validator set
@@ -763,7 +775,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require.NoError(err)
 
 	advanceTimeStandardBlk0 := vm.manager.NewBlock(statelessAdvanceTimeStandardBlk0)
-	err = advanceTimeStandardBlk0.Verify()
+	err = advanceTimeStandardBlk0.Verify(context.Background())
 	require.NoError(err)
 
 	// Verify that the first new validator is now in the current validator set.
@@ -835,7 +847,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	importBlk := vm.manager.NewBlock(statelessImportBlk)
 	// Because the shared memory UTXO hasn't been populated, this block is
 	// currently invalid.
-	err = importBlk.Verify()
+	err = importBlk.Verify(context.Background())
 	require.Error(err)
 
 	// Because we no longer ever reject a block in verification, the status
@@ -869,7 +881,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Because the shared memory UTXO has now been populated, the block should
 	// pass verification.
-	err = importBlk.Verify()
+	err = importBlk.Verify(context.Background())
 	require.NoError(err)
 
 	// The status shouldn't have been changed during a successful verification.
@@ -909,7 +921,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	addValidatorStandardBlk1 := vm.manager.NewBlock(statelessAddValidatorStandardBlk1)
 
-	err = addValidatorStandardBlk1.Verify()
+	err = addValidatorStandardBlk1.Verify(context.Background())
 	require.NoError(err)
 
 	// Verify that the second new validator now in pending validator set
@@ -939,7 +951,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require.NoError(err)
 
 	advanceTimeStandardBlk1 := vm.manager.NewBlock(statelessAdvanceTimeStandardBlk1)
-	err = advanceTimeStandardBlk1.Verify()
+	err = advanceTimeStandardBlk1.Verify(context.Background())
 	require.NoError(err)
 
 	// Verify that the second new validator is now in the current validator set.
@@ -966,7 +978,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		advanceTimeStandardBlk1,
 	}
 	for _, blk := range allBlocks {
-		err = blk.Accept()
+		err = blk.Accept(context.Background())
 		require.NoError(err)
 
 		status := blk.Status()
@@ -1014,7 +1026,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
+		err := vm.Shutdown(context.Background())
 		require.NoError(err)
 
 		vm.ctx.Lock.Unlock()
@@ -1075,9 +1087,9 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	)
 	require.NoError(err)
 	addValidatorProposalBlk0 := vm.manager.NewBlock(statelessStandardBlk)
-	require.NoError(addValidatorProposalBlk0.Verify())
-	require.NoError(addValidatorProposalBlk0.Accept())
-	require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+	require.NoError(addValidatorProposalBlk0.Verify(context.Background()))
+	require.NoError(addValidatorProposalBlk0.Accept(context.Background()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	currentHeight, err = vm.GetCurrentHeight()
 	require.NoError(err)
@@ -1108,9 +1120,9 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	)
 	require.NoError(err)
 	advanceTimeProposalBlk0 := vm.manager.NewBlock(statelessStandardBlk)
-	require.NoError(advanceTimeProposalBlk0.Verify())
-	require.NoError(advanceTimeProposalBlk0.Accept())
-	require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+	require.NoError(advanceTimeProposalBlk0.Verify(context.Background()))
+	require.NoError(advanceTimeProposalBlk0.Accept(context.Background()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	currentHeight, err = vm.GetCurrentHeight()
 	require.NoError(err)
@@ -1154,7 +1166,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown()
+		err := vm.Shutdown(context.Background())
 		require.NoError(err)
 
 		vm.ctx.Lock.Unlock()
@@ -1184,11 +1196,11 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	require.NoError(err)
 
 	// trigger block creation for the validator tx
-	addValidatorBlock, err := vm.Builder.BuildBlock()
+	addValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
-	require.NoError(addValidatorBlock.Verify())
-	require.NoError(addValidatorBlock.Accept())
-	require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+	require.NoError(addValidatorBlock.Verify(context.Background()))
+	require.NoError(addValidatorBlock.Accept(context.Background()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	// create valid tx
 	addFirstDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
@@ -1207,11 +1219,11 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	require.NoError(err)
 
 	// trigger block creation for the first add delegator tx
-	addFirstDelegatorBlock, err := vm.Builder.BuildBlock()
+	addFirstDelegatorBlock, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
-	require.NoError(addFirstDelegatorBlock.Verify())
-	require.NoError(addFirstDelegatorBlock.Accept())
-	require.NoError(vm.SetPreference(vm.manager.LastAccepted()))
+	require.NoError(addFirstDelegatorBlock.Verify(context.Background()))
+	require.NoError(addFirstDelegatorBlock.Accept(context.Background()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	// create valid tx
 	addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(

@@ -4,6 +4,7 @@
 package node
 
 import (
+	"context"
 	"crypto"
 	"errors"
 	"fmt"
@@ -773,7 +774,7 @@ func (n *Node) initVMs() error {
 	// Register the VMs that Avalanche supports
 	errs := wrappers.Errs{}
 	errs.Add(
-		vmRegisterer.Register(constants.PlatformVMID, &platformvm.Factory{
+		vmRegisterer.Register(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
 			Config: config.Config{
 				Chains:                          n.chainManager,
 				Validators:                      vdrs,
@@ -804,14 +805,14 @@ func (n *Node) initVMs() error {
 				MinPercentConnectedStakeHealthy: n.Config.MinPercentConnectedStakeHealthy,
 			},
 		}),
-		vmRegisterer.Register(constants.AVMID, &avm.Factory{
+		vmRegisterer.Register(context.TODO(), constants.AVMID, &avm.Factory{
 			TxFee:            n.Config.TxFee,
 			CreateAssetTxFee: n.Config.CreateAssetTxFee,
 		}),
-		vmRegisterer.Register(constants.EVMID, &coreth.Factory{}),
-		n.Config.VMManager.RegisterFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
-		n.Config.VMManager.RegisterFactory(nftfx.ID, &nftfx.Factory{}),
-		n.Config.VMManager.RegisterFactory(propertyfx.ID, &propertyfx.Factory{}),
+		vmRegisterer.Register(context.TODO(), constants.EVMID, &coreth.Factory{}),
+		n.Config.VMManager.RegisterFactory(context.TODO(), secp256k1fx.ID, &secp256k1fx.Factory{}),
+		n.Config.VMManager.RegisterFactory(context.TODO(), nftfx.ID, &nftfx.Factory{}),
+		n.Config.VMManager.RegisterFactory(context.TODO(), propertyfx.ID, &propertyfx.Factory{}),
 	)
 	if errs.Errored() {
 		return errs.Err
@@ -829,7 +830,7 @@ func (n *Node) initVMs() error {
 	})
 
 	// register any vms that need to be installed as plugins from disk
-	_, failedVMs, err := n.VMRegistry.Reload()
+	_, failedVMs, err := n.VMRegistry.Reload(context.TODO())
 	for failedVM, err := range failedVMs {
 		n.Log.Error("failed to register VM",
 			zap.Stringer("vmID", failedVM),
@@ -1032,7 +1033,7 @@ func (n *Node) initHealthAPI() error {
 		return fmt.Errorf("couldn't register database health check: %w", err)
 	}
 
-	diskSpaceCheck := health.CheckerFunc(func() (interface{}, error) {
+	diskSpaceCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
 		// confirm that the node has enough disk space to continue operating
 		// if there is too little disk space remaining, first report unhealthy and then shutdown the node
 
@@ -1344,7 +1345,7 @@ func (n *Node) Initialize(
 		return fmt.Errorf("couldn't initialize indexer: %w", err)
 	}
 
-	n.health.Start(n.Config.HealthCheckFreq)
+	n.health.Start(context.TODO(), n.Config.HealthCheckFreq)
 	n.initProfiler()
 
 	// Start the Platform chain
@@ -1369,7 +1370,7 @@ func (n *Node) shutdown() {
 
 	if n.health != nil {
 		// Passes if the node is not shutting down
-		shuttingDownCheck := health.CheckerFunc(func() (interface{}, error) {
+		shuttingDownCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
 			return map[string]interface{}{
 				"isShuttingDown": true,
 			}, errShuttingDown

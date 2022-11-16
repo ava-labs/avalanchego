@@ -36,8 +36,8 @@ type Router interface {
 		metricsNamespace string,
 		metricsRegisterer prometheus.Registerer,
 	) error
-	Shutdown()
-	AddChain(chain handler.Handler)
+	Shutdown(context.Context)
+	AddChain(ctx context.Context, chain handler.Handler)
 	health.Checker
 }
 

@@ -4,6 +4,8 @@
 package meterdb
 
 import (
+	"context"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -130,9 +132,9 @@ func (db *Database) Close() error {
 	return err
 }
 
-func (db *Database) HealthCheck() (interface{}, error) {
+func (db *Database) HealthCheck(ctx context.Context) (interface{}, error) {
 	start := db.clock.Time()
-	result, err := db.db.HealthCheck()
+	result, err := db.db.HealthCheck(ctx)
 	end := db.clock.Time()
 	db.healthCheck.Observe(float64(end.Sub(start)))
 	return result, err

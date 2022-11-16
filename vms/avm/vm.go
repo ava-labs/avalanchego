@@ -113,11 +113,11 @@ type VM struct {
 	uniqueTxs cache.Deduplicator
 }
 
-func (*VM) Connected(ids.NodeID, *version.Application) error {
+func (*VM) Connected(context.Context, ids.NodeID, *version.Application) error {
 	return nil
 }
 
-func (*VM) Disconnected(ids.NodeID) error {
+func (*VM) Disconnected(context.Context, ids.NodeID) error {
 	return nil
 }
 
@@ -133,6 +133,7 @@ type Config struct {
 }
 
 func (vm *VM) Initialize(
+	_ context.Context,
 	ctx *snow.Context,
 	dbManager manager.Manager,
 	genesisBytes []byte,
@@ -267,7 +268,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 	return nil
 }
 
-func (vm *VM) SetState(state snow.State) error {
+func (vm *VM) SetState(_ context.Context, state snow.State) error {
 	switch state {
 	case snow.Bootstrapping:
 		return vm.onBootstrapStarted()
@@ -278,7 +279,7 @@ func (vm *VM) SetState(state snow.State) error {
 	}
 }
 
-func (vm *VM) Shutdown() error {
+func (vm *VM) Shutdown(context.Context) error {
 	if vm.timer == nil {
 		return nil
 	}
@@ -292,11 +293,11 @@ func (vm *VM) Shutdown() error {
 	return vm.baseDB.Close()
 }
 
-func (*VM) Version() (string, error) {
+func (*VM) Version(context.Context) (string, error) {
 	return version.Current.String(), nil
 }
 
-func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
+func (vm *VM) CreateHandlers(context.Context) (map[string]*common.HTTPHandler, error) {
 	codec := json.NewCodec()
 
 	rpcServer := rpc.NewServer()
@@ -324,7 +325,7 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	}, err
 }
 
-func (*VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
+func (*VM) CreateStaticHandlers(context.Context) (map[string]*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := json.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
@@ -337,7 +338,7 @@ func (*VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	}, newServer.RegisterService(staticService, "avm")
 }
 
-func (vm *VM) PendingTxs() []snowstorm.Tx {
+func (vm *VM) PendingTxs(context.Context) []snowstorm.Tx {
 	vm.timer.Cancel()
 
 	txs := vm.txs
@@ -345,11 +346,11 @@ func (vm *VM) PendingTxs() []snowstorm.Tx {
 	return txs
 }
 
-func (vm *VM) ParseTx(b []byte) (snowstorm.Tx, error) {
+func (vm *VM) ParseTx(_ context.Context, b []byte) (snowstorm.Tx, error) {
 	return vm.parseTx(b)
 }
 
-func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
+func (vm *VM) GetTx(_ context.Context, txID ids.ID) (snowstorm.Tx, error) {
 	tx := &UniqueTx{
 		vm:   vm,
 		txID: txID,

@@ -295,10 +295,11 @@ type LoadVMsReply struct {
 }
 
 // LoadVMs loads any new VMs available to the node and returns the added VMs.
-func (service *Admin) LoadVMs(_ *http.Request, _ *struct{}, reply *LoadVMsReply) error {
+func (service *Admin) LoadVMs(r *http.Request, _ *struct{}, reply *LoadVMsReply) error {
 	service.Log.Debug("Admin: LoadVMs called")
 
-	loadedVMs, failedVMs, err := service.VMRegistry.ReloadWithReadLock()
+	ctx := r.Context()
+	loadedVMs, failedVMs, err := service.VMRegistry.ReloadWithReadLock(ctx)
 	if err != nil {
 		return err
 	}

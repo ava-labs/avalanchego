@@ -62,8 +62,8 @@ github.com/ava-labs/avalanche-ledger-go v0.0.13 h1:YTdaSuaZS/1ct1RGirBEJeo2tiSfV
 github.com/ava-labs/avalanche-ledger-go v0.0.13/go.mod h1:LolCV2cdtkD67V/BSfy/ELUqleG1sbVyNdo5qe1u4y4=
 github.com/ava-labs/avalanche-network-runner-sdk v0.3.0 h1:TVi9JEdKNU/RevYZ9PyW4pULbEdS+KQDA9Ki2DUvuAs=
 github.com/ava-labs/avalanche-network-runner-sdk v0.3.0/go.mod h1:SgKJvtqvgo/Bl/c8fxEHCLaSxEbzimYfBopcfrajxQk=
-github.com/ava-labs/coreth v0.11.2-rc.0 h1:aK6Hd9I9t3FTqgofgPK5ZYFp8wfHzrUT/Aj4HtBRbTA=
-github.com/ava-labs/coreth v0.11.2-rc.0/go.mod h1:gLc+jBTJXfoSyhBP6x6BU7/Tq1K4ptj5/y6T7qgmyyA=
+github.com/ava-labs/coreth v0.11.3-rc.0 h1:goJtSsVI2dwdGSyR6VmEAotIES1z65aKFVbHIw2i4vA=
+github.com/ava-labs/coreth v0.11.3-rc.0/go.mod h1:FEEvs3gUlRieoUXqoZDya9z12ppbOcEokrwcKKUkL5w=
 github.com/benbjohnson/clock v1.3.0 h1:ip6w0uFQkncKQ979AypyG0ER7mqUSBdKLOgAle/AT8A=
 github.com/benbjohnson/clock v1.3.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
@@ -141,8 +141,8 @@ github.com/envoyproxy/go-control-plane v0.9.9-0.20201210154907-fd9021fe5dad/go.m
 github.com/envoyproxy/go-control-plane v0.9.9-0.20210512163311-63b5d3c536b0/go.mod h1:hliV/p42l8fGbc6Y9bQ70uLwIvmJyVE5k4iMKlh8wCQ=
 github.com/envoyproxy/go-control-plane v0.9.10-0.20210907150352-cf90f659a021/go.mod h1:AFq3mo9L8Lqqiid3OhADV3RfLJnjiw63cSpi+fDTRC0=
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
-github.com/ethereum/go-ethereum v1.10.25 h1:5dFrKJDnYf8L6/5o42abCE6a9yJm9cs4EJVRyYMr55s=
-github.com/ethereum/go-ethereum v1.10.25/go.mod h1:EYFyF19u3ezGLD4RqOkLq+ZCXzYbLoNDdZlMt7kyKFg=
+github.com/ethereum/go-ethereum v1.10.26 h1:i/7d9RBBwiXCEuyduBQzJw/mKmnvzsN14jqBmytw72s=
+github.com/ethereum/go-ethereum v1.10.26/go.mod h1:EYFyF19u3ezGLD4RqOkLq+ZCXzYbLoNDdZlMt7kyKFg=
 github.com/fatih/color v1.13.0 h1:8LOYc1KYPPmyKMuN8QV2DNRWNbLo6LZ0iLs8+mlH53w=
 github.com/fatih/color v1.13.0/go.mod h1:kLAiJbzzSOZDVNGyDpeOxJ47H46qBXwg5ILebYFFOfk=
 github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5 h1:FtmdgXiUlNeRsoNMFlKLDt+S+6hbjVMEW6RGQ7aUf7c=
