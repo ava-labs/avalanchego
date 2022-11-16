@@ -190,6 +190,21 @@ func (mr *MockChainMockRecorder) DeleteUTXO(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUTXO", reflect.TypeOf((*MockChain)(nil).DeleteUTXO), arg0)
 }
 
+// GetAddressStates mocks base method.
+func (m *MockChain) GetAddressStates(arg0 ids.ShortID) (uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAddressStates", arg0)
+	ret0, _ := ret[0].(uint64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetAddressStates indicates an expected call of GetAddressStates.
+func (mr *MockChainMockRecorder) GetAddressStates(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAddressStates", reflect.TypeOf((*MockChain)(nil).GetAddressStates), arg0)
+}
+
 // GetChains mocks base method.
 func (m *MockChain) GetChains(arg0 ids.ID) ([]*txs.Tx, error) {
 	m.ctrl.T.Helper()
@@ -461,6 +476,18 @@ func (m *MockChain) PutPendingValidator(arg0 *Staker) {
 func (mr *MockChainMockRecorder) PutPendingValidator(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutPendingValidator", reflect.TypeOf((*MockChain)(nil).PutPendingValidator), arg0)
+}
+
+// SetAddressStates mocks base method.
+func (m *MockChain) SetAddressStates(arg0 ids.ShortID, arg1 uint64) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetAddressStates", arg0, arg1)
+}
+
+// SetAddressStates indicates an expected call of SetAddressStates.
+func (mr *MockChainMockRecorder) SetAddressStates(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetAddressStates", reflect.TypeOf((*MockChain)(nil).SetAddressStates), arg0, arg1)
 }
 
 // SetCurrentSupply mocks base method.

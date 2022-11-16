@@ -1,0 +1,21 @@
+// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package p
+
+import (
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+)
+
+func (b *backendVisitor) AddAddressStateTx(tx *txs.AddAddressStateTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
+func (s *signerVisitor) AddAddressStateTx(tx *txs.AddAddressStateTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return s.sign(s.tx, txSigners)
+}

@@ -25,7 +25,8 @@
     ],
     "camino": {
         "verifyNodeSignature": true,
-        "lockModeBondDeposit": true
+        "lockModeBondDeposit": true,
+        "initialAdmin": "X-columbus1m4nr983lhd4p4nfsqk3a6a9mejugnn73ju0gav"
     },
     "startTime": 1647388800,
     "initialStakeDuration": 31536000,
@@ -35,7 +36,7 @@
     ],
     "initialStakers": [
         {
-            "nodeID": "NodeID-JPtMGLcaqXQuXZ5fqXFJvvX94d8BWy6zX",
+            "nodeID": "NodeID-EAm6xyzP8mGm6VMSEoeV3L6dUP1YYnjCr",
             "rewardAddress": "X-columbus1m4nr983lhd4p4nfsqk3a6a9mejugnn73ju0gav",
             "delegationFee": 200000
         }

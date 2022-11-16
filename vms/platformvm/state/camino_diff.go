@@ -60,3 +60,27 @@ func (d *diff) CaminoGenesisState() (*genesis.Camino, error) {
 	}
 	return parentState.CaminoGenesisState()
 }
+
+func (d *diff) SetAddressStates(address ids.ShortID, states uint64) {
+	d.caminoDiff.modifiedAddressStates[address] = states
+}
+
+func (d *diff) GetAddressStates(address ids.ShortID) (uint64, error) {
+	if states, ok := d.caminoDiff.modifiedAddressStates[address]; ok {
+		return states, nil
+	}
+
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return 0, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	return parentState.GetAddressStates(address)
+}
+
+// Finally apply all changes
+func (d *diff) ApplyCaminoState(baseState State) {
+	for k, v := range d.caminoDiff.modifiedAddressStates {
+		baseState.SetAddressStates(k, v)
+	}
+}

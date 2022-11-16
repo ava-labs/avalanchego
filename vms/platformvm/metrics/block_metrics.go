@@ -15,7 +15,7 @@ import (
 var _ blocks.Visitor = (*blockMetrics)(nil)
 
 type blockMetrics struct {
-	txMetrics *txMetrics
+	txMetrics *caminoTxMetrics
 
 	numAbortBlocks,
 	numAtomicBlocks,
@@ -28,7 +28,7 @@ func newBlockMetrics(
 	namespace string,
 	registerer prometheus.Registerer,
 ) (*blockMetrics, error) {
-	txMetrics, err := newTxMetrics(namespace, registerer)
+	txMetrics, err := newCaminoTxMetrics(namespace, registerer)
 	errs := wrappers.Errs{Err: err}
 	m := &blockMetrics{
 		txMetrics:         txMetrics,

@@ -25,6 +25,9 @@ var (
 
 	errNodeSignatureMissing = errors.New("last signature is not nodeID's signature")
 	errWrongLockMode        = errors.New("this tx can't be used with this caminoGenesis.LockModeBondDeposit")
+	errNotSecp256Fx         = errors.New("expected fx to be secp256k1.fx")
+	errRecoverAdresses      = errors.New("cannot recover addresses from credentials")
+	errInvalidRoles         = errors.New("invalid role")
 )
 
 type CaminoStandardTxExecutor struct {
@@ -352,4 +355,93 @@ func removeCreds(tx *txs.Tx, num int) []verify.Verifiable {
 
 func addCreds(tx *txs.Tx, creds []verify.Verifiable) {
 	tx.Creds = append(tx.Creds, creds...)
+}
+
+func (e *CaminoStandardTxExecutor) AddAddressStateTx(tx *txs.AddAddressStateTx) error {
+	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
+		return err
+	}
+
+	fx, ok := e.Backend.Fx.(*secp256k1fx.Fx)
+	if !ok {
+		return errNotSecp256Fx
+	}
+
+	addresses, err := fx.RecoverAddresses(tx, e.Tx.Creds)
+	if err != nil {
+		return fmt.Errorf("%w: %s", errRecoverAdresses, err)
+	}
+
+	if addresses.Len() == 0 {
+		return errWrongNumberOfCredentials
+	}
+
+	// Accumulate roles over all signers
+	roles := uint64(0)
+	for address := range addresses {
+		states, err := e.State.GetAddressStates(address)
+		if err != nil {
+			return err
+		}
+		roles |= states
+	}
+	statesBit := uint64(1) << uint64(tx.State)
+
+	// Verify that roles are allowed to modify tx.State
+	if err := verifyAccess(roles, statesBit); err != nil {
+		return err
+	}
+
+	// Get the current state
+	states, err := e.State.GetAddressStates(tx.Address)
+	if err != nil {
+		return err
+	}
+	// Calculate new states
+	newStates := states
+	if tx.Remove && (states&statesBit) != 0 {
+		newStates ^= statesBit
+	} else if !tx.Remove {
+		newStates |= statesBit
+	}
+
+	// Verify the flowcheck
+	if err := e.FlowChecker.VerifySpend(
+		tx,
+		e.State,
+		tx.Ins,
+		tx.Outs,
+		e.Tx.Creds,
+		map[ids.ID]uint64{
+			e.Ctx.AVAXAssetID: e.Config.TxFee,
+		},
+	); err != nil {
+		return err
+	}
+
+	txID := e.Tx.ID()
+
+	// Consume the UTXOS
+	utxo.Consume(e.State, tx.Ins)
+	// Produce the UTXOS
+	utxo.Produce(e.State, txID, tx.Outs)
+	// Set the new states if changed
+	if states != newStates {
+		e.State.SetAddressStates(tx.Address, states)
+	}
+
+	return nil
+}
+
+func verifyAccess(roles, statesBit uint64) error {
+	switch {
+	case (roles & txs.AddressStateRoleAdminBit) != 0:
+	case (txs.AddressStateKycBits & statesBit) != 0:
+		if (roles & txs.AddressStateRoleKycBit) == 0 {
+			return errInvalidRoles
+		}
+	case (txs.AddressStateRoleBits & statesBit) != 0:
+		return errInvalidRoles
+	}
+	return nil
 }
