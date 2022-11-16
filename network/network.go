@@ -499,28 +499,18 @@ func (n *network) Dispatch() error {
 	go n.inboundConnUpgradeThrottler.Dispatch()
 	errs := wrappers.Errs{}
 	for { // Continuously accept new connections
+		if n.onCloseCtx.Err() != nil {
+			break
+		}
+
 		conn, err := n.listener.Accept() // Returns error when n.Close() is called
 		if err != nil {
-			if netErr, ok := err.(net.Error); ok {
-				if netErr.Timeout() {
-					n.metrics.acceptFailed.WithLabelValues("timeout").Inc()
-				}
-
-				// TODO: deprecate "Temporary" and use "Timeout"
-				if netErr.Temporary() {
-					n.metrics.acceptFailed.WithLabelValues("temporary").Inc()
-
-					// Sleep for a small amount of time to try to wait for the
-					// temporary error to go away.
-					time.Sleep(time.Millisecond)
-					continue
-				}
-			}
-
-			n.peerConfig.Log.Debug("error during server accept",
-				zap.Error(err),
-			)
-			break
+			n.peerConfig.Log.Debug("error during server accept", zap.Error(err))
+			// Sleep for a small amount of time to try to wait for the
+			// error to go away.
+			time.Sleep(time.Millisecond)
+			n.metrics.acceptFailed.Inc()
+			continue
 		}
 
 		// We pessimistically drop an incoming connection if the remote
