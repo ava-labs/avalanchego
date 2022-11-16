@@ -18,13 +18,13 @@ func LoadLocalCaminoNodeKeysAndIDs(localStakingPath string) ([]*crypto.PrivateKe
 	nodeKeys := make([]*crypto.PrivateKeySECP256K1R, localNodesCount)
 	nodeIDs := make([]ids.NodeID, localNodesCount)
 
-	for index := 1; index < localNodesCount; index++ {
+	for index := 0; index < localNodesCount; index++ {
 		secp256Factory := crypto.FactorySECP256K1R{}
 		var nodePrivateKey crypto.PrivateKey
 
 		cert, err := staking.LoadTLSCertFromFiles(
-			localStakingPath+"staker"+strconv.Itoa(index)+".key",
-			localStakingPath+"staker"+strconv.Itoa(index)+".crt")
+			localStakingPath+"staker"+strconv.Itoa(index+1)+".key",
+			localStakingPath+"staker"+strconv.Itoa(index+1)+".crt")
 		if err != nil {
 			panic(err)
 		}
