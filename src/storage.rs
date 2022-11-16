@@ -1046,7 +1046,7 @@ impl DiskBuffer {
         match req {
             BufferCmd::Shutdown => return false,
             BufferCmd::InitWAL(rootfd, waldir) => {
-                if let Err(_) = self.init_wal(rootfd, waldir).await {
+                if (self.init_wal(rootfd, waldir).await).is_err() {
                     panic!("cannot initialize from WAL")
                 }
             }

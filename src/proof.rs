@@ -109,21 +109,23 @@ impl Proof {
 
     fn generate_subproof(&self, data: Vec<u8>) -> Result<Option<SubProof>, ProofError> {
         let data_len = data.len();
-        if data_len == 32 {
-            let sub_hash: &[u8] = &data;
-            let sub_hash = sub_hash.try_into().unwrap();
-            Ok(Some(SubProof {
-                rlp: data,
-                hash: Some(sub_hash),
-            }))
-        } else if data_len < 32 {
-            let sub_hash = sha3::Keccak256::digest(&data).into();
-            Ok(Some(SubProof {
-                rlp: data,
-                hash: Some(sub_hash),
-            }))
-        } else {
-            Err(ProofError::DecodeError)
+        match data_len {
+            32 => {
+                let sub_hash: &[u8] = &data;
+                let sub_hash = sub_hash.try_into().unwrap();
+                Ok(Some(SubProof {
+                    rlp: data,
+                    hash: Some(sub_hash),
+                }))
+            }
+            0..=31 => {
+                let sub_hash = sha3::Keccak256::digest(&data).into();
+                Ok(Some(SubProof {
+                    rlp: data,
+                    hash: Some(sub_hash),
+                }))
+            }
+            _ => Err(ProofError::DecodeError),
         }
     }
 }

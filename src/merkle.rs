@@ -773,7 +773,7 @@ impl Merkle {
                             match &mut u.inner {
                                 NodeType::Leaf(u) => u.1 = Data(val),
                                 NodeType::Extension(u) => {
-                                    match (|| {
+                                    if let Err(e) = (|| {
                                         let mut b_ref = self.get_node(u.1)?;
                                         if b_ref
                                             .write(|b| {
@@ -787,8 +787,7 @@ impl Merkle {
                                         }
                                         Ok(())
                                     })() {
-                                        Err(e) => err = Some(Err(e)),
-                                        _ => (),
+                                        err = Some(Err(e))
                                     }
                                 }
                                 _ => unreachable!(),
@@ -1191,7 +1190,7 @@ impl Merkle {
                     self,
                     b_ref,
                     |b| {
-                        match (|| {
+                        if let Err(e) = (|| {
                             match &mut b.inner {
                                 NodeType::Branch(n) => {
                                     // from: [Branch] -> [Branch]x -> [Branch]
@@ -1215,8 +1214,7 @@ impl Merkle {
                             b.rehash();
                             Ok(())
                         })() {
-                            Err(e) => err = Some(Err(e)),
-                            _ => (),
+                            err = Some(Err(e))
                         }
                     },
                     parents,
@@ -1547,7 +1545,7 @@ impl Merkle {
         // Get the hashes of the nodes.
         for node in nodes {
             let node = self.get_node(node)?;
-            let rlp = node.get_eth_rlp::<T>(self.store.as_ref()).clone();
+            let rlp = <&[u8]>::clone(&node.get_eth_rlp::<T>(self.store.as_ref()));
             let hash: [u8; 32] = sha3::Keccak256::digest(rlp).into();
             proofs.insert(hash, rlp.to_vec());
         }
