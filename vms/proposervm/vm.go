@@ -166,8 +166,7 @@ func (vm *VM) Initialize(
 	proposerRetriever := proposer.NewRetriever(ctx.ValidatorState, ctx.SubnetID, ctx.ChainID)
 	vm.Retriever = proposerRetriever
 	vm.ctx.ProposerRetriever = proposerRetriever
-
-	vm.Windower = proposer.New(ctx.ValidatorState, ctx.SubnetID, ctx.ChainID)
+	vm.Windower = proposer.New(proposerRetriever)
 	vm.Tree = tree.New()
 	innerBlkCache, err := metercacher.New(
 		"inner_block_cache",
@@ -292,7 +291,7 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 	// reset scheduler
 	vm.Retriever.SetChainHeight(blk.Height() + 1)
 	vm.Retriever.SetPChainHeight(pChainHeight)
-	minDelay, err := vm.Windower.Delay(blk.Height()+1, pChainHeight, vm.ctx.NodeID)
+	minDelay, err := vm.Windower.Delay(vm.ctx.NodeID)
 	if err != nil {
 		vm.ctx.Log.Debug("failed to fetch the expected delay",
 			zap.Error(err),
