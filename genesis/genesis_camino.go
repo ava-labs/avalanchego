@@ -27,8 +27,8 @@ var (
 		},
 		StakingConfig: StakingConfig{
 			UptimeRequirement: .8, // 80%
-			MinValidatorStake: 2 * units.KiloAvax,
-			MaxValidatorStake: 3 * units.MegaAvax,
+			MinValidatorStake: 100 * units.KiloAvax,
+			MaxValidatorStake: 100 * units.KiloAvax,
 			MinDelegatorStake: 25 * units.Avax,
 			MinDelegationFee:  20000, // 2%
 			MinStakeDuration:  14 * 24 * time.Hour,
@@ -40,7 +40,6 @@ var (
 				SupplyCap:          1000 * units.MegaAvax,
 			},
 			CaminoConfig: config.CaminoConfig{
-				ValidatorBondAmount:   100 * units.KiloAvax,
 				DaoProposalBondAmount: 1 * units.KiloAvax,
 			},
 		},

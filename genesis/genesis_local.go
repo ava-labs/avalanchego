@@ -73,7 +73,6 @@ var (
 				SupplyCap:          720 * units.MegaAvax,
 			},
 			CaminoConfig: config.CaminoConfig{
-				ValidatorBondAmount:   2 * units.KiloAvax,
 				DaoProposalBondAmount: 100 * units.Avax,
 			},
 		},
