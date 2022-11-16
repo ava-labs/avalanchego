@@ -26,8 +26,9 @@ const (
 	MainnetID uint32 = 1
 	FujiID    uint32 = 5
 
-	CaminoID   uint32 = 1000
-	ColumbusID uint32 = 1001
+	CaminoID     uint32 = 1000
+	ColumbusID   uint32 = 1001
+	KopernikusID uint32 = 1002
 
 	TestnetID  uint32 = ColumbusID
 	UnitTestID uint32 = 10
@@ -36,19 +37,21 @@ const (
 	MainnetName = "mainnet"
 	FujiName    = "fuji"
 
-	CaminoName   = "camino"
-	ColumbusName = "columbus"
-	TestnetName  = "testnet"
-	UnitTestName = "testing"
-	LocalName    = "local"
+	CaminoName     = "camino"
+	ColumbusName   = "columbus"
+	KopernikusName = "kopernikus"
+	TestnetName    = "testnet"
+	UnitTestName   = "testing"
+	LocalName      = "local"
 
-	MainnetHRP  = "avax"
-	FujiHRP     = "fuji"
-	CaminoHRP   = "camino"
-	ColumbusHRP = "columbus"
-	UnitTestHRP = "testing"
-	LocalHRP    = "local"
-	FallbackHRP = "custom"
+	MainnetHRP    = "avax"
+	FujiHRP       = "fuji"
+	CaminoHRP     = "camino"
+	ColumbusHRP   = "columbus"
+	KopernikusHRP = "kopernikus"
+	UnitTestHRP   = "testing"
+	LocalHRP      = "local"
+	FallbackHRP   = "custom"
 )
 
 // Variables to be exported
@@ -57,38 +60,42 @@ var (
 	PlatformChainID  = ids.Empty
 
 	NetworkIDToNetworkName = map[uint32]string{
-		MainnetID:  MainnetName,
-		FujiID:     FujiName,
-		CaminoID:   CaminoName,
-		ColumbusID: ColumbusName,
-		UnitTestID: UnitTestName,
-		LocalID:    LocalName,
+		MainnetID:    MainnetName,
+		FujiID:       FujiName,
+		CaminoID:     CaminoName,
+		ColumbusID:   ColumbusName,
+		KopernikusID: KopernikusName,
+		UnitTestID:   UnitTestName,
+		LocalID:      LocalName,
 	}
 	NetworkNameToNetworkID = map[string]uint32{
-		MainnetName:  MainnetID,
-		FujiName:     FujiID,
-		CaminoName:   CaminoID,
-		ColumbusName: ColumbusID,
-		TestnetName:  TestnetID,
-		UnitTestName: UnitTestID,
-		LocalName:    LocalID,
+		MainnetName:    MainnetID,
+		FujiName:       FujiID,
+		CaminoName:     CaminoID,
+		ColumbusName:   ColumbusID,
+		KopernikusName: KopernikusID,
+		TestnetName:    TestnetID,
+		UnitTestName:   UnitTestID,
+		LocalName:      LocalID,
 	}
 
 	NetworkIDToHRP = map[uint32]string{
-		MainnetID:  MainnetHRP,
-		FujiID:     FujiHRP,
-		CaminoID:   CaminoHRP,
-		ColumbusID: ColumbusHRP,
-		UnitTestID: UnitTestHRP,
-		LocalID:    LocalHRP,
+		MainnetID:    MainnetHRP,
+		FujiID:       FujiHRP,
+		CaminoID:     CaminoHRP,
+		ColumbusID:   ColumbusHRP,
+		KopernikusID: KopernikusHRP,
+		UnitTestID:   UnitTestHRP,
+		LocalID:      LocalHRP,
 	}
 	NetworkHRPToNetworkID = map[string]uint32{
-		MainnetHRP:  MainnetID,
-		FujiHRP:     FujiID,
-		CaminoHRP:   CaminoID,
-		ColumbusHRP: ColumbusID,
-		UnitTestHRP: UnitTestID,
-		LocalHRP:    LocalID,
+		MainnetHRP:    MainnetID,
+		FujiHRP:       FujiID,
+		CaminoHRP:     CaminoID,
+		ColumbusHRP:   ColumbusID,
+		KopernikusHRP: KopernikusID,
+		UnitTestHRP:   UnitTestID,
+		LocalHRP:      LocalID,
 	}
 
 	ValidNetworkPrefix = "network-"
@@ -133,5 +140,6 @@ func IsActiveNetwork(networkID uint32) bool {
 	return networkID == MainnetID ||
 		networkID == FujiID ||
 		networkID == ColumbusID ||
-		networkID == CaminoID
+		networkID == CaminoID ||
+		networkID == KopernikusID
 }

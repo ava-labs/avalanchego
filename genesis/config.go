@@ -165,6 +165,10 @@ var (
 	// genesis.
 	ColumbusConfig Config
 
+	// KopernikusConfig is the config that should be used to generate the kopernikus
+	// genesis.
+	KopernikusConfig Config
+
 	// LocalConfig is the config that should be used to generate a local
 	// genesis.
 	LocalConfig Config
@@ -173,12 +177,14 @@ var (
 func init() {
 	unparsedCaminoConfig := UnparsedConfig{}
 	unparsedColumbusConfig := UnparsedConfig{}
+	unparsedKopernikusConfig := UnparsedConfig{}
 	unparsedLocalConfig := UnparsedConfig{}
 
 	errs := wrappers.Errs{}
 	errs.Add(
 		json.Unmarshal(caminoGenesisConfigJSON, &unparsedCaminoConfig),
 		json.Unmarshal(columbusGenesisConfigJSON, &unparsedColumbusConfig),
+		json.Unmarshal(kopernikusGenesisConfigJSON, &unparsedKopernikusConfig),
 		json.Unmarshal(localGenesisConfigJSON, &unparsedLocalConfig),
 	)
 	if errs.Errored() {
@@ -192,6 +198,10 @@ func init() {
 	columbusConfig, err := unparsedColumbusConfig.Parse()
 	errs.Add(err)
 	ColumbusConfig = columbusConfig
+
+	kopernikusConfig, err := unparsedKopernikusConfig.Parse()
+	errs.Add(err)
+	KopernikusConfig = kopernikusConfig
 
 	localConfig, err := unparsedLocalConfig.Parse()
 	errs.Add(err)
@@ -208,6 +218,8 @@ func GetConfig(networkID uint32) *Config {
 		return &CaminoConfig
 	case constants.ColumbusID:
 		return &ColumbusConfig
+	case constants.KopernikusID:
+		return &KopernikusConfig
 	case constants.LocalID:
 		return &LocalConfig
 	default:
