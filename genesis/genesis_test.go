@@ -43,6 +43,10 @@ func TestValidateConfig(t *testing.T) {
 			networkID: 1001,
 			config:    &ColumbusConfig,
 		},
+		"kopernikus": {
+			networkID: 1002,
+			config:    &KopernikusConfig,
+		},
 		"local": {
 			networkID: 12345,
 			config:    &LocalConfig,
@@ -260,6 +264,10 @@ func TestGenesisFromFlag(t *testing.T) {
 			networkID: constants.ColumbusID,
 			err:       "cannot override genesis config for standard network columbus (1001)",
 		},
+		"kopernikus": {
+			networkID: constants.KopernikusID,
+			err:       "cannot override genesis config for standard network kopernikus (1002)",
+		},
 		"local": {
 			networkID: constants.LocalID,
 			err:       "cannot override genesis config for standard network local (12345)",
@@ -306,6 +314,9 @@ func TestGenesisFromFlag(t *testing.T) {
 				case constants.TestnetID:
 					genBytes, err = json.Marshal(&ColumbusConfig)
 					require.NoError(err)
+				case constants.KopernikusID:
+					genBytes, err = json.Marshal(&KopernikusConfig)
+					require.NoError(err)
 				case constants.LocalID:
 					genBytes, err = json.Marshal(&LocalConfig)
 					require.NoError(err)
@@ -346,6 +357,18 @@ func TestGenesis(t *testing.T) {
 		{
 			networkID:  constants.FujiID,
 			expectedID: "2KCdCu9fcQMep37BJgaxPaV5ij3FS19pSvUBFFprQ89qnB2tKK",
+		},
+		{
+			networkID:  constants.CaminoID,
+			expectedID: "2YpqeuuzPxU8xURLR3Ddo1nxbzY2gKZW2ardEfXWhSP93n5Ma",
+		},
+		{
+			networkID:  constants.ColumbusID,
+			expectedID: "78qNjcfcV8oxjqR7Nn21kdvU69FhgEi2hyU5eKHGGEJexXdW8",
+		},
+		{
+			networkID:  constants.KopernikusID,
+			expectedID: "gD3tCkgs7nWkN2tkodbAX3uGh2289ruxbmNTiTkqCo2C4tg6M",
 		},
 		{
 			networkID:  constants.LocalID,
@@ -398,6 +421,19 @@ func TestVMGenesis(t *testing.T) {
 				{
 					vmID:       constants.EVMID,
 					expectedID: "78DmEbaR6rthKyURByQ6ftUzirirCsWo6fcpvstYCDwexM9Wo",
+				},
+			},
+		},
+		{
+			networkID: constants.KopernikusID,
+			vmTest: []vmTest{
+				{
+					vmID:       constants.AVMID,
+					expectedID: "2o7PgvMmE9djr4DCRpXqLGzR4h7fKZY6Ak4HSUfVnzdHXJ3eKk",
+				},
+				{
+					vmID:       constants.EVMID,
+					expectedID: "2s1tDrfUiaiG1rPsQTtS3zSvAmXjDqhtvhEbqkRersVHcgeDX5",
 				},
 			},
 		},
@@ -456,6 +492,10 @@ func TestAVAXAssetID(t *testing.T) {
 		{
 			networkID:  constants.ColumbusID,
 			expectedID: "o8seyjX6WupqJ1CE8CeaozK13kqVgc4DFvdvc4crfacLFBauW",
+		},
+		{
+			networkID:  constants.KopernikusID,
+			expectedID: "2jBY3enWb7J3fp2k7qRoESUiGSHHSd6HjxgcQe1WJB8Wk3xMB2",
 		},
 		{
 			networkID:  constants.LocalID,

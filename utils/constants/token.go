@@ -15,13 +15,15 @@ const (
 // Variables to be exported
 var (
 	NetworkIDToTokenSymbol = map[uint32]string{
-		CaminoID:   CaminoTokenSymbol,
-		ColumbusID: CaminoTokenSymbol,
+		CaminoID:     CaminoTokenSymbol,
+		ColumbusID:   CaminoTokenSymbol,
+		KopernikusID: CaminoTokenSymbol,
 	}
 
 	NetworkIDToTokenName = map[uint32]string{
-		CaminoID:   CaminoTokenName,
-		ColumbusID: CaminoTokenName,
+		CaminoID:     CaminoTokenName,
+		ColumbusID:   CaminoTokenName,
+		KopernikusID: CaminoTokenName,
 	}
 )
 
