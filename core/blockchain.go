@@ -85,6 +85,8 @@ var (
 	acceptedBlockGasUsedCounter  = metrics.NewRegisteredCounter("chain/block/gas/used/accepted", nil)
 	badBlockCounter              = metrics.NewRegisteredCounter("chain/block/bad/count", nil)
 
+	acceptedTxsCounter = metrics.NewRegisteredCounter("chain/txs/accepted/count", nil)
+
 	ErrRefuseToCorruptArchiver = errors.New("node has operated with pruning disabled, shutting down to prevent missing tries")
 
 	errFutureBlockUnsupported  = errors.New("future block insertion not supported")
@@ -910,6 +912,7 @@ func (bc *BlockChain) Accept(block *types.Block) error {
 	bc.lastAccepted = block
 	bc.addAcceptorQueue(block)
 	acceptedBlockGasUsedCounter.Inc(int64(block.GasUsed()))
+	acceptedTxsCounter.Inc(int64(len(block.Transactions())))
 
 	return nil
 }
