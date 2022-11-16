@@ -199,6 +199,25 @@ To regenerate the [gomock](https://github.com/golang/mock) code, run `scripts/mo
 
 This should only be necessary when modifying exported interfaces or after modifying `scripts/mock.mockgen.txt`.
 
+## Versioning
+
+### Version Semantics
+
+AvalancheGo is first and foremost a client for the Avalanche network. The versioning of AvalancheGo follows that of the Avalanche network.
+
+- `v0.x.x` indicates a development network version.
+- `v1.x.x` indicates a production network version.
+- `vx.[Upgrade].x` indicates the number of network upgrades that have occurred.
+- `vx.x.[Patch]` indicates the number of client upgrades that have occurred since the last network upgrade.
+
+### Library Compatibility Guarantees
+
+Because AvalancheGo's version denotes the network version, it is expected that interfaces exported by AvalancheGo's packages may change in `Patch` version updates.
+
+### API Compatibility Guarantees
+
+APIs exposed when running AvalancheGo will maintain backwards compatibility, unless the functionality is explicitly deprecated and announced when removed.
+
 ## Supported Platforms
 
 AvalancheGo can run on different platforms, with different support tiers:
