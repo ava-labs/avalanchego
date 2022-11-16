@@ -42,6 +42,22 @@ func (m *MockVerifier) EXPECT() *MockVerifierMockRecorder {
 	return m.recorder
 }
 
+// Unlock mocks base method.
+func (m *MockVerifier) Unlock(arg0 state.Chain, arg1 []ids.ID, arg2 locked.State) ([]*avax.TransferableInput, []*avax.TransferableOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Unlock", arg0, arg1, arg2)
+	ret0, _ := ret[0].([]*avax.TransferableInput)
+	ret1, _ := ret[1].([]*avax.TransferableOutput)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// Unlock indicates an expected call of Unlock.
+func (mr *MockVerifierMockRecorder) Unlock(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unlock", reflect.TypeOf((*MockVerifier)(nil).Unlock), arg0, arg1, arg2)
+}
+
 // VerifyLock mocks base method.
 func (m *MockVerifier) VerifyLock(arg0 txs.UnsignedTx, arg1 state.UTXOGetter, arg2 []*avax.TransferableInput, arg3 []*avax.TransferableOutput, arg4 []verify.Verifiable, arg5 uint64, arg6 ids.ID, arg7 locked.State) error {
 	m.ctrl.T.Helper()

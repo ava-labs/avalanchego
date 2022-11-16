@@ -21,6 +21,16 @@ type CaminoAddValidatorTx struct {
 	AddValidatorTx `serialize:"true"`
 }
 
+func (tx *CaminoAddValidatorTx) Stake() []*avax.TransferableOutput {
+	var stake []*avax.TransferableOutput
+	for _, out := range tx.Outs {
+		if lockedOut, ok := out.Out.(*locked.Out); ok && lockedOut.IsNewlyLockedWith(locked.StateBonded) {
+			stake = append(stake, out)
+		}
+	}
+	return stake
+}
+
 // SyntacticVerify returns nil iff [tx] is valid
 func (tx *CaminoAddValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {

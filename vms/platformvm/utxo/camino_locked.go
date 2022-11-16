@@ -74,6 +74,30 @@ func ProduceLocked(
 	return nil
 }
 
+type Unlocker interface {
+	// Unlock fetches utxos locked by [lockTxIDs] transactions
+	// with lock state [removedLockState], and then spends them producing
+	// [inputs] and [outputs].
+	// Outputs will have their lock state [removedLockState] removed,
+	// but could still be locked with other lock state.
+	// Arguments:
+	// - [state] are the state from which lock txs and locked utxos will be fetched.
+	// - [lockTxIDs] is array of lock transaction ids.
+	// - [removedLockState] is lock state that will be removed from result [outputs].
+	// Returns:
+	// - [inputs] the inputs that should be consumed to fund the outputs
+	// - [outputs] the outputs that should be returned to the UTXO set
+	Unlock(
+		state state.Chain,
+		lockTxIDs []ids.ID,
+		removedLockState locked.State,
+	) (
+		[]*avax.TransferableInput, // inputs
+		[]*avax.TransferableOutput, // outputs
+		error,
+	)
+}
+
 func (h *handler) Lock(
 	keys []*crypto.PrivateKeySECP256K1R,
 	totalAmountToLock uint64,
