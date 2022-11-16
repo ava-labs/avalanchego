@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"context"
 	"math/big"
 	"strings"
 	"testing"
@@ -153,16 +154,16 @@ func executeTxTest(t *testing.T, test atomicTxTest) {
 	<-issuer
 
 	// If we've reached this point, we expect to be able to build and verify the block without any errors
-	blk, err := vm.BuildBlock()
+	blk, err := vm.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := blk.Verify(); err != nil {
+	if err := blk.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := blk.Accept(); len(test.acceptErr) == 0 && err != nil {
+	if err := blk.Accept(context.Background()); len(test.acceptErr) == 0 && err != nil {
 		t.Fatalf("Accept failed unexpectedly due to: %s", err)
 	} else if len(test.acceptErr) != 0 {
 		if err == nil {

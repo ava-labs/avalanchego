@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"context"
 	"testing"
 
 	"github.com/ava-labs/coreth/params"
@@ -27,7 +28,7 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 			// we use AP3 genesis here to not trip any block fees
 			issuer, vm, _, sharedMemory, _ := GenesisVM(t, true, genesisJSONApricotPhase3, "", "")
 			defer func() {
-				err := vm.Shutdown()
+				err := vm.Shutdown(context.Background())
 				assert.NoError(err)
 			}()
 			mempool := vm.mempool
@@ -65,7 +66,7 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 
 			// Show that BuildBlock generates a block containing [txID] and that it is
 			// still present in the mempool.
-			blk, err := vm.BuildBlock()
+			blk, err := vm.BuildBlock(context.Background())
 			assert.NoError(err, "could not build block out of mempool")
 
 			evmBlk, ok := blk.(*chain.BlockWrapper).Block.(*Block)
@@ -76,10 +77,10 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 			has = mempool.has(txID)
 			assert.True(has, "tx should stay in mempool until block is accepted")
 
-			err = blk.Verify()
+			err = blk.Verify(context.Background())
 			assert.NoError(err)
 
-			err = blk.Accept()
+			err = blk.Accept(context.Background())
 			assert.NoError(err)
 
 			has = mempool.has(txID)
@@ -95,7 +96,7 @@ func TestMempoolMaxMempoolSizeHandling(t *testing.T) {
 
 	_, vm, _, sharedMemory, _ := GenesisVM(t, true, "", "", "")
 	defer func() {
-		err := vm.Shutdown()
+		err := vm.Shutdown(context.Background())
 		assert.NoError(err)
 	}()
 	mempool := vm.mempool
@@ -184,7 +185,7 @@ func TestMempoolPriorityDrop(t *testing.T) {
 	// we use AP3 genesis here to not trip any block fees
 	_, vm, _, _, _ := GenesisVM(t, true, genesisJSONApricotPhase3, "", "")
 	defer func() {
-		err := vm.Shutdown()
+		err := vm.Shutdown(context.Background())
 		assert.NoError(err)
 	}()
 	mempool := vm.mempool
