@@ -48,6 +48,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/metervm"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
+	"github.com/ava-labs/avalanchego/vms/tracedvm"
 
 	dbManager "github.com/ava-labs/avalanchego/database/manager"
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
@@ -636,6 +637,9 @@ func (m *manager) createAvalancheChain(
 	if m.MeterVMEnabled {
 		vm = metervm.NewVertexVM(vm)
 	}
+	if m.TracingEnabled {
+		vm = tracedvm.NewVertexVM(vm, m.Tracer)
+	}
 
 	// Handles serialization/deserialization of vertices and also the
 	// persistence of vertices
@@ -881,6 +885,12 @@ func (m *manager) createSnowmanChain(
 		zap.Uint64("minPChainHeight", m.ApricotPhase4MinPChainHeight),
 		zap.Duration("minBlockDelay", minBlockDelay),
 	)
+
+	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
+	if m.TracingEnabled {
+		vm = tracedvm.NewBlockVM(vm, chainAlias, m.Tracer)
+	}
+
 	vm = proposervm.New(
 		vm,
 		m.ApricotPhase4Time,
@@ -891,6 +901,10 @@ func (m *manager) createSnowmanChain(
 	if m.MeterVMEnabled {
 		vm = metervm.NewBlockVM(vm)
 	}
+	if m.TracingEnabled {
+		vm = tracedvm.NewBlockVM(vm, "proposervm", m.Tracer)
+	}
+
 	if err := vm.Initialize(
 		context.TODO(),
 		ctx.Context,
@@ -1017,8 +1031,6 @@ func (m *manager) createSnowmanChain(
 	handler.SetStateSyncer(stateSyncer)
 
 	// Register health checks
-	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
-
 	if err := m.Health.RegisterHealthCheck(chainAlias, handler); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
