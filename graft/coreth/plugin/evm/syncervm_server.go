@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -31,8 +32,8 @@ type stateSyncServer struct {
 }
 
 type StateSyncServer interface {
-	GetLastStateSummary() (block.StateSummary, error)
-	GetStateSummary(uint64) (block.StateSummary, error)
+	GetLastStateSummary(context.Context) (block.StateSummary, error)
+	GetStateSummary(context.Context, uint64) (block.StateSummary, error)
 }
 
 func NewStateSyncServer(config *stateSyncServerConfig) StateSyncServer {
@@ -74,7 +75,7 @@ func (server *stateSyncServer) stateSummaryAtHeight(height uint64) (message.Sync
 // State summary is calculated by the block nearest to last accepted
 // that is divisible by [syncableInterval]
 // If no summary is available, [database.ErrNotFound] must be returned.
-func (server *stateSyncServer) GetLastStateSummary() (block.StateSummary, error) {
+func (server *stateSyncServer) GetLastStateSummary(context.Context) (block.StateSummary, error) {
 	lastHeight := server.chain.LastAcceptedBlock().NumberU64()
 	lastSyncSummaryNumber := lastHeight - lastHeight%server.syncableInterval
 
@@ -90,7 +91,7 @@ func (server *stateSyncServer) GetLastStateSummary() (block.StateSummary, error)
 // GetStateSummary implements StateSyncableVM and returns a summary corresponding
 // to the provided [height] if the node can serve state sync data for that key.
 // If not, [database.ErrNotFound] must be returned.
-func (server *stateSyncServer) GetStateSummary(height uint64) (block.StateSummary, error) {
+func (server *stateSyncServer) GetStateSummary(_ context.Context, height uint64) (block.StateSummary, error) {
 	summaryBlock := server.chain.GetBlockByNumber(height)
 	if summaryBlock == nil ||
 		summaryBlock.NumberU64() > server.chain.LastAcceptedBlock().NumberU64() ||

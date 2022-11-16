@@ -127,6 +127,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	}
 	// Disable metrics to prevent duplicate registerer
 	if err := syncDisabledVM.Initialize(
+		context.Background(),
 		vmSetup.syncerVM.ctx,
 		vmSetup.syncerDBManager,
 		[]byte(genesisJSONLatest),
@@ -140,7 +141,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	}
 
 	defer func() {
-		if err := syncDisabledVM.Shutdown(); err != nil {
+		if err := syncDisabledVM.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -149,7 +150,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 		t.Fatalf("Unexpected last accepted height: %d", height)
 	}
 
-	enabled, err := syncDisabledVM.StateSyncEnabled()
+	enabled, err := syncDisabledVM.StateSyncEnabled(context.Background())
 	assert.NoError(t, err)
 	assert.False(t, enabled, "sync should be disabled")
 
@@ -163,14 +164,14 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		blk, err := syncDisabledVM.ParseBlock(b)
+		blk, err := syncDisabledVM.ParseBlock(context.Background(), b)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := blk.Verify(); err != nil {
+		if err := blk.Verify(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		if err := blk.Accept(); err != nil {
+		if err := blk.Accept(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -189,6 +190,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 		test.stateSyncMinBlocks,
 	)
 	if err := syncReEnabledVM.Initialize(
+		context.Background(),
 		vmSetup.syncerVM.ctx,
 		vmSetup.syncerDBManager,
 		[]byte(genesisJSONLatest),
@@ -213,9 +215,13 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	}
 
 	// connect peer to [syncerVM]
-	assert.NoError(t, syncReEnabledVM.Connected(vmSetup.serverVM.ctx.NodeID, statesyncclient.StateSyncVersion))
+	assert.NoError(t, syncReEnabledVM.Connected(
+		context.Background(),
+		vmSetup.serverVM.ctx.NodeID,
+		statesyncclient.StateSyncVersion,
+	))
 
-	enabled, err = syncReEnabledVM.StateSyncEnabled()
+	enabled, err = syncReEnabledVM.StateSyncEnabled(context.Background())
 	assert.NoError(t, err)
 	assert.True(t, enabled, "sync should be enabled")
 
@@ -238,13 +244,13 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest) *syncVMSetup {
 		// If the test already failed, shut down the VMs if they were instantiated.
 		if serverVM != nil {
 			log.Info("Shutting down server VM")
-			if err := serverVM.Shutdown(); err != nil {
+			if err := serverVM.Shutdown(context.Background()); err != nil {
 				t.Fatal(err)
 			}
 		}
 		if syncerVM != nil {
 			log.Info("Shutting down syncerVM")
-			if err := syncerVM.Shutdown(); err != nil {
+			if err := syncerVM.Shutdown(context.Background()); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -330,7 +336,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest) *syncVMSetup {
 	if err != nil {
 		t.Fatal(err)
 	}
-	internalBlock, err := serverVM.parseBlock(blockBytes)
+	internalBlock, err := serverVM.parseBlock(context.Background(), blockBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -352,10 +358,10 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest) *syncVMSetup {
 			testShortIDAddrs[0]: importAmount,
 		},
 	)
-	if err := syncerVM.SetState(snow.StateSyncing); err != nil {
+	if err := syncerVM.SetState(context.Background(), snow.StateSyncing); err != nil {
 		t.Fatal(err)
 	}
-	enabled, err := syncerVM.StateSyncEnabled()
+	enabled, err := syncerVM.StateSyncEnabled(context.Background())
 	assert.NoError(t, err)
 	assert.True(t, enabled)
 
@@ -374,7 +380,11 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest) *syncVMSetup {
 	}
 
 	// connect peer to [syncerVM]
-	assert.NoError(t, syncerVM.Connected(serverVM.ctx.NodeID, statesyncclient.StateSyncVersion))
+	assert.NoError(t, syncerVM.Connected(
+		context.Background(),
+		serverVM.ctx.NodeID,
+		statesyncclient.StateSyncVersion,
+	))
 
 	// override [syncerVM]'s SendAppRequest function to trigger AppRequest on [serverVM]
 	syncerAppSender.SendAppRequestF = func(ctx context.Context, nodeSet ids.NodeIDSet, requestID uint32, request []byte) error {
@@ -419,8 +429,8 @@ type syncVMSetup struct {
 // Teardown shuts down both VMs and asserts that both exit without error.
 // Note: assumes both serverVM and sycnerVM have been initialized.
 func (s *syncVMSetup) Teardown(t *testing.T) {
-	assert.NoError(t, s.serverVM.Shutdown())
-	assert.NoError(t, s.syncerVM.Shutdown())
+	assert.NoError(t, s.serverVM.Shutdown(context.Background()))
+	assert.NoError(t, s.syncerVM.Shutdown(context.Background()))
 }
 
 // syncTest contains both the actual VMs as well as the parameters with the expected output.
@@ -444,21 +454,21 @@ func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
 	)
 
 	// get last summary and test related methods
-	summary, err := serverVM.GetLastStateSummary()
+	summary, err := serverVM.GetLastStateSummary(context.Background())
 	if err != nil {
 		t.Fatal("error getting state sync last summary", "err", err)
 	}
-	parsedSummary, err := syncerVM.ParseStateSummary(summary.Bytes())
+	parsedSummary, err := syncerVM.ParseStateSummary(context.Background(), summary.Bytes())
 	if err != nil {
 		t.Fatal("error getting state sync last summary", "err", err)
 	}
-	retrievedSummary, err := serverVM.GetStateSummary(parsedSummary.Height())
+	retrievedSummary, err := serverVM.GetStateSummary(context.Background(), parsedSummary.Height())
 	if err != nil {
 		t.Fatal("error when checking if summary is accepted", "err", err)
 	}
 	assert.Equal(t, summary, retrievedSummary)
 
-	shouldSync, err := parsedSummary.Accept()
+	shouldSync, err := parsedSummary.Accept(context.Background())
 	if err != nil {
 		t.Fatal("unexpected error accepting state summary", "err", err)
 	}
@@ -484,7 +494,7 @@ func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
 
 	// set [syncerVM] to bootstrapping and verify the last accepted block has been updated correctly
 	// and that we can bootstrap and process some blocks.
-	if err := syncerVM.SetState(snow.Bootstrapping); err != nil {
+	if err := syncerVM.SetState(context.Background(), snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 	assert.Equal(t, serverVM.LastAcceptedBlock().Height(), syncerVM.LastAcceptedBlock().Height(), "block height mismatch between syncer and server")
@@ -512,7 +522,7 @@ func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
 	})
 
 	// check we can transition to [NormalOp] state and continue to process blocks.
-	assert.NoError(t, syncerVM.SetState(snow.NormalOp))
+	assert.NoError(t, syncerVM.SetState(context.Background(), snow.NormalOp))
 	assert.True(t, syncerVM.bootstrapped)
 
 	// check atomic memory was synced properly
@@ -570,14 +580,14 @@ func generateAndAcceptBlocks(t *testing.T, vm *VM, numBlocks int, gen func(int, 
 		if err != nil {
 			t.Fatal(err)
 		}
-		vmBlock, err := vm.ParseBlock(bytes)
+		vmBlock, err := vm.ParseBlock(context.Background(), bytes)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := vmBlock.Verify(); err != nil {
+		if err := vmBlock.Verify(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		if err := vmBlock.Accept(); err != nil {
+		if err := vmBlock.Accept(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}

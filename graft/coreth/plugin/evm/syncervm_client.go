@@ -80,9 +80,9 @@ func NewStateSyncClient(config *stateSyncClientConfig) StateSyncClient {
 
 type StateSyncClient interface {
 	// methods that implement the client side of [block.StateSyncableVM]
-	StateSyncEnabled() (bool, error)
-	GetOngoingSyncStateSummary() (block.StateSummary, error)
-	ParseStateSummary(summaryBytes []byte) (block.StateSummary, error)
+	StateSyncEnabled(context.Context) (bool, error)
+	GetOngoingSyncStateSummary(context.Context) (block.StateSummary, error)
+	ParseStateSummary(ctx context.Context, summaryBytes []byte) (block.StateSummary, error)
 
 	// additional methods required by the evm package
 	StateSyncClearOngoingSummary() error
@@ -100,12 +100,14 @@ type Syncer interface {
 }
 
 // StateSyncEnabled returns [client.enabled], which is set in the chain's config file.
-func (client *stateSyncerClient) StateSyncEnabled() (bool, error) { return client.enabled, nil }
+func (client *stateSyncerClient) StateSyncEnabled(context.Context) (bool, error) {
+	return client.enabled, nil
+}
 
 // GetOngoingSyncStateSummary returns a state summary that was previously started
 // and not finished, and sets [resumableSummary] if one was found.
 // Returns [database.ErrNotFound] if no ongoing summary is found or if [client.skipResume] is true.
-func (client *stateSyncerClient) GetOngoingSyncStateSummary() (block.StateSummary, error) {
+func (client *stateSyncerClient) GetOngoingSyncStateSummary(context.Context) (block.StateSummary, error) {
 	if client.skipResume {
 		return nil, database.ErrNotFound
 	}
@@ -136,7 +138,7 @@ func (client *stateSyncerClient) StateSyncClearOngoingSummary() error {
 }
 
 // ParseStateSummary parses [summaryBytes] to [commonEng.Summary]
-func (client *stateSyncerClient) ParseStateSummary(summaryBytes []byte) (block.StateSummary, error) {
+func (client *stateSyncerClient) ParseStateSummary(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
 	return message.NewSyncSummaryFromBytes(summaryBytes, client.acceptSyncSummary)
 }
 
@@ -324,7 +326,7 @@ func (client *stateSyncerClient) Shutdown() error {
 // finishSync is responsible for updating disk and memory pointers so the VM is prepared
 // for bootstrapping. Executes any shared memory operations from the atomic trie to shared memory.
 func (client *stateSyncerClient) finishSync() error {
-	stateBlock, err := client.state.GetBlock(ids.ID(client.syncSummary.BlockHash))
+	stateBlock, err := client.state.GetBlock(context.TODO(), ids.ID(client.syncSummary.BlockHash))
 	if err != nil {
 		return fmt.Errorf("could not get block by hash from client state: %s", client.syncSummary.BlockHash)
 	}

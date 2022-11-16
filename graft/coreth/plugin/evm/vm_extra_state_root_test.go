@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"context"
 	"encoding/json"
 	"math/big"
 	"testing"
@@ -61,7 +62,7 @@ func testVerifyExtraStateRoot(t *testing.T, test verifyExtraStateRootConfig) {
 		testShortIDAddrs[0]: importAmount,
 	})
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -78,26 +79,26 @@ func testVerifyExtraStateRoot(t *testing.T, test verifyExtraStateRootConfig) {
 
 	// build block1
 	<-issuer
-	blk, err := vm.BuildBlock()
+	blk, err := vm.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := blk.Verify(); err != nil {
+	if err := blk.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if status := blk.Status(); status != choices.Processing {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
-	if err := vm.SetPreference(blk.ID()); err != nil {
+	if err := vm.SetPreference(context.Background(), blk.ID()); err != nil {
 		t.Fatal(err)
 	}
-	if err := blk.Accept(); err != nil {
+	if err := blk.Accept(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if status := blk.Status(); status != choices.Accepted {
 		t.Fatalf("Expected status of accepted block to be %s, but found %s", choices.Accepted, status)
 	}
-	if lastAcceptedID, err := vm.LastAccepted(); err != nil {
+	if lastAcceptedID, err := vm.LastAccepted(context.Background()); err != nil {
 		t.Fatal(err)
 	} else if lastAcceptedID != blk.ID() {
 		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk.ID(), lastAcceptedID)
@@ -116,23 +117,23 @@ func testVerifyExtraStateRoot(t *testing.T, test verifyExtraStateRootConfig) {
 
 	// build block2
 	<-issuer
-	blk2, err := vm.BuildBlock()
+	blk2, err := vm.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := blk2.Verify(); err != nil {
+	if err := blk2.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if status := blk2.Status(); status != choices.Processing {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
-	if err := blk2.Accept(); err != nil {
+	if err := blk2.Accept(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if status := blk2.Status(); status != choices.Accepted {
 		t.Fatalf("Expected status of accepted block to be %s, but found %s", choices.Accepted, status)
 	}
-	if lastAcceptedID, err := vm.LastAccepted(); err != nil {
+	if lastAcceptedID, err := vm.LastAccepted(context.Background()); err != nil {
 		t.Fatal(err)
 	} else if lastAcceptedID != blk2.ID() {
 		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk2.ID(), lastAcceptedID)
@@ -204,7 +205,7 @@ func TestCortinaInvalidExtraStateRootWillNotVerify(t *testing.T) {
 		testShortIDAddrs[0]: importAmount,
 	})
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -223,7 +224,7 @@ func TestCortinaInvalidExtraStateRootWillNotVerify(t *testing.T) {
 
 	// calling Verify on blk will succeed, we use it as
 	// a starting point to make an invalid block.
-	blk, err := vm.BuildBlock()
+	blk, err := vm.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +239,7 @@ func TestCortinaInvalidExtraStateRootWillNotVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = badBlk.Verify()
+	err = badBlk.Verify(context.Background())
 	assert.ErrorIs(t, err, errInvalidExtraStateRoot)
 
 	// make a bad block by setting ExtraStateRoot to an incorrect hash
@@ -250,7 +251,7 @@ func TestCortinaInvalidExtraStateRootWillNotVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = badBlk.Verify()
+	err = badBlk.Verify(context.Background())
 	assert.ErrorIs(t, err, errInvalidExtraStateRoot)
 
 	// make a bad block by setting the timestamp before Cortina.
@@ -262,6 +263,6 @@ func TestCortinaInvalidExtraStateRootWillNotVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = badBlk.Verify()
+	err = badBlk.Verify(context.Background())
 	assert.ErrorIs(t, err, errInvalidExtraStateRoot)
 }

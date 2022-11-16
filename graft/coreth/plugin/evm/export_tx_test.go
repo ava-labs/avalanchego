@@ -5,6 +5,7 @@ package evm
 
 import (
 	"bytes"
+	"context"
 	"math/big"
 	"testing"
 
@@ -64,20 +65,20 @@ func createExportTxOptions(t *testing.T, vm *VM, issuer chan engCommon.Message, 
 
 	<-issuer
 
-	blk, err := vm.BuildBlock()
+	blk, err := vm.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := blk.Verify(); err != nil {
+	if err := blk.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm.SetPreference(blk.ID()); err != nil {
+	if err := vm.SetPreference(context.Background(), blk.ID()); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := blk.Accept(); err != nil {
+	if err := blk.Accept(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -318,7 +319,7 @@ func TestExportTxEVMStateTransfer(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			issuer, vm, _, sharedMemory, _ := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
 			defer func() {
-				if err := vm.Shutdown(); err != nil {
+				if err := vm.Shutdown(context.Background()); err != nil {
 					t.Fatal(err)
 				}
 			}()
@@ -376,20 +377,20 @@ func TestExportTxEVMStateTransfer(t *testing.T) {
 
 			<-issuer
 
-			blk, err := vm.BuildBlock()
+			blk, err := vm.BuildBlock(context.Background())
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			if err := blk.Verify(); err != nil {
+			if err := blk.Verify(context.Background()); err != nil {
 				t.Fatal(err)
 			}
 
-			if err := vm.SetPreference(blk.ID()); err != nil {
+			if err := vm.SetPreference(context.Background(), blk.ID()); err != nil {
 				t.Fatal(err)
 			}
 
-			if err := blk.Accept(); err != nil {
+			if err := blk.Accept(context.Background()); err != nil {
 				t.Fatal(err)
 			}
 
@@ -436,7 +437,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 	_, vm, _, _, _ := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
 
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -926,7 +927,7 @@ func TestExportTxAccept(t *testing.T) {
 	xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
 
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -1683,7 +1684,7 @@ func TestNewExportTx(t *testing.T) {
 			issuer, vm, _, sharedMemory, _ := GenesisVM(t, true, test.genesis, "", "")
 
 			defer func() {
-				if err := vm.Shutdown(); err != nil {
+				if err := vm.Shutdown(context.Background()); err != nil {
 					t.Fatal(err)
 				}
 			}()
@@ -1731,20 +1732,20 @@ func TestNewExportTx(t *testing.T) {
 
 			<-issuer
 
-			blk, err := vm.BuildBlock()
+			blk, err := vm.BuildBlock(context.Background())
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			if err := blk.Verify(); err != nil {
+			if err := blk.Verify(context.Background()); err != nil {
 				t.Fatal(err)
 			}
 
-			if err := vm.SetPreference(blk.ID()); err != nil {
+			if err := vm.SetPreference(context.Background(), blk.ID()); err != nil {
 				t.Fatal(err)
 			}
 
-			if err := blk.Accept(); err != nil {
+			if err := blk.Accept(context.Background()); err != nil {
 				t.Fatal(err)
 			}
 
@@ -1843,7 +1844,7 @@ func TestNewExportTxMulticoin(t *testing.T) {
 			issuer, vm, _, sharedMemory, _ := GenesisVM(t, true, test.genesis, "", "")
 
 			defer func() {
-				if err := vm.Shutdown(); err != nil {
+				if err := vm.Shutdown(context.Background()); err != nil {
 					t.Fatal(err)
 				}
 			}()
@@ -1921,20 +1922,20 @@ func TestNewExportTxMulticoin(t *testing.T) {
 
 			<-issuer
 
-			blk, err := vm.BuildBlock()
+			blk, err := vm.BuildBlock(context.Background())
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			if err := blk.Verify(); err != nil {
+			if err := blk.Verify(context.Background()); err != nil {
 				t.Fatal(err)
 			}
 
-			if err := vm.SetPreference(blk.ID()); err != nil {
+			if err := vm.SetPreference(context.Background(), blk.ID()); err != nil {
 				t.Fatal(err)
 			}
 
-			if err := blk.Accept(); err != nil {
+			if err := blk.Accept(context.Background()); err != nil {
 				t.Fatal(err)
 			}
 

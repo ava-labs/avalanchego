@@ -22,7 +22,7 @@ func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 
 	_, vm, _, sharedMemory, sender := GenesisVM(t, true, "", "", "")
 	defer func() {
-		assert.NoError(vm.Shutdown())
+		assert.NoError(vm.Shutdown(context.Background()))
 	}()
 
 	// Create conflicting transactions
@@ -81,7 +81,7 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 
 	_, vm, _, sharedMemory, sender := GenesisVM(t, true, "", "", "")
 	defer func() {
-		assert.NoError(vm.Shutdown())
+		assert.NoError(vm.Shutdown(context.Background()))
 	}()
 
 	nodeID := ids.GenerateTestNodeID()
@@ -152,7 +152,7 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 
 	_, vm, _, sharedMemory, sender := GenesisVM(t, true, "", "", "")
 	defer func() {
-		assert.NoError(vm.Shutdown())
+		assert.NoError(vm.Shutdown(context.Background()))
 	}()
 	mempool := vm.mempool
 
