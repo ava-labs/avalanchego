@@ -156,6 +156,31 @@ func (b *caminoBuilder) NewAddSubnetValidatorTx(
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
+func (b *caminoBuilder) NewRewardValidatorTx(txID ids.ID) (*txs.Tx, error) {
+	if state, err := b.builder.state.CaminoGenesisState(); err != nil {
+		return nil, err
+	} else if !state.LockModeBondDeposit {
+		return b.builder.NewRewardValidatorTx(txID)
+	}
+
+	ins, outs, err := b.Spender.Unlock(b.state, []ids.ID{txID}, locked.StateBonded)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+
+	utx := &txs.CaminoRewardValidatorTx{
+		RewardValidatorTx: txs.RewardValidatorTx{TxID: txID},
+		Ins:               ins,
+		Outs:              outs,
+	}
+	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return tx, tx.SyntacticVerify(b.ctx)
+}
+
 func (b *caminoBuilder) NewAddAddressStateTx(
 	address ids.ShortID,
 	remove bool,

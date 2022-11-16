@@ -6,6 +6,7 @@ package executor
 import (
 	"errors"
 	"fmt"
+	"reflect"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -28,6 +29,7 @@ var (
 	errNotSecp256Fx         = errors.New("expected fx to be secp256k1.fx")
 	errRecoverAdresses      = errors.New("cannot recover addresses from credentials")
 	errInvalidRoles         = errors.New("invalid role")
+	errInvalidSystemTxBody  = errors.New("tx body doesn't match expected one")
 )
 
 type CaminoStandardTxExecutor struct {
@@ -344,6 +346,109 @@ func (e *CaminoStandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) 
 	}
 
 	return e.StandardTxExecutor.TransformSubnetTx(tx)
+}
+
+func (e *CaminoProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
+	caminoGenesis, err := e.OnCommitState.CaminoGenesisState()
+	if err != nil {
+		return err
+	}
+
+	caminoTx, ok := e.Tx.Unsigned.(*txs.CaminoRewardValidatorTx)
+
+	if !caminoGenesis.LockModeBondDeposit && !ok {
+		return e.ProposalTxExecutor.RewardValidatorTx(tx)
+	}
+
+	if !caminoGenesis.LockModeBondDeposit || !ok {
+		return errWrongLockMode
+	}
+
+	switch {
+	case tx == nil:
+		return txs.ErrNilTx
+	case tx.TxID == ids.Empty:
+		return errInvalidID
+	case len(e.Tx.Creds) != 0:
+		return errWrongNumberOfCredentials
+	}
+
+	ins, outs, err := e.FlowChecker.Unlock(e.OnCommitState, []ids.ID{tx.TxID}, locked.StateBonded)
+	if err != nil {
+		return err
+	}
+
+	expectedTx := &txs.CaminoRewardValidatorTx{
+		RewardValidatorTx: *tx,
+		Ins:               ins,
+		Outs:              outs,
+	}
+
+	if !reflect.DeepEqual(caminoTx, expectedTx) {
+		return errInvalidSystemTxBody
+	}
+
+	currentStakerIterator, err := e.OnCommitState.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+	if !currentStakerIterator.Next() {
+		return fmt.Errorf("failed to get next staker to remove: %w", database.ErrNotFound)
+	}
+	stakerToRemove := currentStakerIterator.Value()
+	currentStakerIterator.Release()
+
+	if stakerToRemove.TxID != tx.TxID {
+		return fmt.Errorf(
+			"attempting to remove TxID: %s. Should be removing %s",
+			tx.TxID,
+			stakerToRemove.TxID,
+		)
+	}
+
+	// Verify that the chain's timestamp is the validator's end time
+	currentChainTime := e.OnCommitState.GetTimestamp()
+	if !stakerToRemove.EndTime.Equal(currentChainTime) {
+		return fmt.Errorf(
+			"attempting to remove TxID: %s before their end time %s",
+			tx.TxID,
+			stakerToRemove.EndTime,
+		)
+	}
+
+	if _, err := e.OnCommitState.GetCurrentValidator(
+		constants.PrimaryNetworkID,
+		stakerToRemove.NodeID,
+	); err != nil {
+		// This should never error because the staker set is in memory and
+		// primary network validators are removed last.
+		return err
+	}
+
+	stakerTx, _, err := e.OnCommitState.GetTx(stakerToRemove.TxID)
+	if err != nil {
+		return fmt.Errorf("failed to get next removed staker tx: %w", err)
+	}
+
+	if _, ok := stakerTx.Unsigned.(txs.ValidatorTx); !ok {
+		// Invariant: Permissioned stakers are removed by the advancement of
+		//            time and the current chain timestamp is == this staker's
+		//            EndTime. This means only permissionless stakers should be
+		//            left in the staker set.
+		return errShouldBePermissionlessStaker
+	}
+
+	e.OnCommitState.DeleteCurrentValidator(stakerToRemove)
+	e.OnAbortState.DeleteCurrentValidator(stakerToRemove)
+
+	txID := e.Tx.ID()
+
+	utxo.Consume(e.OnCommitState, caminoTx.Ins)
+	utxo.Consume(e.OnAbortState, caminoTx.Ins)
+	utxo.Produce(e.OnCommitState, txID, caminoTx.Outs)
+	utxo.Produce(e.OnAbortState, txID, caminoTx.Outs)
+
+	return nil
 }
 
 func removeCreds(tx *txs.Tx, num int) []verify.Verifiable {

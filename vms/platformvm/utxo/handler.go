@@ -130,6 +130,8 @@ type Spender interface {
 		[][]*crypto.PrivateKeySECP256K1R, // signers
 		error,
 	)
+
+	Unlocker
 }
 
 type Verifier interface {
@@ -192,6 +194,8 @@ type Verifier interface {
 		assetID ids.ID,
 		appliedLockState locked.State,
 	) error
+
+	Unlocker
 }
 
 type Handler interface {
