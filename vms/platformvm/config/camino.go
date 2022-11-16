@@ -4,6 +4,5 @@
 package config
 
 type CaminoConfig struct {
-	ValidatorBondAmount   uint64
 	DaoProposalBondAmount uint64
 }

@@ -40,6 +40,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 )
 
+const defaultCaminoValidatorWeight = 2 * units.KiloAvax
+
 var (
 	localStakingPath          = "../../../../staking/local/"
 	caminoPreFundedKeys       = crypto.BuildTestKeys()
@@ -197,8 +199,8 @@ func defaultCaminoConfig(postBanff bool) config.Config {
 		TxFee:                  defaultTxFee,
 		CreateSubnetTxFee:      100 * defaultTxFee,
 		CreateBlockchainTxFee:  100 * defaultTxFee,
-		MinValidatorStake:      5 * units.MilliAvax,
-		MaxValidatorStake:      500 * units.MilliAvax,
+		MinValidatorStake:      defaultCaminoValidatorWeight,
+		MaxValidatorStake:      defaultCaminoValidatorWeight,
 		MinDelegatorStake:      1 * units.MilliAvax,
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
@@ -212,7 +214,6 @@ func defaultCaminoConfig(postBanff bool) config.Config {
 		ApricotPhase5Time: defaultValidateEndTime,
 		BanffTime:         banffTime,
 		CaminoConfig: config.CaminoConfig{
-			ValidatorBondAmount:   2 * units.KiloAvax,
 			DaoProposalBondAmount: 100 * units.Avax,
 		},
 	}
@@ -249,7 +250,7 @@ func buildCaminoGenesisTest(ctx *snow.Context, caminoGenesisConf genesis.Camino)
 				Addresses: []string{addr},
 			},
 			Staked: []api.UTXO{{
-				Amount:  json.Uint64(defaultWeight),
+				Amount:  json.Uint64(defaultCaminoValidatorWeight),
 				Address: addr,
 			}},
 			DelegationFee: reward.PercentDenominator,
