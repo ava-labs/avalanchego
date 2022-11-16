@@ -1,7 +1,7 @@
 // Copyright (C) 2022, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package nodeid
+package crypto
 
 import (
 	rsa "crypto/rsa"
@@ -10,10 +10,10 @@ import (
 	"encoding/asn1"
 	"errors"
 
+	"github.com/ava-labs/avalanchego/utils/hashing"
+
 	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v3"
 	ecdsa "github.com/decred/dcrd/dcrec/secp256k1/v3/ecdsa"
-
-	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 var oidLocalKeyID = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 21}

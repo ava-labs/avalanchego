@@ -20,7 +20,7 @@ import (
 	"net"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/nodeid"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 )
 
 var (
@@ -79,7 +79,7 @@ func connToIDAndCert(conn *tls.Conn) (ids.NodeID, net.Conn, *x509.Certificate, e
 }
 
 func CertToID(cert *x509.Certificate) (ids.NodeID, error) {
-	pubKeyBytes, err := nodeid.RecoverSecp256PublicKey(cert)
+	pubKeyBytes, err := crypto.RecoverSecp256PublicKey(cert)
 	if err != nil {
 		return ids.EmptyNodeID, err
 	}

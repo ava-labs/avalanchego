@@ -20,8 +20,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/nodeid"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -101,7 +101,7 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 
 	b.cert = cert
 
-	nodeIDBytes, err := nodeid.RecoverSecp256PublicKey(cert)
+	nodeIDBytes, err := crypto.RecoverSecp256PublicKey(cert)
 	if err != nil {
 		return err
 	}

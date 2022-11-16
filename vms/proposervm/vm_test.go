@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/manager"
@@ -35,13 +34,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/utils/nodeid"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 	"github.com/ava-labs/avalanchego/vms/proposervm/tree"
 
+	crypto2 "github.com/ava-labs/avalanchego/utils/crypto"
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
@@ -77,7 +76,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	nodeIDBytes, err := nodeid.RecoverSecp256PublicKey(pTestCert.Leaf)
+	nodeIDBytes, err := crypto2.RecoverSecp256PublicKey(pTestCert.Leaf)
 	if err != nil {
 		panic(err)
 	}

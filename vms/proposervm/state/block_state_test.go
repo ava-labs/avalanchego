@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -27,8 +26,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/utils/nodeid"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
+
+	crypto2 "github.com/ava-labs/avalanchego/utils/crypto"
 )
 
 func testBlockState(a *require.Assertions, bs BlockState) {
@@ -44,7 +44,7 @@ func testBlockState(a *require.Assertions, bs BlockState) {
 	cert := tlsCert.Leaf
 	key := tlsCert.PrivateKey.(crypto.Signer)
 
-	nodeIDBytes, err := nodeid.RecoverSecp256PublicKey(cert)
+	nodeIDBytes, err := crypto2.RecoverSecp256PublicKey(cert)
 	a.NoError(err)
 	nodeID, err := ids.ToNodeID(nodeIDBytes)
 	a.NoError(err)
@@ -137,7 +137,7 @@ func initCommonTestData(a *require.Assertions) (database.Database, BlockState, b
 	cert := tlsCert.Leaf
 	key := tlsCert.PrivateKey.(crypto.Signer)
 
-	nodeIDBytes, err := nodeid.RecoverSecp256PublicKey(cert)
+	nodeIDBytes, err := crypto2.RecoverSecp256PublicKey(cert)
 	a.NoError(err)
 	nodeID, err := ids.ToNodeID(nodeIDBytes)
 	a.NoError(err)

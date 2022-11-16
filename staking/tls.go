@@ -18,7 +18,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/nodeid"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
@@ -125,8 +125,8 @@ func NewCertAndKeyBytes() ([]byte, []byte, error) {
 		return nil, nil, fmt.Errorf("couldn't generate rsa key: %w", err)
 	}
 	// Create SECP256K1 key to sign cert with
-	secpKey := nodeid.RsaPrivateKeyToSecp256PrivateKey(rsaKey)
-	extension := nodeid.SignRsaPublicKey(secpKey, &rsaKey.PublicKey)
+	secpKey := crypto.RsaPrivateKeyToSecp256PrivateKey(rsaKey)
+	extension := crypto.SignRsaPublicKey(secpKey, &rsaKey.PublicKey)
 
 	// Create self-signed staking cert
 	certTemplate := &x509.Certificate{

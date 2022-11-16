@@ -19,11 +19,12 @@ import (
 	"testing"
 	"time"
 
+	crypto2 "github.com/ava-labs/avalanchego/utils/crypto"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/utils/nodeid"
 )
 
 func TestParse(t *testing.T) {
@@ -41,7 +42,7 @@ func TestParse(t *testing.T) {
 	cert := tlsCert.Leaf
 	key := tlsCert.PrivateKey.(crypto.Signer)
 
-	nodeIDBytes, err := nodeid.RecoverSecp256PublicKey(cert)
+	nodeIDBytes, err := crypto2.RecoverSecp256PublicKey(cert)
 	require.NoError(err)
 
 	nodeID, err := ids.ToNodeID(nodeIDBytes)

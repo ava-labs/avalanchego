@@ -1,7 +1,7 @@
 // Copyright (C) 2022, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package nodeid
+package crypto
 
 import (
 	"bytes"
@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/stretchr/testify/require"
 )
 
@@ -67,8 +66,8 @@ func newCertAndKeyBytesWithNoExt() ([]byte, []byte, error) {
 }
 
 func getPublicKey(t *testing.T, tlsCert *tls.Certificate) []byte {
-	secp256Factory := crypto.FactorySECP256K1R{}
-	var nodePrivateKey crypto.PrivateKey
+	secp256Factory := FactorySECP256K1R{}
+	var nodePrivateKey PrivateKey
 
 	rsaPrivateKey, ok := tlsCert.PrivateKey.(*rsa.PrivateKey)
 	require.True(t, ok)

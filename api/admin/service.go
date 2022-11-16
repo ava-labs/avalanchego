@@ -20,7 +20,6 @@ import (
 	"path"
 
 	"github.com/gorilla/rpc/v2"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -36,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/nodeid"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/vms"
@@ -342,7 +340,7 @@ func (service *Admin) GetNodeSigner(_ *http.Request, _ *struct{}, reply *GetNode
 	config := service.Config.NodeConfig.(*node.Config)
 
 	rsaPrivKey := config.StakingTLSCert.PrivateKey.(*rsa.PrivateKey)
-	privKey := nodeid.RsaPrivateKeyToSecp256PrivateKey(rsaPrivKey)
+	privKey := crypto.RsaPrivateKeyToSecp256PrivateKey(rsaPrivKey)
 	pubKeyBytes := hashing.PubkeyBytesToAddress(privKey.PubKey().SerializeCompressed())
 	nodeID, err := ids.ToShortID(pubKeyBytes)
 	if err != nil {
