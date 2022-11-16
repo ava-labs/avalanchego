@@ -234,7 +234,7 @@ type manager struct {
 	// Value: The chain
 	chains map[ids.ID]handler.Handler
 
-	// snowman++ related interface to allow validators retrival
+	// snowman++ related interface to allow validators retrieval
 	validatorState validators.State
 }
 
@@ -846,15 +846,20 @@ func (m *manager) createSnowmanChain(
 			return nil, fmt.Errorf("expected validators.State but got %T", vm)
 		}
 
-		lockedValState := validators.NewLockedState(&ctx.Lock, valState)
-
-		// Initialize the validator state for future chains.
-		m.validatorState = lockedValState
+		if m.TracingEnabled {
+			valState = validators.Trace(valState, "platformvm", m.Tracer)
+		}
 
 		// Notice that this context is left unlocked. This is because the
 		// lock will already be held when accessing these values on the
 		// P-chain.
 		ctx.ValidatorState = valState
+
+		// Initialize the validator state for future chains.
+		m.validatorState = validators.NewLockedState(&ctx.Lock, valState)
+		if m.TracingEnabled {
+			m.validatorState = validators.Trace(m.validatorState, "lockedState", m.Tracer)
+		}
 
 		if !m.ManagerConfig.StakingEnabled {
 			m.validatorState = validators.NewNoValidatorsState(m.validatorState)
