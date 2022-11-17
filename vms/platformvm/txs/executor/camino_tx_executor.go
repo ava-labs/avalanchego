@@ -48,22 +48,18 @@ type CaminoProposalTxExecutor struct {
  * has access to this node specific private key.
  */
 func (e *CaminoStandardTxExecutor) verifyNodeSignature(nodeID ids.NodeID) error {
-	if state, err := e.State.CaminoGenesisState(); err != nil {
-		return err
-	} else if state.VerifyNodeSignature {
-		if err := e.Backend.Fx.VerifyPermission(
-			e.Tx.Unsigned,
-			&secp256k1fx.Input{SigIndices: []uint32{0}},
-			e.Tx.Creds[len(e.Tx.Creds)-1],
-			&secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs: []ids.ShortID{
-					ids.ShortID(nodeID),
-				},
+	if err := e.Backend.Fx.VerifyPermission(
+		e.Tx.Unsigned,
+		&secp256k1fx.Input{SigIndices: []uint32{0}},
+		e.Tx.Creds[len(e.Tx.Creds)-1],
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				ids.ShortID(nodeID),
 			},
-		); err != nil {
-			return fmt.Errorf("%w: %s", errNodeSignatureMissing, err)
-		}
+		},
+	); err != nil {
+		return fmt.Errorf("%w: %s", errNodeSignatureMissing, err)
 	}
 	return nil
 }
@@ -166,10 +162,6 @@ func verifyAddValidatorTxWithBonding(
 }
 
 func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
-	if err := e.verifyNodeSignature(tx.NodeID()); err != nil {
-		return err
-	}
-
 	caminoGenesis, err := e.State.CaminoGenesisState()
 	if err != nil {
 		return err
@@ -179,20 +171,21 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 		return err
 	}
 
-	_, ok := e.Tx.Unsigned.(*txs.CaminoAddValidatorTx)
-
-	if !caminoGenesis.LockModeBondDeposit && !ok {
-		if caminoGenesis.VerifyNodeSignature {
-			creds := removeCreds(e.Tx, 1)
-			err = e.StandardTxExecutor.AddValidatorTx(tx)
-			addCreds(e.Tx, creds)
-		} else {
-			err = e.StandardTxExecutor.AddValidatorTx(tx)
+	if caminoGenesis.VerifyNodeSignature {
+		if err := e.verifyNodeSignature(tx.NodeID()); err != nil {
+			return err
 		}
-		return err
+		creds := removeCreds(e.Tx, 1)
+		defer addCreds(e.Tx, creds)
 	}
 
-	if !caminoGenesis.LockModeBondDeposit || !ok {
+	_, isCaminoTx := e.Tx.Unsigned.(*txs.CaminoAddValidatorTx)
+
+	if !caminoGenesis.LockModeBondDeposit && !isCaminoTx {
+		return e.StandardTxExecutor.AddValidatorTx(tx)
+	}
+
+	if !caminoGenesis.LockModeBondDeposit || !isCaminoTx {
 		return errWrongLockMode
 	}
 
@@ -222,10 +215,6 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 }
 
 func (e *CaminoStandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	if err := e.verifyNodeSignature(tx.NodeID()); err != nil {
-		return err
-	}
-
 	if err := locked.VerifyNoLocks(tx.Ins, tx.Outs); err != nil {
 		return err
 	}
@@ -235,14 +224,14 @@ func (e *CaminoStandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidat
 	}
 
 	if caminoGenesis.VerifyNodeSignature {
+		if err := e.verifyNodeSignature(tx.NodeID()); err != nil {
+			return err
+		}
 		creds := removeCreds(e.Tx, 1)
-		err = e.StandardTxExecutor.AddSubnetValidatorTx(tx)
-		addCreds(e.Tx, creds)
-	} else {
-		err = e.StandardTxExecutor.AddSubnetValidatorTx(tx)
+		defer addCreds(e.Tx, creds)
 	}
 
-	return err
+	return e.StandardTxExecutor.AddSubnetValidatorTx(tx)
 }
 
 func (e *CaminoStandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
