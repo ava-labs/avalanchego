@@ -82,7 +82,14 @@ func (r *vmRegisterer) register(ctx context.Context, pathAdder server.PathAdder,
 	return pathAdder.AddAliases(defaultEndpoint, urlAliases...)
 }
 
-func (r *vmRegisterer) createStaticHandlers(ctx context.Context, vmID ids.ID, factory vms.Factory) (map[string]*common.HTTPHandler, error) {
+// Creates a dedicated VM instance for the sole purpose of serving the static
+// handlers.
+func (r *vmRegisterer) createStaticHandlers(
+	ctx context.Context,
+	vmID ids.ID,
+	factory vms.Factory,
+) (map[string]*common.HTTPHandler, error) {
+	// passing a nil ctx to the factory disables logging.
 	vm, err := factory.New(nil)
 	if err != nil {
 		return nil, err
