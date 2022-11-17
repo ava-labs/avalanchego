@@ -147,6 +147,7 @@ const (
 	AppGossipNonValidatorSizeKey                       = "consensus-app-gossip-non-validator-size"
 	AppGossipPeerSizeKey                               = "consensus-app-gossip-peer-size"
 	ConsensusShutdownTimeoutKey                        = "consensus-shutdown-timeout"
+	ProposerVMUseCurrentHeightKey                      = "proposervm-use-current-height"
 	FdLimitKey                                         = "fd-limit"
 	IndexEnabledKey                                    = "index-enabled"
 	IndexAllowIncompleteKey                            = "index-allow-incomplete"

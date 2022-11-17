@@ -543,7 +543,15 @@ func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.I
 // in the case of a process restart, we default to the lastAccepted block's
 // height which is likely (but not guaranteed) to also be older than the
 // window's configured TTL.
+//
+// If [UseCurrentHeight] is true, we will always return the last accepted block
+// height as the minimum. This is used to trigger the proposervm on recently
+// created subnets before [recentlyAcceptedWindowTTL].
 func (vm *VM) GetMinimumHeight(ctx context.Context) (uint64, error) {
+	if vm.Config.UseCurrentHeight {
+		return vm.GetCurrentHeight(ctx)
+	}
+
 	oldest, ok := vm.recentlyAccepted.Oldest()
 	if !ok {
 		return vm.GetCurrentHeight(ctx)
@@ -554,6 +562,11 @@ func (vm *VM) GetMinimumHeight(ctx context.Context) (uint64, error) {
 		return 0, err
 	}
 
+	// We subtract 1 from the height of [oldest] because we want the height of
+	// the last block accepted before the [recentlyAccepted] window.
+	//
+	// There is guaranteed to be a block accepted before this window because the
+	// first block added to [recentlyAccepted] window is >= height 1.
 	return blk.Height() - 1, nil
 }
 

@@ -1265,6 +1265,8 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 		return node.Config{}, fmt.Errorf("%s must be >= 0", ConsensusGossipFrequencyKey)
 	}
 
+	nodeConfig.UseCurrentHeight = v.GetBool(ProposerVMUseCurrentHeightKey)
+
 	var err error
 	// Logging
 	nodeConfig.LoggingConfig, err = getLoggingConfig(v)
