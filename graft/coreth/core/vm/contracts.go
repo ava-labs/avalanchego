@@ -107,6 +107,40 @@ var PrecompiledContractsApricotPhase2 = map[common.Address]precompile.StatefulPr
 	NativeAssetCallAddr:              &nativeAssetCall{gasCost: params.AssetCallApricot},
 }
 
+// PrecompiledContractsApricotPhasePre6 contains the default set of pre-compiled Ethereum
+// contracts used in the PrecompiledContractsApricotPhasePre6 release.
+var PrecompiledContractsApricotPhasePre6 = map[common.Address]precompile.StatefulPrecompiledContract{
+	common.BytesToAddress([]byte{1}): newWrappedPrecompiledContract(&ecrecover{}),
+	common.BytesToAddress([]byte{2}): newWrappedPrecompiledContract(&sha256hash{}),
+	common.BytesToAddress([]byte{3}): newWrappedPrecompiledContract(&ripemd160hash{}),
+	common.BytesToAddress([]byte{4}): newWrappedPrecompiledContract(&dataCopy{}),
+	common.BytesToAddress([]byte{5}): newWrappedPrecompiledContract(&bigModExp{eip2565: true}),
+	common.BytesToAddress([]byte{6}): newWrappedPrecompiledContract(&bn256AddIstanbul{}),
+	common.BytesToAddress([]byte{7}): newWrappedPrecompiledContract(&bn256ScalarMulIstanbul{}),
+	common.BytesToAddress([]byte{8}): newWrappedPrecompiledContract(&bn256PairingIstanbul{}),
+	common.BytesToAddress([]byte{9}): newWrappedPrecompiledContract(&blake2F{}),
+	genesisContractAddr:              &deprecatedContract{},
+	NativeAssetBalanceAddr:           &deprecatedContract{},
+	NativeAssetCallAddr:              &deprecatedContract{},
+}
+
+// PrecompiledContractsApricotPhase6 contains the default set of pre-compiled Ethereum
+// contracts used in the Apricot Phase 6 release.
+var PrecompiledContractsApricotPhase6 = map[common.Address]precompile.StatefulPrecompiledContract{
+	common.BytesToAddress([]byte{1}): newWrappedPrecompiledContract(&ecrecover{}),
+	common.BytesToAddress([]byte{2}): newWrappedPrecompiledContract(&sha256hash{}),
+	common.BytesToAddress([]byte{3}): newWrappedPrecompiledContract(&ripemd160hash{}),
+	common.BytesToAddress([]byte{4}): newWrappedPrecompiledContract(&dataCopy{}),
+	common.BytesToAddress([]byte{5}): newWrappedPrecompiledContract(&bigModExp{eip2565: true}),
+	common.BytesToAddress([]byte{6}): newWrappedPrecompiledContract(&bn256AddIstanbul{}),
+	common.BytesToAddress([]byte{7}): newWrappedPrecompiledContract(&bn256ScalarMulIstanbul{}),
+	common.BytesToAddress([]byte{8}): newWrappedPrecompiledContract(&bn256PairingIstanbul{}),
+	common.BytesToAddress([]byte{9}): newWrappedPrecompiledContract(&blake2F{}),
+	genesisContractAddr:              &deprecatedContract{},
+	NativeAssetBalanceAddr:           &nativeAssetBalance{gasCost: params.AssetBalanceApricot},
+	NativeAssetCallAddr:              &nativeAssetCall{gasCost: params.AssetCallApricot},
+}
+
 // PrecompiledContractsBanff contains the default set of pre-compiled Ethereum
 // contracts used in the Banff release.
 var PrecompiledContractsBanff = map[common.Address]precompile.StatefulPrecompiledContract{
@@ -125,12 +159,14 @@ var PrecompiledContractsBanff = map[common.Address]precompile.StatefulPrecompile
 }
 
 var (
-	PrecompiledAddressesBanff         []common.Address
-	PrecompiledAddressesApricotPhase2 []common.Address
-	PrecompiledAddressesIstanbul      []common.Address
-	PrecompiledAddressesByzantium     []common.Address
-	PrecompiledAddressesHomestead     []common.Address
-	PrecompileAllNativeAddresses      map[common.Address]struct{}
+	PrecompiledAddressesBanff            []common.Address
+	PrecompiledAddressesApricotPhase6    []common.Address
+	PrecompiledAddressesApricotPhasePre6 []common.Address
+	PrecompiledAddressesApricotPhase2    []common.Address
+	PrecompiledAddressesIstanbul         []common.Address
+	PrecompiledAddressesByzantium        []common.Address
+	PrecompiledAddressesHomestead        []common.Address
+	PrecompileAllNativeAddresses         map[common.Address]struct{}
 )
 
 func init() {
@@ -146,6 +182,12 @@ func init() {
 	for k := range PrecompiledContractsApricotPhase2 {
 		PrecompiledAddressesApricotPhase2 = append(PrecompiledAddressesApricotPhase2, k)
 	}
+	for k := range PrecompiledContractsApricotPhasePre6 {
+		PrecompiledAddressesApricotPhasePre6 = append(PrecompiledAddressesApricotPhasePre6, k)
+	}
+	for k := range PrecompiledContractsApricotPhase6 {
+		PrecompiledAddressesApricotPhase6 = append(PrecompiledAddressesApricotPhase6, k)
+	}
 	for k := range PrecompiledContractsBanff {
 		PrecompiledAddressesBanff = append(PrecompiledAddressesBanff, k)
 	}
@@ -156,6 +198,8 @@ func init() {
 	addrsList := append(PrecompiledAddressesHomestead, PrecompiledAddressesByzantium...)
 	addrsList = append(addrsList, PrecompiledAddressesIstanbul...)
 	addrsList = append(addrsList, PrecompiledAddressesApricotPhase2...)
+	addrsList = append(addrsList, PrecompiledAddressesApricotPhasePre6...)
+	addrsList = append(addrsList, PrecompiledAddressesApricotPhase6...)
 	addrsList = append(addrsList, PrecompiledAddressesBanff...)
 	for _, k := range addrsList {
 		PrecompileAllNativeAddresses[k] = struct{}{}
