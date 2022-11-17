@@ -37,7 +37,6 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
 	ethCrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
@@ -145,11 +144,11 @@ func TestNativeAssetContractCall(t *testing.T) {
 			gasUsed: []uint64{132091, 41618},
 			want:    "",
 		},
-		"postPhase6": {
-			config:  params.TestApricotPhasePost6Config,
+		"banff": {
+			config:  params.TestBanffChainConfig,
 			txs:     txs,
-			gasUsed: []uint64{0, 0},
-			want:    vmerrs.ErrToAddrProhibitedSoft.Error(),
+			gasUsed: []uint64{132091, 21618},
+			want:    "",
 		},
 	}
 
@@ -189,11 +188,11 @@ func TestNativeAssetContractConstructor(t *testing.T) {
 			gasUsed: []uint64{92046},
 			want:    "",
 		},
-		"postPhase6": {
-			config:  params.TestApricotPhasePost6Config,
+		"banff": {
+			config:  params.TestBanffChainConfig,
 			txs:     txs,
-			gasUsed: []uint64{0},
-			want:    vmerrs.ErrToAddrProhibitedSoft.Error(),
+			gasUsed: []uint64{72046},
+			want:    "",
 		},
 	}
 
@@ -233,11 +232,11 @@ func TestNativeAssetDirectEOACall(t *testing.T) {
 			gasUsed: []uint64{41000},
 			want:    "",
 		},
-		"postPhase6": {
-			config:  params.TestApricotPhasePost6Config,
+		"banff": {
+			config:  params.TestBanffChainConfig,
 			txs:     txs,
-			gasUsed: []uint64{0},
-			want:    vmerrs.ErrToAddrProhibitedSoft.Error(),
+			gasUsed: []uint64{21000},
+			want:    "",
 		},
 	}
 

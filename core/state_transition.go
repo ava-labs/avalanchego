@@ -27,7 +27,6 @@
 package core
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -347,13 +346,6 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		// Increment the nonce for the next transaction
 		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
 		ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value)
-	}
-	if errors.Is(vmerr, vmerrs.ErrToAddrProhibitedSoft) { // Only invalidate soft error here
-		return &ExecutionResult{
-			UsedGas:    st.gasUsed(),
-			Err:        vmerr,
-			ReturnData: ret,
-		}, vmerr
 	}
 	st.refundGas(rules.IsApricotPhase1)
 	st.state.AddBalance(st.evm.Context.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice))
