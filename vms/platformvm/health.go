@@ -8,9 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
@@ -27,6 +29,19 @@ func (vm *VM) HealthCheck(context.Context) (interface{}, error) {
 	vm.metrics.SetPercentConnected(primaryPercentConnected)
 	details := map[string]float64{
 		"primary-percentConnected": primaryPercentConnected,
+	}
+
+	localPrimaryValidator, err := vm.state.GetCurrentValidator(
+		constants.PrimaryNetworkID,
+		vm.ctx.NodeID,
+	)
+	switch err {
+	case nil:
+		vm.metrics.SetTimeUntilUnstake(time.Until(localPrimaryValidator.EndTime))
+	case database.ErrNotFound:
+		vm.metrics.SetTimeUntilUnstake(0)
+	default:
+		return nil, fmt.Errorf("couldn't get current local validator: %w", err)
 	}
 
 	primaryMinPercentConnected, ok := vm.MinPercentConnectedStakeHealthy[constants.PrimaryNetworkID]
@@ -65,6 +80,19 @@ func (vm *VM) HealthCheck(context.Context) (interface{}, error) {
 		key := fmt.Sprintf("%s-percentConnected", subnetID)
 		details[key] = percentConnected
 
+		localSubnetValidator, err := vm.state.GetCurrentValidator(
+			subnetID,
+			vm.ctx.NodeID,
+		)
+		switch err {
+		case nil:
+			vm.metrics.SetTimeUntilSubnetUnstake(subnetID, time.Until(localSubnetValidator.EndTime))
+		case database.ErrNotFound:
+			vm.metrics.SetTimeUntilSubnetUnstake(subnetID, 0)
+		default:
+			return nil, fmt.Errorf("couldn't get current subnet validator of %q: %w", subnetID, err)
+		}
+
 		if percentConnected < minPercentConnected {
 			errorReasons = append(errorReasons,
 				fmt.Sprintf("connected to %f%% of %q weight; should be connected to at least %f%%",
@@ -76,8 +104,11 @@ func (vm *VM) HealthCheck(context.Context) (interface{}, error) {
 		}
 	}
 
-	if len(errorReasons) > 0 {
-		err = fmt.Errorf("platform layer is unhealthy err: %w, details: %s", errNotEnoughStake, strings.Join(errorReasons, ", "))
+	if len(errorReasons) == 0 {
+		return details, nil
 	}
-	return details, err
+	return details, fmt.Errorf("platform layer is unhealthy err: %w, details: %s",
+		errNotEnoughStake,
+		strings.Join(errorReasons, ", "),
+	)
 }
