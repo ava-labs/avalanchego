@@ -10,6 +10,7 @@ import (
 	"encoding/asn1"
 	"errors"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 
 	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v3"
@@ -74,4 +75,14 @@ func RecoverSecp256PublicKey(cert *x509.Certificate) ([]byte, error) {
 	sPubKeyBytes := sPubKey.SerializeCompressed()
 
 	return hashing.PubkeyBytesToAddress(sPubKeyBytes), nil
+}
+
+func FakePrivateKey(addr ids.ShortID) *PrivateKeySECP256K1R {
+	return &PrivateKeySECP256K1R{
+		sk: &secp256k1.PrivateKey{},
+		pk: &PublicKeySECP256K1R{
+			pk:   &secp256k1.PublicKey{},
+			addr: addr,
+		},
+	}
 }

@@ -1,13 +1,3 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
-//
-// This file is a derived work, based on ava-labs code whose
-// original notices appear below.
-//
-// It is distributed under the same license conditions as the
-// original code from which it is derived.
-//
-// Much love to the original authors for their work.
-// **********************************************************
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -2430,78 +2420,6 @@ func (service *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, respon
 	if err != nil {
 		return fmt.Errorf("couldn't encode block %s as string: %w", args.BlockID, err)
 	}
-
-	return nil
-}
-
-// GetConfigurationReply is the response from calling GetConfiguration.
-type GetConfigurationReply struct {
-	// The NetworkID
-	NetworkID json.Uint32 `json:"networkID"`
-	// The fee asset ID
-	AssetID ids.ID `json:"assetID"`
-	// The symbol of the fee asset ID
-	AssetSymbol string `json:"assetSymbol"`
-	// beech32HRP use in addresses
-	Hrp string `json:"hrp"`
-	// Primary network blockchains
-	Blockchains []APIBlockchain `json:"blockchains"`
-	// The minimum duration a validator has to stake
-	MinStakeDuration json.Uint64 `json:"minStakeDuration"`
-	// The maximum duration a validator can stake
-	MaxStakeDuration json.Uint64 `json:"maxStakeDuration"`
-	// The minimum amount of tokens one must bond to be a validator
-	MinValidatorStake json.Uint64 `json:"minValidatorStake"`
-	// The maximum amount of tokens bondable to a validator
-	MaxValidatorStake json.Uint64 `json:"maxValidatorStake"`
-	// The minimum delegation fee
-	MinDelegationFee json.Uint32 `json:"minDelegationFee"`
-	// Minimum stake, in nAVAX, that can be delegated on the primary network
-	MinDelegatorStake json.Uint64 `json:"minDelegatorStake"`
-	// The minimum consumption rate
-	MinConsumptionRate json.Uint64 `json:"minConsumptionRate"`
-	// The maximum consumption rate
-	MaxConsumptionRate json.Uint64 `json:"maxConsumptionRate"`
-	// The supply cap for the native token (AVAX)
-	SupplyCap json.Uint64 `json:"supplyCap"`
-	// The codec version used for serializing
-	CodecVersion json.Uint16 `json:"codecVersion"`
-}
-
-// GetMinStake returns the minimum staking amount in nAVAX.
-func (service *Service) GetConfiguration(_ *http.Request, _ *struct{}, reply *GetConfigurationReply) error {
-	service.vm.ctx.Log.Debug("Platform: GetConfiguration called")
-
-	// Fee Asset ID, NetworkID and HRP
-	reply.NetworkID = json.Uint32(service.vm.ctx.NetworkID)
-	reply.AssetID = service.vm.GetFeeAssetID()
-	reply.AssetSymbol = constants.TokenSymbol(service.vm.ctx.NetworkID)
-	reply.Hrp = constants.GetHRP(service.vm.ctx.NetworkID)
-
-	// Blockchains of the primary network
-	blockchains := &GetBlockchainsResponse{}
-	if err := service.appendBlockchains(constants.PrimaryNetworkID, blockchains); err != nil {
-		return err
-	}
-	reply.Blockchains = blockchains.Blockchains
-
-	// Staking information
-	reply.MinStakeDuration = json.Uint64(service.vm.MinStakeDuration)
-	reply.MaxStakeDuration = json.Uint64(service.vm.MaxStakeDuration)
-
-	reply.MaxValidatorStake = json.Uint64(service.vm.MaxValidatorStake)
-	reply.MinValidatorStake = json.Uint64(service.vm.MinValidatorStake)
-
-	reply.MinDelegationFee = json.Uint32(service.vm.MinDelegationFee)
-	reply.MinDelegatorStake = json.Uint64(service.vm.MinDelegatorStake)
-
-	reply.MinConsumptionRate = json.Uint64(service.vm.RewardConfig.MinConsumptionRate)
-	reply.MaxConsumptionRate = json.Uint64(service.vm.RewardConfig.MaxConsumptionRate)
-
-	reply.SupplyCap = json.Uint64(service.vm.RewardConfig.SupplyCap)
-
-	// Codec information
-	reply.CodecVersion = json.Uint16(txs.Version)
 
 	return nil
 }
