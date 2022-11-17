@@ -17,9 +17,22 @@ import (
 )
 
 var (
+	_ CaminoBuilder = (*caminoBuilder)(nil)
+
 	errNodeKeyMissing   = errors.New("couldn't find key matching nodeID")
 	errWrongNodeKeyType = errors.New("node key type isn't *crypto.PrivateKeySECP256K1R")
 )
+
+type CaminoBuilder interface {
+	Builder
+	NewAddAddressStateTx(
+		ids.ShortID, // address
+		bool, // remove
+		uint8, // state
+		[]*crypto.PrivateKeySECP256K1R,
+		ids.ShortID, // changeAddress
+	) (*txs.Tx, error)
+}
 
 type caminoBuilder struct {
 	builder
