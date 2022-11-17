@@ -13,8 +13,8 @@ import (
 	time "time"
 
 	ids "github.com/ava-labs/avalanchego/ids"
-	snow "github.com/ava-labs/avalanchego/snow"
 	common "github.com/ava-labs/avalanchego/snow/engine/common"
+	trace "github.com/ava-labs/avalanchego/trace"
 	logging "github.com/ava-labs/avalanchego/utils/logging"
 	gomock "github.com/golang/mock/gomock"
 )
@@ -80,20 +80,6 @@ func (mr *MockServerMockRecorder) AddAliasesWithReadLock(arg0 interface{}, arg1 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddAliasesWithReadLock", reflect.TypeOf((*MockServer)(nil).AddAliasesWithReadLock), varargs...)
 }
 
-// AddChainRoute mocks base method.
-func (m *MockServer) AddChainRoute(arg0 *common.HTTPHandler, arg1 *snow.ConsensusContext, arg2, arg3 string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddChainRoute", arg0, arg1, arg2, arg3)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// AddChainRoute indicates an expected call of AddChainRoute.
-func (mr *MockServerMockRecorder) AddChainRoute(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddChainRoute", reflect.TypeOf((*MockServer)(nil).AddChainRoute), arg0, arg1, arg2, arg3)
-}
-
 // AddRoute mocks base method.
 func (m *MockServer) AddRoute(arg0 *common.HTTPHandler, arg1 *sync.RWMutex, arg2, arg3 string) error {
 	m.ctrl.T.Helper()
@@ -151,19 +137,19 @@ func (mr *MockServerMockRecorder) DispatchTLS(arg0, arg1 interface{}) *gomock.Ca
 }
 
 // Initialize mocks base method.
-func (m *MockServer) Initialize(arg0 logging.Logger, arg1 logging.Factory, arg2 string, arg3 uint16, arg4 []string, arg5 time.Duration, arg6 ids.NodeID, arg7 ...Wrapper) {
+func (m *MockServer) Initialize(arg0 logging.Logger, arg1 logging.Factory, arg2 string, arg3 uint16, arg4 []string, arg5 time.Duration, arg6 ids.NodeID, arg7 bool, arg8 trace.Tracer, arg9 ...Wrapper) {
 	m.ctrl.T.Helper()
-	varargs := []interface{}{arg0, arg1, arg2, arg3, arg4, arg5, arg6}
-	for _, a := range arg7 {
+	varargs := []interface{}{arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8}
+	for _, a := range arg9 {
 		varargs = append(varargs, a)
 	}
 	m.ctrl.Call(m, "Initialize", varargs...)
 }
 
 // Initialize indicates an expected call of Initialize.
-func (mr *MockServerMockRecorder) Initialize(arg0, arg1, arg2, arg3, arg4, arg5, arg6 interface{}, arg7 ...interface{}) *gomock.Call {
+func (mr *MockServerMockRecorder) Initialize(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8 interface{}, arg9 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{arg0, arg1, arg2, arg3, arg4, arg5, arg6}, arg7...)
+	varargs := append([]interface{}{arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8}, arg9...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*MockServer)(nil).Initialize), varargs...)
 }
 
