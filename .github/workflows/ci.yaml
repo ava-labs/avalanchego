@@ -22,7 +22,7 @@ jobs:
       - name: Lint
         run: cargo fmt && git diff --exit-code
       - name: Clippy
-        run: cargo clippy --fix --no-deps && git diff --exit-code
+        run: cargo clippy --fix -- -Dwarnings
 
   build:
     runs-on: ubuntu-latest

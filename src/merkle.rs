@@ -281,8 +281,8 @@ impl Node {
     const LEAF_NODE: u8 = 0x2;
 
     fn max_branch_node_size() -> u64 {
-        const MAX_SIZE: OnceCell<u64> = OnceCell::new();
-        *MAX_SIZE.get_or_init(|| {
+        let max_size: OnceCell<u64> = OnceCell::new();
+        *max_size.get_or_init(|| {
             Self {
                 root_hash: OnceCell::new(),
                 eth_rlp_long: OnceCell::new(),
@@ -710,6 +710,7 @@ impl Merkle {
             .unwrap();
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn split<'b>(
         &self, mut u_ref: ObjRef<'b, Node>, parents: &mut [(ObjRef<'b, Node>, u8)], rem_path: &[u8], n_path: Vec<u8>,
         n_value: Option<Data>, val: Vec<u8>, deleted: &mut Vec<ObjPtr<Node>>,
@@ -770,6 +771,7 @@ impl Merkle {
                         self,
                         u_ref,
                         |u| {
+                            #[allow(clippy::blocks_in_if_conditions)]
                             match &mut u.inner {
                                 NodeType::Leaf(u) => u.1 = Data(val),
                                 NodeType::Extension(u) => {
@@ -1105,6 +1107,7 @@ impl Merkle {
                     }
                 }
                 NodeType::Leaf(_) | NodeType::Extension(_) => {
+                    #[allow(clippy::blocks_in_if_conditions)]
                     match &p_ref.inner {
                         NodeType::Branch(_) => {
                             //                            ____[Leaf/Ext]
@@ -1228,6 +1231,7 @@ impl Merkle {
                 NodeType::Branch(_) => {
                     // from: [Branch] -> [Branch]x -> [Leaf/Ext]
                     // to: [Branch] -> [Leaf/Ext]
+                    #[allow(clippy::blocks_in_if_conditions)]
                     let c_ptr = if c_ref
                         .write(|c| {
                             match &mut c.inner {
@@ -1257,6 +1261,7 @@ impl Merkle {
                 NodeType::Extension(n) => {
                     // from: P -> [Ext] -> [Branch]x -> [Leaf/Ext]
                     // to: P -> [Leaf/Ext]
+                    #[allow(clippy::blocks_in_if_conditions)]
                     let c_ptr = if c_ref
                         .write(|c| {
                             let mut path = n.0.clone().into_inner();

@@ -74,6 +74,7 @@ impl growthring::wal::Record for AshRecord {
 }
 
 impl AshRecord {
+    #[allow(clippy::boxed_local)]
     fn deserialize(raw: growthring::wal::WALBytes) -> Self {
         let mut r = &raw[..];
         let len = u64::from_le_bytes(r[..8].try_into().unwrap());
