@@ -2,6 +2,13 @@
 
 ## [v0.11.3](https://github.com/ava-labs/coreth/releases/tag/v0.11.3)
 
+- Add counter for number of processed and accepted transactions
+- Wait for state sync goroutines to complete on shutdown
+- Bump go-ethereum dependency to v1.10.26
+- Increase soft cap on transaction size limits
+- Add back isForkIncompatible checks for all existing forks
+- Clean up Apricot Phase 6 code
+
 ## [v0.11.2](https://github.com/ava-labs/coreth/releases/tag/v0.11.2)
 
 - Add trie clean cache journaling to disk to improve processing time on restart
