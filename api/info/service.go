@@ -87,7 +87,10 @@ func NewService(
 	}, "info"); err != nil {
 		return nil, err
 	}
-	return &common.HTTPHandler{Handler: newServer}, nil
+	return &common.HTTPHandler{
+		LockOptions: common.NoLock,
+		Handler:     newServer,
+	}, nil
 }
 
 // GetNodeVersionReply are the results from calling GetNodeVersion

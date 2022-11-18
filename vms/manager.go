@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -58,6 +59,8 @@ type manager struct {
 	// alias of the VM. That is, [vmID].String() is an alias for [vmID].
 	ids.Aliaser
 
+	lock sync.RWMutex
+
 	// Key: A VM's ID
 	// Value: A factory that creates new instances of that VM
 	factories map[ids.ID]Factory
@@ -77,6 +80,9 @@ func NewManager() Manager {
 }
 
 func (m *manager) GetFactory(vmID ids.ID) (Factory, error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
 	if factory, ok := m.factories[vmID]; ok {
 		return factory, nil
 	}
@@ -84,6 +90,9 @@ func (m *manager) GetFactory(vmID ids.ID) (Factory, error) {
 }
 
 func (m *manager) RegisterFactory(ctx context.Context, vmID ids.ID, factory Factory) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	if _, exists := m.factories[vmID]; exists {
 		return fmt.Errorf("%q was already registered as a vm", vmID)
 	}
@@ -115,6 +124,9 @@ func (m *manager) RegisterFactory(ctx context.Context, vmID ids.ID, factory Fact
 }
 
 func (m *manager) ListFactories() ([]ids.ID, error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
 	vmIDs := make([]ids.ID, 0, len(m.factories))
 	for vmID := range m.factories {
 		vmIDs = append(vmIDs, vmID)
@@ -123,6 +135,9 @@ func (m *manager) ListFactories() ([]ids.ID, error) {
 }
 
 func (m *manager) Versions() (map[string]string, error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
 	versions := make(map[string]string, len(m.versions))
 	for vmID, version := range m.versions {
 		alias, err := m.PrimaryAlias(vmID)
