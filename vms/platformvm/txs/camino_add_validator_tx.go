@@ -4,6 +4,7 @@
 package txs
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/snow"
@@ -14,7 +15,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
-var _ ValidatorTx = (*CaminoAddValidatorTx)(nil)
+var (
+	_ ValidatorTx = (*CaminoAddValidatorTx)(nil)
+
+	errAssetNotAVAX      = errors.New("locked output must be AVAX")
+	errStakeOutsNotEmpty = errors.New("stake outputs must be empty")
+)
 
 // CaminoAddValidatorTx is an unsigned caminoAddValidatorTx
 type CaminoAddValidatorTx struct {
@@ -61,16 +67,16 @@ func (tx *CaminoAddValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 
 			assetID := out.AssetID()
 			if assetID != ctx.AVAXAssetID {
-				return fmt.Errorf("stake output must be AVAX but is %q", assetID)
+				return errAssetNotAVAX
 			}
 		}
 	}
 
 	switch {
-	case !avax.IsSortedTransferableOutputs(tx.StakeOuts, Codec):
-		return errOutputsNotSorted
+	case len(tx.StakeOuts) > 0:
+		return errStakeOutsNotEmpty
 	case totalStakeWeight != tx.Validator.Wght:
-		// return fmt.Errorf("%w: weight %d != stake %d", errValidatorWeightMismatch, tx.Validator.Wght, totalStakeWeight)
+		return fmt.Errorf("%w: weight %d != stake %d", errValidatorWeightMismatch, tx.Validator.Wght, totalStakeWeight)
 	}
 
 	// cache that this is valid

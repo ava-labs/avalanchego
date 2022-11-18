@@ -46,8 +46,7 @@ var (
 	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
 	defaultValidateStartTime  = defaultGenesisTime
 	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
-	defaultMinValidatorStake  = 5 * units.MilliAvax
-	defaultBalance            = 100 * defaultMinValidatorStake
+	defaultCaminoBalance      = 100 * defaultCaminoValidatorWeight
 	preFundedKeys             = crypto.BuildTestKeys()
 	defaultTxFee              = uint64(100)
 )
@@ -90,7 +89,7 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 			panic(err)
 		}
 		genesisUTXOs[i] = api.UTXO{
-			Amount:  json.Uint64(defaultBalance),
+			Amount:  json.Uint64(defaultCaminoBalance),
 			Address: addr,
 		}
 	}

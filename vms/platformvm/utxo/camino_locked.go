@@ -755,6 +755,8 @@ func (sort *innerSortUTXOs) Less(i, j int) bool {
 
 		if *iLockTxID == ids.Empty && *jLockTxID != ids.Empty {
 			return true
+		} else if *iLockTxID != ids.Empty && *jLockTxID == ids.Empty {
+			return false
 		}
 
 		switch bytes.Compare(iOtherLockTxID[:], jOtherLockTxID[:]) {

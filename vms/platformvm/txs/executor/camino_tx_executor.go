@@ -29,6 +29,7 @@ var (
 	errNotSecp256Fx         = errors.New("expected fx to be secp256k1.fx")
 	errRecoverAdresses      = errors.New("cannot recover addresses from credentials")
 	errInvalidRoles         = errors.New("invalid role")
+	errValidatorExists      = errors.New("node is already a validator")
 	errInvalidSystemTxBody  = errors.New("tx body doesn't match expected one")
 )
 
@@ -124,10 +125,7 @@ func verifyAddValidatorTxWithBonding(
 
 	_, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
 	if err == nil {
-		return nil, fmt.Errorf(
-			"attempted to issue duplicate validation for %s",
-			tx.Validator.NodeID,
-		)
+		return nil, errValidatorExists
 	}
 	if err != database.ErrNotFound {
 		return nil, fmt.Errorf(

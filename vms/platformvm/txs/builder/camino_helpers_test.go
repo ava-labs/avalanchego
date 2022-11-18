@@ -1,17 +1,22 @@
 // Copyright (C) 2022, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package executor
+package builder
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -23,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/nodeid"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -30,31 +36,54 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
-	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 const (
+	testNetworkID                = 10 // To be used in tests
 	defaultCaminoValidatorWeight = 2 * units.KiloAvax
 )
 
 var (
-	localStakingPath                                = "../../../../staking/local/"
-	caminoPreFundedKeys                             = crypto.BuildTestKeys()
-	caminoPreFundedNodeKeys, caminoPreFundedNodeIDs = nodeid.LoadLocalCaminoNodeKeysAndIDs(localStakingPath)
-	defaultCaminoBalance                            = 100 * defaultCaminoValidatorWeight
+	defaultMinStakingDuration = 24 * time.Hour
+	defaultMaxStakingDuration = 365 * 24 * time.Hour
+	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
+	defaultValidateStartTime  = defaultGenesisTime
+	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
+	defaultCaminoBalance      = 100 * defaultCaminoValidatorWeight
+	avaxAssetID               = ids.ID{'y', 'e', 'e', 't'}
+	defaultTxFee              = uint64(100)
+	xChainID                  = ids.Empty.Prefix(0)
+	cChainID                  = ids.Empty.Prefix(1)
+	localStakingPath          = "../../../../staking/local/"
+	caminoPreFundedKeys       = crypto.BuildTestKeys()
+	_, caminoPreFundedNodeIDs = nodeid.LoadLocalCaminoNodeKeysAndIDs(localStakingPath)
 )
 
-func newCaminoEnvironment(postBanff bool, caminoGenesisConf genesis.Camino) *environment {
+type mutableSharedMemory struct {
+	atomic.SharedMemory
+}
+
+type snLookup struct {
+	chainsToSubnet map[ids.ID]ids.ID
+}
+
+func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
+	subnetID, ok := sn.chainsToSubnet[chainID]
+	if !ok {
+		return ids.ID{}, errors.New("")
+	}
+	return subnetID, nil
+}
+
+func newCaminoBuilder(postBanff bool, caminoGenesisConf genesis.Camino) Builder {
 	var isBootstrapped utils.AtomicBool
 	isBootstrapped.SetValue(true)
 
@@ -63,7 +92,7 @@ func newCaminoEnvironment(postBanff bool, caminoGenesisConf genesis.Camino) *env
 
 	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
-	ctx, msm := defaultCtx(baseDB)
+	ctx := defaultCtx(baseDB)
 
 	fx := defaultFx(&clk, ctx.Log, isBootstrapped.GetValue())
 
@@ -71,10 +100,9 @@ func newCaminoEnvironment(postBanff bool, caminoGenesisConf genesis.Camino) *env
 	baseState := defaultCaminoState(&config, ctx, baseDB, rewards, caminoGenesisConf)
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
-	uptimes := uptime.NewManager(baseState)
 	utxoHandler := utxo.NewHandler(ctx, &clk, baseState, fx)
 
-	txBuilder := builder.New(
+	txBuilder := New(
 		ctx,
 		&config,
 		&clk,
@@ -84,79 +112,71 @@ func newCaminoEnvironment(postBanff bool, caminoGenesisConf genesis.Camino) *env
 		utxoHandler,
 	)
 
-	backend := Backend{
-		Config:       &config,
-		Ctx:          ctx,
-		Clk:          &clk,
-		Bootstrapped: &isBootstrapped,
-		Fx:           fx,
-		FlowChecker:  utxoHandler,
-		Uptimes:      uptimes,
-		Rewards:      rewards,
-	}
-
-	env := &environment{
-		isBootstrapped: &isBootstrapped,
-		config:         &config,
-		clk:            &clk,
-		baseDB:         baseDB,
-		ctx:            ctx,
-		msm:            msm,
-		fx:             fx,
-		state:          baseState,
-		states:         make(map[ids.ID]state.Chain),
-		atomicUTXOs:    atomicUTXOs,
-		uptimes:        uptimes,
-		utxosHandler:   utxoHandler,
-		txBuilder:      txBuilder,
-		backend:        backend,
-	}
-
-	addCaminoSubnet(env, txBuilder)
-
-	return env
+	return txBuilder
 }
 
-func addCaminoSubnet(
-	env *environment,
-	txBuilder builder.Builder,
-) {
-	// Create a subnet
-	var err error
-	testSubnet1, err = txBuilder.NewCreateSubnetTx(
-		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
-		[]ids.ShortID{ // control keys
-			caminoPreFundedKeys[0].PublicKey().Address(),
-			caminoPreFundedKeys[1].PublicKey().Address(),
-			caminoPreFundedKeys[2].PublicKey().Address(),
-		},
-		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
-		caminoPreFundedKeys[0].PublicKey().Address(),
-	)
-	if err != nil {
-		panic(err)
-	}
+func defaultCtx(db database.Database) *snow.Context {
+	ctx := snow.DefaultContextTest()
+	ctx.NetworkID = 10
+	ctx.XChainID = xChainID
+	ctx.AVAXAssetID = avaxAssetID
 
-	// store it
-	stateDiff, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		panic(err)
-	}
+	atomicDB := prefixdb.New([]byte{1}, db)
+	m := atomic.NewMemory(atomicDB)
 
-	executor := CaminoStandardTxExecutor{
-		StandardTxExecutor{
-			Backend: &env.backend,
-			State:   stateDiff,
-			Tx:      testSubnet1,
+	msm := &mutableSharedMemory{
+		SharedMemory: m.NewSharedMemory(ctx.ChainID),
+	}
+	ctx.SharedMemory = msm
+
+	ctx.SNLookup = &snLookup{
+		chainsToSubnet: map[ids.ID]ids.ID{
+			constants.PlatformChainID: constants.PrimaryNetworkID,
+			xChainID:                  constants.PrimaryNetworkID,
+			cChainID:                  constants.PrimaryNetworkID,
 		},
 	}
-	err = testSubnet1.Unsigned.Visit(&executor)
-	if err != nil {
+
+	return ctx
+}
+
+func defaultClock(postBanff bool) mockable.Clock {
+	now := defaultGenesisTime
+	if postBanff {
+		// 1 second after Banff fork
+		now = defaultValidateEndTime.Add(-2 * time.Second)
+	}
+	clk := mockable.Clock{}
+	clk.Set(now)
+	return clk
+}
+
+type fxVMInt struct {
+	registry codec.Registry
+	clk      *mockable.Clock
+	log      logging.Logger
+}
+
+func (fvi *fxVMInt) CodecRegistry() codec.Registry { return fvi.registry }
+func (fvi *fxVMInt) Clock() *mockable.Clock        { return fvi.clk }
+func (fvi *fxVMInt) Logger() logging.Logger        { return fvi.log }
+
+func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.Fx {
+	fxVMInt := &fxVMInt{
+		registry: linearcodec.NewDefault(),
+		clk:      clk,
+		log:      log,
+	}
+	res := &secp256k1fx.Fx{}
+	if err := res.Initialize(fxVMInt); err != nil {
 		panic(err)
 	}
-
-	stateDiff.AddTx(testSubnet1, status.Committed)
-	stateDiff.Apply(env.state)
+	if isBootstrapped {
+		if err := res.Bootstrapped(); err != nil {
+			panic(err)
+		}
+	}
+	return res
 }
 
 func defaultCaminoState(
@@ -189,7 +209,7 @@ func defaultCaminoState(
 	if err := state.Commit(); err != nil {
 		panic(err)
 	}
-	lastAcceptedID = state.GetLastAccepted()
+	state.GetLastAccepted()
 	return state
 }
 
@@ -205,9 +225,9 @@ func defaultCaminoConfig(postBanff bool) config.Config {
 		TxFee:                  defaultTxFee,
 		CreateSubnetTxFee:      100 * defaultTxFee,
 		CreateBlockchainTxFee:  100 * defaultTxFee,
-		MinValidatorStake:      defaultCaminoValidatorWeight,
+		MinValidatorStake:      5 * units.MilliAvax,
 		MaxValidatorStake:      defaultCaminoValidatorWeight,
-		MinDelegatorStake:      1 * units.MilliAvax,
+		MinDelegatorStake:      defaultCaminoValidatorWeight,
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig: reward.Config{
@@ -287,87 +307,4 @@ func buildCaminoGenesisTest(ctx *snow.Context, caminoGenesisConf genesis.Camino)
 	}
 
 	return genesisBytes
-}
-
-func generateTestUTXO(txID ids.ID, assetID ids.ID, amount uint64, outputOwners secp256k1fx.OutputOwners, depositTxID, bondTxID ids.ID) *avax.UTXO {
-	var out avax.TransferableOut = &secp256k1fx.TransferOutput{
-		Amt:          amount,
-		OutputOwners: outputOwners,
-	}
-	if depositTxID != ids.Empty || bondTxID != ids.Empty {
-		out = &locked.Out{
-			IDs: locked.IDs{
-				DepositTxID: depositTxID,
-				BondTxID:    bondTxID,
-			},
-			TransferableOut: out,
-		}
-	}
-	return &avax.UTXO{
-		UTXOID: avax.UTXOID{TxID: txID},
-		Asset:  avax.Asset{ID: assetID},
-		Out:    out,
-	}
-}
-
-func generateTestOut(assetID ids.ID, amount uint64, outputOwners secp256k1fx.OutputOwners, depositTxID, bondTxID ids.ID) *avax.TransferableOutput {
-	var out avax.TransferableOut = &secp256k1fx.TransferOutput{
-		Amt:          amount,
-		OutputOwners: outputOwners,
-	}
-	if depositTxID != ids.Empty || bondTxID != ids.Empty {
-		out = &locked.Out{
-			IDs: locked.IDs{
-				DepositTxID: depositTxID,
-				BondTxID:    bondTxID,
-			},
-			TransferableOut: out,
-		}
-	}
-	return &avax.TransferableOutput{
-		Asset: avax.Asset{ID: assetID},
-		Out:   out,
-	}
-}
-
-func generateTestStakeableOut(assetID ids.ID, amount, locktime uint64, outputOwners secp256k1fx.OutputOwners) *avax.TransferableOutput {
-	return &avax.TransferableOutput{
-		Asset: avax.Asset{ID: assetID},
-		Out: &stakeable.LockOut{
-			Locktime: locktime,
-			TransferableOut: &secp256k1fx.TransferOutput{
-				Amt:          amount,
-				OutputOwners: outputOwners,
-			},
-		},
-	}
-}
-
-func generateTestInFromUTXO(utxo *avax.UTXO, sigIndices []uint32) *avax.TransferableInput {
-	var in avax.TransferableIn
-	switch out := utxo.Out.(type) {
-	case *secp256k1fx.TransferOutput:
-		in = &secp256k1fx.TransferInput{
-			Amt:   out.Amount(),
-			Input: secp256k1fx.Input{SigIndices: sigIndices},
-		}
-	case *locked.Out:
-		in = &locked.In{
-			IDs: out.IDs,
-			TransferableIn: &secp256k1fx.TransferInput{
-				Amt:   out.Amount(),
-				Input: secp256k1fx.Input{SigIndices: sigIndices},
-			},
-		}
-	default:
-		panic("unknown utxo.Out type")
-	}
-
-	// to be sure that utxoid.id is set in both entities
-	utxo.InputID()
-	return &avax.TransferableInput{
-		UTXOID: utxo.UTXOID,
-		Asset:  utxo.Asset,
-		In:     in,
-	}
 }
