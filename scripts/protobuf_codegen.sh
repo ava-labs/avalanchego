@@ -18,10 +18,10 @@ fi
 ## install "protoc-gen-go"
 # any version changes here should also be bumped in Dockerfile.buf
 # ref. https://github.com/protocolbuffers/protobuf-go/releases
-PROTOC_GEN_GO_VERSION='v1.28.0'
+PROTOC_GEN_GO_VERSION='v1.28.1'
 go install -v google.golang.org/protobuf/cmd/protoc-gen-go@${PROTOC_GEN_GO_VERSION}
 if [[ $(protoc-gen-go --version | cut -f2 -d' ') != "${PROTOC_GEN_GO_VERSION}" ]]; then
-  # e.g., protoc-gen-go v1.28.0
+  # e.g., protoc-gen-go v1.28.1
   echo "could not find protoc-gen-go ${PROTOC_GEN_GO_VERSION}, is it installed + in PATH?"
   exit 255
 fi

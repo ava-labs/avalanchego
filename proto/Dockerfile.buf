@@ -16,7 +16,7 @@ COPY --from=builder /usr/local/bin/buf /usr/local/bin/
 
 # any version changes here should also be bumped in scripts/protobuf_codegen.sh
 RUN \
-  go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.0 && \
+  go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.1 && \
   go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2.0
 
 ENV PATH="${PATH}:/root/go/bin/"
