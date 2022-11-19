@@ -586,12 +586,13 @@ func (t *Transitive) issueWithAncestors(ctx context.Context, blk snowman.Block) 
 	// issue [blk] and its ancestors into consensus
 	status := blk.Status()
 	for status.Fetched() && !t.wasIssued(blk) {
-		if err := t.issue(ctx, blk); err != nil {
+		err := t.issue(ctx, blk)
+		if err != nil {
 			return false, err
 		}
 		blkID = blk.Parent()
-		var err error
-		if blk, err = t.GetBlock(ctx, blkID); err != nil {
+		blk, err = t.GetBlock(ctx, blkID)
+		if err != nil {
 			status = choices.Unknown
 			break
 		}

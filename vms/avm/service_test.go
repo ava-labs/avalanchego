@@ -2437,7 +2437,7 @@ func TestImportExportKey(t *testing.T) {
 		PrivateKey: sk,
 	}
 	importReply := &api.JSONAddress{}
-	if err = s.ImportKey(nil, importArgs, importReply); err != nil {
+	if err := s.ImportKey(nil, importArgs, importReply); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2453,7 +2453,7 @@ func TestImportExportKey(t *testing.T) {
 		Address: addrStr,
 	}
 	exportReply := &ExportKeyReply{}
-	if err = s.ExportKey(nil, exportArgs, exportReply); err != nil {
+	if err := s.ExportKey(nil, exportArgs, exportReply); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2486,7 +2486,7 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 		PrivateKey: sk,
 	}
 	reply := api.JSONAddress{}
-	if err = s.ImportKey(nil, &args, &reply); err != nil {
+	if err := s.ImportKey(nil, &args, &reply); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2500,7 +2500,7 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 	}
 
 	reply2 := api.JSONAddress{}
-	if err = s.ImportKey(nil, &args, &reply2); err != nil {
+	if err := s.ImportKey(nil, &args, &reply2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2644,7 +2644,7 @@ func TestSendMultiple(t *testing.T) {
 				t.Fatal("Transaction ID returned by SendMultiple does not match the transaction found in vm's pending transactions")
 			}
 
-			if _, err = vm.GetTx(context.Background(), reply.TxID); err != nil {
+			if _, err := vm.GetTx(context.Background(), reply.TxID); err != nil {
 				t.Fatalf("Failed to retrieve created transaction: %s", err)
 			}
 		})

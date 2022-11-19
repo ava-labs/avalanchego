@@ -786,7 +786,7 @@ func TestSetLastAcceptedBlock(t *testing.T) {
 	if lastAcceptedID != postSetBlk1.ID() {
 		t.Fatal("Expected last accepted block to be postSetBlk1")
 	}
-	if lastAcceptedID = chainState.LastAcceptedBlock().ID(); lastAcceptedID != postSetBlk1.ID() {
+	if lastAcceptedID := chainState.LastAcceptedBlock().ID(); lastAcceptedID != postSetBlk1.ID() {
 		t.Fatal("Expected last accepted block to be postSetBlk1")
 	}
 
@@ -808,7 +808,7 @@ func TestSetLastAcceptedBlock(t *testing.T) {
 	if lastAcceptedID != postSetBlk2.ID() {
 		t.Fatal("Expected last accepted block to be postSetBlk2")
 	}
-	if lastAcceptedID = chainState.LastAcceptedBlock().ID(); lastAcceptedID != postSetBlk2.ID() {
+	if lastAcceptedID := chainState.LastAcceptedBlock().ID(); lastAcceptedID != postSetBlk2.ID() {
 		t.Fatal("Expected last accepted block to be postSetBlk2")
 	}
 

@@ -261,7 +261,7 @@ func TestBatchPut(t *testing.T, db Database) {
 		t.Fatalf("Unexpected error on db.Delete: %s", err)
 	}
 
-	if batch = db.NewBatch(); batch == nil {
+	if batch := db.NewBatch(); batch == nil {
 		t.Fatalf("db.NewBatch returned nil")
 	} else if err := batch.Put(key, value); err != nil {
 		t.Fatalf("Unexpected error on batch.Put: %s", err)

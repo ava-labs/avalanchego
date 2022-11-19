@@ -507,7 +507,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		},
 	}
 
-	if err = bBlock.Verify(context.Background()); err != nil {
+	if err := bBlock.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 

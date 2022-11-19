@@ -124,7 +124,7 @@ func TestWalletService_SendMultiple(t *testing.T) {
 				t.Fatal("Transaction ID returned by SendMultiple does not match the transaction found in vm's pending transactions")
 			}
 
-			if _, err = vm.GetTx(context.Background(), reply.TxID); err != nil {
+			if _, err := vm.GetTx(context.Background(), reply.TxID); err != nil {
 				t.Fatalf("Failed to retrieve created transaction: %s", err)
 			}
 		})

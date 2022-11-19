@@ -223,7 +223,8 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 		}
 	case v.IsSet(HTTPSKeyFileKey):
 		httpsKeyFilepath := GetExpandedArg(v, HTTPSKeyFileKey)
-		if httpsKey, err = os.ReadFile(filepath.Clean(httpsKeyFilepath)); err != nil {
+		httpsKey, err = os.ReadFile(filepath.Clean(httpsKeyFilepath))
+		if err != nil {
 			return node.HTTPConfig{}, err
 		}
 	}
@@ -237,7 +238,8 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 		}
 	case v.IsSet(HTTPSCertFileKey):
 		httpsCertFilepath := GetExpandedArg(v, HTTPSCertFileKey)
-		if httpsCert, err = os.ReadFile(filepath.Clean(httpsCertFilepath)); err != nil {
+		httpsCert, err = os.ReadFile(filepath.Clean(httpsCertFilepath))
+		if err != nil {
 			return node.HTTPConfig{}, err
 		}
 	}

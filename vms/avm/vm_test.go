@@ -703,7 +703,7 @@ func TestIssueNFT(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = vm.IssueTx(createAssetTx.Bytes()); err != nil {
+	if _, err := vm.IssueTx(createAssetTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -732,7 +732,7 @@ func TestIssueNFT(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = vm.IssueTx(mintNFTTx.Bytes()); err != nil {
+	if _, err := vm.IssueTx(mintNFTTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -766,7 +766,7 @@ func TestIssueNFT(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = vm.IssueTx(transferNFTTx.Bytes()); err != nil {
+	if _, err := vm.IssueTx(transferNFTTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -848,7 +848,7 @@ func TestIssueProperty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = vm.IssueTx(createAssetTx.Bytes()); err != nil {
+	if _, err := vm.IssueTx(createAssetTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -886,7 +886,7 @@ func TestIssueProperty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = vm.IssueTx(mintPropertyTx.Bytes()); err != nil {
+	if _, err := vm.IssueTx(mintPropertyTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -912,7 +912,7 @@ func TestIssueProperty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = vm.IssueTx(burnPropertyTx.Bytes()); err != nil {
+	if _, err := vm.IssueTx(burnPropertyTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -1531,7 +1531,7 @@ func TestIssueImportTx(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	if err = vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
+	if err := vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1700,7 +1700,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	if err = vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
+	if err := vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1937,7 +1937,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	}
 	vm.batchTimeout = 0
 
-	if err = vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
+	if err := vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
 

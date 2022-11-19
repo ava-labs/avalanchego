@@ -416,7 +416,7 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	}
 
 	ss.frontierSeeders = validators.NewSet()
-	if err = ss.frontierSeeders.Set(beacons); err != nil {
+	if err := ss.frontierSeeders.Set(beacons); err != nil {
 		return err
 	}
 

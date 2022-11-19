@@ -70,11 +70,11 @@ func TestCreateAndFinishPoll(t *testing.T) {
 		t.Fatalf("Should only have one active poll")
 	} else if results := s.Vote(1, vdr1, votes); len(results) > 0 {
 		t.Fatalf("Shouldn't have been able to finish a non-existent poll")
-	} else if results = s.Vote(0, vdr1, votes); len(results) > 0 {
+	} else if results := s.Vote(0, vdr1, votes); len(results) > 0 {
 		t.Fatalf("Shouldn't have been able to finish an ongoing poll")
-	} else if results = s.Vote(0, vdr1, votes); len(results) > 0 {
+	} else if results := s.Vote(0, vdr1, votes); len(results) > 0 {
 		t.Fatalf("Should have dropped a duplicated poll")
-	} else if results = s.Vote(0, vdr2, votes); len(results) == 0 {
+	} else if results := s.Vote(0, vdr2, votes); len(results) == 0 {
 		t.Fatalf("Should have finished the poll")
 	} else if len(results) != 1 {
 		t.Fatalf("Wrong number of results returned")

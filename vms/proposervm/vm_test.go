@@ -641,7 +641,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal("Could not build block")
 	}
-	if err = builtBlk.Verify(context.Background()); err != nil {
+	if err := builtBlk.Verify(context.Background()); err != nil {
 		t.Fatal("Built block does not verify")
 	}
 
@@ -690,7 +690,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 	}
 
 	// prove that also block from network verifies
-	if err = netProBlk.Verify(context.Background()); err != nil {
+	if err := netProBlk.Verify(context.Background()); err != nil {
 		t.Fatal("block from network does not verify")
 	}
 }
@@ -852,7 +852,7 @@ func TestPreFork_SetPreference(t *testing.T) {
 			return nil, errUnknownBlock
 		}
 	}
-	if err = proVM.SetPreference(context.Background(), builtBlk.ID()); err != nil {
+	if err := proVM.SetPreference(context.Background(), builtBlk.ID()); err != nil {
 		t.Fatal("Could not set preference on proposer Block")
 	}
 
@@ -1688,7 +1688,7 @@ func TestTooFarAdvanced(t *testing.T) {
 		},
 	}
 
-	if err = bBlock.Verify(context.Background()); err != errProposerWindowNotStarted {
+	if err := bBlock.Verify(context.Background()); err != errProposerWindowNotStarted {
 		t.Fatal("should have errored errProposerWindowNotStarted")
 	}
 
@@ -1712,7 +1712,7 @@ func TestTooFarAdvanced(t *testing.T) {
 		},
 	}
 
-	if err = bBlock.Verify(context.Background()); err != errTimeTooAdvanced {
+	if err := bBlock.Verify(context.Background()); err != errTimeTooAdvanced {
 		t.Fatal("should have errored errTimeTooAdvanced")
 	}
 }

@@ -23,18 +23,19 @@ func listen(addr string) (net.Listener, error) {
 		return nil, err
 	}
 
-	// Try to listen on the socket. If that fails we check to see if it's a stale
-	// socket and remove it if it is. Then we try to listen one more time.
+	// Try to listen on the socket.
 	l, err := net.ListenUnix("unix", uAddr)
-	if err != nil {
-		if err = removeIfStaleUnixSocket(addr); err != nil {
-			return nil, err
-		}
-		if l, err = net.ListenUnix("unix", uAddr); err != nil {
-			return nil, err
-		}
+	if err == nil {
+		return l, nil
 	}
-	return l, err
+
+	// Check to see if the socket is stale and remove it if it is.
+	if err := removeIfStaleUnixSocket(addr); err != nil {
+		return nil, err
+	}
+
+	// Try listening again now that it shouldn't be stale.
+	return net.ListenUnix("unix", uAddr)
 }
 
 // Dial creates a new *Client connected to the given address over a Unix socket
@@ -59,13 +60,16 @@ func Dial(addr string) (*Client, error) {
 // that is refusing connections
 func removeIfStaleUnixSocket(socketPath string) error {
 	// Ensure it's a socket; if not return without an error
-	if st, err := os.Stat(socketPath); err != nil || st.Mode()&os.ModeType != os.ModeSocket {
+	st, err := os.Stat(socketPath)
+	if err != nil {
+		return nil
+	}
+	if st.Mode()&os.ModeType != os.ModeSocket {
 		return nil
 	}
 
 	// Try to connect
 	conn, err := net.DialTimeout("unix", socketPath, staleSocketTimeout)
-
 	switch {
 	// The connection was refused so this socket is stale; remove it
 	case isSyscallError(err, syscall.ECONNREFUSED):
@@ -74,6 +78,8 @@ func removeIfStaleUnixSocket(socketPath string) error {
 	// The socket is alive so close this connection and leave the socket alone
 	case err == nil:
 		return conn.Close()
+
+	default:
+		return nil
 	}
-	return nil
 }

@@ -1237,7 +1237,6 @@ func (n *Node) Initialize(
 ) error {
 	n.Log = logger
 	n.Config = config
-	var err error
 	n.ID = ids.NodeIDFromCert(n.Config.StakingTLSCert.Leaf)
 	n.LogFactory = logFactory
 	n.DoneShuttingDown.Add(1)
@@ -1251,11 +1250,12 @@ func (n *Node) Initialize(
 		zap.Reflect("config", n.Config),
 	)
 
-	if err = n.initBeacons(); err != nil { // Configure the beacons
+	if err := n.initBeacons(); err != nil { // Configure the beacons
 		return fmt.Errorf("problem initializing node beacons: %w", err)
 	}
 
 	// Set up tracer
+	var err error
 	n.tracer, err = trace.New(n.Config.TraceConfig)
 	if err != nil {
 		return fmt.Errorf("couldn't initialize tracer: %w", err)
@@ -1307,7 +1307,7 @@ func (n *Node) Initialize(
 	}
 	n.initCPUTargeter(&config.CPUTargeterConfig, primaryNetVdrs)
 	n.initDiskTargeter(&config.DiskTargeterConfig, primaryNetVdrs)
-	if err = n.initNetworking(primaryNetVdrs); err != nil { // Set up networking layer.
+	if err := n.initNetworking(primaryNetVdrs); err != nil { // Set up networking layer.
 		return fmt.Errorf("problem initializing networking: %w", err)
 	}
 

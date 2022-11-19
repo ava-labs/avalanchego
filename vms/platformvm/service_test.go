@@ -119,7 +119,7 @@ func TestCreateBlockchainArgsParsing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = stdjson.Marshal(args.GenesisData); err != nil {
+	if _, err := stdjson.Marshal(args.GenesisData); err != nil {
 		t.Fatal(err)
 	}
 }

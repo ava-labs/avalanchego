@@ -1455,7 +1455,7 @@ func (s *state) writeBlocks() error {
 
 		delete(s.addedBlocks, blkID)
 		s.blockCache.Put(blkID, stateBlk)
-		if err = s.blockDB.Put(blkID[:], blockBytes); err != nil {
+		if err := s.blockDB.Put(blkID[:], blockBytes); err != nil {
 			return fmt.Errorf("failed to write block %s: %w", blkID, err)
 		}
 	}
@@ -1547,7 +1547,7 @@ func (s *state) writeCurrentPrimaryNetworkStakers(height uint64) error {
 					return fmt.Errorf("failed to serialize current validator: %w", err)
 				}
 
-				if err = s.currentValidatorList.Put(staker.TxID[:], vdrBytes); err != nil {
+				if err := s.currentValidatorList.Put(staker.TxID[:], vdrBytes); err != nil {
 					return fmt.Errorf("failed to write current validator to list: %w", err)
 				}
 
