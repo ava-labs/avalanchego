@@ -85,7 +85,8 @@ var (
 	acceptedBlockGasUsedCounter  = metrics.NewRegisteredCounter("chain/block/gas/used/accepted", nil)
 	badBlockCounter              = metrics.NewRegisteredCounter("chain/block/bad/count", nil)
 
-	acceptedTxsCounter = metrics.NewRegisteredCounter("chain/txs/accepted/count", nil)
+	acceptedTxsCounter  = metrics.NewRegisteredCounter("chain/txs/accepted", nil)
+	processedTxsCounter = metrics.NewRegisteredCounter("chain/txs/processed", nil)
 
 	ErrRefuseToCorruptArchiver = errors.New("node has operated with pruning disabled, shutting down to prevent missing tries")
 
@@ -913,7 +914,6 @@ func (bc *BlockChain) Accept(block *types.Block) error {
 	bc.addAcceptorQueue(block)
 	acceptedBlockGasUsedCounter.Inc(int64(block.GasUsed()))
 	acceptedTxsCounter.Inc(int64(len(block.Transactions())))
-
 	return nil
 }
 
@@ -1252,6 +1252,7 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 	)
 
 	processedBlockGasUsedCounter.Inc(int64(block.GasUsed()))
+	processedTxsCounter.Inc(int64(block.Transactions().Len()))
 	blockInsertCount.Inc(1)
 	return nil
 }
