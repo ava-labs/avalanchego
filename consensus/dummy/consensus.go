@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/trie"
+	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -67,6 +68,26 @@ func NewFullFaker() *DummyEngine {
 		clock:         &mockable.Clock{},
 		consensusMode: ModeSkipHeader,
 	}
+}
+
+// verifyCoinbase checks that the coinbase is valid for the given [header] and [parent].
+func (self *DummyEngine) verifyCoinbase(config *params.ChainConfig, header *types.Header, parent *types.Header, chain consensus.ChainHeaderReader) error {
+	// get the coinbase configured at parent
+	configuredAddressAtParent, isAllowFeeRecipients, err := chain.GetCoinbaseAt(parent)
+	if err != nil {
+		return fmt.Errorf("failed to get coinbase at %v: %w", header.Hash(), err)
+	}
+
+	if isAllowFeeRecipients {
+		// if fee recipients are allowed we don't need to check the coinbase
+		return nil
+	}
+	// we fetch the configured coinbase at the parent's state
+	// to check against the coinbase in [header].
+	if configuredAddressAtParent != header.Coinbase {
+		return fmt.Errorf("%w: %v does not match required coinbase address %v", vmerrs.ErrInvalidCoinbase, header.Coinbase, configuredAddressAtParent)
+	}
+	return nil
 }
 
 func (self *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, header *types.Header, parent *types.Header, chain consensus.ChainHeaderReader) error {
@@ -175,6 +196,14 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header 
 	if err := self.verifyHeaderGasFields(config, header, parent, chain); err != nil {
 		return err
 	}
+	// Ensure that coinbase is valid if reward manager is enabled
+	// If reward manager is disabled, this will be handled in syntactic verification
+	if config.IsRewardManager(timestamp) {
+		if err := self.verifyCoinbase(config, header, parent, chain); err != nil {
+			return err
+		}
+	}
+
 	// Verify the header's timestamp
 	if header.Time > uint64(self.clock.Time().Add(allowedFutureBlockTime).Unix()) {
 		return consensus.ErrFutureBlock

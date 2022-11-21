@@ -13,8 +13,6 @@ contract ExampleFeeManager is AllowList {
   address constant FEE_MANAGER_ADDRESS = 0x0200000000000000000000000000000000000003;
   IFeeManager feeManager = IFeeManager(FEE_MANAGER_ADDRESS);
 
-  bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
-
   struct FeeConfig {
     uint256 gasLimit;
     uint256 targetBlockRate;

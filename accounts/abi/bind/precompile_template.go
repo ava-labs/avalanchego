@@ -86,12 +86,12 @@ var (
 
 	{{- if not .Original.IsConstant | and $contract.AllowList}}
 
-	ErrCannot{{.Normalized.Name}} = errors.New("non-enabled cannot {{.Original.Name}}")
+	ErrCannot{{.Normalized.Name}} = errors.New("non-enabled cannot call {{.Original.Name}}")
 	{{- end}}
 	{{- end}}
 
 	{{- if .Contract.Fallback | and $contract.AllowList}}
-	Err{{.Contract.Type}}CannotFallback = errors.New("non-enabled cannot use fallback function")
+	Err{{.Contract.Type}}CannotFallback = errors.New("non-enabled cannot call fallback function")
 	{{- end}}
 
 	{{.Contract.Type}}ABI abi.ABI // will be initialized by init function

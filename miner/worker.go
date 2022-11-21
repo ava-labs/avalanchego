@@ -160,7 +160,22 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 	if w.coinbase == (common.Address{}) {
 		return nil, errors.New("cannot mine without etherbase")
 	}
+
 	header.Coinbase = w.coinbase
+
+	configuredCoinbase, isAllowFeeRecipient, err := w.chain.GetCoinbaseAt(parent.Header())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get configured coinbase: %w", err)
+	}
+
+	// if fee recipients are not allowed, then the coinbase is the configured coinbase
+	// don't set w.coinbase directly to the configured coinbase because that would override the
+	// coinbase set by the user
+	if !isAllowFeeRecipient && w.coinbase != configuredCoinbase {
+		log.Info("fee recipients are not allowed, using required coinbase for the mining", "currentminer", w.coinbase, "required", configuredCoinbase)
+		header.Coinbase = configuredCoinbase
+	}
+
 	if err := w.engine.Prepare(w.chain, header); err != nil {
 		return nil, fmt.Errorf("failed to prepare header for mining: %w", err)
 	}
@@ -186,11 +201,11 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 	}
 	if len(localTxs) > 0 {
 		txs := types.NewTransactionsByPriceAndNonce(env.signer, localTxs, header.BaseFee)
-		w.commitTransactions(env, txs, w.coinbase)
+		w.commitTransactions(env, txs, header.Coinbase)
 	}
 	if len(remoteTxs) > 0 {
 		txs := types.NewTransactionsByPriceAndNonce(env.signer, remoteTxs, header.BaseFee)
-		w.commitTransactions(env, txs, w.coinbase)
+		w.commitTransactions(env, txs, header.Coinbase)
 	}
 
 	return w.commit(env)

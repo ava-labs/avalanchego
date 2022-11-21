@@ -9,10 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-// Gas costs for stateful precompiles
-// can be added here eg.
-// const MintGasCost = 30_000
-
 // AddressRange represents a continuous range of addresses
 type AddressRange struct {
 	Start common.Address

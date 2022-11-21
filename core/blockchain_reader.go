@@ -32,6 +32,7 @@ import (
 
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/consensus"
+	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/state/snapshot"
@@ -378,4 +379,29 @@ func (bc *BlockChain) GetFeeConfigAt(parent *types.Header) (commontype.FeeConfig
 	// add it to the cache
 	bc.feeConfigCache.Add(parent.Root, cacheable)
 	return storedFeeConfig, lastChangedAt, nil
+}
+
+// GetCoinbaseAt returns the configured coinbase address at [parent]. If fee recipients are allowed, returns true in the second return value.
+func (bc *BlockChain) GetCoinbaseAt(parent *types.Header) (common.Address, bool, error) {
+	config := bc.Config()
+	bigTime := new(big.Int).SetUint64(parent.Time)
+
+	if !config.IsSubnetEVM(bigTime) {
+		return constants.BlackholeAddr, false, nil
+	}
+
+	if !config.IsRewardManager(bigTime) {
+		if bc.chainConfig.AllowFeeRecipients {
+			return common.Address{}, true, nil
+		} else {
+			return constants.BlackholeAddr, false, nil
+		}
+	}
+
+	stateDB, err := bc.StateAt(parent.Root)
+	if err != nil {
+		return common.Address{}, false, err
+	}
+	rewardAddress, feeRecipients := precompile.GetStoredRewardAddress(stateDB)
+	return rewardAddress, feeRecipients, nil
 }

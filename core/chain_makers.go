@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/consensus"
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
+	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/core/vm"
@@ -320,4 +321,8 @@ func (cr *fakeChainReader) GetHeader(hash common.Hash, number uint64) *types.Hea
 func (cr *fakeChainReader) GetBlock(hash common.Hash, number uint64) *types.Block   { return nil }
 func (cr *fakeChainReader) GetFeeConfigAt(parent *types.Header) (commontype.FeeConfig, *big.Int, error) {
 	return cr.config.FeeConfig, nil, nil
+}
+
+func (cr *fakeChainReader) GetCoinbaseAt(parent *types.Header) (common.Address, bool, error) {
+	return constants.BlackholeAddr, cr.config.AllowFeeRecipients, nil
 }

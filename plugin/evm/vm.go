@@ -331,17 +331,13 @@ func (vm *VM) Initialize(
 	}
 
 	// Handle custom fee recipient
-	vm.ethConfig.Miner.Etherbase = constants.BlackholeAddr
 	if common.IsHexAddress(vm.config.FeeRecipient) {
-		if g.Config.AllowFeeRecipients {
-			address := common.HexToAddress(vm.config.FeeRecipient)
-			log.Info("Setting fee recipient", "address", address)
-			vm.ethConfig.Miner.Etherbase = address
-		} else {
-			return errors.New("cannot specify a custom fee recipient on this blockchain")
-		}
-	} else if g.Config.AllowFeeRecipients {
-		log.Warn("Chain enabled `AllowFeeRecipients`, but chain config has not specified any coinbase address. Defaulting to the blackhole address.")
+		address := common.HexToAddress(vm.config.FeeRecipient)
+		log.Info("Setting fee recipient", "address", address)
+		vm.ethConfig.Miner.Etherbase = address
+	} else {
+		log.Warn("Config has not specified any coinbase address. Defaulting to the blackhole address.")
+		vm.ethConfig.Miner.Etherbase = constants.BlackholeAddr
 	}
 
 	vm.chainConfig = g.Config

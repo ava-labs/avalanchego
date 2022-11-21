@@ -105,6 +105,19 @@ func TestVerifyPrecompileUpgrades(t *testing.T) {
 				}),
 			expectedError: "initial mint cannot contain invalid amount",
 		},
+		{
+			name:          "duplicate enableds in config in reward manager allowlist",
+			config:        NewRewardManagerConfig(big.NewInt(3), admins, append(enableds, enableds[0]), nil),
+			expectedError: "duplicate address",
+		},
+		{
+			name: "both reward mechanisms should not be activated at the same time in reward manager",
+			config: NewRewardManagerConfig(big.NewInt(3), admins, enableds, &InitialRewardConfig{
+				AllowFeeRecipients: true,
+				RewardAddress:      common.HexToAddress("0x01"),
+			}),
+			expectedError: ErrCannotEnableBothRewards.Error(),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -154,7 +167,7 @@ func TestEqualTxAllowListConfig(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "different version",
+			name:     "different timestamp",
 			config:   NewTxAllowListConfig(big.NewInt(3), admins, enableds),
 			other:    NewTxAllowListConfig(big.NewInt(4), admins, enableds),
 			expected: false,
@@ -209,7 +222,7 @@ func TestEqualContractDeployerAllowListConfig(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "different version",
+			name:     "different timestamp",
 			config:   NewContractDeployerAllowListConfig(big.NewInt(3), admins, enableds),
 			other:    NewContractDeployerAllowListConfig(big.NewInt(4), admins, enableds),
 			expected: false,
@@ -252,7 +265,7 @@ func TestEqualContractNativeMinterConfig(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "different version",
+			name:     "different timestamps",
 			config:   NewContractNativeMinterConfig(big.NewInt(3), admins, nil, nil),
 			other:    NewContractNativeMinterConfig(big.NewInt(4), admins, nil, nil),
 			expected: false,
@@ -332,7 +345,7 @@ func TestEqualFeeConfigManagerConfig(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "different version",
+			name:     "different timestamp",
 			config:   NewFeeManagerConfig(big.NewInt(3), admins, nil, nil),
 			other:    NewFeeManagerConfig(big.NewInt(4), admins, nil, nil),
 			expected: false,
@@ -364,6 +377,78 @@ func TestEqualFeeConfigManagerConfig(t *testing.T) {
 			name:     "same config",
 			config:   NewFeeManagerConfig(big.NewInt(3), admins, nil, &validFeeConfig),
 			other:    NewFeeManagerConfig(big.NewInt(3), admins, nil, &validFeeConfig),
+			expected: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			require.Equal(tt.expected, tt.config.Equal(tt.other))
+		})
+	}
+}
+
+func TestEqualRewardManagerConfig(t *testing.T) {
+	admins := []common.Address{{1}}
+	enableds := []common.Address{{2}}
+	tests := []struct {
+		name     string
+		config   StatefulPrecompileConfig
+		other    StatefulPrecompileConfig
+		expected bool
+	}{
+		{
+			name:     "non-nil config and nil other",
+			config:   NewRewardManagerConfig(big.NewInt(3), admins, enableds, nil),
+			other:    nil,
+			expected: false,
+		},
+		{
+			name:     "different type",
+			config:   NewRewardManagerConfig(big.NewInt(3), admins, enableds, nil),
+			other:    NewTxAllowListConfig(big.NewInt(3), []common.Address{{1}}, []common.Address{{2}}),
+			expected: false,
+		},
+		{
+			name:     "different timestamp",
+			config:   NewRewardManagerConfig(big.NewInt(3), admins, nil, nil),
+			other:    NewRewardManagerConfig(big.NewInt(4), admins, nil, nil),
+			expected: false,
+		},
+		{
+			name:     "different enabled",
+			config:   NewRewardManagerConfig(big.NewInt(3), admins, nil, nil),
+			other:    NewRewardManagerConfig(big.NewInt(3), admins, enableds, nil),
+			expected: false,
+		},
+		{
+			name: "non-nil initial config and nil initial config",
+			config: NewRewardManagerConfig(big.NewInt(3), admins, nil, &InitialRewardConfig{
+				AllowFeeRecipients: true,
+			}),
+			other:    NewRewardManagerConfig(big.NewInt(3), admins, nil, nil),
+			expected: false,
+		},
+		{
+			name: "different initial config",
+			config: NewRewardManagerConfig(big.NewInt(3), admins, nil, &InitialRewardConfig{
+				RewardAddress: common.HexToAddress("0x01"),
+			}),
+			other: NewRewardManagerConfig(big.NewInt(3), admins, nil,
+				&InitialRewardConfig{
+					RewardAddress: common.HexToAddress("0x02"),
+				}),
+			expected: false,
+		},
+		{
+			name: "same config",
+			config: NewRewardManagerConfig(big.NewInt(3), admins, nil, &InitialRewardConfig{
+				RewardAddress: common.HexToAddress("0x01"),
+			}),
+			other: NewRewardManagerConfig(big.NewInt(3), admins, nil, &InitialRewardConfig{
+				RewardAddress: common.HexToAddress("0x01"),
+			}),
 			expected: true,
 		},
 	}

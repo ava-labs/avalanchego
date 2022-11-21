@@ -253,6 +253,12 @@ func (c *ChainConfig) IsFeeConfigManager(blockTimestamp *big.Int) bool {
 	return config != nil && !config.Disable
 }
 
+// IsRewardManager returns whether [blockTimestamp] is either equal to the RewardManager fork block timestamp or greater.
+func (c *ChainConfig) IsRewardManager(blockTimestamp *big.Int) bool {
+	config := c.GetRewardManagerConfig(blockTimestamp)
+	return config != nil && !config.Disable
+}
+
 // ADD YOUR PRECOMPILE HERE
 /*
 func (c *ChainConfig) Is{YourPrecompile}(blockTimestamp *big.Int) bool {
@@ -493,6 +499,7 @@ type Rules struct {
 	IsContractNativeMinterEnabled      bool
 	IsTxAllowListEnabled               bool
 	IsFeeConfigManagerEnabled          bool
+	IsRewardManagerEnabled             bool
 	// ADD YOUR PRECOMPILE HERE
 	// Is{YourPrecompile}Enabled         bool
 
@@ -532,6 +539,7 @@ func (c *ChainConfig) AvalancheRules(blockNum, blockTimestamp *big.Int) Rules {
 	rules.IsContractNativeMinterEnabled = c.IsContractNativeMinter(blockTimestamp)
 	rules.IsTxAllowListEnabled = c.IsTxAllowList(blockTimestamp)
 	rules.IsFeeConfigManagerEnabled = c.IsFeeConfigManager(blockTimestamp)
+	rules.IsRewardManagerEnabled = c.IsRewardManager(blockTimestamp)
 	// ADD YOUR PRECOMPILE HERE
 	// rules.Is{YourPrecompile}Enabled = c.{IsYourPrecompile}(blockTimestamp)
 
@@ -547,7 +555,14 @@ func (c *ChainConfig) AvalancheRules(blockNum, blockTimestamp *big.Int) Rules {
 	return rules
 }
 
-// GetFeeConfig returns the FeeConfig
+// GetFeeConfig returns the original FeeConfig contained in the genesis ChainConfig.
+// Implements precompile.ChainConfig interface.
 func (c *ChainConfig) GetFeeConfig() commontype.FeeConfig {
 	return c.FeeConfig
+}
+
+// AllowedFeeRecipients returns the original AllowedFeeRecipients parameter contained in the genesis ChainConfig.
+// Implements precompile.ChainConfig interface.
+func (c *ChainConfig) AllowedFeeRecipients() bool {
+	return c.AllowFeeRecipients
 }
