@@ -176,7 +176,7 @@ func TestSetMarshalJSON(t *testing.T) {
 		require.NoError(err)
 		require.Equal("[]", string(asJSON))
 	}
-	id1, id2 := GenerateTestID(), GenerateTestID()
+	id1, id2 := Empty.Prefix(0), Empty.Prefix(1)
 	set.Add(id1)
 	{
 		asJSON, err := set.MarshalJSON()
