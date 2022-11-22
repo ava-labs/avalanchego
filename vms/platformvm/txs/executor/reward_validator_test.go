@@ -301,7 +301,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	require.NoError(env.state.Commit())
 
 	// test validator stake
-	set, ok := env.config.Validators.GetValidators(constants.PrimaryNetworkID)
+	set, ok := env.config.Validators.Get(constants.PrimaryNetworkID)
 	require.True(ok)
 	stake, ok := set.GetWeight(vdrNodeID)
 	require.True(ok)

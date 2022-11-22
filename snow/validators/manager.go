@@ -26,9 +26,9 @@ type Manager interface {
 	// RemoveWeight removes weight from a given validator on a given subnet
 	RemoveWeight(ids.ID, ids.NodeID, uint64) error
 
-	// GetValidators returns the validator set for the given subnet
+	// Get returns the validator set for the given subnet
 	// Returns false if the subnet doesn't exist
-	GetValidators(ids.ID) (Set, bool)
+	Get(ids.ID) (Set, bool)
 
 	// Contains returns true if there is a validator with the specified ID
 	// currently in the set.
@@ -84,7 +84,7 @@ func (m *manager) RemoveWeight(subnetID ids.ID, vdrID ids.NodeID, weight uint64)
 	return nil
 }
 
-func (m *manager) GetValidators(subnetID ids.ID) (Set, bool) {
+func (m *manager) Get(subnetID ids.ID) (Set, bool) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 

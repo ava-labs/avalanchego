@@ -292,7 +292,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 		return err
 	}
 
-	primaryValidatorSet, exist := vm.Validators.GetValidators(constants.PrimaryNetworkID)
+	primaryValidatorSet, exist := vm.Validators.Get(constants.PrimaryNetworkID)
 	if !exist {
 		return errNoPrimaryValidators
 	}
@@ -335,7 +335,7 @@ func (vm *VM) Shutdown(context.Context) error {
 	vm.Builder.Shutdown()
 
 	if vm.bootstrapped.GetValue() {
-		primaryValidatorSet, exist := vm.Validators.GetValidators(constants.PrimaryNetworkID)
+		primaryValidatorSet, exist := vm.Validators.Get(constants.PrimaryNetworkID)
 		if !exist {
 			return errNoPrimaryValidators
 		}
@@ -479,7 +479,7 @@ func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.I
 	// get the start time to track metrics
 	startTime := vm.Clock().Time()
 
-	currentValidators, ok := vm.Validators.GetValidators(subnetID)
+	currentValidators, ok := vm.Validators.Get(subnetID)
 	if !ok {
 		return nil, errMissingValidatorSet
 	}
@@ -619,7 +619,7 @@ func (vm *VM) Logger() logging.Logger {
 // Returns the percentage of the total stake of the subnet connected to this
 // node.
 func (vm *VM) getPercentConnected(subnetID ids.ID) (float64, error) {
-	vdrSet, exists := vm.Validators.GetValidators(subnetID)
+	vdrSet, exists := vm.Validators.Get(subnetID)
 	if !exists {
 		return 0, errNoValidators
 	}

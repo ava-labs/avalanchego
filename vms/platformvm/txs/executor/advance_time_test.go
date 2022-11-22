@@ -697,7 +697,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	require.NoError(t, env.state.Commit())
 
 	// Test validator weight before delegation
-	primarySet, ok := env.config.Validators.GetValidators(constants.PrimaryNetworkID)
+	primarySet, ok := env.config.Validators.Get(constants.PrimaryNetworkID)
 	require.True(t, ok)
 	vdrWeight, _ := primarySet.GetWeight(nodeID)
 	require.Equal(t, env.config.MinValidatorStake, vdrWeight)
@@ -809,7 +809,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	require.NoError(t, env.state.Commit())
 
 	// Test validator weight before delegation
-	primarySet, ok := env.config.Validators.GetValidators(constants.PrimaryNetworkID)
+	primarySet, ok := env.config.Validators.Get(constants.PrimaryNetworkID)
 	require.True(t, ok)
 	vdrWeight, _ := primarySet.GetWeight(nodeID)
 	require.Equal(t, env.config.MinValidatorStake, vdrWeight)

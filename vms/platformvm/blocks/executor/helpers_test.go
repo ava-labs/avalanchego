@@ -472,7 +472,7 @@ func shutdownEnvironment(t *environment) error {
 	}
 
 	if t.isBootstrapped.GetValue() {
-		primaryValidatorSet, exist := t.config.Validators.GetValidators(constants.PrimaryNetworkID)
+		primaryValidatorSet, exist := t.config.Validators.Get(constants.PrimaryNetworkID)
 		if !exist {
 			return errors.New("no default subnet validators")
 		}

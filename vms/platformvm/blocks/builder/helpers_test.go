@@ -436,7 +436,7 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 
 func shutdownEnvironment(env *environment) error {
 	if env.isBootstrapped.GetValue() {
-		primaryValidatorSet, exist := env.config.Validators.GetValidators(constants.PrimaryNetworkID)
+		primaryValidatorSet, exist := env.config.Validators.Get(constants.PrimaryNetworkID)
 		if !exist {
 			return errors.New("no default subnet validators")
 		}

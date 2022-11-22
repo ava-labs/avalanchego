@@ -554,7 +554,7 @@ func TestGenesis(t *testing.T) {
 	}
 
 	// Ensure current validator set of primary network is correct
-	vdrSet, ok := vm.Validators.GetValidators(constants.PrimaryNetworkID)
+	vdrSet, ok := vm.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
 		t.Fatalf("Missing the primary network validator set")
 	}

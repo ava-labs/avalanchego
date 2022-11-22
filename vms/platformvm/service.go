@@ -1004,7 +1004,7 @@ func (s *Service) SampleValidators(_ *http.Request, args *SampleValidatorsArgs, 
 		zap.Uint16("size", uint16(args.Size)),
 	)
 
-	validators, ok := s.vm.Validators.GetValidators(args.SubnetID)
+	validators, ok := s.vm.Validators.Get(args.SubnetID)
 	if !ok {
 		return fmt.Errorf(
 			"couldn't get validators of subnet %q. Is it being validated?",
@@ -1780,7 +1780,7 @@ func (s *Service) nodeValidates(blockchainID ids.ID) bool {
 		return false
 	}
 
-	validators, ok := s.vm.Validators.GetValidators(chain.SubnetID)
+	validators, ok := s.vm.Validators.Get(chain.SubnetID)
 	if !ok {
 		return false
 	}
@@ -2239,7 +2239,7 @@ type GetTotalStakeReply struct {
 
 // GetTotalStake returns the total amount staked on the Primary Network
 func (s *Service) GetTotalStake(_ *http.Request, args *GetTotalStakeArgs, reply *GetTotalStakeReply) error {
-	vdrs, ok := s.vm.Validators.GetValidators(args.SubnetID)
+	vdrs, ok := s.vm.Validators.Get(args.SubnetID)
 	if !ok {
 		return errNoValidators
 	}

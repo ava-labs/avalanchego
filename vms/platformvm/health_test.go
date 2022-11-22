@@ -72,7 +72,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 				require.NoError(vm.Validators.AddWeight(subnetID, subnetVal, 100))
 			}
 
-			vals, ok := vm.Validators.GetValidators(subnetID)
+			vals, ok := vm.Validators.Get(subnetID)
 			require.True(ok)
 
 			// connect to all primary network validators first

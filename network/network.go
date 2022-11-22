@@ -159,7 +159,7 @@ func NewNetwork(
 	dialer dialer.Dialer,
 	router router.ExternalHandler,
 ) (Network, error) {
-	primaryNetworkValidators, ok := config.Validators.GetValidators(constants.PrimaryNetworkID)
+	primaryNetworkValidators, ok := config.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
 		return nil, errNoPrimaryValidators
 	}
@@ -1062,7 +1062,7 @@ func (n *network) StartClose() {
 }
 
 func (n *network) NodeUptime() (UptimeResult, bool) {
-	primaryValidators, ok := n.config.Validators.GetValidators(constants.PrimaryNetworkID)
+	primaryValidators, ok := n.config.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
 		return UptimeResult{}, false
 	}

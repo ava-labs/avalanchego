@@ -975,7 +975,7 @@ func (n *Node) initInfoAPI() error {
 
 	n.Log.Info("initializing info API")
 
-	primaryValidators, _ := n.vdrs.GetValidators(constants.PrimaryNetworkID)
+	primaryValidators, _ := n.vdrs.Get(constants.PrimaryNetworkID)
 	service, err := info.NewService(
 		info.Parameters{
 			Version:                       version.CurrentApp,
