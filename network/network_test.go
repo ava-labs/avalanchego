@@ -198,11 +198,13 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 	err := beacons.AddWeight(nodeIDs[0], 1)
 	require.NoError(err)
 
-	vdrs := validators.NewManager()
+	primaryVdrs := validators.NewSet()
 	for _, nodeID := range nodeIDs {
-		err := vdrs.AddWeight(constants.PrimaryNetworkID, nodeID, 1)
+		err := primaryVdrs.AddWeight(nodeID, 1)
 		require.NoError(err)
 	}
+	vdrs := validators.NewManager()
+	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 
 	msgCreator := newMessageCreator(t)
 

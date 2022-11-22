@@ -316,11 +316,14 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 }
 
 func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
+	vdrs := validators.NewManager()
+	primaryVdrs := validators.NewSet()
+	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
 			Chains:                 chains.MockManager{},
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
-			Validators:             validators.NewManager(),
+			Validators:             vdrs,
 			TxFee:                  defaultTxFee,
 			CreateSubnetTxFee:      100 * defaultTxFee,
 			TransformSubnetTxFee:   100 * defaultTxFee,
@@ -416,10 +419,13 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 		_, genesisBytes = BuildGenesisTest(t)
 	}
 
+	vdrs := validators.NewManager()
+	primaryVdrs := validators.NewSet()
+	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
 			Chains:                 chains.MockManager{},
-			Validators:             validators.NewManager(),
+			Validators:             vdrs,
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
 			TxFee:                  defaultTxFee,
 			MinValidatorStake:      defaultMinValidatorStake,
@@ -1506,10 +1512,13 @@ func TestRestartFullyAccepted(t *testing.T) {
 	db := manager.NewMemDB(version.Semantic1_0_0)
 
 	firstDB := db.NewPrefixDBManager([]byte{})
+	firstVdrs := validators.NewManager()
+	firstPrimaryVdrs := validators.NewSet()
+	_ = firstVdrs.Add(constants.PrimaryNetworkID, firstPrimaryVdrs)
 	firstVM := &VM{Factory: Factory{
 		Config: config.Config{
 			Chains:                 chains.MockManager{},
-			Validators:             validators.NewManager(),
+			Validators:             firstVdrs,
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
 			MinStakeDuration:       defaultMinStakingDuration,
 			MaxStakeDuration:       defaultMaxStakingDuration,
@@ -1594,10 +1603,13 @@ func TestRestartFullyAccepted(t *testing.T) {
 	require.NoError(firstVM.Shutdown(context.Background()))
 	firstCtx.Lock.Unlock()
 
+	secondVdrs := validators.NewManager()
+	secondPrimaryVdrs := validators.NewSet()
+	_ = secondVdrs.Add(constants.PrimaryNetworkID, secondPrimaryVdrs)
 	secondVM := &VM{Factory: Factory{
 		Config: config.Config{
 			Chains:                 chains.MockManager{},
-			Validators:             validators.NewManager(),
+			Validators:             secondVdrs,
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
 			MinStakeDuration:       defaultMinStakingDuration,
 			MaxStakeDuration:       defaultMaxStakingDuration,
@@ -1650,10 +1662,13 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	blocked, err := queue.NewWithMissing(bootstrappingDB, "", prometheus.NewRegistry())
 	require.NoError(err)
 
+	vdrs := validators.NewManager()
+	primaryVdrs := validators.NewSet()
+	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
 			Chains:                 chains.MockManager{},
-			Validators:             validators.NewManager(),
+			Validators:             vdrs,
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
 			MinStakeDuration:       defaultMinStakingDuration,
 			MaxStakeDuration:       defaultMaxStakingDuration,
@@ -1733,9 +1748,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	advanceTimeBlkBytes := advanceTimeBlk.Bytes()
 
 	peerID := ids.NodeID{1, 2, 3, 4, 5, 4, 3, 2, 1}
-	vdrs := validators.NewSet()
-	require.NoError(vdrs.AddWeight(peerID, 1))
-	beacons := vdrs
+	beacons := validators.NewSet()
+	require.NoError(beacons.AddWeight(peerID, 1))
 
 	benchlist := benchlist.NewNoBenchlist()
 	timeoutManager, err := timeout.NewManager(
@@ -1825,7 +1839,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	consensus := &smcon.Topological{}
 	commonCfg := common.Config{
 		Ctx:                            consensusCtx,
-		Validators:                     vdrs,
+		Validators:                     beacons,
 		Beacons:                        beacons,
 		SampleK:                        beacons.Len(),
 		StartupTracker:                 startup,
@@ -1858,7 +1872,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	handler, err := handler.New(
 		bootstrapConfig.Ctx,
-		vdrs,
+		beacons,
 		msgChan,
 		nil,
 		time.Hour,
@@ -1871,7 +1885,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		AllGetsServer: snowGetHandler,
 		VM:            bootstrapConfig.VM,
 		Sender:        bootstrapConfig.Sender,
-		Validators:    vdrs,
+		Validators:    beacons,
 		Params: snowball.Parameters{
 			K:                     1,
 			Alpha:                 1,
@@ -1967,10 +1981,13 @@ func TestUnverifiedParent(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 
+	vdrs := validators.NewManager()
+	primaryVdrs := validators.NewSet()
+	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
 			Chains:                 chains.MockManager{},
-			Validators:             validators.NewManager(),
+			Validators:             vdrs,
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
 			MinStakeDuration:       defaultMinStakingDuration,
 			MaxStakeDuration:       defaultMaxStakingDuration,
@@ -2131,12 +2148,15 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	db := manager.NewMemDB(version.Semantic1_0_0)
 
 	firstDB := db.NewPrefixDBManager([]byte{})
+	firstVdrs := validators.NewManager()
+	firstPrimaryVdrs := validators.NewSet()
+	_ = firstVdrs.Add(constants.PrimaryNetworkID, firstPrimaryVdrs)
 	firstVM := &VM{Factory: Factory{
 		Config: config.Config{
 			Chains:                 chains.MockManager{},
 			UptimePercentage:       .2,
 			RewardConfig:           defaultRewardConfig,
-			Validators:             validators.NewManager(),
+			Validators:             firstVdrs,
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
 			BanffTime:              banffForkTime,
 		},
@@ -2173,11 +2193,14 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstCtx.Lock.Unlock()
 
 	secondDB := db.NewPrefixDBManager([]byte{})
+	secondVdrs := validators.NewManager()
+	secondPrimaryVdrs := validators.NewSet()
+	_ = secondVdrs.Add(constants.PrimaryNetworkID, secondPrimaryVdrs)
 	secondVM := &VM{Factory: Factory{
 		Config: config.Config{
 			Chains:                 chains.MockManager{},
 			UptimePercentage:       .21,
-			Validators:             validators.NewManager(),
+			Validators:             secondVdrs,
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
 			BanffTime:              banffForkTime,
 		},
@@ -2308,12 +2331,15 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
 	db := manager.NewMemDB(version.Semantic1_0_0)
 
+	vdrs := validators.NewManager()
+	primaryVdrs := validators.NewSet()
+	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Factory: Factory{
 		Config: config.Config{
 			Chains:                 chains.MockManager{},
 			UptimePercentage:       .2,
 			RewardConfig:           defaultRewardConfig,
-			Validators:             validators.NewManager(),
+			Validators:             vdrs,
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
 			BanffTime:              banffForkTime,
 		},

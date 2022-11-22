@@ -22,6 +22,9 @@ type Config struct {
 	Chains chains.Manager
 
 	// Node's validator set maps subnetID -> validators of the subnet
+	//
+	// Invariant: The primary network's validator set should be populated
+	//            externally to the vm.
 	Validators validators.Manager
 
 	// Provides access to subnet tracking

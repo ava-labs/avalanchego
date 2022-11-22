@@ -17,8 +17,11 @@ var _ Manager = (*manager)(nil)
 type Manager interface {
 	fmt.Stringer
 
-	// Set a subnet's validator set
-	Set(ids.ID, Set) error
+	// Add a subnet's validator set to the manager.
+	//
+	// If the subnet had previously registered a validator set, false will be
+	// returned and the manager will not be modified.
+	Add(subnetID ids.ID, set Set) bool
 
 	// AddWeight adds weight to a given validator on the given subnet
 	AddWeight(ids.ID, ids.NodeID, uint64) error
@@ -50,16 +53,16 @@ type manager struct {
 	subnetToVdrs map[ids.ID]Set
 }
 
-func (m *manager) Set(subnetID ids.ID, newSet Set) error {
+func (m *manager) Add(subnetID ids.ID, set Set) bool {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	oldSet, exists := m.subnetToVdrs[subnetID]
-	if !exists {
-		m.subnetToVdrs[subnetID] = newSet
-		return nil
+	if _, exists := m.subnetToVdrs[subnetID]; exists {
+		return false
 	}
-	return oldSet.Set(newSet.List())
+
+	m.subnetToVdrs[subnetID] = set
+	return true
 }
 
 func (m *manager) AddWeight(subnetID ids.ID, vdrID ids.NodeID, weight uint64) error {

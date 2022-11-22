@@ -767,6 +767,8 @@ func (n *Node) initVMs() error {
 	// to its own local validator manager (which isn't used for sampling)
 	if !n.Config.EnableStaking {
 		vdrs = validators.NewManager()
+		primaryVdrs := validators.NewSet()
+		_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	}
 
 	vmRegisterer := registry.NewVMRegisterer(registry.VMRegistererConfig{
@@ -1179,13 +1181,11 @@ func (n *Node) initAPIAliases(genesisBytes []byte) error {
 }
 
 // Initializes [n.vdrs] and returns the Primary Network validator set.
-func (n *Node) initVdrs() (validators.Set, error) {
+func (n *Node) initVdrs() validators.Set {
 	n.vdrs = validators.NewManager()
 	vdrSet := validators.NewSet()
-	if err := n.vdrs.Set(constants.PrimaryNetworkID, vdrSet); err != nil {
-		return vdrSet, fmt.Errorf("couldn't set primary network validators: %w", err)
-	}
-	return vdrSet, nil
+	_ = n.vdrs.Add(constants.PrimaryNetworkID, vdrSet)
+	return vdrSet
 }
 
 // Initialize [n.resourceManager].
@@ -1298,10 +1298,7 @@ func (n *Node) Initialize(
 		return fmt.Errorf("problem initializing message creator: %w", err)
 	}
 
-	primaryNetVdrs, err := n.initVdrs()
-	if err != nil {
-		return fmt.Errorf("problem initializing validators: %w", err)
-	}
+	primaryNetVdrs := n.initVdrs()
 	if err := n.initResourceManager(n.MetricsRegisterer); err != nil {
 		return fmt.Errorf("problem initializing resource manager: %w", err)
 	}
