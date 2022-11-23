@@ -12,31 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-func TestSetSet(t *testing.T) {
-	vdr0 := NewValidator(ids.EmptyNodeID, 1)
-	vdr1 := NewValidator(ids.NodeID{0xFF}, math.MaxInt64-1)
-	// Should be discarded, because it has a weight of 0
-	vdr2 := NewValidator(ids.NodeID{0xAA}, 0)
-
-	s := NewSet()
-	err := s.Set([]Validator{vdr0, vdr1, vdr2})
-	require.NoError(t, err)
-
-	length := s.Len()
-	require.Equal(t, 2, length, "should have two validators")
-
-	contains := s.Contains(vdr0.ID())
-	require.True(t, contains, "should have contained vdr0")
-
-	contains = s.Contains(vdr1.ID())
-	require.True(t, contains, "should have contained vdr1")
-
-	sampled, err := s.Sample(1)
-	require.NoError(t, err)
-	require.Len(t, sampled, 1, "should have only sampled one validator")
-	require.Equal(t, vdr1.ID(), sampled[0].ID(), "should have sampled vdr1")
-}
-
 func TestSamplerSample(t *testing.T) {
 	vdr0 := ids.GenerateTestNodeID()
 	vdr1 := ids.GenerateTestNodeID()
@@ -296,46 +271,4 @@ func TestSetValidatorRemovedCallback(t *testing.T) {
 	err = s.RemoveWeight(vdr0, weight0)
 	require.NoError(t, err)
 	require.Equal(t, 2, callcount)
-}
-
-func TestSetValidatorSetCallback(t *testing.T) {
-	vdr0 := ids.NodeID{1}
-	weight0 := uint64(93)
-	vdr1 := ids.NodeID{2}
-	weight1 := uint64(94)
-	vdr2 := ids.NodeID{3}
-	weight2 := uint64(95)
-
-	s := NewSet()
-	err := s.AddWeight(vdr0, weight0)
-	require.NoError(t, err)
-	err = s.AddWeight(vdr1, weight1)
-	require.NoError(t, err)
-
-	newValidators := []Validator{&validator{nodeID: vdr0, weight: weight0}, &validator{nodeID: vdr2, weight: weight2}}
-	callcount := 0
-	s.RegisterCallbackListener(&callbackListener{
-		t: t,
-		onAdd: func(nodeID ids.NodeID, weight uint64) {
-			if nodeID == vdr0 {
-				require.Equal(t, weight0, weight)
-			}
-			if nodeID == vdr1 {
-				require.Equal(t, weight1, weight)
-			}
-			if nodeID == vdr2 {
-				require.Equal(t, weight2, weight)
-			}
-			callcount++
-		},
-		onRemoved: func(nodeID ids.NodeID, weight uint64) {
-			require.Equal(t, vdr1, nodeID)
-			require.Equal(t, weight1, weight)
-			callcount++
-		},
-	})
-
-	err = s.Set(newValidators)
-	require.NoError(t, err)
-	require.Equal(t, 4, callcount)
 }

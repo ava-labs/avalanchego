@@ -283,14 +283,12 @@ func (b *bootstrapper) Startup(ctx context.Context) error {
 	}
 
 	b.sampledBeacons = validators.NewSet()
-	err = b.sampledBeacons.Set(beacons)
-	if err != nil {
-		return err
-	}
-
 	b.pendingSendAcceptedFrontier.Clear()
 	for _, vdr := range beacons {
 		vdrID := vdr.ID()
+		if err := b.sampledBeacons.AddWeight(vdrID, 1); err != nil {
+			return err
+		}
 		b.pendingSendAcceptedFrontier.Add(vdrID)
 	}
 

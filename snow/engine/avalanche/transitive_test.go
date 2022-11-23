@@ -4762,7 +4762,6 @@ func TestSendMixedQuery(t *testing.T) {
 				sender := &common.SenderTest{T: t}
 				engCfg.Sender = sender
 				sender.Default(true)
-				vdrSet := engCfg.Validators
 				manager := vertex.NewTestManager(t)
 				engCfg.Manager = manager
 				// Override the parameters k, MixedQueryNumPushVdr, MixedQueryNumPushNonVdr,
@@ -4782,17 +4781,21 @@ func TestSendMixedQuery(t *testing.T) {
 
 				vdrsList := []validators.Validator{}
 				vdrs := ids.NodeIDSet{}
-				for i := 0; i < te.Config.Params.K; i++ {
+				for i := 0; i < engCfg.Params.K; i++ {
 					vdr := ids.GenerateTestNodeID()
 					vdrs.Add(vdr)
 					vdrsList = append(vdrsList, validators.NewValidator(vdr, 1))
 				}
 				if tt.isVdr {
-					vdrs.Add(te.Ctx.NodeID)
-					vdrsList = append(vdrsList, validators.NewValidator(te.Ctx.NodeID, 1))
+					vdrs.Add(engCfg.Ctx.NodeID)
+					vdrsList = append(vdrsList, validators.NewValidator(engCfg.Ctx.NodeID, 1))
 				}
-				if err := vdrSet.Set(vdrsList); err != nil {
-					t.Fatal(err)
+				te.Validators = validators.NewSet()
+				for _, vdr := range vdrsList {
+					err := te.Validators.AddWeight(vdr.ID(), vdr.Weight())
+					if err != nil {
+						t.Fatal(err)
+					}
 				}
 
 				// [blk1] is a child of [gBlk] and passes verification
@@ -4852,7 +4855,7 @@ func TestSendMixedQuery(t *testing.T) {
 
 				// Give the engine vtx1. It should insert it into consensus and send a mixed query
 				// consisting of 12 pull queries and 8 push queries.
-				if err := te.Put(context.Background(), vdrSet.List()[0].ID(), constants.GossipMsgRequestID, vtx1.Bytes()); err != nil {
+				if err := te.Put(context.Background(), te.Validators.List()[0].ID(), constants.GossipMsgRequestID, vtx1.Bytes()); err != nil {
 					t.Fatal(err)
 				}
 

@@ -124,8 +124,8 @@ type State interface {
 
 	GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error)
 
-	// Return the current validator set of [subnetID].
-	ValidatorSet(subnetID ids.ID) (validators.Set, error)
+	// Populate [vdrs] with the current validators of [subnetID].
+	ValidatorSet(subnetID ids.ID, vdrs validators.Set) error
 
 	SetHeight(height uint64)
 
@@ -948,13 +948,12 @@ func (s *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids
 	return weightDiffs, diffIter.Error()
 }
 
-func (s *state) ValidatorSet(subnetID ids.ID) (validators.Set, error) {
-	vdrs := validators.NewSet()
+func (s *state) ValidatorSet(subnetID ids.ID, vdrs validators.Set) error {
 	for nodeID, validator := range s.currentStakers.validators[subnetID] {
 		staker := validator.validator
 		if staker != nil {
 			if err := vdrs.AddWeight(nodeID, staker.Weight); err != nil {
-				return nil, err
+				return err
 			}
 		}
 
@@ -963,12 +962,12 @@ func (s *state) ValidatorSet(subnetID ids.ID) (validators.Set, error) {
 			staker := delegatorIterator.Value()
 			if err := vdrs.AddWeight(nodeID, staker.Weight); err != nil {
 				delegatorIterator.Release()
-				return nil, err
+				return err
 			}
 		}
 		delegatorIterator.Release()
 	}
-	return vdrs, nil
+	return nil
 }
 
 func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) error {
@@ -1032,7 +1031,11 @@ func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) err
 		s.AddChain(chain)
 		s.AddTx(chain, status.Committed)
 	}
-	return s.write(0)
+
+	// updateValidators is set to false here to maintain the invariant that the
+	// primary network's validator set is empty before the validator sets are
+	// initialized.
+	return s.write(false /*=updateValidators*/, 0)
 }
 
 // Load pulls data previously stored on disk that is expected to be in memory.
@@ -1306,12 +1309,12 @@ func (s *state) loadPendingValidators() error {
 	return errs.Err
 }
 
-func (s *state) write(height uint64) error {
+func (s *state) write(updateValidators bool, height uint64) error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		s.writeBlocks(),
-		s.writeCurrentPrimaryNetworkStakers(height),
-		s.writeCurrentSubnetStakers(height),
+		s.writeCurrentPrimaryNetworkStakers(updateValidators, height),
+		s.writeCurrentSubnetStakers(updateValidators, height),
 		s.writePendingPrimaryNetworkStakers(),
 		s.writePendingSubnetStakers(),
 		s.writeUptimes(),
@@ -1434,7 +1437,9 @@ func (s *state) Abort() {
 }
 
 func (s *state) CommitBatch() (database.Batch, error) {
-	if err := s.write(s.currentHeight); err != nil {
+	// updateValidators is set to true here so that the validator manager is
+	// kept up to date with the last accepted state.
+	if err := s.write(true /*=updateValidators*/, s.currentHeight); err != nil {
 		return nil, err
 	}
 	return s.baseDB.CommitBatch()
@@ -1498,7 +1503,7 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status,
 	return blkState.Blk, blkState.Status, nil
 }
 
-func (s *state) writeCurrentPrimaryNetworkStakers(height uint64) error {
+func (s *state) writeCurrentPrimaryNetworkStakers(updateValidators bool, height uint64) error {
 	validatorDiffs, exists := s.currentStakers.validatorDiffs[constants.PrimaryNetworkID]
 	if !exists {
 		// If there are no validator changes, we shouldn't update any diffs.
@@ -1582,6 +1587,9 @@ func (s *state) writeCurrentPrimaryNetworkStakers(height uint64) error {
 		}
 
 		// TODO: Move the validator set management out of the state package
+		if !updateValidators {
+			continue
+		}
 		if weightDiff.Decrease {
 			err = validators.RemoveWeight(s.cfg.Validators, constants.PrimaryNetworkID, nodeID, weightDiff.Amount)
 		} else {
@@ -1594,7 +1602,9 @@ func (s *state) writeCurrentPrimaryNetworkStakers(height uint64) error {
 	s.validatorDiffsCache.Put(string(prefixBytes), weightDiffs)
 
 	// TODO: Move validator set management out of the state package
-	//
+	if !updateValidators {
+		return nil
+	}
 	// Attempt to update the stake metrics
 	primaryValidators, ok := s.cfg.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
@@ -1606,7 +1616,7 @@ func (s *state) writeCurrentPrimaryNetworkStakers(height uint64) error {
 	return nil
 }
 
-func (s *state) writeCurrentSubnetStakers(height uint64) error {
+func (s *state) writeCurrentSubnetStakers(updateValidators bool, height uint64) error {
 	for subnetID, subnetValidatorDiffs := range s.currentStakers.validatorDiffs {
 		delete(s.currentStakers.validatorDiffs, subnetID)
 
@@ -1673,7 +1683,7 @@ func (s *state) writeCurrentSubnetStakers(height uint64) error {
 			}
 
 			// TODO: Move the validator set management out of the state package
-			if s.cfg.WhitelistedSubnets.Contains(subnetID) {
+			if updateValidators && s.cfg.WhitelistedSubnets.Contains(subnetID) {
 				if weightDiff.Decrease {
 					err = validators.RemoveWeight(s.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
 				} else {

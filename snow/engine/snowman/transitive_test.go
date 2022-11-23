@@ -3127,11 +3127,11 @@ func TestSendMixedQuery(t *testing.T) {
 				engConfig.Params.MixedQueryNumPushNonVdr = 12
 				engConfig.Params.MixedQueryNumPushVdr = 14
 				engConfig.Params.K = 20
-				_, vdrSet, sender, vm, te, gBlk := setup(t, commonCfg, engConfig)
+				_, _, sender, vm, te, gBlk := setup(t, commonCfg, engConfig)
 
 				vdrsList := []validators.Validator{}
 				vdrs := ids.NodeIDSet{}
-				for i := 0; i < te.Config.Params.K; i++ {
+				for i := 0; i < te.Params.K; i++ {
 					vdr := ids.GenerateTestNodeID()
 					vdrs.Add(vdr)
 					vdrsList = append(vdrsList, validators.NewValidator(vdr, 1))
@@ -3140,8 +3140,12 @@ func TestSendMixedQuery(t *testing.T) {
 					vdrs.Add(te.Ctx.NodeID)
 					vdrsList = append(vdrsList, validators.NewValidator(te.Ctx.NodeID, 1))
 				}
-				if err := vdrSet.Set(vdrsList); err != nil {
-					t.Fatal(err)
+				te.Validators = validators.NewSet()
+				for _, vdr := range vdrsList {
+					err := te.Validators.AddWeight(vdr.ID(), vdr.Weight())
+					if err != nil {
+						t.Fatal(err)
+					}
 				}
 
 				// [blk1] is a child of [gBlk] and passes verification
@@ -3208,7 +3212,7 @@ func TestSendMixedQuery(t *testing.T) {
 
 				// Give the engine blk1. It should insert it into consensus and send a mixed query
 				// consisting of 12 push queries and 8 pull queries.
-				if err := te.Put(context.Background(), vdrSet.List()[0].ID(), constants.GossipMsgRequestID, blk1.Bytes()); err != nil {
+				if err := te.Put(context.Background(), te.Validators.List()[0].ID(), constants.GossipMsgRequestID, blk1.Bytes()); err != nil {
 					t.Fatal(err)
 				}
 

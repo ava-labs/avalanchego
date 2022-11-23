@@ -416,12 +416,11 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	}
 
 	ss.frontierSeeders = validators.NewSet()
-	if err := ss.frontierSeeders.Set(beacons); err != nil {
-		return err
-	}
-
 	for _, vdr := range beacons {
 		vdrID := vdr.ID()
+		if err := ss.frontierSeeders.AddWeight(vdrID, 1); err != nil {
+			return err
+		}
 		ss.targetSeeders.Add(vdrID)
 	}
 

@@ -991,7 +991,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	require.Equal(t, 1, chainRouter.timedRequests.Len())
 
 	// remove it from validators
-	err = vdrs.Set(validators.NewSet().List())
+	err = vdrs.RemoveWeight(vID, 1)
 	require.NoError(t, err)
 
 	inMsg = message.InboundChits(ctx.ChainID, reqID, nil, nID)

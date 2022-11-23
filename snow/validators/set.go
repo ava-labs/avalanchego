@@ -14,26 +14,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
-const (
-	// If, when the validator set is reset, cap(set)/len(set) > MaxExcessCapacityFactor,
-	// the underlying arrays' capacities will be reduced by a factor of capacityReductionFactor.
-	// Higher value for maxExcessCapacityFactor --> less aggressive array downsizing --> less memory allocations
-	// but more unnecessary data in the underlying array that can't be garbage collected.
-	// Higher value for capacityReductionFactor --> more aggressive array downsizing --> more memory allocations
-	// but less unnecessary data in the underlying array that can't be garbage collected.
-	maxExcessCapacityFactor = 4
-	capacityReductionFactor = 2
-)
-
 var _ Set = (*set)(nil)
 
 // Set of validators that can be sampled
 type Set interface {
 	formatting.PrefixedStringer
-
-	// Set removes all the current validators and adds all the provided
-	// validators to the set.
-	Set([]Validator) error
 
 	// AddWeight to a staker.
 	AddWeight(ids.NodeID, uint64) error
@@ -105,90 +90,6 @@ type set struct {
 	sampler            sampler.WeightedWithoutReplacement
 
 	callbackListeners []SetCallbackListener
-}
-
-func (s *set) Set(vdrs []Validator) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	return s.set(vdrs)
-}
-
-func (s *set) set(vdrs []Validator) error {
-	// find all the nodes that are going to be added or have their weight changed
-	nodesInResultSet := ids.NewNodeIDSet(len(vdrs))
-	for _, vdr := range vdrs {
-		vdrID := vdr.ID()
-		if nodesInResultSet.Contains(vdrID) {
-			continue
-		}
-		nodesInResultSet.Add(vdrID)
-
-		newWeight := vdr.Weight()
-		vdr, contains := s.vdrs[vdrID]
-		if !contains {
-			s.callValidatorAddedCallbacks(vdrID, newWeight)
-			continue
-		}
-
-		existingWeight := vdr.weight
-		if existingWeight != newWeight {
-			s.callWeightChangeCallbacks(vdrID, existingWeight, newWeight)
-		}
-	}
-
-	// find all nodes that are going to be removed
-	for _, vdr := range s.vdrSlice {
-		if !nodesInResultSet.Contains(vdr.nodeID) {
-			s.callValidatorRemovedCallbacks(vdr.nodeID, vdr.weight)
-		}
-	}
-
-	lenVdrs := len(vdrs)
-	// If the underlying arrays are much larger than necessary, resize them to
-	// allow garbage collection of unused memory
-	if cap(s.vdrSlice) > len(s.vdrSlice)*maxExcessCapacityFactor {
-		newCap := cap(s.vdrSlice) / capacityReductionFactor
-		if newCap < lenVdrs {
-			newCap = lenVdrs
-		}
-		s.vdrSlice = make([]*validator, 0, newCap)
-		s.weights = make([]uint64, 0, newCap)
-	} else {
-		s.vdrSlice = s.vdrSlice[:0]
-		s.weights = s.weights[:0]
-	}
-
-	s.vdrs = make(map[ids.NodeID]*validator, lenVdrs)
-	s.totalWeight = 0
-	s.samplerInitialized = false
-
-	for _, vdr := range vdrs {
-		vdrID := vdr.ID()
-		if s.contains(vdrID) {
-			continue
-		}
-		w := vdr.Weight()
-		if w == 0 {
-			continue // This validator would never be sampled anyway
-		}
-
-		newVdr := &validator{
-			nodeID: vdrID,
-			weight: w,
-			index:  len(s.vdrSlice),
-		}
-		s.vdrs[vdrID] = newVdr
-		s.vdrSlice = append(s.vdrSlice, newVdr)
-		s.weights = append(s.weights, w)
-
-		newTotalWeight, err := math.Add64(s.totalWeight, w)
-		if err != nil {
-			return err
-		}
-		s.totalWeight = newTotalWeight
-	}
-	return nil
 }
 
 func (s *set) AddWeight(vdrID ids.NodeID, weight uint64) error {

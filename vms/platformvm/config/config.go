@@ -23,8 +23,10 @@ type Config struct {
 
 	// Node's validator set maps subnetID -> validators of the subnet
 	//
-	// Invariant: The primary network's validator set should be populated
-	//            externally to the vm.
+	// Invariant: The primary network's validator set should have been added to
+	//            the manager before calling VM.Initialize.
+	// Invariant: The primary network's validator set should be empty before
+	//            calling VM.Initialize.
 	Validators validators.Manager
 
 	// Provides access to subnet tracking

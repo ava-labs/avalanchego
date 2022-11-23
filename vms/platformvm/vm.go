@@ -65,9 +65,10 @@ var (
 	_ secp256k1fx.VM   = (*VM)(nil)
 	_ validators.State = (*VM)(nil)
 
-	errWrongCacheType        = errors.New("unexpectedly cached type")
-	errMissingValidatorSet   = errors.New("missing validator set")
-	errDuplicateValidatorSet = errors.New("duplicate validator set")
+	errWrongCacheType               = errors.New("unexpectedly cached type")
+	errMissingValidatorSet          = errors.New("missing validator set")
+	errValidatorSetAlreadyPopulated = errors.New("validator set already populated")
+	errDuplicateValidatorSet        = errors.New("duplicate validator set")
 )
 
 type VM struct {
@@ -581,15 +582,17 @@ func (vm *VM) GetCurrentHeight(context.Context) (uint64, error) {
 }
 
 func (vm *VM) initValidators() error {
-	newPrimaryValidators, err := vm.state.ValidatorSet(constants.PrimaryNetworkID)
-	if err != nil {
-		return err
-	}
 	primaryValidators, ok := vm.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
 		return errMissingValidatorSet
 	}
-	if err := primaryValidators.Set(newPrimaryValidators.List()); err != nil {
+	if primaryValidators.Len() != 0 {
+		// Enforce the invariant that the validator set is empty before the call
+		// to VM.Initialize.
+		return errValidatorSetAlreadyPopulated
+	}
+	err := vm.state.ValidatorSet(constants.PrimaryNetworkID, primaryValidators)
+	if err != nil {
 		return err
 	}
 
@@ -598,10 +601,12 @@ func (vm *VM) initValidators() error {
 	vm.metrics.SetTotalStake(primaryValidators.Weight())
 
 	for subnetID := range vm.WhitelistedSubnets {
-		subnetValidators, err := vm.state.ValidatorSet(subnetID)
+		subnetValidators := validators.NewSet()
+		err := vm.state.ValidatorSet(subnetID, subnetValidators)
 		if err != nil {
 			return err
 		}
+
 		if !vm.Validators.Add(subnetID, subnetValidators) {
 			return fmt.Errorf("%w: %s", errDuplicateValidatorSet, subnetID)
 		}
