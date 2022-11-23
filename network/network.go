@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -372,7 +373,7 @@ func (n *network) Connected(nodeID ids.NodeID) {
 // peer is a validator/beacon.
 func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 	return !n.config.RequireValidatorToConnect ||
-		n.config.Validators.Contains(constants.PrimaryNetworkID, n.config.MyNodeID) ||
+		validators.Contains(n.config.Validators, constants.PrimaryNetworkID, n.config.MyNodeID) ||
 		n.WantsConnection(nodeID)
 }
 
@@ -568,7 +569,7 @@ func (n *network) WantsConnection(nodeID ids.NodeID) bool {
 }
 
 func (n *network) wantsConnection(nodeID ids.NodeID) bool {
-	return n.config.Validators.Contains(constants.PrimaryNetworkID, nodeID) ||
+	return validators.Contains(n.config.Validators, constants.PrimaryNetworkID, nodeID) ||
 		n.manuallyTrackedIDs.Contains(nodeID)
 }
 
@@ -619,7 +620,7 @@ func (n *network) sampleValidatorIPs() []ips.ClaimedIPPort {
 		int(n.config.PeerListNumValidatorIPs),
 		func(p peer.Peer) bool {
 			// Only sample validators
-			return n.config.Validators.Contains(constants.PrimaryNetworkID, p.ID())
+			return validators.Contains(n.config.Validators, constants.PrimaryNetworkID, p.ID())
 		},
 	)
 	n.peersLock.RUnlock()
@@ -666,7 +667,7 @@ func (n *network) getPeers(
 			continue
 		}
 
-		if validatorOnly && !n.config.Validators.Contains(subnetID, nodeID) {
+		if validatorOnly && !validators.Contains(n.config.Validators, subnetID, nodeID) {
 			continue
 		}
 
@@ -706,7 +707,7 @@ func (n *network) samplePeers(
 				return true
 			}
 
-			if n.config.Validators.Contains(subnetID, p.ID()) {
+			if validators.Contains(n.config.Validators, subnetID, p.ID()) {
 				numValidatorsToSample--
 				return numValidatorsToSample >= 0
 			}

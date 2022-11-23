@@ -1583,9 +1583,9 @@ func (s *state) writeCurrentPrimaryNetworkStakers(height uint64) error {
 
 		// TODO: Move the validator set management out of the state package
 		if weightDiff.Decrease {
-			err = s.cfg.Validators.RemoveWeight(constants.PrimaryNetworkID, nodeID, weightDiff.Amount)
+			err = validators.RemoveWeight(s.cfg.Validators, constants.PrimaryNetworkID, nodeID, weightDiff.Amount)
 		} else {
-			err = s.cfg.Validators.AddWeight(constants.PrimaryNetworkID, nodeID, weightDiff.Amount)
+			err = validators.AddWeight(s.cfg.Validators, constants.PrimaryNetworkID, nodeID, weightDiff.Amount)
 		}
 		if err != nil {
 			return fmt.Errorf("failed to update validator weight: %w", err)
@@ -1675,9 +1675,9 @@ func (s *state) writeCurrentSubnetStakers(height uint64) error {
 			// TODO: Move the validator set management out of the state package
 			if s.cfg.WhitelistedSubnets.Contains(subnetID) {
 				if weightDiff.Decrease {
-					err = s.cfg.Validators.RemoveWeight(subnetID, nodeID, weightDiff.Amount)
+					err = validators.RemoveWeight(s.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
 				} else {
-					err = s.cfg.Validators.AddWeight(subnetID, nodeID, weightDiff.Amount)
+					err = validators.AddWeight(s.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
 				}
 				if err != nil {
 					return fmt.Errorf("failed to update validator weight: %w", err)

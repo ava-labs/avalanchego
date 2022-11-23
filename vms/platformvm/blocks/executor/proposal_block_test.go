@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -560,7 +561,10 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 			}()
 
 			env.config.BanffTime = time.Time{} // activate Banff
-			env.config.WhitelistedSubnets.Add(testSubnet1.ID())
+
+			subnetID := testSubnet1.ID()
+			env.config.WhitelistedSubnets.Add(subnetID)
+			env.config.Validators.Add(subnetID, validators.NewSet())
 
 			for _, staker := range test.stakers {
 				tx, err := env.txBuilder.NewAddValidatorTx(
@@ -592,7 +596,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 					uint64(subStaker.startTime.Unix()),
 					uint64(subStaker.endTime.Unix()),
 					subStaker.nodeID, // validator ID
-					testSubnet1.ID(), // Subnet ID
+					subnetID,         // Subnet ID
 					[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0], preFundedKeys[1]},
 					ids.ShortEmpty,
 				)
@@ -677,20 +681,20 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				case pending:
 					_, err := env.state.GetPendingValidator(constants.PrimaryNetworkID, stakerNodeID)
 					require.NoError(err)
-					require.False(env.config.Validators.Contains(constants.PrimaryNetworkID, stakerNodeID))
+					require.False(validators.Contains(env.config.Validators, constants.PrimaryNetworkID, stakerNodeID))
 				case current:
 					_, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, stakerNodeID)
 					require.NoError(err)
-					require.True(env.config.Validators.Contains(constants.PrimaryNetworkID, stakerNodeID))
+					require.True(validators.Contains(env.config.Validators, constants.PrimaryNetworkID, stakerNodeID))
 				}
 			}
 
 			for stakerNodeID, status := range test.expectedSubnetStakers {
 				switch status {
 				case pending:
-					require.False(env.config.Validators.Contains(testSubnet1.ID(), stakerNodeID))
+					require.False(validators.Contains(env.config.Validators, subnetID, stakerNodeID))
 				case current:
-					require.True(env.config.Validators.Contains(testSubnet1.ID(), stakerNodeID))
+					require.True(validators.Contains(env.config.Validators, subnetID, stakerNodeID))
 				}
 			}
 		})
@@ -706,7 +710,10 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 		}
 	}()
 	env.config.BanffTime = time.Time{} // activate Banff
-	env.config.WhitelistedSubnets.Add(testSubnet1.ID())
+
+	subnetID := testSubnet1.ID()
+	env.config.WhitelistedSubnets.Add(subnetID)
+	env.config.Validators.Add(subnetID, validators.NewSet())
 
 	// Add a subnet validator to the staker set
 	subnetValidatorNodeID := ids.NodeID(preFundedKeys[0].PublicKey().Address())
@@ -718,7 +725,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 		uint64(subnetVdr1StartTime.Unix()), // Start time
 		uint64(subnetVdr1EndTime.Unix()),   // end time
 		subnetValidatorNodeID,              // Node ID
-		testSubnet1.ID(),                   // Subnet ID
+		subnetID,                           // Subnet ID
 		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
 	)
@@ -744,7 +751,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                                // Start time
 		uint64(subnetVdr1EndTime.Add(time.Second).Add(defaultMinStakingDuration).Unix()), // end time
 		subnetVdr2NodeID, // Node ID
-		testSubnet1.ID(), // Subnet ID
+		subnetID,         // Subnet ID
 		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0], preFundedKeys[1]},
 		ids.ShortEmpty,
 	)
@@ -822,14 +829,14 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 
 	blkStateMap := env.blkManager.(*manager).blkIDToState
 	updatedState := blkStateMap[commitBlk.ID()].onAcceptState
-	_, err = updatedState.GetCurrentValidator(testSubnet1.ID(), subnetValidatorNodeID)
+	_, err = updatedState.GetCurrentValidator(subnetID, subnetValidatorNodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Check VM Validators are removed successfully
 	require.NoError(propBlk.Accept(context.Background()))
 	require.NoError(commitBlk.Accept(context.Background()))
-	require.False(env.config.Validators.Contains(testSubnet1.ID(), subnetVdr2NodeID))
-	require.False(env.config.Validators.Contains(testSubnet1.ID(), subnetValidatorNodeID))
+	require.False(validators.Contains(env.config.Validators, subnetID, subnetVdr2NodeID))
+	require.False(validators.Contains(env.config.Validators, subnetID, subnetValidatorNodeID))
 }
 
 func TestBanffProposalBlockWhitelistedSubnet(t *testing.T) {
@@ -844,8 +851,11 @@ func TestBanffProposalBlockWhitelistedSubnet(t *testing.T) {
 				}
 			}()
 			env.config.BanffTime = time.Time{} // activate Banff
+
+			subnetID := testSubnet1.ID()
 			if whitelist {
-				env.config.WhitelistedSubnets.Add(testSubnet1.ID())
+				env.config.WhitelistedSubnets.Add(subnetID)
+				env.config.Validators.Add(subnetID, validators.NewSet())
 			}
 
 			// Add a subnet validator to the staker set
@@ -858,7 +868,7 @@ func TestBanffProposalBlockWhitelistedSubnet(t *testing.T) {
 				uint64(subnetVdr1StartTime.Unix()), // Start time
 				uint64(subnetVdr1EndTime.Unix()),   // end time
 				subnetValidatorNodeID,              // Node ID
-				testSubnet1.ID(),                   // Subnet ID
+				subnetID,                           // Subnet ID
 				[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0], preFundedKeys[1]},
 				ids.ShortEmpty,
 			)
@@ -933,7 +943,7 @@ func TestBanffProposalBlockWhitelistedSubnet(t *testing.T) {
 
 			require.NoError(propBlk.Accept(context.Background()))
 			require.NoError(commitBlk.Accept(context.Background()))
-			require.Equal(whitelist, env.config.Validators.Contains(testSubnet1.ID(), subnetValidatorNodeID))
+			require.Equal(whitelist, validators.Contains(env.config.Validators, subnetID, subnetValidatorNodeID))
 		})
 	}
 }

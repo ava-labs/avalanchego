@@ -340,7 +340,7 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 
 	network := networks[0].(*network)
 	nodeID, tlsCert, _ := getTLS(t, 1)
-	err := network.config.Validators.AddWeight(constants.PrimaryNetworkID, nodeID, 1)
+	err := validators.AddWeight(network.config.Validators, constants.PrimaryNetworkID, nodeID, 1)
 	require.NoError(err)
 
 	useful := network.Track(ips.ClaimedIPPort{

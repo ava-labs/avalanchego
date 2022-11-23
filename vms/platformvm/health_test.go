@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -64,15 +65,17 @@ func TestHealthCheckSubnet(t *testing.T) {
 				require.NoError(vm.Shutdown(context.Background()))
 				vm.ctx.Lock.Unlock()
 			}()
+
 			subnetID := ids.GenerateTestID()
+			subnetVdrs := validators.NewSet()
 			vm.WhitelistedSubnets.Add(subnetID)
 			testVdrCount := 4
 			for i := 0; i < testVdrCount; i++ {
 				subnetVal := ids.GenerateTestNodeID()
-				require.NoError(vm.Validators.AddWeight(subnetID, subnetVal, 100))
+				err := subnetVdrs.AddWeight(subnetVal, 100)
+				require.NoError(err)
 			}
-
-			vals, ok := vm.Validators.Get(subnetID)
+			ok := vm.Validators.Add(subnetID, subnetVdrs)
 			require.True(ok)
 
 			// connect to all primary network validators first
@@ -90,7 +93,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 					subnetID: expectedMinStake,
 				}
 			}
-			for index, validator := range vals.List() {
+			for index, validator := range subnetVdrs.List() {
 				err := vm.Connected(context.Background(), validator.ID(), version.CurrentApp)
 				require.NoError(err)
 				details, err := vm.HealthCheck(context.Background())
