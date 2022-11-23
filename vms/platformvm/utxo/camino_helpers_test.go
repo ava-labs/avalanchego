@@ -191,11 +191,13 @@ func generateTestUTXO(txID ids.ID, assetID ids.ID, amount uint64, outputOwners s
 			TransferableOut: out,
 		}
 	}
-	return &avax.UTXO{
+	testUTXO := &avax.UTXO{
 		UTXOID: avax.UTXOID{TxID: txID},
 		Asset:  avax.Asset{ID: assetID},
 		Out:    out,
 	}
+	testUTXO.InputID()
+	return testUTXO
 }
 
 func generateTestStakeableUTXO(txID ids.ID, assetID ids.ID, amount, locktime uint64, outputOwners secp256k1fx.OutputOwners) *avax.UTXO {

@@ -18,15 +18,15 @@ import (
 
 const (
 	defaultCaminoValidatorWeight = 2 * units.KiloAvax
+	defaultMinStakingDuration    = 24 * time.Hour
+	defaultTxFee                 = uint64(100)
 )
 
 var (
-	caminoPreFundedKeys       = crypto.BuildTestKeys()
-	defaultMinStakingDuration = 24 * time.Hour
-	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
-	defaultValidateStartTime  = defaultGenesisTime
-	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
-	defaultTxFee              = uint64(100)
+	caminoPreFundedKeys      = crypto.BuildTestKeys()
+	defaultGenesisTime       = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
+	defaultValidateStartTime = defaultGenesisTime
+	defaultValidateEndTime   = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 )
 
 func generateTestOut(assetID ids.ID, amount uint64, outputOwners secp256k1fx.OutputOwners, depositTxID, bondTxID ids.ID) *avax.TransferableOutput {

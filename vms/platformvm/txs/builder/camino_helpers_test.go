@@ -51,25 +51,25 @@ import (
 const (
 	testNetworkID                = 10 // To be used in tests
 	defaultCaminoValidatorWeight = 2 * units.KiloAvax
+	defaultMinStakingDuration    = 24 * time.Hour
+	defaultMaxStakingDuration    = 365 * 24 * time.Hour
+	defaultCaminoBalance         = 100 * defaultCaminoValidatorWeight
+	defaultTxFee                 = uint64(100)
+	localStakingPath             = "../../../../staking/local/"
 )
 
 var (
-	defaultMinStakingDuration    = 24 * time.Hour
-	defaultMaxStakingDuration    = 365 * 24 * time.Hour
 	defaultGenesisTime           = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
 	defaultValidateStartTime     = defaultGenesisTime
 	defaultValidateEndTime       = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
-	defaultCaminoBalance         = 100 * defaultCaminoValidatorWeight
 	avaxAssetID                  = ids.ID{'y', 'e', 'e', 't'}
-	defaultTxFee                 = uint64(100)
 	xChainID                     = ids.Empty.Prefix(0)
 	cChainID                     = ids.Empty.Prefix(1)
-	localStakingPath             = "../../../../staking/local/"
 	caminoPreFundedKeys          = crypto.BuildTestKeys()
 	_, caminoPreFundedNodeIDs    = nodeid.LoadLocalCaminoNodeKeysAndIDs(localStakingPath)
 	testCaminoSubnet1ControlKeys = caminoPreFundedKeys[0:3]
-	testSubnet1                  *txs.Tx
 	lastAcceptedID               = ids.GenerateTestID()
+	testSubnet1                  *txs.Tx
 )
 
 type mutableSharedMemory struct {

@@ -45,13 +45,13 @@ import (
 
 const (
 	defaultCaminoValidatorWeight = 2 * units.KiloAvax
+	defaultCaminoBalance         = 100 * defaultCaminoValidatorWeight
+	localStakingPath             = "../../../../staking/local/"
 )
 
 var (
-	localStakingPath                                = "../../../../staking/local/"
 	caminoPreFundedKeys                             = crypto.BuildTestKeys()
 	caminoPreFundedNodeKeys, caminoPreFundedNodeIDs = nodeid.LoadLocalCaminoNodeKeysAndIDs(localStakingPath)
-	defaultCaminoBalance                            = 100 * defaultCaminoValidatorWeight
 	testCaminoSubnet1ControlKeys                    = caminoPreFundedKeys[0:3]
 )
 
@@ -304,11 +304,13 @@ func generateTestUTXO(txID ids.ID, assetID ids.ID, amount uint64, outputOwners s
 			TransferableOut: out,
 		}
 	}
-	return &avax.UTXO{
+	testUTXO := &avax.UTXO{
 		UTXOID: avax.UTXOID{TxID: txID},
 		Asset:  avax.Asset{ID: assetID},
 		Out:    out,
 	}
+	testUTXO.InputID()
+	return testUTXO
 }
 
 func generateTestOut(assetID ids.ID, amount uint64, outputOwners secp256k1fx.OutputOwners, depositTxID, bondTxID ids.ID) *avax.TransferableOutput {

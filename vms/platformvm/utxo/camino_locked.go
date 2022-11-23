@@ -379,7 +379,7 @@ func (h *handler) Unlock(
 	for lockTxID := range lockTxIDsSet {
 		tx, s, err := state.GetTx(lockTxID)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to fetch lockedTx %s: %v", lockTxID, err)
+			return nil, nil, fmt.Errorf("failed to fetch lockedTx %s: %w", lockTxID, err)
 		}
 		if s != status.Committed {
 			return nil, nil, fmt.Errorf("%s is not a committed tx", lockTxID)

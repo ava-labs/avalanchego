@@ -31,6 +31,8 @@ var (
 	errInvalidRoles         = errors.New("invalid role")
 	errValidatorExists      = errors.New("node is already a validator")
 	errInvalidSystemTxBody  = errors.New("tx body doesn't match expected one")
+	errRewardBeforeEndTime  = errors.New("attempting to remove TxID before its end time")
+	errRewardWrongID        = errors.New("attempting to remove wrong TxID")
 )
 
 type CaminoStandardTxExecutor struct {
@@ -387,7 +389,8 @@ func (e *CaminoProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) 
 
 	if stakerToRemove.TxID != tx.TxID {
 		return fmt.Errorf(
-			"attempting to remove TxID: %s. Should be removing %s",
+			"%w. Attempting to remove TxID: %s. Should be removing %s",
+			errRewardWrongID,
 			tx.TxID,
 			stakerToRemove.TxID,
 		)
@@ -397,7 +400,8 @@ func (e *CaminoProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) 
 	currentChainTime := e.OnCommitState.GetTimestamp()
 	if !stakerToRemove.EndTime.Equal(currentChainTime) {
 		return fmt.Errorf(
-			"attempting to remove TxID: %s before their end time %s",
+			"%w. TxID: %s. End time %s",
+			errRewardBeforeEndTime,
 			tx.TxID,
 			stakerToRemove.EndTime,
 		)

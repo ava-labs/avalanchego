@@ -1001,3 +1001,256 @@ func TestCaminoAddSubnetValidatorTxNodeSig(t *testing.T) {
 		})
 	}
 }
+
+func TestCaminoRewardValidatorTx(t *testing.T) {
+	caminoGenesisConf := genesis.Camino{
+		VerifyNodeSignature: true,
+		LockModeBondDeposit: true,
+	}
+	outputOwners := secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs:     []ids.ShortID{caminoPreFundedKeys[0].PublicKey().Address()},
+	}
+
+	env := newCaminoEnvironment( /*postBanff*/ true, caminoGenesisConf)
+	env.ctx.Lock.Lock()
+	env.config.BanffTime = env.state.GetTimestamp()
+
+	currentStakerIterator, err := env.state.GetCurrentStakerIterator()
+	require.NoError(t, err)
+	require.True(t, currentStakerIterator.Next())
+	stakerToRemove := currentStakerIterator.Value()
+	currentStakerIterator.Release()
+
+	stakerToRemoveTxIntf, _, err := env.state.GetTx(stakerToRemove.TxID)
+	require.NoError(t, err)
+	stakerToRemoveTx := stakerToRemoveTxIntf.Unsigned.(*txs.CaminoAddValidatorTx)
+	ins, outs, err := env.utxosHandler.Unlock(env.state, []ids.ID{stakerToRemove.TxID}, locked.StateBonded)
+	require.NoError(t, err)
+
+	// UTXOs before reward
+	innerOut := stakerToRemoveTx.Outs[0].Out.(*locked.Out)
+	stakeOwners := innerOut.TransferableOut.(*secp256k1fx.TransferOutput).AddressesSet()
+	UTXOsBeforeReward, err := avax.GetAllUTXOs(env.state, stakeOwners)
+	require.NoError(t, err)
+
+	type test struct {
+		ins                      []*avax.TransferableInput
+		outs                     []*avax.TransferableOutput
+		preExecute               func(*testing.T, *txs.Tx)
+		generateUTXOsAfterReward func(ids.ID) []*avax.UTXO
+		expectedErr              error
+	}
+
+	tests := map[string]test{
+		"Reward before end time": {
+			ins:                      ins,
+			outs:                     outs,
+			preExecute:               func(t *testing.T, tx *txs.Tx) {},
+			generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO { return UTXOsBeforeReward },
+			expectedErr:              errRewardBeforeEndTime,
+		},
+		"Wrong validator": {
+			ins:  ins,
+			outs: outs,
+			preExecute: func(t *testing.T, tx *txs.Tx) {
+				rewValTx := tx.Unsigned.(*txs.CaminoRewardValidatorTx)
+				rewValTx.RewardValidatorTx.TxID = ids.GenerateTestID()
+			},
+			generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO { return UTXOsBeforeReward },
+			expectedErr:              database.ErrNotFound,
+		},
+		"No zero credentials": {
+			ins:  ins,
+			outs: outs,
+			preExecute: func(t *testing.T, tx *txs.Tx) {
+				tx.Creds = append(tx.Creds, &secp256k1fx.Credential{})
+			},
+			generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO { return UTXOsBeforeReward },
+			expectedErr:              errWrongNumberOfCredentials,
+		},
+		"Invalid inputs (one excess)": {
+			ins:                      append(ins, &avax.TransferableInput{In: &secp256k1fx.TransferInput{}}),
+			outs:                     outs,
+			preExecute:               func(t *testing.T, tx *txs.Tx) {},
+			generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO { return UTXOsBeforeReward },
+			expectedErr:              errInvalidSystemTxBody,
+		},
+		"Invalid inputs (wrong amount)": {
+			ins: func() []*avax.TransferableInput {
+				tempIns := make([]*avax.TransferableInput, len(ins))
+				inputLockIDs := locked.IDs{}
+				if lockedIn, ok := ins[0].In.(*locked.In); ok {
+					inputLockIDs = lockedIn.IDs
+				}
+				tempIns[0] = &avax.TransferableInput{
+					UTXOID: ins[0].UTXOID,
+					Asset:  ins[0].Asset,
+					In: &locked.In{
+						IDs: inputLockIDs,
+						TransferableIn: &secp256k1fx.TransferInput{
+							Amt: ins[0].In.Amount() - 1,
+						},
+					},
+				}
+				return tempIns
+			}(),
+			outs:                     outs,
+			preExecute:               func(t *testing.T, tx *txs.Tx) {},
+			generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO { return UTXOsBeforeReward },
+			expectedErr:              errInvalidSystemTxBody,
+		},
+		"Invalid outs (one excess)": {
+			ins:                      ins,
+			outs:                     append(outs, &avax.TransferableOutput{Out: &secp256k1fx.TransferOutput{}}),
+			preExecute:               func(t *testing.T, tx *txs.Tx) {},
+			generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO { return UTXOsBeforeReward },
+			expectedErr:              errInvalidSystemTxBody,
+		},
+		"Invalid outs (wrong amount)": {
+			ins: ins,
+			outs: func() []*avax.TransferableOutput {
+				tempOuts := make([]*avax.TransferableOutput, len(outs))
+				copy(tempOuts, outs)
+				validOut := tempOuts[0].Out
+				if lockedOut, ok := validOut.(*locked.Out); ok {
+					validOut = lockedOut.TransferableOut
+				}
+				secpOut, ok := validOut.(*secp256k1fx.TransferOutput)
+				require.True(t, ok)
+
+				var invalidOut avax.TransferableOut = &secp256k1fx.TransferOutput{
+					Amt:          secpOut.Amt - 1,
+					OutputOwners: secpOut.OutputOwners,
+				}
+				if lockedOut, ok := validOut.(*locked.Out); ok {
+					invalidOut = &locked.Out{
+						IDs:             lockedOut.IDs,
+						TransferableOut: invalidOut,
+					}
+				}
+				tempOuts[0] = &avax.TransferableOutput{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out:   invalidOut,
+				}
+				return tempOuts
+			}(),
+			preExecute:               func(t *testing.T, tx *txs.Tx) {},
+			generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO { return UTXOsBeforeReward },
+			expectedErr:              errInvalidSystemTxBody,
+		},
+	}
+
+	execute := func(t *testing.T, tt test) (CaminoProposalTxExecutor, *txs.Tx) {
+		utx := &txs.CaminoRewardValidatorTx{
+			RewardValidatorTx: txs.RewardValidatorTx{TxID: stakerToRemove.TxID},
+			Ins:               tt.ins,
+			Outs:              tt.outs,
+		}
+
+		tx, err := txs.NewSigned(utx, txs.Codec, nil)
+		require.NoError(t, err)
+
+		tt.preExecute(t, tx)
+
+		onCommitState, err := state.NewDiff(lastAcceptedID, env)
+		require.NoError(t, err)
+
+		onAbortState, err := state.NewDiff(lastAcceptedID, env)
+		require.NoError(t, err)
+
+		txExecutor := CaminoProposalTxExecutor{
+			ProposalTxExecutor{
+				OnCommitState: onCommitState,
+				OnAbortState:  onAbortState,
+				Backend:       &env.backend,
+				Tx:            tx,
+			},
+		}
+		err = tx.Unsigned.Visit(&txExecutor)
+		require.ErrorIs(t, err, tt.expectedErr)
+		return txExecutor, tx
+	}
+
+	// Asserting UTXO changes
+	assertBalance := func(t *testing.T, tt test, tx *txs.Tx) {
+		onCommitUTXOs, err := avax.GetAllUTXOs(env.state, outputOwners.AddressesSet())
+		require.NoError(t, err)
+		UTXOsAfterReward := tt.generateUTXOsAfterReward(tx.ID())
+		require.Equal(t, onCommitUTXOs, UTXOsAfterReward)
+	}
+
+	// Asserting that staker is removed
+	assertNextStaker := func(t *testing.T) {
+		nextStakerIterator, err := env.state.GetCurrentStakerIterator()
+		require.NoError(t, err)
+		require.True(t, nextStakerIterator.Next())
+		nextStakerToRemove := nextStakerIterator.Value()
+		nextStakerIterator.Release()
+		require.NotEqual(t, nextStakerToRemove.TxID, stakerToRemove.TxID)
+	}
+
+	for name, tt := range tests {
+		t.Run(name+" On abort", func(t *testing.T) {
+			txExecutor, tx := execute(t, tt)
+			txExecutor.OnAbortState.Apply(env.state)
+			env.state.SetHeight(uint64(1))
+			err = env.state.Commit()
+			require.NoError(t, err)
+			assertBalance(t, tt, tx)
+		})
+		t.Run(name+" On commit", func(t *testing.T) {
+			txExecutor, tx := execute(t, tt)
+			txExecutor.OnCommitState.Apply(env.state)
+			env.state.SetHeight(uint64(1))
+			err = env.state.Commit()
+			require.NoError(t, err)
+			assertBalance(t, tt, tx)
+		})
+	}
+
+	happyPathTest := test{
+		ins:  ins,
+		outs: outs,
+		preExecute: func(t *testing.T, tx *txs.Tx) {
+			env.state.SetTimestamp(stakerToRemove.EndTime)
+		},
+		generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO {
+			return []*avax.UTXO{
+				generateTestUTXO(txID, env.ctx.AVAXAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.Empty, env.ctx.AVAXAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
+			}
+		},
+		expectedErr: nil,
+	}
+
+	t.Run("Happy path on commit", func(t *testing.T) {
+		txExecutor, tx := execute(t, happyPathTest)
+		txExecutor.OnCommitState.Apply(env.state)
+		env.state.SetHeight(uint64(1))
+		err = env.state.Commit()
+		require.NoError(t, err)
+		assertBalance(t, happyPathTest, tx)
+		assertNextStaker(t)
+	})
+
+	// We need to start again the environment because the staker is already removed from the previous test
+	env = newCaminoEnvironment( /*postBanff*/ true, caminoGenesisConf)
+	env.ctx.Lock.Lock()
+	env.config.BanffTime = env.state.GetTimestamp()
+
+	t.Run("Happy path on abort", func(t *testing.T) {
+		txExecutor, tx := execute(t, happyPathTest)
+		txExecutor.OnAbortState.Apply(env.state)
+		env.state.SetHeight(uint64(1))
+		err = env.state.Commit()
+		require.NoError(t, err)
+		assertBalance(t, happyPathTest, tx)
+		assertNextStaker(t)
+	})
+
+	// Shut down the environment
+	err = shutdownEnvironment(env)
+	require.NoError(t, err)
+}
