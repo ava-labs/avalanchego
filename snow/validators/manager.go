@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -110,10 +112,7 @@ func (m *manager) String() string {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	subnets := make([]ids.ID, 0, len(m.subnetToVdrs))
-	for subnetID := range m.subnetToVdrs {
-		subnets = append(subnets, subnetID)
-	}
+	subnets := maps.Keys(m.subnetToVdrs)
 	ids.SortIDs(subnets)
 
 	sb := strings.Builder{}

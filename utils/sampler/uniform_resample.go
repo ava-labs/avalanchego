@@ -5,6 +5,8 @@ package sampler
 
 import (
 	"math"
+
+	"golang.org/x/exp/maps"
 )
 
 // uniformResample allows for sampling over a uniform distribution without
@@ -58,9 +60,7 @@ func (s *uniformResample) ClearSeed() {
 }
 
 func (s *uniformResample) Reset() {
-	for k := range s.drawn {
-		delete(s.drawn, k)
-	}
+	maps.Clear(s.drawn)
 }
 
 func (s *uniformResample) Next() (uint64, error) {

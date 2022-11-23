@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"sync"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -127,11 +129,7 @@ func (m *manager) ListFactories() ([]ids.ID, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	vmIDs := make([]ids.ID, 0, len(m.factories))
-	for vmID := range m.factories {
-		vmIDs = append(vmIDs, vmID)
-	}
-	return vmIDs, nil
+	return maps.Keys(m.factories), nil
 }
 
 func (m *manager) Versions() (map[string]string, error) {

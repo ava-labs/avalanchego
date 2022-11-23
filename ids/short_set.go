@@ -3,7 +3,11 @@
 
 package ids
 
-import "strings"
+import (
+	"strings"
+
+	"golang.org/x/exp/maps"
+)
 
 const (
 	minShortSetSize = 16
@@ -103,13 +107,7 @@ func (ids ShortSet) CappedList(size int) []ShortID {
 
 // List converts this set into a list
 func (ids ShortSet) List() []ShortID {
-	idList := make([]ShortID, len(ids))
-	i := 0
-	for id := range ids {
-		idList[i] = id
-		i++
-	}
-	return idList
+	return maps.Keys(ids)
 }
 
 // SortedList returns this set as a sorted list
@@ -121,15 +119,7 @@ func (ids ShortSet) SortedList() []ShortID {
 
 // Equals returns true if the sets contain the same elements
 func (ids ShortSet) Equals(oIDs ShortSet) bool {
-	if ids.Len() != oIDs.Len() {
-		return false
-	}
-	for key := range oIDs {
-		if _, contains := ids[key]; !contains {
-			return false
-		}
-	}
-	return true
+	return maps.Equal(ids, oIDs)
 }
 
 // String returns the string representation of a set

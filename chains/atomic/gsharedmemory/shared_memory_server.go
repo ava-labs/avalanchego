@@ -7,6 +7,8 @@ import (
 	"context"
 	"sync"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -239,12 +241,7 @@ func (s *Server) Apply(
 
 	delete(s.apply, req.Id)
 
-	batches := make([]database.Batch, len(apply.batches))
-	i := 0
-	for _, batch := range apply.batches {
-		batches[i] = batch
-		i++
-	}
+	batches := maps.Values(apply.batches)
 
 	return &sharedmemorypb.ApplyResponse{}, s.sm.Apply(apply.requests, batches...)
 }

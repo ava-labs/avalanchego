@@ -6,6 +6,8 @@ package tree
 import (
 	"context"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
@@ -67,10 +69,7 @@ func (t *tree) Accept(ctx context.Context, blk snowman.Block) error {
 	delete(t.nodes, parentID)
 
 	// mark the siblings of the accepted block as rejectable
-	childrenToReject := make([]snowman.Block, 0, len(children))
-	for _, child := range children {
-		childrenToReject = append(childrenToReject, child)
-	}
+	childrenToReject := maps.Values(children)
 
 	// reject all the rejectable blocks
 	for len(childrenToReject) > 0 {
@@ -86,9 +85,7 @@ func (t *tree) Accept(ctx context.Context, blk snowman.Block) error {
 		// mark the progeny of this block as being rejectable
 		blkID := child.ID()
 		children := t.nodes[blkID]
-		for _, child := range children {
-			childrenToReject = append(childrenToReject, child)
-		}
+		childrenToReject = append(childrenToReject, maps.Values(children)...)
 		delete(t.nodes, blkID)
 	}
 	return nil

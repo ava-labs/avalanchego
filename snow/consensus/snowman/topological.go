@@ -12,6 +12,8 @@ import (
 
 	"go.uber.org/zap"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -338,9 +340,7 @@ func (ts *Topological) HealthCheck(context.Context) (interface{}, error) {
 // the non-transitively applied votes. Also returns the list of leaf blocks.
 func (ts *Topological) calculateInDegree(votes ids.Bag) {
 	// Clear the Kahn node set
-	for k := range ts.kahnNodes {
-		delete(ts.kahnNodes, k)
-	}
+	maps.Clear(ts.kahnNodes)
 	// Clear the leaf set
 	ts.leaves.Clear()
 

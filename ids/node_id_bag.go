@@ -6,6 +6,8 @@ package ids
 import (
 	"fmt"
 	"strings"
+
+	"golang.org/x/exp/maps"
 )
 
 // NodeIDBag is a multiset of NodeIDs.
@@ -65,13 +67,7 @@ func (b *NodeIDBag) Len() int {
 // without duplicates.
 // e.g. a bag with {ID1, ID1, ID2} returns ids.ShortID[]{ID1, ID2}
 func (b *NodeIDBag) List() []NodeID {
-	idList := make([]NodeID, len(b.counts))
-	i := 0
-	for id := range b.counts {
-		idList[i] = id
-		i++
-	}
-	return idList
+	return maps.Keys(b.counts)
 }
 
 // Equals returns true if the bags contain the same elements

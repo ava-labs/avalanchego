@@ -6,6 +6,8 @@ package linkeddb
 import (
 	"sync"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"
@@ -340,9 +342,7 @@ func (ldb *linkedDB) deleteNode(key []byte) error {
 
 func (ldb *linkedDB) resetBatch() {
 	ldb.headKeyIsUpdated = false
-	for key := range ldb.updatedNodes {
-		delete(ldb.updatedNodes, key)
-	}
+	maps.Clear(ldb.updatedNodes)
 	ldb.batch.Reset()
 }
 
