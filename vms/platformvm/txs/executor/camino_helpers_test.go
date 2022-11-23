@@ -52,6 +52,7 @@ var (
 	caminoPreFundedKeys                             = crypto.BuildTestKeys()
 	caminoPreFundedNodeKeys, caminoPreFundedNodeIDs = nodeid.LoadLocalCaminoNodeKeysAndIDs(localStakingPath)
 	defaultCaminoBalance                            = 100 * defaultCaminoValidatorWeight
+	testCaminoSubnet1ControlKeys                    = caminoPreFundedKeys[0:3]
 )
 
 func newCaminoEnvironment(postBanff bool, caminoGenesisConf genesis.Camino) *environment {

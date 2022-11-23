@@ -41,7 +41,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -52,25 +54,58 @@ const (
 )
 
 var (
-	defaultMinStakingDuration = 24 * time.Hour
-	defaultMaxStakingDuration = 365 * 24 * time.Hour
-	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
-	defaultValidateStartTime  = defaultGenesisTime
-	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
-	defaultCaminoBalance      = 100 * defaultCaminoValidatorWeight
-	avaxAssetID               = ids.ID{'y', 'e', 'e', 't'}
-	defaultTxFee              = uint64(100)
-	xChainID                  = ids.Empty.Prefix(0)
-	cChainID                  = ids.Empty.Prefix(1)
-	localStakingPath          = "../../../../staking/local/"
-	caminoPreFundedKeys       = crypto.BuildTestKeys()
-	_, caminoPreFundedNodeIDs = nodeid.LoadLocalCaminoNodeKeysAndIDs(localStakingPath)
+	defaultMinStakingDuration    = 24 * time.Hour
+	defaultMaxStakingDuration    = 365 * 24 * time.Hour
+	defaultGenesisTime           = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
+	defaultValidateStartTime     = defaultGenesisTime
+	defaultValidateEndTime       = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
+	defaultCaminoBalance         = 100 * defaultCaminoValidatorWeight
+	avaxAssetID                  = ids.ID{'y', 'e', 'e', 't'}
+	defaultTxFee                 = uint64(100)
+	xChainID                     = ids.Empty.Prefix(0)
+	cChainID                     = ids.Empty.Prefix(1)
+	localStakingPath             = "../../../../staking/local/"
+	caminoPreFundedKeys          = crypto.BuildTestKeys()
+	_, caminoPreFundedNodeIDs    = nodeid.LoadLocalCaminoNodeKeysAndIDs(localStakingPath)
+	testCaminoSubnet1ControlKeys = caminoPreFundedKeys[0:3]
+	testSubnet1                  *txs.Tx
+	lastAcceptedID               = ids.GenerateTestID()
 )
 
 type mutableSharedMemory struct {
 	atomic.SharedMemory
 }
 
+type environment struct {
+	isBootstrapped *utils.AtomicBool
+	config         *config.Config
+	clk            *mockable.Clock
+	baseDB         *versiondb.Database
+	ctx            *snow.Context
+	msm            *mutableSharedMemory
+	fx             fx.Fx
+	state          state.State
+	states         map[ids.ID]state.Chain
+	atomicUTXOs    avax.AtomicUTXOManager
+	uptimes        uptime.Manager
+	utxosHandler   utxo.Handler
+	txBuilder      Builder
+	backend        executor.Backend
+}
+
+func (e *environment) GetState(blkID ids.ID) (state.Chain, bool) {
+	if blkID == lastAcceptedID {
+		return e.state, true
+	}
+	chainState, ok := e.states[blkID]
+	return chainState, ok
+}
+
+func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
+	e.states[blkID] = chainState
+}
+
+// TODO: snLookup currently duplicated in vm_test.go. Remove duplication
 type snLookup struct {
 	chainsToSubnet map[ids.ID]ids.ID
 }
@@ -92,7 +127,7 @@ func newCaminoBuilder(postBanff bool, caminoGenesisConf genesis.Camino) Builder 
 
 	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
-	ctx := defaultCtx(baseDB)
+	ctx, msm := defaultCtx(baseDB)
 
 	fx := defaultFx(&clk, ctx.Log, isBootstrapped.GetValue())
 
@@ -100,6 +135,7 @@ func newCaminoBuilder(postBanff bool, caminoGenesisConf genesis.Camino) Builder 
 	baseState := defaultCaminoState(&config, ctx, baseDB, rewards, caminoGenesisConf)
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
+	uptimes := uptime.NewManager(baseState)
 	utxoHandler := utxo.NewHandler(ctx, &clk, baseState, fx)
 
 	txBuilder := New(
@@ -112,10 +148,81 @@ func newCaminoBuilder(postBanff bool, caminoGenesisConf genesis.Camino) Builder 
 		utxoHandler,
 	)
 
+	backend := executor.Backend{
+		Config:       &config,
+		Ctx:          ctx,
+		Clk:          &clk,
+		Bootstrapped: &isBootstrapped,
+		Fx:           fx,
+		FlowChecker:  utxoHandler,
+		Uptimes:      uptimes,
+		Rewards:      rewards,
+	}
+
+	env := &environment{
+		isBootstrapped: &isBootstrapped,
+		config:         &config,
+		clk:            &clk,
+		baseDB:         baseDB,
+		ctx:            ctx,
+		msm:            msm,
+		fx:             fx,
+		state:          baseState,
+		states:         make(map[ids.ID]state.Chain),
+		atomicUTXOs:    atomicUTXOs,
+		uptimes:        uptimes,
+		utxosHandler:   utxoHandler,
+		txBuilder:      txBuilder,
+		backend:        backend,
+	}
+
+	addCaminoSubnet(env, txBuilder)
 	return txBuilder
 }
 
-func defaultCtx(db database.Database) *snow.Context {
+func addCaminoSubnet(
+	env *environment,
+	txBuilder Builder,
+) {
+	// Create a subnet
+	var err error
+	testSubnet1, err = txBuilder.NewCreateSubnetTx(
+		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
+		[]ids.ShortID{ // control keys
+			caminoPreFundedKeys[0].PublicKey().Address(),
+			caminoPreFundedKeys[1].PublicKey().Address(),
+			caminoPreFundedKeys[2].PublicKey().Address(),
+		},
+		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
+		caminoPreFundedKeys[0].PublicKey().Address(),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	// store it
+	stateDiff, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		panic(err)
+	}
+
+	caminoExecutor := executor.CaminoStandardTxExecutor{
+		StandardTxExecutor: executor.StandardTxExecutor{
+			Backend: &env.backend,
+			State:   stateDiff,
+			Tx:      testSubnet1,
+		},
+	}
+	err = testSubnet1.Unsigned.Visit(&caminoExecutor)
+	if err != nil {
+		panic(err)
+	}
+
+	stateDiff.AddTx(testSubnet1, status.Committed)
+	stateDiff.Apply(env.state)
+}
+
+func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = 10
 	ctx.XChainID = xChainID
@@ -137,7 +244,7 @@ func defaultCtx(db database.Database) *snow.Context {
 		},
 	}
 
-	return ctx
+	return ctx, msm
 }
 
 func defaultClock(postBanff bool) mockable.Clock {

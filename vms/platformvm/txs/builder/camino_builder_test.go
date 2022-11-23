@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
-func TestCaminoBuilderNewAddValidatorTxNodeSig(t *testing.T) {
+func TestCaminoBuilderTxNodeSig(t *testing.T) {
 	nodeKey1, nodeID1 := nodeid.GenerateCaminoNodeKeyAndID()
 	nodeKey2, _ := nodeid.GenerateCaminoNodeKeyAndID()
 
@@ -56,7 +56,7 @@ func TestCaminoBuilderNewAddValidatorTxNodeSig(t *testing.T) {
 		// because the error will rise from the execution
 	}
 	for name, tt := range tests {
-		t.Run(name, func(t *testing.T) {
+		t.Run("AddValidatorTx: "+name, func(t *testing.T) {
 			b := newCaminoBuilder(true, tt.caminoConfig)
 
 			_, err := b.NewAddValidatorTx(
@@ -67,6 +67,21 @@ func TestCaminoBuilderNewAddValidatorTxNodeSig(t *testing.T) {
 				ids.ShortEmpty,
 				reward.PercentDenominator,
 				[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0], tt.nodeKey},
+				ids.ShortEmpty,
+			)
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+
+		t.Run("AddSubnetValidatorTx: "+name, func(t *testing.T) {
+			b := newCaminoBuilder(true, tt.caminoConfig)
+
+			_, err := b.NewAddSubnetValidatorTx(
+				defaultCaminoValidatorWeight,
+				uint64(defaultValidateStartTime.Unix()+1),
+				uint64(defaultValidateEndTime.Unix()),
+				tt.nodeID,
+				testSubnet1.ID(),
+				[]*crypto.PrivateKeySECP256K1R{testCaminoSubnet1ControlKeys[0], testCaminoSubnet1ControlKeys[1], tt.nodeKey},
 				ids.ShortEmpty,
 			)
 			require.ErrorIs(t, err, tt.expectedErr)
