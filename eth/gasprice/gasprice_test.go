@@ -54,7 +54,6 @@ var (
 
 type testBackend struct {
 	chain         *core.BlockChain
-	pending       bool // pending block available
 	acceptedEvent chan<- core.ChainEvent
 }
 
