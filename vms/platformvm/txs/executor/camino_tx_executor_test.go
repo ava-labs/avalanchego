@@ -830,6 +830,380 @@ func TestCaminoAddValidatorTxNodeSig(t *testing.T) {
 	}
 }
 
+func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
+	outputOwners := secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs:     []ids.ShortID{caminoPreFundedKeys[0].PublicKey().Address()},
+	}
+	sigIndices := []uint32{0}
+
+	nodeKey, nodeID := nodeid.GenerateCaminoNodeKeyAndID()
+
+	signers := [][]*crypto.PrivateKeySECP256K1R{{caminoPreFundedKeys[0]}}
+	signers[len(signers)-1] = []*crypto.PrivateKeySECP256K1R{nodeKey}
+
+	tests := map[string]struct {
+		outs         []*avax.TransferableOutput
+		ins          []*avax.TransferableInput
+		expectedErr  error
+		caminoConfig genesis.Camino
+	}{
+		"Locked out - LockModeBondDeposit: true": {
+			outs: []*avax.TransferableOutput{
+				generateTestOut(ids.ID{}, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.GenerateTestID()),
+			},
+			ins:         []*avax.TransferableInput{},
+			expectedErr: locked.ErrWrongOutType,
+			caminoConfig: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+			},
+		},
+		"Locked in - LockModeBondDeposit: true": {
+			outs: []*avax.TransferableOutput{},
+			ins: []*avax.TransferableInput{
+				generateTestIn(ids.ID{}, defaultCaminoValidatorWeight, ids.GenerateTestID(), ids.Empty, sigIndices),
+			},
+			expectedErr: locked.ErrWrongInType,
+			caminoConfig: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+			},
+		},
+		"Locked out - LockModeBondDeposit: false": {
+			outs: []*avax.TransferableOutput{
+				generateTestOut(ids.ID{}, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.GenerateTestID()),
+			},
+			ins:         []*avax.TransferableInput{},
+			expectedErr: locked.ErrWrongOutType,
+			caminoConfig: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: false,
+			},
+		},
+		"Locked in - LockModeBondDeposit: false": {
+			outs: []*avax.TransferableOutput{},
+			ins: []*avax.TransferableInput{
+				generateTestIn(ids.ID{}, defaultCaminoValidatorWeight, ids.GenerateTestID(), ids.Empty, sigIndices),
+			},
+			expectedErr: locked.ErrWrongInType,
+			caminoConfig: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: false,
+			},
+		},
+		"Stakeable out - LockModeBondDeposit: true": {
+			outs: []*avax.TransferableOutput{
+				generateTestStakeableOut(avaxAssetID, defaultCaminoValidatorWeight, uint64(defaultMinStakingDuration), outputOwners),
+			},
+			ins:         []*avax.TransferableInput{},
+			expectedErr: locked.ErrWrongOutType,
+			caminoConfig: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+			},
+		},
+		"Stakeable in - LockModeBondDeposit: true": {
+			outs: []*avax.TransferableOutput{},
+			ins: []*avax.TransferableInput{
+				generateTestStakeableIn(avaxAssetID, defaultCaminoValidatorWeight, uint64(defaultMinStakingDuration), sigIndices),
+			},
+			expectedErr: locked.ErrWrongInType,
+			caminoConfig: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+			},
+		},
+		"Stakeable out - LockModeBondDeposit: false": {
+			outs: []*avax.TransferableOutput{
+				generateTestStakeableOut(avaxAssetID, defaultCaminoValidatorWeight, uint64(defaultMinStakingDuration), outputOwners),
+			},
+			ins:         []*avax.TransferableInput{},
+			expectedErr: locked.ErrWrongOutType,
+			caminoConfig: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: false,
+			},
+		},
+		"Stakeable in - LockModeBondDeposit: false": {
+			outs: []*avax.TransferableOutput{},
+			ins: []*avax.TransferableInput{
+				generateTestStakeableIn(avaxAssetID, defaultCaminoValidatorWeight, uint64(defaultMinStakingDuration), sigIndices),
+			},
+			expectedErr: locked.ErrWrongInType,
+			caminoConfig: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: false,
+			},
+		},
+	}
+
+	generateExecutor := func(unsidngedTx txs.UnsignedTx, env *environment) CaminoStandardTxExecutor {
+		tx, err := txs.NewSigned(unsidngedTx, txs.Codec, signers)
+		require.NoError(t, err)
+
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
+		require.NoError(t, err)
+
+		executor := CaminoStandardTxExecutor{
+			StandardTxExecutor{
+				Backend: &env.backend,
+				State:   onAcceptState,
+				Tx:      tx,
+			},
+		}
+
+		return executor
+	}
+
+	for name, tt := range tests {
+		t.Run("ExportTx "+name, func(t *testing.T) {
+			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
+			env.ctx.Lock.Lock()
+			defer func() {
+				err := shutdownEnvironment(env)
+				require.NoError(t, err)
+			}()
+			env.config.BanffTime = env.state.GetTimestamp()
+
+			exportTx := &txs.ExportTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    env.ctx.NetworkID,
+					BlockchainID: env.ctx.ChainID,
+					Ins:          tt.ins,
+					Outs:         tt.outs,
+				}},
+				DestinationChain: env.ctx.XChainID,
+				ExportedOutputs: []*avax.TransferableOutput{
+					generateTestOut(env.ctx.AVAXAssetID, defaultMinValidatorStake-defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				},
+			}
+
+			executor := generateExecutor(exportTx, env)
+
+			err := executor.ExportTx(exportTx)
+			require.ErrorIs(t, err, tt.expectedErr)
+
+			exportedOutputsTx := &txs.ExportTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    env.ctx.NetworkID,
+					BlockchainID: env.ctx.ChainID,
+					Ins: []*avax.TransferableInput{
+						generateTestIn(ids.ID{}, 10, ids.Empty, ids.Empty, sigIndices),
+					},
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(env.ctx.AVAXAssetID, defaultMinValidatorStake-defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+					},
+				}},
+				DestinationChain: env.ctx.XChainID,
+				ExportedOutputs: []*avax.TransferableOutput{
+					generateTestOut(env.ctx.AVAXAssetID, defaultMinValidatorStake-defaultTxFee, outputOwners, ids.Empty, ids.GenerateTestID()),
+				},
+			}
+
+			executor = generateExecutor(exportedOutputsTx, env)
+
+			err = executor.ExportTx(exportedOutputsTx)
+			require.ErrorIs(t, err, locked.ErrWrongOutType)
+		})
+
+		t.Run("ImportTx "+name, func(t *testing.T) {
+			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
+			env.ctx.Lock.Lock()
+			defer func() {
+				err := shutdownEnvironment(env)
+				require.NoError(t, err)
+			}()
+			env.config.BanffTime = env.state.GetTimestamp()
+
+			importTx := &txs.ImportTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    env.ctx.NetworkID,
+					BlockchainID: env.ctx.ChainID,
+					Ins:          tt.ins,
+					Outs:         tt.outs,
+				}},
+				SourceChain: env.ctx.XChainID,
+				ImportedInputs: []*avax.TransferableInput{
+					generateTestIn(env.ctx.AVAXAssetID, 10, ids.GenerateTestID(), ids.Empty, sigIndices),
+				},
+			}
+
+			executor := generateExecutor(importTx, env)
+
+			err := executor.ImportTx(importTx)
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+
+		t.Run("AddAddressStateTx "+name, func(t *testing.T) {
+			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
+			env.ctx.Lock.Lock()
+			defer func() {
+				err := shutdownEnvironment(env)
+				require.NoError(t, err)
+			}()
+			env.config.BanffTime = env.state.GetTimestamp()
+
+			addAddressStateTxLockedTx := &txs.AddAddressStateTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    env.ctx.NetworkID,
+					BlockchainID: env.ctx.ChainID,
+					Ins:          tt.ins,
+					Outs:         tt.outs,
+				}},
+				Address: caminoPreFundedKeys[0].PublicKey().Address(),
+				State:   uint8(0),
+				Remove:  false,
+			}
+
+			executor := generateExecutor(addAddressStateTxLockedTx, env)
+
+			err := executor.AddAddressStateTx(addAddressStateTxLockedTx)
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+
+		t.Run("CreateChainTx "+name, func(t *testing.T) {
+			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
+			env.ctx.Lock.Lock()
+			defer func() {
+				err := shutdownEnvironment(env)
+				require.NoError(t, err)
+			}()
+			env.config.BanffTime = env.state.GetTimestamp()
+
+			createChainTx := &txs.CreateChainTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    env.ctx.NetworkID,
+					BlockchainID: env.ctx.ChainID,
+					Ins:          tt.ins,
+					Outs:         tt.outs,
+				}},
+				SubnetID:   env.ctx.SubnetID,
+				SubnetAuth: &secp256k1fx.Input{SigIndices: []uint32{1}},
+			}
+
+			executor := generateExecutor(createChainTx, env)
+
+			err := executor.CreateChainTx(createChainTx)
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+
+		t.Run("CreateSubnetTx "+name, func(t *testing.T) {
+			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
+			env.ctx.Lock.Lock()
+			defer func() {
+				err := shutdownEnvironment(env)
+				require.NoError(t, err)
+			}()
+			env.config.BanffTime = env.state.GetTimestamp()
+
+			createSubnetTx := &txs.CreateSubnetTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    env.ctx.NetworkID,
+					BlockchainID: env.ctx.ChainID,
+					Ins:          tt.ins,
+					Outs:         tt.outs,
+				}},
+				Owner: &secp256k1fx.OutputOwners{},
+			}
+
+			executor := generateExecutor(createSubnetTx, env)
+
+			err := executor.CreateSubnetTx(createSubnetTx)
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+
+		t.Run("TransformSubnetTx "+name, func(t *testing.T) {
+			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
+			env.ctx.Lock.Lock()
+			defer func() {
+				err := shutdownEnvironment(env)
+				require.NoError(t, err)
+			}()
+			env.config.BanffTime = env.state.GetTimestamp()
+
+			transformSubnetTx := &txs.TransformSubnetTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    env.ctx.NetworkID,
+					BlockchainID: env.ctx.ChainID,
+					Ins:          tt.ins,
+					Outs:         tt.outs,
+				}},
+				Subnet:     env.ctx.SubnetID,
+				AssetID:    env.ctx.AVAXAssetID,
+				SubnetAuth: &secp256k1fx.Input{SigIndices: []uint32{1}},
+			}
+
+			executor := generateExecutor(transformSubnetTx, env)
+
+			err := executor.TransformSubnetTx(transformSubnetTx)
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+
+		t.Run("AddSubnetValidatorTx "+name, func(t *testing.T) {
+			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
+			env.ctx.Lock.Lock()
+			defer func() {
+				err := shutdownEnvironment(env)
+				require.NoError(t, err)
+			}()
+			env.config.BanffTime = env.state.GetTimestamp()
+
+			addSubnetValidatorTx := &txs.AddSubnetValidatorTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    env.ctx.NetworkID,
+					BlockchainID: env.ctx.ChainID,
+					Ins:          tt.ins,
+					Outs:         tt.outs,
+				}},
+				Validator: validator.SubnetValidator{
+					Validator: validator.Validator{
+						NodeID: nodeID,
+						Start:  uint64(time.Now().Unix()),
+						End:    uint64(time.Now().Add(time.Hour).Unix()),
+						Wght:   uint64(2022),
+					},
+					Subnet: env.ctx.SubnetID,
+				},
+				SubnetAuth: &secp256k1fx.Input{SigIndices: []uint32{1}},
+			}
+
+			executor := generateExecutor(addSubnetValidatorTx, env)
+
+			err := executor.AddSubnetValidatorTx(addSubnetValidatorTx)
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+
+		t.Run("RemoveSubnetValidatorTx "+name, func(t *testing.T) {
+			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
+			env.ctx.Lock.Lock()
+			defer func() {
+				err := shutdownEnvironment(env)
+				require.NoError(t, err)
+			}()
+			env.config.BanffTime = env.state.GetTimestamp()
+
+			removeSubnetValidatorTx := &txs.RemoveSubnetValidatorTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    env.ctx.NetworkID,
+					BlockchainID: env.ctx.ChainID,
+					Ins:          tt.ins,
+					Outs:         tt.outs,
+				}},
+				Subnet:     env.ctx.SubnetID,
+				NodeID:     nodeID,
+				SubnetAuth: &secp256k1fx.Input{SigIndices: []uint32{1}},
+			}
+
+			executor := generateExecutor(removeSubnetValidatorTx, env)
+
+			err := executor.RemoveSubnetValidatorTx(removeSubnetValidatorTx)
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
+}
+
 func TestCaminoAddSubnetValidatorTxNodeSig(t *testing.T) {
 	nodeKey1, nodeID1 := caminoPreFundedNodeKeys[0], caminoPreFundedNodeIDs[0]
 	nodeKey2 := caminoPreFundedNodeKeys[1]
