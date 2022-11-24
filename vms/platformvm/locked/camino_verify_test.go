@@ -49,7 +49,7 @@ func TestVerifyLockMode(t *testing.T) {
 			},
 			outs:                   []*avax.TransferableOutput{},
 			lockModeDepositBonding: false,
-			expectedErr:            errWrongInType,
+			expectedErr:            ErrWrongInType,
 		},
 		"fail (lockModeDepositBonding false): wrong output type": {
 			ins: []*avax.TransferableInput{},
@@ -57,7 +57,7 @@ func TestVerifyLockMode(t *testing.T) {
 				generateTestLockedOut(),
 			},
 			lockModeDepositBonding: false,
-			expectedErr:            errWrongOutType,
+			expectedErr:            ErrWrongOutType,
 		},
 		"fail (lockModeDepositBonding true): wrong input type": {
 			ins: []*avax.TransferableInput{
@@ -65,7 +65,7 @@ func TestVerifyLockMode(t *testing.T) {
 			},
 			outs:                   []*avax.TransferableOutput{},
 			lockModeDepositBonding: true,
-			expectedErr:            errWrongInType,
+			expectedErr:            ErrWrongInType,
 		},
 		"fail (lockModeDepositBonding true): wrong output type": {
 			ins: []*avax.TransferableInput{},
@@ -73,7 +73,7 @@ func TestVerifyLockMode(t *testing.T) {
 				generateTestStakeableOut(),
 			},
 			lockModeDepositBonding: true,
-			expectedErr:            errWrongOutType,
+			expectedErr:            ErrWrongOutType,
 		},
 	}
 
@@ -109,28 +109,28 @@ func TestVerifyNoLocks(t *testing.T) {
 				generateTestLockedIn(),
 			},
 			outs:        []*avax.TransferableOutput{},
-			expectedErr: errWrongInType,
+			expectedErr: ErrWrongInType,
 		},
 		"fail: locked.Out": {
 			ins: []*avax.TransferableInput{},
 			outs: []*avax.TransferableOutput{
 				generateTestLockedOut(),
 			},
-			expectedErr: errWrongOutType,
+			expectedErr: ErrWrongOutType,
 		},
 		"fail: stakeable.LockIn": {
 			ins: []*avax.TransferableInput{
 				generateTestStakeableIn(),
 			},
 			outs:        []*avax.TransferableOutput{},
-			expectedErr: errWrongInType,
+			expectedErr: ErrWrongInType,
 		},
 		"fail: stakeable.LockOut": {
 			ins: []*avax.TransferableInput{},
 			outs: []*avax.TransferableOutput{
 				generateTestStakeableOut(),
 			},
-			expectedErr: errWrongOutType,
+			expectedErr: ErrWrongOutType,
 		},
 	}
 

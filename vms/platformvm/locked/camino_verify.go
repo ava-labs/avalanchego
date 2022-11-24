@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	errWrongInType  = errors.New("wrong input type")
-	errWrongOutType = errors.New("wrong output type")
+	ErrWrongInType  = errors.New("wrong input type")
+	ErrWrongOutType = errors.New("wrong output type")
 )
 
 // Verifies that [ins] and [outs] have allowed types depending on [lockModeBonding].
@@ -32,7 +32,7 @@ func VerifyLockMode(
 			}
 
 			if _, ok := in.(*stakeable.LockIn); ok {
-				return errWrongInType
+				return ErrWrongInType
 			}
 		}
 
@@ -44,7 +44,7 @@ func VerifyLockMode(
 			}
 
 			if _, ok := out.(*stakeable.LockOut); ok {
-				return errWrongOutType
+				return ErrWrongOutType
 			}
 		}
 
@@ -59,7 +59,7 @@ func VerifyLockMode(
 		}
 
 		if _, ok := in.(*In); ok {
-			return errWrongInType
+			return ErrWrongInType
 		}
 	}
 
@@ -71,7 +71,7 @@ func VerifyLockMode(
 		}
 
 		if _, ok := out.(*Out); ok {
-			return errWrongOutType
+			return ErrWrongOutType
 		}
 	}
 
@@ -85,19 +85,19 @@ func VerifyNoLocks(
 ) error {
 	for _, input := range ins {
 		if _, ok := input.In.(*In); ok {
-			return errWrongInType
+			return ErrWrongInType
 		}
 		if _, ok := input.In.(*stakeable.LockIn); ok {
-			return errWrongInType
+			return ErrWrongInType
 		}
 	}
 
 	for _, output := range outs {
 		if _, ok := output.Out.(*Out); ok {
-			return errWrongOutType
+			return ErrWrongOutType
 		}
 		if _, ok := output.Out.(*stakeable.LockOut); ok {
-			return errWrongOutType
+			return ErrWrongOutType
 		}
 	}
 
