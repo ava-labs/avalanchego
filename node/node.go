@@ -590,10 +590,9 @@ func (n *Node) initChains(genesisBytes []byte) {
 // initAPIServer initializes the server that handles HTTP calls
 func (n *Node) initAPIServer() error {
 	n.Log.Info("initializing API server")
-	n.APIServer = server.New()
 
 	if !n.Config.APIRequireAuthToken {
-		n.APIServer.Initialize(
+		n.APIServer = server.New(
 			n.Log,
 			n.LogFactory,
 			n.Config.HTTPHost,
@@ -612,7 +611,7 @@ func (n *Node) initAPIServer() error {
 		return err
 	}
 
-	n.APIServer.Initialize(
+	n.APIServer = server.New(
 		n.Log,
 		n.LogFactory,
 		n.Config.HTTPHost,
