@@ -24,15 +24,15 @@ var (
 	_ txs.Visitor = (*CaminoStandardTxExecutor)(nil)
 	_ txs.Visitor = (*CaminoProposalTxExecutor)(nil)
 
-	errNodeSignatureMissing = errors.New("last signature is not nodeID's signature")
-	errWrongLockMode        = errors.New("this tx can't be used with this caminoGenesis.LockModeBondDeposit")
-	errNotSecp256Fx         = errors.New("expected fx to be secp256k1.fx")
-	errRecoverAdresses      = errors.New("cannot recover addresses from credentials")
-	errInvalidRoles         = errors.New("invalid role")
-	errValidatorExists      = errors.New("node is already a validator")
-	errInvalidSystemTxBody  = errors.New("tx body doesn't match expected one")
-	errRewardBeforeEndTime  = errors.New("attempting to remove TxID before its end time")
-	errRewardWrongID        = errors.New("attempting to remove wrong TxID")
+	errNodeSignatureMissing   = errors.New("last signature is not nodeID's signature")
+	errWrongLockMode          = errors.New("this tx can't be used with this caminoGenesis.LockModeBondDeposit")
+	errNotSecp256Fx           = errors.New("expected fx to be secp256k1.fx")
+	errRecoverAdresses        = errors.New("cannot recover addresses from credentials")
+	errInvalidRoles           = errors.New("invalid role")
+	errValidatorExists        = errors.New("node is already a validator")
+	errInvalidSystemTxBody    = errors.New("tx body doesn't match expected one")
+	errRemoveValidatorToEarly = errors.New("attempting to remove validator before its end time")
+	errRemoveWrongValidator   = errors.New("attempting to remove wrong validator")
 )
 
 type CaminoStandardTxExecutor struct {
@@ -389,10 +389,10 @@ func (e *CaminoProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) 
 
 	if stakerToRemove.TxID != tx.TxID {
 		return fmt.Errorf(
-			"%w. Attempting to remove TxID: %s. Should be removing %s",
-			errRewardWrongID,
+			"removing validator %s instead of %s: %w",
 			tx.TxID,
 			stakerToRemove.TxID,
+			errRemoveWrongValidator,
 		)
 	}
 
@@ -400,10 +400,11 @@ func (e *CaminoProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) 
 	currentChainTime := e.OnCommitState.GetTimestamp()
 	if !stakerToRemove.EndTime.Equal(currentChainTime) {
 		return fmt.Errorf(
-			"%w. TxID: %s. End time %s",
-			errRewardBeforeEndTime,
+			"removing validator %s at %s, but its endtime is %s: %w",
 			tx.TxID,
+			currentChainTime,
 			stakerToRemove.EndTime,
+			errRemoveValidatorToEarly,
 		)
 	}
 

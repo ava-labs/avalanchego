@@ -37,7 +37,7 @@ func (tx *CaminoAddValidatorTx) Stake() []*avax.TransferableOutput {
 	return stake
 }
 
-// SyntacticVerify returns nil iff [tx] is valid
+// SyntacticVerify returns nil if [tx] is valid
 func (tx *CaminoAddValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:

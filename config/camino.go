@@ -12,7 +12,6 @@ import (
 )
 
 const (
-	ValidatorBondAmountKey   = "validator-bond-amount"
 	DaoProposalBondAmountKey = "dao-proposal-bond-amount"
 )
 
