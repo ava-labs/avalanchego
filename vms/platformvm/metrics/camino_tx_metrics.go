@@ -34,9 +34,7 @@ func newCaminoTxMetrics(
 	return m, errs.Err
 }
 
-func (m *txMetrics) AddAddressStateTx(*txs.AddAddressStateTx) error {
-	return nil
-}
+func (m *txMetrics) AddAddressStateTx(*txs.AddAddressStateTx) error { return nil }
 
 func (m *caminoTxMetrics) AddAddressStateTx(*txs.AddAddressStateTx) error {
 	m.numAddAddressStateTxs.Inc()

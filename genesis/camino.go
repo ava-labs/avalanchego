@@ -3,9 +3,24 @@ package genesis
 import (
 	"errors"
 	"fmt"
+
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 )
 
 func validateCaminoConfig(config *Config) error {
+	_, err := address.Format(
+		configChainIDAlias,
+		constants.GetHRP(config.NetworkID),
+		config.Camino.InitialAdmin.Bytes(),
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"unable to format address from %s",
+			config.Camino.InitialAdmin.String(),
+		)
+	}
+
 	for _, offer := range config.Camino.DepositOffers {
 		if offer.Start >= offer.End {
 			return fmt.Errorf(

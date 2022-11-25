@@ -1423,7 +1423,7 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 			outs:                     outs,
 			preExecute:               func(t *testing.T, tx *txs.Tx) {},
 			generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO { return UTXOsBeforeReward },
-			expectedErr:              errRewardBeforeEndTime,
+			expectedErr:              errRemoveValidatorToEarly,
 		},
 		"Wrong validator": {
 			ins:  ins,
