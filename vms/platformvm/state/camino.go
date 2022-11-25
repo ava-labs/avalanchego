@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -23,7 +24,8 @@ const addressStateCacheSize = 1024
 var (
 	_ CaminoState = (*caminoState)(nil)
 
-	addressStatePrefix = []byte("addressState")
+	addressStatePrefix  = []byte("addressState")
+	depositOffersPrefix = []byte("depositOffers")
 )
 
 type CaminoApply interface {
@@ -32,8 +34,16 @@ type CaminoApply interface {
 
 type CaminoDiff interface {
 	// Address State
+
 	SetAddressStates(ids.ShortID, uint64)
 	GetAddressStates(ids.ShortID) (uint64, error)
+
+	// Deposit offers state
+
+	// precondition: offer.SetID() must be called and return no error
+	AddDepositOffer(offer *DepositOffer)
+	GetDepositOffer(offerID ids.ID) (*DepositOffer, error)
+	GetAllDepositOffers() ([]*DepositOffer, error)
 }
 
 // For state and diff
@@ -56,6 +66,7 @@ type CaminoState interface {
 
 type caminoDiff struct {
 	modifiedAddressStates map[ids.ShortID]uint64
+	modifiedDepositOffers map[ids.ID]*DepositOffer
 }
 
 type caminoState struct {
@@ -67,6 +78,11 @@ type caminoState struct {
 	// Address State
 	addressStateCache cache.Cacher
 	addressStateDB    database.Database
+
+	// Deposit offers
+	depositOffers     map[ids.ID]*DepositOffer
+	depositOffersList linkeddb.LinkedDB
+	depositOffersDB   database.Database
 }
 
 func newCaminoState(baseDB *versiondb.Database, metricsReg prometheus.Registerer) (*caminoState, error) {
@@ -79,11 +95,23 @@ func newCaminoState(baseDB *versiondb.Database, metricsReg prometheus.Registerer
 		return nil, err
 	}
 
+	if err != nil {
+		return nil, err
+	}
+
+	depositOffersDB := prefixdb.New(depositOffersPrefix, baseDB)
+
 	return &caminoState{
 		addressStateDB:    prefixdb.New(addressStatePrefix, baseDB),
 		addressStateCache: addressStateCache,
+
+		depositOffers:     make(map[ids.ID]*DepositOffer),
+		depositOffersDB:   depositOffersDB,
+		depositOffersList: linkeddb.NewDefault(depositOffersDB),
+
 		caminoDiff: caminoDiff{
 			modifiedAddressStates: make(map[ids.ShortID]uint64),
+			modifiedDepositOffers: make(map[ids.ID]*DepositOffer),
 		},
 	}, nil
 }
@@ -109,13 +137,33 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 	s.AddTx(&txs.Tx{Unsigned: tx}, status.Committed)
 	cs.SetAddressStates(g.Camino.InitialAdmin, txs.AddressStateRoleAdminBit)
 
+	for _, genesisOffer := range g.Camino.DepositOffers {
+		offer := &DepositOffer{
+			UnlockHalfPeriodDuration: genesisOffer.UnlockHalfPeriodDuration,
+			InterestRateNominator:    genesisOffer.InterestRateNominator,
+			Start:                    genesisOffer.Start,
+			End:                      genesisOffer.End,
+			MinAmount:                genesisOffer.MinAmount,
+			MinDuration:              genesisOffer.MinDuration,
+			MaxDuration:              genesisOffer.MaxDuration,
+		}
+		if err := offer.SetID(); err != nil {
+			return err
+		}
+
+		cs.AddDepositOffer(offer)
+	}
+
 	return nil
 }
 
 func (cs *caminoState) Load() error {
-	return nil
+	return cs.loadDepositOffers()
 }
 
 func (cs *caminoState) Write() error {
-	return cs.writeAddressStates()
+	if err := cs.writeAddressStates(); err != nil {
+		return err
+	}
+	return cs.writeDepositOffers()
 }

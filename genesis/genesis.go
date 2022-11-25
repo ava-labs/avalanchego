@@ -171,6 +171,10 @@ func validateConfig(networkID uint32, config *Config) error {
 		return errNoCChainGenesis
 	}
 
+	if err := validateCaminoConfig(config); err != nil {
+		return err
+	}
+
 	return nil
 }
 
