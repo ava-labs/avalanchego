@@ -78,9 +78,50 @@ func (d *diff) GetAddressStates(address ids.ShortID) (uint64, error) {
 	return parentState.GetAddressStates(address)
 }
 
+func (d *diff) AddDepositOffer(offer *DepositOffer) {
+	d.caminoDiff.modifiedDepositOffers[offer.id] = offer
+}
+
+func (d *diff) GetDepositOffer(offerID ids.ID) (*DepositOffer, error) {
+	if offer, ok := d.caminoDiff.modifiedDepositOffers[offerID]; ok {
+		return offer, nil
+	}
+
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	return parentState.GetDepositOffer(offerID)
+}
+
+func (d *diff) GetAllDepositOffers() ([]*DepositOffer, error) {
+	offers := make([]*DepositOffer, len(d.caminoDiff.modifiedDepositOffers))
+
+	for _, offer := range d.caminoDiff.modifiedDepositOffers {
+		offers = append(offers, offer)
+	}
+
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	parentOffers, err := parentState.GetAllDepositOffers()
+	if err != nil {
+		return nil, err
+	}
+
+	return append(parentOffers, offers...), nil
+}
+
 // Finally apply all changes
 func (d *diff) ApplyCaminoState(baseState State) {
 	for k, v := range d.caminoDiff.modifiedAddressStates {
 		baseState.SetAddressStates(k, v)
+	}
+
+	for _, v := range d.caminoDiff.modifiedDepositOffers {
+		baseState.AddDepositOffer(v)
 	}
 }

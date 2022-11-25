@@ -15,15 +15,17 @@ import (
 var errCannotParseInitialAdmin = "cannot parse initialAdmin from genesis: %w"
 
 type UnparsedCamino struct {
-	VerifyNodeSignature bool   `json:"verifyNodeSignature"`
-	LockModeBondDeposit bool   `json:"lockModeBondDeposit"`
-	InitialAdmin        string `json:"initialAdmin"`
+	VerifyNodeSignature bool                   `json:"verifyNodeSignature"`
+	LockModeBondDeposit bool                   `json:"lockModeBondDeposit"`
+	InitialAdmin        string                 `json:"initialAdmin"`
+	DepositOffers       []genesis.DepositOffer `json:"depositOffers"`
 }
 
 func (us UnparsedCamino) Parse() (genesis.Camino, error) {
 	c := genesis.Camino{
 		VerifyNodeSignature: us.VerifyNodeSignature,
 		LockModeBondDeposit: us.LockModeBondDeposit,
+		DepositOffers:       us.DepositOffers,
 	}
 
 	_, _, avaxAddrBytes, err := address.Parse(us.InitialAdmin)
@@ -35,12 +37,14 @@ func (us UnparsedCamino) Parse() (genesis.Camino, error) {
 		return c, fmt.Errorf(errCannotParseInitialAdmin, err)
 	}
 	c.InitialAdmin = avaxAddr
+
 	return c, nil
 }
 
 func (us *UnparsedCamino) Unparse(p genesis.Camino, networkID uint32) error {
 	us.VerifyNodeSignature = p.VerifyNodeSignature
 	us.LockModeBondDeposit = p.LockModeBondDeposit
+	us.DepositOffers = p.DepositOffers
 
 	avaxAddr, err := address.Format(
 		"X",

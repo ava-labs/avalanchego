@@ -46,3 +46,15 @@ func (s *state) SetAddressStates(address ids.ShortID, states uint64) {
 func (s *state) GetAddressStates(address ids.ShortID) (uint64, error) {
 	return s.caminoState.GetAddressStates(address)
 }
+
+func (s *state) AddDepositOffer(offer *DepositOffer) {
+	s.caminoState.AddDepositOffer(offer)
+}
+
+func (s *state) GetDepositOffer(offerID ids.ID) (*DepositOffer, error) {
+	return s.caminoState.GetDepositOffer(offerID)
+}
+
+func (s *state) GetAllDepositOffers() ([]*DepositOffer, error) {
+	return s.caminoState.GetAllDepositOffers()
+}
