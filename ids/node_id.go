@@ -7,14 +7,18 @@ import (
 	"bytes"
 	"crypto/x509"
 	"fmt"
-	"sort"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 const NodeIDPrefix = "NodeID-"
 
-var EmptyNodeID = NodeID{}
+var (
+	EmptyNodeID = NodeID{}
+
+	_ utils.Sortable[NodeID] = NodeID{}
+)
 
 type NodeID ShortID
 
@@ -56,6 +60,10 @@ func (id *NodeID) UnmarshalText(text []byte) error {
 	return id.UnmarshalJSON(text)
 }
 
+func (id NodeID) Less(other NodeID) bool {
+	return bytes.Compare(id[:], other[:]) == -1
+}
+
 // ToNodeID attempt to convert a byte slice into a node id
 func ToNodeID(bytes []byte) (NodeID, error) {
 	nodeID, err := ToShortID(bytes)
@@ -66,27 +74,6 @@ func NodeIDFromCert(cert *x509.Certificate) NodeID {
 	return hashing.ComputeHash160Array(
 		hashing.ComputeHash256(cert.Raw),
 	)
-}
-
-type sortNodeIDData []NodeID
-
-func (ids sortNodeIDData) Less(i, j int) bool {
-	return bytes.Compare(
-		ids[i].Bytes(),
-		ids[j].Bytes()) == -1
-}
-
-func (ids sortNodeIDData) Len() int {
-	return len(ids)
-}
-
-func (ids sortNodeIDData) Swap(i, j int) {
-	ids[j], ids[i] = ids[i], ids[j]
-}
-
-// SortNodeIDs sorts the node IDs lexicographically
-func SortNodeIDs(nodeIDs []NodeID) {
-	sort.Sort(sortNodeIDData(nodeIDs))
 }
 
 // NodeIDFromString is the inverse of NodeID.String()

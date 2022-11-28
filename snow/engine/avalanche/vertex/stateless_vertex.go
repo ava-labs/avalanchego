@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
@@ -119,9 +120,9 @@ func (v innerStatelessVertex) verify() error {
 		return errNoOperations
 	case len(v.Txs) > maxTxsPerVtx:
 		return errTooManyTxs
-	case !ids.IsSortedAndUniqueIDs(v.ParentIDs):
+	case !utils.IsSortedAndUniqueSortable(v.ParentIDs):
 		return errInvalidParents
-	case !IsSortedAndUniqueHashOf(v.Txs):
+	case !utils.IsSortedAndUniqueByHash(v.Txs):
 		return errInvalidTxs
 	default:
 		return nil
@@ -138,7 +139,7 @@ func (v innerStatelessVertex) verifyStopVertex() error {
 		return errTooManyparentIDs
 	case len(v.Txs) != 0:
 		return errTooManyTxs
-	case !ids.IsSortedAndUniqueIDs(v.ParentIDs):
+	case !utils.IsSortedAndUniqueSortable(v.ParentIDs):
 		return errInvalidParents
 	default:
 		return nil

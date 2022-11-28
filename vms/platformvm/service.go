@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -1020,7 +1021,7 @@ func (s *Service) SampleValidators(_ *http.Request, args *SampleValidatorsArgs, 
 	if sample == nil {
 		reply.Validators = []ids.NodeID{}
 	} else {
-		ids.SortNodeIDs(sample)
+		utils.Sort(sample)
 		reply.Validators = sample
 	}
 	return nil

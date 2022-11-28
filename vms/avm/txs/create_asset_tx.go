@@ -109,15 +109,11 @@ func (t *CreateAssetTx) SyntacticVerify(
 			return err
 		}
 	}
-	if !utils.IsSortedAndUnique(innerSortInitialState(t.States)) {
+	if !utils.IsSortedAndUniqueSortable(t.States) {
 		return errInitialStatesNotSortedUnique
 	}
 
 	return nil
-}
-
-func (t *CreateAssetTx) Sort() {
-	SortInitialStates(t.States)
 }
 
 func (t *CreateAssetTx) Visit(v Visitor) error {

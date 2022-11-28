@@ -12,6 +12,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
@@ -76,7 +77,7 @@ func (m *manager) String() string {
 	defer m.lock.RUnlock()
 
 	subnets := maps.Keys(m.subnetToVdrs)
-	ids.SortIDs(subnets)
+	utils.Sort(subnets)
 
 	sb := strings.Builder{}
 

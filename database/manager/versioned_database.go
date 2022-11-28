@@ -4,11 +4,12 @@
 package manager
 
 import (
-	"sort"
-
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/version"
 )
+
+var _ utils.Sortable[*VersionedDatabase] = (*VersionedDatabase)(nil)
 
 type VersionedDatabase struct {
 	Database database.Database
@@ -20,22 +21,7 @@ func (db *VersionedDatabase) Close() error {
 	return db.Database.Close()
 }
 
-type innerSortDescendingVersionedDBs []*VersionedDatabase
-
-// Less returns true if the version at index i is greater than the version at index j
-// such that it will sort in descending order (newest version --> oldest version)
-func (dbs innerSortDescendingVersionedDBs) Less(i, j int) bool {
-	return dbs[i].Version.Compare(dbs[j].Version) > 0
-}
-
-func (dbs innerSortDescendingVersionedDBs) Len() int {
-	return len(dbs)
-}
-
-func (dbs innerSortDescendingVersionedDBs) Swap(i, j int) {
-	dbs[j], dbs[i] = dbs[i], dbs[j]
-}
-
-func SortDescending(dbs []*VersionedDatabase) {
-	sort.Sort(innerSortDescendingVersionedDBs(dbs))
+// Note this sorts in descending order (newest version --> oldest version)
+func (db *VersionedDatabase) Less(other *VersionedDatabase) bool {
+	return db.Version.Compare(other.Version) > 0
 }

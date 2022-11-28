@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -617,7 +618,7 @@ func (s *Service) CreateAsset(_ *http.Request, args *CreateAssetArgs, reply *Ass
 			return err
 		}
 		minter.Addrs = minterAddrsSet.List()
-		ids.SortShortIDs(minter.Addrs)
+		utils.Sort(minter.Addrs)
 		initialState.Outs = append(initialState.Outs, minter)
 	}
 	initialState.Sort(s.vm.parser.Codec())
@@ -753,7 +754,7 @@ func (s *Service) CreateNFTAsset(_ *http.Request, args *CreateNFTAssetArgs, repl
 			return err
 		}
 		minter.Addrs = minterAddrsSet.List()
-		ids.SortShortIDs(minter.Addrs)
+		utils.Sort(minter.Addrs)
 		initialState.Outs = append(initialState.Outs, minter)
 	}
 	initialState.Sort(s.vm.parser.Codec())

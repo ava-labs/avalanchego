@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"golang.org/x/exp/maps"
+
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 const (
@@ -113,7 +115,7 @@ func (ids ShortSet) List() []ShortID {
 // SortedList returns this set as a sorted list
 func (ids ShortSet) SortedList() []ShortID {
 	lst := ids.List()
-	SortShortIDs(lst)
+	utils.Sort(lst)
 	return lst
 }
 

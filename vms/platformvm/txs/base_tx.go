@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -88,7 +89,7 @@ func (tx *BaseTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case !avax.IsSortedTransferableOutputs(tx.Outs, Codec):
 		return errOutputsNotSorted
-	case !avax.IsSortedAndUniqueTransferableInputs(tx.Ins):
+	case !utils.IsSortedAndUniqueSortable(tx.Ins):
 		return errInputsNotSortedUnique
 	default:
 		return nil

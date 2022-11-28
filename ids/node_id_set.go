@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"golang.org/x/exp/maps"
+
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 // NodeIDSet is a set of NodeIDs
@@ -109,7 +111,7 @@ func (ids NodeIDSet) List() []NodeID {
 // SortedList returns this set as a sorted list
 func (ids NodeIDSet) SortedList() []NodeID {
 	lst := ids.List()
-	SortNodeIDs(lst)
+	utils.Sort(lst)
 	return lst
 }
 

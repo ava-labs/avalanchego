@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -923,7 +924,7 @@ func TestCreateAssetTxSyntacticVerifyInitialStates(t *testing.T) {
 		},
 	}
 
-	SortInitialStates(uniqueStates)
+	utils.Sort(uniqueStates)
 
 	// Put states in unsorted order
 	tx.States = []*InitialState{

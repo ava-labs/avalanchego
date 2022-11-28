@@ -11,6 +11,7 @@ import (
 	stdcontext "context"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -341,7 +342,7 @@ func (b *builder) NewAddValidatorTx(
 		return nil, err
 	}
 
-	ids.SortShortIDs(rewardsOwner.Addrs)
+	utils.Sort(rewardsOwner.Addrs)
 	return &txs.AddValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
@@ -441,7 +442,7 @@ func (b *builder) NewAddDelegatorTx(
 		return nil, err
 	}
 
-	ids.SortShortIDs(rewardsOwner.Addrs)
+	utils.Sort(rewardsOwner.Addrs)
 	return &txs.AddDelegatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
@@ -479,7 +480,7 @@ func (b *builder) NewCreateChainTx(
 		return nil, err
 	}
 
-	ids.SortIDs(fxIDs)
+	utils.Sort(fxIDs)
 	return &txs.CreateChainTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
@@ -511,7 +512,7 @@ func (b *builder) NewCreateSubnetTx(
 		return nil, err
 	}
 
-	ids.SortShortIDs(owner.Addrs)
+	utils.Sort(owner.Addrs)
 	return &txs.CreateSubnetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
@@ -575,7 +576,7 @@ func (b *builder) NewImportTx(
 		}
 		importedAmounts[assetID] = newImportedAmount
 	}
-	avax.SortTransferableInputs(importedInputs) // sort imported inputs
+	utils.Sort(importedInputs) // sort imported inputs
 
 	if len(importedInputs) == 0 {
 		return nil, fmt.Errorf(
@@ -752,8 +753,8 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 		return nil, err
 	}
 
-	ids.SortShortIDs(validationRewardsOwner.Addrs)
-	ids.SortShortIDs(delegationRewardsOwner.Addrs)
+	utils.Sort(validationRewardsOwner.Addrs)
+	utils.Sort(delegationRewardsOwner.Addrs)
 	return &txs.AddPermissionlessValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
@@ -794,7 +795,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 		return nil, err
 	}
 
-	ids.SortShortIDs(rewardsOwner.Addrs)
+	utils.Sort(rewardsOwner.Addrs)
 	return &txs.AddPermissionlessDelegatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
@@ -1080,7 +1081,7 @@ func (b *builder) spend(
 		}
 	}
 
-	avax.SortTransferableInputs(inputs)                    // sort inputs
+	utils.Sort(inputs)                                     // sort inputs
 	avax.SortTransferableOutputs(changeOutputs, txs.Codec) // sort the change outputs
 	avax.SortTransferableOutputs(stakeOutputs, txs.Codec)  // sort stake outputs
 	return inputs, changeOutputs, stakeOutputs, nil

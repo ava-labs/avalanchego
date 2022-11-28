@@ -36,7 +36,7 @@ func (op *Operation) Verify() error {
 		return errNilOperation
 	case op.Op == nil:
 		return errNilFxOperation
-	case !avax.IsSortedAndUniqueUTXOIDs(op.UTXOIDs):
+	case !utils.IsSortedAndUniqueSortable(op.UTXOIDs):
 		return errNotSortedAndUniqueUTXOIDs
 	default:
 		return verify.All(&op.Asset, op.Op)

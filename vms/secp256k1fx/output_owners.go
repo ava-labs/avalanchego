@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -126,7 +127,7 @@ func (out *OutputOwners) Verify() error {
 		return errOutputUnspendable
 	case out.Threshold == 0 && len(out.Addrs) > 0:
 		return errOutputUnoptimized
-	case !ids.IsSortedAndUniqueShortIDs(out.Addrs):
+	case !utils.IsSortedAndUniqueSortable(out.Addrs):
 		return errAddrsNotSortedUnique
 	default:
 		return nil
@@ -138,7 +139,7 @@ func (out *OutputOwners) VerifyState() error {
 }
 
 func (out *OutputOwners) Sort() {
-	ids.SortShortIDs(out.Addrs)
+	utils.Sort(out.Addrs)
 }
 
 // formatAddress formats a given [addr] into human readable format using

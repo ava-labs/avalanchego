@@ -20,6 +20,8 @@ var (
 	errNilFxOutput      = errors.New("nil feature extension output is not valid")
 	errOutputsNotSorted = errors.New("outputs not sorted")
 	errUnknownFx        = errors.New("unknown feature extension")
+
+	_ utils.Sortable[*InitialState] = (*InitialState)(nil)
 )
 
 type InitialState struct {
@@ -55,6 +57,10 @@ func (is *InitialState) Verify(c codec.Manager, numFxs int) error {
 	}
 
 	return nil
+}
+
+func (is *InitialState) Less(other *InitialState) bool {
+	return is.FxIndex < other.FxIndex
 }
 
 func (is *InitialState) Sort(c codec.Manager) {
@@ -96,26 +102,4 @@ func sortState(vers []verify.State, c codec.Manager) {
 
 func isSortedState(vers []verify.State, c codec.Manager) bool {
 	return sort.IsSorted(&innerSortState{vers: vers, codec: c})
-}
-
-type innerSortInitialState []*InitialState
-
-func (iss innerSortInitialState) Less(i, j int) bool {
-	return iss[i].FxIndex < iss[j].FxIndex
-}
-
-func (iss innerSortInitialState) Len() int {
-	return len(iss)
-}
-
-func (iss innerSortInitialState) Swap(i, j int) {
-	iss[j], iss[i] = iss[i], iss[j]
-}
-
-func SortInitialStates(iss []*InitialState) {
-	sort.Sort(innerSortInitialState(iss))
-}
-
-func IsSortedAndUniqueInitialStates(iss []*InitialState) bool {
-	return utils.IsSortedAndUnique(innerSortInitialState(iss))
 }

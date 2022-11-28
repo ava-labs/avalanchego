@@ -4,13 +4,12 @@
 package genesis
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -274,7 +273,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 				xAllocations = append(xAllocations, allocation)
 			}
 		}
-		sortXAllocation(xAllocations)
+		utils.Sort(xAllocations)
 
 		for _, allocation := range xAllocations {
 			addr, err := address.FormatBech32(hrp, allocation.AVAXAddr.Bytes())
@@ -556,24 +555,4 @@ func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
 		return ids.Empty, err
 	}
 	return tx.ID(), nil
-}
-
-type innerSortXAllocation []Allocation
-
-func (xa innerSortXAllocation) Less(i, j int) bool {
-	return xa[i].InitialAmount < xa[j].InitialAmount ||
-		(xa[i].InitialAmount == xa[j].InitialAmount &&
-			bytes.Compare(xa[i].AVAXAddr.Bytes(), xa[j].AVAXAddr.Bytes()) == -1)
-}
-
-func (xa innerSortXAllocation) Len() int {
-	return len(xa)
-}
-
-func (xa innerSortXAllocation) Swap(i, j int) {
-	xa[j], xa[i] = xa[i], xa[j]
-}
-
-func sortXAllocation(a []Allocation) {
-	sort.Sort(innerSortXAllocation(a))
 }

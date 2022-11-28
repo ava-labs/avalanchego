@@ -7,15 +7,19 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"sort"
 	"strings"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 // ShortEmpty is a useful all zero value
-var ShortEmpty = ShortID{}
+var (
+	ShortEmpty = ShortID{}
+
+	_ utils.Sortable[ShortID] = ShortID{}
+)
 
 // ShortID wraps a 20 byte hash as an identifier
 type ShortID [20]byte
@@ -104,35 +108,8 @@ func (id ShortID) MarshalText() ([]byte, error) {
 	return []byte(id.String()), nil
 }
 
-type sortShortIDData []ShortID
-
-func (ids sortShortIDData) Less(i, j int) bool {
-	return bytes.Compare(
-		ids[i].Bytes(),
-		ids[j].Bytes()) == -1
-}
-
-func (ids sortShortIDData) Len() int {
-	return len(ids)
-}
-
-func (ids sortShortIDData) Swap(i, j int) {
-	ids[j], ids[i] = ids[i], ids[j]
-}
-
-// SortShortIDs sorts the ids lexicographically
-func SortShortIDs(ids []ShortID) {
-	sort.Sort(sortShortIDData(ids))
-}
-
-// IsSortedAndUniqueShortIDs returns true if the ids are sorted and unique
-func IsSortedAndUniqueShortIDs(ids []ShortID) bool {
-	for i := 0; i < len(ids)-1; i++ {
-		if bytes.Compare(ids[i].Bytes(), ids[i+1].Bytes()) != -1 {
-			return false
-		}
-	}
-	return true
+func (id ShortID) Less(other ShortID) bool {
+	return bytes.Compare(id[:], other[:]) == -1
 }
 
 // IsUniqueShortIDs returns true iff [ids] are unique

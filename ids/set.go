@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"golang.org/x/exp/maps"
+
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 // The minimum capacity of a set
@@ -105,7 +107,7 @@ func (ids Set) List() []ID {
 // SortedList returns this set as a sorted list
 func (ids Set) SortedList() []ID {
 	lst := ids.List()
-	SortIDs(lst)
+	utils.Sort(lst)
 	return lst
 }
 
@@ -163,6 +165,6 @@ func (ids *Set) Pop() (ID, bool) {
 
 func (ids *Set) MarshalJSON() ([]byte, error) {
 	idsList := ids.List()
-	SortIDs(idsList)
+	utils.Sort(idsList)
 	return json.Marshal(idsList)
 }

@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"os"
 	"reflect"
-	"sort"
 	"testing"
 
 	stdjson "encoding/json"
@@ -28,6 +27,8 @@ import (
 	plugin "github.com/hashicorp/go-plugin"
 
 	"github.com/stretchr/testify/require"
+
+	"golang.org/x/exp/slices"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -54,13 +55,13 @@ func Test_VMServerInterface(t *testing.T) {
 	for i := 0; i < pb.NumMethod()-1; i++ {
 		wantMethods = append(wantMethods, pb.Method(i).Name)
 	}
-	sort.Strings(wantMethods)
+	slices.Sort(wantMethods)
 
 	impl := reflect.TypeOf(&VMServer{})
 	for i := 0; i < impl.NumMethod(); i++ {
 		gotMethods = append(gotMethods, impl.Method(i).Name)
 	}
-	sort.Strings(gotMethods)
+	slices.Sort(gotMethods)
 
 	if !reflect.DeepEqual(gotMethods, wantMethods) {
 		t.Errorf("\ngot: %q\nwant: %q", gotMethods, wantMethods)

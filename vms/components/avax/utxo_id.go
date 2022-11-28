@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -22,7 +21,8 @@ var (
 	errFailedDecodingUTXOIDTxID  = errors.New("failed decoding UTXOID TxID")
 	errFailedDecodingUTXOIDIndex = errors.New("failed decoding UTXOID index")
 
-	_ verify.Verifiable = (*UTXOID)(nil)
+	_ verify.Verifiable       = (*UTXOID)(nil)
+	_ utils.Sortable[*UTXOID] = (*UTXOID)(nil)
 )
 
 type UTXOID struct {
@@ -91,34 +91,16 @@ func (utxo *UTXOID) Verify() error {
 	}
 }
 
-type innerSortUTXOIDs []*UTXOID
+func (utxo *UTXOID) Less(other *UTXOID) bool {
+	utxoID, utxoIndex := utxo.InputSource()
+	otherID, otherIndex := other.InputSource()
 
-func (utxos innerSortUTXOIDs) Less(i, j int) bool {
-	iID, iIndex := utxos[i].InputSource()
-	jID, jIndex := utxos[j].InputSource()
-
-	switch bytes.Compare(iID[:], jID[:]) {
+	switch bytes.Compare(utxoID[:], otherID[:]) {
 	case -1:
 		return true
 	case 0:
-		return iIndex < jIndex
+		return utxoIndex < otherIndex
 	default:
 		return false
 	}
-}
-
-func (utxos innerSortUTXOIDs) Len() int {
-	return len(utxos)
-}
-
-func (utxos innerSortUTXOIDs) Swap(i, j int) {
-	utxos[j], utxos[i] = utxos[i], utxos[j]
-}
-
-func SortUTXOIDs(utxos []*UTXOID) {
-	sort.Sort(innerSortUTXOIDs(utxos))
-}
-
-func IsSortedAndUniqueUTXOIDs(utxos []*UTXOID) bool {
-	return utils.IsSortedAndUnique(innerSortUTXOIDs(utxos))
 }

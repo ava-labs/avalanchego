@@ -25,8 +25,9 @@ var (
 	errNilTransferableFxInput = errors.New("nil transferable feature extension input is not valid")
 	errInputsNotSortedUnique  = errors.New("inputs not sorted and unique")
 
-	_ verify.Verifiable = (*TransferableOutput)(nil)
-	_ verify.Verifiable = (*TransferableInput)(nil)
+	_ verify.Verifiable                  = (*TransferableOutput)(nil)
+	_ verify.Verifiable                  = (*TransferableInput)(nil)
+	_ utils.Sortable[*TransferableInput] = (*TransferableInput)(nil)
 )
 
 // Amounter is a data structure that has an amount of something associated with it
@@ -160,36 +161,8 @@ func (in *TransferableInput) Verify() error {
 	}
 }
 
-type innerSortTransferableInputs []*TransferableInput
-
-func (ins innerSortTransferableInputs) Less(i, j int) bool {
-	iID, iIndex := ins[i].InputSource()
-	jID, jIndex := ins[j].InputSource()
-
-	switch bytes.Compare(iID[:], jID[:]) {
-	case -1:
-		return true
-	case 0:
-		return iIndex < jIndex
-	default:
-		return false
-	}
-}
-
-func (ins innerSortTransferableInputs) Len() int {
-	return len(ins)
-}
-
-func (ins innerSortTransferableInputs) Swap(i, j int) {
-	ins[j], ins[i] = ins[i], ins[j]
-}
-
-func SortTransferableInputs(ins []*TransferableInput) {
-	sort.Sort(innerSortTransferableInputs(ins))
-}
-
-func IsSortedAndUniqueTransferableInputs(ins []*TransferableInput) bool {
-	return utils.IsSortedAndUnique(innerSortTransferableInputs(ins))
+func (in *TransferableInput) Less(other *TransferableInput) bool {
+	return in.UTXOID.Less(&other.UTXOID)
 }
 
 type innerSortTransferableInputsWithSigners struct {
@@ -226,12 +199,6 @@ func SortTransferableInputsWithSigners(ins []*TransferableInput, signers [][]*cr
 	sort.Sort(&innerSortTransferableInputsWithSigners{ins: ins, signers: signers})
 }
 
-// IsSortedAndUniqueTransferableInputsWithSigners returns true if the inputs are
-// sorted and unique
-func IsSortedAndUniqueTransferableInputsWithSigners(ins []*TransferableInput, signers [][]*crypto.PrivateKeySECP256K1R) bool {
-	return utils.IsSortedAndUnique(&innerSortTransferableInputsWithSigners{ins: ins, signers: signers})
-}
-
 // VerifyTx verifies that the inputs and outputs flowcheck, including a fee.
 // Additionally, this verifies that the inputs and outputs are sorted.
 func VerifyTx(
@@ -266,7 +233,7 @@ func VerifyTx(
 			}
 			fc.Consume(in.AssetID(), in.Input().Amount())
 		}
-		if !IsSortedAndUniqueTransferableInputs(ins) {
+		if !utils.IsSortedAndUniqueSortable(ins) {
 			return errInputsNotSortedUnique
 		}
 	}
