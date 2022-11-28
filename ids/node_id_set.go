@@ -6,8 +6,9 @@ package ids
 import (
 	"strings"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"golang.org/x/exp/maps"
+
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 // NodeIDSet is a set of NodeIDs

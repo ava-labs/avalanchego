@@ -7,8 +7,9 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"golang.org/x/exp/maps"
+
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 // The minimum capacity of a set
