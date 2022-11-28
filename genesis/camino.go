@@ -34,7 +34,7 @@ func validateCaminoConfig(config *Config) error {
 			return errors.New("deposit minimum duration is greater than maximum duration")
 		}
 
-		if uint64(offer.MinDuration) < offer.UnlockHalfPeriodDuration {
+		if offer.MinDuration < offer.UnlockHalfPeriodDuration {
 			return fmt.Errorf(
 				"deposit offer minimum duration (%v) is less than unlock half-period duration (%v)",
 				offer.MinDuration,

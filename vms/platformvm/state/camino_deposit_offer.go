@@ -18,7 +18,7 @@ const interestRateDenominator uint64 = 1_000_000
 type DepositOffer struct {
 	id ids.ID
 
-	UnlockHalfPeriodDuration uint64 `serialize:"true"`
+	UnlockHalfPeriodDuration uint32 `serialize:"true"`
 	InterestRateNominator    uint64 `serialize:"true"`
 	Start                    uint64 `serialize:"true"`
 	End                      uint64 `serialize:"true"`
@@ -119,6 +119,7 @@ func (cs *caminoState) writeDepositOffers() error {
 			return fmt.Errorf("failed to serialize deposit offer: %w", err)
 		}
 
+		offerID := offerID
 		if err := cs.depositOffersList.Put(offerID[:], offerBytes); err != nil {
 			return err
 		}
