@@ -23,5 +23,4 @@ func TestValidatorDataLess(t *testing.T) {
 	}
 	require.False(v1.Less(v2))
 	require.True(v2.Less(v1))
-
 }
