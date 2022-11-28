@@ -4,20 +4,15 @@
 package proposer
 
 import (
-	"sort"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/sampler"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 // Proposer list constants
 const (
 	WindowDuration = 5 * time.Second
-	MaxDelay       = MaxWindows * WindowDuration
+	MaxDelay       = 2 * WindowDuration
 )
 
 var _ Windower = &windower{}
@@ -39,7 +34,10 @@ func New(proposerRetriever Retriever) Windower {
 }
 
 func (w *windower) Delay(validatorID ids.NodeID) (time.Duration, error) {
-	proposers := proposerRetriever.GetCurrentProposers()
+	proposers, err := w.proposerRetriever.GetCurrentProposers()
+	if err != nil {
+		return MaxDelay, err
+	}
 	proposerList := proposers.List()
 	if !proposers.Contains(validatorID) {
 		return MaxDelay, nil
@@ -47,7 +45,9 @@ func (w *windower) Delay(validatorID ids.NodeID) (time.Duration, error) {
 	
 	for idx, nodeID := range proposerList {
 		if nodeID == validatorID {
-			return (idx + 1) * WindowDuration, nil
+			delay := time.Duration(idx + 1) * * WindowDuration
+			return delay, nil
 		}
 	}
+	return MaxDelay, nil
 }

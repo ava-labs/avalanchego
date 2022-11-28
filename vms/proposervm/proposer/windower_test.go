@@ -27,9 +27,12 @@ func TestWindowerNoValidators(t *testing.T) {
 		},
 	}
 
-	w := New(vdrState, subnetID, chainID)
+	r := NewRetriever(vdrState, subnetID, chainID)
+	w := New(r)
 
-	delay, err := w.Delay(1, 0, nodeID)
+	r.SetChainHeight(1)
+	r.SetPChainHeight(0)
+	delay, err := w.Delay(nodeID)
 	require.NoError(err)
 	require.EqualValues(0, delay)
 }
@@ -50,13 +53,16 @@ func TestWindowerRepeatedValidator(t *testing.T) {
 		},
 	}
 
-	w := New(vdrState, subnetID, chainID)
+	r := NewRetriever(vdrState, subnetID, chainID)
+	w := New(r)
 
-	validatorDelay, err := w.Delay(1, 0, validatorID)
+	r.SetChainHeight(1)
+	r.SetPChainHeight(0)
+	validatorDelay, err := w.Delay(validatorID)
 	require.NoError(err)
 	require.EqualValues(0, validatorDelay)
 
-	nonValidatorDelay, err := w.Delay(1, 0, nonValidatorID)
+	nonValidatorDelay, err := w.Delay(nonValidatorID)
 	require.NoError(err)
 	require.EqualValues(MaxDelay, nonValidatorDelay)
 }
@@ -81,8 +87,11 @@ func TestWindowerChangeByHeight(t *testing.T) {
 		},
 	}
 
-	w := New(vdrState, subnetID, chainID)
+	r := NewRetriever(vdrState, subnetID, chainID)
+	w := New(r)
 
+	r.SetChainHeight(1)
+	r.SetPChainHeight(0)
 	expectedDelays1 := []time.Duration{
 		2 * WindowDuration,
 		5 * WindowDuration,
@@ -93,11 +102,13 @@ func TestWindowerChangeByHeight(t *testing.T) {
 	}
 	for i, expectedDelay := range expectedDelays1 {
 		vdrID := validatorIDs[i]
-		validatorDelay, err := w.Delay(1, 0, vdrID)
+		validatorDelay, err := w.Delay(vdrID)
 		require.NoError(err)
 		require.EqualValues(expectedDelay, validatorDelay)
 	}
 
+	r.SetChainHeight(2)
+	r.SetPChainHeight(0)
 	expectedDelays2 := []time.Duration{
 		5 * WindowDuration,
 		1 * WindowDuration,
@@ -140,9 +151,14 @@ func TestWindowerChangeByChain(t *testing.T) {
 		},
 	}
 
-	w0 := New(vdrState, subnetID, chainID0)
-	w1 := New(vdrState, subnetID, chainID1)
+	r0 := NewRetriever(vdrState, subnetID, chainID0)
+	r1 := NewRetriever(vdrState, subnetID, chainID1)
 
+	w0 := New(r0)
+	w1 := New(r1)
+
+	r0.SetChainHeight(2)
+	r0.SetPChainHeight(0)
 	expectedDelays0 := []time.Duration{
 		5 * WindowDuration,
 		2 * WindowDuration,
@@ -153,11 +169,13 @@ func TestWindowerChangeByChain(t *testing.T) {
 	}
 	for i, expectedDelay := range expectedDelays0 {
 		vdrID := validatorIDs[i]
-		validatorDelay, err := w0.Delay(1, 0, vdrID)
+		validatorDelay, err := w0.Delay(vdrID)
 		require.NoError(err)
 		require.EqualValues(expectedDelay, validatorDelay)
 	}
 
+	r1.SetChainHeight(1)
+	r1.SetPChainHeight(0)
 	expectedDelays1 := []time.Duration{
 		0 * WindowDuration,
 		1 * WindowDuration,
@@ -168,7 +186,7 @@ func TestWindowerChangeByChain(t *testing.T) {
 	}
 	for i, expectedDelay := range expectedDelays1 {
 		vdrID := validatorIDs[i]
-		validatorDelay, err := w1.Delay(1, 0, vdrID)
+		validatorDelay, err := w1.Delay(vdrID)
 		require.NoError(err)
 		require.EqualValues(expectedDelay, validatorDelay)
 	}
