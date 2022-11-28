@@ -19,7 +19,6 @@ type weightedHeapElement struct {
 	index            int
 }
 
-// TODO can we define this on *weightedHeapElement?
 func (e weightedHeapElement) Less(other weightedHeapElement) bool {
 	// By accounting for the initial index of the weights, this results in a
 	// stable sort. We do this rather than using `sort.Stable` because of the
