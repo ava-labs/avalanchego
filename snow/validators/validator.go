@@ -4,11 +4,7 @@
 package validators
 
 import (
-	"math"
-
 	"github.com/ava-labs/avalanchego/ids"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var _ Validator = (*validator)(nil)
@@ -41,22 +37,6 @@ func (v *validator) ID() ids.NodeID {
 
 func (v *validator) Weight() uint64 {
 	return v.weight
-}
-
-func (v *validator) addWeight(weight uint64) {
-	newTotalWeight, err := safemath.Add64(weight, v.weight)
-	if err != nil {
-		newTotalWeight = math.MaxUint64
-	}
-	v.weight = newTotalWeight
-}
-
-func (v *validator) removeWeight(weight uint64) {
-	newTotalWeight, err := safemath.Sub(v.weight, weight)
-	if err != nil {
-		newTotalWeight = 0
-	}
-	v.weight = newTotalWeight
 }
 
 // NewValidator returns a validator object that implements the Validator

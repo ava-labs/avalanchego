@@ -207,10 +207,7 @@ func (m *messageQueue) canPop(msg message.InboundMessage) bool {
 	// the number of nodes with unprocessed messages.
 	baseMaxCPU := 1 / float64(len(m.nodeToUnprocessedMsgs))
 	nodeID := msg.NodeID()
-	weight, isVdr := m.vdrs.GetWeight(nodeID)
-	if !isVdr {
-		weight = 0
-	}
+	weight := m.vdrs.GetWeight(nodeID)
 	// The sum of validator weights should never be 0, but handle
 	// that case for completeness here to avoid divide by 0.
 	portionWeight := float64(0)

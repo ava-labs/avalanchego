@@ -1068,8 +1068,8 @@ func (n *network) NodeUptime() (UptimeResult, bool) {
 		return UptimeResult{}, false
 	}
 
-	myStake, isValidator := primaryValidators.GetWeight(n.config.MyNodeID)
-	if !isValidator {
+	myStake := primaryValidators.GetWeight(n.config.MyNodeID)
+	if myStake == 0 {
 		return UptimeResult{}, false
 	}
 
@@ -1086,8 +1086,8 @@ func (n *network) NodeUptime() (UptimeResult, bool) {
 		peer, _ := n.connectedPeers.GetByIndex(i)
 
 		nodeID := peer.ID()
-		weight, ok := primaryValidators.GetWeight(nodeID)
-		if !ok {
+		weight := primaryValidators.GetWeight(nodeID)
+		if weight == 0 {
 			// this is not a validator skip it.
 			continue
 		}

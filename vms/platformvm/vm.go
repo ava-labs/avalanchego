@@ -65,10 +65,8 @@ var (
 	_ secp256k1fx.VM   = (*VM)(nil)
 	_ validators.State = (*VM)(nil)
 
-	errWrongCacheType               = errors.New("unexpectedly cached type")
-	errMissingValidatorSet          = errors.New("missing validator set")
-	errValidatorSetAlreadyPopulated = errors.New("validator set already populated")
-	errDuplicateValidatorSet        = errors.New("duplicate validator set")
+	errWrongCacheType      = errors.New("unexpectedly cached type")
+	errMissingValidatorSet = errors.New("missing validator set")
 )
 
 type VM struct {
@@ -215,10 +213,6 @@ func (vm *VM) Initialize(
 		toEngine,
 		appSender,
 	)
-
-	if err := vm.initValidators(); err != nil {
-		return fmt.Errorf("failed to initialize validator sets: %w", err)
-	}
 
 	// Create all of the chains that the database says exist
 	if err := vm.initBlockchains(); err != nil {
@@ -579,39 +573,6 @@ func (vm *VM) GetCurrentHeight(context.Context) (uint64, error) {
 		return 0, err
 	}
 	return lastAccepted.Height(), nil
-}
-
-func (vm *VM) initValidators() error {
-	primaryValidators, ok := vm.Validators.Get(constants.PrimaryNetworkID)
-	if !ok {
-		return errMissingValidatorSet
-	}
-	if primaryValidators.Len() != 0 {
-		// Enforce the invariant that the validator set is empty before the call
-		// to VM.Initialize.
-		return errValidatorSetAlreadyPopulated
-	}
-	err := vm.state.ValidatorSet(constants.PrimaryNetworkID, primaryValidators)
-	if err != nil {
-		return err
-	}
-
-	weight, _ := primaryValidators.GetWeight(vm.ctx.NodeID)
-	vm.metrics.SetLocalStake(weight)
-	vm.metrics.SetTotalStake(primaryValidators.Weight())
-
-	for subnetID := range vm.WhitelistedSubnets {
-		subnetValidators := validators.NewSet()
-		err := vm.state.ValidatorSet(subnetID, subnetValidators)
-		if err != nil {
-			return err
-		}
-
-		if !vm.Validators.Add(subnetID, subnetValidators) {
-			return fmt.Errorf("%w: %s", errDuplicateValidatorSet, subnetID)
-		}
-	}
-	return nil
 }
 
 func (vm *VM) CodecRegistry() codec.Registry {

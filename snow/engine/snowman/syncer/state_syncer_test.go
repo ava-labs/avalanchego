@@ -120,7 +120,7 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	// attempt starting bootstrapper with not enough stake connected. Bootstrapper should stall.
 	vdr0 := ids.GenerateTestNodeID()
-	require.NoError(vdrs.AddWeight(vdr0, startupAlpha/2))
+	require.NoError(vdrs.Add(vdr0, startupAlpha/2))
 	require.NoError(syncer.Connected(context.Background(), vdr0, version.CurrentApp))
 
 	require.False(commonCfg.StartupTracker.ShouldStart())
@@ -129,7 +129,7 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	// finally attempt starting bootstrapper with enough stake connected. Frontiers should be requested.
 	vdr := ids.GenerateTestNodeID()
-	require.NoError(vdrs.AddWeight(vdr, startupAlpha))
+	require.NoError(vdrs.Add(vdr, startupAlpha))
 	require.NoError(syncer.Connected(context.Background(), vdr, version.CurrentApp))
 
 	require.True(commonCfg.StartupTracker.ShouldStart())
@@ -785,9 +785,8 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 
 	// responsiveBeacon not pending anymore
 	require.False(syncer.pendingSeeders.Contains(responsiveVoterID))
-	voterWeight, found := vdrs.GetWeight(responsiveVoterID)
-	require.True(found)
-	require.True(syncer.weightedSummaries[summaryID].weight == voterWeight)
+	voterWeight := vdrs.GetWeight(responsiveVoterID)
+	require.Equal(voterWeight, syncer.weightedSummaries[summaryID].weight)
 
 	// other listed voters are reached out
 	require.True(
@@ -1023,8 +1022,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 				reqID,
 				[]ids.ID{summaryID, minoritySummaryID},
 			))
-			bw, _ := vdrs.GetWeight(voterID)
-			cumulatedWeight += bw
+			cumulatedWeight += vdrs.GetWeight(voterID)
 
 		case cumulatedWeight < commonCfg.Alpha:
 			require.NoError(syncer.AcceptedStateSummary(
@@ -1033,8 +1031,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 				reqID,
 				[]ids.ID{summaryID},
 			))
-			bw, _ := vdrs.GetWeight(voterID)
-			cumulatedWeight += bw
+			cumulatedWeight += vdrs.GetWeight(voterID)
 
 		default:
 			require.NoError(syncer.GetAcceptedStateSummaryFailed(
@@ -1141,8 +1138,7 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 				voterID,
 				reqID,
 			))
-			bw, _ := vdrs.GetWeight(voterID)
-			timedOutWeight += bw
+			timedOutWeight += vdrs.GetWeight(voterID)
 		} else {
 			require.NoError(syncer.AcceptedStateSummary(
 				context.Background(),
@@ -1290,8 +1286,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 				reqID,
 				[]ids.ID{minoritySummary1.ID(), minoritySummary2.ID()},
 			))
-			bw, _ := vdrs.GetWeight(voterID)
-			votingWeightStake += bw
+			votingWeightStake += vdrs.GetWeight(voterID)
 
 		default:
 			require.NoError(syncer.AcceptedStateSummary(
@@ -1300,8 +1295,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 				reqID,
 				[]ids.ID{{'u', 'n', 'k', 'n', 'o', 'w', 'n', 'I', 'D'}},
 			))
-			bw, _ := vdrs.GetWeight(voterID)
-			votingWeightStake += bw
+			votingWeightStake += vdrs.GetWeight(voterID)
 		}
 	}
 

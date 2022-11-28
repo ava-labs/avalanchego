@@ -4,6 +4,7 @@
 package validators
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -14,23 +15,51 @@ import (
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
-var _ Set = (*set)(nil)
+var (
+	_ Set = (*set)(nil)
+
+	errZeroWeight         = errors.New("weight must be non-zero")
+	errDuplicateValidator = errors.New("duplicate validator")
+	errMissingValidator   = errors.New("missing validator")
+)
 
 // Set of validators that can be sampled
 type Set interface {
 	formatting.PrefixedStringer
 
-	// AddWeight to a staker.
-	AddWeight(ids.NodeID, uint64) error
+	// Add a new staker to the set.
+	// Returns an error if:
+	// - [weight] is 0
+	// - [nodeID] is already in the validator set
+	// - the total weight of the validator set would overflow uint64
+	// If an error is returned, the set will be unmodified.
+	Add(nodeID ids.NodeID, weight uint64) error
+
+	// AddWeight to an existing staker.
+	// Returns an error if:
+	// - [weight] is 0
+	// - [nodeID] is not already in the validator set
+	// - the total weight of the validator set would overflow uint64
+	// If an error is returned, the set will be unmodified.
+	AddWeight(nodeID ids.NodeID, weight uint64) error
 
 	// GetWeight retrieves the validator weight from the set.
-	GetWeight(ids.NodeID) (uint64, bool)
+	GetWeight(ids.NodeID) uint64
+
+	// Get returns the validator tied to the specified ID.
+	Get(ids.NodeID) (Validator, bool)
 
 	// SubsetWeight returns the sum of the weights of the validators.
-	SubsetWeight(ids.NodeIDSet) (uint64, error)
+	SubsetWeight(ids.NodeIDSet) uint64
 
-	// RemoveWeight from a staker.
-	RemoveWeight(ids.NodeID, uint64) error
+	// RemoveWeight from a staker. If the staker's weight becomes 0, the staker
+	// will be removed from the validator set.
+	// Returns an error if:
+	// - [weight] is 0
+	// - [nodeID] is not already in the validator set
+	// - the weight of the validator would become negative
+	// If an error is returned, the set will be unmodified.
+	RemoveWeight(nodeID ids.NodeID, weight uint64) error
 
 	// Contains returns true if there is a validator with the specified ID
 	// currently in the set.
@@ -76,9 +105,6 @@ func NewBestSet(expectedSampleSize int) Set {
 	}
 }
 
-// set of validators. Validator function results are cached. Therefore, to
-// update a validators weight, one should ensure to call add with the updated
-// validator.
 type set struct {
 	lock        sync.RWMutex
 	vdrs        map[ids.NodeID]*validator
@@ -92,170 +118,188 @@ type set struct {
 	callbackListeners []SetCallbackListener
 }
 
-func (s *set) AddWeight(vdrID ids.NodeID, weight uint64) error {
+func (s *set) Add(nodeID ids.NodeID, weight uint64) error {
 	if weight == 0 {
-		return nil // This validator would never be sampled anyway
+		return errZeroWeight
 	}
 
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	return s.addWeight(vdrID, weight)
+	return s.add(nodeID, weight)
 }
 
-func (s *set) addWeight(vdrID ids.NodeID, weight uint64) error {
-	vdr, nodeExists := s.vdrs[vdrID]
-	if !nodeExists {
-		vdr = &validator{
-			nodeID: vdrID,
-			index:  len(s.vdrSlice),
-		}
-		s.vdrs[vdrID] = vdr
-		s.vdrSlice = append(s.vdrSlice, vdr)
-		s.weights = append(s.weights, 0)
-
-		s.callValidatorAddedCallbacks(vdrID, weight)
-	}
-
-	oldWeight := vdr.weight
-	s.weights[vdr.index] += weight
-	vdr.addWeight(weight)
-
+func (s *set) add(nodeID ids.NodeID, weight uint64) error {
+	_, nodeExists := s.vdrs[nodeID]
 	if nodeExists {
-		s.callWeightChangeCallbacks(vdrID, oldWeight, vdr.weight)
+		return errDuplicateValidator
 	}
 
+	// We first calculate the new total weight of the set, as this guarantees
+	// that none of the following operations can overflow.
 	newTotalWeight, err := math.Add64(s.totalWeight, weight)
-	if err != nil {
-		return nil
-	}
-	s.totalWeight = newTotalWeight
-	s.samplerInitialized = false
-	return nil
-}
-
-func (s *set) GetWeight(vdrID ids.NodeID) (uint64, bool) {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	return s.getWeight(vdrID)
-}
-
-func (s *set) getWeight(vdrID ids.NodeID) (uint64, bool) {
-	if vdr, ok := s.vdrs[vdrID]; ok {
-		return vdr.weight, true
-	}
-	return 0, false
-}
-
-func (s *set) SubsetWeight(subset ids.NodeIDSet) (uint64, error) {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	totalWeight := uint64(0)
-	for vdrID := range subset {
-		weight, ok := s.getWeight(vdrID)
-		if !ok {
-			continue
-		}
-		newWeight, err := math.Add64(totalWeight, weight)
-		if err != nil {
-			return 0, err
-		}
-		totalWeight = newWeight
-	}
-	return totalWeight, nil
-}
-
-func (s *set) RemoveWeight(vdrID ids.NodeID, weight uint64) error {
-	if weight == 0 {
-		return nil
-	}
-
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	return s.removeWeight(vdrID, weight)
-}
-
-func (s *set) removeWeight(vdrID ids.NodeID, weight uint64) error {
-	vdr, ok := s.vdrs[vdrID]
-	if !ok {
-		return nil
-	}
-
-	// Validator exists
-
-	oldWeight := vdr.weight
-	weight = math.Min(oldWeight, weight)
-	s.weights[vdr.index] -= weight
-	vdr.removeWeight(weight)
-	s.totalWeight -= weight
-
-	if vdr.Weight() == 0 {
-		s.callValidatorRemovedCallbacks(vdrID, oldWeight)
-		if err := s.remove(vdrID); err != nil {
-			return err
-		}
-	} else {
-		s.callWeightChangeCallbacks(vdrID, oldWeight, vdr.weight)
-	}
-	s.samplerInitialized = false
-	return nil
-}
-
-func (s *set) Get(vdrID ids.NodeID) (Validator, bool) {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	return s.get(vdrID)
-}
-
-func (s *set) get(vdrID ids.NodeID) (Validator, bool) {
-	vdr, ok := s.vdrs[vdrID]
-	return vdr, ok
-}
-
-func (s *set) remove(vdrID ids.NodeID) error {
-	// Get the element to remove
-	vdrToRemove, contains := s.vdrs[vdrID]
-	if !contains {
-		return nil
-	}
-
-	// Get the last element
-	lastIndex := len(s.vdrSlice) - 1
-	vdrToSwap := s.vdrSlice[lastIndex]
-
-	// Move element at last index --> index of removed validator
-	vdrToSwap.index = vdrToRemove.index
-	s.vdrSlice[vdrToRemove.index] = vdrToSwap
-	s.weights[vdrToRemove.index] = vdrToSwap.weight
-
-	// Remove validator
-	delete(s.vdrs, vdrID)
-	s.vdrSlice[lastIndex] = nil
-	s.vdrSlice = s.vdrSlice[:lastIndex]
-	s.weights = s.weights[:lastIndex]
-
-	newTotalWeight, err := math.Sub(s.totalWeight, vdrToRemove.weight)
 	if err != nil {
 		return err
 	}
+
+	vdr := &validator{
+		nodeID: nodeID,
+		weight: weight,
+		index:  len(s.vdrSlice),
+	}
+	s.vdrs[nodeID] = vdr
+	s.vdrSlice = append(s.vdrSlice, vdr)
+	s.weights = append(s.weights, weight)
 	s.totalWeight = newTotalWeight
+	s.samplerInitialized = false
+
+	s.callValidatorAddedCallbacks(nodeID, weight)
+	return nil
+}
+
+func (s *set) AddWeight(nodeID ids.NodeID, weight uint64) error {
+	if weight == 0 {
+		return errZeroWeight
+	}
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.addWeight(nodeID, weight)
+}
+
+func (s *set) addWeight(nodeID ids.NodeID, weight uint64) error {
+	vdr, nodeExists := s.vdrs[nodeID]
+	if !nodeExists {
+		return errMissingValidator
+	}
+
+	// We first calculate the new total weight of the set, as this guarantees
+	// that none of the following operations can overflow.
+	newTotalWeight, err := math.Add64(s.totalWeight, weight)
+	if err != nil {
+		return err
+	}
+
+	oldWeight := vdr.weight
+	vdr.weight += weight
+	s.weights[vdr.index] += weight
+	s.totalWeight = newTotalWeight
+	s.samplerInitialized = false
+
+	s.callWeightChangeCallbacks(nodeID, oldWeight, vdr.weight)
+	return nil
+}
+
+func (s *set) GetWeight(nodeID ids.NodeID) uint64 {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	return s.getWeight(nodeID)
+}
+
+func (s *set) getWeight(nodeID ids.NodeID) uint64 {
+	if vdr, ok := s.vdrs[nodeID]; ok {
+		return vdr.weight
+	}
+	return 0
+}
+
+func (s *set) SubsetWeight(subset ids.NodeIDSet) uint64 {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	return s.subsetWeight(subset)
+}
+
+func (s *set) subsetWeight(subset ids.NodeIDSet) uint64 {
+	var totalWeight uint64
+	for nodeID := range subset {
+		// Because [totalWeight] will be <= [s.totalWeight], we are guaranteed
+		// this will not overflow.
+		totalWeight += s.getWeight(nodeID)
+	}
+	return totalWeight
+}
+
+func (s *set) RemoveWeight(nodeID ids.NodeID, weight uint64) error {
+	if weight == 0 {
+		return errZeroWeight
+	}
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.removeWeight(nodeID, weight)
+}
+
+func (s *set) removeWeight(nodeID ids.NodeID, weight uint64) error {
+	vdr, ok := s.vdrs[nodeID]
+	if !ok {
+		return errMissingValidator
+	}
+
+	oldWeight := vdr.weight
+	// We first calculate the new weight of the validator, as this guarantees
+	// that none of the following operations can underflow.
+	newWeight, err := math.Sub(oldWeight, weight)
+	if err != nil {
+		return err
+	}
+
+	if newWeight == 0 {
+		// Get the last element
+		lastIndex := len(s.vdrSlice) - 1
+		vdrToSwap := s.vdrSlice[lastIndex]
+
+		// Move element at last index --> index of removed validator
+		vdrToSwap.index = vdr.index
+		s.vdrSlice[vdr.index] = vdrToSwap
+		s.weights[vdr.index] = vdrToSwap.weight
+
+		// Remove validator
+		delete(s.vdrs, nodeID)
+		s.vdrSlice[lastIndex] = nil
+		s.vdrSlice = s.vdrSlice[:lastIndex]
+		s.weights = s.weights[:lastIndex]
+
+		s.callValidatorRemovedCallbacks(nodeID, oldWeight)
+	} else {
+		vdr.weight = newWeight
+		s.weights[vdr.index] = newWeight
+
+		s.callWeightChangeCallbacks(nodeID, oldWeight, newWeight)
+	}
+	s.totalWeight -= weight
 	s.samplerInitialized = false
 	return nil
 }
 
-func (s *set) Contains(vdrID ids.NodeID) bool {
+func (s *set) Get(nodeID ids.NodeID) (Validator, bool) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	return s.contains(vdrID)
+	return s.get(nodeID)
 }
 
-func (s *set) contains(vdrID ids.NodeID) bool {
-	_, contains := s.vdrs[vdrID]
+func (s *set) get(nodeID ids.NodeID) (Validator, bool) {
+	vdr, ok := s.vdrs[nodeID]
+	if !ok {
+		return nil, false
+	}
+	copiedVdr := *vdr
+	return &copiedVdr, true
+}
+
+func (s *set) Contains(nodeID ids.NodeID) bool {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	return s.contains(nodeID)
+}
+
+func (s *set) contains(nodeID ids.NodeID) bool {
+	_, contains := s.vdrs[nodeID]
 	return contains
 }
 
@@ -280,7 +324,8 @@ func (s *set) List() []Validator {
 func (s *set) list() []Validator {
 	list := make([]Validator, len(s.vdrSlice))
 	for i, vdr := range s.vdrSlice {
-		list[i] = vdr
+		copiedVdr := *vdr
+		list[i] = &copiedVdr
 	}
 	return list
 }
@@ -311,7 +356,8 @@ func (s *set) sample(size int) ([]Validator, error) {
 
 	list := make([]Validator, size)
 	for i, index := range indices {
-		list[i] = s.vdrSlice[index]
+		copiedVdr := *s.vdrSlice[index]
+		list[i] = &copiedVdr
 	}
 	return list, nil
 }

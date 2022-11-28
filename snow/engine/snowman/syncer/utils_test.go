@@ -60,7 +60,7 @@ func buildTestPeers(t *testing.T) validators.Set {
 	vdrs := validators.NewSet()
 	for idx := 0; idx < 2*common.MaxOutstandingBroadcastRequests; idx++ {
 		beaconID := ids.GenerateTestNodeID()
-		require.NoError(t, vdrs.AddWeight(beaconID, uint64(1)))
+		require.NoError(t, vdrs.Add(beaconID, uint64(1)))
 	}
 	return vdrs
 }

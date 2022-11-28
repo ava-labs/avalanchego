@@ -35,7 +35,7 @@ func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, va
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	if err := vals.AddWeight(vdr, 1); err != nil {
+	if err := vals.Add(vdr, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -418,9 +418,9 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		vals.AddWeight(vdr0, 1),
-		vals.AddWeight(vdr1, 1),
-		vals.AddWeight(vdr2, 1),
+		vals.Add(vdr0, 1),
+		vals.Add(vdr1, 1),
+		vals.Add(vdr2, 1),
 	)
 	if errs.Errored() {
 		t.Fatal(errs.Err)
@@ -904,9 +904,9 @@ func TestVoteCanceling(t *testing.T) {
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		vals.AddWeight(vdr0, 1),
-		vals.AddWeight(vdr1, 1),
-		vals.AddWeight(vdr2, 1),
+		vals.Add(vdr0, 1),
+		vals.Add(vdr1, 1),
+		vals.Add(vdr2, 1),
 	)
 	if errs.Errored() {
 		t.Fatal(errs.Err)
@@ -1579,7 +1579,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 	vdr, vdrs, sender, vm, te, gBlk := setupDefaultConfig(t)
 
 	secondVdr := ids.GenerateTestNodeID()
-	if err := vdrs.AddWeight(secondVdr, 1); err != nil {
+	if err := vdrs.Add(secondVdr, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1793,7 +1793,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	if err := vals.AddWeight(vdr, 1); err != nil {
+	if err := vals.Add(vdr, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1912,10 +1912,10 @@ func TestEngineDoubleChit(t *testing.T) {
 	vdr0 := ids.GenerateTestNodeID()
 	vdr1 := ids.GenerateTestNodeID()
 
-	if err := vals.AddWeight(vdr0, 1); err != nil {
+	if err := vals.Add(vdr0, 1); err != nil {
 		t.Fatal(err)
 	}
-	if err := vals.AddWeight(vdr1, 1); err != nil {
+	if err := vals.Add(vdr1, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2043,7 +2043,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	if err := vals.AddWeight(vdr, 1); err != nil {
+	if err := vals.Add(vdr, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3142,7 +3142,7 @@ func TestSendMixedQuery(t *testing.T) {
 				}
 				te.Validators = validators.NewSet()
 				for _, vdr := range vdrsList {
-					err := te.Validators.AddWeight(vdr.ID(), vdr.Weight())
+					err := te.Validators.Add(vdr.ID(), vdr.Weight())
 					if err != nil {
 						t.Fatal(err)
 					}

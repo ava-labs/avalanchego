@@ -252,7 +252,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 
 	consensusRouter := n.Config.ConsensusRouter
 	if !n.Config.EnableStaking {
-		if err := primaryNetVdrs.AddWeight(n.ID, n.Config.DisabledStakingWeight); err != nil {
+		if err := primaryNetVdrs.Add(n.ID, n.Config.DisabledStakingWeight); err != nil {
 			return err
 		}
 		consensusRouter = &insecureValidatorManager{
@@ -327,7 +327,7 @@ type insecureValidatorManager struct {
 
 func (i *insecureValidatorManager) Connected(vdrID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
 	if constants.PrimaryNetworkID == subnetID {
-		_ = i.vdrs.AddWeight(vdrID, i.weight)
+		_ = i.vdrs.Add(vdrID, i.weight)
 	}
 	i.Router.Connected(vdrID, nodeVersion, subnetID)
 }
@@ -350,11 +350,7 @@ type beaconManager struct {
 func (b *beaconManager) Connected(vdrID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
 	if constants.PrimaryNetworkID == subnetID {
 		// TODO: this is always 1, beacons can be reduced to ShortSet?
-		weight, ok := b.beacons.GetWeight(vdrID)
-		if !ok {
-			b.Router.Connected(vdrID, nodeVersion, subnetID)
-			return
-		}
+		weight := b.beacons.GetWeight(vdrID)
 		weight, err := math.Add64(weight, b.totalWeight)
 		if err != nil {
 			b.timer.Cancel()
@@ -370,15 +366,14 @@ func (b *beaconManager) Connected(vdrID ids.NodeID, nodeVersion *version.Applica
 }
 
 func (b *beaconManager) Disconnected(vdrID ids.NodeID) {
-	if weight, ok := b.beacons.GetWeight(vdrID); ok {
-		// TODO: Account for weight changes in a more robust manner.
+	weight := b.beacons.GetWeight(vdrID)
+	// TODO: Account for weight changes in a more robust manner.
 
-		// Sub64 should rarely error since only validators that have added their
-		// weight can become disconnected. Because it is possible that there are
-		// changes to the validators set, we utilize that Sub64 returns 0 on
-		// error.
-		b.totalWeight, _ = math.Sub(b.totalWeight, weight)
-	}
+	// Sub64 should rarely error since only validators that have added their
+	// weight can become disconnected. Because it is possible that there are
+	// changes to the validators set, we utilize that Sub64 returns 0 on
+	// error.
+	b.totalWeight, _ = math.Sub(b.totalWeight, weight)
 	b.Router.Disconnected(vdrID)
 }
 
@@ -512,7 +507,7 @@ func (n *Node) initDatabase() error {
 func (n *Node) initBeacons() error {
 	n.beacons = validators.NewSet()
 	for _, peerID := range n.Config.BootstrapIDs {
-		if err := n.beacons.AddWeight(peerID, 1); err != nil {
+		if err := n.beacons.Add(peerID, 1); err != nil {
 			return err
 		}
 	}

@@ -202,14 +202,7 @@ func (b *benchlist) remove(node *benchData) {
 
 	// Update metrics
 	b.metrics.numBenched.Set(float64(b.benchedQueue.Len()))
-	benchedStake, err := b.vdrs.SubsetWeight(b.benchlistSet)
-	if err != nil {
-		// This should never happen
-		b.log.Error("couldn't get benched stake",
-			zap.Error(err),
-		)
-		return
-	}
+	benchedStake := b.vdrs.SubsetWeight(b.benchlistSet)
 	b.metrics.weightBenched.Set(float64(benchedStake))
 }
 
@@ -296,22 +289,14 @@ func (b *benchlist) RegisterFailure(nodeID ids.NodeID) {
 // Assumes [b.lock] is held
 // Assumes [nodeID] is not already benched
 func (b *benchlist) bench(nodeID ids.NodeID) {
-	benchedStake, err := b.vdrs.SubsetWeight(b.benchlistSet)
-	if err != nil {
-		// This should never happen
-		b.log.Error("couldn't get benched stake, resetting benchlist",
-			zap.Error(err),
-		)
-		return
-	}
-
-	validatorStake, isVdr := b.vdrs.GetWeight(nodeID)
-	if !isVdr {
+	validatorStake := b.vdrs.GetWeight(nodeID)
+	if validatorStake == 0 {
 		// We might want to bench a non-validator because they don't respond to
 		// my Get requests, but we choose to only bench validators.
 		return
 	}
 
+	benchedStake := b.vdrs.SubsetWeight(b.benchlistSet)
 	newBenchedStake, err := safemath.Add64(benchedStake, validatorStake)
 	if err != nil {
 		// This should never happen
