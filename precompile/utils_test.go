@@ -6,7 +6,7 @@ package precompile
 import (
 	"testing"
 
-	"gotest.tools/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFunctionSignatureRegex(t *testing.T) {
