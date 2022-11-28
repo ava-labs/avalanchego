@@ -30,7 +30,7 @@ func Sort[T Sortable[T]](s []T) {
 func SortByHash[T ~[]byte](s []T) {
 	slices.SortFunc(s, func(i, j T) bool {
 		iHash := hashing.ComputeHash256(i)
-		jHash := hashing.ComputeHash256(i)
+		jHash := hashing.ComputeHash256(j)
 		return bytes.Compare(iHash, jHash) == -1
 	})
 }
