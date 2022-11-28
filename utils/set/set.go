@@ -97,7 +97,9 @@ func (s *Set[T]) Overlaps(big Set[T]) bool {
 }
 
 // Len returns the number of elements in this set.
-func (s Set[_]) Len() int { return len(s) }
+func (s Set[_]) Len() int {
+	return len(s)
+}
 
 // Remove all the given elements from this set.
 // If an element isn't in the set, it's ignored.
