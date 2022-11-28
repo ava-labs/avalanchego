@@ -92,7 +92,10 @@ func IsUnique[T comparable](elts []T) bool {
 	return true
 }
 
-// IsSortedAndUnique returns true if the elements in the data are unique and sorted.
+// IsSortedAndUnique returns true if the elements in the data are unique and
+// sorted.
+//
+// Deprecated: Use one of the other [IsSortedAndUnique...] functions instead.
 func IsSortedAndUnique(data sort.Interface) bool {
 	for i := 0; i < data.Len()-1; i++ {
 		if !data.Less(i, i+1) {
