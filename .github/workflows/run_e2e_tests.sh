@@ -9,7 +9,7 @@ avalanche_testing_repo="avaplatform/avalanche-testing"
 avalanchego_byzantine_repo="avaplatform/avalanche-byzantine"
 
 # Define avalanche-testing and avalanche-byzantine versions to use
-avalanche_testing_image="avaplatform/avalanche-testing:master"
+avalanche_testing_image="avaplatform/avalanche-testing:generic-sort"
 avalanchego_byzantine_image="avaplatform/avalanche-byzantine:master"
 
 # Fetch the images
