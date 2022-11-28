@@ -262,7 +262,7 @@ func (b *builder) NewCreateAssetTx(
 		Denomination: denomination,
 		States:       states,
 	}
-	utils.SortSliceSortable(tx.States) // sort the initial states
+	utils.Sort(tx.States) // sort the initial states
 	return tx, nil
 }
 
@@ -395,7 +395,7 @@ func (b *builder) NewImportTx(
 		}
 		importedAmounts[assetID] = newImportedAmount
 	}
-	utils.SortSliceSortable(importedInputs) // sort imported inputs
+	utils.Sort(importedInputs) // sort imported inputs
 
 	if len(importedAmounts) == 0 {
 		return nil, fmt.Errorf(
@@ -615,7 +615,7 @@ func (b *builder) spend(
 		}
 	}
 
-	utils.SortSliceSortable(inputs)                       // sort inputs
+	utils.Sort(inputs)                                    // sort inputs
 	avax.SortTransferableOutputs(outputs, Parser.Codec()) // sort the change outputs
 	return inputs, outputs, nil
 }

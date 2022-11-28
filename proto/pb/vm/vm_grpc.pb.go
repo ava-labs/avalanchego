@@ -24,23 +24,47 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type VMClient interface {
 	// ChainVM
+	//
+	// Initialize this VM.
 	Initialize(ctx context.Context, in *InitializeRequest, opts ...grpc.CallOption) (*InitializeResponse, error)
+	// SetState communicates to VM its next state it starts
 	SetState(ctx context.Context, in *SetStateRequest, opts ...grpc.CallOption) (*SetStateResponse, error)
+	// Shutdown is called when the node is shutting down.
 	Shutdown(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Creates the HTTP handlers for custom chain network calls.
 	CreateHandlers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateHandlersResponse, error)
+	// Creates the HTTP handlers for custom VM network calls.
+	//
+	// Note: RPC Chain VM Factory will start a new instance of the VM in a
+	// seperate process which will populate the static handlers. After this
+	// process is created other processes will be created to populate blockchains,
+	// but they will not have the static handlers be called again.
 	CreateStaticHandlers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CreateStaticHandlersResponse, error)
 	Connected(ctx context.Context, in *ConnectedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	Disconnected(ctx context.Context, in *DisconnectedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Attempt to create a new block from data contained in the VM.
 	BuildBlock(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*BuildBlockResponse, error)
+	// Attempt to create a block from a stream of bytes.
 	ParseBlock(ctx context.Context, in *ParseBlockRequest, opts ...grpc.CallOption) (*ParseBlockResponse, error)
+	// Attempt to load a block.
 	GetBlock(ctx context.Context, in *GetBlockRequest, opts ...grpc.CallOption) (*GetBlockResponse, error)
+	// Notify the VM of the currently preferred block.
 	SetPreference(ctx context.Context, in *SetPreferenceRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Attempt to verify the health of the VM.
 	Health(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HealthResponse, error)
+	// Version returns the version of the VM.
 	Version(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*VersionResponse, error)
+	// Notify this engine of a request for data from [nodeID].
 	AppRequest(ctx context.Context, in *AppRequestMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Notify this engine that an AppRequest message it sent to [nodeID] with
+	// request ID [requestID] failed.
 	AppRequestFailed(ctx context.Context, in *AppRequestFailedMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Notify this engine of a response to the AppRequest message it sent to
+	// [nodeID] with request ID [requestID].
 	AppResponse(ctx context.Context, in *AppResponseMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Notify this engine of a gossip message from [nodeID].
 	AppGossip(ctx context.Context, in *AppGossipMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Attempts to gather metrics from a VM.
 	Gather(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GatherResponse, error)
 	CrossChainAppRequest(ctx context.Context, in *CrossChainAppRequestMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	CrossChainAppRequestFailed(ctx context.Context, in *CrossChainAppRequestFailedMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -52,10 +76,17 @@ type VMClient interface {
 	VerifyHeightIndex(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*VerifyHeightIndexResponse, error)
 	GetBlockIDAtHeight(ctx context.Context, in *GetBlockIDAtHeightRequest, opts ...grpc.CallOption) (*GetBlockIDAtHeightResponse, error)
 	// StateSyncableVM
+	//
+	// StateSyncEnabled indicates whether the state sync is enabled for this VM.
 	StateSyncEnabled(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*StateSyncEnabledResponse, error)
+	// GetOngoingSyncStateSummary returns an in-progress state summary if it exists.
 	GetOngoingSyncStateSummary(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetOngoingSyncStateSummaryResponse, error)
+	// GetLastStateSummary returns the latest state summary.
 	GetLastStateSummary(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetLastStateSummaryResponse, error)
+	// ParseStateSummary parses a state summary out of [summaryBytes].
 	ParseStateSummary(ctx context.Context, in *ParseStateSummaryRequest, opts ...grpc.CallOption) (*ParseStateSummaryResponse, error)
+	// GetStateSummary retrieves the state summary that was generated at height
+	// [summaryHeight].
 	GetStateSummary(ctx context.Context, in *GetStateSummaryRequest, opts ...grpc.CallOption) (*GetStateSummaryResponse, error)
 	// Block
 	BlockVerify(ctx context.Context, in *BlockVerifyRequest, opts ...grpc.CallOption) (*BlockVerifyResponse, error)
@@ -384,23 +415,47 @@ func (c *vMClient) StateSummaryAccept(ctx context.Context, in *StateSummaryAccep
 // for forward compatibility
 type VMServer interface {
 	// ChainVM
+	//
+	// Initialize this VM.
 	Initialize(context.Context, *InitializeRequest) (*InitializeResponse, error)
+	// SetState communicates to VM its next state it starts
 	SetState(context.Context, *SetStateRequest) (*SetStateResponse, error)
+	// Shutdown is called when the node is shutting down.
 	Shutdown(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
+	// Creates the HTTP handlers for custom chain network calls.
 	CreateHandlers(context.Context, *emptypb.Empty) (*CreateHandlersResponse, error)
+	// Creates the HTTP handlers for custom VM network calls.
+	//
+	// Note: RPC Chain VM Factory will start a new instance of the VM in a
+	// seperate process which will populate the static handlers. After this
+	// process is created other processes will be created to populate blockchains,
+	// but they will not have the static handlers be called again.
 	CreateStaticHandlers(context.Context, *emptypb.Empty) (*CreateStaticHandlersResponse, error)
 	Connected(context.Context, *ConnectedRequest) (*emptypb.Empty, error)
 	Disconnected(context.Context, *DisconnectedRequest) (*emptypb.Empty, error)
+	// Attempt to create a new block from data contained in the VM.
 	BuildBlock(context.Context, *emptypb.Empty) (*BuildBlockResponse, error)
+	// Attempt to create a block from a stream of bytes.
 	ParseBlock(context.Context, *ParseBlockRequest) (*ParseBlockResponse, error)
+	// Attempt to load a block.
 	GetBlock(context.Context, *GetBlockRequest) (*GetBlockResponse, error)
+	// Notify the VM of the currently preferred block.
 	SetPreference(context.Context, *SetPreferenceRequest) (*emptypb.Empty, error)
+	// Attempt to verify the health of the VM.
 	Health(context.Context, *emptypb.Empty) (*HealthResponse, error)
+	// Version returns the version of the VM.
 	Version(context.Context, *emptypb.Empty) (*VersionResponse, error)
+	// Notify this engine of a request for data from [nodeID].
 	AppRequest(context.Context, *AppRequestMsg) (*emptypb.Empty, error)
+	// Notify this engine that an AppRequest message it sent to [nodeID] with
+	// request ID [requestID] failed.
 	AppRequestFailed(context.Context, *AppRequestFailedMsg) (*emptypb.Empty, error)
+	// Notify this engine of a response to the AppRequest message it sent to
+	// [nodeID] with request ID [requestID].
 	AppResponse(context.Context, *AppResponseMsg) (*emptypb.Empty, error)
+	// Notify this engine of a gossip message from [nodeID].
 	AppGossip(context.Context, *AppGossipMsg) (*emptypb.Empty, error)
+	// Attempts to gather metrics from a VM.
 	Gather(context.Context, *emptypb.Empty) (*GatherResponse, error)
 	CrossChainAppRequest(context.Context, *CrossChainAppRequestMsg) (*emptypb.Empty, error)
 	CrossChainAppRequestFailed(context.Context, *CrossChainAppRequestFailedMsg) (*emptypb.Empty, error)
@@ -412,10 +467,17 @@ type VMServer interface {
 	VerifyHeightIndex(context.Context, *emptypb.Empty) (*VerifyHeightIndexResponse, error)
 	GetBlockIDAtHeight(context.Context, *GetBlockIDAtHeightRequest) (*GetBlockIDAtHeightResponse, error)
 	// StateSyncableVM
+	//
+	// StateSyncEnabled indicates whether the state sync is enabled for this VM.
 	StateSyncEnabled(context.Context, *emptypb.Empty) (*StateSyncEnabledResponse, error)
+	// GetOngoingSyncStateSummary returns an in-progress state summary if it exists.
 	GetOngoingSyncStateSummary(context.Context, *emptypb.Empty) (*GetOngoingSyncStateSummaryResponse, error)
+	// GetLastStateSummary returns the latest state summary.
 	GetLastStateSummary(context.Context, *emptypb.Empty) (*GetLastStateSummaryResponse, error)
+	// ParseStateSummary parses a state summary out of [summaryBytes].
 	ParseStateSummary(context.Context, *ParseStateSummaryRequest) (*ParseStateSummaryResponse, error)
+	// GetStateSummary retrieves the state summary that was generated at height
+	// [summaryHeight].
 	GetStateSummary(context.Context, *GetStateSummaryRequest) (*GetStateSummaryResponse, error)
 	// Block
 	BlockVerify(context.Context, *BlockVerifyRequest) (*BlockVerifyResponse, error)

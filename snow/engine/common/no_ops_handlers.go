@@ -38,7 +38,7 @@ func NewNoOpStateSummaryFrontierHandler(log logging.Logger) StateSummaryFrontier
 func (nop *noOpStateSummaryFrontierHandler) StateSummaryFrontier(_ context.Context, nodeID ids.NodeID, requestID uint32, _ []byte) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.StateSummaryFrontier),
+		zap.Stringer("messageOp", message.StateSummaryFrontierOp),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)
@@ -48,7 +48,7 @@ func (nop *noOpStateSummaryFrontierHandler) StateSummaryFrontier(_ context.Conte
 func (nop *noOpStateSummaryFrontierHandler) GetStateSummaryFrontierFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.GetStateSummaryFrontierFailed),
+		zap.Stringer("messageOp", message.GetStateSummaryFrontierFailedOp),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)
@@ -66,7 +66,7 @@ func NewNoOpAcceptedStateSummaryHandler(log logging.Logger) AcceptedStateSummary
 func (nop *noOpAcceptedStateSummaryHandler) AcceptedStateSummary(_ context.Context, nodeID ids.NodeID, requestID uint32, _ []ids.ID) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.AcceptedStateSummary),
+		zap.Stringer("messageOp", message.AcceptedStateSummaryOp),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)
@@ -76,7 +76,7 @@ func (nop *noOpAcceptedStateSummaryHandler) AcceptedStateSummary(_ context.Conte
 func (nop *noOpAcceptedStateSummaryHandler) GetAcceptedStateSummaryFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.GetAcceptedStateSummaryFailed),
+		zap.Stringer("messageOp", message.GetAcceptedStateSummaryFailedOp),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)
@@ -94,7 +94,7 @@ func NewNoOpAcceptedFrontierHandler(log logging.Logger) AcceptedFrontierHandler 
 func (nop *noOpAcceptedFrontierHandler) AcceptedFrontier(_ context.Context, nodeID ids.NodeID, requestID uint32, _ []ids.ID) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.AcceptedFrontier),
+		zap.Stringer("messageOp", message.AcceptedFrontierOp),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)
@@ -104,7 +104,7 @@ func (nop *noOpAcceptedFrontierHandler) AcceptedFrontier(_ context.Context, node
 func (nop *noOpAcceptedFrontierHandler) GetAcceptedFrontierFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.GetAcceptedFrontierFailed),
+		zap.Stringer("messageOp", message.GetAcceptedFrontierFailedOp),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)
@@ -122,7 +122,7 @@ func NewNoOpAcceptedHandler(log logging.Logger) AcceptedHandler {
 func (nop *noOpAcceptedHandler) Accepted(_ context.Context, nodeID ids.NodeID, requestID uint32, _ []ids.ID) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.Accepted),
+		zap.Stringer("messageOp", message.AcceptedOp),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)
@@ -132,7 +132,7 @@ func (nop *noOpAcceptedHandler) Accepted(_ context.Context, nodeID ids.NodeID, r
 func (nop *noOpAcceptedHandler) GetAcceptedFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.GetAcceptedFailed),
+		zap.Stringer("messageOp", message.GetAcceptedFailedOp),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)
@@ -150,7 +150,7 @@ func NewNoOpAncestorsHandler(log logging.Logger) AncestorsHandler {
 func (nop *noOpAncestorsHandler) Ancestors(_ context.Context, nodeID ids.NodeID, requestID uint32, _ [][]byte) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.Ancestors),
+		zap.Stringer("messageOp", message.AncestorsOp),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)
@@ -160,7 +160,7 @@ func (nop *noOpAncestorsHandler) Ancestors(_ context.Context, nodeID ids.NodeID,
 func (nop *noOpAncestorsHandler) GetAncestorsFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.GetAncestorsFailed),
+		zap.Stringer("messageOp", message.GetAncestorsFailedOp),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)
@@ -179,14 +179,14 @@ func (nop *noOpPutHandler) Put(_ context.Context, nodeID ids.NodeID, requestID u
 	if requestID == constants.GossipMsgRequestID {
 		nop.log.Verbo("dropping request",
 			zap.String("reason", "unhandled by this gear"),
-			zap.Stringer("messageOp", message.Put),
+			zap.Stringer("messageOp", message.PutOp),
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 		)
 	} else {
 		nop.log.Debug("dropping request",
 			zap.String("reason", "unhandled by this gear"),
-			zap.Stringer("messageOp", message.Put),
+			zap.Stringer("messageOp", message.PutOp),
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 		)
@@ -197,7 +197,7 @@ func (nop *noOpPutHandler) Put(_ context.Context, nodeID ids.NodeID, requestID u
 func (nop *noOpPutHandler) GetFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.GetFailed),
+		zap.Stringer("messageOp", message.GetFailedOp),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)
@@ -215,7 +215,7 @@ func NewNoOpQueryHandler(log logging.Logger) QueryHandler {
 func (nop *noOpQueryHandler) PullQuery(_ context.Context, nodeID ids.NodeID, requestID uint32, _ ids.ID) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.PullQuery),
+		zap.Stringer("messageOp", message.PullQueryOp),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)
@@ -225,7 +225,7 @@ func (nop *noOpQueryHandler) PullQuery(_ context.Context, nodeID ids.NodeID, req
 func (nop *noOpQueryHandler) PushQuery(_ context.Context, nodeID ids.NodeID, requestID uint32, _ []byte) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.PushQuery),
+		zap.Stringer("messageOp", message.PushQueryOp),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)
@@ -243,7 +243,7 @@ func NewNoOpChitsHandler(log logging.Logger) ChitsHandler {
 func (nop *noOpChitsHandler) Chits(_ context.Context, nodeID ids.NodeID, requestID uint32, _ []ids.ID) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.Chits),
+		zap.Stringer("messageOp", message.ChitsOp),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)
@@ -253,7 +253,7 @@ func (nop *noOpChitsHandler) Chits(_ context.Context, nodeID ids.NodeID, request
 func (nop *noOpChitsHandler) QueryFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.QueryFailed),
+		zap.Stringer("messageOp", message.QueryFailedOp),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)
@@ -268,10 +268,10 @@ func NewNoOpAppHandler(log logging.Logger) AppHandler {
 	return &noOpAppHandler{log: log}
 }
 
-func (nop *noOpAppHandler) CrossChainAppRequest(_ context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+func (nop *noOpAppHandler) CrossChainAppRequest(_ context.Context, chainID ids.ID, requestID uint32, _ time.Time, _ []byte) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.CrossChainAppRequest),
+		zap.Stringer("messageOp", message.CrossChainAppRequestOp),
 		zap.Stringer("chainID", chainID),
 		zap.Uint32("requestID", requestID),
 	)
@@ -281,27 +281,27 @@ func (nop *noOpAppHandler) CrossChainAppRequest(_ context.Context, chainID ids.I
 func (nop *noOpAppHandler) CrossChainAppRequestFailed(_ context.Context, chainID ids.ID, requestID uint32) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.CrossChainAppRequestFailed),
+		zap.Stringer("messageOp", message.CrossChainAppRequestFailedOp),
 		zap.Stringer("chainID", chainID),
 		zap.Uint32("requestID", requestID),
 	)
 	return nil
 }
 
-func (nop *noOpAppHandler) CrossChainAppResponse(_ context.Context, chainID ids.ID, requestID uint32, response []byte) error {
+func (nop *noOpAppHandler) CrossChainAppResponse(_ context.Context, chainID ids.ID, requestID uint32, _ []byte) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.CrossChainAppResponse),
+		zap.Stringer("messageOp", message.CrossChainAppResponseOp),
 		zap.Stringer("chainID", chainID),
 		zap.Uint32("requestID", requestID),
 	)
 	return nil
 }
 
-func (nop *noOpAppHandler) AppRequest(_ context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, _ []byte) error {
+func (nop *noOpAppHandler) AppRequest(_ context.Context, nodeID ids.NodeID, requestID uint32, _ time.Time, _ []byte) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.AppRequest),
+		zap.Stringer("messageOp", message.AppRequestOp),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)
@@ -311,7 +311,7 @@ func (nop *noOpAppHandler) AppRequest(_ context.Context, nodeID ids.NodeID, requ
 func (nop *noOpAppHandler) AppRequestFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.AppRequestFailed),
+		zap.Stringer("messageOp", message.AppRequestFailedOp),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)
@@ -321,7 +321,7 @@ func (nop *noOpAppHandler) AppRequestFailed(_ context.Context, nodeID ids.NodeID
 func (nop *noOpAppHandler) AppResponse(_ context.Context, nodeID ids.NodeID, requestID uint32, _ []byte) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.AppResponse),
+		zap.Stringer("messageOp", message.AppResponseOp),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
 	)
@@ -331,7 +331,7 @@ func (nop *noOpAppHandler) AppResponse(_ context.Context, nodeID ids.NodeID, req
 func (nop *noOpAppHandler) AppGossip(_ context.Context, nodeID ids.NodeID, _ []byte) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.AppGossip),
+		zap.Stringer("messageOp", message.AppGossipOp),
 		zap.Stringer("nodeID", nodeID),
 	)
 	return nil

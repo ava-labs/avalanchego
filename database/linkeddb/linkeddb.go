@@ -6,6 +6,8 @@ package linkeddb
 import (
 	"sync"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"
@@ -69,7 +71,9 @@ func New(db database.Database, cacheSize int) LinkedDB {
 	}
 }
 
-func NewDefault(db database.Database) LinkedDB { return New(db, defaultCacheSize) }
+func NewDefault(db database.Database) LinkedDB {
+	return New(db, defaultCacheSize)
+}
 
 func (ldb *linkedDB) Has(key []byte) (bool, error) {
 	ldb.lock.RLock()
@@ -228,7 +232,9 @@ func (ldb *linkedDB) Head() ([]byte, []byte, error) {
 
 // This iterator does not guarantee that keys are returned in lexicographic
 // order.
-func (ldb *linkedDB) NewIterator() database.Iterator { return &iterator{ldb: ldb} }
+func (ldb *linkedDB) NewIterator() database.Iterator {
+	return &iterator{ldb: ldb}
+}
 
 // NewIteratorWithStart returns an iterator that starts at [start].
 // This iterator does not guarantee that keys are returned in lexicographic
@@ -336,9 +342,7 @@ func (ldb *linkedDB) deleteNode(key []byte) error {
 
 func (ldb *linkedDB) resetBatch() {
 	ldb.headKeyIsUpdated = false
-	for key := range ldb.updatedNodes {
-		delete(ldb.updatedNodes, key)
-	}
+	maps.Clear(ldb.updatedNodes)
 	ldb.batch.Reset()
 }
 
@@ -416,10 +420,19 @@ func (it *iterator) Next() bool {
 	return true
 }
 
-func (it *iterator) Error() error  { return it.err }
-func (it *iterator) Key() []byte   { return it.key }
-func (it *iterator) Value() []byte { return it.value }
-func (it *iterator) Release()      {}
+func (it *iterator) Error() error {
+	return it.err
+}
+
+func (it *iterator) Key() []byte {
+	return it.key
+}
+
+func (it *iterator) Value() []byte {
+	return it.value
+}
+
+func (*iterator) Release() {}
 
 func nodeKey(key []byte) []byte {
 	newKey := make([]byte, len(key)+1)

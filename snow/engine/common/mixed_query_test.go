@@ -8,9 +8,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/golang/mock/gomock"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/golang/mock/gomock"
 )
 
 func TestSendMixedQuery(t *testing.T) {

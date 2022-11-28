@@ -1,6 +1,8 @@
 github.com/ava-labs/avalanchego/api/server=Server=api/server/mock_server.go
 github.com/ava-labs/avalanchego/chains/atomic=SharedMemory=chains/atomic/mock_shared_memory.go
 github.com/ava-labs/avalanchego/database=Batch=database/mock_batch.go
+github.com/ava-labs/avalanchego/message=OutboundMessage=message/mock_message.go
+github.com/ava-labs/avalanchego/network/peer=GossipTracker=network/peer/mock_gossip_tracker.go
 github.com/ava-labs/avalanchego/snow/consensus/snowman=Block=snow/consensus/snowman/mock_block.go
 github.com/ava-labs/avalanchego/snow/engine/avalanche=Engine=snow/engine/avalanche/mock_engine.go
 github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex=DAGVM=snow/engine/avalanche/vertex/mock_vm.go
@@ -11,11 +13,13 @@ github.com/ava-labs/avalanchego/snow/engine/snowman/block=StateSyncableVM=snow/e
 github.com/ava-labs/avalanchego/snow/networking/tracker=Targeter=snow/networking/tracker/mock_targeter.go
 github.com/ava-labs/avalanchego/snow/networking/tracker=Tracker=snow/networking/tracker/mock_resource_tracker.go
 github.com/ava-labs/avalanchego/snow/uptime=Calculator=snow/uptime/mock_calculator.go
+github.com/ava-labs/avalanchego/snow/validators=State=snow/validators/mock_state.go
 github.com/ava-labs/avalanchego/utils/filesystem=Reader=utils/filesystem/mock_io.go
 github.com/ava-labs/avalanchego/utils/hashing=Hasher=utils/hashing/mock_hasher.go
 github.com/ava-labs/avalanchego/utils/logging=Logger=utils/logging/mock_logger.go
 github.com/ava-labs/avalanchego/utils/resource=User=utils/resource/mock_user.go
 github.com/ava-labs/avalanchego/vms/components/avax=TransferableOut=vms/components/avax/mock_transferable_out.go
+github.com/ava-labs/avalanchego/vms/components/avax=TransferableIn=vms/components/avax/mock_transferable_in.go
 github.com/ava-labs/avalanchego/vms/components/verify=Verifiable=vms/components/verify/mock_verifiable.go
 github.com/ava-labs/avalanchego/vms/platformvm/blocks=Block=vms/platformvm/blocks/mock_block.go
 github.com/ava-labs/avalanchego/vms/platformvm/fx=Fx,Owner=vms/platformvm/fx/mock_fx.go
@@ -26,7 +30,6 @@ github.com/ava-labs/avalanchego/vms/platformvm/state=State=vms/platformvm/state/
 github.com/ava-labs/avalanchego/vms/platformvm/state=Versions=vms/platformvm/state/mock_versions.go
 github.com/ava-labs/avalanchego/vms/platformvm/txs/builder=Builder=vms/platformvm/txs/builder/mock_builder.go
 github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool=Mempool=vms/platformvm/txs/mempool/mock_mempool.go
-github.com/ava-labs/avalanchego/vms/platformvm/txs=Staker=vms/platformvm/txs/mock_staker.go
 github.com/ava-labs/avalanchego/vms/platformvm/txs=UnsignedTx=vms/platformvm/txs/mock_unsigned_tx.go
 github.com/ava-labs/avalanchego/vms/platformvm/utxo=Verifier=vms/platformvm/utxo/mock_verifier.go
 github.com/ava-labs/avalanchego/vms/proposervm/state=State=vms/proposervm/state/mock_state.go

@@ -91,7 +91,7 @@ type GetContainerRangeResponse struct {
 // If [startIndex] > the last accepted index, returns an error (unless the above apply.)
 // If [n] > [MaxFetchedByRange], returns an error.
 // If we run out of transactions, returns the ones fetched before running out.
-func (s *service) GetContainerRange(r *http.Request, args *GetContainerRangeArgs, reply *GetContainerRangeResponse) error {
+func (s *service) GetContainerRange(_ *http.Request, args *GetContainerRangeArgs, reply *GetContainerRangeResponse) error {
 	containers, err := s.Index.GetContainerRange(uint64(args.StartIndex), uint64(args.NumToFetch))
 	if err != nil {
 		return err
@@ -119,7 +119,7 @@ type GetIndexResponse struct {
 	Index json.Uint64 `json:"index"`
 }
 
-func (s *service) GetIndex(r *http.Request, args *GetIndexArgs, reply *GetIndexResponse) error {
+func (s *service) GetIndex(_ *http.Request, args *GetIndexArgs, reply *GetIndexResponse) error {
 	index, err := s.Index.GetIndex(args.ID)
 	reply.Index = json.Uint64(index)
 	return err
@@ -133,7 +133,7 @@ type IsAcceptedResponse struct {
 	IsAccepted bool `json:"isAccepted"`
 }
 
-func (s *service) IsAccepted(r *http.Request, args *IsAcceptedArgs, reply *IsAcceptedResponse) error {
+func (s *service) IsAccepted(_ *http.Request, args *IsAcceptedArgs, reply *IsAcceptedResponse) error {
 	_, err := s.Index.GetIndex(args.ID)
 	if err == nil {
 		reply.IsAccepted = true
@@ -151,7 +151,7 @@ type GetContainerByIDArgs struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
-func (s *service) GetContainerByID(r *http.Request, args *GetContainerByIDArgs, reply *FormattedContainer) error {
+func (s *service) GetContainerByID(_ *http.Request, args *GetContainerByIDArgs, reply *FormattedContainer) error {
 	container, err := s.Index.GetContainerByID(args.ID)
 	if err != nil {
 		return err

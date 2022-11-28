@@ -191,8 +191,7 @@ func (w *ResponseWriter) Header() http.Header {
 }
 
 func (w *ResponseWriter) Write(buf []byte) (int, error) {
-	w.body.Write(buf)
-	return len(buf), nil
+	return w.body.Write(buf)
 }
 
 func (w *ResponseWriter) WriteHeader(code int) {

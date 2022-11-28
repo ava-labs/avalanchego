@@ -44,9 +44,11 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 
 	cfg, err := NewConfig(*commonCfg, nil, dummyGetter, nonStateSyncableVM)
 	require.NoError(err)
-	syncer := New(cfg, func(lastReqID uint32) error { return nil })
+	syncer := New(cfg, func(context.Context, uint32) error {
+		return nil
+	})
 
-	enabled, err := syncer.IsEnabled()
+	enabled, err := syncer.IsEnabled(context.Background())
 	require.NoError(err)
 	require.False(enabled)
 
@@ -66,17 +68,23 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 
 	cfg, err = NewConfig(*commonCfg, nil, dummyGetter, fullVM)
 	require.NoError(err)
-	syncer = New(cfg, func(lastReqID uint32) error { return nil })
+	syncer = New(cfg, func(context.Context, uint32) error {
+		return nil
+	})
 
 	// test: VM does not support state syncing
-	fullVM.StateSyncEnabledF = func() (bool, error) { return false, nil }
-	enabled, err = syncer.IsEnabled()
+	fullVM.StateSyncEnabledF = func(context.Context) (bool, error) {
+		return false, nil
+	}
+	enabled, err = syncer.IsEnabled(context.Background())
 	require.NoError(err)
 	require.False(enabled)
 
 	// test: VM does support state syncing
-	fullVM.StateSyncEnabledF = func() (bool, error) { return true, nil }
-	enabled, err = syncer.IsEnabled()
+	fullVM.StateSyncEnabledF = func(context.Context) (bool, error) {
+		return true, nil
+	}
+	enabled, err = syncer.IsEnabled(context.Background())
 	require.NoError(err)
 	require.True(enabled)
 }
@@ -108,25 +116,25 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	// attempt starting bootstrapper with no stake connected. Bootstrapper should stall.
 	require.False(commonCfg.StartupTracker.ShouldStart())
-	require.NoError(syncer.Start(startReqID))
+	require.NoError(syncer.Start(context.Background(), startReqID))
 	require.False(syncer.started)
 
 	// attempt starting bootstrapper with not enough stake connected. Bootstrapper should stall.
 	vdr0 := ids.GenerateTestNodeID()
 	require.NoError(vdrs.AddWeight(vdr0, startupAlpha/2))
-	require.NoError(syncer.Connected(vdr0, version.CurrentApp))
+	require.NoError(syncer.Connected(context.Background(), vdr0, version.CurrentApp))
 
 	require.False(commonCfg.StartupTracker.ShouldStart())
-	require.NoError(syncer.Start(startReqID))
+	require.NoError(syncer.Start(context.Background(), startReqID))
 	require.False(syncer.started)
 
 	// finally attempt starting bootstrapper with enough stake connected. Frontiers should be requested.
 	vdr := ids.GenerateTestNodeID()
 	require.NoError(vdrs.AddWeight(vdr, startupAlpha))
-	require.NoError(syncer.Connected(vdr, version.CurrentApp))
+	require.NoError(syncer.Connected(context.Background(), vdr, version.CurrentApp))
 
 	require.True(commonCfg.StartupTracker.ShouldStart())
-	require.NoError(syncer.Start(startReqID))
+	require.NoError(syncer.Start(context.Background(), startReqID))
 	require.True(syncer.started)
 }
 
@@ -156,13 +164,13 @@ func TestStateSyncLocalSummaryIsIncludedAmongFrontiersIfAvailable(t *testing.T) 
 		BytesV:  summaryBytes,
 	}
 	fullVM.CantStateSyncGetOngoingSummary = true
-	fullVM.GetOngoingSyncStateSummaryF = func() (block.StateSummary, error) {
+	fullVM.GetOngoingSyncStateSummaryF = func(context.Context) (block.StateSummary, error) {
 		return localSummary, nil
 	}
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
 	}
 
 	require.True(syncer.locallyAvailableSummary == localSummary)
@@ -193,13 +201,13 @@ func TestStateSyncNotFoundOngoingSummaryIsNotIncludedAmongFrontiers(t *testing.T
 
 	// mock VM to simulate a no summary returned
 	fullVM.CantStateSyncGetOngoingSummary = true
-	fullVM.GetOngoingSyncStateSummaryF = func() (block.StateSummary, error) {
+	fullVM.GetOngoingSyncStateSummaryF = func(context.Context) (block.StateSummary, error) {
 		return nil, database.ErrNotFound
 	}
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
 	}
 
 	require.Nil(syncer.locallyAvailableSummary)
@@ -234,7 +242,7 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
 	}
 
 	// check that vdrs are reached out for frontiers
@@ -278,7 +286,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
 	}
 
 	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
@@ -287,7 +295,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (block.StateSummary, error) {
+	fullVM.ParseStateSummaryF = func(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
 		return &block.TestStateSummary{
 			HeightV: key,
 			IDV:     summaryID,
@@ -371,7 +379,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
 	}
 
 	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
@@ -382,7 +390,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	summary := []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
 	isSummaryDecoded := false
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (block.StateSummary, error) {
+	fullVM.ParseStateSummaryF = func(context.Context, []byte) (block.StateSummary, error) {
 		isSummaryDecoded = true
 		return nil, errors.New("invalid state summary")
 	}
@@ -443,7 +451,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
 	}
 
 	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
@@ -455,8 +463,8 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	unresponsiveBeaconReqID := contactedFrontiersProviders[unresponsiveBeaconID]
 
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (block.StateSummary, error) {
-		require.True(len(summaryBytes) == 0)
+	fullVM.ParseStateSummaryF = func(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
+		require.Empty(summaryBytes)
 		return nil, errors.New("empty summary")
 	}
 
@@ -479,7 +487,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 
 	// mock VM to simulate a valid but late summary is returned
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (block.StateSummary, error) {
+	fullVM.ParseStateSummaryF = func(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
 		return &block.TestStateSummary{
 			HeightV: key,
 			IDV:     summaryID,
@@ -531,7 +539,7 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(b []byte) (block.StateSummary, error) {
+	fullVM.ParseStateSummaryF = func(_ context.Context, b []byte) (block.StateSummary, error) {
 		switch {
 		case bytes.Equal(b, summaryBytes):
 			return &block.TestStateSummary{
@@ -556,7 +564,7 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
 	}
 	require.True(syncer.pendingSeeders.Len() != 0)
 
@@ -623,7 +631,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(b []byte) (block.StateSummary, error) {
+	fullVM.ParseStateSummaryF = func(_ context.Context, b []byte) (block.StateSummary, error) {
 		require.True(bytes.Equal(b, summaryBytes))
 		return &block.TestStateSummary{
 			HeightV: key,
@@ -642,7 +650,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
 	}
 	require.True(syncer.pendingSeeders.Len() != 0)
 
@@ -697,7 +705,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (block.StateSummary, error) {
+	fullVM.ParseStateSummaryF = func(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
 		return &block.TestStateSummary{
 			HeightV: key,
 			IDV:     summaryID,
@@ -715,7 +723,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
 	}
 	require.True(syncer.pendingSeeders.Len() != 0)
 
@@ -818,7 +826,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (block.StateSummary, error) {
+	fullVM.ParseStateSummaryF = func(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
 		return &block.TestStateSummary{
 			HeightV: key,
 			IDV:     summaryID,
@@ -836,7 +844,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
 	}
 	require.True(syncer.pendingSeeders.Len() != 0)
 
@@ -937,7 +945,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	}
 
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(b []byte) (block.StateSummary, error) {
+	fullVM.ParseStateSummaryF = func(_ context.Context, b []byte) (block.StateSummary, error) {
 		switch {
 		case bytes.Equal(b, summaryBytes):
 			return summary, nil
@@ -958,7 +966,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
 	}
 	require.True(syncer.pendingSeeders.Len() != 0)
 
@@ -992,11 +1000,11 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 
 	majoritySummaryCalled := false
 	minoritySummaryCalled := false
-	summary.AcceptF = func() (bool, error) {
+	summary.AcceptF = func(context.Context) (bool, error) {
 		majoritySummaryCalled = true
 		return true, nil
 	}
-	minoritySummary.AcceptF = func() (bool, error) {
+	minoritySummary.AcceptF = func(context.Context) (bool, error) {
 		minoritySummaryCalled = true
 		return true, nil
 	}
@@ -1081,7 +1089,7 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 		T:       t,
 	}
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (block.StateSummary, error) {
+	fullVM.ParseStateSummaryF = func(context.Context, []byte) (block.StateSummary, error) {
 		return minoritySummary, nil
 	}
 
@@ -1095,7 +1103,7 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
 	}
 	require.True(syncer.pendingSeeders.Len() != 0)
 
@@ -1115,7 +1123,7 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 	require.False(syncer.pendingSeeders.Len() != 0)
 
 	minoritySummaryCalled := false
-	minoritySummary.AcceptF = func() (bool, error) {
+	minoritySummary.AcceptF = func(context.Context) (bool, error) {
 		minoritySummaryCalled = true
 		return true, nil
 	}
@@ -1197,7 +1205,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 	}
 
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(b []byte) (block.StateSummary, error) {
+	fullVM.ParseStateSummaryF = func(_ context.Context, b []byte) (block.StateSummary, error) {
 		switch {
 		case bytes.Equal(b, summaryBytes):
 			return minoritySummary1, nil
@@ -1218,7 +1226,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
 	}
 	require.True(syncer.pendingSeeders.Len() != 0)
 
@@ -1252,17 +1260,17 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 
 	majoritySummaryCalled := false
 	minoritySummaryCalled := false
-	minoritySummary1.AcceptF = func() (bool, error) {
+	minoritySummary1.AcceptF = func(context.Context) (bool, error) {
 		majoritySummaryCalled = true
 		return true, nil
 	}
-	minoritySummary2.AcceptF = func() (bool, error) {
+	minoritySummary2.AcceptF = func(context.Context) (bool, error) {
 		minoritySummaryCalled = true
 		return true, nil
 	}
 
 	stateSyncFullyDone := false
-	syncer.onDoneStateSyncing = func(lastReqID uint32) error {
+	syncer.onDoneStateSyncing = func(context.Context, uint32) error {
 		stateSyncFullyDone = true
 		return nil
 	}
@@ -1327,12 +1335,12 @@ func TestStateSyncIsDoneOnceVMNotifies(t *testing.T) {
 	_ = fullVM
 
 	stateSyncFullyDone := false
-	syncer.onDoneStateSyncing = func(lastReqID uint32) error {
+	syncer.onDoneStateSyncing = func(context.Context, uint32) error {
 		stateSyncFullyDone = true
 		return nil
 	}
 
 	// Any Put response before StateSyncDone is received from VM is dropped
-	require.NoError(syncer.Notify(common.StateSyncDone))
+	require.NoError(syncer.Notify(context.Background(), common.StateSyncDone))
 	require.True(stateSyncFullyDone)
 }

@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var _ Sortable[sortable] = sortable(0)
+
 type sortable int
 
 func (s sortable) Less(other sortable) bool {
@@ -19,39 +21,39 @@ func TestSortSliceSortable(t *testing.T) {
 	require := require.New(t)
 
 	var s []sortable
-	SortSliceSortable(s)
+	Sort(s)
 	require.True(IsSortedAndUniqueSortable(s))
 	require.Equal(0, len(s))
 
 	s = []sortable{1}
-	SortSliceSortable(s)
+	Sort(s)
 	require.True(IsSortedAndUniqueSortable(s))
 	require.Equal([]sortable{1}, s)
 
 	s = []sortable{1, 1}
-	SortSliceSortable(s)
+	Sort(s)
 	require.Equal([]sortable{1, 1}, s)
 
 	s = []sortable{1, 2}
-	SortSliceSortable(s)
+	Sort(s)
 	require.True(IsSortedAndUniqueSortable(s))
 	require.Equal([]sortable{1, 2}, s)
 
 	s = []sortable{2, 1}
-	SortSliceSortable(s)
+	Sort(s)
 	require.True(IsSortedAndUniqueSortable(s))
 	require.Equal([]sortable{1, 2}, s)
 
 	s = []sortable{1, 2, 1}
-	SortSliceSortable(s)
+	Sort(s)
 	require.Equal([]sortable{1, 1, 2}, s)
 
 	s = []sortable{2, 1, 2}
-	SortSliceSortable(s)
+	Sort(s)
 	require.Equal([]sortable{1, 2, 2}, s)
 
 	s = []sortable{3, 1, 2}
-	SortSliceSortable(s)
+	Sort(s)
 	require.Equal([]sortable{1, 2, 3}, s)
 }
 
@@ -106,4 +108,30 @@ func TestIsUnique(t *testing.T) {
 
 	s = []int{1, 2, 1}
 	require.False(IsUnique(s))
+}
+
+func TestSortByHash(t *testing.T) {
+	require := require.New(t)
+
+	s := [][]byte{}
+	SortByHash(s)
+	require.Len(s, 0)
+
+	s = [][]byte{{1}}
+	SortByHash(s)
+	require.Len(s, 1)
+	require.Equal([]byte{1}, s[0])
+
+	s = [][]byte{{1}, {2}}
+	SortByHash(s)
+	require.Len(s, 2)
+	require.Equal([]byte{1}, s[0])
+	require.Equal([]byte{2}, s[1])
+
+	for i := byte(0); i < 100; i++ {
+		s = [][]byte{{i}, {i + 1}, {i + 2}}
+		SortByHash(s)
+		require.Len(s, 3)
+		require.True(IsSortedAndUniqueByHash(s))
+	}
 }

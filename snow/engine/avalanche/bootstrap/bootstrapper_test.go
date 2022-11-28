@@ -16,13 +16,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/getter"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
-
-	avagetter "github.com/ava-labs/avalanchego/snow/engine/avalanche/getter"
 )
 
 var (
@@ -42,9 +41,13 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 
 	isBootstrapped := false
 	subnet := &common.SubnetTest{
-		T:               t,
-		IsBootstrappedF: func() bool { return isBootstrapped },
-		BootstrappedF:   func(ids.ID) { isBootstrapped = true },
+		T: t,
+		IsBootstrappedF: func() bool {
+			return isBootstrapped
+		},
+		BootstrappedF: func(ids.ID) {
+			isBootstrapped = true
+		},
 	}
 
 	sender.Default(true)
@@ -86,7 +89,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.Te
 		SharedCfg:                      &common.SharedConfig{},
 	}
 
-	avaGetHandler, err := avagetter.New(manager, commonConfig)
+	avaGetHandler, err := getter.New(manager, commonConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,21 +142,25 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 	}
 
 	bs, err := New(
+		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(context.Context, uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	vm.CantSetState = false
-	if err := bs.Start(0); err != nil {
+	if err := bs.Start(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 
 	acceptedIDs := []ids.ID{vtxID0, vtxID1, vtxID2}
 
-	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch vtxID {
 		case vtxID0:
 			return vtx0, nil
@@ -167,7 +174,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		}
 	}
 
-	manager.ParseVtxF = func(vtxBytes []byte) (avalanche.Vertex, error) {
+	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(vtxBytes, vtxBytes0):
 			return vtx0, nil
@@ -238,21 +245,25 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	}
 
 	bs, err := New(
+		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(context.Context, uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	vm.CantSetState = false
-	if err := bs.Start(0); err != nil {
+	if err := bs.Start(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 
 	acceptedIDs := []ids.ID{vtxID1}
 
-	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch vtxID {
 		case vtxID1:
 			return vtx1, nil
@@ -278,7 +289,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 		reqVtxID = vtxID
 	}
 
-	manager.ParseVtxF = func(vtxBytes []byte) (avalanche.Vertex, error) {
+	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(vtxBytes, vtxBytes0):
 			vtx0.StatusV = choices.Processing
@@ -312,7 +323,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 	}
 
 	oldReqID = *requestID
-	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch vtxID {
 		case vtxID1:
 			return vtx1, nil
@@ -380,7 +391,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 
 	vtxBytes0 := []byte{2}
 	vtxBytes1 := []byte{3}
-	vm.ParseTxF = func(b []byte) (snowstorm.Tx, error) {
+	vm.ParseTxF = func(_ context.Context, b []byte) (snowstorm.Tx, error) {
 		switch {
 		case bytes.Equal(b, txBytes0):
 			return tx0, nil
@@ -412,21 +423,25 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	}
 
 	bs, err := New(
+		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(context.Context, uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	vm.CantSetState = false
-	if err := bs.Start(0); err != nil {
+	if err := bs.Start(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 
 	acceptedIDs := []ids.ID{vtxID1}
 
-	manager.ParseVtxF = func(vtxBytes []byte) (avalanche.Vertex, error) {
+	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(vtxBytes, vtxBytes1):
 			return vtx1, nil
@@ -436,7 +451,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		t.Fatal(errParsedUnknownVertex)
 		return nil, errParsedUnknownVertex
 	}
-	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch vtxID {
 		case vtxID1:
 			return vtx1, nil
@@ -466,7 +481,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager.ParseVtxF = func(vtxBytes []byte) (avalanche.Vertex, error) {
+	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(vtxBytes, vtxBytes1):
 			return vtx1, nil
@@ -552,21 +567,25 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 	}
 
 	bs, err := New(
+		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(context.Context, uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	vm.CantSetState = false
-	if err := bs.Start(0); err != nil {
+	if err := bs.Start(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 
 	acceptedIDs := []ids.ID{vtxID1}
 
-	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch vtxID {
 		case vtxID1:
 			return vtx1, nil
@@ -577,7 +596,7 @@ func TestBootstrapperMissingTxDependency(t *testing.T) {
 			panic(errUnknownVertex)
 		}
 	}
-	manager.ParseVtxF = func(vtxBytes []byte) (avalanche.Vertex, error) {
+	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(vtxBytes, vtxBytes1):
 			return vtx1, nil
@@ -669,21 +688,25 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	}
 
 	bs, err := New(
+		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(context.Context, uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	vm.CantSetState = false
-	if err := bs.Start(0); err != nil {
+	if err := bs.Start(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 
 	acceptedIDs := []ids.ID{vtxID2}
 
-	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch {
 		case vtxID == vtxID0:
 			return nil, errUnknownVertex
@@ -696,7 +719,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 			panic(errUnknownVertex)
 		}
 	}
-	manager.ParseVtxF = func(vtxBytes []byte) (avalanche.Vertex, error) {
+	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(vtxBytes, vtxBytes0):
 			vtx0.StatusV = choices.Processing
@@ -785,15 +808,19 @@ func TestBootstrapperFinalized(t *testing.T) {
 	}
 
 	bs, err := New(
+		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(context.Context, uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	vm.CantSetState = false
-	if err := bs.Start(0); err != nil {
+	if err := bs.Start(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -801,7 +828,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 
 	parsedVtx0 := false
 	parsedVtx1 := false
-	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch vtxID {
 		case vtxID0:
 			if parsedVtx0 {
@@ -818,7 +845,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 			panic(errUnknownVertex)
 		}
 	}
-	manager.ParseVtxF = func(vtxBytes []byte) (avalanche.Vertex, error) {
+	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(vtxBytes, vtxBytes0):
 			vtx0.StatusV = choices.Processing
@@ -912,15 +939,19 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	}
 
 	bs, err := New(
+		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(context.Context, uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	vm.CantSetState = false
-	if err := bs.Start(0); err != nil {
+	if err := bs.Start(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -929,7 +960,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 	parsedVtx0 := false
 	parsedVtx1 := false
 	parsedVtx2 := false
-	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch vtxID {
 		case vtxID0:
 			if parsedVtx0 {
@@ -951,7 +982,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 		}
 		return nil, errUnknownVertex
 	}
-	manager.ParseVtxF = func(vtxBytes []byte) (avalanche.Vertex, error) {
+	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(vtxBytes, vtxBytes0):
 			vtx0.StatusV = choices.Processing
@@ -1075,8 +1106,12 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	bsIntf, err := New(
+		context.Background(),
 		config,
-		func(lastReqID uint32) error { config.Ctx.SetState(snow.NormalOp); return nil },
+		func(context.Context, uint32) error {
+			config.Ctx.SetState(snow.NormalOp)
+			return nil
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1087,7 +1122,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	if err := bs.Start(0); err != nil {
+	if err := bs.Start(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1097,7 +1132,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	parsedVtx3 := false
 	parsedVtx4 := false
 	parsedVtx5 := false
-	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch vtxID {
 		case vtxID0:
 			if parsedVtx0 {
@@ -1131,7 +1166,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		}
 		return nil, errUnknownVertex
 	}
-	manager.ParseVtxF = func(vtxBytes []byte) (avalanche.Vertex, error) {
+	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
 		switch {
 		case bytes.Equal(vtxBytes, vtxBytes0):
 			vtx0.StatusV = choices.Processing

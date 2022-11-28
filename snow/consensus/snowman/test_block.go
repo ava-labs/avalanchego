@@ -4,13 +4,18 @@
 package snowman
 
 import (
+	"context"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
-var _ Block = (*TestBlock)(nil)
+var (
+	_ Block                      = (*TestBlock)(nil)
+	_ utils.Sortable[*TestBlock] = (*TestBlock)(nil)
+)
 
 // TestBlock is a useful test block
 type TestBlock struct {
@@ -23,9 +28,26 @@ type TestBlock struct {
 	BytesV     []byte
 }
 
-func (b *TestBlock) Parent() ids.ID             { return b.ParentV }
-func (b *TestBlock) Height() uint64             { return b.HeightV }
-func (b *TestBlock) Timestamp() time.Time       { return b.TimestampV }
-func (b *TestBlock) Verify() error              { return b.VerifyV }
-func (b *TestBlock) Bytes() []byte              { return b.BytesV }
-func (b *TestBlock) Less(other *TestBlock) bool { return b.HeightV < other.HeightV }
+func (b *TestBlock) Parent() ids.ID {
+	return b.ParentV
+}
+
+func (b *TestBlock) Height() uint64 {
+	return b.HeightV
+}
+
+func (b *TestBlock) Timestamp() time.Time {
+	return b.TimestampV
+}
+
+func (b *TestBlock) Verify(context.Context) error {
+	return b.VerifyV
+}
+
+func (b *TestBlock) Bytes() []byte {
+	return b.BytesV
+}
+
+func (b *TestBlock) Less(other *TestBlock) bool {
+	return b.HeightV < other.HeightV
+}

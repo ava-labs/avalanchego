@@ -405,7 +405,8 @@ func TestServiceDeleteUser(t *testing.T) {
 				}
 
 				// deleted user details should be available to create user again.
-				if err = s.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &api.EmptyReply{}); err != nil {
+				err := s.CreateUser(nil, &api.UserPass{Username: testUser, Password: password}, &api.EmptyReply{})
+				if err != nil {
 					t.Fatalf("failed to create user: %v", err)
 				}
 			}

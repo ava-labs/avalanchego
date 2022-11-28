@@ -52,7 +52,9 @@ func NewCompatibility(
 	}
 }
 
-func (c *compatibility) Version() *Application { return c.version }
+func (c *compatibility) Version() *Application {
+	return c.version
+}
 
 func (c *compatibility) Compatible(peer *Application) error {
 	if err := c.version.Compatible(peer); err != nil {

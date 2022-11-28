@@ -47,6 +47,7 @@ var (
 	defaultChainConfigDir       = filepath.Join(defaultConfigDir, "chains")
 	defaultVMConfigDir          = filepath.Join(defaultConfigDir, "vms")
 	defaultVMAliasFilePath      = filepath.Join(defaultVMConfigDir, "aliases.json")
+	defaultChainAliasFilePath   = filepath.Join(defaultChainConfigDir, "aliases.json")
 	defaultSubnetConfigDir      = filepath.Join(defaultConfigDir, "subnets")
 
 	// Places to look for the build directory
@@ -152,8 +153,8 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(InboundConnUpgradeThrottlerCooldownKey, 10*time.Second, "Upgrade an inbound connection from a given IP at most once per this duration. If 0, don't rate-limit inbound connection upgrades")
 	fs.Float64(InboundThrottlerMaxConnsPerSecKey, 256, "Max number of inbound connections to accept (from all peers) per second")
 	// Outbound Connection Throttling
-	fs.Uint(OutboundConnectionThrottlingRps, 50, "Make at most this number of outgoing peer connection attempts per second")
-	fs.Duration(OutboundConnectionTimeout, 30*time.Second, "Timeout when dialing a peer")
+	fs.Uint(OutboundConnectionThrottlingRpsKey, 50, "Make at most this number of outgoing peer connection attempts per second")
+	fs.Duration(OutboundConnectionTimeoutKey, 30*time.Second, "Timeout when dialing a peer")
 	// Timeouts
 	fs.Duration(NetworkInitialTimeoutKey, 5*time.Second, "Initial timeout value of the adaptive timeout manager")
 	fs.Duration(NetworkMinimumTimeoutKey, 2*time.Second, "Minimum timeout value of the adaptive timeout manager")
@@ -308,6 +309,9 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Uint(SnowMixedQueryNumPushVdrKey, 10, fmt.Sprintf("If this node is a validator, when a container is inserted into consensus, send a Push Query to %s validators and a Pull Query to the others. Must be <= k.", SnowMixedQueryNumPushVdrKey))
 	fs.Uint(SnowMixedQueryNumPushNonVdrKey, 0, fmt.Sprintf("If this node is not a validator, when a container is inserted into consensus, send a Push Query to %s validators and a Pull Query to the others. Must be <= k.", SnowMixedQueryNumPushNonVdrKey))
 
+	// ProposerVM
+	fs.Bool(ProposerVMUseCurrentHeightKey, false, "Have the ProposerVM always report the last accepted P-chain block height")
+
 	// Metrics
 	fs.Bool(MeterVMsEnabledKey, true, "Enable Meter VMs to track VM performance with more granularity")
 	fs.Duration(UptimeMetricFreqKey, 30*time.Second, "Frequency of renewing this node's average uptime metric")
@@ -331,8 +335,12 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Bool(ProfileContinuousEnabledKey, false, "Whether the app should continuously produce performance profiles")
 	fs.Duration(ProfileContinuousFreqKey, 15*time.Minute, "How frequently to rotate performance profiles")
 	fs.Int(ProfileContinuousMaxFilesKey, 5, "Maximum number of historical profiles to keep")
+
+	// Aliasing
 	fs.String(VMAliasesFileKey, defaultVMAliasFilePath, fmt.Sprintf("Specifies a JSON file that maps vmIDs with custom aliases. Ignored if %s is specified", VMAliasesContentKey))
 	fs.String(VMAliasesContentKey, "", "Specifies base64 encoded maps vmIDs with custom aliases")
+	fs.String(ChainAliasesFileKey, defaultChainAliasFilePath, fmt.Sprintf("Specifies a JSON file that maps blockchainIDs with custom aliases. Ignored if %s is specified", ChainConfigContentKey))
+	fs.String(ChainAliasesContentKey, "", "Specifies base64 encoded map from blockchainID to custom aliases")
 
 	// Delays
 	fs.Duration(NetworkInitialReconnectDelayKey, time.Second, "Initial delay duration must be waited before attempting to reconnect a peer")

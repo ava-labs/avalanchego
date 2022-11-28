@@ -6,6 +6,8 @@ package ids
 import (
 	"fmt"
 	"strings"
+
+	"golang.org/x/exp/maps"
 )
 
 const (
@@ -56,18 +58,16 @@ func (b *UniqueBag) Difference(diff *UniqueBag) {
 	}
 }
 
-func (b *UniqueBag) GetSet(id ID) BitSet64 { return (*b)[id] }
+func (b *UniqueBag) GetSet(id ID) BitSet64 {
+	return (*b)[id]
+}
 
-func (b *UniqueBag) RemoveSet(id ID) { delete(*b, id) }
+func (b *UniqueBag) RemoveSet(id ID) {
+	delete(*b, id)
+}
 
 func (b *UniqueBag) List() []ID {
-	idList := make([]ID, len(*b))
-	i := 0
-	for id := range *b {
-		idList[i] = id
-		i++
-	}
-	return idList
+	return maps.Keys(*b)
 }
 
 func (b *UniqueBag) Bag(alpha int) Bag {
@@ -92,10 +92,10 @@ func (b *UniqueBag) PrefixedString(prefix string) string {
 	return sb.String()
 }
 
-func (b *UniqueBag) String() string { return b.PrefixedString("") }
+func (b *UniqueBag) String() string {
+	return b.PrefixedString("")
+}
 
 func (b *UniqueBag) Clear() {
-	for id := range *b {
-		delete(*b, id)
-	}
+	maps.Clear(*b)
 }

@@ -51,10 +51,14 @@ func (t *BaseTx) ConsumedAssetIDs() set.Set[ids.ID] {
 }
 
 // AssetIDs returns the IDs of the assets this transaction depends on
-func (t *BaseTx) AssetIDs() set.Set[ids.ID] { return t.ConsumedAssetIDs() }
+func (t *BaseTx) AssetIDs() set.Set[ids.ID] {
+	return t.ConsumedAssetIDs()
+}
 
 // NumCredentials returns the number of expected credentials
-func (t *BaseTx) NumCredentials() int { return len(t.Ins) }
+func (t *BaseTx) NumCredentials() int {
+	return len(t.Ins)
+}
 
 // Verify ensures that transaction metadata is valid
 func (t *BaseTx) Verify(ctx *snow.Context) error {

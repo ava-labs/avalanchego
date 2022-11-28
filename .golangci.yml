@@ -4,6 +4,7 @@ run:
   # skip auto-generated files.
   skip-files:
     - ".*\\.pb\\.go$"
+    - ".*mock.*"
 
 issues:
   # Maximum count of issues with the same text. Set to 0 to disable. Default is 3.
@@ -17,6 +18,7 @@ linters:
     - asciicheck
     - depguard
     - errcheck
+    - errorlint
     - exportloopref
     - goconst
     - gocritic
@@ -50,6 +52,48 @@ linters:
     # - noctx
 
 linters-settings:
+  errorlint:
+    # Check for plain type assertions and type switches.
+    asserts: false
+    # Check for plain error comparisons.
+    comparison: false
+  revive:
+    rules:
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#bool-literal-in-expr
+      - name: bool-literal-in-expr
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#early-return
+      - name: early-return
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#empty-lines
+      - name: empty-lines
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#struct-tag
+      - name: struct-tag
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unexported-naming
+      - name: unexported-naming
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unhandled-error
+      - name: unhandled-error
+        disabled: false
+        arguments:
+          - "fmt.Fprint"
+          - "fmt.Fprintf"
+          - "fmt.Print"
+          - "fmt.Printf"
+          - "fmt.Println"
+          - "rand.Read"
+          - "sb.WriteString"
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unused-parameter
+      - name: unused-parameter
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unused-receiver
+      - name: unused-receiver
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#useless-break
+      - name: useless-break
+        disabled: false
   staticcheck:
     go: "1.18"
     # https://staticcheck.io/docs/options#checks

@@ -9,12 +9,17 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 // ShortEmpty is a useful all zero value
-var ShortEmpty = ShortID{}
+var (
+	ShortEmpty = ShortID{}
+
+	_ utils.Sortable[ShortID] = ShortID{}
+)
 
 // ShortID wraps a 20 byte hash as an identifier
 type ShortID [20]byte
@@ -78,10 +83,14 @@ func (id *ShortID) UnmarshalText(text []byte) error {
 
 // Bytes returns the 20 byte hash as a slice. It is assumed this slice is not
 // modified.
-func (id ShortID) Bytes() []byte { return id[:] }
+func (id ShortID) Bytes() []byte {
+	return id[:]
+}
 
 // Hex returns a hex encoded string of this id.
-func (id ShortID) Hex() string { return hex.EncodeToString(id.Bytes()) }
+func (id ShortID) Hex() string {
+	return hex.EncodeToString(id.Bytes())
+}
 
 func (id ShortID) String() string {
 	// We assume that the maximum size of a byte slice that
@@ -100,7 +109,7 @@ func (id ShortID) MarshalText() ([]byte, error) {
 }
 
 func (id ShortID) Less(other ShortID) bool {
-	return bytes.Compare(id.Bytes(), other.Bytes()) == -1
+	return bytes.Compare(id[:], other[:]) == -1
 }
 
 // ShortIDsToStrings converts an array of shortIDs to an array of their string

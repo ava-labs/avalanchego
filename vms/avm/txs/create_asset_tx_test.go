@@ -451,7 +451,7 @@ func TestCreateAssetTxSerializationAgain(t *testing.T) {
 	}
 }
 
-func TestCreateAssetTxGetters(t *testing.T) {
+func TestCreateAssetTxGetters(*testing.T) {
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
@@ -924,7 +924,7 @@ func TestCreateAssetTxSyntacticVerifyInitialStates(t *testing.T) {
 		},
 	}
 
-	utils.SortSliceSortable(uniqueStates)
+	utils.Sort(uniqueStates)
 
 	// Put states in unsorted order
 	tx.States = []*InitialState{

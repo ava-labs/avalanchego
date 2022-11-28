@@ -20,45 +20,29 @@ type testOperable struct {
 	Outputs []verify.State `serialize:"true"`
 }
 
-func (o *testOperable) InitCtx(ctx *snow.Context) {}
+func (*testOperable) InitCtx(*snow.Context) {}
 
-func (o *testOperable) Outs() []verify.State { return o.Outputs }
+func (o *testOperable) Outs() []verify.State {
+	return o.Outputs
+}
 
 func TestOperationVerifyNil(t *testing.T) {
-	c := linearcodec.NewDefault()
-	m := codec.NewDefaultManager()
-	if err := m.RegisterCodec(CodecVersion, c); err != nil {
-		t.Fatal(err)
-	}
-
 	op := (*Operation)(nil)
-	if err := op.Verify(m); err == nil {
+	if err := op.Verify(); err == nil {
 		t.Fatalf("Should have erred due to nil operation")
 	}
 }
 
 func TestOperationVerifyEmpty(t *testing.T) {
-	c := linearcodec.NewDefault()
-	m := codec.NewDefaultManager()
-	if err := m.RegisterCodec(CodecVersion, c); err != nil {
-		t.Fatal(err)
-	}
-
 	op := &Operation{
 		Asset: avax.Asset{ID: ids.Empty},
 	}
-	if err := op.Verify(m); err == nil {
+	if err := op.Verify(); err == nil {
 		t.Fatalf("Should have erred due to empty operation")
 	}
 }
 
 func TestOperationVerifyUTXOIDsNotSorted(t *testing.T) {
-	c := linearcodec.NewDefault()
-	m := codec.NewDefaultManager()
-	if err := m.RegisterCodec(CodecVersion, c); err != nil {
-		t.Fatal(err)
-	}
-
 	op := &Operation{
 		Asset: avax.Asset{ID: ids.Empty},
 		UTXOIDs: []*avax.UTXOID{
@@ -73,18 +57,12 @@ func TestOperationVerifyUTXOIDsNotSorted(t *testing.T) {
 		},
 		Op: &testOperable{},
 	}
-	if err := op.Verify(m); err == nil {
+	if err := op.Verify(); err == nil {
 		t.Fatalf("Should have erred due to unsorted utxoIDs")
 	}
 }
 
 func TestOperationVerify(t *testing.T) {
-	c := linearcodec.NewDefault()
-	m := codec.NewDefaultManager()
-	if err := m.RegisterCodec(CodecVersion, c); err != nil {
-		t.Fatal(err)
-	}
-
 	assetID := ids.GenerateTestID()
 	op := &Operation{
 		Asset: avax.Asset{ID: assetID},
@@ -96,7 +74,7 @@ func TestOperationVerify(t *testing.T) {
 		},
 		Op: &testOperable{},
 	}
-	if err := op.Verify(m); err != nil {
+	if err := op.Verify(); err != nil {
 		t.Fatal(err)
 	}
 }

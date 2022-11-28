@@ -4,6 +4,7 @@
 package health
 
 import (
+	"context"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -16,7 +17,7 @@ import (
 func TestServiceResponses(t *testing.T) {
 	require := require.New(t)
 
-	check := CheckerFunc(func() (interface{}, error) {
+	check := CheckerFunc(func(context.Context) (interface{}, error) {
 		return "", nil
 	})
 
@@ -68,7 +69,7 @@ func TestServiceResponses(t *testing.T) {
 		require.False(reply.Healthy)
 	}
 
-	h.Start(checkFreq)
+	h.Start(context.Background(), checkFreq)
 	defer h.Stop()
 
 	awaitReadiness(h)

@@ -23,6 +23,11 @@ type Config struct {
 	Chains chains.Manager
 
 	// Node's validator set maps subnetID -> validators of the subnet
+	//
+	// Invariant: The primary network's validator set should have been added to
+	//            the manager before calling VM.Initialize.
+	// Invariant: The primary network's validator set should be empty before
+	//            calling VM.Initialize.
 	Validators validators.Manager
 
 	// Provides access to subnet tracking
@@ -105,6 +110,15 @@ type Config struct {
 	// If a subnet is whitelisted but not in this map, we use the value for the
 	// Primary Network.
 	MinPercentConnectedStakeHealthy map[ids.ID]float64
+
+	// UseCurrentHeight forces [GetMinimumHeight] to return the current height
+	// of the P-Chain instead of the oldest block in the [recentlyAccepted]
+	// window.
+	//
+	// This config is particularly useful for triggering proposervm activation
+	// on recently created subnets (without this, users need to wait for
+	// [recentlyAcceptedWindowTTL] to pass for activation to occur).
+	UseCurrentHeight bool
 }
 
 func (c *Config) IsApricotPhase3Activated(timestamp time.Time) bool {

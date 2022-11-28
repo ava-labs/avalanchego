@@ -4,6 +4,7 @@
 package tracker
 
 import (
+	"context"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -78,7 +79,7 @@ func (p *peers) OnValidatorWeightChanged(nodeID ids.NodeID, oldWeight, newWeight
 	}
 }
 
-func (p *peers) Connected(nodeID ids.NodeID, _ *version.Application) error {
+func (p *peers) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -90,7 +91,7 @@ func (p *peers) Connected(nodeID ids.NodeID, _ *version.Application) error {
 	return nil
 }
 
-func (p *peers) Disconnected(nodeID ids.NodeID) error {
+func (p *peers) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 

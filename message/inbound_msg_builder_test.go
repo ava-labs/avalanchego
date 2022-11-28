@@ -10,26 +10,17 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-func Test_newInboundBuilder(t *testing.T) {
+func Test_newMsgBuilder(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 
-	mb, err := newMsgBuilder("test", prometheus.NewRegistry(), int64(constants.DefaultMaxMessageSize), 5*time.Second)
-	require.NoError(err)
-
-	builder := newInboundBuilder(mb)
-
-	inMsg := builder.InboundAccepted(
-		ids.GenerateTestID(),
-		uint32(12345),
-		[]ids.ID{ids.GenerateTestID()},
-		ids.GenerateTestNodeID(),
+	mb, err := newMsgBuilder(
+		"test",
+		prometheus.NewRegistry(),
+		10*time.Second,
 	)
-
-	t.Logf("outbound message built %q", inMsg.Op().String())
+	require.NoError(err)
+	require.NotNil(mb)
 }

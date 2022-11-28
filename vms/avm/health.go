@@ -3,7 +3,9 @@
 
 package avm
 
+import "context"
+
 // TODO: add health checks
-func (vm *VM) HealthCheck() (interface{}, error) {
+func (*VM) HealthCheck(context.Context) (interface{}, error) {
 	return nil, nil
 }

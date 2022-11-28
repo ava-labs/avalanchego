@@ -3,7 +3,10 @@
 
 package snowman
 
-import "errors"
+import (
+	"context"
+	"errors"
+)
 
 var ErrNotOracle = errors.New("block isn't an oracle")
 
@@ -18,5 +21,5 @@ type OracleBlock interface {
 	// Options returns the possible children of this block in the order this
 	// validator prefers the blocks.
 	// Options is guaranteed to only be called on a verified block.
-	Options() ([2]Block, error)
+	Options(context.Context) ([2]Block, error)
 }

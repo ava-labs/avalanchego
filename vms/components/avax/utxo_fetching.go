@@ -24,7 +24,8 @@ func GetBalance(db UTXOReader, addrs set.Set[ids.ShortID]) (uint64, error) {
 	balance := uint64(0)
 	for _, utxo := range utxos {
 		if out, ok := utxo.Out.(Amounter); ok {
-			if balance, err = safemath.Add64(out.Amount(), balance); err != nil {
+			balance, err = safemath.Add64(out.Amount(), balance)
+			if err != nil {
 				return 0, err
 			}
 		}
@@ -70,7 +71,7 @@ func GetPaginatedUTXOs(
 		searchSize = limit         // the limit diminishes which can impact the expected return
 		addrsList  = addrs.List()
 	)
-	utils.SortSliceSortable(addrsList) // enforces the same ordering for pagination
+	utils.Sort(addrsList) // enforces the same ordering for pagination
 	for _, addr := range addrsList {
 		start := ids.Empty
 		if comp := bytes.Compare(addr.Bytes(), lastAddr.Bytes()); comp == -1 { // Skip addresses before [startAddr]

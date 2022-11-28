@@ -76,7 +76,7 @@ type BuildGenesisReply struct {
 
 // BuildGenesis returns the UTXOs such that at least one address in [args.Addresses] is
 // referenced in the UTXO.
-func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
+func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 	parser, err := txs.NewParser([]fxs.Fx{
 		&secp256k1fx.Fx{},
 		&nftfx.Fx{},
@@ -176,10 +176,10 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			initialState.Sort(genesisCodec)
 			asset.States = append(asset.States, initialState)
 		}
-		utils.SortSliceSortable(asset.States)
+		utils.Sort(asset.States)
 		g.Txs = append(g.Txs, &asset)
 	}
-	utils.SortSliceSortable(g.Txs)
+	utils.Sort(g.Txs)
 
 	b, err := genesisCodec.Marshal(txs.CodecVersion, &g)
 	if err != nil {

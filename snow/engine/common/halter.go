@@ -4,13 +4,14 @@
 package common
 
 import (
+	"context"
 	"sync/atomic"
 )
 
 var _ Haltable = (*Halter)(nil)
 
 type Haltable interface {
-	Halt()
+	Halt(context.Context)
 	Halted() bool
 }
 
@@ -18,7 +19,7 @@ type Halter struct {
 	halted uint32
 }
 
-func (h *Halter) Halt() {
+func (h *Halter) Halt(context.Context) {
 	atomic.StoreUint32(&h.halted, 1)
 }
 

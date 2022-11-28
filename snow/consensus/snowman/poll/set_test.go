@@ -245,11 +245,11 @@ func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
 		t.Fatalf("Should only have one active poll")
 	} else if results := s.Vote(1, vdr1, vtxID); len(results) > 0 {
 		t.Fatalf("Shouldn't have been able to finish a non-existent poll")
-	} else if results = s.Vote(0, vdr1, vtxID); len(results) > 0 {
+	} else if results := s.Vote(0, vdr1, vtxID); len(results) > 0 {
 		t.Fatalf("Shouldn't have been able to finish an ongoing poll")
-	} else if results = s.Vote(0, vdr1, vtxID); len(results) > 0 {
+	} else if results := s.Vote(0, vdr1, vtxID); len(results) > 0 {
 		t.Fatalf("Should have dropped a duplicated poll")
-	} else if results = s.Vote(0, vdr2, vtxID); len(results) == 0 {
+	} else if results := s.Vote(0, vdr2, vtxID); len(results) == 0 {
 		t.Fatalf("Should have finished the")
 	} else if len(results) != 1 {
 		t.Fatalf("Wrong number of results returned")
@@ -290,11 +290,11 @@ func TestCreateAndFinishFailedPoll(t *testing.T) {
 		t.Fatalf("Should only have one active poll")
 	} else if results := s.Drop(1, vdr1); len(results) > 0 {
 		t.Fatalf("Shouldn't have been able to finish a non-existent poll")
-	} else if results = s.Drop(0, vdr1); len(results) > 0 {
+	} else if results := s.Drop(0, vdr1); len(results) > 0 {
 		t.Fatalf("Shouldn't have been able to finish an ongoing poll")
-	} else if results = s.Drop(0, vdr1); len(results) > 0 {
+	} else if results := s.Drop(0, vdr1); len(results) > 0 {
 		t.Fatalf("Should have dropped a duplicated poll")
-	} else if results = s.Drop(0, vdr2); len(results) == 0 {
+	} else if results := s.Drop(0, vdr2); len(results) == 0 {
 		t.Fatalf("Should have finished the")
 	} else if list := results[0].List(); len(list) != 0 {
 		t.Fatalf("Wrong number of vertices returned")

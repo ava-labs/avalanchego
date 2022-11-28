@@ -21,6 +21,7 @@ var Tests = []func(t *testing.T, db Database){
 	TestSimpleKeyValue,
 	TestKeyEmptyValue,
 	TestSimpleKeyValueClosed,
+	TestNewBatchClosed,
 	TestBatchPut,
 	TestBatchDelete,
 	TestBatchReset,
@@ -48,6 +49,11 @@ var Tests = []func(t *testing.T, db Database){
 	TestModifyValueAfterBatchPutReplay,
 	TestConcurrentBatches,
 	TestManySmallConcurrentKVPairBatches,
+	TestPutGetEmpty,
+}
+
+var FuzzTests = []func(*testing.F, Database){
+	FuzzKeyValue,
 }
 
 // TestSimpleKeyValue tests to make sure that simple Put + Get + Delete + Has
@@ -201,6 +207,28 @@ func TestMemorySafetyDatabase(t *testing.T, db Database) {
 	}
 }
 
+// TestNewBatchClosed tests to make sure that calling NewBatch on a closed
+// database returns a batch that errors correctly.
+func TestNewBatchClosed(t *testing.T, db Database) {
+	require := require.New(t)
+
+	err := db.Close()
+	require.NoError(err)
+
+	batch := db.NewBatch()
+	require.NotNil(batch)
+
+	key := []byte("hello")
+	value := []byte("world")
+
+	err = batch.Put(key, value)
+	require.NoError(err)
+	require.Greater(batch.Size(), 0)
+
+	err = batch.Write()
+	require.ErrorIs(err, ErrClosed)
+}
+
 // TestBatchPut tests to make sure that batched writes work as expected.
 func TestBatchPut(t *testing.T, db Database) {
 	key := []byte("hello")
@@ -233,7 +261,7 @@ func TestBatchPut(t *testing.T, db Database) {
 		t.Fatalf("Unexpected error on db.Delete: %s", err)
 	}
 
-	if batch = db.NewBatch(); batch == nil {
+	if batch := db.NewBatch(); batch == nil {
 		t.Fatalf("db.NewBatch returned nil")
 	} else if err := batch.Put(key, value); err != nil {
 		t.Fatalf("Unexpected error on batch.Put: %s", err)
@@ -1305,4 +1333,51 @@ func runConcurrentBatches(
 		eg.Go(batch.Write)
 	}
 	return eg.Wait()
+}
+
+func TestPutGetEmpty(t *testing.T, db Database) {
+	require := require.New(t)
+
+	key := []byte("hello")
+
+	err := db.Put(key, nil)
+	require.NoError(err)
+
+	value, err := db.Get(key)
+	require.NoError(err)
+	require.Empty(value) // May be nil or empty byte slice.
+
+	err = db.Put(key, []byte{})
+	require.NoError(err)
+
+	value, err = db.Get(key)
+	require.NoError(err)
+	require.Empty(value) // May be nil or empty byte slice.
+}
+
+func FuzzKeyValue(f *testing.F, db Database) {
+	f.Fuzz(func(t *testing.T, key []byte, value []byte) {
+		require := require.New(t)
+
+		err := db.Put(key, value)
+		require.NoError(err)
+
+		exists, err := db.Has(key)
+		require.NoError(err)
+		require.True(exists)
+
+		gotVal, err := db.Get(key)
+		require.NoError(err)
+		require.True(bytes.Equal(value, gotVal))
+
+		err = db.Delete(key)
+		require.NoError(err)
+
+		exists, err = db.Has(key)
+		require.NoError(err)
+		require.False(exists)
+
+		_, err = db.Get(key)
+		require.ErrorIs(err, ErrNotFound)
+	})
 }

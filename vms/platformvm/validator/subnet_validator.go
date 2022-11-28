@@ -17,7 +17,9 @@ type SubnetValidator struct {
 }
 
 // SubnetID is the ID of the subnet this validator is validating
-func (v *SubnetValidator) SubnetID() ids.ID { return v.Subnet }
+func (v *SubnetValidator) SubnetID() ids.ID {
+	return v.Subnet
+}
 
 // Verify this validator is valid
 func (v *SubnetValidator) Verify() error {

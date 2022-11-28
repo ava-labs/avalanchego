@@ -4,6 +4,7 @@
 package proposer
 
 import (
+	"context"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -25,6 +26,7 @@ var _ Windower = (*windower)(nil)
 
 type Windower interface {
 	Delay(
+		ctx context.Context,
 		chainHeight,
 		pChainHeight uint64,
 		validatorID ids.NodeID,
@@ -50,13 +52,13 @@ func New(state validators.State, subnetID, chainID ids.ID) Windower {
 	}
 }
 
-func (w *windower) Delay(chainHeight, pChainHeight uint64, validatorID ids.NodeID) (time.Duration, error) {
+func (w *windower) Delay(ctx context.Context, chainHeight, pChainHeight uint64, validatorID ids.NodeID) (time.Duration, error) {
 	if validatorID == ids.EmptyNodeID {
 		return MaxDelay, nil
 	}
 
 	// get the validator set by the p-chain height
-	validatorsMap, err := w.state.GetValidatorSet(pChainHeight, w.subnetID)
+	validatorsMap, err := w.state.GetValidatorSet(ctx, pChainHeight, w.subnetID)
 	if err != nil {
 		return 0, err
 	}
@@ -79,7 +81,7 @@ func (w *windower) Delay(chainHeight, pChainHeight uint64, validatorID ids.NodeI
 	// canonically sort validators
 	// Note: validators are sorted by ID, sorting by weight would not create a
 	// canonically sorted list
-	utils.SortSliceSortable(validators)
+	utils.Sort(validators)
 
 	// convert the slice of validators to a slice of weights
 	validatorWeights := make([]uint64, len(validators))

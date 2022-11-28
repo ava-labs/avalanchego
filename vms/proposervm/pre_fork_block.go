@@ -4,6 +4,7 @@
 package proposervm
 
 import (
+	"context"
 	"time"
 
 	"go.uber.org/zap"
@@ -21,36 +22,36 @@ type preForkBlock struct {
 	vm *VM
 }
 
-func (b *preForkBlock) Accept() error {
+func (b *preForkBlock) Accept(ctx context.Context) error {
 	if err := b.acceptOuterBlk(); err != nil {
 		return err
 	}
-	return b.acceptInnerBlk()
+	return b.acceptInnerBlk(ctx)
 }
 
-func (b *preForkBlock) acceptOuterBlk() error {
+func (*preForkBlock) acceptOuterBlk() error {
 	return nil
 }
 
-func (b *preForkBlock) acceptInnerBlk() error {
-	return b.Block.Accept()
+func (b *preForkBlock) acceptInnerBlk(ctx context.Context) error {
+	return b.Block.Accept(ctx)
 }
 
-func (b *preForkBlock) Verify() error {
-	parent, err := b.vm.getPreForkBlock(b.Block.Parent())
+func (b *preForkBlock) Verify(ctx context.Context) error {
+	parent, err := b.vm.getPreForkBlock(ctx, b.Block.Parent())
 	if err != nil {
 		return err
 	}
-	return parent.verifyPreForkChild(b)
+	return parent.verifyPreForkChild(ctx, b)
 }
 
-func (b *preForkBlock) Options() ([2]snowman.Block, error) {
+func (b *preForkBlock) Options(ctx context.Context) ([2]snowman.Block, error) {
 	oracleBlk, ok := b.Block.(snowman.OracleBlock)
 	if !ok {
 		return [2]snowman.Block{}, snowman.ErrNotOracle
 	}
 
-	options, err := oracleBlk.Options()
+	options, err := oracleBlk.Options(ctx)
 	if err != nil {
 		return [2]snowman.Block{}, err
 	}
@@ -71,10 +72,10 @@ func (b *preForkBlock) getInnerBlk() snowman.Block {
 	return b.Block
 }
 
-func (b *preForkBlock) verifyPreForkChild(child *preForkBlock) error {
+func (b *preForkBlock) verifyPreForkChild(ctx context.Context, child *preForkBlock) error {
 	parentTimestamp := b.Timestamp()
 	if !parentTimestamp.Before(b.vm.activationTime) {
-		if err := verifyIsOracleBlock(b.Block); err != nil {
+		if err := verifyIsOracleBlock(ctx, b.Block); err != nil {
 			return err
 		}
 
@@ -88,12 +89,12 @@ func (b *preForkBlock) verifyPreForkChild(child *preForkBlock) error {
 		)
 	}
 
-	return child.Block.Verify()
+	return child.Block.Verify(ctx)
 }
 
 // This method only returns nil once (during the transition)
-func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
-	if err := verifyIsNotOracleBlock(b.Block); err != nil {
+func (b *preForkBlock) verifyPostForkChild(ctx context.Context, child *postForkBlock) error {
+	if err := verifyIsNotOracleBlock(ctx, b.Block); err != nil {
 		return err
 	}
 
@@ -103,7 +104,7 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 
 	childID := child.ID()
 	childPChainHeight := child.PChainHeight()
-	currentPChainHeight, err := b.vm.ctx.ValidatorState.GetCurrentHeight()
+	currentPChainHeight, err := b.vm.ctx.ValidatorState.GetCurrentHeight(ctx)
 	if err != nil {
 		b.vm.ctx.Log.Error("block verification failed",
 			zap.String("reason", "failed to get current P-Chain height"),
@@ -152,18 +153,18 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 	}
 
 	// Verify the inner block and track it as verified
-	return b.vm.verifyAndRecordInnerBlk(child)
+	return b.vm.verifyAndRecordInnerBlk(ctx, child)
 }
 
-func (b *preForkBlock) verifyPostForkOption(child *postForkOption) error {
+func (*preForkBlock) verifyPostForkOption(context.Context, *postForkOption) error {
 	return errUnexpectedBlockType
 }
 
-func (b *preForkBlock) buildChild() (Block, error) {
+func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 	parentTimestamp := b.Timestamp()
 	if parentTimestamp.Before(b.vm.activationTime) {
 		// The chain hasn't forked yet
-		innerBlock, err := b.vm.ChainVM.BuildBlock()
+		innerBlock, err := b.vm.ChainVM.BuildBlock(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -190,12 +191,12 @@ func (b *preForkBlock) buildChild() (Block, error) {
 
 	// The child's P-Chain height is proposed as the optimal P-Chain height that
 	// is at least the minimum height
-	pChainHeight, err := b.vm.optimalPChainHeight(b.vm.minimumPChainHeight)
+	pChainHeight, err := b.vm.optimalPChainHeight(ctx, b.vm.minimumPChainHeight)
 	if err != nil {
 		return nil, err
 	}
 
-	innerBlock, err := b.vm.ChainVM.BuildBlock()
+	innerBlock, err := b.vm.ChainVM.BuildBlock(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +229,7 @@ func (b *preForkBlock) buildChild() (Block, error) {
 	return blk, nil
 }
 
-func (b *preForkBlock) pChainHeight() (uint64, error) {
+func (*preForkBlock) pChainHeight(context.Context) (uint64, error) {
 	return 0, nil
 }
 

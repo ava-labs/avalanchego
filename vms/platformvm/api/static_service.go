@@ -4,7 +4,6 @@
 package api
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"net/http"
@@ -17,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txheap"
@@ -34,6 +34,8 @@ var (
 	errUTXOHasNoValue       = errors.New("genesis UTXO has no value")
 	errValidatorAddsNoValue = errors.New("validator would have already unstaked")
 	errStakeOverflow        = errors.New("validator stake exceeds limit")
+
+	_ utils.Sortable[UTXO] = UTXO{}
 )
 
 // StaticService defines the static API methods exposed by the platform VM
@@ -71,7 +73,7 @@ func (utxo UTXO) Less(other UTXO) bool {
 		return false
 	}
 
-	return bytes.Compare(utxoAddr.Bytes(), otherAddr.Bytes()) == -1
+	return utxoAddr.Less(otherAddr)
 }
 
 // TODO: Refactor APIStaker, APIValidators and merge them together for
@@ -110,13 +112,14 @@ type PermissionlessValidator struct {
 	ValidationRewardOwner *Owner `json:"validationRewardOwner,omitempty"`
 	// The owner of the rewards from delegations during the validation period,
 	// if applicable.
-	DelegationRewardOwner *Owner        `json:"delegationRewardOwner,omitempty"`
-	PotentialReward       *json.Uint64  `json:"potentialReward,omitempty"`
-	DelegationFee         json.Float32  `json:"delegationFee"`
-	ExactDelegationFee    *json.Uint32  `json:"exactDelegationFee,omitempty"`
-	Uptime                *json.Float32 `json:"uptime,omitempty"`
-	Connected             bool          `json:"connected"`
-	Staked                []UTXO        `json:"staked,omitempty"`
+	DelegationRewardOwner *Owner                    `json:"delegationRewardOwner,omitempty"`
+	PotentialReward       *json.Uint64              `json:"potentialReward,omitempty"`
+	DelegationFee         json.Float32              `json:"delegationFee"`
+	ExactDelegationFee    *json.Uint32              `json:"exactDelegationFee,omitempty"`
+	Uptime                *json.Float32             `json:"uptime,omitempty"`
+	Connected             bool                      `json:"connected"`
+	Staked                []UTXO                    `json:"staked,omitempty"`
+	Signer                *signer.ProofOfPossession `json:"signer,omitempty"`
 	// The delegators delegating to this validator
 	Delegators []PrimaryDelegator `json:"delegators"`
 }
@@ -196,7 +199,7 @@ func bech32ToID(addrStr string) (ids.ShortID, error) {
 }
 
 // BuildGenesis build the genesis state of the Platform Chain (and thereby the Avalanche network.)
-func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
+func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 	// Specify the UTXOs on the Platform chain that exist at genesis.
 	utxos := make([]*genesis.UTXO, 0, len(args.UTXOs))
 	for i, apiUTXO := range args.UTXOs {
@@ -244,7 +247,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	for _, vdr := range args.Validators {
 		weight := uint64(0)
 		stake := make([]*avax.TransferableOutput, len(vdr.Staked))
-		utils.SortSliceSortable(vdr.Staked)
+		utils.Sort(vdr.Staked)
 		for i, apiUTXO := range vdr.Staked {
 			addrID, err := bech32ToID(apiUTXO.Address)
 			if err != nil {
@@ -295,7 +298,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			}
 			owner.Addrs = append(owner.Addrs, addrID)
 		}
-		utils.SortSliceSortable(owner.Addrs)
+		utils.Sort(owner.Addrs)
 
 		delegationFee := uint32(0)
 		if vdr.ExactDelegationFee != nil {

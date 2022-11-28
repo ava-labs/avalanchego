@@ -37,8 +37,13 @@ type StandardTxExecutor struct {
 	AtomicRequests map[ids.ID]*atomic.Requests // may be nil
 }
 
-func (*StandardTxExecutor) AdvanceTimeTx(*txs.AdvanceTimeTx) error         { return errWrongTxType }
-func (*StandardTxExecutor) RewardValidatorTx(*txs.RewardValidatorTx) error { return errWrongTxType }
+func (*StandardTxExecutor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+	return errWrongTxType
+}
+
+func (*StandardTxExecutor) RewardValidatorTx(*txs.RewardValidatorTx) error {
+	return errWrongTxType
+}
 
 func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
@@ -77,7 +82,9 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 
 	// If this proposal is committed and this node is a member of the subnet
 	// that validates the blockchain, create the blockchain
-	e.OnAccept = func() { e.Config.CreateChain(txID, tx) }
+	e.OnAccept = func() {
+		e.Config.CreateChain(txID, tx)
+	}
 	return nil
 }
 
@@ -272,8 +279,11 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	}
 
 	txID := e.Tx.ID()
+	newStaker, err := state.NewPendingStaker(txID, tx)
+	if err != nil {
+		return err
+	}
 
-	newStaker := state.NewPendingStaker(txID, tx)
 	e.State.PutPendingValidator(newStaker)
 	utxo.Consume(e.State, tx.Ins)
 	utxo.Produce(e.State, txID, tx.Outs)
@@ -292,8 +302,11 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	}
 
 	txID := e.Tx.ID()
+	newStaker, err := state.NewPendingStaker(txID, tx)
+	if err != nil {
+		return err
+	}
 
-	newStaker := state.NewPendingStaker(txID, tx)
 	e.State.PutPendingValidator(newStaker)
 	utxo.Consume(e.State, tx.Ins)
 	utxo.Produce(e.State, txID, tx.Outs)
@@ -312,7 +325,11 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	}
 
 	txID := e.Tx.ID()
-	newStaker := state.NewPendingStaker(txID, tx)
+	newStaker, err := state.NewPendingStaker(txID, tx)
+	if err != nil {
+		return err
+	}
+
 	e.State.PutPendingDelegator(newStaker)
 	utxo.Consume(e.State, tx.Ins)
 	utxo.Produce(e.State, txID, tx.Outs)
@@ -408,8 +425,11 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 	}
 
 	txID := e.Tx.ID()
+	newStaker, err := state.NewPendingStaker(txID, tx)
+	if err != nil {
+		return err
+	}
 
-	newStaker := state.NewPendingStaker(txID, tx)
 	e.State.PutPendingValidator(newStaker)
 	utxo.Consume(e.State, tx.Ins)
 	utxo.Produce(e.State, txID, tx.Outs)
@@ -428,8 +448,11 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 	}
 
 	txID := e.Tx.ID()
+	newStaker, err := state.NewPendingStaker(txID, tx)
+	if err != nil {
+		return err
+	}
 
-	newStaker := state.NewPendingStaker(txID, tx)
 	e.State.PutPendingDelegator(newStaker)
 	utxo.Consume(e.State, tx.Ins)
 	utxo.Produce(e.State, txID, tx.Outs)

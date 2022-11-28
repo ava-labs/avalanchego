@@ -13,7 +13,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -27,18 +26,24 @@ var (
 )
 
 type adaptiveTimeout struct {
-	index    int           // Index in the wait queue
-	id       ids.RequestID // Unique ID of this timeout
-	handler  func()        // Function to execute if timed out
-	duration time.Duration // How long this timeout was set for
-	deadline time.Time     // When this timeout should be fired
-	op       message.Op    // Type of this outstanding request
+	index          int           // Index in the wait queue
+	id             ids.RequestID // Unique ID of this timeout
+	handler        func()        // Function to execute if timed out
+	duration       time.Duration // How long this timeout was set for
+	deadline       time.Time     // When this timeout should be fired
+	measureLatency bool          // Whether this request should impact latency
 }
 
 type timeoutQueue []*adaptiveTimeout
 
-func (tq timeoutQueue) Len() int           { return len(tq) }
-func (tq timeoutQueue) Less(i, j int) bool { return tq[i].deadline.Before(tq[j].deadline) }
+func (tq timeoutQueue) Len() int {
+	return len(tq)
+}
+
+func (tq timeoutQueue) Less(i, j int) bool {
+	return tq[i].deadline.Before(tq[j].deadline)
+}
+
 func (tq timeoutQueue) Swap(i, j int) {
 	tq[i], tq[j] = tq[j], tq[i]
 	tq[i].index = i
@@ -87,7 +92,7 @@ type AdaptiveTimeoutManager interface {
 	TimeoutDuration() time.Duration
 	// Registers a timeout for the item with the given [id].
 	// If the timeout occurs before the item is Removed, [timeoutHandler] is called.
-	Put(id ids.RequestID, op message.Op, timeoutHandler func())
+	Put(id ids.RequestID, measureLatency bool, timeoutHandler func())
 	// Remove the timeout associated with [id].
 	// Its timeout handler will not be called.
 	Remove(id ids.RequestID)
@@ -180,28 +185,32 @@ func (tm *adaptiveTimeoutManager) TimeoutDuration() time.Duration {
 	return tm.currentTimeout
 }
 
-func (tm *adaptiveTimeoutManager) Dispatch() { tm.timer.Dispatch() }
+func (tm *adaptiveTimeoutManager) Dispatch() {
+	tm.timer.Dispatch()
+}
 
-func (tm *adaptiveTimeoutManager) Stop() { tm.timer.Stop() }
+func (tm *adaptiveTimeoutManager) Stop() {
+	tm.timer.Stop()
+}
 
-func (tm *adaptiveTimeoutManager) Put(id ids.RequestID, op message.Op, timeoutHandler func()) {
+func (tm *adaptiveTimeoutManager) Put(id ids.RequestID, measureLatency bool, timeoutHandler func()) {
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
 
-	tm.put(id, op, timeoutHandler)
+	tm.put(id, measureLatency, timeoutHandler)
 }
 
 // Assumes [tm.lock] is held
-func (tm *adaptiveTimeoutManager) put(id ids.RequestID, op message.Op, handler func()) {
+func (tm *adaptiveTimeoutManager) put(id ids.RequestID, measureLatency bool, handler func()) {
 	now := tm.clock.Time()
 	tm.remove(id, now)
 
 	timeout := &adaptiveTimeout{
-		id:       id,
-		handler:  handler,
-		duration: tm.currentTimeout,
-		deadline: now.Add(tm.currentTimeout),
-		op:       op,
+		id:             id,
+		handler:        handler,
+		duration:       tm.currentTimeout,
+		deadline:       now.Add(tm.currentTimeout),
+		measureLatency: measureLatency,
 	}
 	tm.timeoutMap[id] = timeout
 	tm.numPendingTimeouts.Set(float64(len(tm.timeoutMap)))
@@ -225,10 +234,7 @@ func (tm *adaptiveTimeoutManager) remove(id ids.RequestID, now time.Time) {
 	}
 
 	// Observe the response time to update average network response time.
-	// Don't include Get requests in calculation, since an adversary
-	// can cause you to issue a Get request and then cause it to timeout,
-	// increasing your timeout.
-	if timeout.op != message.Get {
+	if timeout.measureLatency {
 		timeoutRegisteredAt := timeout.deadline.Add(-1 * timeout.duration)
 		latency := now.Sub(timeoutRegisteredAt)
 		tm.observeLatencyAndUpdateTimeout(latency, now)

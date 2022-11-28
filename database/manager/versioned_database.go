@@ -5,8 +5,11 @@ package manager
 
 import (
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/version"
 )
+
+var _ utils.Sortable[*VersionedDatabase] = (*VersionedDatabase)(nil)
 
 type VersionedDatabase struct {
 	Database database.Database

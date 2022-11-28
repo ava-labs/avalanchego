@@ -34,7 +34,9 @@ type Acceptor interface {
 
 type noOpAcceptor struct{}
 
-func (noOpAcceptor) Accept(*ConsensusContext, ids.ID, []byte) error { return nil }
+func (noOpAcceptor) Accept(*ConsensusContext, ids.ID, []byte) error {
+	return nil
+}
 
 // AcceptorTracker tracks the dispatched accept events by its ID and counts.
 // Useful for testing.
@@ -49,7 +51,7 @@ func NewAcceptorTracker() *AcceptorTracker {
 	}
 }
 
-func (a *AcceptorTracker) Accept(ctx *ConsensusContext, containerID ids.ID, container []byte) error {
+func (a *AcceptorTracker) Accept(_ *ConsensusContext, containerID ids.ID, _ []byte) error {
 	a.lock.Lock()
 	a.accepted[containerID]++
 	a.lock.Unlock()

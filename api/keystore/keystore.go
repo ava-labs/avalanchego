@@ -242,12 +242,12 @@ func (ks *keystore) DeleteUser(username, pw string) error {
 	defer it.Release()
 
 	for it.Next() {
-		if err = dataBatch.Delete(it.Key()); err != nil {
+		if err := dataBatch.Delete(it.Key()); err != nil {
 			return err
 		}
 	}
 
-	if err = it.Error(); err != nil {
+	if err := it.Error(); err != nil {
 		return err
 	}
 

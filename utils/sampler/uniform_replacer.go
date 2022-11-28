@@ -5,6 +5,8 @@ package sampler
 
 import (
 	"math"
+
+	"golang.org/x/exp/maps"
 )
 
 type defaultMap map[uint64]uint64
@@ -71,9 +73,7 @@ func (s *uniformReplacer) ClearSeed() {
 }
 
 func (s *uniformReplacer) Reset() {
-	for k := range s.drawn {
-		delete(s.drawn, k)
-	}
+	maps.Clear(s.drawn)
 	s.drawsCount = 0
 }
 

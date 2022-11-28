@@ -279,17 +279,19 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	)
 	require.NoError(err)
 
-	vdrStaker := state.NewCurrentStaker(
+	vdrStaker, err := state.NewCurrentStaker(
 		vdrTx.ID(),
 		vdrTx.Unsigned.(*txs.AddValidatorTx),
 		0,
 	)
+	require.NoError(err)
 
-	delStaker := state.NewCurrentStaker(
+	delStaker, err := state.NewCurrentStaker(
 		delTx.ID(),
 		delTx.Unsigned.(*txs.AddDelegatorTx),
 		1000000,
 	)
+	require.NoError(err)
 
 	env.state.PutCurrentValidator(vdrStaker)
 	env.state.AddTx(vdrTx, status.Committed)
@@ -300,7 +302,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	require.NoError(env.state.Commit())
 
 	// test validator stake
-	vdrSet, ok := env.config.Validators.GetValidators(constants.PrimaryNetworkID)
+	vdrSet, ok := env.config.Validators.Get(constants.PrimaryNetworkID)
 	require.True(ok)
 	stake, ok := vdrSet.GetWeight(vdrNodeID)
 	require.True(ok)
@@ -411,17 +413,19 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	)
 	require.NoError(err)
 
-	vdrStaker := state.NewCurrentStaker(
+	vdrStaker, err := state.NewCurrentStaker(
 		vdrTx.ID(),
 		vdrTx.Unsigned.(*txs.AddValidatorTx),
 		0,
 	)
+	require.NoError(err)
 
-	delStaker := state.NewCurrentStaker(
+	delStaker, err := state.NewCurrentStaker(
 		delTx.ID(),
 		delTx.Unsigned.(*txs.AddDelegatorTx),
 		1000000,
 	)
+	require.NoError(err)
 
 	env.state.PutCurrentValidator(vdrStaker)
 	env.state.AddTx(vdrTx, status.Committed)

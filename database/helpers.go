@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	Uint64Size = 8 // bytes
 	// kvPairOverhead is an estimated overhead for a kv pair in a database.
 	kvPairOverhead = 8 // bytes
 )
@@ -49,13 +50,13 @@ func GetUInt64(db KeyValueReader, key []byte) (uint64, error) {
 }
 
 func PackUInt64(val uint64) []byte {
-	bytes := make([]byte, 8)
+	bytes := make([]byte, Uint64Size)
 	binary.BigEndian.PutUint64(bytes, val)
 	return bytes
 }
 
 func ParseUInt64(b []byte) (uint64, error) {
-	if len(b) != 8 {
+	if len(b) != Uint64Size {
 		return 0, errWrongSize
 	}
 	return binary.BigEndian.Uint64(b), nil

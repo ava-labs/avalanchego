@@ -19,7 +19,9 @@ type issuer struct {
 	deps      set.Set[ids.ID]
 }
 
-func (i *issuer) Dependencies() set.Set[ids.ID] { return i.deps }
+func (i *issuer) Dependencies() set.Set[ids.ID] {
+	return i.deps
+}
 
 // Mark that a dependency has been met
 func (i *issuer) Fulfill(ctx context.Context, id ids.ID) {
