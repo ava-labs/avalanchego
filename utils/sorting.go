@@ -36,7 +36,8 @@ func SortByHash[T ~[]byte](s []T) {
 }
 
 // Sorts a 2D byte slice.
-// Each byte slice is not sorted internally; the byte slices are sorted relative to one another.
+// Each byte slice is not sorted internally; the byte slices are sorted relative
+// to one another.
 func SortBytes[T ~[]byte](arr []T) {
 	slices.SortFunc(arr, func(i, j T) bool {
 		return bytes.Compare(i, j) == -1
