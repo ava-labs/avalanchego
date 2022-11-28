@@ -60,7 +60,7 @@ func (t *targeter) TargetUsage(nodeID ids.NodeID) float64 {
 	baseAlloc = math.Min(baseAlloc, t.maxNonVdrNodeUsage)
 
 	// This node gets a stake-weighted portion of the validator allocation.
-	weight, _ := t.vdrs.GetWeight(nodeID)
+	weight := t.vdrs.GetWeight(nodeID)
 	vdrAlloc := t.vdrAlloc * float64(weight) / float64(t.vdrs.Weight())
 	return vdrAlloc + baseAlloc
 }

@@ -369,11 +369,11 @@ func (b *bootstrapper) fetch(ctx context.Context, vtxIDs ...ids.ID) error {
 			continue
 		}
 
-		validators, err := b.Config.Beacons.Sample(1) // validator to send request to
+		validatorIDs, err := b.Config.Beacons.Sample(1) // validator to send request to
 		if err != nil {
 			return fmt.Errorf("dropping request for %s as there are no validators", vtxID)
 		}
-		validatorID := validators[0].ID()
+		validatorID := validatorIDs[0]
 		b.Config.SharedCfg.RequestID++
 
 		b.OutstandingRequests.Add(validatorID, b.Config.SharedCfg.RequestID, vtxID)

@@ -65,10 +65,8 @@ var (
 	_ secp256k1fx.VM   = (*VM)(nil)
 	_ validators.State = (*VM)(nil)
 
-	errWrongCacheType               = errors.New("unexpectedly cached type")
-	errMissingValidatorSet          = errors.New("missing validator set")
-	errValidatorSetAlreadyPopulated = errors.New("validator set already populated")
-	errDuplicateValidatorSet        = errors.New("duplicate validator set")
+	errWrongCacheType      = errors.New("unexpectedly cached type")
+	errMissingValidatorSet = errors.New("missing validator set")
 )
 
 type VM struct {
@@ -216,10 +214,6 @@ func (vm *VM) Initialize(
 		appSender,
 	)
 
-	if err := vm.initValidators(); err != nil {
-		return fmt.Errorf("failed to initialize validator sets: %w", err)
-	}
-
 	// Create all of the chains that the database says exist
 	if err := vm.initBlockchains(); err != nil {
 		return fmt.Errorf(
@@ -302,7 +296,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 
 	validatorIDs := make([]ids.NodeID, len(primaryValidators))
 	for i, vdr := range primaryValidators {
-		validatorIDs[i] = vdr.ID()
+		validatorIDs[i] = vdr.NodeID
 	}
 
 	if err := vm.uptimeManager.StartTracking(validatorIDs); err != nil {
@@ -345,7 +339,7 @@ func (vm *VM) Shutdown(context.Context) error {
 
 		validatorIDs := make([]ids.NodeID, len(primaryValidators))
 		for i, vdr := range primaryValidators {
-			validatorIDs[i] = vdr.ID()
+			validatorIDs[i] = vdr.NodeID
 		}
 
 		if err := vm.uptimeManager.Shutdown(validatorIDs); err != nil {
@@ -489,7 +483,7 @@ func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.I
 
 	vdrSet := make(map[ids.NodeID]uint64, len(currentValidatorList))
 	for _, vdr := range currentValidatorList {
-		vdrSet[vdr.ID()] = vdr.Weight()
+		vdrSet[vdr.NodeID] = vdr.Weight
 	}
 
 	for i := lastAcceptedHeight; i > height; i-- {
@@ -581,39 +575,6 @@ func (vm *VM) GetCurrentHeight(context.Context) (uint64, error) {
 	return lastAccepted.Height(), nil
 }
 
-func (vm *VM) initValidators() error {
-	primaryValidators, ok := vm.Validators.Get(constants.PrimaryNetworkID)
-	if !ok {
-		return errMissingValidatorSet
-	}
-	if primaryValidators.Len() != 0 {
-		// Enforce the invariant that the validator set is empty before the call
-		// to VM.Initialize.
-		return errValidatorSetAlreadyPopulated
-	}
-	err := vm.state.ValidatorSet(constants.PrimaryNetworkID, primaryValidators)
-	if err != nil {
-		return err
-	}
-
-	weight, _ := primaryValidators.GetWeight(vm.ctx.NodeID)
-	vm.metrics.SetLocalStake(weight)
-	vm.metrics.SetTotalStake(primaryValidators.Weight())
-
-	for subnetID := range vm.WhitelistedSubnets {
-		subnetValidators := validators.NewSet()
-		err := vm.state.ValidatorSet(subnetID, subnetValidators)
-		if err != nil {
-			return err
-		}
-
-		if !vm.Validators.Add(subnetID, subnetValidators) {
-			return fmt.Errorf("%w: %s", errDuplicateValidatorSet, subnetID)
-		}
-	}
-	return nil
-}
-
 func (vm *VM) CodecRegistry() codec.Registry {
 	return vm.codecRegistry
 }
@@ -644,10 +605,10 @@ func (vm *VM) getPercentConnected(subnetID ids.ID) (float64, error) {
 		err            error
 	)
 	for _, vdr := range vdrSet.List() {
-		if !vm.uptimeManager.IsConnected(vdr.ID()) {
+		if !vm.uptimeManager.IsConnected(vdr.NodeID) {
 			continue // not connected to us --> don't include
 		}
-		connectedStake, err = math.Add64(connectedStake, vdr.Weight())
+		connectedStake, err = math.Add64(connectedStake, vdr.Weight)
 		if err != nil {
 			return 0, err
 		}

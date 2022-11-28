@@ -674,6 +674,8 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	}
 
 	// Force a reload of the state from the database.
+	vm.Config.Validators = validators.NewManager()
+	vm.Config.Validators.Add(constants.PrimaryNetworkID, validators.NewSet())
 	is, err := state.New(
 		vm.dbManager.Current().Database,
 		nil,
@@ -989,6 +991,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	}
 
 	// Force a reload of the state from the database.
+	vm.Config.Validators = validators.NewManager()
+	vm.Config.Validators.Add(constants.PrimaryNetworkID, validators.NewSet())
 	is, err := state.New(
 		vm.dbManager.Current().Database,
 		nil,

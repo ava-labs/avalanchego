@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -22,7 +23,7 @@ type GossipTrackerCallback struct {
 
 // OnValidatorAdded adds [validatorID] to the set of validators that can be
 // gossiped about
-func (g *GossipTrackerCallback) OnValidatorAdded(nodeID ids.NodeID, _ uint64) {
+func (g *GossipTrackerCallback) OnValidatorAdded(nodeID ids.NodeID, _ *bls.PublicKey, _ uint64) {
 	if !g.GossipTracker.AddValidator(nodeID) {
 		g.Log.Error("failed to add a validator",
 			zap.Stringer("nodeID", nodeID),

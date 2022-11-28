@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -45,7 +46,7 @@ func NewPeers() Peers {
 	}
 }
 
-func (p *peers) OnValidatorAdded(nodeID ids.NodeID, weight uint64) {
+func (p *peers) OnValidatorAdded(nodeID ids.NodeID, _ *bls.PublicKey, weight uint64) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 

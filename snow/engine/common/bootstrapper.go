@@ -5,6 +5,7 @@ package common
 
 import (
 	"context"
+
 	stdmath "math"
 
 	"go.uber.org/zap"
@@ -113,19 +114,15 @@ func (b *bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, 
 	// We've received the accepted frontier from every bootstrap validator
 	// Ask each bootstrap validator to filter the list of containers that we were
 	// told are on the accepted frontier such that the list only contains containers
-	// they think are accepted
-	var err error
-
+	// they think are accepted.
+	//
 	// Create a newAlpha taking using the sampled beacon
 	// Keep the proportion of b.Alpha in the newAlpha
 	// newAlpha := totalSampledWeight * b.Alpha / totalWeight
 
 	newAlpha := float64(b.sampledBeacons.Weight()*b.Alpha) / float64(b.Beacons.Weight())
 
-	failedBeaconWeight, err := b.Beacons.SubsetWeight(b.failedAcceptedFrontier)
-	if err != nil {
-		return err
-	}
+	failedBeaconWeight := b.Beacons.SubsetWeight(b.failedAcceptedFrontier)
 
 	// fail the bootstrap if the weight is not enough to bootstrap
 	if float64(b.sampledBeacons.Weight())-newAlpha < float64(failedBeaconWeight) {
@@ -189,11 +186,7 @@ func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 	// Mark that we received a response from [nodeID]
 	b.pendingReceiveAccepted.Remove(nodeID)
 
-	weight := uint64(0)
-	if w, ok := b.Beacons.GetWeight(nodeID); ok {
-		weight = w
-	}
-
+	weight := b.Beacons.GetWeight(nodeID)
 	for _, containerID := range containerIDs {
 		previousWeight := b.acceptedVotes[containerID]
 		newWeight, err := math.Add64(weight, previousWeight)
@@ -228,10 +221,7 @@ func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 	size := len(accepted)
 	if size == 0 && b.Beacons.Len() > 0 {
 		// retry the bootstrap if the weight is not enough to bootstrap
-		failedBeaconWeight, err := b.Beacons.SubsetWeight(b.failedAccepted)
-		if err != nil {
-			return err
-		}
+		failedBeaconWeight := b.Beacons.SubsetWeight(b.failedAccepted)
 
 		// in a zero network there will be no accepted votes but the voting weight will be greater than the failed weight
 		if b.Config.RetryBootstrap && b.Beacons.Weight()-b.Alpha < failedBeaconWeight {
@@ -277,19 +267,23 @@ func (b *bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID,
 }
 
 func (b *bootstrapper) Startup(ctx context.Context) error {
-	beacons, err := b.Beacons.Sample(b.Config.SampleK)
+	beaconIDs, err := b.Beacons.Sample(b.Config.SampleK)
 	if err != nil {
 		return err
 	}
 
 	b.sampledBeacons = validators.NewSet()
 	b.pendingSendAcceptedFrontier.Clear()
-	for _, vdr := range beacons {
-		vdrID := vdr.ID()
-		if err := b.sampledBeacons.AddWeight(vdrID, 1); err != nil {
+	for _, nodeID := range beaconIDs {
+		if !b.sampledBeacons.Contains(nodeID) {
+			err = b.sampledBeacons.Add(nodeID, nil, 1)
+		} else {
+			err = b.sampledBeacons.AddWeight(nodeID, 1)
+		}
+		if err != nil {
 			return err
 		}
-		b.pendingSendAcceptedFrontier.Add(vdrID)
+		b.pendingSendAcceptedFrontier.Add(nodeID)
 	}
 
 	b.pendingReceiveAcceptedFrontier.Clear()
@@ -298,8 +292,7 @@ func (b *bootstrapper) Startup(ctx context.Context) error {
 
 	b.pendingSendAccepted.Clear()
 	for _, vdr := range b.Beacons.List() {
-		vdrID := vdr.ID()
-		b.pendingSendAccepted.Add(vdrID)
+		b.pendingSendAccepted.Add(vdr.NodeID)
 	}
 
 	b.pendingReceiveAccepted.Clear()

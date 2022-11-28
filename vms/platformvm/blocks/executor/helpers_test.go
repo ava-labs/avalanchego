@@ -483,7 +483,7 @@ func shutdownEnvironment(t *environment) error {
 
 		validatorIDs := make([]ids.NodeID, len(primaryValidators))
 		for i, vdr := range primaryValidators {
-			validatorIDs[i] = vdr.ID()
+			validatorIDs[i] = vdr.NodeID
 		}
 
 		if err := t.uptimes.Shutdown(validatorIDs); err != nil {
