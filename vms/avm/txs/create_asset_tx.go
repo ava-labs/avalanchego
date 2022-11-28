@@ -58,7 +58,9 @@ func (t *CreateAssetTx) InitCtx(ctx *snow.Context) {
 
 // InitialStates track which virtual machines, and the initial state of these
 // machines, this asset uses. The returned array should not be modified.
-func (t *CreateAssetTx) InitialStates() []*InitialState { return t.States }
+func (t *CreateAssetTx) InitialStates() []*InitialState {
+	return t.States
+}
 
 func (t *CreateAssetTx) SyntacticVerify(
 	ctx *snow.Context,

@@ -38,9 +38,10 @@ import (
 )
 
 const (
-	// minBlockDelay should be kept as whole seconds because block timestamps
-	// are only specific to the second.
-	minBlockDelay         = time.Second
+	// DefaultMinBlockDelay should be kept as whole seconds because block
+	// timestamps are only specific to the second.
+	DefaultMinBlockDelay = time.Second
+
 	checkIndexedFrequency = 10 * time.Second
 	innerBlkCacheSize     = 512
 )
@@ -62,6 +63,7 @@ type VM struct {
 
 	activationTime      time.Time
 	minimumPChainHeight uint64
+	minBlkDelay         time.Duration
 
 	state.State
 	hIndexer                indexer.HeightIndexer
@@ -99,10 +101,13 @@ type VM struct {
 	lastAcceptedHeight uint64
 }
 
+// New performs best when [minBlkDelay] is whole seconds. This is because block
+// timestamps are only specific to the second.
 func New(
 	vm block.ChainVM,
 	activationTime time.Time,
 	minimumPChainHeight uint64,
+	minBlkDelay time.Duration,
 ) *VM {
 	bVM, _ := vm.(block.BatchedChainVM)
 	hVM, _ := vm.(block.HeightIndexedChainVM)
@@ -115,11 +120,13 @@ func New(
 
 		activationTime:      activationTime,
 		minimumPChainHeight: minimumPChainHeight,
+		minBlkDelay:         minBlkDelay,
 	}
 }
 
 func (vm *VM) Initialize(
-	ctx *snow.Context,
+	ctx context.Context,
+	chainCtx *snow.Context,
 	dbManager manager.Manager,
 	genesisBytes []byte,
 	upgradeBytes []byte,
@@ -140,17 +147,17 @@ func (vm *VM) Initialize(
 	if err := multiGatherer.Register("", optionalGatherer); err != nil {
 		return err
 	}
-	if err := ctx.Metrics.Register(multiGatherer); err != nil {
+	if err := chainCtx.Metrics.Register(multiGatherer); err != nil {
 		return err
 	}
-	ctx.Metrics = optionalGatherer
+	chainCtx.Metrics = optionalGatherer
 
-	vm.ctx = ctx
+	vm.ctx = chainCtx
 	rawDB := dbManager.Current().Database
 	prefixDB := prefixdb.New(dbPrefix, rawDB)
 	vm.db = versiondb.New(prefixDB)
 	vm.State = state.New(vm.db)
-	vm.Windower = proposer.New(ctx.ValidatorState, ctx.SubnetID, ctx.ChainID)
+	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID)
 	vm.Tree = tree.New()
 	innerBlkCache, err := metercacher.New(
 		"inner_block_cache",
@@ -171,17 +178,18 @@ func (vm *VM) Initialize(
 	vm.Scheduler = scheduler
 	vm.toScheduler = vmToEngine
 
-	go ctx.Log.RecoverAndPanic(func() {
+	go chainCtx.Log.RecoverAndPanic(func() {
 		scheduler.Dispatch(time.Now())
 	})
 
 	vm.verifiedBlocks = make(map[ids.ID]PostForkBlock)
-	context, cancel := context.WithCancel(context.Background())
+	context, cancel := context.WithCancel(ctx)
 	vm.context = context
 	vm.onShutdown = cancel
 
 	err = vm.ChainVM.Initialize(
 		ctx,
+		chainCtx,
 		dbManager,
 		genesisBytes,
 		upgradeBytes,
@@ -194,25 +202,25 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	if err := vm.repair(indexerState); err != nil {
+	if err := vm.repair(ctx, indexerState); err != nil {
 		return err
 	}
 
-	return vm.setLastAcceptedMetadata()
+	return vm.setLastAcceptedMetadata(ctx)
 }
 
 // shutdown ops then propagate shutdown to innerVM
-func (vm *VM) Shutdown() error {
+func (vm *VM) Shutdown(ctx context.Context) error {
 	vm.onShutdown()
 
 	if err := vm.db.Commit(); err != nil {
 		return err
 	}
-	return vm.ChainVM.Shutdown()
+	return vm.ChainVM.Shutdown(ctx)
 }
 
-func (vm *VM) SetState(newState snow.State) error {
-	if err := vm.ChainVM.SetState(newState); err != nil {
+func (vm *VM) SetState(ctx context.Context, newState snow.State) error {
+	if err := vm.ChainVM.SetState(ctx, newState); err != nil {
 		return err
 	}
 
@@ -226,54 +234,54 @@ func (vm *VM) SetState(newState snow.State) error {
 	// repairAcceptedChainByHeight rolls back the chain to the previously last
 	// accepted block. If state sync has completed successfully, this call is a
 	// no-op.
-	if err := vm.repairAcceptedChainByHeight(); err != nil {
+	if err := vm.repairAcceptedChainByHeight(ctx); err != nil {
 		return err
 	}
-	return vm.setLastAcceptedMetadata()
+	return vm.setLastAcceptedMetadata(ctx)
 }
 
-func (vm *VM) BuildBlock() (snowman.Block, error) {
-	preferredBlock, err := vm.getBlock(vm.preferred)
+func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
+	preferredBlock, err := vm.getBlock(ctx, vm.preferred)
 	if err != nil {
 		return nil, err
 	}
 
-	return preferredBlock.buildChild()
+	return preferredBlock.buildChild(ctx)
 }
 
-func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
-	if blk, err := vm.parsePostForkBlock(b); err == nil {
+func (vm *VM) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error) {
+	if blk, err := vm.parsePostForkBlock(ctx, b); err == nil {
 		return blk, nil
 	}
-	return vm.parsePreForkBlock(b)
+	return vm.parsePreForkBlock(ctx, b)
 }
 
-func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
-	return vm.getBlock(id)
+func (vm *VM) GetBlock(ctx context.Context, id ids.ID) (snowman.Block, error) {
+	return vm.getBlock(ctx, id)
 }
 
-func (vm *VM) SetPreference(preferred ids.ID) error {
+func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 	if vm.preferred == preferred {
 		return nil
 	}
 	vm.preferred = preferred
 
-	blk, err := vm.getPostForkBlock(preferred)
+	blk, err := vm.getPostForkBlock(ctx, preferred)
 	if err != nil {
-		return vm.ChainVM.SetPreference(preferred)
+		return vm.ChainVM.SetPreference(ctx, preferred)
 	}
 
-	if err := vm.ChainVM.SetPreference(blk.getInnerBlk().ID()); err != nil {
+	if err := vm.ChainVM.SetPreference(ctx, blk.getInnerBlk().ID()); err != nil {
 		return err
 	}
 
-	pChainHeight, err := blk.pChainHeight()
+	pChainHeight, err := blk.pChainHeight(ctx)
 	if err != nil {
 		return err
 	}
 
 	// reset scheduler
-	minDelay, err := vm.Windower.Delay(blk.Height()+1, pChainHeight, vm.ctx.NodeID)
+	minDelay, err := vm.Windower.Delay(ctx, blk.Height()+1, pChainHeight, vm.ctx.NodeID)
 	if err != nil {
 		vm.ctx.Log.Debug("failed to fetch the expected delay",
 			zap.Error(err),
@@ -284,8 +292,15 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 		// until the P-chain's height has advanced.
 		return nil
 	}
-	if minDelay < minBlockDelay {
-		minDelay = minBlockDelay
+
+	// Note: The P-chain does not currently try to target any block time. It
+	// notifies the consensus engine as soon as a new block may be built. To
+	// avoid fast runs of blocks there is an additional minimum delay that
+	// validators can specify. This delay may be an issue for high performance,
+	// custom VMs. Until the P-chain is modified to target a specific block
+	// time, ProposerMinBlockDelay can be configured in the subnet config.
+	if minDelay < vm.minBlkDelay {
+		minDelay = vm.minBlkDelay
 	}
 
 	preferredTime := blk.Timestamp()
@@ -300,18 +315,18 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 	return nil
 }
 
-func (vm *VM) LastAccepted() (ids.ID, error) {
+func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
 	lastAccepted, err := vm.State.GetLastAccepted()
 	if err == database.ErrNotFound {
-		return vm.ChainVM.LastAccepted()
+		return vm.ChainVM.LastAccepted(ctx)
 	}
 	return lastAccepted, err
 }
 
-func (vm *VM) repair(indexerState state.State) error {
+func (vm *VM) repair(ctx context.Context, indexerState state.State) error {
 	// check and possibly rebuild height index
 	if vm.hVM == nil {
-		return vm.repairAcceptedChainByIteration()
+		return vm.repairAcceptedChainByIteration(ctx)
 	}
 
 	indexIsEmpty, err := vm.State.IsIndexEmpty()
@@ -338,17 +353,17 @@ func (vm *VM) repair(indexerState state.State) error {
 
 	if !vm.resetHeightIndexOngoing.GetValue() {
 		// We are not going to wipe the height index
-		switch vm.hVM.VerifyHeightIndex() {
+		switch vm.hVM.VerifyHeightIndex(ctx) {
 		case nil:
 			// We are not going to wait for the height index to be repaired.
-			shouldRepair, err := vm.shouldHeightIndexBeRepaired()
+			shouldRepair, err := vm.shouldHeightIndexBeRepaired(ctx)
 			if err != nil {
 				return err
 			}
 			if !shouldRepair {
 				vm.ctx.Log.Info("block height index was successfully verified")
 				vm.hIndexer.MarkRepaired(true)
-				return vm.repairAcceptedChainByHeight()
+				return vm.repairAcceptedChainByHeight(ctx)
 			}
 		case block.ErrIndexIncomplete:
 		default:
@@ -356,7 +371,7 @@ func (vm *VM) repair(indexerState state.State) error {
 		}
 	}
 
-	if err := vm.repairAcceptedChainByIteration(); err != nil {
+	if err := vm.repairAcceptedChainByIteration(ctx); err != nil {
 		return err
 	}
 
@@ -384,7 +399,7 @@ func (vm *VM) repair(indexerState state.State) error {
 		for {
 			// The underlying VM expects the lock to be held here.
 			vm.ctx.Lock.Lock()
-			err := vm.hVM.VerifyHeightIndex()
+			err := vm.hVM.VerifyHeightIndex(ctx)
 			vm.ctx.Lock.Unlock()
 
 			if err == nil {
@@ -407,7 +422,7 @@ func (vm *VM) repair(indexerState state.State) error {
 		}
 
 		vm.ctx.Lock.Lock()
-		shouldRepair, err := vm.shouldHeightIndexBeRepaired()
+		shouldRepair, err := vm.shouldHeightIndexBeRepaired(ctx)
 		vm.ctx.Lock.Unlock()
 
 		if err != nil {
@@ -442,7 +457,7 @@ func (vm *VM) repair(indexerState state.State) error {
 	return nil
 }
 
-func (vm *VM) repairAcceptedChainByIteration() error {
+func (vm *VM) repairAcceptedChainByIteration(ctx context.Context) error {
 	lastAcceptedID, err := vm.GetLastAccepted()
 	if err == database.ErrNotFound {
 		// If the last accepted block isn't indexed yet, then the underlying
@@ -455,7 +470,7 @@ func (vm *VM) repairAcceptedChainByIteration() error {
 
 	// Revert accepted blocks that weren't committed to the database.
 	for {
-		lastAccepted, err := vm.getPostForkBlock(lastAcceptedID)
+		lastAccepted, err := vm.getPostForkBlock(ctx, lastAcceptedID)
 		if err == database.ErrNotFound {
 			// If the post fork block can't be found, it's because we're
 			// reverting past the fork boundary. If this is the case, then there
@@ -512,12 +527,12 @@ func (vm *VM) repairAcceptedChainByIteration() error {
 	}
 }
 
-func (vm *VM) repairAcceptedChainByHeight() error {
-	innerLastAcceptedID, err := vm.ChainVM.LastAccepted()
+func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
+	innerLastAcceptedID, err := vm.ChainVM.LastAccepted(ctx)
 	if err != nil {
 		return err
 	}
-	innerLastAccepted, err := vm.ChainVM.GetBlock(innerLastAcceptedID)
+	innerLastAccepted, err := vm.ChainVM.GetBlock(ctx, innerLastAcceptedID)
 	if err != nil {
 		return err
 	}
@@ -531,7 +546,7 @@ func (vm *VM) repairAcceptedChainByHeight() error {
 		return err
 	}
 
-	proLastAccepted, err := vm.getPostForkBlock(proLastAcceptedID)
+	proLastAccepted, err := vm.getPostForkBlock(ctx, proLastAcceptedID)
 	if err != nil {
 		return err
 	}
@@ -572,7 +587,7 @@ func (vm *VM) repairAcceptedChainByHeight() error {
 	return vm.db.Commit()
 }
 
-func (vm *VM) setLastAcceptedMetadata() error {
+func (vm *VM) setLastAcceptedMetadata(ctx context.Context) error {
 	lastAcceptedID, err := vm.GetLastAccepted()
 	if err == database.ErrNotFound {
 		// If the last accepted block wasn't a PostFork block, then we don't
@@ -585,7 +600,7 @@ func (vm *VM) setLastAcceptedMetadata() error {
 		return err
 	}
 
-	lastAccepted, err := vm.getPostForkBlock(lastAcceptedID)
+	lastAccepted, err := vm.getPostForkBlock(ctx, lastAcceptedID)
 	if err != nil {
 		return err
 	}
@@ -599,7 +614,7 @@ func (vm *VM) setLastAcceptedMetadata() error {
 		return nil
 	}
 
-	acceptedParent, err := vm.getPostForkBlock(lastAccepted.Parent())
+	acceptedParent, err := vm.getPostForkBlock(ctx, lastAccepted.Parent())
 	if err != nil {
 		return err
 	}
@@ -607,7 +622,7 @@ func (vm *VM) setLastAcceptedMetadata() error {
 	return nil
 }
 
-func (vm *VM) parsePostForkBlock(b []byte) (PostForkBlock, error) {
+func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte) (PostForkBlock, error) {
 	statelessBlock, err := statelessblock.Parse(b)
 	if err != nil {
 		return nil, err
@@ -615,7 +630,7 @@ func (vm *VM) parsePostForkBlock(b []byte) (PostForkBlock, error) {
 
 	// if the block already exists, then make sure the status is set correctly
 	blkID := statelessBlock.ID()
-	blk, err := vm.getPostForkBlock(blkID)
+	blk, err := vm.getPostForkBlock(ctx, blkID)
 	if err == nil {
 		return blk, nil
 	}
@@ -624,7 +639,7 @@ func (vm *VM) parsePostForkBlock(b []byte) (PostForkBlock, error) {
 	}
 
 	innerBlkBytes := statelessBlock.Block()
-	innerBlk, err := vm.parseInnerBlock(blkID, innerBlkBytes)
+	innerBlk, err := vm.parseInnerBlock(ctx, blkID, innerBlkBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -651,22 +666,22 @@ func (vm *VM) parsePostForkBlock(b []byte) (PostForkBlock, error) {
 	return blk, nil
 }
 
-func (vm *VM) parsePreForkBlock(b []byte) (*preForkBlock, error) {
-	blk, err := vm.ChainVM.ParseBlock(b)
+func (vm *VM) parsePreForkBlock(ctx context.Context, b []byte) (*preForkBlock, error) {
+	blk, err := vm.ChainVM.ParseBlock(ctx, b)
 	return &preForkBlock{
 		Block: blk,
 		vm:    vm,
 	}, err
 }
 
-func (vm *VM) getBlock(id ids.ID) (Block, error) {
-	if blk, err := vm.getPostForkBlock(id); err == nil {
+func (vm *VM) getBlock(ctx context.Context, id ids.ID) (Block, error) {
+	if blk, err := vm.getPostForkBlock(ctx, id); err == nil {
 		return blk, nil
 	}
-	return vm.getPreForkBlock(id)
+	return vm.getPreForkBlock(ctx, id)
 }
 
-func (vm *VM) getPostForkBlock(blkID ids.ID) (PostForkBlock, error) {
+func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock, error) {
 	block, exists := vm.verifiedBlocks[blkID]
 	if exists {
 		return block, nil
@@ -678,7 +693,7 @@ func (vm *VM) getPostForkBlock(blkID ids.ID) (PostForkBlock, error) {
 	}
 
 	innerBlkBytes := statelessBlock.Block()
-	innerBlk, err := vm.parseInnerBlock(blkID, innerBlkBytes)
+	innerBlk, err := vm.parseInnerBlock(ctx, blkID, innerBlkBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -703,8 +718,8 @@ func (vm *VM) getPostForkBlock(blkID ids.ID) (PostForkBlock, error) {
 	}, nil
 }
 
-func (vm *VM) getPreForkBlock(blkID ids.ID) (*preForkBlock, error) {
-	blk, err := vm.ChainVM.GetBlock(blkID)
+func (vm *VM) getPreForkBlock(ctx context.Context, blkID ids.ID) (*preForkBlock, error) {
+	blk, err := vm.ChainVM.GetBlock(ctx, blkID)
 	return &preForkBlock{
 		Block: blk,
 		vm:    vm,
@@ -723,7 +738,7 @@ func (vm *VM) storePostForkBlock(blk PostForkBlock) error {
 	return vm.db.Commit()
 }
 
-func (vm *VM) verifyAndRecordInnerBlk(postFork PostForkBlock) error {
+func (vm *VM) verifyAndRecordInnerBlk(ctx context.Context, postFork PostForkBlock) error {
 	postForkID := postFork.ID()
 	// If inner block's Verify returned true, don't call it again.
 	//
@@ -732,7 +747,7 @@ func (vm *VM) verifyAndRecordInnerBlk(postFork PostForkBlock) error {
 	// if it's Verify() returns nil, it is eventually accepted or rejected.
 	currentInnerBlk := postFork.getInnerBlk()
 	if originalInnerBlk, contains := vm.Tree.Get(currentInnerBlk); !contains {
-		if err := currentInnerBlk.Verify(); err != nil {
+		if err := currentInnerBlk.Verify(ctx); err != nil {
 			return err
 		}
 		vm.Tree.Add(currentInnerBlk)
@@ -754,8 +769,8 @@ func (vm *VM) notifyInnerBlockReady() {
 	}
 }
 
-func (vm *VM) optimalPChainHeight(minPChainHeight uint64) (uint64, error) {
-	minimumHeight, err := vm.ctx.ValidatorState.GetMinimumHeight()
+func (vm *VM) optimalPChainHeight(ctx context.Context, minPChainHeight uint64) (uint64, error) {
+	minimumHeight, err := vm.ctx.ValidatorState.GetMinimumHeight(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -766,12 +781,12 @@ func (vm *VM) optimalPChainHeight(minPChainHeight uint64) (uint64, error) {
 // parseInnerBlock attempts to parse the provided bytes as an inner block. If
 // the inner block happens to be cached, then the inner block will not be
 // parsed.
-func (vm *VM) parseInnerBlock(outerBlkID ids.ID, innerBlkBytes []byte) (snowman.Block, error) {
+func (vm *VM) parseInnerBlock(ctx context.Context, outerBlkID ids.ID, innerBlkBytes []byte) (snowman.Block, error) {
 	if innerBlkIntf, ok := vm.innerBlkCache.Get(outerBlkID); ok {
 		return innerBlkIntf.(snowman.Block), nil
 	}
 
-	innerBlk, err := vm.ChainVM.ParseBlock(innerBlkBytes)
+	innerBlk, err := vm.ChainVM.ParseBlock(ctx, innerBlkBytes)
 	if err != nil {
 		return nil, err
 	}

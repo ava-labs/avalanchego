@@ -44,7 +44,9 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-			setup:       func(*CreateChainTx) *CreateChainTx { return nil },
+			setup: func(*CreateChainTx) *CreateChainTx {
+				return nil
+			},
 		},
 		{
 			description: "vm ID is empty",
@@ -55,7 +57,10 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-			setup:       func(tx *CreateChainTx) *CreateChainTx { tx.VMID = ids.ID{}; return tx },
+			setup: func(tx *CreateChainTx) *CreateChainTx {
+				tx.VMID = ids.ID{}
+				return tx
+			},
 		},
 		{
 			description: "subnet ID is empty",

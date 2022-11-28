@@ -5,6 +5,7 @@ package admin
 
 import (
 	"errors"
+	"net/http"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -69,13 +70,13 @@ func TestLoadVMsSuccess(t *testing.T) {
 	}
 
 	resources.mockLog.EXPECT().Debug(gomock.Any()).Times(1)
-	resources.mockVMRegistry.EXPECT().ReloadWithReadLock().Times(1).Return(newVMs, failedVMs, nil)
+	resources.mockVMRegistry.EXPECT().ReloadWithReadLock(gomock.Any()).Times(1).Return(newVMs, failedVMs, nil)
 	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
 	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(alias2, nil)
 
 	// execute test
 	reply := LoadVMsReply{}
-	err := resources.admin.LoadVMs(nil, nil, &reply)
+	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)
 
 	require.Equal(t, expectedVMRegistry, reply.NewVMs)
 	require.Equal(t, err, nil)
@@ -88,10 +89,10 @@ func TestLoadVMsReloadFails(t *testing.T) {
 
 	resources.mockLog.EXPECT().Debug(gomock.Any()).Times(1)
 	// Reload fails
-	resources.mockVMRegistry.EXPECT().ReloadWithReadLock().Times(1).Return(nil, nil, errOops)
+	resources.mockVMRegistry.EXPECT().ReloadWithReadLock(gomock.Any()).Times(1).Return(nil, nil, errOops)
 
 	reply := LoadVMsReply{}
-	err := resources.admin.LoadVMs(nil, nil, &reply)
+	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)
 
 	require.Equal(t, err, errOops)
 }
@@ -111,12 +112,12 @@ func TestLoadVMsGetAliasesFails(t *testing.T) {
 	alias1 := []string{id1.String(), "vm1-alias-1", "vm1-alias-2"}
 
 	resources.mockLog.EXPECT().Debug(gomock.Any()).Times(1)
-	resources.mockVMRegistry.EXPECT().ReloadWithReadLock().Times(1).Return(newVMs, failedVMs, nil)
+	resources.mockVMRegistry.EXPECT().ReloadWithReadLock(gomock.Any()).Times(1).Return(newVMs, failedVMs, nil)
 	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
 	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(nil, errOops)
 
 	reply := LoadVMsReply{}
-	err := resources.admin.LoadVMs(nil, nil, &reply)
+	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)
 
 	require.Equal(t, err, errOops)
 }

@@ -47,19 +47,19 @@ type TestVM struct {
 	CantAppRequest, CantAppResponse, CantAppGossip, CantAppRequestFailed,
 	CantCrossChainAppRequest, CantCrossChainAppResponse, CantCrossChainAppRequestFailed bool
 
-	InitializeF                 func(*snow.Context, manager.Manager, []byte, []byte, []byte, chan<- Message, []*Fx, AppSender) error
-	SetStateF                   func(snow.State) error
-	ShutdownF                   func() error
-	CreateHandlersF             func() (map[string]*HTTPHandler, error)
-	CreateStaticHandlersF       func() (map[string]*HTTPHandler, error)
-	ConnectedF                  func(nodeID ids.NodeID, nodeVersion *version.Application) error
-	DisconnectedF               func(nodeID ids.NodeID) error
-	HealthCheckF                func() (interface{}, error)
+	InitializeF                 func(ctx context.Context, chainCtx *snow.Context, db manager.Manager, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, msgChan chan<- Message, fxs []*Fx, appSender AppSender) error
+	SetStateF                   func(ctx context.Context, state snow.State) error
+	ShutdownF                   func(context.Context) error
+	CreateHandlersF             func(context.Context) (map[string]*HTTPHandler, error)
+	CreateStaticHandlersF       func(context.Context) (map[string]*HTTPHandler, error)
+	ConnectedF                  func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
+	DisconnectedF               func(ctx context.Context, nodeID ids.NodeID) error
+	HealthCheckF                func(context.Context) (interface{}, error)
 	AppRequestF                 func(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
 	AppResponseF                func(ctx context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error
 	AppGossipF                  func(ctx context.Context, nodeID ids.NodeID, msg []byte) error
 	AppRequestFailedF           func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
-	VersionF                    func() (string, error)
+	VersionF                    func(context.Context) (string, error)
 	CrossChainAppRequestF       func(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, msg []byte) error
 	CrossChainAppResponseF      func(ctx context.Context, chainID ids.ID, requestID uint32, msg []byte) error
 	CrossChainAppRequestFailedF func(ctx context.Context, chainID ids.ID, requestID uint32) error
@@ -84,9 +84,29 @@ func (vm *TestVM) Default(cant bool) {
 	vm.CantCrossChainAppResponse = cant
 }
 
-func (vm *TestVM) Initialize(ctx *snow.Context, db manager.Manager, genesisBytes, upgradeBytes, configBytes []byte, msgChan chan<- Message, fxs []*Fx, appSender AppSender) error {
+func (vm *TestVM) Initialize(
+	ctx context.Context,
+	chainCtx *snow.Context,
+	db manager.Manager,
+	genesisBytes,
+	upgradeBytes,
+	configBytes []byte,
+	msgChan chan<- Message,
+	fxs []*Fx,
+	appSender AppSender,
+) error {
 	if vm.InitializeF != nil {
-		return vm.InitializeF(ctx, db, genesisBytes, upgradeBytes, configBytes, msgChan, fxs, appSender)
+		return vm.InitializeF(
+			ctx,
+			chainCtx,
+			db,
+			genesisBytes,
+			upgradeBytes,
+			configBytes,
+			msgChan,
+			fxs,
+			appSender,
+		)
 	}
 	if vm.CantInitialize && vm.T != nil {
 		vm.T.Fatal(errInitialize)
@@ -94,9 +114,9 @@ func (vm *TestVM) Initialize(ctx *snow.Context, db manager.Manager, genesisBytes
 	return errInitialize
 }
 
-func (vm *TestVM) SetState(state snow.State) error {
+func (vm *TestVM) SetState(ctx context.Context, state snow.State) error {
 	if vm.SetStateF != nil {
-		return vm.SetStateF(state)
+		return vm.SetStateF(ctx, state)
 	}
 	if vm.CantSetState {
 		if vm.T != nil {
@@ -107,9 +127,9 @@ func (vm *TestVM) SetState(state snow.State) error {
 	return nil
 }
 
-func (vm *TestVM) Shutdown() error {
+func (vm *TestVM) Shutdown(ctx context.Context) error {
 	if vm.ShutdownF != nil {
-		return vm.ShutdownF()
+		return vm.ShutdownF(ctx)
 	}
 	if vm.CantShutdown {
 		if vm.T != nil {
@@ -120,9 +140,9 @@ func (vm *TestVM) Shutdown() error {
 	return nil
 }
 
-func (vm *TestVM) CreateHandlers() (map[string]*HTTPHandler, error) {
+func (vm *TestVM) CreateHandlers(ctx context.Context) (map[string]*HTTPHandler, error) {
 	if vm.CreateHandlersF != nil {
-		return vm.CreateHandlersF()
+		return vm.CreateHandlersF(ctx)
 	}
 	if vm.CantCreateHandlers && vm.T != nil {
 		vm.T.Fatal(errCreateHandlers)
@@ -130,9 +150,9 @@ func (vm *TestVM) CreateHandlers() (map[string]*HTTPHandler, error) {
 	return nil, nil
 }
 
-func (vm *TestVM) CreateStaticHandlers() (map[string]*HTTPHandler, error) {
+func (vm *TestVM) CreateStaticHandlers(ctx context.Context) (map[string]*HTTPHandler, error) {
 	if vm.CreateStaticHandlersF != nil {
-		return vm.CreateStaticHandlersF()
+		return vm.CreateStaticHandlersF(ctx)
 	}
 	if vm.CantCreateStaticHandlers && vm.T != nil {
 		vm.T.Fatal(errCreateStaticHandlers)
@@ -140,9 +160,9 @@ func (vm *TestVM) CreateStaticHandlers() (map[string]*HTTPHandler, error) {
 	return nil, nil
 }
 
-func (vm *TestVM) HealthCheck() (interface{}, error) {
+func (vm *TestVM) HealthCheck(ctx context.Context) (interface{}, error) {
 	if vm.HealthCheckF != nil {
-		return vm.HealthCheckF()
+		return vm.HealthCheckF(ctx)
 	}
 	if vm.CantHealthCheck && vm.T != nil {
 		vm.T.Fatal(errHealthCheck)
@@ -241,9 +261,9 @@ func (vm *TestVM) CrossChainAppResponse(ctx context.Context, chainID ids.ID, req
 	return errCrossChainAppResponse
 }
 
-func (vm *TestVM) Connected(id ids.NodeID, nodeVersion *version.Application) error {
+func (vm *TestVM) Connected(ctx context.Context, id ids.NodeID, nodeVersion *version.Application) error {
 	if vm.ConnectedF != nil {
-		return vm.ConnectedF(id, nodeVersion)
+		return vm.ConnectedF(ctx, id, nodeVersion)
 	}
 	if vm.CantConnected && vm.T != nil {
 		vm.T.Fatal(errConnected)
@@ -251,9 +271,9 @@ func (vm *TestVM) Connected(id ids.NodeID, nodeVersion *version.Application) err
 	return nil
 }
 
-func (vm *TestVM) Disconnected(id ids.NodeID) error {
+func (vm *TestVM) Disconnected(ctx context.Context, id ids.NodeID) error {
 	if vm.DisconnectedF != nil {
-		return vm.DisconnectedF(id)
+		return vm.DisconnectedF(ctx, id)
 	}
 	if vm.CantDisconnected && vm.T != nil {
 		vm.T.Fatal(errDisconnected)
@@ -261,9 +281,9 @@ func (vm *TestVM) Disconnected(id ids.NodeID) error {
 	return nil
 }
 
-func (vm *TestVM) Version() (string, error) {
+func (vm *TestVM) Version(ctx context.Context) (string, error) {
 	if vm.VersionF != nil {
-		return vm.VersionF()
+		return vm.VersionF(ctx)
 	}
 	if vm.CantVersion && vm.T != nil {
 		vm.T.Fatal(errVersion)

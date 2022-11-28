@@ -98,4 +98,6 @@ func (fx *Fx) VerifyTransferOperation(tx secp256k1fx.UnsignedTx, op *BurnOperati
 	return fx.VerifyCredentials(tx, &op.Input, &cred.Credential, &out.OutputOwners)
 }
 
-func (fx *Fx) VerifyTransfer(_, _, _, _ interface{}) error { return errCantTransfer }
+func (*Fx) VerifyTransfer(_, _, _, _ interface{}) error {
+	return errCantTransfer
+}

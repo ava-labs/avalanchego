@@ -37,15 +37,11 @@ func TestQueue(t *testing.T) {
 	currentTime := time.Now()
 	u.clock.Set(currentTime)
 
-	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
-	require.NoError(err)
-
-	mc.SetTime(currentTime)
-	msg1 := mc.InboundPut(
+	msg1 := message.InboundPullQuery(
 		ids.Empty,
 		0,
-		nil,
+		time.Second,
+		ids.GenerateTestID(),
 		vdr1ID,
 	)
 
@@ -96,7 +92,13 @@ func TestQueue(t *testing.T) {
 	require.EqualValues(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	require.EqualValues(1, u.Len())
 
-	msg2 := mc.InboundGet(ids.Empty, 0, 0, ids.Empty, vdr2ID)
+	msg2 := message.InboundPullQuery(
+		ids.Empty,
+		0,
+		time.Second,
+		ids.GenerateTestID(),
+		vdr2ID,
+	)
 
 	// Push msg2 from vdr2ID
 	u.Push(context.Background(), msg2)
@@ -119,8 +121,8 @@ func TestQueue(t *testing.T) {
 	// u is now empty
 	// Non-validators should be able to put messages onto [u]
 	nonVdrNodeID1, nonVdrNodeID2 := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
-	msg3 := mc.InboundPullQuery(ids.Empty, 0, 0, ids.Empty, nonVdrNodeID1)
-	msg4 := mc.InboundPushQuery(ids.Empty, 0, 0, nil, nonVdrNodeID2)
+	msg3 := message.InboundPullQuery(ids.Empty, 0, 0, ids.Empty, nonVdrNodeID1)
+	msg4 := message.InboundPushQuery(ids.Empty, 0, 0, nil, nonVdrNodeID2)
 	u.Push(context.Background(), msg3)
 	u.Push(context.Background(), msg4)
 	u.Push(context.Background(), msg1)

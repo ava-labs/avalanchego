@@ -52,7 +52,9 @@ type errorMsg struct {
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  readBufferSize,
 	WriteBufferSize: writeBufferSize,
-	CheckOrigin:     func(*http.Request) bool { return true },
+	CheckOrigin: func(*http.Request) bool {
+		return true
+	},
 }
 
 // Server maintains the set of active clients and sends messages to the clients.
@@ -65,7 +67,7 @@ type Server struct {
 	subscribedConnections *connections
 }
 
-func New(networkID uint32, log logging.Logger) *Server {
+func New(log logging.Logger) *Server {
 	return &Server{
 		log:                   log,
 		conns:                 make(map[*connection]struct{}),

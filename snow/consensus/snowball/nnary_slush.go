@@ -20,10 +20,18 @@ type nnarySlush struct {
 	preference ids.ID
 }
 
-func (sl *nnarySlush) Initialize(choice ids.ID) { sl.preference = choice }
+func (sl *nnarySlush) Initialize(choice ids.ID) {
+	sl.preference = choice
+}
 
-func (sl *nnarySlush) Preference() ids.ID { return sl.preference }
+func (sl *nnarySlush) Preference() ids.ID {
+	return sl.preference
+}
 
-func (sl *nnarySlush) RecordSuccessfulPoll(choice ids.ID) { sl.preference = choice }
+func (sl *nnarySlush) RecordSuccessfulPoll(choice ids.ID) {
+	sl.preference = choice
+}
 
-func (sl *nnarySlush) String() string { return fmt.Sprintf("SL(Preference = %s)", sl.preference) }
+func (sl *nnarySlush) String() string {
+	return fmt.Sprintf("SL(Preference = %s)", sl.preference)
+}

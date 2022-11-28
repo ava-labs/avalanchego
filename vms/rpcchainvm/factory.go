@@ -59,6 +59,8 @@ func (f *factory) New(ctx *snow.Context) (interface{}, error) {
 		Managed:         true,
 		GRPCDialOptions: grpcutils.DefaultDialOptions,
 	}
+	// createStaticHandlers will send a nil ctx to disable logs
+	// TODO: create a separate log file and no-op ctx
 	if ctx != nil {
 		log.SetOutput(ctx.Log)
 		config.Stderr = ctx.Log

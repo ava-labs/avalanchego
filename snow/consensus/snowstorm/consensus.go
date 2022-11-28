@@ -4,8 +4,10 @@
 package snowstorm
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 
@@ -17,12 +19,10 @@ import (
 // should call collect with the responses.
 type Consensus interface {
 	fmt.Stringer
+	health.Checker
 
 	// Takes in the context, alpha, betaVirtuous, and betaRogue
 	Initialize(*snow.ConsensusContext, sbcon.Parameters) error
-
-	// Returns the parameters that describe this snowstorm instance
-	Parameters() sbcon.Parameters
 
 	// Returns true if transaction <Tx> is virtuous.
 	// That is, no transaction has been added that conflicts with <Tx>
@@ -30,11 +30,11 @@ type Consensus interface {
 
 	// Adds a new transaction to vote on. Returns if a critical error has
 	// occurred.
-	Add(Tx) error
+	Add(context.Context, Tx) error
 
 	// Remove a transaction from the set of currently processing txs. It is
 	// assumed that the provided transaction ID is currently processing.
-	Remove(ids.ID) error
+	Remove(context.Context, ids.ID) error
 
 	// Returns true iff transaction <Tx> has been added
 	Issued(Tx) bool
@@ -55,7 +55,7 @@ type Consensus interface {
 	// Collects the results of a network poll. Assumes all transactions
 	// have been previously added. Returns true if any statuses or preferences
 	// changed. Returns if a critical error has occurred.
-	RecordPoll(ids.Bag) (bool, error)
+	RecordPoll(context.Context, ids.Bag) (bool, error)
 
 	// Returns true iff all remaining transactions are rogue. Note, it is
 	// possible that after returning quiesce, a new decision may be added such
@@ -66,7 +66,4 @@ type Consensus interface {
 	// possible that after returning finalized, a new decision may be added such
 	// that this instance is no longer finalized.
 	Finalized() bool
-
-	// HealthCheck returns information about the consensus health.
-	HealthCheck() (interface{}, error)
 }

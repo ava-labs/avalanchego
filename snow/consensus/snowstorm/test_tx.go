@@ -4,6 +4,8 @@
 package snowstorm
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
@@ -24,9 +26,26 @@ type TestTx struct {
 	BytesV           []byte
 }
 
-func (t *TestTx) Dependencies() ([]Tx, error) { return t.DependenciesV, t.DependenciesErrV }
-func (t *TestTx) InputIDs() []ids.ID          { return t.InputIDsV }
-func (t *TestTx) HasWhitelist() bool          { return t.HasWhitelistV }
-func (t *TestTx) Whitelist() (ids.Set, error) { return t.WhitelistV, t.WhitelistErrV }
-func (t *TestTx) Verify() error               { return t.VerifyV }
-func (t *TestTx) Bytes() []byte               { return t.BytesV }
+func (t *TestTx) Dependencies() ([]Tx, error) {
+	return t.DependenciesV, t.DependenciesErrV
+}
+
+func (t *TestTx) InputIDs() []ids.ID {
+	return t.InputIDsV
+}
+
+func (t *TestTx) HasWhitelist() bool {
+	return t.HasWhitelistV
+}
+
+func (t *TestTx) Whitelist(context.Context) (ids.Set, error) {
+	return t.WhitelistV, t.WhitelistErrV
+}
+
+func (t *TestTx) Verify(context.Context) error {
+	return t.VerifyV
+}
+
+func (t *TestTx) Bytes() []byte {
+	return t.BytesV
+}

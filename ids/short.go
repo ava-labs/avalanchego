@@ -78,10 +78,14 @@ func (id *ShortID) UnmarshalText(text []byte) error {
 
 // Bytes returns the 20 byte hash as a slice. It is assumed this slice is not
 // modified.
-func (id ShortID) Bytes() []byte { return id[:] }
+func (id ShortID) Bytes() []byte {
+	return id[:]
+}
 
 // Hex returns a hex encoded string of this id.
-func (id ShortID) Hex() string { return hex.EncodeToString(id.Bytes()) }
+func (id ShortID) Hex() string {
+	return hex.EncodeToString(id.Bytes())
+}
 
 func (id ShortID) String() string {
 	// We assume that the maximum size of a byte slice that

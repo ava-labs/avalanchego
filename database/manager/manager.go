@@ -220,7 +220,9 @@ func NewManagerFromDBs(dbs []*VersionedDatabase) (Manager, error) {
 	}, nil
 }
 
-func (m *manager) Current() *VersionedDatabase { return m.databases[0] }
+func (m *manager) Current() *VersionedDatabase {
+	return m.databases[0]
+}
 
 func (m *manager) Previous() (*VersionedDatabase, bool) {
 	if len(m.databases) < 2 {
@@ -229,7 +231,9 @@ func (m *manager) Previous() (*VersionedDatabase, bool) {
 	return m.databases[1], true
 }
 
-func (m *manager) GetDatabases() []*VersionedDatabase { return m.databases }
+func (m *manager) GetDatabases() []*VersionedDatabase {
+	return m.databases
+}
 
 func (m *manager) Close() error {
 	errs := wrappers.Errs{}

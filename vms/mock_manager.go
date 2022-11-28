@@ -8,6 +8,7 @@
 package vms
 
 import (
+	context "context"
 	reflect "reflect"
 
 	ids "github.com/ava-labs/avalanchego/ids"
@@ -180,17 +181,17 @@ func (mr *MockManagerMockRecorder) PrimaryAliasOrDefault(arg0 interface{}) *gomo
 }
 
 // RegisterFactory mocks base method.
-func (m *MockManager) RegisterFactory(arg0 ids.ID, arg1 Factory) error {
+func (m *MockManager) RegisterFactory(arg0 context.Context, arg1 ids.ID, arg2 Factory) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RegisterFactory", arg0, arg1)
+	ret := m.ctrl.Call(m, "RegisterFactory", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // RegisterFactory indicates an expected call of RegisterFactory.
-func (mr *MockManagerMockRecorder) RegisterFactory(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockManagerMockRecorder) RegisterFactory(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterFactory", reflect.TypeOf((*MockManager)(nil).RegisterFactory), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterFactory", reflect.TypeOf((*MockManager)(nil).RegisterFactory), arg0, arg1, arg2)
 }
 
 // RemoveAliases mocks base method.

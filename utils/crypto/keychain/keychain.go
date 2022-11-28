@@ -16,6 +16,7 @@ var (
 	_ Keychain = (*ledgerKeychain)(nil)
 	_ Signer   = (*ledgerSigner)(nil)
 
+	ErrInvalidIndicesLength    = errors.New("number of indices should be greater than 0")
 	ErrInvalidNumAddrsToDerive = errors.New("number of addresses to derive should be greater than 0")
 	ErrInvalidNumAddrsDerived  = errors.New("incorrect number of ledger derived addresses")
 	ErrInvalidNumSignatures    = errors.New("incorrect number of signatures")
@@ -60,26 +61,40 @@ func NewLedgerKeychain(l ledger.Ledger, numToDerive int) (Keychain, error) {
 		return nil, ErrInvalidNumAddrsToDerive
 	}
 
-	addrs, err := l.Addresses(numToDerive)
+	indices := make([]uint32, numToDerive)
+	for i := range indices {
+		indices[i] = uint32(i)
+	}
+
+	return NewLedgerKeychainFromIndices(l, indices)
+}
+
+// NewLedgerKeychainFromIndices creates a new Ledger with addresses taken from the given [indices].
+func NewLedgerKeychainFromIndices(l ledger.Ledger, indices []uint32) (Keychain, error) {
+	if len(indices) == 0 {
+		return nil, ErrInvalidIndicesLength
+	}
+
+	addrs, err := l.Addresses(indices)
 	if err != nil {
 		return nil, err
 	}
 
-	addrsLen := len(addrs)
-	if addrsLen != numToDerive {
+	if len(addrs) != len(indices) {
 		return nil, fmt.Errorf(
 			"%w. expected %d, got %d",
 			ErrInvalidNumAddrsDerived,
-			numToDerive,
-			addrsLen,
+			len(indices),
+			len(addrs),
 		)
 	}
 
-	addrsSet := ids.NewShortSet(addrsLen)
+	addrsSet := ids.ShortSet{}
 	addrsSet.Add(addrs...)
-	addrToIdx := make(map[ids.ShortID]uint32, addrsLen)
-	for i, addr := range addrs {
-		addrToIdx[addr] = uint32(i)
+
+	addrToIdx := map[ids.ShortID]uint32{}
+	for i := range indices {
+		addrToIdx[addrs[i]] = indices[i]
 	}
 
 	return &ledgerKeychain{

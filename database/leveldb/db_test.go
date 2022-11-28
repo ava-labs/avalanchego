@@ -8,6 +8,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -23,6 +25,24 @@ func TestInterface(t *testing.T) {
 		defer db.Close()
 
 		test(t, db)
+
+		// The database may have been closed by the test, so we don't care if it
+		// errors here.
+		_ = db.Close()
+	}
+}
+
+func FuzzInterface(f *testing.F) {
+	for _, test := range database.FuzzTests {
+		folder := f.TempDir()
+		db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
+		if err != nil {
+			require.NoError(f, err)
+		}
+
+		defer db.Close()
+
+		test(f, db)
 
 		// The database may have been closed by the test, so we don't care if it
 		// errors here.

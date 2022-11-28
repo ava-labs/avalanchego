@@ -12,6 +12,7 @@ import (
 	time "time"
 
 	ids "github.com/ava-labs/avalanchego/ids"
+	bls "github.com/ava-labs/avalanchego/utils/crypto/bls"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -92,6 +93,22 @@ func (m *MockStaker) PendingPriority() Priority {
 func (mr *MockStakerMockRecorder) PendingPriority() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PendingPriority", reflect.TypeOf((*MockStaker)(nil).PendingPriority))
+}
+
+// PublicKey mocks base method.
+func (m *MockStaker) PublicKey() (*bls.PublicKey, bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PublicKey")
+	ret0, _ := ret[0].(*bls.PublicKey)
+	ret1, _ := ret[1].(bool)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// PublicKey indicates an expected call of PublicKey.
+func (mr *MockStakerMockRecorder) PublicKey() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublicKey", reflect.TypeOf((*MockStaker)(nil).PublicKey))
 }
 
 // StartTime mocks base method.

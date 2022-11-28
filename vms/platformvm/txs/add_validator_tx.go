@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -53,17 +54,53 @@ func (tx *AddValidatorTx) InitCtx(ctx *snow.Context) {
 	tx.RewardsOwner.InitCtx(ctx)
 }
 
-func (tx *AddValidatorTx) SubnetID() ids.ID                  { return constants.PrimaryNetworkID }
-func (tx *AddValidatorTx) NodeID() ids.NodeID                { return tx.Validator.NodeID }
-func (tx *AddValidatorTx) StartTime() time.Time              { return tx.Validator.StartTime() }
-func (tx *AddValidatorTx) EndTime() time.Time                { return tx.Validator.EndTime() }
-func (tx *AddValidatorTx) Weight() uint64                    { return tx.Validator.Wght }
-func (tx *AddValidatorTx) PendingPriority() Priority         { return PrimaryNetworkValidatorPendingPriority }
-func (tx *AddValidatorTx) CurrentPriority() Priority         { return PrimaryNetworkValidatorCurrentPriority }
-func (tx *AddValidatorTx) Stake() []*avax.TransferableOutput { return tx.StakeOuts }
-func (tx *AddValidatorTx) ValidationRewardsOwner() fx.Owner  { return tx.RewardsOwner }
-func (tx *AddValidatorTx) DelegationRewardsOwner() fx.Owner  { return tx.RewardsOwner }
-func (tx *AddValidatorTx) Shares() uint32                    { return tx.DelegationShares }
+func (*AddValidatorTx) SubnetID() ids.ID {
+	return constants.PrimaryNetworkID
+}
+
+func (tx *AddValidatorTx) NodeID() ids.NodeID {
+	return tx.Validator.NodeID
+}
+
+func (*AddValidatorTx) PublicKey() (*bls.PublicKey, bool, error) {
+	return nil, false, nil
+}
+
+func (tx *AddValidatorTx) StartTime() time.Time {
+	return tx.Validator.StartTime()
+}
+
+func (tx *AddValidatorTx) EndTime() time.Time {
+	return tx.Validator.EndTime()
+}
+
+func (tx *AddValidatorTx) Weight() uint64 {
+	return tx.Validator.Wght
+}
+
+func (*AddValidatorTx) PendingPriority() Priority {
+	return PrimaryNetworkValidatorPendingPriority
+}
+
+func (*AddValidatorTx) CurrentPriority() Priority {
+	return PrimaryNetworkValidatorCurrentPriority
+}
+
+func (tx *AddValidatorTx) Stake() []*avax.TransferableOutput {
+	return tx.StakeOuts
+}
+
+func (tx *AddValidatorTx) ValidationRewardsOwner() fx.Owner {
+	return tx.RewardsOwner
+}
+
+func (tx *AddValidatorTx) DelegationRewardsOwner() fx.Owner {
+	return tx.RewardsOwner
+}
+
+func (tx *AddValidatorTx) Shares() uint32 {
+	return tx.DelegationShares
+}
 
 // SyntacticVerify returns nil iff [tx] is valid
 func (tx *AddValidatorTx) SyntacticVerify(ctx *snow.Context) error {

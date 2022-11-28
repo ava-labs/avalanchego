@@ -32,6 +32,9 @@ type KeyValueWriter interface {
 	// Put inserts the given value into the key-value data store.
 	//
 	// Note: [key] and [value] are safe to modify and read after calling Put.
+	//
+	// If [value] is nil or an empty slice, then when it's retrieved
+	// it may be nil or an empty slice.
 	Put(key []byte, value []byte) error
 }
 

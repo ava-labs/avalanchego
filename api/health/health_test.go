@@ -4,6 +4,7 @@
 package health
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -56,7 +57,7 @@ func awaitLiveness(r Reporter, liveness bool) {
 func TestDuplicatedRegistations(t *testing.T) {
 	require := require.New(t)
 
-	check := CheckerFunc(func() (interface{}, error) {
+	check := CheckerFunc(func(context.Context) (interface{}, error) {
 		return "", nil
 	})
 
@@ -82,7 +83,7 @@ func TestDuplicatedRegistations(t *testing.T) {
 func TestDefaultFailing(t *testing.T) {
 	require := require.New(t)
 
-	check := CheckerFunc(func() (interface{}, error) {
+	check := CheckerFunc(func(context.Context) (interface{}, error) {
 		return "", nil
 	})
 
@@ -126,7 +127,7 @@ func TestDefaultFailing(t *testing.T) {
 func TestPassingChecks(t *testing.T) {
 	require := require.New(t)
 
-	check := CheckerFunc(func() (interface{}, error) {
+	check := CheckerFunc(func(context.Context) (interface{}, error) {
 		return "", nil
 	})
 
@@ -140,7 +141,7 @@ func TestPassingChecks(t *testing.T) {
 	err = h.RegisterLivenessCheck("check", check)
 	require.NoError(err)
 
-	h.Start(checkFreq)
+	h.Start(context.Background(), checkFreq)
 	defer h.Stop()
 
 	{
@@ -193,7 +194,7 @@ func TestPassingThenFailingChecks(t *testing.T) {
 		shouldCheckErr utils.AtomicBool
 		checkErr       = errors.New("unhealthy")
 	)
-	check := CheckerFunc(func() (interface{}, error) {
+	check := CheckerFunc(func(context.Context) (interface{}, error) {
 		if shouldCheckErr.GetValue() {
 			return checkErr.Error(), checkErr
 		}
@@ -210,7 +211,7 @@ func TestPassingThenFailingChecks(t *testing.T) {
 	err = h.RegisterLivenessCheck("check", check)
 	require.NoError(err)
 
-	h.Start(checkFreq)
+	h.Start(context.Background(), checkFreq)
 	defer h.Stop()
 
 	awaitReadiness(h)
@@ -254,14 +255,14 @@ func TestDeadlockRegression(t *testing.T) {
 	require.NoError(err)
 
 	var lock sync.Mutex
-	check := CheckerFunc(func() (interface{}, error) {
+	check := CheckerFunc(func(context.Context) (interface{}, error) {
 		lock.Lock()
 		time.Sleep(time.Nanosecond)
 		lock.Unlock()
 		return "", nil
 	})
 
-	h.Start(time.Nanosecond)
+	h.Start(context.Background(), time.Nanosecond)
 	defer h.Stop()
 
 	for i := 0; i < 1000; i++ {

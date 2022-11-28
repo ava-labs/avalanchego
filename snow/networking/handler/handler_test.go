@@ -26,21 +26,21 @@ import (
 func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	called := make(chan struct{})
 
-	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
-	require.NoError(t, err)
-
 	ctx := snow.DefaultConsensusContextTest()
 
 	vdrs := validators.NewSet()
 	vdr0 := ids.GenerateTestNodeID()
-	err = vdrs.AddWeight(vdr0, 1)
+	err := vdrs.AddWeight(vdr0, 1)
 	require.NoError(t, err)
 
-	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	resourceTracker, err := tracker.NewResourceTracker(
+		prometheus.NewRegistry(),
+		resource.NoUsage,
+		meter.ContinuousFactory{},
+		time.Second,
+	)
 	require.NoError(t, err)
 	handlerIntf, err := New(
-		mc,
 		ctx,
 		vdrs,
 		nil,
@@ -60,7 +60,9 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		},
 	}
 	bootstrapper.Default(false)
-	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
+	bootstrapper.ContextF = func() *snow.ConsensusContext {
+		return ctx
+	}
 	bootstrapper.GetAcceptedFrontierF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 		t.Fatalf("GetAcceptedFrontier message should have timed out")
 		return nil
@@ -73,27 +75,26 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
 
 	pastTime := time.Now()
-	mc.SetTime(pastTime)
 	handler.clock.Set(pastTime)
 
 	nodeID := ids.EmptyNodeID
 	reqID := uint32(1)
-	deadline := time.Nanosecond
 	chainID := ids.ID{}
-	msg := mc.InboundGetAcceptedFrontier(chainID, reqID, deadline, nodeID)
+	msg := message.InboundGetAcceptedFrontier(chainID, reqID, 0*time.Second, nodeID)
 	handler.Push(context.Background(), msg)
 
 	currentTime := time.Now().Add(time.Second)
-	mc.SetTime(currentTime)
 	handler.clock.Set(currentTime)
 
 	reqID++
-	msg = mc.InboundGetAccepted(chainID, reqID, deadline, nil, nodeID)
+	msg = message.InboundGetAccepted(chainID, reqID, 1*time.Second, nil, nodeID)
 	handler.Push(context.Background(), msg)
 
-	bootstrapper.StartF = func(startReqID uint32) error { return nil }
+	bootstrapper.StartF = func(context.Context, uint32) error {
+		return nil
+	}
 
-	handler.Start(false)
+	handler.Start(context.Background(), false)
 
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -111,14 +112,15 @@ func TestHandlerClosesOnError(t *testing.T) {
 	vdrs := validators.NewSet()
 	err := vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
 	require.NoError(t, err)
-	metrics := prometheus.NewRegistry()
-	mc, err := message.NewCreator(metrics, "dummyNamespace", true, 10*time.Second)
-	require.NoError(t, err)
 
-	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	resourceTracker, err := tracker.NewResourceTracker(
+		prometheus.NewRegistry(),
+		resource.NoUsage,
+		meter.ContinuousFactory{},
+		time.Second,
+	)
 	require.NoError(t, err)
 	handlerIntf, err := New(
-		mc,
 		ctx,
 		vdrs,
 		nil,
@@ -143,7 +145,9 @@ func TestHandlerClosesOnError(t *testing.T) {
 		},
 	}
 	bootstrapper.Default(false)
-	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
+	bootstrapper.ContextF = func() *snow.ConsensusContext {
+		return ctx
+	}
 	bootstrapper.GetAcceptedFrontierF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 		return errors.New("Engine error should cause handler to close")
 	}
@@ -151,21 +155,25 @@ func TestHandlerClosesOnError(t *testing.T) {
 
 	engine := &common.EngineTest{T: t}
 	engine.Default(false)
-	engine.ContextF = func() *snow.ConsensusContext { return ctx }
+	engine.ContextF = func() *snow.ConsensusContext {
+		return ctx
+	}
 	handler.SetConsensus(engine)
 
 	// assume bootstrapping is ongoing so that InboundGetAcceptedFrontier
 	// should normally be handled
 	ctx.SetState(snow.Bootstrapping)
 
-	bootstrapper.StartF = func(startReqID uint32) error { return nil }
+	bootstrapper.StartF = func(context.Context, uint32) error {
+		return nil
+	}
 
-	handler.Start(false)
+	handler.Start(context.Background(), false)
 
 	nodeID := ids.EmptyNodeID
 	reqID := uint32(1)
 	deadline := time.Nanosecond
-	msg := mc.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline, nodeID)
+	msg := message.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline, nodeID)
 	handler.Push(context.Background(), msg)
 
 	ticker := time.NewTicker(time.Second)
@@ -183,11 +191,14 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	err := vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
 	require.NoError(t, err)
 
-	mc := message.NewInternalBuilder()
-	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	resourceTracker, err := tracker.NewResourceTracker(
+		prometheus.NewRegistry(),
+		resource.NoUsage,
+		meter.ContinuousFactory{},
+		time.Second,
+	)
 	require.NoError(t, err)
 	handlerIntf, err := New(
-		mc,
 		ctx,
 		vdrs,
 		nil,
@@ -209,7 +220,9 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		},
 	}
 	bootstrapper.Default(false)
-	bootstrapper.ContextF = func() *snow.ConsensusContext { return ctx }
+	bootstrapper.ContextF = func() *snow.ConsensusContext {
+		return ctx
+	}
 	bootstrapper.GetFailedF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 		closed <- struct{}{}
 		return nil
@@ -217,14 +230,16 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	handler.SetBootstrapper(bootstrapper)
 	ctx.SetState(snow.Bootstrapping) // assumed bootstrapping is ongoing
 
-	bootstrapper.StartF = func(startReqID uint32) error { return nil }
+	bootstrapper.StartF = func(context.Context, uint32) error {
+		return nil
+	}
 
-	handler.Start(false)
+	handler.Start(context.Background(), false)
 
 	nodeID := ids.EmptyNodeID
 	chainID := ids.Empty
 	reqID := uint32(1)
-	inMsg := mc.InternalFailedRequest(message.GetFailed, nodeID, chainID, chainID, reqID)
+	inMsg := message.InternalGetFailed(nodeID, chainID, reqID)
 	handler.Push(context.Background(), inMsg)
 
 	ticker := time.NewTicker(time.Second)
@@ -244,11 +259,14 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	err := vdrs.AddWeight(ids.GenerateTestNodeID(), 1)
 	require.NoError(t, err)
 
-	mc := message.NewInternalBuilder()
-	resourceTracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, time.Second)
+	resourceTracker, err := tracker.NewResourceTracker(
+		prometheus.NewRegistry(),
+		resource.NoUsage,
+		meter.ContinuousFactory{},
+		time.Second,
+	)
 	require.NoError(t, err)
 	handler, err := New(
-		mc,
 		ctx,
 		vdrs,
 		msgFromVMChan,
@@ -271,17 +289,21 @@ func TestHandlerDispatchInternal(t *testing.T) {
 
 	engine := &common.EngineTest{T: t}
 	engine.Default(false)
-	engine.ContextF = func() *snow.ConsensusContext { return ctx }
-	engine.NotifyF = func(common.Message) error {
+	engine.ContextF = func() *snow.ConsensusContext {
+		return ctx
+	}
+	engine.NotifyF = func(context.Context, common.Message) error {
 		calledNotify <- struct{}{}
 		return nil
 	}
 	handler.SetConsensus(engine)
 	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
 
-	bootstrapper.StartF = func(startReqID uint32) error { return nil }
+	bootstrapper.StartF = func(context.Context, uint32) error {
+		return nil
+	}
 
-	handler.Start(false)
+	handler.Start(context.Background(), false)
 	msgFromVMChan <- 0
 
 	select {

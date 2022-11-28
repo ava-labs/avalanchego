@@ -4,6 +4,7 @@
 package snowman
 
 import (
+	"context"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -34,7 +35,7 @@ type Block interface {
 	//
 	// If nil is returned, it is guaranteed that either Accept or Reject will be
 	// called on this block, unless the VM is shut down.
-	Verify() error
+	Verify(context.Context) error
 
 	// Bytes returns the binary representation of this block.
 	//

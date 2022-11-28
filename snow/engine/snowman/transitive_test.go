@@ -63,9 +63,11 @@ func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, va
 		StatusV: choices.Accepted,
 	}}
 
-	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return gBlk.ID(), nil
+	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -79,7 +81,7 @@ func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, va
 		t.Fatal(err)
 	}
 
-	if err := te.Start(0); err != nil {
+	if err := te.Start(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -97,9 +99,12 @@ func setupDefaultConfig(t *testing.T) (ids.NodeID, validators.Set, *common.Sende
 func TestEngineShutdown(t *testing.T) {
 	_, _, _, vm, transitive, _ := setupDefaultConfig(t)
 	vmShutdownCalled := false
-	vm.ShutdownF = func() error { vmShutdownCalled = true; return nil }
+	vm.ShutdownF = func(context.Context) error {
+		vmShutdownCalled = true
+		return nil
+	}
 	vm.CantShutdown = false
-	if err := transitive.Shutdown(); err != nil {
+	if err := transitive.Shutdown(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if !vmShutdownCalled {
@@ -144,14 +149,14 @@ func TestEngineAdd(t *testing.T) {
 		}
 	}
 
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		if !bytes.Equal(b, blk.Bytes()) {
 			t.Fatalf("Wrong bytes")
 		}
 		return blk, nil
 	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -176,7 +181,9 @@ func TestEngineAdd(t *testing.T) {
 		t.Fatalf("Should have been blocking on request")
 	}
 
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) { return nil, errUnknownBytes }
+	vm.ParseBlockF = func(context.Context, []byte) (snowman.Block, error) {
+		return nil, errUnknownBytes
+	}
 
 	if err := te.Put(context.Background(), vdr, *reqID, nil); err != nil {
 		t.Fatal(err)
@@ -220,7 +227,7 @@ func TestEngineQuery(t *testing.T) {
 	}
 
 	blocked := new(bool)
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		*blocked = true
 		switch blkID {
 		case gBlk.ID():
@@ -277,7 +284,7 @@ func TestEngineQuery(t *testing.T) {
 		}
 	}
 
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		if !bytes.Equal(b, blk.Bytes()) {
 			t.Fatalf("Wrong bytes")
 		}
@@ -302,7 +309,7 @@ func TestEngineQuery(t *testing.T) {
 		BytesV:  []byte{5, 4, 3, 2, 1, 9},
 	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case blk.ID():
 			return nil, errUnknownBlock
@@ -348,12 +355,12 @@ func TestEngineQuery(t *testing.T) {
 		}
 	}
 
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		if !bytes.Equal(b, blk1.Bytes()) {
 			t.Fatalf("Wrong bytes")
 		}
 
-		vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 			switch blkID {
 			case blk.ID():
 				return blk, nil
@@ -436,8 +443,10 @@ func TestEngineMultipleQuery(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return gBlk.ID(), nil
+	}
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		if blkID != gBlk.ID() {
 			t.Fatalf("Wrong block requested")
 		}
@@ -449,7 +458,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := te.Start(0); err != nil {
+	if err := te.Start(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -484,7 +493,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		}
 	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -507,7 +516,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		BytesV:  []byte{2},
 	}
 
-	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		switch id {
 		case gBlk.ID():
 			return gBlk, nil
@@ -543,8 +552,8 @@ func TestEngineMultipleQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
-		vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.ParseBlockF = func(context.Context, []byte) (snowman.Block, error) {
+		vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 			switch {
 			case blkID == blk0.ID():
 				return blk0, nil
@@ -618,7 +627,7 @@ func TestEngineBlockedIssue(t *testing.T) {
 	}
 
 	sender.SendGetF = func(context.Context, ids.NodeID, uint32, ids.ID) {}
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -658,7 +667,7 @@ func TestEngineAbandonResponse(t *testing.T) {
 		BytesV:  []byte{1},
 	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch {
 		case blkID == gBlk.ID():
 			return gBlk, nil
@@ -686,7 +695,7 @@ func TestEngineFetchBlock(t *testing.T) {
 
 	sender.Default(false)
 
-	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		if id == gBlk.ID() {
 			return gBlk, nil
 		}
@@ -732,14 +741,14 @@ func TestEnginePushQuery(t *testing.T) {
 		BytesV:  []byte{1},
 	}
 
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		if bytes.Equal(b, blk.Bytes()) {
 			return blk, nil
 		}
 		return nil, errUnknownBytes
 	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -813,7 +822,7 @@ func TestEngineBuildBlock(t *testing.T) {
 		BytesV:  []byte{1},
 	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -835,8 +844,10 @@ func TestEngineBuildBlock(t *testing.T) {
 		}
 	}
 
-	vm.BuildBlockF = func() (snowman.Block, error) { return blk, nil }
-	if err := te.Notify(common.PendingTxs); err != nil {
+	vm.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return blk, nil
+	}
+	if err := te.Notify(context.Background(), common.PendingTxs); err != nil {
 		t.Fatal(err)
 	}
 
@@ -918,8 +929,10 @@ func TestVoteCanceling(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
-	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return gBlk.ID(), nil
+	}
+	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		switch id {
 		case gBlk.ID():
 			return gBlk, nil
@@ -934,7 +947,7 @@ func TestVoteCanceling(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := te.Start(0); err != nil {
+	if err := te.Start(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1011,9 +1024,11 @@ func TestEngineNoQuery(t *testing.T) {
 
 	vm := &block.TestVM{}
 	vm.T = t
-	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return gBlk.ID(), nil
+	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		if blkID == gBlk.ID() {
 			return gBlk, nil
 		}
@@ -1027,7 +1042,7 @@ func TestEngineNoQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := te.Start(0); err != nil {
+	if err := te.Start(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1060,9 +1075,11 @@ func TestEngineNoRepollQuery(t *testing.T) {
 
 	vm := &block.TestVM{}
 	vm.T = t
-	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return gBlk.ID(), nil
+	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		if blkID == gBlk.ID() {
 			return gBlk, nil
 		}
@@ -1076,7 +1093,7 @@ func TestEngineNoRepollQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := te.Start(0); err != nil {
+	if err := te.Start(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1090,7 +1107,7 @@ func TestEngineAbandonQuery(t *testing.T) {
 
 	blkID := ids.GenerateTestID()
 
-	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		switch id {
 		case blkID:
 			return nil, errUnknownBlock
@@ -1141,7 +1158,7 @@ func TestEngineAbandonChit(t *testing.T) {
 		BytesV:  []byte{1},
 	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -1161,7 +1178,7 @@ func TestEngineAbandonChit(t *testing.T) {
 	require.NoError(err)
 
 	fakeBlkID := ids.GenerateTestID()
-	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		require.Equal(fakeBlkID, id)
 		return nil, errUnknownBlock
 	}
@@ -1199,7 +1216,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 		BytesV:  []byte{1},
 	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -1219,7 +1236,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 	require.NoError(err)
 
 	fakeBlkID := ids.GenerateTestID()
-	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		require.Equal(fakeBlkID, id)
 		return nil, errUnknownBlock
 	}
@@ -1236,7 +1253,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 	sender.CantSendPullQuery = false
 
 	gBlkBytes := gBlk.Bytes()
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		require.Equal(gBlkBytes, b)
 		return gBlk, nil
 	}
@@ -1281,7 +1298,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 		BytesV:  []byte{3},
 	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -1294,7 +1311,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 
 	sender.SendGetF = func(context.Context, ids.NodeID, uint32, ids.ID) {}
 
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(b, blockingBlk.Bytes()):
 			return blockingBlk, nil
@@ -1363,7 +1380,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		BytesV:  []byte{3},
 	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -1497,7 +1514,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 	}
 	sender.SendPullQueryF = func(_ context.Context, _ ids.NodeIDSet, requestID uint32, _ ids.ID) {}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -1530,8 +1547,10 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 func TestEngineGossip(t *testing.T) {
 	_, _, sender, vm, te, gBlk := setupDefaultConfig(t)
 
-	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return gBlk.ID(), nil
+	}
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		if blkID == gBlk.ID() {
 			return gBlk, nil
 		}
@@ -1547,7 +1566,7 @@ func TestEngineGossip(t *testing.T) {
 		}
 	}
 
-	if err := te.Gossip(); err != nil {
+	if err := te.Gossip(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1586,7 +1605,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 	}
 
 	parsed := new(bool)
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		if bytes.Equal(b, pendingBlk.Bytes()) {
 			*parsed = true
 			return pendingBlk, nil
@@ -1594,7 +1613,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -1629,14 +1648,14 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 	}
 
 	*parsed = false
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		if bytes.Equal(b, missingBlk.Bytes()) {
 			*parsed = true
 			return missingBlk, nil
 		}
 		return nil, errUnknownBlock
 	}
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -1688,7 +1707,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	}
 
 	parsed := new(bool)
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		if bytes.Equal(b, pendingBlk.Bytes()) {
 			*parsed = true
 			return pendingBlk, nil
@@ -1696,7 +1715,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -1734,14 +1753,14 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	}
 
 	*parsed = false
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		if bytes.Equal(b, missingBlk.Bytes()) {
 			*parsed = true
 			return missingBlk, nil
 		}
 		return nil, errUnknownBlock
 	}
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -1795,8 +1814,10 @@ func TestEngineAggressivePolling(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return gBlk.ID(), nil
+	}
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		if blkID != gBlk.ID() {
 			t.Fatalf("Wrong block requested")
 		}
@@ -1808,7 +1829,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := te.Start(0); err != nil {
+	if err := te.Start(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1826,7 +1847,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	}
 
 	parsed := new(bool)
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		if bytes.Equal(b, pendingBlk.Bytes()) {
 			*parsed = true
 			return pendingBlk, nil
@@ -1834,7 +1855,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -1849,10 +1870,14 @@ func TestEngineAggressivePolling(t *testing.T) {
 	}
 
 	numPushed := new(int)
-	sender.SendPushQueryF = func(context.Context, ids.NodeIDSet, uint32, []byte) { *numPushed++ }
+	sender.SendPushQueryF = func(context.Context, ids.NodeIDSet, uint32, []byte) {
+		*numPushed++
+	}
 
 	numPulled := new(int)
-	sender.SendPullQueryF = func(context.Context, ids.NodeIDSet, uint32, ids.ID) { *numPulled++ }
+	sender.SendPullQueryF = func(context.Context, ids.NodeIDSet, uint32, ids.ID) {
+		*numPulled++
+	}
 
 	if err := te.Put(context.Background(), vdr, 0, pendingBlk.Bytes()); err != nil {
 		t.Fatal(err)
@@ -1912,8 +1937,10 @@ func TestEngineDoubleChit(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
-	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return gBlk.ID(), nil
+	}
+	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		if id == gBlk.ID() {
 			return gBlk, nil
 		}
@@ -1926,7 +1953,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := te.Start(0); err != nil {
+	if err := te.Start(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1964,7 +1991,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vm.GetBlockF = func(id ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		switch id {
 		case gBlk.ID():
 			return gBlk, nil
@@ -2037,8 +2064,10 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	vm.LastAcceptedF = func() (ids.ID, error) { return gBlk.ID(), nil }
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return gBlk.ID(), nil
+	}
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		if blkID != gBlk.ID() {
 			t.Fatalf("Wrong block requested")
 		}
@@ -2050,7 +2079,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := te.Start(0); err != nil {
+	if err := te.Start(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2094,7 +2123,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		}
 	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -2104,7 +2133,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	}
 
 	blkToReturn := 0
-	vm.BuildBlockF = func() (snowman.Block, error) {
+	vm.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		if blkToReturn >= len(blks) {
 			t.Fatalf("Built too many blocks")
 		}
@@ -2112,7 +2141,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		blkToReturn++
 		return blk, nil
 	}
-	if err := te.Notify(common.PendingTxs); err != nil {
+	if err := te.Notify(context.Background(), common.PendingTxs); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2121,7 +2150,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	}
 
 	queried = false
-	if err := te.Notify(common.PendingTxs); err != nil {
+	if err := te.Notify(context.Background(), common.PendingTxs); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2129,7 +2158,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		t.Fatalf("Shouldn't have sent a query to the peer")
 	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -2180,7 +2209,7 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 		BytesV:  []byte{3},
 	}
 
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(b, acceptedBlk.Bytes()):
 			return acceptedBlk, nil
@@ -2194,7 +2223,7 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 		}
 	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -2284,7 +2313,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 		BytesV:  []byte{3},
 	}
 
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(b, acceptedBlk.Bytes()):
 			return acceptedBlk, nil
@@ -2298,7 +2327,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 		}
 	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -2326,7 +2355,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 		t.Fatalf("Didn't query for the new block")
 	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -2414,7 +2443,7 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 		BytesV:  []byte{3},
 	}
 
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(b, acceptedBlk.Bytes()):
 			return acceptedBlk, nil
@@ -2428,7 +2457,7 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 		}
 	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -2514,7 +2543,7 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 		BytesV:  []byte{3},
 	}
 
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(b, acceptedBlk.Bytes()):
 			return acceptedBlk, nil
@@ -2528,7 +2557,7 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 		}
 	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -2554,7 +2583,7 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 		t.Fatalf("Didn't query for the new block")
 	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -2611,7 +2640,7 @@ func TestEngineNonPreferredAmplification(t *testing.T) {
 		BytesV:  []byte{2},
 	}
 
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(b, preferredBlk.Bytes()):
 			return preferredBlk, nil
@@ -2623,7 +2652,7 @@ func TestEngineNonPreferredAmplification(t *testing.T) {
 		}
 	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -2689,7 +2718,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	}
 
 	// The VM should be able to parse [blk1] and [blk2]
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(b, blk1.Bytes()):
 			return blk1, nil
@@ -2703,7 +2732,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 
 	// The VM should only be able to retrieve [gBlk] from storage
 	// TODO GetBlockF should be updated after blocks are verified/accepted
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -2764,7 +2793,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	}
 
 	// now blk1 is verified, vm can return it
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -2824,7 +2853,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 
 	// Now that [blk1] has been marked as Accepted, [blk2] can pass verification.
 	blk2.VerifyV = nil
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -2922,7 +2951,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	}
 
 	// The VM should be able to parse [blk1], [blk2], and [blk3]
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(b, blk1.Bytes()):
 			return blk1, nil
@@ -2937,7 +2966,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	}
 
 	// The VM should be able to retrieve [gBlk] and [blk1] from storage
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -3098,11 +3127,11 @@ func TestSendMixedQuery(t *testing.T) {
 				engConfig.Params.MixedQueryNumPushNonVdr = 12
 				engConfig.Params.MixedQueryNumPushVdr = 14
 				engConfig.Params.K = 20
-				_, vdrSet, sender, vm, te, gBlk := setup(t, commonCfg, engConfig)
+				_, _, sender, vm, te, gBlk := setup(t, commonCfg, engConfig)
 
 				vdrsList := []validators.Validator{}
 				vdrs := ids.NodeIDSet{}
-				for i := 0; i < te.Config.Params.K; i++ {
+				for i := 0; i < te.Params.K; i++ {
 					vdr := ids.GenerateTestNodeID()
 					vdrs.Add(vdr)
 					vdrsList = append(vdrsList, validators.NewValidator(vdr, 1))
@@ -3111,8 +3140,12 @@ func TestSendMixedQuery(t *testing.T) {
 					vdrs.Add(te.Ctx.NodeID)
 					vdrsList = append(vdrsList, validators.NewValidator(te.Ctx.NodeID, 1))
 				}
-				if err := vdrSet.Set(vdrsList); err != nil {
-					t.Fatal(err)
+				te.Validators = validators.NewSet()
+				for _, vdr := range vdrsList {
+					err := te.Validators.AddWeight(vdr.ID(), vdr.Weight())
+					if err != nil {
+						t.Fatal(err)
+					}
 				}
 
 				// [blk1] is a child of [gBlk] and passes verification
@@ -3127,7 +3160,7 @@ func TestSendMixedQuery(t *testing.T) {
 				}
 
 				// The VM should be able to parse [blk1]
-				vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+				vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 					switch {
 					case bytes.Equal(b, blk1.Bytes()):
 						return blk1, nil
@@ -3138,7 +3171,7 @@ func TestSendMixedQuery(t *testing.T) {
 				}
 
 				// The VM should only be able to retrieve [gBlk] from storage
-				vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+				vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 					switch blkID {
 					case gBlk.ID():
 						return gBlk, nil
@@ -3179,7 +3212,7 @@ func TestSendMixedQuery(t *testing.T) {
 
 				// Give the engine blk1. It should insert it into consensus and send a mixed query
 				// consisting of 12 push queries and 8 pull queries.
-				if err := te.Put(context.Background(), vdrSet.List()[0].ID(), constants.GossipMsgRequestID, blk1.Bytes()); err != nil {
+				if err := te.Put(context.Background(), te.Validators.List()[0].ID(), constants.GossipMsgRequestID, blk1.Bytes()); err != nil {
 					t.Fatal(err)
 				}
 
@@ -3258,12 +3291,12 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 		BytesV:  []byte{3},
 	}
 
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		require.Equal(grandParentBlk.BytesV, b)
 		return grandParentBlk, nil
 	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -3284,7 +3317,7 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	err := te.Put(context.Background(), vdr, 0, grandParentBlk.BytesV)
 	require.NoError(err)
 
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		require.Equal(parentBlkA.BytesV, b)
 		return parentBlkA, nil
 	}
@@ -3295,12 +3328,12 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	err = te.Put(context.Background(), vdr, 0, parentBlkA.BytesV)
 	require.NoError(err)
 
-	vm.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		require.Equal(parentBlkB.BytesV, b)
 		return parentBlkB, nil
 	}
 
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
 			return gBlk, nil
@@ -3340,7 +3373,7 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	require.Equal(choices.Processing, parentBlkA.Status())
 	require.Equal(choices.Accepted, parentBlkB.Status())
 
-	vm.BuildBlockF = func() (snowman.Block, error) {
+	vm.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return childBlk, nil
 	}
 
@@ -3350,7 +3383,7 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	}
 
 	// Should issue a new block and send a query for it.
-	err = te.Notify(common.PendingTxs)
+	err = te.Notify(context.Background(), common.PendingTxs)
 	require.NoError(err)
 	require.True(*sentQuery)
 }

@@ -32,9 +32,13 @@ func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Co
 
 	isBootstrapped := false
 	subnet := &common.SubnetTest{
-		T:               t,
-		IsBootstrappedF: func() bool { return isBootstrapped },
-		BootstrappedF:   func(ids.ID) { isBootstrapped = true },
+		T: t,
+		IsBootstrappedF: func() bool {
+			return isBootstrapped
+		},
+		BootstrappedF: func(ids.ID) {
+			isBootstrapped = true
+		},
 	}
 
 	commonConfig := common.Config{
@@ -73,7 +77,7 @@ func TestAcceptedFrontier(t *testing.T) {
 		t.Fatal("Unexpected get handler")
 	}
 
-	manager.EdgeF = func() []ids.ID {
+	manager.EdgeF = func(context.Context) []ids.ID {
 		return []ids.ID{
 			vtxID0,
 			vtxID1,
@@ -132,7 +136,7 @@ func TestFilterAccepted(t *testing.T) {
 
 	vtxIDs := []ids.ID{vtxID0, vtxID1, vtxID2}
 
-	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch vtxID {
 		case vtxID0:
 			return vtx0, nil

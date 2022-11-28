@@ -4,6 +4,10 @@
 package tree
 
 import (
+	"context"
+
+	"golang.org/x/exp/maps"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
@@ -18,7 +22,7 @@ type Tree interface {
 
 	// Accept marks the provided block as accepted and rejects every conflicting
 	// block.
-	Accept(snowman.Block) error
+	Accept(context.Context, snowman.Block) error
 }
 
 type tree struct {
@@ -51,9 +55,9 @@ func (t *tree) Get(blk snowman.Block) (snowman.Block, bool) {
 	return originalBlk, exists
 }
 
-func (t *tree) Accept(blk snowman.Block) error {
+func (t *tree) Accept(ctx context.Context, blk snowman.Block) error {
 	// accept the provided block
-	if err := blk.Accept(); err != nil {
+	if err := blk.Accept(ctx); err != nil {
 		return err
 	}
 
@@ -65,10 +69,7 @@ func (t *tree) Accept(blk snowman.Block) error {
 	delete(t.nodes, parentID)
 
 	// mark the siblings of the accepted block as rejectable
-	childrenToReject := make([]snowman.Block, 0, len(children))
-	for _, child := range children {
-		childrenToReject = append(childrenToReject, child)
-	}
+	childrenToReject := maps.Values(children)
 
 	// reject all the rejectable blocks
 	for len(childrenToReject) > 0 {
@@ -77,16 +78,14 @@ func (t *tree) Accept(blk snowman.Block) error {
 		childrenToReject = childrenToReject[:i]
 
 		// reject the block
-		if err := child.Reject(); err != nil {
+		if err := child.Reject(ctx); err != nil {
 			return err
 		}
 
 		// mark the progeny of this block as being rejectable
 		blkID := child.ID()
 		children := t.nodes[blkID]
-		for _, child := range children {
-			childrenToReject = append(childrenToReject, child)
-		}
+		childrenToReject = append(childrenToReject, maps.Values(children)...)
 		delete(t.nodes, blkID)
 	}
 	return nil

@@ -40,6 +40,6 @@ func NewNoDialThrottler() DialThrottler {
 	return noDialThrottler{}
 }
 
-func (t noDialThrottler) Acquire(context.Context) error {
+func (noDialThrottler) Acquire(context.Context) error {
 	return nil
 }

@@ -160,7 +160,7 @@ To regenerate the protobuf go code, run `scripts/protobuf_codegen.sh` from the r
 
 This should only be necessary when upgrading protobuf versions or modifying .proto definition files.
 
-To use this script, you must have [buf](https://docs.buf.build/installation) (v1.7.0), protoc-gen-go (v1.28.0) and protoc-gen-go-grpc (v1.2.0) installed.
+To use this script, you must have [buf](https://docs.buf.build/installation) (v1.9.0), protoc-gen-go (v1.28.0) and protoc-gen-go-grpc (v1.2.0) installed.
 
 To install the buf dependencies:
 
@@ -198,6 +198,25 @@ docker run -t -i -v $(pwd):/opt/avalanche -w/opt/avalanche avalanche:protobuf_co
 To regenerate the [gomock](https://github.com/golang/mock) code, run `scripts/mock.gen.sh` from the root of the repo.
 
 This should only be necessary when modifying exported interfaces or after modifying `scripts/mock.mockgen.txt`.
+
+## Versioning
+
+### Version Semantics
+
+AvalancheGo is first and foremost a client for the Avalanche network. The versioning of AvalancheGo follows that of the Avalanche network.
+
+- `v0.x.x` indicates a development network version.
+- `v1.x.x` indicates a production network version.
+- `vx.[Upgrade].x` indicates the number of network upgrades that have occurred.
+- `vx.x.[Patch]` indicates the number of client upgrades that have occurred since the last network upgrade.
+
+### Library Compatibility Guarantees
+
+Because AvalancheGo's version denotes the network version, it is expected that interfaces exported by AvalancheGo's packages may change in `Patch` version updates.
+
+### API Compatibility Guarantees
+
+APIs exposed when running AvalancheGo will maintain backwards compatibility, unless the functionality is explicitly deprecated and announced when removed.
 
 ## Supported Platforms
 

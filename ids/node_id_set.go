@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/ava-labs/avalanchego/utils"
+	"golang.org/x/exp/maps"
 )
 
 // NodeIDSet is a set of NodeIDs
@@ -63,7 +64,9 @@ func (ids *NodeIDSet) Contains(id NodeID) bool {
 }
 
 // Len returns the number of ids in this set
-func (ids NodeIDSet) Len() int { return len(ids) }
+func (ids NodeIDSet) Len() int {
+	return len(ids)
+}
 
 // Remove all the id from this set, if the id isn't in the set, nothing happens
 func (ids *NodeIDSet) Remove(idList ...NodeID) {
@@ -74,7 +77,9 @@ func (ids *NodeIDSet) Remove(idList ...NodeID) {
 }
 
 // Clear empties this set
-func (ids *NodeIDSet) Clear() { *ids = nil }
+func (ids *NodeIDSet) Clear() {
+	*ids = nil
+}
 
 // CappedList returns a list of length at most [size].
 // Size should be >= 0. If size < 0, returns nil.
@@ -99,13 +104,7 @@ func (ids NodeIDSet) CappedList(size int) []NodeID {
 
 // List converts this set into a list
 func (ids NodeIDSet) List() []NodeID {
-	idList := make([]NodeID, len(ids))
-	i := 0
-	for id := range ids {
-		idList[i] = id
-		i++
-	}
-	return idList
+	return maps.Keys(ids)
 }
 
 // SortedList returns this set as a sorted list
@@ -117,15 +116,7 @@ func (ids NodeIDSet) SortedList() []NodeID {
 
 // Equals returns true if the sets contain the same elements
 func (ids NodeIDSet) Equals(oIDs NodeIDSet) bool {
-	if ids.Len() != oIDs.Len() {
-		return false
-	}
-	for key := range oIDs {
-		if _, contains := ids[key]; !contains {
-			return false
-		}
-	}
-	return true
+	return maps.Equal(ids, oIDs)
 }
 
 // String returns the string representation of a set

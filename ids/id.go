@@ -115,7 +115,9 @@ func (id ID) Bit(i uint) int {
 }
 
 // Hex returns a hex encoded string of this id.
-func (id ID) Hex() string { return hex.EncodeToString(id[:]) }
+func (id ID) Hex() string {
+	return hex.EncodeToString(id[:])
+}
 
 func (id ID) String() string {
 	// We assume that the maximum size of a byte slice that

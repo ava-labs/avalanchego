@@ -66,7 +66,7 @@ func (gh *getter) GetStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 		return nil
 	}
 
-	summary, err := gh.ssVM.GetLastStateSummary()
+	summary, err := gh.ssVM.GetLastStateSummary(ctx)
 	if err != nil {
 		gh.log.Debug("dropping GetStateSummaryFrontier message",
 			zap.String("reason", "couldn't get state summary frontier"),
@@ -103,7 +103,7 @@ func (gh *getter) GetAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 
 	summaryIDs := make([]ids.ID, 0, len(heights))
 	for _, height := range heights {
-		summary, err := gh.ssVM.GetStateSummary(height)
+		summary, err := gh.ssVM.GetStateSummary(ctx, height)
 		if err == block.ErrStateSyncableVMNotImplemented {
 			gh.log.Debug("dropping GetAcceptedStateSummary message",
 				zap.String("reason", "state sync not supported"),
@@ -127,7 +127,7 @@ func (gh *getter) GetAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 }
 
 func (gh *getter) GetAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	lastAccepted, err := gh.vm.LastAccepted()
+	lastAccepted, err := gh.vm.LastAccepted(ctx)
 	if err != nil {
 		return err
 	}
@@ -138,7 +138,7 @@ func (gh *getter) GetAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
 	acceptedIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, blkID := range containerIDs {
-		blk, err := gh.vm.GetBlock(blkID)
+		blk, err := gh.vm.GetBlock(ctx, blkID)
 		if err == nil && blk.Status() == choices.Accepted {
 			acceptedIDs = append(acceptedIDs, blkID)
 		}
@@ -149,6 +149,7 @@ func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 
 func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
 	ancestorsBytes, err := block.GetAncestors(
+		ctx,
 		gh.vm,
 		blkID,
 		gh.cfg.AncestorsMaxContainersSent,
@@ -172,7 +173,7 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (gh *getter) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
-	blk, err := gh.vm.GetBlock(blkID)
+	blk, err := gh.vm.GetBlock(ctx, blkID)
 	if err != nil {
 		// If we failed to get the block, that means either an unexpected error
 		// has occurred, [vdr] is not following the protocol, or the

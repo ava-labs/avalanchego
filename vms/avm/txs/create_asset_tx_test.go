@@ -451,7 +451,7 @@ func TestCreateAssetTxSerializationAgain(t *testing.T) {
 	}
 }
 
-func TestCreateAssetTxGetters(t *testing.T) {
+func TestCreateAssetTxGetters(*testing.T) {
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,

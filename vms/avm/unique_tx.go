@@ -4,6 +4,7 @@
 package avm
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -112,11 +113,16 @@ func (tx *UniqueTx) setStatus(status choices.Status) error {
 }
 
 // ID returns the wrapped txID
-func (tx *UniqueTx) ID() ids.ID       { return tx.txID }
-func (tx *UniqueTx) Key() interface{} { return tx.txID }
+func (tx *UniqueTx) ID() ids.ID {
+	return tx.txID
+}
+
+func (tx *UniqueTx) Key() interface{} {
+	return tx.txID
+}
 
 // Accept is called when the transaction was finalized as accepted by consensus
-func (tx *UniqueTx) Accept() error {
+func (tx *UniqueTx) Accept(context.Context) error {
 	if s := tx.Status(); s != choices.Processing {
 		return fmt.Errorf("transaction has invalid status: %s", s)
 	}
@@ -193,7 +199,7 @@ func (tx *UniqueTx) Accept() error {
 }
 
 // Reject is called when the transaction was finalized as rejected by consensus
-func (tx *UniqueTx) Reject() error {
+func (tx *UniqueTx) Reject(context.Context) error {
 	defer tx.vm.db.Abort()
 
 	if err := tx.setStatus(choices.Rejected); err != nil {
@@ -282,12 +288,12 @@ func (tx *UniqueTx) InputIDs() []ids.ID {
 }
 
 // Whitelist is not supported by this transaction type, so [false] is returned.
-func (tx *UniqueTx) HasWhitelist() bool {
+func (*UniqueTx) HasWhitelist() bool {
 	return false
 }
 
 // Whitelist is not supported by this transaction type, so [false] is returned.
-func (tx *UniqueTx) Whitelist() (ids.Set, error) {
+func (*UniqueTx) Whitelist(context.Context) (ids.Set, error) {
 	return nil, nil
 }
 
@@ -331,7 +337,7 @@ func (tx *UniqueTx) verifyWithoutCacheWrites() error {
 }
 
 // Verify the validity of this transaction
-func (tx *UniqueTx) Verify() error {
+func (tx *UniqueTx) Verify(context.Context) error {
 	if err := tx.verifyWithoutCacheWrites(); err != nil {
 		return err
 	}

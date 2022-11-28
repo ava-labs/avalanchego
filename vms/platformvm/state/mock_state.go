@@ -656,16 +656,15 @@ func (mr *MockStateMockRecorder) UTXOIDs(arg0, arg1, arg2 interface{}) *gomock.C
 }
 
 // ValidatorSet mocks base method.
-func (m *MockState) ValidatorSet(arg0 ids.ID) (validators.Set, error) {
+func (m *MockState) ValidatorSet(arg0 ids.ID, arg1 validators.Set) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ValidatorSet", arg0)
-	ret0, _ := ret[0].(validators.Set)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "ValidatorSet", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // ValidatorSet indicates an expected call of ValidatorSet.
-func (mr *MockStateMockRecorder) ValidatorSet(arg0 interface{}) *gomock.Call {
+func (mr *MockStateMockRecorder) ValidatorSet(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidatorSet", reflect.TypeOf((*MockState)(nil).ValidatorSet), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidatorSet", reflect.TypeOf((*MockState)(nil).ValidatorSet), arg0, arg1)
 }

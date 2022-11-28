@@ -5,7 +5,6 @@ package message
 
 import (
 	"bytes"
-	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -14,15 +13,15 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"google.golang.org/protobuf/proto"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/utils/ips"
-	"github.com/ava-labs/avalanchego/utils/units"
 
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
-func TestNewOutboundInboundMessage(t *testing.T) {
+func TestMessage(t *testing.T) {
 	t.Parallel()
 
 	require := require.New(t)
@@ -30,7 +29,6 @@ func TestNewOutboundInboundMessage(t *testing.T) {
 	mb, err := newMsgBuilder(
 		"test",
 		prometheus.NewRegistry(),
-		units.MiB,
 		5*time.Second,
 	)
 	require.NoError(err)
@@ -51,19 +49,28 @@ func TestNewOutboundInboundMessage(t *testing.T) {
 	nowUnix := time.Now().Unix()
 
 	tests := []struct {
-		desc                string
-		op                  Op
-		msg                 *p2ppb.Message
-		gzipCompress        bool
-		bypassThrottling    bool
-		bytesSaved          bool                  // if true, outbound message saved bytes must be non-zero
-		expectedOutboundErr error                 // expected error for creating outbound message
-		fields              map[Field]interface{} // expected fields from the inbound message
-		expectedGetFieldErr map[Field]error       // expected error for getting the specified field
+		desc             string
+		op               Op
+		msg              *p2ppb.Message
+		gzipCompress     bool
+		bypassThrottling bool
+		bytesSaved       bool // if true, outbound message saved bytes must be non-zero
 	}{
 		{
-			desc: "valid pong outbound message with no compression",
-			op:   Pong,
+			desc: "ping message with no compression",
+			op:   PingOp,
+			msg: &p2ppb.Message{
+				Message: &p2ppb.Message_Ping{
+					Ping: &p2ppb.Ping{},
+				},
+			},
+			gzipCompress:     false,
+			bypassThrottling: true,
+			bytesSaved:       false,
+		},
+		{
+			desc: "pong message with no compression",
+			op:   PongOp,
 			msg: &p2ppb.Message{
 				Message: &p2ppb.Message_Pong{
 					Pong: &p2ppb.Pong{
@@ -71,367 +78,34 @@ func TestNewOutboundInboundMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				Uptime: uint8(1),
-			},
-			expectedGetFieldErr: nil,
+			gzipCompress:     false,
+			bypassThrottling: true,
+			bytesSaved:       false,
 		},
 		{
-			desc: "valid ping outbound message with no compression",
-			op:   Ping,
+			desc: "version message with no compression",
+			op:   VersionOp,
 			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Ping{
-					Ping: &p2ppb.Ping{},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields:              nil,
-			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "valid get_accepted_frontier outbound message with no compression",
-			op:   GetAcceptedFrontier,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_GetAcceptedFrontier{
-					GetAcceptedFrontier: &p2ppb.GetAcceptedFrontier{
-						ChainId:   testID[:],
-						RequestId: 1,
-						Deadline:  1,
+				Message: &p2ppb.Message_Version{
+					Version: &p2ppb.Version{
+						NetworkId:      uint32(1337),
+						MyTime:         uint64(nowUnix),
+						IpAddr:         []byte(net.IPv6zero),
+						IpPort:         9651,
+						MyVersion:      "v1.2.3",
+						MyVersionTime:  uint64(nowUnix),
+						Sig:            []byte{'y', 'e', 'e', 't'},
+						TrackedSubnets: [][]byte{testID[:]},
 					},
 				},
 			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:   testID[:],
-				RequestID: uint32(1),
-				Deadline:  uint64(1),
-			},
-			expectedGetFieldErr: nil,
+			gzipCompress:     false,
+			bypassThrottling: true,
+			bytesSaved:       false,
 		},
 		{
-			desc: "valid accepted_frontier outbound message with no compression",
-			op:   AcceptedFrontier,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AcceptedFrontier_{
-					AcceptedFrontier_: &p2ppb.AcceptedFrontier{
-						ChainId:      testID[:],
-						RequestId:    1,
-						ContainerIds: [][]byte{testID[:], testID[:]},
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:      testID[:],
-				RequestID:    uint32(1),
-				ContainerIDs: [][]byte{testID[:], testID[:]},
-			},
-			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "valid get_accepted outbound message with no compression",
-			op:   GetAccepted,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_GetAccepted{
-					GetAccepted: &p2ppb.GetAccepted{
-						ChainId:      testID[:],
-						RequestId:    1,
-						Deadline:     1,
-						ContainerIds: [][]byte{testID[:], testID[:]},
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:      testID[:],
-				RequestID:    uint32(1),
-				Deadline:     uint64(1),
-				ContainerIDs: [][]byte{testID[:], testID[:]},
-			},
-			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "valid accepted outbound message with no compression",
-			op:   Accepted,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Accepted_{
-					Accepted_: &p2ppb.Accepted{
-						ChainId:      testID[:],
-						RequestId:    1,
-						ContainerIds: [][]byte{testID[:], testID[:]},
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:      testID[:],
-				RequestID:    uint32(1),
-				ContainerIDs: [][]byte{testID[:], testID[:]},
-			},
-			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "valid get_ancestors outbound message with no compression",
-			op:   GetAncestors,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_GetAncestors{
-					GetAncestors: &p2ppb.GetAncestors{
-						ChainId:     testID[:],
-						RequestId:   1,
-						Deadline:    1,
-						ContainerId: testID[:],
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:     testID[:],
-				RequestID:   uint32(1),
-				Deadline:    uint64(1),
-				ContainerID: testID[:],
-			},
-			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "valid ancestor outbound message with no compression",
-			op:   Ancestors,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Ancestors_{
-					Ancestors_: &p2ppb.Ancestors{
-						ChainId:    testID[:],
-						RequestId:  12345,
-						Containers: compressibleContainers,
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:             testID[:],
-				RequestID:           uint32(12345),
-				MultiContainerBytes: compressibleContainers,
-			},
-			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "valid ancestor outbound message with compression",
-			op:   Ancestors,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Ancestors_{
-					Ancestors_: &p2ppb.Ancestors{
-						ChainId:    testID[:],
-						RequestId:  12345,
-						Containers: compressibleContainers,
-					},
-				},
-			},
-			gzipCompress:        true,
-			bypassThrottling:    true,
-			bytesSaved:          true,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:             testID[:],
-				RequestID:           uint32(12345),
-				MultiContainerBytes: compressibleContainers,
-			},
-			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "valid get outbound message with no compression",
-			op:   Get,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Get{
-					Get: &p2ppb.Get{
-						ChainId:     testID[:],
-						RequestId:   1,
-						Deadline:    1,
-						ContainerId: testID[:],
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:     testID[:],
-				RequestID:   uint32(1),
-				Deadline:    uint64(1),
-				ContainerID: testID[:],
-			},
-			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "valid put outbound message with no compression",
-			op:   Put,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Put{
-					Put: &p2ppb.Put{
-						ChainId:   testID[:],
-						RequestId: 1,
-						Container: []byte{0},
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:        testID[:],
-				RequestID:      uint32(1),
-				ContainerBytes: []byte{0},
-			},
-			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "valid put outbound message with compression",
-			op:   Put,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Put{
-					Put: &p2ppb.Put{
-						ChainId:   testID[:],
-						RequestId: 1,
-						Container: compressibleContainers[0],
-					},
-				},
-			},
-			gzipCompress:        true,
-			bypassThrottling:    true,
-			bytesSaved:          true,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:        testID[:],
-				RequestID:      uint32(1),
-				ContainerBytes: compressibleContainers[0],
-			},
-			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "valid push_query outbound message with no compression",
-			op:   PushQuery,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_PushQuery{
-					PushQuery: &p2ppb.PushQuery{
-						ChainId:   testID[:],
-						RequestId: 1,
-						Deadline:  1,
-						Container: []byte{0},
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:        testID[:],
-				RequestID:      uint32(1),
-				Deadline:       uint64(1),
-				ContainerBytes: []byte{0},
-			},
-			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "valid push_query outbound message with compression",
-			op:   PushQuery,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_PushQuery{
-					PushQuery: &p2ppb.PushQuery{
-						ChainId:   testID[:],
-						RequestId: 1,
-						Deadline:  1,
-						Container: compressibleContainers[0],
-					},
-				},
-			},
-			gzipCompress:        true,
-			bypassThrottling:    true,
-			bytesSaved:          true,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:        testID[:],
-				RequestID:      uint32(1),
-				Deadline:       uint64(1),
-				ContainerBytes: compressibleContainers[0],
-			},
-			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "valid pull_query outbound message with no compression",
-			op:   PullQuery,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_PullQuery{
-					PullQuery: &p2ppb.PullQuery{
-						ChainId:     testID[:],
-						RequestId:   1,
-						Deadline:    1,
-						ContainerId: testID[:],
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:     testID[:],
-				RequestID:   uint32(1),
-				Deadline:    uint64(1),
-				ContainerID: testID[:],
-			},
-			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "valid chits outbound message with no compression",
-			op:   Chits,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Chits{
-					Chits: &p2ppb.Chits{
-						ChainId:      testID[:],
-						RequestId:    1,
-						ContainerIds: [][]byte{testID[:], testID[:]},
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:      testID[:],
-				RequestID:    uint32(1),
-				ContainerIDs: [][]byte{testID[:], testID[:]},
-			},
-			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "valid peer_list outbound message with no compression",
-			op:   PeerList,
+			desc: "peer_list message with no compression",
+			op:   PeerListOp,
 			msg: &p2ppb.Message{
 				Message: &p2ppb.Message_PeerList{
 					PeerList: &p2ppb.PeerList{
@@ -447,79 +121,13 @@ func TestNewOutboundInboundMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				Peers: []ips.ClaimedIPPort{
-					{
-						Cert:      testTLSCert.Leaf,
-						IPPort:    ips.IPPort{IP: net.IPv4zero, Port: uint16(10)},
-						Timestamp: uint64(1),
-						Signature: []byte{0},
-					},
-				},
-			},
-			expectedGetFieldErr: nil,
+			gzipCompress:     false,
+			bypassThrottling: true,
+			bytesSaved:       false,
 		},
 		{
-			desc: "invalid peer_list inbound message with invalid cert",
-			op:   PeerList,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_PeerList{
-					PeerList: &p2ppb.PeerList{
-						ClaimedIpPorts: []*p2ppb.ClaimedIpPort{
-							{
-								X509Certificate: []byte{0},
-								IpAddr:          []byte(net.IPv4zero[4:]),
-								IpPort:          10,
-								Timestamp:       1,
-								Signature:       []byte{0},
-							},
-						},
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				Peers: nil,
-			},
-			expectedGetFieldErr: map[Field]error{Peers: errInvalidCert},
-		},
-		{
-			desc: "invalid peer_list inbound message with invalid ip",
-			op:   PeerList,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_PeerList{
-					PeerList: &p2ppb.PeerList{
-						ClaimedIpPorts: []*p2ppb.ClaimedIpPort{
-							{
-								X509Certificate: testTLSCert.Certificate[0],
-								IpAddr:          []byte(net.IPv4zero[4:]),
-								IpPort:          10,
-								Timestamp:       1,
-								Signature:       []byte{0},
-							},
-						},
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				Peers: nil,
-			},
-			expectedGetFieldErr: map[Field]error{Peers: errInvalidIPAddrLen},
-		},
-		{
-			desc: "valid peer_list outbound message with compression",
-			op:   PeerList,
+			desc: "peer_list message with compression",
+			op:   PeerListOp,
 			msg: &p2ppb.Message{
 				Message: &p2ppb.Message_PeerList{
 					PeerList: &p2ppb.PeerList{
@@ -535,279 +143,13 @@ func TestNewOutboundInboundMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:        true,
-			bypassThrottling:    true,
-			bytesSaved:          true,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				Peers: []ips.ClaimedIPPort{
-					{
-						Cert:      testTLSCert.Leaf,
-						IPPort:    ips.IPPort{IP: net.IPv6zero, Port: uint16(9651)},
-						Timestamp: uint64(nowUnix),
-						Signature: compressibleContainers[0],
-					},
-				},
-			},
-			expectedGetFieldErr: nil,
+			gzipCompress:     true,
+			bypassThrottling: true,
+			bytesSaved:       true,
 		},
 		{
-			desc: "invalid peer_list outbound message with compression and invalid cert",
-			op:   PeerList,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_PeerList{
-					PeerList: &p2ppb.PeerList{
-						ClaimedIpPorts: []*p2ppb.ClaimedIpPort{
-							{
-								X509Certificate: testTLSCert.Certificate[0][10:],
-								IpAddr:          []byte(net.IPv6zero),
-								IpPort:          9651,
-								Timestamp:       uint64(nowUnix),
-								Signature:       compressibleContainers[0],
-							},
-						},
-					},
-				},
-			},
-			gzipCompress:        true,
-			bypassThrottling:    true,
-			bytesSaved:          true,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				Peers: nil,
-			},
-			expectedGetFieldErr: map[Field]error{Peers: errInvalidCert},
-		},
-		{
-			desc: "invalid peer_list outbound message with compression and invalid ip",
-			op:   PeerList,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_PeerList{
-					PeerList: &p2ppb.PeerList{
-						ClaimedIpPorts: []*p2ppb.ClaimedIpPort{
-							{
-								X509Certificate: testTLSCert.Certificate[0],
-								IpAddr:          []byte(net.IPv6zero[:5]),
-								IpPort:          9651,
-								Timestamp:       uint64(nowUnix),
-								Signature:       compressibleContainers[0],
-							},
-						},
-					},
-				},
-			},
-			gzipCompress:        true,
-			bypassThrottling:    true,
-			bytesSaved:          true,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				Peers: nil,
-			},
-			expectedGetFieldErr: map[Field]error{Peers: errInvalidIPAddrLen},
-		},
-		{
-			desc: "valid version outbound message with no compression",
-			op:   Version,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Version{
-					Version: &p2ppb.Version{
-						NetworkId:      uint32(1337),
-						MyTime:         uint64(nowUnix),
-						IpAddr:         []byte(net.IPv6zero),
-						IpPort:         9651,
-						MyVersion:      "v1.2.3",
-						MyVersionTime:  uint64(nowUnix),
-						Sig:            []byte{'y', 'e', 'e', 't'},
-						TrackedSubnets: [][]byte{testID[:]},
-					},
-				},
-			},
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				NetworkID:      uint32(1337),
-				MyTime:         uint64(nowUnix),
-				IP:             ips.IPPort{IP: net.IPv6zero, Port: uint16(9651)},
-				VersionStr:     "v1.2.3",
-				VersionTime:    uint64(nowUnix),
-				SigBytes:       []byte{'y', 'e', 'e', 't'},
-				TrackedSubnets: [][]byte{testID[:]},
-			},
-			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "invalid version inbound message with invalid ip",
-			op:   Version,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_Version{
-					Version: &p2ppb.Version{
-						NetworkId:      uint32(1337),
-						MyTime:         uint64(nowUnix),
-						IpAddr:         []byte(net.IPv6zero[1:]),
-						IpPort:         9651,
-						MyVersion:      "v1.2.3",
-						MyVersionTime:  uint64(nowUnix),
-						Sig:            []byte{'y', 'e', 'e', 't'},
-						TrackedSubnets: [][]byte{testID[:]},
-					},
-				},
-			},
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				NetworkID:      uint32(1337),
-				MyTime:         uint64(nowUnix),
-				IP:             nil,
-				VersionStr:     "v1.2.3",
-				VersionTime:    uint64(nowUnix),
-				SigBytes:       []byte{'y', 'e', 'e', 't'},
-				TrackedSubnets: [][]byte{testID[:]},
-			},
-			expectedGetFieldErr: map[Field]error{IP: errInvalidIPAddrLen},
-		},
-		{
-			desc: "valid app_request outbound message with no compression",
-			op:   AppRequest,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AppRequest{
-					AppRequest: &p2ppb.AppRequest{
-						ChainId:   testID[:],
-						RequestId: 1,
-						Deadline:  1,
-						AppBytes:  compressibleContainers[0],
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:   testID[:],
-				RequestID: uint32(1),
-				Deadline:  uint64(1),
-				AppBytes:  compressibleContainers[0],
-			},
-			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "valid app_request outbound message with compression",
-			op:   AppRequest,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AppRequest{
-					AppRequest: &p2ppb.AppRequest{
-						ChainId:   testID[:],
-						RequestId: 1,
-						Deadline:  1,
-						AppBytes:  compressibleContainers[0],
-					},
-				},
-			},
-			gzipCompress:        true,
-			bypassThrottling:    true,
-			bytesSaved:          true,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:   testID[:],
-				RequestID: uint32(1),
-				Deadline:  uint64(1),
-				AppBytes:  compressibleContainers[0],
-			},
-			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "valid app_response outbound message with no compression",
-			op:   AppResponse,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AppResponse{
-					AppResponse: &p2ppb.AppResponse{
-						ChainId:   testID[:],
-						RequestId: 1,
-						AppBytes:  compressibleContainers[0],
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:   testID[:],
-				RequestID: uint32(1),
-				AppBytes:  compressibleContainers[0],
-			},
-			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "valid app_response outbound message with compression",
-			op:   AppResponse,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AppResponse{
-					AppResponse: &p2ppb.AppResponse{
-						ChainId:   testID[:],
-						RequestId: 1,
-						AppBytes:  compressibleContainers[0],
-					},
-				},
-			},
-			gzipCompress:        true,
-			bypassThrottling:    true,
-			bytesSaved:          true,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:   testID[:],
-				RequestID: uint32(1),
-				AppBytes:  compressibleContainers[0],
-			},
-			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "valid app_gossip outbound message with no compression",
-			op:   AppGossip,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AppGossip{
-					AppGossip: &p2ppb.AppGossip{
-						ChainId:  testID[:],
-						AppBytes: compressibleContainers[0],
-					},
-				},
-			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:  testID[:],
-				AppBytes: compressibleContainers[0],
-			},
-			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "valid app_gossip outbound message with compression",
-			op:   AppGossip,
-			msg: &p2ppb.Message{
-				Message: &p2ppb.Message_AppGossip{
-					AppGossip: &p2ppb.AppGossip{
-						ChainId:  testID[:],
-						AppBytes: compressibleContainers[0],
-					},
-				},
-			},
-			gzipCompress:        true,
-			bypassThrottling:    true,
-			bytesSaved:          true,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:  testID[:],
-				AppBytes: compressibleContainers[0],
-			},
-			expectedGetFieldErr: nil,
-		},
-		{
-			desc: "valid get_state_summary_frontier outbound message with no compression",
-			op:   GetStateSummaryFrontier,
+			desc: "get_state_summary_frontier message with no compression",
+			op:   GetStateSummaryFrontierOp,
 			msg: &p2ppb.Message{
 				Message: &p2ppb.Message_GetStateSummaryFrontier{
 					GetStateSummaryFrontier: &p2ppb.GetStateSummaryFrontier{
@@ -817,20 +159,13 @@ func TestNewOutboundInboundMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:   testID[:],
-				RequestID: uint32(1),
-				Deadline:  uint64(1),
-			},
-			expectedGetFieldErr: nil,
+			gzipCompress:     false,
+			bypassThrottling: true,
+			bytesSaved:       false,
 		},
 		{
-			desc: "valid state_summary_frontier outbound message with no compression",
-			op:   StateSummaryFrontier,
+			desc: "state_summary_frontier message with no compression",
+			op:   StateSummaryFrontierOp,
 			msg: &p2ppb.Message{
 				Message: &p2ppb.Message_StateSummaryFrontier_{
 					StateSummaryFrontier_: &p2ppb.StateSummaryFrontier{
@@ -840,20 +175,13 @@ func TestNewOutboundInboundMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:      testID[:],
-				RequestID:    uint32(1),
-				SummaryBytes: []byte{0},
-			},
-			expectedGetFieldErr: nil,
+			gzipCompress:     false,
+			bypassThrottling: true,
+			bytesSaved:       false,
 		},
 		{
-			desc: "valid state_summary_frontier outbound message with compression",
-			op:   StateSummaryFrontier,
+			desc: "state_summary_frontier message with compression",
+			op:   StateSummaryFrontierOp,
 			msg: &p2ppb.Message{
 				Message: &p2ppb.Message_StateSummaryFrontier_{
 					StateSummaryFrontier_: &p2ppb.StateSummaryFrontier{
@@ -863,20 +191,13 @@ func TestNewOutboundInboundMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:        true,
-			bypassThrottling:    true,
-			bytesSaved:          true,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:      testID[:],
-				RequestID:    uint32(1),
-				SummaryBytes: compressibleContainers[0],
-			},
-			expectedGetFieldErr: nil,
+			gzipCompress:     true,
+			bypassThrottling: true,
+			bytesSaved:       true,
 		},
 		{
-			desc: "valid get_accepted_state_summary_frontier outbound message with no compression",
-			op:   GetAcceptedStateSummary,
+			desc: "get_accepted_state_summary message with no compression",
+			op:   GetAcceptedStateSummaryOp,
 			msg: &p2ppb.Message{
 				Message: &p2ppb.Message_GetAcceptedStateSummary{
 					GetAcceptedStateSummary: &p2ppb.GetAcceptedStateSummary{
@@ -887,21 +208,13 @@ func TestNewOutboundInboundMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:        testID[:],
-				RequestID:      uint32(1),
-				Deadline:       uint64(1),
-				SummaryHeights: []uint64{0},
-			},
-			expectedGetFieldErr: nil,
+			gzipCompress:     false,
+			bypassThrottling: true,
+			bytesSaved:       false,
 		},
 		{
-			desc: "valid get_accepted_state_summary_frontier outbound message with compression",
-			op:   GetAcceptedStateSummary,
+			desc: "get_accepted_state_summary message with compression",
+			op:   GetAcceptedStateSummaryOp,
 			msg: &p2ppb.Message{
 				Message: &p2ppb.Message_GetAcceptedStateSummary{
 					GetAcceptedStateSummary: &p2ppb.GetAcceptedStateSummary{
@@ -912,21 +225,13 @@ func TestNewOutboundInboundMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:        true,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:        testID[:],
-				RequestID:      uint32(1),
-				Deadline:       uint64(1),
-				SummaryHeights: []uint64{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-			},
-			expectedGetFieldErr: nil,
+			gzipCompress:     true,
+			bypassThrottling: true,
+			bytesSaved:       false,
 		},
 		{
-			desc: "valid accepted_state_summary_frontier outbound message with no compression",
-			op:   AcceptedStateSummary,
+			desc: "accepted_state_summary message with no compression",
+			op:   AcceptedStateSummaryOp,
 			msg: &p2ppb.Message{
 				Message: &p2ppb.Message_AcceptedStateSummary_{
 					AcceptedStateSummary_: &p2ppb.AcceptedStateSummary{
@@ -936,20 +241,13 @@ func TestNewOutboundInboundMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:        false,
-			bypassThrottling:    true,
-			bytesSaved:          false,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:    testID[:],
-				RequestID:  uint32(1),
-				SummaryIDs: [][]byte{testID[:], testID[:]},
-			},
-			expectedGetFieldErr: nil,
+			gzipCompress:     false,
+			bypassThrottling: true,
+			bytesSaved:       false,
 		},
 		{
-			desc: "valid accepted_state_summary_frontier outbound message with compression",
-			op:   AcceptedStateSummary,
+			desc: "accepted_state_summary message with compression",
+			op:   AcceptedStateSummaryOp,
 			msg: &p2ppb.Message{
 				Message: &p2ppb.Message_AcceptedStateSummary_{
 					AcceptedStateSummary_: &p2ppb.AcceptedStateSummary{
@@ -959,61 +257,400 @@ func TestNewOutboundInboundMessage(t *testing.T) {
 					},
 				},
 			},
-			gzipCompress:        true,
-			bypassThrottling:    true,
-			bytesSaved:          true,
-			expectedOutboundErr: nil,
-			fields: map[Field]interface{}{
-				ChainID:    testID[:],
-				RequestID:  uint32(1),
-				SummaryIDs: [][]byte{testID[:], testID[:], testID[:], testID[:], testID[:], testID[:], testID[:], testID[:], testID[:]},
+			gzipCompress:     true,
+			bypassThrottling: true,
+			bytesSaved:       true,
+		},
+		{
+			desc: "get_accepted_frontier message with no compression",
+			op:   GetAcceptedFrontierOp,
+			msg: &p2ppb.Message{
+				Message: &p2ppb.Message_GetAcceptedFrontier{
+					GetAcceptedFrontier: &p2ppb.GetAcceptedFrontier{
+						ChainId:   testID[:],
+						RequestId: 1,
+						Deadline:  1,
+					},
+				},
 			},
+			gzipCompress:     false,
+			bypassThrottling: true,
+			bytesSaved:       false,
+		},
+		{
+			desc: "accepted_frontier message with no compression",
+			op:   AcceptedFrontierOp,
+			msg: &p2ppb.Message{
+				Message: &p2ppb.Message_AcceptedFrontier_{
+					AcceptedFrontier_: &p2ppb.AcceptedFrontier{
+						ChainId:      testID[:],
+						RequestId:    1,
+						ContainerIds: [][]byte{testID[:], testID[:]},
+					},
+				},
+			},
+			gzipCompress:     false,
+			bypassThrottling: true,
+			bytesSaved:       false,
+		},
+		{
+			desc: "get_accepted message with no compression",
+			op:   GetAcceptedOp,
+			msg: &p2ppb.Message{
+				Message: &p2ppb.Message_GetAccepted{
+					GetAccepted: &p2ppb.GetAccepted{
+						ChainId:      testID[:],
+						RequestId:    1,
+						Deadline:     1,
+						ContainerIds: [][]byte{testID[:], testID[:]},
+					},
+				},
+			},
+			gzipCompress:     false,
+			bypassThrottling: true,
+			bytesSaved:       false,
+		},
+		{
+			desc: "accepted message with no compression",
+			op:   AcceptedOp,
+			msg: &p2ppb.Message{
+				Message: &p2ppb.Message_Accepted_{
+					Accepted_: &p2ppb.Accepted{
+						ChainId:      testID[:],
+						RequestId:    1,
+						ContainerIds: [][]byte{testID[:], testID[:]},
+					},
+				},
+			},
+			gzipCompress:     false,
+			bypassThrottling: true,
+			bytesSaved:       false,
+		},
+		{
+			desc: "get_ancestors message with no compression",
+			op:   GetAncestorsOp,
+			msg: &p2ppb.Message{
+				Message: &p2ppb.Message_GetAncestors{
+					GetAncestors: &p2ppb.GetAncestors{
+						ChainId:     testID[:],
+						RequestId:   1,
+						Deadline:    1,
+						ContainerId: testID[:],
+					},
+				},
+			},
+			gzipCompress:     false,
+			bypassThrottling: true,
+			bytesSaved:       false,
+		},
+		{
+			desc: "ancestors message with no compression",
+			op:   AncestorsOp,
+			msg: &p2ppb.Message{
+				Message: &p2ppb.Message_Ancestors_{
+					Ancestors_: &p2ppb.Ancestors{
+						ChainId:    testID[:],
+						RequestId:  12345,
+						Containers: compressibleContainers,
+					},
+				},
+			},
+			gzipCompress:     false,
+			bypassThrottling: true,
+			bytesSaved:       false,
+		},
+		{
+			desc: "ancestors message with compression",
+			op:   AncestorsOp,
+			msg: &p2ppb.Message{
+				Message: &p2ppb.Message_Ancestors_{
+					Ancestors_: &p2ppb.Ancestors{
+						ChainId:    testID[:],
+						RequestId:  12345,
+						Containers: compressibleContainers,
+					},
+				},
+			},
+			gzipCompress:     true,
+			bypassThrottling: true,
+			bytesSaved:       true,
+		},
+		{
+			desc: "get message with no compression",
+			op:   GetOp,
+			msg: &p2ppb.Message{
+				Message: &p2ppb.Message_Get{
+					Get: &p2ppb.Get{
+						ChainId:     testID[:],
+						RequestId:   1,
+						Deadline:    1,
+						ContainerId: testID[:],
+					},
+				},
+			},
+			gzipCompress:     false,
+			bypassThrottling: true,
+			bytesSaved:       false,
+		},
+		{
+			desc: "put message with no compression",
+			op:   PutOp,
+			msg: &p2ppb.Message{
+				Message: &p2ppb.Message_Put{
+					Put: &p2ppb.Put{
+						ChainId:   testID[:],
+						RequestId: 1,
+						Container: []byte{0},
+					},
+				},
+			},
+			gzipCompress:     false,
+			bypassThrottling: true,
+			bytesSaved:       false,
+		},
+		{
+			desc: "put message with compression",
+			op:   PutOp,
+			msg: &p2ppb.Message{
+				Message: &p2ppb.Message_Put{
+					Put: &p2ppb.Put{
+						ChainId:   testID[:],
+						RequestId: 1,
+						Container: compressibleContainers[0],
+					},
+				},
+			},
+			gzipCompress:     true,
+			bypassThrottling: true,
+			bytesSaved:       true,
+		},
+		{
+			desc: "push_query message with no compression",
+			op:   PushQueryOp,
+			msg: &p2ppb.Message{
+				Message: &p2ppb.Message_PushQuery{
+					PushQuery: &p2ppb.PushQuery{
+						ChainId:   testID[:],
+						RequestId: 1,
+						Deadline:  1,
+						Container: []byte{0},
+					},
+				},
+			},
+			gzipCompress:     false,
+			bypassThrottling: true,
+			bytesSaved:       false,
+		},
+		{
+			desc: "push_query message with compression",
+			op:   PushQueryOp,
+			msg: &p2ppb.Message{
+				Message: &p2ppb.Message_PushQuery{
+					PushQuery: &p2ppb.PushQuery{
+						ChainId:   testID[:],
+						RequestId: 1,
+						Deadline:  1,
+						Container: compressibleContainers[0],
+					},
+				},
+			},
+			gzipCompress:     true,
+			bypassThrottling: true,
+			bytesSaved:       true,
+		},
+		{
+			desc: "pull_query message with no compression",
+			op:   PullQueryOp,
+			msg: &p2ppb.Message{
+				Message: &p2ppb.Message_PullQuery{
+					PullQuery: &p2ppb.PullQuery{
+						ChainId:     testID[:],
+						RequestId:   1,
+						Deadline:    1,
+						ContainerId: testID[:],
+					},
+				},
+			},
+			gzipCompress:     false,
+			bypassThrottling: true,
+			bytesSaved:       false,
+		},
+		{
+			desc: "chits message with no compression",
+			op:   ChitsOp,
+			msg: &p2ppb.Message{
+				Message: &p2ppb.Message_Chits{
+					Chits: &p2ppb.Chits{
+						ChainId:      testID[:],
+						RequestId:    1,
+						ContainerIds: [][]byte{testID[:], testID[:]},
+					},
+				},
+			},
+			gzipCompress:     false,
+			bypassThrottling: true,
+			bytesSaved:       false,
+		},
+		{
+			desc: "app_request message with no compression",
+			op:   AppRequestOp,
+			msg: &p2ppb.Message{
+				Message: &p2ppb.Message_AppRequest{
+					AppRequest: &p2ppb.AppRequest{
+						ChainId:   testID[:],
+						RequestId: 1,
+						Deadline:  1,
+						AppBytes:  compressibleContainers[0],
+					},
+				},
+			},
+			gzipCompress:     false,
+			bypassThrottling: true,
+			bytesSaved:       false,
+		},
+		{
+			desc: "app_request message with compression",
+			op:   AppRequestOp,
+			msg: &p2ppb.Message{
+				Message: &p2ppb.Message_AppRequest{
+					AppRequest: &p2ppb.AppRequest{
+						ChainId:   testID[:],
+						RequestId: 1,
+						Deadline:  1,
+						AppBytes:  compressibleContainers[0],
+					},
+				},
+			},
+			gzipCompress:     true,
+			bypassThrottling: true,
+			bytesSaved:       true,
+		},
+		{
+			desc: "app_response message with no compression",
+			op:   AppResponseOp,
+			msg: &p2ppb.Message{
+				Message: &p2ppb.Message_AppResponse{
+					AppResponse: &p2ppb.AppResponse{
+						ChainId:   testID[:],
+						RequestId: 1,
+						AppBytes:  compressibleContainers[0],
+					},
+				},
+			},
+			gzipCompress:     false,
+			bypassThrottling: true,
+			bytesSaved:       false,
+		},
+		{
+			desc: "app_response message with compression",
+			op:   AppResponseOp,
+			msg: &p2ppb.Message{
+				Message: &p2ppb.Message_AppResponse{
+					AppResponse: &p2ppb.AppResponse{
+						ChainId:   testID[:],
+						RequestId: 1,
+						AppBytes:  compressibleContainers[0],
+					},
+				},
+			},
+			gzipCompress:     true,
+			bypassThrottling: true,
+			bytesSaved:       true,
+		},
+		{
+			desc: "app_gossip message with no compression",
+			op:   AppGossipOp,
+			msg: &p2ppb.Message{
+				Message: &p2ppb.Message_AppGossip{
+					AppGossip: &p2ppb.AppGossip{
+						ChainId:  testID[:],
+						AppBytes: compressibleContainers[0],
+					},
+				},
+			},
+			gzipCompress:     false,
+			bypassThrottling: true,
+			bytesSaved:       false,
+		},
+		{
+			desc: "app_gossip message with compression",
+			op:   AppGossipOp,
+			msg: &p2ppb.Message{
+				Message: &p2ppb.Message_AppGossip{
+					AppGossip: &p2ppb.AppGossip{
+						ChainId:  testID[:],
+						AppBytes: compressibleContainers[0],
+					},
+				},
+			},
+			gzipCompress:     true,
+			bypassThrottling: true,
+			bytesSaved:       true,
 		},
 	}
 
 	for _, tv := range tests {
 		require.True(t.Run(tv.desc, func(t2 *testing.T) {
-			// copy before we in-place update via marshal
-			oldProtoMsgS := tv.msg.String()
+			encodedMsg, err := mb.createOutbound(tv.msg, tv.gzipCompress, tv.bypassThrottling)
+			require.NoError(err)
 
-			encodedMsg, err := mb.createOutbound(tv.op, tv.msg, tv.gzipCompress, tv.bypassThrottling)
-			require.ErrorIs(err, tv.expectedOutboundErr, fmt.Errorf("unexpected error %v (%T)", err, err))
-			if tv.expectedOutboundErr != nil {
-				return
-			}
-
-			require.Equal(encodedMsg.BypassThrottling(), tv.bypassThrottling)
+			require.Equal(tv.bypassThrottling, encodedMsg.BypassThrottling())
+			require.Equal(tv.op, encodedMsg.Op())
 
 			bytesSaved := encodedMsg.BytesSavedCompression()
-			if bytesSaved > 0 {
-				t2.Logf("saved %d bytes", bytesSaved)
-			}
 			require.Equal(tv.bytesSaved, bytesSaved > 0)
-
-			if (bytesSaved > 0) != tv.bytesSaved {
-				// if bytes saved expected via compression,
-				// the outbound message BytesSavedCompression should return >bytesSaved
-				t.Fatalf("unexpected BytesSavedCompression>0 (%d), expected bytes saved %v", bytesSaved, tv.bytesSaved)
-			}
 
 			parsedMsg, err := mb.parseInbound(encodedMsg.Bytes(), ids.EmptyNodeID, func() {})
 			require.NoError(err)
-
-			// before/after compression, the message should be the same
-			require.Equal(parsedMsg.msg.String(), oldProtoMsgS)
-
-			for field, v1 := range tv.fields {
-				v2, err := getField(parsedMsg.msg, field)
-
-				// expects "getField" error
-				if expectedGetFieldErr, ok := tv.expectedGetFieldErr[field]; ok {
-					require.ErrorIs(err, expectedGetFieldErr)
-					continue
-				}
-
-				require.NoError(err)
-				require.Equal(v1, v2)
-			}
+			require.Equal(tv.op, parsedMsg.Op())
 		}))
 	}
+}
+
+func TestEmptyInboundMessage(t *testing.T) {
+	t.Parallel()
+
+	require := require.New(t)
+
+	mb, err := newMsgBuilder(
+		"test",
+		prometheus.NewRegistry(),
+		5*time.Second,
+	)
+	require.NoError(err)
+
+	msg := &p2ppb.Message{}
+	msgBytes, err := proto.Marshal(msg)
+	require.NoError(err)
+
+	_, err = mb.parseInbound(msgBytes, ids.EmptyNodeID, func() {})
+	require.ErrorIs(err, errUnknownMessageType)
+}
+
+func TestNilInboundMessage(t *testing.T) {
+	t.Parallel()
+
+	require := require.New(t)
+
+	mb, err := newMsgBuilder(
+		"test",
+		prometheus.NewRegistry(),
+		5*time.Second,
+	)
+	require.NoError(err)
+
+	msg := &p2ppb.Message{
+		Message: &p2ppb.Message_Ping{
+			Ping: nil,
+		},
+	}
+	msgBytes, err := proto.Marshal(msg)
+	require.NoError(err)
+
+	parsedMsg, err := mb.parseInbound(msgBytes, ids.EmptyNodeID, func() {})
+	require.NoError(err)
+
+	pingMsg, ok := parsedMsg.message.(*p2ppb.Ping)
+	require.True(ok)
+	require.NotNil(pingMsg)
 }

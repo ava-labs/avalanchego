@@ -121,3 +121,17 @@ func TestDecodeNil(t *testing.T) {
 		t.Fatal("decoding the empty string should return an empty byte slice")
 	}
 }
+
+func FuzzEncodeDecode(f *testing.F) {
+	f.Fuzz(func(t *testing.T, bytes []byte) {
+		require := require.New(t)
+
+		str, err := Encode(Hex, bytes)
+		require.NoError(err)
+
+		decoded, err := Decode(Hex, str)
+		require.NoError(err)
+
+		require.Equal(bytes, decoded)
+	})
+}

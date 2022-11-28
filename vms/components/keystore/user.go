@@ -135,7 +135,9 @@ func (u *user) GetKey(address ids.ShortID) (*crypto.PrivateKeySECP256K1R, error)
 	return sk, nil
 }
 
-func (u *user) Close() error { return u.db.Close() }
+func (u *user) Close() error {
+	return u.db.Close()
+}
 
 // Create and store a new key that will be controlled by this user.
 func NewKey(u User) (*crypto.PrivateKeySECP256K1R, error) {

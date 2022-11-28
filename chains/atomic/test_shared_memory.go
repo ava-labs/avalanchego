@@ -287,7 +287,7 @@ func TestSharedMemoryCommitOnRemove(t *testing.T, _, chainID1 ids.ID, sm0, _ Sha
 }
 
 // TestPutAndRemoveBatch tests to make sure multiple put and remove requests work properly
-func TestPutAndRemoveBatch(t *testing.T, chainID0, chainID1 ids.ID, _, sm1 SharedMemory, db database.Database) {
+func TestPutAndRemoveBatch(t *testing.T, chainID0, _ ids.ID, _, sm1 SharedMemory, db database.Database) {
 	require := require.New(t)
 
 	batch := db.NewBatch()

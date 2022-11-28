@@ -62,25 +62,20 @@ func NewMessageMetrics(
 		metrics.Register(msg.SentBytes),
 	)
 
-	if op.Compressible() {
-		msg.SavedReceivedBytes = metric.NewAveragerWithErrs(
-			namespace,
-			fmt.Sprintf("%s_compression_saved_received_bytes", op),
-			fmt.Sprintf("bytes saved (not received) due to compression of %s messages", op),
-			metrics,
-			errs,
-		)
-		msg.SavedSentBytes = metric.NewAveragerWithErrs(
-			namespace,
-			fmt.Sprintf("%s_compression_saved_sent_bytes", op),
-			fmt.Sprintf("bytes saved (not sent) due to compression of %s messages", op),
-			metrics,
-			errs,
-		)
-	} else {
-		msg.SavedReceivedBytes = metric.NewNoAverager()
-		msg.SavedSentBytes = metric.NewNoAverager()
-	}
+	msg.SavedReceivedBytes = metric.NewAveragerWithErrs(
+		namespace,
+		fmt.Sprintf("%s_compression_saved_received_bytes", op),
+		fmt.Sprintf("bytes saved (not received) due to compression of %s messages", op),
+		metrics,
+		errs,
+	)
+	msg.SavedSentBytes = metric.NewAveragerWithErrs(
+		namespace,
+		fmt.Sprintf("%s_compression_saved_sent_bytes", op),
+		fmt.Sprintf("bytes saved (not sent) due to compression of %s messages", op),
+		metrics,
+		errs,
+	)
 	return msg
 }
 

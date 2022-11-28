@@ -30,7 +30,7 @@ type Operation struct {
 	Op         fxs.FxOperation `serialize:"true" json:"operation"`
 }
 
-func (op *Operation) Verify(c codec.Manager) error {
+func (op *Operation) Verify() error {
 	switch {
 	case op == nil:
 		return errNilOperation
@@ -62,8 +62,15 @@ func (ops *innerSortOperation) Less(i, j int) bool {
 	}
 	return bytes.Compare(iBytes, jBytes) == -1
 }
-func (ops *innerSortOperation) Len() int      { return len(ops.ops) }
-func (ops *innerSortOperation) Swap(i, j int) { o := ops.ops; o[j], o[i] = o[i], o[j] }
+
+func (ops *innerSortOperation) Len() int {
+	return len(ops.ops)
+}
+
+func (ops *innerSortOperation) Swap(i, j int) {
+	o := ops.ops
+	o[j], o[i] = o[i], o[j]
+}
 
 func SortOperations(ops []*Operation, c codec.Manager) {
 	sort.Sort(&innerSortOperation{ops: ops, codec: c})
@@ -93,7 +100,11 @@ func (ops *innerSortOperationsWithSigners) Less(i, j int) bool {
 	}
 	return bytes.Compare(iBytes, jBytes) == -1
 }
-func (ops *innerSortOperationsWithSigners) Len() int { return len(ops.ops) }
+
+func (ops *innerSortOperationsWithSigners) Len() int {
+	return len(ops.ops)
+}
+
 func (ops *innerSortOperationsWithSigners) Swap(i, j int) {
 	ops.ops[j], ops.ops[i] = ops.ops[i], ops.ops[j]
 	ops.signers[j], ops.signers[i] = ops.signers[i], ops.signers[j]

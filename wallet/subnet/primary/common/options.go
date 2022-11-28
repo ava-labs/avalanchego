@@ -77,7 +77,9 @@ func (o *Options) MinIssuanceTime() uint64 {
 	return uint64(time.Now().Unix())
 }
 
-func (o *Options) AllowStakeableLocked() bool { return o.allowStakeableLocked }
+func (o *Options) AllowStakeableLocked() bool {
+	return o.allowStakeableLocked
+}
 
 func (o *Options) ChangeOwner(defaultOwner *secp256k1fx.OutputOwners) *secp256k1fx.OutputOwners {
 	if o.changeOwner != nil {
@@ -86,9 +88,13 @@ func (o *Options) ChangeOwner(defaultOwner *secp256k1fx.OutputOwners) *secp256k1
 	return defaultOwner
 }
 
-func (o *Options) Memo() []byte { return o.memo }
+func (o *Options) Memo() []byte {
+	return o.memo
+}
 
-func (o *Options) AssumeDecided() bool { return o.assumeDecided }
+func (o *Options) AssumeDecided() bool {
+	return o.assumeDecided
+}
 
 func (o *Options) PollFrequency() time.Duration {
 	if o.pollFrequencySet {

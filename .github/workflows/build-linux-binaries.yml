@@ -1,13 +1,14 @@
 name: build-linux-release
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - "*"
 
 jobs:
   build-x86_64-binaries-tarball:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-20.04
 
     steps:
       - uses: actions/checkout@v3
@@ -44,10 +45,10 @@ jobs:
           TAG: ${{ env.VERSION }}
           BUCKET: ${{ secrets.BUCKET }}
           ARCH: "amd64"
-          RELEASE: "jammy"
+          RELEASE: "focal"
 
   build-arm64-binaries-tarball:
-    runs-on: [self-hosted, linux, ARM64, jammy]
+    runs-on: [self-hosted, linux, ARM64, focal]
 
     steps:
       - uses: actions/checkout@v3
@@ -84,4 +85,4 @@ jobs:
           TAG: ${{ env.VERSION }}
           BUCKET: ${{ secrets.BUCKET }}
           ARCH: "arm64"
-          RELEASE: "jammy"
+          RELEASE: "focal"

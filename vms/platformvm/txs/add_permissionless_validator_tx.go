@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -71,11 +72,33 @@ func (tx *AddPermissionlessValidatorTx) InitCtx(ctx *snow.Context) {
 	tx.DelegatorRewardsOwner.InitCtx(ctx)
 }
 
-func (tx *AddPermissionlessValidatorTx) SubnetID() ids.ID     { return tx.Subnet }
-func (tx *AddPermissionlessValidatorTx) NodeID() ids.NodeID   { return tx.Validator.NodeID }
-func (tx *AddPermissionlessValidatorTx) StartTime() time.Time { return tx.Validator.StartTime() }
-func (tx *AddPermissionlessValidatorTx) EndTime() time.Time   { return tx.Validator.EndTime() }
-func (tx *AddPermissionlessValidatorTx) Weight() uint64       { return tx.Validator.Wght }
+func (tx *AddPermissionlessValidatorTx) SubnetID() ids.ID {
+	return tx.Subnet
+}
+
+func (tx *AddPermissionlessValidatorTx) NodeID() ids.NodeID {
+	return tx.Validator.NodeID
+}
+
+func (tx *AddPermissionlessValidatorTx) PublicKey() (*bls.PublicKey, bool, error) {
+	if err := tx.Signer.Verify(); err != nil {
+		return nil, false, err
+	}
+	key := tx.Signer.Key()
+	return key, key != nil, nil
+}
+
+func (tx *AddPermissionlessValidatorTx) StartTime() time.Time {
+	return tx.Validator.StartTime()
+}
+
+func (tx *AddPermissionlessValidatorTx) EndTime() time.Time {
+	return tx.Validator.EndTime()
+}
+
+func (tx *AddPermissionlessValidatorTx) Weight() uint64 {
+	return tx.Validator.Wght
+}
 
 func (tx *AddPermissionlessValidatorTx) PendingPriority() Priority {
 	if tx.Subnet == constants.PrimaryNetworkID {

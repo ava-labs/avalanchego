@@ -139,7 +139,12 @@ func newDefaultTargeter(t tracker.Tracker) tracker.Targeter {
 }
 
 func newDefaultResourceTracker() tracker.ResourceTracker {
-	tracker, err := tracker.NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, 10*time.Second)
+	tracker, err := tracker.NewResourceTracker(
+		prometheus.NewRegistry(),
+		resource.NoUsage,
+		meter.ContinuousFactory{},
+		10*time.Second,
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -193,11 +198,13 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 	err := beacons.AddWeight(nodeIDs[0], 1)
 	require.NoError(err)
 
-	vdrs := validators.NewManager()
+	primaryVdrs := validators.NewSet()
 	for _, nodeID := range nodeIDs {
-		err := vdrs.AddWeight(constants.PrimaryNetworkID, nodeID, 1)
+		err := primaryVdrs.AddWeight(nodeID, 1)
 		require.NoError(err)
 	}
+	vdrs := validators.NewManager()
+	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 
 	msgCreator := newMessageCreator(t)
 
@@ -318,7 +325,7 @@ func TestSend(t *testing.T) {
 	require.EqualValues(toSend, sentTo)
 
 	inboundGetMsg := <-received
-	require.Equal(message.Get, inboundGetMsg.Op())
+	require.Equal(message.GetOp, inboundGetMsg.Op())
 
 	for _, net := range networks {
 		net.StartClose()
@@ -333,7 +340,7 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 
 	network := networks[0].(*network)
 	nodeID, tlsCert, _ := getTLS(t, 1)
-	err := network.config.Validators.AddWeight(constants.PrimaryNetworkID, nodeID, 1)
+	err := validators.AddWeight(network.config.Validators, constants.PrimaryNetworkID, nodeID, 1)
 	require.NoError(err)
 
 	useful := network.Track(ips.ClaimedIPPort{

@@ -21,20 +21,24 @@ type acceptor struct {
 	txID     ids.ID
 }
 
-func (a *acceptor) Dependencies() ids.Set { return a.deps }
+func (a *acceptor) Dependencies() ids.Set {
+	return a.deps
+}
 
 func (a *acceptor) Fulfill(ctx context.Context, id ids.ID) {
 	a.deps.Remove(id)
 	a.Update(ctx)
 }
 
-func (a *acceptor) Abandon(_ context.Context, id ids.ID) { a.rejected = true }
+func (a *acceptor) Abandon(context.Context, ids.ID) {
+	a.rejected = true
+}
 
-func (a *acceptor) Update(context.Context) {
+func (a *acceptor) Update(ctx context.Context) {
 	// If I was rejected or I am still waiting on dependencies to finish or an
 	// error has occurred, I shouldn't do anything.
 	if a.rejected || a.deps.Len() != 0 || a.errs.Errored() {
 		return
 	}
-	a.errs.Add(a.g.accept(a.txID))
+	a.errs.Add(a.g.accept(ctx, a.txID))
 }

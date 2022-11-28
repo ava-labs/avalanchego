@@ -4,6 +4,8 @@
 package snowstorm
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -109,7 +111,7 @@ func (n *Network) AddNode(cg Consensus) error {
 		}
 		txs[newTx.ID()] = newTx
 
-		if err := cg.Add(newTx); err != nil {
+		if err := cg.Add(context.Background(), newTx); err != nil {
 			return err
 		}
 	}
@@ -155,7 +157,7 @@ func (n *Network) Round() error {
 		}
 	}
 
-	if _, err := running.RecordPoll(sampledColors); err != nil {
+	if _, err := running.RecordPoll(context.Background(), sampledColors); err != nil {
 		return err
 	}
 

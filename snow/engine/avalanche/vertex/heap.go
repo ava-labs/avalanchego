@@ -17,7 +17,9 @@ var (
 
 type priorityQueue []avalanche.Vertex
 
-func (pq priorityQueue) Len() int { return len(pq) }
+func (pq priorityQueue) Len() int {
+	return len(pq)
+}
 
 // Returns true if the vertex at index i has greater height than the vertex at
 // index j.
@@ -87,7 +89,9 @@ type Heap interface {
 }
 
 // NewHeap returns an empty Heap
-func NewHeap() Heap { return &maxHeightVertexHeap{} }
+func NewHeap() Heap {
+	return &maxHeightVertexHeap{}
+}
 
 type maxHeightVertexHeap struct {
 	heap       priorityQueue
@@ -121,6 +125,10 @@ func (vh *maxHeightVertexHeap) Pop() avalanche.Vertex {
 	return vtx
 }
 
-func (vh *maxHeightVertexHeap) Len() int { return vh.heap.Len() }
+func (vh *maxHeightVertexHeap) Len() int {
+	return vh.heap.Len()
+}
 
-func (vh *maxHeightVertexHeap) Contains(vtxID ids.ID) bool { return vh.elementIDs.Contains(vtxID) }
+func (vh *maxHeightVertexHeap) Contains(vtxID ids.ID) bool {
+	return vh.elementIDs.Contains(vtxID)
+}
