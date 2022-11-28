@@ -4,10 +4,11 @@
 package avm
 
 import (
-	"strings"
-
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 )
+
+var _ utils.Sortable[*GenesisAsset] = (*GenesisAsset)(nil)
 
 type Genesis struct {
 	Txs []*GenesisAsset `serialize:"true"`
@@ -19,5 +20,5 @@ type GenesisAsset struct {
 }
 
 func (g *GenesisAsset) Less(other *GenesisAsset) bool {
-	return strings.Compare(g.Alias, other.Alias) == -1
+	return g.Alias < other.Alias
 }

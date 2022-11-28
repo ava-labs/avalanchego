@@ -4,7 +4,6 @@
 package api
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"net/http"
@@ -35,6 +34,8 @@ var (
 	errUTXOHasNoValue       = errors.New("genesis UTXO has no value")
 	errValidatorAddsNoValue = errors.New("validator would have already unstaked")
 	errStakeOverflow        = errors.New("validator stake exceeds limit")
+
+	_ utils.Sortable[UTXO] = UTXO{}
 )
 
 // StaticService defines the static API methods exposed by the platform VM
@@ -72,7 +73,7 @@ func (utxo UTXO) Less(other UTXO) bool {
 		return false
 	}
 
-	return bytes.Compare(utxoAddr.Bytes(), otherAddr.Bytes()) == -1
+	return utxoAddr.Less(otherAddr)
 }
 
 // TODO: Refactor APIStaker, APIValidators and merge them together for
@@ -246,7 +247,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 	for _, vdr := range args.Validators {
 		weight := uint64(0)
 		stake := make([]*avax.TransferableOutput, len(vdr.Staked))
-		utils.SortSliceSortable(vdr.Staked)
+		utils.Sort(vdr.Staked)
 		for i, apiUTXO := range vdr.Staked {
 			addrID, err := bech32ToID(apiUTXO.Address)
 			if err != nil {
@@ -297,7 +298,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			}
 			owner.Addrs = append(owner.Addrs, addrID)
 		}
-		utils.SortSliceSortable(owner.Addrs)
+		utils.Sort(owner.Addrs)
 
 		delegationFee := uint32(0)
 		if vdr.ExactDelegationFee != nil {

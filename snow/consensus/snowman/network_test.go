@@ -30,7 +30,7 @@ func (n *Network) shuffleColors() {
 		colors = append(colors, n.colors[int(index)])
 	}
 	n.colors = colors
-	utils.SortSliceSortable(n.colors)
+	utils.Sort(n.colors)
 }
 
 func (n *Network) Initialize(params snowball.Parameters, numColors int) {

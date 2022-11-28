@@ -19,7 +19,6 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	"golang.org/x/exp/slices"
 
 	gorillarpc "github.com/gorilla/rpc/v2"
 
@@ -27,6 +26,8 @@ import (
 	plugin "github.com/hashicorp/go-plugin"
 
 	"github.com/stretchr/testify/require"
+
+	"golang.org/x/exp/slices"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"

@@ -139,7 +139,7 @@ func (out *OutputOwners) VerifyState() error {
 }
 
 func (out *OutputOwners) Sort() {
-	utils.SortSliceSortable(out.Addrs)
+	utils.Sort(out.Addrs)
 }
 
 // formatAddress formats a given [addr] into human readable format using

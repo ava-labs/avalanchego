@@ -618,7 +618,7 @@ func (s *Service) CreateAsset(_ *http.Request, args *CreateAssetArgs, reply *Ass
 			return err
 		}
 		minter.Addrs = minterAddrsSet.List()
-		utils.SortSliceSortable(minter.Addrs)
+		utils.Sort(minter.Addrs)
 		initialState.Outs = append(initialState.Outs, minter)
 	}
 	initialState.Sort(s.vm.parser.Codec())
@@ -754,7 +754,7 @@ func (s *Service) CreateNFTAsset(_ *http.Request, args *CreateNFTAssetArgs, repl
 			return err
 		}
 		minter.Addrs = minterAddrsSet.List()
-		utils.SortSliceSortable(minter.Addrs)
+		utils.Sort(minter.Addrs)
 		initialState.Outs = append(initialState.Outs, minter)
 	}
 	initialState.Sort(s.vm.parser.Codec())

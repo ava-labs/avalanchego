@@ -9,12 +9,17 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 // ShortEmpty is a useful all zero value
-var ShortEmpty = ShortID{}
+var (
+	ShortEmpty = ShortID{}
+
+	_ utils.Sortable[ShortID] = ShortID{}
+)
 
 // ShortID wraps a 20 byte hash as an identifier
 type ShortID [20]byte
@@ -104,7 +109,7 @@ func (id ShortID) MarshalText() ([]byte, error) {
 }
 
 func (id ShortID) Less(other ShortID) bool {
-	return bytes.Compare(id.Bytes(), other.Bytes()) == -1
+	return bytes.Compare(id[:], other[:]) == -1
 }
 
 // IsUniqueShortIDs returns true iff [ids] are unique

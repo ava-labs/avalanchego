@@ -27,16 +27,3 @@ func getIDs(idsBytes [][]byte) ([]ids.ID, error) {
 	}
 	return res, nil
 }
-
-// TODO: Enforce that the numbers are sorted to make this verification more
-//       efficient.
-func isUnique(nums []uint64) bool {
-	numsSet := make(map[uint64]struct{}, len(nums))
-	for _, num := range nums {
-		if _, found := numsSet[num]; found {
-			return false
-		}
-		numsSet[num] = struct{}{}
-	}
-	return true
-}

@@ -110,7 +110,7 @@ func (ids NodeIDSet) List() []NodeID {
 // SortedList returns this set as a sorted list
 func (ids NodeIDSet) SortedList() []NodeID {
 	lst := ids.List()
-	utils.SortSliceSortable(lst)
+	utils.Sort(lst)
 	return lst
 }
 

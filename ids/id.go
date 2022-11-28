@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -22,6 +23,8 @@ var (
 	Empty = ID{}
 
 	errMissingQuotes = errors.New("first and last characters should be quotes")
+
+	_ utils.Sortable[ID] = ID{}
 )
 
 // ID wraps a 32 byte hash used as an identifier

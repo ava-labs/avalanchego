@@ -98,7 +98,7 @@ func TestShortIDLess(t *testing.T) {
 	require.False(id2.Less(id1))
 
 	id1 = ShortID{1}
-	id2 = ShortID{}
+	id2 = ShortID{0}
 	require.False(id1.Less(id2))
 	require.True(id2.Less(id1))
 
@@ -107,7 +107,7 @@ func TestShortIDLess(t *testing.T) {
 	require.False(id1.Less(id2))
 	require.False(id2.Less(id1))
 
-	id1 = ShortID{1}
+	id1 = ShortID{1, 0}
 	id2 = ShortID{1, 2}
 	require.True(id1.Less(id2))
 	require.False(id2.Less(id1))

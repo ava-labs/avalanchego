@@ -176,10 +176,10 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			initialState.Sort(genesisCodec)
 			asset.States = append(asset.States, initialState)
 		}
-		utils.SortSliceSortable(asset.States)
+		utils.Sort(asset.States)
 		g.Txs = append(g.Txs, &asset)
 	}
-	utils.SortSliceSortable(g.Txs)
+	utils.Sort(g.Txs)
 
 	b, err := genesisCodec.Marshal(txs.CodecVersion, &g)
 	if err != nil {

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
@@ -20,7 +21,8 @@ var (
 	errFailedDecodingUTXOIDTxID  = errors.New("failed decoding UTXOID TxID")
 	errFailedDecodingUTXOIDIndex = errors.New("failed decoding UTXOID index")
 
-	_ verify.Verifiable = (*UTXOID)(nil)
+	_ verify.Verifiable       = (*UTXOID)(nil)
+	_ utils.Sortable[*UTXOID] = (*UTXOID)(nil)
 )
 
 type UTXOID struct {

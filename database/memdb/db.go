@@ -8,10 +8,11 @@ import (
 	"strings"
 	"sync"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/nodb"
 	"github.com/ava-labs/avalanchego/utils"
-	"golang.org/x/exp/slices"
 )
 
 const (

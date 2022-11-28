@@ -9,9 +9,13 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
-var _ Block = (*TestBlock)(nil)
+var (
+	_ Block                      = (*TestBlock)(nil)
+	_ utils.Sortable[*TestBlock] = (*TestBlock)(nil)
+)
 
 // TestBlock is a useful test block
 type TestBlock struct {

@@ -124,7 +124,7 @@ func (sm *sharedMemory) Apply(requests map[ids.ID]*Requests, batches ...database
 		request.peerChainID = peerChainID
 		sharedOperations[sharedID] = request
 	}
-	utils.SortSliceSortable(sharedIDs)
+	utils.Sort(sharedIDs)
 
 	// Make sure all operations are committed atomically
 	vdb := versiondb.New(sm.m.db)

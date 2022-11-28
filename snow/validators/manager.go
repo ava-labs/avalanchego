@@ -76,7 +76,7 @@ func (m *manager) String() string {
 	defer m.lock.RUnlock()
 
 	subnets := maps.Keys(m.subnetToVdrs)
-	utils.SortSliceSortable(subnets)
+	utils.Sort(subnets)
 
 	sb := strings.Builder{}
 

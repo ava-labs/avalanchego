@@ -4,7 +4,6 @@
 package genesis
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -13,12 +12,14 @@ import (
 	"path/filepath"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
+
+var _ utils.Sortable[Allocation] = Allocation{}
 
 type LockedAmount struct {
 	Amount   uint64 `json:"amount"`
@@ -49,8 +50,7 @@ func (a Allocation) Unparse(networkID uint32) (UnparsedAllocation, error) {
 
 func (a Allocation) Less(other Allocation) bool {
 	return a.InitialAmount < other.InitialAmount ||
-		(a.InitialAmount == other.InitialAmount &&
-			bytes.Compare(a.AVAXAddr.Bytes(), other.AVAXAddr.Bytes()) == -1)
+		(a.InitialAmount == other.InitialAmount && a.AVAXAddr.Less(other.AVAXAddr))
 }
 
 type Staker struct {
@@ -133,12 +133,12 @@ func (c Config) Unparse() (UnparsedConfig, error) {
 func (c *Config) InitialSupply() (uint64, error) {
 	initialSupply := uint64(0)
 	for _, allocation := range c.Allocations {
-		newInitialSupply, err := safemath.Add64(initialSupply, allocation.InitialAmount)
+		newInitialSupply, err := math.Add64(initialSupply, allocation.InitialAmount)
 		if err != nil {
 			return 0, err
 		}
 		for _, unlock := range allocation.UnlockSchedule {
-			newInitialSupply, err = safemath.Add64(newInitialSupply, unlock.Amount)
+			newInitialSupply, err = math.Add64(newInitialSupply, unlock.Amount)
 			if err != nil {
 				return 0, err
 			}

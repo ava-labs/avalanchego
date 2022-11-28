@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/networking/worker"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
@@ -467,7 +468,9 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 		return engine.GetStateSummaryFrontierFailed(ctx, nodeID, msg.RequestID)
 
 	case *p2ppb.GetAcceptedStateSummary:
-		if !isUnique(msg.Heights) {
+		// TODO: Enforce that the numbers are sorted to make this verification
+		//       more efficient.
+		if !utils.IsUnique(msg.Heights) {
 			h.ctx.Log.Debug("message with invalid field",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", message.GetAcceptedStateSummaryOp),

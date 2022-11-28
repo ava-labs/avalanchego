@@ -5,10 +5,13 @@ package sampler
 
 import (
 	"github.com/ava-labs/avalanchego/utils"
-	safemath "github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/math"
 )
 
-var _ Weighted = (*weightedLinear)(nil)
+var (
+	_ Weighted                              = (*weightedLinear)(nil)
+	_ utils.Sortable[weightedLinearElement] = weightedLinearElement{}
+)
 
 type weightedLinearElement struct {
 	cumulativeWeight uint64
@@ -48,10 +51,10 @@ func (s *weightedLinear) Initialize(weights []uint64) error {
 	}
 
 	// Optimize so that the most probable values are at the front of the array
-	utils.SortSliceSortable(s.arr)
+	utils.Sort(s.arr)
 
 	for i := 1; i < len(s.arr); i++ {
-		newWeight, err := safemath.Add64(
+		newWeight, err := math.Add64(
 			s.arr[i-1].cumulativeWeight,
 			s.arr[i].cumulativeWeight,
 		)
