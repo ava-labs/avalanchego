@@ -16,7 +16,7 @@ type Camino struct {
 }
 
 type DepositOffer struct {
-	UnlockHalfPeriodDuration uint64 `serialize:"true" json:"unlockHalfPeriodDuration"`
+	UnlockHalfPeriodDuration uint32 `serialize:"true" json:"unlockHalfPeriodDuration"`
 	InterestRateNominator    uint64 `serialize:"true" json:"interestRateNominator"`
 	Start                    uint64 `serialize:"true" json:"start"`
 	End                      uint64 `serialize:"true" json:"end"`
