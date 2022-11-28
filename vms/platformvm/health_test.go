@@ -93,8 +93,8 @@ func TestHealthCheckSubnet(t *testing.T) {
 					subnetID: expectedMinStake,
 				}
 			}
-			for index, validator := range subnetVdrs.List() {
-				err := vm.Connected(context.Background(), validator.ID(), version.CurrentApp)
+			for index, vdr := range subnetVdrs.List() {
+				err := vm.Connected(context.Background(), vdr.NodeID, version.CurrentApp)
 				require.NoError(err)
 				details, err := vm.HealthCheck(context.Background())
 				connectedPerc := float64((index + 1) * (100 / testVdrCount))

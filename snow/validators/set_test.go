@@ -189,21 +189,21 @@ func TestSetGet(t *testing.T) {
 
 	vdr0, ok := s.Get(nodeID)
 	require.True(ok)
-	require.Equal(nodeID, vdr0.ID())
-	require.Equal(pk, vdr0.PublicKey())
-	require.EqualValues(1, vdr0.Weight())
+	require.Equal(nodeID, vdr0.NodeID)
+	require.Equal(pk, vdr0.PublicKey)
+	require.EqualValues(1, vdr0.Weight)
 
 	err = s.AddWeight(nodeID, 1)
 	require.NoError(err)
 
 	vdr1, ok := s.Get(nodeID)
 	require.True(ok)
-	require.Equal(nodeID, vdr0.ID())
-	require.Equal(pk, vdr0.PublicKey())
-	require.EqualValues(1, vdr0.Weight())
-	require.Equal(nodeID, vdr1.ID())
-	require.Equal(pk, vdr1.PublicKey())
-	require.EqualValues(2, vdr1.Weight())
+	require.Equal(nodeID, vdr0.NodeID)
+	require.Equal(pk, vdr0.PublicKey)
+	require.EqualValues(1, vdr0.Weight)
+	require.Equal(nodeID, vdr1.NodeID)
+	require.Equal(pk, vdr1.PublicKey)
+	require.EqualValues(2, vdr1.Weight)
 }
 
 func TestSetContains(t *testing.T) {
@@ -283,9 +283,9 @@ func TestSetList(t *testing.T) {
 	require.Len(list, 1)
 
 	node0 := list[0]
-	require.Equal(nodeID0, node0.ID())
-	require.Equal(pk, node0.PublicKey())
-	require.EqualValues(2, node0.Weight())
+	require.Equal(nodeID0, node0.NodeID)
+	require.Equal(pk, node0.PublicKey)
+	require.EqualValues(2, node0.Weight)
 
 	nodeID1 := ids.GenerateTestNodeID()
 	err = s.Add(nodeID1, nil, 1)
@@ -295,33 +295,33 @@ func TestSetList(t *testing.T) {
 	require.Len(list, 2)
 
 	node0 = list[0]
-	require.Equal(nodeID0, node0.ID())
-	require.Equal(pk, node0.PublicKey())
-	require.EqualValues(2, node0.Weight())
+	require.Equal(nodeID0, node0.NodeID)
+	require.Equal(pk, node0.PublicKey)
+	require.EqualValues(2, node0.Weight)
 
 	node1 := list[1]
-	require.Equal(nodeID1, node1.ID())
-	require.Nil(node1.PublicKey())
-	require.EqualValues(1, node1.Weight())
+	require.Equal(nodeID1, node1.NodeID)
+	require.Nil(node1.PublicKey)
+	require.EqualValues(1, node1.Weight)
 
 	err = s.RemoveWeight(nodeID0, 1)
 	require.NoError(err)
-	require.Equal(nodeID0, node0.ID())
-	require.Equal(pk, node0.PublicKey())
-	require.EqualValues(2, node0.Weight())
+	require.Equal(nodeID0, node0.NodeID)
+	require.Equal(pk, node0.PublicKey)
+	require.EqualValues(2, node0.Weight)
 
 	list = s.List()
 	require.Len(list, 2)
 
 	node0 = list[0]
-	require.Equal(nodeID0, node0.ID())
-	require.Equal(pk, node0.PublicKey())
-	require.EqualValues(1, node0.Weight())
+	require.Equal(nodeID0, node0.NodeID)
+	require.Equal(pk, node0.PublicKey)
+	require.EqualValues(1, node0.Weight)
 
 	node1 = list[1]
-	require.Equal(nodeID1, node1.ID())
-	require.Nil(node1.PublicKey())
-	require.EqualValues(1, node1.Weight())
+	require.Equal(nodeID1, node1.NodeID)
+	require.Nil(node1.PublicKey)
+	require.EqualValues(1, node1.Weight)
 
 	err = s.RemoveWeight(nodeID0, 1)
 	require.NoError(err)
@@ -330,9 +330,9 @@ func TestSetList(t *testing.T) {
 	require.Len(list, 1)
 
 	node0 = list[0]
-	require.Equal(nodeID1, node0.ID())
-	require.Nil(node0.PublicKey())
-	require.EqualValues(1, node0.Weight())
+	require.Equal(nodeID1, node0.NodeID)
+	require.Nil(node0.PublicKey)
+	require.EqualValues(1, node0.Weight)
 
 	err = s.RemoveWeight(nodeID1, 1)
 	require.NoError(err)

@@ -4779,20 +4779,19 @@ func TestSendMixedQuery(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				vdrsList := []validators.Validator{}
 				vdrs := ids.NodeIDSet{}
+				te.Validators = validators.NewSet()
 				for i := 0; i < engCfg.Params.K; i++ {
-					vdr := ids.GenerateTestNodeID()
-					vdrs.Add(vdr)
-					vdrsList = append(vdrsList, validators.NewValidator(vdr, nil, 1))
+					vdrID := ids.GenerateTestNodeID()
+					vdrs.Add(vdrID)
+					err := te.Validators.Add(vdrID, nil, 1)
+					if err != nil {
+						t.Fatal(err)
+					}
 				}
 				if tt.isVdr {
 					vdrs.Add(engCfg.Ctx.NodeID)
-					vdrsList = append(vdrsList, validators.NewValidator(engCfg.Ctx.NodeID, nil, 1))
-				}
-				te.Validators = validators.NewSet()
-				for _, vdr := range vdrsList {
-					err := te.Validators.Add(vdr.ID(), nil, vdr.Weight())
+					err := te.Validators.Add(engCfg.Ctx.NodeID, nil, 1)
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -4855,7 +4854,7 @@ func TestSendMixedQuery(t *testing.T) {
 
 				// Give the engine vtx1. It should insert it into consensus and send a mixed query
 				// consisting of 12 pull queries and 8 push queries.
-				if err := te.Put(context.Background(), te.Validators.List()[0].ID(), constants.GossipMsgRequestID, vtx1.Bytes()); err != nil {
+				if err := te.Put(context.Background(), te.Validators.List()[0].NodeID, constants.GossipMsgRequestID, vtx1.Bytes()); err != nil {
 					t.Fatal(err)
 				}
 

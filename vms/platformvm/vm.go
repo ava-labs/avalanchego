@@ -296,7 +296,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 
 	validatorIDs := make([]ids.NodeID, len(primaryValidators))
 	for i, vdr := range primaryValidators {
-		validatorIDs[i] = vdr.ID()
+		validatorIDs[i] = vdr.NodeID
 	}
 
 	if err := vm.uptimeManager.StartTracking(validatorIDs); err != nil {
@@ -339,7 +339,7 @@ func (vm *VM) Shutdown(context.Context) error {
 
 		validatorIDs := make([]ids.NodeID, len(primaryValidators))
 		for i, vdr := range primaryValidators {
-			validatorIDs[i] = vdr.ID()
+			validatorIDs[i] = vdr.NodeID
 		}
 
 		if err := vm.uptimeManager.Shutdown(validatorIDs); err != nil {
@@ -483,7 +483,7 @@ func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.I
 
 	vdrSet := make(map[ids.NodeID]uint64, len(currentValidatorList))
 	for _, vdr := range currentValidatorList {
-		vdrSet[vdr.ID()] = vdr.Weight()
+		vdrSet[vdr.NodeID] = vdr.Weight
 	}
 
 	for i := lastAcceptedHeight; i > height; i-- {
@@ -605,10 +605,10 @@ func (vm *VM) getPercentConnected(subnetID ids.ID) (float64, error) {
 		err            error
 	)
 	for _, vdr := range vdrSet.List() {
-		if !vm.uptimeManager.IsConnected(vdr.ID()) {
+		if !vm.uptimeManager.IsConnected(vdr.NodeID) {
 			continue // not connected to us --> don't include
 		}
-		connectedStake, err = math.Add64(connectedStake, vdr.Weight())
+		connectedStake, err = math.Add64(connectedStake, vdr.Weight)
 		if err != nil {
 			return 0, err
 		}

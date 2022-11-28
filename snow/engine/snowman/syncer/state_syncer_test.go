@@ -169,7 +169,7 @@ func TestStateSyncLocalSummaryIsIncludedAmongFrontiersIfAvailable(t *testing.T) 
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
 
 	require.True(syncer.locallyAvailableSummary == localSummary)
@@ -206,7 +206,7 @@ func TestStateSyncNotFoundOngoingSummaryIsNotIncludedAmongFrontiers(t *testing.T
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
 
 	require.Nil(syncer.locallyAvailableSummary)
@@ -241,7 +241,7 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
 
 	// check that vdrs are reached out for frontiers
@@ -285,7 +285,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
 
 	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
@@ -378,7 +378,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
 
 	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
@@ -450,7 +450,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
 
 	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
@@ -563,7 +563,7 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
 	require.True(syncer.pendingSeeders.Len() != 0)
 
@@ -649,7 +649,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
 	require.True(syncer.pendingSeeders.Len() != 0)
 
@@ -722,7 +722,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
 	require.True(syncer.pendingSeeders.Len() != 0)
 
@@ -842,7 +842,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
 	require.True(syncer.pendingSeeders.Len() != 0)
 
@@ -964,7 +964,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
 	require.True(syncer.pendingSeeders.Len() != 0)
 
@@ -1099,7 +1099,7 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
 	require.True(syncer.pendingSeeders.Len() != 0)
 
@@ -1221,7 +1221,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
 	require.True(syncer.pendingSeeders.Len() != 0)
 
