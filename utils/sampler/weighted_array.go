@@ -19,7 +19,6 @@ type weightedArrayElement struct {
 }
 
 // Note that this sorts in order of decreasing weight.
-// TODO can we define this on *weightedArrayElement?
 func (e weightedArrayElement) Less(other weightedArrayElement) bool {
 	return e.cumulativeWeight > other.cumulativeWeight
 }
