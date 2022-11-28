@@ -1017,11 +1017,12 @@ func (s *Service) SampleValidators(_ *http.Request, args *SampleValidatorsArgs, 
 		return fmt.Errorf("sampling errored with %w", err)
 	}
 
-	reply.Validators = make([]ids.NodeID, int(args.Size))
-	for i, vdr := range sample {
-		reply.Validators[i] = vdr.ID()
+	if sample == nil {
+		reply.Validators = []ids.NodeID{}
+	} else {
+		ids.SortNodeIDs(sample)
+		reply.Validators = sample
 	}
-	ids.SortNodeIDs(reply.Validators)
 	return nil
 }
 

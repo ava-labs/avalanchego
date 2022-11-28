@@ -625,7 +625,7 @@ func (t *Transitive) issueRepoll(ctx context.Context) {
 	}
 
 	vtxID := preferredIDs.CappedList(1)[0]
-	vdrs, err := t.Validators.Sample(t.Params.K) // Validators to sample
+	vdrIDs, err := t.Validators.Sample(t.Params.K) // Validators to sample
 	if err != nil {
 		t.Ctx.Log.Error("dropped re-query",
 			zap.String("reason", "insufficient number of validators"),
@@ -636,9 +636,7 @@ func (t *Transitive) issueRepoll(ctx context.Context) {
 	}
 
 	vdrBag := ids.NodeIDBag{} // IDs of validators to be sampled
-	for _, vdr := range vdrs {
-		vdrBag.Add(vdr.ID())
-	}
+	vdrBag.Add(vdrIDs...)
 
 	vdrList := vdrBag.List()
 	vdrSet := ids.NewNodeIDSet(len(vdrList))

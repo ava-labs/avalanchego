@@ -5,6 +5,7 @@ package common
 
 import (
 	"context"
+
 	stdmath "math"
 
 	"go.uber.org/zap"
@@ -266,24 +267,23 @@ func (b *bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID,
 }
 
 func (b *bootstrapper) Startup(ctx context.Context) error {
-	beacons, err := b.Beacons.Sample(b.Config.SampleK)
+	beaconIDs, err := b.Beacons.Sample(b.Config.SampleK)
 	if err != nil {
 		return err
 	}
 
 	b.sampledBeacons = validators.NewSet()
 	b.pendingSendAcceptedFrontier.Clear()
-	for _, vdr := range beacons {
-		vdrID := vdr.ID()
-		if !b.sampledBeacons.Contains(vdrID) {
-			err = b.sampledBeacons.Add(vdrID, 1)
+	for _, nodeID := range beaconIDs {
+		if !b.sampledBeacons.Contains(nodeID) {
+			err = b.sampledBeacons.Add(nodeID, 1)
 		} else {
-			err = b.sampledBeacons.AddWeight(vdrID, 1)
+			err = b.sampledBeacons.AddWeight(nodeID, 1)
 		}
 		if err != nil {
 			return err
 		}
-		b.pendingSendAcceptedFrontier.Add(vdrID)
+		b.pendingSendAcceptedFrontier.Add(nodeID)
 	}
 
 	b.pendingReceiveAcceptedFrontier.Clear()

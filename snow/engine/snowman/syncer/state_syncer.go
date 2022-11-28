@@ -404,23 +404,22 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	ss.failedVoters.Clear()
 
 	// sample K beacons to retrieve frontier from
-	beacons, err := ss.StateSyncBeacons.Sample(ss.Config.SampleK)
+	beaconIDs, err := ss.StateSyncBeacons.Sample(ss.Config.SampleK)
 	if err != nil {
 		return err
 	}
 
 	ss.frontierSeeders = validators.NewSet()
-	for _, vdr := range beacons {
-		vdrID := vdr.ID()
-		if !ss.frontierSeeders.Contains(vdrID) {
-			err = ss.frontierSeeders.Add(vdrID, 1)
+	for _, nodeID := range beaconIDs {
+		if !ss.frontierSeeders.Contains(nodeID) {
+			err = ss.frontierSeeders.Add(nodeID, 1)
 		} else {
-			err = ss.frontierSeeders.AddWeight(vdrID, 1)
+			err = ss.frontierSeeders.AddWeight(nodeID, 1)
 		}
 		if err != nil {
 			return err
 		}
-		ss.targetSeeders.Add(vdrID)
+		ss.targetSeeders.Add(nodeID)
 	}
 
 	// list all beacons, to reach them for voting on frontier

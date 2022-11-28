@@ -127,7 +127,7 @@ func (i *issuer) Update(ctx context.Context) {
 	}
 
 	// Issue a poll for this vertex.
-	vdrs, err := i.t.Validators.Sample(i.t.Params.K) // Validators to sample
+	vdrIDs, err := i.t.Validators.Sample(i.t.Params.K) // Validators to sample
 	if err != nil {
 		i.t.Ctx.Log.Error("dropped query",
 			zap.String("reason", "insufficient number of validators"),
@@ -136,9 +136,7 @@ func (i *issuer) Update(ctx context.Context) {
 	}
 
 	vdrBag := ids.NodeIDBag{} // Validators to sample repr. as a set
-	for _, vdr := range vdrs {
-		vdrBag.Add(vdr.ID())
-	}
+	vdrBag.Add(vdrIDs...)
 
 	i.t.RequestID++
 	if err == nil && i.t.polls.Add(i.t.RequestID, vdrBag) {

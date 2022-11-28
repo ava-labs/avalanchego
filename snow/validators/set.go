@@ -74,9 +74,9 @@ type Set interface {
 	// Weight returns the cumulative weight of all validators in the set.
 	Weight() uint64
 
-	// Sample returns a collection of validators, potentially with duplicates.
+	// Sample returns a collection of validatorIDs, potentially with duplicates.
 	// If sampling the requested size isn't possible, an error will be returned.
-	Sample(size int) ([]Validator, error)
+	Sample(size int) ([]ids.NodeID, error)
 
 	// When a validator's weight changes, or a validator is added/removed,
 	// this listener is called.
@@ -330,7 +330,7 @@ func (s *set) list() []Validator {
 	return list
 }
 
-func (s *set) Sample(size int) ([]Validator, error) {
+func (s *set) Sample(size int) ([]ids.NodeID, error) {
 	if size == 0 {
 		return nil, nil
 	}
@@ -341,7 +341,7 @@ func (s *set) Sample(size int) ([]Validator, error) {
 	return s.sample(size)
 }
 
-func (s *set) sample(size int) ([]Validator, error) {
+func (s *set) sample(size int) ([]ids.NodeID, error) {
 	if !s.samplerInitialized {
 		if err := s.sampler.Initialize(s.weights); err != nil {
 			return nil, err
@@ -354,10 +354,9 @@ func (s *set) sample(size int) ([]Validator, error) {
 		return nil, err
 	}
 
-	list := make([]Validator, size)
+	list := make([]ids.NodeID, size)
 	for i, index := range indices {
-		copiedVdr := *s.vdrSlice[index]
-		list[i] = &copiedVdr
+		list[i] = s.vdrSlice[index].nodeID
 	}
 	return list, nil
 }

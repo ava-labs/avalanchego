@@ -686,7 +686,7 @@ func (t *Transitive) pullQuery(ctx context.Context, blkID ids.ID) {
 		zap.Stringer("validators", t.Validators),
 	)
 	// The validators we will query
-	vdrs, err := t.Validators.Sample(t.Params.K)
+	vdrIDs, err := t.Validators.Sample(t.Params.K)
 	if err != nil {
 		t.Ctx.Log.Error("dropped query for block",
 			zap.String("reason", "insufficient number of validators"),
@@ -696,9 +696,7 @@ func (t *Transitive) pullQuery(ctx context.Context, blkID ids.ID) {
 	}
 
 	vdrBag := ids.NodeIDBag{}
-	for _, vdr := range vdrs {
-		vdrBag.Add(vdr.ID())
-	}
+	vdrBag.Add(vdrIDs...)
 
 	t.RequestID++
 	if t.polls.Add(t.RequestID, vdrBag) {
@@ -717,7 +715,7 @@ func (t *Transitive) sendMixedQuery(ctx context.Context, blk snowman.Block) {
 	)
 
 	blkID := blk.ID()
-	vdrs, err := t.Validators.Sample(t.Params.K)
+	vdrIDs, err := t.Validators.Sample(t.Params.K)
 	if err != nil {
 		t.Ctx.Log.Error("dropped query for block",
 			zap.String("reason", "insufficient number of validators"),
@@ -727,9 +725,7 @@ func (t *Transitive) sendMixedQuery(ctx context.Context, blk snowman.Block) {
 	}
 
 	vdrBag := ids.NodeIDBag{}
-	for _, vdr := range vdrs {
-		vdrBag.Add(vdr.ID())
-	}
+	vdrBag.Add(vdrIDs...)
 
 	t.RequestID++
 	if t.polls.Add(t.RequestID, vdrBag) {

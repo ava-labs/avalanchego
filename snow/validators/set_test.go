@@ -357,11 +357,7 @@ func TestSetSample(t *testing.T) {
 
 	sampled, err = s.Sample(1)
 	require.NoError(err)
-	require.Len(sampled, 1)
-
-	sampled0 := sampled[0]
-	require.Equal(nodeID0, sampled0.ID())
-	require.EqualValues(1, sampled0.Weight())
+	require.Equal([]ids.NodeID{nodeID0}, sampled)
 
 	_, err = s.Sample(2)
 	require.Error(err)
@@ -372,39 +368,15 @@ func TestSetSample(t *testing.T) {
 
 	sampled, err = s.Sample(1)
 	require.NoError(err)
-	require.Len(sampled, 1)
-
-	sampled0 = sampled[0]
-	require.Equal(nodeID1, sampled0.ID())
-	require.EqualValues(math.MaxInt64-1, sampled0.Weight())
+	require.Equal([]ids.NodeID{nodeID1}, sampled)
 
 	sampled, err = s.Sample(2)
 	require.NoError(err)
-	require.Len(sampled, 2)
-
-	sampled0 = sampled[0]
-	require.Equal(nodeID1, sampled0.ID())
-	require.EqualValues(math.MaxInt64-1, sampled0.Weight())
-
-	sampled1 := sampled[1]
-	require.Equal(nodeID1, sampled1.ID())
-	require.EqualValues(math.MaxInt64-1, sampled1.Weight())
+	require.Equal([]ids.NodeID{nodeID1, nodeID1}, sampled)
 
 	sampled, err = s.Sample(3)
 	require.NoError(err)
-	require.Len(sampled, 3)
-
-	sampled0 = sampled[0]
-	require.Equal(nodeID1, sampled0.ID())
-	require.EqualValues(math.MaxInt64-1, sampled0.Weight())
-
-	sampled1 = sampled[1]
-	require.Equal(nodeID1, sampled1.ID())
-	require.EqualValues(math.MaxInt64-1, sampled1.Weight())
-
-	sampled2 := sampled[2]
-	require.Equal(nodeID1, sampled2.ID())
-	require.EqualValues(math.MaxInt64-1, sampled2.Weight())
+	require.Equal([]ids.NodeID{nodeID1, nodeID1, nodeID1}, sampled)
 }
 
 func TestSetString(t *testing.T) {
