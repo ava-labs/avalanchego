@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
 var (
@@ -93,6 +94,19 @@ func (m *manager) String() string {
 	}
 
 	return sb.String()
+}
+
+// Add is a helper that fetches the validator set of [subnetID] from [m] and
+// adds [nodeID] to the validator set.
+// Returns an error if:
+// - [subnetID] does not have a registered validator set in [m]
+// - adding [nodeID] to the validator set returns an error
+func Add(m Manager, subnetID ids.ID, nodeID ids.NodeID, pk *bls.PublicKey, weight uint64) error {
+	vdrs, ok := m.Get(subnetID)
+	if !ok {
+		return fmt.Errorf("%w: %s", errMissingValidators, subnetID)
+	}
+	return vdrs.Add(nodeID, pk, weight)
 }
 
 // AddWeight is a helper that fetches the validator set of [subnetID] from [m]

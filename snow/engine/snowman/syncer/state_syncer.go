@@ -188,10 +188,7 @@ func (ss *stateSyncer) receivedStateSummaryFrontier(ctx context.Context) error {
 	// problems will go away and we can collect a qualified frontier.
 	// We assume the frontier is qualified after an alpha proportion of frontier seeders have responded
 	frontierAlpha := float64(ss.frontierSeeders.Weight()*ss.Alpha) / float64(ss.StateSyncBeacons.Weight())
-	failedBeaconWeight, err := ss.StateSyncBeacons.SubsetWeight(ss.failedSeeders)
-	if err != nil {
-		return err
-	}
+	failedBeaconWeight := ss.StateSyncBeacons.SubsetWeight(ss.failedSeeders)
 
 	frontierStake := ss.frontierSeeders.Weight() - failedBeaconWeight
 	if float64(frontierStake) < frontierAlpha {
@@ -232,7 +229,7 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 	// Mark that we received a response from [nodeID]
 	ss.pendingVoters.Remove(nodeID)
 
-	weight, _ := ss.StateSyncBeacons.GetWeight(nodeID)
+	weight := ss.StateSyncBeacons.GetWeight(nodeID)
 	for _, summaryID := range summaryIDs {
 		ws, ok := ss.weightedSummaries[summaryID]
 		if !ok {
@@ -280,10 +277,7 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 	size := len(ss.weightedSummaries)
 	if size == 0 {
 		// retry the state sync if the weight is not enough to state sync
-		failedBeaconWeight, err := ss.StateSyncBeacons.SubsetWeight(ss.failedVoters)
-		if err != nil {
-			return err
-		}
+		failedBeaconWeight := ss.StateSyncBeacons.SubsetWeight(ss.failedVoters)
 
 		// if we had too many timeouts when asking for validator votes, we should restart
 		// state sync hoping for the network problems to go away; otherwise, we received
@@ -411,24 +405,27 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	ss.failedVoters.Clear()
 
 	// sample K beacons to retrieve frontier from
-	beacons, err := ss.StateSyncBeacons.Sample(ss.Config.SampleK)
+	beaconIDs, err := ss.StateSyncBeacons.Sample(ss.Config.SampleK)
 	if err != nil {
 		return err
 	}
 
 	ss.frontierSeeders = validators.NewSet()
-	for _, vdr := range beacons {
-		vdrID := vdr.ID()
-		if err := ss.frontierSeeders.AddWeight(vdrID, 1); err != nil {
+	for _, nodeID := range beaconIDs {
+		if !ss.frontierSeeders.Contains(nodeID) {
+			err = ss.frontierSeeders.Add(nodeID, nil, 1)
+		} else {
+			err = ss.frontierSeeders.AddWeight(nodeID, 1)
+		}
+		if err != nil {
 			return err
 		}
-		ss.targetSeeders.Add(vdrID)
+		ss.targetSeeders.Add(nodeID)
 	}
 
 	// list all beacons, to reach them for voting on frontier
 	for _, vdr := range ss.StateSyncBeacons.List() {
-		vdrID := vdr.ID()
-		ss.targetVoters.Add(vdrID)
+		ss.targetVoters.Add(vdr.NodeID)
 	}
 
 	// check if there is an ongoing state sync; if so add its state summary

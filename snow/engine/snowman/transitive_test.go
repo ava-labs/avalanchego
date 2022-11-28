@@ -36,7 +36,7 @@ func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, va
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	if err := vals.AddWeight(vdr, 1); err != nil {
+	if err := vals.Add(vdr, nil, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -419,9 +419,9 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		vals.AddWeight(vdr0, 1),
-		vals.AddWeight(vdr1, 1),
-		vals.AddWeight(vdr2, 1),
+		vals.Add(vdr0, nil, 1),
+		vals.Add(vdr1, nil, 1),
+		vals.Add(vdr2, nil, 1),
 	)
 	if errs.Errored() {
 		t.Fatal(errs.Err)
@@ -905,9 +905,9 @@ func TestVoteCanceling(t *testing.T) {
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		vals.AddWeight(vdr0, 1),
-		vals.AddWeight(vdr1, 1),
-		vals.AddWeight(vdr2, 1),
+		vals.Add(vdr0, nil, 1),
+		vals.Add(vdr1, nil, 1),
+		vals.Add(vdr2, nil, 1),
 	)
 	if errs.Errored() {
 		t.Fatal(errs.Err)
@@ -1580,7 +1580,7 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 	vdr, vdrs, sender, vm, te, gBlk := setupDefaultConfig(t)
 
 	secondVdr := ids.GenerateTestNodeID()
-	if err := vdrs.AddWeight(secondVdr, 1); err != nil {
+	if err := vdrs.Add(secondVdr, nil, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1794,7 +1794,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	if err := vals.AddWeight(vdr, 1); err != nil {
+	if err := vals.Add(vdr, nil, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1913,10 +1913,10 @@ func TestEngineDoubleChit(t *testing.T) {
 	vdr0 := ids.GenerateTestNodeID()
 	vdr1 := ids.GenerateTestNodeID()
 
-	if err := vals.AddWeight(vdr0, 1); err != nil {
+	if err := vals.Add(vdr0, nil, 1); err != nil {
 		t.Fatal(err)
 	}
-	if err := vals.AddWeight(vdr1, 1); err != nil {
+	if err := vals.Add(vdr1, nil, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2044,7 +2044,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	engCfg.Validators = vals
 
 	vdr := ids.GenerateTestNodeID()
-	if err := vals.AddWeight(vdr, 1); err != nil {
+	if err := vals.Add(vdr, nil, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3132,20 +3132,19 @@ func TestSendMixedQuery(t *testing.T) {
 				engConfig.Params.K = 20
 				_, _, sender, vm, te, gBlk := setup(t, commonCfg, engConfig)
 
-				vdrsList := []validators.Validator{}
 				vdrs := set.Set[ids.NodeID]{}
+				te.Validators = validators.NewSet()
 				for i := 0; i < te.Params.K; i++ {
-					vdr := ids.GenerateTestNodeID()
-					vdrs.Add(vdr)
-					vdrsList = append(vdrsList, validators.NewValidator(vdr, 1))
+					vdrID := ids.GenerateTestNodeID()
+					vdrs.Add(vdrID)
+					err := te.Validators.Add(vdrID, nil, 1)
+					if err != nil {
+						t.Fatal(err)
+					}
 				}
 				if tt.isVdr {
 					vdrs.Add(te.Ctx.NodeID)
-					vdrsList = append(vdrsList, validators.NewValidator(te.Ctx.NodeID, 1))
-				}
-				te.Validators = validators.NewSet()
-				for _, vdr := range vdrsList {
-					err := te.Validators.AddWeight(vdr.ID(), vdr.Weight())
+					err := te.Validators.Add(te.Ctx.NodeID, nil, 1)
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -3215,7 +3214,7 @@ func TestSendMixedQuery(t *testing.T) {
 
 				// Give the engine blk1. It should insert it into consensus and send a mixed query
 				// consisting of 12 push queries and 8 pull queries.
-				if err := te.Put(context.Background(), te.Validators.List()[0].ID(), constants.GossipMsgRequestID, blk1.Bytes()); err != nil {
+				if err := te.Put(context.Background(), te.Validators.List()[0].NodeID, constants.GossipMsgRequestID, blk1.Bytes()); err != nil {
 					t.Fatal(err)
 				}
 

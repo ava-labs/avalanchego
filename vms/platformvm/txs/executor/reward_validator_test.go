@@ -304,8 +304,8 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	// test validator stake
 	vdrSet, ok := env.config.Validators.Get(constants.PrimaryNetworkID)
 	require.True(ok)
-	stake, ok := vdrSet.GetWeight(vdrNodeID)
-	require.True(ok)
+
+	stake := vdrSet.GetWeight(vdrNodeID)
 	require.Equal(env.config.MinValidatorStake+env.config.MinDelegatorStake, stake)
 
 	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
@@ -363,9 +363,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	require.Less(vdrReward, delReward, "the delegator's reward should be greater than the delegatee's because the delegatee's share is 25%")
 	require.Equal(expectedReward, delReward+vdrReward, "expected total reward to be %d but is %d", expectedReward, delReward+vdrReward)
 
-	stake, ok = vdrSet.GetWeight(vdrNodeID)
-	require.True(ok)
-	require.Equal(env.config.MinValidatorStake, stake)
+	require.Equal(env.config.MinValidatorStake, vdrSet.GetWeight(vdrNodeID))
 }
 
 func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {

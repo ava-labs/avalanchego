@@ -85,8 +85,8 @@ func (t *outboundMsgThrottler) Acquire(msg message.OutboundMessage, nodeID ids.N
 	// Take as many bytes as we can from [nodeID]'s validator allocation.
 	// Calculate [nodeID]'s validator allocation size based on its weight
 	vdrAllocationSize := uint64(0)
-	weight, isVdr := t.vdrs.GetWeight(nodeID)
-	if isVdr && weight != 0 {
+	weight := t.vdrs.GetWeight(nodeID)
+	if weight != 0 {
 		vdrAllocationSize = uint64(float64(t.maxVdrBytes) * float64(weight) / float64(t.vdrs.Weight()))
 	}
 	vdrBytesAlreadyUsed := t.nodeToVdrBytesUsed[nodeID]
