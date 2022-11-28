@@ -17,6 +17,7 @@ import (
 	stdjson "encoding/json"
 
 	"github.com/golang/mock/gomock"
+
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 
