@@ -412,7 +412,7 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	ss.frontierSeeders = validators.NewSet()
 	for _, nodeID := range beaconIDs {
 		if !ss.frontierSeeders.Contains(nodeID) {
-			err = ss.frontierSeeders.Add(nodeID, 1)
+			err = ss.frontierSeeders.Add(nodeID, nil, 1)
 		} else {
 			err = ss.frontierSeeders.AddWeight(nodeID, 1)
 		}

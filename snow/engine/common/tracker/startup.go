@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -35,11 +36,11 @@ func NewStartup(peers Peers, startupWeight uint64) Startup {
 	}
 }
 
-func (s *startup) OnValidatorAdded(nodeID ids.NodeID, weight uint64) {
+func (s *startup) OnValidatorAdded(nodeID ids.NodeID, pk *bls.PublicKey, weight uint64) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.Peers.OnValidatorAdded(nodeID, weight)
+	s.Peers.OnValidatorAdded(nodeID, pk, weight)
 	s.shouldStart = s.shouldStart || s.Peers.ConnectedWeight() >= s.startupWeight
 }
 

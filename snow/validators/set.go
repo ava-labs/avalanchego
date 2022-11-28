@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
@@ -33,7 +34,7 @@ type Set interface {
 	// - [nodeID] is already in the validator set
 	// - the total weight of the validator set would overflow uint64
 	// If an error is returned, the set will be unmodified.
-	Add(nodeID ids.NodeID, weight uint64) error
+	Add(nodeID ids.NodeID, pk *bls.PublicKey, weight uint64) error
 
 	// AddWeight to an existing staker.
 	// Returns an error if:
@@ -84,7 +85,7 @@ type Set interface {
 }
 
 type SetCallbackListener interface {
-	OnValidatorAdded(validatorID ids.NodeID, weight uint64)
+	OnValidatorAdded(validatorID ids.NodeID, pk *bls.PublicKey, weight uint64)
 	OnValidatorRemoved(validatorID ids.NodeID, weight uint64)
 	OnValidatorWeightChanged(validatorID ids.NodeID, oldWeight, newWeight uint64)
 }
@@ -118,7 +119,7 @@ type set struct {
 	callbackListeners []SetCallbackListener
 }
 
-func (s *set) Add(nodeID ids.NodeID, weight uint64) error {
+func (s *set) Add(nodeID ids.NodeID, pk *bls.PublicKey, weight uint64) error {
 	if weight == 0 {
 		return errZeroWeight
 	}
@@ -126,10 +127,10 @@ func (s *set) Add(nodeID ids.NodeID, weight uint64) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	return s.add(nodeID, weight)
+	return s.add(nodeID, pk, weight)
 }
 
-func (s *set) add(nodeID ids.NodeID, weight uint64) error {
+func (s *set) add(nodeID ids.NodeID, pk *bls.PublicKey, weight uint64) error {
 	_, nodeExists := s.vdrs[nodeID]
 	if nodeExists {
 		return errDuplicateValidator
@@ -144,6 +145,7 @@ func (s *set) add(nodeID ids.NodeID, weight uint64) error {
 
 	vdr := &validator{
 		nodeID: nodeID,
+		pk:     pk,
 		weight: weight,
 		index:  len(s.vdrSlice),
 	}
@@ -153,7 +155,7 @@ func (s *set) add(nodeID ids.NodeID, weight uint64) error {
 	s.totalWeight = newTotalWeight
 	s.samplerInitialized = false
 
-	s.callValidatorAddedCallbacks(nodeID, weight)
+	s.callValidatorAddedCallbacks(nodeID, pk, weight)
 	return nil
 }
 
@@ -405,7 +407,7 @@ func (s *set) RegisterCallbackListener(callbackListener SetCallbackListener) {
 
 	s.callbackListeners = append(s.callbackListeners, callbackListener)
 	for _, vdr := range s.vdrSlice {
-		callbackListener.OnValidatorAdded(vdr.nodeID, vdr.weight)
+		callbackListener.OnValidatorAdded(vdr.nodeID, vdr.pk, vdr.weight)
 	}
 }
 
@@ -417,9 +419,9 @@ func (s *set) callWeightChangeCallbacks(node ids.NodeID, oldWeight, newWeight ui
 }
 
 // Assumes [s.lock] is held
-func (s *set) callValidatorAddedCallbacks(node ids.NodeID, weight uint64) {
+func (s *set) callValidatorAddedCallbacks(node ids.NodeID, pk *bls.PublicKey, weight uint64) {
 	for _, callbackListener := range s.callbackListeners {
-		callbackListener.OnValidatorAdded(node, weight)
+		callbackListener.OnValidatorAdded(node, pk, weight)
 	}
 }
 

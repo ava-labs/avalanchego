@@ -19,13 +19,13 @@ func TestAdd(t *testing.T) {
 	subnetID := ids.GenerateTestID()
 	nodeID := ids.GenerateTestNodeID()
 
-	err := Add(m, subnetID, nodeID, 1)
+	err := Add(m, subnetID, nodeID, nil, 1)
 	require.ErrorIs(err, errMissingValidators)
 
 	s := NewSet()
 	m.Add(subnetID, s)
 
-	err = Add(m, subnetID, nodeID, 1)
+	err = Add(m, subnetID, nodeID, nil, 1)
 	require.NoError(err)
 
 	weight := s.Weight()
@@ -49,7 +49,7 @@ func TestAddWeight(t *testing.T) {
 	err = AddWeight(m, subnetID, nodeID, 1)
 	require.ErrorIs(err, errMissingValidator)
 
-	err = Add(m, subnetID, nodeID, 1)
+	err = Add(m, subnetID, nodeID, nil, 1)
 	require.NoError(err)
 
 	err = AddWeight(m, subnetID, nodeID, 1)
@@ -73,7 +73,7 @@ func TestRemoveWeight(t *testing.T) {
 	s := NewSet()
 	m.Add(subnetID, s)
 
-	err = Add(m, subnetID, nodeID, 2)
+	err = Add(m, subnetID, nodeID, nil, 2)
 	require.NoError(err)
 
 	err = RemoveWeight(m, subnetID, nodeID, 1)
@@ -106,7 +106,7 @@ func TestContains(t *testing.T) {
 	contains = Contains(m, subnetID, nodeID)
 	require.False(contains)
 
-	err := Add(m, subnetID, nodeID, 1)
+	err := Add(m, subnetID, nodeID, nil, 1)
 	require.NoError(err)
 
 	contains = Contains(m, subnetID, nodeID)

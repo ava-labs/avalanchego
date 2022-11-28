@@ -60,7 +60,7 @@ func testSetup(
 	sender.CantSendGetAcceptedFrontier = false
 
 	peer := ids.GenerateTestNodeID()
-	if err := peers.Add(peer, 1); err != nil {
+	if err := peers.Add(peer, nil, 1); err != nil {
 		t.Fatal(err)
 	}
 

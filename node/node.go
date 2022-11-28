@@ -59,6 +59,7 @@ import (
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/ips"
@@ -252,9 +253,15 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 
 	consensusRouter := n.Config.ConsensusRouter
 	if !n.Config.EnableStaking {
-		if err := primaryNetVdrs.Add(n.ID, n.Config.DisabledStakingWeight); err != nil {
+		err := primaryNetVdrs.Add(
+			n.ID,
+			bls.PublicFromSecretKey(n.Config.StakingSigningKey),
+			n.Config.DisabledStakingWeight,
+		)
+		if err != nil {
 			return err
 		}
+
 		consensusRouter = &insecureValidatorManager{
 			Router: consensusRouter,
 			vdrs:   primaryNetVdrs,
@@ -327,7 +334,7 @@ type insecureValidatorManager struct {
 
 func (i *insecureValidatorManager) Connected(vdrID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
 	if constants.PrimaryNetworkID == subnetID {
-		_ = i.vdrs.Add(vdrID, i.weight)
+		_ = i.vdrs.Add(vdrID, nil, i.weight)
 	}
 	i.Router.Connected(vdrID, nodeVersion, subnetID)
 }
@@ -507,7 +514,7 @@ func (n *Node) initDatabase() error {
 func (n *Node) initBeacons() error {
 	n.beacons = validators.NewSet()
 	for _, peerID := range n.Config.BootstrapIDs {
-		if err := n.beacons.Add(peerID, 1); err != nil {
+		if err := n.beacons.Add(peerID, nil, 1); err != nil {
 			return err
 		}
 	}

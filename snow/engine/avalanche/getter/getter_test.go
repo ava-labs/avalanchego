@@ -22,7 +22,7 @@ var errUnknownVertex = errors.New("unknown vertex")
 func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Config) {
 	peers := validators.NewSet()
 	peer := ids.GenerateTestNodeID()
-	if err := peers.Add(peer, 1); err != nil {
+	if err := peers.Add(peer, nil, 1); err != nil {
 		t.Fatal(err)
 	}
 

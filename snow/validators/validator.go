@@ -5,6 +5,7 @@ package validators
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
 var _ Validator = (*validator)(nil)
@@ -13,6 +14,10 @@ var _ Validator = (*validator)(nil)
 type Validator interface {
 	// ID returns the node ID of this validator
 	ID() ids.NodeID
+
+	// PublicKey returns the BLS public key this validator registered when being
+	// added, if one exists.
+	PublicKey() *bls.PublicKey
 
 	// Weight that can be used for weighted sampling. If this validator is
 	// validating the primary network, returns the amount of AVAX staked.
@@ -23,6 +28,7 @@ type Validator interface {
 // interface.
 type validator struct {
 	nodeID ids.NodeID
+	pk     *bls.PublicKey
 	weight uint64
 
 	// index is used to efficiently remove validators from the validator set. It
@@ -35,6 +41,10 @@ func (v *validator) ID() ids.NodeID {
 	return v.nodeID
 }
 
+func (v *validator) PublicKey() *bls.PublicKey {
+	return v.pk
+}
+
 func (v *validator) Weight() uint64 {
 	return v.weight
 }
@@ -43,10 +53,12 @@ func (v *validator) Weight() uint64 {
 // interface
 func NewValidator(
 	nodeID ids.NodeID,
+	pk *bls.PublicKey,
 	weight uint64,
 ) Validator {
 	return &validator{
 		nodeID: nodeID,
+		pk:     pk,
 		weight: weight,
 	}
 }

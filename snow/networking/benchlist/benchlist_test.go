@@ -30,11 +30,11 @@ func TestBenchlistAdd(t *testing.T) {
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		vdrs.Add(vdrID0, 50),
-		vdrs.Add(vdrID1, 50),
-		vdrs.Add(vdrID2, 50),
-		vdrs.Add(vdrID3, 50),
-		vdrs.Add(vdrID4, 50),
+		vdrs.Add(vdrID0, nil, 50),
+		vdrs.Add(vdrID1, nil, 50),
+		vdrs.Add(vdrID2, nil, 50),
+		vdrs.Add(vdrID3, nil, 50),
+		vdrs.Add(vdrID4, nil, 50),
 	)
 	if errs.Errored() {
 		t.Fatal(errs.Err)
@@ -170,11 +170,11 @@ func TestBenchlistMaxStake(t *testing.T) {
 	// Total weight is 5100
 	errs := wrappers.Errs{}
 	errs.Add(
-		vdrs.Add(vdrID0, 1000),
-		vdrs.Add(vdrID1, 1000),
-		vdrs.Add(vdrID2, 1000),
-		vdrs.Add(vdrID3, 2000),
-		vdrs.Add(vdrID4, 100),
+		vdrs.Add(vdrID0, nil, 1000),
+		vdrs.Add(vdrID1, nil, 1000),
+		vdrs.Add(vdrID2, nil, 1000),
+		vdrs.Add(vdrID3, nil, 2000),
+		vdrs.Add(vdrID4, nil, 100),
 	)
 	if errs.Errored() {
 		t.Fatal(errs.Err)
@@ -302,11 +302,11 @@ func TestBenchlistRemove(t *testing.T) {
 	// Total weight is 5000
 	errs := wrappers.Errs{}
 	errs.Add(
-		vdrs.Add(vdrID0, 1000),
-		vdrs.Add(vdrID1, 1000),
-		vdrs.Add(vdrID2, 1000),
-		vdrs.Add(vdrID3, 1000),
-		vdrs.Add(vdrID4, 1000),
+		vdrs.Add(vdrID0, nil, 1000),
+		vdrs.Add(vdrID1, nil, 1000),
+		vdrs.Add(vdrID2, nil, 1000),
+		vdrs.Add(vdrID3, nil, 1000),
+		vdrs.Add(vdrID4, nil, 1000),
 	)
 	if errs.Errored() {
 		t.Fatal(errs.Err)

@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -1324,7 +1325,7 @@ func (s *state) initValidatorSets() error {
 func (s *state) validatorSet(subnetID ids.ID, vdrs validators.Set) error {
 	for nodeID, validator := range s.currentStakers.validators[subnetID] {
 		staker := validator.validator
-		if err := vdrs.Add(nodeID, staker.Weight); err != nil {
+		if err := vdrs.Add(nodeID, staker.PublicKey, staker.Weight); err != nil {
 			return err
 		}
 
@@ -1555,8 +1556,11 @@ func (s *state) writeCurrentPrimaryNetworkStakers(updateValidators bool, height 
 
 	weightDiffs := make(map[ids.NodeID]*ValidatorWeightDiff)
 	for nodeID, validatorDiff := range validatorDiffs {
-		weightDiff := &ValidatorWeightDiff{}
-		isNewValidator := false
+		var (
+			weightDiff     = &ValidatorWeightDiff{}
+			isNewValidator bool
+			pk             *bls.PublicKey
+		)
 		if validatorDiff.validatorModified {
 			staker := validatorDiff.validator
 
@@ -1591,6 +1595,7 @@ func (s *state) writeCurrentPrimaryNetworkStakers(updateValidators bool, height 
 
 				s.uptimes[nodeID] = vdr
 				isNewValidator = true
+				pk = staker.PublicKey
 			}
 		}
 
@@ -1628,7 +1633,7 @@ func (s *state) writeCurrentPrimaryNetworkStakers(updateValidators bool, height 
 			err = validators.RemoveWeight(s.cfg.Validators, constants.PrimaryNetworkID, nodeID, weightDiff.Amount)
 		} else {
 			if isNewValidator {
-				err = validators.Add(s.cfg.Validators, constants.PrimaryNetworkID, nodeID, weightDiff.Amount)
+				err = validators.Add(s.cfg.Validators, constants.PrimaryNetworkID, nodeID, pk, weightDiff.Amount)
 			} else {
 				err = validators.AddWeight(s.cfg.Validators, constants.PrimaryNetworkID, nodeID, weightDiff.Amount)
 			}
@@ -1676,8 +1681,11 @@ func (s *state) writeCurrentSubnetStakers(updateValidators bool, height uint64) 
 
 		weightDiffs := make(map[ids.NodeID]*ValidatorWeightDiff)
 		for nodeID, validatorDiff := range subnetValidatorDiffs {
-			weightDiff := &ValidatorWeightDiff{}
-			isNewValidator := false
+			var (
+				weightDiff     = &ValidatorWeightDiff{}
+				isNewValidator bool
+				pk             *bls.PublicKey
+			)
 			if validatorDiff.validatorModified {
 				staker := validatorDiff.validator
 
@@ -1689,6 +1697,7 @@ func (s *state) writeCurrentSubnetStakers(updateValidators bool, height uint64) 
 				} else {
 					err = database.PutUInt64(s.currentSubnetValidatorList, staker.TxID[:], staker.PotentialReward)
 					isNewValidator = true
+					pk = staker.PublicKey
 				}
 				if err != nil {
 					return fmt.Errorf("failed to update current subnet staker: %w", err)
@@ -1727,7 +1736,7 @@ func (s *state) writeCurrentSubnetStakers(updateValidators bool, height uint64) 
 					err = validators.RemoveWeight(s.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
 				} else {
 					if isNewValidator {
-						err = validators.Add(s.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
+						err = validators.Add(s.cfg.Validators, subnetID, nodeID, pk, weightDiff.Amount)
 					} else {
 						err = validators.AddWeight(s.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
 					}

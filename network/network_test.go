@@ -195,12 +195,12 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 	dialer, listeners, nodeIDs, configs := newTestNetwork(t, len(handlers))
 
 	beacons := validators.NewSet()
-	err := beacons.Add(nodeIDs[0], 1)
+	err := beacons.Add(nodeIDs[0], nil, 1)
 	require.NoError(err)
 
 	primaryVdrs := validators.NewSet()
 	for _, nodeID := range nodeIDs {
-		err := primaryVdrs.Add(nodeID, 1)
+		err := primaryVdrs.Add(nodeID, nil, 1)
 		require.NoError(err)
 	}
 	vdrs := validators.NewManager()
@@ -340,7 +340,7 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 
 	network := networks[0].(*network)
 	nodeID, tlsCert, _ := getTLS(t, 1)
-	err := validators.Add(network.config.Validators, constants.PrimaryNetworkID, nodeID, 1)
+	err := validators.Add(network.config.Validators, constants.PrimaryNetworkID, nodeID, nil, 1)
 	require.NoError(err)
 
 	useful := network.Track(ips.ClaimedIPPort{
