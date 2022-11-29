@@ -53,10 +53,11 @@ var ErrUnfinalizedData = errors.New("cannot query unfinalized data")
 
 // EthAPIBackend implements ethapi.Backend for full nodes
 type EthAPIBackend struct {
-	extRPCEnabled       bool
-	allowUnprotectedTxs bool
-	eth                 *Ethereum
-	gpo                 *gasprice.Oracle
+	extRPCEnabled            bool
+	allowUnprotectedTxs      bool
+	allowUnprotectedTxHashes map[common.Hash]struct{} // Invariant: read-only after creation.
+	eth                      *Ethereum
+	gpo                      *gasprice.Oracle
 }
 
 // ChainConfig returns the active chain configuration.
@@ -386,8 +387,24 @@ func (b *EthAPIBackend) ExtRPCEnabled() bool {
 	return b.extRPCEnabled
 }
 
-func (b *EthAPIBackend) UnprotectedAllowed() bool {
-	return b.allowUnprotectedTxs
+func (b *EthAPIBackend) UnprotectedAllowed(tx *types.Transaction) bool {
+	if b.allowUnprotectedTxs {
+		return true
+	}
+
+	// Check for special cased transaction hashes:
+	// Note: this map is read-only after creation, so it is safe to read from it on multiple threads.
+	if _, ok := b.allowUnprotectedTxHashes[tx.Hash()]; ok {
+		return true
+	}
+
+	// Check for "predictable pattern" (Nick's Signature: https://weka.medium.com/how-to-send-ether-to-11-440-people-187e332566b7)
+	v, r, s := tx.RawSignatureValues()
+	if v == nil || r == nil || s == nil {
+		return false
+	}
+
+	return tx.Nonce() == 0 && r.Cmp(s) == 0
 }
 
 func (b *EthAPIBackend) RPCGasCap() uint64 {
