@@ -213,6 +213,7 @@ func New(
 			SnapshotVerify:                  config.SnapshotVerify,
 			SkipSnapshotRebuild:             config.SkipSnapshotRebuild,
 			Preimages:                       config.Preimages,
+			TxLookupLimit:                   config.TxLookupLimit,
 		}
 	)
 
