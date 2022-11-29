@@ -121,6 +121,9 @@ func TestEIP155SigningVitalik(t *testing.T) {
 		if from != addr {
 			t.Errorf("%d: expected %x got %x", i, addr, from)
 		}
+		if !tx.Protected() {
+			t.Errorf("%d: expected to be protected", i)
+		}
 	}
 }
 

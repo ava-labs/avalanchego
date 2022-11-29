@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/eth/gasprice"
 	"github.com/ava-labs/subnet-evm/miner"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 // DefaultFullGPOConfig contains default gasprice oracle settings for full node.
@@ -132,6 +133,9 @@ type Config struct {
 	// Unprotected transactions are transactions that are signed without EIP-155
 	// replay protection.
 	AllowUnprotectedTxs bool
+	// AllowUnprotectedTxHashes provides a list of transaction hashes, which will be allowed
+	// to be issued without replay protection over the API even if AllowUnprotectedTxs is false.
+	AllowUnprotectedTxHashes []common.Hash
 
 	// OfflinePruning enables offline pruning on startup of the node. If a node is started
 	// with this configuration option, it must finish pruning before resuming normal operation.

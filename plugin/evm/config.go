@@ -55,15 +55,20 @@ const (
 	defaultStateSyncMinBlocks = 300_000
 )
 
-var defaultEnabledAPIs = []string{
-	"eth",
-	"eth-filter",
-	"net",
-	"web3",
-	"internal-eth",
-	"internal-blockchain",
-	"internal-transaction",
-}
+var (
+	defaultEnabledAPIs = []string{
+		"eth",
+		"eth-filter",
+		"net",
+		"web3",
+		"internal-eth",
+		"internal-blockchain",
+		"internal-transaction",
+	}
+	defaultAllowUnprotectedTxHashes = []common.Hash{
+		common.HexToHash("0xfefb2da535e927b85fe68eb81cb2e4a5827c905f78381a01ef2322aa9b0aee8e"), // EIP-1820: https://eips.ethereum.org/EIPS/eip-1820
+	}
+)
 
 type Duration struct {
 	time.Duration
@@ -114,13 +119,14 @@ type Config struct {
 	MetricsExpensiveEnabled bool `json:"metrics-expensive-enabled"` // Debug-level metrics that might impact runtime performance
 
 	// API Settings
-	LocalTxsEnabled         bool     `json:"local-txs-enabled"`
-	APIMaxDuration          Duration `json:"api-max-duration"`
-	WSCPURefillRate         Duration `json:"ws-cpu-refill-rate"`
-	WSCPUMaxStored          Duration `json:"ws-cpu-max-stored"`
-	MaxBlocksPerRequest     int64    `json:"api-max-blocks-per-request"`
-	AllowUnfinalizedQueries bool     `json:"allow-unfinalized-queries"`
-	AllowUnprotectedTxs     bool     `json:"allow-unprotected-txs"`
+	LocalTxsEnabled          bool          `json:"local-txs-enabled"`
+	APIMaxDuration           Duration      `json:"api-max-duration"`
+	WSCPURefillRate          Duration      `json:"ws-cpu-refill-rate"`
+	WSCPUMaxStored           Duration      `json:"ws-cpu-max-stored"`
+	MaxBlocksPerRequest      int64         `json:"api-max-blocks-per-request"`
+	AllowUnfinalizedQueries  bool          `json:"allow-unfinalized-queries"`
+	AllowUnprotectedTxs      bool          `json:"allow-unprotected-txs"`
+	AllowUnprotectedTxHashes []common.Hash `json:"allow-unprotected-tx-hashes"`
 
 	// Keystore Settings
 	KeystoreDirectory             string `json:"keystore-directory"` // both absolute and relative supported
@@ -209,6 +215,7 @@ func (c *Config) SetDefaults() {
 	c.StateSyncServerTrieCache = defaultStateSyncServerTrieCache
 	c.StateSyncCommitInterval = defaultSyncableCommitInterval
 	c.StateSyncMinBlocks = defaultStateSyncMinBlocks
+	c.AllowUnprotectedTxHashes = defaultAllowUnprotectedTxHashes
 }
 
 func (d *Duration) UnmarshalJSON(data []byte) (err error) {
