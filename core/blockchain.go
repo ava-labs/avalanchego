@@ -770,7 +770,6 @@ func (bc *BlockChain) Stop() {
 		return
 	}
 
-	// Wait for accepted feed to process all remaining items
 	log.Info("Closing quit channel")
 	close(bc.quit)
 	// Wait for accepted feed to process all remaining items
