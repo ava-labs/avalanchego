@@ -3,99 +3,96 @@
 
 package message
 
+import (
+	"errors"
+	"fmt"
+
+	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
+)
+
 // Op is an opcode
 type Op byte
 
 // Types of messages that may be sent between nodes
 // Note: If you add a new parseable Op below, you must also add it to ops
 // (declared below)
-//
-// "_" are used in places where old message types were defined that are no
-// longer supported. When new messages are introduced these values are typically
-// safe to reuse.
 const (
 	// Handshake:
-	_ Op = iota // Used to be a GetVersion message
-	_           // Used to be a Version message
-	_           // Used to be a GetPeerList message
-	Pong
-	Ping
-	_ // Used to be a Pong message
+	PingOp Op = iota
+	PongOp
+	VersionOp
+	PeerListOp
+	// State sync:
+	GetStateSummaryFrontierOp
+	GetStateSummaryFrontierFailedOp
+	StateSummaryFrontierOp
+	GetAcceptedStateSummaryOp
+	GetAcceptedStateSummaryFailedOp
+	AcceptedStateSummaryOp
 	// Bootstrapping:
-	GetAcceptedFrontier
-	AcceptedFrontier
-	GetAccepted
-	Accepted
-	GetAncestors
-	Ancestors
+	GetAcceptedFrontierOp
+	GetAcceptedFrontierFailedOp
+	AcceptedFrontierOp
+	GetAcceptedOp
+	GetAcceptedFailedOp
+	AcceptedOp
+	GetAncestorsOp
+	GetAncestorsFailedOp
+	AncestorsOp
 	// Consensus:
-	Get
-	Put
-	PushQuery
-	PullQuery
-	Chits
-	// Handshake / peer gossiping
-	_ // Used to be a Version message
-	PeerList
-	Version
-	// Application level:
-	AppRequest
-	AppResponse
-	AppGossip
-	// State sync
-	GetStateSummaryFrontier
-	StateSummaryFrontier
-	GetAcceptedStateSummary
-	AcceptedStateSummary
-
-	// Internal messages (External messages should be added above these):
-	GetAcceptedFrontierFailed
-	GetAcceptedFailed
-	GetAncestorsFailed
-	GetFailed
-	QueryFailed
-	AppRequestFailed
-	Timeout
-	Connected
-	Disconnected
-	Notify
-	GossipRequest
-	GetStateSummaryFrontierFailed
-	GetAcceptedStateSummaryFailed
-	CrossChainAppRequest
-	CrossChainAppResponse
-	CrossChainAppRequestFailed
+	GetOp
+	GetFailedOp
+	PutOp
+	PushQueryOp
+	PullQueryOp
+	QueryFailedOp
+	ChitsOp
+	// Application:
+	AppRequestOp
+	AppRequestFailedOp
+	AppResponseOp
+	AppGossipOp
+	// Cross chain:
+	CrossChainAppRequestOp
+	CrossChainAppRequestFailedOp
+	CrossChainAppResponseOp
+	// Internal:
+	ConnectedOp
+	DisconnectedOp
+	NotifyOp
+	GossipRequestOp
+	TimeoutOp
 )
 
 var (
 	HandshakeOps = []Op{
-		Version,
-		PeerList,
-		Ping,
-		Pong,
+		PingOp,
+		PongOp,
+		VersionOp,
+		PeerListOp,
 	}
 
 	// List of all consensus request message types
 	ConsensusRequestOps = []Op{
-		GetAcceptedFrontier,
-		GetAccepted,
-		GetAncestors,
-		Get,
-		PushQuery,
-		PullQuery,
-		AppRequest,
-		GetStateSummaryFrontier,
-		GetAcceptedStateSummary,
+		GetStateSummaryFrontierOp,
+		GetAcceptedStateSummaryOp,
+		GetAcceptedFrontierOp,
+		GetAcceptedOp,
+		GetAncestorsOp,
+		GetOp,
+		PushQueryOp,
+		PullQueryOp,
+		AppRequestOp,
 	}
 	ConsensusResponseOps = []Op{
-		AcceptedFrontier,
-		Accepted,
-		Ancestors,
-		Put,
-		Chits,
-		AppResponse,
-		StateSummaryFrontier,
-		AcceptedStateSummary,
+		StateSummaryFrontierOp,
+		AcceptedStateSummaryOp,
+		AcceptedFrontierOp,
+		AcceptedOp,
+		AncestorsOp,
+		PutOp,
+		ChitsOp,
+		AppResponseOp,
 	}
 	// AppGossip is the only message that is sent unrequested without the
 	// expectation of a response
@@ -103,199 +100,295 @@ var (
 		ConsensusRequestOps,
 		append(
 			ConsensusResponseOps,
-			AppGossip,
+			AppGossipOp,
 		)...,
 	)
 	ConsensusInternalOps = []Op{
-		GetAcceptedFrontierFailed,
-		GetAcceptedFailed,
-		GetAncestorsFailed,
-		GetFailed,
-		QueryFailed,
-		AppRequestFailed,
-		Timeout,
-		Connected,
-		Disconnected,
-		Notify,
-		GossipRequest,
-		GetStateSummaryFrontierFailed,
-		GetAcceptedStateSummaryFailed,
-		CrossChainAppRequest,
-		CrossChainAppRequestFailed,
-		CrossChainAppResponse,
+		GetStateSummaryFrontierFailedOp,
+		GetAcceptedStateSummaryFailedOp,
+		GetAcceptedFrontierFailedOp,
+		GetAcceptedFailedOp,
+		GetAncestorsFailedOp,
+		GetFailedOp,
+		QueryFailedOp,
+		AppRequestFailedOp,
+		CrossChainAppRequestOp,
+		CrossChainAppRequestFailedOp,
+		CrossChainAppResponseOp,
+		ConnectedOp,
+		DisconnectedOp,
+		NotifyOp,
+		GossipRequestOp,
+		TimeoutOp,
 	}
 	ConsensusOps = append(ConsensusExternalOps, ConsensusInternalOps...)
 
 	ExternalOps = append(ConsensusExternalOps, HandshakeOps...)
 
 	SynchronousOps = []Op{
-		GetAcceptedFrontier,
-		AcceptedFrontier,
-		GetAccepted,
-		Accepted,
-		GetAncestors,
-		Ancestors,
-		Get,
-		Put,
-		PushQuery,
-		PullQuery,
-		Chits,
-		GetAcceptedFrontierFailed,
-		GetAcceptedFailed,
-		GetAncestorsFailed,
-		GetFailed,
-		QueryFailed,
-		Connected,
-		Disconnected,
-
 		// State sync
-		GetStateSummaryFrontier,
-		StateSummaryFrontier,
-		GetAcceptedStateSummary,
-		AcceptedStateSummary,
-		GetStateSummaryFrontierFailed,
-		GetAcceptedStateSummaryFailed,
+		GetStateSummaryFrontierOp,
+		GetStateSummaryFrontierFailedOp,
+		StateSummaryFrontierOp,
+		GetAcceptedStateSummaryOp,
+		GetAcceptedStateSummaryFailedOp,
+		AcceptedStateSummaryOp,
+		// Bootstrapping
+		GetAcceptedFrontierOp,
+		GetAcceptedFrontierFailedOp,
+		AcceptedFrontierOp,
+		GetAcceptedOp,
+		GetAcceptedFailedOp,
+		AcceptedOp,
+		GetAncestorsOp,
+		GetAncestorsFailedOp,
+		AncestorsOp,
+		// Consensus
+		GetOp,
+		GetFailedOp,
+		PutOp,
+		PushQueryOp,
+		PullQueryOp,
+		QueryFailedOp,
+		ChitsOp,
+		// Internal
+		ConnectedOp,
+		DisconnectedOp,
 	}
 
 	AsynchronousOps = []Op{
-		AppRequest,
-		AppGossip,
-		AppRequestFailed,
-		AppResponse,
-
-		CrossChainAppRequest,
-		CrossChainAppRequestFailed,
-		CrossChainAppResponse,
+		// Application
+		AppRequestOp,
+		AppRequestFailedOp,
+		AppGossipOp,
+		AppResponseOp,
+		// Cross chain
+		CrossChainAppRequestOp,
+		CrossChainAppRequestFailedOp,
+		CrossChainAppResponseOp,
 	}
 
-	ResponseToFailedOps = map[Op]Op{
-		AcceptedFrontier:      GetAcceptedFrontierFailed,
-		Accepted:              GetAcceptedFailed,
-		Ancestors:             GetAncestorsFailed,
-		Put:                   GetFailed,
-		Chits:                 QueryFailed,
-		AppResponse:           AppRequestFailed,
-		CrossChainAppResponse: CrossChainAppRequestFailed,
-		StateSummaryFrontier:  GetStateSummaryFrontierFailed,
-		AcceptedStateSummary:  GetAcceptedStateSummaryFailed,
-	}
 	FailedToResponseOps = map[Op]Op{
-		GetStateSummaryFrontierFailed: StateSummaryFrontier,
-		GetAcceptedStateSummaryFailed: AcceptedStateSummary,
-		GetAcceptedFrontierFailed:     AcceptedFrontier,
-		GetAcceptedFailed:             Accepted,
-		GetAncestorsFailed:            Ancestors,
-		GetFailed:                     Put,
-		QueryFailed:                   Chits,
-		AppRequestFailed:              AppResponse,
-		CrossChainAppRequestFailed:    CrossChainAppResponse,
+		GetStateSummaryFrontierFailedOp: StateSummaryFrontierOp,
+		GetAcceptedStateSummaryFailedOp: AcceptedStateSummaryOp,
+		GetAcceptedFrontierFailedOp:     AcceptedFrontierOp,
+		GetAcceptedFailedOp:             AcceptedOp,
+		GetAncestorsFailedOp:            AncestorsOp,
+		GetFailedOp:                     PutOp,
+		QueryFailedOp:                   ChitsOp,
+		AppRequestFailedOp:              AppResponseOp,
+		CrossChainAppRequestFailedOp:    CrossChainAppResponseOp,
 	}
 	UnrequestedOps = map[Op]struct{}{
-		GetAcceptedFrontier:     {},
-		GetAccepted:             {},
-		GetAncestors:            {},
-		Get:                     {},
-		PushQuery:               {},
-		PullQuery:               {},
-		AppRequest:              {},
-		AppGossip:               {},
-		CrossChainAppRequest:    {},
-		GetStateSummaryFrontier: {},
-		GetAcceptedStateSummary: {},
+		GetAcceptedFrontierOp:     {},
+		GetAcceptedOp:             {},
+		GetAncestorsOp:            {},
+		GetOp:                     {},
+		PushQueryOp:               {},
+		PullQueryOp:               {},
+		AppRequestOp:              {},
+		AppGossipOp:               {},
+		CrossChainAppRequestOp:    {},
+		GetStateSummaryFrontierOp: {},
+		GetAcceptedStateSummaryOp: {},
 	}
-)
 
-func (op Op) Compressible() bool {
-	switch op {
-	case PeerList, Put, Ancestors, PushQuery,
-		AppRequest, AppResponse, AppGossip,
-		StateSummaryFrontier, GetAcceptedStateSummary, AcceptedStateSummary:
-		return true
-	default:
-		return false
-	}
-}
+	errUnknownMessageType = errors.New("unknown message type")
+)
 
 func (op Op) String() string {
 	switch op {
-	case Version:
-		return "version"
-	case PeerList:
-		return "peerlist"
-	case Ping:
+	// Handshake
+	case PingOp:
 		return "ping"
-	case Pong:
+	case PongOp:
 		return "pong"
-	case GetAcceptedFrontier:
-		return "get_accepted_frontier"
-	case AcceptedFrontier:
-		return "accepted_frontier"
-	case GetAccepted:
-		return "get_accepted"
-	case Accepted:
-		return "accepted"
-	case Get:
-		return "get"
-	case GetAncestors:
-		return "get_ancestors"
-	case Put:
-		return "put"
-	case Ancestors:
-		return "ancestors"
-	case PushQuery:
-		return "push_query"
-	case PullQuery:
-		return "pull_query"
-	case Chits:
-		return "chits"
-	case AppRequest:
-		return "app_request"
-	case AppResponse:
-		return "app_response"
-	case AppGossip:
-		return "app_gossip"
-	case CrossChainAppRequest:
-		return "cross_chain_app_request"
-	case CrossChainAppResponse:
-		return "cross_chain_app_response"
-	case GetStateSummaryFrontier:
+	case VersionOp:
+		return "version"
+	case PeerListOp:
+		return "peerlist"
+	// State sync
+	case GetStateSummaryFrontierOp:
 		return "get_state_summary_frontier"
-	case StateSummaryFrontier:
-		return "state_summary_frontier"
-	case GetAcceptedStateSummary:
-		return "get_accepted_state_summary"
-	case AcceptedStateSummary:
-		return "accepted_state_summary"
-
-	case GetAcceptedFrontierFailed:
-		return "get_accepted_frontier_failed"
-	case GetAcceptedFailed:
-		return "get_accepted_failed"
-	case GetAncestorsFailed:
-		return "get_ancestors_failed"
-	case GetFailed:
-		return "get_failed"
-	case QueryFailed:
-		return "query_failed"
-	case AppRequestFailed:
-		return "app_request_failed"
-	case CrossChainAppRequestFailed:
-		return "cross_chain_app_request_failed"
-	case GetStateSummaryFrontierFailed:
+	case GetStateSummaryFrontierFailedOp:
 		return "get_state_summary_frontier_failed"
-	case GetAcceptedStateSummaryFailed:
+	case StateSummaryFrontierOp:
+		return "state_summary_frontier"
+	case GetAcceptedStateSummaryOp:
+		return "get_accepted_state_summary"
+	case GetAcceptedStateSummaryFailedOp:
 		return "get_accepted_state_summary_failed"
-	case Timeout:
-		return "timeout"
-	case Connected:
+	case AcceptedStateSummaryOp:
+		return "accepted_state_summary"
+	// Bootstrapping
+	case GetAcceptedFrontierOp:
+		return "get_accepted_frontier"
+	case GetAcceptedFrontierFailedOp:
+		return "get_accepted_frontier_failed"
+	case AcceptedFrontierOp:
+		return "accepted_frontier"
+	case GetAcceptedOp:
+		return "get_accepted"
+	case GetAcceptedFailedOp:
+		return "get_accepted_failed"
+	case AcceptedOp:
+		return "accepted"
+	case GetAncestorsOp:
+		return "get_ancestors"
+	case GetAncestorsFailedOp:
+		return "get_ancestors_failed"
+	case AncestorsOp:
+		return "ancestors"
+	// Consensus
+	case GetOp:
+		return "get"
+	case GetFailedOp:
+		return "get_failed"
+	case PutOp:
+		return "put"
+	case PushQueryOp:
+		return "push_query"
+	case PullQueryOp:
+		return "pull_query"
+	case QueryFailedOp:
+		return "query_failed"
+	case ChitsOp:
+		return "chits"
+	// Application
+	case AppRequestOp:
+		return "app_request"
+	case AppRequestFailedOp:
+		return "app_request_failed"
+	case AppResponseOp:
+		return "app_response"
+	case AppGossipOp:
+		return "app_gossip"
+	// Cross chain
+	case CrossChainAppRequestOp:
+		return "cross_chain_app_request"
+	case CrossChainAppRequestFailedOp:
+		return "cross_chain_app_request_failed"
+	case CrossChainAppResponseOp:
+		return "cross_chain_app_response"
+		// Internal
+	case ConnectedOp:
 		return "connected"
-	case Disconnected:
+	case DisconnectedOp:
 		return "disconnected"
-	case Notify:
+	case NotifyOp:
 		return "notify"
-	case GossipRequest:
+	case GossipRequestOp:
 		return "gossip_request"
+	case TimeoutOp:
+		return "timeout"
 	default:
-		return "Unknown Op"
+		return "unknown"
+	}
+}
+
+func Unwrap(m *p2ppb.Message) (interface{}, error) {
+	switch msg := m.GetMessage().(type) {
+	// Handshake:
+	case *p2ppb.Message_Ping:
+		return msg.Ping, nil
+	case *p2ppb.Message_Pong:
+		return msg.Pong, nil
+	case *p2ppb.Message_Version:
+		return msg.Version, nil
+	case *p2ppb.Message_PeerList:
+		return msg.PeerList, nil
+	// State sync:
+	case *p2ppb.Message_GetStateSummaryFrontier:
+		return msg.GetStateSummaryFrontier, nil
+	case *p2ppb.Message_StateSummaryFrontier_:
+		return msg.StateSummaryFrontier_, nil
+	case *p2ppb.Message_GetAcceptedStateSummary:
+		return msg.GetAcceptedStateSummary, nil
+	case *p2ppb.Message_AcceptedStateSummary_:
+		return msg.AcceptedStateSummary_, nil
+	// Bootstrapping:
+	case *p2ppb.Message_GetAcceptedFrontier:
+		return msg.GetAcceptedFrontier, nil
+	case *p2ppb.Message_AcceptedFrontier_:
+		return msg.AcceptedFrontier_, nil
+	case *p2ppb.Message_GetAccepted:
+		return msg.GetAccepted, nil
+	case *p2ppb.Message_Accepted_:
+		return msg.Accepted_, nil
+	case *p2ppb.Message_GetAncestors:
+		return msg.GetAncestors, nil
+	case *p2ppb.Message_Ancestors_:
+		return msg.Ancestors_, nil
+	// Consensus:
+	case *p2ppb.Message_Get:
+		return msg.Get, nil
+	case *p2ppb.Message_Put:
+		return msg.Put, nil
+	case *p2ppb.Message_PushQuery:
+		return msg.PushQuery, nil
+	case *p2ppb.Message_PullQuery:
+		return msg.PullQuery, nil
+	case *p2ppb.Message_Chits:
+		return msg.Chits, nil
+	// Application:
+	case *p2ppb.Message_AppRequest:
+		return msg.AppRequest, nil
+	case *p2ppb.Message_AppResponse:
+		return msg.AppResponse, nil
+	case *p2ppb.Message_AppGossip:
+		return msg.AppGossip, nil
+	default:
+		return nil, fmt.Errorf("%w: %T", errUnknownMessageType, msg)
+	}
+}
+
+func ToOp(m *p2ppb.Message) (Op, error) {
+	switch msg := m.GetMessage().(type) {
+	case *p2ppb.Message_Ping:
+		return PingOp, nil
+	case *p2ppb.Message_Pong:
+		return PongOp, nil
+	case *p2ppb.Message_Version:
+		return VersionOp, nil
+	case *p2ppb.Message_PeerList:
+		return PeerListOp, nil
+	case *p2ppb.Message_GetStateSummaryFrontier:
+		return GetStateSummaryFrontierOp, nil
+	case *p2ppb.Message_StateSummaryFrontier_:
+		return StateSummaryFrontierOp, nil
+	case *p2ppb.Message_GetAcceptedStateSummary:
+		return GetAcceptedStateSummaryOp, nil
+	case *p2ppb.Message_AcceptedStateSummary_:
+		return AcceptedStateSummaryOp, nil
+	case *p2ppb.Message_GetAcceptedFrontier:
+		return GetAcceptedFrontierOp, nil
+	case *p2ppb.Message_AcceptedFrontier_:
+		return AcceptedFrontierOp, nil
+	case *p2ppb.Message_GetAccepted:
+		return GetAcceptedOp, nil
+	case *p2ppb.Message_Accepted_:
+		return AcceptedOp, nil
+	case *p2ppb.Message_GetAncestors:
+		return GetAncestorsOp, nil
+	case *p2ppb.Message_Ancestors_:
+		return AncestorsOp, nil
+	case *p2ppb.Message_Get:
+		return GetOp, nil
+	case *p2ppb.Message_Put:
+		return PutOp, nil
+	case *p2ppb.Message_PushQuery:
+		return PushQueryOp, nil
+	case *p2ppb.Message_PullQuery:
+		return PullQueryOp, nil
+	case *p2ppb.Message_Chits:
+		return ChitsOp, nil
+	case *p2ppb.Message_AppRequest:
+		return AppRequestOp, nil
+	case *p2ppb.Message_AppResponse:
+		return AppResponseOp, nil
+	case *p2ppb.Message_AppGossip:
+		return AppGossipOp, nil
+	default:
+		return 0, fmt.Errorf("%w: %T", errUnknownMessageType, msg)
 	}
 }

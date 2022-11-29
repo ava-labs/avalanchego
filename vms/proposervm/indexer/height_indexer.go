@@ -95,7 +95,7 @@ func (hi *heightIndexer) RepairHeightIndex(ctx context.Context) error {
 
 	// retrieve checkpoint height. We explicitly track block height
 	// in doRepair to avoid heavier DB reads.
-	startBlk, err := hi.server.GetFullPostForkBlock(startBlkID)
+	startBlk, err := hi.server.GetFullPostForkBlock(ctx, startBlkID)
 	if err != nil {
 		return err
 	}

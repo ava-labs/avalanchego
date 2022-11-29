@@ -4,6 +4,8 @@
 package avalanche
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
@@ -34,7 +36,7 @@ type transactionVertex struct {
 	status choices.Status
 }
 
-func (tv *transactionVertex) Bytes() []byte {
+func (*transactionVertex) Bytes() []byte {
 	// Snowstorm uses the bytes of the transaction to broadcast through the
 	// decision dispatcher. Because this is an internal transaction type, we
 	// don't want to have this transaction broadcast. So, we return nil here.
@@ -45,21 +47,25 @@ func (tv *transactionVertex) ID() ids.ID {
 	return tv.vtx.ID()
 }
 
-func (tv *transactionVertex) Accept() error {
+func (tv *transactionVertex) Accept(context.Context) error {
 	tv.status = choices.Accepted
 	return nil
 }
 
-func (tv *transactionVertex) Reject() error {
+func (tv *transactionVertex) Reject(context.Context) error {
 	tv.status = choices.Rejected
 	return nil
 }
 
-func (tv *transactionVertex) Status() choices.Status { return tv.status }
+func (tv *transactionVertex) Status() choices.Status {
+	return tv.status
+}
 
 // Verify isn't called in the consensus code. So this implementation doesn't
 // really matter. However it's used to implement the tx interface.
-func (tv *transactionVertex) Verify() error { return nil }
+func (*transactionVertex) Verify(context.Context) error {
+	return nil
+}
 
 // Dependencies returns the currently processing transaction vertices of this
 // vertex's parents.
@@ -78,10 +84,16 @@ func (tv *transactionVertex) Dependencies() ([]snowstorm.Tx, error) {
 }
 
 // InputIDs must return a non-empty slice to avoid having the snowstorm engine
-// vaciously accept it. A slice is returned containing just the vertexID in
+// vacuously accept it. A slice is returned containing just the vertexID in
 // order to produce no conflicts based on the consumed input.
-func (tv *transactionVertex) InputIDs() []ids.ID { return []ids.ID{tv.vtx.ID()} }
+func (tv *transactionVertex) InputIDs() []ids.ID {
+	return []ids.ID{tv.vtx.ID()}
+}
 
-func (tv *transactionVertex) HasWhitelist() bool { return tv.vtx.HasWhitelist() }
+func (tv *transactionVertex) HasWhitelist() bool {
+	return tv.vtx.HasWhitelist()
+}
 
-func (tv *transactionVertex) Whitelist() (ids.Set, error) { return tv.vtx.Whitelist() }
+func (tv *transactionVertex) Whitelist(ctx context.Context) (ids.Set, error) {
+	return tv.vtx.Whitelist(ctx)
+}

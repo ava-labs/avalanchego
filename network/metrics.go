@@ -22,7 +22,7 @@ type metrics struct {
 	sendFailRate              prometheus.Gauge
 	connected                 prometheus.Counter
 	disconnected              prometheus.Counter
-	acceptFailed              *prometheus.CounterVec
+	acceptFailed              prometheus.Counter
 	inboundConnRateLimited    prometheus.Counter
 	inboundConnAllowed        prometheus.Counter
 	nodeUptimeWeightedAverage prometheus.Gauge
@@ -79,11 +79,11 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 			Name:      "times_disconnected",
 			Help:      "Times this node disconnected from a peer it had completed a handshake with",
 		}),
-		acceptFailed: prometheus.NewCounterVec(prometheus.CounterOpts{
+		acceptFailed: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "accept_failed",
-			Help:      "Times this node failed to accept connection from a peer it had completed a handshake with",
-		}, []string{"error"}),
+			Help:      "Times this node's listener failed to accept an inbound connection",
+		}),
 		inboundConnAllowed: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "inbound_conn_throttler_allowed",
@@ -134,9 +134,6 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 		m.numSubnetPeers.WithLabelValues(subnetID.String()).Set(0)
 	}
 
-	// initialize to 0
-	_ = m.acceptFailed.WithLabelValues("timeout")
-	_ = m.acceptFailed.WithLabelValues("temporary")
 	return m, errs.Err
 }
 

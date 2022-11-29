@@ -61,7 +61,7 @@ type MyInnerStruct struct {
 	Str string `serialize:"true"`
 }
 
-func (m *MyInnerStruct) Foo() int {
+func (*MyInnerStruct) Foo() int {
 	return 1
 }
 
@@ -69,7 +69,7 @@ type MyInnerStruct2 struct {
 	Bool bool `serialize:"true"`
 }
 
-func (m *MyInnerStruct2) Foo() int {
+func (*MyInnerStruct2) Foo() int {
 	return 2
 }
 
@@ -613,7 +613,7 @@ func TestSerializeUnexportedField(codec GeneralCodec, t testing.TB) {
 
 	type s struct {
 		ExportedField   string `serialize:"true"`
-		unexportedField string `serialize:"true"`
+		unexportedField string `serialize:"true"` //nolint:revive
 	}
 
 	myS := s{
@@ -897,7 +897,9 @@ type outer struct {
 
 type innerInterface struct{}
 
-func (it *innerInterface) ToInt() int { return 0 }
+func (*innerInterface) ToInt() int {
+	return 0
+}
 
 type innerNoInterface struct{}
 

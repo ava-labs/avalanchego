@@ -99,12 +99,29 @@ func NewCustomParser(
 	}, nil
 }
 
-func (p *parser) Codec() codec.Manager                   { return p.cm }
-func (p *parser) GenesisCodec() codec.Manager            { return p.gcm }
-func (p *parser) Parse(bytes []byte) (*Tx, error)        { return parse(p.cm, bytes) }
-func (p *parser) ParseGenesis(bytes []byte) (*Tx, error) { return parse(p.gcm, bytes) }
-func (p *parser) InitializeTx(tx *Tx) error              { return initializeTx(p.cm, tx) }
-func (p *parser) InitializeGenesisTx(tx *Tx) error       { return initializeTx(p.gcm, tx) }
+func (p *parser) Codec() codec.Manager {
+	return p.cm
+}
+
+func (p *parser) GenesisCodec() codec.Manager {
+	return p.gcm
+}
+
+func (p *parser) Parse(bytes []byte) (*Tx, error) {
+	return parse(p.cm, bytes)
+}
+
+func (p *parser) ParseGenesis(bytes []byte) (*Tx, error) {
+	return parse(p.gcm, bytes)
+}
+
+func (p *parser) InitializeTx(tx *Tx) error {
+	return initializeTx(p.cm, tx)
+}
+
+func (p *parser) InitializeGenesisTx(tx *Tx) error {
+	return initializeTx(p.gcm, tx)
+}
 
 func parse(cm codec.Manager, bytes []byte) (*Tx, error) {
 	tx := &Tx{}

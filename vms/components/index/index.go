@@ -251,10 +251,10 @@ func NewNoIndexer(db database.Database, allowIncomplete bool) (AddressTxsIndexer
 	return &noIndexer{}, checkIndexStatus(db, false, allowIncomplete)
 }
 
-func (i *noIndexer) Accept(ids.ID, []*avax.UTXO, []*avax.UTXO) error {
+func (*noIndexer) Accept(ids.ID, []*avax.UTXO, []*avax.UTXO) error {
 	return nil
 }
 
-func (i *noIndexer) Read([]byte, ids.ID, uint64, uint64) ([]ids.ID, error) {
+func (*noIndexer) Read([]byte, ids.ID, uint64, uint64) ([]ids.ID, error) {
 	return nil, nil
 }

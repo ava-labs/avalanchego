@@ -101,47 +101,47 @@ func (mr *MockDAGVMMockRecorder) AppResponse(arg0, arg1, arg2, arg3 interface{})
 }
 
 // Connected mocks base method.
-func (m *MockDAGVM) Connected(arg0 ids.NodeID, arg1 *version.Application) error {
+func (m *MockDAGVM) Connected(arg0 context.Context, arg1 ids.NodeID, arg2 *version.Application) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Connected", arg0, arg1)
+	ret := m.ctrl.Call(m, "Connected", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Connected indicates an expected call of Connected.
-func (mr *MockDAGVMMockRecorder) Connected(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockDAGVMMockRecorder) Connected(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Connected", reflect.TypeOf((*MockDAGVM)(nil).Connected), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Connected", reflect.TypeOf((*MockDAGVM)(nil).Connected), arg0, arg1, arg2)
 }
 
 // CreateHandlers mocks base method.
-func (m *MockDAGVM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
+func (m *MockDAGVM) CreateHandlers(arg0 context.Context) (map[string]*common.HTTPHandler, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateHandlers")
+	ret := m.ctrl.Call(m, "CreateHandlers", arg0)
 	ret0, _ := ret[0].(map[string]*common.HTTPHandler)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateHandlers indicates an expected call of CreateHandlers.
-func (mr *MockDAGVMMockRecorder) CreateHandlers() *gomock.Call {
+func (mr *MockDAGVMMockRecorder) CreateHandlers(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateHandlers", reflect.TypeOf((*MockDAGVM)(nil).CreateHandlers))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateHandlers", reflect.TypeOf((*MockDAGVM)(nil).CreateHandlers), arg0)
 }
 
 // CreateStaticHandlers mocks base method.
-func (m *MockDAGVM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
+func (m *MockDAGVM) CreateStaticHandlers(arg0 context.Context) (map[string]*common.HTTPHandler, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateStaticHandlers")
+	ret := m.ctrl.Call(m, "CreateStaticHandlers", arg0)
 	ret0, _ := ret[0].(map[string]*common.HTTPHandler)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateStaticHandlers indicates an expected call of CreateStaticHandlers.
-func (mr *MockDAGVMMockRecorder) CreateStaticHandlers() *gomock.Call {
+func (mr *MockDAGVMMockRecorder) CreateStaticHandlers(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateStaticHandlers", reflect.TypeOf((*MockDAGVM)(nil).CreateStaticHandlers))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateStaticHandlers", reflect.TypeOf((*MockDAGVM)(nil).CreateStaticHandlers), arg0)
 }
 
 // CrossChainAppRequest mocks base method.
@@ -187,131 +187,131 @@ func (mr *MockDAGVMMockRecorder) CrossChainAppResponse(arg0, arg1, arg2, arg3 in
 }
 
 // Disconnected mocks base method.
-func (m *MockDAGVM) Disconnected(arg0 ids.NodeID) error {
+func (m *MockDAGVM) Disconnected(arg0 context.Context, arg1 ids.NodeID) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Disconnected", arg0)
+	ret := m.ctrl.Call(m, "Disconnected", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Disconnected indicates an expected call of Disconnected.
-func (mr *MockDAGVMMockRecorder) Disconnected(arg0 interface{}) *gomock.Call {
+func (mr *MockDAGVMMockRecorder) Disconnected(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Disconnected", reflect.TypeOf((*MockDAGVM)(nil).Disconnected), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Disconnected", reflect.TypeOf((*MockDAGVM)(nil).Disconnected), arg0, arg1)
 }
 
 // GetTx mocks base method.
-func (m *MockDAGVM) GetTx(arg0 ids.ID) (snowstorm.Tx, error) {
+func (m *MockDAGVM) GetTx(arg0 context.Context, arg1 ids.ID) (snowstorm.Tx, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetTx", arg0)
+	ret := m.ctrl.Call(m, "GetTx", arg0, arg1)
 	ret0, _ := ret[0].(snowstorm.Tx)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetTx indicates an expected call of GetTx.
-func (mr *MockDAGVMMockRecorder) GetTx(arg0 interface{}) *gomock.Call {
+func (mr *MockDAGVMMockRecorder) GetTx(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTx", reflect.TypeOf((*MockDAGVM)(nil).GetTx), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTx", reflect.TypeOf((*MockDAGVM)(nil).GetTx), arg0, arg1)
 }
 
 // HealthCheck mocks base method.
-func (m *MockDAGVM) HealthCheck() (interface{}, error) {
+func (m *MockDAGVM) HealthCheck(arg0 context.Context) (interface{}, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HealthCheck")
+	ret := m.ctrl.Call(m, "HealthCheck", arg0)
 	ret0, _ := ret[0].(interface{})
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // HealthCheck indicates an expected call of HealthCheck.
-func (mr *MockDAGVMMockRecorder) HealthCheck() *gomock.Call {
+func (mr *MockDAGVMMockRecorder) HealthCheck(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HealthCheck", reflect.TypeOf((*MockDAGVM)(nil).HealthCheck))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HealthCheck", reflect.TypeOf((*MockDAGVM)(nil).HealthCheck), arg0)
 }
 
 // Initialize mocks base method.
-func (m *MockDAGVM) Initialize(arg0 *snow.Context, arg1 manager.Manager, arg2, arg3, arg4 []byte, arg5 chan<- common.Message, arg6 []*common.Fx, arg7 common.AppSender) error {
+func (m *MockDAGVM) Initialize(arg0 context.Context, arg1 *snow.Context, arg2 manager.Manager, arg3, arg4, arg5 []byte, arg6 chan<- common.Message, arg7 []*common.Fx, arg8 common.AppSender) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Initialize", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+	ret := m.ctrl.Call(m, "Initialize", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Initialize indicates an expected call of Initialize.
-func (mr *MockDAGVMMockRecorder) Initialize(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7 interface{}) *gomock.Call {
+func (mr *MockDAGVMMockRecorder) Initialize(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*MockDAGVM)(nil).Initialize), arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*MockDAGVM)(nil).Initialize), arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
 }
 
 // ParseTx mocks base method.
-func (m *MockDAGVM) ParseTx(arg0 []byte) (snowstorm.Tx, error) {
+func (m *MockDAGVM) ParseTx(arg0 context.Context, arg1 []byte) (snowstorm.Tx, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ParseTx", arg0)
+	ret := m.ctrl.Call(m, "ParseTx", arg0, arg1)
 	ret0, _ := ret[0].(snowstorm.Tx)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ParseTx indicates an expected call of ParseTx.
-func (mr *MockDAGVMMockRecorder) ParseTx(arg0 interface{}) *gomock.Call {
+func (mr *MockDAGVMMockRecorder) ParseTx(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseTx", reflect.TypeOf((*MockDAGVM)(nil).ParseTx), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseTx", reflect.TypeOf((*MockDAGVM)(nil).ParseTx), arg0, arg1)
 }
 
 // PendingTxs mocks base method.
-func (m *MockDAGVM) PendingTxs() []snowstorm.Tx {
+func (m *MockDAGVM) PendingTxs(arg0 context.Context) []snowstorm.Tx {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PendingTxs")
+	ret := m.ctrl.Call(m, "PendingTxs", arg0)
 	ret0, _ := ret[0].([]snowstorm.Tx)
 	return ret0
 }
 
 // PendingTxs indicates an expected call of PendingTxs.
-func (mr *MockDAGVMMockRecorder) PendingTxs() *gomock.Call {
+func (mr *MockDAGVMMockRecorder) PendingTxs(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PendingTxs", reflect.TypeOf((*MockDAGVM)(nil).PendingTxs))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PendingTxs", reflect.TypeOf((*MockDAGVM)(nil).PendingTxs), arg0)
 }
 
 // SetState mocks base method.
-func (m *MockDAGVM) SetState(arg0 snow.State) error {
+func (m *MockDAGVM) SetState(arg0 context.Context, arg1 snow.State) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetState", arg0)
+	ret := m.ctrl.Call(m, "SetState", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SetState indicates an expected call of SetState.
-func (mr *MockDAGVMMockRecorder) SetState(arg0 interface{}) *gomock.Call {
+func (mr *MockDAGVMMockRecorder) SetState(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetState", reflect.TypeOf((*MockDAGVM)(nil).SetState), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetState", reflect.TypeOf((*MockDAGVM)(nil).SetState), arg0, arg1)
 }
 
 // Shutdown mocks base method.
-func (m *MockDAGVM) Shutdown() error {
+func (m *MockDAGVM) Shutdown(arg0 context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Shutdown")
+	ret := m.ctrl.Call(m, "Shutdown", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Shutdown indicates an expected call of Shutdown.
-func (mr *MockDAGVMMockRecorder) Shutdown() *gomock.Call {
+func (mr *MockDAGVMMockRecorder) Shutdown(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Shutdown", reflect.TypeOf((*MockDAGVM)(nil).Shutdown))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Shutdown", reflect.TypeOf((*MockDAGVM)(nil).Shutdown), arg0)
 }
 
 // Version mocks base method.
-func (m *MockDAGVM) Version() (string, error) {
+func (m *MockDAGVM) Version(arg0 context.Context) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Version")
+	ret := m.ctrl.Call(m, "Version", arg0)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Version indicates an expected call of Version.
-func (mr *MockDAGVMMockRecorder) Version() *gomock.Call {
+func (mr *MockDAGVMMockRecorder) Version(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Version", reflect.TypeOf((*MockDAGVM)(nil).Version))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Version", reflect.TypeOf((*MockDAGVM)(nil).Version), arg0)
 }

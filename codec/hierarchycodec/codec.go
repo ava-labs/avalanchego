@@ -62,7 +62,9 @@ func New(tagNames []string, maxSliceLen uint32) Codec {
 }
 
 // NewDefault returns a new codec with reasonable default values
-func NewDefault() Codec { return New([]string{reflectcodec.DefaultTagName}, defaultMaxSliceLength) }
+func NewDefault() Codec {
+	return New([]string{reflectcodec.DefaultTagName}, defaultMaxSliceLength)
+}
 
 // SkipRegistrations some number of type IDs
 func (c *hierarchyCodec) SkipRegistrations(num int) {

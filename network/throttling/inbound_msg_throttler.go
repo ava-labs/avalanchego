@@ -93,7 +93,6 @@ func NewInboundMsgThrottler(
 		fmt.Sprintf("%s_cpu", namespace),
 		registerer,
 		throttlerConfig.CPUThrottlerConfig,
-		vdrs,
 		resourceTracker.CPUTracker(),
 		cpuTargeter,
 	)
@@ -104,7 +103,6 @@ func NewInboundMsgThrottler(
 		fmt.Sprintf("%s_disk", namespace),
 		registerer,
 		throttlerConfig.DiskThrottlerConfig,
-		vdrs,
 		resourceTracker.DiskTracker(),
 		diskTargeter,
 	)

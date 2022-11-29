@@ -25,9 +25,13 @@ func NewFlowChecker() *FlowChecker {
 	}
 }
 
-func (fc *FlowChecker) Consume(assetID ids.ID, amount uint64) { fc.add(fc.consumed, assetID, amount) }
+func (fc *FlowChecker) Consume(assetID ids.ID, amount uint64) {
+	fc.add(fc.consumed, assetID, amount)
+}
 
-func (fc *FlowChecker) Produce(assetID ids.ID, amount uint64) { fc.add(fc.produced, assetID, amount) }
+func (fc *FlowChecker) Produce(assetID ids.ID, amount uint64) {
+	fc.add(fc.produced, assetID, amount)
+}
 
 func (fc *FlowChecker) add(value map[ids.ID]uint64, assetID ids.ID, amount uint64) {
 	var err error

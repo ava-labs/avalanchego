@@ -21,8 +21,13 @@ type BanffCommitBlock struct {
 	ApricotCommitBlock `serialize:"true"`
 }
 
-func (b *BanffCommitBlock) Timestamp() time.Time  { return time.Unix(int64(b.Time), 0) }
-func (b *BanffCommitBlock) Visit(v Visitor) error { return v.BanffCommitBlock(b) }
+func (b *BanffCommitBlock) Timestamp() time.Time {
+	return time.Unix(int64(b.Time), 0)
+}
+
+func (b *BanffCommitBlock) Visit(v Visitor) error {
+	return v.BanffCommitBlock(b)
+}
 
 func NewBanffCommitBlock(
 	timestamp time.Time,
@@ -50,10 +55,15 @@ func (b *ApricotCommitBlock) initialize(bytes []byte) error {
 	return nil
 }
 
-func (*ApricotCommitBlock) InitCtx(ctx *snow.Context) {}
+func (*ApricotCommitBlock) InitCtx(*snow.Context) {}
 
-func (*ApricotCommitBlock) Txs() []*txs.Tx          { return nil }
-func (b *ApricotCommitBlock) Visit(v Visitor) error { return v.ApricotCommitBlock(b) }
+func (*ApricotCommitBlock) Txs() []*txs.Tx {
+	return nil
+}
+
+func (b *ApricotCommitBlock) Visit(v Visitor) error {
+	return v.ApricotCommitBlock(b)
+}
 
 func NewApricotCommitBlock(
 	parentID ids.ID,

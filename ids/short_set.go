@@ -3,7 +3,13 @@
 
 package ids
 
-import "strings"
+import (
+	"strings"
+
+	"golang.org/x/exp/maps"
+
+	"github.com/ava-labs/avalanchego/utils"
+)
 
 const (
 	minShortSetSize = 16
@@ -63,7 +69,9 @@ func (ids *ShortSet) Contains(id ShortID) bool {
 }
 
 // Len returns the number of ids in this set
-func (ids ShortSet) Len() int { return len(ids) }
+func (ids ShortSet) Len() int {
+	return len(ids)
+}
 
 // Remove all the id from this set, if the id isn't in the set, nothing happens
 func (ids *ShortSet) Remove(idList ...ShortID) {
@@ -74,7 +82,9 @@ func (ids *ShortSet) Remove(idList ...ShortID) {
 }
 
 // Clear empties this set
-func (ids *ShortSet) Clear() { *ids = nil }
+func (ids *ShortSet) Clear() {
+	*ids = nil
+}
 
 // CappedList returns a list of length at most [size].
 // Size should be >= 0. If size < 0, returns nil.
@@ -99,33 +109,19 @@ func (ids ShortSet) CappedList(size int) []ShortID {
 
 // List converts this set into a list
 func (ids ShortSet) List() []ShortID {
-	idList := make([]ShortID, len(ids))
-	i := 0
-	for id := range ids {
-		idList[i] = id
-		i++
-	}
-	return idList
+	return maps.Keys(ids)
 }
 
 // SortedList returns this set as a sorted list
 func (ids ShortSet) SortedList() []ShortID {
 	lst := ids.List()
-	SortShortIDs(lst)
+	utils.Sort(lst)
 	return lst
 }
 
 // Equals returns true if the sets contain the same elements
 func (ids ShortSet) Equals(oIDs ShortSet) bool {
-	if ids.Len() != oIDs.Len() {
-		return false
-	}
-	for key := range oIDs {
-		if _, contains := ids[key]; !contains {
-			return false
-		}
-	}
-	return true
+	return maps.Equal(ids, oIDs)
 }
 
 // String returns the string representation of a set

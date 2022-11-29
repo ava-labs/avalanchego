@@ -49,9 +49,13 @@ func (sf *binarySnowflake) RecordSuccessfulPoll(choice int) {
 	sf.binarySlush.RecordSuccessfulPoll(choice)
 }
 
-func (sf *binarySnowflake) RecordUnsuccessfulPoll() { sf.confidence = 0 }
+func (sf *binarySnowflake) RecordUnsuccessfulPoll() {
+	sf.confidence = 0
+}
 
-func (sf *binarySnowflake) Finalized() bool { return sf.finalized }
+func (sf *binarySnowflake) Finalized() bool {
+	return sf.finalized
+}
 
 func (sf *binarySnowflake) String() string {
 	return fmt.Sprintf("SF(Confidence = %d, Finalized = %v, %s)",

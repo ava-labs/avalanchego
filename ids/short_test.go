@@ -5,7 +5,6 @@ package ids
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -39,92 +38,21 @@ func TestShortString(t *testing.T) {
 
 func TestIsUniqueShortIDs(t *testing.T) {
 	ids := []ShortID{}
-	if IsUniqueShortIDs(ids) == false {
+	if !IsUniqueShortIDs(ids) {
 		t.Fatal("should be unique")
 	}
 	id1 := GenerateTestShortID()
 	ids = append(ids, id1)
-	if IsUniqueShortIDs(ids) == false {
+	if !IsUniqueShortIDs(ids) {
 		t.Fatal("should be unique")
 	}
 	ids = append(ids, GenerateTestShortID())
-	if IsUniqueShortIDs(ids) == false {
+	if !IsUniqueShortIDs(ids) {
 		t.Fatal("should be unique")
 	}
 	ids = append(ids, id1)
-	if IsUniqueShortIDs(ids) == true {
+	if IsUniqueShortIDs(ids) {
 		t.Fatal("should not be unique")
-	}
-}
-
-func TestIsSortedAndUniqueShortIDs(t *testing.T) {
-	id0 := ShortID{0}
-	id1 := ShortID{1}
-	id2 := ShortID{2}
-
-	tests := []struct {
-		arr      []ShortID
-		isSorted bool
-	}{
-		{
-			arr:      nil,
-			isSorted: true,
-		},
-		{
-			arr:      []ShortID{},
-			isSorted: true,
-		},
-		{
-			arr:      []ShortID{GenerateTestShortID()},
-			isSorted: true,
-		},
-		{
-			arr:      []ShortID{id0, id0},
-			isSorted: false,
-		},
-		{
-			arr:      []ShortID{id0, id1},
-			isSorted: true,
-		},
-		{
-			arr:      []ShortID{id1, id0},
-			isSorted: false,
-		},
-		{
-			arr:      []ShortID{id0, id1, id2},
-			isSorted: true,
-		},
-		{
-			arr:      []ShortID{id0, id1, id2, id2},
-			isSorted: false,
-		},
-		{
-			arr:      []ShortID{id0, id1, id1},
-			isSorted: false,
-		},
-		{
-			arr:      []ShortID{id0, id0, id1},
-			isSorted: false,
-		},
-		{
-			arr:      []ShortID{id2, id1, id0},
-			isSorted: false,
-		},
-		{
-			arr:      []ShortID{id2, id1, id2},
-			isSorted: false,
-		},
-	}
-	for _, test := range tests {
-		t.Run(fmt.Sprintf("%v", test.arr), func(t *testing.T) {
-			if test.isSorted {
-				if !IsSortedAndUniqueShortIDs(test.arr) {
-					t.Fatal("should have been marked as sorted and unique")
-				}
-			} else if IsSortedAndUniqueShortIDs(test.arr) {
-				t.Fatal("shouldn't have been marked as sorted and unique")
-			}
-		})
 	}
 }
 
@@ -159,4 +87,28 @@ func TestShortIDsToStrings(t *testing.T) {
 	expected := []string{"6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt", "BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp", "BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp"}
 	shortStrings := ShortIDsToStrings(shortIDs)
 	require.EqualValues(t, expected, shortStrings)
+}
+
+func TestShortIDLess(t *testing.T) {
+	require := require.New(t)
+
+	id1 := ShortID{}
+	id2 := ShortID{}
+	require.False(id1.Less(id2))
+	require.False(id2.Less(id1))
+
+	id1 = ShortID{1}
+	id2 = ShortID{0}
+	require.False(id1.Less(id2))
+	require.True(id2.Less(id1))
+
+	id1 = ShortID{1}
+	id2 = ShortID{1}
+	require.False(id1.Less(id2))
+	require.False(id2.Less(id1))
+
+	id1 = ShortID{1, 0}
+	id2 = ShortID{1, 2}
+	require.True(id1.Less(id2))
+	require.False(id2.Less(id1))
 }

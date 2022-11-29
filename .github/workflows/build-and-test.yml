@@ -9,7 +9,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-11, macos-12, ubuntu-20.04, ubuntu-22.04, windows-latest, [self-hosted, linux, ARM64, focal],[self-hosted, linux, ARM64, jammy]]
+        os: [macos-12, ubuntu-20.04, ubuntu-22.04, windows-latest, [self-hosted, linux, ARM64, focal],[self-hosted, linux, ARM64, jammy]]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v3

@@ -6,16 +6,14 @@ package ids
 import (
 	"encoding/json"
 	"strings"
+
+	"golang.org/x/exp/maps"
+
+	"github.com/ava-labs/avalanchego/utils"
 )
 
-const (
-	// The minimum capacity of a set
-	minSetSize = 16
-
-	// If a set has more than this many keys, it will be cleared by setting the map to nil
-	// rather than iteratively deleting
-	clearSizeThreshold = 512
-)
+// The minimum capacity of a set
+const minSetSize = 16
 
 // Set is a set of IDs
 type Set map[ID]struct{}
@@ -85,7 +83,9 @@ func (ids *Set) Overlaps(big Set) bool {
 }
 
 // Len returns the number of ids in this set
-func (ids Set) Len() int { return len(ids) }
+func (ids Set) Len() int {
+	return len(ids)
+}
 
 // Remove all the id from this set, if the id isn't in the set, nothing happens
 func (ids *Set) Remove(idList ...ID) {
@@ -96,30 +96,18 @@ func (ids *Set) Remove(idList ...ID) {
 
 // Clear empties this set
 func (ids *Set) Clear() {
-	if len(*ids) > clearSizeThreshold {
-		*ids = nil
-		return
-	}
-	for key := range *ids {
-		delete(*ids, key)
-	}
+	maps.Clear(*ids)
 }
 
 // List converts this set into a list
 func (ids Set) List() []ID {
-	idList := make([]ID, ids.Len())
-	i := 0
-	for id := range ids {
-		idList[i] = id
-		i++
-	}
-	return idList
+	return maps.Keys(ids)
 }
 
 // SortedList returns this set as a sorted list
 func (ids Set) SortedList() []ID {
 	lst := ids.List()
-	SortIDs(lst)
+	utils.Sort(lst)
 	return lst
 }
 
@@ -146,15 +134,7 @@ func (ids Set) CappedList(size int) []ID {
 
 // Equals returns true if the sets contain the same elements
 func (ids Set) Equals(oIDs Set) bool {
-	if ids.Len() != oIDs.Len() {
-		return false
-	}
-	for key := range oIDs {
-		if _, contains := ids[key]; !contains {
-			return false
-		}
-	}
-	return true
+	return maps.Equal(ids, oIDs)
 }
 
 // String returns the string representation of a set
@@ -185,6 +165,6 @@ func (ids *Set) Pop() (ID, bool) {
 
 func (ids *Set) MarshalJSON() ([]byte, error) {
 	idsList := ids.List()
-	SortIDs(idsList)
+	utils.Sort(idsList)
 	return json.Marshal(idsList)
 }

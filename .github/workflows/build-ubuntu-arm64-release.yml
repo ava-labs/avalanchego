@@ -1,6 +1,7 @@
 name: build-arm64-debian-packages
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - "*"

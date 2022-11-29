@@ -29,7 +29,9 @@ type SendFailedCallback interface {
 
 type SendFailedFunc func(message.OutboundMessage)
 
-func (f SendFailedFunc) SendFailed(msg message.OutboundMessage) { f(msg) }
+func (f SendFailedFunc) SendFailed(msg message.OutboundMessage) {
+	f(msg)
+}
 
 type MessageQueue interface {
 	// Push attempts to add the message to the queue. If the context is

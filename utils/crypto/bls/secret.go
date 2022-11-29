@@ -6,6 +6,7 @@ package bls
 import (
 	"crypto/rand"
 	"errors"
+	"runtime"
 
 	blst "github.com/supranational/blst/bindings/go"
 )
@@ -29,7 +30,12 @@ type SecretKey = blst.SecretKey
 func NewSecretKey() (*SecretKey, error) {
 	var ikm [32]byte
 	_, err := rand.Read(ikm[:])
-	return blst.KeyGen(ikm[:]), err
+	if err != nil {
+		return nil, err
+	}
+	sk := blst.KeyGen(ikm[:])
+	ikm = [32]byte{} // zero out the ikm
+	return sk, nil
 }
 
 // SecretKeyToBytes returns the big-endian format of the secret key.
@@ -44,6 +50,9 @@ func SecretKeyFromBytes(skBytes []byte) (*SecretKey, error) {
 	if sk == nil {
 		return nil, errFailedSecretKeyDeserialize
 	}
+	runtime.SetFinalizer(sk, func(sk *SecretKey) {
+		sk.Zeroize()
+	})
 	return sk, nil
 }
 

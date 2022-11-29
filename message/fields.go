@@ -3,88 +3,72 @@
 
 package message
 
-// Field that may be packed into a message
-type Field uint32
+import (
+	"errors"
+	"time"
 
-// Fields that may be packed. These values are not sent over the wire.
-const (
-	VersionStr          Field = iota // Used in handshake
-	NetworkID                        // Used in handshake
-	NodeID                           // TODO: remove NodeID. Used in handshake
-	MyTime                           // Used in handshake
-	IP                               // Used in handshake
-	ChainID                          // Used for dispatching
-	RequestID                        // Used for all messages
-	Deadline                         // Used for request messages
-	ContainerID                      // Used for querying
-	ContainerBytes                   // Used for gossiping
-	ContainerIDs                     // Used for querying
-	MultiContainerBytes              // Used in Ancestors
-	SigBytes                         // Used in handshake / peer gossiping
-	VersionTime                      // Used in handshake / peer gossiping
-	Peers                            // Used in peer gossiping
-	TrackedSubnets                   // Used in handshake / peer gossiping
-	AppBytes                         // Used at application level
-	VMMessage                        // Used internally
-	Uptime                           // Used for Pong
-	SummaryBytes                     // Used for state sync
-	SummaryHeights                   // Used for state sync
-	SummaryIDs                       // Used for state sync
-	VersionStruct                    // Used internally
-	SourceChainID                    // Used for cross-chain messaging
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
+
+	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
-func (f Field) String() string {
-	switch f {
-	case VersionStr:
-		return "VersionStr"
-	case NetworkID:
-		return "NetworkID"
-	case NodeID:
-		return "NodeID"
-	case MyTime:
-		return "MyTime"
-	case IP:
-		return "IP"
-	case ChainID:
-		return "ChainID"
-	case SourceChainID:
-		return "SourceChainID"
-	case RequestID:
-		return "RequestID"
-	case Deadline:
-		return "Deadline"
-	case ContainerID:
-		return "ContainerID"
-	case ContainerBytes:
-		return "Container Bytes"
-	case ContainerIDs:
-		return "Container IDs"
-	case MultiContainerBytes:
-		return "MultiContainerBytes"
-	case AppBytes:
-		return "AppBytes"
-	case SigBytes:
-		return "SigBytes"
-	case VersionTime:
-		return "VersionTime"
-	case Peers:
-		return "Peers"
-	case TrackedSubnets:
-		return "TrackedSubnets"
-	case VMMessage:
-		return "VMMessage"
-	case Uptime:
-		return "Uptime"
-	case SummaryBytes:
-		return "Summary"
-	case SummaryHeights:
-		return "SummaryHeights"
-	case SummaryIDs:
-		return "SummaryIDs"
-	case VersionStruct:
-		return "VersionStruct"
-	default:
-		return "Unknown Field"
+var errMissingField = errors.New("message missing field")
+
+type chainIDGetter interface {
+	GetChainId() []byte
+}
+
+func GetChainID(m any) (ids.ID, error) {
+	msg, ok := m.(chainIDGetter)
+	if !ok {
+		return ids.Empty, errMissingField
 	}
+	chainIDBytes := msg.GetChainId()
+	return ids.ToID(chainIDBytes)
+}
+
+type sourceChainIDGetter interface {
+	GetSourceChainID() ids.ID
+}
+
+func GetSourceChainID(m any) (ids.ID, error) {
+	msg, ok := m.(sourceChainIDGetter)
+	if !ok {
+		return GetChainID(m)
+	}
+	return msg.GetSourceChainID(), nil
+}
+
+type requestIDGetter interface {
+	GetRequestId() uint32
+}
+
+func GetRequestID(m any) (uint32, bool) {
+	if msg, ok := m.(requestIDGetter); ok {
+		requestID := msg.GetRequestId()
+		return requestID, true
+	}
+
+	// AppGossip is the only message currently not containing a requestID
+	// Here we assign the requestID already in use for gossiped containers
+	// to allow a uniform handling of all messages
+	if _, ok := m.(*p2ppb.AppGossip); ok {
+		return constants.GossipMsgRequestID, true
+	}
+
+	return 0, false
+}
+
+type deadlineGetter interface {
+	GetDeadline() uint64
+}
+
+func GetDeadline(m any) (time.Duration, bool) {
+	msg, ok := m.(deadlineGetter)
+	if !ok {
+		return 0, false
+	}
+	deadline := msg.GetDeadline()
+	return time.Duration(deadline), true
 }

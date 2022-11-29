@@ -9,6 +9,10 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.opentelemetry.io/otel/attribute"
+
+	oteltrace "go.opentelemetry.io/otel/trace"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
@@ -35,7 +39,6 @@ func Trace(router Router, tracer trace.Tracer) Router {
 func (r *tracedRouter) Initialize(
 	nodeID ids.NodeID,
 	log logging.Logger,
-	msgCreator message.InternalMsgBuilder,
 	timeoutManager timeout.Manager,
 	closeTimeout time.Duration,
 	criticalChains ids.Set,
@@ -48,7 +51,6 @@ func (r *tracedRouter) Initialize(
 	return r.router.Initialize(
 		nodeID,
 		log,
-		msgCreator,
 		timeoutManager,
 		closeTimeout,
 		criticalChains,
@@ -67,6 +69,7 @@ func (r *tracedRouter) RegisterRequest(
 	respondingChainID ids.ID,
 	requestID uint32,
 	op message.Op,
+	failedMsg message.InboundMessage,
 ) {
 	r.router.RegisterRequest(
 		ctx,
@@ -75,22 +78,51 @@ func (r *tracedRouter) RegisterRequest(
 		respondingChainID,
 		requestID,
 		op,
+		failedMsg,
 	)
 }
 
 func (r *tracedRouter) HandleInbound(ctx context.Context, msg message.InboundMessage) {
-	ctx, span := r.tracer.Start(ctx, "tracedRouter.HandleInbound")
+	m := msg.Message()
+	destinationChainID, err := message.GetChainID(m)
+	if err != nil {
+		r.router.HandleInbound(ctx, msg)
+		return
+	}
+
+	sourceChainID, err := message.GetSourceChainID(m)
+	if err != nil {
+		r.router.HandleInbound(ctx, msg)
+		return
+	}
+
+	ctx, span := r.tracer.Start(ctx, "tracedRouter.HandleInbound", oteltrace.WithAttributes(
+		attribute.Stringer("nodeID", msg.NodeID()),
+		attribute.Stringer("messageOp", msg.Op()),
+		attribute.Stringer("chainID", destinationChainID),
+		attribute.Stringer("sourceChainID", sourceChainID),
+	))
 	defer span.End()
 
 	r.router.HandleInbound(ctx, msg)
 }
 
-func (r *tracedRouter) Shutdown() {
-	r.router.Shutdown()
+func (r *tracedRouter) Shutdown(ctx context.Context) {
+	ctx, span := r.tracer.Start(ctx, "tracedRouter.Shutdown")
+	defer span.End()
+
+	r.router.Shutdown(ctx)
 }
 
-func (r *tracedRouter) AddChain(chain handler.Handler) {
-	r.router.AddChain(chain)
+func (r *tracedRouter) AddChain(ctx context.Context, chain handler.Handler) {
+	chainCtx := chain.Context()
+	ctx, span := r.tracer.Start(ctx, "tracedRouter.AddChain", oteltrace.WithAttributes(
+		attribute.Stringer("subnetID", chainCtx.SubnetID),
+		attribute.Stringer("chainID", chainCtx.ChainID),
+	))
+	defer span.End()
+
+	r.router.AddChain(ctx, chain)
 }
 
 func (r *tracedRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
@@ -109,6 +141,9 @@ func (r *tracedRouter) Unbenched(chainID ids.ID, nodeID ids.NodeID) {
 	r.router.Unbenched(chainID, nodeID)
 }
 
-func (r *tracedRouter) HealthCheck() (interface{}, error) {
-	return r.router.HealthCheck()
+func (r *tracedRouter) HealthCheck(ctx context.Context) (interface{}, error) {
+	ctx, span := r.tracer.Start(ctx, "tracedRouter.HealthCheck")
+	defer span.End()
+
+	return r.router.HealthCheck(ctx)
 }

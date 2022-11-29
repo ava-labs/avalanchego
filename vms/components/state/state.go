@@ -176,13 +176,13 @@ func (s *state) PutID(db database.Database, key ids.ID, id ids.ID) error {
 
 // GetID gets the ID associated with [key] in [db]
 func (s *state) GetID(db database.Database, key ids.ID) (ids.ID, error) {
-	IDInterface, err := s.Get(db, IDTypeID, key)
+	idIntf, err := s.Get(db, IDTypeID, key)
 	if err != nil {
 		return ids.ID{}, err
 	}
 
-	if ID, ok := IDInterface.(ids.ID); ok {
-		return ID, nil
+	if id, ok := idIntf.(ids.ID); ok {
+		return id, nil
 	}
 
 	return ids.ID{}, errWrongType

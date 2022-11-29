@@ -111,35 +111,15 @@ func TestSetCappedList(t *testing.T) {
 	}
 }
 
-// Test that Clear() works with both the iterative and set-to-nil path
-func TestSetClearLarge(t *testing.T) {
-	// Using iterative clear path
+func TestSetClear(t *testing.T) {
 	set := Set{}
-	for i := 0; i < clearSizeThreshold; i++ {
+	for i := 0; i < 25; i++ {
 		set.Add(GenerateTestID())
 	}
 	set.Clear()
-	if set.Len() != 0 {
-		t.Fatal("length should be 0")
-	}
+	require.Len(t, set, 0)
 	set.Add(GenerateTestID())
-	if set.Len() != 1 {
-		t.Fatal("length should be 1")
-	}
-
-	// Using bulk (set map to nil) path
-	set = Set{}
-	for i := 0; i < clearSizeThreshold+1; i++ {
-		set.Add(GenerateTestID())
-	}
-	set.Clear()
-	if set.Len() != 0 {
-		t.Fatal("length should be 0")
-	}
-	set.Add(GenerateTestID())
-	if set.Len() != 1 {
-		t.Fatal("length should be 1")
-	}
+	require.Len(t, set, 1)
 }
 
 func TestSetPop(t *testing.T) {
@@ -176,7 +156,7 @@ func TestSetMarshalJSON(t *testing.T) {
 		require.NoError(err)
 		require.Equal("[]", string(asJSON))
 	}
-	id1, id2 := GenerateTestID(), GenerateTestID()
+	id1, id2 := Empty.Prefix(0), Empty.Prefix(1)
 	set.Add(id1)
 	{
 		asJSON, err := set.MarshalJSON()

@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func TestTimer(t *testing.T) {
+func TestTimer(*testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	defer wg.Wait()

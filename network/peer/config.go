@@ -44,4 +44,7 @@ type Config struct {
 
 	// Tracks CPU/disk usage caused by each peer.
 	ResourceTracker tracker.ResourceTracker
+
+	// Tracks which peer knows about which peers
+	GossipTracker GossipTracker
 }

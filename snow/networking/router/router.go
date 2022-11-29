@@ -27,7 +27,6 @@ type Router interface {
 	Initialize(
 		nodeID ids.NodeID,
 		log logging.Logger,
-		msgCreator message.InternalMsgBuilder,
 		timeouts timeout.Manager,
 		shutdownTimeout time.Duration,
 		criticalChains ids.Set,
@@ -37,8 +36,8 @@ type Router interface {
 		metricsNamespace string,
 		metricsRegisterer prometheus.Registerer,
 	) error
-	Shutdown()
-	AddChain(chain handler.Handler)
+	Shutdown(context.Context)
+	AddChain(ctx context.Context, chain handler.Handler)
 	health.Checker
 }
 
@@ -53,5 +52,6 @@ type InternalHandler interface {
 		destinationChainID ids.ID,
 		requestID uint32,
 		op message.Op,
+		failedMsg message.InboundMessage,
 	)
 }

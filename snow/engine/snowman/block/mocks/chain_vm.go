@@ -101,62 +101,62 @@ func (mr *MockChainVMMockRecorder) AppResponse(arg0, arg1, arg2, arg3 interface{
 }
 
 // BuildBlock mocks base method.
-func (m *MockChainVM) BuildBlock() (snowman.Block, error) {
+func (m *MockChainVM) BuildBlock(arg0 context.Context) (snowman.Block, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BuildBlock")
+	ret := m.ctrl.Call(m, "BuildBlock", arg0)
 	ret0, _ := ret[0].(snowman.Block)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // BuildBlock indicates an expected call of BuildBlock.
-func (mr *MockChainVMMockRecorder) BuildBlock() *gomock.Call {
+func (mr *MockChainVMMockRecorder) BuildBlock(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildBlock", reflect.TypeOf((*MockChainVM)(nil).BuildBlock))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildBlock", reflect.TypeOf((*MockChainVM)(nil).BuildBlock), arg0)
 }
 
 // Connected mocks base method.
-func (m *MockChainVM) Connected(arg0 ids.NodeID, arg1 *version.Application) error {
+func (m *MockChainVM) Connected(arg0 context.Context, arg1 ids.NodeID, arg2 *version.Application) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Connected", arg0, arg1)
+	ret := m.ctrl.Call(m, "Connected", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Connected indicates an expected call of Connected.
-func (mr *MockChainVMMockRecorder) Connected(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockChainVMMockRecorder) Connected(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Connected", reflect.TypeOf((*MockChainVM)(nil).Connected), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Connected", reflect.TypeOf((*MockChainVM)(nil).Connected), arg0, arg1, arg2)
 }
 
 // CreateHandlers mocks base method.
-func (m *MockChainVM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
+func (m *MockChainVM) CreateHandlers(arg0 context.Context) (map[string]*common.HTTPHandler, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateHandlers")
+	ret := m.ctrl.Call(m, "CreateHandlers", arg0)
 	ret0, _ := ret[0].(map[string]*common.HTTPHandler)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateHandlers indicates an expected call of CreateHandlers.
-func (mr *MockChainVMMockRecorder) CreateHandlers() *gomock.Call {
+func (mr *MockChainVMMockRecorder) CreateHandlers(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateHandlers", reflect.TypeOf((*MockChainVM)(nil).CreateHandlers))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateHandlers", reflect.TypeOf((*MockChainVM)(nil).CreateHandlers), arg0)
 }
 
 // CreateStaticHandlers mocks base method.
-func (m *MockChainVM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
+func (m *MockChainVM) CreateStaticHandlers(arg0 context.Context) (map[string]*common.HTTPHandler, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateStaticHandlers")
+	ret := m.ctrl.Call(m, "CreateStaticHandlers", arg0)
 	ret0, _ := ret[0].(map[string]*common.HTTPHandler)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateStaticHandlers indicates an expected call of CreateStaticHandlers.
-func (mr *MockChainVMMockRecorder) CreateStaticHandlers() *gomock.Call {
+func (mr *MockChainVMMockRecorder) CreateStaticHandlers(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateStaticHandlers", reflect.TypeOf((*MockChainVM)(nil).CreateStaticHandlers))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateStaticHandlers", reflect.TypeOf((*MockChainVM)(nil).CreateStaticHandlers), arg0)
 }
 
 // CrossChainAppRequest mocks base method.
@@ -202,146 +202,146 @@ func (mr *MockChainVMMockRecorder) CrossChainAppResponse(arg0, arg1, arg2, arg3 
 }
 
 // Disconnected mocks base method.
-func (m *MockChainVM) Disconnected(arg0 ids.NodeID) error {
+func (m *MockChainVM) Disconnected(arg0 context.Context, arg1 ids.NodeID) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Disconnected", arg0)
+	ret := m.ctrl.Call(m, "Disconnected", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Disconnected indicates an expected call of Disconnected.
-func (mr *MockChainVMMockRecorder) Disconnected(arg0 interface{}) *gomock.Call {
+func (mr *MockChainVMMockRecorder) Disconnected(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Disconnected", reflect.TypeOf((*MockChainVM)(nil).Disconnected), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Disconnected", reflect.TypeOf((*MockChainVM)(nil).Disconnected), arg0, arg1)
 }
 
 // GetBlock mocks base method.
-func (m *MockChainVM) GetBlock(arg0 ids.ID) (snowman.Block, error) {
+func (m *MockChainVM) GetBlock(arg0 context.Context, arg1 ids.ID) (snowman.Block, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBlock", arg0)
+	ret := m.ctrl.Call(m, "GetBlock", arg0, arg1)
 	ret0, _ := ret[0].(snowman.Block)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetBlock indicates an expected call of GetBlock.
-func (mr *MockChainVMMockRecorder) GetBlock(arg0 interface{}) *gomock.Call {
+func (mr *MockChainVMMockRecorder) GetBlock(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlock", reflect.TypeOf((*MockChainVM)(nil).GetBlock), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlock", reflect.TypeOf((*MockChainVM)(nil).GetBlock), arg0, arg1)
 }
 
 // HealthCheck mocks base method.
-func (m *MockChainVM) HealthCheck() (interface{}, error) {
+func (m *MockChainVM) HealthCheck(arg0 context.Context) (interface{}, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HealthCheck")
+	ret := m.ctrl.Call(m, "HealthCheck", arg0)
 	ret0, _ := ret[0].(interface{})
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // HealthCheck indicates an expected call of HealthCheck.
-func (mr *MockChainVMMockRecorder) HealthCheck() *gomock.Call {
+func (mr *MockChainVMMockRecorder) HealthCheck(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HealthCheck", reflect.TypeOf((*MockChainVM)(nil).HealthCheck))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HealthCheck", reflect.TypeOf((*MockChainVM)(nil).HealthCheck), arg0)
 }
 
 // Initialize mocks base method.
-func (m *MockChainVM) Initialize(arg0 *snow.Context, arg1 manager.Manager, arg2, arg3, arg4 []byte, arg5 chan<- common.Message, arg6 []*common.Fx, arg7 common.AppSender) error {
+func (m *MockChainVM) Initialize(arg0 context.Context, arg1 *snow.Context, arg2 manager.Manager, arg3, arg4, arg5 []byte, arg6 chan<- common.Message, arg7 []*common.Fx, arg8 common.AppSender) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Initialize", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+	ret := m.ctrl.Call(m, "Initialize", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Initialize indicates an expected call of Initialize.
-func (mr *MockChainVMMockRecorder) Initialize(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7 interface{}) *gomock.Call {
+func (mr *MockChainVMMockRecorder) Initialize(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*MockChainVM)(nil).Initialize), arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*MockChainVM)(nil).Initialize), arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
 }
 
 // LastAccepted mocks base method.
-func (m *MockChainVM) LastAccepted() (ids.ID, error) {
+func (m *MockChainVM) LastAccepted(arg0 context.Context) (ids.ID, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "LastAccepted")
+	ret := m.ctrl.Call(m, "LastAccepted", arg0)
 	ret0, _ := ret[0].(ids.ID)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // LastAccepted indicates an expected call of LastAccepted.
-func (mr *MockChainVMMockRecorder) LastAccepted() *gomock.Call {
+func (mr *MockChainVMMockRecorder) LastAccepted(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LastAccepted", reflect.TypeOf((*MockChainVM)(nil).LastAccepted))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LastAccepted", reflect.TypeOf((*MockChainVM)(nil).LastAccepted), arg0)
 }
 
 // ParseBlock mocks base method.
-func (m *MockChainVM) ParseBlock(arg0 []byte) (snowman.Block, error) {
+func (m *MockChainVM) ParseBlock(arg0 context.Context, arg1 []byte) (snowman.Block, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ParseBlock", arg0)
+	ret := m.ctrl.Call(m, "ParseBlock", arg0, arg1)
 	ret0, _ := ret[0].(snowman.Block)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ParseBlock indicates an expected call of ParseBlock.
-func (mr *MockChainVMMockRecorder) ParseBlock(arg0 interface{}) *gomock.Call {
+func (mr *MockChainVMMockRecorder) ParseBlock(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseBlock", reflect.TypeOf((*MockChainVM)(nil).ParseBlock), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseBlock", reflect.TypeOf((*MockChainVM)(nil).ParseBlock), arg0, arg1)
 }
 
 // SetPreference mocks base method.
-func (m *MockChainVM) SetPreference(arg0 ids.ID) error {
+func (m *MockChainVM) SetPreference(arg0 context.Context, arg1 ids.ID) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetPreference", arg0)
+	ret := m.ctrl.Call(m, "SetPreference", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SetPreference indicates an expected call of SetPreference.
-func (mr *MockChainVMMockRecorder) SetPreference(arg0 interface{}) *gomock.Call {
+func (mr *MockChainVMMockRecorder) SetPreference(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPreference", reflect.TypeOf((*MockChainVM)(nil).SetPreference), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPreference", reflect.TypeOf((*MockChainVM)(nil).SetPreference), arg0, arg1)
 }
 
 // SetState mocks base method.
-func (m *MockChainVM) SetState(arg0 snow.State) error {
+func (m *MockChainVM) SetState(arg0 context.Context, arg1 snow.State) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetState", arg0)
+	ret := m.ctrl.Call(m, "SetState", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SetState indicates an expected call of SetState.
-func (mr *MockChainVMMockRecorder) SetState(arg0 interface{}) *gomock.Call {
+func (mr *MockChainVMMockRecorder) SetState(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetState", reflect.TypeOf((*MockChainVM)(nil).SetState), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetState", reflect.TypeOf((*MockChainVM)(nil).SetState), arg0, arg1)
 }
 
 // Shutdown mocks base method.
-func (m *MockChainVM) Shutdown() error {
+func (m *MockChainVM) Shutdown(arg0 context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Shutdown")
+	ret := m.ctrl.Call(m, "Shutdown", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Shutdown indicates an expected call of Shutdown.
-func (mr *MockChainVMMockRecorder) Shutdown() *gomock.Call {
+func (mr *MockChainVMMockRecorder) Shutdown(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Shutdown", reflect.TypeOf((*MockChainVM)(nil).Shutdown))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Shutdown", reflect.TypeOf((*MockChainVM)(nil).Shutdown), arg0)
 }
 
 // Version mocks base method.
-func (m *MockChainVM) Version() (string, error) {
+func (m *MockChainVM) Version(arg0 context.Context) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Version")
+	ret := m.ctrl.Call(m, "Version", arg0)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Version indicates an expected call of Version.
-func (mr *MockChainVMMockRecorder) Version() *gomock.Call {
+func (mr *MockChainVMMockRecorder) Version(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Version", reflect.TypeOf((*MockChainVM)(nil).Version))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Version", reflect.TypeOf((*MockChainVM)(nil).Version), arg0)
 }

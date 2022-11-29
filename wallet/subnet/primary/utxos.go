@@ -7,6 +7,8 @@ import (
 	"context"
 	"sync"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -110,11 +112,7 @@ func (u *utxos) UTXOs(_ context.Context, sourceChainID, destinationChainID ids.I
 
 	destToUTXOIDToUTXO := u.sourceToDestToUTXOIDToUTXO[sourceChainID]
 	utxoIDToUTXO := destToUTXOIDToUTXO[destinationChainID]
-	utxos := make([]*avax.UTXO, 0, len(utxoIDToUTXO))
-	for _, utxo := range utxoIDToUTXO {
-		utxos = append(utxos, utxo)
-	}
-	return utxos, nil
+	return maps.Values(utxoIDToUTXO), nil
 }
 
 func (u *utxos) GetUTXO(_ context.Context, sourceChainID, destinationChainID, utxoID ids.ID) (*avax.UTXO, error) {

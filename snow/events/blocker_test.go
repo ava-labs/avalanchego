@@ -86,14 +86,27 @@ type testBlockable struct {
 
 func newTestBlockable() *testBlockable {
 	return &testBlockable{
-		dependencies: func() ids.Set { return ids.Set{} },
-		fulfill:      func(context.Context, ids.ID) {},
-		abandon:      func(context.Context, ids.ID) {},
-		update:       func(context.Context) {},
+		dependencies: func() ids.Set {
+			return ids.Set{}
+		},
+		fulfill: func(context.Context, ids.ID) {},
+		abandon: func(context.Context, ids.ID) {},
+		update:  func(context.Context) {},
 	}
 }
 
-func (b *testBlockable) Dependencies() ids.Set                  { return b.dependencies() }
-func (b *testBlockable) Fulfill(ctx context.Context, id ids.ID) { b.fulfill(ctx, id) }
-func (b *testBlockable) Abandon(ctx context.Context, id ids.ID) { b.abandon(ctx, id) }
-func (b *testBlockable) Update(ctx context.Context)             { b.update(ctx) }
+func (b *testBlockable) Dependencies() ids.Set {
+	return b.dependencies()
+}
+
+func (b *testBlockable) Fulfill(ctx context.Context, id ids.ID) {
+	b.fulfill(ctx, id)
+}
+
+func (b *testBlockable) Abandon(ctx context.Context, id ids.ID) {
+	b.abandon(ctx, id)
+}
+
+func (b *testBlockable) Update(ctx context.Context) {
+	b.update(ctx)
+}

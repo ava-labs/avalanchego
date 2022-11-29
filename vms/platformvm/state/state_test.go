@@ -324,8 +324,8 @@ func newUninitializedState(require *require.Assertions) (State, database.Databas
 
 func newStateFromDB(require *require.Assertions, db database.Database) State {
 	vdrs := validators.NewManager()
-	require.NoError(vdrs.Set(constants.PrimaryNetworkID, validators.NewSet()))
-
+	primaryVdrs := validators.NewSet()
+	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	state, err := new(
 		db,
 		metrics.Noop,

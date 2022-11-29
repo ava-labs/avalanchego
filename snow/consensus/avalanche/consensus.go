@@ -4,6 +4,9 @@
 package avalanche
 
 import (
+	"context"
+
+	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
@@ -18,15 +21,14 @@ import (
 // Consensus represents a general avalanche instance that can be used directly
 // to process a series of partially ordered elements.
 type Consensus interface {
+	health.Checker
+
 	// Takes in alpha, beta1, beta2, the accepted frontier, the join statuses,
 	// the mutation statuses, and the consumer statuses. If accept or reject is
 	// called, the status maps should be immediately updated accordingly.
 	// Assumes each element in the accepted frontier will return accepted from
 	// the join status map.
-	Initialize(*snow.ConsensusContext, Parameters, []Vertex) error
-
-	// Returns the parameters that describe this avalanche instance
-	Parameters() Parameters
+	Initialize(context.Context, *snow.ConsensusContext, Parameters, []Vertex) error
 
 	// Returns the number of vertices processing
 	NumProcessing() int
@@ -38,7 +40,7 @@ type Consensus interface {
 	// Adds a new decision. Assumes the dependencies have already been added.
 	// Assumes that mutations don't conflict with themselves. Returns if a
 	// critical error has occurred.
-	Add(Vertex) error
+	Add(context.Context, Vertex) error
 
 	// VertexIssued returns true iff Vertex has been added
 	VertexIssued(Vertex) bool
@@ -59,7 +61,7 @@ type Consensus interface {
 	// RecordPoll collects the results of a network poll. If a result has not
 	// been added, the result is dropped. Returns if a critical error has
 	// occurred.
-	RecordPoll(ids.UniqueBag) error
+	RecordPoll(context.Context, ids.UniqueBag) error
 
 	// Quiesce is guaranteed to return true if the instance is finalized. It
 	// may, but doesn't need to, return true if all processing vertices are
@@ -71,7 +73,4 @@ type Consensus interface {
 	// finalized. Note, it is possible that after returning finalized, a new
 	// decision may be added such that this instance is no longer finalized.
 	Finalized() bool
-
-	// HealthCheck returns information about the consensus health.
-	HealthCheck() (interface{}, error)
 }

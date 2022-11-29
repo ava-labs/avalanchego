@@ -49,13 +49,17 @@ func NewTestNetwork(
 	}
 }
 
-func (n *testNetwork) Connected(ids.NodeID) {}
+func (*testNetwork) Connected(ids.NodeID) {}
 
-func (n *testNetwork) AllowConnection(ids.NodeID) bool { return true }
+func (*testNetwork) AllowConnection(ids.NodeID) bool {
+	return true
+}
 
-func (n *testNetwork) Track(ips.ClaimedIPPort) bool { return true }
+func (*testNetwork) Track(ips.ClaimedIPPort) bool {
+	return true
+}
 
-func (n *testNetwork) Disconnected(ids.NodeID) {}
+func (*testNetwork) Disconnected(ids.NodeID) {}
 
 func (n *testNetwork) Version() (message.OutboundMessage, error) {
 	now := uint64(time.Now().Unix())
@@ -78,8 +82,8 @@ func (n *testNetwork) Version() (message.OutboundMessage, error) {
 	)
 }
 
-func (n *testNetwork) Peers() (message.OutboundMessage, error) {
-	return n.mc.PeerList(nil, true)
+func (*testNetwork) Peers(ids.NodeID) ([]ids.NodeID, []ips.ClaimedIPPort, error) {
+	return nil, nil, nil
 }
 
 func (n *testNetwork) Pong(ids.NodeID) (message.OutboundMessage, error) {

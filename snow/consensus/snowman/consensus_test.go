@@ -4,6 +4,7 @@
 package snowman
 
 import (
+	"context"
 	"errors"
 	"path"
 	"reflect"
@@ -101,9 +102,7 @@ func InitializeTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	if p := sm.Parameters(); p != params {
-		t.Fatalf("Wrong returned parameters")
-	} else if pref := sm.Preference(); pref != GenesisID {
+	if pref := sm.Preference(); pref != GenesisID {
 		t.Fatalf("Wrong preference returned")
 	} else if !sm.Finalized() {
 		t.Fatalf("Wrong should have marked the instance as being finalized")
@@ -143,7 +142,7 @@ func NumProcessingTest(t *testing.T, factory Factory) {
 	}
 
 	// Adding to the previous preference will update the preference
-	if err := sm.Add(block); err != nil {
+	if err := sm.Add(context.Background(), block); err != nil {
 		t.Fatal(err)
 	}
 
@@ -153,7 +152,7 @@ func NumProcessingTest(t *testing.T, factory Factory) {
 
 	votes := ids.Bag{}
 	votes.Add(block.ID())
-	if err := sm.RecordPoll(votes); err != nil {
+	if err := sm.RecordPoll(context.Background(), votes); err != nil {
 		t.Fatal(err)
 	}
 
@@ -191,7 +190,7 @@ func AddToTailTest(t *testing.T, factory Factory) {
 	}
 
 	// Adding to the previous preference will update the preference
-	if err := sm.Add(block); err != nil {
+	if err := sm.Add(context.Background(), block); err != nil {
 		t.Fatal(err)
 	} else if pref := sm.Preference(); pref != block.ID() {
 		t.Fatalf("Wrong preference. Expected %s, got %s", block.ID(), pref)
@@ -237,7 +236,7 @@ func AddToNonTailTest(t *testing.T, factory Factory) {
 	}
 
 	// Adding to the previous preference will update the preference
-	if err := sm.Add(firstBlock); err != nil {
+	if err := sm.Add(context.Background(), firstBlock); err != nil {
 		t.Fatal(err)
 	} else if pref := sm.Preference(); pref != firstBlock.IDV {
 		t.Fatalf("Wrong preference. Expected %s, got %s", firstBlock.IDV, pref)
@@ -245,7 +244,7 @@ func AddToNonTailTest(t *testing.T, factory Factory) {
 
 	// Adding to something other than the previous preference won't update the
 	// preference
-	if err := sm.Add(secondBlock); err != nil {
+	if err := sm.Add(context.Background(), secondBlock); err != nil {
 		t.Fatal(err)
 	} else if pref := sm.Preference(); pref != firstBlock.IDV {
 		t.Fatalf("Wrong preference. Expected %s, got %s", firstBlock.IDV, pref)
@@ -288,7 +287,7 @@ func AddToUnknownTest(t *testing.T, factory Factory) {
 
 	// Adding a block with an unknown parent means the parent must have already
 	// been rejected. Therefore the block should be immediately rejected
-	if err := sm.Add(block); err != nil {
+	if err := sm.Add(context.Background(), block); err != nil {
 		t.Fatal(err)
 	} else if pref := sm.Preference(); pref != GenesisID {
 		t.Fatalf("Wrong preference. Expected %s, got %s", GenesisID, pref)
@@ -438,7 +437,7 @@ func StatusOrProcessingIssuedTest(t *testing.T, factory Factory) {
 		HeightV: Genesis.HeightV + 1,
 	}
 
-	if err := sm.Add(block); err != nil {
+	if err := sm.Add(context.Background(), block); err != nil {
 		t.Fatal(err)
 	}
 	if block.Status() == choices.Accepted {
@@ -482,13 +481,13 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 		HeightV: Genesis.HeightV + 1,
 	}
 
-	if err := sm.Add(block); err != nil {
+	if err := sm.Add(context.Background(), block); err != nil {
 		t.Fatal(err)
 	}
 
 	votes := ids.Bag{}
 	votes.Add(block.ID())
-	if err := sm.RecordPoll(votes); err != nil {
+	if err := sm.RecordPoll(context.Background(), votes); err != nil {
 		t.Fatal(err)
 	} else if pref := sm.Preference(); pref != block.ID() {
 		t.Fatalf("Preference returned the wrong block")
@@ -496,7 +495,7 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 		t.Fatalf("Snowman instance finalized too soon")
 	} else if status := block.Status(); status != choices.Processing {
 		t.Fatalf("Block's status changed unexpectedly")
-	} else if err := sm.RecordPoll(votes); err != nil {
+	} else if err := sm.RecordPoll(context.Background(), votes); err != nil {
 		t.Fatal(err)
 	} else if pref := sm.Preference(); pref != block.ID() {
 		t.Fatalf("Preference returned the wrong block")
@@ -542,16 +541,16 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 		HeightV: Genesis.HeightV + 1,
 	}
 
-	if err := sm.Add(firstBlock); err != nil {
+	if err := sm.Add(context.Background(), firstBlock); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(secondBlock); err != nil {
+	} else if err := sm.Add(context.Background(), secondBlock); err != nil {
 		t.Fatal(err)
 	}
 
 	votes := ids.Bag{}
 	votes.Add(firstBlock.ID())
 
-	if err := sm.RecordPoll(votes); err != nil {
+	if err := sm.RecordPoll(context.Background(), votes); err != nil {
 		t.Fatal(err)
 	} else if pref := sm.Preference(); pref != firstBlock.ID() {
 		t.Fatalf("Preference returned the wrong block")
@@ -561,7 +560,7 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 		t.Fatalf("Block's status changed unexpectedly")
 	} else if status := secondBlock.Status(); status != choices.Processing {
 		t.Fatalf("Block's status changed unexpectedly")
-	} else if err := sm.RecordPoll(votes); err != nil {
+	} else if err := sm.RecordPoll(context.Background(), votes); err != nil {
 		t.Fatal(err)
 	} else if pref := sm.Preference(); pref != firstBlock.ID() {
 		t.Fatalf("Preference returned the wrong block")
@@ -611,15 +610,15 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 		HeightV: Genesis.HeightV + 1,
 	}
 
-	require.NoError(sm.Add(firstBlock))
-	require.NoError(sm.Add(secondBlock))
+	require.NoError(sm.Add(context.Background(), firstBlock))
+	require.NoError(sm.Add(context.Background(), secondBlock))
 
 	votes := ids.Bag{}
 	votes.Add(firstBlock.ID())
 	votes.Add(secondBlock.ID())
 
 	// The first poll will accept shared bits
-	require.NoError(sm.RecordPoll(votes))
+	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Equal(firstBlock.ID(), sm.Preference())
 	require.False(sm.Finalized())
 
@@ -628,7 +627,7 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 	require.EqualValues(1, metrics["polls_successful"])
 
 	// The second poll will do nothing
-	require.NoError(sm.RecordPoll(votes))
+	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Equal(firstBlock.ID(), sm.Preference())
 	require.False(sm.Finalized())
 
@@ -657,7 +656,7 @@ func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {
 
 	votes := ids.Bag{}
 	votes.Add(GenesisID)
-	if err := sm.RecordPoll(votes); err != nil {
+	if err := sm.RecordPoll(context.Background(), votes); err != nil {
 		t.Fatal(err)
 	} else if !sm.Finalized() {
 		t.Fatalf("Consensus should still be finalized")
@@ -709,11 +708,11 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 		HeightV: block1.HeightV + 1,
 	}
 
-	if err := sm.Add(block0); err != nil {
+	if err := sm.Add(context.Background(), block0); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block1); err != nil {
+	} else if err := sm.Add(context.Background(), block1); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block2); err != nil {
+	} else if err := sm.Add(context.Background(), block2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -727,7 +726,7 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 
 	votes := ids.Bag{}
 	votes.Add(block0.ID())
-	if err := sm.RecordPoll(votes); err != nil {
+	if err := sm.RecordPoll(context.Background(), votes); err != nil {
 		t.Fatal(err)
 	}
 
@@ -799,13 +798,13 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 		HeightV: block1.HeightV + 1,
 	}
 
-	if err := sm.Add(block0); err != nil {
+	if err := sm.Add(context.Background(), block0); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block1); err != nil {
+	} else if err := sm.Add(context.Background(), block1); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block2); err != nil {
+	} else if err := sm.Add(context.Background(), block2); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block3); err != nil {
+	} else if err := sm.Add(context.Background(), block3); err != nil {
 		t.Fatal(err)
 	}
 
@@ -818,7 +817,7 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 
 	votesFor2 := ids.Bag{}
 	votesFor2.Add(block2.ID())
-	if err := sm.RecordPoll(votesFor2); err != nil {
+	if err := sm.RecordPoll(context.Background(), votesFor2); err != nil {
 		t.Fatal(err)
 	} else if sm.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -827,13 +826,13 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 	}
 
 	emptyVotes := ids.Bag{}
-	if err := sm.RecordPoll(emptyVotes); err != nil {
+	if err := sm.RecordPoll(context.Background(), emptyVotes); err != nil {
 		t.Fatal(err)
 	} else if sm.Finalized() {
 		t.Fatalf("Finalized too early")
 	} else if pref := sm.Preference(); block2.ID() != pref {
 		t.Fatalf("Wrong preference listed")
-	} else if err := sm.RecordPoll(votesFor2); err != nil {
+	} else if err := sm.RecordPoll(context.Background(), votesFor2); err != nil {
 		t.Fatal(err)
 	} else if sm.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -843,13 +842,13 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 
 	votesFor3 := ids.Bag{}
 	votesFor3.Add(block3.ID())
-	if err := sm.RecordPoll(votesFor3); err != nil {
+	if err := sm.RecordPoll(context.Background(), votesFor3); err != nil {
 		t.Fatal(err)
 	} else if sm.Finalized() {
 		t.Fatalf("Finalized too early")
 	} else if pref := sm.Preference(); block2.ID() != pref {
 		t.Fatalf("Wrong preference listed")
-	} else if err := sm.RecordPoll(votesFor3); err != nil {
+	} else if err := sm.RecordPoll(context.Background(), votesFor3); err != nil {
 		t.Fatal(err)
 	} else if !sm.Finalized() {
 		t.Fatalf("Finalized too late")
@@ -894,21 +893,21 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 	}
 	unknownBlockID := ids.Empty.Prefix(2)
 
-	if err := sm.Add(block); err != nil {
+	if err := sm.Add(context.Background(), block); err != nil {
 		t.Fatal(err)
 	}
 
 	validVotes := ids.Bag{}
 	validVotes.Add(block.ID())
-	if err := sm.RecordPoll(validVotes); err != nil {
+	if err := sm.RecordPoll(context.Background(), validVotes); err != nil {
 		t.Fatal(err)
 	}
 
 	invalidVotes := ids.Bag{}
 	invalidVotes.Add(unknownBlockID)
-	if err := sm.RecordPoll(invalidVotes); err != nil {
+	if err := sm.RecordPoll(context.Background(), invalidVotes); err != nil {
 		t.Fatal(err)
-	} else if err := sm.RecordPoll(validVotes); err != nil {
+	} else if err := sm.RecordPoll(context.Background(), validVotes); err != nil {
 		t.Fatal(err)
 	} else if sm.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -976,15 +975,15 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 		HeightV: block3.HeightV + 1,
 	}
 
-	if err := sm.Add(block0); err != nil {
+	if err := sm.Add(context.Background(), block0); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block1); err != nil {
+	} else if err := sm.Add(context.Background(), block1); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block2); err != nil {
+	} else if err := sm.Add(context.Background(), block2); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block3); err != nil {
+	} else if err := sm.Add(context.Background(), block3); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block4); err != nil {
+	} else if err := sm.Add(context.Background(), block4); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1004,7 +1003,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 		block2.ID(),
 		block4.ID(),
 	)
-	if err := sm.RecordPoll(votes0_2_4); err != nil {
+	if err := sm.RecordPoll(context.Background(), votes0_2_4); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1036,7 +1035,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 
 	dep2_2_2 := ids.Bag{}
 	dep2_2_2.AddCount(block2.ID(), 3)
-	if err := sm.RecordPoll(dep2_2_2); err != nil {
+	if err := sm.RecordPoll(context.Background(), dep2_2_2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1114,10 +1113,10 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 		HeightV: block2.HeightV + 1,
 	}
 
-	err = sm.Add(block0)
+	err = sm.Add(context.Background(), block0)
 	require.NoError(err)
 
-	err = sm.Add(block1)
+	err = sm.Add(context.Background(), block1)
 	require.NoError(err)
 
 	// The first bit is contested as either 0 or 1. When voting for [block0] and
@@ -1125,19 +1124,19 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	// the 255 remaining bits of [block0].
 	votes0 := ids.Bag{}
 	votes0.Add(block0.ID())
-	err = sm.RecordPoll(votes0)
+	err = sm.RecordPoll(context.Background(), votes0)
 	require.NoError(err)
 
 	// Although we are adding in [block2] here - the underlying snowball
 	// instance has already decided it is rejected. Snowman doesn't actually
 	// know that though, because that is an implementation detail of the
 	// Snowball trie that is used.
-	err = sm.Add(block2)
+	err = sm.Add(context.Background(), block2)
 	require.NoError(err)
 
 	// Because [block2] is effectively rejected, [block3] is also effectively
 	// rejected.
-	err = sm.Add(block3)
+	err = sm.Add(context.Background(), block3)
 	require.NoError(err)
 
 	require.Equal(block0.ID(), sm.Preference())
@@ -1164,7 +1163,7 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	// transitively.
 	votes3 := ids.Bag{}
 	votes3.Add(block3.ID())
-	err = sm.RecordPoll(votes3)
+	err = sm.RecordPoll(context.Background(), votes3)
 	require.NoError(err)
 
 	require.True(sm.Finalized(), "finalized too late")
@@ -1224,8 +1223,8 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 		HeightV: block2.HeightV + 1,
 	}
 
-	require.NoError(sm.Add(block0))
-	require.NoError(sm.Add(block1))
+	require.NoError(sm.Add(context.Background(), block0))
+	require.NoError(sm.Add(context.Background(), block1))
 
 	// When voting for [block0], we end up finalizing the first bit as 0. The
 	// second bit is contested as either 0 or 1. For when the second bit is 1,
@@ -1233,17 +1232,17 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 	// [block0].
 	votes0 := ids.Bag{}
 	votes0.Add(block0.ID())
-	require.NoError(sm.RecordPoll(votes0))
+	require.NoError(sm.RecordPoll(context.Background(), votes0))
 
 	// Although we are adding in [block2] here - the underlying snowball
 	// instance has already decided it is rejected. Snowman doesn't actually
 	// know that though, because that is an implementation detail of the
 	// Snowball trie that is used.
-	require.NoError(sm.Add(block2))
+	require.NoError(sm.Add(context.Background(), block2))
 
 	// Because [block2] is effectively rejected, [block3] is also effectively
 	// rejected.
-	require.NoError(sm.Add(block3))
+	require.NoError(sm.Add(context.Background(), block3))
 
 	require.Equal(block0.ID(), sm.Preference())
 	require.Equal(choices.Processing, block0.Status(), "should not be decided yet")
@@ -1269,7 +1268,7 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 	// will never happen.
 	votes3 := ids.Bag{}
 	votes3.Add(block3.ID())
-	require.NoError(sm.RecordPoll(votes3))
+	require.NoError(sm.RecordPoll(context.Background(), votes3))
 
 	require.False(sm.Finalized(), "finalized too early")
 	require.Equal(choices.Processing, block0.Status())
@@ -1329,16 +1328,16 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 		HeightV: b1Block.HeightV + 1,
 	}
 
-	if err := sm.Add(a1Block); err != nil {
+	if err := sm.Add(context.Background(), a1Block); err != nil {
 		t.Fatal(err)
 	}
-	if err := sm.Add(a2Block); err != nil {
+	if err := sm.Add(context.Background(), a2Block); err != nil {
 		t.Fatal(err)
 	}
-	if err := sm.Add(b1Block); err != nil {
+	if err := sm.Add(context.Background(), b1Block); err != nil {
 		t.Fatal(err)
 	}
-	if err := sm.Add(b2Block); err != nil {
+	if err := sm.Add(context.Background(), b2Block); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1362,7 +1361,7 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 	b2Votes := ids.Bag{}
 	b2Votes.Add(b2Block.ID())
 
-	if err := sm.RecordPoll(b2Votes); err != nil {
+	if err := sm.RecordPoll(context.Background(), b2Votes); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1386,10 +1385,10 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 	a1Votes := ids.Bag{}
 	a1Votes.Add(a1Block.ID())
 
-	if err := sm.RecordPoll(a1Votes); err != nil {
+	if err := sm.RecordPoll(context.Background(), a1Votes); err != nil {
 		t.Fatal(err)
 	}
-	if err := sm.RecordPoll(a1Votes); err != nil {
+	if err := sm.RecordPoll(context.Background(), a1Votes); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1532,7 +1531,7 @@ func ErrorOnInitialRejectionTest(t *testing.T, factory Factory) {
 		HeightV: rejectedBlock.HeightV + 1,
 	}
 
-	if err := sm.Add(block); err == nil {
+	if err := sm.Add(context.Background(), block); err == nil {
 		t.Fatalf("Should have errored on rejecting the rejectable block")
 	}
 }
@@ -1566,13 +1565,13 @@ func ErrorOnAcceptTest(t *testing.T, factory Factory) {
 		HeightV: Genesis.HeightV + 1,
 	}
 
-	if err := sm.Add(block); err != nil {
+	if err := sm.Add(context.Background(), block); err != nil {
 		t.Fatal(err)
 	}
 
 	votes := ids.Bag{}
 	votes.Add(block.ID())
-	if err := sm.RecordPoll(votes); err == nil {
+	if err := sm.RecordPoll(context.Background(), votes); err == nil {
 		t.Fatalf("Should have errored on accepted the block")
 	}
 }
@@ -1614,15 +1613,15 @@ func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
 		HeightV: Genesis.HeightV + 1,
 	}
 
-	if err := sm.Add(block0); err != nil {
+	if err := sm.Add(context.Background(), block0); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block1); err != nil {
+	} else if err := sm.Add(context.Background(), block1); err != nil {
 		t.Fatal(err)
 	}
 
 	votes := ids.Bag{}
 	votes.Add(block0.ID())
-	if err := sm.RecordPoll(votes); err == nil {
+	if err := sm.RecordPoll(context.Background(), votes); err == nil {
 		t.Fatalf("Should have errored on rejecting the block's sibling")
 	}
 }
@@ -1672,17 +1671,17 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 		HeightV: block1.HeightV + 1,
 	}
 
-	if err := sm.Add(block0); err != nil {
+	if err := sm.Add(context.Background(), block0); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block1); err != nil {
+	} else if err := sm.Add(context.Background(), block1); err != nil {
 		t.Fatal(err)
-	} else if err := sm.Add(block2); err != nil {
+	} else if err := sm.Add(context.Background(), block2); err != nil {
 		t.Fatal(err)
 	}
 
 	votes := ids.Bag{}
 	votes.Add(block0.ID())
-	if err := sm.RecordPoll(votes); err == nil {
+	if err := sm.RecordPoll(context.Background(), votes); err == nil {
 		t.Fatalf("Should have errored on transitively rejecting the block")
 	}
 }
@@ -1749,7 +1748,7 @@ func ErrorOnAddDecidedBlock(t *testing.T, factory Factory) {
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
-	require.ErrorIs(sm.Add(block0), errDuplicateAdd)
+	require.ErrorIs(sm.Add(context.Background(), block0), errDuplicateAdd)
 }
 
 func ErrorOnAddDuplicateBlockID(t *testing.T, factory Factory) {
@@ -1786,8 +1785,8 @@ func ErrorOnAddDuplicateBlockID(t *testing.T, factory Factory) {
 		HeightV: block0.HeightV + 1,
 	}
 
-	require.NoError(sm.Add(block0))
-	require.ErrorIs(sm.Add(block1), errDuplicateAdd)
+	require.NoError(sm.Add(context.Background(), block0))
+	require.ErrorIs(sm.Add(context.Background(), block1), errDuplicateAdd)
 }
 
 func gatherCounterGauge(t *testing.T, reg *prometheus.Registry) map[string]float64 {

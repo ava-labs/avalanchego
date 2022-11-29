@@ -22,8 +22,13 @@ type BanffStandardBlock struct {
 	ApricotStandardBlock `serialize:"true"`
 }
 
-func (b *BanffStandardBlock) Timestamp() time.Time  { return time.Unix(int64(b.Time), 0) }
-func (b *BanffStandardBlock) Visit(v Visitor) error { return v.BanffStandardBlock(b) }
+func (b *BanffStandardBlock) Timestamp() time.Time {
+	return time.Unix(int64(b.Time), 0)
+}
+
+func (b *BanffStandardBlock) Visit(v Visitor) error {
+	return v.BanffStandardBlock(b)
+}
 
 func NewBanffStandardBlock(
 	timestamp time.Time,
@@ -65,8 +70,13 @@ func (b *ApricotStandardBlock) InitCtx(ctx *snow.Context) {
 	}
 }
 
-func (b *ApricotStandardBlock) Txs() []*txs.Tx        { return b.Transactions }
-func (b *ApricotStandardBlock) Visit(v Visitor) error { return v.ApricotStandardBlock(b) }
+func (b *ApricotStandardBlock) Txs() []*txs.Tx {
+	return b.Transactions
+}
+
+func (b *ApricotStandardBlock) Visit(v Visitor) error {
+	return v.ApricotStandardBlock(b)
+}
 
 // NewApricotStandardBlock is kept for testing purposes only.
 // Following Banff activation and subsequent code cleanup, Apricot Standard blocks

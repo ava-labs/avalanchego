@@ -7,21 +7,11 @@ import (
 	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/message"
 )
 
-var (
-	errDuplicatedID     = errors.New("inbound message contains duplicated ID")
-	errDuplicatedHeight = errors.New("inbound message contains duplicated height")
-)
+var errDuplicatedID = errors.New("inbound message contains duplicated ID")
 
-func getIDs(field message.Field, msg message.InboundMessage) ([]ids.ID, error) {
-	idsBytesIntf, err := msg.Get(field)
-	if err != nil {
-		return nil, err
-	}
-	idsBytes := idsBytesIntf.([][]byte)
-
+func getIDs(idsBytes [][]byte) ([]ids.ID, error) {
 	res := make([]ids.ID, len(idsBytes))
 	idSet := ids.NewSet(len(idsBytes))
 	for i, bytes := range idsBytes {
@@ -36,21 +26,4 @@ func getIDs(field message.Field, msg message.InboundMessage) ([]ids.ID, error) {
 		idSet.Add(id)
 	}
 	return res, nil
-}
-
-func getSummaryHeights(msg message.InboundMessage) ([]uint64, error) {
-	heightsIntf, err := msg.Get(message.SummaryHeights)
-	if err != nil {
-		return nil, err
-	}
-	heights := heightsIntf.([]uint64)
-
-	heightsSet := make(map[uint64]struct{}, len(heights))
-	for _, height := range heights {
-		if _, found := heightsSet[height]; found {
-			return nil, errDuplicatedHeight
-		}
-		heightsSet[height] = struct{}{}
-	}
-	return heights, nil
 }

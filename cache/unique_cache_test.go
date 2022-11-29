@@ -14,8 +14,13 @@ type evictable[T comparable] struct {
 	evicted int
 }
 
-func (e *evictable[T]) Key() T { return e.id }
-func (e *evictable[_]) Evict() { e.evicted++ }
+func (e *evictable[T]) Key() T {
+	return e.id
+}
+
+func (e *evictable[_]) Evict() {
+	e.evicted++
+}
 
 func TestEvictableLRU(t *testing.T) {
 	cache := EvictableLRU[ids.ID, *evictable[ids.ID]]{}

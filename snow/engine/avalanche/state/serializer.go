@@ -6,6 +6,7 @@
 package state
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -70,19 +71,27 @@ func NewSerializer(config SerializerConfig) vertex.Manager {
 	return &s
 }
 
-func (s *Serializer) ParseVtx(b []byte) (avalanche.Vertex, error) {
-	return newUniqueVertex(s, b)
+func (s *Serializer) ParseVtx(ctx context.Context, b []byte) (avalanche.Vertex, error) {
+	return newUniqueVertex(ctx, s, b)
 }
 
-func (s *Serializer) BuildVtx(parentIDs []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
-	return s.buildVtx(parentIDs, txs, false)
+func (s *Serializer) BuildVtx(
+	ctx context.Context,
+	parentIDs []ids.ID,
+	txs []snowstorm.Tx,
+) (avalanche.Vertex, error) {
+	return s.buildVtx(ctx, parentIDs, txs, false)
 }
 
-func (s *Serializer) BuildStopVtx(parentIDs []ids.ID) (avalanche.Vertex, error) {
-	return s.buildVtx(parentIDs, nil, true)
+func (s *Serializer) BuildStopVtx(
+	ctx context.Context,
+	parentIDs []ids.ID,
+) (avalanche.Vertex, error) {
+	return s.buildVtx(ctx, parentIDs, nil, true)
 }
 
 func (s *Serializer) buildVtx(
+	ctx context.Context,
 	parentIDs []ids.ID,
 	txs []snowstorm.Tx,
 	stopVtx bool,
@@ -133,14 +142,16 @@ func (s *Serializer) buildVtx(
 	}
 	// setVertex handles the case where this vertex already exists even
 	// though we just made it
-	return uVtx, uVtx.setVertex(vtx)
+	return uVtx, uVtx.setVertex(ctx, vtx)
 }
 
-func (s *Serializer) GetVtx(vtxID ids.ID) (avalanche.Vertex, error) {
+func (s *Serializer) GetVtx(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 	return s.getUniqueVertex(vtxID)
 }
 
-func (s *Serializer) Edge() []ids.ID { return s.edge.List() }
+func (s *Serializer) Edge(context.Context) []ids.ID {
+	return s.edge.List()
+}
 
 func (s *Serializer) parseVertex(b []byte) (vertex.StatelessVertex, error) {
 	vtx, err := vertex.Parse(b)
@@ -164,8 +175,8 @@ func (s *Serializer) getUniqueVertex(vtxID ids.ID) (*uniqueVertex, error) {
 	return vtx, nil
 }
 
-func (s *Serializer) StopVertexAccepted() (bool, error) {
-	edge := s.Edge()
+func (s *Serializer) StopVertexAccepted(ctx context.Context) (bool, error) {
+	edge := s.Edge(ctx)
 	if len(edge) != 1 {
 		return false, nil
 	}

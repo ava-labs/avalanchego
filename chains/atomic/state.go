@@ -202,7 +202,7 @@ func (s *state) getKeys(traits [][]byte, startTrait, startKey []byte, limit int)
 	lastKey := startKey
 	// Iterate over the traits in order appending all of the keys that possess
 	// the given [traits].
-	utils.Sort2DBytes(traits)
+	utils.SortBytes(traits)
 	for _, trait := range traits {
 		switch bytes.Compare(trait, startTrait) {
 		case -1:

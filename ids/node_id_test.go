@@ -6,8 +6,9 @@ package ids
 import (
 	"bytes"
 	"encoding/json"
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestNodeIDEquality(t *testing.T) {
@@ -163,23 +164,6 @@ func TestNodeIDString(t *testing.T) {
 	}
 }
 
-func TestSortNodeIDs(t *testing.T) {
-	ids := []NodeID{
-		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-		{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'},
-		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-	}
-	SortNodeIDs(ids)
-	expected := []NodeID{
-		{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'},
-		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-	}
-	if !reflect.DeepEqual(ids, expected) {
-		t.Fatal("[]NodeID was not sorted lexographically")
-	}
-}
-
 func TestNodeIDMapMarshalling(t *testing.T) {
 	originalMap := map[NodeID]int{
 		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}: 1,
@@ -204,4 +188,28 @@ func TestNodeIDMapMarshalling(t *testing.T) {
 			t.Fatalf("map was incorrectly Unmarshalled")
 		}
 	}
+}
+
+func TestNodeIDLess(t *testing.T) {
+	require := require.New(t)
+
+	id1 := NodeID{}
+	id2 := NodeID{}
+	require.False(id1.Less(id2))
+	require.False(id2.Less(id1))
+
+	id1 = NodeID{1}
+	id2 = NodeID{}
+	require.False(id1.Less(id2))
+	require.True(id2.Less(id1))
+
+	id1 = NodeID{1}
+	id2 = NodeID{1}
+	require.False(id1.Less(id2))
+	require.False(id2.Less(id1))
+
+	id1 = NodeID{1}
+	id2 = NodeID{1, 2}
+	require.True(id1.Less(id2))
+	require.False(id2.Less(id1))
 }

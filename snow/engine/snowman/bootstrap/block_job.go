@@ -4,6 +4,7 @@
 package bootstrap
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -27,8 +28,8 @@ type parser struct {
 	vm                      block.ChainVM
 }
 
-func (p *parser) Parse(blkBytes []byte) (queue.Job, error) {
-	blk, err := p.vm.ParseBlock(blkBytes)
+func (p *parser) Parse(ctx context.Context, blkBytes []byte) (queue.Job, error) {
+	blk, err := p.vm.ParseBlock(ctx, blkBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -50,26 +51,29 @@ type blockJob struct {
 	vm                      block.Getter
 }
 
-func (b *blockJob) ID() ids.ID { return b.blk.ID() }
-func (b *blockJob) MissingDependencies() (ids.Set, error) {
+func (b *blockJob) ID() ids.ID {
+	return b.blk.ID()
+}
+
+func (b *blockJob) MissingDependencies(ctx context.Context) (ids.Set, error) {
 	missing := ids.Set{}
 	parentID := b.blk.Parent()
-	if parent, err := b.vm.GetBlock(parentID); err != nil || parent.Status() != choices.Accepted {
+	if parent, err := b.vm.GetBlock(ctx, parentID); err != nil || parent.Status() != choices.Accepted {
 		missing.Add(parentID)
 	}
 	return missing, nil
 }
 
-func (b *blockJob) HasMissingDependencies() (bool, error) {
+func (b *blockJob) HasMissingDependencies(ctx context.Context) (bool, error) {
 	parentID := b.blk.Parent()
-	if parent, err := b.vm.GetBlock(parentID); err != nil || parent.Status() != choices.Accepted {
+	if parent, err := b.vm.GetBlock(ctx, parentID); err != nil || parent.Status() != choices.Accepted {
 		return true, nil
 	}
 	return false, nil
 }
 
-func (b *blockJob) Execute() error {
-	hasMissingDeps, err := b.HasMissingDependencies()
+func (b *blockJob) Execute(ctx context.Context) error {
+	hasMissingDeps, err := b.HasMissingDependencies(ctx)
 	if err != nil {
 		return err
 	}
@@ -84,7 +88,7 @@ func (b *blockJob) Execute() error {
 		return fmt.Errorf("attempting to execute block with status %s", status)
 	case choices.Processing:
 		blkID := b.blk.ID()
-		if err := b.blk.Verify(); err != nil {
+		if err := b.blk.Verify(ctx); err != nil {
 			b.log.Error("block failed verification during bootstrapping",
 				zap.Stringer("blkID", blkID),
 				zap.Error(err),
@@ -97,7 +101,7 @@ func (b *blockJob) Execute() error {
 			zap.Stringer("blkID", blkID),
 			zap.Uint64("blkHeight", b.blk.Height()),
 		)
-		if err := b.blk.Accept(); err != nil {
+		if err := b.blk.Accept(ctx); err != nil {
 			b.log.Debug("failed to accept block during bootstrapping",
 				zap.Stringer("blkID", blkID),
 				zap.Error(err),
@@ -107,4 +111,7 @@ func (b *blockJob) Execute() error {
 	}
 	return nil
 }
-func (b *blockJob) Bytes() []byte { return b.blk.Bytes() }
+
+func (b *blockJob) Bytes() []byte {
+	return b.blk.Bytes()
+}

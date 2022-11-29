@@ -227,7 +227,7 @@ message Put {
   uint32 request_id = 2;
   bytes container = 3;
 
-// NOTE: "container_id" is deprecated in packer based serializer
+  // NOTE: "container_id" is deprecated in packer based serializer
 }
 
 // Message that contains a preferred container ID and its container bytes
@@ -245,7 +245,7 @@ message PushQuery {
   uint64 deadline = 3;
   bytes container = 4;
 
-// NOTE: "container_id" is deprecated in packer based serializer
+  // NOTE: "container_id" is deprecated in packer based serializer
 }
 
 // Message that contains a preferred container ID to query other peers

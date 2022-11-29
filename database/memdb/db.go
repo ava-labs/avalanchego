@@ -4,9 +4,11 @@
 package memdb
 
 import (
-	"sort"
+	"context"
 	"strings"
 	"sync"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/nodb"
@@ -35,11 +37,15 @@ type Database struct {
 }
 
 // New returns a map with the Database interface methods implemented.
-func New() *Database { return NewWithSize(DefaultSize) }
+func New() *Database {
+	return NewWithSize(DefaultSize)
+}
 
 // NewWithSize returns a map pre-allocated to the provided size with the
 // Database interface methods implemented.
-func NewWithSize(size int) *Database { return &Database{db: make(map[string][]byte, size)} }
+func NewWithSize(size int) *Database {
+	return &Database{db: make(map[string][]byte, size)}
+}
 
 func (db *Database) Close() error {
 	db.lock.Lock()
@@ -105,7 +111,9 @@ func (db *Database) Delete(key []byte) error {
 	return nil
 }
 
-func (db *Database) NewBatch() database.Batch { return &batch{db: db} }
+func (db *Database) NewBatch() database.Batch {
+	return &batch{db: db}
+}
 
 func (db *Database) NewIterator() database.Iterator {
 	return db.NewIteratorWithStartAndPrefix(nil, nil)
@@ -135,7 +143,7 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 			keys = append(keys, key)
 		}
 	}
-	sort.Strings(keys) // Keys need to be in sorted order
+	slices.Sort(keys) // Keys need to be in sorted order
 	values := make([][]byte, 0, len(keys))
 	for _, key := range keys {
 		values = append(values, db.db[key])
@@ -147,7 +155,7 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	}
 }
 
-func (db *Database) Compact(start []byte, limit []byte) error {
+func (db *Database) Compact(_, _ []byte) error {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -157,7 +165,7 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 	return nil
 }
 
-func (db *Database) HealthCheck() (interface{}, error) {
+func (db *Database) HealthCheck(context.Context) (interface{}, error) {
 	if db.isClosed() {
 		return nil, database.ErrClosed
 	}
@@ -188,7 +196,9 @@ func (b *batch) Delete(key []byte) error {
 	return nil
 }
 
-func (b *batch) Size() int { return b.size }
+func (b *batch) Size() int {
+	return b.size
+}
 
 func (b *batch) Write() error {
 	b.db.lock.Lock()
@@ -232,7 +242,9 @@ func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
 }
 
 // Inner returns itself
-func (b *batch) Inner() database.Batch { return b }
+func (b *batch) Inner() database.Batch {
+	return b
+}
 
 type iterator struct {
 	db          *Database
@@ -266,7 +278,9 @@ func (it *iterator) Next() bool {
 	return len(it.keys) > 0
 }
 
-func (it *iterator) Error() error { return it.err }
+func (it *iterator) Error() error {
+	return it.err
+}
 
 func (it *iterator) Key() []byte {
 	if len(it.keys) > 0 {
@@ -282,4 +296,7 @@ func (it *iterator) Value() []byte {
 	return nil
 }
 
-func (it *iterator) Release() { it.keys = nil; it.values = nil }
+func (it *iterator) Release() {
+	it.keys = nil
+	it.values = nil
+}
