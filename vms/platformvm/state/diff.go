@@ -51,7 +51,7 @@ type diff struct {
 
 	addedTxs map[ids.ID]*txAndStatus
 
-	//If the *utxoModification is nil, it has been removed
+	// If the *utxoModification is nil, it has been removed
 	modifiedUTXOs map[ids.ID]*utxoModification
 }
 

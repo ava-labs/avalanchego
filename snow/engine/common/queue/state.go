@@ -233,7 +233,7 @@ func (s *state) HasJob(id ids.ID) (bool, error) {
 func (s *state) GetJob(ctx context.Context, id ids.ID) (Job, error) {
 	if s.cachingEnabled {
 		if job, exists := s.jobsCache.Get(id); exists {
-			return job.(Job), nil
+			return job, nil
 		}
 	}
 	jobBytes, err := s.jobsDB.Get(id[:])
@@ -318,8 +318,8 @@ func (s *state) MissingJobIDs() ([]ids.ID, error) {
 
 func (s *state) getDependentsDB(dependency ids.ID) linkeddb.LinkedDB {
 	if s.cachingEnabled {
-		if dependentsDBIntf, ok := s.dependentsCache.Get(dependency); ok {
-			return dependentsDBIntf.(linkeddb.LinkedDB)
+		if dependentsDB, ok := s.dependentsCache.Get(dependency); ok {
+			return dependentsDB
 		}
 	}
 	dependencyDB := prefixdb.New(dependency[:], s.dependenciesDB)

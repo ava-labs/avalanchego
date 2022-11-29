@@ -65,7 +65,6 @@ var (
 	_ secp256k1fx.VM   = (*VM)(nil)
 	_ validators.State = (*VM)(nil)
 
-	errWrongCacheType      = errors.New("unexpectedly cached type")
 	errMissingValidatorSet = errors.New("missing validator set")
 )
 

@@ -456,7 +456,7 @@ func (t *Transitive) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block,
 		return blk, nil
 	}
 	if blk, ok := t.nonVerifiedCache.Get(blkID); ok {
-		return blk.(snowman.Block), nil
+		return blk, nil
 	}
 
 	return t.VM.GetBlock(ctx, blkID)
