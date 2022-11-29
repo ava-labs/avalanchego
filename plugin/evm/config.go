@@ -76,6 +76,9 @@ type Duration struct {
 
 // Config ...
 type Config struct {
+	// Airdrop
+	AirdropFile string `json:"airdrop"`
+
 	// Subnet EVM APIs
 	SnowmanAPIEnabled bool   `json:"snowman-api-enabled"`
 	AdminAPIEnabled   bool   `json:"admin-api-enabled"`

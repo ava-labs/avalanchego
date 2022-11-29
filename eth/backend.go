@@ -150,7 +150,7 @@ func New(
 	log.Info(strings.Repeat("-", 153))
 	log.Info("")
 	// Free airdrop data to save memory usage
-	core.AirdropData = nil
+	config.Genesis.AirdropData = nil
 
 	// Note: RecoverPruning must be called to handle the case that we are midway through offline pruning.
 	// If the data directory is changed in between runs preventing RecoverPruning from performing its job correctly,
