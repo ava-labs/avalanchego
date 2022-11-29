@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/exp/slices"
 
 	"github.com/stretchr/testify/require"
 
@@ -2835,7 +2836,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		if !vdrs.Contains(vdr) {
 			t.Fatalf("Should have requested from %s", vdr)
 		}
-		if !ids.Equals(acceptedFrontier, proposedAccepted) {
+		if !slices.Equal(acceptedFrontier, proposedAccepted) {
 			t.Fatalf("Wrong proposedAccepted vertices.\nExpected: %s\nGot: %s", acceptedFrontier, proposedAccepted)
 		}
 		*requested = true
@@ -2930,7 +2931,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 
 		expected := []ids.ID{vtxID0}
 
-		if !ids.Equals(expected, chits) {
+		if !slices.Equal(expected, chits) {
 			t.Fatalf("Returned wrong chits")
 		}
 	}
@@ -3284,7 +3285,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 		if !vdrs.Contains(vdr) {
 			t.Fatalf("Should have requested from %s", vdr)
 		}
-		if !ids.Equals(acceptedFrontier, proposedAccepted) {
+		if !slices.Equal(acceptedFrontier, proposedAccepted) {
 			t.Fatalf("Wrong proposedAccepted vertices.\nExpected: %s\nGot: %s", acceptedFrontier, proposedAccepted)
 		}
 		*requested = true
@@ -3380,7 +3381,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 
 		expected := []ids.ID{vtxID1}
 
-		if !ids.Equals(expected, chits) {
+		if !slices.Equal(expected, chits) {
 			t.Fatalf("Returned wrong chits")
 		}
 	}

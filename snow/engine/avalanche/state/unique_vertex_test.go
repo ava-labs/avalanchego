@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
+	"github.com/ava-labs/avalanchego/utils/compare"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -444,7 +445,7 @@ func TestStopVertexWhitelistWithParents(t *testing.T) {
 		uvtx4.ID(),
 		svtx5.ID(),
 	}
-	if !ids.UnsortedEquals(whitelist.List(), expectedWhitelist) {
+	if !compare.UnsortedEquals(whitelist.List(), expectedWhitelist) {
 		t.Fatalf("whitelist expected %v, got %v", expectedWhitelist, whitelist)
 	}
 }
@@ -486,7 +487,7 @@ func TestStopVertexWhitelistWithLinearChain(t *testing.T) {
 		uvtx3.ID(),
 		uvtx4.ID(),
 	}
-	if !ids.UnsortedEquals(whitelist.List(), expectedWhitelist) {
+	if !compare.UnsortedEquals(whitelist.List(), expectedWhitelist) {
 		t.Fatalf("whitelist expected %v, got %v", expectedWhitelist, whitelist)
 	}
 }
