@@ -204,7 +204,7 @@ func getKeyStoreDir(conf *Config) (string, bool, error) {
 	if err != nil {
 		return "", false, err
 	}
-	if err := os.MkdirAll(keydir, 0o700); err != nil {
+	if err := os.MkdirAll(keydir, 0700); err != nil {
 		return "", false, err
 	}
 

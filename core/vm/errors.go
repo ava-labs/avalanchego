@@ -31,6 +31,7 @@ import (
 	"fmt"
 )
 
+// List evm execution errors
 var (
 	// errStopToken is an internal token indicating interpreter loop termination,
 	// never returned to outside callers.

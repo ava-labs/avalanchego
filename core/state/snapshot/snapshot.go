@@ -846,6 +846,7 @@ func (t *Tree) verify(root common.Hash, force bool) error {
 		}
 		return hash, nil
 	}, newGenerateStats(), true)
+
 	if err != nil {
 		return err
 	}

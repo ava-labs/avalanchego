@@ -50,7 +50,7 @@ import (
 )
 
 const (
-	targetTxsSize = 232 * units.KiB
+	targetTxsSize = 1800 * units.KiB
 )
 
 // environment is the worker's current environment and holds all of the current state information.
@@ -160,7 +160,6 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 	if w.coinbase == (common.Address{}) {
 		return nil, errors.New("cannot mine without etherbase")
 	}
-
 	header.Coinbase = w.coinbase
 
 	configuredCoinbase, isAllowFeeRecipient, err := w.chain.GetCoinbaseAt(parent.Header())

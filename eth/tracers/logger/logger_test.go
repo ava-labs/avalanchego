@@ -1,4 +1,4 @@
-// Copyright 2016 The go-ethereum Authors
+// Copyright 2021 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -83,22 +83,14 @@ func TestStructLogMarshalingOmitEmpty(t *testing.T) {
 		log  *StructLog
 		want string
 	}{
-		{
-			"empty err and no fields", &StructLog{},
-			`{"pc":0,"op":0,"gas":"0x0","gasCost":"0x0","memSize":0,"stack":null,"depth":0,"refund":0,"opName":"STOP"}`,
-		},
-		{
-			"with err", &StructLog{Err: fmt.Errorf("this failed")},
-			`{"pc":0,"op":0,"gas":"0x0","gasCost":"0x0","memSize":0,"stack":null,"depth":0,"refund":0,"opName":"STOP","error":"this failed"}`,
-		},
-		{
-			"with mem", &StructLog{Memory: make([]byte, 2), MemorySize: 2},
-			`{"pc":0,"op":0,"gas":"0x0","gasCost":"0x0","memory":"0x0000","memSize":2,"stack":null,"depth":0,"refund":0,"opName":"STOP"}`,
-		},
-		{
-			"with 0-size mem", &StructLog{Memory: make([]byte, 0)},
-			`{"pc":0,"op":0,"gas":"0x0","gasCost":"0x0","memSize":0,"stack":null,"depth":0,"refund":0,"opName":"STOP"}`,
-		},
+		{"empty err and no fields", &StructLog{},
+			`{"pc":0,"op":0,"gas":"0x0","gasCost":"0x0","memSize":0,"stack":null,"depth":0,"refund":0,"opName":"STOP"}`},
+		{"with err", &StructLog{Err: fmt.Errorf("this failed")},
+			`{"pc":0,"op":0,"gas":"0x0","gasCost":"0x0","memSize":0,"stack":null,"depth":0,"refund":0,"opName":"STOP","error":"this failed"}`},
+		{"with mem", &StructLog{Memory: make([]byte, 2), MemorySize: 2},
+			`{"pc":0,"op":0,"gas":"0x0","gasCost":"0x0","memory":"0x0000","memSize":2,"stack":null,"depth":0,"refund":0,"opName":"STOP"}`},
+		{"with 0-size mem", &StructLog{Memory: make([]byte, 0)},
+			`{"pc":0,"op":0,"gas":"0x0","gasCost":"0x0","memSize":0,"stack":null,"depth":0,"refund":0,"opName":"STOP"}`},
 	}
 
 	for _, tt := range tests {

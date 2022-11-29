@@ -170,6 +170,18 @@ func (n *network) request(nodeID ids.NodeID, request []byte, responseHandler mes
 	return nil
 }
 
+func (n *network) CrossChainAppRequest(_ context.Context, requestingChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+	return nil
+}
+
+func (n *network) CrossChainAppRequestFailed(_ context.Context, respondingChainID ids.ID, requestID uint32) error {
+	return nil
+}
+
+func (n *network) CrossChainAppResponse(_ context.Context, respondingChainID ids.ID, requestID uint32, response []byte) error {
+	return nil
+}
+
 // AppRequest is called by avalanchego -> VM when there is an incoming AppRequest from a peer
 // error returned by this function is expected to be treated as fatal by the engine
 // returns error if the requestHandler returns an error
@@ -205,7 +217,8 @@ func (n *network) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID u
 	}
 
 	log.Debug("processing incoming request", "nodeID", nodeID, "requestID", requestID, "req", req)
-	// We make a new context here because we don't want to cancel the context passed into n.AppSender.SendAppResponse below
+	// We make a new context here because we don't want to cancel the context
+	// passed into n.AppSender.SendAppResponse below
 	handleCtx, cancel := context.WithDeadline(context.Background(), bufferedDeadline)
 	defer cancel()
 
@@ -261,21 +274,6 @@ func (n *network) AppRequestFailed(_ context.Context, nodeID ids.NodeID, request
 	return handler.OnFailure(nodeID, requestID)
 }
 
-// CrossChainAppRequest is a no-op.
-func (n *network) CrossChainAppRequest(_ context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
-	return nil
-}
-
-// CrossChainAppRequestFailed is a no-op.
-func (n *network) CrossChainAppRequestFailed(_ context.Context, chainID ids.ID, requestID uint32) error {
-	return nil
-}
-
-// CrossChainAppResponse is a no-op.
-func (n *network) CrossChainAppResponse(_ context.Context, chainID ids.ID, requestID uint32, response []byte) error {
-	return nil
-}
-
 // getRequestHandler fetches the handler for [requestID] and marks the request with [requestID] as having been fulfilled.
 // This is called by either [AppResponse] or [AppRequestFailed].
 // assumes that the write lock is held.
@@ -310,7 +308,7 @@ func (n *network) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes []
 }
 
 // Connected adds the given nodeID to the peer list so that it can receive messages
-func (n *network) Connected(nodeID ids.NodeID, nodeVersion *version.Application) error {
+func (n *network) Connected(_ context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
 	log.Debug("adding new peer", "nodeID", nodeID)
 
 	n.lock.Lock()
@@ -326,7 +324,7 @@ func (n *network) Connected(nodeID ids.NodeID, nodeVersion *version.Application)
 }
 
 // Disconnected removes given [nodeID] from the peer list
-func (n *network) Disconnected(nodeID ids.NodeID) error {
+func (n *network) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 	log.Debug("disconnecting peer", "nodeID", nodeID)
 	n.lock.Lock()
 	defer n.lock.Unlock()

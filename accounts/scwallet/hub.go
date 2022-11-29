@@ -122,7 +122,7 @@ func (hub *Hub) readPairings() error {
 }
 
 func (hub *Hub) writePairings() error {
-	pairingFile, err := os.OpenFile(filepath.Join(hub.datadir, "smartcards.json"), os.O_RDWR|os.O_CREATE, 0o755)
+	pairingFile, err := os.OpenFile(filepath.Join(hub.datadir, "smartcards.json"), os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
 		return err
 	}

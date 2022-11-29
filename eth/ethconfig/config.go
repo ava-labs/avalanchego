@@ -52,9 +52,6 @@ var DefaultConfig = NewDefaultConfig()
 func NewDefaultConfig() Config {
 	return Config{
 		NetworkId:             1,
-		LightPeers:            100,
-		UltraLightFraction:    75,
-		DatabaseCache:         512,
 		TrieCleanCache:        512,
 		TrieDirtyCache:        256,
 		TrieDirtyCommitTarget: 20,
@@ -80,10 +77,6 @@ type Config struct {
 	// Protocol options
 	NetworkId uint64 // Network ID to use for selecting peers to connect to
 
-	// This can be set to list of enrtree:// URLs which will be queried for
-	// for nodes to connect to.
-	DiscoveryURLs []string
-
 	Pruning                         bool    // Whether to disable pruning and flush everything to disk
 	AcceptorQueueLimit              int     // Maximum blocks to queue before blocking during acceptance
 	CommitInterval                  uint64  // If pruning is enabled, specified the interval at which to commit an entire trie to disk.
@@ -95,24 +88,10 @@ type Config struct {
 	SnapshotVerify                  bool    // Whether to verify generated snapshots
 	SkipSnapshotRebuild             bool    // Whether to skip rebuilding the snapshot in favor of returning an error (only set to true for tests)
 
-	// Light client options
-	LightServ    int  `toml:",omitempty"` // Maximum percentage of time allowed for serving LES requests
-	LightIngress int  `toml:",omitempty"` // Incoming bandwidth limit for light servers
-	LightEgress  int  `toml:",omitempty"` // Outgoing bandwidth limit for light servers
-	LightPeers   int  `toml:",omitempty"` // Maximum number of LES client peers
-	LightNoPrune bool `toml:",omitempty"` // Whether to disable light chain pruning
-
-	// Ultra Light client options
-	UltraLightServers      []string `toml:",omitempty"` // List of trusted ultra light servers
-	UltraLightFraction     int      `toml:",omitempty"` // Percentage of trusted servers to accept an announcement
-	UltraLightOnlyAnnounce bool     `toml:",omitempty"` // Whether to only announce headers, or also serve them
-
 	// Database options
 	SkipBcVersionCheck bool `toml:"-"`
-	DatabaseHandles    int  `toml:"-"`
-	DatabaseCache      int
-	// DatabaseFreezer    string
 
+	// TrieDB and snapshot options
 	TrieCleanCache        int
 	TrieCleanJournal      string
 	TrieCleanRejournal    time.Duration
@@ -135,9 +114,6 @@ type Config struct {
 
 	// Enables tracking of SHA3 preimages in the VM
 	EnablePreimageRecording bool
-
-	// Miscellaneous options
-	DocRoot string `toml:"-"`
 
 	// RPCGasCap is the global gas cap for eth-call variants.
 	RPCGasCap uint64 `toml:",omitempty"`
@@ -162,4 +138,10 @@ type Config struct {
 	OfflinePruning                bool
 	OfflinePruningBloomFilterSize uint64
 	OfflinePruningDataDirectory   string
+
+	// SkipUpgradeCheck disables checking that upgrades must take place before the last
+	// accepted block. Skipping this check is useful when a node operator does not update
+	// their node before the network upgrade and their node accepts blocks that have
+	// identical state with the pre-upgrade ruleset.
+	SkipUpgradeCheck bool
 }

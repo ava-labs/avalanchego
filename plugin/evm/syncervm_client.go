@@ -6,6 +6,7 @@ package evm
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -63,6 +64,7 @@ type stateSyncerClient struct {
 	resumableSummary message.SyncSummary
 
 	cancel context.CancelFunc
+	wg     sync.WaitGroup
 
 	// State Sync results
 	syncSummary  message.SyncSummary
@@ -77,9 +79,9 @@ func NewStateSyncClient(config *stateSyncClientConfig) StateSyncClient {
 
 type StateSyncClient interface {
 	// methods that implement the client side of [block.StateSyncableVM]
-	StateSyncEnabled() (bool, error)
-	GetOngoingSyncStateSummary() (block.StateSummary, error)
-	ParseStateSummary(summaryBytes []byte) (block.StateSummary, error)
+	StateSyncEnabled(context.Context) (bool, error)
+	GetOngoingSyncStateSummary(context.Context) (block.StateSummary, error)
+	ParseStateSummary(ctx context.Context, summaryBytes []byte) (block.StateSummary, error)
 
 	// additional methods required by the evm package
 	StateSyncClearOngoingSummary() error
@@ -97,12 +99,14 @@ type Syncer interface {
 }
 
 // StateSyncEnabled returns [client.enabled], which is set in the chain's config file.
-func (client *stateSyncerClient) StateSyncEnabled() (bool, error) { return client.enabled, nil }
+func (client *stateSyncerClient) StateSyncEnabled(context.Context) (bool, error) {
+	return client.enabled, nil
+}
 
 // GetOngoingSyncStateSummary returns a state summary that was previously started
 // and not finished, and sets [resumableSummary] if one was found.
 // Returns [database.ErrNotFound] if no ongoing summary is found or if [client.skipResume] is true.
-func (client *stateSyncerClient) GetOngoingSyncStateSummary() (block.StateSummary, error) {
+func (client *stateSyncerClient) GetOngoingSyncStateSummary(context.Context) (block.StateSummary, error) {
 	if client.skipResume {
 		return nil, database.ErrNotFound
 	}
@@ -133,17 +137,13 @@ func (client *stateSyncerClient) StateSyncClearOngoingSummary() error {
 }
 
 // ParseStateSummary parses [summaryBytes] to [commonEng.Summary]
-func (client *stateSyncerClient) ParseStateSummary(summaryBytes []byte) (block.StateSummary, error) {
+func (client *stateSyncerClient) ParseStateSummary(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
 	return message.NewSyncSummaryFromBytes(summaryBytes, client.acceptSyncSummary)
 }
 
 // stateSync blockingly performs the state sync for the EVM state and the atomic state
 // to [client.syncSummary]. returns an error if one occurred.
-func (client *stateSyncerClient) stateSync() error {
-	ctx, cancel := context.WithCancel(context.Background())
-	client.cancel = cancel
-	defer cancel()
-
+func (client *stateSyncerClient) stateSync(ctx context.Context) error {
 	if err := client.syncBlocks(ctx, client.syncSummary.BlockHash, client.syncSummary.BlockNumber, parentsToGet); err != nil {
 		return err
 	}
@@ -200,8 +200,16 @@ func (client *stateSyncerClient) acceptSyncSummary(proposedSummary message.SyncS
 	}
 
 	log.Info("Starting state sync", "summary", proposedSummary)
+
+	// create a cancellable ctx for the state sync goroutine
+	ctx, cancel := context.WithCancel(context.Background())
+	client.cancel = cancel
+	client.wg.Add(1) // track the state sync goroutine so we can wait for it on shutdown
 	go func() {
-		if err := client.stateSync(); err != nil {
+		defer client.wg.Done()
+		defer cancel()
+
+		if err := client.stateSync(ctx); err != nil {
 			client.stateSyncErr = err
 		} else {
 			client.stateSyncErr = client.finishSync()
@@ -291,13 +299,14 @@ func (client *stateSyncerClient) Shutdown() error {
 	if client.cancel != nil {
 		client.cancel()
 	}
+	client.wg.Wait() // wait for the background goroutine to exit
 	return nil
 }
 
 // finishSync is responsible for updating disk and memory pointers so the VM is prepared
 // for bootstrapping. Executes any shared memory operations from the atomic trie to shared memory.
 func (client *stateSyncerClient) finishSync() error {
-	stateBlock, err := client.state.GetBlock(ids.ID(client.syncSummary.BlockHash))
+	stateBlock, err := client.state.GetBlock(context.TODO(), ids.ID(client.syncSummary.BlockHash))
 	if err != nil {
 		return fmt.Errorf("could not get block by hash from client state: %s", client.syncSummary.BlockHash)
 	}
@@ -333,7 +342,7 @@ func (client *stateSyncerClient) finishSync() error {
 	parentHash := block.ParentHash()
 	client.chain.BloomIndexer().AddCheckpoint(parentHeight/params.BloomBitsBlocks, parentHash)
 
-	if err := client.chain.BlockChain().ResetState(block); err != nil {
+	if err := client.chain.BlockChain().ResetToStateSyncedBlock(block); err != nil {
 		return err
 	}
 

@@ -32,7 +32,9 @@ import (
 	"reflect"
 )
 
-var errBadBool = errors.New("abi: improperly encoded boolean value")
+var (
+	errBadBool = errors.New("abi: improperly encoded boolean value")
+)
 
 // formatSliceString formats the reflection kind with the given slice size
 // and returns a formatted string representation.

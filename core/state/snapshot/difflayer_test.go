@@ -133,7 +133,9 @@ func TestMergeBasics(t *testing.T) {
 
 // TestMergeDelete tests some deletion
 func TestMergeDelete(t *testing.T) {
-	storage := make(map[common.Hash]map[common.Hash][]byte)
+	var (
+		storage = make(map[common.Hash]map[common.Hash][]byte)
+	)
 	// Fill up a parent
 	h1 := common.HexToHash("0x01")
 	h2 := common.HexToHash("0x02")

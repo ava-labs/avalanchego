@@ -74,11 +74,9 @@ func (g *gossipStats) IncEthTxsGossipSent() { g.ethTxsGossipSent.Inc(1) }
 
 // regossip
 func (g *gossipStats) IncEthTxsRegossipQueued() { g.ethTxsRegossipQueued.Inc(1) }
-
 func (g *gossipStats) IncEthTxsRegossipQueuedLocal(count int) {
 	g.ethTxsRegossipQueuedLocal.Inc(int64(count))
 }
-
 func (g *gossipStats) IncEthTxsRegossipQueuedRemote(count int) {
 	g.ethTxsRegossipQueuedRemote.Inc(int64(count))
 }

@@ -21,16 +21,13 @@ type MockTrieDB struct {
 func (t *MockTrieDB) Dereference(root common.Hash) {
 	t.LastDereference = root
 }
-
 func (t *MockTrieDB) Commit(root common.Hash, report bool, callback func(common.Hash)) error {
 	t.LastCommit = root
 	return nil
 }
-
 func (t *MockTrieDB) Size() (common.StorageSize, common.StorageSize) {
 	return 0, 0
 }
-
 func (t *MockTrieDB) Cap(limit common.StorageSize) error {
 	return nil
 }

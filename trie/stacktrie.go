@@ -157,7 +157,7 @@ func (st *StackTrie) unmarshalBinary(r io.Reader) error {
 	st.val = dec.Val
 	st.key = dec.Key
 
-	hasChild := make([]byte, 1)
+	var hasChild = make([]byte, 1)
 	for i := range st.children {
 		if _, err := r.Read(hasChild); err != nil {
 			return err

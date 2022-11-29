@@ -103,6 +103,7 @@ func GenerateTrie(snaptree *Tree, root common.Hash, src ethdb.Database, dst ethd
 		}
 		return hash, nil
 	}, newGenerateStats(), true)
+
 	if err != nil {
 		return err
 	}

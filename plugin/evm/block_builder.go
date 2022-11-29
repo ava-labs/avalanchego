@@ -4,10 +4,10 @@
 package evm
 
 import (
-	"math/big"
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/params"
 
@@ -16,20 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-// buildingBlkStatus denotes the current status of the VM in block production.
-type buildingBlkStatus uint8
-
-var (
-	// Pre-Subnet EVM Params
-	minBlockTime = 2 * time.Second
-	maxBlockTime = 3 * time.Second
-	// Subnet EVM Params
-	minBlockTimeSE = 500 * time.Millisecond
-)
-
 const (
-	batchSize = 250
-
 	// waitBlockTime is the amount of time to wait for BuildBlock to be
 	// called by the engine before deciding whether or not to gossip the
 	// transaction that triggered the PendingTxs message to the engine.
@@ -40,10 +27,9 @@ const (
 	// whatever the peer makes.
 	waitBlockTime = 100 * time.Millisecond
 
-	dontBuild        buildingBlkStatus = iota
-	conditionalBuild                   // Only used prior to SubnetEVM
-	mayBuild
-	building
+	// Minimum amount of time to wait after building a block before attempting to build a block
+	// a second time without changing the contents of the mempool.
+	minBlockBuildingRetryDelay = 500 * time.Millisecond
 )
 
 type blockBuilder struct {
@@ -60,25 +46,18 @@ type blockBuilder struct {
 	// is ready to be build. This notifies the consensus engine.
 	notifyBuildBlockChan chan<- commonEng.Message
 
-	// [buildBlockLock] must be held when accessing [buildStatus]
+	// [buildBlockLock] must be held when accessing [buildSent]
 	buildBlockLock sync.Mutex
 
-	// [buildBlockTimer] is a two stage timer handling block production.
-	// Stage1 build a block if the batch size has been reached.
-	// Stage2 build a block regardless of the size.
-	buildBlockTimer *Timer
+	// buildSent is true iff we have sent a PendingTxs message to the consensus message and
+	// are still waiting for buildBlock to be called.
+	buildSent bool
 
-	// buildStatus signals the phase of block building the VM is currently in.
-	// [dontBuild] indicates there's no need to build a block.
-	// [conditionalBuild] indicates build a block if the batch size has been reached.
-	// [mayBuild] indicates the VM should proceed to build a block.
-	// [building] indicates the VM has sent a request to the engine to build a block.
-	buildStatus buildingBlkStatus
-
-	// isSE is a boolean indicating if SubnetEVM is activated. This prevents us from
-	// getting the current time and comparing it to the *params.chainConfig more
-	// than once.
-	isSE bool
+	// buildBlockTimer is a timer used to delay retrying block building a minimum amount of time
+	// with the same contents of the mempool.
+	// If the mempool receives a new transaction, the block builder will send a new notification to
+	// the engine and cancel the timer.
+	buildBlockTimer *timer.Timer
 }
 
 func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *blockBuilder {
@@ -90,87 +69,41 @@ func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *bl
 		shutdownChan:         vm.shutdownChan,
 		shutdownWg:           &vm.shutdownWg,
 		notifyBuildBlockChan: notifyBuildBlockChan,
-		buildStatus:          dontBuild,
 	}
-
 	b.handleBlockBuilding()
 	return b
 }
 
+// handleBlockBuilding dispatches a timer used to delay block building retry attempts when the contents
+// of the mempool has not been changed since the last attempt.
 func (b *blockBuilder) handleBlockBuilding() {
-	b.buildBlockTimer = NewStagedTimer(b.buildBlockTwoStageTimer)
+	b.buildBlockTimer = timer.NewTimer(b.buildBlockTimerCallback)
 	go b.ctx.Log.RecoverAndPanic(b.buildBlockTimer.Dispatch)
+}
 
-	if !b.chainConfig.IsSubnetEVM(big.NewInt(time.Now().Unix())) {
-		b.shutdownWg.Add(1)
-		go b.ctx.Log.RecoverAndPanic(b.migrateSE)
-	} else {
-		b.isSE = true
+// buildBlockTimerCallback is the timer callback that will send a PendingTxs notification
+// to the consensus engine if there are transactions in the mempool.
+func (b *blockBuilder) buildBlockTimerCallback() {
+	b.buildBlockLock.Lock()
+	defer b.buildBlockLock.Unlock()
+
+	// If there are still transactions in the mempool, send another notification to
+	// the engine to retry BuildBlock.
+	if b.needToBuild() {
+		b.markBuilding()
 	}
 }
 
-func (b *blockBuilder) migrateSE() {
-	defer b.shutdownWg.Done()
-
-	// In some tests, the SubnetEVM timestamp is not populated. If this is the case, we
-	// should only stop [buildBlockTwoStageTimer] on shutdown.
-	if b.chainConfig.SubnetEVMTimestamp == nil {
-		<-b.shutdownChan
-		b.buildBlockTimer.Stop()
-		return
-	}
-
-	timestamp := time.Unix(b.chainConfig.SubnetEVMTimestamp.Int64(), 0)
-	duration := time.Until(timestamp)
-	select {
-	case <-time.After(duration):
-		b.isSE = true
-		b.buildBlockLock.Lock()
-		// Flush any invalid statuses leftover from legacy block timer builder
-		if b.buildStatus == conditionalBuild {
-			b.buildStatus = mayBuild
-		}
-		b.buildBlockLock.Unlock()
-	case <-b.shutdownChan:
-		// buildBlockTimer will never be nil because we exit as soon as it is ever
-		// set to nil.
-		b.buildBlockTimer.Stop()
-	}
-}
-
-// handleGenerateBlock should be called immediately after [BuildBlock].
-// [handleGenerateBlock] invocation could lead to quiesence, building a block with
-// some delay, or attempting to build another block immediately.
+// handleGenerateBlock is called from the VM immediately after BuildBlock.
 func (b *blockBuilder) handleGenerateBlock() {
 	b.buildBlockLock.Lock()
 	defer b.buildBlockLock.Unlock()
 
-	if !b.isSE {
-		// Set the buildStatus before calling Cancel or Issue on
-		// the mempool and after generating the block.
-		// This prevents [needToBuild] from returning true when the
-		// produced block will change whether or not we need to produce
-		// another block and also ensures that when the mempool adds a
-		// new item to Pending it will be handled appropriately by [signalTxsReady]
-		if b.needToBuild() {
-			b.buildStatus = conditionalBuild
-			b.buildBlockTimer.SetTimeoutIn(minBlockTime)
-		} else {
-			b.buildStatus = dontBuild
-		}
-	} else {
-		// If we still need to build a block immediately after building, we let the
-		// engine know it [mayBuild] in [minBlockTimeSE].
-		//
-		// It is often the case in SubnetEVM that a block (with the same txs) could be built
-		// after a few seconds of delay as the [baseFee] and/or [blockGasCost] decrease.
-		if b.needToBuild() {
-			b.buildStatus = mayBuild
-			b.buildBlockTimer.SetTimeoutIn(minBlockTimeSE)
-		} else {
-			b.buildStatus = dontBuild
-		}
-	}
+	// Reset buildSent now that the engine has called BuildBlock.
+	b.buildSent = false
+
+	// Set a timer to check if calling build block a second time is needed.
+	b.buildBlockTimer.SetTimeoutIn(minBlockBuildingRetryDelay)
 }
 
 // needToBuild returns true if there are outstanding transactions to be issued
@@ -180,76 +113,32 @@ func (b *blockBuilder) needToBuild() bool {
 	return size > 0
 }
 
-// buildEarly returns true if there are sufficient outstanding transactions to
-// be issued into a block to build a block early.
-//
-// NOTE: Only used prior to SubnetEVM.
-func (b *blockBuilder) buildEarly() bool {
-	size := b.txPool.PendingSize()
-	return size > batchSize
-}
-
-// buildBlockTwoStageTimer is a two stage timer that sends a notification
-// to the engine when the VM is ready to build a block.
-// If it should be called back again, it returns the timeout duration at
-// which it should be called again.
-func (b *blockBuilder) buildBlockTwoStageTimer() (time.Duration, bool) {
-	b.buildBlockLock.Lock()
-	defer b.buildBlockLock.Unlock()
-
-	switch b.buildStatus {
-	case dontBuild:
-	case conditionalBuild:
-		if !b.buildEarly() {
-			b.buildStatus = mayBuild
-			return (maxBlockTime - minBlockTime), true
-		}
-		b.markBuilding()
-	case mayBuild:
-		b.markBuilding()
-	case building:
-		// If the status has already been set to building, there is no need
-		// to send an additional request to the consensus engine until the call
-		// to BuildBlock resets the block status.
-	default:
-		// Log an error if an invalid status is found.
-		log.Error("Found invalid build status in build block timer", "buildStatus", b.buildStatus)
-	}
-
-	// No need for the timeout to fire again until BuildBlock is called.
-	return 0, false
-}
-
+// markBuilding adds a PendingTxs message to the toEngine channel.
 // markBuilding assumes the [buildBlockLock] is held.
 func (b *blockBuilder) markBuilding() {
+	// If the engine has not called BuildBlock, no need to send another message.
+	if b.buildSent {
+		return
+	}
+	b.buildBlockTimer.Cancel() // Cancel any future attempt from the timer to send a PendingTxs message
+
 	select {
 	case b.notifyBuildBlockChan <- commonEng.PendingTxs:
-		b.buildStatus = building
+		b.buildSent = true
 	default:
 		log.Error("Failed to push PendingTxs notification to the consensus engine.")
 	}
 }
 
-// signalTxsReady sets the initial timeout on the two stage timer if the process
-// has not already begun from an earlier notification. If [buildStatus] is anything
-// other than [dontBuild], then the attempt has already begun and this notification
-// can be safely skipped.
+// signalTxsReady sends a PendingTxs notification to the consensus engine.
+// If BuildBlock has not been called since the last PendingTxs message was sent,
+// signalTxsReady will not send a duplicate.
 func (b *blockBuilder) signalTxsReady() {
 	b.buildBlockLock.Lock()
 	defer b.buildBlockLock.Unlock()
 
-	if b.buildStatus != dontBuild {
-		return
-	}
-
-	if !b.isSE {
-		b.buildStatus = conditionalBuild
-		b.buildBlockTimer.SetTimeoutIn(minBlockTime)
-		return
-	}
-
 	// We take a naive approach here and signal the engine that we should build
-	// a block as soon as we receive at least one transaction.
+	// a block as soon as we receive at least one new transaction.
 	//
 	// In the future, we may wish to add optimization here to only signal the
 	// engine if the sum of the projected tips in the mempool satisfies the
@@ -272,18 +161,17 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 
 		for {
 			select {
-			case txsEvent := <-txSubmitChan:
+			case ethTxsEvent := <-txSubmitChan:
 				log.Trace("New tx detected, trying to generate a block")
 				b.signalTxsReady()
 
-				// We only attempt to invoke [GossipTxs] once AP4 is activated
-				if b.isSE && b.gossiper != nil && len(txsEvent.Txs) > 0 {
+				if b.gossiper != nil && len(ethTxsEvent.Txs) > 0 {
 					// Give time for this node to build a block before attempting to
 					// gossip
 					time.Sleep(waitBlockTime)
 					// [GossipTxs] will block unless [gossiper.txsToGossipChan] (an
 					// unbuffered channel) is listened on
-					if err := b.gossiper.GossipTxs(txsEvent.Txs); err != nil {
+					if err := b.gossiper.GossipTxs(ethTxsEvent.Txs); err != nil {
 						log.Warn(
 							"failed to gossip new eth transactions",
 							"err", err,

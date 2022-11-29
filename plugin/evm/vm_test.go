@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/subnet-evm/commontype"
+	"github.com/ava-labs/subnet-evm/metrics"
 	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ava-labs/subnet-evm/trie"
 	"github.com/ava-labs/subnet-evm/vmerrs"
@@ -81,8 +82,6 @@ func init() {
 	addr2 := crypto.PubkeyToAddress(key2.PublicKey)
 	testEthAddrs = append(testEthAddrs, addr1, addr2)
 
-	minBlockTime = time.Millisecond
-	maxBlockTime = time.Millisecond
 	firstTxAmount = new(big.Int).Mul(big.NewInt(testMinGasPrice), big.NewInt(21000*100))
 	genesisBalance = new(big.Int).Mul(big.NewInt(testMinGasPrice), big.NewInt(21000*1000))
 }
@@ -200,6 +199,7 @@ func GenesisVM(t *testing.T,
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func(context.Context, []byte) error { return nil }
 	if err := vm.Initialize(
+		context.Background(),
 		ctx,
 		dbManager,
 		genesisBytes,
@@ -213,8 +213,8 @@ func GenesisVM(t *testing.T,
 	}
 
 	if finishBootstrapping {
-		assert.NoError(t, vm.SetState(snow.Bootstrapping))
-		assert.NoError(t, vm.SetState(snow.NormalOp))
+		assert.NoError(t, vm.SetState(context.Background(), snow.Bootstrapping))
+		assert.NoError(t, vm.SetState(context.Background(), snow.NormalOp))
 	}
 
 	return issuer, vm, dbManager, appSender
@@ -227,7 +227,7 @@ func TestVMConfig(t *testing.T) {
 	_, vm, _, _ := GenesisVM(t, false, "", configJSON, "")
 	require.Equal(t, vm.config.RPCTxFeeCap, txFeeCap, "Tx Fee Cap should be set")
 	require.Equal(t, vm.config.EthAPIs(), enabledEthAPIs, "EnabledEthAPIs should be set")
-	assert.NoError(t, vm.Shutdown())
+	assert.NoError(t, vm.Shutdown(context.Background()))
 }
 
 func TestVMConfigDefaults(t *testing.T) {
@@ -241,7 +241,7 @@ func TestVMConfigDefaults(t *testing.T) {
 	vmConfig.RPCTxFeeCap = txFeeCap
 	vmConfig.EnabledEthAPIs = enabledEthAPIs
 	require.Equal(t, vmConfig, vm.config, "VM Config should match default with overrides")
-	assert.NoError(t, vm.Shutdown())
+	assert.NoError(t, vm.Shutdown(context.Background()))
 }
 
 func TestVMNilConfig(t *testing.T) {
@@ -251,7 +251,7 @@ func TestVMNilConfig(t *testing.T) {
 	var vmConfig Config
 	vmConfig.SetDefaults()
 	require.Equal(t, vmConfig, vm.config, "VM Config should match default config")
-	assert.NoError(t, vm.Shutdown())
+	assert.NoError(t, vm.Shutdown(context.Background()))
 }
 
 func TestVMContinuousProfiler(t *testing.T) {
@@ -265,7 +265,7 @@ func TestVMContinuousProfiler(t *testing.T) {
 	// Sleep for twice the frequency of the profiler to give it time
 	// to generate the first profile.
 	time.Sleep(2 * time.Second)
-	assert.NoError(t, vm.Shutdown())
+	assert.NoError(t, vm.Shutdown(context.Background()))
 
 	// Check that the first profile was generated
 	expectedFileName := filepath.Join(profilerDir, "cpu.profile.1")
@@ -295,7 +295,7 @@ func TestVMUpgrades(t *testing.T) {
 			defer func() {
 				shutdownChan := make(chan error, 1)
 				shutdownFunc := func() {
-					err := vm.Shutdown()
+					err := vm.Shutdown(context.Background())
 					shutdownChan <- err
 				}
 
@@ -312,7 +312,7 @@ func TestVMUpgrades(t *testing.T) {
 				}
 			}()
 
-			lastAcceptedID, err := vm.LastAccepted()
+			lastAcceptedID, err := vm.LastAccepted(context.Background())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -321,7 +321,7 @@ func TestVMUpgrades(t *testing.T) {
 				t.Fatal("Expected last accepted block to match the genesis block hash")
 			}
 
-			genesisBlk, err := vm.GetBlock(lastAcceptedID)
+			genesisBlk, err := vm.GetBlock(context.Background(), lastAcceptedID)
 			if err != nil {
 				t.Fatalf("Failed to get genesis block due to %s", err)
 			}
@@ -330,7 +330,7 @@ func TestVMUpgrades(t *testing.T) {
 				t.Fatalf("Expected height of geneiss block to be 0, found: %d", height)
 			}
 
-			if _, err := vm.ParseBlock(genesisBlk.Bytes()); err != nil {
+			if _, err := vm.ParseBlock(context.Background(), genesisBlk.Bytes()); err != nil {
 				t.Fatalf("Failed to parse genesis block due to %s", err)
 			}
 
@@ -346,12 +346,12 @@ func issueAndAccept(t *testing.T, issuer <-chan engCommon.Message, vm *VM) snowm
 	t.Helper()
 	<-issuer
 
-	blk, err := vm.BuildBlock()
+	blk, err := vm.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := blk.Verify(); err != nil {
+	if err := blk.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -359,11 +359,11 @@ func issueAndAccept(t *testing.T, issuer <-chan engCommon.Message, vm *VM) snowm
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	if err := vm.SetPreference(blk.ID()); err != nil {
+	if err := vm.SetPreference(context.Background(), blk.ID()); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := blk.Accept(); err != nil {
+	if err := blk.Accept(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -375,7 +375,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 	issuer, vm, dbManager, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "{\"pruning-enabled\":true}", "")
 
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -433,7 +433,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 		t.Fatalf("Expected status of accepted block to be %s, but found %s", choices.Accepted, status)
 	}
 
-	lastAcceptedID, err := vm.LastAccepted()
+	lastAcceptedID, err := vm.LastAccepted(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -448,7 +448,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 
 	// Clear the cache and ensure that GetBlock returns internal blocks with the correct status
 	vm.State.Flush()
-	blk2Refreshed, err := vm.GetBlockInternal(blk2.ID())
+	blk2Refreshed, err := vm.GetBlockInternal(context.Background(), blk2.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -457,7 +457,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 	}
 
 	blk1RefreshedID := blk2Refreshed.Parent()
-	blk1Refreshed, err := vm.GetBlockInternal(blk1RefreshedID)
+	blk1Refreshed, err := vm.GetBlockInternal(context.Background(), blk1RefreshedID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -473,6 +473,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 	genesisBytes := buildGenesisTest(t, genesisJSONSubnetEVM)
 
 	if err := restartedVM.Initialize(
+		context.Background(),
 		NewContext(),
 		dbManager,
 		genesisBytes,
@@ -513,11 +514,11 @@ func TestSetPreferenceRace(t *testing.T) {
 	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "{\"pruning-enabled\":true}", "")
 
 	defer func() {
-		if err := vm1.Shutdown(); err != nil {
+		if err := vm1.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 
-		if err := vm2.Shutdown(); err != nil {
+		if err := vm2.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -542,12 +543,12 @@ func TestSetPreferenceRace(t *testing.T) {
 
 	<-issuer1
 
-	vm1BlkA, err := vm1.BuildBlock()
+	vm1BlkA, err := vm1.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to build block with import transaction: %s", err)
 	}
 
-	if err := vm1BlkA.Verify(); err != nil {
+	if err := vm1BlkA.Verify(context.Background()); err != nil {
 		t.Fatalf("Block failed verification on VM1: %s", err)
 	}
 
@@ -555,28 +556,28 @@ func TestSetPreferenceRace(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	if err := vm1.SetPreference(vm1BlkA.ID()); err != nil {
+	if err := vm1.SetPreference(context.Background(), vm1BlkA.ID()); err != nil {
 		t.Fatal(err)
 	}
 
-	vm2BlkA, err := vm2.ParseBlock(vm1BlkA.Bytes())
+	vm2BlkA, err := vm2.ParseBlock(context.Background(), vm1BlkA.Bytes())
 	if err != nil {
 		t.Fatalf("Unexpected error parsing block from vm2: %s", err)
 	}
-	if err := vm2BlkA.Verify(); err != nil {
+	if err := vm2BlkA.Verify(context.Background()); err != nil {
 		t.Fatalf("Block failed verification on VM2: %s", err)
 	}
 	if status := vm2BlkA.Status(); status != choices.Processing {
 		t.Fatalf("Expected status of block on VM2 to be %s, but found %s", choices.Processing, status)
 	}
-	if err := vm2.SetPreference(vm2BlkA.ID()); err != nil {
+	if err := vm2.SetPreference(context.Background(), vm2BlkA.ID()); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm1BlkA.Accept(); err != nil {
+	if err := vm1BlkA.Accept(context.Background()); err != nil {
 		t.Fatalf("VM1 failed to accept block: %s", err)
 	}
-	if err := vm2BlkA.Accept(); err != nil {
+	if err := vm2BlkA.Accept(context.Background()); err != nil {
 		t.Fatalf("VM2 failed to accept block: %s", err)
 	}
 
@@ -613,12 +614,12 @@ func TestSetPreferenceRace(t *testing.T) {
 
 	<-issuer1
 
-	vm1BlkB, err := vm1.BuildBlock()
+	vm1BlkB, err := vm1.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm1BlkB.Verify(); err != nil {
+	if err := vm1BlkB.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -626,7 +627,7 @@ func TestSetPreferenceRace(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	if err := vm1.SetPreference(vm1BlkB.ID()); err != nil {
+	if err := vm1.SetPreference(context.Background(), vm1BlkB.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -641,12 +642,12 @@ func TestSetPreferenceRace(t *testing.T) {
 	}
 
 	<-issuer2
-	vm2BlkC, err := vm2.BuildBlock()
+	vm2BlkC, err := vm2.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to build BlkC on VM2: %s", err)
 	}
 
-	if err := vm2BlkC.Verify(); err != nil {
+	if err := vm2BlkC.Verify(context.Background()); err != nil {
 		t.Fatalf("BlkC failed verification on VM2: %s", err)
 	}
 
@@ -654,7 +655,7 @@ func TestSetPreferenceRace(t *testing.T) {
 		t.Fatalf("Expected status of built block C to be %s, but found %s", choices.Processing, status)
 	}
 
-	if err := vm2.SetPreference(vm2BlkC.ID()); err != nil {
+	if err := vm2.SetPreference(context.Background(), vm2BlkC.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -672,12 +673,12 @@ func TestSetPreferenceRace(t *testing.T) {
 	}
 
 	<-issuer2
-	vm2BlkD, err := vm2.BuildBlock()
+	vm2BlkD, err := vm2.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to build BlkD on VM2: %s", err)
 	}
 
-	if err := vm2BlkD.Verify(); err != nil {
+	if err := vm2BlkD.Verify(context.Background()); err != nil {
 		t.Fatalf("BlkD failed verification on VM2: %s", err)
 	}
 
@@ -685,7 +686,7 @@ func TestSetPreferenceRace(t *testing.T) {
 		t.Fatalf("Expected status of built block D to be %s, but found %s", choices.Processing, status)
 	}
 
-	if err := vm2.SetPreference(vm2BlkD.ID()); err != nil {
+	if err := vm2.SetPreference(context.Background(), vm2BlkD.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -695,43 +696,43 @@ func TestSetPreferenceRace(t *testing.T) {
 	// Here we parse them in reverse order to simulate receiving a chain from the tip
 	// back to the last accepted block as would typically be the case in the consensus
 	// engine
-	vm1BlkD, err := vm1.ParseBlock(vm2BlkD.Bytes())
+	vm1BlkD, err := vm1.ParseBlock(context.Background(), vm2BlkD.Bytes())
 	if err != nil {
 		t.Fatalf("VM1 errored parsing blkD: %s", err)
 	}
-	vm1BlkC, err := vm1.ParseBlock(vm2BlkC.Bytes())
+	vm1BlkC, err := vm1.ParseBlock(context.Background(), vm2BlkC.Bytes())
 	if err != nil {
 		t.Fatalf("VM1 errored parsing blkC: %s", err)
 	}
 
 	// The blocks must be verified in order. This invariant is maintained
 	// in the consensus engine.
-	if err := vm1BlkC.Verify(); err != nil {
+	if err := vm1BlkC.Verify(context.Background()); err != nil {
 		t.Fatalf("VM1 BlkC failed verification: %s", err)
 	}
-	if err := vm1BlkD.Verify(); err != nil {
+	if err := vm1BlkD.Verify(context.Background()); err != nil {
 		t.Fatalf("VM1 BlkD failed verification: %s", err)
 	}
 
 	// Set VM1's preference to blockD, skipping blockC
-	if err := vm1.SetPreference(vm1BlkD.ID()); err != nil {
+	if err := vm1.SetPreference(context.Background(), vm1BlkD.ID()); err != nil {
 		t.Fatal(err)
 	}
 
 	// Accept the longer chain on both VMs and ensure there are no errors
 	// VM1 Accepts the blocks in order
-	if err := vm1BlkC.Accept(); err != nil {
+	if err := vm1BlkC.Accept(context.Background()); err != nil {
 		t.Fatalf("VM1 BlkC failed on accept: %s", err)
 	}
-	if err := vm1BlkD.Accept(); err != nil {
+	if err := vm1BlkD.Accept(context.Background()); err != nil {
 		t.Fatalf("VM1 BlkC failed on accept: %s", err)
 	}
 
 	// VM2 Accepts the blocks in order
-	if err := vm2BlkC.Accept(); err != nil {
+	if err := vm2BlkC.Accept(context.Background()); err != nil {
 		t.Fatalf("VM2 BlkC failed on accept: %s", err)
 	}
-	if err := vm2BlkD.Accept(); err != nil {
+	if err := vm2BlkD.Accept(context.Background()); err != nil {
 		t.Fatalf("VM2 BlkC failed on accept: %s", err)
 	}
 
@@ -763,11 +764,11 @@ func TestReorgProtection(t *testing.T) {
 	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "{\"pruning-enabled\":false}", "")
 
 	defer func() {
-		if err := vm1.Shutdown(); err != nil {
+		if err := vm1.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 
-		if err := vm2.Shutdown(); err != nil {
+		if err := vm2.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -792,12 +793,12 @@ func TestReorgProtection(t *testing.T) {
 
 	<-issuer1
 
-	vm1BlkA, err := vm1.BuildBlock()
+	vm1BlkA, err := vm1.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to build block with import transaction: %s", err)
 	}
 
-	if err := vm1BlkA.Verify(); err != nil {
+	if err := vm1BlkA.Verify(context.Background()); err != nil {
 		t.Fatalf("Block failed verification on VM1: %s", err)
 	}
 
@@ -805,28 +806,28 @@ func TestReorgProtection(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	if err := vm1.SetPreference(vm1BlkA.ID()); err != nil {
+	if err := vm1.SetPreference(context.Background(), vm1BlkA.ID()); err != nil {
 		t.Fatal(err)
 	}
 
-	vm2BlkA, err := vm2.ParseBlock(vm1BlkA.Bytes())
+	vm2BlkA, err := vm2.ParseBlock(context.Background(), vm1BlkA.Bytes())
 	if err != nil {
 		t.Fatalf("Unexpected error parsing block from vm2: %s", err)
 	}
-	if err := vm2BlkA.Verify(); err != nil {
+	if err := vm2BlkA.Verify(context.Background()); err != nil {
 		t.Fatalf("Block failed verification on VM2: %s", err)
 	}
 	if status := vm2BlkA.Status(); status != choices.Processing {
 		t.Fatalf("Expected status of block on VM2 to be %s, but found %s", choices.Processing, status)
 	}
-	if err := vm2.SetPreference(vm2BlkA.ID()); err != nil {
+	if err := vm2.SetPreference(context.Background(), vm2BlkA.ID()); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm1BlkA.Accept(); err != nil {
+	if err := vm1BlkA.Accept(context.Background()); err != nil {
 		t.Fatalf("VM1 failed to accept block: %s", err)
 	}
-	if err := vm2BlkA.Accept(); err != nil {
+	if err := vm2BlkA.Accept(context.Background()); err != nil {
 		t.Fatalf("VM2 failed to accept block: %s", err)
 	}
 
@@ -863,12 +864,12 @@ func TestReorgProtection(t *testing.T) {
 
 	<-issuer1
 
-	vm1BlkB, err := vm1.BuildBlock()
+	vm1BlkB, err := vm1.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm1BlkB.Verify(); err != nil {
+	if err := vm1BlkB.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -876,7 +877,7 @@ func TestReorgProtection(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	if err := vm1.SetPreference(vm1BlkB.ID()); err != nil {
+	if err := vm1.SetPreference(context.Background(), vm1BlkB.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -891,29 +892,29 @@ func TestReorgProtection(t *testing.T) {
 	}
 
 	<-issuer2
-	vm2BlkC, err := vm2.BuildBlock()
+	vm2BlkC, err := vm2.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to build BlkC on VM2: %s", err)
 	}
 
-	if err := vm2BlkC.Verify(); err != nil {
+	if err := vm2BlkC.Verify(context.Background()); err != nil {
 		t.Fatalf("Block failed verification on VM2: %s", err)
 	}
 	if status := vm2BlkC.Status(); status != choices.Processing {
 		t.Fatalf("Expected status of block on VM2 to be %s, but found %s", choices.Processing, status)
 	}
 
-	vm1BlkC, err := vm1.ParseBlock(vm2BlkC.Bytes())
+	vm1BlkC, err := vm1.ParseBlock(context.Background(), vm2BlkC.Bytes())
 	if err != nil {
 		t.Fatalf("Unexpected error parsing block from vm2: %s", err)
 	}
 
-	if err := vm1BlkC.Verify(); err != nil {
+	if err := vm1BlkC.Verify(context.Background()); err != nil {
 		t.Fatalf("Block failed verification on VM1: %s", err)
 	}
 
 	// Accept B, such that block C should get Rejected.
-	if err := vm1BlkB.Accept(); err != nil {
+	if err := vm1BlkB.Accept(context.Background()); err != nil {
 		t.Fatalf("VM1 failed to accept block: %s", err)
 	}
 
@@ -921,11 +922,11 @@ func TestReorgProtection(t *testing.T) {
 	// with the preferred chain lower than the last finalized block)
 	// should NEVER happen. However, the VM defends against this
 	// just in case.
-	if err := vm1.SetPreference(vm1BlkC.ID()); !strings.Contains(err.Error(), "cannot orphan finalized block") {
+	if err := vm1.SetPreference(context.Background(), vm1BlkC.ID()); !strings.Contains(err.Error(), "cannot orphan finalized block") {
 		t.Fatalf("Unexpected error when setting preference that would trigger reorg: %s", err)
 	}
 
-	if err := vm1BlkC.Accept(); !strings.Contains(err.Error(), "expected accepted block to have parent") {
+	if err := vm1BlkC.Accept(context.Background()); !strings.Contains(err.Error(), "expected accepted block to have parent") {
 		t.Fatalf("Unexpected error when setting block at finalized height: %s", err)
 	}
 }
@@ -940,11 +941,11 @@ func TestNonCanonicalAccept(t *testing.T) {
 	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
 
 	defer func() {
-		if err := vm1.Shutdown(); err != nil {
+		if err := vm1.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 
-		if err := vm2.Shutdown(); err != nil {
+		if err := vm2.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -969,12 +970,12 @@ func TestNonCanonicalAccept(t *testing.T) {
 
 	<-issuer1
 
-	vm1BlkA, err := vm1.BuildBlock()
+	vm1BlkA, err := vm1.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to build block with import transaction: %s", err)
 	}
 
-	if err := vm1BlkA.Verify(); err != nil {
+	if err := vm1BlkA.Verify(context.Background()); err != nil {
 		t.Fatalf("Block failed verification on VM1: %s", err)
 	}
 
@@ -982,28 +983,28 @@ func TestNonCanonicalAccept(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	if err := vm1.SetPreference(vm1BlkA.ID()); err != nil {
+	if err := vm1.SetPreference(context.Background(), vm1BlkA.ID()); err != nil {
 		t.Fatal(err)
 	}
 
-	vm2BlkA, err := vm2.ParseBlock(vm1BlkA.Bytes())
+	vm2BlkA, err := vm2.ParseBlock(context.Background(), vm1BlkA.Bytes())
 	if err != nil {
 		t.Fatalf("Unexpected error parsing block from vm2: %s", err)
 	}
-	if err := vm2BlkA.Verify(); err != nil {
+	if err := vm2BlkA.Verify(context.Background()); err != nil {
 		t.Fatalf("Block failed verification on VM2: %s", err)
 	}
 	if status := vm2BlkA.Status(); status != choices.Processing {
 		t.Fatalf("Expected status of block on VM2 to be %s, but found %s", choices.Processing, status)
 	}
-	if err := vm2.SetPreference(vm2BlkA.ID()); err != nil {
+	if err := vm2.SetPreference(context.Background(), vm2BlkA.ID()); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm1BlkA.Accept(); err != nil {
+	if err := vm1BlkA.Accept(context.Background()); err != nil {
 		t.Fatalf("VM1 failed to accept block: %s", err)
 	}
-	if err := vm2BlkA.Accept(); err != nil {
+	if err := vm2BlkA.Accept(context.Background()); err != nil {
 		t.Fatalf("VM2 failed to accept block: %s", err)
 	}
 
@@ -1040,12 +1041,12 @@ func TestNonCanonicalAccept(t *testing.T) {
 
 	<-issuer1
 
-	vm1BlkB, err := vm1.BuildBlock()
+	vm1BlkB, err := vm1.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm1BlkB.Verify(); err != nil {
+	if err := vm1BlkB.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1053,7 +1054,7 @@ func TestNonCanonicalAccept(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	if err := vm1.SetPreference(vm1BlkB.ID()); err != nil {
+	if err := vm1.SetPreference(context.Background(), vm1BlkB.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1073,21 +1074,21 @@ func TestNonCanonicalAccept(t *testing.T) {
 	}
 
 	<-issuer2
-	vm2BlkC, err := vm2.BuildBlock()
+	vm2BlkC, err := vm2.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to build BlkC on VM2: %s", err)
 	}
 
-	vm1BlkC, err := vm1.ParseBlock(vm2BlkC.Bytes())
+	vm1BlkC, err := vm1.ParseBlock(context.Background(), vm2BlkC.Bytes())
 	if err != nil {
 		t.Fatalf("Unexpected error parsing block from vm2: %s", err)
 	}
 
-	if err := vm1BlkC.Verify(); err != nil {
+	if err := vm1BlkC.Verify(context.Background()); err != nil {
 		t.Fatalf("Block failed verification on VM1: %s", err)
 	}
 
-	if err := vm1BlkC.Accept(); err != nil {
+	if err := vm1BlkC.Accept(context.Background()); err != nil {
 		t.Fatalf("VM1 failed to accept block: %s", err)
 	}
 
@@ -1110,11 +1111,11 @@ func TestStickyPreference(t *testing.T) {
 	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
 
 	defer func() {
-		if err := vm1.Shutdown(); err != nil {
+		if err := vm1.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 
-		if err := vm2.Shutdown(); err != nil {
+		if err := vm2.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -1139,12 +1140,12 @@ func TestStickyPreference(t *testing.T) {
 
 	<-issuer1
 
-	vm1BlkA, err := vm1.BuildBlock()
+	vm1BlkA, err := vm1.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to build block with import transaction: %s", err)
 	}
 
-	if err := vm1BlkA.Verify(); err != nil {
+	if err := vm1BlkA.Verify(context.Background()); err != nil {
 		t.Fatalf("Block failed verification on VM1: %s", err)
 	}
 
@@ -1152,28 +1153,28 @@ func TestStickyPreference(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	if err := vm1.SetPreference(vm1BlkA.ID()); err != nil {
+	if err := vm1.SetPreference(context.Background(), vm1BlkA.ID()); err != nil {
 		t.Fatal(err)
 	}
 
-	vm2BlkA, err := vm2.ParseBlock(vm1BlkA.Bytes())
+	vm2BlkA, err := vm2.ParseBlock(context.Background(), vm1BlkA.Bytes())
 	if err != nil {
 		t.Fatalf("Unexpected error parsing block from vm2: %s", err)
 	}
-	if err := vm2BlkA.Verify(); err != nil {
+	if err := vm2BlkA.Verify(context.Background()); err != nil {
 		t.Fatalf("Block failed verification on VM2: %s", err)
 	}
 	if status := vm2BlkA.Status(); status != choices.Processing {
 		t.Fatalf("Expected status of block on VM2 to be %s, but found %s", choices.Processing, status)
 	}
-	if err := vm2.SetPreference(vm2BlkA.ID()); err != nil {
+	if err := vm2.SetPreference(context.Background(), vm2BlkA.ID()); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm1BlkA.Accept(); err != nil {
+	if err := vm1BlkA.Accept(context.Background()); err != nil {
 		t.Fatalf("VM1 failed to accept block: %s", err)
 	}
-	if err := vm2BlkA.Accept(); err != nil {
+	if err := vm2BlkA.Accept(context.Background()); err != nil {
 		t.Fatalf("VM2 failed to accept block: %s", err)
 	}
 
@@ -1210,12 +1211,12 @@ func TestStickyPreference(t *testing.T) {
 
 	<-issuer1
 
-	vm1BlkB, err := vm1.BuildBlock()
+	vm1BlkB, err := vm1.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm1BlkB.Verify(); err != nil {
+	if err := vm1BlkB.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1223,7 +1224,7 @@ func TestStickyPreference(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	if err := vm1.SetPreference(vm1BlkB.ID()); err != nil {
+	if err := vm1.SetPreference(context.Background(), vm1BlkB.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1243,12 +1244,12 @@ func TestStickyPreference(t *testing.T) {
 	}
 
 	<-issuer2
-	vm2BlkC, err := vm2.BuildBlock()
+	vm2BlkC, err := vm2.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to build BlkC on VM2: %s", err)
 	}
 
-	if err := vm2BlkC.Verify(); err != nil {
+	if err := vm2BlkC.Verify(context.Background()); err != nil {
 		t.Fatalf("BlkC failed verification on VM2: %s", err)
 	}
 
@@ -1256,7 +1257,7 @@ func TestStickyPreference(t *testing.T) {
 		t.Fatalf("Expected status of built block C to be %s, but found %s", choices.Processing, status)
 	}
 
-	if err := vm2.SetPreference(vm2BlkC.ID()); err != nil {
+	if err := vm2.SetPreference(context.Background(), vm2BlkC.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1273,19 +1274,19 @@ func TestStickyPreference(t *testing.T) {
 	}
 
 	<-issuer2
-	vm2BlkD, err := vm2.BuildBlock()
+	vm2BlkD, err := vm2.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to build BlkD on VM2: %s", err)
 	}
 
 	// Parse blocks produced in vm2
-	vm1BlkC, err := vm1.ParseBlock(vm2BlkC.Bytes())
+	vm1BlkC, err := vm1.ParseBlock(context.Background(), vm2BlkC.Bytes())
 	if err != nil {
 		t.Fatalf("Unexpected error parsing block from vm2: %s", err)
 	}
 	blkCHash := vm1BlkC.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
 
-	vm1BlkD, err := vm1.ParseBlock(vm2BlkD.Bytes())
+	vm1BlkD, err := vm1.ParseBlock(context.Background(), vm2BlkD.Bytes())
 	if err != nil {
 		t.Fatalf("Unexpected error parsing block from vm2: %s", err)
 	}
@@ -1293,10 +1294,10 @@ func TestStickyPreference(t *testing.T) {
 	blkDHash := vm1BlkD.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
 
 	// Should be no-ops
-	if err := vm1BlkC.Verify(); err != nil {
+	if err := vm1BlkC.Verify(context.Background()); err != nil {
 		t.Fatalf("Block failed verification on VM1: %s", err)
 	}
-	if err := vm1BlkD.Verify(); err != nil {
+	if err := vm1BlkD.Verify(context.Background()); err != nil {
 		t.Fatalf("Block failed verification on VM1: %s", err)
 	}
 	if b := vm1.blockChain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
@@ -1310,10 +1311,10 @@ func TestStickyPreference(t *testing.T) {
 	}
 
 	// Should still be no-ops on re-verify
-	if err := vm1BlkC.Verify(); err != nil {
+	if err := vm1BlkC.Verify(context.Background()); err != nil {
 		t.Fatalf("Block failed verification on VM1: %s", err)
 	}
-	if err := vm1BlkD.Verify(); err != nil {
+	if err := vm1BlkD.Verify(context.Background()); err != nil {
 		t.Fatalf("Block failed verification on VM1: %s", err)
 	}
 	if b := vm1.blockChain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
@@ -1327,7 +1328,7 @@ func TestStickyPreference(t *testing.T) {
 	}
 
 	// Should be queryable after setting preference to side chain
-	if err := vm1.SetPreference(vm1BlkD.ID()); err != nil {
+	if err := vm1.SetPreference(context.Background(), vm1BlkD.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1342,15 +1343,15 @@ func TestStickyPreference(t *testing.T) {
 	}
 
 	// Attempt to accept out of order
-	if err := vm1BlkD.Accept(); !strings.Contains(err.Error(), "expected accepted block to have parent") {
+	if err := vm1BlkD.Accept(context.Background()); !strings.Contains(err.Error(), "expected accepted block to have parent") {
 		t.Fatalf("unexpected error when accepting out of order block: %s", err)
 	}
 
 	// Accept in order
-	if err := vm1BlkC.Accept(); err != nil {
+	if err := vm1BlkC.Accept(context.Background()); err != nil {
 		t.Fatalf("Block failed verification on VM1: %s", err)
 	}
-	if err := vm1BlkD.Accept(); err != nil {
+	if err := vm1BlkD.Accept(context.Background()); err != nil {
 		t.Fatalf("Block failed acceptance on VM1: %s", err)
 	}
 
@@ -1379,10 +1380,10 @@ func TestUncleBlock(t *testing.T) {
 	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
 
 	defer func() {
-		if err := vm1.Shutdown(); err != nil {
+		if err := vm1.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		if err := vm2.Shutdown(); err != nil {
+		if err := vm2.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -1407,12 +1408,12 @@ func TestUncleBlock(t *testing.T) {
 
 	<-issuer1
 
-	vm1BlkA, err := vm1.BuildBlock()
+	vm1BlkA, err := vm1.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to build block with import transaction: %s", err)
 	}
 
-	if err := vm1BlkA.Verify(); err != nil {
+	if err := vm1BlkA.Verify(context.Background()); err != nil {
 		t.Fatalf("Block failed verification on VM1: %s", err)
 	}
 
@@ -1420,28 +1421,28 @@ func TestUncleBlock(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	if err := vm1.SetPreference(vm1BlkA.ID()); err != nil {
+	if err := vm1.SetPreference(context.Background(), vm1BlkA.ID()); err != nil {
 		t.Fatal(err)
 	}
 
-	vm2BlkA, err := vm2.ParseBlock(vm1BlkA.Bytes())
+	vm2BlkA, err := vm2.ParseBlock(context.Background(), vm1BlkA.Bytes())
 	if err != nil {
 		t.Fatalf("Unexpected error parsing block from vm2: %s", err)
 	}
-	if err := vm2BlkA.Verify(); err != nil {
+	if err := vm2BlkA.Verify(context.Background()); err != nil {
 		t.Fatalf("Block failed verification on VM2: %s", err)
 	}
 	if status := vm2BlkA.Status(); status != choices.Processing {
 		t.Fatalf("Expected status of block on VM2 to be %s, but found %s", choices.Processing, status)
 	}
-	if err := vm2.SetPreference(vm2BlkA.ID()); err != nil {
+	if err := vm2.SetPreference(context.Background(), vm2BlkA.ID()); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm1BlkA.Accept(); err != nil {
+	if err := vm1BlkA.Accept(context.Background()); err != nil {
 		t.Fatalf("VM1 failed to accept block: %s", err)
 	}
-	if err := vm2BlkA.Accept(); err != nil {
+	if err := vm2BlkA.Accept(context.Background()); err != nil {
 		t.Fatalf("VM2 failed to accept block: %s", err)
 	}
 
@@ -1475,12 +1476,12 @@ func TestUncleBlock(t *testing.T) {
 
 	<-issuer1
 
-	vm1BlkB, err := vm1.BuildBlock()
+	vm1BlkB, err := vm1.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm1BlkB.Verify(); err != nil {
+	if err := vm1BlkB.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1488,7 +1489,7 @@ func TestUncleBlock(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	if err := vm1.SetPreference(vm1BlkB.ID()); err != nil {
+	if err := vm1.SetPreference(context.Background(), vm1BlkB.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1500,12 +1501,12 @@ func TestUncleBlock(t *testing.T) {
 	}
 
 	<-issuer2
-	vm2BlkC, err := vm2.BuildBlock()
+	vm2BlkC, err := vm2.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to build BlkC on VM2: %s", err)
 	}
 
-	if err := vm2BlkC.Verify(); err != nil {
+	if err := vm2BlkC.Verify(context.Background()); err != nil {
 		t.Fatalf("BlkC failed verification on VM2: %s", err)
 	}
 
@@ -1513,7 +1514,7 @@ func TestUncleBlock(t *testing.T) {
 		t.Fatalf("Expected status of built block C to be %s, but found %s", choices.Processing, status)
 	}
 
-	if err := vm2.SetPreference(vm2BlkC.ID()); err != nil {
+	if err := vm2.SetPreference(context.Background(), vm2BlkC.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1530,7 +1531,7 @@ func TestUncleBlock(t *testing.T) {
 	}
 
 	<-issuer2
-	vm2BlkD, err := vm2.BuildBlock()
+	vm2BlkD, err := vm2.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to build BlkD on VM2: %s", err)
 	}
@@ -1550,13 +1551,13 @@ func TestUncleBlock(t *testing.T) {
 	)
 	uncleBlock := vm2.newBlock(uncleEthBlock)
 
-	if err := uncleBlock.Verify(); !errors.Is(err, errUnclesUnsupported) {
+	if err := uncleBlock.Verify(context.Background()); !errors.Is(err, errUnclesUnsupported) {
 		t.Fatalf("VM2 should have failed with %q but got %q", errUnclesUnsupported, err.Error())
 	}
-	if _, err := vm1.ParseBlock(vm2BlkC.Bytes()); err != nil {
+	if _, err := vm1.ParseBlock(context.Background(), vm2BlkC.Bytes()); err != nil {
 		t.Fatalf("VM1 errored parsing blkC: %s", err)
 	}
-	if _, err := vm1.ParseBlock(uncleBlock.Bytes()); !errors.Is(err, errUnclesUnsupported) {
+	if _, err := vm1.ParseBlock(context.Background(), uncleBlock.Bytes()); !errors.Is(err, errUnclesUnsupported) {
 		t.Fatalf("VM1 should have failed with %q but got %q", errUnclesUnsupported, err.Error())
 	}
 }
@@ -1567,7 +1568,7 @@ func TestEmptyBlock(t *testing.T) {
 	issuer, vm, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
 
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -1587,7 +1588,7 @@ func TestEmptyBlock(t *testing.T) {
 
 	<-issuer
 
-	blk, err := vm.BuildBlock()
+	blk, err := vm.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to build block with import transaction: %s", err)
 	}
@@ -1605,10 +1606,10 @@ func TestEmptyBlock(t *testing.T) {
 
 	emptyBlock := vm.newBlock(emptyEthBlock)
 
-	if _, err := vm.ParseBlock(emptyBlock.Bytes()); !errors.Is(err, errEmptyBlock) {
+	if _, err := vm.ParseBlock(context.Background(), emptyBlock.Bytes()); !errors.Is(err, errEmptyBlock) {
 		t.Fatalf("VM should have failed with errEmptyBlock but got %s", err.Error())
 	}
-	if err := emptyBlock.Verify(); !errors.Is(err, errEmptyBlock) {
+	if err := emptyBlock.Verify(context.Background()); !errors.Is(err, errEmptyBlock) {
 		t.Fatalf("block should have failed verification with errEmptyBlock but got %s", err.Error())
 	}
 }
@@ -1625,11 +1626,11 @@ func TestAcceptReorg(t *testing.T) {
 	issuer2, vm2, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
 
 	defer func() {
-		if err := vm1.Shutdown(); err != nil {
+		if err := vm1.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 
-		if err := vm2.Shutdown(); err != nil {
+		if err := vm2.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -1654,12 +1655,12 @@ func TestAcceptReorg(t *testing.T) {
 
 	<-issuer1
 
-	vm1BlkA, err := vm1.BuildBlock()
+	vm1BlkA, err := vm1.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to build block with import transaction: %s", err)
 	}
 
-	if err := vm1BlkA.Verify(); err != nil {
+	if err := vm1BlkA.Verify(context.Background()); err != nil {
 		t.Fatalf("Block failed verification on VM1: %s", err)
 	}
 
@@ -1667,28 +1668,28 @@ func TestAcceptReorg(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	if err := vm1.SetPreference(vm1BlkA.ID()); err != nil {
+	if err := vm1.SetPreference(context.Background(), vm1BlkA.ID()); err != nil {
 		t.Fatal(err)
 	}
 
-	vm2BlkA, err := vm2.ParseBlock(vm1BlkA.Bytes())
+	vm2BlkA, err := vm2.ParseBlock(context.Background(), vm1BlkA.Bytes())
 	if err != nil {
 		t.Fatalf("Unexpected error parsing block from vm2: %s", err)
 	}
-	if err := vm2BlkA.Verify(); err != nil {
+	if err := vm2BlkA.Verify(context.Background()); err != nil {
 		t.Fatalf("Block failed verification on VM2: %s", err)
 	}
 	if status := vm2BlkA.Status(); status != choices.Processing {
 		t.Fatalf("Expected status of block on VM2 to be %s, but found %s", choices.Processing, status)
 	}
-	if err := vm2.SetPreference(vm2BlkA.ID()); err != nil {
+	if err := vm2.SetPreference(context.Background(), vm2BlkA.ID()); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm1BlkA.Accept(); err != nil {
+	if err := vm1BlkA.Accept(context.Background()); err != nil {
 		t.Fatalf("VM1 failed to accept block: %s", err)
 	}
-	if err := vm2BlkA.Accept(); err != nil {
+	if err := vm2BlkA.Accept(context.Background()); err != nil {
 		t.Fatalf("VM2 failed to accept block: %s", err)
 	}
 
@@ -1724,12 +1725,12 @@ func TestAcceptReorg(t *testing.T) {
 
 	<-issuer1
 
-	vm1BlkB, err := vm1.BuildBlock()
+	vm1BlkB, err := vm1.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm1BlkB.Verify(); err != nil {
+	if err := vm1BlkB.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1737,7 +1738,7 @@ func TestAcceptReorg(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	if err := vm1.SetPreference(vm1BlkB.ID()); err != nil {
+	if err := vm1.SetPreference(context.Background(), vm1BlkB.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1750,16 +1751,16 @@ func TestAcceptReorg(t *testing.T) {
 
 	<-issuer2
 
-	vm2BlkC, err := vm2.BuildBlock()
+	vm2BlkC, err := vm2.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to build BlkC on VM2: %s", err)
 	}
 
-	if err := vm2BlkC.Verify(); err != nil {
+	if err := vm2BlkC.Verify(context.Background()); err != nil {
 		t.Fatalf("BlkC failed verification on VM2: %s", err)
 	}
 
-	if err := vm2.SetPreference(vm2BlkC.ID()); err != nil {
+	if err := vm2.SetPreference(context.Background(), vm2BlkC.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1777,26 +1778,26 @@ func TestAcceptReorg(t *testing.T) {
 
 	<-issuer2
 
-	vm2BlkD, err := vm2.BuildBlock()
+	vm2BlkD, err := vm2.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to build BlkD on VM2: %s", err)
 	}
 
 	// Parse blocks produced in vm2
-	vm1BlkC, err := vm1.ParseBlock(vm2BlkC.Bytes())
+	vm1BlkC, err := vm1.ParseBlock(context.Background(), vm2BlkC.Bytes())
 	if err != nil {
 		t.Fatalf("Unexpected error parsing block from vm2: %s", err)
 	}
 
-	vm1BlkD, err := vm1.ParseBlock(vm2BlkD.Bytes())
+	vm1BlkD, err := vm1.ParseBlock(context.Background(), vm2BlkD.Bytes())
 	if err != nil {
 		t.Fatalf("Unexpected error parsing block from vm2: %s", err)
 	}
 
-	if err := vm1BlkC.Verify(); err != nil {
+	if err := vm1BlkC.Verify(context.Background()); err != nil {
 		t.Fatalf("Block failed verification on VM1: %s", err)
 	}
-	if err := vm1BlkD.Verify(); err != nil {
+	if err := vm1BlkD.Verify(context.Background()); err != nil {
 		t.Fatalf("Block failed verification on VM1: %s", err)
 	}
 
@@ -1805,7 +1806,7 @@ func TestAcceptReorg(t *testing.T) {
 		t.Fatalf("expected current block to have hash %s but got %s", blkBHash.Hex(), b.Hash().Hex())
 	}
 
-	if err := vm1BlkC.Accept(); err != nil {
+	if err := vm1BlkC.Accept(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1813,11 +1814,11 @@ func TestAcceptReorg(t *testing.T) {
 	if b := vm1.blockChain.CurrentBlock(); b.Hash() != blkCHash {
 		t.Fatalf("expected current block to have hash %s but got %s", blkCHash.Hex(), b.Hash().Hex())
 	}
-	if err := vm1BlkB.Reject(); err != nil {
+	if err := vm1BlkB.Reject(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm1BlkD.Accept(); err != nil {
+	if err := vm1BlkD.Accept(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	blkDHash := vm1BlkD.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
@@ -1830,7 +1831,7 @@ func TestFutureBlock(t *testing.T) {
 	issuer, vm, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
 
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -1850,7 +1851,7 @@ func TestFutureBlock(t *testing.T) {
 
 	<-issuer
 
-	blkA, err := vm.BuildBlock()
+	blkA, err := vm.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to build block with import transaction: %s", err)
 	}
@@ -1873,7 +1874,7 @@ func TestFutureBlock(t *testing.T) {
 
 	futureBlock := vm.newBlock(modifiedBlock)
 
-	if err := futureBlock.Verify(); err == nil {
+	if err := futureBlock.Verify(context.Background()); err == nil {
 		t.Fatal("Future block should have failed verification due to block timestamp too far in the future")
 	} else if !strings.Contains(err.Error(), "block timestamp is too far in the future") {
 		t.Fatalf("Expected error to be block timestamp too far in the future but found %s", err)
@@ -1884,7 +1885,7 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 	issuer, vm, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
 
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -1904,12 +1905,12 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 
 	<-issuer
 
-	blk, err := vm.BuildBlock()
+	blk, err := vm.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to build block with import transaction: %s", err)
 	}
 
-	if err := blk.Verify(); err != nil {
+	if err := blk.Verify(context.Background()); err != nil {
 		t.Fatalf("Block failed verification on VM: %s", err)
 	}
 
@@ -1917,7 +1918,7 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
 	}
 
-	if err := vm.SetPreference(blk.ID()); err != nil {
+	if err := vm.SetPreference(context.Background(), blk.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1942,7 +1943,7 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 		t.Fatalf("expected ErrUnfinalizedData but got %s", err.Error())
 	}
 
-	if err := blk.Accept(); err != nil {
+	if err := blk.Accept(context.Background()); err != nil {
 		t.Fatalf("VM failed to accept block: %s", err)
 	}
 
@@ -1974,6 +1975,7 @@ func TestConfigureLogLevel(t *testing.T) {
 			appSender.CantSendAppGossip = true
 			appSender.SendAppGossipF = func(context.Context, []byte) error { return nil }
 			err := vm.Initialize(
+				context.Background(),
 				ctx,
 				dbManager,
 				genesisBytes,
@@ -1997,7 +1999,7 @@ func TestConfigureLogLevel(t *testing.T) {
 			if err == nil {
 				shutdownChan := make(chan error, 1)
 				shutdownFunc := func() {
-					err := vm.Shutdown()
+					err := vm.Shutdown(context.Background())
 					shutdownChan <- err
 				}
 				go shutdownFunc()
@@ -2023,7 +2025,7 @@ func TestBuildSubnetEVMBlock(t *testing.T) {
 	issuer, vm, _, _ := GenesisVM(t, true, genesisJSONSubnetEVM, "", "")
 
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -2083,7 +2085,7 @@ func TestBuildSubnetEVMBlock(t *testing.T) {
 		t.Fatalf("Expected status of accepted block to be %s, but found %s", choices.Accepted, status)
 	}
 
-	lastAcceptedID, err := vm.LastAccepted()
+	lastAcceptedID, err := vm.LastAccepted(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2117,7 +2119,7 @@ func TestBuildAllowListActivationBlock(t *testing.T) {
 	issuer, vm, _, _ := GenesisVM(t, true, string(genesisJSON), "", "")
 
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -2180,7 +2182,7 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	issuer, vm, _, _ := GenesisVM(t, true, string(genesisJSON), "", "")
 
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -2270,7 +2272,7 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 	vm.clock.Set(disableAllowListTimestamp) // upgrade takes effect after a block is issued, so we can set vm's clock here.
 
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -2379,7 +2381,7 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	issuer, vm, _, _ := GenesisVM(t, true, string(genesisJSON), "", "")
 
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -2485,7 +2487,7 @@ func TestAllowFeeRecipientDisabled(t *testing.T) {
 
 	vm.miner.SetEtherbase(common.HexToAddress("0x0123456789")) // set non-blackhole address by force
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -2508,7 +2510,7 @@ func TestAllowFeeRecipientDisabled(t *testing.T) {
 
 	<-issuer
 
-	blk, err := vm.BuildBlock()
+	blk, err := vm.BuildBlock(context.Background())
 	require.NoError(t, err) // this won't return an error since miner will set the etherbase to blackhole address
 
 	ethBlock := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
@@ -2528,7 +2530,7 @@ func TestAllowFeeRecipientDisabled(t *testing.T) {
 
 	modifiedBlk := vm.newBlock(modifiedBlock)
 
-	require.ErrorIs(t, modifiedBlk.Verify(), vmerrs.ErrInvalidCoinbase)
+	require.ErrorIs(t, modifiedBlk.Verify(context.Background()), vmerrs.ErrInvalidCoinbase)
 }
 
 func TestAllowFeeRecipientEnabled(t *testing.T) {
@@ -2553,7 +2555,7 @@ func TestAllowFeeRecipientEnabled(t *testing.T) {
 	issuer, vm, _, _ := GenesisVM(t, true, string(genesisJSON), string(configJSON), "")
 
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -2610,7 +2612,7 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 	issuer, vm, _, _ := GenesisVM(t, true, string(genesisJSON), string(configJSON), "")
 
 	defer func() {
-		err := vm.Shutdown()
+		err := vm.Shutdown(context.Background())
 		require.NoError(t, err)
 	}()
 
@@ -2717,7 +2719,7 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	issuer, vm, _, _ := GenesisVM(t, true, string(genesisJSON), string(configJSON), "")
 
 	defer func() {
-		require.NoError(t, vm.Shutdown())
+		require.NoError(t, vm.Shutdown(context.Background()))
 	}()
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
@@ -2802,4 +2804,67 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 
 	balance = blkState.GetBalance(constants.BlackholeAddr)
 	require.Equal(t, 1, balance.Cmp(previousBalance))
+}
+
+func TestSkipChainConfigCheckCompatible(t *testing.T) {
+	// The most recent network upgrade in Subnet-EVM is SubnetEVM itself, which cannot be disabled for this test since it results in
+	// disabling dynamic fees and causes a panic since some code assumes that this is enabled.
+	// TODO update this test when there is a future network upgrade that can be skipped in the config.
+	t.Skip("no skippable upgrades")
+	// Hack: registering metrics uses global variables, so we need to disable metrics here so that we can initialize the VM twice.
+	metrics.Enabled = false
+	defer func() { metrics.Enabled = true }()
+
+	issuer, vm, dbManager, appSender := GenesisVM(t, true, genesisJSONPreSubnetEVM, "{\"pruning-enabled\":true}", "")
+
+	defer func() {
+		if err := vm.Shutdown(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
+	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
+
+	key, err := accountKeystore.NewKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tx := types.NewTransaction(uint64(0), key.Address, firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	errs := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("Failed to add tx at index %d: %s", i, err)
+		}
+	}
+
+	blk := issueAndAccept(t, issuer, vm)
+	newHead := <-newTxPoolHeadChan
+	if newHead.Head.Hash() != common.Hash(blk.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+
+	reinitVM := &VM{}
+	// use the block's timestamp instead of 0 since rewind to genesis
+	// is hardcoded to be allowed in core/genesis.go.
+	genesisWithUpgrade := &core.Genesis{}
+	require.NoError(t, json.Unmarshal([]byte(genesisJSONPreSubnetEVM), genesisWithUpgrade))
+	genesisWithUpgrade.Config.SubnetEVMTimestamp = big.NewInt(blk.Timestamp().Unix())
+	genesisWithUpgradeBytes, err := json.Marshal(genesisWithUpgrade)
+	require.NoError(t, err)
+
+	// this will not be allowed
+	err = reinitVM.Initialize(context.Background(), vm.ctx, dbManager, genesisWithUpgradeBytes, []byte{}, []byte{}, issuer, []*engCommon.Fx{}, appSender)
+	require.ErrorContains(t, err, "mismatching SubnetEVM fork block timestamp in database")
+
+	// try again with skip-upgrade-check
+	config := []byte("{\"skip-upgrade-check\": true}")
+	err = reinitVM.Initialize(context.Background(), vm.ctx, dbManager, genesisWithUpgradeBytes, []byte{}, config, issuer, []*engCommon.Fx{}, appSender)
+	require.NoError(t, err)
+	require.NoError(t, reinitVM.Shutdown(context.Background()))
 }

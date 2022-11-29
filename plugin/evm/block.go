@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"time"
@@ -38,7 +39,7 @@ func (vm *VM) newBlock(ethBlock *types.Block) *Block {
 func (b *Block) ID() ids.ID { return b.id }
 
 // Accept implements the snowman.Block interface
-func (b *Block) Accept() error {
+func (b *Block) Accept(context.Context) error {
 	vm := b.vm
 
 	// Although returning an error from Accept is considered fatal, it is good
@@ -58,7 +59,7 @@ func (b *Block) Accept() error {
 }
 
 // Reject implements the snowman.Block interface
-func (b *Block) Reject() error {
+func (b *Block) Reject(context.Context) error {
 	b.status = choices.Rejected
 	log.Debug(fmt.Sprintf("Rejecting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
 	return b.vm.blockChain.Reject(b.ethBlock)
@@ -100,7 +101,7 @@ func (b *Block) syntacticVerify() error {
 }
 
 // Verify implements the snowman.Block interface
-func (b *Block) Verify() error {
+func (b *Block) Verify(context.Context) error {
 	return b.verify(true)
 }
 

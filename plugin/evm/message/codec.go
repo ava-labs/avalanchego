@@ -20,6 +20,7 @@ var Codec codec.Manager
 func init() {
 	Codec = codec.NewManager(maxMessageSize)
 	c := linearcodec.NewDefault()
+
 	errs := wrappers.Errs{}
 	errs.Add(
 		// Gossip types

@@ -489,6 +489,7 @@ func TestTransactionCoding(t *testing.T) {
 		if err := assertEqual(parsedTx, tx); err != nil {
 			t.Fatal(err)
 		}
+
 		// JSON
 		parsedTx, err = encodeDecodeJSON(tx)
 		if err != nil {
@@ -505,7 +506,7 @@ func encodeDecodeJSON(tx *Transaction) (*Transaction, error) {
 	if err != nil {
 		return nil, fmt.Errorf("json encoding failed: %v", err)
 	}
-	parsedTx := &Transaction{}
+	var parsedTx = &Transaction{}
 	if err := json.Unmarshal(data, &parsedTx); err != nil {
 		return nil, fmt.Errorf("json decoding failed: %v", err)
 	}
@@ -517,7 +518,7 @@ func encodeDecodeBinary(tx *Transaction) (*Transaction, error) {
 	if err != nil {
 		return nil, fmt.Errorf("rlp encoding failed: %v", err)
 	}
-	parsedTx := &Transaction{}
+	var parsedTx = &Transaction{}
 	if err := parsedTx.UnmarshalBinary(data); err != nil {
 		return nil, fmt.Errorf("rlp decoding failed: %v", err)
 	}

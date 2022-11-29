@@ -203,7 +203,7 @@ func (abi ABI) UnpackInput(name string, data []byte) ([]interface{}, error) {
 	return args.Unpack(data)
 }
 
-// Unpack unpacks the output according to the ABI specification.
+// Unpack unpacks the output according to the abi specification.
 func (abi ABI) Unpack(name string, data []byte) ([]interface{}, error) {
 	args, err := abi.getArguments(name, data)
 	if err != nil {
@@ -227,9 +227,9 @@ func (abi ABI) UnpackInputIntoInterface(v interface{}, name string, data []byte)
 	return args.Copy(v, unpacked)
 }
 
-// UnpackIntoInterface unpacks the output in v according to the ABI specification.
+// UnpackIntoInterface unpacks the output in v according to the abi specification.
 // It performs an additional copy. Please only use, if you want to unpack into a
-// structure that does not strictly conform to the ABI structure (e.g. has additional arguments)
+// structure that does not strictly conform to the abi structure (e.g. has additional arguments)
 func (abi ABI) UnpackIntoInterface(v interface{}, name string, data []byte) error {
 	args, err := abi.getArguments(name, data)
 	if err != nil {

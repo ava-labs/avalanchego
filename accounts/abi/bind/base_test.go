@@ -123,7 +123,6 @@ func (mc *mockAcceptedCaller) AcceptedCallContract(ctx context.Context, call int
 	mc.acceptedCallContractCalled = true
 	return mc.acceptedCallContractBytes, mc.acceptedCallContractErr
 }
-
 func TestPassingBlockNumber(t *testing.T) {
 	mc := &mockAcceptedCaller{
 		mockCaller: &mockCaller{
@@ -370,7 +369,7 @@ func newMockLog(topics []common.Hash, txHash common.Hash) types.Log {
 }
 
 func TestCall(t *testing.T) {
-	method, methodWithArg := "something", "somethingArrrrg"
+	var method, methodWithArg = "something", "somethingArrrrg"
 	tests := []struct {
 		name, method string
 		opts         *bind.CallOpts

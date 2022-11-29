@@ -46,7 +46,7 @@ import (
 )
 
 func setupGenesisBlock(db ethdb.Database, genesis *Genesis, lastAcceptedHash common.Hash) (*params.ChainConfig, common.Hash, error) {
-	conf, err := SetupGenesisBlock(db, genesis, lastAcceptedHash)
+	conf, err := SetupGenesisBlock(db, genesis, lastAcceptedHash, false)
 	stored := rawdb.ReadCanonicalHash(db, 0)
 	return conf, stored, err
 }
@@ -137,6 +137,7 @@ func TestSetupGenesis(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
+
 				// This should return a compatibility error.
 				return setupGenesisBlock(db, &customg, bc.lastAccepted.Hash())
 			},
@@ -214,7 +215,7 @@ func TestStatefulPrecompilesConfigure(t *testing.T) {
 			genesisBlock := genesis.ToBlock(nil)
 			genesisRoot := genesisBlock.Root()
 
-			_, err := SetupGenesisBlock(db, genesis, genesisBlock.Hash())
+			_, err := SetupGenesisBlock(db, genesis, genesisBlock.Hash(), false)
 			if err != nil {
 				t.Fatal(err)
 			}

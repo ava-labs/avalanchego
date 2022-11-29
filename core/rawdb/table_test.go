@@ -54,7 +54,7 @@ func (r *testReplayer) Delete(key []byte) error {
 func testTableDatabase(t *testing.T, prefix string) {
 	db := NewTable(NewMemoryDatabase(), prefix)
 
-	entries := []struct {
+	var entries = []struct {
 		key   []byte
 		value []byte
 	}{

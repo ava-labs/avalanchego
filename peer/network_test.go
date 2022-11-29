@@ -47,7 +47,7 @@ var (
 func TestNetworkDoesNotConnectToItself(t *testing.T) {
 	selfNodeID := ids.GenerateTestNodeID()
 	n := NewNetwork(nil, nil, selfNodeID, 1)
-	assert.NoError(t, n.Connected(selfNodeID, defaultPeerVersion))
+	assert.NoError(t, n.Connected(context.Background(), selfNodeID, defaultPeerVersion))
 	assert.EqualValues(t, 0, n.Size())
 }
 
@@ -85,12 +85,12 @@ func TestRequestAnyRequestsRoutingAndResponse(t *testing.T) {
 	net.SetRequestHandler(&HelloGreetingRequestHandler{codec: codecManager})
 	client := NewNetworkClient(net)
 	nodeID := ids.GenerateTestNodeID()
-	assert.NoError(t, net.Connected(nodeID, defaultPeerVersion))
+	assert.NoError(t, net.Connected(context.Background(), nodeID, defaultPeerVersion))
 
 	requestMessage := HelloRequest{Message: "this is a request"}
 
 	defer net.Shutdown()
-	assert.NoError(t, net.Connected(nodeID, defaultPeerVersion))
+	assert.NoError(t, net.Connected(context.Background(), nodeID, defaultPeerVersion))
 
 	totalRequests := 5000
 	numCallsPerRequest := 1 // on sending response
@@ -167,7 +167,7 @@ func TestRequestRequestsRoutingAndResponse(t *testing.T) {
 		ids.GenerateTestNodeID(),
 	}
 	for _, nodeID := range nodes {
-		assert.NoError(t, net.Connected(nodeID, defaultPeerVersion))
+		assert.NoError(t, net.Connected(context.Background(), nodeID, defaultPeerVersion))
 	}
 
 	requestMessage := HelloRequest{Message: "this is a request"}
@@ -248,6 +248,7 @@ func TestRequestMinVersion(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NoError(t,
 		net.Connected(
+			context.Background(),
 			nodeID,
 			&version.Application{
 				Major: 1,
@@ -343,7 +344,7 @@ func TestGossip(t *testing.T) {
 	clientNetwork = NewNetwork(sender, codecManager, ids.EmptyNodeID, 1)
 	clientNetwork.SetGossipHandler(gossipHandler)
 
-	assert.NoError(t, clientNetwork.Connected(nodeID, defaultPeerVersion))
+	assert.NoError(t, clientNetwork.Connected(context.Background(), nodeID, defaultPeerVersion))
 
 	client := NewNetworkClient(clientNetwork)
 	defer clientNetwork.Shutdown()
@@ -370,7 +371,7 @@ func TestHandleInvalidMessages(t *testing.T) {
 	clientNetwork.SetGossipHandler(message.NoopMempoolGossipHandler{})
 	clientNetwork.SetRequestHandler(&testRequestHandler{})
 
-	assert.NoError(t, clientNetwork.Connected(nodeID, defaultPeerVersion))
+	assert.NoError(t, clientNetwork.Connected(context.Background(), nodeID, defaultPeerVersion))
 
 	defer clientNetwork.Shutdown()
 
@@ -419,7 +420,7 @@ func TestNetworkPropagatesRequestHandlerError(t *testing.T) {
 	clientNetwork.SetGossipHandler(message.NoopMempoolGossipHandler{})
 	clientNetwork.SetRequestHandler(&testRequestHandler{err: errors.New("fail")}) // Return an error from the request handler
 
-	assert.NoError(t, clientNetwork.Connected(nodeID, defaultPeerVersion))
+	assert.NoError(t, clientNetwork.Connected(context.Background(), nodeID, defaultPeerVersion))
 
 	defer clientNetwork.Shutdown()
 

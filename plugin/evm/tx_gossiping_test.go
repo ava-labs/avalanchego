@@ -87,7 +87,7 @@ func TestMempoolTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 
 	_, vm, _, sender := GenesisVM(t, true, cfgJson, "", "")
 	defer func() {
-		err := vm.Shutdown()
+		err := vm.Shutdown(context.Background())
 		assert.NoError(err)
 	}()
 	vm.txPool.SetGasPrice(common.Big1)
@@ -174,7 +174,7 @@ func TestMempoolTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 
 	_, vm, _, sender := GenesisVM(t, true, cfgJson, "", "")
 	defer func() {
-		err := vm.Shutdown()
+		err := vm.Shutdown(context.Background())
 		assert.NoError(err)
 	}()
 	vm.txPool.SetGasPrice(common.Big1)
@@ -234,7 +234,7 @@ func TestMempoolTxsAppGossipHandling(t *testing.T) {
 
 	_, vm, _, sender := GenesisVM(t, true, cfgJson, "", "")
 	defer func() {
-		err := vm.Shutdown()
+		err := vm.Shutdown(context.Background())
 		assert.NoError(err)
 	}()
 	vm.txPool.SetGasPrice(common.Big1)
@@ -289,7 +289,7 @@ func TestMempoolTxsRegossipSingleAccount(t *testing.T) {
 
 	_, vm, _, _ := GenesisVM(t, true, cfgJson, `{"local-txs-enabled":true}`, "")
 	defer func() {
-		err := vm.Shutdown()
+		err := vm.Shutdown(context.Background())
 		assert.NoError(err)
 	}()
 	vm.txPool.SetGasPrice(common.Big1)
@@ -329,7 +329,7 @@ func TestMempoolTxsRegossip(t *testing.T) {
 
 	_, vm, _, _ := GenesisVM(t, true, cfgJson, `{"local-txs-enabled":true}`, "")
 	defer func() {
-		err := vm.Shutdown()
+		err := vm.Shutdown(context.Background())
 		assert.NoError(err)
 	}()
 	vm.txPool.SetGasPrice(common.Big1)
@@ -392,7 +392,7 @@ func TestMempoolTxsPriorityRegossip(t *testing.T) {
 	cfg := fmt.Sprintf(`{"local-txs-enabled":true,"priority-regossip-addresses":["%s"]}`, addr)
 	_, vm, _, _ := GenesisVM(t, true, cfgJson, cfg, "")
 	defer func() {
-		err := vm.Shutdown()
+		err := vm.Shutdown(context.Background())
 		assert.NoError(err)
 	}()
 	vm.txPool.SetGasPrice(common.Big1)

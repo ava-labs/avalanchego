@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/codec"
-
 	"github.com/ava-labs/avalanchego/ids"
 )
 

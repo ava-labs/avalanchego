@@ -65,7 +65,7 @@ const (
 	// to validate whether they fit into the pool or not.
 	//
 	// Note: the max contract size is 24KB
-	txMaxSize = 32 * 1024 // 32 KB
+	txMaxSize = 4 * txSlotSize // 128KB
 )
 
 var (
@@ -755,6 +755,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	if err := pool.checkTxState(from, tx); err != nil {
 		return err
 	}
+	// Transactor should have enough funds to cover the costs
 
 	// Ensure the transaction has more gas than the basic tx fee.
 	intrGas, err := IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, true, pool.istanbul)

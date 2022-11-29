@@ -536,7 +536,7 @@ func TestDiskSeek(t *testing.T) {
 		pos    byte
 		expkey byte
 	}
-	cases := []testcase{
+	var cases = []testcase{
 		{0xff, 0x55}, // this should exit immediately without checking key
 		{0x01, 0x02},
 		{0xfe, 0xfe},

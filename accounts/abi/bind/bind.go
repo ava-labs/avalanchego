@@ -112,7 +112,6 @@ func Bind(types []string, abis []string, bytecodes []string, fsigs []map[string]
 		// isLib is the map used to flag each encountered library as such
 		isLib = make(map[string]struct{})
 	)
-
 	for i := 0; i < len(types); i++ {
 		// Parse the actual ABI to generate the binding for
 		evmABI, err := abi.JSON(strings.NewReader(abis[i]))
@@ -154,8 +153,9 @@ func Bind(types []string, abis []string, bytecodes []string, fsigs []map[string]
 			// Normalize the method for capital cases and non-anonymous inputs/outputs
 			normalized := original
 			normalizedName := methodNormalizer[lang](alias(aliases, original.Name))
+
 			// Ensure there is no duplicated identifier
-			identifiers := callIdentifiers
+			var identifiers = callIdentifiers
 			if !original.IsConstant() {
 				identifiers = transactIdentifiers
 			}
@@ -163,6 +163,7 @@ func Bind(types []string, abis []string, bytecodes []string, fsigs []map[string]
 				return "", fmt.Errorf("duplicated identifier \"%s\"(normalized \"%s\"), use --alias for renaming", original.Name, normalizedName)
 			}
 			identifiers[normalizedName] = true
+
 			normalized.Name = normalizedName
 			normalized.Inputs = make([]abi.Argument, len(original.Inputs))
 			copy(normalized.Inputs, original.Inputs)
