@@ -3,6 +3,8 @@
 
 package compare
 
+import "golang.org/x/exp/maps"
+
 // TODO use a generic bag here once that's merged.
 // Returns true iff the slices have the same elements,
 // regardless of order.
@@ -16,13 +18,5 @@ func UnsortedEquals[T comparable](a, b []T) bool {
 		aMap[a[i]]++
 		bMap[b[i]]++
 	}
-	if len(aMap) != len(bMap) {
-		return false
-	}
-	for elem, count := range aMap {
-		if bMap[elem] != count {
-			return false
-		}
-	}
-	return true
+	return maps.Equal(aMap, bMap)
 }
