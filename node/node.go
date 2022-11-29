@@ -64,7 +64,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
@@ -269,13 +268,13 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		}
 	}
 
-	bootstrapWeight := n.beacons.Weight()
-	reqWeight := (3*bootstrapWeight + 3) / 4
+	numBeacons := n.beacons.Len()
+	requiredConns := (3*numBeacons + 3) / 4
 
-	if reqWeight > 0 {
+	if requiredConns > 0 {
 		// Set a timer that will fire after a given timeout unless we connect
-		// to a sufficient portion of stake-weighted nodes. If the timeout
-		// fires, the node will shutdown.
+		// to a sufficient portion of nodes. If the timeout fires, the node will
+		// shutdown.
 		timer := timer.NewTimer(func() {
 			// If the timeout fires and we're already shutting down, nothing to do.
 			if !n.shuttingDown.GetValue() {
@@ -290,10 +289,10 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		timer.SetTimeoutIn(n.Config.BootstrapBeaconConnectionTimeout)
 
 		consensusRouter = &beaconManager{
-			Router:         consensusRouter,
-			timer:          timer,
-			beacons:        n.beacons,
-			requiredWeight: reqWeight,
+			Router:        consensusRouter,
+			timer:         timer,
+			beacons:       n.beacons,
+			requiredConns: int64(requiredConns),
 		}
 	}
 
@@ -324,64 +323,6 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	)
 
 	return err
-}
-
-type insecureValidatorManager struct {
-	router.Router
-	vdrs   validators.Set
-	weight uint64
-}
-
-func (i *insecureValidatorManager) Connected(vdrID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
-	if constants.PrimaryNetworkID == subnetID {
-		_ = i.vdrs.Add(vdrID, nil, i.weight)
-	}
-	i.Router.Connected(vdrID, nodeVersion, subnetID)
-}
-
-func (i *insecureValidatorManager) Disconnected(vdrID ids.NodeID) {
-	// Shouldn't error unless the set previously had an error, which should
-	// never happen as described above
-	_ = i.vdrs.RemoveWeight(vdrID, i.weight)
-	i.Router.Disconnected(vdrID)
-}
-
-type beaconManager struct {
-	router.Router
-	timer          *timer.Timer
-	beacons        validators.Set
-	requiredWeight uint64
-	totalWeight    uint64
-}
-
-func (b *beaconManager) Connected(vdrID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
-	if constants.PrimaryNetworkID == subnetID {
-		// TODO: this is always 1, beacons can be reduced to ShortSet?
-		weight := b.beacons.GetWeight(vdrID)
-		weight, err := math.Add64(weight, b.totalWeight)
-		if err != nil {
-			b.timer.Cancel()
-			b.Router.Connected(vdrID, nodeVersion, subnetID)
-			return
-		}
-		b.totalWeight = weight
-		if b.totalWeight >= b.requiredWeight {
-			b.timer.Cancel()
-		}
-	}
-	b.Router.Connected(vdrID, nodeVersion, subnetID)
-}
-
-func (b *beaconManager) Disconnected(vdrID ids.NodeID) {
-	weight := b.beacons.GetWeight(vdrID)
-	// TODO: Account for weight changes in a more robust manner.
-
-	// Sub64 should rarely error since only validators that have added their
-	// weight can become disconnected. Because it is possible that there are
-	// changes to the validators set, we utilize that Sub64 returns 0 on
-	// error.
-	b.totalWeight, _ = math.Sub(b.totalWeight, weight)
-	b.Router.Disconnected(vdrID)
 }
 
 // Dispatch starts the node's servers.
@@ -514,6 +455,8 @@ func (n *Node) initDatabase() error {
 func (n *Node) initBeacons() error {
 	n.beacons = validators.NewSet()
 	for _, peerID := range n.Config.BootstrapIDs {
+		// Note: The beacon connection manager will treat all beaconIDs as
+		//       equal.
 		if err := n.beacons.Add(peerID, nil, 1); err != nil {
 			return err
 		}
