@@ -146,11 +146,11 @@ func TestTimeout(t *testing.T) {
 	var (
 		wg           = sync.WaitGroup{}
 		vdrIDs       = set.Set[ids.NodeID]{}
-		chains       = ids.Set{}
+		chains       = set.Set[ids.ID]{}
 		requestID    uint32
 		failedLock   sync.Mutex
 		failedVDRs   = set.Set[ids.NodeID]{}
-		failedChains = ids.Set{}
+		failedChains = set.Set[ids.ID]{}
 	)
 
 	failed := func(_ context.Context, nodeID ids.NodeID, _ uint32) error {
