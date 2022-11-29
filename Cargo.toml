@@ -12,7 +12,7 @@ once_cell = "1.13.1"
 hex = "0.4.3"
 lru = "0.8.0"
 libaio-futures = "0.2.2"
-nix = "0.25.0"
+nix = "0.26.1"
 typed-builder = "0.11.0"
 tokio = { version = "1.21.1", features = ["rt", "sync", "macros"] }
 shale = "0.1.7"
