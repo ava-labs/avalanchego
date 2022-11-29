@@ -2,6 +2,7 @@ github.com/ava-labs/avalanchego/api/server=Server=api/server/mock_server.go
 github.com/ava-labs/avalanchego/chains/atomic=SharedMemory=chains/atomic/mock_shared_memory.go
 github.com/ava-labs/avalanchego/database=Batch=database/mock_batch.go
 github.com/ava-labs/avalanchego/message=OutboundMessage=message/mock_message.go
+github.com/ava-labs/avalanchego/message=OutboundMsgBuilder=message/mock_outbound_message_builder.go
 github.com/ava-labs/avalanchego/network/peer=GossipTracker=network/peer/mock_gossip_tracker.go
 github.com/ava-labs/avalanchego/snow/consensus/snowman=Block=snow/consensus/snowman/mock_block.go
 github.com/ava-labs/avalanchego/snow/engine/avalanche=Engine=snow/engine/avalanche/mock_engine.go
@@ -10,6 +11,9 @@ github.com/ava-labs/avalanchego/snow/engine/common=Sender=snow/engine/common/moc
 github.com/ava-labs/avalanchego/snow/engine/snowman=Engine=snow/engine/snowman/mock_engine.go
 github.com/ava-labs/avalanchego/snow/engine/snowman/block=ChainVM=snow/engine/snowman/block/mocks/chain_vm.go
 github.com/ava-labs/avalanchego/snow/engine/snowman/block=StateSyncableVM=snow/engine/snowman/block/mocks/state_syncable_vm.go
+github.com/ava-labs/avalanchego/snow/networking/timeout=Manager=snow/networking/timeout/mock_manager.go
+github.com/ava-labs/avalanchego/snow/networking/router=Router=snow/networking/router/mock_router.go
+github.com/ava-labs/avalanchego/snow/networking/sender=ExternalSender=snow/networking/sender/mock_external_sender.go
 github.com/ava-labs/avalanchego/snow/networking/tracker=Targeter=snow/networking/tracker/mock_targeter.go
 github.com/ava-labs/avalanchego/snow/networking/tracker=Tracker=snow/networking/tracker/mock_resource_tracker.go
 github.com/ava-labs/avalanchego/snow/uptime=Calculator=snow/uptime/mock_calculator.go
