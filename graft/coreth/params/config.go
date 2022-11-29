@@ -74,7 +74,7 @@ var (
 		ApricotPhase6BlockTimestamp:     big.NewInt(time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC).Unix()),
 		ApricotPhasePost6BlockTimestamp: big.NewInt(time.Date(2022, time.September, 7, 3, 0, 0, 0, time.UTC).Unix()),
 		BanffBlockTimestamp:             big.NewInt(time.Date(2022, time.October, 18, 16, 0, 0, 0, time.UTC).Unix()),
-		// TODO Add Banff and Cortina timestamps
+		// TODO Add Cortina timestamp
 	}
 
 	// AvalancheFujiChainConfig is the configuration for the Fuji Test Network
