@@ -86,6 +86,11 @@ type Peer interface {
 	// guaranteed not to be delivered to the peer.
 	Send(ctx context.Context, msg message.OutboundMessage) bool
 
+	// StartSendPeerList attempts to send a PeerList message to this peer on
+	// this peer's gossip routine. It is not guaranteed that a PeerList will be
+	// sent.
+	StartSendPeerList()
+
 	// StartClose will begin shutting down the peer. It will not block.
 	StartClose()
 
@@ -157,6 +162,10 @@ type peer struct {
 	// Unix time of the last message sent and received respectively
 	// Must only be accessed atomically
 	lastSent, lastReceived int64
+
+	// peerListChan signals that we should attempt to send a PeerList to this
+	// peer
+	peerListChan chan struct{}
 }
 
 // Start a new peer instance.
@@ -182,11 +191,17 @@ func Start(
 		onClosingCtx:       onClosingCtx,
 		onClosingCtxCancel: onClosingCtxCancel,
 		onClosed:           make(chan struct{}),
+		peerListChan:       make(chan struct{}, 1),
 	}
+
+	// We add the peer to our gossip tracker before the handshake starts because
+	// a PeerList message (which depends on the gossip tracker's info) is sent
+	// as part of the handshake.
+	p.GossipTracker.StartTrackingPeer(id)
 
 	go p.readMessages()
 	go p.writeMessages()
-	go p.sendPings()
+	go p.sendNetworkMessages()
 
 	return p
 }
@@ -268,6 +283,13 @@ func (p *peer) Send(ctx context.Context, msg message.OutboundMessage) bool {
 	return p.messageQueue.Push(ctx, msg)
 }
 
+func (p *peer) StartSendPeerList() {
+	select {
+	case p.peerListChan <- struct{}{}:
+	default:
+	}
+}
+
 func (p *peer) StartClose() {
 	p.startClosingOnce.Do(func() {
 		if err := p.conn.Close(); err != nil {
@@ -306,6 +328,8 @@ func (p *peer) close() {
 	if atomic.AddInt64(&p.numExecuting, -1) != 0 {
 		return
 	}
+
+	p.GossipTracker.StopTrackingPeer(p.id)
 
 	p.Network.Disconnected(p.id)
 	close(p.onClosed)
@@ -530,7 +554,7 @@ func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 	p.Metrics.Sent(msg)
 }
 
-func (p *peer) sendPings() {
+func (p *peer) sendNetworkMessages() {
 	sendPingsTicker := time.NewTicker(p.PingFrequency)
 	defer func() {
 		sendPingsTicker.Stop()
@@ -541,6 +565,43 @@ func (p *peer) sendPings() {
 
 	for {
 		select {
+		case <-p.peerListChan:
+			_, peerIPs, err := p.Config.Network.Peers(p.id)
+			if err != nil {
+				p.Log.Error("failed to get peers to gossip",
+					zap.Stringer("nodeID", p.id),
+					zap.Error(err),
+				)
+				return
+			}
+
+			if len(peerIPs) == 0 {
+				p.Config.Log.Debug(
+					"skipping peer gossip as there are no unknown peers",
+					zap.Stringer("nodeID", p.id),
+				)
+				continue
+			}
+
+			// Bypass throttling is disabled here to follow the non-handshake
+			// message sending pattern.
+			msg, err := p.Config.MessageCreator.PeerList(peerIPs, false /*=bypassThrottling*/)
+			if err != nil {
+				p.Log.Error("failed to create peer list message",
+					zap.Stringer("nodeID", p.id),
+					zap.Error(err),
+				)
+				continue
+			}
+
+			if !p.Send(p.onClosingCtx, msg) {
+				p.Log.Debug("failed to send peer list",
+					zap.Stringer("nodeID", p.id),
+				)
+				continue
+			}
+
+			// TODO track outgoing peer lists
 		case <-sendPingsTicker.C:
 			if !p.Network.AllowConnection(p.id) {
 				p.Log.Debug("disconnecting from peer",
@@ -774,15 +835,35 @@ func (p *peer) handleVersion(msg *p2ppb.Version) {
 
 	p.gotVersion.SetValue(true)
 
-	peerlistMsg, err := p.Network.Peers()
+	_, peerIPs, err := p.Network.Peers(p.id)
 	if err != nil {
-		p.Log.Error("failed to create message",
+		p.Log.Error("failed to get peers to gossip for handshake",
+			zap.Stringer("nodeID", p.id),
+			zap.Error(err),
+		)
+		return
+	}
+
+	// We bypass throttling here to ensure that the version message is
+	// acknowledged timely.
+	peerListMsg, err := p.Config.MessageCreator.PeerList(peerIPs, true /*=bypassThrottling*/)
+	if err != nil {
+		p.Log.Error("failed to create peer list handshake message",
+			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", message.PeerListOp),
 			zap.Error(err),
 		)
 		return
 	}
-	p.Send(p.onClosingCtx, peerlistMsg)
+
+	if !p.Send(p.onClosingCtx, peerListMsg) {
+		p.Log.Error("failed to send peer list for handshake",
+			zap.Stringer("nodeID", p.id),
+		)
+		return
+	}
+
+	// TODO track outgoing peer lists
 }
 
 func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
@@ -795,6 +876,9 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 		p.finishedHandshake.SetValue(true)
 		close(p.onFinishHandshake)
 	}
+
+	// the peers this peer told us about
+	discoveredPeers := make([]ids.NodeID, len(msg.ClaimedIpPorts))
 
 	for _, claimedIPPort := range msg.ClaimedIpPorts {
 		tlsCert, err := x509.ParseCertificate(claimedIPPort.X509Certificate)
@@ -830,9 +914,23 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 			Timestamp: claimedIPPort.Timestamp,
 			Signature: claimedIPPort.Signature,
 		}
+
+		// it's important to add this to our list of discovered peers regardless
+		// of whether we end up tracking it or not to avoid a situation where
+		// we are re-gossiping peers we are already connected to back to the
+		// node to told us about them.
+		discoveredPeers = append(discoveredPeers, ids.NodeIDFromCert(ip.Cert))
+
 		if !p.Network.Track(ip) {
 			p.Metrics.NumUselessPeerListBytes.Add(float64(ip.BytesLen()))
 		}
+	}
+
+	// a peer must have known about a set of peers if it gossiped them to us
+	if !p.GossipTracker.AddKnown(p.id, discoveredPeers) {
+		p.Log.Error("failed to update known peers",
+			zap.Stringer("nodeID", p.id),
+		)
 	}
 }
 

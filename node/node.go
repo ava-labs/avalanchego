@@ -296,6 +296,18 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		}
 	}
 
+	// initialize gossip tracker
+	gossipTracker, err := peer.NewGossipTracker(n.MetricsRegisterer, n.networkNamespace)
+	if err != nil {
+		return err
+	}
+
+	// keep gossip tracker synchronized with the validator set
+	primaryNetVdrs.RegisterCallbackListener(&peer.GossipTrackerCallback{
+		Log:           n.Log,
+		GossipTracker: gossipTracker,
+	})
+
 	// add node configs to network config
 	n.Config.NetworkConfig.Namespace = n.networkNamespace
 	n.Config.NetworkConfig.MyNodeID = n.ID
@@ -311,6 +323,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	n.Config.NetworkConfig.ResourceTracker = n.resourceTracker
 	n.Config.NetworkConfig.CPUTargeter = n.cpuTargeter
 	n.Config.NetworkConfig.DiskTargeter = n.diskTargeter
+	n.Config.NetworkConfig.GossipTracker = gossipTracker
 
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,

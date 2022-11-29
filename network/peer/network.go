@@ -37,9 +37,8 @@ type Network interface {
 	// during the handshake.
 	Version() (message.OutboundMessage, error)
 
-	// Peers provides the peer with the PeerList message to send to the peer
-	// during the handshake.
-	Peers() (message.OutboundMessage, error)
+	// Peers returns peers that [peerID] might not know about.
+	Peers(peerID ids.NodeID) ([]ids.NodeID, []ips.ClaimedIPPort, error)
 
 	// Pong provides the peer with a Pong message to send to the peer in
 	// response to a Ping message.
