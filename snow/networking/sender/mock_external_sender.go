@@ -8,60 +8,60 @@
 package sender
 
 import (
-	reflect "reflect"
-
-	ids "github.com/ava-labs/avalanchego/ids"
-	message "github.com/ava-labs/avalanchego/message"
-	gomock "github.com/golang/mock/gomock"
+        ids "github.com/ava-labs/avalanchego/ids"
+        message "github.com/ava-labs/avalanchego/message"
+        set "github.com/ava-labs/avalanchego/utils/set"
+        gomock "github.com/golang/mock/gomock"
+        reflect "reflect"
 )
 
 // MockExternalSender is a mock of ExternalSender interface.
 type MockExternalSender struct {
-	ctrl     *gomock.Controller
-	recorder *MockExternalSenderMockRecorder
+        ctrl     *gomock.Controller
+        recorder *MockExternalSenderMockRecorder
 }
 
 // MockExternalSenderMockRecorder is the mock recorder for MockExternalSender.
 type MockExternalSenderMockRecorder struct {
-	mock *MockExternalSender
+        mock *MockExternalSender
 }
 
 // NewMockExternalSender creates a new mock instance.
 func NewMockExternalSender(ctrl *gomock.Controller) *MockExternalSender {
-	mock := &MockExternalSender{ctrl: ctrl}
-	mock.recorder = &MockExternalSenderMockRecorder{mock}
-	return mock
+        mock := &MockExternalSender{ctrl: ctrl}
+        mock.recorder = &MockExternalSenderMockRecorder{mock}
+        return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockExternalSender) EXPECT() *MockExternalSenderMockRecorder {
-	return m.recorder
+        return m.recorder
 }
 
 // Gossip mocks base method.
-func (m *MockExternalSender) Gossip(arg0 message.OutboundMessage, arg1 ids.ID, arg2 bool, arg3, arg4, arg5 int) ids.NodeIDSet {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Gossip", arg0, arg1, arg2, arg3, arg4, arg5)
-	ret0, _ := ret[0].(ids.NodeIDSet)
-	return ret0
+func (m *MockExternalSender) Gossip(arg0 message.OutboundMessage, arg1 ids.ID, arg2 bool, arg3, arg4, arg5 int) set.Set[ids.NodeID] {
+        m.ctrl.T.Helper()
+        ret := m.ctrl.Call(m, "Gossip", arg0, arg1, arg2, arg3, arg4, arg5)
+        ret0, _ := ret[0].(set.Set[ids.NodeID])
+        return ret0
 }
 
 // Gossip indicates an expected call of Gossip.
 func (mr *MockExternalSenderMockRecorder) Gossip(arg0, arg1, arg2, arg3, arg4, arg5 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Gossip", reflect.TypeOf((*MockExternalSender)(nil).Gossip), arg0, arg1, arg2, arg3, arg4, arg5)
+        mr.mock.ctrl.T.Helper()
+        return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Gossip", reflect.TypeOf((*MockExternalSender)(nil).Gossip), arg0, arg1, arg2, arg3, arg4, arg5)
 }
 
 // Send mocks base method.
-func (m *MockExternalSender) Send(arg0 message.OutboundMessage, arg1 ids.NodeIDSet, arg2 ids.ID, arg3 bool) ids.NodeIDSet {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Send", arg0, arg1, arg2, arg3)
-	ret0, _ := ret[0].(ids.NodeIDSet)
-	return ret0
+func (m *MockExternalSender) Send(arg0 message.OutboundMessage, arg1 set.Set[ids.NodeID], arg2 ids.ID, arg3 bool) set.Set[ids.NodeID] {
+        m.ctrl.T.Helper()
+        ret := m.ctrl.Call(m, "Send", arg0, arg1, arg2, arg3)
+        ret0, _ := ret[0].(set.Set[ids.NodeID])
+        return ret0
 }
 
 // Send indicates an expected call of Send.
 func (mr *MockExternalSenderMockRecorder) Send(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Send", reflect.TypeOf((*MockExternalSender)(nil).Send), arg0, arg1, arg2, arg3)
+        mr.mock.ctrl.T.Helper()
+        return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Send", reflect.TypeOf((*MockExternalSender)(nil).Send), arg0, arg1, arg2, arg3)
 }
