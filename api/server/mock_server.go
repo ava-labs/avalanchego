@@ -10,12 +10,8 @@ package server
 import (
 	reflect "reflect"
 	sync "sync"
-	time "time"
 
-	ids "github.com/ava-labs/avalanchego/ids"
 	common "github.com/ava-labs/avalanchego/snow/engine/common"
-	trace "github.com/ava-labs/avalanchego/trace"
-	logging "github.com/ava-labs/avalanchego/utils/logging"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -134,23 +130,6 @@ func (m *MockServer) DispatchTLS(arg0, arg1 []byte) error {
 func (mr *MockServerMockRecorder) DispatchTLS(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DispatchTLS", reflect.TypeOf((*MockServer)(nil).DispatchTLS), arg0, arg1)
-}
-
-// Initialize mocks base method.
-func (m *MockServer) Initialize(arg0 logging.Logger, arg1 logging.Factory, arg2 string, arg3 uint16, arg4 []string, arg5 time.Duration, arg6 ids.NodeID, arg7 bool, arg8 trace.Tracer, arg9 ...Wrapper) {
-	m.ctrl.T.Helper()
-	varargs := []interface{}{arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8}
-	for _, a := range arg9 {
-		varargs = append(varargs, a)
-	}
-	m.ctrl.Call(m, "Initialize", varargs...)
-}
-
-// Initialize indicates an expected call of Initialize.
-func (mr *MockServerMockRecorder) Initialize(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8 interface{}, arg9 ...interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8}, arg9...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*MockServer)(nil).Initialize), varargs...)
 }
 
 // RegisterChain mocks base method.

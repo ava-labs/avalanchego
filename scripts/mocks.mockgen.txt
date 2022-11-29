@@ -6,7 +6,6 @@ github.com/ava-labs/avalanchego/network/peer=GossipTracker=network/peer/mock_gos
 github.com/ava-labs/avalanchego/snow/consensus/snowman=Block=snow/consensus/snowman/mock_block.go
 github.com/ava-labs/avalanchego/snow/engine/avalanche=Engine=snow/engine/avalanche/mock_engine.go
 github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex=DAGVM=snow/engine/avalanche/vertex/mock_vm.go
-github.com/ava-labs/avalanchego/snow/engine/common=Sender=snow/engine/common/mock_sender.go
 github.com/ava-labs/avalanchego/snow/engine/snowman=Engine=snow/engine/snowman/mock_engine.go
 github.com/ava-labs/avalanchego/snow/engine/snowman/block=ChainVM=snow/engine/snowman/block/mocks/chain_vm.go
 github.com/ava-labs/avalanchego/snow/engine/snowman/block=StateSyncableVM=snow/engine/snowman/block/mocks/state_syncable_vm.go
@@ -30,7 +29,6 @@ github.com/ava-labs/avalanchego/vms/platformvm/state=State=vms/platformvm/state/
 github.com/ava-labs/avalanchego/vms/platformvm/state=Versions=vms/platformvm/state/mock_versions.go
 github.com/ava-labs/avalanchego/vms/platformvm/txs/builder=Builder=vms/platformvm/txs/builder/mock_builder.go
 github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool=Mempool=vms/platformvm/txs/mempool/mock_mempool.go
-github.com/ava-labs/avalanchego/vms/platformvm/txs=UnsignedTx=vms/platformvm/txs/mock_unsigned_tx.go
 github.com/ava-labs/avalanchego/vms/platformvm/utxo=Verifier=vms/platformvm/utxo/mock_verifier.go
 github.com/ava-labs/avalanchego/vms/proposervm/state=State=vms/proposervm/state/mock_state.go
 github.com/ava-labs/avalanchego/vms/proposervm/tree=Tree=vms/proposervm/tree/mock_tree.go
