@@ -81,7 +81,7 @@ type StateDB interface {
 	RevertToSnapshot(int)
 	Snapshot() int
 
-	AddLog(*types.Log)
+	AddLog(addr common.Address, topics []common.Hash, data []byte, blockNumber uint64)
 	AddPreimage(common.Hash, []byte)
 
 	ForEachStorage(common.Address, func(common.Hash, common.Hash) bool) error

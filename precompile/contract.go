@@ -58,6 +58,8 @@ type StateDB interface {
 	CreateAccount(common.Address)
 	Exist(common.Address) bool
 
+	AddLog(addr common.Address, topics []common.Hash, data []byte, blockNumber uint64)
+
 	Suicide(common.Address) bool
 	Finalise(deleteEmptyObjects bool)
 }

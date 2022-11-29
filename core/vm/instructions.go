@@ -29,7 +29,6 @@ package vm
 import (
 	"sync/atomic"
 
-	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
@@ -859,14 +858,12 @@ func makeLog(size int) executionFunc {
 		}
 
 		d := scope.Memory.GetCopy(int64(mStart.Uint64()), int64(mSize.Uint64()))
-		interpreter.evm.StateDB.AddLog(&types.Log{
-			Address: scope.Contract.Address(),
-			Topics:  topics,
-			Data:    d,
-			// This is a non-consensus field, but assigned here because
-			// core/state doesn't know the current block number.
-			BlockNumber: interpreter.evm.Context.BlockNumber.Uint64(),
-		})
+		interpreter.evm.StateDB.AddLog(
+			scope.Contract.Address(),
+			topics,
+			d,
+			interpreter.evm.Context.BlockNumber.Uint64(),
+		)
 
 		return nil, nil
 	}
