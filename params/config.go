@@ -32,6 +32,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/precompile"
 	"github.com/ava-labs/subnet-evm/utils"
@@ -88,8 +89,45 @@ var (
 		},
 	}
 
-	TestChainConfig        = &ChainConfig{AvalancheContext{common.Hash{1}}, big.NewInt(1), DefaultFeeConfig, false, big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), NetworkUpgrades{big.NewInt(0)}, PrecompileUpgrade{}, UpgradeConfig{}}
-	TestPreSubnetEVMConfig = &ChainConfig{AvalancheContext{common.Hash{1}}, big.NewInt(1), DefaultFeeConfig, false, big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), NetworkUpgrades{}, PrecompileUpgrade{}, UpgradeConfig{}}
+	TestChainConfig = &ChainConfig{
+		AvalancheContext:    AvalancheContext{snow.DefaultContextTest()},
+		ChainID:             big.NewInt(1),
+		FeeConfig:           DefaultFeeConfig,
+		AllowFeeRecipients:  false,
+		HomesteadBlock:      big.NewInt(0),
+		EIP150Block:         big.NewInt(0),
+		EIP150Hash:          common.Hash{},
+		EIP155Block:         big.NewInt(0),
+		EIP158Block:         big.NewInt(0),
+		ByzantiumBlock:      big.NewInt(0),
+		ConstantinopleBlock: big.NewInt(0),
+		PetersburgBlock:     big.NewInt(0),
+		IstanbulBlock:       big.NewInt(0),
+		MuirGlacierBlock:    big.NewInt(0),
+		NetworkUpgrades:     NetworkUpgrades{big.NewInt(0)},
+		PrecompileUpgrade:   PrecompileUpgrade{},
+		UpgradeConfig:       UpgradeConfig{},
+	}
+
+	TestPreSubnetEVMConfig = &ChainConfig{
+		AvalancheContext:    AvalancheContext{snow.DefaultContextTest()},
+		ChainID:             big.NewInt(1),
+		FeeConfig:           DefaultFeeConfig,
+		AllowFeeRecipients:  false,
+		HomesteadBlock:      big.NewInt(0),
+		EIP150Block:         big.NewInt(0),
+		EIP150Hash:          common.Hash{},
+		EIP155Block:         big.NewInt(0),
+		EIP158Block:         big.NewInt(0),
+		ByzantiumBlock:      big.NewInt(0),
+		ConstantinopleBlock: big.NewInt(0),
+		PetersburgBlock:     big.NewInt(0),
+		IstanbulBlock:       big.NewInt(0),
+		MuirGlacierBlock:    big.NewInt(0),
+		NetworkUpgrades:     NetworkUpgrades{},
+		PrecompileUpgrade:   PrecompileUpgrade{},
+		UpgradeConfig:       UpgradeConfig{},
+	}
 )
 
 // ChainConfig is the core config which determines the blockchain settings.
@@ -139,7 +177,7 @@ type UpgradeConfig struct {
 
 // AvalancheContext provides Avalanche specific context directly into the EVM.
 type AvalancheContext struct {
-	BlockchainID common.Hash
+	SnowCtx *snow.Context
 }
 
 // String implements the fmt.Stringer interface.

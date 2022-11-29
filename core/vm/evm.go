@@ -32,6 +32,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile"
@@ -198,6 +199,11 @@ func (evm *EVM) Cancel() {
 // Cancelled returns true if Cancel has been called
 func (evm *EVM) Cancelled() bool {
 	return atomic.LoadInt32(&evm.abort) == 1
+}
+
+// GetSnowContext returns the evm's snow.Context.
+func (evm *EVM) GetSnowContext() *snow.Context {
+	return evm.chainConfig.SnowCtx
 }
 
 // GetStateDB returns the evm's StateDB

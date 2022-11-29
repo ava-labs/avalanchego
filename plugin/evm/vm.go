@@ -293,7 +293,7 @@ func (vm *VM) Initialize(
 	}
 	// Set the Avalanche Context on the ChainConfig
 	g.Config.AvalancheContext = params.AvalancheContext{
-		BlockchainID: common.Hash(chainCtx.ChainID),
+		SnowCtx: chainCtx,
 	}
 	vm.syntacticBlockValidator = NewBlockValidator()
 

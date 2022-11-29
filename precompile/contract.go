@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -21,6 +22,7 @@ type RunStatefulPrecompileFunc func(accessibleState PrecompileAccessibleState, c
 type PrecompileAccessibleState interface {
 	GetStateDB() StateDB
 	GetBlockContext() BlockContext
+	GetSnowContext() *snow.Context
 }
 
 // BlockContext defines an interface that provides information to a stateful precompile
