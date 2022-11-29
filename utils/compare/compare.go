@@ -12,11 +12,9 @@ func UnsortedEquals[T comparable](a, b []T) bool {
 	}
 	aMap := make(map[T]int, len(a))
 	bMap := make(map[T]int, len(b))
-	for _, elem := range a {
-		aMap[elem]++
-	}
-	for _, elem := range b {
-		bMap[elem]++
+	for i := 0; i < len(a); i++ {
+		aMap[a[i]]++
+		bMap[b[i]]++
 	}
 	if len(aMap) != len(bMap) {
 		return false
