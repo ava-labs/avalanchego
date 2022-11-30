@@ -181,7 +181,7 @@ func (s *Set[_]) MarshalJSON() ([]byte, error) {
 	// Sort for determinism
 	asStrs := make([]string, len(elts))
 	for i, elt := range elts {
-		asStrs[i] = fmt.Sprintf("%v", elt)
+		asStrs[i] = elt.String()
 	}
 	sort.Strings(asStrs)
 
