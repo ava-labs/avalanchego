@@ -369,6 +369,16 @@ func (vm *VM) Initialize(
 	vm.db = versiondb.New(baseDB)
 	vm.acceptedBlockDB = prefixdb.New(acceptedPrefix, vm.db)
 	vm.metadataDB = prefixdb.New(metadataPrefix, vm.db)
+
+	if vm.config.InspectDatabase {
+		start := time.Now()
+		log.Info("Starting database inspection")
+		if err := rawdb.InspectDatabase(vm.chaindb, nil, nil); err != nil {
+			return err
+		}
+		log.Info("Completed database inspection", "elapsed", time.Since(start))
+	}
+
 	g := new(core.Genesis)
 	if err := json.Unmarshal(genesisBytes, g); err != nil {
 		return err

@@ -154,6 +154,9 @@ type Config struct {
 	StateSyncCommitInterval  uint64 `json:"state-sync-commit-interval"`
 	StateSyncMinBlocks       uint64 `json:"state-sync-min-blocks"`
 
+	// Database Settings
+	InspectDatabase bool `json:"inspect-database"` // Inspects the database on startup if enabled.
+
 	// SkipUpgradeCheck disables checking that upgrades must take place before the last
 	// accepted block. Skipping this check is useful when a node operator does not update
 	// their node before the network upgrade and their node accepts blocks that have
