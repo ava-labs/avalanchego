@@ -1877,6 +1877,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		nil,
 		time.Hour,
 		cpuTracker,
+		vm,
 	)
 	require.NoError(err)
 

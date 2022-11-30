@@ -31,7 +31,7 @@ func TestMessageQueue(t *testing.T) {
 
 	// Assert that the messages are popped in the same order they were pushed
 	for i := 0; i < numToSend; i++ {
-		m, err := mc.Pong(uint8(i))
+		m, err := mc.Pong(uint32(i))
 		require.NoError(err)
 		msgs = append(msgs, m)
 	}

@@ -12,6 +12,7 @@ github.com/ava-labs/avalanchego/snow/engine/snowman=Engine=snow/engine/snowman/m
 github.com/ava-labs/avalanchego/snow/engine/snowman/block=ChainVM=snow/engine/snowman/block/mocks/chain_vm.go
 github.com/ava-labs/avalanchego/snow/engine/snowman/block=BuildBlockWithContextChainVM=snow/engine/snowman/block/mocks/build_block_with_context_vm.go
 github.com/ava-labs/avalanchego/snow/engine/snowman/block=StateSyncableVM=snow/engine/snowman/block/mocks/state_syncable_vm.go
+github.com/ava-labs/avalanchego/snow/networking/handler=Handler=snow/networking/handler/mock_handler.go
 github.com/ava-labs/avalanchego/snow/networking/timeout=Manager=snow/networking/timeout/mock_manager.go
 github.com/ava-labs/avalanchego/snow/networking/router=Router=snow/networking/router/mock_router.go
 github.com/ava-labs/avalanchego/snow/networking/sender=ExternalSender=snow/networking/sender/mock_external_sender.go
@@ -19,6 +20,7 @@ github.com/ava-labs/avalanchego/snow/networking/tracker=Targeter=snow/networking
 github.com/ava-labs/avalanchego/snow/networking/tracker=Tracker=snow/networking/tracker/mock_resource_tracker.go
 github.com/ava-labs/avalanchego/snow/uptime=Calculator=snow/uptime/mock_calculator.go
 github.com/ava-labs/avalanchego/snow/validators=State=snow/validators/mock_state.go
+github.com/ava-labs/avalanchego/snow/validators=SubnetConnector=snow/validators/mock_subnet_connector.go
 github.com/ava-labs/avalanchego/utils/filesystem=Reader=utils/filesystem/mock_io.go
 github.com/ava-labs/avalanchego/utils/hashing=Hasher=utils/hashing/mock_hasher.go
 github.com/ava-labs/avalanchego/utils/logging=Logger=utils/logging/mock_logger.go

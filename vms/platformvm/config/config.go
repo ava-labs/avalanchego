@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -28,9 +27,6 @@ type Config struct {
 	// Invariant: The primary network's validator set should be empty before
 	//            calling VM.Initialize.
 	Validators validators.Manager
-
-	// Provides access to subnet tracking
-	SubnetTracker common.SubnetTracker
 
 	// Provides access to the uptime manager as a thread safe data structure
 	UptimeLockedCalculator uptime.LockedCalculator

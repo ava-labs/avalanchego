@@ -42,14 +42,19 @@ type requestEntry struct {
 }
 
 type peer struct {
-	version        *version.Application
+	version *version.Application
+	// The subnets that this peer is currently tracking (i.e whitelisted)
 	trackedSubnets ids.Set
+	// The subnets that this peer actually has a connection to.
+	// This is a subset of trackedSubnets.
+	connectedSubnets ids.Set
 }
 
 // ChainRouter routes incoming messages from the validator network
 // to the consensus engines that the messages are intended for.
 // Note that consensus engines are uniquely identified by the ID of the chain
 // that they are working on.
+// Invariant: P-chain must be registered before processing any messages
 type ChainRouter struct {
 	clock  mockable.Clock
 	log    logging.Logger
@@ -62,6 +67,7 @@ type ChainRouter struct {
 	timeoutManager timeout.Manager
 
 	closeTimeout time.Duration
+	myNodeID     ids.NodeID
 	peers        map[ids.NodeID]*peer
 	// node ID --> chains that node is benched on
 	// invariant: if a node is benched on any chain, it is treated as disconnected on all chains
@@ -104,6 +110,7 @@ func (cr *ChainRouter) Initialize(
 	cr.healthConfig = healthConfig
 
 	// Mark myself as connected
+	cr.myNodeID = nodeID
 	myself := &peer{
 		version: version.CurrentApp,
 	}
@@ -349,6 +356,25 @@ func (cr *ChainRouter) AddChain(ctx context.Context, chain handler.Handler) {
 			chain.Push(ctx, msg)
 		}
 	}
+
+	// When we register the P-chain, we mark ourselves as connected on all of
+	// the subnets that we have whitelisted.
+	if chainID != constants.PlatformChainID {
+		return
+	}
+
+	// If we have currently benched ourselves, we will mark ourselves as
+	// connected when we unbench. So skip connecting now.
+	// This is not "theoretically" possible, but keeping this here prevents us
+	// from keeping an invariant that we never bench ourselves.
+	if _, benched := cr.benched[cr.myNodeID]; benched {
+		return
+	}
+
+	myself := cr.peers[cr.myNodeID]
+	for subnetID := range myself.trackedSubnets {
+		cr.connectedSubnet(myself, cr.myNodeID, subnetID)
+	}
 }
 
 // Connected routes an incoming notification that a validator was just connected
@@ -379,6 +405,8 @@ func (cr *ChainRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Applica
 			chain.Push(context.TODO(), msg)
 		}
 	}
+
+	cr.connectedSubnet(connectedPeer, nodeID, subnetID)
 }
 
 // Disconnected routes an incoming notification that a validator was connected
@@ -417,6 +445,8 @@ func (cr *ChainRouter) Benched(chainID ids.ID, nodeID ids.NodeID) {
 		return
 	}
 
+	// This will disconnect the node from all subnets when issued to P-chain.
+	// Even if there is no chain in the subnet.
 	msg := message.InternalDisconnected(nodeID)
 
 	for _, chain := range cr.chains {
@@ -424,6 +454,8 @@ func (cr *ChainRouter) Benched(chainID ids.ID, nodeID ids.NodeID) {
 			chain.Push(context.TODO(), msg)
 		}
 	}
+
+	peer.connectedSubnets.Clear()
 }
 
 // Unbenched routes an incoming notification that a validator was just unbenched
@@ -451,6 +483,13 @@ func (cr *ChainRouter) Unbenched(chainID ids.ID, nodeID ids.NodeID) {
 		if peer.trackedSubnets.Contains(chain.Context().SubnetID) {
 			chain.Push(context.TODO(), msg)
 		}
+	}
+
+	// This will unbench the node from all its subnets.
+	// We handle this case separately because the node may have been benched on
+	// a subnet that has no chains.
+	for subnetID := range peer.trackedSubnets {
+		cr.connectedSubnet(peer, nodeID, subnetID)
 	}
 }
 
@@ -548,4 +587,41 @@ func (cr *ChainRouter) clearRequest(
 	cr.timedRequests.Delete(uniqueRequestID)
 	cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
 	return uniqueRequestID, &request
+}
+
+// connectedSubnet pushes an InternalSubnetConnected message with [nodeID] and
+// [subnetID] to the P-chain. This should be called when a node is either first
+// connecting to [subnetID] or when a node that was already connected is
+// unbenched on [subnetID]. This is a noop if [subnetID] is the Primary Network
+// or if the peer is already marked as connected to the subnet.
+// Invariant: should be called after *message.Connected is pushed to the P-chain
+// Invariant: should be called after the P-chain was provided in [AddChain]
+func (cr *ChainRouter) connectedSubnet(peer *peer, nodeID ids.NodeID, subnetID ids.ID) {
+	// if connected to primary network, we can skip this
+	// because Connected has its own internal message
+	if subnetID == constants.PrimaryNetworkID {
+		return
+	}
+
+	// peer already connected to this subnet
+	if peer.connectedSubnets.Contains(subnetID) {
+		return
+	}
+
+	msg := message.InternalConnectedSubnet(nodeID, subnetID)
+	// We only push this message to the P-chain because it is the only chain
+	// that cares about the connectivity of all subnets. Others chains learn
+	// about the connectivity of their own subnet when they receive a
+	// *message.Connected.
+	platformChain, ok := cr.chains[constants.PlatformChainID]
+	if !ok {
+		cr.log.Error("trying to issue InternalConnectedSubnet message, but platform chain is not registered",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("subnetID", subnetID),
+		)
+		return
+	}
+	platformChain.Push(context.TODO(), msg)
+
+	peer.connectedSubnets.Add(subnetID)
 }

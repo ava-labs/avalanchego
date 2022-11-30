@@ -681,6 +681,7 @@ func (m *manager) createAvalancheChain(
 		sb.afterBootstrapped(),
 		m.ConsensusGossipFrequency,
 		m.ResourceTracker,
+		validators.UnhandledSubnetConnector, // avalanche chains don't use subnet connector
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing network handler: %w", err)
@@ -843,8 +844,13 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("problem initializing event dispatcher: %w", err)
 	}
 
-	// first vm to be init is P-Chain once, which provides validator interface to all ProposerVMs
-	var bootstrapFunc func()
+	var (
+		bootstrapFunc   func()
+		subnetConnector = validators.UnhandledSubnetConnector
+	)
+	// If [m.validatorState] is nil then we are creating the P-Chain. Since the
+	// P-Chain is the first chain to be created, we can use it to initialize
+	// required interfaces for the other chains
 	if m.validatorState == nil {
 		valState, ok := vm.(validators.State)
 		if !ok {
@@ -877,6 +883,12 @@ func (m *manager) createSnowmanChain(
 		// we don't need to be concerned about closing this channel multiple times.
 		bootstrapFunc = func() {
 			close(m.unblockChainCreatorCh)
+		}
+
+		// Set up the subnet connector for the P-Chain
+		subnetConnector, ok = vm.(validators.SubnetConnector)
+		if !ok {
+			return nil, fmt.Errorf("expected validators.SubnetConnector but got %T", vm)
 		}
 	}
 
@@ -942,6 +954,7 @@ func (m *manager) createSnowmanChain(
 		sb.afterBootstrapped(),
 		m.ConsensusGossipFrequency,
 		m.ResourceTracker,
+		subnetConnector,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)
