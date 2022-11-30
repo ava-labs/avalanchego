@@ -111,7 +111,7 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	syncer, _, sender := buildTestsObjects(t, &commonCfg)
 
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(_ context.Context, ss set.Set[ids.NodeID], u uint32) {}
+	sender.SendGetStateSummaryFrontierF = func(context.Context, set.Set[ids.NodeID], uint32) {}
 	startReqID := uint32(0)
 
 	// attempt starting bootstrapper with no stake connected. Bootstrapper should stall.
@@ -236,7 +236,7 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := set.NewSet[ids.NodeID](3)
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(_ context.Context, ss set.Set[ids.NodeID], u uint32) {
+	sender.SendGetStateSummaryFrontierF = func(_ context.Context, ss set.Set[ids.NodeID], _ uint32) {
 		contactedFrontiersProviders.Union(ss)
 	}
 

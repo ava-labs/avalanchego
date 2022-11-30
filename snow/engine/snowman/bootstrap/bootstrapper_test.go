@@ -182,7 +182,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	frontierRequested := false
 	sender.CantSendGetAcceptedFrontier = false
-	sender.SendGetAcceptedFrontierF = func(_ context.Context, ss set.Set[ids.NodeID], u uint32) {
+	sender.SendGetAcceptedFrontierF = func(context.Context, set.Set[ids.NodeID], uint32) {
 		frontierRequested = true
 	}
 
