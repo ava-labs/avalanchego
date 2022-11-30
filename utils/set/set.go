@@ -111,13 +111,7 @@ func (s *Set[_]) Clear() {
 
 // List converts this set into a list
 func (s Set[T]) List() []T {
-	elts := make([]T, s.Len())
-	i := 0
-	for elt := range s {
-		elts[i] = elt
-		i++
-	}
-	return elts
+	return maps.Keys(s)
 }
 
 // CappedList returns a list of length at most [size].
@@ -143,15 +137,7 @@ func (s Set[T]) CappedList(size int) []T {
 
 // Equals returns true if the sets contain the same elements
 func (s Set[T]) Equals(other Set[T]) bool {
-	if s.Len() != other.Len() {
-		return false
-	}
-	for elt := range other {
-		if _, contains := s[elt]; !contains {
-			return false
-		}
-	}
-	return true
+	return maps.Equal(s, other)
 }
 
 // String returns the string representation of a set
