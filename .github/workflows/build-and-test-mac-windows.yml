@@ -2,7 +2,8 @@ name: Unit Tests Mac-Windows
 
 on:
   push:
-    tags: ["*"] # Push events to every tag
+    branches: [chain4travel, dev]
+  workflow_dispatch:
 
 jobs:
   run_build_tests:

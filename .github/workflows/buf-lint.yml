@@ -1,10 +1,9 @@
 name: Lint proto files
 
 on:
-  push:
-    branches: [chain4travel]
   pull_request:
-    branches: [chain4travel]
+    tags-ignore: ["*"]  
+    branches: [chain4travel, dev]
 
 permissions:
   contents: read

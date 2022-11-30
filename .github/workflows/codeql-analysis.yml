@@ -12,11 +12,9 @@
 name: "CodeQL"
 
 on:
-  push:
-    branches: [chain4travel]
   pull_request:
-    # The branches below must be a subset of the branches above
-    branches: [chain4travel]
+    tags-ignore: ["*"]
+    branches: [chain4travel, dev]
 
 jobs:
   analyze:

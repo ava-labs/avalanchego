@@ -1,10 +1,9 @@
 name: Unit Tests
 
 on:
-  push:
-    branches: [chain4travel]
   pull_request:
-    branches: [chain4travel]
+    tags-ignore: ["*"]
+    branches: [chain4travel, dev]
 
 jobs:
   run_build_unit_tests:
