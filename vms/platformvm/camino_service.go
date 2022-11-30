@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -13,12 +14,16 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
+	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"go.uber.org/zap"
+
+	utilsjson "github.com/ava-labs/avalanchego/utils/json"
 )
 
 var (
@@ -29,10 +34,28 @@ var (
 	errCreateTx          = "couldn't create tx: %w"
 )
 
+// CaminoService defines the API calls that can be made to the platform chain
+type CaminoService struct {
+	Service
+}
+
+type GetBalanceResponseV2 struct {
+	Balances               map[ids.ID]utilsjson.Uint64 `json:"balances"`
+	UnlockedOutputs        map[ids.ID]utilsjson.Uint64 `json:"unlockedOutputs"`
+	BondedOutputs          map[ids.ID]utilsjson.Uint64 `json:"bondedOutputs"`
+	DepositedOutputs       map[ids.ID]utilsjson.Uint64 `json:"depositedOutputs"`
+	DepositedBondedOutputs map[ids.ID]utilsjson.Uint64 `json:"bondedDepositedOutputs"`
+}
+type GetBalanceResponseWrapper struct {
+	LockModeBondDeposit bool
+	GetBalanceResponse
+	GetBalanceResponseV2 //nolint:govet
+}
+
 // GetConfigurationReply is the response from calling GetConfiguration.
 type GetConfigurationReply struct {
 	// The NetworkID
-	NetworkID json.Uint32 `json:"networkID"`
+	NetworkID utilsjson.Uint32 `json:"networkID"`
 	// The fee asset ID
 	AssetID ids.ID `json:"assetID"`
 	// The symbol of the fee asset ID
@@ -42,25 +65,104 @@ type GetConfigurationReply struct {
 	// Primary network blockchains
 	Blockchains []APIBlockchain `json:"blockchains"`
 	// The minimum duration a validator has to stake
-	MinStakeDuration json.Uint64 `json:"minStakeDuration"`
+	MinStakeDuration utilsjson.Uint64 `json:"minStakeDuration"`
 	// The maximum duration a validator can stake
-	MaxStakeDuration json.Uint64 `json:"maxStakeDuration"`
+	MaxStakeDuration utilsjson.Uint64 `json:"maxStakeDuration"`
 	// The minimum amount of tokens one must bond to be a validator
-	MinValidatorStake json.Uint64 `json:"minValidatorStake"`
+	MinValidatorStake utilsjson.Uint64 `json:"minValidatorStake"`
 	// The maximum amount of tokens bondable to a validator
-	MaxValidatorStake json.Uint64 `json:"maxValidatorStake"`
+	MaxValidatorStake utilsjson.Uint64 `json:"maxValidatorStake"`
 	// The minimum delegation fee
-	MinDelegationFee json.Uint32 `json:"minDelegationFee"`
+	MinDelegationFee utilsjson.Uint32 `json:"minDelegationFee"`
 	// Minimum stake, in nAVAX, that can be delegated on the primary network
-	MinDelegatorStake json.Uint64 `json:"minDelegatorStake"`
+	MinDelegatorStake utilsjson.Uint64 `json:"minDelegatorStake"`
 	// The minimum consumption rate
-	MinConsumptionRate json.Uint64 `json:"minConsumptionRate"`
+	MinConsumptionRate utilsjson.Uint64 `json:"minConsumptionRate"`
 	// The maximum consumption rate
-	MaxConsumptionRate json.Uint64 `json:"maxConsumptionRate"`
+	MaxConsumptionRate utilsjson.Uint64 `json:"maxConsumptionRate"`
 	// The supply cap for the native token (AVAX)
-	SupplyCap json.Uint64 `json:"supplyCap"`
+	SupplyCap utilsjson.Uint64 `json:"supplyCap"`
 	// The codec version used for serializing
-	CodecVersion json.Uint16 `json:"codecVersion"`
+	CodecVersion utilsjson.Uint16 `json:"codecVersion"`
+}
+
+func (response GetBalanceResponseWrapper) MarshalJSON() ([]byte, error) {
+	if !response.LockModeBondDeposit {
+		return json.Marshal(response.GetBalanceResponse)
+	}
+	return json.Marshal(response.GetBalanceResponseV2)
+}
+
+// GetBalance gets the balance of an address
+func (service *CaminoService) GetBalance(_ *http.Request, args *GetBalanceRequest, response *GetBalanceResponseWrapper) error {
+	caminoGenesis, err := service.vm.state.CaminoGenesisState()
+	if err != nil {
+		return err
+	}
+	response.LockModeBondDeposit = caminoGenesis.LockModeBondDeposit
+	if !caminoGenesis.LockModeBondDeposit {
+		return service.Service.GetBalance(nil, args, &response.GetBalanceResponse)
+	}
+
+	if args.Address != nil {
+		args.Addresses = append(args.Addresses, *args.Address)
+	}
+
+	service.vm.ctx.Log.Debug("Platform: GetBalance called",
+		logging.UserStrings("addresses", args.Addresses),
+	)
+
+	// Parse to address
+	addrs, err := avax.ParseServiceAddresses(service.addrManager, args.Addresses)
+	if err != nil {
+		return err
+	}
+
+	utxos, err := avax.GetAllUTXOs(service.vm.state, addrs)
+	if err != nil {
+		return fmt.Errorf("couldn't get UTXO set of %v: %w", args.Addresses, err)
+	}
+
+	unlockedOutputs := map[ids.ID]utilsjson.Uint64{}
+	bondedOutputs := map[ids.ID]utilsjson.Uint64{}
+	depositedOutputs := map[ids.ID]utilsjson.Uint64{}
+	depositedBondedOutputs := map[ids.ID]utilsjson.Uint64{}
+	balances := map[ids.ID]utilsjson.Uint64{}
+
+utxoFor:
+	for _, utxo := range utxos {
+		assetID := utxo.AssetID()
+		switch out := utxo.Out.(type) {
+		case *secp256k1fx.TransferOutput:
+			unlockedOutputs[assetID] = utilsjson.SafeAdd(unlockedOutputs[assetID], utilsjson.Uint64(out.Amount()))
+			balances[assetID] = utilsjson.SafeAdd(balances[assetID], utilsjson.Uint64(out.Amount()))
+		case *locked.Out:
+			switch out.LockState() {
+			case locked.StateBonded:
+				bondedOutputs[assetID] = utilsjson.SafeAdd(bondedOutputs[assetID], utilsjson.Uint64(out.Amount()))
+				balances[assetID] = utilsjson.SafeAdd(balances[assetID], utilsjson.Uint64(out.Amount()))
+			case locked.StateDeposited:
+				depositedOutputs[assetID] = utilsjson.SafeAdd(depositedOutputs[assetID], utilsjson.Uint64(out.Amount()))
+				balances[assetID] = utilsjson.SafeAdd(balances[assetID], utilsjson.Uint64(out.Amount()))
+			case locked.StateDepositedBonded:
+				depositedBondedOutputs[assetID] = utilsjson.SafeAdd(depositedBondedOutputs[assetID], utilsjson.Uint64(out.Amount()))
+				balances[assetID] = utilsjson.SafeAdd(balances[assetID], utilsjson.Uint64(out.Amount()))
+			default:
+				service.vm.ctx.Log.Warn("Unexpected utxo lock state")
+				continue utxoFor
+			}
+		default:
+			service.vm.ctx.Log.Warn("unexpected output type in UTXO",
+				zap.String("type", fmt.Sprintf("%T", out)),
+			)
+			continue utxoFor
+		}
+
+		response.UTXOIDs = append(response.UTXOIDs, &utxo.UTXOID)
+	}
+
+	response.GetBalanceResponseV2 = GetBalanceResponseV2{balances, unlockedOutputs, bondedOutputs, depositedOutputs, depositedBondedOutputs}
+	return nil
 }
 
 // GetMinStake returns the minimum staking amount in nAVAX.
@@ -68,7 +170,7 @@ func (service *Service) GetConfiguration(_ *http.Request, _ *struct{}, reply *Ge
 	service.vm.ctx.Log.Debug("Platform: GetConfiguration called")
 
 	// Fee Asset ID, NetworkID and HRP
-	reply.NetworkID = json.Uint32(service.vm.ctx.NetworkID)
+	reply.NetworkID = utilsjson.Uint32(service.vm.ctx.NetworkID)
 	reply.AssetID = service.vm.GetFeeAssetID()
 	reply.AssetSymbol = constants.TokenSymbol(service.vm.ctx.NetworkID)
 	reply.Hrp = constants.GetHRP(service.vm.ctx.NetworkID)
@@ -81,22 +183,22 @@ func (service *Service) GetConfiguration(_ *http.Request, _ *struct{}, reply *Ge
 	reply.Blockchains = blockchains.Blockchains
 
 	// Staking information
-	reply.MinStakeDuration = json.Uint64(service.vm.MinStakeDuration)
-	reply.MaxStakeDuration = json.Uint64(service.vm.MaxStakeDuration)
+	reply.MinStakeDuration = utilsjson.Uint64(service.vm.MinStakeDuration)
+	reply.MaxStakeDuration = utilsjson.Uint64(service.vm.MaxStakeDuration)
 
-	reply.MaxValidatorStake = json.Uint64(service.vm.MaxValidatorStake)
-	reply.MinValidatorStake = json.Uint64(service.vm.MinValidatorStake)
+	reply.MaxValidatorStake = utilsjson.Uint64(service.vm.MaxValidatorStake)
+	reply.MinValidatorStake = utilsjson.Uint64(service.vm.MinValidatorStake)
 
-	reply.MinDelegationFee = json.Uint32(service.vm.MinDelegationFee)
-	reply.MinDelegatorStake = json.Uint64(service.vm.MinDelegatorStake)
+	reply.MinDelegationFee = utilsjson.Uint32(service.vm.MinDelegationFee)
+	reply.MinDelegatorStake = utilsjson.Uint64(service.vm.MinDelegatorStake)
 
-	reply.MinConsumptionRate = json.Uint64(service.vm.RewardConfig.MinConsumptionRate)
-	reply.MaxConsumptionRate = json.Uint64(service.vm.RewardConfig.MaxConsumptionRate)
+	reply.MinConsumptionRate = utilsjson.Uint64(service.vm.RewardConfig.MinConsumptionRate)
+	reply.MaxConsumptionRate = utilsjson.Uint64(service.vm.RewardConfig.MaxConsumptionRate)
 
-	reply.SupplyCap = json.Uint64(service.vm.RewardConfig.SupplyCap)
+	reply.SupplyCap = utilsjson.Uint64(service.vm.RewardConfig.SupplyCap)
 
 	// Codec information
-	reply.CodecVersion = json.Uint16(txs.Version)
+	reply.CodecVersion = utilsjson.Uint16(txs.Version)
 
 	return nil
 }

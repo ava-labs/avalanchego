@@ -56,6 +56,10 @@ func (ls State) IsDeposited() bool {
 	return StateDeposited&ls == StateDeposited
 }
 
+func (ls State) IsStateDepositedBonded() bool {
+	return StateDepositedBonded&ls == StateDepositedBonded
+}
+
 /**********************  IDs *********************/
 
 type IDs struct {
