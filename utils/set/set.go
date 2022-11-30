@@ -211,5 +211,5 @@ func (s *Set[T]) Peek() (T, bool) {
 	for elt := range *s {
 		return elt, true
 	}
-	return *new(T), false //nolint:gocritic
+	return utils.Zero[T](), false
 }
