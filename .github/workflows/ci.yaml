@@ -61,6 +61,6 @@ jobs:
       - name: Run dump example
         run: cargo run --example dump
       - name: Run benchmark example
-        run: cargo run --example benchmark -- --nbatch 10000 --batch-size 10
+        run: cargo run --example benchmark -- --nbatch 100 --batch-size 1000
       - name: Run rev example
         run: cargo run --example rev
