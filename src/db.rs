@@ -48,10 +48,10 @@ struct DBParams {
 pub struct DBRevConfig {
     /// Maximum cached MPT objects.
     #[builder(default = 1 << 20)]
-    merkle_ncached_objs: usize,
+    pub merkle_ncached_objs: usize,
     /// Maximum cached Blob (currently just `Account`) objects.
     #[builder(default = 4096)]
-    blob_ncached_objs: usize,
+    pub blob_ncached_objs: usize,
 }
 
 /// Database configuration.
@@ -59,45 +59,45 @@ pub struct DBRevConfig {
 pub struct DBConfig {
     /// Maximum cached pages for the free list of the item stash.
     #[builder(default = 16384)] // 64M total size by default
-    meta_ncached_pages: usize,
+    pub meta_ncached_pages: usize,
     /// Maximum cached file descriptors for the free list of the item stash.
     #[builder(default = 1024)] // 1K fds by default
-    meta_ncached_files: usize,
+    pub meta_ncached_files: usize,
     /// Number of low-bits in the 64-bit address to determine the file ID. It is the exponent to
     /// the power of 2 for the file size.
     #[builder(default = 22)] // 4MB file by default
-    meta_file_nbit: u64,
+    pub meta_file_nbit: u64,
     /// Maximum cached pages for the item stash. This is the low-level cache used by the linear
     /// space that holds MPT nodes and account objects.
     #[builder(default = 262144)] // 1G total size by default
-    payload_ncached_pages: usize,
+    pub payload_ncached_pages: usize,
     /// Maximum cached file descriptors for the item stash.
     #[builder(default = 1024)] // 1K fds by default
-    payload_ncached_files: usize,
+    pub payload_ncached_files: usize,
     /// Number of low-bits in the 64-bit address to determine the file ID. It is the exponent to
     /// the power of 2 for the file size.
     #[builder(default = 22)] // 4MB file by default
-    payload_file_nbit: u64,
+    pub payload_file_nbit: u64,
     /// Maximum steps of walk to recycle a freed item.
     #[builder(default = 10)]
-    payload_max_walk: u64,
+    pub payload_max_walk: u64,
     /// Region size in bits (should be not greater than `payload_file_nbit`). One file is
     /// partitioned into multiple regions. Just use the default value.
     #[builder(default = 22)]
-    payload_regn_nbit: u64,
+    pub payload_regn_nbit: u64,
     /// Whether to truncate the DB when opening it. If set, the DB will be reset and all its
     /// existing contents will be lost.
     #[builder(default = false)]
-    truncate: bool,
+    pub truncate: bool,
     /// Config for accessing a version of the DB.
     #[builder(default = DBRevConfig::builder().build())]
-    rev: DBRevConfig,
+    pub rev: DBRevConfig,
     /// Config for the disk buffer.
     #[builder(default = DiskBufferConfig::builder().build())]
-    buffer: DiskBufferConfig,
+    pub buffer: DiskBufferConfig,
     /// Config for WAL.
     #[builder(default = WALConfig::builder().build())]
-    wal: WALConfig,
+    pub wal: WALConfig,
 }
 
 /// Necessary linear space instances bundled for a `CompactSpace`.

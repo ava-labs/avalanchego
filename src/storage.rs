@@ -795,11 +795,11 @@ pub enum BufferCmd {
 #[derive(TypedBuilder, Clone)]
 pub struct WALConfig {
     #[builder(default = 22)] // 4MB WAL logs
-    pub(crate) file_nbit: u64,
+    pub file_nbit: u64,
     #[builder(default = 15)] // 32KB
-    pub(crate) block_nbit: u64,
+    pub block_nbit: u64,
     #[builder(default = 100)] // preserve a rolling window of 100 past commits
-    pub(crate) max_revisions: u32,
+    pub max_revisions: u32,
 }
 
 /// Config for the disk buffer.
@@ -807,28 +807,28 @@ pub struct WALConfig {
 pub struct DiskBufferConfig {
     /// Maximum buffered disk buffer commands.
     #[builder(default = 4096)]
-    pub(crate) max_buffered: usize,
+    pub max_buffered: usize,
     /// Maximum number of pending pages.
     #[builder(default = 65536)] // 256MB total size by default
-    max_pending: usize,
+    pub max_pending: usize,
     /// Maximum number of concurrent async I/O requests.
     #[builder(default = 1024)]
-    max_aio_requests: u32,
+    pub max_aio_requests: u32,
     /// Maximum number of async I/O responses that it polls for at a time.
     #[builder(default = 128)]
-    max_aio_response: u16,
+    pub max_aio_response: u16,
     /// Maximum number of async I/O requests per submission.
     #[builder(default = 128)]
-    max_aio_submit: usize,
+    pub max_aio_submit: usize,
     /// Maximum number of concurrent async I/O requests in WAL.
     #[builder(default = 256)]
-    wal_max_aio_requests: usize,
+    pub wal_max_aio_requests: usize,
     /// Maximum buffered WAL records.
     #[builder(default = 1024)]
-    wal_max_buffered: usize,
+    pub wal_max_buffered: usize,
     /// Maximum batched WAL records per write.
     #[builder(default = 4096)]
-    wal_max_batch: usize,
+    pub wal_max_batch: usize,
 }
 
 struct PendingPage {
