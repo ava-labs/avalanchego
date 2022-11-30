@@ -19,31 +19,35 @@ import (
 )
 
 var (
-	_ block.ChainVM              = (*blockVM)(nil)
-	_ block.BatchedChainVM       = (*blockVM)(nil)
-	_ block.HeightIndexedChainVM = (*blockVM)(nil)
-	_ block.StateSyncableVM      = (*blockVM)(nil)
+	_ block.ChainVM                      = (*blockVM)(nil)
+	_ block.BuildBlockWithContextChainVM = (*blockVM)(nil)
+	_ block.BatchedChainVM               = (*blockVM)(nil)
+	_ block.HeightIndexedChainVM         = (*blockVM)(nil)
+	_ block.StateSyncableVM              = (*blockVM)(nil)
 )
 
 type blockVM struct {
 	block.ChainVM
-	bVM  block.BatchedChainVM
-	hVM  block.HeightIndexedChainVM
-	ssVM block.StateSyncableVM
+	buildBlockVM block.BuildBlockWithContextChainVM
+	batchedVM    block.BatchedChainVM
+	hVM          block.HeightIndexedChainVM
+	ssVM         block.StateSyncableVM
 
 	blockMetrics
 	clock mockable.Clock
 }
 
 func NewBlockVM(vm block.ChainVM) block.ChainVM {
-	bVM, _ := vm.(block.BatchedChainVM)
+	buildBlockVM, _ := vm.(block.BuildBlockWithContextChainVM)
+	batchedVM, _ := vm.(block.BatchedChainVM)
 	hVM, _ := vm.(block.HeightIndexedChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
 	return &blockVM{
-		ChainVM: vm,
-		bVM:     bVM,
-		hVM:     hVM,
-		ssVM:    ssVM,
+		ChainVM:      vm,
+		buildBlockVM: buildBlockVM,
+		batchedVM:    batchedVM,
+		hVM:          hVM,
+		ssVM:         ssVM,
 	}
 }
 
@@ -60,7 +64,8 @@ func (vm *blockVM) Initialize(
 ) error {
 	registerer := prometheus.NewRegistry()
 	err := vm.blockMetrics.Initialize(
-		vm.bVM != nil,
+		vm.buildBlockVM != nil,
+		vm.batchedVM != nil,
 		vm.hVM != nil,
 		vm.ssVM != nil,
 		"",

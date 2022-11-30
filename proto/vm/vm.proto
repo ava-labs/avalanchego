@@ -31,7 +31,7 @@ service VM {
   rpc Connected(ConnectedRequest) returns (google.protobuf.Empty);
   rpc Disconnected(DisconnectedRequest) returns (google.protobuf.Empty);
   // Attempt to create a new block from data contained in the VM.
-  rpc BuildBlock(google.protobuf.Empty) returns (BuildBlockResponse);
+  rpc BuildBlock(BuildBlockRequest) returns (BuildBlockResponse);
   // Attempt to create a block from a stream of bytes.
   rpc ParseBlock(ParseBlockRequest) returns (ParseBlockResponse);
   // Attempt to load a block.
@@ -147,6 +147,10 @@ message Handler {
   // server_addr is the address of the gRPC server which serves the
   // HTTP service
   string server_addr = 3;
+}
+
+message BuildBlockRequest {
+  optional uint64 p_chain_height = 1;
 }
 
 message BuildBlockResponse {

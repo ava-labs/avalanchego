@@ -57,9 +57,10 @@ var (
 
 type VM struct {
 	block.ChainVM
-	bVM  block.BatchedChainVM
-	hVM  block.HeightIndexedChainVM
-	ssVM block.StateSyncableVM
+	blockBuilderVM block.BuildBlockWithContextChainVM
+	batchedVM      block.BatchedChainVM
+	hVM            block.HeightIndexedChainVM
+	ssVM           block.StateSyncableVM
 
 	activationTime      time.Time
 	minimumPChainHeight uint64
@@ -109,14 +110,16 @@ func New(
 	minimumPChainHeight uint64,
 	minBlkDelay time.Duration,
 ) *VM {
-	bVM, _ := vm.(block.BatchedChainVM)
+	blockBuilderVM, _ := vm.(block.BuildBlockWithContextChainVM)
+	batchedVM, _ := vm.(block.BatchedChainVM)
 	hVM, _ := vm.(block.HeightIndexedChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
 	return &VM{
-		ChainVM: vm,
-		bVM:     bVM,
-		hVM:     hVM,
-		ssVM:    ssVM,
+		ChainVM:        vm,
+		blockBuilderVM: blockBuilderVM,
+		batchedVM:      batchedVM,
+		hVM:            hVM,
+		ssVM:           ssVM,
 
 		activationTime:      activationTime,
 		minimumPChainHeight: minimumPChainHeight,

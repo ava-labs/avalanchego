@@ -72,11 +72,12 @@ var (
 	errUnsupportedFXs                       = errors.New("unsupported feature extensions")
 	errBatchedParseBlockWrongNumberOfBlocks = errors.New("BatchedParseBlock returned different number of blocks than expected")
 
-	_ block.ChainVM              = (*VMClient)(nil)
-	_ block.BatchedChainVM       = (*VMClient)(nil)
-	_ block.HeightIndexedChainVM = (*VMClient)(nil)
-	_ block.StateSyncableVM      = (*VMClient)(nil)
-	_ prometheus.Gatherer        = (*VMClient)(nil)
+	_ block.ChainVM                      = (*VMClient)(nil)
+	_ block.BuildBlockWithContextChainVM = (*VMClient)(nil)
+	_ block.BatchedChainVM               = (*VMClient)(nil)
+	_ block.HeightIndexedChainVM         = (*VMClient)(nil)
+	_ block.StateSyncableVM              = (*VMClient)(nil)
+	_ prometheus.Gatherer                = (*VMClient)(nil)
 
 	_ snowman.Block = (*blockClient)(nil)
 
@@ -242,14 +243,15 @@ func (vm *VMClient) Initialize(
 	chainState, err := chain.NewMeteredState(
 		registerer,
 		&chain.Config{
-			DecidedCacheSize:    decidedCacheSize,
-			MissingCacheSize:    missingCacheSize,
-			UnverifiedCacheSize: unverifiedCacheSize,
-			BytesToIDCacheSize:  bytesToIDCacheSize,
-			LastAcceptedBlock:   lastAcceptedBlk,
-			GetBlock:            vm.getBlock,
-			UnmarshalBlock:      vm.parseBlock,
-			BuildBlock:          vm.buildBlock,
+			DecidedCacheSize:      decidedCacheSize,
+			MissingCacheSize:      missingCacheSize,
+			UnverifiedCacheSize:   unverifiedCacheSize,
+			BytesToIDCacheSize:    bytesToIDCacheSize,
+			LastAcceptedBlock:     lastAcceptedBlk,
+			GetBlock:              vm.getBlock,
+			UnmarshalBlock:        vm.parseBlock,
+			BuildBlock:            vm.buildBlock,
+			BuildBlockWithContext: vm.buildBlockWithContext,
 		},
 	)
 	if err != nil {
@@ -435,32 +437,24 @@ func (vm *VMClient) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	return err
 }
 
+// If the underlying VM doesn't actually implement this method, its [BuildBlock]
+// method will be called instead.
+func (vm *VMClient) buildBlockWithContext(ctx context.Context, blockCtx *block.Context) (snowman.Block, error) {
+	resp, err := vm.client.BuildBlock(ctx, &vmpb.BuildBlockRequest{
+		PChainHeight: &blockCtx.PChainHeight,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return vm.newBlockFromBuildBlock(resp)
+}
+
 func (vm *VMClient) buildBlock(ctx context.Context) (snowman.Block, error) {
-	resp, err := vm.client.BuildBlock(ctx, &emptypb.Empty{})
+	resp, err := vm.client.BuildBlock(ctx, &vmpb.BuildBlockRequest{})
 	if err != nil {
 		return nil, err
 	}
-
-	id, err := ids.ToID(resp.Id)
-	if err != nil {
-		return nil, err
-	}
-
-	parentID, err := ids.ToID(resp.ParentId)
-	if err != nil {
-		return nil, err
-	}
-
-	time, err := grpcutils.TimestampAsTime(resp.Timestamp)
-	return &blockClient{
-		vm:       vm,
-		id:       id,
-		parentID: parentID,
-		status:   choices.Processing,
-		bytes:    resp.Bytes,
-		height:   resp.Height,
-		time:     time,
-	}, err
+	return vm.newBlockFromBuildBlock(resp)
 }
 
 func (vm *VMClient) parseBlock(ctx context.Context, bytes []byte) (snowman.Block, error) {
@@ -825,6 +819,29 @@ func (vm *VMClient) GetStateSummary(ctx context.Context, summaryHeight uint64) (
 		id:     summaryID,
 		height: summaryHeight,
 		bytes:  resp.Bytes,
+	}, err
+}
+
+func (vm *VMClient) newBlockFromBuildBlock(resp *vmpb.BuildBlockResponse) (*blockClient, error) {
+	id, err := ids.ToID(resp.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	parentID, err := ids.ToID(resp.ParentId)
+	if err != nil {
+		return nil, err
+	}
+
+	time, err := grpcutils.TimestampAsTime(resp.Timestamp)
+	return &blockClient{
+		vm:       vm,
+		id:       id,
+		parentID: parentID,
+		status:   choices.Processing,
+		bytes:    resp.Bytes,
+		height:   resp.Height,
+		time:     time,
 	}, err
 }
 

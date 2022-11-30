@@ -18,7 +18,7 @@ func (vm *blockVM) StateSyncEnabled(ctx context.Context) (bool, error) {
 		return false, nil
 	}
 
-	ctx, span := vm.tracer.Start(ctx, "blockVM.StateSyncEnabled")
+	ctx, span := vm.tracer.Start(ctx, vm.stateSyncEnabledTag)
 	defer span.End()
 
 	return vm.ssVM.StateSyncEnabled(ctx)
@@ -29,7 +29,7 @@ func (vm *blockVM) GetOngoingSyncStateSummary(ctx context.Context) (block.StateS
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
 
-	ctx, span := vm.tracer.Start(ctx, "blockVM.GetOngoingSyncStateSummary")
+	ctx, span := vm.tracer.Start(ctx, vm.getOngoingSyncStateSummaryTag)
 	defer span.End()
 
 	return vm.ssVM.GetOngoingSyncStateSummary(ctx)
@@ -40,7 +40,7 @@ func (vm *blockVM) GetLastStateSummary(ctx context.Context) (block.StateSummary,
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
 
-	ctx, span := vm.tracer.Start(ctx, "blockVM.GetLastStateSummary")
+	ctx, span := vm.tracer.Start(ctx, vm.getLastStateSummaryTag)
 	defer span.End()
 
 	return vm.ssVM.GetLastStateSummary(ctx)
@@ -51,7 +51,7 @@ func (vm *blockVM) ParseStateSummary(ctx context.Context, summaryBytes []byte) (
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
 
-	ctx, span := vm.tracer.Start(ctx, "blockVM.ParseStateSummary", oteltrace.WithAttributes(
+	ctx, span := vm.tracer.Start(ctx, vm.parseStateSummaryTag, oteltrace.WithAttributes(
 		attribute.Int("summaryLen", len(summaryBytes)),
 	))
 	defer span.End()
@@ -64,7 +64,7 @@ func (vm *blockVM) GetStateSummary(ctx context.Context, height uint64) (block.St
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
 
-	ctx, span := vm.tracer.Start(ctx, "blockVM.GetStateSummary", oteltrace.WithAttributes(
+	ctx, span := vm.tracer.Start(ctx, vm.getStateSummaryTag, oteltrace.WithAttributes(
 		attribute.Int64("height", int64(height)),
 	))
 	defer span.End()
