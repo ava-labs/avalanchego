@@ -11,16 +11,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"golang.org/x/exp/maps"
 )
 
-const (
-	// The minimum capacity of a set
-	minSetSize = 16
-
-	// If a set has more than this many keys, it will be cleared by setting the map to nil
-	// rather than iteratively deleting
-	clearSizeThreshold = 512
-)
+// The minimum capacity of a set
+const minSetSize = 16
 
 // Settable describes an element that can be in a set.
 type Settable interface {
@@ -111,13 +106,7 @@ func (s *Set[T]) Remove(elts ...T) {
 
 // Clear empties this set
 func (s *Set[_]) Clear() {
-	if len(*s) > clearSizeThreshold {
-		*s = nil
-		return
-	}
-	for elt := range *s {
-		delete(*s, elt)
-	}
+	maps.Clear(*s)
 }
 
 // List converts this set into a list

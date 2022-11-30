@@ -93,35 +93,15 @@ func TestSetCappedList(t *testing.T) {
 	require.NotEqual(gotList[0], gotList[1])
 }
 
-// Test that Clear() works with both the iterative and set-to-nil path
-func TestSetClearLarge(t *testing.T) {
-	require := require.New(t)
-
-	// Using iterative clear path
+func TestSetClear(t *testing.T) {
 	set := Set[testSettable]{}
-	for i := 0; i < clearSizeThreshold; i++ {
+	for i := 0; i < 25; i++ {
 		set.Add(generateTestSettable())
 	}
 	set.Clear()
-	require.Len(set, 0)
-	require.Equal(set.Len(), 0)
-
+	require.Len(t, set, 0)
 	set.Add(generateTestSettable())
-	require.Len(set, 1)
-	require.Equal(set.Len(), 1)
-
-	// Using bulk (set map to nil) path
-	set = Set[testSettable]{}
-	for i := 0; i < clearSizeThreshold+1; i++ {
-		set.Add(generateTestSettable())
-	}
-	set.Clear()
-	require.Len(set, 0)
-	require.Equal(set.Len(), 0)
-
-	set.Add(generateTestSettable())
-	require.Len(set, 1)
-	require.Equal(set.Len(), 1)
+	require.Len(t, set, 1)
 }
 
 func TestSetPop(t *testing.T) {
