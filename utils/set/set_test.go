@@ -15,7 +15,6 @@ func init() {
 	rand.Seed(1337) // For determinism in generateTestSettable
 }
 
-// TODO is this the best way to make a testSettable?
 type testSettable [20]byte
 
 func (s testSettable) String() string {
