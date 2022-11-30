@@ -22,6 +22,7 @@ fn print_states(db: &DB) {
     }
 }
 
+/// cargo run --example simple
 fn main() {
     let cfg = DBConfig::builder().wal(WALConfig::builder().max_revisions(10).build());
     {

@@ -1,6 +1,7 @@
 use clap::{command, Arg, ArgMatches};
 use firewood::db::{DBConfig, DBError, WALConfig, DB};
 
+/// cargo run --example dump benchmark_db/
 fn main() {
     let matches = command!()
         .arg(Arg::new("INPUT").help("db path name").required(false).index(1))

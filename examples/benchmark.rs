@@ -15,6 +15,7 @@ struct Args {
     no_root_hash: bool,
 }
 
+/// cargo run --example benchmark -- --nbatch 100 --batch-size 1000
 fn main() {
     let args = Args::parse();
 
