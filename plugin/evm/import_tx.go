@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -102,7 +103,7 @@ func (utx *UnsignedImportTx) Verify(
 			return errImportNonAVAXInputBanff
 		}
 	}
-	if !avax.IsSortedAndUniqueTransferableInputs(utx.ImportedInputs) {
+	if !utils.IsSortedAndUniqueSortable(utx.ImportedInputs) {
 		return errInputsNotSortedUnique
 	}
 
