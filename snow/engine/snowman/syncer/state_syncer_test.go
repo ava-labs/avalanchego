@@ -556,7 +556,7 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 
 	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32, sl []uint64) {
+	sender.SendGetAcceptedStateSummaryF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32, _ []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -642,7 +642,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 
 	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32, sl []uint64) {
+	sender.SendGetAcceptedStateSummaryF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32, _ []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -715,7 +715,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 
 	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32, sl []uint64) {
+	sender.SendGetAcceptedStateSummaryF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32, _ []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -835,7 +835,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 
 	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32, sl []uint64) {
+	sender.SendGetAcceptedStateSummaryF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32, _ []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -957,7 +957,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 
 	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32, sl []uint64) {
+	sender.SendGetAcceptedStateSummaryF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32, _ []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -1092,7 +1092,7 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 
 	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32, sl []uint64) {
+	sender.SendGetAcceptedStateSummaryF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32, _ []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -1214,7 +1214,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 
 	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32, sl []uint64) {
+	sender.SendGetAcceptedStateSummaryF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32, _ []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
