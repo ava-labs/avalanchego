@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -113,7 +114,7 @@ func TestImportTxVerify(t *testing.T) {
 	}
 
 	// // Sort the inputs and outputs to ensure the transaction is canonical
-	avax.SortTransferableInputs(importTx.ImportedInputs)
+	utils.Sort(importTx.ImportedInputs)
 	SortEVMOutputs(importTx.Outs)
 
 	tests := map[string]atomicTxVerifyTest{
