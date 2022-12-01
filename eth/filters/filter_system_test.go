@@ -153,6 +153,11 @@ func (b *testBackend) BloomStatus() (uint64, uint64) {
 	return params.BloomBitsBlocks, b.sections
 }
 
+func (b *testBackend) LastBloomIndex() uint64 {
+	size, sections := b.BloomStatus()
+	return size * sections
+}
+
 func (b *testBackend) ServiceFilter(ctx context.Context, session *bloombits.MatcherSession) {
 	requests := make(chan chan *bloombits.Retrieval)
 

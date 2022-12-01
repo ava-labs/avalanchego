@@ -945,6 +945,7 @@ func (fb *filterBackend) SubscribePendingLogsEvent(ch chan<- []*types.Log) event
 }
 
 func (fb *filterBackend) BloomStatus() (uint64, uint64) { return 4096, 0 }
+func (fb *filterBackend) LastBloomIndex() uint64        { return 0 }
 
 func (fb *filterBackend) ServiceFilter(ctx context.Context, ms *bloombits.MatcherSession) {
 	panic("not supported")

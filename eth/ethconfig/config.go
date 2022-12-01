@@ -52,18 +52,19 @@ var DefaultConfig = NewDefaultConfig()
 
 func NewDefaultConfig() Config {
 	return Config{
-		NetworkId:             1,
-		TrieCleanCache:        512,
-		TrieDirtyCache:        256,
-		TrieDirtyCommitTarget: 20,
-		SnapshotCache:         256,
-		FilterLogCacheSize:    32,
-		Miner:                 miner.Config{},
-		TxPool:                core.DefaultTxPoolConfig,
-		RPCGasCap:             25000000,
-		RPCEVMTimeout:         5 * time.Second,
-		GPO:                   DefaultFullGPOConfig,
-		RPCTxFeeCap:           1,
+		NetworkId:                   1,
+		TrieCleanCache:              512,
+		TrieDirtyCache:              256,
+		TrieDirtyCommitTarget:       20,
+		SnapshotCache:               256,
+		IndexedFilterLogCacheSize:   32,
+		UnindexedFilterLogCacheSize: 32,
+		Miner:                       miner.Config{},
+		TxPool:                      core.DefaultTxPoolConfig,
+		RPCGasCap:                   25000000,
+		RPCEVMTimeout:               5 * time.Second,
+		GPO:                         DefaultFullGPOConfig,
+		RPCTxFeeCap:                 1,
 	}
 }
 
@@ -101,8 +102,10 @@ type Config struct {
 	SnapshotCache         int
 	Preimages             bool
 
-	// This is the number of blocks for which logs will be cached in the filter system.
-	FilterLogCacheSize int
+	// This is the number of indexed blocks for which logs will be cached in the filter system.
+	IndexedFilterLogCacheSize int
+	// This is the number of unindexed blocks for which logs will be cached in the filter system.
+	UnindexedFilterLogCacheSize int
 
 	// Mining options
 	Miner miner.Config

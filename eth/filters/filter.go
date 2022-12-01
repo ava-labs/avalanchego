@@ -128,7 +128,7 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 		if header == nil {
 			return nil, errors.New("unknown block")
 		}
-		return f.blockLogs(ctx, header, false)
+		return f.blockLogs(ctx, header, false, f.sys.backend.LastBloomIndex() > header.Number.Uint64())
 	}
 	// Short-cut if all we care about is pending logs
 	if f.begin == rpc.PendingBlockNumber.Int64() {
@@ -176,14 +176,14 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 	}
 	// Gather all indexed logs, and finish with non indexed ones
 	var (
-		logs           []*types.Log
-		size, sections = f.sys.backend.BloomStatus()
+		logs        []*types.Log
+		lastIndexed = f.sys.backend.LastBloomIndex()
 	)
-	if indexed := sections * size; indexed > uint64(f.begin) {
-		if indexed > end {
+	if lastIndexed > uint64(f.begin) {
+		if lastIndexed > end {
 			logs, err = f.indexedLogs(ctx, end)
 		} else {
-			logs, err = f.indexedLogs(ctx, indexed-1)
+			logs, err = f.indexedLogs(ctx, lastIndexed-1)
 		}
 		if err != nil {
 			return logs, err
@@ -229,7 +229,7 @@ func (f *Filter) indexedLogs(ctx context.Context, end uint64) ([]*types.Log, err
 			if header == nil || err != nil {
 				return logs, err
 			}
-			found, err := f.blockLogs(ctx, header, true)
+			found, err := f.blockLogs(ctx, header, true, true)
 			if err != nil {
 				return logs, err
 			}
@@ -251,7 +251,7 @@ func (f *Filter) unindexedLogs(ctx context.Context, end uint64) ([]*types.Log, e
 		if header == nil || err != nil {
 			return logs, err
 		}
-		found, err := f.blockLogs(ctx, header, false)
+		found, err := f.blockLogs(ctx, header, false, false)
 		if err != nil {
 			return logs, err
 		}
@@ -261,24 +261,24 @@ func (f *Filter) unindexedLogs(ctx context.Context, end uint64) ([]*types.Log, e
 }
 
 // blockLogs returns the logs matching the filter criteria within a single block.
-func (f *Filter) blockLogs(ctx context.Context, header *types.Header, skipBloom bool) ([]*types.Log, error) {
+func (f *Filter) blockLogs(ctx context.Context, header *types.Header, skipBloom bool, indexed bool) ([]*types.Log, error) {
 	// Fast track: no filtering criteria
 	if len(f.addresses) == 0 && len(f.topics) == 0 {
-		list, err := f.sys.cachedGetLogs(ctx, header.Hash(), header.Number.Uint64())
+		list, err := f.sys.cachedGetLogs(ctx, header.Hash(), header.Number.Uint64(), indexed)
 		if err != nil {
 			return nil, err
 		}
 		return flatten(list), nil
 	} else if skipBloom || bloomFilter(header.Bloom, f.addresses, f.topics) {
-		return f.checkMatches(ctx, header)
+		return f.checkMatches(ctx, header, indexed)
 	}
 	return nil, nil
 }
 
 // checkMatches checks if the receipts belonging to the given header contain any log events that
 // match the filter criteria. This function is called when the bloom filter signals a potential match.
-func (f *Filter) checkMatches(ctx context.Context, header *types.Header) ([]*types.Log, error) {
-	logsList, err := f.sys.cachedGetLogs(ctx, header.Hash(), header.Number.Uint64())
+func (f *Filter) checkMatches(ctx context.Context, header *types.Header, indexed bool) ([]*types.Log, error) {
+	logsList, err := f.sys.cachedGetLogs(ctx, header.Hash(), header.Number.Uint64(), indexed)
 	if err != nil {
 		return nil, err
 	}

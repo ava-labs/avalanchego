@@ -50,16 +50,20 @@ import (
 
 // Config represents the configuration of the filter system.
 type Config struct {
-	LogCacheSize int           // maximum number of cached blocks (default: 32)
-	Timeout      time.Duration // how long filters stay active (default: 5min)
+	IndexedLogCacheSize   int           // maximum number of indexed cached blocks (default: 32)
+	UnindexedLogCacheSize int           // maximum number of unindexed cached blocks (default: 32)
+	Timeout               time.Duration // how long filters stay active (default: 5min)
 }
 
 func (cfg Config) withDefaults() Config {
 	if cfg.Timeout == 0 {
 		cfg.Timeout = 5 * time.Minute
 	}
-	if cfg.LogCacheSize == 0 {
-		cfg.LogCacheSize = 32
+	if cfg.IndexedLogCacheSize == 0 {
+		cfg.IndexedLogCacheSize = 32
+	}
+	if cfg.UnindexedLogCacheSize == 0 {
+		cfg.UnindexedLogCacheSize = 32
 	}
 	return cfg
 }
@@ -83,6 +87,7 @@ type Backend interface {
 	SubscribeAcceptedTransactionEvent(ch chan<- core.NewTxsEvent) event.Subscription
 
 	BloomStatus() (uint64, uint64)
+	LastBloomIndex() uint64
 	ServiceFilter(ctx context.Context, session *bloombits.MatcherSession)
 
 	// Added to the backend interface to support limiting of logs requests
@@ -93,29 +98,39 @@ type Backend interface {
 
 // FilterSystem holds resources shared by all filters.
 type FilterSystem struct {
-	backend   Backend
-	logsCache *lru.Cache
-	cfg       *Config
+	backend            Backend
+	indexedLogsCache   *lru.Cache
+	unindexedLogsCache *lru.Cache
+	cfg                *Config
 }
 
 // NewFilterSystem creates a filter system.
 func NewFilterSystem(backend Backend, config Config) *FilterSystem {
 	config = config.withDefaults()
 
-	cache, err := lru.New(config.LogCacheSize)
+	indexedCache, err := lru.New(config.IndexedLogCacheSize)
+	if err != nil {
+		panic(err)
+	}
+	unindexedCache, err := lru.New(config.UnindexedLogCacheSize)
 	if err != nil {
 		panic(err)
 	}
 	return &FilterSystem{
-		backend:   backend,
-		logsCache: cache,
-		cfg:       &config,
+		backend:            backend,
+		indexedLogsCache:   indexedCache,
+		unindexedLogsCache: unindexedCache,
+		cfg:                &config,
 	}
 }
 
 // cachedGetLogs loads block logs from the backend and caches the result.
-func (sys *FilterSystem) cachedGetLogs(ctx context.Context, blockHash common.Hash, number uint64) ([][]*types.Log, error) {
-	cached, ok := sys.logsCache.Get(blockHash)
+func (sys *FilterSystem) cachedGetLogs(ctx context.Context, blockHash common.Hash, number uint64, indexed bool) ([][]*types.Log, error) {
+	cache := sys.indexedLogsCache
+	if !indexed {
+		cache = sys.unindexedLogsCache
+	}
+	cached, ok := cache.Get(blockHash)
 	if ok {
 		return cached.([][]*types.Log), nil
 	}
@@ -127,7 +142,7 @@ func (sys *FilterSystem) cachedGetLogs(ctx context.Context, blockHash common.Has
 	if logs == nil {
 		return nil, fmt.Errorf("failed to get logs for block #%d (0x%s)", number, blockHash.TerminalString())
 	}
-	sys.logsCache.Add(blockHash, logs)
+	cache.Add(blockHash, logs)
 	return logs, nil
 }
 
@@ -626,7 +641,9 @@ func (es *EventSystem) lightFilterLogs(header *types.Header, addresses []common.
 		// Get the logs of the block
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
-		logsList, err := es.sys.cachedGetLogs(ctx, header.Hash(), header.Number.Uint64())
+		indexed := es.sys.backend.LastBloomIndex()
+		headerNumber := header.Number.Uint64()
+		logsList, err := es.sys.cachedGetLogs(ctx, header.Hash(), headerNumber, indexed > headerNumber)
 		if err != nil {
 			return nil
 		}
