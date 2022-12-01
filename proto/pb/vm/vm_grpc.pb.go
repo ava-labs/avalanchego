@@ -43,7 +43,7 @@ type VMClient interface {
 	Connected(ctx context.Context, in *ConnectedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	Disconnected(ctx context.Context, in *DisconnectedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Attempt to create a new block from data contained in the VM.
-	BuildBlock(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*BuildBlockResponse, error)
+	BuildBlock(ctx context.Context, in *BuildBlockRequest, opts ...grpc.CallOption) (*BuildBlockResponse, error)
 	// Attempt to create a block from a stream of bytes.
 	ParseBlock(ctx context.Context, in *ParseBlockRequest, opts ...grpc.CallOption) (*ParseBlockResponse, error)
 	// Attempt to load a block.
@@ -167,7 +167,7 @@ func (c *vMClient) Disconnected(ctx context.Context, in *DisconnectedRequest, op
 	return out, nil
 }
 
-func (c *vMClient) BuildBlock(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*BuildBlockResponse, error) {
+func (c *vMClient) BuildBlock(ctx context.Context, in *BuildBlockRequest, opts ...grpc.CallOption) (*BuildBlockResponse, error) {
 	out := new(BuildBlockResponse)
 	err := c.cc.Invoke(ctx, "/vm.VM/BuildBlock", in, out, opts...)
 	if err != nil {
@@ -434,7 +434,7 @@ type VMServer interface {
 	Connected(context.Context, *ConnectedRequest) (*emptypb.Empty, error)
 	Disconnected(context.Context, *DisconnectedRequest) (*emptypb.Empty, error)
 	// Attempt to create a new block from data contained in the VM.
-	BuildBlock(context.Context, *emptypb.Empty) (*BuildBlockResponse, error)
+	BuildBlock(context.Context, *BuildBlockRequest) (*BuildBlockResponse, error)
 	// Attempt to create a block from a stream of bytes.
 	ParseBlock(context.Context, *ParseBlockRequest) (*ParseBlockResponse, error)
 	// Attempt to load a block.
@@ -513,7 +513,7 @@ func (UnimplementedVMServer) Connected(context.Context, *ConnectedRequest) (*emp
 func (UnimplementedVMServer) Disconnected(context.Context, *DisconnectedRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Disconnected not implemented")
 }
-func (UnimplementedVMServer) BuildBlock(context.Context, *emptypb.Empty) (*BuildBlockResponse, error) {
+func (UnimplementedVMServer) BuildBlock(context.Context, *BuildBlockRequest) (*BuildBlockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BuildBlock not implemented")
 }
 func (UnimplementedVMServer) ParseBlock(context.Context, *ParseBlockRequest) (*ParseBlockResponse, error) {
@@ -734,7 +734,7 @@ func _VM_Disconnected_Handler(srv interface{}, ctx context.Context, dec func(int
 }
 
 func _VM_BuildBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
+	in := new(BuildBlockRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -746,7 +746,7 @@ func _VM_BuildBlock_Handler(srv interface{}, ctx context.Context, dec func(inter
 		FullMethod: "/vm.VM/BuildBlock",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).BuildBlock(ctx, req.(*emptypb.Empty))
+		return srv.(VMServer).BuildBlock(ctx, req.(*BuildBlockRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }

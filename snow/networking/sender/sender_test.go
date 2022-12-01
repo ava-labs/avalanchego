@@ -117,6 +117,7 @@ func TestTimeout(t *testing.T) {
 		nil,
 		time.Hour,
 		resourceTracker,
+		validators.UnhandledSubnetConnector,
 	)
 	require.NoError(err)
 
@@ -365,6 +366,7 @@ func TestReliableMessages(t *testing.T) {
 		nil,
 		1,
 		resourceTracker,
+		validators.UnhandledSubnetConnector,
 	)
 	require.NoError(t, err)
 
@@ -488,6 +490,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		nil,
 		time.Second,
 		resourceTracker,
+		validators.UnhandledSubnetConnector,
 	)
 	require.NoError(t, err)
 

@@ -71,7 +71,7 @@ echo "launch avalanche-network-runner in the background"
 server \
 --log-level debug \
 --port=":12342" \
---disable-grpc-gateway 2> /dev/null &
+--disable-grpc-gateway &
 PID=${!}
 
 #################################

@@ -6,8 +6,11 @@ package handler
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/golang/mock/gomock"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -47,6 +50,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		nil,
 		time.Second,
 		resourceTracker,
+		validators.UnhandledSubnetConnector,
 	)
 	require.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -127,6 +131,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		nil,
 		time.Second,
 		resourceTracker,
+		validators.UnhandledSubnetConnector,
 	)
 	require.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -205,6 +210,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		nil,
 		1,
 		resourceTracker,
+		validators.UnhandledSubnetConnector,
 	)
 	require.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -273,6 +279,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		nil,
 		time.Second,
 		resourceTracker,
+		validators.UnhandledSubnetConnector,
 	)
 	require.NoError(t, err)
 
@@ -311,4 +318,74 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		t.Fatalf("should have called notify")
 	case <-calledNotify:
 	}
+}
+
+func TestHandlerSubnetConnector(t *testing.T) {
+	ctx := snow.DefaultConsensusContextTest()
+	vdrs := validators.NewSet()
+	err := vdrs.Add(ids.GenerateTestNodeID(), nil, 1)
+	require.NoError(t, err)
+
+	resourceTracker, err := tracker.NewResourceTracker(
+		prometheus.NewRegistry(),
+		resource.NoUsage,
+		meter.ContinuousFactory{},
+		time.Second,
+	)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	connector := validators.NewMockSubnetConnector(ctrl)
+
+	nodeID := ids.GenerateTestNodeID()
+	subnetID := ids.GenerateTestID()
+
+	require.NoError(t, err)
+	handler, err := New(
+		ctx,
+		vdrs,
+		nil,
+		nil,
+		time.Second,
+		resourceTracker,
+		connector,
+	)
+	require.NoError(t, err)
+
+	bootstrapper := &common.BootstrapperTest{
+		BootstrapableTest: common.BootstrapableTest{
+			T: t,
+		},
+		EngineTest: common.EngineTest{
+			T: t,
+		},
+	}
+	bootstrapper.Default(false)
+	handler.SetBootstrapper(bootstrapper)
+
+	engine := &common.EngineTest{T: t}
+	engine.Default(false)
+	engine.ContextF = func() *snow.ConsensusContext {
+		return ctx
+	}
+	handler.SetConsensus(engine)
+	ctx.SetState(snow.NormalOp) // assumed bootstrapping is done
+
+	bootstrapper.StartF = func(context.Context, uint32) error {
+		return nil
+	}
+
+	handler.Start(context.Background(), false)
+
+	// Handler should call subnet connector when ConnectedSubnet message is received
+	var wg sync.WaitGroup
+	connector.EXPECT().ConnectedSubnet(gomock.Any(), nodeID, subnetID).Do(
+		func(context.Context, ids.NodeID, ids.ID) {
+			wg.Done()
+		})
+
+	wg.Add(1)
+	defer wg.Wait()
+
+	subnetMsg := message.InternalConnectedSubnet(nodeID, subnetID)
+	handler.Push(context.Background(), subnetMsg)
 }

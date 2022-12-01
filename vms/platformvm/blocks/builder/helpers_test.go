@@ -77,6 +77,8 @@ var (
 
 	testSubnet1            *txs.Tx
 	testSubnet1ControlKeys = preFundedKeys[0:3]
+
+	errMissingPrimaryValidators = errors.New("missing primary validator set")
 )
 
 type mutableSharedMemory struct {
@@ -280,6 +282,7 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = 10
 	ctx.XChainID = xChainID
+	ctx.CChainID = cChainID
 	ctx.AVAXAssetID = avaxAssetID
 
 	atomicDB := prefixdb.New([]byte{1}, db)
@@ -441,7 +444,7 @@ func shutdownEnvironment(env *environment) error {
 	if env.isBootstrapped.GetValue() {
 		primaryValidatorSet, exist := env.config.Validators.Get(constants.PrimaryNetworkID)
 		if !exist {
-			return errors.New("no default subnet validators")
+			return errMissingPrimaryValidators
 		}
 		primaryValidators := primaryValidatorSet.List()
 
@@ -450,7 +453,7 @@ func shutdownEnvironment(env *environment) error {
 			validatorIDs[i] = vdr.NodeID
 		}
 
-		if err := env.uptimes.Shutdown(validatorIDs); err != nil {
+		if err := env.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID); err != nil {
 			return err
 		}
 		if err := env.state.Commit(); err != nil {
