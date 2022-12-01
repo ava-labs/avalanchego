@@ -146,8 +146,8 @@ func (s *set) add(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint
 	vdr := &Validator{
 		NodeID:    nodeID,
 		PublicKey: pk,
-		Weight:    weight,
 		TxID:      txID,
+		Weight:    weight,
 		index:     len(s.vdrSlice),
 	}
 	s.vdrs[nodeID] = vdr

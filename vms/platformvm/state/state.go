@@ -1689,7 +1689,8 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				err = validators.RemoveWeight(s.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
 			} else {
 				if isNewValidator {
-					err = validators.Add(s.cfg.Validators, subnetID, nodeID, pk, validatorDiff.validator.TxID, weightDiff.Amount)
+					txID := validatorDiff.validator.TxID
+					err = validators.Add(s.cfg.Validators, subnetID, nodeID, pk, txID, weightDiff.Amount)
 				} else {
 					err = validators.AddWeight(s.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
 				}

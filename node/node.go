@@ -255,7 +255,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		// Staking is disabled we don't have a txID that added us as a
 		// validator. Because each validator needs some kind of txID
 		// associated with it, we hack one together by just padding our
-		// nodeID with zeroes, so we have a unique "TxID" per node.
+		// nodeID with zeroes, so we have a unique "txID" per node.
 		dummyTxID := ids.Empty
 		copy(dummyTxID[:], n.ID[:])
 
@@ -478,6 +478,7 @@ func (n *Node) initBeacons() error {
 	for _, peerID := range n.Config.BootstrapIDs {
 		// Note: The beacon connection manager will treat all beaconIDs as
 		//       equal.
+		// Invariant: We never use the TxID or BLS keys populated here.
 		if err := n.beacons.Add(peerID, nil, ids.Empty, 1); err != nil {
 			return err
 		}
