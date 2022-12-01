@@ -104,6 +104,8 @@ type handler struct {
 	numDispatchersClosed int
 	// Closed when this handler and [engine] are done shutting down
 	closed chan struct{}
+
+	subnetConnector validators.SubnetConnector
 }
 
 // Initialize this consensus handler
@@ -115,6 +117,7 @@ func New(
 	preemptTimeouts chan struct{},
 	gossipFrequency time.Duration,
 	resourceTracker tracker.ResourceTracker,
+	subnetConnector validators.SubnetConnector,
 ) (Handler, error) {
 	h := &handler{
 		ctx:              ctx,
@@ -127,6 +130,7 @@ func New(
 		closingChan:      make(chan struct{}),
 		closed:           make(chan struct{}),
 		resourceTracker:  resourceTracker,
+		subnetConnector:  subnetConnector,
 	}
 
 	var err error
@@ -640,6 +644,9 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 
 	case *message.Connected:
 		return engine.Connected(ctx, nodeID, msg.NodeVersion)
+
+	case *message.ConnectedSubnet:
+		return h.subnetConnector.ConnectedSubnet(ctx, nodeID, msg.SubnetID)
 
 	case *message.Disconnected:
 		return engine.Disconnected(ctx, nodeID)

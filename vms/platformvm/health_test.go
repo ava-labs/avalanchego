@@ -94,7 +94,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 				}
 			}
 			for index, vdr := range subnetVdrs.List() {
-				err := vm.Connected(context.Background(), vdr.NodeID, version.CurrentApp)
+				err := vm.ConnectedSubnet(context.Background(), vdr.NodeID, subnetID)
 				require.NoError(err)
 				details, err := vm.HealthCheck(context.Background())
 				connectedPerc := float64((index + 1) * (100 / testVdrCount))

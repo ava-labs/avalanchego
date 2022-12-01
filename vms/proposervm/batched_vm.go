@@ -26,7 +26,7 @@ func (vm *VM) GetAncestors(
 	maxBlocksSize int,
 	maxBlocksRetrivalTime time.Duration,
 ) ([][]byte, error) {
-	if vm.bVM == nil {
+	if vm.batchedVM == nil {
 		return nil, block.ErrRemoteVMNotImplemented
 	}
 
@@ -67,7 +67,7 @@ func (vm *VM) GetAncestors(
 	preMaxBlocksNum := maxBlocksNum - len(res)
 	preMaxBlocksSize := maxBlocksSize - currentByteLength
 	preMaxBlocksRetrivalTime := maxBlocksRetrivalTime - time.Since(startTime)
-	innerBytes, err := vm.bVM.GetAncestors(
+	innerBytes, err := vm.batchedVM.GetAncestors(
 		ctx,
 		blkID,
 		preMaxBlocksNum,
@@ -85,7 +85,7 @@ func (vm *VM) GetAncestors(
 }
 
 func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.Block, error) {
-	if vm.bVM == nil {
+	if vm.batchedVM == nil {
 		return nil, block.ErrRemoteVMNotImplemented
 	}
 
@@ -124,7 +124,7 @@ func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.B
 	innerBlockBytes = append(innerBlockBytes, blks[blocksIndex:]...)
 
 	// parse all inner blocks at once
-	innerBlks, err := vm.bVM.BatchedParseBlock(ctx, innerBlockBytes)
+	innerBlks, err := vm.batchedVM.BatchedParseBlock(ctx, innerBlockBytes)
 	if err != nil {
 		return nil, err
 	}

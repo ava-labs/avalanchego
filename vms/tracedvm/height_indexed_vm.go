@@ -19,7 +19,7 @@ func (vm *blockVM) VerifyHeightIndex(ctx context.Context) error {
 		return block.ErrHeightIndexedVMNotImplemented
 	}
 
-	ctx, span := vm.tracer.Start(ctx, "blockVM.VerifyHeightIndex")
+	ctx, span := vm.tracer.Start(ctx, vm.verifyHeightIndexTag)
 	defer span.End()
 
 	return vm.hVM.VerifyHeightIndex(ctx)
@@ -30,7 +30,7 @@ func (vm *blockVM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.I
 		return ids.Empty, block.ErrHeightIndexedVMNotImplemented
 	}
 
-	ctx, span := vm.tracer.Start(ctx, "blockVM.GetBlockIDAtHeight", oteltrace.WithAttributes(
+	ctx, span := vm.tracer.Start(ctx, vm.getBlockIDAtHeightTag, oteltrace.WithAttributes(
 		attribute.Int64("height", int64(height)),
 	))
 	defer span.End()

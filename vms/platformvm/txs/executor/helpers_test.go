@@ -73,6 +73,8 @@ var (
 
 	// Used to create and use keys.
 	testKeyfactory crypto.FactorySECP256K1R
+
+	errMissingPrimaryValidators = errors.New("missing primary validator set")
 )
 
 type mutableSharedMemory struct {
@@ -261,6 +263,7 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = 10
 	ctx.XChainID = xChainID
+	ctx.CChainID = cChainID
 	ctx.AVAXAssetID = avaxAssetID
 
 	atomicDB := prefixdb.New([]byte{1}, db)
@@ -431,7 +434,7 @@ func shutdownEnvironment(env *environment) error {
 	if env.isBootstrapped.GetValue() {
 		primaryValidatorSet, exist := env.config.Validators.Get(constants.PrimaryNetworkID)
 		if !exist {
-			return errors.New("no default subnet validators")
+			return errMissingPrimaryValidators
 		}
 		primaryValidators := primaryValidatorSet.List()
 
@@ -439,9 +442,24 @@ func shutdownEnvironment(env *environment) error {
 		for i, vdr := range primaryValidators {
 			validatorIDs[i] = vdr.NodeID
 		}
-
-		if err := env.uptimes.Shutdown(validatorIDs); err != nil {
+		if err := env.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID); err != nil {
 			return err
+		}
+
+		for subnetID := range env.config.WhitelistedSubnets {
+			vdrs, exist := env.config.Validators.Get(subnetID)
+			if !exist {
+				return nil
+			}
+			validators := vdrs.List()
+
+			validatorIDs := make([]ids.NodeID, len(validators))
+			for i, vdr := range validators {
+				validatorIDs[i] = vdr.NodeID
+			}
+			if err := env.uptimes.StopTracking(validatorIDs, subnetID); err != nil {
+				return err
+			}
 		}
 		env.state.SetHeight( /*height*/ math.MaxUint64)
 		if err := env.state.Commit(); err != nil {

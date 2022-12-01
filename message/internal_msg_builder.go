@@ -406,6 +406,25 @@ func InternalConnected(nodeID ids.NodeID, nodeVersion *version.Application) Inbo
 	}
 }
 
+// ConnectedSubnet contains the subnet ID of the subnet that the node is
+// connected to.
+type ConnectedSubnet struct {
+	SubnetID ids.ID
+}
+
+// InternalConnectedSubnet returns a message that indicates the node with [nodeID] is
+// connected to the subnet with the given [subnetID].
+func InternalConnectedSubnet(nodeID ids.NodeID, subnetID ids.ID) InboundMessage {
+	return &inboundMessage{
+		nodeID: nodeID,
+		op:     ConnectedSubnetOp,
+		message: &ConnectedSubnet{
+			SubnetID: subnetID,
+		},
+		expiration: mockable.MaxTime,
+	}
+}
+
 type Disconnected struct{}
 
 func InternalDisconnected(nodeID ids.NodeID) InboundMessage {

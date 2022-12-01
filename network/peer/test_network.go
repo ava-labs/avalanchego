@@ -25,7 +25,7 @@ type testNetwork struct {
 	signer    crypto.Signer
 	subnets   ids.Set
 
-	uptime uint8
+	uptime uint32
 }
 
 // NewTestNetwork creates and returns a new TestNetwork
@@ -36,7 +36,7 @@ func NewTestNetwork(
 	version *version.Application,
 	signer crypto.Signer,
 	subnets ids.Set,
-	uptime uint8,
+	uptime uint32,
 ) Network {
 	return &testNetwork{
 		mc:        mc,

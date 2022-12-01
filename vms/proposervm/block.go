@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
+
+	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 const (
@@ -213,7 +215,14 @@ func (p *postForkCommonComponents) buildChild(
 		}
 	}
 
-	innerBlock, err := p.vm.ChainVM.BuildBlock(ctx)
+	var innerBlock snowman.Block
+	if p.vm.blockBuilderVM != nil {
+		innerBlock, err = p.vm.blockBuilderVM.BuildBlockWithContext(ctx, &smblock.Context{
+			PChainHeight: pChainHeight,
+		})
+	} else {
+		innerBlock, err = p.vm.ChainVM.BuildBlock(ctx)
+	}
 	if err != nil {
 		return nil, err
 	}
