@@ -411,8 +411,7 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	ss.frontierSeeders = validators.NewSet()
 	for _, nodeID := range beaconIDs {
 		if !ss.frontierSeeders.Contains(nodeID) {
-			// invariant: we use an empty AddValidator txID + a nil BLS key
-			// which is fine because we only care about beacon weights here.
+			// Invariant: We never use the TxID or BLS keys populated here.
 			err = ss.frontierSeeders.Add(nodeID, nil, ids.Empty, 1)
 		} else {
 			err = ss.frontierSeeders.AddWeight(nodeID, 1)
