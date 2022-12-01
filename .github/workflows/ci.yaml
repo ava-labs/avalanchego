@@ -64,3 +64,16 @@ jobs:
         run: cargo run --example benchmark -- --nbatch 100 --batch-size 1000
       - name: Run rev example
         run: cargo run --example rev
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+      - name: Lint intra docs links
+        run: cargo rustdoc -p firewood -- -D rustdoc::broken-intra-doc-links
+      - name: Lint missing crate-level docs
+        run: cargo rustdoc -p firewood -- -D rustdoc::missing-crate-level-docs
