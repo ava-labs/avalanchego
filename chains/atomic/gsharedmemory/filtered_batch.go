@@ -4,8 +4,9 @@
 package gsharedmemory
 
 import (
-	sharedmemorypb "github.com/ava-labs/avalanchego/proto/pb/sharedmemory"
 	"github.com/ava-labs/avalanchego/utils/set"
+
+	sharedmemorypb "github.com/ava-labs/avalanchego/proto/pb/sharedmemory"
 )
 
 type filteredBatch struct {

@@ -5,7 +5,6 @@ package compare
 
 import "golang.org/x/exp/maps"
 
-// TODO use a generic bag here once that's merged.
 // Returns true iff the slices have the same elements,
 // regardless of order.
 func UnsortedEquals[T comparable](a, b []T) bool {

@@ -14,7 +14,7 @@ var errDuplicatedID = errors.New("inbound message contains duplicated ID")
 
 func getIDs(idsBytes [][]byte) ([]ids.ID, error) {
 	res := make([]ids.ID, len(idsBytes))
-	idSet := set.Set[ids.ID]{}
+	idSet := set.NewSet[ids.ID](len(idsBytes))
 	for i, bytes := range idsBytes {
 		id, err := ids.ToID(bytes)
 		if err != nil {
