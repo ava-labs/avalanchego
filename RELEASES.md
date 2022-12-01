@@ -4,8 +4,8 @@
 
 This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0). It is optional, but encouraged. The supported plugin version is `20`.
 
-- Removed unnecessary locking from the `info` API
-- Added inbound peerlist tracking
+### Validator Set Tracking
+
 - Renamed `GetValidators` to `Get` on the `validators.Manager` interface
 - Removed `Set`, `AddWeight`, `RemoveWeight`, and `Contains` from the `validators.Manager` interface
 - Added `Add` to the `validators.Manager` interface
@@ -14,19 +14,40 @@ This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/ava
 - Modified `validators.Set#Sample` to return `ids.NodeID` rather than `valdiators.Validator`
 - Replaced the `validators.Validator` interface with a struct and added a `BLS` public key field
 - Improved and documented error handling within the `validators.Set` interface
+- Added `BLS` public keys to the result of `GetValidatorSet`
+- Added `BuildBlockWithContext` as an optional VM method to build blocks at a specific P-chain height
+
+### Uptime Tracking
+
+- Added subnet uptime tracking
+- Added subnet uptimes to `platform.getCurrentValidators`
+
+### Fixes
+
 - Fixed race condition between API initialization and shutdown
 - Fixed race condition between NAT traversal initialization and shutdown
 - Fixed race condition during beacon connection tracking
 - Added race detection to the E2E tests
-- Converted all sorting to utilize generics
 - Added additional message and sender tests
-- Added `BuildBlockWithContext` as an optional VM method to build blocks at a specific P-chain height
-- Added independent subnet uptime tracking
-- Added the C-chain ID to the `snow.Context`
-- Added `BLS` public keys to the result of `GetValidatorSet`
+
+### Coreth
+
+- Added config option to perform database inspection on startup
+- Added configurable transaction indexing to reduce disk usage
+- Added special case to allow transactions using Nick's Method to bypass API level replay protection
+
+### APIs
+
+- Added indices to the return values of `GetLastAccepted` and `GetContainerByID` on the `indexer` API client
+- Removed unnecessary locking from the `info` API
+
+### Miscellaneous
+
+- Added inbound peerlist tracking to improve peerlist gossip
+- Added `CChainID` to the `snow.Context`
 - Added `ChainDataDir` to the `snow.Context`
 - Added `--chain-data-dir` as a CLI flag to specify the base directory for all `ChainDataDir`s
-- Added indices to the return values of `GetLastAccepted` and `GetContainerByID` on the `indexer` API client
+- Converted all sorting to utilize generics
 
 ## [v1.9.3](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.3)
 
