@@ -967,9 +967,7 @@ func (p *peer) txIDsForPeers(peerIPs []ips.ClaimedIPPort) ([]ids.ID, error) {
 	txIDs := make([]ids.ID, len(peerIPs))
 
 	for _, peerIP := range peerIPs {
-		nodeID := ids.NodeIDFromCert(peerIP.Cert)
-
-		vdr, ok := p.Validators.Get(nodeID)
+		vdr, ok := p.Validators.Get(ids.NodeIDFromCert(peerIP.Cert))
 		if !ok {
 			return nil, fmt.Errorf("peer is not a validator of the primary network")
 		}
