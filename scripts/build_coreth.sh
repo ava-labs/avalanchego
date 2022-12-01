@@ -39,8 +39,6 @@ while getopts 'rc:e:' flag; do
   esac
 done
 
-echo "coreth:"$coreth_path evm:$evm_path""
-
 # Sanity-check the user's overrides for coreth path/version if they supplied a flag
 if [[ -z $coreth_path ]] || [[ -z $evm_path ]]; then
   echo "Invalid arguments to build coreth. Coreth path (-c) must be provided with EVM path (-e)."

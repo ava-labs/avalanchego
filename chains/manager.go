@@ -174,7 +174,8 @@ type ManagerConfig struct {
 	Keystore                    keystore.Keystore
 	AtomicMemory                *atomic.Memory
 	AVAXAssetID                 ids.ID
-	XChainID                    ids.ID
+	XChainID                    ids.ID          // ID of the X-Chain,
+	CChainID                    ids.ID          // ID of the C-Chain,
 	CriticalChains              ids.Set         // Chains that can't exit gracefully
 	TimeoutManager              timeout.Manager // Manages request timeouts when sending messages to other validators
 	Health                      health.Registerer
@@ -425,6 +426,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 			NodeID:    m.NodeID,
 
 			XChainID:    m.XChainID,
+			CChainID:    m.CChainID,
 			AVAXAssetID: m.AVAXAssetID,
 
 			Log:          chainLog,
