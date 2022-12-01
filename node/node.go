@@ -252,7 +252,6 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 
 	consensusRouter := n.Config.ConsensusRouter
 	if !n.Config.EnableStaking {
-
 		err := primaryNetVdrs.Add(
 			n.ID,
 			bls.PublicFromSecretKey(n.Config.StakingSigningKey),
