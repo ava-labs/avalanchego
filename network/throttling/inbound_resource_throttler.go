@@ -6,6 +6,7 @@ package throttling
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -51,6 +52,8 @@ type systemThrottler struct {
 	targeter tracker.Targeter
 	// Tells us the utilization of each node.
 	tracker tracker.Tracker
+	// Invariant: [timerPool] only returns timers that have been stopped and drained.
+	timerPool sync.Pool
 }
 
 type systemThrottlerMetrics struct {
@@ -102,23 +105,26 @@ func NewSystemThrottler(
 		SystemThrottlerConfig: config,
 		targeter:              targeter,
 		tracker:               tracker,
+		timerPool: sync.Pool{
+			New: func() interface{} {
+				// Satisfy invariant that timer is stopped and drained.
+				timer := time.NewTimer(0)
+				if !timer.Stop() {
+					<-timer.C
+				}
+				return timer
+			},
+		},
 	}, nil
 }
 
 func (t *systemThrottler) Acquire(ctx context.Context, nodeID ids.NodeID) {
-	// Fires when we should re-check whether this node's usage has fallen to an
-	// acceptable level.
-	timer := time.NewTimer(0)
-	if !timer.Stop() {
-		<-timer.C
-	}
-	defer timer.Stop()
-
-	// [waited] is true if we waited for this node's usage to fall to an
-	// acceptable level before returning
-	waited := false
+	// [timer] fires when we should re-check whether this node's
+	// usage has fallen to an acceptable level.
+	// Lazily initialize timer only if we actually need to wait.
+	var timer *time.Timer
 	defer func() {
-		if waited {
+		if timer != nil { // We waited at least once for usage to fall.
 			t.metrics.totalWaits.Inc()
 			// Note that [t.metrics.awaitingAcquire.Inc()] was called once if
 			// and only if [waited] is true.
@@ -158,11 +164,26 @@ func (t *systemThrottler) Acquire(ctx context.Context, nodeID ids.NodeID) {
 			// acceptable level.
 			waitDuration = t.MaxRecheckDelay
 		}
-		if !waited {
+
+		// Reset [timer].
+		if timer == nil {
 			// Note this is called at most once.
 			t.metrics.awaitingAcquire.Inc()
+
+			timer = t.timerPool.Get().(*time.Timer)
+			defer func() {
+				// Satisfy [t.timerPool] invariant.
+				if !timer.Stop() {
+					// The default ensures we don't wait forever in the case
+					// that the channel was already drained.
+					select {
+					case <-timer.C:
+					default:
+					}
+				}
+				t.timerPool.Put(timer)
+			}()
 		}
-		waited = true
 		timer.Reset(waitDuration)
 		select {
 		case <-ctx.Done():
