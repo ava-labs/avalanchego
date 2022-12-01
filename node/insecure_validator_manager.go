@@ -22,7 +22,7 @@ func (i *insecureValidatorManager) Connected(vdrID ids.NodeID, nodeVersion *vers
 		// Add will only error here if the total weight of the set would go over
 		// [math.MaxUint64]. In this case, we will just not mark this new peer
 		// as a validator.
-		_ = i.vdrs.Add(vdrID, nil, i.weight)
+		_ = i.vdrs.Add(vdrID, nil, ids.Empty, i.weight)
 	}
 	i.Router.Connected(vdrID, nodeVersion, subnetID)
 }

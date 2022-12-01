@@ -470,7 +470,7 @@ func (n *Node) initBeacons() error {
 	for _, peerID := range n.Config.BootstrapIDs {
 		// Note: The beacon connection manager will treat all beaconIDs as
 		//       equal.
-		if err := n.beacons.Add(peerID, nil, 1); err != nil {
+		if err := n.beacons.Add(peerID, nil, ids.Empty, 1); err != nil {
 			return err
 		}
 	}

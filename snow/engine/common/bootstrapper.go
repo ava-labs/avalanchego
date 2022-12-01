@@ -5,7 +5,6 @@ package common
 
 import (
 	"context"
-
 	stdmath "math"
 
 	"go.uber.org/zap"
@@ -276,7 +275,9 @@ func (b *bootstrapper) Startup(ctx context.Context) error {
 	b.pendingSendAcceptedFrontier.Clear()
 	for _, nodeID := range beaconIDs {
 		if !b.sampledBeacons.Contains(nodeID) {
-			err = b.sampledBeacons.Add(nodeID, nil, 1)
+			// invariant: we use an empty AddValidator txID + a nil BLS key which is
+			// fine because we only care about beacon weights here.
+			err = b.sampledBeacons.Add(nodeID, nil, ids.Empty, 1)
 		} else {
 			err = b.sampledBeacons.AddWeight(nodeID, 1)
 		}

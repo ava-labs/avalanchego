@@ -49,7 +49,9 @@ func NewConfig(
 	if len(stateSyncerIDs) != 0 {
 		stateSyncBeacons = validators.NewSet()
 		for _, peerID := range stateSyncerIDs {
-			if err := stateSyncBeacons.Add(peerID, nil, 1); err != nil {
+			// invariant: we use an empty AddValidator txID + a nil BLS key
+			// which is fine because we only care about beacon weights here.
+			if err := stateSyncBeacons.Add(peerID, nil, ids.Empty, 1); err != nil {
 				return Config{}, err
 			}
 		}

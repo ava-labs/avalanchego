@@ -6,9 +6,8 @@ package syncer
 import (
 	"context"
 	"fmt"
-	"time"
-
 	stdmath "math"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -412,7 +411,9 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	ss.frontierSeeders = validators.NewSet()
 	for _, nodeID := range beaconIDs {
 		if !ss.frontierSeeders.Contains(nodeID) {
-			err = ss.frontierSeeders.Add(nodeID, nil, 1)
+			// invariant: we use an empty AddValidator txID + a nil BLS key
+			// which is fine because we only care about beacon weights here.
+			err = ss.frontierSeeders.Add(nodeID, nil, ids.Empty, 1)
 		} else {
 			err = ss.frontierSeeders.AddWeight(nodeID, 1)
 		}

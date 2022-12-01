@@ -13,6 +13,7 @@ import (
 type Validator struct {
 	NodeID    ids.NodeID
 	PublicKey *bls.PublicKey
+	TxID      ids.ID
 	Weight    uint64
 
 	// index is used to efficiently remove validators from the validator set. It
