@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // Op is an opcode
@@ -182,7 +183,7 @@ var (
 		AppRequestFailedOp:              AppResponseOp,
 		CrossChainAppRequestFailedOp:    CrossChainAppResponseOp,
 	}
-	UnrequestedOps = map[Op]struct{}{
+	UnrequestedOps = set.Set[Op]{
 		GetAcceptedFrontierOp:     {},
 		GetAcceptedOp:             {},
 		GetAncestorsOp:            {},

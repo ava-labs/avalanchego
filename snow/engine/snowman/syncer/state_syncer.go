@@ -81,7 +81,7 @@ type stateSyncer struct {
 
 	// summaries received may be different even if referring to the same height
 	// we keep a list of deduplicated height ready for voting
-	summariesHeights       map[uint64]struct{}
+	summariesHeights       set.Set[uint64]
 	uniqueSummariesHeights []uint64
 
 	// number of times the state sync has been attempted
@@ -137,8 +137,8 @@ func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.Node
 		}
 
 		height := summary.Height()
-		if _, exists := ss.summariesHeights[height]; !exists {
-			ss.summariesHeights[height] = struct{}{}
+		if !ss.summariesHeights.Contains(height) {
+			ss.summariesHeights.Add(height)
 			ss.uniqueSummariesHeights = append(ss.uniqueSummariesHeights, height)
 		}
 	} else {
@@ -394,7 +394,7 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 
 	// clear up messages trackers
 	ss.weightedSummaries = make(map[ids.ID]*weightedSummary)
-	ss.summariesHeights = make(map[uint64]struct{})
+	ss.summariesHeights.Clear()
 	ss.uniqueSummariesHeights = nil
 
 	ss.targetSeeders.Clear()
@@ -442,7 +442,7 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 		}
 
 		height := localSummary.Height()
-		ss.summariesHeights[height] = struct{}{}
+		ss.summariesHeights.Add(height)
 		ss.uniqueSummariesHeights = append(ss.uniqueSummariesHeights, height)
 	default:
 		return err

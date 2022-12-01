@@ -5,16 +5,17 @@ package gsharedmemory
 
 import (
 	sharedmemorypb "github.com/ava-labs/avalanchego/proto/pb/sharedmemory"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 type filteredBatch struct {
 	writes  map[string][]byte
-	deletes map[string]struct{}
+	deletes set.Set[string]
 }
 
 func (b *filteredBatch) Put(key []byte, value []byte) error {
 	keyStr := string(key)
-	delete(b.deletes, keyStr)
+	b.deletes.Remove(keyStr)
 	b.writes[keyStr] = value
 	return nil
 }
@@ -22,7 +23,7 @@ func (b *filteredBatch) Put(key []byte, value []byte) error {
 func (b *filteredBatch) Delete(key []byte) error {
 	keyStr := string(key)
 	delete(b.writes, keyStr)
-	b.deletes[keyStr] = struct{}{}
+	b.deletes.Add(keyStr)
 	return nil
 }
 
