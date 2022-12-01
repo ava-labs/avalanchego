@@ -11,8 +11,7 @@ import (
 	reflect "reflect"
 
 	ids "github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-
+	bls "github.com/ava-labs/avalanchego/utils/crypto/bls"
 	gomock "github.com/golang/mock/gomock"
 )
 
