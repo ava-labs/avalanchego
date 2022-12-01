@@ -68,6 +68,7 @@ var (
 
 	errWrongCacheType      = errors.New("unexpectedly cached type")
 	errMissingValidatorSet = errors.New("missing validator set")
+	errMissingValidator    = errors.New("missing validator")
 )
 
 type VM struct {
@@ -473,7 +474,7 @@ func (vm *VM) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 
 // GetValidatorSet returns the validator set at the specified height for the
 // provided subnetID.
-func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.Validator, error) {
 	validatorSetsCache, exists := vm.validatorSetCaches[subnetID]
 	if !exists {
 		validatorSetsCache = &cache.LRU{Size: validatorSetsCacheSize}
@@ -484,7 +485,7 @@ func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.I
 	}
 
 	if validatorSetIntf, ok := validatorSetsCache.Get(height); ok {
-		validatorSet, ok := validatorSetIntf.(map[ids.NodeID]uint64)
+		validatorSet, ok := validatorSetIntf.(map[ids.NodeID]*validators.Validator)
 		if !ok {
 			return nil, errWrongCacheType
 		}
@@ -503,26 +504,47 @@ func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.I
 	// get the start time to track metrics
 	startTime := vm.Clock().Time()
 
-	currentValidators, ok := vm.Validators.Get(subnetID)
+	currentSubnetValidators, ok := vm.Validators.Get(subnetID)
 	if !ok {
 		return nil, errMissingValidatorSet
 	}
-	currentValidatorList := currentValidators.List()
+	currentPrimaryNetworkValidators, ok := vm.Validators.Get(constants.PrimaryNetworkID)
+	if !ok {
+		// This should never happen
+		return nil, errMissingValidatorSet
+	}
 
-	vdrSet := make(map[ids.NodeID]uint64, len(currentValidatorList))
-	for _, vdr := range currentValidatorList {
-		vdrSet[vdr.NodeID] = vdr.Weight
+	currentSubnetValidatorList := currentSubnetValidators.List()
+	vdrSet := make(map[ids.NodeID]*validators.Validator, len(currentSubnetValidatorList))
+	for _, vdr := range currentSubnetValidatorList {
+		primaryVdr, ok := currentPrimaryNetworkValidators.Get(vdr.NodeID)
+		if !ok {
+			// This should never happen
+			return nil, fmt.Errorf("%w: %s", errMissingValidator, vdr.NodeID)
+		}
+		vdr.PublicKey = primaryVdr.PublicKey
+		vdrSet[vdr.NodeID] = vdr
 	}
 
 	for i := lastAcceptedHeight; i > height; i-- {
-		diffs, err := vm.state.GetValidatorWeightDiffs(i, subnetID)
+		weightDiffs, err := vm.state.GetValidatorWeightDiffs(i, subnetID)
 		if err != nil {
 			return nil, err
 		}
 
-		for nodeID, diff := range diffs {
+		for nodeID, weightDiff := range weightDiffs {
+			vdr, ok := vdrSet[nodeID]
+			if !ok {
+				// This node isn't in the current validator set.
+				vdr = &validators.Validator{
+					NodeID: nodeID,
+				}
+				vdrSet[nodeID] = vdr
+			}
+
+			// The weight of this node changed at this block.
 			var op func(uint64, uint64) (uint64, error)
-			if diff.Decrease {
+			if weightDiff.Decrease {
 				// The validator's weight was decreased at this block, so in the
 				// prior block it was higher.
 				op = math.Add64
@@ -532,15 +554,37 @@ func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.I
 				op = math.Sub[uint64]
 			}
 
-			newWeight, err := op(vdrSet[nodeID], diff.Amount)
+			// Apply the weight change.
+			vdr.Weight, err = op(vdr.Weight, weightDiff.Amount)
 			if err != nil {
 				return nil, err
 			}
-			if newWeight == 0 {
+
+			if vdr.Weight == 0 {
+				// The validator's weight was 0 before this block so
+				// they weren't in the validator set.
 				delete(vdrSet, nodeID)
-			} else {
-				vdrSet[nodeID] = newWeight
 			}
+		}
+
+		pkDiffs, err := vm.state.GetValidatorPublicKeyDiffs(i)
+		if err != nil {
+			return nil, err
+		}
+
+		for nodeID, pk := range pkDiffs {
+			vdr, ok := vdrSet[nodeID]
+			if !ok {
+				// If this were to happen - that would mean that this validator
+				// had a public key removed when they were not a validator.
+				// Because there is a minimum stake duration, this is
+				// impossible.
+				return nil, fmt.Errorf("%w: %s", errMissingValidator, vdr.NodeID)
+			}
+
+			// The validator's public key was removed at this block, so it
+			// was in the validator set before.
+			vdr.PublicKey = pk
 		}
 	}
 

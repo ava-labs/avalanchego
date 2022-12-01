@@ -69,9 +69,9 @@ func (w *windower) Delay(ctx context.Context, chainHeight, pChainHeight uint64, 
 	for k, v := range validatorsMap {
 		validators = append(validators, validatorData{
 			id:     k,
-			weight: v,
+			weight: v.Weight,
 		})
-		newWeight, err := math.Add64(weight, v)
+		newWeight, err := math.Add64(weight, v.Weight)
 		if err != nil {
 			return 0, err
 		}

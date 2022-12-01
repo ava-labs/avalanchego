@@ -2301,6 +2301,8 @@ type GetValidatorsAtArgs struct {
 
 // GetValidatorsAtReply is the response from GetValidatorsAt
 type GetValidatorsAtReply struct {
+	// TODO should we change this to map[ids.NodeID]*validators.Validator?
+	// We'd have to add a MarshalJSON method to validators.Validator.
 	Validators map[ids.NodeID]uint64 `json:"validators"`
 }
 
@@ -2315,9 +2317,13 @@ func (s *Service) GetValidatorsAt(r *http.Request, args *GetValidatorsAtArgs, re
 
 	ctx := r.Context()
 	var err error
-	reply.Validators, err = s.vm.GetValidatorSet(ctx, height, args.SubnetID)
+	vdrs, err := s.vm.GetValidatorSet(ctx, height, args.SubnetID)
 	if err != nil {
-		return fmt.Errorf("couldn't get validator set: %w", err)
+		return fmt.Errorf("failed to get validator set: %w", err)
+	}
+	reply.Validators = make(map[ids.NodeID]uint64, len(vdrs))
+	for _, vdr := range vdrs {
+		reply.Validators[vdr.NodeID] = vdr.Weight
 	}
 	return nil
 }
