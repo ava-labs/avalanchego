@@ -1315,8 +1315,7 @@ func (s *state) loadPendingValidators() error {
 }
 
 // Invariant: initValidatorSets requires loadCurrentValidators to have already
-//
-//	been called.
+//            been called.
 func (s *state) initValidatorSets() error {
 	primaryValidators, ok := s.cfg.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {

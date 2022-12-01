@@ -2686,12 +2686,11 @@ func TestEngineNonPreferredAmplification(t *testing.T) {
 // to ensure that the consensus engine correctly handles the case that votes can
 // be bubbled correctly through a block that cannot pass verification until one
 // of its ancestors has been marked as accepted.
-//
-//	G
-//	|
-//	A
-//	|
-//	B
+//  G
+//  |
+//  A
+//  |
+//  B
 func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	vdr, _, sender, vm, te, gBlk := setupDefaultConfig(t)
 
@@ -2907,14 +2906,13 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 // regression test to ensure that the consensus engine correctly handles the
 // case that votes can be bubbled correctly through a chain that cannot pass
 // verification until one of its ancestors has been marked as accepted.
-//
-//	G
-//	|
-//	A
-//	|
-//	B
-//	|
-//	C
+//  G
+//  |
+//  A
+//  |
+//  B
+//  |
+//  C
 func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	vdr, _, sender, vm, te, gBlk := setupDefaultConfig(t)
 
