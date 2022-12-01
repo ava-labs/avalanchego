@@ -45,7 +45,7 @@ docker pull $avalanchego_byzantine_image
 git_commit_id=$( git rev-list -1 HEAD )
 
 # Build current avalanchego
-source "$AVALANCHE_PATH"/scripts/build_image.sh
+source "$AVALANCHE_PATH"/scripts/build_image.sh -r
 
 # Target built version to use in avalanche-testing
 avalanche_image="$avalanchego_dockerhub_repo:$current_branch"
