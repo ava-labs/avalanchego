@@ -6,8 +6,9 @@ package syncer
 import (
 	"context"
 	"fmt"
-	stdmath "math"
 	"time"
+
+	stdmath "math"
 
 	"go.uber.org/zap"
 
