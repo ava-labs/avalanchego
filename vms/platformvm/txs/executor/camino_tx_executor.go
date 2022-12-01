@@ -537,6 +537,10 @@ func verifyAccess(roles, statesBit uint64) error {
 		if (roles & txs.AddressStateRoleKycBit) == 0 {
 			return errInvalidRoles
 		}
+	case (txs.AddressStateValidatorBits & statesBit) != 0:
+		if (roles & txs.AddressStateRoleValidatorBit) == 0 {
+			return errInvalidRoles
+		}
 	case (txs.AddressStateRoleBits & statesBit) != 0:
 		return errInvalidRoles
 	}
