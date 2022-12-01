@@ -252,10 +252,15 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 
 	consensusRouter := n.Config.ConsensusRouter
 	if !n.Config.EnableStaking {
+		// staking is disabled, so we don't have a txID, so we have to
+		// hack one ourselves.
+		dummyTxID := ids.Empty
+		copy(dummyTxID[:], n.ID[:])
+
 		err := primaryNetVdrs.Add(
 			n.ID,
 			bls.PublicFromSecretKey(n.Config.StakingSigningKey),
-			ids.Empty,
+			dummyTxID,
 			n.Config.DisabledStakingWeight,
 		)
 		if err != nil {
