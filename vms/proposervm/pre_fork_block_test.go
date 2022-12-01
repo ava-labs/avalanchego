@@ -9,13 +9,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
+
+	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 func TestOracle_PreForkBlkImplementsInterface(t *testing.T) {
@@ -810,4 +820,60 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 	if err == nil {
 		t.Fatal("Should have failed to verify a child that was signed when it should be a pre fork block")
 	}
+}
+
+// Assert that when the underlying VM implements ChainVMWithBuildBlockContext
+// and the proposervm is activated, we call the VM's BuildBlockWithContext
+// method to build a block rather than BuildBlockWithContext. If the proposervm
+// isn't activated, we should call BuildBlock rather than BuildBlockWithContext.
+func TestPreForkBlock_BuildBlockWithContext(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	pChainHeight := uint64(1337)
+	blkID := ids.GenerateTestID()
+	innerBlk := snowman.NewMockBlock(ctrl)
+	innerBlk.EXPECT().ID().Return(blkID).AnyTimes()
+	innerBlk.EXPECT().Timestamp().Return(mockable.MaxTime)
+	builtBlk := snowman.NewMockBlock(ctrl)
+	builtBlk.EXPECT().Bytes().Return([]byte{1, 2, 3}).AnyTimes()
+	builtBlk.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
+	builtBlk.EXPECT().Height().Return(pChainHeight).AnyTimes()
+	innerVM := mocks.NewMockChainVM(ctrl)
+	innerBlockBuilderVM := mocks.NewMockBuildBlockWithContextChainVM(ctrl)
+	innerBlockBuilderVM.EXPECT().BuildBlockWithContext(gomock.Any(), &smblock.Context{
+		PChainHeight: pChainHeight,
+	}).Return(builtBlk, nil).AnyTimes()
+	vdrState := validators.NewMockState(ctrl)
+	vdrState.EXPECT().GetMinimumHeight(context.Background()).Return(pChainHeight, nil).AnyTimes()
+
+	vm := &VM{
+		ChainVM:        innerVM,
+		blockBuilderVM: innerBlockBuilderVM,
+		ctx: &snow.Context{
+			ValidatorState: vdrState,
+			Log:            logging.NoLog{},
+		},
+	}
+
+	blk := &preForkBlock{
+		Block: innerBlk,
+		vm:    vm,
+	}
+
+	// Should call BuildBlockWithContext since proposervm is activated
+	// (timestamp is after activation time)
+	gotChild, err := blk.buildChild(context.Background())
+	require.NoError(err)
+	require.Equal(builtBlk, gotChild.(*postForkBlock).innerBlk)
+
+	// Should call BuildBlock since proposervm is not activated
+	innerBlk.EXPECT().Timestamp().Return(time.Time{})
+	vm.activationTime = mockable.MaxTime
+	innerVM.EXPECT().BuildBlock(context.Background()).Return(builtBlk, nil)
+
+	gotChild, err = blk.buildChild(context.Background())
+	require.NoError(err)
+	require.Equal(builtBlk, gotChild.(*preForkBlock).Block)
 }

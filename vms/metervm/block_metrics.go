@@ -23,6 +23,9 @@ type blockMetrics struct {
 	verifyErr,
 	accept,
 	reject,
+	// Block building with context metrics
+	buildBlockWithContext,
+	buildBlockWithContextErr,
 	// Batched metrics
 	getAncestors,
 	batchedParseBlock,
@@ -40,6 +43,7 @@ type blockMetrics struct {
 }
 
 func (m *blockMetrics) Initialize(
+	supportsBlockBuildingWithContext bool,
 	supportsBatchedFetching bool,
 	supportsHeightIndexing bool,
 	supportsStateSync bool,
@@ -60,6 +64,10 @@ func (m *blockMetrics) Initialize(
 	m.accept = newAverager(namespace, "accept", reg, &errs)
 	m.reject = newAverager(namespace, "reject", reg, &errs)
 
+	if supportsBlockBuildingWithContext {
+		m.buildBlockWithContext = newAverager(namespace, "build_block_with_context", reg, &errs)
+		m.buildBlockWithContextErr = newAverager(namespace, "build_block_with_context_err", reg, &errs)
+	}
 	if supportsBatchedFetching {
 		m.getAncestors = newAverager(namespace, "get_ancestors", reg, &errs)
 		m.batchedParseBlock = newAverager(namespace, "batched_parse_block", reg, &errs)

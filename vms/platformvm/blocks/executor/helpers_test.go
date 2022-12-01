@@ -83,6 +83,8 @@ var (
 
 	genesisBlkID ids.ID
 	testSubnet1  *txs.Tx
+
+	errMissingPrimaryValidators = errors.New("missing primary validator set")
 )
 
 type stakerStatus uint
@@ -315,6 +317,7 @@ func defaultCtx(db database.Database) *snow.Context {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = 10
 	ctx.XChainID = xChainID
+	ctx.CChainID = cChainID
 	ctx.AVAXAssetID = avaxAssetID
 
 	atomicDB := prefixdb.New([]byte{1}, db)
@@ -477,7 +480,7 @@ func shutdownEnvironment(t *environment) error {
 	if t.isBootstrapped.GetValue() {
 		primaryValidatorSet, exist := t.config.Validators.Get(constants.PrimaryNetworkID)
 		if !exist {
-			return errors.New("no default subnet validators")
+			return errMissingPrimaryValidators
 		}
 		primaryValidators := primaryValidatorSet.List()
 
@@ -486,7 +489,7 @@ func shutdownEnvironment(t *environment) error {
 			validatorIDs[i] = vdr.NodeID
 		}
 
-		if err := t.uptimes.Shutdown(validatorIDs); err != nil {
+		if err := t.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID); err != nil {
 			return err
 		}
 		if err := t.state.Commit(); err != nil {

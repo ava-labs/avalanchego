@@ -22,7 +22,7 @@ jobs:
           check-latest: true
       - name: Build the avalanchego binaries
         shell: bash
-        run: ./scripts/build.sh
+        run: ./scripts/build.sh -r
       - name: Run e2e tests
         shell: bash
         run: scripts/tests.e2e.sh ./build/avalanchego

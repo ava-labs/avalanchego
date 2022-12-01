@@ -23,11 +23,11 @@ func (vm *blockVM) GetAncestors(
 	maxBlocksSize int,
 	maxBlocksRetrivalTime time.Duration,
 ) ([][]byte, error) {
-	if vm.bVM == nil {
+	if vm.batchedVM == nil {
 		return nil, block.ErrRemoteVMNotImplemented
 	}
 
-	ctx, span := vm.tracer.Start(ctx, "blockVM.GetAncestors", oteltrace.WithAttributes(
+	ctx, span := vm.tracer.Start(ctx, vm.getAncestorsTag, oteltrace.WithAttributes(
 		attribute.Stringer("blkID", blkID),
 		attribute.Int("maxBlocksNum", maxBlocksNum),
 		attribute.Int("maxBlocksSize", maxBlocksSize),
@@ -35,7 +35,7 @@ func (vm *blockVM) GetAncestors(
 	))
 	defer span.End()
 
-	return vm.bVM.GetAncestors(
+	return vm.batchedVM.GetAncestors(
 		ctx,
 		blkID,
 		maxBlocksNum,
@@ -45,16 +45,16 @@ func (vm *blockVM) GetAncestors(
 }
 
 func (vm *blockVM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.Block, error) {
-	if vm.bVM == nil {
+	if vm.batchedVM == nil {
 		return nil, block.ErrRemoteVMNotImplemented
 	}
 
-	ctx, span := vm.tracer.Start(ctx, "blockVM.BatchedParseBlock", oteltrace.WithAttributes(
+	ctx, span := vm.tracer.Start(ctx, vm.batchedParseBlockTag, oteltrace.WithAttributes(
 		attribute.Int("numBlocks", len(blks)),
 	))
 	defer span.End()
 
-	blocks, err := vm.bVM.BatchedParseBlock(ctx, blks)
+	blocks, err := vm.batchedVM.BatchedParseBlock(ctx, blks)
 	if err != nil {
 		return nil, err
 	}

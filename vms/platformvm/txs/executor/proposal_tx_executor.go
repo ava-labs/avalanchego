@@ -559,6 +559,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	// TODO: calculate subnet uptimes
 	uptime, err := e.Uptimes.CalculateUptimePercentFrom(
 		primaryNetworkValidator.NodeID,
+		constants.PrimaryNetworkID,
 		primaryNetworkValidator.StartTime,
 	)
 	if err != nil {

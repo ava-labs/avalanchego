@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ids/galiasreader"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -56,8 +57,12 @@ var _ vmpb.VMServer = (*VMServer)(nil)
 type VMServer struct {
 	vmpb.UnsafeVMServer
 
-	vm   block.ChainVM
-	hVM  block.HeightIndexedChainVM
+	vm block.ChainVM
+	// If nil, the underlying VM doesn't implement the interface.
+	bVM block.BuildBlockWithContextChainVM
+	// If nil, the underlying VM doesn't implement the interface.
+	hVM block.HeightIndexedChainVM
+	// If nil, the underlying VM doesn't implement the interface.
 	ssVM block.StateSyncableVM
 
 	processMetrics prometheus.Gatherer
@@ -72,10 +77,12 @@ type VMServer struct {
 
 // NewServer returns a vm instance connected to a remote vm instance
 func NewServer(vm block.ChainVM) *VMServer {
+	bVM, _ := vm.(block.BuildBlockWithContextChainVM)
 	hVM, _ := vm.(block.HeightIndexedChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
 	return &VMServer{
 		vm:   vm,
+		bVM:  bVM,
 		hVM:  hVM,
 		ssVM: ssVM,
 	}
@@ -95,6 +102,10 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		return nil, err
 	}
 	xChainID, err := ids.ToID(req.XChainId)
+	if err != nil {
+		return nil, err
+	}
+	cChainID, err := ids.ToID(req.CChainId)
 	if err != nil {
 		return nil, err
 	}
@@ -198,6 +209,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		NodeID:    nodeID,
 
 		XChainID:    xChainID,
+		CChainID:    cChainID,
 		AVAXAssetID: avaxAssetID,
 
 		Log:          logging.NoLog{},
@@ -209,6 +221,8 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 
 		ValidatorState: validatorStateClient,
 		// TODO: support remaining snowman++ fields
+
+		ChainDataDir: req.ChainDataDir,
 	}
 
 	if err := vm.vm.Initialize(ctx, vm.ctx, dbManager, req.GenesisBytes, req.UpgradeBytes, req.ConfigBytes, toEngine, nil, appSenderClient); err != nil {
@@ -375,11 +389,24 @@ func (vm *VMServer) Disconnected(ctx context.Context, req *vmpb.DisconnectedRequ
 	return &emptypb.Empty{}, vm.vm.Disconnected(ctx, nodeID)
 }
 
-func (vm *VMServer) BuildBlock(ctx context.Context, _ *emptypb.Empty) (*vmpb.BuildBlockResponse, error) {
-	blk, err := vm.vm.BuildBlock(ctx)
+// If the underlying VM doesn't actually implement this method, its [BuildBlock]
+// method will be called instead.
+func (vm *VMServer) BuildBlock(ctx context.Context, req *vmpb.BuildBlockRequest) (*vmpb.BuildBlockResponse, error) {
+	var (
+		blk snowman.Block
+		err error
+	)
+	if vm.bVM == nil || req.PChainHeight == nil {
+		blk, err = vm.vm.BuildBlock(ctx)
+	} else {
+		blk, err = vm.bVM.BuildBlockWithContext(ctx, &block.Context{
+			PChainHeight: *req.PChainHeight,
+		})
+	}
 	if err != nil {
 		return nil, err
 	}
+
 	blkID := blk.ID()
 	parentID := blk.Parent()
 	return &vmpb.BuildBlockResponse{

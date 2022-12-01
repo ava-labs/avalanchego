@@ -141,13 +141,25 @@ func initTestProposerVM(
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return defaultPChainHeight, nil
 	}
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]uint64, error) {
-		res := make(map[ids.NodeID]uint64)
-		res[proVM.ctx.NodeID] = uint64(10)
-		res[ids.NodeID{1}] = uint64(5)
-		res[ids.NodeID{2}] = uint64(6)
-		res[ids.NodeID{3}] = uint64(7)
-		return res, nil
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.Validator, error) {
+		return map[ids.NodeID]*validators.Validator{
+			proVM.ctx.NodeID: {
+				NodeID: proVM.ctx.NodeID,
+				Weight: 10,
+			},
+			{1}: {
+				NodeID: ids.NodeID{1},
+				Weight: 5,
+			},
+			{2}: {
+				NodeID: ids.NodeID{2},
+				Weight: 6,
+			},
+			{3}: {
+				NodeID: ids.NodeID{3},
+				Weight: 7,
+			},
+		}, nil
 	}
 
 	ctx := snow.DefaultContextTest()
@@ -923,9 +935,12 @@ func TestExpiredBuildBlock(t *testing.T) {
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return defaultPChainHeight, nil
 	}
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]uint64, error) {
-		return map[ids.NodeID]uint64{
-			{1}: 100,
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.Validator, error) {
+		return map[ids.NodeID]*validators.Validator{
+			{1}: {
+				NodeID: ids.NodeID{1},
+				Weight: 100,
+			},
 		}, nil
 	}
 
@@ -1212,9 +1227,12 @@ func TestInnerVMRollback(t *testing.T) {
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return defaultPChainHeight, nil
 	}
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]uint64, error) {
-		return map[ids.NodeID]uint64{
-			{1}: 100,
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.Validator, error) {
+		return map[ids.NodeID]*validators.Validator{
+			{1}: {
+				NodeID: ids.NodeID{1},
+				Weight: 100,
+			},
 		}, nil
 	}
 
@@ -1404,9 +1422,12 @@ func TestInnerVMRollback(t *testing.T) {
 func TestBuildBlockDuringWindow(t *testing.T) {
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]uint64, error) {
-		return map[ids.NodeID]uint64{
-			proVM.ctx.NodeID: 10,
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.Validator, error) {
+		return map[ids.NodeID]*validators.Validator{
+			proVM.ctx.NodeID: {
+				NodeID: proVM.ctx.NodeID,
+				Weight: 10,
+			},
 		}, nil
 	}
 
@@ -1927,13 +1948,25 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return defaultPChainHeight, nil
 	}
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]uint64, error) {
-		res := make(map[ids.NodeID]uint64)
-		res[proVM.ctx.NodeID] = uint64(10)
-		res[ids.NodeID{1}] = uint64(5)
-		res[ids.NodeID{2}] = uint64(6)
-		res[ids.NodeID{3}] = uint64(7)
-		return res, nil
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.Validator, error) {
+		return map[ids.NodeID]*validators.Validator{
+			proVM.ctx.NodeID: {
+				NodeID: proVM.ctx.NodeID,
+				Weight: 10,
+			},
+			{1}: {
+				NodeID: ids.NodeID{1},
+				Weight: 5,
+			},
+			{2}: {
+				NodeID: ids.NodeID{2},
+				Weight: 6,
+			},
+			{3}: {
+				NodeID: ids.NodeID{3},
+				Weight: 7,
+			},
+		}, nil
 	}
 
 	ctx := snow.DefaultContextTest()
@@ -2125,13 +2158,25 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return defaultPChainHeight, nil
 	}
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]uint64, error) {
-		res := make(map[ids.NodeID]uint64)
-		res[proVM.ctx.NodeID] = uint64(10)
-		res[ids.NodeID{1}] = uint64(5)
-		res[ids.NodeID{2}] = uint64(6)
-		res[ids.NodeID{3}] = uint64(7)
-		return res, nil
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.Validator, error) {
+		return map[ids.NodeID]*validators.Validator{
+			proVM.ctx.NodeID: {
+				NodeID: proVM.ctx.NodeID,
+				Weight: 10,
+			},
+			{1}: {
+				NodeID: ids.NodeID{1},
+				Weight: 5,
+			},
+			{2}: {
+				NodeID: ids.NodeID{2},
+				Weight: 6,
+			},
+			{3}: {
+				NodeID: ids.NodeID{3},
+				Weight: 7,
+			},
+		}, nil
 	}
 
 	ctx := snow.DefaultContextTest()
@@ -2335,7 +2380,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 	gotBlk, ok := vm.innerBlkCache.Get(blkNearTip.ID())
 	require.True(ok)
 	require.Equal(mockInnerBlkNearTip, gotBlk)
-	require.Equal(uint64(0), vm.lastAcceptedHeight)
+	require.EqualValues(0, vm.lastAcceptedHeight)
 
 	// Clear the cache
 	vm.innerBlkCache.Flush()

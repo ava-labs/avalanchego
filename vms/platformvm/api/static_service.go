@@ -85,6 +85,7 @@ func (utxo UTXO) Less(other UTXO) bool {
 // [StartTime] is the Unix time when they start staking
 // [Endtime] is the Unix time repr. of when they are done staking
 // [NodeID] is the node ID of the staker
+// [Uptime] is the observed uptime of this staker
 type Staker struct {
 	TxID        ids.ID       `json:"txID"`
 	StartTime   json.Uint64  `json:"startTime"`
@@ -128,7 +129,8 @@ type PermissionlessValidator struct {
 type PermissionedValidator struct {
 	Staker
 	// The owner the staking reward, if applicable, will go to
-	Connected bool `json:"connected"`
+	Connected bool          `json:"connected"`
+	Uptime    *json.Float32 `json:"uptime,omitempty"`
 }
 
 // PrimaryDelegator is the repr. of a primary network delegator sent over APIs.

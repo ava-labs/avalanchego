@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -45,9 +44,10 @@ const (
 )
 
 var (
-	_                      sender.ExternalSender = (*network)(nil)
-	_                      Network               = (*network)(nil)
-	errNoPrimaryValidators                       = errors.New("no default subnet validators")
+	_ sender.ExternalSender = (*network)(nil)
+	_ Network               = (*network)(nil)
+
+	errMissingPrimaryValidators = errors.New("missing primary validator set")
 )
 
 // Network defines the functionality of the networking library.
@@ -60,7 +60,6 @@ type Network interface {
 	health.Checker
 
 	peer.Network
-	common.SubnetTracker
 
 	// StartClose this network and all existing connections it has. Calling
 	// StartClose multiple times is handled gracefully.
@@ -164,7 +163,7 @@ func NewNetwork(
 ) (Network, error) {
 	primaryNetworkValidators, ok := config.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
-		return nil, errNoPrimaryValidators
+		return nil, errMissingPrimaryValidators
 	}
 
 	inboundMsgThrottler, err := throttling.NewInboundMsgThrottler(
@@ -527,12 +526,16 @@ func (n *network) Peers(peerID ids.NodeID) ([]ids.NodeID, []ips.ClaimedIPPort, e
 }
 
 func (n *network) Pong(nodeID ids.NodeID) (message.OutboundMessage, error) {
-	uptimePercentFloat, err := n.config.UptimeCalculator.CalculateUptimePercent(nodeID)
+	// TODO: expand this message for tracking subnet uptimes.
+	uptimePercentFloat, err := n.config.UptimeCalculator.CalculateUptimePercent(
+		nodeID,
+		constants.PrimaryNetworkID,
+	)
 	if err != nil {
 		uptimePercentFloat = 0
 	}
 
-	uptimePercentInt := uint8(uptimePercentFloat * 100)
+	uptimePercentInt := uint32(uptimePercentFloat * 100)
 	return n.peerConfig.MessageCreator.Pong(uptimePercentInt)
 }
 
@@ -639,22 +642,6 @@ func (n *network) ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort) {
 		n.trackedIPs[nodeID] = tracked
 		n.dial(n.onCloseCtx, nodeID, tracked)
 	}
-}
-
-func (n *network) TracksSubnet(nodeID ids.NodeID, subnetID ids.ID) bool {
-	if n.config.MyNodeID == nodeID {
-		return subnetID == constants.PrimaryNetworkID || n.config.WhitelistedSubnets.Contains(subnetID)
-	}
-
-	n.peersLock.RLock()
-	defer n.peersLock.RUnlock()
-
-	peer, connected := n.connectedPeers.GetByID(nodeID)
-	if !connected {
-		return false
-	}
-	trackedSubnets := peer.TrackedSubnets()
-	return subnetID == constants.PrimaryNetworkID || trackedSubnets.Contains(subnetID)
 }
 
 // getPeers returns a slice of connected peers from a set of [nodeIDs].

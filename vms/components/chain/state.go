@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 // State implements an efficient caching layer used to wrap a VM
@@ -30,6 +31,9 @@ type State struct {
 	// create an unknown block, and building on top of the preferred block should never yield
 	// a block that has already been decided.
 	buildBlock func(context.Context) (snowman.Block, error)
+
+	// If nil, [BuildBlockWithContext] returns [BuildBlock].
+	buildBlockWithContext func(context.Context, *block.Context) (snowman.Block, error)
 
 	// getStatus returns the status of the block
 	getStatus func(context.Context, snowman.Block) (choices.Status, error)
@@ -57,11 +61,12 @@ type Config struct {
 	// Cache configuration:
 	DecidedCacheSize, MissingCacheSize, UnverifiedCacheSize, BytesToIDCacheSize int
 
-	LastAcceptedBlock  snowman.Block
-	GetBlock           func(context.Context, ids.ID) (snowman.Block, error)
-	UnmarshalBlock     func(context.Context, []byte) (snowman.Block, error)
-	BuildBlock         func(context.Context) (snowman.Block, error)
-	GetBlockIDAtHeight func(context.Context, uint64) (ids.ID, error)
+	LastAcceptedBlock     snowman.Block
+	GetBlock              func(context.Context, ids.ID) (snowman.Block, error)
+	UnmarshalBlock        func(context.Context, []byte) (snowman.Block, error)
+	BuildBlock            func(context.Context) (snowman.Block, error)
+	BuildBlockWithContext func(context.Context, *block.Context) (snowman.Block, error)
+	GetBlockIDAtHeight    func(context.Context, uint64) (ids.ID, error)
 }
 
 // Block is an interface wrapping the normal snowman.Block interface to be used in
@@ -114,6 +119,7 @@ func (s *State) initialize(config *Config) {
 	s.verifiedBlocks = make(map[ids.ID]*BlockWrapper)
 	s.getBlock = config.GetBlock
 	s.buildBlock = config.BuildBlock
+	s.buildBlockWithContext = config.BuildBlockWithContext
 	s.unmarshalBlock = config.UnmarshalBlock
 	if config.GetBlockIDAtHeight == nil {
 		s.getStatus = func(_ context.Context, blk snowman.Block) (choices.Status, error) {
@@ -315,6 +321,22 @@ func (s *State) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error)
 	return s.addBlockOutsideConsensus(ctx, blk)
 }
 
+// BuildBlockWithContext attempts to build a new internal Block, wraps it, and
+// adds it to the appropriate caching layer if successful.
+// If [s.buildBlockWithContext] is nil, returns [BuildBlock].
+func (s *State) BuildBlockWithContext(ctx context.Context, blockCtx *block.Context) (snowman.Block, error) {
+	if s.buildBlockWithContext == nil {
+		return s.BuildBlock(ctx)
+	}
+
+	blk, err := s.buildBlockWithContext(ctx, blockCtx)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.deduplicate(ctx, blk)
+}
+
 // BuildBlock attempts to build a new internal Block, wraps it, and adds it
 // to the appropriate caching layer if successful.
 func (s *State) BuildBlock(ctx context.Context) (snowman.Block, error) {
@@ -323,6 +345,10 @@ func (s *State) BuildBlock(ctx context.Context) (snowman.Block, error) {
 		return nil, err
 	}
 
+	return s.deduplicate(ctx, blk)
+}
+
+func (s *State) deduplicate(ctx context.Context, blk snowman.Block) (snowman.Block, error) {
 	blkID := blk.ID()
 	// Defensive: buildBlock should not return a block that has already been verified.
 	// If it does, make sure to return the existing reference to the block.

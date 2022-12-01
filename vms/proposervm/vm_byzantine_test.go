@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
@@ -22,6 +23,7 @@ import (
 // Ensure that a byzantine node issuing an invalid PreForkBlock (Y) when the
 // parent block (X) is issued into a PostForkBlock (A) will be marked as invalid
 // correctly.
+//
 //     G
 //   / |
 // A - X
@@ -641,10 +643,13 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 
 	// Make sure that we will be sampled to perform the proposals.
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]uint64, error) {
-		res := make(map[ids.NodeID]uint64)
-		res[proVM.ctx.NodeID] = uint64(10)
-		return res, nil
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.Validator, error) {
+		return map[ids.NodeID]*validators.Validator{
+			proVM.ctx.NodeID: {
+				NodeID: proVM.ctx.NodeID,
+				Weight: 10,
+			},
+		}, nil
 	}
 
 	proVM.Set(coreGenBlk.Timestamp())

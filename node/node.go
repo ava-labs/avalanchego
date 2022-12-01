@@ -685,6 +685,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		AtomicMemory:                            n.sharedMemory,
 		AVAXAssetID:                             avaxAssetID,
 		XChainID:                                xChainID,
+		CChainID:                                cChainID,
 		CriticalChains:                          criticalChains,
 		TimeoutManager:                          timeoutManager,
 		Health:                                  n.health,
@@ -706,6 +707,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		StateSyncBeacons:                        n.Config.StateSyncIDs,
 		TracingEnabled:                          n.Config.TraceConfig.Enabled,
 		Tracer:                                  n.tracer,
+		ChainDataDir:                            n.Config.ChainDataDir,
 	})
 
 	// Notify the API server when new chains are created
@@ -741,7 +743,6 @@ func (n *Node) initVMs() error {
 			Config: config.Config{
 				Chains:                          n.chainManager,
 				Validators:                      vdrs,
-				SubnetTracker:                   n.Net,
 				UptimeLockedCalculator:          n.uptimeCalculator,
 				StakingEnabled:                  n.Config.EnableStaking,
 				WhitelistedSubnets:              n.Config.WhitelistedSubnets,
