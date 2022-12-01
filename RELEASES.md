@@ -10,8 +10,23 @@ This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/ava
 - Removed `Set`, `AddWeight`, `RemoveWeight`, and `Contains` from the `validators.Manager` interface
 - Added `Add` to the `validators.Manager` interface
 - Removed `Set` from the `validators.Set` interface
-- Removed the `validators.Set` interface
+- Added `Add` and `Get` to the `validators.Set` interface
+- Modified `validators.Set#Sample` to return `ids.NodeID` rather than `valdiators.Validator`
+- Replaced the `validators.Validator` interface with a struct and added a `BLS` public key field
 - Improved and documented error handling within the `validators.Set` interface
+- Fixed race condition between API initialization and shutdown
+- Fixed race condition between NAT traversal initialization and shutdown
+- Fixed race condition during beacon connection tracking
+- Added race detection to the E2E tests
+- Converted all sorting to utilize generics
+- Added additional message and sender tests
+- Added `BuildBlockWithContext` as an optional VM method to build blocks at a specific P-chain height
+- Added independent subnet uptime tracking
+- Added the C-chain ID to the `snow.Context`
+- Added `BLS` public keys to the result of `GetValidatorSet`
+- Added `ChainDataDir` to the `snow.Context`
+- Added `--chain-data-dir` as a CLI flag to specify the base directory for all `ChainDataDir`s
+- Added indices to the return values of `GetLastAccepted` and `GetContainerByID` on the `indexer` API client
 
 ## [v1.9.3](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.3)
 
