@@ -1,5 +1,11 @@
 # Release Notes
 
+## [v0.11.4](https://github.com/ava-labs/coreth/releases/tag/v0.11.4)
+
+- Add config option to perform database inspection on startup
+- Add configurable transaction indexing to reduce disk usage
+- Add special case to allow transactions using Nick's Method to bypass API level replay protection
+
 ## [v0.11.3](https://github.com/ava-labs/coreth/releases/tag/v0.11.3)
 
 - Add counter for number of processed and accepted transactions
