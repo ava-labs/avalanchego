@@ -4,6 +4,7 @@
 package set
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -138,16 +139,20 @@ func TestSetMarshalJSON(t *testing.T) {
 		require.Equal("[]", string(asJSON))
 	}
 	id1, id2 := testSettable{1}, testSettable{2}
+	id1JSON, err := json.Marshal(id1)
+	require.NoError(err)
+	id2JSON, err := json.Marshal(id2)
+	require.NoError(err)
 	set.Add(id1)
 	{
 		asJSON, err := set.MarshalJSON()
 		require.NoError(err)
-		require.Equal(fmt.Sprintf("[\"%s\"]", id1), string(asJSON))
+		require.Equal(fmt.Sprintf("[%s]", string(id1JSON)), string(asJSON))
 	}
 	set.Add(id2)
 	{
 		asJSON, err := set.MarshalJSON()
 		require.NoError(err)
-		require.Equal(fmt.Sprintf("[\"%s\",\"%s\"]", id1, id2), string(asJSON))
+		require.Equal(fmt.Sprintf("[%s,%s]", string(id1JSON), string(id2JSON)), string(asJSON))
 	}
 }

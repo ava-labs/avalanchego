@@ -5,9 +5,8 @@ package set
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
-	"sort"
-	"strings"
 
 	"golang.org/x/exp/maps"
 
@@ -18,20 +17,19 @@ import (
 // The minimum capacity of a set
 const minSetSize = 16
 
-// Settable describes an element that can be in a set.
-type Settable interface {
-	comparable
-	fmt.Stringer
-}
+var (
+	_ fmt.Stringer   = (*Set[int])(nil)
+	_ json.Marshaler = (*Set[int])(nil)
+)
 
 // Set is a set of elements.
-type Set[T Settable] map[T]struct{}
+type Set[T comparable] map[T]struct{}
 
 // Return a new set with initial capacity [size].
 // More or less than [size] elements can be added to this set.
 // Using NewSet() rather than Set[T]{} is just an optimization that can
 // be used if you know how many elements will be put in this set.
-func NewSet[T Settable](size int) Set[T] {
+func NewSet[T comparable](size int) Set[T] {
 	if size < 0 {
 		return Set[T]{}
 	}
@@ -149,22 +147,6 @@ func (s Set[T]) Equals(other Set[T]) bool {
 	return true
 }
 
-// String returns the string representation of a set
-func (s Set[_]) String() string {
-	sb := strings.Builder{}
-	sb.WriteString("{")
-	first := true
-	for elt := range s {
-		if !first {
-			sb.WriteString(", ")
-		}
-		first = false
-		sb.WriteString(elt.String())
-	}
-	sb.WriteString("}")
-	return sb.String()
-}
-
 // Removes and returns an element.
 // If the set is empty, does nothing and returns false.
 func (s *Set[T]) Pop() (T, bool) {
@@ -175,35 +157,48 @@ func (s *Set[T]) Pop() (T, bool) {
 	return utils.Zero[T](), false
 }
 
-func (s *Set[_]) MarshalJSON() ([]byte, error) {
-	elts := s.List()
+// TODO: This is only use to set opentelemetry attributes.
+//       Do we need this?
+func (s Set[T]) String() string {
+	asBytes, _ := s.MarshalJSON()
+	return string(asBytes)
+}
 
-	// Sort for determinism
-	asStrs := make([]string, len(elts))
-	for i, elt := range elts {
-		asStrs[i] = elt.String()
+func (s *Set[_]) MarshalJSON() ([]byte, error) {
+	var (
+		eltBytes = make([][]byte, len(*s))
+		i        int
+		err      error
+	)
+	for elt := range *s {
+		eltBytes[i], err = json.Marshal(elt)
+		if err != nil {
+			return nil, err
+		}
+		i++
 	}
-	sort.Strings(asStrs)
+	// Sort for determinism
+	utils.SortBytes(eltBytes)
 
 	// Build the JSON
 	var (
-		jsonStr = bytes.Buffer{}
+		jsonBuf = bytes.Buffer{}
 		errs    = wrappers.Errs{}
 	)
-	_, err := jsonStr.WriteString("[")
+	_, err = jsonBuf.WriteString("[")
 	errs.Add(err)
-	for i, str := range asStrs {
-		_, err := jsonStr.WriteString("\"" + str + "\"")
+	for i, elt := range eltBytes {
+		_, err := jsonBuf.Write(elt)
 		errs.Add(err)
-		if i != len(asStrs)-1 {
-			_, err := jsonStr.WriteString(",")
+		if i != len(eltBytes)-1 {
+			_, err := jsonBuf.WriteString(",")
 			errs.Add(err)
 		}
 	}
-	_, err = jsonStr.WriteString("]")
+	_, err = jsonBuf.WriteString("]")
 	errs.Add(err)
 
-	return jsonStr.Bytes(), errs.Err
+	return jsonBuf.Bytes(), errs.Err
 }
 
 // Returns an element. If the set is empty, returns false
