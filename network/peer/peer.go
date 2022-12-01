@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"net"
@@ -583,9 +584,21 @@ func (p *peer) sendNetworkMessages() {
 				continue
 			}
 
+			txIDs, err := p.txIDsForPeers(peerIPs)
+			if err != nil {
+				// This should never happen
+				p.Log.Error(
+					"failed to get txIDs for peers",
+					zap.Error(err),
+				)
+				// TODO should we close the connection?
+				p.StartClose()
+				return
+			}
+
 			// Bypass throttling is disabled here to follow the non-handshake
 			// message sending pattern.
-			msg, err := p.Config.MessageCreator.PeerList(peerIPs, false /*=bypassThrottling*/)
+			msg, err := p.Config.MessageCreator.PeerList(peerIPs, txIDs, false /*=bypassThrottling*/)
 			if err != nil {
 				p.Log.Error("failed to create peer list message",
 					zap.Stringer("nodeID", p.id),
@@ -844,9 +857,21 @@ func (p *peer) handleVersion(msg *p2ppb.Version) {
 		return
 	}
 
+	txIDs, err := p.txIDsForPeers(peerIPs)
+	if err != nil {
+		// This should never happen
+		p.Log.Error(
+			"failed to get txIDs for peers",
+			zap.Error(err),
+		)
+		// TODO should we close the connection?
+		p.StartClose()
+		return
+	}
+
 	// We bypass throttling here to ensure that the version message is
 	// acknowledged timely.
-	peerListMsg, err := p.Config.MessageCreator.PeerList(peerIPs, true /*=bypassThrottling*/)
+	peerListMsg, err := p.Config.MessageCreator.PeerList(peerIPs, txIDs, true /*=bypassThrottling*/)
 	if err != nil {
 		p.Log.Error("failed to create peer list handshake message",
 			zap.Stringer("nodeID", p.id),
@@ -936,4 +961,21 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 
 func (p *peer) nextTimeout() time.Time {
 	return p.Clock.Time().Add(p.PongTimeout)
+}
+
+func (p *peer) txIDsForPeers(peerIPs []ips.ClaimedIPPort) ([]ids.ID, error) {
+	txIDs := make([]ids.ID, len(peerIPs))
+
+	for _, peerIP := range peerIPs {
+		nodeID := ids.NodeIDFromCert(peerIP.Cert)
+
+		vdr, ok := p.Validators.Get(nodeID)
+		if !ok {
+			return nil, fmt.Errorf("peer is not a validator of the primary network")
+		}
+
+		txIDs = append(txIDs, vdr.TxID)
+	}
+
+	return txIDs, nil
 }

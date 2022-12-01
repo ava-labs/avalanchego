@@ -30,6 +30,7 @@ type OutboundMsgBuilder interface {
 
 	PeerList(
 		peers []ips.ClaimedIPPort,
+		txIDs []ids.ID,
 		bypassThrottling bool,
 	) (OutboundMessage, error)
 
@@ -224,7 +225,7 @@ func (b *outMsgBuilder) Version(
 	)
 }
 
-func (b *outMsgBuilder) PeerList(peers []ips.ClaimedIPPort, bypassThrottling bool) (OutboundMessage, error) {
+func (b *outMsgBuilder) PeerList(peers []ips.ClaimedIPPort, txIDs []ids.ID, bypassThrottling bool) (OutboundMessage, error) {
 	claimIPPorts := make([]*p2ppb.ClaimedIpPort, len(peers))
 	for i, p := range peers {
 		claimIPPorts[i] = &p2ppb.ClaimedIpPort{
@@ -235,11 +236,16 @@ func (b *outMsgBuilder) PeerList(peers []ips.ClaimedIPPort, bypassThrottling boo
 			Signature:       p.Signature,
 		}
 	}
+
+	txIDsBytes := make([][]byte, len(txIDs))
+	encodeIDs(txIDs, txIDsBytes)
+
 	return b.builder.createOutbound(
 		&p2ppb.Message{
 			Message: &p2ppb.Message_PeerList{
 				PeerList: &p2ppb.PeerList{
 					ClaimedIpPorts: claimIPPorts,
+					TxIds:          txIDsBytes,
 				},
 			},
 		},

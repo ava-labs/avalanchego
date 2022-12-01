@@ -104,6 +104,7 @@ message ClaimedIpPort {
 // of the remote peer.
 message PeerList {
   repeated ClaimedIpPort claimed_ip_ports = 1;
+  repeated bytes tx_ids = 2;
 }
 
 message GetStateSummaryFrontier {
