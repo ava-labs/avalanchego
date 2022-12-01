@@ -113,7 +113,7 @@ func TestImportTxVerify(t *testing.T) {
 		},
 	}
 
-	// // Sort the inputs and outputs to ensure the transaction is canonical
+	// Sort the inputs and outputs to ensure the transaction is canonical
 	utils.Sort(importTx.ImportedInputs)
 	SortEVMOutputs(importTx.Outs)
 
