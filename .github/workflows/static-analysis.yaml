@@ -1,5 +1,7 @@
 name: Static analysis
 on:
+  push:
+    branches: [chain4travel, dev]
   pull_request:
     tags-ignore: ["*"]
     branches: [chain4travel, dev]
