@@ -522,7 +522,6 @@ func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.I
 			// This should never happen
 			return nil, fmt.Errorf("%w: %s", errMissingValidator, vdr.NodeID)
 		}
-		vdr.PublicKey = primaryVdr.PublicKey
 		vdrSet[vdr.NodeID] = &validators.GetValidatorOutput{
 			NodeID:    vdr.NodeID,
 			PublicKey: primaryVdr.PublicKey,
