@@ -35,12 +35,10 @@ func (ip *UnsignedIP) Sign(signer crypto.Signer) (*SignedIP, error) {
 }
 
 func (ip *UnsignedIP) bytes() []byte {
-	p := ips.Packer{
-		Packer: wrappers.Packer{
-			Bytes: make([]byte, wrappers.IPLen+wrappers.LongLen),
-		},
+	p := wrappers.Packer{
+		Bytes: make([]byte, wrappers.IPLen+wrappers.LongLen),
 	}
-	p.PackIP(ip.IP)
+	ips.PackIP(&p, ip.IP)
 	p.PackLong(ip.Timestamp)
 	return p.Bytes
 }
