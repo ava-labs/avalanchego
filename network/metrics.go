@@ -106,18 +106,21 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 			Name:      "node_uptime_rewarding_stake",
 			Help:      "The percentage of total stake which thinks this node is eligible for rewards",
 		}),
-		nodeSubnetUptimeWeightedAverage: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "node_subnet_uptime_weighted_average",
-			Help:      "This node's subnet uptime averages weighted by observing subnet peer stakes",
-		},
+		nodeSubnetUptimeWeightedAverage: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "node_subnet_uptime_weighted_average",
+				Help:      "This node's subnet uptime averages weighted by observing subnet peer stakes",
+			},
 			[]string{"subnetID"},
 		),
-		nodeSubnetUptimeRewardingStake: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "node_subnet_uptime_rewarding_stake",
-			Help:      "The percentage of subnet's total stake which thinks this node is eligible for subnet's rewards",
-		}, []string{"subnetID"},
+		nodeSubnetUptimeRewardingStake: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "node_subnet_uptime_rewarding_stake",
+				Help:      "The percentage of subnet's total stake which thinks this node is eligible for subnet's rewards",
+			},
+			[]string{"subnetID"},
 		),
 	}
 
@@ -137,6 +140,8 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 		registerer.Register(m.inboundConnRateLimited),
 		registerer.Register(m.nodeUptimeWeightedAverage),
 		registerer.Register(m.nodeUptimeRewardingStake),
+		registerer.Register(m.nodeSubnetUptimeWeightedAverage),
+		registerer.Register(m.nodeSubnetUptimeRewardingStake),
 	)
 
 	// init subnet tracker metrics with whitelisted subnets

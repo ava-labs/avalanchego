@@ -1114,6 +1114,7 @@ func (n *network) NodeUptime(subnetID ids.ID) (UptimeResult, error) {
 		totalWeightedPercent += percent * weightFloat
 
 		// if this peer thinks we're above requirement add the weight
+		// TODO: use subnet-specific uptime requirements
 		if percent/100 >= n.config.UptimeRequirement {
 			rewardingStake += weightFloat
 		}

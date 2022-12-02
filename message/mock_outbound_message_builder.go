@@ -250,21 +250,6 @@ func (mr *MockOutboundMsgBuilderMockRecorder) GetStateSummaryFrontier(arg0, arg1
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStateSummaryFrontier", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).GetStateSummaryFrontier), arg0, arg1, arg2)
 }
 
-// NewPong mocks base method.
-func (m *MockOutboundMsgBuilder) NewPong(arg0 map[string]uint32) (OutboundMessage, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewPong", arg0)
-	ret0, _ := ret[0].(OutboundMessage)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// NewPong indicates an expected call of NewPong.
-func (mr *MockOutboundMsgBuilderMockRecorder) NewPong(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewPong", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).NewPong), arg0)
-}
-
 // PeerList mocks base method.
 func (m *MockOutboundMsgBuilder) PeerList(arg0 []ips.ClaimedIPPort, arg1 bool) (OutboundMessage, error) {
 	m.ctrl.T.Helper()

@@ -274,12 +274,12 @@ type UptimeResponse struct {
 	WeightedAveragePercentage json.Float64 `json:"weightedAveragePercentage"`
 }
 
-type UptimesRequest struct {
+type UptimeRequest struct {
 	// if omitted, defaults to primary network
 	SubnetID ids.ID `json:"subnetID"`
 }
 
-func (i *Info) Uptime(_ *http.Request, args *UptimesRequest, reply *UptimeResponse) error {
+func (i *Info) Uptime(_ *http.Request, args *UptimeRequest, reply *UptimeResponse) error {
 	i.log.Debug("Info: Uptime called")
 	result, err := i.networking.NodeUptime(args.SubnetID)
 	if err != nil {
