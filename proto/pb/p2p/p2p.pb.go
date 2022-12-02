@@ -758,7 +758,8 @@ func (x *PeerList) GetClaimedIpPorts() []*ClaimedIpPort {
 	return nil
 }
 
-// Message that contains the AddValidatorTxIDs that were used by the peer that sent this message.
+// Message that contains the AddValidatorTxIDs that were used by the peer that
+// sent this message.
 type PeerListAck struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
