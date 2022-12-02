@@ -22,6 +22,7 @@ const (
 	PongOp
 	VersionOp
 	PeerListOp
+	PeerListAckOp
 	// State sync:
 	GetStateSummaryFrontierOp
 	GetStateSummaryFrontierFailedOp
@@ -63,7 +64,6 @@ const (
 	NotifyOp
 	GossipRequestOp
 	TimeoutOp
-	PeerListAckOp
 )
 
 var (

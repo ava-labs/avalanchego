@@ -262,7 +262,7 @@ func (b *outMsgBuilder) PeerListAck(txIDs []ids.ID) (OutboundMessage, error) {
 				},
 			},
 		},
-		b.compress,
+		false,
 		false,
 	)
 }
@@ -302,6 +302,7 @@ func (b *outMsgBuilder) StateSummaryFrontier(
 				},
 			},
 		},
+		b.compress,
 		b.compress,
 		false,
 	)
