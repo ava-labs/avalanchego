@@ -14,8 +14,9 @@ const (
 	intLen  = 4
 	longLen = 8
 	ipLen   = 18
+	idLen   = 32
 	// Certificate length, signature length, IP, timestamp
-	baseIPCertDescLen = 2*intLen + ipLen + longLen
+	baseIPCertDescLen = 2*intLen + ipLen + longLen + idLen
 )
 
 // A self contained proof that a peer is claiming ownership of an IPPort at a
