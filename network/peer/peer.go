@@ -694,10 +694,6 @@ func (p *peer) handle(msg message.InboundMessage) {
 }
 
 func (p *peer) handlePing(_ *p2ppb.Ping) {
-	p.sendPong()
-}
-
-func (p *peer) sendPong() {
 	primaryUptimePerc, err := p.Network.PeerUptimePercentage(p.id, constants.PrimaryNetworkID)
 	if err != nil {
 		p.Log.Debug("failed to get peer primary uptime percentage",
