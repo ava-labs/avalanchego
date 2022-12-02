@@ -35,7 +35,7 @@ func (g *GossipTrackerCallback) OnValidatorAdded(
 	}) {
 		g.Log.Error("failed to add a validator",
 			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("t1", txID),
+			zap.Stringer("txID", txID),
 		)
 	}
 }
