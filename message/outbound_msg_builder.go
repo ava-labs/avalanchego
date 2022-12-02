@@ -303,7 +303,6 @@ func (b *outMsgBuilder) StateSummaryFrontier(
 			},
 		},
 		b.compress,
-		b.compress,
 		false,
 	)
 }
