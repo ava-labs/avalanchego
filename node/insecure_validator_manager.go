@@ -19,10 +19,16 @@ type insecureValidatorManager struct {
 
 func (i *insecureValidatorManager) Connected(vdrID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
 	if constants.PrimaryNetworkID == subnetID {
+		// Staking is disabled so we don't have a txID that added the peer as a
+		// validator. Because each validator needs a txID associated with it, we
+		// hack one together by padding the nodeID with zeroes.
+		dummyTxID := ids.Empty
+		copy(dummyTxID[:], vdrID[:])
+
 		// Add will only error here if the total weight of the set would go over
 		// [math.MaxUint64]. In this case, we will just not mark this new peer
 		// as a validator.
-		_ = i.vdrs.Add(vdrID, nil, i.weight)
+		_ = i.vdrs.Add(vdrID, nil, dummyTxID, i.weight)
 	}
 	i.Router.Connected(vdrID, nodeVersion, subnetID)
 }

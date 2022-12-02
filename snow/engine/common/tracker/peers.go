@@ -46,7 +46,7 @@ func NewPeers() Peers {
 	}
 }
 
-func (p *peers) OnValidatorAdded(nodeID ids.NodeID, _ *bls.PublicKey, weight uint64) {
+func (p *peers) OnValidatorAdded(nodeID ids.NodeID, _ *bls.PublicKey, _ ids.ID, weight uint64) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
