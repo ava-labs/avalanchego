@@ -236,6 +236,7 @@ func NewNetwork(
 		MaxClockDifference:   config.MaxClockDifference,
 		ResourceTracker:      config.ResourceTracker,
 		GossipTracker:        config.GossipTracker,
+		UptimeCalculator:     config.UptimeCalculator,
 	}
 
 	onCloseCtx, cancel := context.WithCancel(context.Background())
@@ -539,18 +540,6 @@ func (n *network) Peers(peerID ids.NodeID) ([]ids.NodeID, []ips.ClaimedIPPort, e
 	}
 
 	return validatorIDs, validatorIPs, nil
-}
-
-func (n *network) PeerUptimePercentage(nodeID ids.NodeID, subnetID ids.ID) (uint32, error) {
-	uptimePercentFloat, err := n.config.UptimeCalculator.CalculateUptimePercent(
-		nodeID,
-		subnetID,
-	)
-	if err != nil {
-		return 0, err
-	}
-
-	return uint32(uptimePercentFloat * 100), nil
 }
 
 // Dispatch starts accepting connections from other nodes attempting to connect

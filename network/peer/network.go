@@ -39,8 +39,4 @@ type Network interface {
 
 	// Peers returns peers that [peerID] might not know about.
 	Peers(peerID ids.NodeID) ([]ids.NodeID, []ips.ClaimedIPPort, error)
-
-	// PeerUptimePercentage provides the peer's uptime percentage
-	// from this node's point of view.
-	PeerUptimePercentage(ids.NodeID, ids.ID) (uint32, error)
 }
