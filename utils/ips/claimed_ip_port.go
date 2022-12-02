@@ -15,7 +15,7 @@ const (
 	longLen = 8
 	ipLen   = 18
 	idLen   = 32
-	// Certificate length, signature length, IP, timestamp
+	// Certificate length, signature length, IP, timestamp, tx ID
 	baseIPCertDescLen = 2*intLen + ipLen + longLen + idLen
 )
 
