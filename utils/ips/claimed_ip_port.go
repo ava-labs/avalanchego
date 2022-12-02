@@ -5,6 +5,8 @@ package ips
 
 import (
 	"crypto/x509"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 // Can't import these from wrappers package due to circular import.
@@ -30,6 +32,8 @@ type ClaimedIPPort struct {
 	// actually claimed by the peer in question, and not by a malicious peer
 	// trying to get us to dial bogus IPPorts.
 	Signature []byte
+	// The txID that added this peer into the validator set
+	TxID ids.ID
 }
 
 // Returns the length of the byte representation of this ClaimedIPPort.

@@ -499,26 +499,27 @@ func (n *network) Peers(peerID ids.NodeID) ([]ids.NodeID, []ips.ClaimedIPPort, e
 	validatorIDs := make([]ids.NodeID, 0, len(unknownValidators))
 	validatorIPs := make([]ips.ClaimedIPPort, 0, len(unknownValidators))
 
-	for _, validatorID := range unknownValidators {
+	for _, validator := range unknownValidators {
 		n.peersLock.RLock()
-		p, ok := n.connectedPeers.GetByID(validatorID)
+		p, ok := n.connectedPeers.GetByID(validator.NodeID)
 		n.peersLock.RUnlock()
 		if !ok {
 			n.peerConfig.Log.Debug(
 				"unable to find validator in connected peers",
-				zap.Stringer("nodeID", validatorID),
+				zap.Stringer("nodeID", validator.NodeID),
 			)
 			continue
 		}
 
 		peerIP := p.IP()
-		validatorIDs = append(validatorIDs, validatorID)
+		validatorIDs = append(validatorIDs, validator.NodeID)
 		validatorIPs = append(validatorIPs,
 			ips.ClaimedIPPort{
 				Cert:      p.Cert(),
 				IPPort:    peerIP.IP.IP,
 				Timestamp: peerIP.IP.Timestamp,
 				Signature: peerIP.Signature,
+				TxID:      validator.TxID,
 			},
 		)
 	}

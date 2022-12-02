@@ -250,18 +250,18 @@ func (mr *MockOutboundMsgBuilderMockRecorder) GetStateSummaryFrontier(arg0, arg1
 }
 
 // PeerList mocks base method.
-func (m *MockOutboundMsgBuilder) PeerList(arg0 []ips.ClaimedIPPort, arg1 []ids.ID, arg2 bool) (OutboundMessage, error) {
+func (m *MockOutboundMsgBuilder) PeerList(arg0 []ips.ClaimedIPPort, arg1 bool) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PeerList", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "PeerList", arg0, arg1)
 	ret0, _ := ret[0].(OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // PeerList indicates an expected call of PeerList.
-func (mr *MockOutboundMsgBuilderMockRecorder) PeerList(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockOutboundMsgBuilderMockRecorder) PeerList(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PeerList", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).PeerList), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PeerList", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).PeerList), arg0, arg1)
 }
 
 // Ping mocks base method.

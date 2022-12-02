@@ -8,7 +8,6 @@ import (
 	"context"
 	"crypto/x509"
 	"errors"
-	"fmt"
 	"io"
 	"math"
 	"net"
@@ -584,21 +583,9 @@ func (p *peer) sendNetworkMessages() {
 				continue
 			}
 
-			txIDs, err := p.txIDsForPeers(peerIPs)
-			if err != nil {
-				// This should never happen
-				p.Log.Error(
-					"failed to get txIDs for peers",
-					zap.Error(err),
-				)
-				// TODO should we close the connection?
-				p.StartClose()
-				return
-			}
-
 			// Bypass throttling is disabled here to follow the non-handshake
 			// message sending pattern.
-			msg, err := p.Config.MessageCreator.PeerList(peerIPs, txIDs, false /*=bypassThrottling*/)
+			msg, err := p.Config.MessageCreator.PeerList(peerIPs, false /*=bypassThrottling*/)
 			if err != nil {
 				p.Log.Error("failed to create peer list message",
 					zap.Stringer("nodeID", p.id),
@@ -857,21 +844,9 @@ func (p *peer) handleVersion(msg *p2ppb.Version) {
 		return
 	}
 
-	txIDs, err := p.txIDsForPeers(peerIPs)
-	if err != nil {
-		// This should never happen
-		p.Log.Error(
-			"failed to get txIDs for peers",
-			zap.Error(err),
-		)
-		// TODO should we close the connection?
-		p.StartClose()
-		return
-	}
-
 	// We bypass throttling here to ensure that the version message is
 	// acknowledged timely.
-	peerListMsg, err := p.Config.MessageCreator.PeerList(peerIPs, txIDs, true /*=bypassThrottling*/)
+	peerListMsg, err := p.Config.MessageCreator.PeerList(peerIPs, true /*=bypassThrottling*/)
 	if err != nil {
 		p.Log.Error("failed to create peer list handshake message",
 			zap.Stringer("nodeID", p.id),
@@ -930,6 +905,17 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 			return
 		}
 
+		txID, err := ids.ToID(claimedIPPort.TxId)
+		if err != nil {
+			p.Log.Debug("message with invalid field",
+				zap.Stringer("nodeID", p.id),
+				zap.Stringer("messageOp", message.PeerListOp),
+				zap.String("field", "t1"),
+				zap.Error(err),
+			)
+			p.StartClose()
+			return
+		}
 		ip := ips.ClaimedIPPort{
 			Cert: tlsCert,
 			IPPort: ips.IPPort{
@@ -938,6 +924,7 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 			},
 			Timestamp: claimedIPPort.Timestamp,
 			Signature: claimedIPPort.Signature,
+			TxID:      txID,
 		}
 
 		// it's important to add this to our list of discovered peers regardless
@@ -961,19 +948,4 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 
 func (p *peer) nextTimeout() time.Time {
 	return p.Clock.Time().Add(p.PongTimeout)
-}
-
-func (p *peer) txIDsForPeers(peerIPs []ips.ClaimedIPPort) ([]ids.ID, error) {
-	txIDs := make([]ids.ID, len(peerIPs))
-
-	for _, peerIP := range peerIPs {
-		vdr, ok := p.Validators.Get(ids.NodeIDFromCert(peerIP.Cert))
-		if !ok {
-			return nil, fmt.Errorf("peer is not a validator of the primary network")
-		}
-
-		txIDs = append(txIDs, vdr.TxID)
-	}
-
-	return txIDs, nil
 }
