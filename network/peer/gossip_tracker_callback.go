@@ -29,10 +29,11 @@ func (g *GossipTrackerCallback) OnValidatorAdded(
 	txID ids.ID,
 	_ uint64,
 ) {
-	if !g.GossipTracker.AddValidator(GossipValidator{
+	vdr := GossipValidator{
 		NodeID: nodeID,
 		TxID:   txID,
-	}) {
+	}
+	if !g.GossipTracker.AddValidator(vdr) {
 		g.Log.Error("failed to add a validator",
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("txID", txID),
