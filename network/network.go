@@ -7,13 +7,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	gomath "math"
 	"net"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	gomath "math"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -220,7 +219,6 @@ func NewNetwork(
 		MaxClockDifference:   config.MaxClockDifference,
 		ResourceTracker:      config.ResourceTracker,
 		GossipTracker:        config.GossipTracker,
-		Validators:           primaryNetworkValidators,
 	}
 
 	onCloseCtx, cancel := context.WithCancel(context.Background())
@@ -499,27 +497,26 @@ func (n *network) Peers(peerID ids.NodeID) ([]ids.NodeID, []ips.ClaimedIPPort, e
 	validatorIDs := make([]ids.NodeID, 0, len(unknownValidators))
 	validatorIPs := make([]ips.ClaimedIPPort, 0, len(unknownValidators))
 
-	for _, validator := range unknownValidators {
+	for _, validatorID := range unknownValidators {
 		n.peersLock.RLock()
-		p, ok := n.connectedPeers.GetByID(validator.NodeID)
+		p, ok := n.connectedPeers.GetByID(validatorID)
 		n.peersLock.RUnlock()
 		if !ok {
 			n.peerConfig.Log.Debug(
 				"unable to find validator in connected peers",
-				zap.Stringer("nodeID", validator.NodeID),
+				zap.Stringer("nodeID", validatorID),
 			)
 			continue
 		}
 
 		peerIP := p.IP()
-		validatorIDs = append(validatorIDs, validator.NodeID)
+		validatorIDs = append(validatorIDs, validatorID)
 		validatorIPs = append(validatorIPs,
 			ips.ClaimedIPPort{
 				Cert:      p.Cert(),
 				IPPort:    peerIP.IP.IP,
 				Timestamp: peerIP.IP.Timestamp,
 				Signature: peerIP.Signature,
-				TxID:      validator.TxID,
 			},
 		)
 	}

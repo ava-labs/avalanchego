@@ -7,6 +7,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"math"
+
+	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 const (
@@ -245,4 +247,10 @@ func (p *Packer) PackStr(str string) {
 func (p *Packer) UnpackStr() string {
 	strSize := p.UnpackShort()
 	return string(p.UnpackFixedBytes(int(strSize)))
+}
+
+// PackIP packs an ip port pair to the byte array
+func (p *Packer) PackIP(ip ips.IPPort) {
+	p.PackFixedBytes(ip.IP.To16())
+	p.PackShort(ip.Port)
 }

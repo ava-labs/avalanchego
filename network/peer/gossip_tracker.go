@@ -56,7 +56,7 @@ type GossipTracker interface {
 
 	// AddValidator adds a validator that can be gossiped about
 	// 	bool: False if [validatorID] was already present. True otherwise.
-	AddValidator(validator GossipValidator) bool
+	AddValidator(validatorID ids.NodeID) bool
 	// RemoveValidator removes a validator that can be gossiped about
 	// 	bool: False if [validatorID] was already not present. True otherwise.
 	RemoveValidator(validatorID ids.NodeID) bool
@@ -70,7 +70,7 @@ type GossipTracker interface {
 	//	[]ids.NodeID: a slice of [limit] validatorIDs that [peerID] doesn't know
 	//		about.
 	// 	bool: False if [peerID] is not tracked. True otherwise.
-	GetUnknown(peerID ids.NodeID, limit int) ([]GossipValidator, bool, error)
+	GetUnknown(peerID ids.NodeID, limit int) ([]ids.NodeID, bool, error)
 }
 
 type gossipTracker struct {
@@ -80,7 +80,7 @@ type gossipTracker struct {
 	// a mapping of validators => the index they occupy in the bitsets
 	validatorsToIndices map[ids.NodeID]int
 	// each validator in the index it occupies in the bitset
-	validatorIndices []GossipValidator
+	validatorIndices []ids.NodeID
 
 	metrics gossipTrackerMetrics
 }
@@ -145,20 +145,19 @@ func (g *gossipTracker) StopTrackingPeer(peerID ids.NodeID) bool {
 	return true
 }
 
-func (g *gossipTracker) AddValidator(validator GossipValidator) bool {
+func (g *gossipTracker) AddValidator(validatorID ids.NodeID) bool {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
 	// only add validators that are not already present
-	if _, ok := g.validatorsToIndices[validator.NodeID]; ok {
+	if _, ok := g.validatorsToIndices[validatorID]; ok {
 		return false
 	}
 
 	// add the validator to the MSB of the bitset.
 	msb := len(g.validatorsToIndices)
-	g.validatorsToIndices[validator.NodeID] = msb
-
-	g.validatorIndices = append(g.validatorIndices, validator)
+	g.validatorsToIndices[validatorID] = msb
+	g.validatorIndices = append(g.validatorIndices, validatorID)
 
 	// emit metrics
 	g.metrics.validatorsToIndicesSize.Set(float64(len(g.validatorsToIndices)))
@@ -185,7 +184,7 @@ func (g *gossipTracker) RemoveValidator(validatorID ids.NodeID) bool {
 		lastPeer := g.validatorIndices[lastIndex]
 
 		g.validatorIndices[indexToRemove] = lastPeer
-		g.validatorsToIndices[lastPeer.NodeID] = indexToRemove
+		g.validatorsToIndices[lastPeer] = indexToRemove
 	}
 
 	delete(g.validatorsToIndices, validatorID)
@@ -243,7 +242,7 @@ func (g *gossipTracker) AddKnown(peerID ids.NodeID, validatorIDs []ids.NodeID) b
 	return true
 }
 
-func (g *gossipTracker) GetUnknown(peerID ids.NodeID, limit int) ([]GossipValidator, bool, error) {
+func (g *gossipTracker) GetUnknown(peerID ids.NodeID, limit int) ([]ids.NodeID, bool, error) {
 	if limit <= 0 {
 		return nil, false, nil
 	}
@@ -267,7 +266,7 @@ func (g *gossipTracker) GetUnknown(peerID ids.NodeID, limit int) ([]GossipValida
 	// Calculate the unknown information we need to send to this peer. We do
 	// this by computing the difference between the validators we know about
 	// and the validators we know we've sent to [peerID].
-	result := make([]GossipValidator, 0, limit)
+	result := make([]ids.NodeID, 0, limit)
 	for i := 0; i < len(g.validatorIndices) && len(result) < limit; i++ {
 		drawn, err := s.Next()
 		if err != nil {

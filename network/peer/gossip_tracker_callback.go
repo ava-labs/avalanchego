@@ -26,16 +26,12 @@ type GossipTrackerCallback struct {
 func (g *GossipTrackerCallback) OnValidatorAdded(
 	nodeID ids.NodeID,
 	_ *bls.PublicKey,
-	txID ids.ID,
+	_ ids.ID,
 	_ uint64,
 ) {
-	if !g.GossipTracker.AddValidator(GossipValidator{
-		NodeID: nodeID,
-		TxID:   txID,
-	}) {
+	if !g.GossipTracker.AddValidator(nodeID) {
 		g.Log.Error("failed to add a validator",
 			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("t1", txID),
 		)
 	}
 }
