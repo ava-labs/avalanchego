@@ -882,7 +882,7 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 	}
 
 	// the peers this peer told us about
-	discoveredPeers := make([]ids.NodeID, len(msg.ClaimedIpPorts))
+	discoveredTxs := make([]ids.ID, len(msg.ClaimedIpPorts))
 
 	for _, claimedIPPort := range msg.ClaimedIpPorts {
 		tlsCert, err := x509.ParseCertificate(claimedIPPort.X509Certificate)
@@ -935,7 +935,7 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 		// of whether we end up tracking it or not to avoid a situation where
 		// we are re-gossiping peers we are already connected to back to the
 		// node to told us about them.
-		discoveredPeers = append(discoveredPeers, ids.NodeIDFromCert(ip.Cert))
+		discoveredTxs = append(discoveredTxs, txID)
 
 		if !p.Network.Track(ip) {
 			p.Metrics.NumUselessPeerListBytes.Add(float64(ip.BytesLen()))
@@ -943,7 +943,7 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 	}
 
 	// a peer must have known about a set of peers if it gossiped them to us
-	if !p.GossipTracker.AddKnown(p.id, discoveredPeers) {
+	if !p.GossipTracker.AddKnown(p.id, discoveredTxs) {
 		p.Log.Error("failed to update known peers",
 			zap.Stringer("nodeID", p.id),
 		)

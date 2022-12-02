@@ -35,7 +35,7 @@ func newGossipTrackerMetrics(registerer prometheus.Registerer, namespace string)
 			prometheus.GaugeOpts{
 				Namespace: namespace,
 				Name:      "validator_indices_size",
-				Help:      "amount of validators this node is tracking in validatorIndices",
+				Help:      "amount of validators this node is tracking in gossipValidators",
 			},
 		),
 	}
