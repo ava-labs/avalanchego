@@ -705,9 +705,8 @@ func (p *peer) handlePing(_ *p2ppb.Ping) {
 		primaryUptimePerc = 0
 	}
 
-	subnetIDs := p.trackedSubnets.List()
-	subnetUptimes := make([]*p2ppb.SubnetUptime, 0, len(subnetIDs))
-	for _, subnetID := range subnetIDs {
+	subnetUptimes := make([]*p2ppb.SubnetUptime, 0, p.trackedSubnets.Len())
+	for subnetID := range p.trackedSubnets {
 		uptimePerc, err := p.Network.PeerUptimePercentage(p.id, subnetID)
 		if err != nil {
 			p.Log.Debug("failed to get peer uptime percentage",
