@@ -49,6 +49,7 @@ var (
 	defaultVMAliasFilePath      = filepath.Join(defaultVMConfigDir, "aliases.json")
 	defaultChainAliasFilePath   = filepath.Join(defaultChainConfigDir, "aliases.json")
 	defaultSubnetConfigDir      = filepath.Join(defaultConfigDir, "subnets")
+	defaultChainDataDir         = filepath.Join(defaultUnexpandedDataDir, "chainData")
 
 	// Places to look for the build directory
 	defaultBuildDirs = []string{}
@@ -329,6 +330,9 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(ChainConfigContentKey, "", "Specifies base64 encoded chains configurations")
 	fs.String(SubnetConfigDirKey, defaultSubnetConfigDir, fmt.Sprintf("Subnet specific configurations parent directory. Ignored if %s is specified", SubnetConfigContentKey))
 	fs.String(SubnetConfigContentKey, "", "Specifies base64 encoded subnets configurations")
+
+	// Chain Data Directory
+	fs.String(ChainDataDirKey, defaultChainDataDir, "Chain specific data directory")
 
 	// Profiles
 	fs.String(ProfileDirKey, defaultProfileDir, "Path to the profile directory")

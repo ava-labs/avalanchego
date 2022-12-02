@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
@@ -56,14 +57,16 @@ func TestIndexClient(t *testing.T) {
 				*(reply.(*FormattedContainer)) = FormattedContainer{
 					ID:    id,
 					Bytes: bytesStr,
+					Index: json.Uint64(10),
 				}
 				return nil
 			},
 		}
-		container, err := client.GetLastAccepted(context.Background())
+		container, index, err := client.GetLastAccepted(context.Background())
 		require.NoError(err)
 		require.EqualValues(id, container.ID)
 		require.EqualValues(bytes, container.Bytes)
+		require.EqualValues(index, 10)
 	}
 	{
 		// Test GetContainerRange
@@ -115,13 +118,15 @@ func TestIndexClient(t *testing.T) {
 				*(reply.(*FormattedContainer)) = FormattedContainer{
 					ID:    id,
 					Bytes: bytesStr,
+					Index: json.Uint64(10),
 				}
 				return nil
 			},
 		}
-		container, err := client.GetContainerByID(context.Background(), id)
+		container, index, err := client.GetContainerByID(context.Background(), id)
 		require.NoError(err)
 		require.EqualValues(id, container.ID)
 		require.EqualValues(bytes, container.Bytes)
+		require.EqualValues(index, 10)
 	}
 }

@@ -236,4 +236,8 @@ type Config struct {
 
 	// ProvidedFlags contains all the flags set by the user
 	ProvidedFlags map[string]interface{} `json:"-"`
+
+	// ChainDataDir is the root path for per-chain directories where VMs can
+	// write arbitrary data.
+	ChainDataDir string `json:"chainDataDir"`
 }
