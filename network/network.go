@@ -220,6 +220,7 @@ func NewNetwork(
 		MaxClockDifference:   config.MaxClockDifference,
 		ResourceTracker:      config.ResourceTracker,
 		GossipTracker:        config.GossipTracker,
+		Validators:           primaryNetworkValidators,
 	}
 
 	onCloseCtx, cancel := context.WithCancel(context.Background())

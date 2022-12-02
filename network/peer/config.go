@@ -47,4 +47,7 @@ type Config struct {
 
 	// Tracks which peer knows about which peers
 	GossipTracker GossipTracker
+
+	// Primary network validator set
+	Validators validators.Set
 }
