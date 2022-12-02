@@ -101,12 +101,12 @@ func (m *manager) String() string {
 // Returns an error if:
 // - [subnetID] does not have a registered validator set in [m]
 // - adding [nodeID] to the validator set returns an error
-func Add(m Manager, subnetID ids.ID, nodeID ids.NodeID, pk *bls.PublicKey, weight uint64) error {
+func Add(m Manager, subnetID ids.ID, nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) error {
 	vdrs, ok := m.Get(subnetID)
 	if !ok {
 		return fmt.Errorf("%w: %s", errMissingValidators, subnetID)
 	}
-	return vdrs.Add(nodeID, pk, weight)
+	return vdrs.Add(nodeID, pk, txID, weight)
 }
 
 // AddWeight is a helper that fetches the validator set of [subnetID] from [m]
