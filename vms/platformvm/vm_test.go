@@ -2491,14 +2491,14 @@ func TestVM_GetValidatorSet(t *testing.T) {
 		oldState      = vm.state
 		numVdrs       = 4
 		vdrBaseWeight = uint64(1_000)
-		vdrs          []*validators.Validator
+		vdrs          []*validators.GetValidatorOutput
 	)
 	// Populate the validator set to use below
 	for i := 0; i < numVdrs; i++ {
 		sk, err := bls.NewSecretKey()
 		r.NoError(err)
 
-		vdrs = append(vdrs, &validators.Validator{
+		vdrs = append(vdrs, &validators.GetValidatorOutput{
 			NodeID:    ids.GenerateTestNodeID(),
 			PublicKey: bls.PublicFromSecretKey(sk),
 			Weight:    vdrBaseWeight + uint64(i),
@@ -2520,7 +2520,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 		// Diff at tip, block before tip, etc.
 		// This must have [height] - [lastAcceptedHeight] elements
 		pkDiffs        []map[ids.NodeID]*bls.PublicKey
-		expectedVdrSet map[ids.NodeID]*validators.Validator
+		expectedVdrSet map[ids.NodeID]*validators.GetValidatorOutput
 		expectedErr    error
 	}
 
@@ -2529,7 +2529,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			name:               "after tip",
 			height:             1,
 			lastAcceptedHeight: 0,
-			expectedVdrSet:     map[ids.NodeID]*validators.Validator{},
+			expectedVdrSet:     map[ids.NodeID]*validators.GetValidatorOutput{},
 			expectedErr:        database.ErrNotFound,
 		},
 		{
@@ -2542,7 +2542,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			currentSubnetValidators: []*validators.Validator{
 				copySubnetValidator(vdrs[0]),
 			},
-			expectedVdrSet: map[ids.NodeID]*validators.Validator{
+			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				vdrs[0].NodeID: vdrs[0],
 			},
 			expectedErr: nil,
@@ -2583,7 +2583,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 					vdrs[2].NodeID: vdrs[2].PublicKey,
 				},
 			},
-			expectedVdrSet: map[ids.NodeID]*validators.Validator{
+			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				vdrs[0].NodeID: {
 					NodeID:    vdrs[0].NodeID,
 					PublicKey: vdrs[0].PublicKey,
@@ -2655,7 +2655,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 				},
 				{},
 			},
-			expectedVdrSet: map[ids.NodeID]*validators.Validator{
+			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				vdrs[0].NodeID: {
 					NodeID:    vdrs[0].NodeID,
 					PublicKey: vdrs[0].PublicKey,
@@ -2703,7 +2703,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			pkDiffs: []map[ids.NodeID]*bls.PublicKey{
 				{},
 			},
-			expectedVdrSet: map[ids.NodeID]*validators.Validator{
+			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				vdrs[0].NodeID: {
 					NodeID:    vdrs[0].NodeID,
 					PublicKey: vdrs[0].PublicKey,
@@ -2757,7 +2757,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			pkDiffs: []map[ids.NodeID]*bls.PublicKey{
 				{},
 			},
-			expectedVdrSet: map[ids.NodeID]*validators.Validator{
+			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				vdrs[0].NodeID: {
 					NodeID:    vdrs[0].NodeID,
 					PublicKey: vdrs[0].PublicKey,
@@ -2841,13 +2841,20 @@ func TestVM_GetValidatorSet(t *testing.T) {
 	vm.state = oldState
 }
 
-func copyPrimaryValidator(vdr *validators.Validator) *validators.Validator {
-	newVdr := *vdr
-	return &newVdr
+func copyPrimaryValidator(vdr *validators.GetValidatorOutput) *validators.Validator {
+	return &validators.Validator{
+		NodeID:    vdr.NodeID,
+		PublicKey: vdr.PublicKey,
+		TxID:      ids.Empty,
+		Weight:    vdr.Weight,
+	}
 }
 
-func copySubnetValidator(vdr *validators.Validator) *validators.Validator {
-	newVdr := *vdr
-	newVdr.PublicKey = nil
-	return &newVdr
+func copySubnetValidator(vdr *validators.GetValidatorOutput) *validators.Validator {
+	return &validators.Validator{
+		NodeID:    vdr.NodeID,
+		PublicKey: vdr.PublicKey,
+		TxID:      ids.Empty,
+		Weight:    vdr.Weight,
+	}
 }

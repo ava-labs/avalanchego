@@ -45,7 +45,7 @@ func (c *Client) GetValidatorSet(
 	ctx context.Context,
 	height uint64,
 	subnetID ids.ID,
-) (map[ids.NodeID]*validators.Validator, error) {
+) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 	resp, err := c.client.GetValidatorSet(ctx, &pb.GetValidatorSetRequest{
 		Height:   height,
 		SubnetId: subnetID[:],
@@ -54,7 +54,7 @@ func (c *Client) GetValidatorSet(
 		return nil, err
 	}
 
-	vdrs := make(map[ids.NodeID]*validators.Validator, len(resp.Validators))
+	vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, len(resp.Validators))
 	for _, validator := range resp.Validators {
 		nodeID, err := ids.ToNodeID(validator.NodeId)
 		if err != nil {
@@ -67,7 +67,7 @@ func (c *Client) GetValidatorSet(
 				return nil, err
 			}
 		}
-		vdrs[nodeID] = &validators.Validator{
+		vdrs[nodeID] = &validators.GetValidatorOutput{
 			NodeID:    nodeID,
 			PublicKey: publicKey,
 			Weight:    validator.Weight,
