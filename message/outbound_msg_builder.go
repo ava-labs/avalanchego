@@ -33,9 +33,7 @@ type OutboundMsgBuilder interface {
 		bypassThrottling bool,
 	) (OutboundMessage, error)
 
-	PeerListAck(
-		txIDs []ids.ID,
-	) (OutboundMessage, error)
+	PeerListAck(txIDs []ids.ID) (OutboundMessage, error)
 
 	Ping() (OutboundMessage, error)
 
