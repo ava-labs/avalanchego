@@ -64,6 +64,7 @@ const (
 	NotifyOp
 	GossipRequestOp
 	TimeoutOp
+	PeerListAckOp
 )
 
 var (
