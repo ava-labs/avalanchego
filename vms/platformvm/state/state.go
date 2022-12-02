@@ -1597,7 +1597,6 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			var (
 				weightDiff     = &ValidatorWeightDiff{}
 				isNewValidator bool
-				pk             *bls.PublicKey
 			)
 			if validatorDiff.validatorModified {
 				// This validator is being added or removed.
@@ -1646,7 +1645,6 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 
 					s.validatorUptimes.LoadUptime(nodeID, subnetID, vdr)
 					isNewValidator = true
-					pk = staker.PublicKey
 				}
 			}
 
