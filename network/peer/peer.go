@@ -764,6 +764,7 @@ func (p *peer) handlePong(msg *p2ppb.Pong) {
 		if uptime > 100 {
 			p.Log.Debug("dropping pong message with invalid uptime",
 				zap.Stringer("nodeID", p.id),
+				zap.Stringer("subnetID", subnetID),
 				zap.Uint32("uptime", uptime),
 			)
 			p.StartClose()
