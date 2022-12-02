@@ -749,6 +749,7 @@ func (p *peer) handlePong(msg *p2ppb.Pong) {
 		return
 	}
 	p.observeUptime(constants.PrimaryNetworkID, msg.UptimePct)
+
 	// handle subnets
 	for _, subnetUptimes := range msg.SubnetUptimes {
 		subnetID, err := ids.ToID(subnetUptimes.SubnetId)
