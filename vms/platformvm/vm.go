@@ -474,7 +474,7 @@ func (vm *VM) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 
 // GetValidatorSet returns the validator set at the specified height for the
 // provided subnetID.
-func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.Validator, error) {
+func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 	validatorSetsCache, exists := vm.validatorSetCaches[subnetID]
 	if !exists {
 		validatorSetsCache = &cache.LRU{Size: validatorSetsCacheSize}
@@ -485,7 +485,7 @@ func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.I
 	}
 
 	if validatorSetIntf, ok := validatorSetsCache.Get(height); ok {
-		validatorSet, ok := validatorSetIntf.(map[ids.NodeID]*validators.Validator)
+		validatorSet, ok := validatorSetIntf.(map[ids.NodeID]*validators.GetValidatorOutput)
 		if !ok {
 			return nil, errWrongCacheType
 		}
@@ -515,15 +515,18 @@ func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.I
 	}
 
 	currentSubnetValidatorList := currentSubnetValidators.List()
-	vdrSet := make(map[ids.NodeID]*validators.Validator, len(currentSubnetValidatorList))
+	vdrSet := make(map[ids.NodeID]*validators.GetValidatorOutput, len(currentSubnetValidatorList))
 	for _, vdr := range currentSubnetValidatorList {
 		primaryVdr, ok := currentPrimaryNetworkValidators.Get(vdr.NodeID)
 		if !ok {
 			// This should never happen
 			return nil, fmt.Errorf("%w: %s", errMissingValidator, vdr.NodeID)
 		}
-		vdr.PublicKey = primaryVdr.PublicKey
-		vdrSet[vdr.NodeID] = vdr
+		vdrSet[vdr.NodeID] = &validators.GetValidatorOutput{
+			NodeID:    vdr.NodeID,
+			PublicKey: primaryVdr.PublicKey,
+			Weight:    vdr.Weight,
+		}
 	}
 
 	for i := lastAcceptedHeight; i > height; i-- {
@@ -536,7 +539,7 @@ func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.I
 			vdr, ok := vdrSet[nodeID]
 			if !ok {
 				// This node isn't in the current validator set.
-				vdr = &validators.Validator{
+				vdr = &validators.GetValidatorOutput{
 					NodeID: nodeID,
 				}
 				vdrSet[nodeID] = vdr

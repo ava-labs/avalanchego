@@ -252,9 +252,16 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 
 	consensusRouter := n.Config.ConsensusRouter
 	if !n.Config.EnableStaking {
+		// Staking is disabled so we don't have a txID that added us as a
+		// validator. Because each validator needs a txID associated with it, we
+		// hack one together by just padding our nodeID with zeroes.
+		dummyTxID := ids.Empty
+		copy(dummyTxID[:], n.ID[:])
+
 		err := primaryNetVdrs.Add(
 			n.ID,
 			bls.PublicFromSecretKey(n.Config.StakingSigningKey),
+			dummyTxID,
 			n.Config.DisabledStakingWeight,
 		)
 		if err != nil {
@@ -470,7 +477,8 @@ func (n *Node) initBeacons() error {
 	for _, peerID := range n.Config.BootstrapIDs {
 		// Note: The beacon connection manager will treat all beaconIDs as
 		//       equal.
-		if err := n.beacons.Add(peerID, nil, 1); err != nil {
+		// Invariant: We never use the TxID or BLS keys populated here.
+		if err := n.beacons.Add(peerID, nil, ids.Empty, 1); err != nil {
 			return err
 		}
 	}

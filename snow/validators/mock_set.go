@@ -39,17 +39,17 @@ func (m *MockSet) EXPECT() *MockSetMockRecorder {
 }
 
 // Add mocks base method.
-func (m *MockSet) Add(arg0 ids.NodeID, arg1 *bls.PublicKey, arg2 uint64) error {
+func (m *MockSet) Add(arg0 ids.NodeID, arg1 *bls.PublicKey, arg2 ids.ID, arg3 uint64) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Add", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "Add", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Add indicates an expected call of Add.
-func (mr *MockSetMockRecorder) Add(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockSetMockRecorder) Add(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockSet)(nil).Add), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockSet)(nil).Add), arg0, arg1, arg2, arg3)
 }
 
 // AddWeight mocks base method.
