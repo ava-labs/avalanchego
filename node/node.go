@@ -252,10 +252,9 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 
 	consensusRouter := n.Config.ConsensusRouter
 	if !n.Config.EnableStaking {
-		// Staking is disabled we don't have a txID that added us as a
-		// validator. Because each validator needs some kind of txID
-		// associated with it, we hack one together by just padding our
-		// nodeID with zeroes, so we have a unique "txID" per node.
+		// Staking is disabled so we don't have a txID that added us as a
+		// validator. Because each validator needs a txID associated with it, we
+		// hack one together by just padding our nodeID with zeroes.
 		dummyTxID := ids.Empty
 		copy(dummyTxID[:], n.ID[:])
 
