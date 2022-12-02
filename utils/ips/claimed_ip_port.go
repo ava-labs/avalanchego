@@ -5,6 +5,7 @@ package ips
 
 import (
 	"crypto/x509"
+
 	"github.com/ava-labs/avalanchego/ids"
 )
 
