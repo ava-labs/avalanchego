@@ -914,7 +914,7 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 			p.Log.Debug("message with invalid field",
 				zap.Stringer("nodeID", p.id),
 				zap.Stringer("messageOp", message.PeerListOp),
-				zap.String("field", "t1"),
+				zap.String("field", "txID"),
 				zap.Error(err),
 			)
 			p.StartClose()
