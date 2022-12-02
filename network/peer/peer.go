@@ -913,6 +913,7 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 			},
 			Timestamp: claimedIPPort.Timestamp,
 			Signature: claimedIPPort.Signature,
+			TxID:      ids.ID{}, // TODO: populate this field
 		}
 
 		// it's important to add this to our list of discovered peers regardless
