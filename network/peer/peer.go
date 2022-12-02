@@ -76,9 +76,9 @@ type Peer interface {
 	// be called after [Ready] returns true.
 	TrackedSubnets() ids.Set
 
-	// ObservedUptime returns the local node's subnet uptime according to the peer. The
-	// value ranges from [0, 100]. It should only be called after [Ready]
-	// returns true.
+	// ObservedUptime returns the local node's subnet uptime according to the
+	// peer. The value ranges from [0, 100]. It should only be called after
+	// [Ready] returns true.
 	ObservedUptime(subnetID ids.ID) (uint32, bool)
 
 	// Send attempts to send [msg] to the peer. The peer takes ownership of
@@ -694,8 +694,6 @@ func (p *peer) handle(msg message.InboundMessage) {
 }
 
 func (p *peer) handlePing(_ *p2ppb.Ping) {
-	// Prepare uptimes for pong message
-	// get primary uptime first
 	primaryUptime, err := p.UptimeCalculator.CalculateUptimePercent(
 		p.id,
 		constants.PrimaryNetworkID,
@@ -709,11 +707,9 @@ func (p *peer) handlePing(_ *p2ppb.Ping) {
 		primaryUptime = 0
 	}
 
-	// get subnet uptimes
 	subnetUptimes := make([]*p2ppb.SubnetUptime, 0, p.trackedSubnets.Len())
 	for subnetID := range p.trackedSubnets {
-		subnetID := subnetID
-		uptime, err := p.UptimeCalculator.CalculateUptimePercent(p.id, subnetID)
+		subnetUptime, err := p.UptimeCalculator.CalculateUptimePercent(p.id, subnetID)
 		if err != nil {
 			p.Log.Debug("failed to get peer uptime percentage",
 				zap.Stringer("nodeID", p.id),
@@ -722,16 +718,16 @@ func (p *peer) handlePing(_ *p2ppb.Ping) {
 			)
 			continue
 		}
-		uptimePerc := uint32(uptime * 100)
+
+		subnetID := subnetID
 		subnetUptimes = append(subnetUptimes, &p2ppb.SubnetUptime{
 			SubnetId: subnetID[:],
-			Uptime:   uptimePerc,
+			Uptime:   uint32(subnetUptime * 100),
 		})
 	}
 
-	// send pong message
-	primaryUptimePerc := uint32(primaryUptime * 100)
-	msg, err := p.MessageCreator.Pong(primaryUptimePerc, subnetUptimes)
+	primaryUptimePercent := uint32(primaryUptime * 100)
+	msg, err := p.MessageCreator.Pong(primaryUptimePercent, subnetUptimes)
 	if err != nil {
 		p.Log.Error("failed to create message",
 			zap.Stringer("messageOp", message.PongOp),
@@ -743,18 +739,16 @@ func (p *peer) handlePing(_ *p2ppb.Ping) {
 }
 
 func (p *peer) handlePong(msg *p2ppb.Pong) {
-	// handle primary network first
-	if msg.UptimePct > 100 {
+	if msg.Uptime > 100 {
 		p.Log.Debug("dropping pong message with invalid uptime",
 			zap.Stringer("nodeID", p.id),
-			zap.Uint32("uptime", msg.UptimePct),
+			zap.Uint32("uptime", msg.Uptime),
 		)
 		p.StartClose()
 		return
 	}
-	p.observeUptime(constants.PrimaryNetworkID, msg.UptimePct)
+	p.observeUptime(constants.PrimaryNetworkID, msg.Uptime)
 
-	// handle subnets
 	for _, subnetUptimes := range msg.SubnetUptimes {
 		subnetID, err := ids.ToID(subnetUptimes.SubnetId)
 		if err != nil {

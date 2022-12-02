@@ -74,7 +74,7 @@ func TestMessage(t *testing.T) {
 			msg: &p2ppb.Message{
 				Message: &p2ppb.Message_Pong{
 					Pong: &p2ppb.Pong{
-						UptimePct: 100,
+						Uptime: 100,
 						SubnetUptimes: []*p2ppb.SubnetUptime{
 							{SubnetId: testID[:], Uptime: 100},
 						},
