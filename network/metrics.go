@@ -13,20 +13,22 @@ import (
 )
 
 type metrics struct {
-	numTracked                prometheus.Gauge
-	numPeers                  prometheus.Gauge
-	numSubnetPeers            *prometheus.GaugeVec
-	timeSinceLastMsgSent      prometheus.Gauge
-	timeSinceLastMsgReceived  prometheus.Gauge
-	sendQueuePortionFull      prometheus.Gauge
-	sendFailRate              prometheus.Gauge
-	connected                 prometheus.Counter
-	disconnected              prometheus.Counter
-	acceptFailed              prometheus.Counter
-	inboundConnRateLimited    prometheus.Counter
-	inboundConnAllowed        prometheus.Counter
-	nodeUptimeWeightedAverage prometheus.Gauge
-	nodeUptimeRewardingStake  prometheus.Gauge
+	numTracked                      prometheus.Gauge
+	numPeers                        prometheus.Gauge
+	numSubnetPeers                  *prometheus.GaugeVec
+	timeSinceLastMsgSent            prometheus.Gauge
+	timeSinceLastMsgReceived        prometheus.Gauge
+	sendQueuePortionFull            prometheus.Gauge
+	sendFailRate                    prometheus.Gauge
+	connected                       prometheus.Counter
+	disconnected                    prometheus.Counter
+	acceptFailed                    prometheus.Counter
+	inboundConnRateLimited          prometheus.Counter
+	inboundConnAllowed              prometheus.Counter
+	nodeUptimeWeightedAverage       prometheus.Gauge
+	nodeUptimeRewardingStake        prometheus.Gauge
+	nodeSubnetUptimeWeightedAverage *prometheus.GaugeVec
+	nodeSubnetUptimeRewardingStake  *prometheus.GaugeVec
 }
 
 func newMetrics(namespace string, registerer prometheus.Registerer, initialSubnetIDs ids.Set) (*metrics, error) {
@@ -104,6 +106,19 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 			Name:      "node_uptime_rewarding_stake",
 			Help:      "The percentage of total stake which thinks this node is eligible for rewards",
 		}),
+		nodeSubnetUptimeWeightedAverage: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "node_subnet_uptime_weighted_average",
+			Help:      "This node's subnet uptime averages weighted by observing subnet peer stakes",
+		},
+			[]string{"subnetID"},
+		),
+		nodeSubnetUptimeRewardingStake: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "node_subnet_uptime_rewarding_stake",
+			Help:      "The percentage of subnet's total stake which thinks this node is eligible for subnet's rewards",
+		}, []string{"subnetID"},
+		),
 	}
 
 	errs := wrappers.Errs{}

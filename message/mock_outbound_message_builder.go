@@ -12,6 +12,7 @@ import (
 	time "time"
 
 	ids "github.com/ava-labs/avalanchego/ids"
+	p2p "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	ips "github.com/ava-labs/avalanchego/utils/ips"
 	gomock "github.com/golang/mock/gomock"
 )
@@ -249,6 +250,21 @@ func (mr *MockOutboundMsgBuilderMockRecorder) GetStateSummaryFrontier(arg0, arg1
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStateSummaryFrontier", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).GetStateSummaryFrontier), arg0, arg1, arg2)
 }
 
+// NewPong mocks base method.
+func (m *MockOutboundMsgBuilder) NewPong(arg0 map[string]uint32) (OutboundMessage, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewPong", arg0)
+	ret0, _ := ret[0].(OutboundMessage)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NewPong indicates an expected call of NewPong.
+func (mr *MockOutboundMsgBuilderMockRecorder) NewPong(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewPong", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).NewPong), arg0)
+}
+
 // PeerList mocks base method.
 func (m *MockOutboundMsgBuilder) PeerList(arg0 []ips.ClaimedIPPort, arg1 bool) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
@@ -280,18 +296,18 @@ func (mr *MockOutboundMsgBuilderMockRecorder) Ping() *gomock.Call {
 }
 
 // Pong mocks base method.
-func (m *MockOutboundMsgBuilder) Pong(arg0 uint32) (OutboundMessage, error) {
+func (m *MockOutboundMsgBuilder) Pong(arg0 uint32, arg1 []*p2p.SubnetUptime) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Pong", arg0)
+	ret := m.ctrl.Call(m, "Pong", arg0, arg1)
 	ret0, _ := ret[0].(OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Pong indicates an expected call of Pong.
-func (mr *MockOutboundMsgBuilderMockRecorder) Pong(arg0 interface{}) *gomock.Call {
+func (mr *MockOutboundMsgBuilderMockRecorder) Pong(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Pong", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).Pong), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Pong", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).Pong), arg0, arg1)
 }
 
 // PullQuery mocks base method.

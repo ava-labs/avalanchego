@@ -86,6 +86,6 @@ func (*testNetwork) Peers(ids.NodeID) ([]ids.NodeID, []ips.ClaimedIPPort, error)
 	return nil, nil, nil
 }
 
-func (n *testNetwork) Pong(ids.NodeID) (message.OutboundMessage, error) {
-	return n.mc.Pong(n.uptime)
+func (n *testNetwork) PeerUptimePercentage(ids.NodeID, ids.ID) (uint32, error) {
+	return n.uptime, nil
 }
