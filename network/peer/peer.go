@@ -966,8 +966,20 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 		)
 	}
 
-	peerListAckMsg := p.Config.MessageCreator.
-		p.Send(p.onClosingCtx, )
+	peerListAckMsg, err := p.Config.MessageCreator.PeerListAck(ackedPeerTxs)
+	if err != nil {
+		p.Log.Error("failed to create message",
+			zap.Stringer("messageOp", message.VersionOp),
+			zap.Error(err),
+		)
+		return
+	}
+
+	if !p.Send(p.onClosingCtx, peerListAckMsg) {
+		p.Log.Debug("failed to send peer list ack",
+			zap.Stringer("nodeID", p.id),
+		)
+	}
 }
 
 func (p *peer) nextTimeout() time.Time {
