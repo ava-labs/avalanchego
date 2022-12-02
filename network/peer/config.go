@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
 type Config struct {
@@ -48,6 +49,5 @@ type Config struct {
 	// Tracks which peer knows about which peers
 	GossipTracker GossipTracker
 
-	// Primary network validator set
-	Validators validators.Set
+	PChain state.Chain
 }

@@ -19,14 +19,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
-
-	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 )
 
 var (
@@ -883,6 +883,8 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 
 	// the peers this peer told us about
 	discoveredTxs := make([]ids.ID, len(msg.ClaimedIpPorts))
+	// we only want peers that we have txs of in the pchain's state
+	ackedPeerTxs := make([]ids.ID, 0, len(msg.ClaimedIpPorts))
 
 	for _, claimedIPPort := range msg.ClaimedIpPorts {
 		tlsCert, err := x509.ParseCertificate(claimedIPPort.X509Certificate)
@@ -936,6 +938,18 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 			TxID:      txID,
 		}
 
+		// We only want to ack back peers for whom we have a corresponding
+		// committed tx for in the P-Chain, to prove that we knew about this
+		// peer at a specific point in time.
+		if _, txStatus, err := p.Config.PChain.GetTx(txID); err != nil {
+			p.Log.Error("failed to get tx",
+				zap.Stringer("nodeID", p.id),
+				zap.Error(err),
+			)
+		} else if txStatus == status.Committed {
+			ackedPeerTxs = append(ackedPeerTxs, txID)
+		}
+
 		// it's important to add this to our list of discovered peers regardless
 		// of whether we end up tracking it or not to avoid a situation where
 		// we are re-gossiping peers we are already connected to back to the
@@ -951,6 +965,9 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 			zap.Stringer("nodeID", p.id),
 		)
 	}
+
+	peerListAckMsg := p.Config.MessageCreator.
+		p.Send(p.onClosingCtx, )
 }
 
 func (p *peer) nextTimeout() time.Time {
