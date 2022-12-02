@@ -22,7 +22,7 @@ func (i *insecureValidatorManager) Connected(vdrID ids.NodeID, nodeVersion *vers
 		// Staking is disabled we don't have a txID that added us as a
 		// validator. Because each validator needs some kind of txID
 		// associated with it, we hack one together by just padding our
-		// nodeID with zeroes, so we have a unique "TxID" per node.
+		// nodeID with zeroes, so we have a unique "txID" per node.
 		dummyTxID := ids.Empty
 		copy(dummyTxID[:], vdrID[:])
 
