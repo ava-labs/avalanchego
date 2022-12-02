@@ -6,7 +6,6 @@ package set
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 
 	"golang.org/x/exp/maps"
 
@@ -17,10 +16,7 @@ import (
 // The minimum capacity of a set
 const minSetSize = 16
 
-var (
-	_ fmt.Stringer   = (*Set[int])(nil)
-	_ json.Marshaler = (*Set[int])(nil)
-)
+var _ json.Marshaler = (*Set[int])(nil)
 
 // Set is a set of elements.
 type Set[T comparable] map[T]struct{}
@@ -147,13 +143,6 @@ func (s *Set[T]) Pop() (T, bool) {
 		return elt, true
 	}
 	return utils.Zero[T](), false
-}
-
-// TODO: This is only use to set opentelemetry attributes.
-//       Do we need this?
-func (s Set[T]) String() string {
-	asBytes, _ := s.MarshalJSON()
-	return string(asBytes)
 }
 
 func (s *Set[_]) MarshalJSON() ([]byte, error) {
