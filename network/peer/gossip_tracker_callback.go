@@ -29,7 +29,7 @@ func (g *GossipTrackerCallback) OnValidatorAdded(
 	txID ids.ID,
 	_ uint64,
 ) {
-	vdr := GossipValidator{
+	vdr := ValidatorID{
 		NodeID: nodeID,
 		TxID:   txID,
 	}

@@ -56,7 +56,7 @@ type GossipTracker interface {
 
 	// AddValidator adds a validator that can be gossiped about
 	// 	bool: False if [validator] was already present. True otherwise.
-	AddValidator(validator GossipValidator) bool
+	AddValidator(validator ValidatorID) bool
 	// RemoveValidator removes a validator that can be gossiped about
 	// 	bool: False if [nodeID] was already not present. True otherwise.
 	RemoveValidator(validatorID ids.NodeID) bool
@@ -70,7 +70,7 @@ type GossipTracker interface {
 	//	[]ids.NodeID: a slice of [limit] txIDs that [peerID] doesn't know
 	//		about.
 	// 	bool: False if [peerID] is not tracked. True otherwise.
-	GetUnknown(peerID ids.NodeID, limit int) ([]GossipValidator, bool, error)
+	GetUnknown(peerID ids.NodeID, limit int) ([]ValidatorID, bool, error)
 
 	// GetTxID gets the txID that added a valdiator to the validator set
 	// Returns:
@@ -86,7 +86,7 @@ type gossipTracker struct {
 	// a mapping of validators => the index they occupy in the bitsets
 	validatorsToIndices map[ids.NodeID]int
 	// each validator in the index it occupies in the bitset
-	gossipValidators []GossipValidator
+	gossipValidators []ValidatorID
 	// a mapping of txs => the validators they correspond to
 	txsToValidators map[ids.ID]ids.NodeID
 
@@ -154,7 +154,7 @@ func (g *gossipTracker) StopTrackingPeer(peerID ids.NodeID) bool {
 	return true
 }
 
-func (g *gossipTracker) AddValidator(validator GossipValidator) bool {
+func (g *gossipTracker) AddValidator(validator ValidatorID) bool {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -259,7 +259,7 @@ func (g *gossipTracker) AddKnown(peerID ids.NodeID, txIDs []ids.ID) bool {
 	return true
 }
 
-func (g *gossipTracker) GetUnknown(peerID ids.NodeID, limit int) ([]GossipValidator, bool, error) {
+func (g *gossipTracker) GetUnknown(peerID ids.NodeID, limit int) ([]ValidatorID, bool, error) {
 	if limit <= 0 {
 		return nil, false, nil
 	}
@@ -283,7 +283,7 @@ func (g *gossipTracker) GetUnknown(peerID ids.NodeID, limit int) ([]GossipValida
 	// Calculate the unknown information we need to send to this peer. We do
 	// this by computing the difference between the validators we know about
 	// and the validators we know we've sent to [peerID].
-	result := make([]GossipValidator, 0, limit)
+	result := make([]ValidatorID, 0, limit)
 	for i := 0; i < len(g.gossipValidators) && len(result) < limit; i++ {
 		drawn, err := s.Next()
 		if err != nil {

@@ -909,16 +909,19 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 			return
 		}
 
-		txID, err := ids.ToID(claimedIPPort.TxId)
-		if err != nil {
-			p.Log.Debug("message with invalid field",
-				zap.Stringer("nodeID", p.id),
-				zap.Stringer("messageOp", message.PeerListOp),
-				zap.String("field", "txID"),
-				zap.Error(err),
-			)
-			p.StartClose()
-			return
+		var txID ids.ID
+		if len(claimedIPPort.TxId) > 0 {
+			txID, err = ids.ToID(claimedIPPort.TxId)
+			if err != nil {
+				p.Log.Debug("message with invalid field",
+					zap.Stringer("nodeID", p.id),
+					zap.Stringer("messageOp", message.PeerListOp),
+					zap.String("field", "txID"),
+					zap.Error(err),
+				)
+				p.StartClose()
+				return
+			}
 		}
 		ip := ips.ClaimedIPPort{
 			Cert: tlsCert,

@@ -5,8 +5,8 @@ package peer
 
 import "github.com/ava-labs/avalanchego/ids"
 
-// GossipValidator represents a validator that we gossip to other peers
-type GossipValidator struct {
+// ValidatorID represents a validator that we gossip to other peers
+type ValidatorID struct {
 	// The validator's ID
 	NodeID ids.NodeID
 	// The Tx that added this into the validator set
