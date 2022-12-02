@@ -557,7 +557,7 @@ func TestSetValidatorRemovedCallback(t *testing.T) {
 	require := require.New(t)
 
 	nodeID0 := ids.NodeID{1}
-	txID0 := ids.Empty
+	txID0 := ids.GenerateTestID()
 	weight0 := uint64(93)
 
 	s := NewSet()
