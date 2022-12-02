@@ -193,7 +193,7 @@ func (b *batch) Write() error {
 	for i := len(b.writes) - 1; i >= 0; i-- {
 		kv := b.writes[i]
 		key := string(kv.key)
-		if _, overwritten := keySet[key]; overwritten {
+		if keySet.Contains(key) {
 			continue
 		}
 		keySet.Add(key)
