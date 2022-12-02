@@ -465,7 +465,7 @@ func TestSetAddCallback(t *testing.T) {
 	sk0, err := bls.NewSecretKey()
 	require.NoError(err)
 	pk0 := bls.PublicFromSecretKey(sk0)
-	txID0 := ids.Empty
+	txID0 := ids.GenerateTestID()
 	weight0 := uint64(1)
 
 	s := NewSet()
