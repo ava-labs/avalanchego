@@ -518,6 +518,7 @@ func (n *network) Peers(peerID ids.NodeID) ([]ids.NodeID, []ips.ClaimedIPPort, e
 				IPPort:    peerIP.IP.IP,
 				Timestamp: peerIP.IP.Timestamp,
 				Signature: peerIP.Signature,
+				TxID:      ids.ID{}, // TODO: populate this field
 			},
 		)
 	}
