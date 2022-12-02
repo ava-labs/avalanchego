@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var (
@@ -658,10 +659,11 @@ func (p *peer) handle(msg message.InboundMessage) {
 		msg.OnFinishedHandling()
 		return
 	case *p2ppb.PeerListAck:
-		// TODO implement a handler for this
+		p.handlePeerListAck(m)
 		msg.OnFinishedHandling()
 		return
 	}
+
 	if !p.finishedHandshake.GetValue() {
 		p.Log.Debug(
 			"dropping message",
@@ -980,6 +982,57 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 			zap.Stringer("nodeID", p.id),
 		)
 	}
+}
+
+func (p *peer) handlePeerListAck(msg *p2ppb.PeerListAck) {
+	ackedNodeIDs := make([]ids.NodeID, 0, len(msg.TxIds))
+
+	for _, txIDBytes := range msg.TxIds {
+		txID, err := ids.ToID(txIDBytes)
+		if err != nil {
+			p.Log.Error("failed to parse txID",
+				zap.Error(err),
+			)
+			continue
+		}
+
+		tx, s, err := p.Config.PChain.GetTx(txID)
+		if err != nil {
+			// This shouldn't happen
+			p.Log.Error("failed to get tx",
+				zap.Error(err),
+			)
+			continue
+		}
+		if s != status.Committed {
+			// This shouldn't happen unless someone lied to us
+			p.Log.Debug("tx is not commited",
+				zap.Stringer("txID", txID),
+				zap.Stringer("status", s),
+			)
+			continue
+		}
+		if s != status.Committed {
+			// This shouldn't happen unless someone lied to us
+			p.Log.Debug("tx is not commited",
+				zap.Stringer("txID", txID),
+				zap.Stringer("status", s),
+			)
+			continue
+		}
+
+		addValidatorTx := txs.AddValidatorTx{}
+		if _, err := txs.Codec.Unmarshal(tx.Bytes(), addValidatorTx); err != nil {
+			p.Log.Debug("failed to unmarshal AddValidatorTx",
+				zap.Error(err),
+			)
+			continue
+		}
+
+		ackedNodeIDs = append(ackedNodeIDs)
+	}
+
+	p.Config.GossipTracker.AddKnown(p.id, ackedNodeIDs)
 }
 
 func (p *peer) nextTimeout() time.Time {
