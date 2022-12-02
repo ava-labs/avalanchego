@@ -525,7 +525,7 @@ func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.I
 		vdr.PublicKey = primaryVdr.PublicKey
 		vdrSet[vdr.NodeID] = &validators.GetValidatorOutput{
 			NodeID:    vdr.NodeID,
-			PublicKey: vdr.PublicKey,
+			PublicKey: primaryVdr.PublicKey,
 			Weight:    vdr.Weight,
 		}
 	}
