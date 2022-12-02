@@ -694,6 +694,7 @@ func (p *peer) handle(msg message.InboundMessage) {
 }
 
 func (p *peer) handlePing(_ *p2ppb.Ping) {
+	// Prepare uptimes for pong message
 	// get primary uptime first
 	primaryUptimePerc, err := p.peerUptimePercentage(p.id, constants.PrimaryNetworkID)
 	if err != nil {
@@ -725,6 +726,7 @@ func (p *peer) handlePing(_ *p2ppb.Ping) {
 		})
 	}
 
+	// send pong message
 	msg, err := p.MessageCreator.Pong(primaryUptimePerc, subnetUptimes)
 	if err != nil {
 		p.Log.Error("failed to create message",
