@@ -694,10 +694,7 @@ func (p *peer) handle(msg message.InboundMessage) {
 }
 
 func (p *peer) handlePing(_ *p2ppb.Ping) {
-	p.sendPong()
-}
-
-func (p *peer) sendPong() {
+	// get primary uptime first
 	primaryUptimePerc, err := p.peerUptimePercentage(p.id, constants.PrimaryNetworkID)
 	if err != nil {
 		p.Log.Debug("failed to get peer primary uptime percentage",
@@ -709,9 +706,9 @@ func (p *peer) sendPong() {
 		primaryUptimePerc = 0
 	}
 
-	subnetIDs := p.trackedSubnets.List()
-	subnetUptimes := make([]*p2ppb.SubnetUptime, 0, len(subnetIDs))
-	for _, subnetID := range subnetIDs {
+	// get subnet uptimes
+	subnetUptimes := make([]*p2ppb.SubnetUptime, 0, p.trackedSubnets.Len())
+	for subnetID := range p.trackedSubnets {
 		subnetID := subnetID
 		uptimePerc, err := p.peerUptimePercentage(p.id, subnetID)
 		if err != nil {
@@ -750,6 +747,7 @@ func (p *peer) handlePong(msg *p2ppb.Pong) {
 		return
 	}
 	p.observeUptime(constants.PrimaryNetworkID, msg.UptimePct)
+
 	// handle subnets
 	for _, subnetUptimes := range msg.SubnetUptimes {
 		subnetID, err := ids.ToID(subnetUptimes.SubnetId)
