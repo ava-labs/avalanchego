@@ -905,17 +905,6 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 			return
 		}
 
-		txID, err := ids.ToID(claimedIPPort.TxId)
-		if err != nil {
-			p.Log.Debug("message with invalid field",
-				zap.Stringer("nodeID", p.id),
-				zap.Stringer("messageOp", message.PeerListOp),
-				zap.String("field", "t1"),
-				zap.Error(err),
-			)
-			p.StartClose()
-			return
-		}
 		ip := ips.ClaimedIPPort{
 			Cert: tlsCert,
 			IPPort: ips.IPPort{
@@ -924,7 +913,6 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 			},
 			Timestamp: claimedIPPort.Timestamp,
 			Signature: claimedIPPort.Signature,
-			TxID:      txID,
 		}
 
 		// it's important to add this to our list of discovered peers regardless
