@@ -157,7 +157,6 @@ func (g *gossipTracker) AddValidator(validator GossipValidator) bool {
 	// add the validator to the MSB of the bitset.
 	msb := len(g.validatorsToIndices)
 	g.validatorsToIndices[validator.NodeID] = msb
-
 	g.validatorIndices = append(g.validatorIndices, validator)
 
 	// emit metrics
