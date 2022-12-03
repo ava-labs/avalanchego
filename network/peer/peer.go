@@ -904,7 +904,7 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 			return
 		}
 
-		// TODO: After the next network upgrade, required txIDs to be populated.
+		// TODO: After the next network upgrade, require txIDs to be populated.
 		var txID ids.ID
 		if len(claimedIPPort.TxId) > 0 {
 			txID, err = ids.ToID(claimedIPPort.TxId)
