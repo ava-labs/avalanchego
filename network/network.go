@@ -1151,7 +1151,7 @@ func (n *network) runTimers() {
 			n.metrics.nodeUptimeWeightedAverage.Set(primaryUptime.WeightedAveragePercentage)
 			n.metrics.nodeUptimeRewardingStake.Set(primaryUptime.RewardingStakePercentage)
 
-			for subnetID := range n.peerConfig.MySubnets {
+			for subnetID := range n.config.WhitelistedSubnets {
 				result, err := n.NodeUptime(subnetID)
 				if err != nil {
 					n.peerConfig.Log.Debug("failed to get subnet uptime",
