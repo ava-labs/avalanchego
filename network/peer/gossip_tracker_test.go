@@ -165,6 +165,53 @@ func TestGossipTracker_StopTrackingPeer(t *testing.T) {
 	}
 }
 
+func TestGossipTracker_HasValidator(t *testing.T) {
+	type args struct {
+		valdiator ValidatorID
+	}
+
+	tests := []struct {
+		name       string
+		validators []ValidatorID
+		args       args
+		expected   bool
+	}{
+		{
+			name:       "empty",
+			validators: []ValidatorID{},
+			args:       args{v1},
+			expected:   false,
+		},
+		{
+			name:       "populated - does not contain",
+			validators: []ValidatorID{v1, v2},
+			args:       args{v3},
+			expected:   false,
+		},
+		{
+			name:       "populated - contains",
+			validators: []ValidatorID{v1, v2, v3},
+			args:       args{v3},
+			expected:   true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			r := require.New(t)
+
+			g, err := NewGossipTracker(prometheus.NewRegistry(), "foobar")
+			r.NoError(err)
+
+			for _, validator := range test.validators {
+				r.True(g.AddValidator(validator))
+			}
+
+			r.Equal(test.expected, g.HasValidator(test.args.valdiator))
+		})
+	}
+}
+
 func TestGossipTracker_AddValidator(t *testing.T) {
 	type args struct {
 		validator ValidatorID
