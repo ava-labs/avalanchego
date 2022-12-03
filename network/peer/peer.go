@@ -618,10 +618,7 @@ func (p *peer) sendNetworkMessages() {
 				p.Log.Debug("failed to send peer list",
 					zap.Stringer("nodeID", p.id),
 				)
-				continue
 			}
-
-			// TODO track outgoing peer lists
 		case <-sendPingsTicker.C:
 			if !p.Network.AllowConnection(p.id) {
 				p.Log.Debug("disconnecting from peer",
@@ -1041,7 +1038,9 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 	}
 
 	if len(trackedTxIDs) == 0 {
-		// There is no point in ack-ing a peerlist with an empty list of IDs.
+		p.Log.Debug("skipping peerlist ack as there were no tracked txIDs",
+			zap.Stringer("nodeID", p.id),
+		)
 		return
 	}
 
