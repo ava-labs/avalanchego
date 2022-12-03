@@ -157,6 +157,10 @@ func (g *gossipTracker) AddValidator(validator ValidatorID) bool {
 		return false
 	}
 
+	if _, ok := g.txsToValidators[validator.TxID]; ok {
+		return false
+	}
+
 	// add the validator to the MSB of the bitset.
 	msb := len(g.validatorsToIndices)
 	g.validatorsToIndices[validator.NodeID] = msb
