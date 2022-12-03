@@ -750,8 +750,8 @@ func (p *peer) handlePong(msg *p2ppb.Pong) {
 	}
 	p.observeUptime(constants.PrimaryNetworkID, msg.Uptime)
 
-	for _, subnetUptimes := range msg.SubnetUptimes {
-		subnetID, err := ids.ToID(subnetUptimes.SubnetId)
+	for _, subnetUptime := range msg.SubnetUptimes {
+		subnetID, err := ids.ToID(subnetUptime.SubnetId)
 		if err != nil {
 			p.Log.Debug("dropping pong message with invalid subnetID",
 				zap.Stringer("nodeID", p.id),
@@ -760,8 +760,8 @@ func (p *peer) handlePong(msg *p2ppb.Pong) {
 			p.StartClose()
 			return
 		}
-		uptime := subnetUptimes.Uptime
 
+		uptime := subnetUptime.Uptime
 		if uptime > 100 {
 			p.Log.Debug("dropping pong message with invalid uptime",
 				zap.Stringer("nodeID", p.id),
