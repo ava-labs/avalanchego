@@ -936,7 +936,9 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 	// Invariant: Because [p.Network.Track] directly calls the validator set, we
 	// must get the [trackedTxIDs] from the [p.GossipTracker] first. This
 	// prevents the situation where we may drop an IP in [p.Network.Track] but
-	// report to the peer that it was tracked.
+	// report to the peer that it was tracked. This means we may not send as
+	// many txIDs as we could send. However, we guarantee the txIDs we do send
+	// are correct.
 
 	// The peer knows about peers they gossiped to us.
 	trackedTxIDs, ok := p.GossipTracker.AddKnown(p.id, discoveredTxIDs)
