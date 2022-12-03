@@ -19,7 +19,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
@@ -27,7 +26,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+
+	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
 var (
@@ -985,7 +985,7 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 }
 
 func (p *peer) handlePeerListAck(msg *p2ppb.PeerListAck) {
-	ackedNodeIDs := make([]ids.NodeID, 0, len(msg.TxIds))
+	ackedTxIds := make([]ids.NodeID, 0, len(msg.TxIds))
 
 	for _, txIDBytes := range msg.TxIds {
 		txID, err := ids.ToID(txIDBytes)
@@ -1021,18 +1021,10 @@ func (p *peer) handlePeerListAck(msg *p2ppb.PeerListAck) {
 			continue
 		}
 
-		addValidatorTx := txs.AddValidatorTx{}
-		if _, err := txs.Codec.Unmarshal(tx.Bytes(), addValidatorTx); err != nil {
-			p.Log.Debug("failed to unmarshal AddValidatorTx",
-				zap.Error(err),
-			)
-			continue
-		}
-
-		ackedNodeIDs = append(ackedNodeIDs)
+		ackedTxIds = append(ackedTxIds)
 	}
 
-	p.Config.GossipTracker.AddKnown(p.id, ackedNodeIDs)
+	p.Config.GossipTracker.AddKnown(p.id, ackedTxIds)
 }
 
 func (p *peer) nextTimeout() time.Time {
