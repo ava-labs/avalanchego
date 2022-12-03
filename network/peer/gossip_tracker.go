@@ -81,7 +81,7 @@ type gossipTracker struct {
 	nodeIDsToIndices map[ids.NodeID]int
 	// each validator in the index it occupies in the bitset
 	validatorIDs []ValidatorID
-	// a mapping of each peer => the validators we have sent them
+	// a mapping of each peer => the validators they know about
 	trackedPeers map[ids.NodeID]ids.BigBitSet
 
 	metrics gossipTrackerMetrics
