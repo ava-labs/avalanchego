@@ -81,20 +81,6 @@ func (mr *MockGossipTrackerMockRecorder) GetUnknown(arg0, arg1 interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUnknown", reflect.TypeOf((*MockGossipTracker)(nil).GetUnknown), arg0, arg1)
 }
 
-// HasValidator mocks base method.
-func (m *MockGossipTracker) HasValidator(arg0 ValidatorID) bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HasValidator", arg0)
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// HasValidator indicates an expected call of HasValidator.
-func (mr *MockGossipTrackerMockRecorder) HasValidator(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasValidator", reflect.TypeOf((*MockGossipTracker)(nil).HasValidator), arg0)
-}
-
 // RemoveValidator mocks base method.
 func (m *MockGossipTracker) RemoveValidator(arg0 ids.NodeID) bool {
 	m.ctrl.T.Helper()
