@@ -950,10 +950,10 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 	}
 
 	for _, ip := range discoveredIPs {
-		// it's important to add this to our list of discovered peers regardless
-		// of whether we end up tracking it or not to avoid a situation where
-		// we are re-gossiping peers we are already connected to back to the
-		// node to told us about them.
+		// It's important that the return value of [Track] is not considered for
+		// gossip tracking. In addition to the racy behavior documented above,
+		// the gossip tracker should not care if the received IP was new. The
+		// gossip tracker only tracks if the peer knows the IP.
 		if !p.Network.Track(ip) {
 			p.Metrics.NumUselessPeerListBytes.Add(float64(ip.BytesLen()))
 		}
