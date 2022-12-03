@@ -962,11 +962,13 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 		p.Log.Error("failed to update known peers",
 			zap.Stringer("nodeID", p.id),
 		)
+		return
 	}
 
 	peerListAckMsg, err := p.Config.MessageCreator.PeerListAck(ackedPeerTxs)
 	if err != nil {
 		p.Log.Error("failed to create message",
+			zap.Stringer("nodeID", p.id),
 			zap.Stringer("messageOp", message.VersionOp),
 			zap.Error(err),
 		)
@@ -986,18 +988,24 @@ func (p *peer) handlePeerListAck(msg *p2ppb.PeerListAck) {
 	for _, txIDBytes := range msg.TxIds {
 		txID, err := ids.ToID(txIDBytes)
 		if err != nil {
-			p.Log.Error("failed to parse txID",
+			p.Log.Debug("failed to parse txID",
+				zap.Stringer("nodeID", p.id),
 				zap.Error(err),
 			)
-			continue
+			p.StartClose()
+			return
 		}
 
 		ackedTxIds = append(ackedTxIds, txID)
 	}
 
-	// Add this to our gossip tracker so we don't send this peer these
+	// Add this to our gossip tracker, so we don't send this peer these
 	// validators again.
-	p.Config.GossipTracker.AddKnown(p.id, ackedTxIds)
+	if !p.GossipTracker.AddKnown(p.id, ackedTxIds) {
+		p.Log.Error("failed to update known peers",
+			zap.Stringer("nodeID", p.id),
+		)
+	}
 }
 
 func (p *peer) nextTimeout() time.Time {
