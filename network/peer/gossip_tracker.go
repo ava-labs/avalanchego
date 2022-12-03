@@ -160,7 +160,7 @@ func (g *gossipTracker) HasValidator(validator ValidatorID) bool {
 		return false
 	}
 
-	return validator == g.gossipValidators[idx]
+	return validator == g.validators[idx]
 }
 
 func (g *gossipTracker) AddValidator(validator ValidatorID) bool {

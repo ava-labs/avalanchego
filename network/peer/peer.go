@@ -881,7 +881,7 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 
 	// the peers this peer told us about
 	discoveredTxs := make([]ids.ID, len(msg.ClaimedIpPorts))
-	// we only want peers that we have txs of in the pchain's state
+	// the peers that we will try to connect to
 	ackedPeerTxs := make([]ids.ID, 0, len(msg.ClaimedIpPorts))
 
 	for _, claimedIPPort := range msg.ClaimedIpPorts {
@@ -944,7 +944,17 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 			p.Metrics.NumUselessPeerListBytes.Add(float64(ip.BytesLen()))
 		}
 
-		if p.GossipTracker.Tracked()
+		// We only want to ack that we're going to try to connect to a validator
+		// if it's in our gossip tracker since otherwise we might end up in a
+		// world where we drop a connection to a validator and this peer never
+		// tells us about them again.
+		vdr := ValidatorID{
+			NodeID: ids.NodeIDFromCert(ip.Cert),
+			TxID:   txID,
+		}
+		if p.GossipTracker.HasValidator(vdr) {
+			ackedPeerTxs = append(ackedPeerTxs, txID)
+		}
 	}
 
 	// a peer must have known about a set of peers if it gossiped them to us
