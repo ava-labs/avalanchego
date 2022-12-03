@@ -276,7 +276,8 @@ func (b *bootstrapper) Startup(ctx context.Context) error {
 	b.pendingSendAcceptedFrontier.Clear()
 	for _, nodeID := range beaconIDs {
 		if !b.sampledBeacons.Contains(nodeID) {
-			err = b.sampledBeacons.Add(nodeID, nil, 1)
+			// Invariant: We never use the TxID or BLS keys populated here.
+			err = b.sampledBeacons.Add(nodeID, nil, ids.Empty, 1)
 		} else {
 			err = b.sampledBeacons.AddWeight(nodeID, 1)
 		}

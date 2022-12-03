@@ -93,6 +93,7 @@ message ClaimedIpPort {
   uint32 ip_port = 3;
   uint64 timestamp = 4;
   bytes signature = 5;
+  bytes tx_id = 6;
 }
 
 // Message that contains a list of peer information (IP, certs, etc.)

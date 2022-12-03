@@ -53,7 +53,7 @@ func (s *tracedState) GetValidatorSet(
 	ctx context.Context,
 	height uint64,
 	subnetID ids.ID,
-) (map[ids.NodeID]*Validator, error) {
+) (map[ids.NodeID]*GetValidatorOutput, error) {
 	ctx, span := s.tracer.Start(ctx, s.getValidatorSetTag, oteltrace.WithAttributes(
 		attribute.Int64("height", int64(height)),
 		attribute.Stringer("subnetID", subnetID),
