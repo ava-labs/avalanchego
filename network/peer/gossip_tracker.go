@@ -191,13 +191,13 @@ func (g *gossipTracker) RemoveValidator(validatorID ids.NodeID) bool {
 	if indexToRemove != lastIndex {
 		lastPeer := g.validators[lastIndex]
 
-		g.validators[indexToRemove] = lastPeer
 		g.validatorsToIndices[lastPeer.NodeID] = indexToRemove
+		g.validators[indexToRemove] = lastPeer
 	}
 
 	delete(g.validatorsToIndices, validatorID)
-	delete(g.txsToValidators, g.validators[lastIndex].TxID)
 	g.validators = g.validators[:lastIndex]
+	delete(g.txsToValidators, g.validators[lastIndex].TxID)
 
 	// invariant: we must remove the validator from everyone else's validator
 	// bitsets to make sure that each validator occupies the same position in
