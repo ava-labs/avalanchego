@@ -880,7 +880,7 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 	}
 
 	// the peers this peer told us about
-	discoveredTxs := make([]ids.ID, len(msg.ClaimedIpPorts))
+	discoveredTxs := make([]ids.ID, 0, len(msg.ClaimedIpPorts))
 	// the peers that we will try to connect to
 	ackedPeerTxs := make([]ids.ID, 0, len(msg.ClaimedIpPorts))
 
