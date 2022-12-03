@@ -433,59 +433,6 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 	}
 }
 
-func TestGossipTracker_GetTx(t *testing.T) {
-	type args struct {
-		validatorID ids.NodeID
-	}
-
-	tests := []struct {
-		name       string
-		validators []ValidatorID
-		args       args
-		expectedTx ids.ID
-		expectedOk bool
-	}{
-		{
-			name:       "empty",
-			validators: []ValidatorID{},
-			args:       args{validatorID: v3.NodeID},
-			expectedTx: ids.Empty,
-			expectedOk: false,
-		},
-		{
-			name:       "populated - not present",
-			validators: []ValidatorID{v1, v2},
-			args:       args{validatorID: v3.NodeID},
-			expectedTx: ids.Empty,
-			expectedOk: false,
-		},
-		{
-			name:       "populated - present",
-			validators: []ValidatorID{v1, v2, v3},
-			args:       args{validatorID: v3.NodeID},
-			expectedTx: v3.TxID,
-			expectedOk: true,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			r := require.New(t)
-
-			g, err := NewGossipTracker(prometheus.NewRegistry(), "foobar")
-			r.NoError(err)
-
-			for _, vdr := range test.validators {
-				r.True(g.AddValidator(vdr))
-			}
-
-			actualTx, ok := g.GetTxID(test.args.validatorID)
-			r.Equal(test.expectedTx, actualTx)
-			r.Equal(test.expectedOk, ok)
-		})
-	}
-}
-
 func TestGossipTracker_E2E(t *testing.T) {
 	r := require.New(t)
 

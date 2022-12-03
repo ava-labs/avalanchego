@@ -71,12 +71,6 @@ type GossipTracker interface {
 	//		about.
 	// 	bool: False if [peerID] is not tracked. True otherwise.
 	GetUnknown(peerID ids.NodeID, limit int) ([]ValidatorID, bool, error)
-
-	// GetTxID gets the txID that added a valdiator to the validator set
-	// Returns:
-	// 	ids.ID: The TxID that added [validatorID] to the validator set
-	//	bool: False if [validatorID] is not present. True otherwise.
-	GetTxID(validatorID ids.NodeID) (ids.ID, bool)
 }
 
 type gossipTracker struct {
@@ -296,17 +290,4 @@ func (g *gossipTracker) GetUnknown(peerID ids.NodeID, limit int) ([]ValidatorID,
 	}
 
 	return result, true, nil
-}
-
-func (g *gossipTracker) GetTxID(validatorID ids.NodeID) (ids.ID, bool) {
-	g.lock.RLock()
-	defer g.lock.RUnlock()
-
-	// return false if this validator isn't in the validator set
-	idx, ok := g.validatorsToIndices[validatorID]
-	if !ok {
-		return ids.Empty, false
-	}
-
-	return g.gossipValidators[idx].TxID, true
 }
