@@ -75,12 +75,12 @@ type GossipTracker interface {
 
 type gossipTracker struct {
 	lock sync.RWMutex
-	// each validator in the index it occupies in the bitset
-	validatorIndices []ValidatorID
-	// a mapping of validators => the index they occupy in the bitsets
-	validatorsToIndices map[ids.NodeID]int
 	// a mapping of txs => the validators they correspond to
-	txsToValidators map[ids.ID]ids.NodeID
+	txIDsToNodeIDs map[ids.ID]ids.NodeID
+	// a mapping of validators => the index they occupy in the bitsets
+	nodeIDsToIndices map[ids.NodeID]int
+	// each validator in the index it occupies in the bitset
+	validatorIDs []ValidatorID
 	// a mapping of each peer => the validators we have sent them
 	trackedPeers map[ids.NodeID]ids.BigBitSet
 
@@ -98,10 +98,10 @@ func NewGossipTracker(
 	}
 
 	return &gossipTracker{
-		validatorsToIndices: make(map[ids.NodeID]int),
-		txsToValidators:     make(map[ids.ID]ids.NodeID),
-		trackedPeers:        make(map[ids.NodeID]ids.BigBitSet),
-		metrics:             m,
+		txIDsToNodeIDs:   make(map[ids.ID]ids.NodeID),
+		nodeIDsToIndices: make(map[ids.NodeID]int),
+		trackedPeers:     make(map[ids.NodeID]ids.BigBitSet),
+		metrics:          m,
 	}, nil
 }
 
@@ -153,22 +153,21 @@ func (g *gossipTracker) AddValidator(validator ValidatorID) bool {
 	defer g.lock.Unlock()
 
 	// only add validators that are not already present
-	if _, ok := g.validatorsToIndices[validator.NodeID]; ok {
+	if _, ok := g.txIDsToNodeIDs[validator.TxID]; ok {
 		return false
 	}
-
-	if _, ok := g.txsToValidators[validator.TxID]; ok {
+	if _, ok := g.nodeIDsToIndices[validator.NodeID]; ok {
 		return false
 	}
 
 	// add the validator to the MSB of the bitset.
-	msb := len(g.validatorsToIndices)
-	g.validatorsToIndices[validator.NodeID] = msb
-	g.validatorIndices = append(g.validatorIndices, validator)
+	msb := len(g.validatorIDs)
+	g.txIDsToNodeIDs[validator.TxID] = validator.NodeID
+	g.nodeIDsToIndices[validator.NodeID] = msb
+	g.validatorIDs = append(g.validatorIDs, validator)
 
 	// emit metrics
-	g.metrics.validatorsToIndicesSize.Set(float64(len(g.validatorsToIndices)))
-	g.metrics.validatorIndices.Set(float64(len(g.validatorIndices)))
+	g.metrics.validatorsSize.Set(float64(len(g.validatorIDs)))
 
 	return true
 }
@@ -178,27 +177,28 @@ func (g *gossipTracker) RemoveValidator(validatorID ids.NodeID) bool {
 	defer g.lock.Unlock()
 
 	// only remove validators that are already present
-	indexToRemove, ok := g.validatorsToIndices[validatorID]
+	indexToRemove, ok := g.nodeIDsToIndices[validatorID]
 	if !ok {
 		return false
 	}
+	validatorToRemove := g.validatorIDs[indexToRemove]
 
 	// swap the validator-to-be-removed with the validator in the last index
 	// if the element we're swapping with is ourselves, we can skip this swap
 	// since we only need to delete instead
-	lastIndex := len(g.validatorIndices) - 1
+	lastIndex := len(g.validatorIDs) - 1
 	if indexToRemove != lastIndex {
-		lastPeer := g.validatorIndices[lastIndex]
+		lastValidator := g.validatorIDs[lastIndex]
 
-		g.validatorIndices[indexToRemove] = lastPeer
-		g.validatorsToIndices[lastPeer.NodeID] = indexToRemove
+		g.nodeIDsToIndices[lastValidator.NodeID] = indexToRemove
+		g.validatorIDs[indexToRemove] = lastValidator
 	}
 
-	delete(g.validatorsToIndices, validatorID)
-	delete(g.txsToValidators, g.validatorIndices[lastIndex].TxID)
-	g.validatorIndices = g.validatorIndices[:lastIndex]
+	delete(g.txIDsToNodeIDs, validatorToRemove.TxID)
+	delete(g.nodeIDsToIndices, validatorID)
+	g.validatorIDs = g.validatorIDs[:lastIndex]
 
-	// invariant: we must remove the validator from everyone else's validator
+	// Invariant: We must remove the validator from everyone else's validator
 	// bitsets to make sure that each validator occupies the same position in
 	// each bitset.
 	for _, knownPeers := range g.trackedPeers {
@@ -214,8 +214,7 @@ func (g *gossipTracker) RemoveValidator(validatorID ids.NodeID) bool {
 	}
 
 	// emit metrics
-	g.metrics.validatorsToIndicesSize.Set(float64(len(g.validatorsToIndices)))
-	g.metrics.validatorIndices.Set(float64(len(g.validatorIndices)))
+	g.metrics.validatorsSize.Set(float64(len(g.validatorIDs)))
 
 	return true
 }
@@ -236,21 +235,18 @@ func (g *gossipTracker) AddKnown(peerID ids.NodeID, txIDs []ids.ID) bool {
 	}
 
 	for _, txID := range txIDs {
-		nodeID, ok := g.txsToValidators[txID]
+		nodeID, ok := g.txIDsToNodeIDs[txID]
 		if !ok {
-			// We don't know about this txID, this is unexpected.
+			// We don't know about this txID, this can happen due to differences
+			// between our current validator set and the peer's current
+			// validator set.
 			continue
 		}
 
-		// sanity check that this node we learned about is actually a validator
-		idx, ok := g.validatorsToIndices[nodeID]
-		if !ok {
-			// if we try to learn about a validator that we don't know about,
-			// silently continue.
-			continue
-		}
-
-		knownPeers.Add(idx)
+		// Because we fetched the nodeID from [g.txIDsToNodeIDs], we are
+		// guaranteed that the index is populated.
+		index := g.nodeIDsToIndices[nodeID]
+		knownPeers.Add(index)
 	}
 
 	return true
@@ -273,7 +269,7 @@ func (g *gossipTracker) GetUnknown(peerID ids.NodeID, limit int) ([]ValidatorID,
 	// We select a random sample of bits to gossip to avoid starving out a
 	// validator from being gossiped for ane extended period of time.
 	s := sampler.NewUniform()
-	if err := s.Initialize(uint64(len(g.validatorIndices))); err != nil {
+	if err := s.Initialize(uint64(len(g.validatorIDs))); err != nil {
 		return nil, false, err
 	}
 
@@ -281,14 +277,14 @@ func (g *gossipTracker) GetUnknown(peerID ids.NodeID, limit int) ([]ValidatorID,
 	// this by computing the difference between the validators we know about
 	// and the validators we know we've sent to [peerID].
 	result := make([]ValidatorID, 0, limit)
-	for i := 0; i < len(g.validatorIndices) && len(result) < limit; i++ {
+	for i := 0; i < len(g.validatorIDs) && len(result) < limit; i++ {
 		drawn, err := s.Next()
 		if err != nil {
 			return nil, false, err
 		}
 
 		if !knownPeers.Contains(int(drawn)) {
-			result = append(result, g.validatorIndices[drawn])
+			result = append(result, g.validatorIDs[drawn])
 		}
 	}
 

@@ -183,7 +183,25 @@ func TestGossipTracker_AddValidator(t *testing.T) {
 			expected:   true,
 		},
 		{
-			name:       "already present",
+			name:       "already present txID",
+			validators: []ValidatorID{v1},
+			args: args{validator: ValidatorID{
+				NodeID: ids.GenerateTestNodeID(),
+				TxID:   v1.TxID,
+			}},
+			expected: false,
+		},
+		{
+			name:       "already present nodeID",
+			validators: []ValidatorID{v1},
+			args: args{validator: ValidatorID{
+				NodeID: v1.NodeID,
+				TxID:   ids.GenerateTestID(),
+			}},
+			expected: false,
+		},
+		{
+			name:       "already present nodeID",
 			validators: []ValidatorID{v1},
 			args:       args{validator: v1},
 			expected:   false,
@@ -560,4 +578,21 @@ func TestGossipTracker_E2E(t *testing.T) {
 	r.NoError(err)
 	r.Empty(unknown)
 	r.True(ok)
+}
+
+func TestGossipTracker_Regression_IncorrectTxIDDeletion(t *testing.T) {
+	r := require.New(t)
+
+	g, err := NewGossipTracker(prometheus.NewRegistry(), "foobar")
+	r.NoError(err)
+
+	r.True(g.AddValidator(v1))
+	r.True(g.AddValidator(v2))
+
+	r.True(g.RemoveValidator(v1.NodeID))
+
+	r.False(g.AddValidator(ValidatorID{
+		NodeID: ids.GenerateTestNodeID(),
+		TxID:   v2.TxID,
+	}))
 }
