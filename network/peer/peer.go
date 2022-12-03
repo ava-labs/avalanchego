@@ -882,7 +882,7 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 	}
 
 	// the peers this peer told us about
-	discoveredTxs := make([]ids.ID, len(msg.ClaimedIpPorts))
+	discoveredTxs := make([]ids.ID, 0, len(msg.ClaimedIpPorts))
 
 	for _, claimedIPPort := range msg.ClaimedIpPorts {
 		tlsCert, err := x509.ParseCertificate(claimedIPPort.X509Certificate)
