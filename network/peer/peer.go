@@ -19,15 +19,13 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-
-	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
 var (
@@ -663,7 +661,6 @@ func (p *peer) handle(msg message.InboundMessage) {
 		msg.OnFinishedHandling()
 		return
 	}
-
 	if !p.finishedHandshake.GetValue() {
 		p.Log.Debug(
 			"dropping message",
@@ -940,18 +937,6 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 			TxID:      txID,
 		}
 
-		// We only want to ack back peers for whom we have a corresponding
-		// committed tx for in the P-Chain, to prove that we knew about this
-		// peer at a specific point in time.
-		if _, txStatus, err := p.Config.PChain.GetTx(txID); err != nil {
-			p.Log.Error("failed to get tx",
-				zap.Stringer("nodeID", p.id),
-				zap.Error(err),
-			)
-		} else if txStatus == status.Committed {
-			ackedPeerTxs = append(ackedPeerTxs, txID)
-		}
-
 		// it's important to add this to our list of discovered peers regardless
 		// of whether we end up tracking it or not to avoid a situation where
 		// we are re-gossiping peers we are already connected to back to the
@@ -985,7 +970,7 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 }
 
 func (p *peer) handlePeerListAck(msg *p2ppb.PeerListAck) {
-	ackedTxIds := make([]ids.NodeID, 0, len(msg.TxIds))
+	ackedTxIds := make([]ids.ID, 0, len(msg.TxIds))
 
 	for _, txIDBytes := range msg.TxIds {
 		txID, err := ids.ToID(txIDBytes)
@@ -996,34 +981,11 @@ func (p *peer) handlePeerListAck(msg *p2ppb.PeerListAck) {
 			continue
 		}
 
-		tx, s, err := p.Config.PChain.GetTx(txID)
-		if err != nil {
-			// This shouldn't happen
-			p.Log.Error("failed to get tx",
-				zap.Error(err),
-			)
-			continue
-		}
-		if s != status.Committed {
-			// This shouldn't happen unless someone lied to us
-			p.Log.Debug("tx is not commited",
-				zap.Stringer("txID", txID),
-				zap.Stringer("status", s),
-			)
-			continue
-		}
-		if s != status.Committed {
-			// This shouldn't happen unless someone lied to us
-			p.Log.Debug("tx is not commited",
-				zap.Stringer("txID", txID),
-				zap.Stringer("status", s),
-			)
-			continue
-		}
-
-		ackedTxIds = append(ackedTxIds)
+		ackedTxIds = append(ackedTxIds, txID)
 	}
 
+	// Add this to our gossip tracker so we don't send this peer these
+	// validators again.
 	p.Config.GossipTracker.AddKnown(p.id, ackedTxIds)
 }
 
