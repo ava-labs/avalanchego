@@ -866,8 +866,6 @@ func (p *peer) handleVersion(msg *p2ppb.Version) {
 		)
 		return
 	}
-
-	// TODO track outgoing peer lists
 }
 
 func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
