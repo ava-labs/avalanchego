@@ -944,15 +944,7 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 			p.Metrics.NumUselessPeerListBytes.Add(float64(ip.BytesLen()))
 		}
 
-		// We only want to ack that we're going to try to connect to a validator
-		// if it's in our gossip tracker since otherwise we might end up in a
-		// world where we drop a connection to a validator and this peer never
-		// tells us about them again.
-		vdr := ValidatorID{
-			NodeID: ids.NodeIDFromCert(ip.Cert),
-			TxID:   txID,
-		}
-		if p.GossipTracker.HasValidator(vdr) {
+		if txID != ids.Empty {
 			ackedPeerTxs = append(ackedPeerTxs, txID)
 		}
 	}
