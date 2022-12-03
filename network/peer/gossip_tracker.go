@@ -80,7 +80,7 @@ type gossipTracker struct {
 	// a mapping of validators => the index they occupy in the bitsets
 	validatorsToIndices map[ids.NodeID]int
 	// each validator in the index it occupies in the bitset
-	gossipValidators []ValidatorID
+	validators []ValidatorID
 	// a mapping of txs => the validators they correspond to
 	txsToValidators map[ids.ID]ids.NodeID
 
@@ -160,12 +160,12 @@ func (g *gossipTracker) AddValidator(validator ValidatorID) bool {
 	// add the validator to the MSB of the bitset.
 	msb := len(g.validatorsToIndices)
 	g.validatorsToIndices[validator.NodeID] = msb
-	g.gossipValidators = append(g.gossipValidators, validator)
+	g.validators = append(g.validators, validator)
 	g.txsToValidators[validator.TxID] = validator.NodeID
 
 	// emit metrics
 	g.metrics.validatorsToIndicesSize.Set(float64(len(g.validatorsToIndices)))
-	g.metrics.validatorIndices.Set(float64(len(g.gossipValidators)))
+	g.metrics.validatorIndices.Set(float64(len(g.validators)))
 
 	return true
 }
@@ -183,17 +183,17 @@ func (g *gossipTracker) RemoveValidator(validatorID ids.NodeID) bool {
 	// swap the validator-to-be-removed with the validator in the last index
 	// if the element we're swapping with is ourselves, we can skip this swap
 	// since we only need to delete instead
-	lastIndex := len(g.gossipValidators) - 1
+	lastIndex := len(g.validators) - 1
 	if indexToRemove != lastIndex {
-		lastPeer := g.gossipValidators[lastIndex]
+		lastPeer := g.validators[lastIndex]
 
-		g.gossipValidators[indexToRemove] = lastPeer
+		g.validators[indexToRemove] = lastPeer
 		g.validatorsToIndices[lastPeer.NodeID] = indexToRemove
 	}
 
 	delete(g.validatorsToIndices, validatorID)
-	delete(g.txsToValidators, g.gossipValidators[lastIndex].TxID)
-	g.gossipValidators = g.gossipValidators[:lastIndex]
+	delete(g.txsToValidators, g.validators[lastIndex].TxID)
+	g.validators = g.validators[:lastIndex]
 
 	// invariant: we must remove the validator from everyone else's validator
 	// bitsets to make sure that each validator occupies the same position in
@@ -212,7 +212,7 @@ func (g *gossipTracker) RemoveValidator(validatorID ids.NodeID) bool {
 
 	// emit metrics
 	g.metrics.validatorsToIndicesSize.Set(float64(len(g.validatorsToIndices)))
-	g.metrics.validatorIndices.Set(float64(len(g.gossipValidators)))
+	g.metrics.validatorIndices.Set(float64(len(g.validators)))
 
 	return true
 }
@@ -270,7 +270,7 @@ func (g *gossipTracker) GetUnknown(peerID ids.NodeID, limit int) ([]ValidatorID,
 	// We select a random sample of bits to gossip to avoid starving out a
 	// validator from being gossiped for ane extended period of time.
 	s := sampler.NewUniform()
-	if err := s.Initialize(uint64(len(g.gossipValidators))); err != nil {
+	if err := s.Initialize(uint64(len(g.validators))); err != nil {
 		return nil, false, err
 	}
 
@@ -278,14 +278,14 @@ func (g *gossipTracker) GetUnknown(peerID ids.NodeID, limit int) ([]ValidatorID,
 	// this by computing the difference between the validators we know about
 	// and the validators we know we've sent to [peerID].
 	result := make([]ValidatorID, 0, limit)
-	for i := 0; i < len(g.gossipValidators) && len(result) < limit; i++ {
+	for i := 0; i < len(g.validators) && len(result) < limit; i++ {
 		drawn, err := s.Next()
 		if err != nil {
 			return nil, false, err
 		}
 
 		if !knownPeers.Contains(int(drawn)) {
-			result = append(result, g.gossipValidators[drawn])
+			result = append(result, g.validators[drawn])
 		}
 	}
 
