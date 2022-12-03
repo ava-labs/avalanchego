@@ -1145,18 +1145,17 @@ func (n *network) runTimers() {
 				n.peerConfig.Log.Debug("failed to get primary network uptime",
 					zap.Error(err),
 				)
-			} else {
-				n.metrics.nodeUptimeWeightedAverage.Set(primaryUptime.WeightedAveragePercentage)
-				n.metrics.nodeUptimeRewardingStake.Set(primaryUptime.RewardingStakePercentage)
 			}
-			for subnetID := range n.peerConfig.MySubnets {
+			n.metrics.nodeUptimeWeightedAverage.Set(primaryUptime.WeightedAveragePercentage)
+			n.metrics.nodeUptimeRewardingStake.Set(primaryUptime.RewardingStakePercentage)
+
+			for subnetID := range n.config.WhitelistedSubnets {
 				result, err := n.NodeUptime(subnetID)
 				if err != nil {
 					n.peerConfig.Log.Debug("failed to get subnet uptime",
 						zap.Stringer("subnetID", subnetID),
 						zap.Error(err),
 					)
-					continue
 				}
 				n.metrics.nodeSubnetUptimeWeightedAverage.WithLabelValues(subnetID.String()).Set(result.WeightedAveragePercentage)
 				n.metrics.nodeSubnetUptimeRewardingStake.WithLabelValues(subnetID.String()).Set(result.RewardingStakePercentage)
