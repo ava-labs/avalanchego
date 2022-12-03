@@ -10,35 +10,12 @@ import (
 )
 
 type gossipTrackerMetrics struct {
-	validators              prometheus.Gauge
-	txsToValidatorsSize     prometheus.Gauge
-	validatorsToIndicesSize prometheus.Gauge
-	trackedPeersSize        prometheus.Gauge
+	trackedPeersSize prometheus.Gauge
+	validatorsSize   prometheus.Gauge
 }
 
 func newGossipTrackerMetrics(registerer prometheus.Registerer, namespace string) (gossipTrackerMetrics, error) {
 	m := gossipTrackerMetrics{
-		validators: prometheus.NewGauge(
-			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "validators__size",
-				Help:      "amount of validators this node is tracking in validators",
-			},
-		),
-		validatorsToIndicesSize: prometheus.NewGauge(
-			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "validators_to_indices_size",
-				Help:      "amount of validators this node is tracking in validatorsToIndices",
-			},
-		),
-		txsToValidatorsSize: prometheus.NewGauge(
-			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "txs_to_validators_size",
-				Help:      "amount of txs this node is tracking in txsToValidators",
-			},
-		),
 		trackedPeersSize: prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Namespace: namespace,
@@ -46,14 +23,19 @@ func newGossipTrackerMetrics(registerer prometheus.Registerer, namespace string)
 				Help:      "amount of peers that are being tracked",
 			},
 		),
+		validatorsSize: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "validators_size",
+				Help:      "number of validators this node is tracking",
+			},
+		),
 	}
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		registerer.Register(m.validators),
-		registerer.Register(m.validatorsToIndicesSize),
-		registerer.Register(m.txsToValidatorsSize),
 		registerer.Register(m.trackedPeersSize),
+		registerer.Register(m.validatorsSize),
 	)
 
 	return m, errs.Err
