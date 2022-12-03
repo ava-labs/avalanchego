@@ -943,6 +943,12 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 		}
 	}
 
+	// TODO: Because [p.Network.Track] is not performed atomically with the
+	// [p.GossipTracker], it is possible that we didn't track a validator above,
+	// but are marking in the gossip tracker that we did track the validator
+	// above. This should be resolved by removing the usage of the validator set
+	// and replacing it with the gossip tracker.
+
 	// a peer must have known about a set of peers if it gossiped them to us
 	trackedTxIDs, ok := p.GossipTracker.AddKnown(p.id, discoveredTxIDs)
 	if !ok {
