@@ -943,6 +943,8 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 		if !p.Network.Track(ip) {
 			p.Metrics.NumUselessPeerListBytes.Add(float64(ip.BytesLen()))
 		}
+
+		if p.GossipTracker.Tracked()
 	}
 
 	// a peer must have known about a set of peers if it gossiped them to us

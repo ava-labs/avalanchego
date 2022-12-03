@@ -54,6 +54,9 @@ type GossipTracker interface {
 	// 	bool: False if [peerID] was not tracked. True otherwise.
 	StopTrackingPeer(peerID ids.NodeID) bool
 
+	// HasValidator returns if [validator] exists in the gossip tracker
+	// 	bool: False if [validator] is not present. True otherwise.
+	HasValidator(validator ValidatorID) bool
 	// AddValidator adds a validator that can be gossiped about
 	// 	bool: False if [validator] was already present. True otherwise.
 	AddValidator(validator ValidatorID) bool
@@ -146,6 +149,18 @@ func (g *gossipTracker) StopTrackingPeer(peerID ids.NodeID) bool {
 	g.metrics.trackedPeersSize.Set(float64(len(g.trackedPeers)))
 
 	return true
+}
+
+func (g *gossipTracker) HasValidator(validator ValidatorID) bool {
+	g.lock.RLock()
+	defer g.lock.RUnlock()
+
+	idx, ok := g.validatorsToIndices[validator.NodeID]
+	if !ok {
+		return false
+	}
+
+	return validator == g.gossipValidators[idx]
 }
 
 func (g *gossipTracker) AddValidator(validator ValidatorID) bool {
