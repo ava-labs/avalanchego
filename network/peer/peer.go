@@ -880,6 +880,7 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 	}
 
 	// the peers this peer told us about
+	discoveredIPs := make([]ips.ClaimedIPPort, 0, len(msg.ClaimedIpPorts))
 	discoveredTxIDs := make([]ids.ID, 0, len(msg.ClaimedIpPorts))
 	for _, claimedIPPort := range msg.ClaimedIpPorts {
 		tlsCert, err := x509.ParseCertificate(claimedIPPort.X509Certificate)
@@ -923,7 +924,7 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 
 			discoveredTxIDs = append(discoveredTxIDs, txID)
 		}
-		ip := ips.ClaimedIPPort{
+		discoveredIPs = append(discoveredIPs, ips.ClaimedIPPort{
 			Cert: tlsCert,
 			IPPort: ips.IPPort{
 				IP:   net.IP(claimedIPPort.IpAddr),
@@ -932,8 +933,24 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 			Timestamp: claimedIPPort.Timestamp,
 			Signature: claimedIPPort.Signature,
 			TxID:      txID,
-		}
+		})
+	}
 
+	// Invariant: Because [p.Network.Track] directly calls the validator set, we
+	// must get the [trackedTxIDs] from the [p.GossipTracker] first. This
+	// prevents the situation where we may drop an IP in [p.Network.Track] but
+	// report to the peer that it was tracked.
+
+	// The peer knows about peers they gossiped to us.
+	trackedTxIDs, ok := p.GossipTracker.AddKnown(p.id, discoveredTxIDs)
+	if !ok {
+		p.Log.Error("failed to update known peers",
+			zap.Stringer("nodeID", p.id),
+		)
+		return
+	}
+
+	for _, ip := range discoveredIPs {
 		// it's important to add this to our list of discovered peers regardless
 		// of whether we end up tracking it or not to avoid a situation where
 		// we are re-gossiping peers we are already connected to back to the
@@ -941,21 +958,6 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 		if !p.Network.Track(ip) {
 			p.Metrics.NumUselessPeerListBytes.Add(float64(ip.BytesLen()))
 		}
-	}
-
-	// TODO: Because [p.Network.Track] is not performed atomically with the
-	// [p.GossipTracker], it is possible that we didn't track a validator above,
-	// but are marking in the gossip tracker that we did track the validator
-	// above. This should be resolved by removing the usage of the validator set
-	// and replacing it with the gossip tracker.
-
-	// a peer must have known about a set of peers if it gossiped them to us
-	trackedTxIDs, ok := p.GossipTracker.AddKnown(p.id, discoveredTxIDs)
-	if !ok {
-		p.Log.Error("failed to update known peers",
-			zap.Stringer("nodeID", p.id),
-		)
-		return
 	}
 
 	peerListAckMsg, err := p.Config.MessageCreator.PeerListAck(trackedTxIDs)
