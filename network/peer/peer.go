@@ -944,9 +944,7 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 			p.Metrics.NumUselessPeerListBytes.Add(float64(ip.BytesLen()))
 		}
 
-		if txID != ids.Empty {
-			ackedPeerTxs = append(ackedPeerTxs, txID)
-		}
+		ackedPeerTxs = append(ackedPeerTxs, txID)
 	}
 
 	// a peer must have known about a set of peers if it gossiped them to us
