@@ -217,13 +217,13 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 		}
 
 		beacons := validators.NewSet()
-		err = beacons.Add(nodeIDs[0], nil, ids.Empty, 1)
+		err = beacons.Add(nodeIDs[0], nil, ids.GenerateTestID(), 1)
 		require.NoError(err)
 
 		primaryVdrs := validators.NewSet()
 		primaryVdrs.RegisterCallbackListener(&gossipTrackerCallback)
 		for _, nodeID := range nodeIDs {
-			err := primaryVdrs.Add(nodeID, nil, ids.Empty, 1)
+			err := primaryVdrs.Add(nodeID, nil, ids.GenerateTestID(), 1)
 			require.NoError(err)
 		}
 

@@ -168,6 +168,22 @@ func TestMessage(t *testing.T) {
 			bytesSaved:       true,
 		},
 		{
+			desc: "peer_list_ack message with no compression",
+			op:   PeerListAckOp,
+			msg: &p2ppb.Message{
+				Message: &p2ppb.Message_PeerListAck{
+					PeerListAck: &p2ppb.PeerListAck{
+						TxIds: [][]byte{
+							testID[:],
+						},
+					},
+				},
+			},
+			gzipCompress:     false,
+			bypassThrottling: false,
+			bytesSaved:       false,
+		},
+		{
 			desc: "get_state_summary_frontier message with no compression",
 			op:   GetStateSummaryFrontierOp,
 			msg: &p2ppb.Message{
