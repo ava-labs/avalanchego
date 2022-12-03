@@ -566,7 +566,7 @@ func (p *peer) sendNetworkMessages() {
 	for {
 		select {
 		case <-p.peerListChan:
-			_, peerIPs, err := p.Config.Network.Peers(p.id)
+			peerIPs, err := p.Config.Network.Peers(p.id)
 			if err != nil {
 				p.Log.Error("failed to get peers to gossip",
 					zap.Stringer("nodeID", p.id),
@@ -839,7 +839,7 @@ func (p *peer) handleVersion(msg *p2ppb.Version) {
 
 	p.gotVersion.SetValue(true)
 
-	_, peerIPs, err := p.Network.Peers(p.id)
+	peerIPs, err := p.Network.Peers(p.id)
 	if err != nil {
 		p.Log.Error("failed to get peers to gossip for handshake",
 			zap.Stringer("nodeID", p.id),
@@ -922,6 +922,8 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 				p.StartClose()
 				return
 			}
+
+			discoveredTxs = append(discoveredTxs, txID)
 		}
 		ip := ips.ClaimedIPPort{
 			Cert: tlsCert,
@@ -938,8 +940,6 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 		// of whether we end up tracking it or not to avoid a situation where
 		// we are re-gossiping peers we are already connected to back to the
 		// node to told us about them.
-		discoveredTxs = append(discoveredTxs, txID)
-
 		if !p.Network.Track(ip) {
 			p.Metrics.NumUselessPeerListBytes.Add(float64(ip.BytesLen()))
 		}

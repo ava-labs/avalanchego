@@ -82,8 +82,8 @@ func (n *testNetwork) Version() (message.OutboundMessage, error) {
 	)
 }
 
-func (*testNetwork) Peers(ids.NodeID) ([]ids.NodeID, []ips.ClaimedIPPort, error) {
-	return nil, nil, nil
+func (*testNetwork) Peers(ids.NodeID) ([]ips.ClaimedIPPort, error) {
+	return nil, nil
 }
 
 func (n *testNetwork) Pong(ids.NodeID) (message.OutboundMessage, error) {

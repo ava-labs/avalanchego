@@ -481,21 +481,20 @@ func (n *network) Version() (message.OutboundMessage, error) {
 	)
 }
 
-func (n *network) Peers(peerID ids.NodeID) ([]ids.NodeID, []ips.ClaimedIPPort, error) {
+func (n *network) Peers(peerID ids.NodeID) ([]ips.ClaimedIPPort, error) {
 	// Only select validators that we haven't already sent to this peer
 	unknownValidators, ok, err := n.gossipTracker.GetUnknown(peerID, int(n.config.PeerListNumValidatorIPs))
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if !ok {
 		n.peerConfig.Log.Debug(
 			"unable to find peer to gossip to",
 			zap.Stringer("nodeID", peerID),
 		)
-		return nil, nil, nil
+		return nil, nil
 	}
 
-	validatorIDs := make([]ids.NodeID, 0, len(unknownValidators))
 	validatorIPs := make([]ips.ClaimedIPPort, 0, len(unknownValidators))
 
 	for _, validator := range unknownValidators {
@@ -511,7 +510,6 @@ func (n *network) Peers(peerID ids.NodeID) ([]ids.NodeID, []ips.ClaimedIPPort, e
 		}
 
 		peerIP := p.IP()
-		validatorIDs = append(validatorIDs, validator.NodeID)
 		validatorIPs = append(validatorIPs,
 			ips.ClaimedIPPort{
 				Cert:      p.Cert(),
@@ -523,7 +521,7 @@ func (n *network) Peers(peerID ids.NodeID) ([]ids.NodeID, []ips.ClaimedIPPort, e
 		)
 	}
 
-	return validatorIDs, validatorIPs, nil
+	return validatorIPs, nil
 }
 
 func (n *network) Pong(nodeID ids.NodeID) (message.OutboundMessage, error) {
