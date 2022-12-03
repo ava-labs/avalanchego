@@ -39,8 +39,4 @@ type Network interface {
 
 	// Peers returns peers that [peerID] might not know about.
 	Peers(peerID ids.NodeID) ([]ids.NodeID, []ips.ClaimedIPPort, error)
-
-	// Pong provides the peer with a Pong message to send to the peer in
-	// response to a Ping message.
-	Pong(ids.NodeID) (message.OutboundMessage, error)
 }

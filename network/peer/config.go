@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -47,4 +48,7 @@ type Config struct {
 
 	// Tracks which peer knows about which peers
 	GossipTracker GossipTracker
+
+	// Calculates uptime of peers
+	UptimeCalculator uptime.Calculator
 }
