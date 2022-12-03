@@ -75,14 +75,14 @@ type GossipTracker interface {
 
 type gossipTracker struct {
 	lock sync.RWMutex
-	// a mapping of each peer => the validators we have sent them
-	trackedPeers map[ids.NodeID]ids.BigBitSet
-	// a mapping of validators => the index they occupy in the bitsets
-	validatorsToIndices map[ids.NodeID]int
 	// each validator in the index it occupies in the bitset
 	validators []ValidatorID
+	// a mapping of validators => the index they occupy in the bitsets
+	validatorsToIndices map[ids.NodeID]int
 	// a mapping of txs => the validators they correspond to
 	txsToValidators map[ids.ID]ids.NodeID
+	// a mapping of each peer => the validators we have sent them
+	trackedPeers map[ids.NodeID]ids.BigBitSet
 
 	metrics gossipTrackerMetrics
 }
@@ -98,9 +98,9 @@ func NewGossipTracker(
 	}
 
 	return &gossipTracker{
-		trackedPeers:        make(map[ids.NodeID]ids.BigBitSet),
 		validatorsToIndices: make(map[ids.NodeID]int),
 		txsToValidators:     make(map[ids.ID]ids.NodeID),
+		trackedPeers:        make(map[ids.NodeID]ids.BigBitSet),
 		metrics:             m,
 	}, nil
 }
@@ -161,15 +161,17 @@ func (g *gossipTracker) AddValidator(validator ValidatorID) bool {
 		return false
 	}
 
+	g.validators = append(g.validators, validator)
+
 	// add the validator to the MSB of the bitset.
 	msb := len(g.validatorsToIndices)
 	g.validatorsToIndices[validator.NodeID] = msb
-	g.validators = append(g.validators, validator)
 	g.txsToValidators[validator.TxID] = validator.NodeID
 
 	// emit metrics
+	g.metrics.validators.Set(float64(len(g.validators)))
 	g.metrics.validatorsToIndicesSize.Set(float64(len(g.validatorsToIndices)))
-	g.metrics.validatorIndices.Set(float64(len(g.validators)))
+	g.metrics.txsToValidatorsSize.Set(float64(len(g.txsToValidators)))
 
 	return true
 }
@@ -188,16 +190,15 @@ func (g *gossipTracker) RemoveValidator(validatorID ids.NodeID) bool {
 	// if the element we're swapping with is ourselves, we can skip this swap
 	// since we only need to delete instead
 	lastIndex := len(g.validators) - 1
+	lastPeer := g.validators[lastIndex]
 	if indexToRemove != lastIndex {
-		lastPeer := g.validators[lastIndex]
-
-		g.validatorsToIndices[lastPeer.NodeID] = indexToRemove
 		g.validators[indexToRemove] = lastPeer
+		g.validatorsToIndices[lastPeer.NodeID] = indexToRemove
 	}
 
-	delete(g.validatorsToIndices, validatorID)
 	g.validators = g.validators[:lastIndex]
-	delete(g.txsToValidators, g.validators[lastIndex].TxID)
+	delete(g.validatorsToIndices, validatorID)
+	delete(g.txsToValidators, lastPeer.TxID)
 
 	// invariant: we must remove the validator from everyone else's validator
 	// bitsets to make sure that each validator occupies the same position in
@@ -215,8 +216,9 @@ func (g *gossipTracker) RemoveValidator(validatorID ids.NodeID) bool {
 	}
 
 	// emit metrics
+	g.metrics.validators.Set(float64(len(g.validators)))
 	g.metrics.validatorsToIndicesSize.Set(float64(len(g.validatorsToIndices)))
-	g.metrics.validatorIndices.Set(float64(len(g.validators)))
+	g.metrics.txsToValidatorsSize.Set(float64(len(g.txsToValidators)))
 
 	return true
 }
