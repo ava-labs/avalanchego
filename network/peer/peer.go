@@ -960,6 +960,11 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 		}
 	}
 
+	if len(trackedTxIDs) == 0 {
+		// There is no point in ack-ing a peerlist with an empty list of IDs.
+		return
+	}
+
 	peerListAckMsg, err := p.Config.MessageCreator.PeerListAck(trackedTxIDs)
 	if err != nil {
 		p.Log.Error("failed to create message",
