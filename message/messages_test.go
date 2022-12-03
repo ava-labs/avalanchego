@@ -69,7 +69,21 @@ func TestMessage(t *testing.T) {
 			bytesSaved:       false,
 		},
 		{
-			desc: "pong message with no compression",
+			desc: "pong message with no compression no subnet uptimes",
+			op:   PongOp,
+			msg: &p2ppb.Message{
+				Message: &p2ppb.Message_Pong{
+					Pong: &p2ppb.Pong{
+						Uptime: 100,
+					},
+				},
+			},
+			gzipCompress:     false,
+			bypassThrottling: true,
+			bytesSaved:       false,
+		},
+		{
+			desc: "pong message with no compression and subnet uptimes",
 			op:   PongOp,
 			msg: &p2ppb.Message{
 				Message: &p2ppb.Message_Pong{

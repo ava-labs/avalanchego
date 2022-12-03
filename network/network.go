@@ -95,7 +95,7 @@ type Network interface {
 type UptimeResult struct {
 	// RewardingStakePercentage shows what percent of network stake thinks we're
 	// above the uptime requirement.
-	WeightedAveragePercentage float64
+	RewardingStakePercentage float64
 
 	// WeightedAveragePercentage is the average perceived uptime of this node,
 	// weighted by stake.
@@ -105,7 +105,7 @@ type UptimeResult struct {
 	// i.e If uptime requirement is 85 and a peer reports 40 percent it will be
 	// counted (40*weight) in WeightedAveragePercentage but not in
 	// RewardingStakePercentage since 40 < 85
-	RewardingStakePercentage float64
+	WeightedAveragePercentage float64
 }
 
 type network struct {
