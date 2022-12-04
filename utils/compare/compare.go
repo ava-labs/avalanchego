@@ -9,8 +9,8 @@ func UnsortedEquals[T comparable](a, b []T) bool {
 		return false
 	}
 	m := make(map[T]int, len(a))
-	for i := 0; i < len(a); i++ {
-		m[a[i]]++
+	for _, v := range a {
+		m[v]++
 	}
 	for _, v := range b {
 		switch count := m[v]; count {
