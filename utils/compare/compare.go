@@ -3,8 +3,7 @@
 
 package compare
 
-// Returns true iff the slices have the same elements,
-// regardless of order.
+// Returns true iff the slices have the same elements, regardless of order.
 func UnsortedEquals[T comparable](a, b []T) bool {
 	if len(a) != len(b) {
 		return false
@@ -13,8 +12,7 @@ func UnsortedEquals[T comparable](a, b []T) bool {
 	for i := 0; i < len(a); i++ {
 		m[a[i]]++
 	}
-	for i := 0; i < len(b); i++ {
-		v := b[i]
+	for _, v := range b {
 		switch count := m[v]; count {
 		case 0:
 			// There were more instances of [v] in [b] than [a].
@@ -22,7 +20,7 @@ func UnsortedEquals[T comparable](a, b []T) bool {
 		case 1:
 			delete(m, v)
 		default:
-			m[v]--
+			m[v] = count - 1
 		}
 	}
 	return len(m) == 0
