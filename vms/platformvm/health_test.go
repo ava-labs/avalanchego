@@ -72,7 +72,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 			testVdrCount := 4
 			for i := 0; i < testVdrCount; i++ {
 				subnetVal := ids.GenerateTestNodeID()
-				err := subnetVdrs.Add(subnetVal, nil, 100)
+				err := subnetVdrs.Add(subnetVal, nil, ids.Empty, 100)
 				require.NoError(err)
 			}
 			ok := vm.Validators.Add(subnetID, subnetVdrs)
