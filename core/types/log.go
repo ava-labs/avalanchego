@@ -148,3 +148,12 @@ func (l *LogForStorage) DecodeRLP(s *rlp.Stream) error {
 	}
 	return err
 }
+
+// FlattenLogs converts a nested array of logs to a single array of logs.
+func FlattenLogs(list [][]*Log) []*Log {
+	var flat []*Log
+	for _, logs := range list {
+		flat = append(flat, logs...)
+	}
+	return flat
+}

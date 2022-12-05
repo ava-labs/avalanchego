@@ -405,3 +405,12 @@ func (bc *BlockChain) GetCoinbaseAt(parent *types.Header) (common.Address, bool,
 	rewardAddress, feeRecipients := precompile.GetStoredRewardAddress(stateDB)
 	return rewardAddress, feeRecipients, nil
 }
+
+// GetLogs fetches all logs from a given block.
+func (bc *BlockChain) GetLogs(hash common.Hash, number uint64) [][]*types.Log {
+	logs, ok := bc.acceptedLogsCache.Get(hash) // this cache is thread-safe
+	if ok {
+		return logs
+	}
+	return rawdb.ReadLogs(bc.db, hash, number)
+}

@@ -44,8 +44,7 @@ const (
 	defaultMaxOutboundActiveRequests              = 16
 	defaultPopulateMissingTriesParallelism        = 1024
 	defaultStateSyncServerTrieCache               = 64 // MB
-	defaultIndexedFilterLogCacheSize              = 32
-	defaultUnindexedFilterLogCacheSize            = 32 // There can be up to [params.BloomBitsBlocks = 4096] unindexed blocks
+	defaultAcceptedCacheSize                      = 32 // blocks
 
 	// defaultStateSyncMinBlocks is the minimum number of blocks the blockchain
 	// should be ahead of local last accepted to perform state sync.
@@ -177,10 +176,12 @@ type Config struct {
 	// identical state with the pre-upgrade ruleset.
 	SkipUpgradeCheck bool `json:"skip-upgrade-check"`
 
-	// IndexedLogCacheSize is the number of indexed blocks for which logs will be cached in the filter system.
-	IndexedLogCacheSize int `json:"indexed-log-cache-size"`
-	// UnindexedLogCacheSize is the number of unindexed blocks for which logs will be cached in the filter system.
-	UnindexedLogCacheSize int `json:"unindexed-log-cache-size"`
+	// AcceptedCacheSize is the depth to keep in the accepted headers cache and the
+	// accepted logs cache at the accepted tip.
+	//
+	// This is particularly useful for improving the performance of eth_getLogs
+	// on RPC nodes.
+	AcceptedCacheSize int `json:"accepted-cache-size"`
 }
 
 // EthAPIs returns an array of strings representing the Eth APIs that should be enabled
@@ -226,8 +227,7 @@ func (c *Config) SetDefaults() {
 	c.StateSyncCommitInterval = defaultSyncableCommitInterval
 	c.StateSyncMinBlocks = defaultStateSyncMinBlocks
 	c.AllowUnprotectedTxHashes = defaultAllowUnprotectedTxHashes
-	c.IndexedLogCacheSize = defaultIndexedFilterLogCacheSize
-	c.UnindexedLogCacheSize = defaultUnindexedFilterLogCacheSize
+	c.AcceptedCacheSize = defaultAcceptedCacheSize
 }
 
 func (d *Duration) UnmarshalJSON(data []byte) (err error) {

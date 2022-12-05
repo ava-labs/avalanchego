@@ -52,19 +52,18 @@ var DefaultConfig = NewDefaultConfig()
 
 func NewDefaultConfig() Config {
 	return Config{
-		NetworkId:                   1,
-		TrieCleanCache:              512,
-		TrieDirtyCache:              256,
-		TrieDirtyCommitTarget:       20,
-		SnapshotCache:               256,
-		IndexedFilterLogCacheSize:   32,
-		UnindexedFilterLogCacheSize: 32,
-		Miner:                       miner.Config{},
-		TxPool:                      core.DefaultTxPoolConfig,
-		RPCGasCap:                   25000000,
-		RPCEVMTimeout:               5 * time.Second,
-		GPO:                         DefaultFullGPOConfig,
-		RPCTxFeeCap:                 1,
+		NetworkId:             1,
+		TrieCleanCache:        512,
+		TrieDirtyCache:        256,
+		TrieDirtyCommitTarget: 20,
+		SnapshotCache:         256,
+		AcceptedCacheSize:     32,
+		Miner:                 miner.Config{},
+		TxPool:                core.DefaultTxPoolConfig,
+		RPCGasCap:             25000000,
+		RPCEVMTimeout:         5 * time.Second,
+		GPO:                   DefaultFullGPOConfig,
+		RPCTxFeeCap:           1,
 	}
 }
 
@@ -102,10 +101,9 @@ type Config struct {
 	SnapshotCache         int
 	Preimages             bool
 
-	// This is the number of indexed blocks for which logs will be cached in the filter system.
-	IndexedFilterLogCacheSize int
-	// This is the number of unindexed blocks for which logs will be cached in the filter system.
-	UnindexedFilterLogCacheSize int
+	// AcceptedCacheSize is the depth of accepted headers cache and accepted
+	// logs cache at the accepted tip.
+	AcceptedCacheSize int
 
 	// Mining options
 	Miner miner.Config

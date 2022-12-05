@@ -79,7 +79,7 @@ func NewTrieWriter(db TrieDB, config *CacheConfig) TrieWriter {
 			targetCommitSize: common.StorageSize(config.TrieDirtyCommitTarget) * 1024 * 1024,
 			imageCap:         4 * 1024 * 1024,
 			commitInterval:   config.CommitInterval,
-			tipBuffer:        NewBoundedBuffer(tipBufferSize, db.Dereference),
+			tipBuffer:        NewBoundedBuffer[common.Hash](tipBufferSize, db.Dereference),
 		}
 		cm.flushStepSize = (cm.memoryCap - cm.targetCommitSize) / common.StorageSize(flushWindow)
 		return cm
@@ -121,7 +121,7 @@ type cappedMemoryTrieWriter struct {
 	imageCap         common.StorageSize
 	commitInterval   uint64
 
-	tipBuffer *BoundedBuffer
+	tipBuffer *BoundedBuffer[common.Hash]
 }
 
 func (cm *cappedMemoryTrieWriter) InsertTrie(block *types.Block) error {
@@ -192,8 +192,8 @@ func (cm *cappedMemoryTrieWriter) RejectTrie(block *types.Block) error {
 func (cm *cappedMemoryTrieWriter) Shutdown() error {
 	// If [tipBuffer] entry is empty, no need to do any cleanup on
 	// shutdown.
-	last := cm.tipBuffer.Last()
-	if last == (common.Hash{}) {
+	last, exists := cm.tipBuffer.Last()
+	if !exists {
 		return nil
 	}
 

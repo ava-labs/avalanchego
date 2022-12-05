@@ -336,8 +336,7 @@ func (vm *VM) Initialize(
 	vm.ethConfig.OfflinePruningDataDirectory = vm.config.OfflinePruningDataDirectory
 	vm.ethConfig.CommitInterval = vm.config.CommitInterval
 	vm.ethConfig.SkipUpgradeCheck = vm.config.SkipUpgradeCheck
-	vm.ethConfig.IndexedFilterLogCacheSize = vm.config.IndexedLogCacheSize
-	vm.ethConfig.UnindexedFilterLogCacheSize = vm.config.UnindexedLogCacheSize
+	vm.ethConfig.AcceptedCacheSize = vm.config.AcceptedCacheSize
 
 	// Create directory for offline pruning
 	if len(vm.ethConfig.OfflinePruningDataDirectory) != 0 {
