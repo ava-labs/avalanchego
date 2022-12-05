@@ -52,6 +52,8 @@ message Message {
     AppRequest app_request = 30;
     AppResponse app_response = 31;
     AppGossip app_gossip = 32;
+
+    PeerListAck peer_list_ack = 33;
   }
 }
 
@@ -116,6 +118,12 @@ message ClaimedIpPort {
 // of the remote peer.
 message PeerList {
   repeated ClaimedIpPort claimed_ip_ports = 1;
+}
+
+// Message that responds to a peer_list message containing the AddValidatorTxIDs
+// from the peer_list message that we currently have in our validator set.
+message PeerListAck {
+  repeated bytes tx_ids = 1;
 }
 
 message GetStateSummaryFrontier {

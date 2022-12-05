@@ -677,6 +677,10 @@ func (p *peer) handle(msg message.InboundMessage) {
 		p.handlePeerList(m)
 		msg.OnFinishedHandling()
 		return
+	case *p2ppb.PeerListAck:
+		// TODO implement a handler for this
+		msg.OnFinishedHandling()
+		return
 	}
 	if !p.finishedHandshake.GetValue() {
 		p.Log.Debug(
