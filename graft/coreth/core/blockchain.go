@@ -88,6 +88,9 @@ var (
 	acceptedTxsCounter  = metrics.NewRegisteredCounter("chain/txs/accepted", nil)
 	processedTxsCounter = metrics.NewRegisteredCounter("chain/txs/processed", nil)
 
+	acceptedLogsCounter  = metrics.NewRegisteredCounter("chain/logs/accepted", nil)
+	processedLogsCounter = metrics.NewRegisteredCounter("chain/logs/processed", nil)
+
 	ErrRefuseToCorruptArchiver = errors.New("node has operated with pruning disabled, shutting down to prevent missing tries")
 
 	errFutureBlockUnsupported  = errors.New("future block insertion not supported")
@@ -535,6 +538,9 @@ func (bc *BlockChain) startAcceptor() {
 
 		acceptorWorkTimer.Inc(time.Since(start).Milliseconds())
 		acceptorWorkCount.Inc(1)
+		// Note: in contrast to most accepted metrics, we increment the accepted log metrics in the acceptor queue because
+		// the logs are already processed in the acceptor queue.
+		acceptedLogsCounter.Inc(int64(len(logs)))
 	}
 }
 
@@ -1315,6 +1321,7 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 
 	processedBlockGasUsedCounter.Inc(int64(block.GasUsed()))
 	processedTxsCounter.Inc(int64(block.Transactions().Len()))
+	processedLogsCounter.Inc(int64(len(logs)))
 	blockInsertCount.Inc(1)
 	return nil
 }
