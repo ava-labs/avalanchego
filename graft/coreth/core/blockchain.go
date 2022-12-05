@@ -158,6 +158,7 @@ type CacheConfig struct {
 	SnapshotVerify                  bool          // Verify generated snapshots
 	SkipSnapshotRebuild             bool          // Whether to skip rebuilding the snapshot in favor of returning an error (only set to true for tests)
 	Preimages                       bool          // Whether to store preimage of trie key to the disk
+	AcceptedCacheSize               int           // Depth of accepted headers cache and accepted logs cache at the accepted tip
 	TxLookupLimit                   uint64        // Number of recent blocks for which to maintain transaction lookup indices
 }
 
@@ -169,6 +170,7 @@ var DefaultCacheConfig = &CacheConfig{
 	CommitInterval:        4096,
 	AcceptorQueueLimit:    64, // Provides 2 minutes of buffer (2s block target) for a commit delay
 	SnapshotLimit:         256,
+	AcceptedCacheSize:     32,
 }
 
 // BlockChain represents the canonical chain given a database with a genesis
@@ -269,6 +271,9 @@ type BlockChain struct {
 	// [flattenLock] prevents the [acceptor] from flattening snapshots while
 	// a block is being verified.
 	flattenLock sync.Mutex
+
+	// [acceptedLogsCache] stores recently accepted logs to improve the performance of eth_getLogs.
+	acceptedLogsCache FIFOCache[common.Hash, [][]*types.Log]
 }
 
 // NewBlockChain returns a fully initialised block chain using information
@@ -297,23 +302,24 @@ func NewBlockChain(
 			Preimages:   cacheConfig.Preimages,
 			StatsPrefix: trieCleanCacheStatsNamespace,
 		}),
-		bodyCache:     bodyCache,
-		receiptsCache: receiptsCache,
-		blockCache:    blockCache,
-		txLookupCache: txLookupCache,
-		engine:        engine,
-		vmConfig:      vmConfig,
-		badBlocks:     badBlocks,
-		senderCacher:  newTxSenderCacher(runtime.NumCPU()),
-		acceptorQueue: make(chan *types.Block, cacheConfig.AcceptorQueueLimit),
-		quit:          make(chan struct{}),
+		bodyCache:         bodyCache,
+		receiptsCache:     receiptsCache,
+		blockCache:        blockCache,
+		txLookupCache:     txLookupCache,
+		engine:            engine,
+		vmConfig:          vmConfig,
+		badBlocks:         badBlocks,
+		senderCacher:      newTxSenderCacher(runtime.NumCPU()),
+		acceptorQueue:     make(chan *types.Block, cacheConfig.AcceptorQueueLimit),
+		quit:              make(chan struct{}),
+		acceptedLogsCache: NewFIFOCache[common.Hash, [][]*types.Log](cacheConfig.AcceptedCacheSize),
 	}
 	bc.validator = NewBlockValidator(chainConfig, bc, engine)
 	bc.prefetcher = newStatePrefetcher(chainConfig, bc, engine)
 	bc.processor = NewStateProcessor(chainConfig, bc, engine)
 
 	var err error
-	bc.hc, err = NewHeaderChain(db, chainConfig, engine)
+	bc.hc, err = NewHeaderChain(db, chainConfig, cacheConfig, engine)
 	if err != nil {
 		return nil, err
 	}
@@ -370,6 +376,9 @@ func NewBlockChain(
 		// already initialized in recovery)
 		bc.initSnapshot(head)
 	}
+
+	// Warm up [hc.acceptedNumberCache] and [acceptedLogsCache]
+	bc.warmAcceptedCaches()
 
 	// Start processing accepted blocks effects in the background
 	go bc.startAcceptor()
@@ -499,6 +508,41 @@ func (bc *BlockChain) flattenSnapshot(postAbortWork func() error, hash common.Ha
 	return bc.snaps.Flatten(hash)
 }
 
+// warmAcceptedCaches fetches previously accepted headers and logs from disk to
+// pre-populate [hc.acceptedNumberCache] and [acceptedLogsCache].
+func (bc *BlockChain) warmAcceptedCaches() {
+	var (
+		startTime       = time.Now()
+		lastAccepted    = bc.LastAcceptedBlock().NumberU64()
+		startIndex      = uint64(1)
+		targetCacheSize = uint64(bc.cacheConfig.AcceptedCacheSize)
+	)
+	if targetCacheSize == 0 {
+		log.Info("Not warming accepted cache because disabled")
+		return
+	}
+	if lastAccepted < startIndex {
+		// This could occur if we haven't accepted any blocks yet
+		log.Info("Not warming accepted cache because there are no accepted blocks")
+		return
+	}
+	cacheDiff := targetCacheSize - 1 // last accepted lookback is inclusive, so we reduce size by 1
+	if cacheDiff < lastAccepted {
+		startIndex = lastAccepted - cacheDiff
+	}
+	for i := startIndex; i <= lastAccepted; i++ {
+		header := bc.GetHeaderByNumber(i)
+		if header == nil {
+			// This could happen if a node state-synced
+			log.Info("Exiting accepted cache warming early because header is nil", "height", i, "t", time.Since(startTime))
+			break
+		}
+		bc.hc.acceptedNumberCache.Put(header.Number.Uint64(), header)
+		bc.acceptedLogsCache.Put(header.Hash(), rawdb.ReadLogs(bc.db, header.Hash(), header.Number.Uint64()))
+	}
+	log.Info("Warmed accepted caches", "start", startIndex, "end", lastAccepted, "t", time.Since(startTime))
+}
+
 // startAcceptor starts processing items on the [acceptorQueue]. If a [nil]
 // object is placed on the [acceptorQueue], the [startAcceptor] will exit.
 func (bc *BlockChain) startAcceptor() {
@@ -519,13 +563,16 @@ func (bc *BlockChain) startAcceptor() {
 			log.Crit("failed to write accepted block effects", "err", err)
 		}
 
-		// Fetch block logs
-		logs := bc.gatherBlockLogs(next.Hash(), next.NumberU64(), false)
+		// Ensure [hc.acceptedNumberCache] and [acceptedLogsCache] have latest content
+		bc.hc.acceptedNumberCache.Put(next.NumberU64(), next.Header())
+		logs := rawdb.ReadLogs(bc.db, next.Hash(), next.NumberU64())
+		bc.acceptedLogsCache.Put(next.Hash(), logs)
 
 		// Update accepted feeds
-		bc.chainAcceptedFeed.Send(ChainEvent{Block: next, Hash: next.Hash(), Logs: logs})
-		if len(logs) > 0 {
-			bc.logsAcceptedFeed.Send(logs)
+		flattenedLogs := types.FlattenLogs(logs)
+		bc.chainAcceptedFeed.Send(ChainEvent{Block: next, Hash: next.Hash(), Logs: flattenedLogs})
+		if len(flattenedLogs) > 0 {
+			bc.logsAcceptedFeed.Send(flattenedLogs)
 		}
 		if len(next.Transactions()) != 0 {
 			bc.txAcceptedFeed.Send(NewTxsEvent{next.Transactions()})
@@ -978,6 +1025,7 @@ func (bc *BlockChain) Accept(block *types.Block) error {
 		}
 	}
 
+	// Enqueue block in the acceptor
 	bc.lastAccepted = block
 	bc.addAcceptorQueue(block)
 	acceptedBlockGasUsedCounter.Inc(int64(block.GasUsed()))

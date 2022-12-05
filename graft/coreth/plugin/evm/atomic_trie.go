@@ -118,7 +118,7 @@ type atomicTrie struct {
 	lastAcceptedRoot    common.Hash       // most recent trie root passed to accept trie or the root of the atomic trie on intialization.
 	codec               codec.Manager
 	memoryCap           common.StorageSize
-	tipBuffer           *core.BoundedBuffer
+	tipBuffer           *core.BoundedBuffer[common.Hash]
 }
 
 // newAtomicTrie returns a new instance of a atomicTrie with a configurable commitHeightInterval, used in testing.

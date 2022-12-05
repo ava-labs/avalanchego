@@ -264,11 +264,11 @@ func (f *Filter) unindexedLogs(ctx context.Context, end uint64) ([]*types.Log, e
 func (f *Filter) blockLogs(ctx context.Context, header *types.Header, skipBloom bool) ([]*types.Log, error) {
 	// Fast track: no filtering criteria
 	if len(f.addresses) == 0 && len(f.topics) == 0 {
-		list, err := f.sys.cachedGetLogs(ctx, header.Hash(), header.Number.Uint64())
+		list, err := f.sys.getLogs(ctx, header.Hash(), header.Number.Uint64())
 		if err != nil {
 			return nil, err
 		}
-		return flatten(list), nil
+		return types.FlattenLogs(list), nil
 	} else if skipBloom || bloomFilter(header.Bloom, f.addresses, f.topics) {
 		return f.checkMatches(ctx, header)
 	}
@@ -278,12 +278,12 @@ func (f *Filter) blockLogs(ctx context.Context, header *types.Header, skipBloom 
 // checkMatches checks if the receipts belonging to the given header contain any log events that
 // match the filter criteria. This function is called when the bloom filter signals a potential match.
 func (f *Filter) checkMatches(ctx context.Context, header *types.Header) ([]*types.Log, error) {
-	logsList, err := f.sys.cachedGetLogs(ctx, header.Hash(), header.Number.Uint64())
+	logsList, err := f.sys.getLogs(ctx, header.Hash(), header.Number.Uint64())
 	if err != nil {
 		return nil, err
 	}
 
-	unfiltered := flatten(logsList)
+	unfiltered := types.FlattenLogs(logsList)
 	logs := filterLogs(unfiltered, nil, nil, f.addresses, f.topics)
 	if len(logs) > 0 {
 		// We have matching logs, check if we need to resolve full logs via the light client
@@ -376,12 +376,4 @@ func bloomFilter(bloom types.Bloom, addresses []common.Address, topics [][]commo
 		}
 	}
 	return true
-}
-
-func flatten(list [][]*types.Log) []*types.Log {
-	var flat []*types.Log
-	for _, logs := range list {
-		flat = append(flat, logs...)
-	}
-	return flat
 }

@@ -70,9 +70,10 @@ type HeaderChain struct {
 	currentHeader     atomic.Value // Current head of the header chain (may be above the block chain!)
 	currentHeaderHash common.Hash  // Hash of the current head of the header chain (prevent recomputing all the time)
 
-	headerCache *lru.Cache // Cache for the most recent block headers
-	tdCache     *lru.Cache // Cache for the most recent block total difficulties
-	numberCache *lru.Cache // Cache for the most recent block numbers
+	headerCache         *lru.Cache                       // Cache for the most recent block headers
+	tdCache             *lru.Cache                       // Cache for the most recent block total difficulties
+	numberCache         *lru.Cache                       // Cache for the most recent block numbers
+	acceptedNumberCache FIFOCache[uint64, *types.Header] // Cache for most recent accepted heights to headers (only modified in accept)
 
 	rand   *mrand.Rand
 	engine consensus.Engine
@@ -80,10 +81,11 @@ type HeaderChain struct {
 
 // NewHeaderChain creates a new HeaderChain structure. ProcInterrupt points
 // to the parent's interrupt semaphore.
-func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, engine consensus.Engine) (*HeaderChain, error) {
+func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, cacheConfig *CacheConfig, engine consensus.Engine) (*HeaderChain, error) {
 	headerCache, _ := lru.New(headerCacheLimit)
 	tdCache, _ := lru.New(tdCacheLimit)
 	numberCache, _ := lru.New(numberCacheLimit)
+	acceptedNumberCache := NewFIFOCache[uint64, *types.Header](cacheConfig.AcceptedCacheSize)
 
 	// Seed a fast but crypto originating random generator
 	seed, err := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
@@ -92,13 +94,14 @@ func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, engine c
 	}
 
 	hc := &HeaderChain{
-		config:      config,
-		chainDb:     chainDb,
-		headerCache: headerCache,
-		tdCache:     tdCache,
-		numberCache: numberCache,
-		rand:        mrand.New(mrand.NewSource(seed.Int64())),
-		engine:      engine,
+		config:              config,
+		chainDb:             chainDb,
+		headerCache:         headerCache,
+		tdCache:             tdCache,
+		numberCache:         numberCache,
+		acceptedNumberCache: acceptedNumberCache,
+		rand:                mrand.New(mrand.NewSource(seed.Int64())),
+		engine:              engine,
 	}
 
 	hc.genesisHeader = hc.GetHeaderByNumber(0)
@@ -170,6 +173,9 @@ func (hc *HeaderChain) HasHeader(hash common.Hash, number uint64) bool {
 // GetHeaderByNumber retrieves a block header from the database by number,
 // caching it (associated with its hash) if found.
 func (hc *HeaderChain) GetHeaderByNumber(number uint64) *types.Header {
+	if cachedHeader, ok := hc.acceptedNumberCache.Get(number); ok {
+		return cachedHeader
+	}
 	hash := rawdb.ReadCanonicalHash(hc.chainDb, number)
 	if hash == (common.Hash{}) {
 		return nil

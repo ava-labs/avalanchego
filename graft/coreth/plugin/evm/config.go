@@ -40,6 +40,7 @@ const (
 	defaultPopulateMissingTriesParallelism        = 1024
 	defaultMaxOutboundActiveRequests              = 16
 	defaultStateSyncServerTrieCache               = 64 // MB
+	defaultAcceptedCacheSize                      = 32 // blocks
 
 	// defaultStateSyncMinBlocks is the minimum number of blocks the blockchain
 	// should be ahead of local last accepted to perform state sync.
@@ -163,6 +164,13 @@ type Config struct {
 	// identical state with the pre-upgrade ruleset.
 	SkipUpgradeCheck bool `json:"skip-upgrade-check"`
 
+	// AcceptedCacheSize is the depth to keep in the accepted headers cache and the
+	// accepted logs cache at the accepted tip.
+	//
+	// This is particularly useful for improving the performance of eth_getLogs
+	// on RPC nodes.
+	AcceptedCacheSize int `json:"accepted-cache-size"`
+
 	// TxLookupLimit is the maximum number of blocks from head whose tx indices
 	// are reserved:
 	//  * 0:   means no limit
@@ -209,6 +217,7 @@ func (c *Config) SetDefaults() {
 	c.StateSyncCommitInterval = defaultSyncableCommitInterval
 	c.StateSyncMinBlocks = defaultStateSyncMinBlocks
 	c.AllowUnprotectedTxHashes = defaultAllowUnprotectedTxHashes
+	c.AcceptedCacheSize = defaultAcceptedCacheSize
 }
 
 func (d *Duration) UnmarshalJSON(data []byte) (err error) {
