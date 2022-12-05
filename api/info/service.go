@@ -26,10 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
-var (
-	errNoChainProvided = errors.New("argument 'chain' not given")
-	errNotValidator    = errors.New("this is not a validator node")
-)
+var errNoChainProvided = errors.New("argument 'chain' not given")
 
 // Info is the API service for unprivileged info on a node
 type Info struct {
@@ -277,11 +274,16 @@ type UptimeResponse struct {
 	WeightedAveragePercentage json.Float64 `json:"weightedAveragePercentage"`
 }
 
-func (i *Info) Uptime(_ *http.Request, _ *struct{}, reply *UptimeResponse) error {
+type UptimeRequest struct {
+	// if omitted, defaults to primary network
+	SubnetID ids.ID `json:"subnetID"`
+}
+
+func (i *Info) Uptime(_ *http.Request, args *UptimeRequest, reply *UptimeResponse) error {
 	i.log.Debug("Info: Uptime called")
-	result, isValidator := i.networking.NodeUptime()
-	if !isValidator {
-		return errNotValidator
+	result, err := i.networking.NodeUptime(args.SubnetID)
+	if err != nil {
+		return fmt.Errorf("couldn't get node uptime: %w", err)
 	}
 	reply.WeightedAveragePercentage = json.Float64(result.WeightedAveragePercentage)
 	reply.RewardingStakePercentage = json.Float64(result.RewardingStakePercentage)
