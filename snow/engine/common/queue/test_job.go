@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
@@ -27,7 +28,7 @@ type TestJob struct {
 	CantHasMissingDependencies bool
 
 	IDF                     func() ids.ID
-	MissingDependenciesF    func(context.Context) (ids.Set, error)
+	MissingDependenciesF    func(context.Context) (set.Set[ids.ID], error)
 	ExecuteF                func(context.Context) error
 	BytesF                  func() []byte
 	HasMissingDependenciesF func(context.Context) (bool, error)
@@ -51,14 +52,14 @@ func (j *TestJob) ID() ids.ID {
 	return ids.ID{}
 }
 
-func (j *TestJob) MissingDependencies(ctx context.Context) (ids.Set, error) {
+func (j *TestJob) MissingDependencies(ctx context.Context) (set.Set[ids.ID], error) {
 	if j.MissingDependenciesF != nil {
 		return j.MissingDependenciesF(ctx)
 	}
 	if j.CantMissingDependencies && j.T != nil {
 		j.T.Fatalf("Unexpectedly called MissingDependencies")
 	}
-	return ids.Set{}, nil
+	return set.Set[ids.ID]{}, nil
 }
 
 func (j *TestJob) Execute(ctx context.Context) error {

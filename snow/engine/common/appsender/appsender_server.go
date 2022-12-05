@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/set"
 
 	appsenderpb "github.com/ava-labs/avalanchego/proto/pb/appsender"
 )
@@ -45,7 +46,7 @@ func (s *Server) SendCrossChainAppResponse(ctx context.Context, msg *appsenderpb
 }
 
 func (s *Server) SendAppRequest(ctx context.Context, req *appsenderpb.SendAppRequestMsg) (*emptypb.Empty, error) {
-	nodeIDs := ids.NewNodeIDSet(len(req.NodeIds))
+	nodeIDs := set.NewSet[ids.NodeID](len(req.NodeIds))
 	for _, nodeIDBytes := range req.NodeIds {
 		nodeID, err := ids.ToNodeID(nodeIDBytes)
 		if err != nil {
@@ -72,7 +73,7 @@ func (s *Server) SendAppGossip(ctx context.Context, req *appsenderpb.SendAppGoss
 }
 
 func (s *Server) SendAppGossipSpecific(ctx context.Context, req *appsenderpb.SendAppGossipSpecificMsg) (*emptypb.Empty, error) {
-	nodeIDs := ids.NewNodeIDSet(len(req.NodeIds))
+	nodeIDs := set.NewSet[ids.NodeID](len(req.NodeIds))
 	for _, nodeIDBytes := range req.NodeIds {
 		nodeID, err := ids.ToNodeID(nodeIDBytes)
 		if err != nil {

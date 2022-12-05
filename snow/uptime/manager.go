@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
@@ -45,7 +46,7 @@ type manager struct {
 
 	state          State
 	connections    map[ids.NodeID]map[ids.ID]time.Time // nodeID -> subnetID -> time
-	trackedSubnets ids.Set
+	trackedSubnets set.Set[ids.ID]
 }
 
 func NewManager(state State) Manager {

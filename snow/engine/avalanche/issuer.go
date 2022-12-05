@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // issuer issues [vtx] into consensus after its dependencies are met.
@@ -19,7 +20,7 @@ type issuer struct {
 	t                 *Transitive
 	vtx               avalanche.Vertex
 	issued, abandoned bool
-	vtxDeps, txDeps   ids.Set
+	vtxDeps, txDeps   set.Set[ids.ID]
 }
 
 // Register that a vertex we were waiting on has been issued to consensus.
@@ -176,7 +177,7 @@ func (i *issuer) Update(ctx context.Context) {
 
 type vtxIssuer struct{ i *issuer }
 
-func (vi *vtxIssuer) Dependencies() ids.Set {
+func (vi *vtxIssuer) Dependencies() set.Set[ids.ID] {
 	return vi.i.vtxDeps
 }
 
@@ -194,7 +195,7 @@ func (vi *vtxIssuer) Update(ctx context.Context) {
 
 type txIssuer struct{ i *issuer }
 
-func (ti *txIssuer) Dependencies() ids.Set {
+func (ti *txIssuer) Dependencies() set.Set[ids.ID] {
 	return ti.i.txDeps
 }
 

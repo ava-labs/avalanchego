@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -60,27 +61,27 @@ type stateSyncer struct {
 	frontierSeeders validators.Set
 	// IDs of validators we should request state summary frontier from.
 	// Will be consumed seeders are reached out for frontier.
-	targetSeeders ids.NodeIDSet
+	targetSeeders set.Set[ids.NodeID]
 	// IDs of validators we requested a state summary frontier from
 	// but haven't received a reply yet. ID is cleared if/when reply arrives.
-	pendingSeeders ids.NodeIDSet
+	pendingSeeders set.Set[ids.NodeID]
 	// IDs of validators that failed to respond with their state summary frontier
-	failedSeeders ids.NodeIDSet
+	failedSeeders set.Set[ids.NodeID]
 
 	// IDs of validators we should request filtering the accepted state summaries from
-	targetVoters ids.NodeIDSet
+	targetVoters set.Set[ids.NodeID]
 	// IDs of validators we requested filtering the accepted state summaries from
 	// but haven't received a reply yet. ID is cleared if/when reply arrives.
-	pendingVoters ids.NodeIDSet
+	pendingVoters set.Set[ids.NodeID]
 	// IDs of validators that failed to respond with their filtered accepted state summaries
-	failedVoters ids.NodeIDSet
+	failedVoters set.Set[ids.NodeID]
 
 	// summaryID --> (summary, weight)
 	weightedSummaries map[ids.ID]*weightedSummary
 
 	// summaries received may be different even if referring to the same height
 	// we keep a list of deduplicated height ready for voting
-	summariesHeights       map[uint64]struct{}
+	summariesHeights       set.Set[uint64]
 	uniqueSummariesHeights []uint64
 
 	// number of times the state sync has been attempted
@@ -136,8 +137,8 @@ func (ss *stateSyncer) StateSummaryFrontier(ctx context.Context, nodeID ids.Node
 		}
 
 		height := summary.Height()
-		if _, exists := ss.summariesHeights[height]; !exists {
-			ss.summariesHeights[height] = struct{}{}
+		if !ss.summariesHeights.Contains(height) {
+			ss.summariesHeights.Add(height)
 			ss.uniqueSummariesHeights = append(ss.uniqueSummariesHeights, height)
 		}
 	} else {
@@ -393,7 +394,7 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 
 	// clear up messages trackers
 	ss.weightedSummaries = make(map[ids.ID]*weightedSummary)
-	ss.summariesHeights = make(map[uint64]struct{})
+	ss.summariesHeights.Clear()
 	ss.uniqueSummariesHeights = nil
 
 	ss.targetSeeders.Clear()
@@ -442,7 +443,7 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 		}
 
 		height := localSummary.Height()
-		ss.summariesHeights[height] = struct{}{}
+		ss.summariesHeights.Add(height)
 		ss.uniqueSummariesHeights = append(ss.uniqueSummariesHeights, height)
 	default:
 		return err
@@ -474,7 +475,7 @@ func (ss *stateSyncer) restart(ctx context.Context) error {
 // to send their accepted state summary. It is called again until there are
 // no more seeders to be reached in the pending set
 func (ss *stateSyncer) sendGetStateSummaryFrontiers(ctx context.Context) {
-	vdrs := ids.NewNodeIDSet(1)
+	vdrs := set.NewSet[ids.NodeID](1)
 	for ss.targetSeeders.Len() > 0 && ss.pendingSeeders.Len() < common.MaxOutstandingBroadcastRequests {
 		vdr, _ := ss.targetSeeders.Pop()
 		vdrs.Add(vdr)
@@ -490,7 +491,7 @@ func (ss *stateSyncer) sendGetStateSummaryFrontiers(ctx context.Context) {
 // their filtered accepted frontier. It is called again until there are
 // no more voters to be reached in the pending set.
 func (ss *stateSyncer) sendGetAcceptedStateSummaries(ctx context.Context) {
-	vdrs := ids.NewNodeIDSet(1)
+	vdrs := set.NewSet[ids.NodeID](1)
 	for ss.targetVoters.Len() > 0 && ss.pendingVoters.Len() < common.MaxOutstandingBroadcastRequests {
 		vdr, _ := ss.targetVoters.Pop()
 		vdrs.Add(vdr)

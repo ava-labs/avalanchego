@@ -7,17 +7,18 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/utils/bloom"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 type FilterParam struct {
 	lock   sync.RWMutex
-	set    map[string]struct{}
+	set    set.Set[string]
 	filter bloom.Filter
 }
 
 func NewFilterParam() *FilterParam {
 	return &FilterParam{
-		set: make(map[string]struct{}),
+		set: set.Set[string]{},
 	}
 }
 
@@ -25,7 +26,7 @@ func (f *FilterParam) NewSet() {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	f.set = make(map[string]struct{})
+	f.set = set.Set[string]{}
 	f.filter = nil
 }
 
@@ -52,8 +53,7 @@ func (f *FilterParam) Check(addr []byte) bool {
 	if f.filter != nil && f.filter.Check(addr) {
 		return true
 	}
-	_, ok := f.set[string(addr)]
-	return ok
+	return f.set.Contains(string(addr))
 }
 
 func (f *FilterParam) Add(bl ...[]byte) error {
@@ -74,7 +74,7 @@ func (f *FilterParam) Add(bl ...[]byte) error {
 		return ErrAddressLimit
 	}
 	for _, b := range bl {
-		f.set[string(b)] = struct{}{}
+		f.set.Add(string(b))
 	}
 	return nil
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var _ snowstorm.Tx = (*transactionVertex)(nil)
@@ -94,6 +95,6 @@ func (tv *transactionVertex) HasWhitelist() bool {
 	return tv.vtx.HasWhitelist()
 }
 
-func (tv *transactionVertex) Whitelist(ctx context.Context) (ids.Set, error) {
+func (tv *transactionVertex) Whitelist(ctx context.Context) (set.Set[ids.ID], error) {
 	return tv.vtx.Whitelist(ctx)
 }

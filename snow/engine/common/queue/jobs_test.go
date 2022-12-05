@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // Magic value that comes from the size in bytes of a serialized key-value bootstrap checkpoint in a database +
@@ -29,11 +30,11 @@ func testJob(t *testing.T, jobID ids.ID, executed *bool, parentID ids.ID, parent
 		IDF: func() ids.ID {
 			return jobID
 		},
-		MissingDependenciesF: func(context.Context) (ids.Set, error) {
+		MissingDependenciesF: func(context.Context) (set.Set[ids.ID], error) {
 			if parentID != ids.Empty && !*parentExecuted {
-				return ids.Set{parentID: struct{}{}}, nil
+				return set.Set[ids.ID]{parentID: struct{}{}}, nil
 			}
-			return ids.Set{}, nil
+			return set.Set[ids.ID]{}, nil
 		},
 		HasMissingDependenciesF: func(context.Context) (bool, error) {
 			if parentID != ids.Empty && !*parentExecuted {
@@ -301,7 +302,7 @@ func TestMissingJobs(t *testing.T) {
 	numMissingIDs := jobs.NumMissingIDs()
 	require.Equal(2, numMissingIDs)
 
-	missingIDSet := ids.Set{}
+	missingIDSet := set.Set[ids.ID]{}
 	missingIDSet.Add(jobs.MissingIDs()...)
 
 	containsJob0ID := missingIDSet.Contains(job0ID)
@@ -321,7 +322,7 @@ func TestMissingJobs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	missingIDSet = ids.Set{}
+	missingIDSet = set.Set[ids.ID]{}
 	missingIDSet.Add(jobs.MissingIDs()...)
 
 	containsJob0ID = missingIDSet.Contains(job0ID)
@@ -451,7 +452,7 @@ func TestInitializeNumJobs(t *testing.T) {
 		IDF: func() ids.ID {
 			return job0ID
 		},
-		MissingDependenciesF: func(context.Context) (ids.Set, error) {
+		MissingDependenciesF: func(context.Context) (set.Set[ids.ID], error) {
 			return nil, nil
 		},
 		HasMissingDependenciesF: func(context.Context) (bool, error) {
@@ -467,7 +468,7 @@ func TestInitializeNumJobs(t *testing.T) {
 		IDF: func() ids.ID {
 			return job1ID
 		},
-		MissingDependenciesF: func(context.Context) (ids.Set, error) {
+		MissingDependenciesF: func(context.Context) (set.Set[ids.ID], error) {
 			return nil, nil
 		},
 		HasMissingDependenciesF: func(context.Context) (bool, error) {

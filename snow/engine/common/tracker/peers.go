@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -24,7 +25,7 @@ type Peers interface {
 	// PreferredPeers returns the currently connected validators. If there are
 	// no currently connected validators then it will return the currently
 	// connected peers.
-	PreferredPeers() ids.NodeIDSet
+	PreferredPeers() set.Set[ids.NodeID]
 }
 
 type peers struct {
@@ -35,9 +36,9 @@ type peers struct {
 	connectedWeight uint64
 	// connectedValidators is the set of currently connected peers with a
 	// non-zero stake weight
-	connectedValidators ids.NodeIDSet
+	connectedValidators set.Set[ids.NodeID]
 	// connectedPeers is the set of all connected peers
-	connectedPeers ids.NodeIDSet
+	connectedPeers set.Set[ids.NodeID]
 }
 
 func NewPeers() Peers {
@@ -110,17 +111,17 @@ func (p *peers) ConnectedWeight() uint64 {
 	return p.connectedWeight
 }
 
-func (p *peers) PreferredPeers() ids.NodeIDSet {
+func (p *peers) PreferredPeers() set.Set[ids.NodeID] {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
 	if p.connectedValidators.Len() == 0 {
-		connectedPeers := ids.NewNodeIDSet(p.connectedPeers.Len())
+		connectedPeers := set.NewSet[ids.NodeID](p.connectedPeers.Len())
 		connectedPeers.Union(p.connectedPeers)
 		return connectedPeers
 	}
 
-	connectedValidators := ids.NewNodeIDSet(p.connectedValidators.Len())
+	connectedValidators := set.NewSet[ids.NodeID](p.connectedValidators.Len())
 	connectedValidators.Union(p.connectedValidators)
 	return connectedValidators
 }

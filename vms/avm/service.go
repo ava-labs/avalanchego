@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
@@ -391,7 +392,7 @@ func (s *Service) GetBalance(_ *http.Request, args *GetBalanceArgs, reply *GetBa
 		return err
 	}
 
-	addrSet := ids.ShortSet{}
+	addrSet := set.Set[ids.ShortID]{}
 	addrSet.Add(addr)
 
 	utxos, err := avax.GetAllUTXOs(s.vm.state, addrSet)
@@ -455,7 +456,7 @@ func (s *Service) GetAllBalances(_ *http.Request, args *GetAllBalancesArgs, repl
 	if err != nil {
 		return fmt.Errorf("problem parsing address '%s': %w", args.Address, err)
 	}
-	addrSet := ids.ShortSet{}
+	addrSet := set.Set[ids.ShortID]{}
 	addrSet.Add(address)
 
 	utxos, err := avax.GetAllUTXOs(s.vm.state, addrSet)
@@ -464,7 +465,7 @@ func (s *Service) GetAllBalances(_ *http.Request, args *GetAllBalancesArgs, repl
 	}
 
 	now := s.vm.clock.Unix()
-	assetIDs := ids.Set{}               // IDs of assets the address has a non-zero balance of
+	assetIDs := set.Set[ids.ID]{}       // IDs of assets the address has a non-zero balance of
 	balances := make(map[ids.ID]uint64) // key: ID (as bytes). value: balance of that asset
 	for _, utxo := range utxos {
 		// TODO make this not specific to *secp256k1fx.TransferOutput

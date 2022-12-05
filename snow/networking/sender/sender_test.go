@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -78,8 +79,8 @@ func TestTimeout(t *testing.T) {
 		logging.NoLog{},
 		tm,
 		time.Second,
-		ids.Set{},
-		ids.Set{},
+		set.Set[ids.ID]{},
+		set.Set[ids.ID]{},
 		nil,
 		router.HealthConfig{},
 		"",
@@ -148,12 +149,12 @@ func TestTimeout(t *testing.T) {
 
 	var (
 		wg           = sync.WaitGroup{}
-		vdrIDs       = ids.NodeIDSet{}
-		chains       = ids.Set{}
+		vdrIDs       = set.Set[ids.NodeID]{}
+		chains       = set.Set[ids.ID]{}
 		requestID    uint32
 		failedLock   sync.Mutex
-		failedVDRs   = ids.NodeIDSet{}
-		failedChains = ids.Set{}
+		failedVDRs   = set.Set[ids.NodeID]{}
+		failedChains = set.Set[ids.ID]{}
 	)
 
 	failed := func(_ context.Context, nodeID ids.NodeID, _ uint32) error {
@@ -184,7 +185,7 @@ func TestTimeout(t *testing.T) {
 
 	sendAll := func() {
 		{
-			nodeIDs := ids.NodeIDSet{
+			nodeIDs := set.Set[ids.NodeID]{
 				ids.GenerateTestNodeID(): struct{}{},
 			}
 			vdrIDs.Union(nodeIDs)
@@ -193,7 +194,7 @@ func TestTimeout(t *testing.T) {
 			sender.SendGetStateSummaryFrontier(context.Background(), nodeIDs, requestID)
 		}
 		{
-			nodeIDs := ids.NodeIDSet{
+			nodeIDs := set.Set[ids.NodeID]{
 				ids.GenerateTestNodeID(): struct{}{},
 			}
 			vdrIDs.Union(nodeIDs)
@@ -202,7 +203,7 @@ func TestTimeout(t *testing.T) {
 			sender.SendGetAcceptedStateSummary(context.Background(), nodeIDs, requestID, nil)
 		}
 		{
-			nodeIDs := ids.NodeIDSet{
+			nodeIDs := set.Set[ids.NodeID]{
 				ids.GenerateTestNodeID(): struct{}{},
 			}
 			vdrIDs.Union(nodeIDs)
@@ -211,7 +212,7 @@ func TestTimeout(t *testing.T) {
 			sender.SendGetAcceptedFrontier(context.Background(), nodeIDs, requestID)
 		}
 		{
-			nodeIDs := ids.NodeIDSet{
+			nodeIDs := set.Set[ids.NodeID]{
 				ids.GenerateTestNodeID(): struct{}{},
 			}
 			vdrIDs.Union(nodeIDs)
@@ -234,7 +235,7 @@ func TestTimeout(t *testing.T) {
 			sender.SendGet(context.Background(), nodeID, requestID, ids.Empty)
 		}
 		{
-			nodeIDs := ids.NodeIDSet{
+			nodeIDs := set.Set[ids.NodeID]{
 				ids.GenerateTestNodeID(): struct{}{},
 			}
 			vdrIDs.Union(nodeIDs)
@@ -243,7 +244,7 @@ func TestTimeout(t *testing.T) {
 			sender.SendPullQuery(context.Background(), nodeIDs, requestID, ids.Empty)
 		}
 		{
-			nodeIDs := ids.NodeIDSet{
+			nodeIDs := set.Set[ids.NodeID]{
 				ids.GenerateTestNodeID(): struct{}{},
 			}
 			vdrIDs.Union(nodeIDs)
@@ -252,7 +253,7 @@ func TestTimeout(t *testing.T) {
 			sender.SendPushQuery(context.Background(), nodeIDs, requestID, nil)
 		}
 		{
-			nodeIDs := ids.NodeIDSet{
+			nodeIDs := set.Set[ids.NodeID]{
 				ids.GenerateTestNodeID(): struct{}{},
 			}
 			vdrIDs.Union(nodeIDs)
@@ -272,13 +273,13 @@ func TestTimeout(t *testing.T) {
 	}
 
 	// Send messages to disconnected peers
-	externalSender.SendF = func(_ message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
+	externalSender.SendF = func(_ message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ bool) set.Set[ids.NodeID] {
 		return nil
 	}
 	sendAll()
 
 	// Send messages to connected peers
-	externalSender.SendF = func(_ message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
+	externalSender.SendF = func(_ message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ bool) set.Set[ids.NodeID] {
 		return nodeIDs
 	}
 	sendAll()
@@ -326,8 +327,8 @@ func TestReliableMessages(t *testing.T) {
 		logging.NoLog{},
 		tm,
 		time.Second,
-		ids.Set{},
-		ids.Set{},
+		set.Set[ids.ID]{},
+		set.Set[ids.ID]{},
 		nil,
 		router.HealthConfig{},
 		"",
@@ -407,7 +408,7 @@ func TestReliableMessages(t *testing.T) {
 
 	go func() {
 		for i := 0; i < queriesToSend; i++ {
-			vdrIDs := ids.NodeIDSet{}
+			vdrIDs := set.Set[ids.NodeID]{}
 			vdrIDs.Add(ids.NodeID{1})
 
 			sender.SendPullQuery(context.Background(), vdrIDs, uint32(i), ids.Empty)
@@ -457,8 +458,8 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		logging.NoLog{},
 		tm,
 		time.Second,
-		ids.Set{},
-		ids.Set{},
+		set.Set[ids.ID]{},
+		set.Set[ids.ID]{},
 		nil,
 		router.HealthConfig{},
 		"",
@@ -533,7 +534,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			// Send a pull query to some random peer that won't respond
 			// because they don't exist. This will almost immediately trigger
 			// a query failed message
-			vdrIDs := ids.NodeIDSet{}
+			vdrIDs := set.Set[ids.NodeID]{}
 			vdrIDs.Add(ids.GenerateTestNodeID())
 			sender.SendPullQuery(context.Background(), vdrIDs, uint32(i), ids.Empty)
 		}
@@ -572,7 +573,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 		expectedResponseOp      message.Op
 		setMsgCreatorExpect     func(msgCreator *message.MockOutboundMsgBuilder)
 		setExternalSenderExpect func(externalSender *MockExternalSender)
-		sendF                   func(r *require.Assertions, sender common.Sender, nodeIDs ids.NodeIDSet)
+		sendF                   func(r *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID])
 	}
 
 	tests := []test{
@@ -603,17 +604,17 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
-					ids.NodeIDSet{ // Note [myNodeID] is not in this set
+					set.Set[ids.NodeID]{ // Note [myNodeID] is not in this set
 						successNodeID: struct{}{},
 						failedNodeID:  struct{}{},
 					}, // Node IDs
 					subnetID, // Subnet ID
 					snowCtx.IsValidatorOnly(),
-				).Return(ids.NodeIDSet{
+				).Return(set.Set[ids.NodeID]{
 					successNodeID: struct{}{},
 				})
 			},
-			sendF: func(r *require.Assertions, sender common.Sender, nodeIDs ids.NodeIDSet) {
+			sendF: func(r *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
 				sender.SendGetStateSummaryFrontier(
 					context.Background(),
 					nodeIDs,
@@ -650,17 +651,17 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
-					ids.NodeIDSet{ // Note [myNodeID] is not in this set
+					set.Set[ids.NodeID]{ // Note [myNodeID] is not in this set
 						successNodeID: struct{}{},
 						failedNodeID:  struct{}{},
 					}, // Node IDs
 					subnetID, // Subnet ID
 					snowCtx.IsValidatorOnly(),
-				).Return(ids.NodeIDSet{
+				).Return(set.Set[ids.NodeID]{
 					successNodeID: struct{}{},
 				})
 			},
-			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs ids.NodeIDSet) {
+			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
 				sender.SendGetAcceptedStateSummary(context.Background(), nodeIDs, requestID, heights)
 			},
 		},
@@ -691,17 +692,17 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
-					ids.NodeIDSet{ // Note [myNodeID] is not in this set
+					set.Set[ids.NodeID]{ // Note [myNodeID] is not in this set
 						successNodeID: struct{}{},
 						failedNodeID:  struct{}{},
 					}, // Node IDs
 					subnetID, // Subnet ID
 					snowCtx.IsValidatorOnly(),
-				).Return(ids.NodeIDSet{
+				).Return(set.Set[ids.NodeID]{
 					successNodeID: struct{}{},
 				})
 			},
-			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs ids.NodeIDSet) {
+			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
 				sender.SendGetAcceptedFrontier(context.Background(), nodeIDs, requestID)
 			},
 		},
@@ -733,17 +734,17 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
-					ids.NodeIDSet{ // Note [myNodeID] is not in this set
+					set.Set[ids.NodeID]{ // Note [myNodeID] is not in this set
 						successNodeID: struct{}{},
 						failedNodeID:  struct{}{},
 					}, // Node IDs
 					subnetID, // Subnet ID
 					snowCtx.IsValidatorOnly(),
-				).Return(ids.NodeIDSet{
+				).Return(set.Set[ids.NodeID]{
 					successNodeID: struct{}{},
 				})
 			},
-			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs ids.NodeIDSet) {
+			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
 				sender.SendGetAccepted(context.Background(), nodeIDs, requestID, containerIDs)
 			},
 		},
@@ -760,12 +761,12 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				externalSender = NewMockExternalSender(ctrl)
 				timeoutManager = timeout.NewMockManager(ctrl)
 				router         = router.NewMockRouter(ctrl)
-				nodeIDs        = ids.NodeIDSet{
+				nodeIDs        = set.Set[ids.NodeID]{
 					successNodeID: struct{}{},
 					failedNodeID:  struct{}{},
 					myNodeID:      struct{}{},
 				}
-				nodeIDsCopy ids.NodeIDSet
+				nodeIDsCopy set.Set[ids.NodeID]
 			)
 			nodeIDsCopy.Union(nodeIDs)
 			snowCtx.Registerer = prometheus.NewRegistry()
@@ -872,7 +873,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
-					ids.NodeIDSet{destinationNodeID: struct{}{}}, // Node IDs
+					set.Set[ids.NodeID]{destinationNodeID: struct{}{}}, // Node IDs
 					subnetID, // Subnet ID
 					snowCtx.IsValidatorOnly(),
 				).Return(nil)
@@ -902,7 +903,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
-					ids.NodeIDSet{destinationNodeID: struct{}{}}, // Node IDs
+					set.Set[ids.NodeID]{destinationNodeID: struct{}{}}, // Node IDs
 					subnetID, // Subnet ID
 					snowCtx.IsValidatorOnly(),
 				).Return(nil)
@@ -932,7 +933,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
-					ids.NodeIDSet{destinationNodeID: struct{}{}}, // Node IDs
+					set.Set[ids.NodeID]{destinationNodeID: struct{}{}}, // Node IDs
 					subnetID, // Subnet ID
 					snowCtx.IsValidatorOnly(),
 				).Return(nil)
@@ -962,7 +963,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
-					ids.NodeIDSet{destinationNodeID: struct{}{}}, // Node IDs
+					set.Set[ids.NodeID]{destinationNodeID: struct{}{}}, // Node IDs
 					subnetID, // Subnet ID
 					snowCtx.IsValidatorOnly(),
 				).Return(nil)
@@ -1053,7 +1054,7 @@ func TestSender_Single_Request(t *testing.T) {
 		assertMsgToMyself       func(r *require.Assertions, msg message.InboundMessage)
 		expectedResponseOp      message.Op
 		setMsgCreatorExpect     func(msgCreator *message.MockOutboundMsgBuilder)
-		setExternalSenderExpect func(externalSender *MockExternalSender, sentTo ids.NodeIDSet)
+		setExternalSenderExpect func(externalSender *MockExternalSender, sentTo set.Set[ids.NodeID])
 		sendF                   func(r *require.Assertions, sender common.Sender, nodeID ids.NodeID)
 	}
 
@@ -1082,10 +1083,10 @@ func TestSender_Single_Request(t *testing.T) {
 					containerID,
 				).Return(nil, nil)
 			},
-			setExternalSenderExpect: func(externalSender *MockExternalSender, sentTo ids.NodeIDSet) {
+			setExternalSenderExpect: func(externalSender *MockExternalSender, sentTo set.Set[ids.NodeID]) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
-					ids.NodeIDSet{destinationNodeID: struct{}{}}, // Node IDs
+					set.Set[ids.NodeID]{destinationNodeID: struct{}{}}, // Node IDs
 					subnetID,
 					snowCtx.IsValidatorOnly(),
 				).Return(sentTo)
@@ -1118,10 +1119,10 @@ func TestSender_Single_Request(t *testing.T) {
 					containerID,
 				).Return(nil, nil)
 			},
-			setExternalSenderExpect: func(externalSender *MockExternalSender, sentTo ids.NodeIDSet) {
+			setExternalSenderExpect: func(externalSender *MockExternalSender, sentTo set.Set[ids.NodeID]) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
-					ids.NodeIDSet{destinationNodeID: struct{}{}}, // Node IDs
+					set.Set[ids.NodeID]{destinationNodeID: struct{}{}}, // Node IDs
 					subnetID,
 					snowCtx.IsValidatorOnly(),
 				).Return(sentTo)
@@ -1259,7 +1260,7 @@ func TestSender_Single_Request(t *testing.T) {
 				tt.setMsgCreatorExpect(msgCreator)
 
 				// Make sure we're sending the message
-				tt.setExternalSenderExpect(externalSender, ids.NodeIDSet{})
+				tt.setExternalSenderExpect(externalSender, set.Set[ids.NodeID]{})
 
 				tt.sendF(require, sender, destinationNodeID)
 

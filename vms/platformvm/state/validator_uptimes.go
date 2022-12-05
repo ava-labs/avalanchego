@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -67,13 +68,13 @@ type validatorUptimes interface {
 type uptimes struct {
 	uptimes map[ids.NodeID]map[ids.ID]*uptimeAndReward // vdrID -> subnetID -> uptimes
 	// updatedUptimes tracks the updates since the last call to WriteUptimes
-	updatedUptimes map[ids.NodeID]map[ids.ID]struct{} // vdrID -> subnetID -> nil
+	updatedUptimes map[ids.NodeID]set.Set[ids.ID] // vdrID -> subnetIDs
 }
 
 func newValidatorUptimes() validatorUptimes {
 	return &uptimes{
 		uptimes:        make(map[ids.NodeID]map[ids.ID]*uptimeAndReward),
-		updatedUptimes: make(map[ids.NodeID]map[ids.ID]struct{}),
+		updatedUptimes: make(map[ids.NodeID]set.Set[ids.ID]),
 	}
 }
 
@@ -116,10 +117,10 @@ func (u *uptimes) SetUptime(
 
 	updatedSubnetUptimes, ok := u.updatedUptimes[vdrID]
 	if !ok {
-		updatedSubnetUptimes = make(map[ids.ID]struct{})
+		updatedSubnetUptimes = set.Set[ids.ID]{}
 		u.updatedUptimes[vdrID] = updatedSubnetUptimes
 	}
-	updatedSubnetUptimes[subnetID] = struct{}{}
+	updatedSubnetUptimes.Add(subnetID)
 	return nil
 }
 

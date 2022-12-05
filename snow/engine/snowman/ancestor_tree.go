@@ -5,6 +5,7 @@ package snowman
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 type AncestorTree interface {
@@ -18,13 +19,13 @@ type AncestorTree interface {
 
 type ancestorTree struct {
 	childToParent    map[ids.ID]ids.ID
-	parentToChildren map[ids.ID]ids.Set
+	parentToChildren map[ids.ID]set.Set[ids.ID]
 }
 
 func NewAncestorTree() AncestorTree {
 	return &ancestorTree{
 		childToParent:    make(map[ids.ID]ids.ID),
-		parentToChildren: make(map[ids.ID]ids.Set),
+		parentToChildren: make(map[ids.ID]set.Set[ids.ID]),
 	}
 }
 

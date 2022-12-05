@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 func TestSetAddZeroWeight(t *testing.T) {
@@ -107,7 +108,7 @@ func TestSetSubsetWeight(t *testing.T) {
 	weight1 := uint64(123)
 	weight2 := uint64(810)
 
-	subset := ids.NodeIDSet{}
+	subset := set.Set[ids.NodeID]{}
 	subset.Add(nodeID0)
 	subset.Add(nodeID1)
 

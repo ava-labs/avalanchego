@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // Voter records chits received from [vdr] once its dependencies are met.
@@ -19,10 +20,10 @@ type voter struct {
 	vdr       ids.NodeID
 	requestID uint32
 	response  []ids.ID
-	deps      ids.Set
+	deps      set.Set[ids.ID]
 }
 
-func (v *voter) Dependencies() ids.Set {
+func (v *voter) Dependencies() set.Set[ids.ID] {
 	return v.deps
 }
 

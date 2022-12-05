@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -275,7 +276,7 @@ func (s *state) DisableCaching() {
 	s.cachingEnabled = false
 }
 
-func (s *state) AddMissingJobIDs(missingIDs ids.Set) error {
+func (s *state) AddMissingJobIDs(missingIDs set.Set[ids.ID]) error {
 	for missingID := range missingIDs {
 		missingID := missingID
 		if err := s.missingJobIDs.Put(missingID[:], nil); err != nil {
@@ -285,7 +286,7 @@ func (s *state) AddMissingJobIDs(missingIDs ids.Set) error {
 	return nil
 }
 
-func (s *state) RemoveMissingJobIDs(missingIDs ids.Set) error {
+func (s *state) RemoveMissingJobIDs(missingIDs set.Set[ids.ID]) error {
 	for missingID := range missingIDs {
 		missingID := missingID
 		if err := s.missingJobIDs.Delete(missingID[:]); err != nil {

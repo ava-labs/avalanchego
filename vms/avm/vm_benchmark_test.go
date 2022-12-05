@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -39,7 +40,7 @@ func BenchmarkLoadUser(b *testing.B) {
 
 		b.ResetTimer()
 
-		fromAddrs := ids.ShortSet{}
+		fromAddrs := set.Set[ids.ShortID]{}
 		for n := 0; n < b.N; n++ {
 			addrIndex := n % numKeys
 			fromAddrs.Clear()
@@ -100,7 +101,7 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 		}
 	}
 
-	addrsSet := ids.ShortSet{}
+	addrsSet := set.Set[ids.ShortID]{}
 	addrsSet.Add(addr)
 
 	var (

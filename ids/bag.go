@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"golang.org/x/exp/maps"
+
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 const (
@@ -26,7 +28,7 @@ type Bag struct {
 	modeFreq int
 
 	threshold    int
-	metThreshold Set
+	metThreshold set.Set[ID]
 }
 
 func (b *Bag) init() {
@@ -117,7 +119,7 @@ func (b *Bag) Mode() (ID, int) {
 }
 
 // Threshold returns the ids that have been seen at least threshold times.
-func (b *Bag) Threshold() Set {
+func (b *Bag) Threshold() set.Set[ID] {
 	return b.metThreshold
 }
 

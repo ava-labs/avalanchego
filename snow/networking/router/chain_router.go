@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -44,10 +45,10 @@ type requestEntry struct {
 type peer struct {
 	version *version.Application
 	// The subnets that this peer is currently tracking (i.e whitelisted)
-	trackedSubnets ids.Set
+	trackedSubnets set.Set[ids.ID]
 	// The subnets that this peer actually has a connection to.
 	// This is a subset of trackedSubnets.
-	connectedSubnets ids.Set
+	connectedSubnets set.Set[ids.ID]
 }
 
 // ChainRouter routes incoming messages from the validator network
@@ -71,8 +72,8 @@ type ChainRouter struct {
 	peers        map[ids.NodeID]*peer
 	// node ID --> chains that node is benched on
 	// invariant: if a node is benched on any chain, it is treated as disconnected on all chains
-	benched        map[ids.NodeID]ids.Set
-	criticalChains ids.Set
+	benched        map[ids.NodeID]set.Set[ids.ID]
+	criticalChains set.Set[ids.ID]
 	onFatal        func(exitCode int)
 	metrics        *routerMetrics
 	// Parameters for doing health checks
@@ -91,8 +92,8 @@ func (cr *ChainRouter) Initialize(
 	log logging.Logger,
 	timeoutManager timeout.Manager,
 	closeTimeout time.Duration,
-	criticalChains ids.Set,
-	whitelistedSubnets ids.Set,
+	criticalChains set.Set[ids.ID],
+	whitelistedSubnets set.Set[ids.ID],
 	onFatal func(exitCode int),
 	healthConfig HealthConfig,
 	metricsNamespace string,
@@ -102,7 +103,7 @@ func (cr *ChainRouter) Initialize(
 	cr.chains = make(map[ids.ID]handler.Handler)
 	cr.timeoutManager = timeoutManager
 	cr.closeTimeout = closeTimeout
-	cr.benched = make(map[ids.NodeID]ids.Set)
+	cr.benched = make(map[ids.NodeID]set.Set[ids.ID])
 	cr.criticalChains = criticalChains
 	cr.onFatal = onFatal
 	cr.timedRequests = linkedhashmap.New[ids.RequestID, requestEntry]()
@@ -247,7 +248,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 
 	// TODO: [requestID] can overflow, which means a timeout on the request
 	//       before the overflow may not be handled properly.
-	if _, notRequested := message.UnrequestedOps[op]; notRequested ||
+	if notRequested := message.UnrequestedOps.Contains(op); notRequested ||
 		(op == message.PutOp && requestID == constants.GossipMsgRequestID) {
 		if chainCtx.IsExecuting() {
 			cr.log.Debug("dropping message and skipping queue",

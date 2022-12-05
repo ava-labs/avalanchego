@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/utils/set"
+
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
@@ -184,7 +186,7 @@ var (
 		AppRequestFailedOp:              AppResponseOp,
 		CrossChainAppRequestFailedOp:    CrossChainAppResponseOp,
 	}
-	UnrequestedOps = map[Op]struct{}{
+	UnrequestedOps = set.Set[Op]{
 		GetAcceptedFrontierOp:     {},
 		GetAcceptedOp:             {},
 		GetAncestorsOp:            {},

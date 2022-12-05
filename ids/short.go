@@ -112,13 +112,6 @@ func (id ShortID) Less(other ShortID) bool {
 	return bytes.Compare(id[:], other[:]) == -1
 }
 
-// IsUniqueShortIDs returns true iff [ids] are unique
-func IsUniqueShortIDs(ids []ShortID) bool {
-	set := ShortSet{}
-	set.Add(ids...)
-	return set.Len() == len(ids)
-}
-
 // ShortIDsToStrings converts an array of shortIDs to an array of their string
 // representations
 func ShortIDsToStrings(ids []ShortID) []string {

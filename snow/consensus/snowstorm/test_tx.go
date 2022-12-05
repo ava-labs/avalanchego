@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var _ Tx = (*TestTx)(nil)
@@ -20,7 +21,7 @@ type TestTx struct {
 	DependenciesErrV error
 	InputIDsV        []ids.ID
 	HasWhitelistV    bool
-	WhitelistV       ids.Set
+	WhitelistV       set.Set[ids.ID]
 	WhitelistErrV    error
 	VerifyV          error
 	BytesV           []byte
@@ -38,7 +39,7 @@ func (t *TestTx) HasWhitelist() bool {
 	return t.HasWhitelistV
 }
 
-func (t *TestTx) Whitelist(context.Context) (ids.Set, error) {
+func (t *TestTx) Whitelist(context.Context) (set.Set[ids.ID], error) {
 	return t.WhitelistV, t.WhitelistErrV
 }
 

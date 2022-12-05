@@ -47,6 +47,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/metervm"
@@ -179,7 +180,7 @@ type ManagerConfig struct {
 	AVAXAssetID                 ids.ID
 	XChainID                    ids.ID          // ID of the X-Chain,
 	CChainID                    ids.ID          // ID of the C-Chain,
-	CriticalChains              ids.Set         // Chains that can't exit gracefully
+	CriticalChains              set.Set[ids.ID] // Chains that can't exit gracefully
 	TimeoutManager              timeout.Manager // Manages request timeouts when sending messages to other validators
 	Health                      health.Registerer
 	RetryBootstrap              bool                    // Should Bootstrap be retried
