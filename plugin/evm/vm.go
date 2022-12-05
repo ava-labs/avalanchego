@@ -76,6 +76,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -731,7 +732,7 @@ func (vm *VM) preBatchOnFinalizeAndAssemble(header *types.Header, state *state.S
 func (vm *VM) postBatchOnFinalizeAndAssemble(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
 	var (
 		batchAtomicTxs    []*Tx
-		batchAtomicUTXOs  ids.Set
+		batchAtomicUTXOs  set.Set[ids.ID]
 		batchContribution *big.Int = new(big.Int).Set(common.Big0)
 		batchGasUsed      *big.Int = new(big.Int).Set(common.Big0)
 		rules                      = vm.chainConfig.AvalancheRules(header.Number, new(big.Int).SetUint64(header.Time))
@@ -1230,7 +1231,7 @@ func (vm *VM) CreateStaticHandlers(context.Context) (map[string]*commonEng.HTTPH
 // or any of its ancestor blocks going back to the last accepted block in its ancestry. If [ancestor] is
 // accepted, then nil will be returned immediately.
 // If the ancestry of [ancestor] cannot be fetched, then [errRejectedParent] may be returned.
-func (vm *VM) conflicts(inputs ids.Set, ancestor *Block) error {
+func (vm *VM) conflicts(inputs set.Set[ids.ID], ancestor *Block) error {
 	for ancestor.Status() != choices.Accepted {
 		// If any of the atomic transactions in the ancestor conflict with [inputs]
 		// return an error.
@@ -1420,7 +1421,7 @@ func (vm *VM) verifyTxs(txs []*Tx, parentHash common.Hash, baseFee *big.Int, hei
 
 	// Ensure each tx in [txs] doesn't conflict with any other atomic tx in
 	// a processing ancestor block.
-	inputs := &ids.Set{}
+	inputs := set.Set[ids.ID]{}
 	for _, atomicTx := range txs {
 		utx := atomicTx.UnsignedAtomicTx
 		if err := utx.SemanticVerify(vm, atomicTx, ancestor, baseFee, rules); err != nil {
@@ -1439,7 +1440,7 @@ func (vm *VM) verifyTxs(txs []*Tx, parentHash common.Hash, baseFee *big.Int, hei
 // referenced in.
 func (vm *VM) GetAtomicUTXOs(
 	chainID ids.ID,
-	addrs ids.ShortSet,
+	addrs set.Set[ids.ShortID],
 	startAddr ids.ShortID,
 	startUTXOID ids.ID,
 	limit int,

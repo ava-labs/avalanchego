@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/set"
 
 	"github.com/ava-labs/coreth/plugin/evm/message"
 
@@ -57,7 +58,7 @@ func TestRequestAnyRequestsRoutingAndResponse(t *testing.T) {
 	senderWg := &sync.WaitGroup{}
 	var net Network
 	sender := testAppSender{
-		sendAppRequestFn: func(nodes ids.NodeIDSet, requestID uint32, requestBytes []byte) error {
+		sendAppRequestFn: func(nodes set.Set[ids.NodeID], requestID uint32, requestBytes []byte) error {
 			nodeID, _ := nodes.Pop()
 			senderWg.Add(1)
 			go func() {
@@ -128,7 +129,7 @@ func TestRequestRequestsRoutingAndResponse(t *testing.T) {
 	var lock sync.Mutex
 	contactedNodes := make(map[ids.NodeID]struct{})
 	sender := testAppSender{
-		sendAppRequestFn: func(nodes ids.NodeIDSet, requestID uint32, requestBytes []byte) error {
+		sendAppRequestFn: func(nodes set.Set[ids.NodeID], requestID uint32, requestBytes []byte) error {
 			nodeID, _ := nodes.Pop()
 			lock.Lock()
 			contactedNodes[nodeID] = struct{}{}
@@ -222,7 +223,7 @@ func TestRequestMinVersion(t *testing.T) {
 
 	var net Network
 	sender := testAppSender{
-		sendAppRequestFn: func(nodes ids.NodeIDSet, reqID uint32, messageBytes []byte) error {
+		sendAppRequestFn: func(nodes set.Set[ids.NodeID], reqID uint32, messageBytes []byte) error {
 			atomic.AddUint32(&callNum, 1)
 			assert.True(t, nodes.Contains(nodeID), "request nodes should contain expected nodeID")
 			assert.Len(t, nodes, 1, "request nodes should contain exactly one node")
@@ -286,7 +287,7 @@ func TestOnRequestHonoursDeadline(t *testing.T) {
 	var net Network
 	responded := false
 	sender := testAppSender{
-		sendAppRequestFn: func(nodes ids.NodeIDSet, reqID uint32, message []byte) error {
+		sendAppRequestFn: func(nodes set.Set[ids.NodeID], reqID uint32, message []byte) error {
 			return nil
 		},
 		sendAppResponseFn: func(nodeID ids.NodeID, reqID uint32, message []byte) error {
@@ -456,7 +457,7 @@ func buildGossip(codec codec.Manager, msg message.GossipMessage) ([]byte, error)
 type testAppSender struct {
 	sendCrossChainAppRequestFn  func(ids.ID, uint32, []byte) error
 	sendCrossChainAppResponseFn func(ids.ID, uint32, []byte) error
-	sendAppRequestFn            func(ids.NodeIDSet, uint32, []byte) error
+	sendAppRequestFn            func(set.Set[ids.NodeID], uint32, []byte) error
 	sendAppResponseFn           func(ids.NodeID, uint32, []byte) error
 	sendAppGossipFn             func([]byte) error
 }
@@ -469,11 +470,11 @@ func (t testAppSender) SendCrossChainAppResponse(_ context.Context, chainID ids.
 	return t.sendCrossChainAppResponseFn(chainID, requestID, appResponseBytes)
 }
 
-func (t testAppSender) SendAppGossipSpecific(context.Context, ids.NodeIDSet, []byte) error {
+func (t testAppSender) SendAppGossipSpecific(context.Context, set.Set[ids.NodeID], []byte) error {
 	panic("not implemented")
 }
 
-func (t testAppSender) SendAppRequest(_ context.Context, nodeIDs ids.NodeIDSet, requestID uint32, message []byte) error {
+func (t testAppSender) SendAppRequest(_ context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, message []byte) error {
 	return t.sendAppRequestFn(nodeIDs, requestID, message)
 }
 

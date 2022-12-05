@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -103,7 +104,7 @@ type UnsignedAtomicTx interface {
 	UnsignedTx
 
 	// InputUTXOs returns the UTXOs this tx consumes
-	InputUTXOs() ids.Set
+	InputUTXOs() set.Set[ids.ID]
 	// Verify attempts to verify that the transaction is well formed
 	Verify(ctx *snow.Context, rules params.Rules) error
 	// Attempts to verify this transaction with the provided state.
