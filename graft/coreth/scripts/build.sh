@@ -27,7 +27,7 @@ if version_lt "$(go_version)" "$go_version_minimum"; then
     exit 1
 fi
 
-# Avalanche root directory
+# Coreth root directory
 CORETH_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 
 # Load the versions
