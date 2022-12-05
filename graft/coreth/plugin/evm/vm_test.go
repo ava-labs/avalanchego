@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -3637,7 +3638,7 @@ func TestAtomicTxBuildBlockDropsConflicts(t *testing.T) {
 	}()
 
 	// Create a conflict set for each pair of transactions
-	conflictSets := make([]ids.Set, len(testKeys))
+	conflictSets := make([]set.Set[ids.ID], len(testKeys))
 	for index, key := range testKeys {
 		importTx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[index], initialBaseFee, []*crypto.PrivateKeySECP256K1R{key})
 		if err != nil {
@@ -3667,7 +3668,7 @@ func TestAtomicTxBuildBlockDropsConflicts(t *testing.T) {
 	}
 	atomicTxs := blk.(*chain.BlockWrapper).Block.(*Block).atomicTxs
 	assert.True(t, len(atomicTxs) == len(testKeys), "Conflict transactions should be out of the batch")
-	atomicTxIDs := ids.Set{}
+	atomicTxIDs := set.Set[ids.ID]{}
 	for _, tx := range atomicTxs {
 		atomicTxIDs.Add(tx.ID())
 	}

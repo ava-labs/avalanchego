@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -117,7 +118,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	syncDisabledVM := &VM{}
 	appSender := &commonEng.SenderTest{T: t}
 	appSender.SendAppGossipF = func(context.Context, []byte) error { return nil }
-	appSender.SendAppRequestF = func(ctx context.Context, nodeSet ids.NodeIDSet, requestID uint32, request []byte) error {
+	appSender.SendAppRequestF = func(ctx context.Context, nodeSet set.Set[ids.NodeID], requestID uint32, request []byte) error {
 		nodeID, hasItem := nodeSet.Pop()
 		if !hasItem {
 			t.Fatal("expected nodeSet to contain at least 1 nodeID")
@@ -387,7 +388,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest) *syncVMSetup {
 	))
 
 	// override [syncerVM]'s SendAppRequest function to trigger AppRequest on [serverVM]
-	syncerAppSender.SendAppRequestF = func(ctx context.Context, nodeSet ids.NodeIDSet, requestID uint32, request []byte) error {
+	syncerAppSender.SendAppRequestF = func(ctx context.Context, nodeSet set.Set[ids.NodeID], requestID uint32, request []byte) error {
 		nodeID, hasItem := nodeSet.Pop()
 		if !hasItem {
 			t.Fatal("expected nodeSet to contain at least 1 nodeID")

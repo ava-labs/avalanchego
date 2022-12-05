@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	utils_math "github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -43,9 +44,9 @@ type peerInfo struct {
 type peerTracker struct {
 	peers                  map[ids.NodeID]*peerInfo // all peers we are connected to
 	numTrackedPeers        metrics.Gauge
-	trackedPeers           ids.NodeIDSet // peers that we have sent a request to
+	trackedPeers           set.Set[ids.NodeID] // peers that we have sent a request to
 	numResponsivePeers     metrics.Gauge
-	responsivePeers        ids.NodeIDSet           // peers that responded to the last request they were sent
+	responsivePeers        set.Set[ids.NodeID]     // peers that responded to the last request they were sent
 	bandwidthHeap          utils_math.AveragerHeap // tracks bandwidth peers are responding with
 	averageBandwidthMetric metrics.GaugeFloat64
 	averageBandwidth       utils_math.Averager
@@ -55,9 +56,9 @@ func NewPeerTracker() *peerTracker {
 	return &peerTracker{
 		peers:                  make(map[ids.NodeID]*peerInfo),
 		numTrackedPeers:        metrics.GetOrRegisterGauge("net_tracked_peers", nil),
-		trackedPeers:           make(ids.NodeIDSet),
+		trackedPeers:           make(set.Set[ids.NodeID]),
 		numResponsivePeers:     metrics.GetOrRegisterGauge("net_responsive_peers", nil),
-		responsivePeers:        make(ids.NodeIDSet),
+		responsivePeers:        make(set.Set[ids.NodeID]),
 		bandwidthHeap:          utils_math.NewMaxAveragerHeap(),
 		averageBandwidthMetric: metrics.GetOrRegisterGaugeFloat64("net_average_bandwidth", nil),
 		averageBandwidth:       utils_math.NewAverager(0, bandwidthHalflife, time.Now()),

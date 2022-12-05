@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	"github.com/stretchr/testify/assert"
@@ -109,7 +110,7 @@ func verifyTxs(t testing.TB, repo AtomicTxRepository, txMap map[uint64][]*Tx) {
 		// txs should be stored in order of txID
 		sort.Slice(expectedTxs, getComparator(expectedTxs))
 
-		txIDs := ids.Set{}
+		txIDs := set.Set[ids.ID]{}
 		for i := 0; i < len(txs); i++ {
 			assert.Equalf(t, expectedTxs[i].ID().Hex(), txs[i].ID().Hex(), "wrong txID at height=%d idx=%d", height, i)
 			txIDs.Add(txs[i].ID())

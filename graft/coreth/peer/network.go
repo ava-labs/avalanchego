@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 
 	"github.com/ava-labs/coreth/peer/stats"
@@ -153,7 +154,7 @@ func (n *network) request(nodeID ids.NodeID, request []byte, responseHandler mes
 
 	n.outstandingRequestHandlers[requestID] = responseHandler
 
-	nodeIDs := ids.NewNodeIDSet(1)
+	nodeIDs := set.NewSet[ids.NodeID](1)
 	nodeIDs.Add(nodeID)
 
 	// send app request to the peer

@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -48,8 +49,8 @@ type UnsignedExportTx struct {
 }
 
 // InputUTXOs returns a set of all the hash(address:nonce) exporting funds.
-func (utx *UnsignedExportTx) InputUTXOs() ids.Set {
-	set := ids.NewSet(len(utx.Ins))
+func (utx *UnsignedExportTx) InputUTXOs() set.Set[ids.ID] {
+	set := set.NewSet[ids.ID](len(utx.Ins))
 	for _, in := range utx.Ins {
 		// Total populated bytes is exactly 32 bytes.
 		// 8 (Nonce) + 4 (Address Length) + 20 (Address)
