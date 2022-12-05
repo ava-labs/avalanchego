@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
@@ -243,7 +244,7 @@ func (tx *UniqueTx) Dependencies() ([]snowstorm.Tx, error) {
 		return tx.deps, nil
 	}
 
-	txIDs := ids.Set{}
+	txIDs := set.Set[ids.ID]{}
 	for _, in := range tx.InputUTXOs() {
 		if in.Symbolic() {
 			continue
@@ -293,7 +294,7 @@ func (*UniqueTx) HasWhitelist() bool {
 }
 
 // Whitelist is not supported by this transaction type, so [false] is returned.
-func (*UniqueTx) Whitelist(context.Context) (ids.Set, error) {
+func (*UniqueTx) Whitelist(context.Context) (set.Set[ids.ID], error) {
 	return nil, nil
 }
 

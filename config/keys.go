@@ -162,6 +162,7 @@ const (
 	BootstrapMaxTimeGetAncestorsKey                    = "bootstrap-max-time-get-ancestors"
 	BootstrapAncestorsMaxContainersSentKey             = "bootstrap-ancestors-max-containers-sent"
 	BootstrapAncestorsMaxContainersReceivedKey         = "bootstrap-ancestors-max-containers-received"
+	ChainDataDirKey                                    = "chain-data-dir"
 	ChainConfigDirKey                                  = "chain-config-dir"
 	ChainConfigContentKey                              = "chain-config-content"
 	SubnetConfigDirKey                                 = "subnet-config-dir"

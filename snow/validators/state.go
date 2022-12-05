@@ -21,10 +21,14 @@ type State interface {
 	// GetCurrentHeight returns the current height of the P-chain.
 	GetCurrentHeight(context.Context) (uint64, error)
 
-	// GetValidatorSet returns the weights of the nodeIDs for the provided
-	// subnet at the requested P-chain height.
+	// GetValidatorSet returns the validators of the provided subnet at the
+	// requested P-chain height.
 	// The returned map should not be modified.
-	GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error)
+	GetValidatorSet(
+		ctx context.Context,
+		height uint64,
+		subnetID ids.ID,
+	) (map[ids.NodeID]*GetValidatorOutput, error)
 }
 
 type lockedState struct {
@@ -53,7 +57,11 @@ func (s *lockedState) GetCurrentHeight(ctx context.Context) (uint64, error) {
 	return s.s.GetCurrentHeight(ctx)
 }
 
-func (s *lockedState) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
+func (s *lockedState) GetValidatorSet(
+	ctx context.Context,
+	height uint64,
+	subnetID ids.ID,
+) (map[ids.NodeID]*GetValidatorOutput, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -70,6 +78,6 @@ func NewNoValidatorsState(state State) State {
 	}
 }
 
-func (*noValidators) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.NodeID]uint64, error) {
+func (*noValidators) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.NodeID]*GetValidatorOutput, error) {
 	return nil, nil
 }

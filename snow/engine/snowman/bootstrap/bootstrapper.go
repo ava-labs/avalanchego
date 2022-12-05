@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -72,7 +73,7 @@ type bootstrapper struct {
 	// nodeID will be added back to [fetchFrom] unless the Ancestors message is
 	// empty. This is to attempt to prevent requesting containers from that peer
 	// again.
-	fetchFrom ids.NodeIDSet
+	fetchFrom set.Set[ids.NodeID]
 
 	// bootstrappedOnce ensures that the [Bootstrapped] callback is only invoked
 	// once, even if bootstrapping is retried.

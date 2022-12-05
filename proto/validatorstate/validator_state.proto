@@ -33,6 +33,7 @@ message GetValidatorSetRequest {
 message Validator {
   bytes node_id = 1;
   uint64 weight = 2;
+  bytes public_key = 3;
 }
 
 message GetValidatorSetResponse {

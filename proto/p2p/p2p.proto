@@ -52,6 +52,8 @@ message Message {
     AppRequest app_request = 30;
     AppResponse app_response = 31;
     AppGossip app_gossip = 32;
+
+    PeerListAck peer_list_ack = 33;
   }
 }
 
@@ -62,10 +64,21 @@ message Message {
 // uptime value of the message sender in "pong" message.
 message Ping {}
 
-// Contains the uptime of the message receiver (remote peer)
+// Contains subnet id and the related observed subnet uptime of the message
+// receiver (remote peer).
+message SubnetUptime {
+  bytes subnet_id = 1;
+  uint32 uptime = 2;
+}
+
+// Contains the uptime percentage of the message receiver (remote peer)
 // from the sender's point of view, in response to "ping" message.
+// Uptimes are expected to be provided as integers ranging in [0, 100].
 message Pong {
-  uint32 uptime_pct = 1;
+  // uptime is the primary network uptime percentage.
+  uint32 uptime = 1;
+  // subnet_uptimes contains subnet uptime percentages.
+  repeated SubnetUptime subnet_uptimes = 2;
 }
 
 // The first outbound message that the local node sends to its remote peer
@@ -93,6 +106,7 @@ message ClaimedIpPort {
   uint32 ip_port = 3;
   uint64 timestamp = 4;
   bytes signature = 5;
+  bytes tx_id = 6;
 }
 
 // Message that contains a list of peer information (IP, certs, etc.)
@@ -104,6 +118,12 @@ message ClaimedIpPort {
 // of the remote peer.
 message PeerList {
   repeated ClaimedIpPort claimed_ip_ports = 1;
+}
+
+// Message that responds to a peer_list message containing the AddValidatorTxIDs
+// from the peer_list message that we currently have in our validator set.
+message PeerListAck {
+  repeated bytes tx_ids = 1;
 }
 
 message GetStateSummaryFrontier {

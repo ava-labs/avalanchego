@@ -991,13 +991,25 @@ func initTestRemoteProposerVM(
 	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
 		return defaultPChainHeight, nil
 	}
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]uint64, error) {
-		res := make(map[ids.NodeID]uint64)
-		res[proVM.ctx.NodeID] = uint64(10)
-		res[ids.NodeID{1}] = uint64(5)
-		res[ids.NodeID{2}] = uint64(6)
-		res[ids.NodeID{3}] = uint64(7)
-		return res, nil
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		return map[ids.NodeID]*validators.GetValidatorOutput{
+			proVM.ctx.NodeID: {
+				NodeID: proVM.ctx.NodeID,
+				Weight: 10,
+			},
+			{1}: {
+				NodeID: ids.NodeID{1},
+				Weight: 5,
+			},
+			{2}: {
+				NodeID: ids.NodeID{2},
+				Weight: 6,
+			},
+			{3}: {
+				NodeID: ids.NodeID{3},
+				Weight: 7,
+			},
+		}, nil
 	}
 
 	ctx := snow.DefaultContextTest()

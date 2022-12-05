@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/events"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -16,12 +17,12 @@ var _ events.Blockable = (*acceptor)(nil)
 type acceptor struct {
 	g        *Directed
 	errs     *wrappers.Errs
-	deps     ids.Set
+	deps     set.Set[ids.ID]
 	rejected bool
 	txID     ids.ID
 }
 
-func (a *acceptor) Dependencies() ids.Set {
+func (a *acceptor) Dependencies() set.Set[ids.ID] {
 	return a.deps
 }
 

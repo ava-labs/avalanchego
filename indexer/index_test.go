@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
@@ -99,7 +100,7 @@ func TestIndex(t *testing.T) {
 
 	// Ensure that the data is correct
 	lastTimestamp := int64(0)
-	sawContainers := ids.Set{}
+	sawContainers := set.Set[ids.ID]{}
 	for _, container := range containersList {
 		require.False(sawContainers.Contains(container.ID)) // Should only see this container once
 		require.Contains(containers, container.ID)

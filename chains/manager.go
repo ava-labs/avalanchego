@@ -9,6 +9,8 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -44,6 +46,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/perms"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/metervm"
@@ -176,7 +180,7 @@ type ManagerConfig struct {
 	AVAXAssetID                 ids.ID
 	XChainID                    ids.ID          // ID of the X-Chain,
 	CChainID                    ids.ID          // ID of the C-Chain,
-	CriticalChains              ids.Set         // Chains that can't exit gracefully
+	CriticalChains              set.Set[ids.ID] // Chains that can't exit gracefully
 	TimeoutManager              timeout.Manager // Manages request timeouts when sending messages to other validators
 	Health                      health.Registerer
 	RetryBootstrap              bool                    // Should Bootstrap be retried
@@ -208,6 +212,8 @@ type ManagerConfig struct {
 	ResourceTracker timetracker.ResourceTracker
 
 	StateSyncBeacons []ids.NodeID
+
+	ChainDataDir string
 }
 
 type manager struct {
@@ -400,6 +406,12 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 	primaryAlias := m.PrimaryAliasOrDefault(chainParams.ID)
 
+	// Create this chain's data directory
+	chainDataDir := filepath.Join(m.ChainDataDir, chainParams.ID.String())
+	if err := os.MkdirAll(chainDataDir, perms.ReadWriteExecute); err != nil {
+		return nil, fmt.Errorf("error while creating chain data directory %w", err)
+	}
+
 	// Create the log and context of the chain
 	chainLog, err := m.LogFactory.MakeChain(primaryAlias)
 	if err != nil {
@@ -440,6 +452,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 			StakingCertLeaf:   m.StakingCert.Leaf,
 			StakingLeafSigner: m.StakingCert.PrivateKey.(crypto.Signer),
 			StakingBLSKey:     m.StakingBLSKey,
+			ChainDataDir:      chainDataDir,
 		},
 		DecisionAcceptor:  m.DecisionAcceptorGroup,
 		ConsensusAcceptor: m.ConsensusAcceptorGroup,

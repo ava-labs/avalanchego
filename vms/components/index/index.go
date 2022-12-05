@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
@@ -105,7 +106,7 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOs []*avax.UTXO, outputUTXOs []*av
 	// Address -> AssetID --> exists if the address's balance
 	// of the asset is changed by processing tx [txID]
 	// we do this step separately to simplify the write process later
-	balanceChanges := make(map[string]map[ids.ID]struct{})
+	balanceChanges := map[string]set.Set[ids.ID]{}
 	for _, utxo := range utxos {
 		out, ok := utxo.Out.(avax.Addressable)
 		if !ok {
@@ -120,10 +121,10 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOs []*avax.UTXO, outputUTXOs []*av
 
 			addressChanges, exists := balanceChanges[address]
 			if !exists {
-				addressChanges = make(map[ids.ID]struct{})
+				addressChanges = set.Set[ids.ID]{}
 				balanceChanges[address] = addressChanges
 			}
-			addressChanges[utxo.AssetID()] = struct{}{}
+			addressChanges.Add(utxo.AssetID())
 		}
 	}
 

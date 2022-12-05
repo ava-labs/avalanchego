@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // Whitelister defines the interface for specifying whitelisted operations.
@@ -19,7 +20,7 @@ type Whitelister interface {
 	// Whitelist returns the set of transaction IDs that are explicitly
 	// whitelisted. Transactions that are not explicitly whitelisted are
 	// considered conflicting.
-	Whitelist(context.Context) (ids.Set, error)
+	Whitelist(context.Context) (set.Set[ids.ID], error)
 }
 
 // Tx consumes state.

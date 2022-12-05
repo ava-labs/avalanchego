@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -41,8 +42,8 @@ func (r *tracedRouter) Initialize(
 	log logging.Logger,
 	timeoutManager timeout.Manager,
 	closeTimeout time.Duration,
-	criticalChains ids.Set,
-	whitelistedSubnets ids.Set,
+	criticalChains set.Set[ids.ID],
+	whitelistedSubnets set.Set[ids.ID],
 	onFatal func(exitCode int),
 	healthConfig HealthConfig,
 	metricsNamespace string,

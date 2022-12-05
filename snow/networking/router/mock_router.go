@@ -17,6 +17,7 @@ import (
 	handler "github.com/ava-labs/avalanchego/snow/networking/handler"
 	timeout "github.com/ava-labs/avalanchego/snow/networking/timeout"
 	logging "github.com/ava-labs/avalanchego/utils/logging"
+	set "github.com/ava-labs/avalanchego/utils/set"
 	version "github.com/ava-labs/avalanchego/version"
 	gomock "github.com/golang/mock/gomock"
 	prometheus "github.com/prometheus/client_golang/prometheus"
@@ -121,7 +122,7 @@ func (mr *MockRouterMockRecorder) HealthCheck(arg0 interface{}) *gomock.Call {
 }
 
 // Initialize mocks base method.
-func (m *MockRouter) Initialize(arg0 ids.NodeID, arg1 logging.Logger, arg2 timeout.Manager, arg3 time.Duration, arg4, arg5 ids.Set, arg6 func(int), arg7 HealthConfig, arg8 string, arg9 prometheus.Registerer) error {
+func (m *MockRouter) Initialize(arg0 ids.NodeID, arg1 logging.Logger, arg2 timeout.Manager, arg3 time.Duration, arg4, arg5 set.Set[ids.ID], arg6 func(int), arg7 HealthConfig, arg8 string, arg9 prometheus.Registerer) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Initialize", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9)
 	ret0, _ := ret[0].(error)

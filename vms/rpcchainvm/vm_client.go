@@ -207,6 +207,7 @@ func (vm *VMClient) Initialize(
 		XChainId:     chainCtx.XChainID[:],
 		CChainId:     chainCtx.CChainID[:],
 		AvaxAssetId:  chainCtx.AVAXAssetID[:],
+		ChainDataDir: chainCtx.ChainDataDir,
 		GenesisBytes: genesisBytes,
 		UpgradeBytes: upgradeBytes,
 		ConfigBytes:  configBytes,

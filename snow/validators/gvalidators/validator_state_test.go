@@ -18,6 +18,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
@@ -129,11 +130,32 @@ func TestGetValidatorSet(t *testing.T) {
 	defer state.closeFn()
 
 	// Happy path
-	nodeID1, nodeID2 := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
-	nodeID1Weight, nodeID2Weight := uint64(1), uint64(2)
-	expectedVdrs := map[ids.NodeID]uint64{
-		nodeID1: nodeID1Weight,
-		nodeID2: nodeID2Weight,
+	sk0, err := bls.NewSecretKey()
+	require.NoError(err)
+	vdr0 := &validators.GetValidatorOutput{
+		NodeID:    ids.GenerateTestNodeID(),
+		PublicKey: bls.PublicFromSecretKey(sk0),
+		Weight:    1,
+	}
+
+	sk1, err := bls.NewSecretKey()
+	require.NoError(err)
+	vdr1 := &validators.GetValidatorOutput{
+		NodeID:    ids.GenerateTestNodeID(),
+		PublicKey: bls.PublicFromSecretKey(sk1),
+		Weight:    2,
+	}
+
+	vdr2 := &validators.GetValidatorOutput{
+		NodeID:    ids.GenerateTestNodeID(),
+		PublicKey: nil,
+		Weight:    3,
+	}
+
+	expectedVdrs := map[ids.NodeID]*validators.GetValidatorOutput{
+		vdr0.NodeID: vdr0,
+		vdr1.NodeID: vdr1,
+		vdr2.NodeID: vdr2,
 	}
 	height := uint64(1337)
 	subnetID := ids.GenerateTestID()

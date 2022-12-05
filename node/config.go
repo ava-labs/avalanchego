@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/profiler"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/vms"
 )
@@ -189,7 +190,7 @@ type Config struct {
 	ConsensusGossipFrequency time.Duration `json:"consensusGossipFreq"`
 
 	// Subnet Whitelist
-	WhitelistedSubnets ids.Set `json:"whitelistedSubnets"`
+	WhitelistedSubnets set.Set[ids.ID] `json:"whitelistedSubnets"`
 
 	// SubnetConfigs
 	SubnetConfigs map[ids.ID]chains.SubnetConfig `json:"subnetConfigs"`
@@ -235,4 +236,8 @@ type Config struct {
 
 	// ProvidedFlags contains all the flags set by the user
 	ProvidedFlags map[string]interface{} `json:"-"`
+
+	// ChainDataDir is the root path for per-chain directories where VMs can
+	// write arbitrary data.
+	ChainDataDir string `json:"chainDataDir"`
 }

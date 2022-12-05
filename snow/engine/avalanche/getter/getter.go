@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -105,7 +106,7 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 	queue[0] = vertex
 	ancestorsBytesLen := 0                                                 // length, in bytes, of vertex and its ancestors
 	ancestorsBytes := make([][]byte, 0, gh.cfg.AncestorsMaxContainersSent) // vertex and its ancestors in BFS order
-	visited := ids.Set{}                                                   // IDs of vertices that have been in queue before
+	visited := set.Set[ids.ID]{}                                           // IDs of vertices that have been in queue before
 	visited.Add(vertex.ID())
 
 	for len(ancestorsBytes) < gh.cfg.AncestorsMaxContainersSent && len(queue) > 0 && time.Since(startTime) < gh.cfg.MaxTimeGetAncestors {

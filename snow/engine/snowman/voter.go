@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // Voter records chits received from [vdr] once its dependencies are met.
@@ -17,10 +18,10 @@ type voter struct {
 	vdr       ids.NodeID
 	requestID uint32
 	response  ids.ID
-	deps      ids.Set
+	deps      set.Set[ids.ID]
 }
 
-func (v *voter) Dependencies() ids.Set {
+func (v *voter) Dependencies() set.Set[ids.ID] {
 	return v.deps
 }
 

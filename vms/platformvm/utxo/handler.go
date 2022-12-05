@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -178,7 +179,7 @@ func (h *handler) Spend(
 	[][]*crypto.PrivateKeySECP256K1R, // signers
 	error,
 ) {
-	addrs := ids.NewShortSet(len(keys)) // The addresses controlled by [keys]
+	addrs := set.NewSet[ids.ShortID](len(keys)) // The addresses controlled by [keys]
 	for _, key := range keys {
 		addrs.Add(key.PublicKey().Address())
 	}

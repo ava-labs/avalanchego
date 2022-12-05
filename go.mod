@@ -13,7 +13,7 @@ require (
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/ava-labs/avalanche-ledger-go v0.0.13
 	github.com/ava-labs/avalanche-network-runner-sdk v0.3.0
-	github.com/ava-labs/coreth v0.11.4-0.20221129225851-b66bfb225a40
+	github.com/ava-labs/coreth v0.11.4-rc.0.0.20221205195342-45b0f40505f4
 	github.com/btcsuite/btcd v0.23.1
 	github.com/btcsuite/btcd/btcutil v1.1.1
 	github.com/decred/dcrd/dcrec/secp256k1/v3 v3.0.0-20200627015759-01fd2de07837

@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 const (
@@ -39,7 +40,7 @@ type Serializer struct {
 	SerializerConfig
 	versionDB *versiondb.Database
 	state     *prefixedState
-	edge      ids.Set
+	edge      set.Set[ids.ID]
 }
 
 type SerializerConfig struct {

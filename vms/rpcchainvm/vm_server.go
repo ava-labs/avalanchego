@@ -221,6 +221,8 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 
 		ValidatorState: validatorStateClient,
 		// TODO: support remaining snowman++ fields
+
+		ChainDataDir: req.ChainDataDir,
 	}
 
 	if err := vm.vm.Initialize(ctx, vm.ctx, dbManager, req.GenesisBytes, req.UpgradeBytes, req.ConfigBytes, toEngine, nil, appSenderClient); err != nil {

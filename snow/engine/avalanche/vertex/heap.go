@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
@@ -95,7 +96,7 @@ func NewHeap() Heap {
 
 type maxHeightVertexHeap struct {
 	heap       priorityQueue
-	elementIDs ids.Set
+	elementIDs set.Set[ids.ID]
 }
 
 func (vh *maxHeightVertexHeap) Clear() {

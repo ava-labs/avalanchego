@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -461,7 +462,7 @@ func (v *verifier) standardBlock(
 
 // verifyUniqueInputs verifies that the inputs of the given block are not
 // duplicated in any of the parent blocks pinned in memory.
-func (v *verifier) verifyUniqueInputs(block blocks.Block, inputs ids.Set) error {
+func (v *verifier) verifyUniqueInputs(block blocks.Block, inputs set.Set[ids.ID]) error {
 	if inputs.Len() == 0 {
 		return nil
 	}

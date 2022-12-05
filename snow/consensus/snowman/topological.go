@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/metrics"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
@@ -64,16 +65,16 @@ type Topological struct {
 	blocks map[ids.ID]*snowmanBlock // blockID -> snowmanBlock
 
 	// preferredIDs stores the set of IDs that are currently preferred.
-	preferredIDs ids.Set
+	preferredIDs set.Set[ids.ID]
 
 	// tail is the preferred block with no children
 	tail ids.ID
 
 	// Used in [calculateInDegree] and.
 	// Should only be accessed in that method.
-	// We use this one instance of ids.Set instead of creating a
-	// new ids.Set during each call to [calculateInDegree].
-	leaves ids.Set
+	// We use this one instance of set.Set instead of creating a
+	// new set.Set during each call to [calculateInDegree].
+	leaves set.Set[ids.ID]
 
 	// Kahn nodes used in [calculateInDegree] and [markAncestorInDegrees].
 	// Should only be accessed in those methods.
@@ -128,7 +129,7 @@ func (ts *Topological) Initialize(ctx *snow.ConsensusContext, params snowball.Pa
 	}
 	ts.Timestamp = timestampMetrics
 
-	ts.leaves = ids.Set{}
+	ts.leaves = set.Set[ids.ID]{}
 	ts.kahnNodes = make(map[ids.ID]kahnNode)
 	ts.ctx = ctx
 	ts.params = params

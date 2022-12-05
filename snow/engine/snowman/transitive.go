@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/poll"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/events"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -701,7 +702,7 @@ func (t *Transitive) pullQuery(ctx context.Context, blkID ids.ID) {
 	t.RequestID++
 	if t.polls.Add(t.RequestID, vdrBag) {
 		vdrList := vdrBag.List()
-		vdrSet := ids.NewNodeIDSet(len(vdrList))
+		vdrSet := set.NewSet[ids.NodeID](len(vdrList))
 		vdrSet.Add(vdrList...)
 		t.Sender.SendPullQuery(ctx, vdrSet, t.RequestID, blkID)
 	}

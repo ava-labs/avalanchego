@@ -12,6 +12,7 @@ import (
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	message "github.com/ava-labs/avalanchego/message"
+	set "github.com/ava-labs/avalanchego/utils/set"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -39,10 +40,10 @@ func (m *MockExternalSender) EXPECT() *MockExternalSenderMockRecorder {
 }
 
 // Gossip mocks base method.
-func (m *MockExternalSender) Gossip(arg0 message.OutboundMessage, arg1 ids.ID, arg2 bool, arg3, arg4, arg5 int) ids.NodeIDSet {
+func (m *MockExternalSender) Gossip(arg0 message.OutboundMessage, arg1 ids.ID, arg2 bool, arg3, arg4, arg5 int) set.Set[ids.NodeID] {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Gossip", arg0, arg1, arg2, arg3, arg4, arg5)
-	ret0, _ := ret[0].(ids.NodeIDSet)
+	ret0, _ := ret[0].(set.Set[ids.NodeID])
 	return ret0
 }
 
@@ -53,10 +54,10 @@ func (mr *MockExternalSenderMockRecorder) Gossip(arg0, arg1, arg2, arg3, arg4, a
 }
 
 // Send mocks base method.
-func (m *MockExternalSender) Send(arg0 message.OutboundMessage, arg1 ids.NodeIDSet, arg2 ids.ID, arg3 bool) ids.NodeIDSet {
+func (m *MockExternalSender) Send(arg0 message.OutboundMessage, arg1 set.Set[ids.NodeID], arg2 ids.ID, arg3 bool) set.Set[ids.NodeID] {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Send", arg0, arg1, arg2, arg3)
-	ret0, _ := ret[0].(ids.NodeIDSet)
+	ret0, _ := ret[0].(set.Set[ids.NodeID])
 	return ret0
 }
 

@@ -1058,7 +1058,9 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	}
 	validators, err := vm.GetValidatorSet(context.Background(), 1, constants.PrimaryNetworkID)
 	require.NoError(err)
-	require.Equal(expectedValidators1, validators)
+	for nodeID, weight := range expectedValidators1 {
+		require.Equal(weight, validators[nodeID].Weight)
+	}
 
 	newValidatorStartTime0 := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime0 := newValidatorStartTime0.Add(defaultMaxStakingDuration)
@@ -1105,7 +1107,9 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	for i := uint64(1); i <= 2; i++ {
 		validators, err = vm.GetValidatorSet(context.Background(), i, constants.PrimaryNetworkID)
 		require.NoError(err)
-		require.Equal(expectedValidators1, validators)
+		for nodeID, weight := range expectedValidators1 {
+			require.Equal(weight, validators[nodeID].Weight)
+		}
 	}
 
 	// Advance chain time to move the first new validator from the pending
@@ -1138,7 +1142,9 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	for i := uint64(1); i <= 2; i++ {
 		validators, err = vm.GetValidatorSet(context.Background(), i, constants.PrimaryNetworkID)
 		require.NoError(err)
-		require.Equal(expectedValidators1, validators)
+		for nodeID, weight := range expectedValidators1 {
+			require.Equal(weight, validators[nodeID].Weight)
+		}
 	}
 
 	expectedValidators2 := map[ids.NodeID]uint64{
@@ -1151,7 +1157,9 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	}
 	validators, err = vm.GetValidatorSet(context.Background(), 3, constants.PrimaryNetworkID)
 	require.NoError(err)
-	require.Equal(expectedValidators2, validators)
+	for nodeID, weight := range expectedValidators2 {
+		require.Equal(weight, validators[nodeID].Weight)
+	}
 }
 
 func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {

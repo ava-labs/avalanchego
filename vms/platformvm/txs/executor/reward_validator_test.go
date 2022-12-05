@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -301,10 +302,10 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	require.NoError(env.state.Commit())
 
 	// test validator stake
-	set, ok := env.config.Validators.Get(constants.PrimaryNetworkID)
+	vdrSet, ok := env.config.Validators.Get(constants.PrimaryNetworkID)
 	require.True(ok)
 
-	stake := set.GetWeight(vdrNodeID)
+	stake := vdrSet.GetWeight(vdrNodeID)
 	require.Equal(env.config.MinValidatorStake+env.config.MinDelegatorStake, stake)
 
 	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
@@ -329,9 +330,9 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	err = tx.Unsigned.Visit(&txExecutor)
 	require.NoError(err)
 
-	vdrDestSet := ids.ShortSet{}
+	vdrDestSet := set.Set[ids.ShortID]{}
 	vdrDestSet.Add(vdrRewardAddress)
-	delDestSet := ids.ShortSet{}
+	delDestSet := set.Set[ids.ShortID]{}
 	delDestSet.Add(delRewardAddress)
 
 	expectedReward := uint64(1000000)
@@ -362,7 +363,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	require.Less(vdrReward, delReward, "the delegator's reward should be greater than the delegatee's because the delegatee's share is 25%")
 	require.Equal(expectedReward, delReward+vdrReward, "expected total reward to be %d but is %d", expectedReward, delReward+vdrReward)
 
-	require.Equal(env.config.MinValidatorStake, set.GetWeight(vdrNodeID))
+	require.Equal(env.config.MinValidatorStake, vdrSet.GetWeight(vdrNodeID))
 }
 
 func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
@@ -454,9 +455,9 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	err = tx.Unsigned.Visit(&txExecutor)
 	require.NoError(err)
 
-	vdrDestSet := ids.ShortSet{}
+	vdrDestSet := set.Set[ids.ShortID]{}
 	vdrDestSet.Add(vdrRewardAddress)
-	delDestSet := ids.ShortSet{}
+	delDestSet := set.Set[ids.ShortID]{}
 	delDestSet.Add(delRewardAddress)
 
 	expectedReward := uint64(1000000)

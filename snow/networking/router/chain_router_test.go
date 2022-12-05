@@ -29,13 +29,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
 )
 
 func TestShutdown(t *testing.T) {
 	vdrs := validators.NewSet()
-	err := vdrs.Add(ids.GenerateTestNodeID(), nil, 1)
+	err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
 	require.NoError(t, err)
 	benchlist := benchlist.NewNoBenchlist()
 	tm, err := timeout.NewManager(
@@ -59,8 +60,8 @@ func TestShutdown(t *testing.T) {
 		logging.NoLog{},
 		tm,
 		time.Second,
-		ids.Set{},
-		ids.Set{},
+		set.Set[ids.ID]{},
+		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
 		"",
@@ -155,7 +156,7 @@ func TestShutdown(t *testing.T) {
 func TestShutdownTimesOut(t *testing.T) {
 	nodeID := ids.EmptyNodeID
 	vdrs := validators.NewSet()
-	err := vdrs.Add(ids.GenerateTestNodeID(), nil, 1)
+	err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
 	require.NoError(t, err)
 	benchlist := benchlist.NewNoBenchlist()
 	metrics := prometheus.NewRegistry()
@@ -182,8 +183,8 @@ func TestShutdownTimesOut(t *testing.T) {
 		logging.NoLog{},
 		tm,
 		time.Millisecond,
-		ids.Set{},
-		ids.Set{},
+		set.Set[ids.ID]{},
+		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
 		"",
@@ -304,8 +305,8 @@ func TestRouterTimeout(t *testing.T) {
 		logging.NoLog{},
 		tm,
 		time.Millisecond,
-		ids.Set{},
-		ids.Set{},
+		set.Set[ids.ID]{},
+		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
 		"",
@@ -327,7 +328,7 @@ func TestRouterTimeout(t *testing.T) {
 
 	ctx := snow.DefaultConsensusContextTest()
 	vdrs := validators.NewSet()
-	err = vdrs.Add(ids.GenerateTestNodeID(), nil, 1)
+	err = vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
 	r.NoError(err)
 
 	resourceTracker, err := tracker.NewResourceTracker(
@@ -626,8 +627,8 @@ func TestRouterClearTimeouts(t *testing.T) {
 		logging.NoLog{},
 		tm,
 		time.Millisecond,
-		ids.Set{},
-		ids.Set{},
+		set.Set[ids.ID]{},
+		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
 		"",
@@ -638,7 +639,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 	// Create bootstrapper, engine and handler
 	ctx := snow.DefaultConsensusContextTest()
 	vdrs := validators.NewSet()
-	err = vdrs.Add(ids.GenerateTestNodeID(), nil, 1)
+	err = vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
 	require.NoError(t, err)
 
 	resourceTracker, err := tracker.NewResourceTracker(
@@ -887,8 +888,8 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		logging.NoLog{},
 		tm,
 		time.Millisecond,
-		ids.Set{},
-		ids.Set{},
+		set.Set[ids.ID]{},
+		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
 		"",
@@ -904,7 +905,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	ctx.SetValidatorOnly()
 	vdrs := validators.NewSet()
 	vID := ids.GenerateTestNodeID()
-	err = vdrs.Add(vID, nil, 1)
+	err = vdrs.Add(vID, nil, ids.Empty, 1)
 	require.NoError(t, err)
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
@@ -1034,8 +1035,8 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		logging.NoLog{},
 		tm,
 		time.Millisecond,
-		ids.Set{},
-		ids.Set{},
+		set.Set[ids.ID]{},
+		set.Set[ids.ID]{},
 		nil,
 		HealthConfig{},
 		"",
@@ -1045,7 +1046,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 
 	// Set up validators
 	vdrs := validators.NewSet()
-	require.NoError(t, vdrs.Add(ids.GenerateTestNodeID(), nil, 1))
+	require.NoError(t, vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	// Create bootstrapper, engine and handler
 	requester := snow.DefaultConsensusContextTest()
@@ -1167,7 +1168,7 @@ func TestConnectedSubnet(t *testing.T) {
 	peerNodeID := ids.GenerateTestNodeID()
 	subnetID0 := ids.GenerateTestID()
 	subnetID1 := ids.GenerateTestID()
-	whitelistedSubnets := ids.Set{}
+	whitelistedSubnets := set.Set[ids.ID]{}
 	whitelistedSubnets.Add(subnetID0, subnetID1)
 	chainRouter := ChainRouter{}
 	err = chainRouter.Initialize(
@@ -1175,7 +1176,7 @@ func TestConnectedSubnet(t *testing.T) {
 		logging.NoLog{},
 		tm,
 		time.Millisecond,
-		ids.Set{},
+		set.Set[ids.ID]{},
 		whitelistedSubnets,
 		nil,
 		HealthConfig{},

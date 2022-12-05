@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -27,8 +28,8 @@ type UnsignedTx interface {
 	Initialize(unsignedBytes []byte)
 	Bytes() []byte
 
-	ConsumedAssetIDs() ids.Set
-	AssetIDs() ids.Set
+	ConsumedAssetIDs() set.Set[ids.ID]
+	AssetIDs() set.Set[ids.ID]
 
 	NumCredentials() int
 	InputUTXOs() []*avax.UTXOID

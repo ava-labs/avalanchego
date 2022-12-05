@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -42,15 +43,15 @@ func (tx *ImportTx) InitCtx(ctx *snow.Context) {
 }
 
 // InputUTXOs returns the UTXOIDs of the imported funds
-func (tx *ImportTx) InputUTXOs() ids.Set {
-	set := ids.NewSet(len(tx.ImportedInputs))
+func (tx *ImportTx) InputUTXOs() set.Set[ids.ID] {
+	set := set.NewSet[ids.ID](len(tx.ImportedInputs))
 	for _, in := range tx.ImportedInputs {
 		set.Add(in.InputID())
 	}
 	return set
 }
 
-func (tx *ImportTx) InputIDs() ids.Set {
+func (tx *ImportTx) InputIDs() set.Set[ids.ID] {
 	inputs := tx.BaseTx.InputIDs()
 	atomicInputs := tx.InputUTXOs()
 	inputs.Union(atomicInputs)
