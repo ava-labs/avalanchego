@@ -148,7 +148,7 @@ func (b *postForkBlock) verifyPostForkOption(ctx context.Context, child *postFor
 		return errInnerParentMismatch
 	}
 
-	return child.vm.verifyAndRecordInnerBlk(ctx, child)
+	return child.vm.verifyAndRecordInnerBlk(ctx, nil, child)
 }
 
 // Return the child (a *postForkBlock) of this block
