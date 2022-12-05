@@ -586,7 +586,7 @@ func (p *peer) sendNetworkMessages() {
 	for {
 		select {
 		case <-p.peerListChan:
-			_, peerIPs, err := p.Config.Network.Peers(p.id)
+			peerIPs, err := p.Config.Network.Peers(p.id)
 			if err != nil {
 				p.Log.Error("failed to get peers to gossip",
 					zap.Stringer("nodeID", p.id),
@@ -919,7 +919,7 @@ func (p *peer) handleVersion(msg *p2ppb.Version) {
 
 	p.gotVersion.SetValue(true)
 
-	_, peerIPs, err := p.Network.Peers(p.id)
+	peerIPs, err := p.Network.Peers(p.id)
 	if err != nil {
 		p.Log.Error("failed to get peers to gossip for handshake",
 			zap.Stringer("nodeID", p.id),
@@ -962,7 +962,7 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 	}
 
 	// the peers this peer told us about
-	discoveredPeers := make([]ids.NodeID, len(msg.ClaimedIpPorts))
+	discoveredTxs := make([]ids.ID, 0, len(msg.ClaimedIpPorts))
 
 	for _, claimedIPPort := range msg.ClaimedIpPorts {
 		tlsCert, err := x509.ParseCertificate(claimedIPPort.X509Certificate)
@@ -989,6 +989,22 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 			return
 		}
 
+		var txID ids.ID
+		if len(claimedIPPort.TxId) > 0 {
+			txID, err = ids.ToID(claimedIPPort.TxId)
+			if err != nil {
+				p.Log.Debug("message with invalid field",
+					zap.Stringer("nodeID", p.id),
+					zap.Stringer("messageOp", message.PeerListOp),
+					zap.String("field", "txID"),
+					zap.Error(err),
+				)
+				p.StartClose()
+				return
+			}
+
+			discoveredTxs = append(discoveredTxs, txID)
+		}
 		ip := ips.ClaimedIPPort{
 			Cert: tlsCert,
 			IPPort: ips.IPPort{
@@ -997,22 +1013,20 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 			},
 			Timestamp: claimedIPPort.Timestamp,
 			Signature: claimedIPPort.Signature,
-			TxID:      ids.ID{}, // TODO: populate this field
+			TxID:      txID,
 		}
 
 		// it's important to add this to our list of discovered peers regardless
 		// of whether we end up tracking it or not to avoid a situation where
 		// we are re-gossiping peers we are already connected to back to the
 		// node to told us about them.
-		discoveredPeers = append(discoveredPeers, ids.NodeIDFromCert(ip.Cert))
-
 		if !p.Network.Track(ip) {
 			p.Metrics.NumUselessPeerListBytes.Add(float64(ip.BytesLen()))
 		}
 	}
 
 	// a peer must have known about a set of peers if it gossiped them to us
-	if !p.GossipTracker.AddKnown(p.id, discoveredPeers) {
+	if !p.GossipTracker.AddKnown(p.id, discoveredTxs) {
 		p.Log.Error("failed to update known peers",
 			zap.Stringer("nodeID", p.id),
 		)

@@ -38,5 +38,5 @@ type Network interface {
 	Version() (message.OutboundMessage, error)
 
 	// Peers returns peers that [peerID] might not know about.
-	Peers(peerID ids.NodeID) ([]ids.NodeID, []ips.ClaimedIPPort, error)
+	Peers(peerID ids.NodeID) ([]ips.ClaimedIPPort, error)
 }
