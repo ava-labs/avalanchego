@@ -24,3 +24,18 @@ type BuildBlockWithContextChainVM interface {
 	// Otherwise [BuildBlock] will be called.
 	BuildBlockWithContext(ctx context.Context, blockCtx *Context) (snowman.Block, error)
 }
+
+type WithVerifyContext interface {
+	// Returns true if [VerifyWithContext] should be called.
+	// Returns false if [Verify] should be called.
+	ShouldVerifyWithContext(context.Context) (bool, error)
+
+	// Verify that the state transition this block would make if accepted is
+	// valid. If the state transition is invalid, a non-nil error should be
+	// returned.
+	//
+	// It is guaranteed that the Parent has been successfully verified.
+	//
+	// This method may be called again with a different context.
+	VerifyWithContext(context.Context, *Context) error
+}

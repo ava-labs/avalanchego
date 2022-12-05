@@ -155,13 +155,14 @@ message BuildBlockRequest {
   optional uint64 p_chain_height = 1;
 }
 
+// Note: The status of a freshly built block is assumed to be Processing.
 message BuildBlockResponse {
   bytes id = 1;
   bytes parent_id = 2;
   bytes bytes = 3;
   uint64 height = 4;
   google.protobuf.Timestamp timestamp = 5;
-  // status is always processing
+  bool verify_with_context = 6;
 }
 
 message ParseBlockRequest {
@@ -174,6 +175,7 @@ message ParseBlockResponse {
   uint32 status = 3;
   uint64 height = 4;
   google.protobuf.Timestamp timestamp = 5;
+  bool verify_with_context = 6;
 }
 
 message GetBlockRequest {
@@ -188,6 +190,7 @@ message GetBlockResponse {
   google.protobuf.Timestamp timestamp = 5;
   // used to propagate database.ErrNotFound through RPC
   uint32 err = 6;
+  bool verify_with_context = 7;
 }
 
 message SetPreferenceRequest {
@@ -196,6 +199,10 @@ message SetPreferenceRequest {
 
 message BlockVerifyRequest {
   bytes bytes = 1;
+
+  // If set, the VM server casts the block to a [block.WithVerifyContext] and
+  // calls [VerifyWithContext] instead of [Verify].
+  optional uint64 p_chain_height = 2;
 }
 
 message BlockVerifyResponse {
