@@ -23,6 +23,10 @@ type blockMetrics struct {
 	verifyErr,
 	accept,
 	reject,
+	// Block verification with context metrics
+	shouldVerifyWithContext,
+	verifyWithContext,
+	verifyWithContextErr,
 	// Block building with context metrics
 	buildBlockWithContext,
 	buildBlockWithContextErr,
@@ -63,6 +67,9 @@ func (m *blockMetrics) Initialize(
 	m.verifyErr = newAverager(namespace, "verify_err", reg, &errs)
 	m.accept = newAverager(namespace, "accept", reg, &errs)
 	m.reject = newAverager(namespace, "reject", reg, &errs)
+	m.shouldVerifyWithContext = newAverager(namespace, "should_verify_with_context", reg, &errs)
+	m.verifyWithContext = newAverager(namespace, "verify_with_context", reg, &errs)
+	m.verifyWithContextErr = newAverager(namespace, "verify_with_context_err", reg, &errs)
 
 	if supportsBlockBuildingWithContext {
 		m.buildBlockWithContext = newAverager(namespace, "build_block_with_context", reg, &errs)
