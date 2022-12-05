@@ -76,7 +76,7 @@ type mutableSharedMemory struct {
 	atomic.SharedMemory
 }
 
-type environment struct {
+type caminoEnvironment struct {
 	isBootstrapped *utils.AtomicBool
 	config         *config.Config
 	clk            *mockable.Clock
@@ -89,11 +89,11 @@ type environment struct {
 	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
 	utxosHandler   utxo.Handler
-	txBuilder      Builder
+	txBuilder      CaminoBuilder
 	backend        executor.Backend
 }
 
-func (e *environment) GetState(blkID ids.ID) (state.Chain, bool) {
+func (e *caminoEnvironment) GetState(blkID ids.ID) (state.Chain, bool) {
 	if blkID == lastAcceptedID {
 		return e.state, true
 	}
@@ -101,7 +101,7 @@ func (e *environment) GetState(blkID ids.ID) (state.Chain, bool) {
 	return chainState, ok
 }
 
-func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
+func (e *caminoEnvironment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
 }
 
@@ -159,7 +159,7 @@ func newCaminoBuilder(postBanff bool, caminoGenesisConf genesis.Camino) CaminoBu
 		Rewards:      rewards,
 	}
 
-	env := &environment{
+	env := &caminoEnvironment{
 		isBootstrapped: &isBootstrapped,
 		config:         &config,
 		clk:            &clk,
@@ -181,7 +181,7 @@ func newCaminoBuilder(postBanff bool, caminoGenesisConf genesis.Camino) CaminoBu
 }
 
 func addCaminoSubnet(
-	env *environment,
+	env *caminoEnvironment,
 	txBuilder Builder,
 ) {
 	// Create a subnet
