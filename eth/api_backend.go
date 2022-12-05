@@ -247,7 +247,10 @@ func (b *EthAPIBackend) GetReceipts(ctx context.Context, hash common.Hash) (type
 }
 
 func (b *EthAPIBackend) GetLogs(ctx context.Context, hash common.Hash, number uint64) ([][]*types.Log, error) {
-	return rawdb.ReadLogs(b.eth.chainDb, hash, number), nil
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return b.eth.blockchain.GetLogs(hash, number), nil
 }
 
 func (b *EthAPIBackend) GetEVM(ctx context.Context, msg core.Message, state *state.StateDB, header *types.Header, vmConfig *vm.Config) (*vm.EVM, func() error, error) {

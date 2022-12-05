@@ -3,37 +3,42 @@
 
 package core
 
-import (
-	"github.com/ethereum/go-ethereum/common"
-)
-
-// BoundedBuffer keeps [size] common.Hash entries in a buffer and calls
-// [callback] on any item that is evicted. This is typically used for
+// BoundedBuffer keeps [size] entries of type [K] in a buffer and calls
+// [callback] on any item that is overwritten. This is typically used for
 // dereferencing old roots during block processing.
-type BoundedBuffer struct {
+//
+// BoundedBuffer is not thread-safe and requires the caller synchronize usage.
+type BoundedBuffer[K any] struct {
 	lastPos  int
 	size     int
-	callback func(common.Hash)
-	buffer   []common.Hash
+	callback func(K)
+	buffer   []K
+
+	cycled bool
 }
 
 // NewBoundedBuffer creates a new [BoundedBuffer].
-func NewBoundedBuffer(size int, callback func(common.Hash)) *BoundedBuffer {
-	return &BoundedBuffer{
+func NewBoundedBuffer[K any](size int, callback func(K)) *BoundedBuffer[K] {
+	return &BoundedBuffer[K]{
+		lastPos:  -1,
 		size:     size,
 		callback: callback,
-		buffer:   make([]common.Hash, size),
+		buffer:   make([]K, size),
 	}
 }
 
-// Insert adds a new common.Hash to the buffer. If the buffer is full, the
-// oldest common.Hash will be evicted and [callback] will be invoked.
-//
-// WARNING: BoundedBuffer does not support the insertion of empty common.Hash.
-// Inserting such data will cause unintended behavior.
-func (b *BoundedBuffer) Insert(h common.Hash) {
-	nextPos := (b.lastPos + 1) % b.size // the first item added to the buffer will be at position 1
-	if b.buffer[nextPos] != (common.Hash{}) {
+// Insert adds a new value to the buffer. If the buffer is full, the
+// oldest value will be overwritten and [callback] will be invoked.
+func (b *BoundedBuffer[K]) Insert(h K) {
+	nextPos := b.lastPos + 1 // the first item added to the buffer will be at position 0
+	if nextPos == b.size {
+		nextPos = 0
+		// Set [cycled] since we are back to the 0th element
+		b.cycled = true
+	}
+	if b.cycled {
+		// We ensure we have cycled through the buffer once before invoking the
+		// [callback] to ensure we don't call it with unset values.
 		b.callback(b.buffer[nextPos])
 	}
 	b.buffer[nextPos] = h
@@ -41,7 +46,12 @@ func (b *BoundedBuffer) Insert(h common.Hash) {
 }
 
 // Last retrieves the last item added to the buffer.
-// If no items have been added to the buffer, Last returns an empty hash.
-func (b *BoundedBuffer) Last() common.Hash {
-	return b.buffer[b.lastPos]
+//
+// If no items have been added to the buffer, Last returns the default value of
+// [K] and [false].
+func (b *BoundedBuffer[K]) Last() (K, bool) {
+	if b.lastPos == -1 {
+		return *new(K), false
+	}
+	return b.buffer[b.lastPos], true
 }

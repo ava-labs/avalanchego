@@ -213,6 +213,7 @@ func New(
 			SnapshotVerify:                  config.SnapshotVerify,
 			SkipSnapshotRebuild:             config.SkipSnapshotRebuild,
 			Preimages:                       config.Preimages,
+			AcceptedCacheSize:               config.AcceptedCacheSize,
 			TxLookupLimit:                   config.TxLookupLimit,
 		}
 	)
@@ -281,10 +282,8 @@ func (s *Ethereum) APIs() []rpc.API {
 	apis = append(apis, s.stackRPCs...)
 
 	// Create [filterSystem] with the log cache size set in the config.
-	ethcfg := s.APIBackend.eth.config
 	filterSystem := filters.NewFilterSystem(s.APIBackend, filters.Config{
-		LogCacheSize: ethcfg.FilterLogCacheSize,
-		Timeout:      5 * time.Minute,
+		Timeout: 5 * time.Minute,
 	})
 
 	// Append all the local APIs and return

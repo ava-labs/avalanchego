@@ -334,3 +334,12 @@ func (bc *BlockChain) SubscribeAcceptedLogsEvent(ch chan<- []*types.Log) event.S
 func (bc *BlockChain) SubscribeAcceptedTransactionEvent(ch chan<- NewTxsEvent) event.Subscription {
 	return bc.scope.Track(bc.txAcceptedFeed.Subscribe(ch))
 }
+
+// GetLogs fetches all logs from a given block.
+func (bc *BlockChain) GetLogs(hash common.Hash, number uint64) [][]*types.Log {
+	logs, ok := bc.acceptedLogsCache.Get(hash) // this cache is thread-safe
+	if ok {
+		return logs
+	}
+	return rawdb.ReadLogs(bc.db, hash, number)
+}

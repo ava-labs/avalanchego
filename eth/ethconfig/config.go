@@ -57,7 +57,7 @@ func NewDefaultConfig() Config {
 		TrieDirtyCache:        256,
 		TrieDirtyCommitTarget: 20,
 		SnapshotCache:         256,
-		FilterLogCacheSize:    32,
+		AcceptedCacheSize:     32,
 		Miner:                 miner.Config{},
 		TxPool:                core.DefaultTxPoolConfig,
 		RPCGasCap:             25000000,
@@ -101,8 +101,9 @@ type Config struct {
 	SnapshotCache         int
 	Preimages             bool
 
-	// This is the number of blocks for which logs will be cached in the filter system.
-	FilterLogCacheSize int
+	// AcceptedCacheSize is the depth of accepted headers cache and accepted
+	// logs cache at the accepted tip.
+	AcceptedCacheSize int
 
 	// Mining options
 	Miner miner.Config
