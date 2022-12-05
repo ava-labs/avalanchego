@@ -6,6 +6,13 @@ This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/ava
 
 **This version modifies the db format. The db format is compatible with v1.9.3, but not v1.9.2 or earlier. After running a node with v1.9.4 attempting to run a node with a version earlier than v1.9.3 may report a fatal error on startup.**
 
+### PeerList Gossip Optimization
+
+- Added gossip tracking to the `peer` instance to only gossip new `IP`s to a connection
+- Added `PeerListAck` message to report which `TxID`s provided by the `PeerList` message were tracked
+- Added `TxID`s to the `PeerList` message to unique-ify nodeIDs across validation periods
+- Added `TxID` mappings to the gossip tracker
+
 ### Validator Set Tracking
 
 - Renamed `GetValidators` to `Get` on the `validators.Manager` interface
@@ -14,15 +21,20 @@ This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/ava
 - Removed `Set` from the `validators.Set` interface
 - Added `Add` and `Get` to the `validators.Set` interface
 - Modified `validators.Set#Sample` to return `ids.NodeID` rather than `valdiators.Validator`
-- Replaced the `validators.Validator` interface with a struct and added a `BLS` public key field
+- Replaced the `validators.Validator` interface with a struct
+- Added a `BLS` public key field to `validators.Validator`
+- Added a `TxID` field to `validators.Validator`
 - Improved and documented error handling within the `validators.Set` interface
 - Added `BLS` public keys to the result of `GetValidatorSet`
 - Added `BuildBlockWithContext` as an optional VM method to build blocks at a specific P-chain height
+- Added `VerifyWithContext` as an optional block method to verify blocks at a specific P-chain height
 
 ### Uptime Tracking
 
 - Added subnet uptime tracking
+- Added subnet uptimes to p2p `pong` messages
 - Added subnet uptimes to `platform.getCurrentValidators`
+- Added `subnetID` as an argument to `info.Uptime`
 
 ### Fixes
 
@@ -43,13 +55,19 @@ This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/ava
 - Added indices to the return values of `GetLastAccepted` and `GetContainerByID` on the `indexer` API client
 - Removed unnecessary locking from the `info` API
 
+### Chain Data
+
+- Added `ChainDataDir` to the `snow.Context` to allow blockchains to canonically access disk outside avalanchego's database
+- Added `--chain-data-dir` as a CLI flag to specify the base directory for all `ChainDataDir`s
+
 ### Miscellaneous
 
-- Added inbound peerlist tracking to improve peerlist gossip
+- Removed `Version` from the `peer.Network` interface
+- Removed `Pong` from the `peer.Network` interface
+- Reduced memory allocations inside the system throttler
 - Added `CChainID` to the `snow.Context`
-- Added `ChainDataDir` to the `snow.Context`
-- Added `--chain-data-dir` as a CLI flag to specify the base directory for all `ChainDataDir`s
 - Converted all sorting to utilize generics
+- Converted all set management to utilize generics
 
 ## [v1.9.3](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.3)
 
