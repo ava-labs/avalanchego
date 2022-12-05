@@ -64,8 +64,9 @@ type GossipTracker interface {
 
 	// AddKnown adds [txIDs] to the txIDs known by [peerID]
 	// Returns:
+	// 	txIDs: The txIDs in [txIDs] that are currently validators.
 	// 	bool: False if [peerID] is not tracked. True otherwise.
-	AddKnown(peerID ids.NodeID, txIDs []ids.ID) bool
+	AddKnown(peerID ids.NodeID, txIDs []ids.ID) ([]ids.ID, bool)
 	// GetUnknown gets the peers that we haven't sent to this peer
 	// Returns:
 	// 	[]ValidatorID: a slice of [limit] ValidatorIDs that [peerID] doesn't
@@ -227,15 +228,16 @@ func (g *gossipTracker) RemoveValidator(validatorID ids.NodeID) bool {
 //  2. [txIDs] SHOULD only be a slice of txIDs that have been added with
 //     AddValidator. Trying to learn about txIDs that aren't registered
 //     yet will result in dropping the unregistered ID.
-func (g *gossipTracker) AddKnown(peerID ids.NodeID, txIDs []ids.ID) bool {
+func (g *gossipTracker) AddKnown(peerID ids.NodeID, txIDs []ids.ID) ([]ids.ID, bool) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
 	knownPeers, ok := g.trackedPeers[peerID]
 	if !ok {
-		return false
+		return nil, false
 	}
 
+	knownTxIDs := make([]ids.ID, 0, len(txIDs))
 	for _, txID := range txIDs {
 		nodeID, ok := g.txIDsToNodeIDs[txID]
 		if !ok {
@@ -249,9 +251,11 @@ func (g *gossipTracker) AddKnown(peerID ids.NodeID, txIDs []ids.ID) bool {
 		// guaranteed that the index is populated.
 		index := g.nodeIDsToIndices[nodeID]
 		knownPeers.Add(index)
+
+		knownTxIDs = append(knownTxIDs, txID)
 	}
 
-	return true
+	return knownTxIDs, true
 }
 
 func (g *gossipTracker) GetUnknown(peerID ids.NodeID, limit int) ([]ValidatorID, bool, error) {

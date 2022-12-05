@@ -596,7 +596,7 @@ func (p *peer) sendNetworkMessages() {
 			}
 
 			if len(peerIPs) == 0 {
-				p.Config.Log.Debug(
+				p.Log.Debug(
 					"skipping peer gossip as there are no unknown peers",
 					zap.Stringer("nodeID", p.id),
 				)
@@ -618,10 +618,7 @@ func (p *peer) sendNetworkMessages() {
 				p.Log.Debug("failed to send peer list",
 					zap.Stringer("nodeID", p.id),
 				)
-				continue
 			}
-
-			// TODO track outgoing peer lists
 		case <-sendPingsTicker.C:
 			if !p.Network.AllowConnection(p.id) {
 				p.Log.Debug("disconnecting from peer",
@@ -678,7 +675,7 @@ func (p *peer) handle(msg message.InboundMessage) {
 		msg.OnFinishedHandling()
 		return
 	case *p2ppb.PeerListAck:
-		// TODO implement a handler for this
+		p.handlePeerListAck(m)
 		msg.OnFinishedHandling()
 		return
 	}
@@ -944,10 +941,7 @@ func (p *peer) handleVersion(msg *p2ppb.Version) {
 		p.Log.Error("failed to send peer list for handshake",
 			zap.Stringer("nodeID", p.id),
 		)
-		return
 	}
-
-	// TODO track outgoing peer lists
 }
 
 func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
@@ -962,9 +956,9 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 	}
 
 	// the peers this peer told us about
-	discoveredTxs := make([]ids.ID, 0, len(msg.ClaimedIpPorts))
-
-	for _, claimedIPPort := range msg.ClaimedIpPorts {
+	discoveredIPs := make([]ips.ClaimedIPPort, len(msg.ClaimedIpPorts))
+	discoveredTxIDs := make([]ids.ID, 0, len(msg.ClaimedIpPorts))
+	for i, claimedIPPort := range msg.ClaimedIpPorts {
 		tlsCert, err := x509.ParseCertificate(claimedIPPort.X509Certificate)
 		if err != nil {
 			p.Log.Debug("message with invalid field",
@@ -989,6 +983,7 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 			return
 		}
 
+		// TODO: After the next network upgrade, require txIDs to be populated.
 		var txID ids.ID
 		if len(claimedIPPort.TxId) > 0 {
 			txID, err = ids.ToID(claimedIPPort.TxId)
@@ -1003,9 +998,10 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 				return
 			}
 
-			discoveredTxs = append(discoveredTxs, txID)
+			discoveredTxIDs = append(discoveredTxIDs, txID)
 		}
-		ip := ips.ClaimedIPPort{
+
+		discoveredIPs[i] = ips.ClaimedIPPort{
 			Cert: tlsCert,
 			IPPort: ips.IPPort{
 				IP:   net.IP(claimedIPPort.IpAddr),
@@ -1015,18 +1011,77 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 			Signature: claimedIPPort.Signature,
 			TxID:      txID,
 		}
+	}
 
-		// it's important to add this to our list of discovered peers regardless
-		// of whether we end up tracking it or not to avoid a situation where
-		// we are re-gossiping peers we are already connected to back to the
-		// node to told us about them.
+	// Invariant: Because [p.Network.Track] directly calls the validator set, we
+	// must get the [trackedTxIDs] from the [p.GossipTracker] first. This
+	// prevents the situation where we may drop an IP in [p.Network.Track] but
+	// report to the peer that it was tracked. This means we may not send as
+	// many txIDs as we could send. However, we guarantee the txIDs we do send
+	// are correct.
+
+	// The peer knows about peers they gossiped to us.
+	trackedTxIDs, ok := p.GossipTracker.AddKnown(p.id, discoveredTxIDs)
+	if !ok {
+		p.Log.Error("failed to update known peers",
+			zap.Stringer("nodeID", p.id),
+		)
+		return
+	}
+
+	for _, ip := range discoveredIPs {
+		// It's important that the return value of [Track] is not considered for
+		// gossip tracking. In addition to the racy behavior documented above,
+		// the gossip tracker should not care if the received IP was new. The
+		// gossip tracker only tracks if the peer knows the IP.
 		if !p.Network.Track(ip) {
 			p.Metrics.NumUselessPeerListBytes.Add(float64(ip.BytesLen()))
 		}
 	}
 
-	// a peer must have known about a set of peers if it gossiped them to us
-	if !p.GossipTracker.AddKnown(p.id, discoveredTxs) {
+	if len(trackedTxIDs) == 0 {
+		p.Log.Debug("skipping peerlist ack as there were no tracked txIDs",
+			zap.Stringer("nodeID", p.id),
+		)
+		return
+	}
+
+	peerListAckMsg, err := p.Config.MessageCreator.PeerListAck(trackedTxIDs)
+	if err != nil {
+		p.Log.Error("failed to create message",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.PeerListAckOp),
+			zap.Error(err),
+		)
+		return
+	}
+
+	if !p.Send(p.onClosingCtx, peerListAckMsg) {
+		p.Log.Debug("failed to send peer list ack",
+			zap.Stringer("nodeID", p.id),
+		)
+	}
+}
+
+func (p *peer) handlePeerListAck(msg *p2ppb.PeerListAck) {
+	txIDs := make([]ids.ID, len(msg.TxIds))
+	for i, txIDBytes := range msg.TxIds {
+		txID, err := ids.ToID(txIDBytes)
+		if err != nil {
+			p.Log.Debug("failed to parse txID",
+				zap.Stringer("nodeID", p.id),
+				zap.Error(err),
+			)
+			p.StartClose()
+			return
+		}
+
+		txIDs[i] = txID
+	}
+
+	// Add this to our gossip tracker, so we don't send this peer these
+	// validators again.
+	if _, ok := p.GossipTracker.AddKnown(p.id, txIDs); !ok {
 		p.Log.Error("failed to update known peers",
 			zap.Stringer("nodeID", p.id),
 		)

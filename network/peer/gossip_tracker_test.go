@@ -272,51 +272,57 @@ func TestGossipTracker_AddKnown(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		trackedPeers []ids.NodeID
-		validators   []ValidatorID
-		args         args
-		expected     bool
+		name          string
+		trackedPeers  []ids.NodeID
+		validators    []ValidatorID
+		args          args
+		expectedTxIDs []ids.ID
+		expectedOk    bool
 	}{
 		{
 			// We should not be able to update an untracked peer
-			name:         "untracked peer - empty",
-			trackedPeers: []ids.NodeID{},
-			validators:   []ValidatorID{},
-			args:         args{peerID: p1, txIDs: []ids.ID{}},
-			expected:     false,
+			name:          "untracked peer - empty",
+			trackedPeers:  []ids.NodeID{},
+			validators:    []ValidatorID{},
+			args:          args{peerID: p1, txIDs: []ids.ID{}},
+			expectedTxIDs: nil,
+			expectedOk:    false,
 		},
 		{
 			// We should not be able to update an untracked peer
-			name:         "untracked peer - populated",
-			trackedPeers: []ids.NodeID{p2, p3},
-			validators:   []ValidatorID{},
-			args:         args{peerID: p1, txIDs: []ids.ID{}},
-			expected:     false,
+			name:          "untracked peer - populated",
+			trackedPeers:  []ids.NodeID{p2, p3},
+			validators:    []ValidatorID{},
+			args:          args{peerID: p1, txIDs: []ids.ID{}},
+			expectedTxIDs: nil,
+			expectedOk:    false,
 		},
 		{
 			// We shouldn't be able to look up a peer that isn't tracked
-			name:         "untracked peer - unknown validator",
-			trackedPeers: []ids.NodeID{},
-			validators:   []ValidatorID{},
-			args:         args{peerID: p1, txIDs: []ids.ID{v1.TxID}},
-			expected:     false,
+			name:          "untracked peer - unknown validator",
+			trackedPeers:  []ids.NodeID{},
+			validators:    []ValidatorID{},
+			args:          args{peerID: p1, txIDs: []ids.ID{v1.TxID}},
+			expectedTxIDs: nil,
+			expectedOk:    false,
 		},
 		{
 			// We shouldn't fail on a validator that's not registered
-			name:         "tracked peer  - unknown validator",
-			trackedPeers: []ids.NodeID{p1},
-			validators:   []ValidatorID{},
-			args:         args{peerID: p1, txIDs: []ids.ID{v1.TxID}},
-			expected:     true,
+			name:          "tracked peer  - unknown validator",
+			trackedPeers:  []ids.NodeID{p1},
+			validators:    []ValidatorID{},
+			args:          args{peerID: p1, txIDs: []ids.ID{v1.TxID}},
+			expectedTxIDs: []ids.ID{},
+			expectedOk:    true,
 		},
 		{
 			// We should be able to update a tracked validator
-			name:         "update tracked validator",
-			trackedPeers: []ids.NodeID{p1, p2, p3},
-			validators:   []ValidatorID{v1},
-			args:         args{peerID: p1, txIDs: []ids.ID{v1.TxID}},
-			expected:     true,
+			name:          "update tracked validator",
+			trackedPeers:  []ids.NodeID{p1, p2, p3},
+			validators:    []ValidatorID{v1},
+			args:          args{peerID: p1, txIDs: []ids.ID{v1.TxID}},
+			expectedTxIDs: []ids.ID{v1.TxID},
+			expectedOk:    true,
 		},
 	}
 
@@ -336,7 +342,9 @@ func TestGossipTracker_AddKnown(t *testing.T) {
 				r.True(g.AddValidator(v))
 			}
 
-			r.Equal(test.expected, g.AddKnown(test.args.peerID, test.args.txIDs))
+			txIDs, ok := g.AddKnown(test.args.peerID, test.args.txIDs)
+			r.Equal(test.expectedOk, ok)
+			r.Equal(test.expectedTxIDs, txIDs)
 		})
 	}
 }
@@ -499,7 +507,9 @@ func TestGossipTracker_E2E(t *testing.T) {
 
 	// p1 now knows about v1, but not v2, so it should see [v2] in its unknown
 	// p2 still knows nothing, so it should see both
-	r.True(g.AddKnown(p1, []ids.ID{v1.TxID}))
+	txIDs, ok := g.AddKnown(p1, []ids.ID{v1.TxID})
+	r.True(ok)
+	r.Equal([]ids.ID{v1.TxID}, txIDs)
 
 	// p1 should have an unknown of [v2], since it knows v1
 	unknown, ok, err = g.GetUnknown(p1, limit)
@@ -522,7 +532,10 @@ func TestGossipTracker_E2E(t *testing.T) {
 	// track p3, who knows of v1, v2, and v3
 	// p1 and p2 still don't know of v3
 	r.True(g.StartTrackingPeer(p3))
-	r.True(g.AddKnown(p3, []ids.ID{v1.TxID, v2.TxID, v3.TxID}))
+
+	txIDs, ok = g.AddKnown(p3, []ids.ID{v1.TxID, v2.TxID, v3.TxID})
+	r.True(ok)
+	r.Equal([]ids.ID{v1.TxID, v2.TxID, v3.TxID}, txIDs)
 
 	// p1 doesn't know about [v2, v3]
 	unknown, ok, err = g.GetUnknown(p1, limit)

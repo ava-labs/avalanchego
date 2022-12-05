@@ -38,11 +38,12 @@ func (m *MockGossipTracker) EXPECT() *MockGossipTrackerMockRecorder {
 }
 
 // AddKnown mocks base method.
-func (m *MockGossipTracker) AddKnown(arg0 ids.NodeID, arg1 []ids.ID) bool {
+func (m *MockGossipTracker) AddKnown(arg0 ids.NodeID, arg1 []ids.ID) ([]ids.ID, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddKnown", arg0, arg1)
-	ret0, _ := ret[0].(bool)
-	return ret0
+	ret0, _ := ret[0].([]ids.ID)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
 }
 
 // AddKnown indicates an expected call of AddKnown.
