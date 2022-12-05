@@ -2551,39 +2551,74 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		blk.EXPECT().getInnerBlk().Return(innerBlk).AnyTimes()
 		blkID := ids.GenerateTestID()
 		blk.EXPECT().ID().Return(blkID).AnyTimes()
-		blk.EXPECT().pChainHeight(gomock.Any()).Return(pChainHeight, nil)
 
-		err = vm.verifyAndRecordInnerBlk(context.Background(), blk)
+		err = vm.verifyAndRecordInnerBlk(
+			context.Background(),
+			&block.Context{
+				PChainHeight: pChainHeight,
+			},
+			blk,
+		)
 		require.NoError(err)
 
 		// Call VerifyWithContext again but with a different P-Chain height
 		blk.EXPECT().setInnerBlk(innerBlk).AnyTimes()
 		pChainHeight++
-		blk.EXPECT().pChainHeight(context.Background()).Return(pChainHeight, nil)
 		innerBlk.MockWithVerifyContext.EXPECT().VerifyWithContext(context.Background(),
 			&block.Context{
 				PChainHeight: pChainHeight,
 			},
 		).Return(nil)
 
-		err = vm.verifyAndRecordInnerBlk(context.Background(), blk)
+		err = vm.verifyAndRecordInnerBlk(
+			context.Background(),
+			&block.Context{
+				PChainHeight: pChainHeight,
+			},
+			blk,
+		)
 		require.NoError(err)
 	}
 
-	// Ensure we call Verify on a block that returns
-	// false for ShouldVerifyWithContext
-	innerBlk := blockWithVerifyContext{
-		MockBlock:             snowman.NewMockBlock(ctrl),
-		MockWithVerifyContext: mocks.NewMockWithVerifyContext(ctrl),
+	{
+		// Ensure we call Verify on a block that returns
+		// false for ShouldVerifyWithContext
+		innerBlk := blockWithVerifyContext{
+			MockBlock:             snowman.NewMockBlock(ctrl),
+			MockWithVerifyContext: mocks.NewMockWithVerifyContext(ctrl),
+		}
+		innerBlk.MockWithVerifyContext.EXPECT().ShouldVerifyWithContext(gomock.Any()).Return(false, nil)
+		innerBlk.MockBlock.EXPECT().Verify(gomock.Any()).Return(nil)
+		innerBlk.MockBlock.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
+		innerBlk.MockBlock.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
+		blk := NewMockPostForkBlock(ctrl)
+		blk.EXPECT().getInnerBlk().Return(innerBlk).AnyTimes()
+		blkID := ids.GenerateTestID()
+		blk.EXPECT().ID().Return(blkID).AnyTimes()
+		err = vm.verifyAndRecordInnerBlk(
+			context.Background(),
+			&block.Context{
+				PChainHeight: 1,
+			},
+			blk,
+		)
+		require.NoError(err)
 	}
-	innerBlk.MockWithVerifyContext.EXPECT().ShouldVerifyWithContext(gomock.Any()).Return(false, nil)
-	innerBlk.MockBlock.EXPECT().Verify(gomock.Any()).Return(nil)
-	innerBlk.MockBlock.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
-	innerBlk.MockBlock.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
-	blk := NewMockPostForkBlock(ctrl)
-	blk.EXPECT().getInnerBlk().Return(innerBlk).AnyTimes()
-	blkID := ids.GenerateTestID()
-	blk.EXPECT().ID().Return(blkID).AnyTimes()
-	err = vm.verifyAndRecordInnerBlk(context.Background(), blk)
-	require.NoError(err)
+
+	{
+		// Ensure we call Verify on a block that doesn't have a valid context
+		innerBlk := blockWithVerifyContext{
+			MockBlock:             snowman.NewMockBlock(ctrl),
+			MockWithVerifyContext: mocks.NewMockWithVerifyContext(ctrl),
+		}
+		innerBlk.MockBlock.EXPECT().Verify(gomock.Any()).Return(nil)
+		innerBlk.MockBlock.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
+		innerBlk.MockBlock.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
+		blk := NewMockPostForkBlock(ctrl)
+		blk.EXPECT().getInnerBlk().Return(innerBlk).AnyTimes()
+		blkID := ids.GenerateTestID()
+		blk.EXPECT().ID().Return(blkID).AnyTimes()
+		err = vm.verifyAndRecordInnerBlk(context.Background(), nil, blk)
+		require.NoError(err)
+	}
 }
