@@ -131,6 +131,7 @@ type peer struct {
 
 	observedUptimesLock sync.RWMutex
 	// [observedUptimesLock] must be held while accessing [observedUptime]
+	// Subnet ID --> Our uptime for the given subnet as perceived by the peer
 	observedUptimes map[ids.ID]uint32
 
 	// True if this peer has sent us a valid Version message and
@@ -791,9 +792,11 @@ func (p *peer) handlePong(msg *p2ppb.Pong) {
 	}
 }
 
-func (p *peer) observeUptime(subnetID ids.ID, uptimePct uint32) {
+// Record that the given peer perceives our uptime for the given [subnetID]
+// to be [uptime].
+func (p *peer) observeUptime(subnetID ids.ID, uptime uint32) {
 	p.observedUptimesLock.Lock()
-	p.observedUptimes[subnetID] = uptimePct // [0, 100] percentage
+	p.observedUptimes[subnetID] = uptime // [0, 100] percentage
 	p.observedUptimesLock.Unlock()
 }
 
