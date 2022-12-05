@@ -4,84 +4,26 @@
 package peer
 
 import (
-	"crypto"
-	"time"
-
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/utils/ips"
-	"github.com/ava-labs/avalanchego/version"
 )
 
-var _ Network = (*testNetwork)(nil)
+var TestNetwork Network = testNetwork{}
 
-// testNetwork is a network definition for a TestPeer
-type testNetwork struct {
-	mc message.Creator
+type testNetwork struct{}
 
-	networkID uint32
-	ip        ips.IPPort
-	version   *version.Application
-	signer    crypto.Signer
-	subnets   ids.Set
+func (testNetwork) Connected(ids.NodeID) {}
 
-	uptime uint32
-}
-
-// NewTestNetwork creates and returns a new TestNetwork
-func NewTestNetwork(
-	mc message.Creator,
-	networkID uint32,
-	ipPort ips.IPPort,
-	version *version.Application,
-	signer crypto.Signer,
-	subnets ids.Set,
-	uptime uint32,
-) Network {
-	return &testNetwork{
-		mc:        mc,
-		networkID: networkID,
-		ip:        ipPort,
-		version:   version,
-		signer:    signer,
-		subnets:   subnets,
-		uptime:    uptime,
-	}
-}
-
-func (*testNetwork) Connected(ids.NodeID) {}
-
-func (*testNetwork) AllowConnection(ids.NodeID) bool {
+func (testNetwork) AllowConnection(ids.NodeID) bool {
 	return true
 }
 
-func (*testNetwork) Track(ips.ClaimedIPPort) bool {
+func (testNetwork) Track(ips.ClaimedIPPort) bool {
 	return true
 }
 
-func (*testNetwork) Disconnected(ids.NodeID) {}
+func (testNetwork) Disconnected(ids.NodeID) {}
 
-func (n *testNetwork) Version() (message.OutboundMessage, error) {
-	now := uint64(time.Now().Unix())
-	unsignedIP := UnsignedIP{
-		IP:        n.ip,
-		Timestamp: now,
-	}
-	signedIP, err := unsignedIP.Sign(n.signer)
-	if err != nil {
-		return nil, err
-	}
-	return n.mc.Version(
-		n.networkID,
-		now,
-		n.ip,
-		n.version.String(),
-		now,
-		signedIP.Signature,
-		n.subnets.List(),
-	)
-}
-
-func (*testNetwork) Peers(ids.NodeID) ([]ips.ClaimedIPPort, error) {
+func (testNetwork) Peers(ids.NodeID) ([]ips.ClaimedIPPort, error) {
 	return nil, nil
 }

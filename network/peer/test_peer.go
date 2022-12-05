@@ -86,10 +86,6 @@ func StartTestPeer(
 		return nil, err
 	}
 
-	ipPort := ips.IPPort{
-		IP:   net.IPv6zero,
-		Port: 0,
-	}
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
 		resource.NoUsage,
@@ -100,21 +96,16 @@ func StartTestPeer(
 		return nil, err
 	}
 
+	signerIP := ips.NewDynamicIPPort(net.IPv6zero, 0)
+	tls := tlsCert.PrivateKey.(crypto.Signer)
+
 	peer := Start(
 		&Config{
-			Metrics:             metrics,
-			MessageCreator:      mc,
-			Log:                 logging.NoLog{},
-			InboundMsgThrottler: throttling.NewNoInboundThrottler(),
-			Network: NewTestNetwork(
-				mc,
-				networkID,
-				ipPort,
-				version.CurrentApp,
-				tlsCert.PrivateKey.(crypto.Signer),
-				ids.Set{},
-				100,
-			),
+			Metrics:              metrics,
+			MessageCreator:       mc,
+			Log:                  logging.NoLog{},
+			InboundMsgThrottler:  throttling.NewNoInboundThrottler(),
+			Network:              TestNetwork,
 			Router:               router,
 			VersionCompatibility: version.GetCompatibility(networkID),
 			MySubnets:            ids.Set{},
@@ -124,6 +115,7 @@ func StartTestPeer(
 			PongTimeout:          constants.DefaultPingPongTimeout,
 			MaxClockDifference:   time.Minute,
 			ResourceTracker:      resourceTracker,
+			IPSigner:             NewIPSigner(signerIP, tls),
 		},
 		conn,
 		cert,

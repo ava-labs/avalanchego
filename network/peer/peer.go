@@ -495,7 +495,23 @@ func (p *peer) writeMessages() {
 	writer := bufio.NewWriterSize(p.conn, p.Config.WriteBufferSize)
 
 	// Make sure that the version is the first message sent
-	msg, err := p.Network.Version()
+	mySignedIP, err := p.IPSigner.GetSignedIP()
+	if err != nil {
+		p.Log.Error("failed to get signed IP",
+			zap.Error(err),
+		)
+		return
+	}
+
+	msg, err := p.MessageCreator.Version(
+		p.NetworkID,
+		p.Clock.Unix(),
+		mySignedIP.IP.IP,
+		p.VersionCompatibility.Version().String(),
+		mySignedIP.IP.Timestamp,
+		mySignedIP.Signature,
+		p.MySubnets.List(),
+	)
 	if err != nil {
 		p.Log.Error("failed to create message",
 			zap.Stringer("messageOp", message.VersionOp),

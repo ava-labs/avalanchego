@@ -1,48 +1,45 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package network
+package peer
 
 import (
 	"crypto"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
-// ipSigner will return a signedIP for the current value of our dynamic IP.
-type ipSigner struct {
+// IPSigner will return a signedIP for the current value of our dynamic IP.
+type IPSigner struct {
 	ip     ips.DynamicIPPort
-	clock  *mockable.Clock
+	clock  mockable.Clock
 	signer crypto.Signer
 
 	// Must be held while accessing [signedIP]
 	signedIPLock sync.RWMutex
 	// Note that the values in [*signedIP] are constants and can be inspected
 	// without holding [signedIPLock].
-	signedIP *peer.SignedIP
+	signedIP *SignedIP
 }
 
-func newIPSigner(
+func NewIPSigner(
 	ip ips.DynamicIPPort,
-	clock *mockable.Clock,
 	signer crypto.Signer,
-) *ipSigner {
-	return &ipSigner{
+) *IPSigner {
+	return &IPSigner{
 		ip:     ip,
-		clock:  clock,
 		signer: signer,
 	}
 }
 
-// getSignedIP returns the signedIP of the current value of the provided
+// GetSignedIP returns the signedIP of the current value of the provided
 // dynamicIP. If the dynamicIP hasn't changed since the prior call to
-// getSignedIP, then the same [SignedIP] will be returned.
+// GetSignedIP, then the same [SignedIP] will be returned.
 //
-// It's safe for multiple goroutines to concurrently call getSignedIP.
-func (s *ipSigner) getSignedIP() (*peer.SignedIP, error) {
+// It's safe for multiple goroutines to concurrently call GetSignedIP.
+func (s *IPSigner) GetSignedIP() (*SignedIP, error) {
 	// Optimistically, the IP should already be signed. By grabbing a read lock
 	// here we enable full concurrency of new connections.
 	s.signedIPLock.RLock()
@@ -66,7 +63,7 @@ func (s *ipSigner) getSignedIP() (*peer.SignedIP, error) {
 	}
 
 	// We should now sign our new IP at the current timestamp.
-	unsignedIP := peer.UnsignedIP{
+	unsignedIP := UnsignedIP{
 		IP:        ip,
 		Timestamp: s.clock.Unix(),
 	}

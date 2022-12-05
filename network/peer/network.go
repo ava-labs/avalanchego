@@ -5,7 +5,6 @@ package peer
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
@@ -32,10 +31,6 @@ type Network interface {
 	// is guaranteed that [Connected] will not be called after [Disconnected]
 	// for a given [Peer] object.
 	Disconnected(ids.NodeID)
-
-	// Version provides the peer with the Version message to send to the peer
-	// during the handshake.
-	Version() (message.OutboundMessage, error)
 
 	// Peers returns peers that [peerID] might not know about.
 	Peers(peerID ids.NodeID) ([]ips.ClaimedIPPort, error)

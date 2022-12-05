@@ -110,39 +110,21 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 	peerConfig0 := sharedConfig
 	peerConfig1 := sharedConfig
 
-	peerConfig0.Network = &testNetwork{
-		mc: mc,
+	ip0 := ips.NewDynamicIPPort(net.IPv6loopback, 0)
+	tls0 := tlsCert0.PrivateKey.(crypto.Signer)
+	peerConfig0.IPSigner = NewIPSigner(ip0, tls0)
 
-		networkID: constants.LocalID,
-		ip: ips.IPPort{
-			IP:   net.IPv6loopback,
-			Port: 0,
-		},
-		version: version.CurrentApp,
-		signer:  tlsCert0.PrivateKey.(crypto.Signer),
-		subnets: ids.Set{},
-
-		uptime: 100,
-	}
+	peerConfig0.Network = TestNetwork
 	inboundMsgChan0 := make(chan message.InboundMessage)
 	peerConfig0.Router = router.InboundHandlerFunc(func(_ context.Context, msg message.InboundMessage) {
 		inboundMsgChan0 <- msg
 	})
 
-	peerConfig1.Network = &testNetwork{
-		mc: mc,
+	ip1 := ips.NewDynamicIPPort(net.IPv6loopback, 1)
+	tls1 := tlsCert1.PrivateKey.(crypto.Signer)
+	peerConfig1.IPSigner = NewIPSigner(ip1, tls1)
 
-		networkID: constants.LocalID,
-		ip: ips.IPPort{
-			IP:   net.IPv6loopback,
-			Port: 1,
-		},
-		version: version.CurrentApp,
-		signer:  tlsCert1.PrivateKey.(crypto.Signer),
-		subnets: ids.Set{},
-
-		uptime: 100,
-	}
+	peerConfig1.Network = TestNetwork
 	inboundMsgChan1 := make(chan message.InboundMessage)
 	peerConfig1.Router = router.InboundHandlerFunc(func(_ context.Context, msg message.InboundMessage) {
 		inboundMsgChan1 <- msg
