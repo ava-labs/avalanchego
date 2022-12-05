@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 
 	ledger "github.com/ava-labs/avalanche-ledger-go"
 )
@@ -36,14 +37,14 @@ type Keychain interface {
 	Get(addr ids.ShortID) (Signer, bool)
 	// Returns the set of addresses for which the accessor keeps an associated
 	// signer
-	Addresses() ids.ShortSet
+	Addresses() set.Set[ids.ShortID]
 }
 
 // ledgerKeychain is an abstraction of the underlying ledger hardware device,
 // to be able to get a signer from a finite set of derived signers
 type ledgerKeychain struct {
 	ledger    ledger.Ledger
-	addrs     ids.ShortSet
+	addrs     set.Set[ids.ShortID]
 	addrToIdx map[ids.ShortID]uint32
 }
 
@@ -89,7 +90,7 @@ func NewLedgerKeychainFromIndices(l ledger.Ledger, indices []uint32) (Keychain, 
 		)
 	}
 
-	addrsSet := ids.ShortSet{}
+	addrsSet := set.NewSet[ids.ShortID](len(addrs))
 	addrsSet.Add(addrs...)
 
 	addrToIdx := map[ids.ShortID]uint32{}
@@ -104,7 +105,7 @@ func NewLedgerKeychainFromIndices(l ledger.Ledger, indices []uint32) (Keychain, 
 	}, nil
 }
 
-func (l *ledgerKeychain) Addresses() ids.ShortSet {
+func (l *ledgerKeychain) Addresses() set.Set[ids.ShortID] {
 	return l.addrs
 }
 

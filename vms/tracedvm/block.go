@@ -5,17 +5,23 @@ package tracedvm
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"go.opentelemetry.io/otel/attribute"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 var (
-	_ snowman.Block       = (*tracedBlock)(nil)
-	_ snowman.OracleBlock = (*tracedBlock)(nil)
+	_ snowman.Block           = (*tracedBlock)(nil)
+	_ snowman.OracleBlock     = (*tracedBlock)(nil)
+	_ block.WithVerifyContext = (*tracedBlock)(nil)
+
+	errExpectedBlockWithVerifyContext = errors.New("expected block.WithVerifyContext")
 )
 
 type tracedBlock struct {
@@ -80,4 +86,35 @@ func (b *tracedBlock) Options(ctx context.Context) ([2]snowman.Block, error) {
 			vm:    b.vm,
 		},
 	}, nil
+}
+
+func (b *tracedBlock) ShouldVerifyWithContext(ctx context.Context) (bool, error) {
+	blkWithCtx, ok := b.Block.(block.WithVerifyContext)
+	if !ok {
+		return false, nil
+	}
+
+	ctx, span := b.vm.tracer.Start(ctx, b.vm.shouldVerifyWithContextTag, oteltrace.WithAttributes(
+		attribute.Stringer("blkID", b.ID()),
+		attribute.Int64("height", int64(b.Height())),
+	))
+	defer span.End()
+
+	return blkWithCtx.ShouldVerifyWithContext(ctx)
+}
+
+func (b *tracedBlock) VerifyWithContext(ctx context.Context, blockCtx *block.Context) error {
+	blkWithCtx, ok := b.Block.(block.WithVerifyContext)
+	if !ok {
+		return fmt.Errorf("%w but got %T", errExpectedBlockWithVerifyContext, b.Block)
+	}
+
+	ctx, span := b.vm.tracer.Start(ctx, b.vm.verifyWithContextTag, oteltrace.WithAttributes(
+		attribute.Stringer("blkID", b.ID()),
+		attribute.Int64("height", int64(b.Height())),
+		attribute.Int64("pChainHeight", int64(blockCtx.PChainHeight)),
+	))
+	defer span.End()
+
+	return blkWithCtx.VerifyWithContext(ctx, blockCtx)
 }

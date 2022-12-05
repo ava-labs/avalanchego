@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
@@ -96,8 +97,8 @@ func (out *OutputOwners) Addresses() [][]byte {
 }
 
 // AddressesSet returns addresses as a set
-func (out *OutputOwners) AddressesSet() ids.ShortSet {
-	set := ids.NewShortSet(len(out.Addrs))
+func (out *OutputOwners) AddressesSet() set.Set[ids.ShortID] {
+	set := set.NewSet[ids.ShortID](len(out.Addrs))
 	set.Add(out.Addrs...)
 	return set
 }

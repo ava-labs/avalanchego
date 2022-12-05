@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
@@ -663,7 +664,7 @@ func (vm *VM) verifyOperation(tx *txs.OperationTx, op *txs.Operation, cred verif
 func (vm *VM) LoadUser(
 	username string,
 	password string,
-	addrsToUse ids.ShortSet,
+	addrsToUse set.Set[ids.ShortID],
 ) (
 	[]*avax.UTXO,
 	*secp256k1fx.Keychain,

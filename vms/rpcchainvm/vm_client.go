@@ -79,7 +79,8 @@ var (
 	_ block.StateSyncableVM              = (*VMClient)(nil)
 	_ prometheus.Gatherer                = (*VMClient)(nil)
 
-	_ snowman.Block = (*blockClient)(nil)
+	_ snowman.Block           = (*blockClient)(nil)
+	_ block.WithVerifyContext = (*blockClient)(nil)
 
 	_ block.StateSummary = (*summaryClient)(nil)
 )
@@ -232,6 +233,8 @@ func (vm *VMClient) Initialize(
 		return err
 	}
 
+	// We don't need to check whether this is a block.WithVerifyContext because
+	// we'll never Verify this block.
 	lastAcceptedBlk := &blockClient{
 		vm:       vm,
 		id:       id,
@@ -354,6 +357,8 @@ func (vm *VMClient) SetState(ctx context.Context, state snow.State) error {
 		return err
 	}
 
+	// We don't need to check whether this is a block.WithVerifyContext because
+	// we'll never Verify this block.
 	return vm.State.SetLastAcceptedBlock(&blockClient{
 		vm:       vm,
 		id:       id,
@@ -483,15 +488,19 @@ func (vm *VMClient) parseBlock(ctx context.Context, bytes []byte) (snowman.Block
 	}
 
 	time, err := grpcutils.TimestampAsTime(resp.Timestamp)
+	if err != nil {
+		return nil, err
+	}
 	return &blockClient{
-		vm:       vm,
-		id:       id,
-		parentID: parentID,
-		status:   status,
-		bytes:    bytes,
-		height:   resp.Height,
-		time:     time,
-	}, err
+		vm:                  vm,
+		id:                  id,
+		parentID:            parentID,
+		status:              status,
+		bytes:               bytes,
+		height:              resp.Height,
+		time:                time,
+		shouldVerifyWithCtx: resp.VerifyWithContext,
+	}, nil
 }
 
 func (vm *VMClient) getBlock(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -517,13 +526,14 @@ func (vm *VMClient) getBlock(ctx context.Context, blkID ids.ID) (snowman.Block, 
 
 	time, err := grpcutils.TimestampAsTime(resp.Timestamp)
 	return &blockClient{
-		vm:       vm,
-		id:       blkID,
-		parentID: parentID,
-		status:   status,
-		bytes:    resp.Bytes,
-		height:   resp.Height,
-		time:     time,
+		vm:                  vm,
+		id:                  blkID,
+		parentID:            parentID,
+		status:              status,
+		bytes:               resp.Bytes,
+		height:              resp.Height,
+		time:                time,
+		shouldVerifyWithCtx: resp.VerifyWithContext,
 	}, err
 }
 
@@ -695,13 +705,14 @@ func (vm *VMClient) BatchedParseBlock(ctx context.Context, blksBytes [][]byte) (
 		}
 
 		res = append(res, &blockClient{
-			vm:       vm,
-			id:       id,
-			parentID: parentID,
-			status:   status,
-			bytes:    blksBytes[idx],
-			height:   blkResp.Height,
-			time:     time,
+			vm:                  vm,
+			id:                  id,
+			parentID:            parentID,
+			status:              status,
+			bytes:               blksBytes[idx],
+			height:              blkResp.Height,
+			time:                time,
+			shouldVerifyWithCtx: blkResp.VerifyWithContext,
 		})
 	}
 
@@ -837,25 +848,27 @@ func (vm *VMClient) newBlockFromBuildBlock(resp *vmpb.BuildBlockResponse) (*bloc
 
 	time, err := grpcutils.TimestampAsTime(resp.Timestamp)
 	return &blockClient{
-		vm:       vm,
-		id:       id,
-		parentID: parentID,
-		status:   choices.Processing,
-		bytes:    resp.Bytes,
-		height:   resp.Height,
-		time:     time,
+		vm:                  vm,
+		id:                  id,
+		parentID:            parentID,
+		status:              choices.Processing,
+		bytes:               resp.Bytes,
+		height:              resp.Height,
+		time:                time,
+		shouldVerifyWithCtx: resp.VerifyWithContext,
 	}, err
 }
 
 type blockClient struct {
 	vm *VMClient
 
-	id       ids.ID
-	parentID ids.ID
-	status   choices.Status
-	bytes    []byte
-	height   uint64
-	time     time.Time
+	id                  ids.ID
+	parentID            ids.ID
+	status              choices.Status
+	bytes               []byte
+	height              uint64
+	time                time.Time
+	shouldVerifyWithCtx bool
 }
 
 func (b *blockClient) ID() ids.ID {
@@ -908,6 +921,23 @@ func (b *blockClient) Height() uint64 {
 
 func (b *blockClient) Timestamp() time.Time {
 	return b.time
+}
+
+func (b *blockClient) ShouldVerifyWithContext(context.Context) (bool, error) {
+	return b.shouldVerifyWithCtx, nil
+}
+
+func (b *blockClient) VerifyWithContext(ctx context.Context, blockCtx *block.Context) error {
+	resp, err := b.vm.client.BlockVerify(ctx, &vmpb.BlockVerifyRequest{
+		Bytes:        b.bytes,
+		PChainHeight: &blockCtx.PChainHeight,
+	})
+	if err != nil {
+		return err
+	}
+
+	b.time, err = grpcutils.TimestampAsTime(resp.Timestamp)
+	return err
 }
 
 type summaryClient struct {

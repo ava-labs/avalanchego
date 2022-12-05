@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -22,7 +23,7 @@ func TestFetchUTXOs(t *testing.T) {
 	txID := ids.GenerateTestID()
 	assetID := ids.GenerateTestID()
 	addr := ids.GenerateTestShortID()
-	addrs := ids.ShortSet{}
+	addrs := set.Set[ids.ShortID]{}
 	addrs.Add(addr)
 	utxo := &UTXO{
 		UTXOID: UTXOID{
@@ -75,7 +76,7 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 	addr0 := ids.GenerateTestShortID()
 	addr1 := ids.GenerateTestShortID()
 	addr2 := ids.GenerateTestShortID()
-	addrs := ids.ShortSet{}
+	addrs := set.Set[ids.ShortID]{}
 	addrs.Add(addr0, addr1)
 
 	c := linearcodec.NewDefault()

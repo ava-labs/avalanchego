@@ -33,9 +33,14 @@ type OutboundMsgBuilder interface {
 		bypassThrottling bool,
 	) (OutboundMessage, error)
 
+	PeerListAck(txIDs []ids.ID) (OutboundMessage, error)
+
 	Ping() (OutboundMessage, error)
 
-	Pong(uptimePercentage uint32) (OutboundMessage, error)
+	Pong(
+		primaryUptime uint32,
+		subnetUptimes []*p2ppb.SubnetUptime,
+	) (OutboundMessage, error)
 
 	GetStateSummaryFrontier(
 		chainID ids.ID,
@@ -179,12 +184,16 @@ func (b *outMsgBuilder) Ping() (OutboundMessage, error) {
 	)
 }
 
-func (b *outMsgBuilder) Pong(uptimePercentage uint32) (OutboundMessage, error) {
+func (b *outMsgBuilder) Pong(
+	primaryUptime uint32,
+	subnetUptimes []*p2ppb.SubnetUptime,
+) (OutboundMessage, error) {
 	return b.builder.createOutbound(
 		&p2ppb.Message{
 			Message: &p2ppb.Message_Pong{
 				Pong: &p2ppb.Pong{
-					UptimePct: uptimePercentage,
+					Uptime:        primaryUptime,
+					SubnetUptimes: subnetUptimes,
 				},
 			},
 		},
@@ -233,6 +242,7 @@ func (b *outMsgBuilder) PeerList(peers []ips.ClaimedIPPort, bypassThrottling boo
 			IpPort:          uint32(p.IPPort.Port),
 			Timestamp:       p.Timestamp,
 			Signature:       p.Signature,
+			TxId:            p.TxID[:],
 		}
 	}
 	return b.builder.createOutbound(
@@ -245,6 +255,23 @@ func (b *outMsgBuilder) PeerList(peers []ips.ClaimedIPPort, bypassThrottling boo
 		},
 		b.compress,
 		bypassThrottling,
+	)
+}
+
+func (b *outMsgBuilder) PeerListAck(txIDs []ids.ID) (OutboundMessage, error) {
+	txIDsBytes := make([][]byte, len(txIDs))
+	encodeIDs(txIDs, txIDsBytes)
+
+	return b.builder.createOutbound(
+		&p2ppb.Message{
+			Message: &p2ppb.Message_PeerListAck{
+				PeerListAck: &p2ppb.PeerListAck{
+					TxIds: txIDsBytes,
+				},
+			},
+		},
+		false,
+		false,
 	)
 }
 

@@ -6,6 +6,7 @@ package rpcchainvm
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -51,7 +52,11 @@ import (
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
 
-var _ vmpb.VMServer = (*VMServer)(nil)
+var (
+	_ vmpb.VMServer = (*VMServer)(nil)
+
+	errExpectedBlockWithVerifyContext = errors.New("expected block.WithVerifyContext")
+)
 
 // VMServer is a VM that is managed over RPC.
 type VMServer struct {
@@ -407,14 +412,25 @@ func (vm *VMServer) BuildBlock(ctx context.Context, req *vmpb.BuildBlockRequest)
 		return nil, err
 	}
 
-	blkID := blk.ID()
-	parentID := blk.Parent()
+	blkWithCtx, verifyWithCtx := blk.(block.WithVerifyContext)
+	if verifyWithCtx {
+		verifyWithCtx, err = blkWithCtx.ShouldVerifyWithContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var (
+		blkID    = blk.ID()
+		parentID = blk.Parent()
+	)
 	return &vmpb.BuildBlockResponse{
-		Id:        blkID[:],
-		ParentId:  parentID[:],
-		Bytes:     blk.Bytes(),
-		Height:    blk.Height(),
-		Timestamp: grpcutils.TimestampFromTime(blk.Timestamp()),
+		Id:                blkID[:],
+		ParentId:          parentID[:],
+		Bytes:             blk.Bytes(),
+		Height:            blk.Height(),
+		Timestamp:         grpcutils.TimestampFromTime(blk.Timestamp()),
+		VerifyWithContext: verifyWithCtx,
 	}, nil
 }
 
@@ -423,14 +439,26 @@ func (vm *VMServer) ParseBlock(ctx context.Context, req *vmpb.ParseBlockRequest)
 	if err != nil {
 		return nil, err
 	}
-	blkID := blk.ID()
-	parentID := blk.Parent()
+
+	blkWithCtx, verifyWithCtx := blk.(block.WithVerifyContext)
+	if verifyWithCtx {
+		verifyWithCtx, err = blkWithCtx.ShouldVerifyWithContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var (
+		blkID    = blk.ID()
+		parentID = blk.Parent()
+	)
 	return &vmpb.ParseBlockResponse{
-		Id:        blkID[:],
-		ParentId:  parentID[:],
-		Status:    uint32(blk.Status()),
-		Height:    blk.Height(),
-		Timestamp: grpcutils.TimestampFromTime(blk.Timestamp()),
+		Id:                blkID[:],
+		ParentId:          parentID[:],
+		Status:            uint32(blk.Status()),
+		Height:            blk.Height(),
+		Timestamp:         grpcutils.TimestampFromTime(blk.Timestamp()),
+		VerifyWithContext: verifyWithCtx,
 	}, nil
 }
 
@@ -446,13 +474,22 @@ func (vm *VMServer) GetBlock(ctx context.Context, req *vmpb.GetBlockRequest) (*v
 		}, errorToRPCError(err)
 	}
 
+	blkWithCtx, verifyWithCtx := blk.(block.WithVerifyContext)
+	if verifyWithCtx {
+		verifyWithCtx, err = blkWithCtx.ShouldVerifyWithContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	parentID := blk.Parent()
 	return &vmpb.GetBlockResponse{
-		ParentId:  parentID[:],
-		Bytes:     blk.Bytes(),
-		Status:    uint32(blk.Status()),
-		Height:    blk.Height(),
-		Timestamp: grpcutils.TimestampFromTime(blk.Timestamp()),
+		ParentId:          parentID[:],
+		Bytes:             blk.Bytes(),
+		Status:            uint32(blk.Status()),
+		Height:            blk.Height(),
+		Timestamp:         grpcutils.TimestampFromTime(blk.Timestamp()),
+		VerifyWithContext: verifyWithCtx,
 	}, nil
 }
 
@@ -791,9 +828,23 @@ func (vm *VMServer) BlockVerify(ctx context.Context, req *vmpb.BlockVerifyReques
 	if err != nil {
 		return nil, err
 	}
-	if err := blk.Verify(ctx); err != nil {
+
+	if req.PChainHeight == nil {
+		err = blk.Verify(ctx)
+	} else {
+		blkWithCtx, ok := blk.(block.WithVerifyContext)
+		if !ok {
+			return nil, fmt.Errorf("%w but got %T", errExpectedBlockWithVerifyContext, blk)
+		}
+		blockCtx := &block.Context{
+			PChainHeight: *req.PChainHeight,
+		}
+		err = blkWithCtx.VerifyWithContext(ctx, blockCtx)
+	}
+	if err != nil {
 		return nil, err
 	}
+
 	return &vmpb.BlockVerifyResponse{
 		Timestamp: grpcutils.TimestampFromTime(blk.Timestamp()),
 	}, nil

@@ -35,16 +35,18 @@ type blockVM struct {
 	hVM          block.HeightIndexedChainVM
 	ssVM         block.StateSyncableVM
 	// ChainVM tags
-	initializeTag    string
-	buildBlockTag    string
-	parseBlockTag    string
-	getBlockTag      string
-	setPreferenceTag string
-	lastAcceptedTag  string
-	verifyTag        string
-	acceptTag        string
-	rejectTag        string
-	optionsTag       string
+	initializeTag              string
+	buildBlockTag              string
+	parseBlockTag              string
+	getBlockTag                string
+	setPreferenceTag           string
+	lastAcceptedTag            string
+	verifyTag                  string
+	acceptTag                  string
+	rejectTag                  string
+	optionsTag                 string
+	shouldVerifyWithContextTag string
+	verifyWithContextTag       string
 	// BuildBlockWithContextChainVM tags
 	buildBlockWithContextTag string
 	// BatchedChainVM tags
@@ -83,6 +85,8 @@ func NewBlockVM(vm block.ChainVM, name string, tracer trace.Tracer) block.ChainV
 		acceptTag:                     fmt.Sprintf("%s.accept", name),
 		rejectTag:                     fmt.Sprintf("%s.reject", name),
 		optionsTag:                    fmt.Sprintf("%s.options", name),
+		shouldVerifyWithContextTag:    fmt.Sprintf("%s.shouldVerifyWithContext", name),
+		verifyWithContextTag:          fmt.Sprintf("%s.verifyWithContext", name),
 		buildBlockWithContextTag:      fmt.Sprintf("%s.buildBlockWithContext", name),
 		getAncestorsTag:               fmt.Sprintf("%s.getAncestors", name),
 		batchedParseBlockTag:          fmt.Sprintf("%s.batchedParseBlock", name),

@@ -23,7 +23,7 @@ func TestWindowerNoValidators(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	vdrState := &validators.TestState{
 		T: t,
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.Validator, error) {
+		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 			return nil, nil
 		},
 	}
@@ -44,8 +44,8 @@ func TestWindowerRepeatedValidator(t *testing.T) {
 	nonValidatorID := ids.GenerateTestNodeID()
 	vdrState := &validators.TestState{
 		T: t,
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.Validator, error) {
-			return map[ids.NodeID]*validators.Validator{
+		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			return map[ids.NodeID]*validators.GetValidatorOutput{
 				validatorID: {
 					NodeID: validatorID,
 					Weight: 10,
@@ -76,10 +76,10 @@ func TestWindowerChangeByHeight(t *testing.T) {
 	}
 	vdrState := &validators.TestState{
 		T: t,
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.Validator, error) {
-			vdrs := make(map[ids.NodeID]*validators.Validator, MaxWindows)
+		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, MaxWindows)
 			for _, id := range validatorIDs {
-				vdrs[id] = &validators.Validator{
+				vdrs[id] = &validators.GetValidatorOutput{
 					NodeID: id,
 					Weight: 1,
 				}
@@ -138,10 +138,10 @@ func TestWindowerChangeByChain(t *testing.T) {
 	}
 	vdrState := &validators.TestState{
 		T: t,
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.Validator, error) {
-			vdrs := make(map[ids.NodeID]*validators.Validator, MaxWindows)
+		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, MaxWindows)
 			for _, id := range validatorIDs {
-				vdrs[id] = &validators.Validator{
+				vdrs[id] = &validators.GetValidatorOutput{
 					NodeID: id,
 					Weight: 1,
 				}

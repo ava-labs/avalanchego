@@ -38,7 +38,7 @@ func (ip *UnsignedIP) bytes() []byte {
 	p := wrappers.Packer{
 		Bytes: make([]byte, wrappers.IPLen+wrappers.LongLen),
 	}
-	p.PackIP(ip.IP)
+	ips.PackIP(&p, ip.IP)
 	p.PackLong(ip.Timestamp)
 	return p.Bytes
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/golang/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 func TestSendMixedQuery(t *testing.T) {
@@ -32,7 +33,7 @@ func TestSendMixedQuery(t *testing.T) {
 				s := NewMockSender(ctrl)
 				s.EXPECT().SendPushQuery(
 					gomock.Any(),
-					ids.NodeIDSet{vdr1: struct{}{}, vdr2: struct{}{}, vdr3: struct{}{}},
+					set.Set[ids.NodeID]{vdr1: struct{}{}, vdr2: struct{}{}, vdr3: struct{}{}},
 					reqID,
 					containerBytes,
 				).Times(1)
@@ -52,13 +53,13 @@ func TestSendMixedQuery(t *testing.T) {
 				s := NewMockSender(ctrl)
 				s.EXPECT().SendPushQuery(
 					gomock.Any(),
-					ids.NodeIDSet{vdr1: struct{}{}},
+					set.Set[ids.NodeID]{vdr1: struct{}{}},
 					reqID,
 					containerBytes,
 				).Times(1)
 				s.EXPECT().SendPullQuery(
 					gomock.Any(),
-					ids.NodeIDSet{vdr2: struct{}{}, vdr3: struct{}{}},
+					set.Set[ids.NodeID]{vdr2: struct{}{}, vdr3: struct{}{}},
 					reqID,
 					containerID,
 				).Times(1)
@@ -72,7 +73,7 @@ func TestSendMixedQuery(t *testing.T) {
 				s := NewMockSender(ctrl)
 				s.EXPECT().SendPushQuery(
 					gomock.Any(),
-					ids.NodeIDSet{vdr1: struct{}{}, vdr2: struct{}{}},
+					set.Set[ids.NodeID]{vdr1: struct{}{}, vdr2: struct{}{}},
 					reqID,
 					containerBytes,
 				).Times(1)
@@ -98,7 +99,7 @@ func TestSendMixedQuery(t *testing.T) {
 				).Times(0)
 				s.EXPECT().SendPullQuery(
 					gomock.Any(),
-					ids.NodeIDSet{vdr1: struct{}{}},
+					set.Set[ids.NodeID]{vdr1: struct{}{}},
 					reqID,
 					containerID,
 				).Times(1)
@@ -112,7 +113,7 @@ func TestSendMixedQuery(t *testing.T) {
 				s := NewMockSender(ctrl)
 				s.EXPECT().SendPushQuery(
 					gomock.Any(),
-					ids.NodeIDSet{vdr1: struct{}{}, vdr2: struct{}{}},
+					set.Set[ids.NodeID]{vdr1: struct{}{}, vdr2: struct{}{}},
 					reqID,
 					containerBytes,
 				).Times(1)

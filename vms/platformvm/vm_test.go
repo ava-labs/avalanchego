@@ -47,6 +47,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -539,7 +540,7 @@ func TestGenesis(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		addrs := ids.ShortSet{}
+		addrs := set.Set[ids.ShortID]{}
 		addrs.Add(addr)
 		utxos, err := avax.GetAllUTXOs(vm.state, addrs)
 		if err != nil {
@@ -1755,7 +1756,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	peerID := ids.NodeID{1, 2, 3, 4, 5, 4, 3, 2, 1}
 	beacons := validators.NewSet()
-	require.NoError(beacons.Add(peerID, nil, 1))
+	require.NoError(beacons.Add(peerID, nil, ids.Empty, 1))
 
 	benchlist := benchlist.NewNoBenchlist()
 	timeoutManager, err := timeout.NewManager(
@@ -1785,8 +1786,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		logging.NoLog{},
 		timeoutManager,
 		time.Second,
-		ids.Set{},
-		ids.Set{},
+		set.Set[ids.ID]{},
+		set.Set[ids.ID]{},
 		nil,
 		router.HealthConfig{},
 		"",
@@ -1814,7 +1815,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	var reqID uint32
-	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
+	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ bool) set.Set[ids.NodeID] {
 		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		require.NoError(err)
 		require.Equal(message.GetAcceptedFrontierOp, inMsg.Op())
@@ -1930,7 +1931,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
+	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ bool) set.Set[ids.NodeID] {
 		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		require.NoError(err)
 		require.Equal(message.GetAcceptedOp, inMsgIntf.Op())
@@ -1945,7 +1946,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, _ ids.ID, _ bool) ids.NodeIDSet {
+	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ bool) set.Set[ids.NodeID] {
 		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		require.NoError(err)
 		require.Equal(message.GetAncestorsOp, inMsgIntf.Op())
@@ -2520,7 +2521,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 		// Diff at tip, block before tip, etc.
 		// This must have [height] - [lastAcceptedHeight] elements
 		pkDiffs        []map[ids.NodeID]*bls.PublicKey
-		expectedVdrSet map[ids.NodeID]*validators.Validator
+		expectedVdrSet map[ids.NodeID]*validators.GetValidatorOutput
 		expectedErr    error
 	}
 
@@ -2529,7 +2530,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			name:               "after tip",
 			height:             1,
 			lastAcceptedHeight: 0,
-			expectedVdrSet:     map[ids.NodeID]*validators.Validator{},
+			expectedVdrSet:     map[ids.NodeID]*validators.GetValidatorOutput{},
 			expectedErr:        database.ErrNotFound,
 		},
 		{
@@ -2542,8 +2543,12 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			currentSubnetValidators: []*validators.Validator{
 				copySubnetValidator(vdrs[0]),
 			},
-			expectedVdrSet: map[ids.NodeID]*validators.Validator{
-				vdrs[0].NodeID: vdrs[0],
+			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
+				vdrs[0].NodeID: {
+					NodeID:    vdrs[0].NodeID,
+					PublicKey: vdrs[0].PublicKey,
+					Weight:    vdrs[0].Weight,
+				},
 			},
 			expectedErr: nil,
 		},
@@ -2583,7 +2588,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 					vdrs[2].NodeID: vdrs[2].PublicKey,
 				},
 			},
-			expectedVdrSet: map[ids.NodeID]*validators.Validator{
+			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				vdrs[0].NodeID: {
 					NodeID:    vdrs[0].NodeID,
 					PublicKey: vdrs[0].PublicKey,
@@ -2655,7 +2660,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 				},
 				{},
 			},
-			expectedVdrSet: map[ids.NodeID]*validators.Validator{
+			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				vdrs[0].NodeID: {
 					NodeID:    vdrs[0].NodeID,
 					PublicKey: vdrs[0].PublicKey,
@@ -2703,7 +2708,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			pkDiffs: []map[ids.NodeID]*bls.PublicKey{
 				{},
 			},
-			expectedVdrSet: map[ids.NodeID]*validators.Validator{
+			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				vdrs[0].NodeID: {
 					NodeID:    vdrs[0].NodeID,
 					PublicKey: vdrs[0].PublicKey,
@@ -2757,7 +2762,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			pkDiffs: []map[ids.NodeID]*bls.PublicKey{
 				{},
 			},
-			expectedVdrSet: map[ids.NodeID]*validators.Validator{
+			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				vdrs[0].NodeID: {
 					NodeID:    vdrs[0].NodeID,
 					PublicKey: vdrs[0].PublicKey,

@@ -23,10 +23,20 @@ type GossipTrackerCallback struct {
 
 // OnValidatorAdded adds [validatorID] to the set of validators that can be
 // gossiped about
-func (g *GossipTrackerCallback) OnValidatorAdded(nodeID ids.NodeID, _ *bls.PublicKey, _ uint64) {
-	if !g.GossipTracker.AddValidator(nodeID) {
+func (g *GossipTrackerCallback) OnValidatorAdded(
+	nodeID ids.NodeID,
+	_ *bls.PublicKey,
+	txID ids.ID,
+	_ uint64,
+) {
+	vdr := ValidatorID{
+		NodeID: nodeID,
+		TxID:   txID,
+	}
+	if !g.GossipTracker.AddValidator(vdr) {
 		g.Log.Error("failed to add a validator",
 			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("txID", txID),
 		)
 	}
 }

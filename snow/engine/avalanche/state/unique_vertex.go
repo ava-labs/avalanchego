@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
@@ -303,11 +304,11 @@ func (vtx *uniqueVertex) Verify(ctx context.Context) error {
 	// 1. check the edge of the transitive paths refers to the accepted frontier
 	// 2. check dependencies of all txs must be subset of transitive paths
 	queue := []avalanche.Vertex{vtx}
-	visitedVtx := ids.NewSet(0)
+	visitedVtx := set.NewSet[ids.ID](0)
 
-	acceptedFrontier := ids.NewSet(0)
-	transitivePaths := ids.NewSet(0)
-	dependencies := ids.NewSet(0)
+	acceptedFrontier := set.NewSet[ids.ID](0)
+	transitivePaths := set.NewSet[ids.ID](0)
+	dependencies := set.NewSet[ids.ID](0)
 	for len(queue) > 0 { // perform BFS
 		cur := queue[0]
 		queue = queue[1:]
@@ -353,7 +354,7 @@ func (vtx *uniqueVertex) Verify(ctx context.Context) error {
 		queue = append(queue, parents...)
 	}
 
-	acceptedEdges := ids.NewSet(0)
+	acceptedEdges := set.NewSet[ids.ID](0)
 	acceptedEdges.Add(vtx.serializer.Edge(ctx)...)
 
 	// stop vertex should be able to reach all IDs
@@ -378,7 +379,7 @@ func (vtx *uniqueVertex) HasWhitelist() bool {
 
 // "uniqueVertex" itself implements "Whitelist" traversal iff its underlying
 // "vertex.StatelessVertex" is marked as a stop vertex.
-func (vtx *uniqueVertex) Whitelist(ctx context.Context) (ids.Set, error) {
+func (vtx *uniqueVertex) Whitelist(ctx context.Context) (set.Set[ids.ID], error) {
 	if !vtx.v.vtx.StopVertex() {
 		return nil, nil
 	}
@@ -387,8 +388,8 @@ func (vtx *uniqueVertex) Whitelist(ctx context.Context) (ids.Set, error) {
 	// represents all processing transaction IDs transitively referenced by the
 	// vertex
 	queue := []avalanche.Vertex{vtx}
-	whitlist := ids.NewSet(0)
-	visitedVtx := ids.NewSet(0)
+	whitlist := set.NewSet[ids.ID](0)
+	visitedVtx := set.NewSet[ids.ID](0)
 	for len(queue) > 0 {
 		cur := queue[0]
 		queue = queue[1:]

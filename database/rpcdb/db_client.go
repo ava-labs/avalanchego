@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/nodb"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
@@ -188,14 +189,14 @@ func (b *batch) Write() error {
 		Continues: true,
 	}
 	currentSize := 0
-	keySet := make(map[string]struct{}, len(b.writes))
+	keySet := set.NewSet[string](len(b.writes))
 	for i := len(b.writes) - 1; i >= 0; i-- {
 		kv := b.writes[i]
 		key := string(kv.key)
-		if _, overwritten := keySet[key]; overwritten {
+		if keySet.Contains(key) {
 			continue
 		}
-		keySet[key] = struct{}{}
+		keySet.Add(key)
 
 		sizeChange := baseElementSize + len(kv.key) + len(kv.value)
 		if newSize := currentSize + sizeChange; newSize > maxBatchSize {

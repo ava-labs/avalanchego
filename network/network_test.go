@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -217,13 +218,13 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 		}
 
 		beacons := validators.NewSet()
-		err = beacons.Add(nodeIDs[0], nil, 1)
+		err = beacons.Add(nodeIDs[0], nil, ids.GenerateTestID(), 1)
 		require.NoError(err)
 
 		primaryVdrs := validators.NewSet()
 		primaryVdrs.RegisterCallbackListener(&gossipTrackerCallback)
 		for _, nodeID := range nodeIDs {
-			err := primaryVdrs.Add(nodeID, nil, 1)
+			err := primaryVdrs.Add(nodeID, nil, ids.GenerateTestID(), 1)
 			require.NoError(err)
 		}
 
@@ -236,7 +237,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 		config.Beacons = beacons
 		config.Validators = vdrs
 
-		var connected ids.NodeIDSet
+		var connected set.Set[ids.NodeID]
 		net, err := NewNetwork(
 			config,
 			msgCreator,
@@ -333,7 +334,7 @@ func TestSend(t *testing.T) {
 	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
 	require.NoError(err)
 
-	toSend := ids.NodeIDSet{}
+	toSend := set.Set[ids.NodeID]{}
 	toSend.Add(nodeIDs[1])
 	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, false)
 	require.EqualValues(toSend, sentTo)
@@ -354,7 +355,7 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 
 	network := networks[0].(*network)
 	nodeID, tlsCert, _ := getTLS(t, 1)
-	err := validators.Add(network.config.Validators, constants.PrimaryNetworkID, nodeID, nil, 1)
+	err := validators.Add(network.config.Validators, constants.PrimaryNetworkID, nodeID, nil, ids.Empty, 1)
 	require.NoError(err)
 
 	useful := network.Track(ips.ClaimedIPPort{

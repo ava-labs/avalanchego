@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
@@ -99,14 +100,13 @@ type auth struct {
 	// Can be changed via API call.
 	password password.Hash
 	// Set of token IDs that have been revoked
-	revoked map[string]struct{}
+	revoked set.Set[string]
 }
 
 func New(log logging.Logger, endpoint, pw string) (Auth, error) {
 	a := &auth{
 		log:      log,
 		endpoint: endpoint,
-		revoked:  make(map[string]struct{}),
 	}
 	return a, a.password.Set(pw)
 }
@@ -116,7 +116,6 @@ func NewFromHash(log logging.Logger, endpoint string, pw password.Hash) Auth {
 		log:      log,
 		endpoint: endpoint,
 		password: pw,
-		revoked:  make(map[string]struct{}),
 	}
 }
 
@@ -196,7 +195,7 @@ func (a *auth) RevokeToken(tokenStr, pw string) error {
 	if !ok {
 		return fmt.Errorf("expected auth token's claims to be type endpointClaims but is %T", token.Claims)
 	}
-	a.revoked[claims.Id] = struct{}{}
+	a.revoked.Add(claims.Id)
 	return nil
 }
 
@@ -250,7 +249,7 @@ func (a *auth) ChangePassword(oldPW, newPW string) error {
 
 	// All the revoked tokens are now invalid; no need to mark specifically as
 	// revoked.
-	a.revoked = make(map[string]struct{})
+	a.revoked.Clear()
 	return nil
 }
 

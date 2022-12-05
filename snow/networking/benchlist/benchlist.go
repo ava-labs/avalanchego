@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 
@@ -117,7 +118,7 @@ type benchlist struct {
 	failureStreaks map[ids.NodeID]failureStreak
 
 	// IDs of validators that are currently benched
-	benchlistSet ids.NodeIDSet
+	benchlistSet set.Set[ids.NodeID]
 
 	// Min heap containing benched validators and their endtimes
 	// Pop() returns the next validator to leave
@@ -156,7 +157,7 @@ func NewBenchlist(
 		chainID:                chainID,
 		log:                    log,
 		failureStreaks:         make(map[ids.NodeID]failureStreak),
-		benchlistSet:           ids.NodeIDSet{},
+		benchlistSet:           set.Set[ids.NodeID]{},
 		benchable:              benchable,
 		vdrs:                   validators,
 		threshold:              threshold,

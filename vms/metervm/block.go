@@ -5,13 +5,19 @@ package metervm
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 var (
-	_ snowman.Block       = (*meterBlock)(nil)
-	_ snowman.OracleBlock = (*meterBlock)(nil)
+	_ snowman.Block           = (*meterBlock)(nil)
+	_ snowman.OracleBlock     = (*meterBlock)(nil)
+	_ block.WithVerifyContext = (*meterBlock)(nil)
+
+	errExpectedBlockWithVerifyContext = errors.New("expected block.WithVerifyContext")
 )
 
 type meterBlock struct {
@@ -71,4 +77,36 @@ func (mb *meterBlock) Options(ctx context.Context) ([2]snowman.Block, error) {
 			vm:    mb.vm,
 		},
 	}, nil
+}
+
+func (mb *meterBlock) ShouldVerifyWithContext(ctx context.Context) (bool, error) {
+	blkWithCtx, ok := mb.Block.(block.WithVerifyContext)
+	if !ok {
+		return false, nil
+	}
+
+	start := mb.vm.clock.Time()
+	shouldVerify, err := blkWithCtx.ShouldVerifyWithContext(ctx)
+	end := mb.vm.clock.Time()
+	duration := float64(end.Sub(start))
+	mb.vm.blockMetrics.shouldVerifyWithContext.Observe(duration)
+	return shouldVerify, err
+}
+
+func (mb *meterBlock) VerifyWithContext(ctx context.Context, blockCtx *block.Context) error {
+	blkWithCtx, ok := mb.Block.(block.WithVerifyContext)
+	if !ok {
+		return fmt.Errorf("%w but got %T", errExpectedBlockWithVerifyContext, mb.Block)
+	}
+
+	start := mb.vm.clock.Time()
+	err := blkWithCtx.VerifyWithContext(ctx, blockCtx)
+	end := mb.vm.clock.Time()
+	duration := float64(end.Sub(start))
+	if err != nil {
+		mb.vm.blockMetrics.verifyWithContextErr.Observe(duration)
+	} else {
+		mb.vm.verifyWithContext.Observe(duration)
+	}
+	return err
 }

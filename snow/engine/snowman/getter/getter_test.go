@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var errUnknownBlock = errors.New("unknown block")
@@ -60,7 +61,7 @@ func testSetup(
 	sender.CantSendGetAcceptedFrontier = false
 
 	peer := ids.GenerateTestNodeID()
-	if err := peers.Add(peer, nil, 1); err != nil {
+	if err := peers.Add(peer, nil, ids.Empty, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -192,7 +193,7 @@ func TestFilterAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	acceptedSet := ids.Set{}
+	acceptedSet := set.Set[ids.ID]{}
 	acceptedSet.Add(accepted...)
 
 	if acceptedSet.Len() != 2 {
