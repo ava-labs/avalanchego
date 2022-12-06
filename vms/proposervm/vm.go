@@ -186,7 +186,8 @@ func (vm *VM) Initialize(
 	})
 
 	vm.verifiedBlocks = make(map[ids.ID]PostForkBlock)
-	context, cancel := context.WithCancel(ctx)
+	detachedCtx := utils.Detach(ctx)
+	context, cancel := context.WithCancel(detachedCtx)
 	vm.context = context
 	vm.onShutdown = cancel
 
@@ -205,7 +206,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	if err := vm.repair(ctx, indexerState); err != nil {
+	if err := vm.repair(detachedCtx, indexerState); err != nil {
 		return err
 	}
 
