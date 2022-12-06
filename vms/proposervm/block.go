@@ -164,7 +164,13 @@ func (p *postForkCommonComponents) Verify(
 		)
 	}
 
-	return p.vm.verifyAndRecordInnerBlk(ctx, child)
+	return p.vm.verifyAndRecordInnerBlk(
+		ctx,
+		&smblock.Context{
+			PChainHeight: parentPChainHeight,
+		},
+		child,
+	)
 }
 
 // Return the child (a *postForkBlock) of this block
@@ -218,7 +224,7 @@ func (p *postForkCommonComponents) buildChild(
 	var innerBlock snowman.Block
 	if p.vm.blockBuilderVM != nil {
 		innerBlock, err = p.vm.blockBuilderVM.BuildBlockWithContext(ctx, &smblock.Context{
-			PChainHeight: pChainHeight,
+			PChainHeight: parentPChainHeight,
 		})
 	} else {
 		innerBlock, err = p.vm.ChainVM.BuildBlock(ctx)

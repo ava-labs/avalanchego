@@ -24,8 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
-
-	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 func TestOracle_PreForkBlkImplementsInterface(t *testing.T) {
@@ -823,9 +821,8 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 }
 
 // Assert that when the underlying VM implements ChainVMWithBuildBlockContext
-// and the proposervm is activated, we call the VM's BuildBlockWithContext
-// method to build a block rather than BuildBlockWithContext. If the proposervm
-// isn't activated, we should call BuildBlock rather than BuildBlockWithContext.
+// and the proposervm is activated, we only call the VM's BuildBlockWithContext
+// when a P-chain height can be correctly provided from the parent block.
 func TestPreForkBlock_BuildBlockWithContext(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
@@ -841,16 +838,12 @@ func TestPreForkBlock_BuildBlockWithContext(t *testing.T) {
 	builtBlk.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
 	builtBlk.EXPECT().Height().Return(pChainHeight).AnyTimes()
 	innerVM := mocks.NewMockChainVM(ctrl)
-	innerBlockBuilderVM := mocks.NewMockBuildBlockWithContextChainVM(ctrl)
-	innerBlockBuilderVM.EXPECT().BuildBlockWithContext(gomock.Any(), &smblock.Context{
-		PChainHeight: pChainHeight,
-	}).Return(builtBlk, nil).AnyTimes()
+	innerVM.EXPECT().BuildBlock(gomock.Any()).Return(builtBlk, nil).AnyTimes()
 	vdrState := validators.NewMockState(ctrl)
 	vdrState.EXPECT().GetMinimumHeight(context.Background()).Return(pChainHeight, nil).AnyTimes()
 
 	vm := &VM{
-		ChainVM:        innerVM,
-		blockBuilderVM: innerBlockBuilderVM,
+		ChainVM: innerVM,
 		ctx: &snow.Context{
 			ValidatorState: vdrState,
 			Log:            logging.NoLog{},
@@ -862,8 +855,7 @@ func TestPreForkBlock_BuildBlockWithContext(t *testing.T) {
 		vm:    vm,
 	}
 
-	// Should call BuildBlockWithContext since proposervm is activated
-	// (timestamp is after activation time)
+	// Should call BuildBlock since proposervm won't have a P-chain height
 	gotChild, err := blk.buildChild(context.Background())
 	require.NoError(err)
 	require.Equal(builtBlk, gotChild.(*postForkBlock).innerBlk)
@@ -871,7 +863,6 @@ func TestPreForkBlock_BuildBlockWithContext(t *testing.T) {
 	// Should call BuildBlock since proposervm is not activated
 	innerBlk.EXPECT().Timestamp().Return(time.Time{})
 	vm.activationTime = mockable.MaxTime
-	innerVM.EXPECT().BuildBlock(context.Background()).Return(builtBlk, nil)
 
 	gotChild, err = blk.buildChild(context.Background())
 	require.NoError(err)

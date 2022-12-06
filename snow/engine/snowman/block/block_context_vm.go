@@ -12,6 +12,13 @@ import (
 // Context defines the block context that will be optionally provided by the
 // proposervm to an underlying vm.
 type Context struct {
+	// PChainHeight is the height that this block will use to verify it's state.
+	// In the proposervm, blocks verify the proposer based on the P-chain height
+	// recorded in the parent block. The P-chain height provided here is also
+	// the parent's P-chain height, not this block's P-chain height.
+	//
+	// Because PreForkBlocks and PostForkOptions do not verify their execution
+	// against the P-chain's state, this context is undefined for those blocks.
 	PChainHeight uint64
 }
 
@@ -20,6 +27,7 @@ type Context struct {
 type BuildBlockWithContextChainVM interface {
 	// Attempt to build a new block given that the P-Chain height is
 	// [blockCtx.PChainHeight].
+	//
 	// This method will be called if and only if the proposervm is activated.
 	// Otherwise [BuildBlock] will be called.
 	BuildBlockWithContext(ctx context.Context, blockCtx *Context) (snowman.Block, error)
@@ -28,6 +36,9 @@ type BuildBlockWithContextChainVM interface {
 type WithVerifyContext interface {
 	// Returns true if [VerifyWithContext] should be called.
 	// Returns false if [Verify] should be called.
+	//
+	// This method will be called if and only if the proposervm is activated.
+	// Otherwise [Verify] will be called.
 	ShouldVerifyWithContext(context.Context) (bool, error)
 
 	// Verify that the state transition this block would make if accepted is

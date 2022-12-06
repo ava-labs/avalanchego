@@ -157,7 +157,12 @@ func TestTimeout(t *testing.T) {
 		failedChains = set.Set[ids.ID]{}
 	)
 
-	failed := func(_ context.Context, nodeID ids.NodeID, _ uint32) error {
+	cancelledCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	failed := func(ctx context.Context, nodeID ids.NodeID, _ uint32) error {
+		require.NoError(ctx.Err())
+
 		failedLock.Lock()
 		defer failedLock.Unlock()
 
@@ -174,7 +179,9 @@ func TestTimeout(t *testing.T) {
 	bootstrapper.GetFailedF = failed
 	bootstrapper.QueryFailedF = failed
 	bootstrapper.AppRequestFailedF = failed
-	bootstrapper.CrossChainAppRequestFailedF = func(_ context.Context, chainID ids.ID, _ uint32) error {
+	bootstrapper.CrossChainAppRequestFailedF = func(ctx context.Context, chainID ids.ID, _ uint32) error {
+		require.NoError(ctx.Err())
+
 		failedLock.Lock()
 		defer failedLock.Unlock()
 
@@ -191,7 +198,7 @@ func TestTimeout(t *testing.T) {
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
-			sender.SendGetStateSummaryFrontier(context.Background(), nodeIDs, requestID)
+			sender.SendGetStateSummaryFrontier(cancelledCtx, nodeIDs, requestID)
 		}
 		{
 			nodeIDs := set.Set[ids.NodeID]{
@@ -200,7 +207,7 @@ func TestTimeout(t *testing.T) {
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
-			sender.SendGetAcceptedStateSummary(context.Background(), nodeIDs, requestID, nil)
+			sender.SendGetAcceptedStateSummary(cancelledCtx, nodeIDs, requestID, nil)
 		}
 		{
 			nodeIDs := set.Set[ids.NodeID]{
@@ -209,7 +216,7 @@ func TestTimeout(t *testing.T) {
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
-			sender.SendGetAcceptedFrontier(context.Background(), nodeIDs, requestID)
+			sender.SendGetAcceptedFrontier(cancelledCtx, nodeIDs, requestID)
 		}
 		{
 			nodeIDs := set.Set[ids.NodeID]{
@@ -218,21 +225,21 @@ func TestTimeout(t *testing.T) {
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
-			sender.SendGetAccepted(context.Background(), nodeIDs, requestID, nil)
+			sender.SendGetAccepted(cancelledCtx, nodeIDs, requestID, nil)
 		}
 		{
 			nodeID := ids.GenerateTestNodeID()
 			vdrIDs.Add(nodeID)
 			wg.Add(1)
 			requestID++
-			sender.SendGetAncestors(context.Background(), nodeID, requestID, ids.Empty)
+			sender.SendGetAncestors(cancelledCtx, nodeID, requestID, ids.Empty)
 		}
 		{
 			nodeID := ids.GenerateTestNodeID()
 			vdrIDs.Add(nodeID)
 			wg.Add(1)
 			requestID++
-			sender.SendGet(context.Background(), nodeID, requestID, ids.Empty)
+			sender.SendGet(cancelledCtx, nodeID, requestID, ids.Empty)
 		}
 		{
 			nodeIDs := set.Set[ids.NodeID]{
@@ -241,7 +248,7 @@ func TestTimeout(t *testing.T) {
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
-			sender.SendPullQuery(context.Background(), nodeIDs, requestID, ids.Empty)
+			sender.SendPullQuery(cancelledCtx, nodeIDs, requestID, ids.Empty)
 		}
 		{
 			nodeIDs := set.Set[ids.NodeID]{
@@ -250,7 +257,7 @@ func TestTimeout(t *testing.T) {
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
-			sender.SendPushQuery(context.Background(), nodeIDs, requestID, nil)
+			sender.SendPushQuery(cancelledCtx, nodeIDs, requestID, nil)
 		}
 		{
 			nodeIDs := set.Set[ids.NodeID]{
@@ -259,7 +266,7 @@ func TestTimeout(t *testing.T) {
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
-			err := sender.SendAppRequest(context.Background(), nodeIDs, requestID, nil)
+			err := sender.SendAppRequest(cancelledCtx, nodeIDs, requestID, nil)
 			require.NoError(err)
 		}
 		{
@@ -267,7 +274,7 @@ func TestTimeout(t *testing.T) {
 			chains.Add(chainID)
 			wg.Add(1)
 			requestID++
-			err := sender.SendCrossChainAppRequest(context.Background(), chainID, requestID, nil)
+			err := sender.SendCrossChainAppRequest(cancelledCtx, chainID, requestID, nil)
 			require.NoError(err)
 		}
 	}

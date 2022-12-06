@@ -67,19 +67,18 @@ func (mr *MockGossipTrackerMockRecorder) AddValidator(arg0 interface{}) *gomock.
 }
 
 // GetUnknown mocks base method.
-func (m *MockGossipTracker) GetUnknown(arg0 ids.NodeID, arg1 int) ([]ValidatorID, bool, error) {
+func (m *MockGossipTracker) GetUnknown(arg0 ids.NodeID) ([]ValidatorID, bool) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUnknown", arg0, arg1)
+	ret := m.ctrl.Call(m, "GetUnknown", arg0)
 	ret0, _ := ret[0].([]ValidatorID)
 	ret1, _ := ret[1].(bool)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	return ret0, ret1
 }
 
 // GetUnknown indicates an expected call of GetUnknown.
-func (mr *MockGossipTrackerMockRecorder) GetUnknown(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockGossipTrackerMockRecorder) GetUnknown(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUnknown", reflect.TypeOf((*MockGossipTracker)(nil).GetUnknown), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUnknown", reflect.TypeOf((*MockGossipTracker)(nil).GetUnknown), arg0)
 }
 
 // RemoveValidator mocks base method.

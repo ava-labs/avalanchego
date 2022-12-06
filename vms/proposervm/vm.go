@@ -186,7 +186,8 @@ func (vm *VM) Initialize(
 	})
 
 	vm.verifiedBlocks = make(map[ids.ID]PostForkBlock)
-	context, cancel := context.WithCancel(ctx)
+	detachedCtx := utils.Detach(ctx)
+	context, cancel := context.WithCancel(detachedCtx)
 	vm.context = context
 	vm.onShutdown = cancel
 
@@ -205,7 +206,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	if err := vm.repair(ctx, indexerState); err != nil {
+	if err := vm.repair(detachedCtx, indexerState); err != nil {
 		return err
 	}
 
@@ -741,7 +742,7 @@ func (vm *VM) storePostForkBlock(blk PostForkBlock) error {
 	return vm.db.Commit()
 }
 
-func (vm *VM) verifyAndRecordInnerBlk(ctx context.Context, postFork PostForkBlock) error {
+func (vm *VM) verifyAndRecordInnerBlk(ctx context.Context, blockCtx *block.Context, postFork PostForkBlock) error {
 	innerBlk := postFork.getInnerBlk()
 	postForkID := postFork.ID()
 	originalInnerBlock, previouslyVerified := vm.Tree.Get(innerBlk)
@@ -753,12 +754,18 @@ func (vm *VM) verifyAndRecordInnerBlk(ctx context.Context, postFork PostForkBloc
 		vm.innerBlkCache.Put(postForkID, originalInnerBlock)
 	}
 
-	var err error
-	blkWithCtx, shouldVerifyWithCtx := innerBlk.(block.WithVerifyContext)
+	var (
+		shouldVerifyWithCtx = blockCtx != nil
+		blkWithCtx          block.WithVerifyContext
+		err                 error
+	)
 	if shouldVerifyWithCtx {
-		shouldVerifyWithCtx, err = blkWithCtx.ShouldVerifyWithContext(ctx)
-		if err != nil {
-			return err
+		blkWithCtx, shouldVerifyWithCtx = innerBlk.(block.WithVerifyContext)
+		if shouldVerifyWithCtx {
+			shouldVerifyWithCtx, err = blkWithCtx.ShouldVerifyWithContext(ctx)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -770,11 +777,6 @@ func (vm *VM) verifyAndRecordInnerBlk(ctx context.Context, postFork PostForkBloc
 		// This block needs to know the P-Chain height during verification.
 		// Note that [VerifyWithContext] with context may be called multiple
 		// times with multiple contexts.
-		blockCtx := &block.Context{}
-		blockCtx.PChainHeight, err = postFork.pChainHeight(ctx)
-		if err != nil {
-			return err
-		}
 		err = blkWithCtx.VerifyWithContext(ctx, blockCtx)
 	} else if !previouslyVerified {
 		// This isn't a [block.WithVerifyContext] so we only call [Verify] once.
