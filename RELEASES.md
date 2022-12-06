@@ -38,6 +38,7 @@ This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/ava
 
 ### Fixes
 
+- Fixed incorrect context cancellation of escaped contexts from grpc servers
 - Fixed race condition between API initialization and shutdown
 - Fixed race condition between NAT traversal initialization and shutdown
 - Fixed race condition during beacon connection tracking
