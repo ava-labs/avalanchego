@@ -10,7 +10,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
 // GossipTracker tracks the validators that we're currently aware of, as well as
@@ -69,10 +68,9 @@ type GossipTracker interface {
 	AddKnown(peerID ids.NodeID, txIDs []ids.ID) ([]ids.ID, bool)
 	// GetUnknown gets the peers that we haven't sent to this peer
 	// Returns:
-	// 	[]ValidatorID: a slice of [limit] ValidatorIDs that [peerID] doesn't
-	// 	know about.
+	// 	[]ValidatorID: a slice of ValidatorIDs that [peerID] doesn't know about.
 	// 	bool: False if [peerID] is not tracked. True otherwise.
-	GetUnknown(peerID ids.NodeID, limit int) ([]ValidatorID, bool, error)
+	GetUnknown(peerID ids.NodeID) ([]ValidatorID, bool)
 }
 
 type gossipTracker struct {
@@ -258,41 +256,25 @@ func (g *gossipTracker) AddKnown(peerID ids.NodeID, txIDs []ids.ID) ([]ids.ID, b
 	return knownTxIDs, true
 }
 
-func (g *gossipTracker) GetUnknown(peerID ids.NodeID, limit int) ([]ValidatorID, bool, error) {
-	if limit <= 0 {
-		return nil, false, nil
-	}
-
+func (g *gossipTracker) GetUnknown(peerID ids.NodeID) ([]ValidatorID, bool) {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 
 	// return false if this peer isn't tracked
 	knownPeers, ok := g.trackedPeers[peerID]
 	if !ok {
-		return nil, false, nil
-	}
-
-	// We select a random sample of bits to gossip to avoid starving out a
-	// validator from being gossiped for ane extended period of time.
-	s := sampler.NewUniform()
-	if err := s.Initialize(uint64(len(g.validatorIDs))); err != nil {
-		return nil, false, err
+		return nil, false
 	}
 
 	// Calculate the unknown information we need to send to this peer. We do
 	// this by computing the difference between the validators we know about
 	// and the validators we know we've sent to [peerID].
-	result := make([]ValidatorID, 0, limit)
-	for i := 0; i < len(g.validatorIDs) && len(result) < limit; i++ {
-		drawn, err := s.Next()
-		if err != nil {
-			return nil, false, err
-		}
-
-		if !knownPeers.Contains(int(drawn)) {
-			result = append(result, g.validatorIDs[drawn])
+	result := make([]ValidatorID, 0, len(g.validatorIDs))
+	for i, validatorID := range g.validatorIDs {
+		if !knownPeers.Contains(i) {
+			result = append(result, validatorID)
 		}
 	}
 
-	return result, true, nil
+	return result, true
 }
