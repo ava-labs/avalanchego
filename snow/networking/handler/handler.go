@@ -229,14 +229,15 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 		return
 	}
 
+	detachedCtx := utils.Detach(ctx)
 	dispatchSync := func() {
-		h.dispatchSync(ctx)
+		h.dispatchSync(detachedCtx)
 	}
 	dispatchAsync := func() {
-		h.dispatchAsync(ctx)
+		h.dispatchAsync(detachedCtx)
 	}
 	dispatchChans := func() {
-		h.dispatchChans(ctx)
+		h.dispatchChans(detachedCtx)
 	}
 	if recoverPanic {
 		go h.ctx.Log.RecoverAndExit(dispatchSync, func() {

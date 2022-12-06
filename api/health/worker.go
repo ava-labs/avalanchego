@@ -90,15 +90,16 @@ func (w *worker) Results() (map[string]Result, bool) {
 
 func (w *worker) Start(ctx context.Context, freq time.Duration) {
 	w.startOnce.Do(func() {
+		detachedCtx := utils.Detach(ctx)
 		go func() {
 			ticker := time.NewTicker(freq)
 			defer ticker.Stop()
 
-			w.runChecks(ctx)
+			w.runChecks(detachedCtx)
 			for {
 				select {
 				case <-ticker.C:
-					w.runChecks(ctx)
+					w.runChecks(detachedCtx)
 				case <-w.closer:
 					return
 				}

@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -125,7 +126,8 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Se
 			deadline,
 			s.ctx.NodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+		detachedCtx := utils.Detach(ctx)
+		go s.router.HandleInbound(detachedCtx, inMsg)
 	}
 
 	// Create the outbound message.
@@ -175,7 +177,8 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 			summary,
 			nodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+		detachedCtx := utils.Detach(ctx)
+		go s.router.HandleInbound(detachedCtx, inMsg)
 		return
 	}
 
@@ -260,7 +263,8 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 			deadline,
 			s.ctx.NodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+		detachedCtx := utils.Detach(ctx)
+		go s.router.HandleInbound(detachedCtx, inMsg)
 	}
 
 	// Create the outbound message.
@@ -311,7 +315,8 @@ func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 			summaryIDs,
 			nodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+		detachedCtx := utils.Detach(ctx)
+		go s.router.HandleInbound(detachedCtx, inMsg)
 		return
 	}
 
@@ -389,7 +394,8 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 			deadline,
 			s.ctx.NodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+		detachedCtx := utils.Detach(ctx)
+		go s.router.HandleInbound(detachedCtx, inMsg)
 	}
 
 	// Create the outbound message.
@@ -439,7 +445,8 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 			containerIDs,
 			nodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+		detachedCtx := utils.Detach(ctx)
+		go s.router.HandleInbound(detachedCtx, inMsg)
 		return
 	}
 
@@ -518,7 +525,8 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 			containerIDs,
 			s.ctx.NodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+		detachedCtx := utils.Detach(ctx)
+		go s.router.HandleInbound(detachedCtx, inMsg)
 	}
 
 	// Create the outbound message.
@@ -569,7 +577,8 @@ func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 			containerIDs,
 			nodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+		detachedCtx := utils.Detach(ctx)
+		go s.router.HandleInbound(detachedCtx, inMsg)
 		return
 	}
 
@@ -626,7 +635,8 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 
 	// Sending a GetAncestors to myself always fails.
 	if nodeID == s.ctx.NodeID {
-		go s.router.HandleInbound(ctx, inMsg)
+		detachedCtx := utils.Detach(ctx)
+		go s.router.HandleInbound(detachedCtx, inMsg)
 		return
 	}
 
@@ -635,7 +645,9 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 	if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
 		s.failedDueToBench[message.GetAncestorsOp].Inc() // update metric
 		s.timeouts.RegisterRequestToUnreachableValidator()
-		go s.router.HandleInbound(ctx, inMsg)
+
+		detachedCtx := utils.Detach(ctx)
+		go s.router.HandleInbound(detachedCtx, inMsg)
 		return
 	}
 
@@ -658,7 +670,8 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 			zap.Error(err),
 		)
 
-		go s.router.HandleInbound(ctx, inMsg)
+		detachedCtx := utils.Detach(ctx)
+		go s.router.HandleInbound(detachedCtx, inMsg)
 		return
 	}
 
@@ -681,7 +694,9 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 		)
 
 		s.timeouts.RegisterRequestToUnreachableValidator()
-		go s.router.HandleInbound(ctx, inMsg)
+
+		detachedCtx := utils.Detach(ctx)
+		go s.router.HandleInbound(detachedCtx, inMsg)
 	}
 }
 
@@ -746,7 +761,8 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 
 	// Sending a Get to myself always fails.
 	if nodeID == s.ctx.NodeID {
-		go s.router.HandleInbound(ctx, inMsg)
+		detachedCtx := utils.Detach(ctx)
+		go s.router.HandleInbound(detachedCtx, inMsg)
 		return
 	}
 
@@ -755,7 +771,9 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
 		s.failedDueToBench[message.GetOp].Inc() // update metric
 		s.timeouts.RegisterRequestToUnreachableValidator()
-		go s.router.HandleInbound(ctx, inMsg)
+
+		detachedCtx := utils.Detach(ctx)
+		go s.router.HandleInbound(detachedCtx, inMsg)
 		return
 	}
 
@@ -802,7 +820,9 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		)
 
 		s.timeouts.RegisterRequestToUnreachableValidator()
-		go s.router.HandleInbound(ctx, inMsg)
+
+		detachedCtx := utils.Detach(ctx)
+		go s.router.HandleInbound(detachedCtx, inMsg)
 	}
 }
 
@@ -881,6 +901,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
+	detachedCtx := utils.Detach(ctx)
 
 	// Sending a message to myself. No need to send it over the network. Just
 	// put it right into the router. Do so asynchronously to avoid deadlock.
@@ -893,7 +914,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 			container,
 			s.ctx.NodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+		go s.router.HandleInbound(detachedCtx, inMsg)
 	}
 
 	// Some of [nodeIDs] may be benched. That is, they've been unresponsive so
@@ -912,7 +933,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 				s.ctx.ChainID,
 				requestID,
 			)
-			go s.router.HandleInbound(ctx, inMsg)
+			go s.router.HandleInbound(detachedCtx, inMsg)
 		}
 	}
 
@@ -967,7 +988,7 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 				s.ctx.ChainID,
 				requestID,
 			)
-			go s.router.HandleInbound(ctx, inMsg)
+			go s.router.HandleInbound(detachedCtx, inMsg)
 		}
 	}
 }
@@ -1002,6 +1023,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
+	detachedCtx := utils.Detach(ctx)
 
 	// Sending a message to myself. No need to send it over the network. Just
 	// put it right into the router. Do so asynchronously to avoid deadlock.
@@ -1014,7 +1036,8 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 			containerID,
 			s.ctx.NodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+
+		go s.router.HandleInbound(detachedCtx, inMsg)
 	}
 
 	// Some of the nodes in [nodeIDs] may be benched. That is, they've been
@@ -1032,7 +1055,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 				s.ctx.ChainID,
 				requestID,
 			)
-			go s.router.HandleInbound(ctx, inMsg)
+			go s.router.HandleInbound(detachedCtx, inMsg)
 		}
 	}
 
@@ -1081,7 +1104,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 				s.ctx.ChainID,
 				requestID,
 			)
-			go s.router.HandleInbound(ctx, inMsg)
+			go s.router.HandleInbound(detachedCtx, inMsg)
 		}
 	}
 }
@@ -1097,7 +1120,9 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 			votes,
 			nodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+
+		detachedCtx := utils.Detach(ctx)
+		go s.router.HandleInbound(detachedCtx, inMsg)
 		return
 	}
 
@@ -1160,7 +1185,9 @@ func (s *sender) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, r
 		s.timeouts.TimeoutDuration(),
 		appRequestBytes,
 	)
-	go s.router.HandleInbound(ctx, inMsg)
+
+	detachedCtx := utils.Detach(ctx)
+	go s.router.HandleInbound(detachedCtx, inMsg)
 	return nil
 }
 
@@ -1172,7 +1199,9 @@ func (s *sender) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, 
 		requestID,
 		appResponseBytes,
 	)
-	go s.router.HandleInbound(ctx, inMsg)
+
+	detachedCtx := utils.Detach(ctx)
+	go s.router.HandleInbound(detachedCtx, inMsg)
 	return nil
 }
 
@@ -1205,6 +1234,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
+	detachedCtx := utils.Detach(ctx)
 
 	// Sending a message to myself. No need to send it over the network. Just
 	// put it right into the router. Do so asynchronously to avoid deadlock.
@@ -1217,7 +1247,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 			appRequestBytes,
 			s.ctx.NodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+		go s.router.HandleInbound(detachedCtx, inMsg)
 	}
 
 	// Some of the nodes in [nodeIDs] may be benched. That is, they've been
@@ -1236,7 +1266,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 				s.ctx.ChainID,
 				requestID,
 			)
-			go s.router.HandleInbound(ctx, inMsg)
+			go s.router.HandleInbound(detachedCtx, inMsg)
 		}
 	}
 
@@ -1291,7 +1321,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 				s.ctx.ChainID,
 				requestID,
 			)
-			go s.router.HandleInbound(ctx, inMsg)
+			go s.router.HandleInbound(detachedCtx, inMsg)
 		}
 	}
 	return nil
@@ -1307,7 +1337,9 @@ func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, request
 			appResponseBytes,
 			nodeID,
 		)
-		go s.router.HandleInbound(ctx, inMsg)
+
+		detachedCtx := utils.Detach(ctx)
+		go s.router.HandleInbound(detachedCtx, inMsg)
 		return nil
 	}
 
