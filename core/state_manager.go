@@ -79,7 +79,7 @@ func NewTrieWriter(db TrieDB, config *CacheConfig) TrieWriter {
 			targetCommitSize: common.StorageSize(config.TrieDirtyCommitTarget) * 1024 * 1024,
 			imageCap:         4 * 1024 * 1024,
 			commitInterval:   config.CommitInterval,
-			tipBuffer:        NewBoundedBuffer[common.Hash](tipBufferSize, db.Dereference),
+			tipBuffer:        NewBoundedBuffer(tipBufferSize, db.Dereference),
 		}
 		cm.flushStepSize = (cm.memoryCap - cm.targetCommitSize) / common.StorageSize(flushWindow)
 		return cm
