@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -89,6 +90,8 @@ func New(
 }
 
 func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32) {
+	ctx = utils.Detach(ctx)
+
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -167,6 +170,8 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Se
 }
 
 func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) {
+	ctx = utils.Detach(ctx)
+
 	// Sending this message to myself.
 	if nodeID == s.ctx.NodeID {
 		inMsg := message.InboundStateSummaryFrontier(
@@ -223,6 +228,8 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 }
 
 func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, heights []uint64) {
+	ctx = utils.Detach(ctx)
+
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -304,6 +311,8 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 }
 
 func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) {
+	ctx = utils.Detach(ctx)
+
 	if nodeID == s.ctx.NodeID {
 		inMsg := message.InboundAcceptedStateSummary(
 			s.ctx.ChainID,
@@ -353,6 +362,8 @@ func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 }
 
 func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32) {
+	ctx = utils.Detach(ctx)
+
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -431,6 +442,8 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 }
 
 func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
+	ctx = utils.Detach(ctx)
+
 	// Sending this message to myself.
 	if nodeID == s.ctx.NodeID {
 		inMsg := message.InboundAcceptedFrontier(
@@ -481,6 +494,8 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 }
 
 func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerIDs []ids.ID) {
+	ctx = utils.Detach(ctx)
+
 	// Note that this timeout duration won't exactly match the one that gets
 	// registered. That's OK.
 	deadline := s.timeouts.TimeoutDuration()
@@ -562,6 +577,8 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 }
 
 func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
+	ctx = utils.Detach(ctx)
+
 	if nodeID == s.ctx.NodeID {
 		inMsg := message.InboundAccepted(
 			s.ctx.ChainID,
@@ -607,6 +624,8 @@ func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 }
 
 func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
+	ctx = utils.Detach(ctx)
+
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from this node.
 	inMsg := message.InternalGetAncestorsFailed(
@@ -727,6 +746,8 @@ func (s *sender) SendAncestors(_ context.Context, nodeID ids.NodeID, requestID u
 // consensus engine would like the recipient to send this consensus engine the
 // specified container.
 func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
+	ctx = utils.Detach(ctx)
+
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from this node.
 	inMsg := message.InternalGetFailed(
@@ -856,6 +877,8 @@ func (s *sender) SendPut(_ context.Context, nodeID ids.NodeID, requestID uint32,
 // node to send their preferred frontier given the existence of the specified
 // container.
 func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, container []byte) {
+	ctx = utils.Detach(ctx)
+
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
 	// We register timeouts for all nodes, regardless of whether we fail
@@ -977,6 +1000,8 @@ func (s *sender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 // The PullQuery message signifies that this consensus engine would like each
 // node to send their preferred frontier.
 func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerID ids.ID) {
+	ctx = utils.Detach(ctx)
+
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
 	// We register timeouts for all nodes, regardless of whether we fail
@@ -1088,6 +1113,8 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 
 // SendChits sends chits
 func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) {
+	ctx = utils.Detach(ctx)
+
 	// If [nodeID] is myself, send this message directly
 	// to my own router rather than sending it over the network
 	if nodeID == s.ctx.NodeID {
@@ -1135,6 +1162,8 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 }
 
 func (s *sender) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
+	ctx = utils.Detach(ctx)
+
 	// The failed message is treated as if it was sent by the requested chain
 	failedMsg := message.InternalCrossChainAppRequestFailed(
 		s.ctx.NodeID,
@@ -1165,6 +1194,8 @@ func (s *sender) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, r
 }
 
 func (s *sender) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, appResponseBytes []byte) error {
+	ctx = utils.Detach(ctx)
+
 	inMsg := message.InternalCrossChainAppResponse(
 		s.ctx.NodeID,
 		s.ctx.ChainID,
@@ -1180,6 +1211,8 @@ func (s *sender) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, 
 // The meaning of this request, and how it should be handled, is defined by the
 // VM.
 func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, appRequestBytes []byte) error {
+	ctx = utils.Detach(ctx)
+
 	// Tell the router to expect a response message or a message notifying
 	// that we won't get a response from each of these nodes.
 	// We register timeouts for all nodes, regardless of whether we fail
@@ -1300,6 +1333,8 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 // SendAppResponse sends a response to an application-level request from the
 // given node
 func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, appResponseBytes []byte) error {
+	ctx = utils.Detach(ctx)
+
 	if nodeID == s.ctx.NodeID {
 		inMsg := message.InboundAppResponse(
 			s.ctx.ChainID,
