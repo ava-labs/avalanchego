@@ -12,6 +12,24 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 )
 
+func NewCaminoDiff(
+	parentID ids.ID,
+	stateVersions Versions,
+) (Diff, error) {
+	parentState, ok := stateVersions.GetState(parentID)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, parentID)
+	}
+	return &diff{
+		parentID:      parentID,
+		stateVersions: stateVersions,
+		timestamp:     parentState.GetTimestamp(),
+		caminoDiff: caminoDiff{
+			modifiedAddressStates: make(map[ids.ShortID]uint64),
+		},
+	}, nil
+}
+
 func (d *diff) LockedUTXOs(txIDs ids.Set, addresses ids.ShortSet, lockState locked.State) ([]*avax.UTXO, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {

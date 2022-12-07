@@ -36,8 +36,8 @@ const (
 var (
 	_ UnsignedTx = (*AddAddressStateTx)(nil)
 
-	errEmptyAddress = errors.New("address is empty")
-	errInvalidState = errors.New("invalid state")
+	ErrEmptyAddress = errors.New("address is empty")
+	ErrInvalidState = errors.New("invalid state")
 )
 
 // AddAddressStateTx is an unsigned addAddressStateTx
@@ -60,9 +60,9 @@ func (tx *AddAddressStateTx) SyntacticVerify(ctx *snow.Context) error {
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	case tx.Address == ids.ShortEmpty:
-		return errEmptyAddress
+		return ErrEmptyAddress
 	case tx.State > AddressStateMax || AddressStateValidBits&(uint64(1)<<tx.State) == 0:
-		return errInvalidState
+		return ErrInvalidState
 	}
 
 	if err := locked.VerifyNoLocks(tx.Ins, tx.Outs); err != nil {

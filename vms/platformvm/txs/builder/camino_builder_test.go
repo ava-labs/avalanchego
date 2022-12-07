@@ -13,9 +13,70 @@ import (
 	"github.com/ava-labs/avalanchego/utils/nodeid"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-func TestCaminoBuilderTxNodeSig(t *testing.T) {
+func TestCaminoBuilderTxAddressState(t *testing.T) {
+	caminoConfig := genesis.Camino{
+		VerifyNodeSignature: true,
+		LockModeBondDeposit: true,
+	}
+
+	b := newCaminoBuilder(true, caminoConfig)
+
+	tests := map[string]struct {
+		remove      bool
+		state       uint8
+		address     ids.ShortID
+		expectedErr error
+	}{
+		"KYC Role: Add": {
+			remove:      false,
+			state:       txs.AddressStateRoleKyc,
+			address:     caminoPreFundedKeys[0].PublicKey().Address(),
+			expectedErr: nil,
+		},
+		"KYC Role: Remove": {
+			remove:      true,
+			state:       txs.AddressStateRoleKyc,
+			address:     caminoPreFundedKeys[0].PublicKey().Address(),
+			expectedErr: nil,
+		},
+		"Admin Role: Add": {
+			remove:      false,
+			state:       txs.AddressStateRoleAdmin,
+			address:     caminoPreFundedKeys[0].PublicKey().Address(),
+			expectedErr: nil,
+		},
+		"Admin Role: Remove": {
+			remove:      true,
+			state:       txs.AddressStateRoleAdmin,
+			address:     caminoPreFundedKeys[0].PublicKey().Address(),
+			expectedErr: nil,
+		},
+		"Empty Address": {
+			remove:      false,
+			state:       txs.AddressStateRoleKyc,
+			address:     ids.ShortEmpty,
+			expectedErr: txs.ErrEmptyAddress,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := b.(CaminoBuilder).NewAddAddressStateTx(
+				tt.address,
+				tt.remove,
+				tt.state,
+				caminoPreFundedKeys,
+				ids.ShortEmpty,
+			)
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
+}
+
+func TestCaminoBuilderNewAddValidatorTxNodeSig(t *testing.T) {
 	nodeKey1, nodeID1 := nodeid.GenerateCaminoNodeKeyAndID()
 	nodeKey2, _ := nodeid.GenerateCaminoNodeKeyAndID()
 

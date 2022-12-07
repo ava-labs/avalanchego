@@ -1628,3 +1628,260 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 	err = shutdownEnvironment(env)
 	require.NoError(t, err)
 }
+
+func TestAddAdressStateTxExecutor(t *testing.T) {
+	caminoGenesisConf := genesis.Camino{
+		VerifyNodeSignature: true,
+		LockModeBondDeposit: true,
+	}
+
+	env := newCaminoEnvironment( /*postBanff*/ true, caminoGenesisConf)
+	env.ctx.Lock.Lock()
+	defer func() {
+		err := shutdownEnvironment(env)
+		require.NoError(t, err)
+	}()
+
+	signers := [][]*crypto.PrivateKeySECP256K1R{{caminoPreFundedKeys[0]}}
+
+	outputOwners := secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs:     []ids.ShortID{caminoPreFundedKeys[0].PublicKey().Address()},
+	}
+	sigIndices := []uint32{0}
+
+	tests := map[string]struct {
+		stateAddress  ids.ShortID
+		targetAddress ids.ShortID
+		flag          uint64
+		state         uint8
+		expectedErr   error
+		remove        bool
+	}{
+		"Flag: AddressStateRoleAdmin": {
+			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
+			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
+			flag:          uint64(txs.AddressStateRoleAdmin),
+			state:         txs.AddressStateRoleAdmin,
+			expectedErr:   errInvalidRoles,
+			remove:        false,
+		},
+		"Flag: AddressStateRoleAdminBit": {
+			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
+			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
+			flag:          txs.AddressStateRoleAdminBit,
+			state:         txs.AddressStateRoleAdmin,
+			expectedErr:   nil,
+			remove:        false,
+		},
+		"Flag: AddressStateRoleKyc Add": {
+			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
+			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
+			flag:          uint64(txs.AddressStateRoleKyc),
+			state:         txs.AddressStateRoleKyc,
+			expectedErr:   nil,
+			remove:        false,
+		},
+		"Flag: AddressStateRoleKyc Remove": {
+			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
+			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
+			flag:          uint64(txs.AddressStateRoleKyc),
+			state:         txs.AddressStateRoleKyc,
+			expectedErr:   nil,
+			remove:        true,
+		},
+		"Flag: AddressStateRoleKyc Add, Different Target Address": {
+			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
+			targetAddress: caminoPreFundedKeys[2].PublicKey().Address(),
+			flag:          uint64(txs.AddressStateRoleKyc),
+			state:         txs.AddressStateRoleKyc,
+			expectedErr:   nil,
+			remove:        false,
+		},
+		"Flag: AddressStateRoleKycBit Add": {
+			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
+			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
+			flag:          txs.AddressStateRoleKycBit,
+			state:         txs.AddressStateRoleAdmin,
+			expectedErr:   errInvalidRoles,
+			remove:        false,
+		},
+		"Flag: AddressStateRoleBits Add": {
+			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
+			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
+			flag:          txs.AddressStateRoleBits,
+			state:         txs.AddressStateRoleAdmin,
+			expectedErr:   nil,
+			remove:        false,
+		},
+		"Flag: AddressStateRoleBits Remove": {
+			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
+			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
+			flag:          txs.AddressStateRoleBits,
+			state:         txs.AddressStateRoleAdmin,
+			expectedErr:   nil,
+			remove:        true,
+		},
+		"Flag: AddressStateRoleBits Add, Different Target Address": {
+			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
+			targetAddress: caminoPreFundedKeys[2].PublicKey().Address(),
+			flag:          txs.AddressStateRoleBits,
+			state:         txs.AddressStateRoleAdmin,
+			expectedErr:   nil,
+			remove:        false,
+		},
+		"Flag: AddressStateKycVerified": {
+			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
+			targetAddress: caminoPreFundedKeys[2].PublicKey().Address(),
+			flag:          txs.AddressStateKycVerified,
+			state:         txs.AddressStateRoleAdmin,
+			expectedErr:   errInvalidRoles,
+			remove:        false,
+		},
+		"Flag: AddressStateKycExpired Add": {
+			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
+			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
+			flag:          txs.AddressStateKycExpired,
+			state:         txs.AddressStateRoleKyc,
+			expectedErr:   nil,
+			remove:        false,
+		},
+		"Flag: AddressStateKycExpired Add, Different Target Address": {
+			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
+			targetAddress: caminoPreFundedKeys[2].PublicKey().Address(),
+			flag:          txs.AddressStateKycExpired,
+			state:         txs.AddressStateRoleKyc,
+			expectedErr:   nil,
+			remove:        false,
+		},
+		"Flag: AddressStateKycExpired Remove": {
+			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
+			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
+			flag:          txs.AddressStateKycExpired,
+			state:         txs.AddressStateRoleKyc,
+			expectedErr:   nil,
+			remove:        true,
+		},
+		"Flag: AddressStateKycBits": {
+			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
+			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
+			flag:          txs.AddressStateKycBits,
+			state:         txs.AddressStateRoleKyc,
+			expectedErr:   errInvalidRoles,
+			remove:        false,
+		},
+		"Flag: AddressStateKycBits, Different Target Address": {
+			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
+			targetAddress: caminoPreFundedKeys[2].PublicKey().Address(),
+			flag:          txs.AddressStateKycBits,
+			state:         txs.AddressStateRoleKyc,
+			expectedErr:   errInvalidRoles,
+			remove:        false,
+		},
+		"Flag: AddressStateMax Add": {
+			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
+			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
+			flag:          txs.AddressStateMax,
+			state:         txs.AddressStateRoleAdmin,
+			expectedErr:   nil,
+			remove:        false,
+		},
+		"Flag: AddressStateMax Remove": {
+			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
+			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
+			flag:          txs.AddressStateMax,
+			state:         txs.AddressStateRoleAdmin,
+			expectedErr:   nil,
+			remove:        true,
+		},
+		"Flag: AddressStateValidBits Add": {
+			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
+			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
+			flag:          txs.AddressStateValidBits,
+			state:         txs.AddressStateRoleValidator,
+			expectedErr:   nil,
+			remove:        false,
+		},
+		"Flag: AddressStateValidBits Remove": {
+			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
+			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
+			flag:          txs.AddressStateValidBits,
+			state:         txs.AddressStateRoleValidator,
+			expectedErr:   nil,
+			remove:        true,
+		},
+		"Flag: AddressStateRoleAdmin Add, State: AddressStateKycExpired": {
+			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
+			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
+			flag:          uint64(txs.AddressStateRoleAdmin),
+			state:         txs.AddressStateKycExpired,
+			expectedErr:   errInvalidRoles,
+			remove:        false,
+		},
+		"Flag: AddressStateRoleKyc Add, State: AddressStateRoleValidatorBit": {
+			stateAddress:  caminoPreFundedKeys[0].PublicKey().Address(),
+			targetAddress: caminoPreFundedKeys[0].PublicKey().Address(),
+			flag:          uint64(txs.AddressStateRoleKyc),
+			state:         uint8(txs.AddressStateRoleValidatorBit),
+			expectedErr:   txs.ErrInvalidState,
+			remove:        false,
+		},
+		"Wrong address": {
+			stateAddress:  ids.GenerateTestShortID(),
+			targetAddress: ids.GenerateTestShortID(),
+			flag:          uint64(txs.AddressStateRoleKyc),
+			state:         txs.AddressStateRoleKyc,
+			expectedErr:   errInvalidRoles,
+			remove:        false,
+		},
+		"Empty address": {
+			stateAddress:  ids.ShortEmpty,
+			targetAddress: ids.ShortEmpty,
+			flag:          uint64(txs.AddressStateRoleKyc),
+			state:         txs.AddressStateRoleKyc,
+			expectedErr:   txs.ErrEmptyAddress,
+			remove:        false,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			addAddressStateTx := &txs.AddAddressStateTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    env.ctx.NetworkID,
+					BlockchainID: env.ctx.ChainID,
+					Ins: []*avax.TransferableInput{
+						generateTestIn(avaxAssetID, defaultCaminoBalance, ids.Empty, ids.Empty, sigIndices),
+					},
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(avaxAssetID, defaultCaminoValidatorWeight-defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+					},
+				}},
+				Address: tt.stateAddress,
+				State:   tt.state,
+				Remove:  tt.remove,
+			}
+
+			tx, err := txs.NewSigned(addAddressStateTx, txs.Codec, signers)
+			require.NoError(t, err)
+
+			onAcceptState, err := state.NewCaminoDiff(lastAcceptedID, env)
+			require.NoError(t, err)
+
+			executor := CaminoStandardTxExecutor{
+				StandardTxExecutor{
+					Backend: &env.backend,
+					State:   onAcceptState,
+					Tx:      tx,
+				},
+			}
+
+			executor.State.SetAddressStates(tt.stateAddress, tt.flag)
+			executor.State.SetAddressStates(tt.targetAddress, tt.flag)
+
+			err = addAddressStateTx.Visit(&executor)
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
+}

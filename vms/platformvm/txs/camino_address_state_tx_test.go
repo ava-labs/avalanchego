@@ -133,7 +133,7 @@ func TestAddAddressStateTxSyntacticVerify(t *testing.T) {
 	stx, err = NewSigned(addAddressStateTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	require.Error(err, errEmptyAddress)
+	require.Error(err, ErrEmptyAddress)
 	addAddressStateTx.Address = preFundedKeys[0].PublicKey().Address()
 
 	// Invalid mode
@@ -142,7 +142,7 @@ func TestAddAddressStateTxSyntacticVerify(t *testing.T) {
 	stx, err = NewSigned(addAddressStateTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	require.Error(err, errInvalidState)
+	require.Error(err, ErrInvalidState)
 	addAddressStateTx.State = AddressStateRoleAdmin
 
 	// Locked out
