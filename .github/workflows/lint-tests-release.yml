@@ -101,7 +101,9 @@ jobs:
         with:
           go-version: 1.18
       - name: Set up arm64 cross compiler
-        run: sudo apt-get -y install gcc-aarch64-linux-gnu
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install gcc-aarch64-linux-gnu
       - name: Checkout osxcross
         uses: actions/checkout@v2
         with:
