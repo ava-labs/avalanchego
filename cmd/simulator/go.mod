@@ -15,7 +15,7 @@ replace github.com/ava-labs/subnet-evm => ../..
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.10.0 // indirect
-	github.com/ava-labs/avalanchego v1.9.4-rc.11 // indirect
+	github.com/ava-labs/avalanchego v1.9.4 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.2.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect

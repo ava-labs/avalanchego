@@ -45,8 +45,8 @@ github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d/go.mod h1:rBZYJk5
 github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156 h1:eMwmnE/GDgah4HI848JfFxHt+iPb26b4zyfspmqY0/8=
 github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156/go.mod h1:Cb/ax3seSYIx7SuZdm2G2xzfwmv3TPSk2ucNfQESPXM=
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
-github.com/ava-labs/avalanchego v1.9.4-rc.11 h1:wXu4u/XexkiIQPxUYWkJ6M7kCNUTwoKDOUAsqX/dbms=
-github.com/ava-labs/avalanchego v1.9.4-rc.11/go.mod h1:H4pMTYzgudfPs9WX+KXI0nCiUGNkdgPWOwm1nqzGibQ=
+github.com/ava-labs/avalanchego v1.9.4 h1:z5tE/vUGzUQflqv3mn6X5E1VTCZHYhuD36idOyPNRrc=
+github.com/ava-labs/avalanchego v1.9.4/go.mod h1:H4pMTYzgudfPs9WX+KXI0nCiUGNkdgPWOwm1nqzGibQ=
 github.com/benbjohnson/clock v1.3.0 h1:ip6w0uFQkncKQ979AypyG0ER7mqUSBdKLOgAle/AT8A=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=
