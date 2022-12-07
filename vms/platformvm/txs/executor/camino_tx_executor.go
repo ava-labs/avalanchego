@@ -11,8 +11,10 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	deposits "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -24,15 +26,21 @@ var (
 	_ txs.Visitor = (*CaminoStandardTxExecutor)(nil)
 	_ txs.Visitor = (*CaminoProposalTxExecutor)(nil)
 
-	errNodeSignatureMissing   = errors.New("last signature is not nodeID's signature")
-	errWrongLockMode          = errors.New("this tx can't be used with this caminoGenesis.LockModeBondDeposit")
-	errNotSecp256Fx           = errors.New("expected fx to be secp256k1.fx")
-	errRecoverAdresses        = errors.New("cannot recover addresses from credentials")
-	errInvalidRoles           = errors.New("invalid role")
-	errValidatorExists        = errors.New("node is already a validator")
-	errInvalidSystemTxBody    = errors.New("tx body doesn't match expected one")
-	errRemoveValidatorToEarly = errors.New("attempting to remove validator before its end time")
-	errRemoveWrongValidator   = errors.New("attempting to remove wrong validator")
+	errNodeSignatureMissing     = errors.New("last signature is not nodeID's signature")
+	errWrongLockMode            = errors.New("this tx can't be used with this caminoGenesis.LockModeBondDeposit")
+	errNotSecp256Fx             = errors.New("expected fx to be secp256k1.fx")
+	errRecoverAdresses          = errors.New("cannot recover addresses from credentials")
+	errInvalidRoles             = errors.New("invalid role")
+	errValidatorExists          = errors.New("node is already a validator")
+	errInvalidSystemTxBody      = errors.New("tx body doesn't match expected one")
+	errRemoveValidatorToEarly   = errors.New("attempting to remove validator before its end time")
+	errRemoveWrongValidator     = errors.New("attempting to remove wrong validator")
+	errDepositOfferNotActiveYet = errors.New("deposit offer not active yet")
+	errDepositOfferInactive     = errors.New("deposit offer inactive")
+	errDepositToSmall           = errors.New("deposit amount is less than deposit offer minmum amount")
+	errDepositDurationToSmall   = errors.New("deposit duration is less than deposit offer minmum duration")
+	errDepositDurationToBig     = errors.New("deposit duration is greater than deposit offer maximum duration")
+	errSupplyOverflow           = errors.New("resulting total supply would be more, than allowed maximum")
 )
 
 type CaminoStandardTxExecutor struct {
@@ -439,6 +447,154 @@ func (e *CaminoProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) 
 	utxo.Consume(e.OnAbortState, caminoTx.Ins)
 	utxo.Produce(e.OnCommitState, txID, caminoTx.Outs)
 	utxo.Produce(e.OnAbortState, txID, caminoTx.Outs)
+
+	return nil
+}
+
+func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
+	caminoGenesis, err := e.State.CaminoGenesisState()
+	if err != nil {
+		return err
+	}
+
+	if !caminoGenesis.LockModeBondDeposit {
+		return errWrongLockMode
+	}
+
+	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoGenesis.LockModeBondDeposit); err != nil {
+		return err
+	}
+
+	depositAmount, err := tx.DepositAmount()
+	if err != nil {
+		return err
+	}
+
+	depositOffer, err := e.State.GetDepositOffer(tx.DepositOfferID)
+	if err != nil {
+		return err
+	}
+
+	currentChainTime := e.State.GetTimestamp()
+
+	switch {
+	case depositOffer.StartTime().After(currentChainTime):
+		return errDepositOfferNotActiveYet
+	case depositOffer.EndTime().Before(currentChainTime):
+		return errDepositOfferInactive
+	case tx.Duration < depositOffer.MinDuration:
+		return errDepositDurationToSmall
+	case tx.Duration > depositOffer.MaxDuration:
+		return errDepositDurationToBig
+	case depositAmount < depositOffer.MinAmount:
+		return errDepositToSmall
+	}
+
+	if err := e.FlowChecker.VerifyLock(
+		tx,
+		e.State,
+		tx.Ins,
+		tx.Outs,
+		e.Tx.Creds,
+		e.Config.TxFee,
+		e.Ctx.AVAXAssetID,
+		locked.StateDeposited,
+	); err != nil {
+		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
+	}
+
+	txID := e.Tx.ID()
+
+	currentSupply, err := e.State.GetCurrentSupply(constants.PrimaryNetworkID)
+	if err != nil {
+		return err
+	}
+
+	deposit := &deposits.Deposit{
+		DepositOfferID: tx.DepositOfferID,
+		Duration:       tx.Duration,
+		Amount:         depositAmount,
+		Start:          uint64(currentChainTime.Unix()),
+	}
+
+	potentialReward := deposit.TotalReward(depositOffer)
+
+	newSupply, err := math.Add64(currentSupply, potentialReward)
+	if err != nil || newSupply > e.Config.RewardConfig.SupplyCap {
+		return errSupplyOverflow
+	}
+
+	e.State.SetCurrentSupply(constants.PrimaryNetworkID, newSupply)
+	e.State.UpdateDeposit(txID, deposit)
+
+	utxo.Consume(e.State, tx.Ins)
+	if err := utxo.ProduceLocked(e.State, txID, tx.Outs, locked.StateDeposited); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) error {
+	caminoGenesis, err := e.State.CaminoGenesisState()
+	if err != nil {
+		return err
+	}
+
+	if !caminoGenesis.LockModeBondDeposit {
+		return errWrongLockMode
+	}
+
+	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoGenesis.LockModeBondDeposit); err != nil {
+		return err
+	}
+
+	newUnlockedAmounts, err := e.FlowChecker.VerifyUnlockDeposit(
+		e.State,
+		tx,
+		tx.Ins,
+		tx.Outs,
+		e.Tx.Creds,
+		e.Config.TxFee,
+		e.Ctx.AVAXAssetID,
+	)
+	if err != nil {
+		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
+	}
+
+	for depositTxID, newUnlockedAmount := range newUnlockedAmounts {
+		deposit, err := e.State.GetDeposit(depositTxID)
+		if err != nil {
+			return err
+		}
+
+		newUnlockedAmount, err := math.Add64(newUnlockedAmount, deposit.UnlockedAmount)
+		if err != nil {
+			return err
+		}
+
+		offer, err := e.State.GetDepositOffer(deposit.DepositOfferID)
+		if err != nil {
+			return err
+		}
+
+		var updatedDeposit *deposits.Deposit
+		if newUnlockedAmount < deposit.Amount ||
+			deposit.ClaimedRewardAmount < deposit.TotalReward(offer) {
+			updatedDeposit = &deposits.Deposit{
+				DepositOfferID:      deposit.DepositOfferID,
+				UnlockedAmount:      newUnlockedAmount,
+				ClaimedRewardAmount: deposit.ClaimedRewardAmount,
+				Amount:              deposit.Amount,
+				Start:               deposit.Start,
+			}
+		}
+
+		e.State.UpdateDeposit(depositTxID, updatedDeposit)
+	}
+
+	utxo.Consume(e.State, tx.Ins)
+	utxo.Produce(e.State, e.Tx.ID(), tx.Outs)
 
 	return nil
 }

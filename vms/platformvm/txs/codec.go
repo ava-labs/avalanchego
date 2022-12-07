@@ -110,6 +110,8 @@ func RegisterUnsignedTxsTypes(targetCodec codec.CaminoRegistry) error {
 		targetCodec.RegisterCustomType(&CaminoAddValidatorTx{}),
 		targetCodec.RegisterCustomType(&CaminoRewardValidatorTx{}),
 		targetCodec.RegisterCustomType(&AddAddressStateTx{}),
+		targetCodec.RegisterCustomType(&DepositTx{}),
+		targetCodec.RegisterCustomType(&UnlockDepositTx{}),
 	)
 	return errs.Err
 }

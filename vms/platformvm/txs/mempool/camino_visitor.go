@@ -13,8 +13,28 @@ func (i *issuer) AddAddressStateTx(*txs.AddAddressStateTx) error {
 	return nil
 }
 
+func (i *issuer) DepositTx(*txs.DepositTx) error {
+	i.m.addStakerTx(i.tx)
+	return nil
+}
+
+func (i *issuer) UnlockDepositTx(*txs.UnlockDepositTx) error {
+	i.m.addStakerTx(i.tx)
+	return nil
+}
+
 // Remover
 func (r *remover) AddAddressStateTx(*txs.AddAddressStateTx) error {
+	r.m.removeStakerTx(r.tx)
+	return nil
+}
+
+func (r *remover) DepositTx(*txs.DepositTx) error {
+	r.m.removeStakerTx(r.tx)
+	return nil
+}
+
+func (r *remover) UnlockDepositTx(*txs.UnlockDepositTx) error {
 	r.m.removeStakerTx(r.tx)
 	return nil
 }

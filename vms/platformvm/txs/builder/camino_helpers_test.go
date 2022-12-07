@@ -118,7 +118,7 @@ func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
 	return subnetID, nil
 }
 
-func newCaminoBuilder(postBanff bool, caminoGenesisConf genesis.Camino) Builder {
+func newCaminoBuilder(postBanff bool, caminoGenesisConf genesis.Camino) CaminoBuilder {
 	var isBootstrapped utils.AtomicBool
 	isBootstrapped.SetValue(true)
 
@@ -138,7 +138,7 @@ func newCaminoBuilder(postBanff bool, caminoGenesisConf genesis.Camino) Builder 
 	uptimes := uptime.NewManager(baseState)
 	utxoHandler := utxo.NewHandler(ctx, &clk, baseState, fx)
 
-	txBuilder := New(
+	txBuilder := NewCamino(
 		ctx,
 		&config,
 		&clk,

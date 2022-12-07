@@ -13,6 +13,7 @@ import (
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
+	deposit "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	genesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	locked "github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -56,7 +57,7 @@ func (mr *MockDiffMockRecorder) AddChain(arg0 interface{}) *gomock.Call {
 }
 
 // AddDepositOffer mocks base method.
-func (m *MockDiff) AddDepositOffer(arg0 *DepositOffer) {
+func (m *MockDiff) AddDepositOffer(arg0 *deposit.Offer) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddDepositOffer", arg0)
 }
@@ -242,10 +243,10 @@ func (mr *MockDiffMockRecorder) GetAddressStates(arg0 interface{}) *gomock.Call 
 }
 
 // GetAllDepositOffers mocks base method.
-func (m *MockDiff) GetAllDepositOffers() ([]*DepositOffer, error) {
+func (m *MockDiff) GetAllDepositOffers() ([]*deposit.Offer, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAllDepositOffers")
-	ret0, _ := ret[0].([]*DepositOffer)
+	ret0, _ := ret[0].([]*deposit.Offer)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -331,11 +332,26 @@ func (mr *MockDiffMockRecorder) GetCurrentValidator(arg0, arg1 interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentValidator", reflect.TypeOf((*MockDiff)(nil).GetCurrentValidator), arg0, arg1)
 }
 
+// GetDeposit mocks base method.
+func (m *MockDiff) GetDeposit(arg0 ids.ID) (*deposit.Deposit, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDeposit", arg0)
+	ret0, _ := ret[0].(*deposit.Deposit)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDeposit indicates an expected call of GetDeposit.
+func (mr *MockDiffMockRecorder) GetDeposit(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDeposit", reflect.TypeOf((*MockDiff)(nil).GetDeposit), arg0)
+}
+
 // GetDepositOffer mocks base method.
-func (m *MockDiff) GetDepositOffer(arg0 ids.ID) (*DepositOffer, error) {
+func (m *MockDiff) GetDepositOffer(arg0 ids.ID) (*deposit.Offer, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetDepositOffer", arg0)
-	ret0, _ := ret[0].(*DepositOffer)
+	ret0, _ := ret[0].(*deposit.Offer)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -578,4 +594,16 @@ func (m *MockDiff) SetTimestamp(arg0 time.Time) {
 func (mr *MockDiffMockRecorder) SetTimestamp(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTimestamp", reflect.TypeOf((*MockDiff)(nil).SetTimestamp), arg0)
+}
+
+// UpdateDeposit mocks base method.
+func (m *MockDiff) UpdateDeposit(arg0 ids.ID, arg1 *deposit.Deposit) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "UpdateDeposit", arg0, arg1)
+}
+
+// UpdateDeposit indicates an expected call of UpdateDeposit.
+func (mr *MockDiffMockRecorder) UpdateDeposit(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateDeposit", reflect.TypeOf((*MockDiff)(nil).UpdateDeposit), arg0, arg1)
 }

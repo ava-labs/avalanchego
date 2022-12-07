@@ -75,7 +75,7 @@ func newCaminoEnvironment(postBanff bool, caminoGenesisConf genesis.Camino) *env
 	uptimes := uptime.NewManager(baseState)
 	utxoHandler := utxo.NewHandler(ctx, &clk, baseState, fx)
 
-	txBuilder := builder.New(
+	txBuilder := builder.NewCamino(
 		ctx,
 		&config,
 		&clk,

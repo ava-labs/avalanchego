@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 )
@@ -47,14 +48,22 @@ func (s *state) GetAddressStates(address ids.ShortID) (uint64, error) {
 	return s.caminoState.GetAddressStates(address)
 }
 
-func (s *state) AddDepositOffer(offer *DepositOffer) {
+func (s *state) AddDepositOffer(offer *deposit.Offer) {
 	s.caminoState.AddDepositOffer(offer)
 }
 
-func (s *state) GetDepositOffer(offerID ids.ID) (*DepositOffer, error) {
+func (s *state) GetDepositOffer(offerID ids.ID) (*deposit.Offer, error) {
 	return s.caminoState.GetDepositOffer(offerID)
 }
 
-func (s *state) GetAllDepositOffers() ([]*DepositOffer, error) {
+func (s *state) GetAllDepositOffers() ([]*deposit.Offer, error) {
 	return s.caminoState.GetAllDepositOffers()
+}
+
+func (s *state) UpdateDeposit(depositTxID ids.ID, deposit *deposit.Deposit) {
+	s.caminoState.UpdateDeposit(depositTxID, deposit)
+}
+
+func (s *state) GetDeposit(depositTxID ids.ID) (*deposit.Deposit, error) {
+	return s.caminoState.GetDeposit(depositTxID)
 }
