@@ -74,6 +74,6 @@ jobs:
           toolchain: nightly
           override: true
       - name: Lint intra docs links
-        run: cargo rustdoc -p firewood -- -D rustdoc::broken-intra-doc-links
+        run: cargo rustdoc -p firewood --lib -- -D rustdoc::broken-intra-doc-links
       - name: Lint missing crate-level docs
-        run: cargo rustdoc -p firewood -- -D rustdoc::missing-crate-level-docs
+        run: cargo rustdoc -p firewood --lib -- -D rustdoc::missing-crate-level-docs
