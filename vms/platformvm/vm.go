@@ -110,7 +110,7 @@ type VM struct {
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted window.Window[ids.ID]
 
-	txBuilder         txbuilder.Builder
+	txBuilder         txbuilder.CaminoBuilder
 	txExecutorBackend *txexecutor.Backend
 	manager           blockexecutor.Manager
 }
@@ -178,7 +178,7 @@ func (vm *VM) Initialize(
 	vm.uptimeManager = uptime.NewManager(vm.state)
 	vm.UptimeLockedCalculator.SetCalculator(&vm.bootstrapped, &ctx.Lock, vm.uptimeManager)
 
-	vm.txBuilder = txbuilder.New(
+	vm.txBuilder = txbuilder.NewCamino(
 		vm.ctx,
 		&vm.Config,
 		&vm.clock,

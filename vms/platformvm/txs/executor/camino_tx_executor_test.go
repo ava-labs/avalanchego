@@ -8,6 +8,10 @@ import (
 	"testing"
 	"time"
 
+	deposits "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
+
+	"github.com/ava-labs/avalanchego/utils/units"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -34,7 +38,7 @@ func TestCaminoEnv(t *testing.T) {
 	env := newCaminoEnvironment( /*postBanff*/ false, caminoGenesisConf)
 	env.ctx.Lock.Lock()
 	defer func() {
-		err := shutdownEnvironment(env)
+		err := shutdownCaminoEnvironment(env)
 		require.NoError(t, err)
 	}()
 	env.config.BanffTime = env.state.GetTimestamp()
@@ -48,7 +52,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 	env := newCaminoEnvironment( /*postBanff*/ true, caminoGenesisConf)
 	env.ctx.Lock.Lock()
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
+		if err := shutdownCaminoEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -226,7 +230,7 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 	env := newCaminoEnvironment( /*postBanff*/ true, caminoGenesisConf)
 	env.ctx.Lock.Lock()
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
+		if err := shutdownCaminoEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -506,7 +510,7 @@ func TestCaminoStandardTxExecutorAddValidatorTxBody(t *testing.T) {
 	env := newCaminoEnvironment( /*postBanff*/ true, caminoGenesisConf)
 	env.ctx.Lock.Lock()
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
+		if err := shutdownCaminoEnvironment(env); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -766,7 +770,7 @@ func TestCaminoAddValidatorTxNodeSig(t *testing.T) {
 			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
 			env.ctx.Lock.Lock()
 			defer func() {
-				if err := shutdownEnvironment(env); err != nil {
+				if err := shutdownCaminoEnvironment(env); err != nil {
 					t.Fatal(err)
 				}
 			}()
@@ -939,7 +943,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		},
 	}
 
-	generateExecutor := func(unsidngedTx txs.UnsignedTx, env *environment) CaminoStandardTxExecutor {
+	generateExecutor := func(unsidngedTx txs.UnsignedTx, env *caminoEnvironment) CaminoStandardTxExecutor {
 		tx, err := txs.NewSigned(unsidngedTx, txs.Codec, signers)
 		require.NoError(t, err)
 
@@ -962,7 +966,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
 			env.ctx.Lock.Lock()
 			defer func() {
-				err := shutdownEnvironment(env)
+				err := shutdownCaminoEnvironment(env)
 				require.NoError(t, err)
 			}()
 			env.config.BanffTime = env.state.GetTimestamp()
@@ -1012,7 +1016,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
 			env.ctx.Lock.Lock()
 			defer func() {
-				err := shutdownEnvironment(env)
+				err := shutdownCaminoEnvironment(env)
 				require.NoError(t, err)
 			}()
 			env.config.BanffTime = env.state.GetTimestamp()
@@ -1040,7 +1044,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
 			env.ctx.Lock.Lock()
 			defer func() {
-				err := shutdownEnvironment(env)
+				err := shutdownCaminoEnvironment(env)
 				require.NoError(t, err)
 			}()
 			env.config.BanffTime = env.state.GetTimestamp()
@@ -1067,7 +1071,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
 			env.ctx.Lock.Lock()
 			defer func() {
-				err := shutdownEnvironment(env)
+				err := shutdownCaminoEnvironment(env)
 				require.NoError(t, err)
 			}()
 			env.config.BanffTime = env.state.GetTimestamp()
@@ -1093,7 +1097,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
 			env.ctx.Lock.Lock()
 			defer func() {
-				err := shutdownEnvironment(env)
+				err := shutdownCaminoEnvironment(env)
 				require.NoError(t, err)
 			}()
 			env.config.BanffTime = env.state.GetTimestamp()
@@ -1118,7 +1122,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
 			env.ctx.Lock.Lock()
 			defer func() {
-				err := shutdownEnvironment(env)
+				err := shutdownCaminoEnvironment(env)
 				require.NoError(t, err)
 			}()
 			env.config.BanffTime = env.state.GetTimestamp()
@@ -1145,7 +1149,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
 			env.ctx.Lock.Lock()
 			defer func() {
-				err := shutdownEnvironment(env)
+				err := shutdownCaminoEnvironment(env)
 				require.NoError(t, err)
 			}()
 			env.config.BanffTime = env.state.GetTimestamp()
@@ -1179,7 +1183,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
 			env.ctx.Lock.Lock()
 			defer func() {
-				err := shutdownEnvironment(env)
+				err := shutdownCaminoEnvironment(env)
 				require.NoError(t, err)
 			}()
 			env.config.BanffTime = env.state.GetTimestamp()
@@ -1315,7 +1319,7 @@ func TestCaminoAddSubnetValidatorTxNodeSig(t *testing.T) {
 			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
 			env.ctx.Lock.Lock()
 			defer func() {
-				if err := shutdownEnvironment(env); err != nil {
+				if err := shutdownCaminoEnvironment(env); err != nil {
 					t.Fatal(err)
 				}
 			}()
@@ -1625,7 +1629,7 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 	})
 
 	// Shut down the environment
-	err = shutdownEnvironment(env)
+	err = shutdownCaminoEnvironment(env)
 	require.NoError(t, err)
 }
 
@@ -1638,7 +1642,7 @@ func TestAddAdressStateTxExecutor(t *testing.T) {
 	env := newCaminoEnvironment( /*postBanff*/ true, caminoGenesisConf)
 	env.ctx.Lock.Lock()
 	defer func() {
-		err := shutdownEnvironment(env)
+		err := shutdownCaminoEnvironment(env)
 		require.NoError(t, err)
 	}()
 
@@ -1881,6 +1885,1479 @@ func TestAddAdressStateTxExecutor(t *testing.T) {
 			executor.State.SetAddressStates(tt.targetAddress, tt.flag)
 
 			err = addAddressStateTx.Visit(&executor)
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
+}
+
+func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
+	currentTime := time.Now()
+
+	testDepositOffer := genesis.DepositOffer{
+		UnlockHalfPeriodDuration: 30,
+		InterestRateNominator:    0,
+		Start:                    uint64(currentTime.Add(-60 * time.Hour).Unix()),
+		End:                      uint64(currentTime.Add(+60 * time.Hour).Unix()),
+		MinAmount:                1,
+		MinDuration:              60,
+		MaxDuration:              60,
+	}
+
+	testKey, err := testKeyfactory.NewPrivateKey()
+	require.NoError(t, err)
+	dummyKey, err := testKeyfactory.NewPrivateKey()
+	require.NoError(t, err)
+	dummyOutputOwners := secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs:     []ids.ShortID{dummyKey.PublicKey().Address()},
+	}
+
+	outputOwners := secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs:     []ids.ShortID{testKey.PublicKey().Address()},
+	}
+	sigIndices := []uint32{0}
+	inputSigners := []*crypto.PrivateKeySECP256K1R{testKey.(*crypto.PrivateKeySECP256K1R)}
+	existingTxID := ids.GenerateTestID()
+
+	tests := map[string]struct {
+		caminoGenesisConf genesis.Camino
+		utxos             []*avax.UTXO
+		generateIns       func([]*avax.UTXO) []*avax.TransferableInput
+		signers           [][]*crypto.PrivateKeySECP256K1R
+		outs              []*avax.TransferableOutput
+		depositOfferID    func(caminoEnvironment) ids.ID
+		expectedErr       error
+	}{
+		"Wrong lockModeBondDeposit flag": {
+			caminoGenesisConf: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: false,
+				DepositOffers:       []genesis.DepositOffer{testDepositOffer},
+			},
+			utxos:          []*avax.UTXO{},
+			generateIns:    noInputs,
+			outs:           []*avax.TransferableOutput{},
+			depositOfferID: noOffers,
+			expectedErr:    errWrongLockMode,
+		},
+		"Stakeable ins": {
+			caminoGenesisConf: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+				DepositOffers:       []genesis.DepositOffer{testDepositOffer},
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestStakeableIn(avaxAssetID, defaultCaminoBalance, uint64(defaultMinStakingDuration), sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoBalance-defaultCaminoValidatorWeight-defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, locked.ThisTxID, ids.Empty),
+			},
+			depositOfferID: func(env caminoEnvironment) ids.ID {
+				genesisOffers, err := env.state.GetAllDepositOffers()
+				require.NoError(t, err)
+				return genesisOffers[0].ID
+			},
+			expectedErr: locked.ErrWrongInType,
+		},
+		"Stakeable outs": {
+			caminoGenesisConf: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+				DepositOffers:       []genesis.DepositOffer{testDepositOffer},
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestStakeableOut(avaxAssetID, defaultCaminoBalance, uint64(defaultMinStakingDuration), outputOwners),
+			},
+			depositOfferID: func(env caminoEnvironment) ids.ID {
+				genesisOffers, err := env.state.GetAllDepositOffers()
+				require.NoError(t, err)
+				return genesisOffers[0].ID
+			},
+			expectedErr: locked.ErrWrongOutType,
+		},
+		"Inputs and utxos length mismatch": {
+			caminoGenesisConf: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+				DepositOffers:       []genesis.DepositOffer{testDepositOffer},
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners, inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoBalance-defaultCaminoValidatorWeight-defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, locked.ThisTxID, ids.Empty),
+			},
+			depositOfferID: func(env caminoEnvironment) ids.ID {
+				genesisOffers, err := env.state.GetAllDepositOffers()
+				require.NoError(t, err)
+				return genesisOffers[0].ID
+			},
+			expectedErr: errFlowCheckFailed,
+		},
+		"Inputs and credentials length mismatch": {
+			caminoGenesisConf: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+				DepositOffers:       []genesis.DepositOffer{testDepositOffer},
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners, inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoBalance-defaultCaminoValidatorWeight-defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, locked.ThisTxID, ids.Empty),
+			},
+			depositOfferID: func(env caminoEnvironment) ids.ID {
+				genesisOffers, err := env.state.GetAllDepositOffers()
+				require.NoError(t, err)
+				return genesisOffers[0].ID
+			},
+			expectedErr: errFlowCheckFailed,
+		},
+		"Not existing deposit offer ID": {
+			caminoGenesisConf: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+				DepositOffers:       []genesis.DepositOffer{testDepositOffer},
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoBalance-defaultCaminoValidatorWeight-defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, locked.ThisTxID, ids.Empty),
+			},
+			depositOfferID: func(env caminoEnvironment) ids.ID {
+				return ids.GenerateTestID()
+			},
+			expectedErr: database.ErrNotFound,
+		},
+		"Deposit is not active yet": {
+			caminoGenesisConf: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+				DepositOffers: []genesis.DepositOffer{
+					{
+						UnlockHalfPeriodDuration: 30,
+						InterestRateNominator:    0,
+						Start:                    uint64(time.Now().Add(+60 * time.Hour).Unix()),
+						End:                      uint64(time.Now().Add(+60 * time.Hour).Unix()),
+						MinAmount:                1,
+						MinDuration:              60,
+						MaxDuration:              60,
+					},
+				},
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoBalance-defaultCaminoValidatorWeight-defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, locked.ThisTxID, ids.Empty),
+			},
+			depositOfferID: func(env caminoEnvironment) ids.ID {
+				genesisOffers, err := env.state.GetAllDepositOffers()
+				require.NoError(t, err)
+				return genesisOffers[0].ID
+			},
+			expectedErr: errDepositOfferNotActiveYet,
+		},
+		"Deposit offer has expired": {
+			caminoGenesisConf: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+				DepositOffers: []genesis.DepositOffer{
+					{
+						UnlockHalfPeriodDuration: 30,
+						InterestRateNominator:    0,
+						Start:                    uint64(time.Now().Add(-60 * time.Hour).Unix()),
+						End:                      uint64(time.Now().Add(-60 * time.Hour).Unix()),
+						MinAmount:                1,
+						MinDuration:              60,
+						MaxDuration:              60,
+					},
+				},
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoBalance-defaultCaminoValidatorWeight-defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, locked.ThisTxID, ids.Empty),
+			},
+			depositOfferID: func(env caminoEnvironment) ids.ID {
+				genesisOffers, err := env.state.GetAllDepositOffers()
+				require.NoError(t, err)
+				return genesisOffers[0].ID
+			},
+			expectedErr: errDepositOfferInactive,
+		},
+		"Deposit's duration is too small": {
+			caminoGenesisConf: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+				DepositOffers: []genesis.DepositOffer{
+					{
+						UnlockHalfPeriodDuration: 30,
+						InterestRateNominator:    0,
+						Start:                    uint64(time.Now().Add(-60 * time.Hour).Unix()),
+						End:                      uint64(time.Now().Add(+60 * time.Hour).Unix()),
+						MinAmount:                1,
+						MinDuration:              100,
+						MaxDuration:              60,
+					},
+				},
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoBalance-defaultCaminoValidatorWeight-defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, locked.ThisTxID, ids.Empty),
+			},
+			depositOfferID: func(env caminoEnvironment) ids.ID {
+				genesisOffers, err := env.state.GetAllDepositOffers()
+				require.NoError(t, err)
+				return genesisOffers[0].ID
+			},
+			expectedErr: errDepositDurationToSmall,
+		},
+		"Deposit's duration is too big": {
+			caminoGenesisConf: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+				DepositOffers: []genesis.DepositOffer{
+					{
+						UnlockHalfPeriodDuration: 30,
+						InterestRateNominator:    0,
+						Start:                    uint64(time.Now().Add(-60 * time.Hour).Unix()),
+						End:                      uint64(time.Now().Add(+60 * time.Hour).Unix()),
+						MinAmount:                1,
+						MinDuration:              60,
+						MaxDuration:              30,
+					},
+				},
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoBalance-defaultCaminoValidatorWeight-defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, locked.ThisTxID, ids.Empty),
+			},
+			depositOfferID: func(env caminoEnvironment) ids.ID {
+				genesisOffers, err := env.state.GetAllDepositOffers()
+				require.NoError(t, err)
+				return genesisOffers[0].ID
+			},
+			expectedErr: errDepositDurationToBig,
+		},
+		"Deposit's amount is too small": {
+			caminoGenesisConf: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+				DepositOffers: []genesis.DepositOffer{
+					{
+						UnlockHalfPeriodDuration: 30,
+						InterestRateNominator:    0,
+						Start:                    uint64(time.Now().Add(-60 * time.Hour).Unix()),
+						End:                      uint64(time.Now().Add(+60 * time.Hour).Unix()),
+						MinAmount:                defaultCaminoValidatorWeight * 2,
+						MinDuration:              60,
+						MaxDuration:              60,
+					},
+				},
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoBalance-defaultCaminoValidatorWeight-defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, locked.ThisTxID, ids.Empty),
+			},
+			depositOfferID: func(env caminoEnvironment) ids.ID {
+				genesisOffers, err := env.state.GetAllDepositOffers()
+				require.NoError(t, err)
+				return genesisOffers[0].ID
+			},
+			expectedErr: errDepositToSmall,
+		},
+		"No fee burning": {
+			caminoGenesisConf: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+				DepositOffers: []genesis.DepositOffer{
+					testDepositOffer,
+				},
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, existingTxID),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, locked.ThisTxID, existingTxID),
+			},
+			depositOfferID: func(env caminoEnvironment) ids.ID {
+				genesisOffers, err := env.state.GetAllDepositOffers()
+				require.NoError(t, err)
+				return genesisOffers[0].ID
+			},
+			expectedErr: errFlowCheckFailed,
+		},
+		"Deposit already deposited amount": {
+			caminoGenesisConf: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+				DepositOffers: []genesis.DepositOffer{
+					testDepositOffer,
+				},
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultCaminoBalance, outputOwners, existingTxID, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+					generateTestInFromUTXO(utxos[1], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners, inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, locked.ThisTxID, existingTxID),
+			},
+			depositOfferID: func(env caminoEnvironment) ids.ID {
+				genesisOffers, err := env.state.GetAllDepositOffers()
+				require.NoError(t, err)
+				return genesisOffers[0].ID
+			},
+			expectedErr: errFlowCheckFailed,
+		},
+		"Deposit amount of not owned utxos": {
+			caminoGenesisConf: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+				DepositOffers: []genesis.DepositOffer{
+					testDepositOffer,
+				},
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, dummyOutputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoBalance-defaultCaminoValidatorWeight-defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, locked.ThisTxID, ids.Empty),
+			},
+			depositOfferID: func(env caminoEnvironment) ids.ID {
+				genesisOffers, err := env.state.GetAllDepositOffers()
+				require.NoError(t, err)
+				return genesisOffers[0].ID
+			},
+			expectedErr: errFlowCheckFailed,
+		},
+		"Not enough balance to deposit": {
+			caminoGenesisConf: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+				DepositOffers: []genesis.DepositOffer{
+					testDepositOffer,
+				},
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, locked.ThisTxID, ids.Empty),
+			},
+			depositOfferID: func(env caminoEnvironment) ids.ID {
+				genesisOffers, err := env.state.GetAllDepositOffers()
+				require.NoError(t, err)
+				return genesisOffers[0].ID
+			},
+			expectedErr: errFlowCheckFailed,
+		},
+		"Supply overflow": {
+			caminoGenesisConf: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+				DepositOffers: []genesis.DepositOffer{
+					{
+						UnlockHalfPeriodDuration: 30,
+						InterestRateNominator:    1000 * units.MegaAvax,
+						Start:                    uint64(time.Now().Add(-60 * time.Hour).Unix()),
+						End:                      uint64(time.Now().Add(+60 * time.Hour).Unix()),
+						MinAmount:                1,
+						MinDuration:              60,
+						MaxDuration:              60,
+					},
+				},
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoBalance-defaultCaminoValidatorWeight-defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, locked.ThisTxID, ids.Empty),
+			},
+			depositOfferID: func(env caminoEnvironment) ids.ID {
+				genesisOffers, err := env.state.GetAllDepositOffers()
+				require.NoError(t, err)
+				return genesisOffers[0].ID
+			},
+			expectedErr: errSupplyOverflow,
+		},
+		"Happy path deposit unlocked": {
+			caminoGenesisConf: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+				DepositOffers: []genesis.DepositOffer{
+					testDepositOffer,
+				},
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoBalance-defaultCaminoValidatorWeight-defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, locked.ThisTxID, ids.Empty),
+			},
+			depositOfferID: func(env caminoEnvironment) ids.ID {
+				genesisOffers, err := env.state.GetAllDepositOffers()
+				require.NoError(t, err)
+				return genesisOffers[0].ID
+			},
+			expectedErr: nil,
+		},
+		"Happy path deposit unlocked, fee change to new address": {
+			caminoGenesisConf: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+				DepositOffers: []genesis.DepositOffer{
+					testDepositOffer,
+				},
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance+10, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, 10, dummyOutputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoBalance-defaultCaminoValidatorWeight-defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, locked.ThisTxID, ids.Empty),
+			},
+			depositOfferID: func(env caminoEnvironment) ids.ID {
+				genesisOffers, err := env.state.GetAllDepositOffers()
+				require.NoError(t, err)
+				return genesisOffers[0].ID
+			},
+			expectedErr: nil,
+		},
+		"Happy path deposit bonded": {
+			caminoGenesisConf: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+				DepositOffers: []genesis.DepositOffer{
+					testDepositOffer,
+				},
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, existingTxID),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+					generateTestInFromUTXO(utxos[1], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners, inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, locked.ThisTxID, existingTxID),
+			},
+			depositOfferID: func(env caminoEnvironment) ids.ID {
+				genesisOffers, err := env.state.GetAllDepositOffers()
+				require.NoError(t, err)
+				return genesisOffers[0].ID
+			},
+			expectedErr: nil,
+		},
+		"Happy path deposit bonded and unlocked": {
+			caminoGenesisConf: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+				DepositOffers: []genesis.DepositOffer{
+					testDepositOffer,
+				},
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultTxFee+defaultCaminoValidatorWeight/2, outputOwners, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultCaminoValidatorWeight/2, outputOwners, ids.Empty, existingTxID),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+					generateTestInFromUTXO(utxos[1], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners, inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight/2, outputOwners, locked.ThisTxID, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight/2, outputOwners, locked.ThisTxID, existingTxID),
+			},
+			depositOfferID: func(env caminoEnvironment) ids.ID {
+				genesisOffers, err := env.state.GetAllDepositOffers()
+				require.NoError(t, err)
+				return genesisOffers[0].ID
+			},
+			expectedErr: nil,
+		},
+		"Happy path, deposited amount transferred to another owner": {
+			caminoGenesisConf: genesis.Camino{
+				VerifyNodeSignature: true,
+				LockModeBondDeposit: true,
+				DepositOffers: []genesis.DepositOffer{
+					testDepositOffer,
+				},
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoBalance, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoBalance-defaultCaminoValidatorWeight-defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, dummyOutputOwners, locked.ThisTxID, ids.Empty),
+			},
+			depositOfferID: func(env caminoEnvironment) ids.ID {
+				genesisOffers, err := env.state.GetAllDepositOffers()
+				require.NoError(t, err)
+				return genesisOffers[0].ID
+			},
+			expectedErr: nil,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoGenesisConf)
+			env.ctx.Lock.Lock()
+			defer func() {
+				if err := shutdownCaminoEnvironment(env); err != nil {
+					t.Fatal(err)
+				}
+			}()
+
+			env.config.BanffTime = env.state.GetTimestamp()
+			env.state.SetTimestamp(time.Now())
+
+			for _, utxo := range tt.utxos {
+				env.state.AddUTXO(utxo)
+			}
+
+			err := env.state.Commit()
+			require.NoError(t, err)
+			ins := tt.generateIns(tt.utxos)
+
+			avax.SortTransferableInputsWithSigners(ins, tt.signers)
+			avax.SortTransferableOutputs(tt.outs, txs.Codec)
+
+			utx := &txs.DepositTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    env.ctx.NetworkID,
+					BlockchainID: env.ctx.ChainID,
+					Ins:          ins,
+					Outs:         tt.outs,
+				}},
+				DepositOfferID: tt.depositOfferID(*env),
+				Duration:       60,
+				RewardsOwner: &secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{ids.ShortEmpty},
+				},
+			}
+
+			tx, err := txs.NewSigned(utx, txs.Codec, tt.signers)
+			require.NoError(t, err)
+
+			onAcceptState, err := state.NewDiff(lastAcceptedID, env)
+			require.NoError(t, err)
+
+			executor := CaminoStandardTxExecutor{
+				StandardTxExecutor{
+					Backend: &env.backend,
+					State:   onAcceptState,
+					Tx:      tx,
+				},
+			}
+
+			err = tx.Unsigned.Visit(&executor)
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
+}
+
+func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
+	testUndepositAmount := uint64(10000)
+	testKey, err := testKeyfactory.NewPrivateKey()
+	require.NoError(t, err)
+	dummyKey, err := testKeyfactory.NewPrivateKey()
+	require.NoError(t, err)
+
+	outputOwners := secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs:     []ids.ShortID{testKey.PublicKey().Address()},
+	}
+	dummyOutputOwners := secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs:     []ids.ShortID{dummyKey.PublicKey().Address()},
+	}
+	sigIndices := []uint32{0}
+	inputSigners := []*crypto.PrivateKeySECP256K1R{testKey.(*crypto.PrivateKeySECP256K1R)}
+	existingTxID := ids.GenerateTestID()
+	depositTxID := ids.GenerateTestID()
+	depositTxID2 := ids.GenerateTestID()
+	depositStartTime := time.Now()
+
+	depositExpiredTime := depositStartTime.Add(100 * time.Second)
+	depositEndedTime := depositStartTime.Add(80 * time.Second)
+	depositNotEndedTime := depositStartTime.Add(50 * time.Second)
+	genesisDepositOffer := genesis.DepositOffer{
+		UnlockHalfPeriodDuration: 30,
+		InterestRateNominator:    0,
+		Start:                    uint64(time.Now().Add(-60 * time.Hour).Unix()),
+		End:                      uint64(time.Now().Add(+60 * time.Hour).Unix()),
+		MinAmount:                1,
+		MinDuration:              60,
+		MaxDuration:              100,
+	}
+	caminoGenesisConf := genesis.Camino{
+		VerifyNodeSignature: true,
+		LockModeBondDeposit: true,
+		DepositOffers: []genesis.DepositOffer{
+			genesisDepositOffer,
+		},
+	}
+	depositOffer := &deposits.Offer{
+		UnlockHalfPeriodDuration: 30,
+		InterestRateNominator:    0,
+		Start:                    uint64(time.Now().Add(-60 * time.Hour).Unix()),
+		End:                      uint64(time.Now().Add(+60 * time.Hour).Unix()),
+		MinAmount:                1,
+		MinDuration:              60,
+		MaxDuration:              100,
+	}
+	deposit := &deposits.Deposit{
+		Duration: 60,
+		Amount:   defaultCaminoValidatorWeight,
+		Start:    uint64(depositStartTime.Unix()),
+	}
+
+	tests := map[string]struct {
+		utxos       []*avax.UTXO
+		generateIns func([]*avax.UTXO) []*avax.TransferableInput
+		signers     [][]*crypto.PrivateKeySECP256K1R
+		outs        []*avax.TransferableOutput
+		preExecute  func(env caminoEnvironment)
+		expectedErr error
+	}{
+		"Stakeable ins": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestStakeableIn(avaxAssetID, defaultCaminoValidatorWeight, uint64(defaultMinStakingDuration), sigIndices),
+				}
+			},
+			signers:     [][]*crypto.PrivateKeySECP256K1R{inputSigners},
+			outs:        []*avax.TransferableOutput{},
+			preExecute:  func(env caminoEnvironment) {},
+			expectedErr: locked.ErrWrongInType,
+		},
+		"Stakeable outs": {
+			utxos:       []*avax.UTXO{},
+			generateIns: noInputs,
+			outs: []*avax.TransferableOutput{
+				generateTestStakeableOut(avaxAssetID, defaultCaminoValidatorWeight, uint64(defaultMinStakingDuration), outputOwners),
+			},
+			preExecute:  func(env caminoEnvironment) {},
+			expectedErr: locked.ErrWrongOutType,
+		},
+		"Inputs and utxos length mismatch": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, depositTxID, ids.Empty),
+				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+					generateTestInFromUTXO(utxos[1], sigIndices),
+					generateTestIn(avaxAssetID, 10, ids.Empty, ids.Empty, sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners, inputSigners, inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.Empty),
+			},
+			preExecute: func(env caminoEnvironment) {
+				env.state.SetTimestamp(depositExpiredTime)
+			},
+			expectedErr: errFlowCheckFailed,
+		},
+		"Unlock bonded UTXOs": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, existingTxID),
+				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+					generateTestInFromUTXO(utxos[1], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners, inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.Empty),
+			},
+			preExecute:  func(env caminoEnvironment) {},
+			expectedErr: errFlowCheckFailed,
+		},
+		"Unlock deposited UTXOs but with unlocked ins": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, depositTxID, ids.Empty),
+				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				in := generateTestInFromUTXO(utxos[0], sigIndices)
+				innerIn := &secp256k1fx.TransferInput{
+					Amt:   in.In.Amount(),
+					Input: secp256k1fx.Input{SigIndices: sigIndices},
+				}
+				in.In = innerIn
+				return []*avax.TransferableInput{in, generateTestInFromUTXO(utxos[1], sigIndices)}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{{}, inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.Empty),
+			},
+			preExecute:  func(env caminoEnvironment) {},
+			expectedErr: errFlowCheckFailed,
+		},
+		"Unlock deposited UTXOs but with bonded ins": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, depositTxID, ids.Empty),
+				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				in := generateTestInFromUTXO(utxos[0], sigIndices)
+				out := utxos[0].Out.(*locked.Out)
+				innerIn := &locked.In{
+					IDs: locked.IDs{BondTxID: existingTxID},
+					TransferableIn: &secp256k1fx.TransferInput{
+						Amt:   out.Amount(),
+						Input: secp256k1fx.Input{SigIndices: sigIndices},
+					},
+				}
+				in.In = innerIn
+				return []*avax.TransferableInput{in, generateTestInFromUTXO(utxos[1], sigIndices)}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{{}, inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.Empty),
+			},
+			preExecute:  func(env caminoEnvironment) {},
+			expectedErr: errFlowCheckFailed,
+		},
+		"Unlock some amount, before deposit's half period": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, depositTxID, ids.Empty),
+				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+					generateTestInFromUTXO(utxos[1], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{{}, inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, 1, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight-1, outputOwners, depositTxID, ids.Empty),
+			},
+			preExecute:  func(env caminoEnvironment) {},
+			expectedErr: errFlowCheckFailed,
+		},
+		"Unlock some amount, deposit expired": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, depositTxID, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{{}},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight-1, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, 1, outputOwners, depositTxID, ids.Empty),
+			},
+			preExecute: func(env caminoEnvironment) {
+				env.state.SetTimestamp(depositExpiredTime)
+			},
+			expectedErr: errFlowCheckFailed,
+		},
+		"Unlock some amount of not owned utxos, deposit not ended": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, dummyOutputOwners, depositTxID, ids.Empty),
+				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+					generateTestInFromUTXO(utxos[1], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{{}, inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, testUndepositAmount, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight-testUndepositAmount, outputOwners, depositTxID, ids.Empty),
+			},
+			preExecute: func(env caminoEnvironment) {
+				env.state.SetTimestamp(depositNotEndedTime)
+			},
+			expectedErr: errFlowCheckFailed,
+		},
+		"Unlock some amount, utxos and input amount mismatch, deposit ended but not expired": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, depositTxID, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				in := generateTestInFromUTXO(utxos[0], sigIndices)
+				out := utxos[0].Out.(*locked.Out)
+				innerIn := &locked.In{
+					IDs: utxos[0].Out.(*locked.Out).IDs,
+					TransferableIn: &secp256k1fx.TransferInput{
+						Amt:   out.Amount() + 1,
+						Input: secp256k1fx.Input{SigIndices: sigIndices},
+					},
+				}
+				in.In = innerIn
+				return []*avax.TransferableInput{in}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, testUndepositAmount, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight-testUndepositAmount, outputOwners, depositTxID, ids.Empty),
+			},
+			preExecute: func(env caminoEnvironment) {
+				env.state.SetTimestamp(depositEndedTime)
+			},
+			expectedErr: errFlowCheckFailed,
+		},
+		"Unlock some amount, deposit not ended": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, depositTxID, ids.Empty),
+				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+					generateTestInFromUTXO(utxos[1], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{{}, inputSigners},
+			outs: func() []*avax.TransferableOutput {
+				unlockableAmount := deposit.UnlockableAmount(depositOffer, uint64(depositNotEndedTime.Unix()))
+				return []*avax.TransferableOutput{
+					generateTestOut(avaxAssetID, unlockableAmount+1, outputOwners, ids.Empty, ids.Empty),
+					generateTestOut(avaxAssetID, defaultCaminoValidatorWeight-unlockableAmount-1, outputOwners, depositTxID, ids.Empty),
+				}
+			}(),
+			preExecute: func(env caminoEnvironment) {
+				env.state.SetTimestamp(depositNotEndedTime)
+			},
+			expectedErr: errFlowCheckFailed,
+		},
+		"Unlock some amount, deposit ended but not expired": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, depositTxID, ids.Empty),
+				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+					generateTestInFromUTXO(utxos[1], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{{}, inputSigners},
+			outs: func() []*avax.TransferableOutput {
+				unlockableAmount := deposit.UnlockableAmount(depositOffer, uint64(depositEndedTime.Unix()))
+				return []*avax.TransferableOutput{
+					generateTestOut(avaxAssetID, unlockableAmount+1, outputOwners, ids.Empty, ids.Empty),
+					generateTestOut(avaxAssetID, defaultCaminoValidatorWeight-unlockableAmount-1, outputOwners, depositTxID, ids.Empty),
+				}
+			}(),
+			preExecute: func(env caminoEnvironment) {
+				env.state.SetTimestamp(depositEndedTime)
+			},
+			expectedErr: errFlowCheckFailed,
+		},
+		"One deposit, two utxos with diff owners, consumed 1.5 utxo < unlockable ,produced as owner1": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, testUndepositAmount, outputOwners, depositTxID, ids.Empty),
+				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultCaminoValidatorWeight, dummyOutputOwners, depositTxID2, ids.Empty),
+				generateTestUTXO(ids.ID{3}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+					generateTestInFromUTXO(utxos[1], sigIndices),
+					generateTestInFromUTXO(utxos[2], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{{}, {}, inputSigners},
+			outs: func() []*avax.TransferableOutput {
+				unlockableAmount := deposit.UnlockableAmount(depositOffer, uint64(depositNotEndedTime.Unix()))
+				return []*avax.TransferableOutput{
+					generateTestOut(avaxAssetID, unlockableAmount, outputOwners, ids.Empty, ids.Empty),
+					generateTestOut(avaxAssetID, defaultCaminoValidatorWeight-(unlockableAmount-testUndepositAmount), dummyOutputOwners, depositTxID2, ids.Empty),
+				}
+			}(),
+			preExecute: func(env caminoEnvironment) {
+				env.state.SetTimestamp(depositNotEndedTime)
+			},
+			expectedErr: errFlowCheckFailed,
+		},
+		"Unlock all amount of not owned utxos, deposit expired": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, dummyOutputOwners, depositTxID, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.Empty),
+			},
+			preExecute: func(env caminoEnvironment) {
+				env.state.SetTimestamp(depositStartTime.Add(120 * time.Second))
+			},
+			expectedErr: errFlowCheckFailed,
+		},
+		"Unlock all amount, utxos and input amount mismatch, deposit expired": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, depositTxID, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				in := generateTestInFromUTXO(utxos[0], sigIndices)
+				out := utxos[0].Out.(*locked.Out)
+				innerIn := &locked.In{
+					IDs: utxos[0].Out.(*locked.Out).IDs,
+					TransferableIn: &secp256k1fx.TransferInput{
+						Amt:   out.Amount() + 1,
+						Input: secp256k1fx.Input{SigIndices: sigIndices},
+					},
+				}
+				in.In = innerIn
+				return []*avax.TransferableInput{in}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.Empty),
+			},
+			preExecute: func(env caminoEnvironment) {
+				env.state.SetTimestamp(depositStartTime.Add(120 * time.Second))
+			},
+			expectedErr: errFlowCheckFailed,
+		},
+		"Unlock all amount but also consume bonded utxo, deposit expired": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, depositTxID, ids.Empty),
+				generateTestUTXO(ids.ID{1}, avaxAssetID, 10, outputOwners, ids.Empty, existingTxID),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+					generateTestInFromUTXO(utxos[1], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, 10, outputOwners, ids.Empty, existingTxID),
+			},
+			preExecute: func(env caminoEnvironment) {
+				env.state.SetTimestamp(depositStartTime.Add(120 * time.Second))
+			},
+			expectedErr: errFlowCheckFailed,
+		},
+		"Unlock deposit, one expired-not-owned and one active deposit": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, dummyOutputOwners, depositTxID, ids.Empty),
+				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, depositTxID2, ids.Empty),
+				generateTestUTXO(ids.ID{3}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+					generateTestInFromUTXO(utxos[1], sigIndices),
+					generateTestInFromUTXO(utxos[2], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{{}, {}, inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, testUndepositAmount, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight-testUndepositAmount, outputOwners, depositTxID2, ids.Empty),
+			},
+			preExecute: func(env caminoEnvironment) {
+				env.state.SetTimestamp(depositExpiredTime)
+				// Add a second deposit to state
+				genesisOffers, err := env.state.GetAllDepositOffers()
+				require.NoError(t, err)
+				deposit := &deposits.Deposit{
+					DepositOfferID: genesisOffers[0].ID,
+					Duration:       100,
+					Amount:         defaultCaminoValidatorWeight,
+					Start:          uint64(depositStartTime.Unix()),
+				}
+				env.state.UpdateDeposit(depositTxID2, deposit)
+				err = env.state.Commit()
+				require.NoError(t, err)
+			},
+			expectedErr: errFlowCheckFailed,
+		},
+		"Unlock deposit, one expired and one active-not-owned deposit": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, depositTxID, ids.Empty),
+				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultCaminoValidatorWeight, dummyOutputOwners, depositTxID2, ids.Empty),
+				generateTestUTXO(ids.ID{3}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+					generateTestInFromUTXO(utxos[1], sigIndices),
+					generateTestInFromUTXO(utxos[2], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{{}, {}, inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, testUndepositAmount, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight-testUndepositAmount, outputOwners, depositTxID2, ids.Empty),
+			},
+			preExecute: func(env caminoEnvironment) {
+				env.state.SetTimestamp(depositExpiredTime)
+				// Add a second deposit to state
+				genesisOffers, err := env.state.GetAllDepositOffers()
+				require.NoError(t, err)
+				deposit := &deposits.Deposit{
+					DepositOfferID: genesisOffers[0].ID,
+					Duration:       100,
+					Amount:         defaultCaminoValidatorWeight,
+					Start:          uint64(depositStartTime.Unix()),
+				}
+				env.state.UpdateDeposit(depositTxID2, deposit)
+				err = env.state.Commit()
+				require.NoError(t, err)
+			},
+			expectedErr: errFlowCheckFailed,
+		},
+		"Producing more than consumed": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, testUndepositAmount, outputOwners, depositTxID, ids.Empty),
+				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+					generateTestInFromUTXO(utxos[1], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{{}, inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, testUndepositAmount+1, outputOwners, ids.Empty, ids.Empty),
+			},
+			preExecute: func(env caminoEnvironment) {
+				env.state.SetTimestamp(depositNotEndedTime)
+			},
+			expectedErr: errFlowCheckFailed,
+		},
+		"No fee burning inputs are unlocked": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.Empty),
+			},
+			preExecute: func(env caminoEnvironment) {
+				env.state.SetTimestamp(depositExpiredTime)
+			},
+			expectedErr: errFlowCheckFailed,
+		},
+		"No fee burning inputs are deposited": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, depositTxID, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{{}},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight-testUndepositAmount, outputOwners, depositTxID, ids.Empty),
+				generateTestOut(avaxAssetID, testUndepositAmount, outputOwners, ids.Empty, ids.Empty),
+			},
+			preExecute: func(env caminoEnvironment) {
+				env.state.SetTimestamp(depositEndedTime)
+			},
+			expectedErr: errFlowCheckFailed,
+		},
+		"Happy path burn only fees": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.Empty),
+				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+					generateTestInFromUTXO(utxos[1], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{inputSigners, inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.Empty),
+			},
+			preExecute:  func(env caminoEnvironment) {},
+			expectedErr: nil,
+		},
+		"Happy path unlock all amount with creds provided, deposit expired": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, depositTxID, ids.Empty),
+				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+					generateTestInFromUTXO(utxos[1], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{{}, inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.Empty),
+			},
+			preExecute: func(env caminoEnvironment) {
+				env.state.SetTimestamp(depositExpiredTime)
+			},
+			expectedErr: nil,
+		},
+		"Happy path unlock all amount, deposit expired": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, depositTxID, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{{}},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.Empty),
+			},
+			preExecute: func(env caminoEnvironment) {
+				env.state.SetTimestamp(depositStartTime.Add(120 * time.Second))
+			},
+			expectedErr: nil,
+		},
+		"Happy path unlock some amount, deposit ended but not expired": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, depositTxID, ids.Empty),
+				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+					generateTestInFromUTXO(utxos[1], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{{}, inputSigners},
+			outs: func() []*avax.TransferableOutput {
+				unlockableAmount := deposit.UnlockableAmount(depositOffer, uint64(depositEndedTime.Unix()))
+				return []*avax.TransferableOutput{
+					generateTestOut(avaxAssetID, unlockableAmount, outputOwners, ids.Empty, ids.Empty),
+					generateTestOut(avaxAssetID, defaultCaminoValidatorWeight-unlockableAmount, outputOwners, depositTxID, ids.Empty),
+				}
+			}(),
+			preExecute: func(env caminoEnvironment) {
+				env.state.SetTimestamp(depositEndedTime)
+			},
+			expectedErr: nil,
+		},
+		"Happy path unlock some amount, deposit not ended": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, depositTxID, ids.Empty),
+				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+					generateTestInFromUTXO(utxos[1], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{{}, inputSigners},
+			outs: func() []*avax.TransferableOutput {
+				unlockableAmount := deposit.UnlockableAmount(depositOffer, uint64(depositNotEndedTime.Unix()))
+				return []*avax.TransferableOutput{
+					generateTestOut(avaxAssetID, unlockableAmount, outputOwners, ids.Empty, ids.Empty),
+					generateTestOut(avaxAssetID, defaultCaminoValidatorWeight-unlockableAmount, outputOwners, depositTxID, ids.Empty),
+				}
+			}(),
+			preExecute: func(env caminoEnvironment) {
+				env.state.SetTimestamp(depositNotEndedTime)
+			},
+			expectedErr: nil,
+		},
+		"Happy path unlock some amount, deposit not ended, fee change to new address": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, depositTxID, ids.Empty),
+				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultTxFee+10, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+					generateTestInFromUTXO(utxos[1], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{{}, inputSigners},
+			outs: func() []*avax.TransferableOutput {
+				unlockableAmount := deposit.UnlockableAmount(depositOffer, uint64(depositNotEndedTime.Unix()))
+				return []*avax.TransferableOutput{
+					generateTestOut(avaxAssetID, 10, dummyOutputOwners, ids.Empty, ids.Empty),
+					generateTestOut(avaxAssetID, unlockableAmount, outputOwners, ids.Empty, ids.Empty),
+					generateTestOut(avaxAssetID, defaultCaminoValidatorWeight-unlockableAmount, outputOwners, depositTxID, ids.Empty),
+				}
+			}(),
+			preExecute: func(env caminoEnvironment) {
+				env.state.SetTimestamp(depositNotEndedTime)
+			},
+			expectedErr: nil,
+		},
+		"Happy path unlock deposit, one expired deposit and one active": {
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{1}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, depositTxID, ids.Empty),
+				generateTestUTXO(ids.ID{2}, avaxAssetID, defaultCaminoValidatorWeight, outputOwners, depositTxID2, ids.Empty),
+				generateTestUTXO(ids.ID{3}, avaxAssetID, defaultTxFee, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateIns: func(utxos []*avax.UTXO) []*avax.TransferableInput {
+				return []*avax.TransferableInput{
+					generateTestInFromUTXO(utxos[0], sigIndices),
+					generateTestInFromUTXO(utxos[1], sigIndices),
+					generateTestInFromUTXO(utxos[2], sigIndices),
+				}
+			},
+			signers: [][]*crypto.PrivateKeySECP256K1R{{}, {}, inputSigners},
+			outs: []*avax.TransferableOutput{
+				generateTestOut(avaxAssetID, testUndepositAmount, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, ids.Empty),
+				generateTestOut(avaxAssetID, defaultCaminoValidatorWeight-testUndepositAmount, outputOwners, depositTxID2, ids.Empty),
+			},
+			preExecute: func(env caminoEnvironment) {
+				env.state.SetTimestamp(depositExpiredTime)
+				// Add a second deposit to state
+				genesisOffers, err := env.state.GetAllDepositOffers()
+				require.NoError(t, err)
+				deposit := &deposits.Deposit{
+					DepositOfferID: genesisOffers[0].ID,
+					Duration:       100,
+					Amount:         defaultCaminoValidatorWeight,
+					Start:          uint64(depositStartTime.Unix()),
+				}
+				env.state.UpdateDeposit(depositTxID2, deposit)
+				err = env.state.Commit()
+				require.NoError(t, err)
+			},
+			expectedErr: nil,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			env := newCaminoEnvironment( /*postBanff*/ true, caminoGenesisConf)
+			env.ctx.Lock.Lock()
+			defer func() {
+				if err = shutdownCaminoEnvironment(env); err != nil {
+					t.Fatal(err)
+				}
+			}()
+
+			env.config.BanffTime = env.state.GetTimestamp()
+			env.state.SetTimestamp(depositStartTime)
+
+			genesisOffers, err := env.state.GetAllDepositOffers()
+			require.NoError(t, err)
+
+			// Add a deposit to state
+			deposit.DepositOfferID = genesisOffers[0].ID
+			env.state.UpdateDeposit(depositTxID, deposit)
+			err = env.state.Commit()
+			require.NoError(t, err)
+
+			var ins []*avax.TransferableInput
+			for _, utxo := range tt.utxos {
+				env.state.AddUTXO(utxo)
+			}
+			ins = append(ins, tt.generateIns(tt.utxos)...)
+
+			err = env.state.Commit()
+			require.NoError(t, err)
+
+			avax.SortTransferableInputsWithSigners(ins, tt.signers)
+			avax.SortTransferableOutputs(tt.outs, txs.Codec)
+
+			utx := &txs.UnlockDepositTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    env.ctx.NetworkID,
+					BlockchainID: env.ctx.ChainID,
+					Ins:          ins,
+					Outs:         tt.outs,
+				}},
+			}
+
+			tx, err := txs.NewSigned(utx, txs.Codec, tt.signers)
+			require.NoError(t, err)
+
+			tt.preExecute(*env)
+
+			onAcceptState, err := state.NewDiff(lastAcceptedID, env)
+			require.NoError(t, err)
+
+			executor := CaminoStandardTxExecutor{
+				StandardTxExecutor{
+					Backend: &env.backend,
+					State:   onAcceptState,
+					Tx:      tx,
+				},
+			}
+
+			err = tx.Unsigned.Visit(&executor)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}

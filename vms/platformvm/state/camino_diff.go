@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 )
@@ -24,9 +25,7 @@ func NewCaminoDiff(
 		parentID:      parentID,
 		stateVersions: stateVersions,
 		timestamp:     parentState.GetTimestamp(),
-		caminoDiff: caminoDiff{
-			modifiedAddressStates: make(map[ids.ShortID]uint64),
-		},
+		caminoDiff:    newCaminoDiff(),
 	}, nil
 }
 
@@ -96,11 +95,11 @@ func (d *diff) GetAddressStates(address ids.ShortID) (uint64, error) {
 	return parentState.GetAddressStates(address)
 }
 
-func (d *diff) AddDepositOffer(offer *DepositOffer) {
-	d.caminoDiff.modifiedDepositOffers[offer.id] = offer
+func (d *diff) AddDepositOffer(offer *deposit.Offer) {
+	d.caminoDiff.modifiedDepositOffers[offer.ID] = offer
 }
 
-func (d *diff) GetDepositOffer(offerID ids.ID) (*DepositOffer, error) {
+func (d *diff) GetDepositOffer(offerID ids.ID) (*deposit.Offer, error) {
 	if offer, ok := d.caminoDiff.modifiedDepositOffers[offerID]; ok {
 		return offer, nil
 	}
@@ -113,13 +112,7 @@ func (d *diff) GetDepositOffer(offerID ids.ID) (*DepositOffer, error) {
 	return parentState.GetDepositOffer(offerID)
 }
 
-func (d *diff) GetAllDepositOffers() ([]*DepositOffer, error) {
-	offers := make([]*DepositOffer, len(d.caminoDiff.modifiedDepositOffers))
-
-	for _, offer := range d.caminoDiff.modifiedDepositOffers {
-		offers = append(offers, offer)
-	}
-
+func (d *diff) GetAllDepositOffers() ([]*deposit.Offer, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
@@ -130,7 +123,38 @@ func (d *diff) GetAllDepositOffers() ([]*DepositOffer, error) {
 		return nil, err
 	}
 
-	return append(parentOffers, offers...), nil
+	var offers []*deposit.Offer
+
+	for _, offer := range d.caminoDiff.modifiedDepositOffers {
+		if offer != nil {
+			offers = append(offers, offer)
+		}
+	}
+
+	for _, offer := range parentOffers {
+		if _, ok := d.caminoDiff.modifiedDepositOffers[offer.ID]; !ok {
+			offers = append(offers, offer)
+		}
+	}
+
+	return offers, nil
+}
+
+func (d *diff) UpdateDeposit(depositTxID ids.ID, deposit *deposit.Deposit) {
+	d.caminoDiff.modifiedDeposits[depositTxID] = deposit
+}
+
+func (d *diff) GetDeposit(depositTxID ids.ID) (*deposit.Deposit, error) {
+	if deposit, ok := d.caminoDiff.modifiedDeposits[depositTxID]; ok {
+		return deposit, nil
+	}
+
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	return parentState.GetDeposit(depositTxID)
 }
 
 // Finally apply all changes
@@ -139,7 +163,11 @@ func (d *diff) ApplyCaminoState(baseState State) {
 		baseState.SetAddressStates(k, v)
 	}
 
-	for _, v := range d.caminoDiff.modifiedDepositOffers {
-		baseState.AddDepositOffer(v)
+	for _, depositOffer := range d.caminoDiff.modifiedDepositOffers {
+		baseState.AddDepositOffer(depositOffer)
+	}
+
+	for depositTxID, deposit := range d.caminoDiff.modifiedDeposits {
+		baseState.UpdateDeposit(depositTxID, deposit)
 	}
 }

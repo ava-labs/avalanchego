@@ -5,64 +5,24 @@ package state
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 )
 
-const interestRateDenominator uint64 = 1_000_000
-
-type DepositOffer struct {
-	id ids.ID
-
-	UnlockHalfPeriodDuration uint32 `serialize:"true"`
-	InterestRateNominator    uint64 `serialize:"true"`
-	Start                    uint64 `serialize:"true"`
-	End                      uint64 `serialize:"true"`
-	MinAmount                uint64 `serialize:"true"`
-	MinDuration              uint32 `serialize:"true"`
-	MaxDuration              uint32 `serialize:"true"`
+func (cs *caminoState) AddDepositOffer(offer *deposit.Offer) {
+	cs.modifiedDepositOffers[offer.ID] = offer
 }
 
-// ID of this offer
-func (o *DepositOffer) ID() ids.ID {
-	return o.id
-}
-
-// Sets offer id from its bytes hash
-func (o *DepositOffer) SetID() error {
-	bytes, err := blocks.GenesisCodec.Marshal(blocks.Version, o)
-	if err != nil {
-		return err
-	}
-	o.id = hashing.ComputeHash256Array(bytes)
-	return nil
-}
-
-// Time when this offer becomes active
-func (o *DepositOffer) StartTime() time.Time {
-	return time.Unix(int64(o.Start), 0)
-}
-
-// Time when this offer becomes inactive
-func (o *DepositOffer) EndTime() time.Time {
-	return time.Unix(int64(o.End), 0)
-}
-
-func (o *DepositOffer) InterestRateFloat64() float64 {
-	return float64(o.InterestRateNominator) / float64(interestRateDenominator)
-}
-
-func (cs *caminoState) AddDepositOffer(offer *DepositOffer) {
-	cs.modifiedDepositOffers[offer.id] = offer
-}
-
-func (cs *caminoState) GetDepositOffer(offerID ids.ID) (*DepositOffer, error) {
+func (cs *caminoState) GetDepositOffer(offerID ids.ID) (*deposit.Offer, error) {
 	// Try to get from modified state
 	offer, ok := cs.modifiedDepositOffers[offerID]
+	// offer was deleted
+	if ok && offer == nil {
+		return nil, database.ErrNotFound
+	}
 	// Try to get it from state
 	if !ok {
 		if offer, ok = cs.depositOffers[offerID]; !ok {
@@ -72,15 +32,19 @@ func (cs *caminoState) GetDepositOffer(offerID ids.ID) (*DepositOffer, error) {
 	return offer, nil
 }
 
-func (cs *caminoState) GetAllDepositOffers() ([]*DepositOffer, error) {
-	offers := make([]*DepositOffer, len(cs.modifiedDepositOffers))
+func (cs *caminoState) GetAllDepositOffers() ([]*deposit.Offer, error) {
+	var offers []*deposit.Offer
 
 	for _, offer := range cs.modifiedDepositOffers {
-		offers = append(offers, offer)
+		if offer != nil {
+			offers = append(offers, offer)
+		}
 	}
 
-	for _, offer := range cs.depositOffers {
-		offers = append(offers, offer)
+	for offerID, offer := range cs.depositOffers {
+		if _, ok := cs.modifiedDepositOffers[offerID]; !ok {
+			offers = append(offers, offer)
+		}
 	}
 
 	return offers, nil
@@ -97,8 +61,8 @@ func (cs *caminoState) loadDepositOffers() error {
 		}
 
 		depositOfferBytes := depositOffersIt.Value()
-		depositOffer := &DepositOffer{
-			id: depositOfferID,
+		depositOffer := &deposit.Offer{
+			ID: depositOfferID,
 		}
 		if _, err := blocks.GenesisCodec.Unmarshal(depositOfferBytes, depositOffer); err != nil {
 			return err

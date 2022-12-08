@@ -68,7 +68,7 @@ type diff struct {
 	modifiedUTXOs map[ids.ID]*utxoModification
 
 	// camino state diff handler
-	caminoDiff caminoDiff
+	caminoDiff *caminoDiff
 }
 
 type utxoModification struct {
@@ -88,6 +88,7 @@ func NewDiff(
 		parentID:      parentID,
 		stateVersions: stateVersions,
 		timestamp:     parentState.GetTimestamp(),
+		caminoDiff:    newCaminoDiff(),
 	}, nil
 }
 

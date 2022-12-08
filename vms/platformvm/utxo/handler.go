@@ -28,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
-	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -109,29 +108,7 @@ type Spender interface {
 		error,
 	)
 
-	// Lock the provided amount while deducting the provided fee.
-	// Arguments:
-	// - [keys] are the owners of the funds
-	// - [totalAmountToLock] is the amount of funds that are trying to be locked with [appliedLockState]
-	// - [totalAmountToBurn] is the amount of AVAX that should be burned
-	// Returns:
-	// - [inputs] the inputs that should be consumed to fund the outputs
-	// - [outputs] the outputs that should be returned to the UTXO set
-	// - [signers] the proof of ownership of the funds being moved
-	Lock(
-		keys []*crypto.PrivateKeySECP256K1R,
-		totalAmountToLock uint64,
-		totalAmountToBurn uint64,
-		appliedLockState locked.State,
-		changeAddr ids.ShortID,
-	) (
-		[]*avax.TransferableInput, // inputs
-		[]*avax.TransferableOutput, // outputs
-		[][]*crypto.PrivateKeySECP256K1R, // signers
-		error,
-	)
-
-	Unlocker
+	CaminoSpender
 }
 
 type Verifier interface {
@@ -174,28 +151,7 @@ type Verifier interface {
 		unlockedProduced map[ids.ID]uint64,
 	) error
 
-	// Verify that [tx] is semantically valid.
-	// [ins] and [outs] are the inputs and outputs of [tx].
-	// [creds] are the credentials of [tx], which allow [ins] to be spent.
-	// The [ins] must have at least [burnedAmount] more than the [outs].
-	// [assetID] is id of allowed asset, ins/outs with other assets will return error
-	// [appliedLockState] are lockState that was applied to [ins] lockState to produce [outs]
-	//
-	// Precondition: [tx] has already been syntactically verified.
-	//
-	// Note: [unlockedProduced] is modified by this method.
-	VerifyLock(
-		tx txs.UnsignedTx,
-		utxoDB state.UTXOGetter,
-		ins []*avax.TransferableInput,
-		outs []*avax.TransferableOutput,
-		creds []verify.Verifiable,
-		burnedAmount uint64,
-		assetID ids.ID,
-		appliedLockState locked.State,
-	) error
-
-	Unlocker
+	CaminoVerifier
 }
 
 type Handler interface {

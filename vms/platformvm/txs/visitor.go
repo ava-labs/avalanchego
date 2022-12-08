@@ -28,5 +28,6 @@ type Visitor interface {
 	TransformSubnetTx(*TransformSubnetTx) error
 	AddPermissionlessValidatorTx(*AddPermissionlessValidatorTx) error
 	AddPermissionlessDelegatorTx(*AddPermissionlessDelegatorTx) error
-	AddAddressStateTx(*AddAddressStateTx) error
+
+	CaminoVisitor
 }

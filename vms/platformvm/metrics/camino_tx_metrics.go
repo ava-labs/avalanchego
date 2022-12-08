@@ -13,7 +13,9 @@ var _ txs.Visitor = (*caminoTxMetrics)(nil)
 
 type caminoTxMetrics struct {
 	txMetrics
-	numAddAddressStateTxs prometheus.Counter
+	numAddAddressStateTxs,
+	numDepositTxs,
+	numUnlockDepositTxs prometheus.Counter
 }
 
 func newCaminoTxMetrics(
@@ -35,8 +37,20 @@ func newCaminoTxMetrics(
 }
 
 func (m *txMetrics) AddAddressStateTx(*txs.AddAddressStateTx) error { return nil }
+func (m *txMetrics) DepositTx(*txs.DepositTx) error                 { return nil }
+func (m *txMetrics) UnlockDepositTx(*txs.UnlockDepositTx) error     { return nil }
 
 func (m *caminoTxMetrics) AddAddressStateTx(*txs.AddAddressStateTx) error {
 	m.numAddAddressStateTxs.Inc()
+	return nil
+}
+
+func (m *caminoTxMetrics) DepositTx(*txs.DepositTx) error {
+	m.numDepositTxs.Inc()
+	return nil
+}
+
+func (m *caminoTxMetrics) UnlockDepositTx(*txs.UnlockDepositTx) error {
+	m.numUnlockDepositTxs.Inc()
 	return nil
 }
