@@ -29,13 +29,15 @@
     "initialAdmin": "X-kopernikus1m4nr983lhd4p4nfsqk3a6a9mejugnn73cmp283",
     "depositOffers": [
       {
-        "unlockHalfPeriodDuration": 30,
         "start": 1668073842,
         "end": 1699609842,
         "minAmount": 1,
         "minDuration": 60,
         "maxDuration": 60,
-        "InterestRateNominator": 0
+        "unlockPeriodDuration": 60,
+        "noRewardsPeriodDuration": 0,
+        "interestRateNominator": 0,
+        "flags": 0
       }
     ]
   },

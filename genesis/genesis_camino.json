@@ -26,7 +26,20 @@
     "camino": {
         "verifyNodeSignature": true,
         "lockModeBondDeposit": true,
-        "initialAdmin": "X-camino1m4nr983lhd4p4nfsqk3a6a9mejugnn73f83vuy"
+        "initialAdmin": "X-camino1m4nr983lhd4p4nfsqk3a6a9mejugnn73f83vuy",
+        "depositOffers": [
+          {
+            "start": 1668073842,
+            "end": 1699609842,
+            "minAmount": 1,
+            "minDuration": 90,
+            "maxDuration": 90,
+            "unlockPeriodDuration": 60,
+            "noRewardsPeriodDuration": 30,
+            "interestRateNominator": 0,
+            "flags": 0
+          }
+        ]
     },
     "startTime": 1647388800,
     "initialStakeDuration": 31536000,
