@@ -22,6 +22,5 @@ fn main() -> Result<()> {
 
     match &cli.command {
         Commands::Create(opts) => create::run(opts),
-        _ => unreachable!("Subcommand not found. Exhausted list of subcommands"),
     }
 }
