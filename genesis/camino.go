@@ -34,16 +34,24 @@ func validateCaminoConfig(config *Config) error {
 			return errors.New("deposit minimum duration is greater than maximum duration")
 		}
 
-		if offer.MinDuration < offer.UnlockHalfPeriodDuration {
+		if offer.MinDuration == 0 {
+			return errors.New("deposit offer has zero minimum duration")
+		}
+
+		if offer.MinDuration < offer.NoRewardsPeriodDuration {
 			return fmt.Errorf(
-				"deposit offer minimum duration (%v) is less than unlock half-period duration (%v)",
+				"deposit offer minimum duration (%v) is less than no-rewards period duration (%v)",
 				offer.MinDuration,
-				offer.UnlockHalfPeriodDuration,
+				offer.NoRewardsPeriodDuration,
 			)
 		}
 
-		if offer.MinDuration == 0 {
-			return errors.New("deposit offer has zero  minimum duration")
+		if offer.MinDuration < offer.UnlockPeriodDuration {
+			return fmt.Errorf(
+				"deposit offer minimum duration (%v) is less than unlock period duration (%v)",
+				offer.MinDuration,
+				offer.UnlockPeriodDuration,
+			)
 		}
 	}
 

@@ -702,13 +702,13 @@ func TestGetDepositUnlockableAmounts(t *testing.T) {
 					deposit1 := deposit.Deposit{
 						DepositOfferID: testID,
 						Start:          nowMinus20m,
-						Duration:       uint32((10 * time.Minute).Seconds()),
+						Duration:       uint32((20 * time.Minute).Seconds()),
 						Amount:         depositedAmount,
 					}
 					s.EXPECT().GetDeposit(testID).Return(&deposit1, nil)
 					s.EXPECT().GetDepositOffer(testID).Return(&deposit.Offer{
-						UnlockHalfPeriodDuration: uint32((10 * time.Minute).Seconds()),
-						Start:                    nowMinus20m,
+						Start:                nowMinus20m,
+						UnlockPeriodDuration: uint32((20 * time.Minute).Seconds()),
 					}, nil)
 					return s
 				},
@@ -726,13 +726,13 @@ func TestGetDepositUnlockableAmounts(t *testing.T) {
 					deposit1 := deposit.Deposit{
 						DepositOfferID: testID,
 						Start:          nowMinus20m,
-						Duration:       uint32((20 * time.Minute).Seconds()),
+						Duration:       uint32((40 * time.Minute).Seconds()),
 						Amount:         depositedAmount,
 					}
 					s.EXPECT().GetDeposit(testID).Return(&deposit1, nil)
 					s.EXPECT().GetDepositOffer(testID).Return(&deposit.Offer{
-						UnlockHalfPeriodDuration: uint32((10 * time.Minute).Seconds()),
-						Start:                    nowMinus20m,
+						Start:                nowMinus20m,
+						UnlockPeriodDuration: uint32((40 * time.Minute).Seconds()),
 					}, nil)
 					return s
 				},
@@ -840,8 +840,8 @@ func TestUnlockDeposit(t *testing.T) {
 
 					s.EXPECT().GetDeposit(testID).Return(&deposit1, nil)
 					s.EXPECT().GetDepositOffer(testID).Return(&deposit.Offer{
-						UnlockHalfPeriodDuration: uint32((5 * time.Minute).Seconds()),
-						Start:                    nowMinus10m,
+						Start:                nowMinus10m,
+						UnlockPeriodDuration: uint32((10 * time.Minute).Seconds()),
 					}, nil)
 					s.EXPECT().LockedUTXOs(depositTxSet, gomock.Any(), locked.StateDeposited).Return(nil, fmt.Errorf("%w: %s", state.ErrMissingParentState, testID))
 					return s
@@ -858,7 +858,7 @@ func TestUnlockDeposit(t *testing.T) {
 					deposit1 := deposit.Deposit{
 						DepositOfferID: testID,
 						Start:          nowMinus10m,
-						Duration:       uint32((10 * time.Minute).Seconds()),
+						Duration:       uint32((15 * time.Minute).Seconds()),
 						Amount:         depositedAmount,
 					}
 					depositTxSet := ids.NewSet(1)
@@ -866,8 +866,8 @@ func TestUnlockDeposit(t *testing.T) {
 
 					s.EXPECT().GetDeposit(testID).Return(&deposit1, nil)
 					s.EXPECT().GetDepositOffer(testID).Return(&deposit.Offer{
-						UnlockHalfPeriodDuration: uint32((5 * time.Minute).Seconds()),
-						Start:                    nowMinus10m,
+						Start:                nowMinus10m,
+						UnlockPeriodDuration: uint32((10 * time.Minute).Seconds()),
 					}, nil)
 					s.EXPECT().LockedUTXOs(depositTxSet, gomock.Any(), locked.StateDeposited).Return(depositedUTXOs, nil)
 					return s
@@ -891,7 +891,7 @@ func TestUnlockDeposit(t *testing.T) {
 					deposit1 := deposit.Deposit{
 						DepositOfferID: testID,
 						Start:          nowMinus10m,
-						Duration:       uint32((9 * time.Minute).Seconds()),
+						Duration:       uint32((10 * time.Minute).Seconds()),
 						Amount:         depositedAmount,
 					}
 					depositTxSet := ids.NewSet(1)
@@ -899,8 +899,8 @@ func TestUnlockDeposit(t *testing.T) {
 
 					s.EXPECT().GetDeposit(testID).Return(&deposit1, nil)
 					s.EXPECT().GetDepositOffer(testID).Return(&deposit.Offer{
-						UnlockHalfPeriodDuration: uint32((time.Minute).Seconds()),
-						Start:                    nowMinus10m,
+						Start:                nowMinus10m,
+						UnlockPeriodDuration: uint32((2 * time.Minute).Seconds()),
 					}, nil)
 					s.EXPECT().LockedUTXOs(depositTxSet, gomock.Any(), locked.StateDeposited).Return(depositedUTXOs, nil)
 					return s
@@ -996,7 +996,7 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			},
 			err: errInputsCredentialsMismatch,
 		},
-		"Number of inputs/utxos mismatch": {
+		"Number of inputs-utxos mismatch": {
 			args: args{
 				chainState: func(ctrl *gomock.Controller) state.Chain {
 					return state.NewMockChain(ctrl)
@@ -1019,7 +1019,7 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			},
 			err: errWrongCredentials,
 		},
-		"Lock Ids mismatch / no lockedOut output": {
+		"Lock Ids mismatch or no lockedOut output": {
 			args: args{
 				chainState: func(ctrl *gomock.Controller) state.Chain {
 					s := state.NewMockChain(ctrl)
@@ -1032,7 +1032,7 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			},
 			err: errLockIDsMismatch,
 		},
-		"Utxo/AssetID mismatch": {
+		"Utxo AssetID mismatch": {
 			args: args{
 				chainState: func(ctrl *gomock.Controller) state.Chain {
 					s := state.NewMockChain(ctrl)
@@ -1051,7 +1051,7 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			},
 			err: fmt.Errorf("utxo %d has asset ID %s but expect %s: %w", 0, ctx.AVAXAssetID, testID, errAssetIDMismatch),
 		},
-		"Input/AssetID mismatch": {
+		"Input AssetID mismatch": {
 			args: args{
 				chainState: func(ctrl *gomock.Controller) state.Chain {
 					s := state.NewMockChain(ctrl)
@@ -1108,7 +1108,7 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			},
 			err: errLockedFundsNotMarkedAsLocked,
 		},
-		"Consumed/input amount mismatch": {
+		"Consumed input amount mismatch": {
 			args: args{
 				chainState: func(ctrl *gomock.Controller) state.Chain {
 					s := state.NewMockChain(ctrl)
@@ -1137,13 +1137,13 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 						UnlockedAmount:      0,
 						ClaimedRewardAmount: 5000,
 						Start:               nowMinus10m,
-						Duration:            uint32((9 * time.Minute).Seconds()),
+						Duration:            uint32((10 * time.Minute).Seconds()),
 						Amount:              1000,
 					}
 					s.EXPECT().GetDeposit(testID).Return(&deposit1, nil)
 					s.EXPECT().GetDepositOffer(testID).Return(&deposit.Offer{
-						UnlockHalfPeriodDuration: uint32((time.Minute).Seconds()),
-						Start:                    nowMinus10m,
+						Start:                nowMinus10m,
+						UnlockPeriodDuration: uint32((time.Minute).Seconds()),
 					}, nil)
 					return s
 				},
@@ -1151,7 +1151,9 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 				utxos: []*avax.UTXO{
 					generateTestUTXO(ids.ID{9, 9}, ctx.AVAXAssetID, utxoAmount, outputOwners, testID, ids.Empty),
 				},
-				ins:          []*avax.TransferableInput{generateTestIn(ctx.AVAXAssetID, utxoAmount, testID, ids.Empty, sigIndices)},
+				ins: []*avax.TransferableInput{
+					generateTestIn(ctx.AVAXAssetID, utxoAmount, testID, ids.Empty, sigIndices),
+				},
 				outs:         nil,
 				creds:        []verify.Verifiable{cred1},
 				burnedAmount: utxoAmount + 1,
@@ -1169,13 +1171,13 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 						UnlockedAmount:      0,
 						ClaimedRewardAmount: 5000,
 						Start:               nowMinus10m,
-						Duration:            uint32((9 * time.Minute).Seconds()),
+						Duration:            uint32((10 * time.Minute).Seconds()),
 						Amount:              depositedAmount,
 					}
 					s.EXPECT().GetDeposit(testID).Return(&deposit1, nil)
 					s.EXPECT().GetDepositOffer(testID).Return(&deposit.Offer{
-						UnlockHalfPeriodDuration: uint32((time.Minute).Seconds()),
-						Start:                    nowMinus10m,
+						Start:                nowMinus10m,
+						UnlockPeriodDuration: uint32((time.Minute).Seconds()),
 					}, nil)
 					return s
 				},
@@ -1216,7 +1218,7 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			},
 			err: errWrongProducedAmount,
 		},
-		"Consumed/produced amount mismatch": {
+		"Consumed-produced amount mismatch": {
 			args: args{
 				chainState: func(ctrl *gomock.Controller) state.Chain {
 					s := state.NewMockChain(ctrl)
@@ -1259,8 +1261,8 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 					}
 					s.EXPECT().GetDeposit(testID).Return(&deposit1, nil)
 					s.EXPECT().GetDepositOffer(testID).Return(&deposit.Offer{
-						UnlockHalfPeriodDuration: uint32((time.Minute).Seconds()),
-						Start:                    uint64(now.Add(-11 * time.Minute).Unix()),
+						Start:                uint64(now.Add(-11 * time.Minute).Unix()),
+						UnlockPeriodDuration: uint32((2 * time.Minute).Seconds()),
 					}, nil)
 					return s
 				},
@@ -1293,13 +1295,13 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 					deposit1 := deposit.Deposit{
 						DepositOfferID: testID,
 						Start:          nowMinus10m,
-						Duration:       uint32((9 * time.Minute).Seconds()),
+						Duration:       uint32((10 * time.Minute).Seconds()),
 						Amount:         1000,
 					}
 					s.EXPECT().GetDeposit(testID).Return(&deposit1, nil)
 					s.EXPECT().GetDepositOffer(testID).Return(&deposit.Offer{
-						UnlockHalfPeriodDuration: uint32((time.Minute).Seconds()),
-						Start:                    nowMinus10m,
+						Start:                nowMinus10m,
+						UnlockPeriodDuration: uint32((time.Minute).Seconds()),
 					}, nil)
 					return s
 				},

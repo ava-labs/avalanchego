@@ -23,13 +23,15 @@ var bigInterestRateDenominator = (&big.Int{}).SetInt64(interestRateDenominator)
 type Offer struct {
 	ID ids.ID
 
-	UnlockHalfPeriodDuration uint32 `serialize:"true"`
-	InterestRateNominator    uint64 `serialize:"true"`
-	Start                    uint64 `serialize:"true"`
-	End                      uint64 `serialize:"true"`
-	MinAmount                uint64 `serialize:"true"`
-	MinDuration              uint32 `serialize:"true"`
-	MaxDuration              uint32 `serialize:"true"`
+	InterestRateNominator   uint64 `serialize:"true"`
+	Start                   uint64 `serialize:"true"`
+	End                     uint64 `serialize:"true"`
+	MinAmount               uint64 `serialize:"true"`
+	MinDuration             uint32 `serialize:"true"`
+	MaxDuration             uint32 `serialize:"true"`
+	UnlockPeriodDuration    uint32 `serialize:"true"`
+	NoRewardsPeriodDuration uint32 `serialize:"true"`
+	Flags                   uint64 `serialize:"true"`
 }
 
 // Sets offer id from its bytes hash
@@ -73,7 +75,12 @@ func (deposit *Deposit) IsExpired(
 	depositOffer *Offer,
 	timestamp uint64,
 ) bool {
-	return deposit.Start+uint64(deposit.Duration)+uint64(depositOffer.UnlockHalfPeriodDuration) < timestamp
+	depositEndTime, err := math.Add64(deposit.Start, uint64(deposit.Duration))
+	if err != nil {
+		// if err (overflow), than depositEndTime >= unlockTime
+		return false
+	}
+	return depositEndTime < timestamp
 }
 
 // Returns amount of tokens that can be unlocked from [deposit] at [unlockTime] (seconds).
@@ -82,14 +89,14 @@ func (deposit *Deposit) IsExpired(
 func (deposit *Deposit) UnlockableAmount(offer *Offer, unlockTime uint64) uint64 {
 	unlockPeriodStart, err := math.Add64(
 		deposit.Start,
-		uint64(deposit.Duration-offer.UnlockHalfPeriodDuration),
+		uint64(deposit.Duration-offer.UnlockPeriodDuration),
 	)
 	if err != nil || unlockPeriodStart > unlockTime {
 		// if err (overflow), than unlockPeriodStart > unlockTime for sure
 		return 0
 	}
 
-	unlockPeriodDuration := uint64(offer.UnlockHalfPeriodDuration) * 2
+	unlockPeriodDuration := uint64(offer.UnlockPeriodDuration)
 	passedUnlockPeriodDuration := math.Min(unlockTime-unlockPeriodStart, unlockPeriodDuration)
 
 	bigTotalUnlockableAmount := (&big.Int{}).SetUint64(deposit.Amount)
@@ -111,6 +118,17 @@ func (deposit *Deposit) ClaimableReward(offer *Offer, depositAmount, claimTime u
 		return 0
 	}
 
+	rewardsEndTime, err := math.Add64(
+		deposit.Start,
+		uint64(deposit.Duration-offer.NoRewardsPeriodDuration),
+	)
+	if err != nil {
+		// if err (overflow), than rewardsEndTime > claimTime
+		rewardsEndTime = claimTime
+	}
+
+	claimTime = math.Min(claimTime, rewardsEndTime)
+
 	bigTotalRewardAmount := (&big.Int{}).SetUint64(depositAmount)
 	bigPassedDepositDuration := (&big.Int{}).SetUint64(claimTime - deposit.Start)
 	bigInterestRateNominator := (&big.Int{}).SetUint64(offer.InterestRateNominator)
@@ -128,11 +146,12 @@ func (deposit *Deposit) ClaimableReward(offer *Offer, depositAmount, claimTime u
 // Precondition: all args are valid in conjunction.
 func (deposit *Deposit) TotalReward(offer *Offer) uint64 {
 	bigTotalRewardAmount := (&big.Int{}).SetUint64(deposit.Amount)
-	bigDepositDuration := (&big.Int{}).SetUint64(uint64(deposit.Duration))
+
+	bigRewardsPeriodDuration := (&big.Int{}).SetUint64(uint64(deposit.Duration - offer.NoRewardsPeriodDuration))
 	bigInterestRateNominator := (&big.Int{}).SetUint64(offer.InterestRateNominator)
 
-	// totalRewardAmount := depositAmount * offer.InterestRate * depositDuration / interestRateBase
-	bigTotalRewardAmount.Mul(bigTotalRewardAmount, bigDepositDuration)
+	// totalRewardAmount := depositAmount * offer.InterestRate * rewardsPeriodDuration / interestRateBase
+	bigTotalRewardAmount.Mul(bigTotalRewardAmount, bigRewardsPeriodDuration)
 	bigTotalRewardAmount.Mul(bigTotalRewardAmount, bigInterestRateNominator)
 	bigTotalRewardAmount.Div(bigTotalRewardAmount, bigInterestRateDenominator)
 

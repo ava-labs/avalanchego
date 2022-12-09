@@ -16,11 +16,13 @@ type Camino struct {
 }
 
 type DepositOffer struct {
-	UnlockHalfPeriodDuration uint32 `serialize:"true" json:"unlockHalfPeriodDuration"`
-	InterestRateNominator    uint64 `serialize:"true" json:"interestRateNominator"`
-	Start                    uint64 `serialize:"true" json:"start"`
-	End                      uint64 `serialize:"true" json:"end"`
-	MinAmount                uint64 `serialize:"true" json:"minAmount"`
-	MinDuration              uint32 `serialize:"true" json:"minDuration"`
-	MaxDuration              uint32 `serialize:"true" json:"maxDuration"`
+	InterestRateNominator   uint64 `serialize:"true" json:"interestRateNominator"`
+	Start                   uint64 `serialize:"true" json:"start"`
+	End                     uint64 `serialize:"true" json:"end"`
+	MinAmount               uint64 `serialize:"true" json:"minAmount"`
+	MinDuration             uint32 `serialize:"true" json:"minDuration"`
+	MaxDuration             uint32 `serialize:"true" json:"maxDuration"`
+	UnlockPeriodDuration    uint32 `serialize:"true" json:"unlockPeriodDuration"`
+	NoRewardsPeriodDuration uint32 `serialize:"true" json:"noRewardsPeriodDuration"`
+	Flags                   uint64 `serialize:"true" json:"flags"`
 }
