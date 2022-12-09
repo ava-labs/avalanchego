@@ -918,7 +918,7 @@ func (p *peer) handleVersion(msg *p2ppb.Version) {
 	p.ip = &SignedIP{
 		IP: UnsignedIP{
 			IP: ips.IPPort{
-				IP:   net.IP(msg.IpAddr),
+				IP:   msg.IpAddr,
 				Port: uint16(msg.IpPort),
 			},
 			Timestamp: msg.MyVersionTime,
@@ -1024,7 +1024,7 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 		discoveredIPs[i] = ips.ClaimedIPPort{
 			Cert: tlsCert,
 			IPPort: ips.IPPort{
-				IP:   net.IP(claimedIPPort.IpAddr),
+				IP:   claimedIPPort.IpAddr,
 				Port: uint16(claimedIPPort.IpPort),
 			},
 			Timestamp: claimedIPPort.Timestamp,
