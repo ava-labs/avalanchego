@@ -311,8 +311,18 @@ func (vm *VM) Initialize(
 	vm.ethConfig.RPCGasCap = vm.config.RPCGasCap
 	vm.ethConfig.RPCEVMTimeout = vm.config.APIMaxDuration.Duration
 	vm.ethConfig.RPCTxFeeCap = vm.config.RPCTxFeeCap
-	vm.ethConfig.TxPool.NoLocals = !vm.config.LocalTxsEnabled
+
 	vm.ethConfig.TxPool.Locals = vm.config.PriorityRegossipAddresses
+	vm.ethConfig.TxPool.NoLocals = !vm.config.LocalTxsEnabled
+	vm.ethConfig.TxPool.Journal = vm.config.TxPoolJournal
+	vm.ethConfig.TxPool.Rejournal = vm.config.TxPoolRejournal.Duration
+	vm.ethConfig.TxPool.PriceLimit = vm.config.TxPoolPriceLimit
+	vm.ethConfig.TxPool.PriceBump = vm.config.TxPoolPriceBump
+	vm.ethConfig.TxPool.AccountSlots = vm.config.TxPoolAccountSlots
+	vm.ethConfig.TxPool.GlobalSlots = vm.config.TxPoolGlobalSlots
+	vm.ethConfig.TxPool.AccountQueue = vm.config.TxPoolAccountQueue
+	vm.ethConfig.TxPool.GlobalQueue = vm.config.TxPoolGlobalQueue
+
 	vm.ethConfig.AllowUnfinalizedQueries = vm.config.AllowUnfinalizedQueries
 	vm.ethConfig.AllowUnprotectedTxs = vm.config.AllowUnprotectedTxs
 	vm.ethConfig.AllowUnprotectedTxHashes = vm.config.AllowUnprotectedTxHashes

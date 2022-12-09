@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/eth"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/spf13/cast"
@@ -123,7 +124,19 @@ type Config struct {
 	MetricsExpensiveEnabled bool `json:"metrics-expensive-enabled"` // Debug-level metrics that might impact runtime performance
 
 	// API Settings
-	LocalTxsEnabled          bool          `json:"local-txs-enabled"`
+	LocalTxsEnabled bool `json:"local-txs-enabled"`
+
+	TxPoolJournal   string   `json:"tx-pool-journal"`
+	TxPoolRejournal Duration `json:"tx-pool-rejournal"`
+
+	TxPoolPriceLimit uint64 `json:"tx-pool-price-limit"`
+	TxPoolPriceBump  uint64 `json:"tx-pool-price-bump"`
+
+	TxPoolAccountSlots uint64 `json:"tx-pool-account-slots"`
+	TxPoolGlobalSlots  uint64 `json:"tx-pool-global-slots"`
+	TxPoolAccountQueue uint64 `json:"tx-pool-account-queue"`
+	TxPoolGlobalQueue  uint64 `json:"tx-pool-global-queue"`
+
 	APIMaxDuration           Duration      `json:"api-max-duration"`
 	WSCPURefillRate          Duration      `json:"ws-cpu-refill-rate"`
 	WSCPUMaxStored           Duration      `json:"ws-cpu-max-stored"`
@@ -198,6 +211,16 @@ func (c *Config) SetDefaults() {
 	c.RPCGasCap = defaultRpcGasCap
 	c.RPCTxFeeCap = defaultRpcTxFeeCap
 	c.MetricsExpensiveEnabled = defaultMetricsExpensiveEnabled
+
+	c.TxPoolJournal = core.DefaultTxPoolConfig.Journal
+	c.TxPoolRejournal = Duration{Duration: core.DefaultTxPoolConfig.Rejournal}
+	c.TxPoolPriceLimit = core.DefaultTxPoolConfig.PriceLimit
+	c.TxPoolPriceBump = core.DefaultTxPoolConfig.PriceBump
+	c.TxPoolAccountSlots = core.DefaultTxPoolConfig.AccountSlots
+	c.TxPoolGlobalSlots = core.DefaultTxPoolConfig.GlobalSlots
+	c.TxPoolAccountQueue = core.DefaultTxPoolConfig.AccountQueue
+	c.TxPoolGlobalQueue = core.DefaultTxPoolConfig.GlobalQueue
+
 	c.APIMaxDuration.Duration = defaultApiMaxDuration
 	c.WSCPURefillRate.Duration = defaultWsCpuRefillRate
 	c.WSCPUMaxStored.Duration = defaultWsCpuMaxStored
