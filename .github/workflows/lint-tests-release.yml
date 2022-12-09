@@ -89,7 +89,7 @@ jobs:
 
   release:
     # needs: [lint_test, unit_test, e2e_test, simulator_test]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - name: Git checkout
         uses: actions/checkout@v3
