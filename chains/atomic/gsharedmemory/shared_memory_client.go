@@ -6,22 +6,11 @@ package gsharedmemory
 import (
 	"context"
 
-	stdatomic "sync/atomic"
-
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/units"
 
 	sharedmemorypb "github.com/ava-labs/avalanchego/proto/pb/sharedmemory"
-)
-
-const (
-	maxBatchSize = 128 * units.KiB
-
-	// baseElementSize is an approximation of the protobuf encoding overhead per
-	// element
-	baseElementSize = 8 // bytes
 )
 
 var _ atomic.SharedMemory = (*Client)(nil)
@@ -29,8 +18,6 @@ var _ atomic.SharedMemory = (*Client)(nil)
 // Client is atomic.SharedMemory that talks over RPC.
 type Client struct {
 	client sharedmemorypb.SharedMemoryClient
-
-	uniqueID int64
 }
 
 // NewClient returns shared memory connected to remote shared memory
@@ -39,49 +26,14 @@ func NewClient(client sharedmemorypb.SharedMemoryClient) *Client {
 }
 
 func (c *Client) Get(peerChainID ids.ID, keys [][]byte) ([][]byte, error) {
-	req := &sharedmemorypb.GetRequest{
+	resp, err := c.client.Get(context.Background(), &sharedmemorypb.GetRequest{
 		PeerChainId: peerChainID[:],
-		Id:          stdatomic.AddInt64(&c.uniqueID, 1),
-		Continues:   true,
-	}
-
-	currentSize := 0
-	prevIndex := 0
-	for i, key := range keys {
-		sizeChange := baseElementSize + len(key)
-		if newSize := currentSize + sizeChange; newSize > maxBatchSize {
-			_, err := c.client.Get(context.Background(), req)
-			if err != nil {
-				return nil, err
-			}
-
-			currentSize = 0
-			prevIndex = i
-			req.PeerChainId = nil
-		}
-		currentSize += sizeChange
-
-		req.Keys = keys[prevIndex : i+1]
-	}
-
-	req.Continues = false
-	resp, err := c.client.Get(context.Background(), req)
+		Keys:        keys,
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	values := resp.Values
-
-	req.PeerChainId = nil
-	req.Keys = nil
-	for resp.Continues {
-		resp, err = c.client.Get(context.Background(), req)
-		if err != nil {
-			return nil, err
-		}
-		values = append(values, resp.Values...)
-	}
-	return values, nil
+	return resp.Values, nil
 }
 
 func (c *Client) Indexed(
@@ -96,212 +48,55 @@ func (c *Client) Indexed(
 	[]byte,
 	error,
 ) {
-	req := &sharedmemorypb.IndexedRequest{
+	resp, err := c.client.Indexed(context.Background(), &sharedmemorypb.IndexedRequest{
 		PeerChainId: peerChainID[:],
+		Traits:      traits,
 		StartTrait:  startTrait,
 		StartKey:    startKey,
 		Limit:       int32(limit),
-		Id:          stdatomic.AddInt64(&c.uniqueID, 1),
-		Continues:   true,
-	}
-
-	currentSize := 0
-	prevIndex := 0
-	for i, trait := range traits {
-		sizeChange := baseElementSize + len(trait)
-		if newSize := currentSize + sizeChange; newSize > maxBatchSize {
-			_, err := c.client.Indexed(context.Background(), req)
-			if err != nil {
-				return nil, nil, nil, err
-			}
-
-			currentSize = 0
-			prevIndex = i
-			req.PeerChainId = nil
-			req.StartTrait = nil
-			req.StartKey = nil
-			req.Limit = 0
-		}
-		currentSize += sizeChange
-
-		req.Traits = traits[prevIndex : i+1]
-	}
-
-	req.Continues = false
-	resp, err := c.client.Indexed(context.Background(), req)
+	})
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	lastTrait := resp.LastTrait
-	lastKey := resp.LastKey
-	values := resp.Values
-
-	req.PeerChainId = nil
-	req.Traits = nil
-	req.StartTrait = nil
-	req.StartKey = nil
-	req.Limit = 0
-	for resp.Continues {
-		resp, err = c.client.Indexed(context.Background(), req)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		values = append(values, resp.Values...)
-	}
-	return values, lastTrait, lastKey, nil
+	return resp.Values, resp.LastTrait, resp.LastKey, nil
 }
 
-func (c *Client) Apply(requests map[ids.ID]*atomic.Requests, batch ...database.Batch) error {
+func (c *Client) Apply(requests map[ids.ID]*atomic.Requests, batches ...database.Batch) error {
 	req := &sharedmemorypb.ApplyRequest{
-		Continues: true,
-		Id:        stdatomic.AddInt64(&c.uniqueID, 1),
+		Requests: make([]*sharedmemorypb.AtomicRequest, 0, len(requests)),
+		Batches:  make([]*sharedmemorypb.Batch, len(batches)),
 	}
-
-	currentSize := 0
 	for key, value := range requests {
 		key := key
 
 		chainReq := &sharedmemorypb.AtomicRequest{
-			PeerChainId: key[:],
+			RemoveRequests: value.RemoveRequests,
+			PutRequests:    make([]*sharedmemorypb.Element, len(value.PutRequests)),
+			PeerChainId:    key[:],
 		}
-		req.Requests = append(req.Requests, chainReq)
-
-		for _, v := range value.PutRequests {
-			sizeChange := baseElementSize + len(v.Key) + len(v.Value)
-			for _, trait := range v.Traits {
-				sizeChange += len(trait)
-			}
-
-			if newSize := sizeChange + currentSize; newSize > maxBatchSize {
-				currentSize = 0
-
-				if _, err := c.client.Apply(context.Background(), req); err != nil {
-					return err
-				}
-
-				chainReq = &sharedmemorypb.AtomicRequest{
-					PeerChainId: key[:],
-				}
-				req.Requests = []*sharedmemorypb.AtomicRequest{chainReq}
-			}
-
-			currentSize += sizeChange
-			chainReq.PutRequests = append(chainReq.PutRequests, &sharedmemorypb.Element{
+		for i, v := range value.PutRequests {
+			chainReq.PutRequests[i] = &sharedmemorypb.Element{
 				Key:    v.Key,
 				Value:  v.Value,
 				Traits: v.Traits,
-			})
-		}
-
-		for _, v := range value.RemoveRequests {
-			sizeChange := baseElementSize + len(v)
-			if newSize := sizeChange + currentSize; newSize > maxBatchSize {
-				currentSize = 0
-
-				if _, err := c.client.Apply(context.Background(), req); err != nil {
-					return err
-				}
-
-				chainReq = &sharedmemorypb.AtomicRequest{
-					PeerChainId: key[:],
-				}
-				req.Requests = []*sharedmemorypb.AtomicRequest{chainReq}
 			}
-
-			currentSize += sizeChange
-			chainReq.RemoveRequests = append(chainReq.RemoveRequests, v)
 		}
+		req.Requests = append(req.Requests, chainReq)
 	}
-
-	batchGroups, err := c.makeBatches(batch, currentSize)
-	if err != nil {
-		return err
-	}
-
-	for i, batches := range batchGroups {
-		req.Batches = batches
-		req.Continues = i < len(batchGroups)-1
-		if _, err := c.client.Apply(context.Background(), req); err != nil {
-			return err
-		}
-		req.Requests = nil
-	}
-
-	if len(batchGroups) == 0 {
-		req.Continues = false
-		if _, err := c.client.Apply(context.Background(), req); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (c *Client) makeBatches(rawBatches []database.Batch, currentSize int) ([][]*sharedmemorypb.Batch, error) {
-	batchGroups := [][]*sharedmemorypb.Batch(nil)
-	currentBatchGroup := []*sharedmemorypb.Batch(nil)
-	currentBatch := &sharedmemorypb.Batch{
-		Id: stdatomic.AddInt64(&c.uniqueID, 1),
-	}
-	for _, batch := range rawBatches {
+	for i, batch := range batches {
 		batch := batch.Inner()
 		fb := filteredBatch{
 			writes: make(map[string][]byte),
 		}
 		if err := batch.Replay(&fb); err != nil {
-			return nil, err
+			return err
 		}
-
-		puts := fb.PutRequests()
-		for _, p := range puts {
-			sizeChange := baseElementSize + len(p.Key) + len(p.Value)
-			if newSize := currentSize + sizeChange; newSize > maxBatchSize {
-				if len(currentBatch.Deletes)+len(currentBatch.Puts) > 0 {
-					currentBatchGroup = append(currentBatchGroup, currentBatch)
-				}
-				if len(currentBatchGroup) > 0 {
-					batchGroups = append(batchGroups, currentBatchGroup)
-				}
-
-				currentSize = 0
-				currentBatchGroup = nil
-				currentBatch = &sharedmemorypb.Batch{
-					Id: currentBatch.Id,
-				}
-			}
-			currentSize += sizeChange
-			currentBatch.Puts = append(currentBatch.Puts, p)
-		}
-
-		deletes := fb.DeleteRequests()
-		for _, d := range deletes {
-			sizeChange := baseElementSize + len(d.Key)
-			if newSize := currentSize + sizeChange; newSize > maxBatchSize {
-				if len(currentBatch.Deletes)+len(currentBatch.Puts) > 0 {
-					currentBatchGroup = append(currentBatchGroup, currentBatch)
-				}
-				if len(currentBatchGroup) > 0 {
-					batchGroups = append(batchGroups, currentBatchGroup)
-				}
-
-				currentSize = 0
-				currentBatchGroup = nil
-				currentBatch = &sharedmemorypb.Batch{
-					Id: currentBatch.Id,
-				}
-			}
-			currentSize += sizeChange
-			currentBatch.Deletes = append(currentBatch.Deletes, d)
-		}
-
-		if len(currentBatch.Deletes)+len(currentBatch.Puts) > 0 {
-			currentBatchGroup = append(currentBatchGroup, currentBatch)
-		}
-		currentBatch = &sharedmemorypb.Batch{
-			Id: stdatomic.AddInt64(&c.uniqueID, 1),
+		req.Batches[i] = &sharedmemorypb.Batch{
+			Puts:    fb.PutRequests(),
+			Deletes: fb.DeleteRequests(),
 		}
 	}
-	if len(currentBatchGroup) > 0 {
-		batchGroups = append(batchGroups, currentBatchGroup)
-	}
-	return batchGroups, nil
+
+	_, err := c.client.Apply(context.Background(), req)
+	return err
 }

@@ -22,7 +22,6 @@ message BatchDelete {
 message Batch {
   repeated BatchPut puts = 1;
   repeated BatchDelete deletes = 2;
-  int64 id = 3;
 }
 
 message AtomicRequest {
@@ -40,13 +39,10 @@ message Element {
 message GetRequest {
   bytes peer_chain_id = 1;
   repeated bytes keys = 2;
-  int64 id = 3;
-  bool continues = 4;
 }
 
 message GetResponse {
   repeated bytes values = 1;
-  bool continues = 2;
 }
 
 message IndexedRequest {
@@ -55,22 +51,17 @@ message IndexedRequest {
   bytes start_trait = 3;
   bytes start_key = 4;
   int32 limit = 5;
-  int64 id = 6;
-  bool continues = 7;
 }
 
 message IndexedResponse {
   repeated bytes values = 1;
   bytes last_trait = 2;
   bytes last_key = 3;
-  bool continues = 4;
 }
 
 message ApplyRequest {
   repeated AtomicRequest requests = 1;
   repeated Batch batches = 2;
-  int64 id = 3;
-  bool continues = 4;
 }
 
 message ApplyResponse {}

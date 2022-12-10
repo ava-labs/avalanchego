@@ -45,7 +45,7 @@ func setupState(t testing.TB, ctrl *gomock.Controller) *testState {
 	serverCloser := grpcutils.ServerCloser{}
 
 	serverFunc := func(opts []grpc.ServerOption) *grpc.Server {
-		server := grpc.NewServer(opts...)
+		server := grpcutils.NewDefaultServer(opts)
 		pb.RegisterValidatorStateServer(server, NewServer(state.server))
 		serverCloser.Add(server)
 		return server

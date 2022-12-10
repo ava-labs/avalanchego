@@ -56,10 +56,7 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Start responsewriter gRPC service.
 	go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
-		if len(opts) == 0 {
-			opts = append(opts, grpcutils.DefaultServerOptions...)
-		}
-		server := grpc.NewServer(opts...)
+		server := grpcutils.NewDefaultServer(opts)
 		closer.Add(server)
 		responsewriterpb.RegisterWriterServer(server, gresponsewriter.NewServer(w))
 		return server

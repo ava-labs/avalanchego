@@ -6,7 +6,6 @@ package rpcdb
 import (
 	"context"
 	"encoding/json"
-	"sync/atomic"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -14,18 +13,9 @@ import (
 	"github.com/ava-labs/avalanchego/database/nodb"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
-)
-
-const (
-	maxBatchSize = 128 * units.KiB
-
-	// baseElementSize is an approximation of the protobuf encoding overhead per
-	// element
-	baseElementSize = 8 // bytes
 )
 
 var (
@@ -38,8 +28,7 @@ var (
 type DatabaseClient struct {
 	client rpcdbpb.DatabaseClient
 
-	closed     utils.AtomicBool
-	batchIndex int64
+	closed utils.AtomicBool
 }
 
 // NewClient returns a database instance connected to a remote database instance
@@ -184,11 +173,7 @@ func (b *batch) Size() int {
 }
 
 func (b *batch) Write() error {
-	request := &rpcdbpb.WriteBatchRequest{
-		Id:        atomic.AddInt64(&b.db.batchIndex, 1),
-		Continues: true,
-	}
-	currentSize := 0
+	request := &rpcdbpb.WriteBatchRequest{}
 	keySet := set.NewSet[string](len(b.writes))
 	for i := len(b.writes) - 1; i >= 0; i-- {
 		kv := b.writes[i]
@@ -197,21 +182,6 @@ func (b *batch) Write() error {
 			continue
 		}
 		keySet.Add(key)
-
-		sizeChange := baseElementSize + len(kv.key) + len(kv.value)
-		if newSize := currentSize + sizeChange; newSize > maxBatchSize {
-			resp, err := b.db.client.WriteBatch(context.Background(), request)
-			if err != nil {
-				return err
-			}
-			if err := errCodeToError[resp.Err]; err != nil {
-				return err
-			}
-			currentSize = 0
-			request.Deletes = request.Deletes[:0]
-			request.Puts = request.Puts[:0]
-		}
-		currentSize += sizeChange
 
 		if kv.delete {
 			request.Deletes = append(request.Deletes, &rpcdbpb.DeleteRequest{
@@ -225,7 +195,6 @@ func (b *batch) Write() error {
 		}
 	}
 
-	request.Continues = false
 	resp, err := b.db.client.WriteBatch(context.Background(), request)
 	if err != nil {
 		return err

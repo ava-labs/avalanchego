@@ -51,10 +51,7 @@ func (s *Server) GetDatabase(
 	serverAddr := serverListener.Addr().String()
 
 	go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
-		if len(opts) == 0 {
-			opts = append(opts, grpcutils.DefaultServerOptions...)
-		}
-		server := grpc.NewServer(opts...)
+		server := grpcutils.NewDefaultServer(opts)
 		closer.closer.Add(server)
 		db := rpcdb.NewServer(&closer)
 		rpcdbpb.RegisterDatabaseServer(server, db)

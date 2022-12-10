@@ -319,10 +319,7 @@ func (vm *VMServer) CreateHandlers(ctx context.Context, _ *emptypb.Empty) (*vmpb
 
 		// Start the gRPC server which serves the HTTP service
 		go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
-			if len(opts) == 0 {
-				opts = append(opts, grpcutils.DefaultServerOptions...)
-			}
-			server := grpc.NewServer(opts...)
+			server := grpcutils.NewDefaultServer(opts)
 			vm.serverCloser.Add(server)
 			httppb.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler))
 			return server
@@ -354,10 +351,7 @@ func (vm *VMServer) CreateStaticHandlers(ctx context.Context, _ *emptypb.Empty) 
 
 		// Start the gRPC server which serves the HTTP service
 		go grpcutils.Serve(serverListener, func(opts []grpc.ServerOption) *grpc.Server {
-			if len(opts) == 0 {
-				opts = append(opts, grpcutils.DefaultServerOptions...)
-			}
-			server := grpc.NewServer(opts...)
+			server := grpcutils.NewDefaultServer(opts)
 			vm.serverCloser.Add(server)
 			httppb.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler))
 			return server
