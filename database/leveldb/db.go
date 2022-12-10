@@ -5,6 +5,7 @@ package leveldb
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -290,7 +291,9 @@ func (db *Database) Delete(key []byte) error {
 
 // NewBatch creates a write/delete-only buffer that is atomically committed to
 // the database when write is called
-func (db *Database) NewBatch() database.Batch { return &batch{db: db} }
+func (db *Database) NewBatch() database.Batch {
+	return &batch{db: db}
+}
 
 // NewIterator creates a lexicographically ordered iterator over the database
 func (db *Database) NewIterator() database.Iterator {
@@ -356,7 +359,7 @@ func (db *Database) Close() error {
 	return updateError(db.DB.Close())
 }
 
-func (db *Database) HealthCheck() (interface{}, error) {
+func (db *Database) HealthCheck(context.Context) (interface{}, error) {
 	if db.closed.GetValue() {
 		return nil, database.ErrClosed
 	}
@@ -385,7 +388,9 @@ func (b *batch) Delete(key []byte) error {
 }
 
 // Size retrieves the amount of data queued up for writing.
-func (b *batch) Size() int { return b.size }
+func (b *batch) Size() int {
+	return b.size
+}
 
 // Write flushes any accumulated data to disk.
 func (b *batch) Write() error {
@@ -409,7 +414,9 @@ func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
 }
 
 // Inner returns itself
-func (b *batch) Inner() database.Batch { return b }
+func (b *batch) Inner() database.Batch {
+	return b
+}
 
 type replayer struct {
 	writerDeleter database.KeyValueWriterDeleter
@@ -465,9 +472,13 @@ func (it *iter) Error() error {
 	return updateError(it.Iterator.Error())
 }
 
-func (it *iter) Key() []byte { return it.key }
+func (it *iter) Key() []byte {
+	return it.key
+}
 
-func (it *iter) Value() []byte { return it.val }
+func (it *iter) Value() []byte {
+	return it.val
+}
 
 func updateError(err error) error {
 	switch err {

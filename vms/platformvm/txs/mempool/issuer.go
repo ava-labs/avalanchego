@@ -21,11 +21,11 @@ type issuer struct {
 	tx *txs.Tx
 }
 
-func (i *issuer) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
+func (*issuer) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
 	return errCantIssueAdvanceTimeTx
 }
 
-func (i *issuer) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
+func (*issuer) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return errCantIssueRewardValidatorTx
 }
 
@@ -34,52 +34,52 @@ func (i *issuer) AddValidatorTx(*txs.AddValidatorTx) error {
 	return nil
 }
 
-func (i *issuer) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
+func (i *issuer) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
 	i.m.addStakerTx(i.tx)
 	return nil
 }
 
-func (i *issuer) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
+func (i *issuer) AddDelegatorTx(*txs.AddDelegatorTx) error {
 	i.m.addStakerTx(i.tx)
 	return nil
 }
 
-func (i *issuer) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
+func (i *issuer) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
 	i.m.addDecisionTx(i.tx)
 	return nil
 }
 
-func (i *issuer) CreateChainTx(tx *txs.CreateChainTx) error {
+func (i *issuer) CreateChainTx(*txs.CreateChainTx) error {
 	i.m.addDecisionTx(i.tx)
 	return nil
 }
 
-func (i *issuer) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
+func (i *issuer) CreateSubnetTx(*txs.CreateSubnetTx) error {
 	i.m.addDecisionTx(i.tx)
 	return nil
 }
 
-func (i *issuer) ImportTx(tx *txs.ImportTx) error {
+func (i *issuer) ImportTx(*txs.ImportTx) error {
 	i.m.addDecisionTx(i.tx)
 	return nil
 }
 
-func (i *issuer) ExportTx(tx *txs.ExportTx) error {
+func (i *issuer) ExportTx(*txs.ExportTx) error {
 	i.m.addDecisionTx(i.tx)
 	return nil
 }
 
-func (i *issuer) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
+func (i *issuer) TransformSubnetTx(*txs.TransformSubnetTx) error {
 	i.m.addDecisionTx(i.tx)
 	return nil
 }
 
-func (i *issuer) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+func (i *issuer) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
 	i.m.addStakerTx(i.tx)
 	return nil
 }
 
-func (i *issuer) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+func (i *issuer) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
 	i.m.addStakerTx(i.tx)
 	return nil
 }

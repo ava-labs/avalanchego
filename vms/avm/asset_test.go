@@ -4,6 +4,7 @@
 package avm
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
@@ -13,7 +14,7 @@ import (
 func TestGetAssetDescriptionC4T(t *testing.T) {
 	_, vm, s, _, genesisTx := setup(t, true)
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.TODO()); err != nil {
 			t.Fatal(err)
 		}
 		vm.ctx.Lock.Unlock()

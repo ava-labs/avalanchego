@@ -8,6 +8,7 @@
 package registry
 
 import (
+	context "context"
 	reflect "reflect"
 
 	ids "github.com/ava-labs/avalanchego/ids"
@@ -39,29 +40,29 @@ func (m *MockVMRegisterer) EXPECT() *MockVMRegistererMockRecorder {
 }
 
 // Register mocks base method.
-func (m *MockVMRegisterer) Register(arg0 ids.ID, arg1 vms.Factory) error {
+func (m *MockVMRegisterer) Register(arg0 context.Context, arg1 ids.ID, arg2 vms.Factory) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Register", arg0, arg1)
+	ret := m.ctrl.Call(m, "Register", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Register indicates an expected call of Register.
-func (mr *MockVMRegistererMockRecorder) Register(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockVMRegistererMockRecorder) Register(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockVMRegisterer)(nil).Register), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockVMRegisterer)(nil).Register), arg0, arg1, arg2)
 }
 
 // RegisterWithReadLock mocks base method.
-func (m *MockVMRegisterer) RegisterWithReadLock(arg0 ids.ID, arg1 vms.Factory) error {
+func (m *MockVMRegisterer) RegisterWithReadLock(arg0 context.Context, arg1 ids.ID, arg2 vms.Factory) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RegisterWithReadLock", arg0, arg1)
+	ret := m.ctrl.Call(m, "RegisterWithReadLock", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // RegisterWithReadLock indicates an expected call of RegisterWithReadLock.
-func (mr *MockVMRegistererMockRecorder) RegisterWithReadLock(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockVMRegistererMockRecorder) RegisterWithReadLock(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterWithReadLock", reflect.TypeOf((*MockVMRegisterer)(nil).RegisterWithReadLock), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterWithReadLock", reflect.TypeOf((*MockVMRegisterer)(nil).RegisterWithReadLock), arg0, arg1, arg2)
 }

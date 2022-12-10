@@ -53,6 +53,7 @@ func NewLogger(prefix string, wrappedCores ...WrappedCore) Logger {
 	}
 }
 
+// TODO: return errors here
 func (l *log) Write(p []byte) (int, error) {
 	for _, wc := range l.wrappedCores {
 		if wc.WriterDisabled {
@@ -63,9 +64,10 @@ func (l *log) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
+// TODO: return errors here
 func (l *log) Stop() {
 	for _, wc := range l.wrappedCores {
-		wc.Writer.Close()
+		_ = wc.Writer.Close()
 	}
 }
 
@@ -112,7 +114,10 @@ func (l *log) StopOnPanic() {
 	}
 }
 
-func (l *log) RecoverAndPanic(f func()) { defer l.StopOnPanic(); f() }
+func (l *log) RecoverAndPanic(f func()) {
+	defer l.StopOnPanic()
+	f()
+}
 
 func (l *log) stopAndExit(exit func()) {
 	if r := recover(); r != nil {
@@ -122,4 +127,7 @@ func (l *log) stopAndExit(exit func()) {
 	}
 }
 
-func (l *log) RecoverAndExit(f, exit func()) { defer l.stopAndExit(exit); f() }
+func (l *log) RecoverAndExit(f, exit func()) {
+	defer l.stopAndExit(exit)
+	f()
+}

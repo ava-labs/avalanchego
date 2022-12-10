@@ -24,14 +24,14 @@ type Client interface {
 	GetContainerRange(ctx context.Context, startIndex uint64, numToFetch int, options ...rpc.Option) ([]Container, error)
 	// Get a container by its index
 	GetContainerByIndex(ctx context.Context, index uint64, options ...rpc.Option) (Container, error)
-	// Get the most recently accepted container
-	GetLastAccepted(context.Context, ...rpc.Option) (Container, error)
+	// Get the most recently accepted container and its index
+	GetLastAccepted(context.Context, ...rpc.Option) (Container, uint64, error)
 	// Returns 1 less than the number of containers accepted on this chain
 	GetIndex(ctx context.Context, containerID ids.ID, options ...rpc.Option) (uint64, error)
 	// Returns true if the given container is accepted
 	IsAccepted(ctx context.Context, containerID ids.ID, options ...rpc.Option) (bool, error)
-	// Get a container by its index
-	GetContainerByID(ctx context.Context, containerID ids.ID, options ...rpc.Option) (Container, error)
+	// Get a container and its index by its ID
+	GetContainerByID(ctx context.Context, containerID ids.ID, options ...rpc.Option) (Container, uint64, error)
 }
 
 // Client implementation for Avalanche Indexer API Endpoint
@@ -98,24 +98,24 @@ func (c *client) GetContainerByIndex(ctx context.Context, index uint64, options 
 	}, nil
 }
 
-func (c *client) GetLastAccepted(ctx context.Context, options ...rpc.Option) (Container, error) {
+func (c *client) GetLastAccepted(ctx context.Context, options ...rpc.Option) (Container, uint64, error) {
 	var fc FormattedContainer
 	err := c.requester.SendRequest(ctx, "index.getLastAccepted", &GetLastAcceptedArgs{
 		Encoding: formatting.Hex,
 	}, &fc, options...)
 	if err != nil {
-		return Container{}, nil
+		return Container{}, 0, nil
 	}
 
 	containerBytes, err := formatting.Decode(fc.Encoding, fc.Bytes)
 	if err != nil {
-		return Container{}, fmt.Errorf("couldn't decode container %s: %w", fc.ID, err)
+		return Container{}, 0, fmt.Errorf("couldn't decode container %s: %w", fc.ID, err)
 	}
 	return Container{
 		ID:        fc.ID,
 		Timestamp: fc.Timestamp.Unix(),
 		Bytes:     containerBytes,
-	}, nil
+	}, uint64(fc.Index), nil
 }
 
 func (c *client) GetIndex(ctx context.Context, id ids.ID, options ...rpc.Option) (uint64, error) {
@@ -134,23 +134,23 @@ func (c *client) IsAccepted(ctx context.Context, id ids.ID, options ...rpc.Optio
 	return res.IsAccepted, err
 }
 
-func (c *client) GetContainerByID(ctx context.Context, id ids.ID, options ...rpc.Option) (Container, error) {
+func (c *client) GetContainerByID(ctx context.Context, id ids.ID, options ...rpc.Option) (Container, uint64, error) {
 	var fc FormattedContainer
 	err := c.requester.SendRequest(ctx, "index.getContainerByID", &GetContainerByIDArgs{
 		ID:       id,
 		Encoding: formatting.Hex,
 	}, &fc, options...)
 	if err != nil {
-		return Container{}, err
+		return Container{}, 0, err
 	}
 
 	containerBytes, err := formatting.Decode(fc.Encoding, fc.Bytes)
 	if err != nil {
-		return Container{}, fmt.Errorf("couldn't decode container %s: %w", fc.ID, err)
+		return Container{}, 0, fmt.Errorf("couldn't decode container %s: %w", fc.ID, err)
 	}
 	return Container{
 		ID:        fc.ID,
 		Timestamp: fc.Timestamp.Unix(),
 		Bytes:     containerBytes,
-	}, nil
+	}, uint64(fc.Index), nil
 }

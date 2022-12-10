@@ -6,6 +6,7 @@ package executor
 import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -23,21 +24,45 @@ type AtomicTxExecutor struct {
 
 	// outputs of visitor execution
 	OnAccept       state.Diff
-	Inputs         ids.Set
+	Inputs         set.Set[ids.ID]
 	AtomicRequests map[ids.ID]*atomic.Requests
 }
 
-func (*AtomicTxExecutor) AddValidatorTx(*txs.AddValidatorTx) error             { return errWrongTxType }
-func (*AtomicTxExecutor) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error { return errWrongTxType }
-func (*AtomicTxExecutor) AddDelegatorTx(*txs.AddDelegatorTx) error             { return errWrongTxType }
-func (*AtomicTxExecutor) CreateChainTx(*txs.CreateChainTx) error               { return errWrongTxType }
-func (*AtomicTxExecutor) CreateSubnetTx(*txs.CreateSubnetTx) error             { return errWrongTxType }
-func (*AtomicTxExecutor) AdvanceTimeTx(*txs.AdvanceTimeTx) error               { return errWrongTxType }
-func (*AtomicTxExecutor) RewardValidatorTx(*txs.RewardValidatorTx) error       { return errWrongTxType }
+func (*AtomicTxExecutor) AddValidatorTx(*txs.AddValidatorTx) error {
+	return errWrongTxType
+}
+
+func (*AtomicTxExecutor) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
+	return errWrongTxType
+}
+
+func (*AtomicTxExecutor) AddDelegatorTx(*txs.AddDelegatorTx) error {
+	return errWrongTxType
+}
+
+func (*AtomicTxExecutor) CreateChainTx(*txs.CreateChainTx) error {
+	return errWrongTxType
+}
+
+func (*AtomicTxExecutor) CreateSubnetTx(*txs.CreateSubnetTx) error {
+	return errWrongTxType
+}
+
+func (*AtomicTxExecutor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+	return errWrongTxType
+}
+
+func (*AtomicTxExecutor) RewardValidatorTx(*txs.RewardValidatorTx) error {
+	return errWrongTxType
+}
+
 func (*AtomicTxExecutor) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
 	return errWrongTxType
 }
-func (*AtomicTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error { return errWrongTxType }
+
+func (*AtomicTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error {
+	return errWrongTxType
+}
 
 func (*AtomicTxExecutor) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
 	return errWrongTxType

@@ -448,7 +448,7 @@ func generateTestInFromUTXO(utxo *avax.UTXO, sigIndices []uint32) *avax.Transfer
 
 func shutdownCaminoEnvironment(env *caminoEnvironment) error {
 	if env.isBootstrapped.GetValue() {
-		primaryValidatorSet, exist := env.config.Validators.GetValidators(constants.PrimaryNetworkID)
+		primaryValidatorSet, exist := env.config.Validators.Get(constants.PrimaryNetworkID)
 		if !exist {
 			return errors.New("no default subnet validators")
 		}
@@ -456,10 +456,10 @@ func shutdownCaminoEnvironment(env *caminoEnvironment) error {
 
 		validatorIDs := make([]ids.NodeID, len(primaryValidators))
 		for i, vdr := range primaryValidators {
-			validatorIDs[i] = vdr.ID()
+			validatorIDs[i] = vdr.NodeID
 		}
 
-		if err := env.uptimes.Shutdown(validatorIDs); err != nil {
+		if err := env.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID); err != nil {
 			return err
 		}
 		env.state.SetHeight( /*height*/ math.MaxUint64)

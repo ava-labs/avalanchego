@@ -66,10 +66,10 @@ func newCaminoVM(genesisConfig genesis.Camino, genesisUTXOs []api.UTXO) (*VM, da
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func(context.Context, []byte) error { return nil }
 
-	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
+	if err := vm.Initialize(context.TODO(), ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
 		panic(err)
 	}
-	if err := vm.SetState(snow.NormalOp); err != nil {
+	if err := vm.SetState(context.TODO(), snow.NormalOp); err != nil {
 		panic(err)
 	}
 
@@ -88,13 +88,13 @@ func newCaminoVM(genesisConfig genesis.Camino, genesisUTXOs []api.UTXO) (*VM, da
 		panic(err)
 	} else if err := vm.Builder.AddUnverifiedTx(testSubnet1); err != nil {
 		panic(err)
-	} else if blk, err := vm.Builder.BuildBlock(); err != nil {
+	} else if blk, err := vm.Builder.BuildBlock(context.TODO()); err != nil {
 		panic(err)
-	} else if err := blk.Verify(); err != nil {
+	} else if err := blk.Verify(context.TODO()); err != nil {
 		panic(err)
-	} else if err := blk.Accept(); err != nil {
+	} else if err := blk.Accept(context.TODO()); err != nil {
 		panic(err)
-	} else if err := vm.SetPreference(vm.manager.LastAccepted()); err != nil {
+	} else if err := vm.SetPreference(context.TODO(), vm.manager.LastAccepted()); err != nil {
 		panic(err)
 	}
 

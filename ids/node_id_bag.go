@@ -6,6 +6,8 @@ package ids
 import (
 	"fmt"
 	"strings"
+
+	"golang.org/x/exp/maps"
 )
 
 // NodeIDBag is a multiset of NodeIDs.
@@ -57,19 +59,15 @@ func (b *NodeIDBag) Remove(id NodeID) {
 }
 
 // Len returns the number of times an id has been added.
-func (b *NodeIDBag) Len() int { return b.size }
+func (b *NodeIDBag) Len() int {
+	return b.size
+}
 
 // List returns a list of all IDs that have been added,
 // without duplicates.
 // e.g. a bag with {ID1, ID1, ID2} returns ids.ShortID[]{ID1, ID2}
 func (b *NodeIDBag) List() []NodeID {
-	idList := make([]NodeID, len(b.counts))
-	i := 0
-	for id := range b.counts {
-		idList[i] = id
-		i++
-	}
-	return idList
+	return maps.Keys(b.counts)
 }
 
 // Equals returns true if the bags contain the same elements
@@ -96,4 +94,6 @@ func (b *NodeIDBag) PrefixedString(prefix string) string {
 	return sb.String()
 }
 
-func (b *NodeIDBag) String() string { return b.PrefixedString("") }
+func (b *NodeIDBag) String() string {
+	return b.PrefixedString("")
+}

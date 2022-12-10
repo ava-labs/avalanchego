@@ -62,6 +62,7 @@ func NewContext(tb testing.TB) *snow.Context {
 	}
 	ctx.AVAXAssetID = avaxAssetID
 	ctx.XChainID = ids.Empty.Prefix(0)
+	ctx.CChainID = ids.Empty.Prefix(1)
 	aliaser := ctx.BCLookup.(ids.Aliaser)
 
 	errs := wrappers.Errs{}

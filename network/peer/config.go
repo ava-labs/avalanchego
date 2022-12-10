@@ -11,8 +11,10 @@ import (
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -31,7 +33,7 @@ type Config struct {
 	Network              Network
 	Router               router.InboundHandler
 	VersionCompatibility version.Compatibility
-	MySubnets            ids.Set
+	MySubnets            set.Set[ids.ID]
 	Beacons              validators.Set
 	NetworkID            uint32
 	PingFrequency        time.Duration
@@ -44,4 +46,13 @@ type Config struct {
 
 	// Tracks CPU/disk usage caused by each peer.
 	ResourceTracker tracker.ResourceTracker
+
+	// Tracks which peer knows about which peers
+	GossipTracker GossipTracker
+
+	// Calculates uptime of peers
+	UptimeCalculator uptime.Calculator
+
+	// Signs my IP so I can send my signed IP address in the Version message
+	IPSigner *IPSigner
 }

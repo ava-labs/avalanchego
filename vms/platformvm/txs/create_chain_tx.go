@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -61,7 +62,7 @@ func (tx *CreateChainTx) SyntacticVerify(ctx *snow.Context) error {
 		return errNameTooLong
 	case tx.VMID == ids.Empty:
 		return errInvalidVMID
-	case !ids.IsSortedAndUniqueIDs(tx.FxIDs):
+	case !utils.IsSortedAndUniqueSortable(tx.FxIDs):
 		return errFxIDsNotSortedAndUnique
 	case len(tx.GenesisData) > MaxGenesisLen:
 		return errGenesisTooLong

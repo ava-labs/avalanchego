@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/encdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -135,7 +136,9 @@ func (u *user) GetKey(address ids.ShortID) (*crypto.PrivateKeySECP256K1R, error)
 	return sk, nil
 }
 
-func (u *user) Close() error { return u.db.Close() }
+func (u *user) Close() error {
+	return u.db.Close()
+}
 
 // Create and store a new key that will be controlled by this user.
 func NewKey(u User) (*crypto.PrivateKeySECP256K1R, error) {
@@ -170,7 +173,7 @@ func NewKeys(u User, numKeys int) ([]*crypto.PrivateKeySECP256K1R, error) {
 // is missing, it will be ignored.
 // If [addresses] is empty, then it will create a keychain using every address
 // in the provided [user].
-func GetKeychain(u User, addresses ids.ShortSet) (*secp256k1fx.Keychain, error) {
+func GetKeychain(u User, addresses set.Set[ids.ShortID]) (*secp256k1fx.Keychain, error) {
 	addrsList := addresses.List()
 	if len(addrsList) == 0 {
 		var err error

@@ -4,6 +4,7 @@
 package block
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -23,16 +24,24 @@ type TestStateSummary struct {
 
 	T          *testing.T
 	CantAccept bool
-	AcceptF    func() (bool, error)
+	AcceptF    func(context.Context) (bool, error)
 }
 
-func (s *TestStateSummary) ID() ids.ID     { return s.IDV }
-func (s *TestStateSummary) Height() uint64 { return s.HeightV }
-func (s *TestStateSummary) Bytes() []byte  { return s.BytesV }
+func (s *TestStateSummary) ID() ids.ID {
+	return s.IDV
+}
 
-func (s *TestStateSummary) Accept() (bool, error) {
+func (s *TestStateSummary) Height() uint64 {
+	return s.HeightV
+}
+
+func (s *TestStateSummary) Bytes() []byte {
+	return s.BytesV
+}
+
+func (s *TestStateSummary) Accept(ctx context.Context) (bool, error) {
 	if s.AcceptF != nil {
-		return s.AcceptF()
+		return s.AcceptF(ctx)
 	}
 	if s.CantAccept && s.T != nil {
 		s.T.Fatal(errAccept)

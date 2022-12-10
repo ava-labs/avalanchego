@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
@@ -38,26 +39,26 @@ type SenderTest struct {
 	CantSendCrossChainAppRequest, CantSendCrossChainAppResponse bool
 
 	AcceptF                      func(*snow.ConsensusContext, ids.ID, []byte) error
-	SendGetStateSummaryFrontierF func(context.Context, ids.NodeIDSet, uint32)
+	SendGetStateSummaryFrontierF func(context.Context, set.Set[ids.NodeID], uint32)
 	SendStateSummaryFrontierF    func(context.Context, ids.NodeID, uint32, []byte)
-	SendGetAcceptedStateSummaryF func(context.Context, ids.NodeIDSet, uint32, []uint64)
+	SendGetAcceptedStateSummaryF func(context.Context, set.Set[ids.NodeID], uint32, []uint64)
 	SendAcceptedStateSummaryF    func(context.Context, ids.NodeID, uint32, []ids.ID)
-	SendGetAcceptedFrontierF     func(context.Context, ids.NodeIDSet, uint32)
+	SendGetAcceptedFrontierF     func(context.Context, set.Set[ids.NodeID], uint32)
 	SendAcceptedFrontierF        func(context.Context, ids.NodeID, uint32, []ids.ID)
-	SendGetAcceptedF             func(context.Context, ids.NodeIDSet, uint32, []ids.ID)
+	SendGetAcceptedF             func(context.Context, set.Set[ids.NodeID], uint32, []ids.ID)
 	SendAcceptedF                func(context.Context, ids.NodeID, uint32, []ids.ID)
 	SendGetF                     func(context.Context, ids.NodeID, uint32, ids.ID)
 	SendGetAncestorsF            func(context.Context, ids.NodeID, uint32, ids.ID)
 	SendPutF                     func(context.Context, ids.NodeID, uint32, []byte)
 	SendAncestorsF               func(context.Context, ids.NodeID, uint32, [][]byte)
-	SendPushQueryF               func(context.Context, ids.NodeIDSet, uint32, []byte)
-	SendPullQueryF               func(context.Context, ids.NodeIDSet, uint32, ids.ID)
+	SendPushQueryF               func(context.Context, set.Set[ids.NodeID], uint32, []byte)
+	SendPullQueryF               func(context.Context, set.Set[ids.NodeID], uint32, ids.ID)
 	SendChitsF                   func(context.Context, ids.NodeID, uint32, []ids.ID)
 	SendGossipF                  func(context.Context, []byte)
-	SendAppRequestF              func(context.Context, ids.NodeIDSet, uint32, []byte) error
+	SendAppRequestF              func(context.Context, set.Set[ids.NodeID], uint32, []byte) error
 	SendAppResponseF             func(context.Context, ids.NodeID, uint32, []byte) error
 	SendAppGossipF               func(context.Context, []byte) error
-	SendAppGossipSpecificF       func(context.Context, ids.NodeIDSet, []byte) error
+	SendAppGossipSpecificF       func(context.Context, set.Set[ids.NodeID], []byte) error
 	SendCrossChainAppRequestF    func(context.Context, ids.ID, uint32, []byte)
 	SendCrossChainAppResponseF   func(context.Context, ids.ID, uint32, []byte)
 }
@@ -108,7 +109,7 @@ func (s *SenderTest) Accept(ctx *snow.ConsensusContext, containerID ids.ID, cont
 // SendGetStateSummaryFrontier calls SendGetStateSummaryFrontierF if it was initialized. If it
 // wasn't initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) SendGetStateSummaryFrontier(ctx context.Context, validatorIDs ids.NodeIDSet, requestID uint32) {
+func (s *SenderTest) SendGetStateSummaryFrontier(ctx context.Context, validatorIDs set.Set[ids.NodeID], requestID uint32) {
 	if s.SendGetStateSummaryFrontierF != nil {
 		s.SendGetStateSummaryFrontierF(ctx, validatorIDs, requestID)
 	} else if s.CantSendGetStateSummaryFrontier && s.T != nil {
@@ -130,7 +131,7 @@ func (s *SenderTest) SendStateSummaryFrontier(ctx context.Context, validatorID i
 // SendGetAcceptedStateSummary calls SendGetAcceptedStateSummaryF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, heights []uint64) {
+func (s *SenderTest) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, heights []uint64) {
 	if s.SendGetAcceptedStateSummaryF != nil {
 		s.SendGetAcceptedStateSummaryF(ctx, nodeIDs, requestID, heights)
 	} else if s.CantSendGetAcceptedStateSummary && s.T != nil {
@@ -152,7 +153,7 @@ func (s *SenderTest) SendAcceptedStateSummary(ctx context.Context, validatorID i
 // SendGetAcceptedFrontier calls SendGetAcceptedFrontierF if it was initialized.
 // If it wasn't initialized and this function shouldn't be called and testing
 // was initialized, then testing will fail.
-func (s *SenderTest) SendGetAcceptedFrontier(ctx context.Context, validatorIDs ids.NodeIDSet, requestID uint32) {
+func (s *SenderTest) SendGetAcceptedFrontier(ctx context.Context, validatorIDs set.Set[ids.NodeID], requestID uint32) {
 	if s.SendGetAcceptedFrontierF != nil {
 		s.SendGetAcceptedFrontierF(ctx, validatorIDs, requestID)
 	} else if s.CantSendGetAcceptedFrontier && s.T != nil {
@@ -174,7 +175,7 @@ func (s *SenderTest) SendAcceptedFrontier(ctx context.Context, validatorID ids.N
 // SendGetAccepted calls SendGetAcceptedF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) SendGetAccepted(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, containerIDs []ids.ID) {
+func (s *SenderTest) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerIDs []ids.ID) {
 	if s.SendGetAcceptedF != nil {
 		s.SendGetAcceptedF(ctx, nodeIDs, requestID, containerIDs)
 	} else if s.CantSendGetAccepted && s.T != nil {
@@ -240,7 +241,7 @@ func (s *SenderTest) SendAncestors(ctx context.Context, vdr ids.NodeID, requestI
 // SendPushQuery calls SendPushQueryF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) SendPushQuery(ctx context.Context, vdrs ids.NodeIDSet, requestID uint32, vtx []byte) {
+func (s *SenderTest) SendPushQuery(ctx context.Context, vdrs set.Set[ids.NodeID], requestID uint32, vtx []byte) {
 	if s.SendPushQueryF != nil {
 		s.SendPushQueryF(ctx, vdrs, requestID, vtx)
 	} else if s.CantSendPushQuery && s.T != nil {
@@ -251,7 +252,7 @@ func (s *SenderTest) SendPushQuery(ctx context.Context, vdrs ids.NodeIDSet, requ
 // SendPullQuery calls SendPullQueryF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) SendPullQuery(ctx context.Context, vdrs ids.NodeIDSet, requestID uint32, vtxID ids.ID) {
+func (s *SenderTest) SendPullQuery(ctx context.Context, vdrs set.Set[ids.NodeID], requestID uint32, vtxID ids.ID) {
 	if s.SendPullQueryF != nil {
 		s.SendPullQueryF(ctx, vdrs, requestID, vtxID)
 	} else if s.CantSendPullQuery && s.T != nil {
@@ -302,7 +303,7 @@ func (s *SenderTest) SendCrossChainAppResponse(ctx context.Context, chainID ids.
 // SendAppRequest calls SendAppRequestF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) SendAppRequest(ctx context.Context, nodeIDs ids.NodeIDSet, requestID uint32, appRequestBytes []byte) error {
+func (s *SenderTest) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, appRequestBytes []byte) error {
 	switch {
 	case s.SendAppRequestF != nil:
 		return s.SendAppRequestF(ctx, nodeIDs, requestID, appRequestBytes)
@@ -341,7 +342,7 @@ func (s *SenderTest) SendAppGossip(ctx context.Context, appGossipBytes []byte) e
 // SendAppGossipSpecific calls SendAppGossipSpecificF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) SendAppGossipSpecific(ctx context.Context, nodeIDs ids.NodeIDSet, appGossipBytes []byte) error {
+func (s *SenderTest) SendAppGossipSpecific(ctx context.Context, nodeIDs set.Set[ids.NodeID], appGossipBytes []byte) error {
 	switch {
 	case s.SendAppGossipSpecificF != nil:
 		return s.SendAppGossipSpecificF(ctx, nodeIDs, appGossipBytes)

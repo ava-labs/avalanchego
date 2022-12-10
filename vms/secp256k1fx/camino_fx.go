@@ -9,13 +9,14 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 var errNotSecp256Cred = errors.New("expected secp256k1 credentials")
 
-func (fx *Fx) RecoverAddresses(utx UnsignedTx, verifies []verify.Verifiable) (ids.ShortSet, error) {
-	var ret ids.ShortSet
+func (fx *Fx) RecoverAddresses(utx UnsignedTx, verifies []verify.Verifiable) (set.Set[ids.ShortID], error) {
+	var ret set.Set[ids.ShortID]
 	visited := make(map[[crypto.SECP256K1RSigLen]byte]bool)
 
 	txHash := hashing.ComputeHash256(utx.Bytes())

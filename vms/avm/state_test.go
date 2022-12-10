@@ -4,6 +4,7 @@
 package avm
 
 import (
+	"context"
 	"math"
 	"testing"
 
@@ -33,7 +34,7 @@ func TestSetsAndGets(t *testing.T) {
 	)
 	ctx := vm.ctx
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		ctx.Lock.Unlock()
@@ -124,7 +125,7 @@ func TestFundingNoAddresses(t *testing.T) {
 	)
 	ctx := vm.ctx
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		ctx.Lock.Unlock()
@@ -165,7 +166,7 @@ func TestFundingAddresses(t *testing.T) {
 	)
 	ctx := vm.ctx
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		ctx.Lock.Unlock()

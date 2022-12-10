@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/types"
 )
 
@@ -41,8 +42,8 @@ func (t *BaseTx) InputUTXOs() []*UTXOID {
 }
 
 // ConsumedAssetIDs returns the IDs of the assets this transaction consumes
-func (t *BaseTx) ConsumedAssetIDs() ids.Set {
-	assets := ids.Set{}
+func (t *BaseTx) ConsumedAssetIDs() set.Set[ids.ID] {
+	assets := set.Set[ids.ID]{}
 	for _, in := range t.Ins {
 		assets.Add(in.AssetID())
 	}
@@ -50,10 +51,14 @@ func (t *BaseTx) ConsumedAssetIDs() ids.Set {
 }
 
 // AssetIDs returns the IDs of the assets this transaction depends on
-func (t *BaseTx) AssetIDs() ids.Set { return t.ConsumedAssetIDs() }
+func (t *BaseTx) AssetIDs() set.Set[ids.ID] {
+	return t.ConsumedAssetIDs()
+}
 
 // NumCredentials returns the number of expected credentials
-func (t *BaseTx) NumCredentials() int { return len(t.Ins) }
+func (t *BaseTx) NumCredentials() int {
+	return len(t.Ins)
+}
 
 // Verify ensures that transaction metadata is valid
 func (t *BaseTx) Verify(ctx *snow.Context) error {

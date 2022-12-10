@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
@@ -55,17 +56,41 @@ type statelessVertex struct {
 	bytes []byte
 }
 
-func (v statelessVertex) ID() ids.ID      { return v.id }
-func (v statelessVertex) Bytes() []byte   { return v.bytes }
-func (v statelessVertex) Version() uint16 { return v.innerStatelessVertex.Version }
-func (v statelessVertex) ChainID() ids.ID { return v.innerStatelessVertex.ChainID }
+func (v statelessVertex) ID() ids.ID {
+	return v.id
+}
+
+func (v statelessVertex) Bytes() []byte {
+	return v.bytes
+}
+
+func (v statelessVertex) Version() uint16 {
+	return v.innerStatelessVertex.Version
+}
+
+func (v statelessVertex) ChainID() ids.ID {
+	return v.innerStatelessVertex.ChainID
+}
+
 func (v statelessVertex) StopVertex() bool {
 	return v.innerStatelessVertex.Version == codecVersionWithStopVtx
 }
-func (v statelessVertex) Height() uint64      { return v.innerStatelessVertex.Height }
-func (v statelessVertex) Epoch() uint32       { return v.innerStatelessVertex.Epoch }
-func (v statelessVertex) ParentIDs() []ids.ID { return v.innerStatelessVertex.ParentIDs }
-func (v statelessVertex) Txs() [][]byte       { return v.innerStatelessVertex.Txs }
+
+func (v statelessVertex) Height() uint64 {
+	return v.innerStatelessVertex.Height
+}
+
+func (v statelessVertex) Epoch() uint32 {
+	return v.innerStatelessVertex.Epoch
+}
+
+func (v statelessVertex) ParentIDs() []ids.ID {
+	return v.innerStatelessVertex.ParentIDs
+}
+
+func (v statelessVertex) Txs() [][]byte {
+	return v.innerStatelessVertex.Txs
+}
 
 type innerStatelessVertex struct {
 	Version   uint16   `json:"version"`
@@ -95,9 +120,9 @@ func (v innerStatelessVertex) verify() error {
 		return errNoOperations
 	case len(v.Txs) > maxTxsPerVtx:
 		return errTooManyTxs
-	case !ids.IsSortedAndUniqueIDs(v.ParentIDs):
+	case !utils.IsSortedAndUniqueSortable(v.ParentIDs):
 		return errInvalidParents
-	case !IsSortedAndUniqueHashOf(v.Txs):
+	case !utils.IsSortedAndUniqueByHash(v.Txs):
 		return errInvalidTxs
 	default:
 		return nil
@@ -114,7 +139,7 @@ func (v innerStatelessVertex) verifyStopVertex() error {
 		return errTooManyparentIDs
 	case len(v.Txs) != 0:
 		return errTooManyTxs
-	case !ids.IsSortedAndUniqueIDs(v.ParentIDs):
+	case !utils.IsSortedAndUniqueSortable(v.ParentIDs):
 		return errInvalidParents
 	default:
 		return nil

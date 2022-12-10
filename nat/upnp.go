@@ -66,7 +66,7 @@ type upnpRouter struct {
 	client upnpClient
 }
 
-func (r *upnpRouter) SupportsNAT() bool {
+func (*upnpRouter) SupportsNAT() bool {
 	return true
 }
 

@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
@@ -96,7 +98,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 
 	// Visit the block
 	blk := manager.NewBlock(apricotBlk)
-	err = blk.Verify()
+	err = blk.Verify(context.Background())
 	require.NoError(err)
 	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
 	gotBlkState := verifier.backend.blkIDToState[apricotBlk.ID()]
@@ -113,7 +115,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	require.Equal(status.Aborted, gotStatus)
 
 	// Visiting again should return nil without using dependencies.
-	err = blk.Verify()
+	err = blk.Verify(context.Background())
 	require.NoError(err)
 }
 
@@ -160,7 +162,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 
 	onAccept := state.NewMockDiff(ctrl)
 	blkTx := txs.NewMockUnsignedTx(ctrl)
-	inputs := ids.Set{ids.GenerateTestID(): struct{}{}}
+	inputs := set.Set[ids.ID]{ids.GenerateTestID(): struct{}{}}
 	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.AtomicTxExecutor{})).DoAndReturn(
 		func(e *executor.AtomicTxExecutor) error {
 			e.OnAccept = onAccept
@@ -193,7 +195,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	onAccept.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 
 	blk := manager.NewBlock(apricotBlk)
-	err = blk.Verify()
+	err = blk.Verify(context.Background())
 	require.NoError(err)
 
 	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
@@ -204,7 +206,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = blk.Verify()
+	err = blk.Verify(context.Background())
 	require.NoError(err)
 }
 
@@ -264,7 +266,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.CaminoStandardTxExecutor{})).DoAndReturn(
 		func(e *executor.CaminoStandardTxExecutor) error {
 			e.OnAccept = func() {}
-			e.Inputs = ids.Set{}
+			e.Inputs = set.Set[ids.ID]{}
 			e.AtomicRequests = atomicRequests
 			return nil
 		},
@@ -295,18 +297,18 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	mempool.EXPECT().Remove(apricotBlk.Txs()).Times(1)
 
 	blk := manager.NewBlock(apricotBlk)
-	err = blk.Verify()
+	err = blk.Verify(context.Background())
 	require.NoError(err)
 
 	// Assert expected state.
 	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
 	gotBlkState := verifier.backend.blkIDToState[apricotBlk.ID()]
 	require.Equal(apricotBlk, gotBlkState.statelessBlock)
-	require.Equal(ids.Set{}, gotBlkState.inputs)
+	require.Equal(set.Set[ids.ID]{}, gotBlkState.inputs)
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = blk.Verify()
+	err = blk.Verify(context.Background())
 	require.NoError(err)
 }
 
@@ -369,7 +371,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 
 	// Verify the block.
 	blk := manager.NewBlock(apricotBlk)
-	err = blk.Verify()
+	err = blk.Verify(context.Background())
 	require.NoError(err)
 
 	// Assert expected state.
@@ -379,7 +381,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = blk.Verify()
+	err = blk.Verify(context.Background())
 	require.NoError(err)
 }
 
@@ -442,7 +444,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 
 	// Verify the block.
 	blk := manager.NewBlock(apricotBlk)
-	err = blk.Verify()
+	err = blk.Verify(context.Background())
 	require.NoError(err)
 
 	// Assert expected state.
@@ -452,7 +454,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	err = blk.Verify()
+	err = blk.Verify(context.Background())
 	require.NoError(err)
 }
 
@@ -699,7 +701,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	parentState := state.NewMockDiff(ctrl)
-	atomicInputs := ids.Set{
+	atomicInputs := set.Set[ids.ID]{
 		ids.GenerateTestID(): struct{}{},
 	}
 

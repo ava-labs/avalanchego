@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -76,18 +78,11 @@ func (w *WalletService) update(utxos []*avax.UTXO) ([]*avax.UTXO, error) {
 			utxoMap[utxo.InputID()] = utxo
 		}
 	}
-
-	newUTXOs := make([]*avax.UTXO, len(utxoMap))
-	i := 0
-	for _, utxo := range utxoMap {
-		newUTXOs[i] = utxo
-		i++
-	}
-	return newUTXOs, nil
+	return maps.Values(utxoMap), nil
 }
 
 // IssueTx attempts to issue a transaction into consensus
-func (w *WalletService) IssueTx(r *http.Request, args *api.FormattedTx, reply *api.JSONTxID) error {
+func (w *WalletService) IssueTx(_ *http.Request, args *api.FormattedTx, reply *api.JSONTxID) error {
 	w.vm.ctx.Log.Debug("AVM Wallet: IssueTx called",
 		logging.UserString("tx", args.Tx),
 	)
@@ -111,7 +106,7 @@ func (w *WalletService) Send(r *http.Request, args *SendArgs, reply *api.JSONTxI
 }
 
 // SendMultiple sends a transaction with multiple outputs.
-func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, reply *api.JSONTxIDChangeAddr) error {
+func (w *WalletService) SendMultiple(_ *http.Request, args *SendMultipleArgs, reply *api.JSONTxIDChangeAddr) error {
 	w.vm.ctx.Log.Debug("AVM Wallet: SendMultiple",
 		logging.UserString("username", args.Username),
 	)

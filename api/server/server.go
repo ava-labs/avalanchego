@@ -21,9 +21,11 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -63,15 +65,6 @@ type PathAdderWithReadLock interface {
 type Server interface {
 	PathAdder
 	PathAdderWithReadLock
-	// Initialize creates the API server at the provided host and port
-	Initialize(log logging.Logger,
-		factory logging.Factory,
-		host string,
-		port uint16,
-		allowedOrigins []string,
-		shutdownTimeout time.Duration,
-		nodeID ids.NodeID,
-		wrappers ...Wrapper)
 	// Dispatch starts the API server
 	Dispatch() error
 	// DispatchTLS starts the API server with the provided TLS certificate
@@ -84,12 +77,6 @@ type Server interface {
 	// and at the same time the server's lock is held due to an API call and is trying
 	// to grab the P-Chain's lock.
 	RegisterChain(chainName string, engine common.Engine)
-	// AddChainRoute registers a route to a chain's handler
-	AddChainRoute(
-		handler *common.HTTPHandler,
-		ctx *snow.ConsensusContext,
-		base, endpoint string,
-	) error
 	// Shutdown this server
 	Shutdown() error
 }
@@ -99,13 +86,14 @@ type server struct {
 	log logging.Logger
 	// generates new logs for chains to write to
 	factory logging.Factory
-	// points the the router handlers
-	handler http.Handler
 	// Listens for HTTP traffic on this address
 	listenHost string
 	listenPort uint16
 
 	shutdownTimeout time.Duration
+
+	tracingEnabled bool
+	tracer         trace.Tracer
 
 	// Maps endpoints to handlers
 	router *router
@@ -114,11 +102,7 @@ type server struct {
 }
 
 // New returns an instance of a Server.
-func New() Server {
-	return &server{}
-}
-
-func (s *server) Initialize(
+func New(
 	log logging.Logger,
 	factory logging.Factory,
 	host string,
@@ -126,25 +110,17 @@ func (s *server) Initialize(
 	allowedOrigins []string,
 	shutdownTimeout time.Duration,
 	nodeID ids.NodeID,
+	tracingEnabled bool,
+	tracer trace.Tracer,
 	wrappers ...Wrapper,
-) {
-	s.log = log
-	s.factory = factory
-	s.listenHost = host
-	s.listenPort = port
-	s.shutdownTimeout = shutdownTimeout
-	s.router = newRouter()
-
-	s.log.Info("API created",
-		zap.Strings("allowedOrigins", allowedOrigins),
-	)
-
+) Server {
+	router := newRouter()
 	corsHandler := cors.New(cors.Options{
 		AllowedOrigins:   allowedOrigins,
 		AllowCredentials: true,
-	}).Handler(s.router)
+	}).Handler(router)
 	gzipHandler := gziphandler.GzipHandler(corsHandler)
-	s.handler = http.HandlerFunc(
+	var handler http.Handler = http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			// Attach this node's ID as a header
 			w.Header().Set("node-id", nodeID.String())
@@ -153,7 +129,26 @@ func (s *server) Initialize(
 	)
 
 	for _, wrapper := range wrappers {
-		s.handler = wrapper.WrapHandler(s.handler)
+		handler = wrapper.WrapHandler(handler)
+	}
+
+	log.Info("API created",
+		zap.Strings("allowedOrigins", allowedOrigins),
+	)
+
+	return &server{
+		log:             log,
+		factory:         factory,
+		listenHost:      host,
+		listenPort:      port,
+		shutdownTimeout: shutdownTimeout,
+		tracingEnabled:  tracingEnabled,
+		tracer:          tracer,
+		router:          router,
+		srv: &http.Server{
+			Handler:           handler,
+			ReadHeaderTimeout: readHeaderTimeout,
+		},
 	}
 }
 
@@ -176,10 +171,6 @@ func (s *server) Dispatch() error {
 		)
 	}
 
-	s.srv = &http.Server{
-		Handler:           s.handler,
-		ReadHeaderTimeout: readHeaderTimeout,
-	}
 	return s.srv.Serve(listener)
 }
 
@@ -211,11 +202,6 @@ func (s *server) DispatchTLS(certBytes, keyBytes []byte) error {
 		)
 	}
 
-	s.srv = &http.Server{
-		Addr:              listenAddress,
-		Handler:           s.handler,
-		ReadHeaderTimeout: readHeaderTimeout,
-	}
 	return s.srv.Serve(listener)
 }
 
@@ -231,7 +217,7 @@ func (s *server) registerChain(chainName string, engine common.Engine) {
 
 	ctx := engine.Context()
 	ctx.Lock.Lock()
-	handlers, err = engine.GetVM().CreateHandlers()
+	handlers, err = engine.GetVM().CreateHandlers(context.TODO())
 	ctx.Lock.Unlock()
 	if err != nil {
 		s.log.Error("failed to create handlers",
@@ -259,7 +245,7 @@ func (s *server) registerChain(chainName string, engine common.Engine) {
 			)
 			continue
 		}
-		if err := s.AddChainRoute(handler, ctx, defaultEndpoint, extension); err != nil {
+		if err := s.addChainRoute(chainName, handler, ctx, defaultEndpoint, extension); err != nil {
 			s.log.Error("error adding route",
 				zap.Error(err),
 			)
@@ -267,14 +253,26 @@ func (s *server) registerChain(chainName string, engine common.Engine) {
 	}
 }
 
-func (s *server) AddChainRoute(handler *common.HTTPHandler, ctx *snow.ConsensusContext, base, endpoint string) error {
+func (s *server) addChainRoute(chainName string, handler *common.HTTPHandler, ctx *snow.ConsensusContext, base, endpoint string) error {
 	url := fmt.Sprintf("%s/%s", baseURL, base)
 	s.log.Info("adding route",
 		zap.String("url", url),
 		zap.String("endpoint", endpoint),
 	)
+	if s.tracingEnabled {
+		handler = &common.HTTPHandler{
+			LockOptions: handler.LockOptions,
+			Handler:     api.TraceHandler(handler.Handler, chainName, s.tracer),
+		}
+	}
 	// Apply middleware to grab/release chain's lock before/after calling API method
-	h, err := lockMiddleware(handler.Handler, handler.LockOptions, &ctx.Lock)
+	h, err := lockMiddleware(
+		handler.Handler,
+		handler.LockOptions,
+		s.tracingEnabled,
+		s.tracer,
+		&ctx.Lock,
+	)
 	if err != nil {
 		return err
 	}
@@ -299,8 +297,22 @@ func (s *server) addRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base,
 		zap.String("url", url),
 		zap.String("endpoint", endpoint),
 	)
+
+	if s.tracingEnabled {
+		handler = &common.HTTPHandler{
+			LockOptions: handler.LockOptions,
+			Handler:     api.TraceHandler(handler.Handler, url, s.tracer),
+		}
+	}
+
 	// Apply middleware to grab/release chain's lock before/after calling API method
-	h, err := lockMiddleware(handler.Handler, handler.LockOptions, lock)
+	h, err := lockMiddleware(
+		handler.Handler,
+		handler.LockOptions,
+		s.tracingEnabled,
+		s.tracer,
+		lock,
+	)
 	if err != nil {
 		return err
 	}
@@ -308,25 +320,43 @@ func (s *server) addRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base,
 }
 
 // Wraps a handler by grabbing and releasing a lock before calling the handler.
-func lockMiddleware(handler http.Handler, lockOption common.LockOption, lock *sync.RWMutex) (http.Handler, error) {
+func lockMiddleware(
+	handler http.Handler,
+	lockOption common.LockOption,
+	tracingEnabled bool,
+	tracer trace.Tracer,
+	lock *sync.RWMutex,
+) (http.Handler, error) {
+	var (
+		name          string
+		lockedHandler http.Handler
+	)
 	switch lockOption {
 	case common.WriteLock:
-		return middlewareHandler{
+		name = "writeLock"
+		lockedHandler = middlewareHandler{
 			before:  lock.Lock,
 			after:   lock.Unlock,
 			handler: handler,
-		}, nil
+		}
 	case common.ReadLock:
-		return middlewareHandler{
+		name = "readLock"
+		lockedHandler = middlewareHandler{
 			before:  lock.RLock,
 			after:   lock.RUnlock,
 			handler: handler,
-		}, nil
+		}
 	case common.NoLock:
 		return handler, nil
 	default:
 		return nil, errUnknownLockOption
 	}
+
+	if !tracingEnabled {
+		return lockedHandler, nil
+	}
+
+	return api.TraceHandler(lockedHandler, name, tracer), nil
 }
 
 // Reject middleware wraps a handler. If the chain that the context describes is
@@ -363,10 +393,6 @@ func (s *server) AddAliasesWithReadLock(endpoint string, aliases ...string) erro
 }
 
 func (s *server) Shutdown() error {
-	if s.srv == nil {
-		return nil
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), s.shutdownTimeout)
 	err := s.srv.Shutdown(ctx)
 	cancel()

@@ -4,6 +4,7 @@
 package syncer
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -59,7 +60,7 @@ func buildTestPeers(t *testing.T) validators.Set {
 	vdrs := validators.NewSet()
 	for idx := 0; idx < 2*common.MaxOutstandingBroadcastRequests; idx++ {
 		beaconID := ids.GenerateTestNodeID()
-		require.NoError(t, vdrs.AddWeight(beaconID, uint64(1)))
+		require.NoError(t, vdrs.Add(beaconID, nil, ids.Empty, 1))
 	}
 	return vdrs
 }
@@ -85,12 +86,14 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 
 	cfg, err := NewConfig(*commonCfg, nil, dummyGetter, fullVM)
 	require.NoError(t, err)
-	commonSyncer := New(cfg, func(lastReqID uint32) error { return nil })
+	commonSyncer := New(cfg, func(context.Context, uint32) error {
+		return nil
+	})
 	syncer, ok := commonSyncer.(*stateSyncer)
 	require.True(t, ok)
 	require.True(t, syncer.stateSyncVM != nil)
 
-	fullVM.GetOngoingSyncStateSummaryF = func() (block.StateSummary, error) {
+	fullVM.GetOngoingSyncStateSummaryF = func(context.Context) (block.StateSummary, error) {
 		return nil, database.ErrNotFound
 	}
 

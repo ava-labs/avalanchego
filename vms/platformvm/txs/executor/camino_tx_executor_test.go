@@ -151,17 +151,17 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 				}
 			},
 			preExecute: func(t *testing.T, tx *txs.Tx) {
-				staker := state.NewCurrentStaker(
+				staker, err := state.NewCurrentStaker(
 					tx.ID(),
 					tx.Unsigned.(*txs.CaminoAddValidatorTx),
 					0,
 				)
-
+				require.NoError(t, err)
 				env.state.PutCurrentValidator(staker)
 				env.state.AddTx(tx, status.Committed)
 				dummyHeight := uint64(1)
 				env.state.SetHeight(dummyHeight)
-				err := env.state.Commit()
+				err = env.state.Commit()
 				require.NoError(t, err)
 			},
 			expectedErr: errValidatorExists,
@@ -254,11 +254,12 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 		ids.ShortEmpty,
 	)
 	require.NoError(t, err)
-	staker := state.NewCurrentStaker(
+	staker, err := state.NewCurrentStaker(
 		addDSTx.ID(),
 		addDSTx.Unsigned.(*txs.CaminoAddValidatorTx),
 		0,
 	)
+	require.NoError(t, err)
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(addDSTx, status.Committed)
 	dummyHeight := uint64(1)
@@ -277,11 +278,12 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 		ids.ShortEmpty,
 	)
 	require.NoError(t, err)
-	staker = state.NewCurrentStaker(
+	staker, err = state.NewCurrentStaker(
 		subnetTx.ID(),
 		subnetTx.Unsigned.(*txs.AddSubnetValidatorTx),
 		0,
 	)
+	require.NoError(t, err)
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(subnetTx, status.Committed)
 	env.state.SetHeight(dummyHeight)

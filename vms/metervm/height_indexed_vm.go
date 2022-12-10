@@ -4,29 +4,31 @@
 package metervm
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
-func (vm *blockVM) VerifyHeightIndex() error {
+func (vm *blockVM) VerifyHeightIndex(ctx context.Context) error {
 	if vm.hVM == nil {
 		return block.ErrHeightIndexedVMNotImplemented
 	}
 
 	start := vm.clock.Time()
-	err := vm.hVM.VerifyHeightIndex()
+	err := vm.hVM.VerifyHeightIndex(ctx)
 	end := vm.clock.Time()
 	vm.blockMetrics.verifyHeightIndex.Observe(float64(end.Sub(start)))
 	return err
 }
 
-func (vm *blockVM) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
+func (vm *blockVM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
 	if vm.hVM == nil {
 		return ids.Empty, block.ErrHeightIndexedVMNotImplemented
 	}
 
 	start := vm.clock.Time()
-	blockID, err := vm.hVM.GetBlockIDAtHeight(height)
+	blockID, err := vm.hVM.GetBlockIDAtHeight(ctx, height)
 	end := vm.clock.Time()
 	vm.blockMetrics.getBlockIDAtHeight.Observe(float64(end.Sub(start)))
 	return blockID, err

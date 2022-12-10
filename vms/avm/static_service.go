@@ -11,6 +11,7 @@ import (
 	stdjson "encoding/json"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -75,7 +76,7 @@ type BuildGenesisReply struct {
 
 // BuildGenesis returns the UTXOs such that at least one address in [args.Addresses] is
 // referenced in the UTXO.
-func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
+func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 	parser, err := txs.NewParser([]fxs.Fx{
 		&secp256k1fx.Fx{},
 		&nftfx.Fx{},
@@ -175,10 +176,10 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			initialState.Sort(genesisCodec)
 			asset.States = append(asset.States, initialState)
 		}
-		asset.Sort()
+		utils.Sort(asset.States)
 		g.Txs = append(g.Txs, &asset)
 	}
-	g.Sort()
+	utils.Sort(g.Txs)
 
 	b, err := genesisCodec.Marshal(txs.CodecVersion, &g)
 	if err != nil {

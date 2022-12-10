@@ -8,25 +8,51 @@ import "io/prometheus/client/metrics.proto";
 
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/vm";
 
+// ref. https://pkg.go.dev/github.com/ava-labs/avalanchego/snow/engine/snowman/block
+// ref. https://pkg.go.dev/github.com/ava-labs/avalanchego/snow/consensus/snowman#Block
 service VM {
   // ChainVM
+  //
+  // Initialize this VM.
   rpc Initialize(InitializeRequest) returns (InitializeResponse);
+  // SetState communicates to VM its next state it starts
   rpc SetState(SetStateRequest) returns (SetStateResponse);
+  // Shutdown is called when the node is shutting down.
   rpc Shutdown(google.protobuf.Empty) returns (google.protobuf.Empty);
+  // Creates the HTTP handlers for custom chain network calls.
   rpc CreateHandlers(google.protobuf.Empty) returns (CreateHandlersResponse);
+  // Creates the HTTP handlers for custom VM network calls.
+  //
+  // Note: RPC Chain VM Factory will start a new instance of the VM in a
+  // seperate process which will populate the static handlers. After this
+  // process is created other processes will be created to populate blockchains,
+  // but they will not have the static handlers be called again.
   rpc CreateStaticHandlers(google.protobuf.Empty) returns (CreateStaticHandlersResponse);
   rpc Connected(ConnectedRequest) returns (google.protobuf.Empty);
   rpc Disconnected(DisconnectedRequest) returns (google.protobuf.Empty);
-  rpc BuildBlock(google.protobuf.Empty) returns (BuildBlockResponse);
+  // Attempt to create a new block from data contained in the VM.
+  rpc BuildBlock(BuildBlockRequest) returns (BuildBlockResponse);
+  // Attempt to create a block from a stream of bytes.
   rpc ParseBlock(ParseBlockRequest) returns (ParseBlockResponse);
+  // Attempt to load a block.
   rpc GetBlock(GetBlockRequest) returns (GetBlockResponse);
+  // Notify the VM of the currently preferred block.
   rpc SetPreference(SetPreferenceRequest) returns (google.protobuf.Empty);
+  // Attempt to verify the health of the VM.
   rpc Health(google.protobuf.Empty) returns (HealthResponse);
+  // Version returns the version of the VM.
   rpc Version(google.protobuf.Empty) returns (VersionResponse);
+  // Notify this engine of a request for data from [nodeID].
   rpc AppRequest(AppRequestMsg) returns (google.protobuf.Empty);
+  // Notify this engine that an AppRequest message it sent to [nodeID] with
+  // request ID [requestID] failed.
   rpc AppRequestFailed(AppRequestFailedMsg) returns (google.protobuf.Empty);
+  // Notify this engine of a response to the AppRequest message it sent to
+  // [nodeID] with request ID [requestID].
   rpc AppResponse(AppResponseMsg) returns (google.protobuf.Empty);
+  // Notify this engine of a gossip message from [nodeID].
   rpc AppGossip(AppGossipMsg) returns (google.protobuf.Empty);
+  // Attempts to gather metrics from a VM.
   rpc Gather(google.protobuf.Empty) returns (GatherResponse);
   rpc CrossChainAppRequest(CrossChainAppRequestMsg) returns (google.protobuf.Empty);
   rpc CrossChainAppRequestFailed(CrossChainAppRequestFailedMsg) returns (google.protobuf.Empty);
@@ -41,10 +67,17 @@ service VM {
   rpc GetBlockIDAtHeight(GetBlockIDAtHeightRequest) returns (GetBlockIDAtHeightResponse);
 
   // StateSyncableVM
+  //
+  // StateSyncEnabled indicates whether the state sync is enabled for this VM.
   rpc StateSyncEnabled(google.protobuf.Empty) returns (StateSyncEnabledResponse);
+  // GetOngoingSyncStateSummary returns an in-progress state summary if it exists.
   rpc GetOngoingSyncStateSummary(google.protobuf.Empty) returns (GetOngoingSyncStateSummaryResponse);
+  // GetLastStateSummary returns the latest state summary.
   rpc GetLastStateSummary(google.protobuf.Empty) returns (GetLastStateSummaryResponse);
+  // ParseStateSummary parses a state summary out of [summaryBytes].
   rpc ParseStateSummary(ParseStateSummaryRequest) returns (ParseStateSummaryResponse);
+  // GetStateSummary retrieves the state summary that was generated at height
+  // [summaryHeight].
   rpc GetStateSummary(GetStateSummaryRequest) returns (GetStateSummaryResponse);
 
   // Block
@@ -62,15 +95,17 @@ message InitializeRequest {
   bytes chain_id = 3;
   bytes node_id = 4;
   bytes x_chain_id = 5;
-  bytes avax_asset_id = 6;
-  bytes genesis_bytes = 7;
-  bytes upgrade_bytes = 8;
-  bytes config_bytes = 9;
-  repeated VersionedDBServer db_servers = 10;
+  bytes c_chain_id = 6;
+  bytes avax_asset_id = 7;
+  string chain_data_dir = 8;
+  bytes genesis_bytes = 9;
+  bytes upgrade_bytes = 10;
+  bytes config_bytes = 11;
+  repeated VersionedDBServer db_servers = 12;
   // server_addr is the address of the gRPC server which serves
   // the messenger, keystore, shared memory, blockchain alias,
   // subnet alias, and appSender services
-  string server_addr = 11;
+  string server_addr = 13;
 }
 
 message InitializeResponse {
@@ -116,13 +151,18 @@ message Handler {
   string server_addr = 3;
 }
 
+message BuildBlockRequest {
+  optional uint64 p_chain_height = 1;
+}
+
+// Note: The status of a freshly built block is assumed to be Processing.
 message BuildBlockResponse {
   bytes id = 1;
   bytes parent_id = 2;
   bytes bytes = 3;
   uint64 height = 4;
   google.protobuf.Timestamp timestamp = 5;
-  // status is always processing
+  bool verify_with_context = 6;
 }
 
 message ParseBlockRequest {
@@ -135,6 +175,7 @@ message ParseBlockResponse {
   uint32 status = 3;
   uint64 height = 4;
   google.protobuf.Timestamp timestamp = 5;
+  bool verify_with_context = 6;
 }
 
 message GetBlockRequest {
@@ -149,6 +190,7 @@ message GetBlockResponse {
   google.protobuf.Timestamp timestamp = 5;
   // used to propagate database.ErrNotFound through RPC
   uint32 err = 6;
+  bool verify_with_context = 7;
 }
 
 message SetPreferenceRequest {
@@ -157,6 +199,10 @@ message SetPreferenceRequest {
 
 message BlockVerifyRequest {
   bytes bytes = 1;
+
+  // If set, the VM server casts the block to a [block.WithVerifyContext] and
+  // calls [VerifyWithContext] instead of [Verify].
+  optional uint64 p_chain_height = 2;
 }
 
 message BlockVerifyResponse {

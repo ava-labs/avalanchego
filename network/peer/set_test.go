@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 func TestSet(t *testing.T) {
@@ -17,12 +18,12 @@ func TestSet(t *testing.T) {
 	set := NewSet()
 
 	peer1 := &peer{
-		id:             ids.NodeID{0x01},
-		observedUptime: 0,
+		id:              ids.NodeID{0x01},
+		observedUptimes: map[ids.ID]uint32{constants.PrimaryNetworkID: 0},
 	}
 	updatedPeer1 := &peer{
-		id:             ids.NodeID{0x01},
-		observedUptime: 1,
+		id:              ids.NodeID{0x01},
+		observedUptimes: map[ids.ID]uint32{constants.PrimaryNetworkID: 1},
 	}
 	peer2 := &peer{
 		id: ids.NodeID{0x02},
@@ -41,21 +42,27 @@ func TestSet(t *testing.T) {
 	set.Add(peer1)
 	retrievedPeer1, peer1Found := set.GetByID(peer1.id)
 	require.True(peer1Found)
-	require.Equal(peer1.ObservedUptime(), retrievedPeer1.ObservedUptime())
+	observed1, _ := peer1.ObservedUptime(constants.PrimaryNetworkID)
+	observed2, _ := retrievedPeer1.ObservedUptime(constants.PrimaryNetworkID)
+	require.Equal(observed1, observed2)
 	require.Equal(1, set.Len())
 
 	// re-addition of peer works as update
 	set.Add(updatedPeer1)
 	retrievedPeer1, peer1Found = set.GetByID(peer1.id)
 	require.True(peer1Found)
-	require.Equal(updatedPeer1.ObservedUptime(), retrievedPeer1.ObservedUptime())
+	observed1, _ = updatedPeer1.ObservedUptime(constants.PrimaryNetworkID)
+	observed2, _ = retrievedPeer1.ObservedUptime(constants.PrimaryNetworkID)
+	require.Equal(observed1, observed2)
 	require.Equal(1, set.Len())
 
 	// add of another peer is handled
 	set.Add(peer2)
 	retrievedPeer2, peer2Found := set.GetByID(peer2.id)
 	require.True(peer2Found)
-	require.Equal(peer2.ObservedUptime(), retrievedPeer2.ObservedUptime())
+	observed1, _ = peer2.ObservedUptime(constants.PrimaryNetworkID)
+	observed2, _ = retrievedPeer2.ObservedUptime(constants.PrimaryNetworkID)
+	require.Equal(observed1, observed2)
 	require.Equal(2, set.Len())
 
 	// removal of added peer is handled

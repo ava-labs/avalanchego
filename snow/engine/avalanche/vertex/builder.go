@@ -4,18 +4,21 @@
 package vertex
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 // Builder builds a vertex given a set of parentIDs and transactions.
 type Builder interface {
 	// Build a new vertex from the contents of a vertex
-	BuildVtx(parentIDs []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error)
+	BuildVtx(ctx context.Context, parentIDs []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error)
 	// Build a new stop vertex from the parents
-	BuildStopVtx(parentIDs []ids.ID) (avalanche.Vertex, error)
+	BuildStopVtx(ctx context.Context, parentIDs []ids.ID) (avalanche.Vertex, error)
 }
 
 // Build a new stateless vertex from the contents of a vertex
@@ -59,8 +62,8 @@ func buildVtx(
 	verifyFunc func(innerStatelessVertex) error,
 	stopVertex bool,
 ) (StatelessVertex, error) {
-	ids.SortIDs(parentIDs)
-	SortHashOf(txs)
+	utils.Sort(parentIDs)
+	utils.SortByHash(txs)
 
 	codecVer := codecVersion
 	if stopVertex {

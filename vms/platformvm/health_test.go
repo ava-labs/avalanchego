@@ -4,12 +4,14 @@
 package platformvm
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -22,14 +24,14 @@ func TestHealthCheckPrimaryNetwork(t *testing.T) {
 	vm.ctx.Lock.Lock()
 
 	defer func() {
-		require.NoError(vm.Shutdown())
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 	genesisState, _ := defaultGenesis()
 	for index, validator := range genesisState.Validators {
-		err := vm.Connected(validator.NodeID, version.CurrentApp)
+		err := vm.Connected(context.Background(), validator.NodeID, version.CurrentApp)
 		require.NoError(err)
-		details, err := vm.HealthCheck()
+		details, err := vm.HealthCheck(context.Background())
 		if float64((index+1)*20) >= defaultMinConnectedStake*100 {
 			require.NoError(err)
 		} else {
@@ -60,24 +62,26 @@ func TestHealthCheckSubnet(t *testing.T) {
 			vm, _, _ := defaultVM()
 			vm.ctx.Lock.Lock()
 			defer func() {
-				require.NoError(vm.Shutdown())
+				require.NoError(vm.Shutdown(context.Background()))
 				vm.ctx.Lock.Unlock()
 			}()
+
 			subnetID := ids.GenerateTestID()
+			subnetVdrs := validators.NewSet()
 			vm.WhitelistedSubnets.Add(subnetID)
 			testVdrCount := 4
 			for i := 0; i < testVdrCount; i++ {
 				subnetVal := ids.GenerateTestNodeID()
-				require.NoError(vm.Validators.AddWeight(subnetID, subnetVal, 100))
+				err := subnetVdrs.Add(subnetVal, nil, ids.Empty, 100)
+				require.NoError(err)
 			}
-
-			vals, ok := vm.Validators.GetValidators(subnetID)
+			ok := vm.Validators.Add(subnetID, subnetVdrs)
 			require.True(ok)
 
 			// connect to all primary network validators first
 			genesisState, _ := defaultGenesis()
 			for _, validator := range genesisState.Validators {
-				err := vm.Connected(validator.NodeID, version.CurrentApp)
+				err := vm.Connected(context.Background(), validator.NodeID, version.CurrentApp)
 				require.NoError(err)
 			}
 			var expectedMinStake float64
@@ -89,10 +93,10 @@ func TestHealthCheckSubnet(t *testing.T) {
 					subnetID: expectedMinStake,
 				}
 			}
-			for index, validator := range vals.List() {
-				err := vm.Connected(validator.ID(), version.CurrentApp)
+			for index, vdr := range subnetVdrs.List() {
+				err := vm.ConnectedSubnet(context.Background(), vdr.NodeID, subnetID)
 				require.NoError(err)
-				details, err := vm.HealthCheck()
+				details, err := vm.HealthCheck(context.Background())
 				connectedPerc := float64((index + 1) * (100 / testVdrCount))
 				if connectedPerc >= expectedMinStake*100 {
 					require.NoError(err)

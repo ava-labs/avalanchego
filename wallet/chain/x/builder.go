@@ -10,7 +10,9 @@ import (
 	stdcontext "context"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -155,7 +157,7 @@ type BuilderBackend interface {
 }
 
 type builder struct {
-	addrs   ids.ShortSet
+	addrs   set.Set[ids.ShortID]
 	backend BuilderBackend
 }
 
@@ -165,7 +167,7 @@ type builder struct {
 //     signing the transactions in the future.
 //   - [backend] provides the required access to the chain's context and state
 //     to build out the transactions.
-func NewBuilder(addrs ids.ShortSet, backend BuilderBackend) Builder {
+func NewBuilder(addrs set.Set[ids.ShortID], backend BuilderBackend) Builder {
 	return &builder{
 		addrs:   addrs,
 		backend: backend,
@@ -260,7 +262,7 @@ func (b *builder) NewCreateAssetTx(
 		Denomination: denomination,
 		States:       states,
 	}
-	tx.Sort() // sort the initial states
+	utils.Sort(tx.States) // sort the initial states
 	return tx, nil
 }
 
@@ -393,7 +395,7 @@ func (b *builder) NewImportTx(
 		}
 		importedAmounts[assetID] = newImportedAmount
 	}
-	avax.SortTransferableInputs(importedInputs) // sort imported inputs
+	utils.Sort(importedInputs) // sort imported inputs
 
 	if len(importedAmounts) == 0 {
 		return nil, fmt.Errorf(
@@ -613,7 +615,7 @@ func (b *builder) spend(
 		}
 	}
 
-	avax.SortTransferableInputs(inputs)                   // sort inputs
+	utils.Sort(inputs)                                    // sort inputs
 	avax.SortTransferableOutputs(outputs, Parser.Codec()) // sort the change outputs
 	return inputs, outputs, nil
 }

@@ -14,19 +14,45 @@ var _ Manager = (*MockManager)(nil)
 // To be used only in tests
 type MockManager struct{}
 
-func (mm MockManager) Router() router.Router               { return nil }
-func (mm MockManager) QueueChainCreation(ChainParameters)  {}
-func (mm MockManager) ForceCreateChain(ChainParameters)    {}
-func (mm MockManager) AddRegistrant(Registrant)            {}
-func (mm MockManager) Aliases(ids.ID) ([]string, error)    { return nil, nil }
-func (mm MockManager) PrimaryAlias(ids.ID) (string, error) { return "", nil }
-func (mm MockManager) PrimaryAliasOrDefault(ids.ID) string { return "" }
-func (mm MockManager) Alias(ids.ID, string) error          { return nil }
-func (mm MockManager) RemoveAliases(ids.ID)                {}
-func (mm MockManager) Shutdown()                           {}
-func (mm MockManager) StartChainCreator(ChainParameters)   {}
-func (mm MockManager) SubnetID(ids.ID) (ids.ID, error)     { return ids.ID{}, nil }
-func (mm MockManager) IsBootstrapped(ids.ID) bool          { return false }
+func (mm MockManager) Router() router.Router {
+	return nil
+}
+
+func (mm MockManager) QueueChainCreation(ChainParameters) {}
+
+func (mm MockManager) ForceCreateChain(ChainParameters) {}
+
+func (mm MockManager) AddRegistrant(Registrant) {}
+
+func (mm MockManager) Aliases(ids.ID) ([]string, error) {
+	return nil, nil
+}
+
+func (mm MockManager) PrimaryAlias(ids.ID) (string, error) {
+	return "", nil
+}
+
+func (mm MockManager) PrimaryAliasOrDefault(ids.ID) string {
+	return ""
+}
+
+func (mm MockManager) Alias(ids.ID, string) error {
+	return nil
+}
+
+func (mm MockManager) RemoveAliases(ids.ID) {}
+
+func (mm MockManager) Shutdown() {}
+
+func (mm MockManager) StartChainCreator(ChainParameters) {}
+
+func (mm MockManager) SubnetID(ids.ID) (ids.ID, error) {
+	return ids.ID{}, nil
+}
+
+func (mm MockManager) IsBootstrapped(ids.ID) bool {
+	return false
+}
 
 func (mm MockManager) Lookup(s string) (ids.ID, error) {
 	id, err := ids.FromString(s)

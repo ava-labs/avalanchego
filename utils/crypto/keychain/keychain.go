@@ -18,6 +18,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 
 	ledger "github.com/ava-labs/avalanche-ledger-go"
 )
@@ -26,6 +27,7 @@ var (
 	_ Keychain = (*ledgerKeychain)(nil)
 	_ Signer   = (*ledgerSigner)(nil)
 
+	ErrInvalidIndicesLength    = errors.New("number of indices should be greater than 0")
 	ErrInvalidNumAddrsToDerive = errors.New("number of addresses to derive should be greater than 0")
 	ErrInvalidNumAddrsDerived  = errors.New("incorrect number of ledger derived addresses")
 	ErrInvalidNumSignatures    = errors.New("incorrect number of signatures")
@@ -45,14 +47,14 @@ type Keychain interface {
 	Get(addr ids.ShortID) (Signer, bool)
 	// Returns the set of addresses for which the accessor keeps an associated
 	// signer
-	Addresses() ids.ShortSet
+	Addresses() set.Set[ids.ShortID]
 }
 
 // ledgerKeychain is an abstraction of the underlying ledger hardware device,
 // to be able to get a signer from a finite set of derived signers
 type ledgerKeychain struct {
 	ledger    ledger.Ledger
-	addrs     ids.ShortSet
+	addrs     set.Set[ids.ShortID]
 	addrToIdx map[ids.ShortID]uint32
 }
 
@@ -70,22 +72,36 @@ func NewLedgerKeychain(l ledger.Ledger, numToDerive int) (Keychain, error) {
 		return nil, ErrInvalidNumAddrsToDerive
 	}
 
-	addrs, err := l.Addresses(numToDerive)
+	indices := make([]uint32, numToDerive)
+	for i := range indices {
+		indices[i] = uint32(i)
+	}
+
+	return NewLedgerKeychainFromIndices(l, indices)
+}
+
+// NewLedgerKeychainFromIndices creates a new Ledger with addresses taken from the given [indices].
+func NewLedgerKeychainFromIndices(l ledger.Ledger, indices []uint32) (Keychain, error) {
+	if len(indices) == 0 {
+		return nil, ErrInvalidIndicesLength
+	}
+
+	addrs, err := l.Addresses(indices)
 	if err != nil {
 		return nil, err
 	}
 
 	addrsLen := len(addrs)
-	if addrsLen != numToDerive {
+	if len(addrs) != len(indices) {
 		return nil, fmt.Errorf(
 			"%w. expected %d, got %d",
 			ErrInvalidNumAddrsDerived,
-			numToDerive,
-			addrsLen,
+			len(indices),
+			len(addrs),
 		)
 	}
 
-	addrsSet := ids.NewShortSet(addrsLen)
+	addrsSet := set.NewSet[ids.ShortID](addrsLen)
 	addrToIdx := make(map[ids.ShortID]uint32, addrsLen)
 	for i, addr := range addrs {
 		addrsSet.Add(ids.ShortID(addr))
@@ -99,7 +115,7 @@ func NewLedgerKeychain(l ledger.Ledger, numToDerive int) (Keychain, error) {
 	}, nil
 }
 
-func (l *ledgerKeychain) Addresses() ids.ShortSet {
+func (l *ledgerKeychain) Addresses() set.Set[ids.ShortID] {
 	return l.addrs
 }
 

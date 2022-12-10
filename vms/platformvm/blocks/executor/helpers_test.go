@@ -83,6 +83,8 @@ var (
 
 	genesisBlkID ids.ID
 	testSubnet1  *txs.Tx
+
+	errMissingPrimaryValidators = errors.New("missing primary validator set")
 )
 
 type stakerStatus uint
@@ -122,7 +124,7 @@ type environment struct {
 	backend        *executor.Backend
 }
 
-func (t *environment) ResetBlockTimer() {
+func (*environment) ResetBlockTimer() {
 	// dummy call, do nothing for now
 }
 
@@ -315,6 +317,7 @@ func defaultCtx(db database.Database) *snow.Context {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = 10
 	ctx.XChainID = xChainID
+	ctx.CChainID = cChainID
 	ctx.AVAXAssetID = avaxAssetID
 
 	atomicDB := prefixdb.New([]byte{1}, db)
@@ -334,10 +337,13 @@ func defaultCtx(db database.Database) *snow.Context {
 }
 
 func defaultConfig() *config.Config {
+	vdrs := validators.NewManager()
+	primaryVdrs := validators.NewSet()
+	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	return &config.Config{
 		Chains:                 chains.MockManager{},
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Validators:             validators.NewManager(),
+		Validators:             vdrs,
 		TxFee:                  defaultTxFee,
 		CreateSubnetTxFee:      100 * defaultTxFee,
 		CreateBlockchainTxFee:  100 * defaultTxFee,
@@ -370,9 +376,17 @@ type fxVMInt struct {
 	log      logging.Logger
 }
 
-func (fvi *fxVMInt) CodecRegistry() codec.Registry { return fvi.registry }
-func (fvi *fxVMInt) Clock() *mockable.Clock        { return fvi.clk }
-func (fvi *fxVMInt) Logger() logging.Logger        { return fvi.log }
+func (fvi *fxVMInt) CodecRegistry() codec.Registry {
+	return fvi.registry
+}
+
+func (fvi *fxVMInt) Clock() *mockable.Clock {
+	return fvi.clk
+}
+
+func (fvi *fxVMInt) Logger() logging.Logger {
+	return fvi.log
+}
 
 func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.Fx {
 	fxVMInt := &fxVMInt{
@@ -446,7 +460,7 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 	buildGenesisResponse := api.BuildGenesisReply{}
 	platformvmSS := api.StaticService{}
 	if err := platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse); err != nil {
-		panic(fmt.Errorf("problem while building platform chain's genesis state: %v", err))
+		panic(fmt.Errorf("problem while building platform chain's genesis state: %w", err))
 	}
 
 	genesisBytes, err := formatting.Decode(buildGenesisResponse.Encoding, buildGenesisResponse.Bytes)
@@ -464,18 +478,18 @@ func shutdownEnvironment(t *environment) error {
 	}
 
 	if t.isBootstrapped.GetValue() {
-		primaryValidatorSet, exist := t.config.Validators.GetValidators(constants.PrimaryNetworkID)
+		primaryValidatorSet, exist := t.config.Validators.Get(constants.PrimaryNetworkID)
 		if !exist {
-			return errors.New("no default subnet validators")
+			return errMissingPrimaryValidators
 		}
 		primaryValidators := primaryValidatorSet.List()
 
 		validatorIDs := make([]ids.NodeID, len(primaryValidators))
 		for i, vdr := range primaryValidators {
-			validatorIDs[i] = vdr.ID()
+			validatorIDs[i] = vdr.NodeID
 		}
 
-		if err := t.uptimes.Shutdown(validatorIDs); err != nil {
+		if err := t.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID); err != nil {
 			return err
 		}
 		if err := t.state.Commit(); err != nil {
@@ -513,10 +527,13 @@ func addPendingValidator(
 		return nil, err
 	}
 
-	staker := state.NewPendingStaker(
+	staker, err := state.NewPendingStaker(
 		addPendingValidatorTx.ID(),
 		addPendingValidatorTx.Unsigned.(*txs.AddValidatorTx),
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	env.state.PutPendingValidator(staker)
 	env.state.AddTx(addPendingValidatorTx, status.Committed)

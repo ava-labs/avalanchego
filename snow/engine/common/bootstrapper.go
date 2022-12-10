@@ -5,6 +5,7 @@ package common
 
 import (
 	"context"
+
 	stdmath "math"
 
 	"go.uber.org/zap"
@@ -12,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 const (
@@ -34,8 +36,8 @@ type Bootstrapper interface {
 	AcceptedFrontierHandler
 	AcceptedHandler
 	Haltable
-	Startup() error
-	Restart(reset bool) error
+	Startup(context.Context) error
+	Restart(ctx context.Context, reset bool) error
 }
 
 // It collects mechanisms common to both snowman and avalanche bootstrappers
@@ -46,23 +48,23 @@ type bootstrapper struct {
 	// Holds the beacons that were sampled for the accepted frontier
 	sampledBeacons validators.Set
 	// IDs of validators we should request an accepted frontier from
-	pendingSendAcceptedFrontier ids.NodeIDSet
+	pendingSendAcceptedFrontier set.Set[ids.NodeID]
 	// IDs of validators we requested an accepted frontier from but haven't
 	// received a reply yet
-	pendingReceiveAcceptedFrontier ids.NodeIDSet
+	pendingReceiveAcceptedFrontier set.Set[ids.NodeID]
 	// IDs of validators that failed to respond with their accepted frontier
-	failedAcceptedFrontier ids.NodeIDSet
+	failedAcceptedFrontier set.Set[ids.NodeID]
 	// IDs of all the returned accepted frontiers
-	acceptedFrontierSet ids.Set
+	acceptedFrontierSet set.Set[ids.ID]
 
 	// IDs of validators we should request filtering the accepted frontier from
-	pendingSendAccepted ids.NodeIDSet
+	pendingSendAccepted set.Set[ids.NodeID]
 	// IDs of validators we requested filtering the accepted frontier from but
 	// haven't received a reply yet
-	pendingReceiveAccepted ids.NodeIDSet
+	pendingReceiveAccepted set.Set[ids.NodeID]
 	// IDs of validators that failed to respond with their filtered accepted
 	// frontier
-	failedAccepted ids.NodeIDSet
+	failedAccepted set.Set[ids.NodeID]
 	// IDs of the returned accepted containers and the stake weight that has
 	// marked them as accepted
 	acceptedVotes    map[ids.ID]uint64
@@ -113,19 +115,15 @@ func (b *bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, 
 	// We've received the accepted frontier from every bootstrap validator
 	// Ask each bootstrap validator to filter the list of containers that we were
 	// told are on the accepted frontier such that the list only contains containers
-	// they think are accepted
-	var err error
-
+	// they think are accepted.
+	//
 	// Create a newAlpha taking using the sampled beacon
 	// Keep the proportion of b.Alpha in the newAlpha
 	// newAlpha := totalSampledWeight * b.Alpha / totalWeight
 
 	newAlpha := float64(b.sampledBeacons.Weight()*b.Alpha) / float64(b.Beacons.Weight())
 
-	failedBeaconWeight, err := b.Beacons.SubsetWeight(b.failedAcceptedFrontier)
-	if err != nil {
-		return err
-	}
+	failedBeaconWeight := b.Beacons.SubsetWeight(b.failedAcceptedFrontier)
 
 	// fail the bootstrap if the weight is not enough to bootstrap
 	if float64(b.sampledBeacons.Weight())-newAlpha < float64(failedBeaconWeight) {
@@ -136,7 +134,7 @@ func (b *bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, 
 				zap.Int("numFailedBootstrappers", b.failedAcceptedFrontier.Len()),
 				zap.Int("numBootstrapAttemps", b.bootstrapAttempts),
 			)
-			return b.Restart(false)
+			return b.Restart(ctx, false)
 		}
 
 		b.Ctx.Log.Debug("didn't receive enough frontiers",
@@ -148,7 +146,7 @@ func (b *bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, 
 	b.Config.SharedCfg.RequestID++
 	b.acceptedFrontier = b.acceptedFrontierSet.List()
 
-	b.sendGetAccepted()
+	b.sendGetAccepted(ctx)
 	return nil
 }
 
@@ -189,11 +187,7 @@ func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 	// Mark that we received a response from [nodeID]
 	b.pendingReceiveAccepted.Remove(nodeID)
 
-	weight := uint64(0)
-	if w, ok := b.Beacons.GetWeight(nodeID); ok {
-		weight = w
-	}
-
+	weight := b.Beacons.GetWeight(nodeID)
 	for _, containerID := range containerIDs {
 		previousWeight := b.acceptedVotes[containerID]
 		newWeight, err := math.Add64(weight, previousWeight)
@@ -208,7 +202,7 @@ func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 		b.acceptedVotes[containerID] = newWeight
 	}
 
-	b.sendGetAccepted()
+	b.sendGetAccepted(ctx)
 
 	// wait on pending responses
 	if b.pendingReceiveAccepted.Len() != 0 {
@@ -228,10 +222,7 @@ func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 	size := len(accepted)
 	if size == 0 && b.Beacons.Len() > 0 {
 		// retry the bootstrap if the weight is not enough to bootstrap
-		failedBeaconWeight, err := b.Beacons.SubsetWeight(b.failedAccepted)
-		if err != nil {
-			return err
-		}
+		failedBeaconWeight := b.Beacons.SubsetWeight(b.failedAccepted)
 
 		// in a zero network there will be no accepted votes but the voting weight will be greater than the failed weight
 		if b.Config.RetryBootstrap && b.Beacons.Weight()-b.Alpha < failedBeaconWeight {
@@ -241,7 +232,7 @@ func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 				zap.Int("numFailedBootstrappers", b.failedAccepted.Len()),
 				zap.Int("numBootstrapAttempts", b.bootstrapAttempts),
 			)
-			return b.Restart(false)
+			return b.Restart(ctx, false)
 		}
 	}
 
@@ -276,22 +267,25 @@ func (b *bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID,
 	return b.Accepted(ctx, nodeID, requestID, nil)
 }
 
-func (b *bootstrapper) Startup() error {
-	beacons, err := b.Beacons.Sample(b.Config.SampleK)
+func (b *bootstrapper) Startup(ctx context.Context) error {
+	beaconIDs, err := b.Beacons.Sample(b.Config.SampleK)
 	if err != nil {
 		return err
 	}
 
 	b.sampledBeacons = validators.NewSet()
-	err = b.sampledBeacons.Set(beacons)
-	if err != nil {
-		return err
-	}
-
 	b.pendingSendAcceptedFrontier.Clear()
-	for _, vdr := range beacons {
-		vdrID := vdr.ID()
-		b.pendingSendAcceptedFrontier.Add(vdrID)
+	for _, nodeID := range beaconIDs {
+		if !b.sampledBeacons.Contains(nodeID) {
+			// Invariant: We never use the TxID or BLS keys populated here.
+			err = b.sampledBeacons.Add(nodeID, nil, ids.Empty, 1)
+		} else {
+			err = b.sampledBeacons.AddWeight(nodeID, 1)
+		}
+		if err != nil {
+			return err
+		}
+		b.pendingSendAcceptedFrontier.Add(nodeID)
 	}
 
 	b.pendingReceiveAcceptedFrontier.Clear()
@@ -300,8 +294,7 @@ func (b *bootstrapper) Startup() error {
 
 	b.pendingSendAccepted.Clear()
 	for _, vdr := range b.Beacons.List() {
-		vdrID := vdr.ID()
-		b.pendingSendAccepted.Add(vdrID)
+		b.pendingSendAccepted.Add(vdr.NodeID)
 	}
 
 	b.pendingReceiveAccepted.Clear()
@@ -313,15 +306,15 @@ func (b *bootstrapper) Startup() error {
 		b.Ctx.Log.Info("bootstrapping skipped",
 			zap.String("reason", "no provided bootstraps"),
 		)
-		return b.Bootstrapable.ForceAccepted(context.TODO(), nil)
+		return b.Bootstrapable.ForceAccepted(ctx, nil)
 	}
 
 	b.Config.SharedCfg.RequestID++
-	b.sendGetAcceptedFrontiers(context.TODO())
+	b.sendGetAcceptedFrontiers(ctx)
 	return nil
 }
 
-func (b *bootstrapper) Restart(reset bool) error {
+func (b *bootstrapper) Restart(ctx context.Context, reset bool) error {
 	// resets the attempts when we're pulling blocks/vertices we don't want to
 	// fail the bootstrap at that stage
 	if reset {
@@ -337,13 +330,13 @@ func (b *bootstrapper) Restart(reset bool) error {
 		)
 	}
 
-	return b.Startup()
+	return b.Startup(ctx)
 }
 
 // Ask up to [MaxOutstandingBroadcastRequests] bootstrap validators to send
 // their accepted frontier with the current accepted frontier
 func (b *bootstrapper) sendGetAcceptedFrontiers(ctx context.Context) {
-	vdrs := ids.NewNodeIDSet(1)
+	vdrs := set.NewSet[ids.NodeID](1)
 	for b.pendingSendAcceptedFrontier.Len() > 0 && b.pendingReceiveAcceptedFrontier.Len() < MaxOutstandingBroadcastRequests {
 		vdr, _ := b.pendingSendAcceptedFrontier.Pop()
 		// Add the validator to the set to send the messages to
@@ -359,8 +352,8 @@ func (b *bootstrapper) sendGetAcceptedFrontiers(ctx context.Context) {
 
 // Ask up to [MaxOutstandingBroadcastRequests] bootstrap validators to send
 // their filtered accepted frontier
-func (b *bootstrapper) sendGetAccepted() {
-	vdrs := ids.NewNodeIDSet(1)
+func (b *bootstrapper) sendGetAccepted(ctx context.Context) {
+	vdrs := set.NewSet[ids.NodeID](1)
 	for b.pendingSendAccepted.Len() > 0 && b.pendingReceiveAccepted.Len() < MaxOutstandingBroadcastRequests {
 		vdr, _ := b.pendingSendAccepted.Pop()
 		// Add the validator to the set to send the messages to
@@ -374,6 +367,6 @@ func (b *bootstrapper) sendGetAccepted() {
 			zap.Int("numSent", vdrs.Len()),
 			zap.Int("numPending", b.pendingSendAccepted.Len()),
 		)
-		b.Sender.SendGetAccepted(context.TODO(), vdrs, b.Config.SharedCfg.RequestID, b.acceptedFrontier)
+		b.Sender.SendGetAccepted(ctx, vdrs, b.Config.SharedCfg.RequestID, b.acceptedFrontier)
 	}
 }

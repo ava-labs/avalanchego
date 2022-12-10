@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var errDuplicatedOperation = errors.New("duplicated operation on provided value")
@@ -196,13 +197,13 @@ func (s *state) getKeys(traits [][]byte, startTrait, startKey []byte, limit int)
 	//       this variable is declared, the map may not be initialized from the
 	//       start. The first add to the underlying map of the set would then
 	//       result in the map being initialized.
-	keySet := ids.Set{}
+	keySet := set.Set[ids.ID]{}
 	keys := [][]byte(nil)
 	lastTrait := startTrait
 	lastKey := startKey
 	// Iterate over the traits in order appending all of the keys that possess
 	// the given [traits].
-	utils.Sort2DBytes(traits)
+	utils.SortBytes(traits)
 	for _, trait := range traits {
 		switch bytes.Compare(trait, startTrait) {
 		case -1:
@@ -235,7 +236,7 @@ func (s *state) getKeys(traits [][]byte, startTrait, startKey []byte, limit int)
 // and adds keys that possess [trait] to [keys] until the iteration completes or
 // limit hits 0. If a key possesses multiple traits, it will be de-duplicated
 // with [keySet].
-func (s *state) appendTraitKeys(keys *[][]byte, keySet *ids.Set, limit *int, trait, startKey []byte) ([]byte, error) {
+func (s *state) appendTraitKeys(keys *[][]byte, keySet *set.Set[ids.ID], limit *int, trait, startKey []byte) ([]byte, error) {
 	lastKey := startKey
 
 	// Create the prefixDB for the specified trait.

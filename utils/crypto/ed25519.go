@@ -68,7 +68,9 @@ func (k *PublicKeyED25519) Address() ids.ShortID {
 	return k.addr
 }
 
-func (k *PublicKeyED25519) Bytes() []byte { return k.pk }
+func (k *PublicKeyED25519) Bytes() []byte {
+	return k.pk
+}
 
 type PrivateKeyED25519 struct {
 	sk ed25519.PrivateKey
@@ -92,4 +94,6 @@ func (k PrivateKeyED25519) SignHash(hash []byte) ([]byte, error) {
 	return k.Sign(hash)
 }
 
-func (k PrivateKeyED25519) Bytes() []byte { return k.sk }
+func (k PrivateKeyED25519) Bytes() []byte {
+	return k.sk
+}

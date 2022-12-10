@@ -59,7 +59,9 @@ func (p *ProofOfPossession) Verify() error {
 	return nil
 }
 
-func (p *ProofOfPossession) Key() *bls.PublicKey { return p.publicKey }
+func (p *ProofOfPossession) Key() *bls.PublicKey {
+	return p.publicKey
+}
 
 type jsonProofOfPossession struct {
 	PublicKey         string `json:"publicKey"`

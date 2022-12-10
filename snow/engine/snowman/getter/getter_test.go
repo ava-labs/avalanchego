@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var errUnknownBlock = errors.New("unknown block")
@@ -48,15 +49,19 @@ func testSetup(
 
 	isBootstrapped := false
 	subnet := &common.SubnetTest{
-		T:               t,
-		IsBootstrappedF: func() bool { return isBootstrapped },
-		BootstrappedF:   func(ids.ID) { isBootstrapped = true },
+		T: t,
+		IsBootstrappedF: func() bool {
+			return isBootstrapped
+		},
+		BootstrappedF: func(ids.ID) {
+			isBootstrapped = true
+		},
 	}
 
 	sender.CantSendGetAcceptedFrontier = false
 
 	peer := ids.GenerateTestNodeID()
-	if err := peers.AddWeight(peer, 1); err != nil {
+	if err := peers.Add(peer, nil, ids.Empty, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -94,8 +99,10 @@ func TestAcceptedFrontier(t *testing.T) {
 		BytesV:  []byte{1, 2, 3},
 	}
 	vm.CantLastAccepted = false
-	vm.LastAcceptedF = func() (ids.ID, error) { return blkID, nil }
-	vm.GetBlockF = func(bID ids.ID) (snowman.Block, error) {
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return blkID, nil
+	}
+	vm.GetBlockF = func(_ context.Context, bID ids.ID) (snowman.Block, error) {
 		require.Equal(t, blkID, bID)
 		return dummyBlk, nil
 	}
@@ -146,8 +153,10 @@ func TestFilterAccepted(t *testing.T) {
 	}}
 
 	vm.CantLastAccepted = false
-	vm.LastAcceptedF = func() (ids.ID, error) { return blk1.ID(), nil }
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return blk1.ID(), nil
+	}
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		require.Equal(t, blk1.ID(), blkID)
 		return blk1, nil
 	}
@@ -162,7 +171,7 @@ func TestFilterAccepted(t *testing.T) {
 	}
 
 	blkIDs := []ids.ID{blkID0, blkID1, blkID2}
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case blkID0:
 			return blk0, nil
@@ -184,7 +193,7 @@ func TestFilterAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	acceptedSet := ids.Set{}
+	acceptedSet := set.Set[ids.ID]{}
 	acceptedSet.Add(accepted...)
 
 	if acceptedSet.Len() != 2 {

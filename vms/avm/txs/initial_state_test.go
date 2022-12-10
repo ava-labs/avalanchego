@@ -8,6 +8,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
@@ -176,4 +178,16 @@ func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
 	if err := is.Verify(m, numFxs); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestInitialStateLess(t *testing.T) {
+	require := require.New(t)
+
+	var is1, is2 InitialState
+	require.False(is1.Less(&is2))
+	require.False(is2.Less(&is1))
+
+	is1.FxIndex = 1
+	require.False(is1.Less(&is2))
+	require.True(is2.Less(&is1))
 }

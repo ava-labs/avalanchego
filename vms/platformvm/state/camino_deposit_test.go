@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
@@ -19,7 +20,7 @@ import (
 func TestGetDeposit(t *testing.T) {
 	baseDBManager := db_manager.NewMemDB(version.Semantic1_0_0)
 	addr0 := ids.GenerateTestShortID()
-	addresses := ids.ShortSet{}
+	addresses := set.NewSet[ids.ShortID](0)
 	addresses.Add(addr0)
 	testID := ids.GenerateTestID()
 	deposit1 := deposit.Deposit{
@@ -162,7 +163,7 @@ func TestGetDeposit(t *testing.T) {
 func TestWriteDeposits(t *testing.T) {
 	baseDBManager := db_manager.NewMemDB(version.Semantic1_0_0)
 	addr0 := ids.GenerateTestShortID()
-	addresses := ids.ShortSet{}
+	addresses := set.NewSet[ids.ShortID](0)
 	addresses.Add(addr0)
 	testID := ids.GenerateTestID()
 
