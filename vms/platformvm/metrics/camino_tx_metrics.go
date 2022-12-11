@@ -36,9 +36,17 @@ func newCaminoTxMetrics(
 	return m, errs.Err
 }
 
-func (m *txMetrics) AddAddressStateTx(*txs.AddAddressStateTx) error { return nil }
-func (m *txMetrics) DepositTx(*txs.DepositTx) error                 { return nil }
-func (m *txMetrics) UnlockDepositTx(*txs.UnlockDepositTx) error     { return nil }
+func (*txMetrics) AddAddressStateTx(*txs.AddAddressStateTx) error {
+	return nil
+}
+
+func (*txMetrics) DepositTx(*txs.DepositTx) error {
+	return nil
+}
+
+func (*txMetrics) UnlockDepositTx(*txs.UnlockDepositTx) error {
+	return nil
+}
 
 func (m *caminoTxMetrics) AddAddressStateTx(*txs.AddAddressStateTx) error {
 	m.numAddAddressStateTxs.Inc()

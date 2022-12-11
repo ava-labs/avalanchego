@@ -144,13 +144,17 @@ func TestUnlockUTXOs(t *testing.T) {
 			},
 		},
 		"Wrong state, lockStateUnlocked": {
-			lockState:     locked.StateUnlocked,
-			generateWant:  func(utxos []*avax.UTXO) want { return want{} },
+			lockState: locked.StateUnlocked,
+			generateWant: func(utxos []*avax.UTXO) want {
+				return want{}
+			},
 			expectedError: errInvalidTargetLockState,
 		},
 		"Wrong state, LockStateDepositedBonded": {
-			lockState:     locked.StateDepositedBonded,
-			generateWant:  func(utxos []*avax.UTXO) want { return want{} },
+			lockState: locked.StateDepositedBonded,
+			generateWant: func(utxos []*avax.UTXO) want {
+				return want{}
+			},
 			expectedError: errInvalidTargetLockState,
 		},
 	}

@@ -1205,7 +1205,7 @@ func (h *handler) VerifyUnlockDepositedUTXOs(
 		// if we don't need keys, than deposit is expired and must be fully unlocked
 		// that means that tx must fully consume remaining deposited tokens and
 		// produce them as unlocked
-		isExpired := deposit.IsExpired(depositOffer, currentTimestamp)
+		isExpired := deposit.IsExpired(currentTimestamp)
 
 		// if there are active deposit - its not system tx and we need to burn fee
 		if !isExpired {
@@ -1321,8 +1321,15 @@ func (sort *innerSortUTXOs) Less(i, j int) bool {
 
 	return iAmount < jAmount
 }
-func (sort *innerSortUTXOs) Len() int      { return len(sort.utxos) }
-func (sort *innerSortUTXOs) Swap(i, j int) { u := sort.utxos; u[j], u[i] = u[i], u[j] }
+
+func (sort *innerSortUTXOs) Len() int {
+	return len(sort.utxos)
+}
+
+func (sort *innerSortUTXOs) Swap(i, j int) {
+	u := sort.utxos
+	u[j], u[i] = u[i], u[j]
+}
 
 func sortUTXOs(utxos []*avax.UTXO, allowedAssetID ids.ID, lockState locked.State) {
 	sort.Sort(&innerSortUTXOs{utxos: utxos, allowedAssetID: allowedAssetID, lockState: lockState})

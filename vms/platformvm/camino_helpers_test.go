@@ -64,7 +64,9 @@ func newCaminoVM(genesisConfig genesis.Camino, genesisUTXOs []api.UTXO) (*VM, da
 	_, genesisBytes := newCaminoGenesisWithUTXOs(genesisConfig, genesisUTXOs)
 	appSender := &common.SenderTest{}
 	appSender.CantSendAppGossip = true
-	appSender.SendAppGossipF = func(context.Context, []byte) error { return nil }
+	appSender.SendAppGossipF = func(context.Context, []byte) error {
+		return nil
+	}
 
 	if err := vm.Initialize(context.TODO(), ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
 		panic(err)
@@ -106,10 +108,14 @@ func defaultCaminoConfig(postBanff bool) config.Config {
 	if postBanff {
 		banffTime = defaultValidateEndTime.Add(-2 * time.Second)
 	}
+
+	vdrs := validators.NewManager()
+	primaryVdrs := validators.NewSet()
+	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	return config.Config{
 		Chains:                 chains.MockManager{},
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Validators:             validators.NewManager(),
+		Validators:             vdrs,
 		TxFee:                  defaultTxFee,
 		CreateSubnetTxFee:      100 * defaultTxFee,
 		CreateBlockchainTxFee:  100 * defaultTxFee,

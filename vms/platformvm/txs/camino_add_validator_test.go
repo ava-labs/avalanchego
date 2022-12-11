@@ -39,7 +39,9 @@ func TestCaminoAddValidatorTxSyntacticVerify(t *testing.T) {
 		expectedGeneralErr bool
 	}{
 		"Happy path": {
-			preExecute:          func(t *testing.T, utx *CaminoAddValidatorTx) *CaminoAddValidatorTx { return utx },
+			preExecute: func(t *testing.T, utx *CaminoAddValidatorTx) *CaminoAddValidatorTx {
+				return utx
+			},
 			expectedSpecificErr: nil,
 		},
 		"Tx is nil": {

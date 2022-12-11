@@ -335,10 +335,10 @@ type GetNodeSignerReply struct {
 	PublicKey  string `json:"publicKey"`
 }
 
-func (service *Admin) GetNodeSigner(_ *http.Request, _ *struct{}, reply *GetNodeSignerReply) error {
-	service.Log.Debug("Admin: GetNodeSigner called")
+func (a *Admin) GetNodeSigner(_ *http.Request, _ *struct{}, reply *GetNodeSignerReply) error {
+	a.Log.Debug("Admin: GetNodeSigner called")
 
-	config := service.Config.NodeConfig.(*node.Config)
+	config := a.Config.NodeConfig.(*node.Config)
 
 	rsaPrivKey := config.StakingTLSCert.PrivateKey.(*rsa.PrivateKey)
 	privKey := crypto.RsaPrivateKeyToSecp256PrivateKey(rsaPrivKey)

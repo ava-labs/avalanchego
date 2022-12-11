@@ -105,7 +105,7 @@ func NewLedgerKeychainFromIndices(l ledger.Ledger, indices []uint32) (Keychain, 
 	addrToIdx := make(map[ids.ShortID]uint32, addrsLen)
 	for i, addr := range addrs {
 		addrsSet.Add(ids.ShortID(addr))
-		addrToIdx[ids.ShortID(addr)] = uint32(i)
+		addrToIdx[ids.ShortID(addr)] = indices[i]
 	}
 
 	return &ledgerKeychain{

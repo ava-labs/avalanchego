@@ -30,7 +30,7 @@ func (s *state) LockedUTXOs(txIDs set.Set[ids.ID], addresses set.Set[ids.ShortID
 				continue
 			}
 			if lockedOut, ok := utxo.Out.(*locked.Out); ok &&
-				lockedOut.IDs.Match(lockState, set.Set[ids.ID](txIDs)) {
+				lockedOut.IDs.Match(lockState, txIDs) {
 				retUtxos = append(retUtxos, utxo)
 			}
 		}

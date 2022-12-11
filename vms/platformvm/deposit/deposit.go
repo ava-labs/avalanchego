@@ -72,7 +72,6 @@ func (deposit *Deposit) StartTime() time.Time {
 }
 
 func (deposit *Deposit) IsExpired(
-	depositOffer *Offer,
 	timestamp uint64,
 ) bool {
 	depositEndTime, err := math.Add64(deposit.Start, uint64(deposit.Duration))

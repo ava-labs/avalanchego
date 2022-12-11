@@ -1880,7 +1880,7 @@ func (s *Service) appendBlockchains(subnetID ids.ID, response *GetBlockchainsRes
 }
 
 // GetBlockchains returns all of the blockchains that exist
-func (s *Service) GetBlockchains(_ *http.Request, args *struct{}, response *GetBlockchainsResponse) error {
+func (s *Service) GetBlockchains(_ *http.Request, _ *struct{}, response *GetBlockchainsResponse) error {
 	s.vm.ctx.Log.Debug("Platform: GetBlockchains called")
 
 	subnets, err := s.vm.state.GetSubnets()
