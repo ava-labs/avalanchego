@@ -28,6 +28,7 @@ const (
 	getStateSummaryTestKey                         = "getStateSummaryTest"
 	acceptStateSummaryTestKey                      = "acceptStateSummaryTest"
 	lastAcceptedBlockPostStateSummaryAcceptTestKey = "lastAcceptedBlockPostStateSummaryAcceptTest"
+	contextTestKey                                 = "contextTest"
 )
 
 var (
@@ -50,6 +51,7 @@ var (
 		getStateSummaryTestKey:                         getStateSummaryTestPlugin,
 		acceptStateSummaryTestKey:                      acceptStateSummaryTestPlugin,
 		lastAcceptedBlockPostStateSummaryAcceptTestKey: lastAcceptedBlockPostStateSummaryAcceptTestPlugin,
+		contextTestKey:                                 contextEnabledTestPlugin,
 	}
 )
 
