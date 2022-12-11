@@ -29,6 +29,7 @@ const (
 	acceptStateSummaryTestKey                      = "acceptStateSummaryTest"
 	lastAcceptedBlockPostStateSummaryAcceptTestKey = "lastAcceptedBlockPostStateSummaryAcceptTest"
 	contextTestKey                                 = "contextTest"
+	batchedParseBlockCachingTestKey                = "batchedParseBlockCachingTest"
 )
 
 var (
@@ -52,6 +53,7 @@ var (
 		acceptStateSummaryTestKey:                      acceptStateSummaryTestPlugin,
 		lastAcceptedBlockPostStateSummaryAcceptTestKey: lastAcceptedBlockPostStateSummaryAcceptTestPlugin,
 		contextTestKey:                                 contextEnabledTestPlugin,
+		batchedParseBlockCachingTestKey:                batchedParseBlockCachingTestPlugin,
 	}
 )
 

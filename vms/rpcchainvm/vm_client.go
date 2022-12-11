@@ -255,6 +255,7 @@ func (vm *VMClient) Initialize(
 			LastAcceptedBlock:     lastAcceptedBlk,
 			GetBlock:              vm.getBlock,
 			UnmarshalBlock:        vm.parseBlock,
+			BatchedUnmarshalBlock: vm.batchedParseBlock,
 			BuildBlock:            vm.buildBlock,
 			BuildBlockWithContext: vm.buildBlockWithContext,
 		},
@@ -671,7 +672,7 @@ func (vm *VMClient) GetAncestors(
 	return resp.BlksBytes, nil
 }
 
-func (vm *VMClient) BatchedParseBlock(ctx context.Context, blksBytes [][]byte) ([]snowman.Block, error) {
+func (vm *VMClient) batchedParseBlock(ctx context.Context, blksBytes [][]byte) ([]snowman.Block, error) {
 	resp, err := vm.client.BatchedParseBlock(ctx, &vmpb.BatchedParseBlockRequest{
 		Request: blksBytes,
 	})

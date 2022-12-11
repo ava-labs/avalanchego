@@ -25,7 +25,8 @@ type State struct {
 	// a nil error, then the returned block must not have the status Unknown
 	getBlock func(context.Context, ids.ID) (snowman.Block, error)
 	// unmarshals [b] into a block
-	unmarshalBlock func(context.Context, []byte) (snowman.Block, error)
+	unmarshalBlock        func(context.Context, []byte) (snowman.Block, error)
+	batchedUnmarshalBlock func(context.Context, [][]byte) ([]snowman.Block, error)
 	// buildBlock attempts to build a block on top of the currently preferred block
 	// buildBlock should always return a block with status Processing since it should never
 	// create an unknown block, and building on top of the preferred block should never yield
@@ -64,6 +65,7 @@ type Config struct {
 	LastAcceptedBlock     snowman.Block
 	GetBlock              func(context.Context, ids.ID) (snowman.Block, error)
 	UnmarshalBlock        func(context.Context, []byte) (snowman.Block, error)
+	BatchedUnmarshalBlock func(context.Context, [][]byte) ([]snowman.Block, error)
 	BuildBlock            func(context.Context) (snowman.Block, error)
 	BuildBlockWithContext func(context.Context, *block.Context) (snowman.Block, error)
 	GetBlockIDAtHeight    func(context.Context, uint64) (ids.ID, error)
@@ -121,6 +123,7 @@ func (s *State) initialize(config *Config) {
 	s.buildBlock = config.BuildBlock
 	s.buildBlockWithContext = config.BuildBlockWithContext
 	s.unmarshalBlock = config.UnmarshalBlock
+	s.batchedUnmarshalBlock = config.BatchedUnmarshalBlock
 	if config.GetBlockIDAtHeight == nil {
 		s.getStatus = func(_ context.Context, blk snowman.Block) (choices.Status, error) {
 			return blk.Status(), nil
@@ -282,8 +285,8 @@ func (s *State) GetBlockInternal(ctx context.Context, blkID ids.ID) (snowman.Blo
 	return wrappedBlk.(*BlockWrapper).Block, nil
 }
 
-// ParseBlock attempts to parse [b] into an internal Block and adds it to the appropriate
-// caching layer if successful.
+// ParseBlock attempts to parse [b] into an internal Block and adds it to the
+// appropriate caching layer if successful.
 func (s *State) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error) {
 	// See if we've cached this block's ID by its byte repr.
 	blkIDIntf, blkIDCached := s.bytesToIDCache.Get(string(b))
@@ -319,6 +322,88 @@ func (s *State) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error)
 	// Since this block is not in consensus, addBlockOutsideConsensus
 	// is called to add [blk] to the correct cache.
 	return s.addBlockOutsideConsensus(ctx, blk)
+}
+
+// BatchedParseBlock implements part of the block.BatchedChainVM interface. In
+// addition to performing all the caching as the ParseBlock function, it
+// performs at most one call to the underlying VM if [batchedUnmarshalBlock] was
+// provided.
+func (s *State) BatchedParseBlock(ctx context.Context, blksBytes [][]byte) ([]snowman.Block, error) {
+	blks := make([]snowman.Block, len(blksBytes))
+	idWasCached := make([]bool, len(blksBytes))
+	unparsedBlksBytes := make([][]byte, 0, len(blksBytes))
+	for i, blkBytes := range blksBytes {
+		// See if we've cached this block's ID by its byte repr.
+		blkIDIntf, blkIDCached := s.bytesToIDCache.Get(string(blkBytes))
+		idWasCached[i] = blkIDCached
+		if !blkIDCached {
+			unparsedBlksBytes = append(unparsedBlksBytes, blkBytes)
+			continue
+		}
+
+		blkID := blkIDIntf.(ids.ID)
+		// See if we have this block cached
+		if cachedBlk, ok := s.getCachedBlock(blkID); ok {
+			blks[i] = cachedBlk
+		} else {
+			unparsedBlksBytes = append(unparsedBlksBytes, blkBytes)
+		}
+	}
+
+	if len(unparsedBlksBytes) == 0 {
+		return blks, nil
+	}
+
+	var (
+		parsedBlks []snowman.Block
+		err        error
+	)
+	if s.batchedUnmarshalBlock != nil {
+		parsedBlks, err = s.batchedUnmarshalBlock(ctx, unparsedBlksBytes)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		parsedBlks = make([]snowman.Block, len(unparsedBlksBytes))
+		for i, blkBytes := range unparsedBlksBytes {
+			parsedBlks[i], err = s.unmarshalBlock(ctx, blkBytes)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	i := 0
+	for _, blk := range parsedBlks {
+		for ; ; i++ {
+			if blks[i] == nil {
+				break
+			}
+		}
+
+		blkID := blk.ID()
+		if !idWasCached[i] {
+			blkBytes := blk.Bytes()
+			blkBytesStr := string(blkBytes)
+			s.bytesToIDCache.Put(blkBytesStr, blkID)
+
+			// Check for an existing block, so we can return a unique block
+			// if processing or simply allow this block to be immediately
+			// garbage collected if it is already cached.
+			if cachedBlk, ok := s.getCachedBlock(blkID); ok {
+				blks[i] = cachedBlk
+				continue
+			}
+		}
+
+		s.missingBlocks.Evict(blkID)
+		wrappedBlk, err := s.addBlockOutsideConsensus(ctx, blk)
+		if err != nil {
+			return nil, err
+		}
+		blks[i] = wrappedBlk
+	}
+	return blks, nil
 }
 
 // BuildBlockWithContext attempts to build a new internal Block, wraps it, and
