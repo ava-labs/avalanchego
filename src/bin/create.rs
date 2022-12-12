@@ -1,14 +1,21 @@
 use anyhow::Result;
-use clap::Args;
+use clap::{value_parser, Args};
 use firewood::db::{DBConfig, DBRevConfig, DiskBufferConfig, WALConfig, DB};
 
 #[derive(Args)]
 pub struct Options {
     /// DB Options
-    #[arg(default_value_t = String::from("firewood"), value_name = "NAME", help = "A name for the database")]
+    #[arg(
+        long,
+        required = false,
+        default_value_t = String::from("firewood"),
+        value_name = "NAME",
+        help = "A name for the database.")]
     pub name: String,
 
     #[arg(
+        long,
+        required = false,
         default_value_t = 16384,
         value_name = "META_NCACHED_PAGES",
         help = "Maximum cached pages for the free list of the item stash."
@@ -16,6 +23,8 @@ pub struct Options {
     pub meta_ncached_pages: usize,
 
     #[arg(
+        long,
+        required = false,
         default_value_t = 1024,
         value_name = "META_NCACHED_FILES",
         help = "Maximum cached file descriptors for the free list of the item stash."
@@ -23,6 +32,8 @@ pub struct Options {
     pub meta_ncached_files: usize,
 
     #[arg(
+        long,
+        required = false,
         default_value_t = 22,
         value_name = "META_FILE_NBIT",
         help = "Number of low-bits in the 64-bit address to determine the file ID. It is the exponent to
@@ -31,6 +42,8 @@ pub struct Options {
     pub meta_file_nbit: u64,
 
     #[arg(
+        long,
+        required = false,
         default_value_t = 262144,
         value_name = "PAYLOAD_NCACHED_PAGES",
         help = "Maximum cached pages for the item stash. This is the low-level cache used by the linear
@@ -39,6 +52,8 @@ pub struct Options {
     pub payload_ncached_pages: usize,
 
     #[arg(
+        long,
+        required = false,
         default_value_t = 1024,
         value_name = "PAYLOAD_NCACHED_FILES",
         help = "Maximum cached file descriptors for the item stash."
@@ -46,6 +61,8 @@ pub struct Options {
     pub payload_ncached_files: usize,
 
     #[arg(
+        long,
+        required = false,
         default_value_t = 22,
         value_name = "PAYLOAD_FILE_NBIT",
         help = "Number of low-bits in the 64-bit address to determine the file ID. It is the exponent to
@@ -54,6 +71,8 @@ pub struct Options {
     pub payload_file_nbit: u64,
 
     #[arg(
+        long,
+        required = false,
         default_value_t = 10,
         value_name = "PAYLOAD_MAX_WALK",
         help = "Maximum steps of walk to recycle a freed item."
@@ -61,6 +80,8 @@ pub struct Options {
     pub payload_max_walk: u64,
 
     #[arg(
+        long,
+        required = false,
         default_value_t = 22,
         value_name = "PAYLOAD_REGN_NBIT",
         help = "Region size in bits (should be not greater than PAYLOAD_FILE_NBIT). One file is
@@ -69,18 +90,29 @@ pub struct Options {
     pub payload_regn_nbit: u64,
 
     #[arg(
+        long,
+        required = false,
+        value_parser = value_parser!(bool),
+        default_missing_value = "false",
         default_value_t = false,
         value_name = "TRUNCATE",
         help = "Whether to truncate the DB when opening it. If set, the DB will be reset and all its
-    existing contents will be lost."
+    existing contents will be lost. [default: false]"
     )]
     pub truncate: bool,
 
     /// Revision options
-    #[arg(default_value_t = 1 << 20, value_name = "REV_MERKLE_NCACHED", help = "Config for accessing a version of the DB. Maximum cached MPT objects.")]
+    #[arg(
+        long,
+        required = false,
+        default_value_t = 1 << 20,
+        value_name = "REV_MERKLE_NCACHED",
+        help = "Config for accessing a version of the DB. Maximum cached MPT objects.")]
     merkle_ncached_objs: usize,
 
     #[arg(
+        long,
+        required = false,
         default_value_t = 4096,
         value_name = "REV_BLOB_NCACHED",
         help = "Maximum cached Blob objects."
@@ -89,6 +121,8 @@ pub struct Options {
 
     /// Disk Buffer options
     #[arg(
+        long,
+        required = false,
         default_value_t = 4096,
         value_name = "DISK_BUFFER_MAX_BUFFERED",
         help = "Maximum buffered disk buffer."
@@ -96,6 +130,8 @@ pub struct Options {
     max_buffered: usize,
 
     #[arg(
+        long,
+        required = false,
         default_value_t = 65536,
         value_name = "DISK_BUFFER_MAX_PENDING",
         help = "Maximum number of pending pages."
@@ -103,6 +139,8 @@ pub struct Options {
     max_pending: usize,
 
     #[arg(
+        long,
+        required = false,
         default_value_t = 1024,
         value_name = "DISK_BUFFER_MAX_AIO_REQUESTS",
         help = "Maximum number of concurrent async I/O requests."
@@ -110,6 +148,8 @@ pub struct Options {
     max_aio_requests: u32,
 
     #[arg(
+        long,
+        required = false,
         default_value_t = 128,
         value_name = "DISK_BUFFER_MAX_AIO_RESPONSE",
         help = "Maximum number of async I/O responses that firewood polls for at a time."
@@ -117,6 +157,8 @@ pub struct Options {
     max_aio_response: u16,
 
     #[arg(
+        long,
+        required = false,
         default_value_t = 128,
         value_name = "DISK_BUFFER_MAX_AIO_SUBMIT",
         help = "Maximum number of async I/O requests per submission."
@@ -124,6 +166,8 @@ pub struct Options {
     max_aio_submit: usize,
 
     #[arg(
+        long,
+        required = false,
         default_value_t = 256,
         value_name = "DISK_BUFFER_WAL_MAX_AIO_REQUESTS",
         help = "Maximum number of concurrent async I/O requests in WAL."
@@ -131,6 +175,8 @@ pub struct Options {
     wal_max_aio_requests: usize,
 
     #[arg(
+        long,
+        required = false,
         default_value_t = 1024,
         value_name = "DISK_BUFFER_WAL_MAX_BUFFERED",
         help = "Maximum buffered WAL records."
@@ -138,6 +184,8 @@ pub struct Options {
     wal_max_buffered: usize,
 
     #[arg(
+        long,
+        required = false,
         default_value_t = 4096,
         value_name = "DISK_BUFFER_WAL_MAX_BATCH",
         help = "Maximum batched WAL records per write."
@@ -145,13 +193,27 @@ pub struct Options {
     wal_max_batch: usize,
 
     /// WAL Config
-    #[arg(default_value_t = 22, value_name = "WAL_FILE_NBIT", help = "Size of WAL file.")]
+    #[arg(
+        long,
+        required = false,
+        default_value_t = 22,
+        value_name = "WAL_FILE_NBIT",
+        help = "Size of WAL file."
+    )]
     file_nbit: u64,
 
-    #[arg(default_value_t = 15, value_name = "WAL_BLOCK_NBIT", help = "Size of WAL blocks.")]
+    #[arg(
+        long,
+        required = false,
+        default_value_t = 15,
+        value_name = "WAL_BLOCK_NBIT",
+        help = "Size of WAL blocks."
+    )]
     block_nbit: u64,
 
     #[arg(
+        long,
+        required = false,
         default_value_t = 100,
         value_name = "WAL_MAX_REVISIONS",
         help = "Number of revisions to keep from the past. This preserves a rolling window

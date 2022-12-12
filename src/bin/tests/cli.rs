@@ -3,7 +3,7 @@ use assert_cmd::Command;
 use predicates::prelude::*;
 
 const PRG: &str = "fwdctl";
-const VERSION: &str = "0.0.1";
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[test]
 fn prints_version() -> Result<()> {
