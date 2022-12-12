@@ -45,6 +45,11 @@ func Parse(genesisBytes []byte) (*Genesis, error) {
 			return nil, err
 		}
 	}
+	for _, tx := range gen.Camino.Deposits {
+		if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
+			return nil, err
+		}
+	}
 	for _, tx := range gen.Chains {
 		if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
 			return nil, err

@@ -4,10 +4,10 @@
 package genesis
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
@@ -15,20 +15,22 @@ import (
 var errCannotParseInitialAdmin = "cannot parse initialAdmin from genesis: %w"
 
 type UnparsedCamino struct {
-	VerifyNodeSignature bool                   `json:"verifyNodeSignature"`
-	LockModeBondDeposit bool                   `json:"lockModeBondDeposit"`
-	InitialAdmin        string                 `json:"initialAdmin"`
-	DepositOffers       []genesis.DepositOffer `json:"depositOffers"`
+	VerifyNodeSignature bool                       `json:"verifyNodeSignature"`
+	LockModeBondDeposit bool                       `json:"lockModeBondDeposit"`
+	InitialAdmin        string                     `json:"initialAdmin"`
+	DepositOffers       []genesis.DepositOffer     `json:"depositOffers"`
+	Allocations         []UnparsedCaminoAllocation `json:"allocations"`
 }
 
-func (us UnparsedCamino) Parse() (genesis.Camino, error) {
-	c := genesis.Camino{
-		VerifyNodeSignature: us.VerifyNodeSignature,
-		LockModeBondDeposit: us.LockModeBondDeposit,
-		DepositOffers:       us.DepositOffers,
+func (uc UnparsedCamino) Parse() (Camino, error) {
+	c := Camino{
+		VerifyNodeSignature: uc.VerifyNodeSignature,
+		LockModeBondDeposit: uc.LockModeBondDeposit,
+		DepositOffers:       uc.DepositOffers,
+		Allocations:         make([]CaminoAllocation, len(uc.Allocations)),
 	}
 
-	_, _, avaxAddrBytes, err := address.Parse(us.InitialAdmin)
+	_, _, avaxAddrBytes, err := address.Parse(uc.InitialAdmin)
 	if err != nil {
 		return c, fmt.Errorf(errCannotParseInitialAdmin, err)
 	}
@@ -38,23 +40,53 @@ func (us UnparsedCamino) Parse() (genesis.Camino, error) {
 	}
 	c.InitialAdmin = avaxAddr
 
+	for i, ua := range uc.Allocations {
+		a, err := ua.Parse()
+		if err != nil {
+			return c, err
+		}
+		c.Allocations[i] = a
+	}
+
 	return c, nil
 }
 
-func (us *UnparsedCamino) Unparse(p genesis.Camino, networkID uint32) error {
-	us.VerifyNodeSignature = p.VerifyNodeSignature
-	us.LockModeBondDeposit = p.LockModeBondDeposit
-	us.DepositOffers = p.DepositOffers
+type UnparsedCaminoAllocation struct {
+	ETHAddr             string               `json:"ethAddr"`
+	AVAXAddr            string               `json:"avaxAddr"`
+	XAmount             uint64               `json:"xAmount"`
+	PlatformAllocations []PlatformAllocation `json:"platformAllocations"`
+}
 
-	avaxAddr, err := address.Format(
-		"X",
-		constants.GetHRP(networkID),
-		p.InitialAdmin.Bytes(),
-	)
-	if err != nil {
-		return err
+func (ua UnparsedCaminoAllocation) Parse() (CaminoAllocation, error) {
+	a := CaminoAllocation{
+		XAmount:             ua.XAmount,
+		PlatformAllocations: ua.PlatformAllocations,
 	}
-	us.InitialAdmin = avaxAddr
 
-	return nil
+	if len(ua.ETHAddr) < 2 {
+		return a, errInvalidETHAddress
+	}
+
+	ethAddrBytes, err := hex.DecodeString(ua.ETHAddr[2:])
+	if err != nil {
+		return a, err
+	}
+	ethAddr, err := ids.ToShortID(ethAddrBytes)
+	if err != nil {
+		return a, err
+	}
+	a.ETHAddr = ethAddr
+
+	_, _, avaxAddrBytes, err := address.Parse(ua.AVAXAddr)
+	if err != nil {
+		return a, err
+	}
+	avaxAddr, err := ids.ToShortID(avaxAddrBytes)
+	if err != nil {
+		return a, err
+	}
+	a.AVAXAddr = avaxAddr
+
+	return a, nil
 }

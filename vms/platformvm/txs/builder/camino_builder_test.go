@@ -11,13 +11,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/nodeid"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 func TestCaminoBuilderTxAddressState(t *testing.T) {
-	caminoConfig := genesis.Camino{
+	caminoConfig := api.Camino{
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
 	}
@@ -81,13 +81,13 @@ func TestCaminoBuilderNewAddValidatorTxNodeSig(t *testing.T) {
 	nodeKey2, _ := nodeid.GenerateCaminoNodeKeyAndID()
 
 	tests := map[string]struct {
-		caminoConfig genesis.Camino
+		caminoConfig api.Camino
 		nodeID       ids.NodeID
 		nodeKey      *crypto.PrivateKeySECP256K1R
 		expectedErr  error
 	}{
 		"Happy path, LockModeBondDeposit false, VerifyNodeSignature true": {
-			caminoConfig: genesis.Camino{
+			caminoConfig: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: false,
 			},
@@ -96,7 +96,7 @@ func TestCaminoBuilderNewAddValidatorTxNodeSig(t *testing.T) {
 			expectedErr: nil,
 		},
 		"NodeId node and signature mismatch, LockModeBondDeposit false, VerifyNodeSignature true": {
-			caminoConfig: genesis.Camino{
+			caminoConfig: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: false,
 			},
@@ -105,7 +105,7 @@ func TestCaminoBuilderNewAddValidatorTxNodeSig(t *testing.T) {
 			expectedErr: errNodeKeyMissing,
 		},
 		"NodeId node and signature mismatch, LockModeBondDeposit true, VerifyNodeSignature true": {
-			caminoConfig: genesis.Camino{
+			caminoConfig: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 			},

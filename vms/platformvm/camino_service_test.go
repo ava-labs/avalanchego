@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/stretchr/testify/require"
@@ -33,7 +32,7 @@ func TestGetCaminoBalance(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := map[string]struct {
-		camino          genesis.Camino
+		camino          api.Camino
 		genesisUTXOs    []api.UTXO
 		address         string
 		bonded          uint64
@@ -42,7 +41,7 @@ func TestGetCaminoBalance(t *testing.T) {
 		expectedError   error
 	}{
 		"Genesis Validator with added balance": {
-			camino: genesis.Camino{
+			camino: api.Camino{
 				LockModeBondDeposit: true,
 			},
 			genesisUTXOs: []api.UTXO{
@@ -55,7 +54,7 @@ func TestGetCaminoBalance(t *testing.T) {
 			bonded:  defaultWeight,
 		},
 		"Genesis Validator with deposited amount": {
-			camino: genesis.Camino{
+			camino: api.Camino{
 				LockModeBondDeposit: true,
 			},
 			genesisUTXOs: []api.UTXO{
@@ -69,7 +68,7 @@ func TestGetCaminoBalance(t *testing.T) {
 			deposited: defaultBalance,
 		},
 		"Genesis Validator with depositedBonded amount": {
-			camino: genesis.Camino{
+			camino: api.Camino{
 				LockModeBondDeposit: true,
 			},
 			genesisUTXOs: []api.UTXO{
@@ -83,7 +82,7 @@ func TestGetCaminoBalance(t *testing.T) {
 			depositedBonded: defaultBalance,
 		},
 		"Genesis Validator with added balance and disabled LockModeBondDeposit": {
-			camino: genesis.Camino{
+			camino: api.Camino{
 				LockModeBondDeposit: false,
 			},
 			genesisUTXOs: []api.UTXO{
@@ -96,7 +95,7 @@ func TestGetCaminoBalance(t *testing.T) {
 			bonded:  defaultWeight,
 		},
 		"Error - Empty address ": {
-			camino: genesis.Camino{
+			camino: api.Camino{
 				LockModeBondDeposit: true,
 			},
 			expectedError: fmt.Errorf("couldn't parse address %q: %s", "P-", ""),
@@ -170,7 +169,7 @@ func TestGetCaminoBalance(t *testing.T) {
 	}
 }
 
-func defaultCaminoService(t *testing.T, camino genesis.Camino, utxos []api.UTXO) *CaminoService {
+func defaultCaminoService(t *testing.T, camino api.Camino, utxos []api.UTXO) *CaminoService {
 	vm, _, _ := newCaminoVM(camino, utxos)
 
 	vm.ctx.Lock.Lock()

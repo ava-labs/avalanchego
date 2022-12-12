@@ -12,7 +12,6 @@ import (
 	set "github.com/ava-labs/avalanchego/utils/set"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
 	deposit "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
-	genesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	locked "github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -128,19 +127,19 @@ func (mr *MockChainMockRecorder) AddUTXO(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddUTXO", reflect.TypeOf((*MockChain)(nil).AddUTXO), arg0)
 }
 
-// CaminoGenesisState mocks base method.
-func (m *MockChain) CaminoGenesisState() (*genesis.Camino, error) {
+// CaminoConfig mocks base method.
+func (m *MockChain) CaminoConfig() (*CaminoConfig, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CaminoGenesisState")
-	ret0, _ := ret[0].(*genesis.Camino)
+	ret := m.ctrl.Call(m, "CaminoConfig")
+	ret0, _ := ret[0].(*CaminoConfig)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// CaminoGenesisState indicates an expected call of CaminoGenesisState.
-func (mr *MockChainMockRecorder) CaminoGenesisState() *gomock.Call {
+// CaminoConfig indicates an expected call of CaminoConfig.
+func (mr *MockChainMockRecorder) CaminoConfig() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CaminoGenesisState", reflect.TypeOf((*MockChain)(nil).CaminoGenesisState))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CaminoConfig", reflect.TypeOf((*MockChain)(nil).CaminoConfig))
 }
 
 // DeleteCurrentDelegator mocks base method.

@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
@@ -42,7 +41,7 @@ var (
 	_, caminoPreFundedNodeIDs = nodeid.LoadLocalCaminoNodeKeysAndIDs(localStakingPath)
 )
 
-func newCaminoVM(genesisConfig genesis.Camino, genesisUTXOs []api.UTXO) (*VM, database.Database, *mutableSharedMemory) {
+func newCaminoVM(genesisConfig api.Camino, genesisUTXOs []api.UTXO) (*VM, database.Database, *mutableSharedMemory) {
 	vm := &VM{Factory: Factory{defaultCaminoConfig(true)}}
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -142,8 +141,12 @@ func defaultCaminoConfig(postBanff bool) config.Config {
 // Returns:
 // 1) The genesis state
 // 2) The byte representation of the default genesis for tests
-func newCaminoGenesisWithUTXOs(caminoGenesisConfig genesis.Camino, genesisUTXOs []api.UTXO) (*api.BuildGenesisArgs, []byte) {
+func newCaminoGenesisWithUTXOs(caminoGenesisConfig api.Camino, genesisUTXOs []api.UTXO) (*api.BuildGenesisArgs, []byte) {
 	hrp := constants.NetworkIDToHRP[testNetworkID]
+
+	caminoGenesisConfig.UTXODeposits = make([]ids.ID, len(genesisUTXOs))
+	caminoGenesisConfig.ValidatorDeposits = make([][]ids.ID, len(keys))
+
 	genesisValidators := make([]api.PermissionlessValidator, len(keys))
 	for i, key := range keys {
 		addr, err := address.FormatBech32(hrp, key.PublicKey().Address().Bytes())
@@ -165,6 +168,7 @@ func newCaminoGenesisWithUTXOs(caminoGenesisConfig genesis.Camino, genesisUTXOs 
 				Address: addr,
 			}},
 		}
+		caminoGenesisConfig.ValidatorDeposits[i] = make([]ids.ID, 1)
 	}
 
 	buildGenesisArgs := api.BuildGenesisArgs{

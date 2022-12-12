@@ -149,22 +149,24 @@ func validateConfig(networkID uint32, config *Config) error {
 		return errNoStakeDuration
 	}
 
-	if len(config.InitialStakers) == 0 {
-		return errNoStakers
-	}
+	if !config.Camino.LockModeBondDeposit {
+		if len(config.InitialStakers) == 0 {
+			return errNoStakers
+		}
 
-	offsetTimeRequired := config.InitialStakeDurationOffset * uint64(len(config.InitialStakers)-1)
-	if offsetTimeRequired > config.InitialStakeDuration {
-		return fmt.Errorf(
-			"initial stake duration is %d but need at least %d with offset of %d",
-			config.InitialStakeDuration,
-			offsetTimeRequired,
-			config.InitialStakeDurationOffset,
-		)
-	}
+		offsetTimeRequired := config.InitialStakeDurationOffset * uint64(len(config.InitialStakers)-1)
+		if offsetTimeRequired > config.InitialStakeDuration {
+			return fmt.Errorf(
+				"initial stake duration is %d but need at least %d with offset of %d",
+				config.InitialStakeDuration,
+				offsetTimeRequired,
+				config.InitialStakeDurationOffset,
+			)
+		}
 
-	if err := validateInitialStakedFunds(config); err != nil {
-		return fmt.Errorf("initial staked funds validation failed: %w", err)
+		if err := validateInitialStakedFunds(config); err != nil {
+			return fmt.Errorf("initial staked funds validation failed: %w", err)
+		}
 	}
 
 	if len(config.CChainGenesis) == 0 {
@@ -329,6 +331,10 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		return nil, ids.ID{}, fmt.Errorf("couldn't generate AVAX asset ID: %w", err)
 	}
 
+	if config.Camino.LockModeBondDeposit {
+		return buildPGenesis(config, hrp, bytes, avmReply.Bytes)
+	}
+
 	genesisTime := time.Unix(int64(config.StartTime), 0)
 	initialSupply, err := config.InitialSupply()
 	if err != nil {
@@ -347,7 +353,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		InitialSupply: json.Uint64(initialSupply),
 		Message:       config.Message,
 		Encoding:      defaultEncoding,
-		Camino:        config.Camino,
+		Camino:        caminoArgFromConfig(config),
 	}
 	for _, allocation := range config.Allocations {
 		if initiallyStaked.Contains(allocation.AVAXAddr) {
