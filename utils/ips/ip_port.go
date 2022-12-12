@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var errBadIP = errors.New("bad ip format")
@@ -53,4 +55,10 @@ func ToIPPort(str string) (IPPort, error) {
 		IP:   ip,
 		Port: uint16(port),
 	}, nil
+}
+
+// PackIP packs an ip port pair to the byte array
+func PackIP(p *wrappers.Packer, ip IPPort) {
+	p.PackFixedBytes(ip.IP.To16())
+	p.PackShort(ip.Port)
 }

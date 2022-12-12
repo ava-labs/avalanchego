@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -143,13 +144,17 @@ func TestUnlockUTXOs(t *testing.T) {
 			},
 		},
 		"Wrong state, lockStateUnlocked": {
-			lockState:     locked.StateUnlocked,
-			generateWant:  func(utxos []*avax.UTXO) want { return want{} },
+			lockState: locked.StateUnlocked,
+			generateWant: func(utxos []*avax.UTXO) want {
+				return want{}
+			},
 			expectedError: errInvalidTargetLockState,
 		},
 		"Wrong state, LockStateDepositedBonded": {
-			lockState:     locked.StateDepositedBonded,
-			generateWant:  func(utxos []*avax.UTXO) want { return want{} },
+			lockState: locked.StateDepositedBonded,
+			generateWant: func(utxos []*avax.UTXO) want {
+				return want{}
+			},
 			expectedError: errInvalidTargetLockState,
 		},
 	}
@@ -670,10 +675,10 @@ func TestGetDepositUnlockableAmounts(t *testing.T) {
 	baseDB := versiondb.New(baseDBManager.Current().Database)
 	rewardsCalc := reward.NewCalculator(config.RewardConfig)
 	addr0 := ids.GenerateTestShortID()
-	addresses := ids.ShortSet{}
+	addresses := set.NewSet[ids.ShortID](0)
 	addresses.Add(addr0)
 
-	depositTxSet := ids.Set{}
+	depositTxSet := set.NewSet[ids.ID](0)
 	testID := ids.GenerateTestID()
 	depositTxSet.Add(testID)
 
@@ -685,9 +690,9 @@ func TestGetDepositUnlockableAmounts(t *testing.T) {
 	depositedAmount := uint64(1000)
 	type args struct {
 		state        func(*gomock.Controller) state.Chain
-		depositTxIDs ids.Set
+		depositTxIDs set.Set[ids.ID]
 		currentTime  uint64
-		addresses    ids.ShortSet
+		addresses    set.Set[ids.ShortID]
 	}
 	tests := map[string]struct {
 		args args
@@ -835,7 +840,7 @@ func TestUnlockDeposit(t *testing.T) {
 						Start:          nowMinus10m,
 						Duration:       uint32((10 * time.Minute).Seconds()),
 					}
-					depositTxSet := ids.NewSet(1)
+					depositTxSet := set.NewSet[ids.ID](1)
 					depositTxSet.Add(testID)
 
 					s.EXPECT().GetDeposit(testID).Return(&deposit1, nil)
@@ -861,7 +866,7 @@ func TestUnlockDeposit(t *testing.T) {
 						Duration:       uint32((15 * time.Minute).Seconds()),
 						Amount:         depositedAmount,
 					}
-					depositTxSet := ids.NewSet(1)
+					depositTxSet := set.NewSet[ids.ID](1)
 					depositTxSet.Add(testID)
 
 					s.EXPECT().GetDeposit(testID).Return(&deposit1, nil)
@@ -894,7 +899,7 @@ func TestUnlockDeposit(t *testing.T) {
 						Duration:       uint32((10 * time.Minute).Seconds()),
 						Amount:         depositedAmount,
 					}
-					depositTxSet := ids.NewSet(1)
+					depositTxSet := set.NewSet[ids.ID](1)
 					depositTxSet.Add(testID)
 
 					s.EXPECT().GetDeposit(testID).Return(&deposit1, nil)

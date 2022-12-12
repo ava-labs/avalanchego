@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -19,7 +20,7 @@ type Options struct {
 	ctx context.Context
 
 	customAddressesSet bool
-	customAddresses    ids.ShortSet
+	customAddresses    set.Set[ids.ShortID]
 
 	minIssuanceTimeSet bool
 	minIssuanceTime    uint64
@@ -63,7 +64,7 @@ func (o *Options) Context() context.Context {
 	return context.Background()
 }
 
-func (o *Options) Addresses(defaultAddresses ids.ShortSet) ids.ShortSet {
+func (o *Options) Addresses(defaultAddresses set.Set[ids.ShortID]) set.Set[ids.ShortID] {
 	if o.customAddressesSet {
 		return o.customAddresses
 	}
@@ -77,7 +78,9 @@ func (o *Options) MinIssuanceTime() uint64 {
 	return uint64(time.Now().Unix())
 }
 
-func (o *Options) AllowStakeableLocked() bool { return o.allowStakeableLocked }
+func (o *Options) AllowStakeableLocked() bool {
+	return o.allowStakeableLocked
+}
 
 func (o *Options) ChangeOwner(defaultOwner *secp256k1fx.OutputOwners) *secp256k1fx.OutputOwners {
 	if o.changeOwner != nil {
@@ -86,9 +89,13 @@ func (o *Options) ChangeOwner(defaultOwner *secp256k1fx.OutputOwners) *secp256k1
 	return defaultOwner
 }
 
-func (o *Options) Memo() []byte { return o.memo }
+func (o *Options) Memo() []byte {
+	return o.memo
+}
 
-func (o *Options) AssumeDecided() bool { return o.assumeDecided }
+func (o *Options) AssumeDecided() bool {
+	return o.assumeDecided
+}
 
 func (o *Options) PollFrequency() time.Duration {
 	if o.pollFrequencySet {
@@ -103,7 +110,7 @@ func WithContext(ctx context.Context) Option {
 	}
 }
 
-func WithCustomAddresses(addrs ids.ShortSet) Option {
+func WithCustomAddresses(addrs set.Set[ids.ShortID]) Option {
 	return func(o *Options) {
 		o.customAddressesSet = true
 		o.customAddresses = addrs

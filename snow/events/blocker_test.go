@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 func TestBlocker(t *testing.T) {
@@ -20,10 +21,10 @@ func TestBlocker(t *testing.T) {
 	id2 := ids.GenerateTestID()
 
 	calledDep := new(bool)
-	a.dependencies = func() ids.Set {
+	a.dependencies = func() set.Set[ids.ID] {
 		*calledDep = true
 
-		s := ids.Set{}
+		s := set.Set[ids.ID]{}
 		s.Add(id0, id1)
 		return s
 	}
@@ -78,7 +79,7 @@ func TestBlocker(t *testing.T) {
 }
 
 type testBlockable struct {
-	dependencies func() ids.Set
+	dependencies func() set.Set[ids.ID]
 	fulfill      func(context.Context, ids.ID)
 	abandon      func(context.Context, ids.ID)
 	update       func(context.Context)
@@ -86,14 +87,27 @@ type testBlockable struct {
 
 func newTestBlockable() *testBlockable {
 	return &testBlockable{
-		dependencies: func() ids.Set { return ids.Set{} },
-		fulfill:      func(context.Context, ids.ID) {},
-		abandon:      func(context.Context, ids.ID) {},
-		update:       func(context.Context) {},
+		dependencies: func() set.Set[ids.ID] {
+			return set.Set[ids.ID]{}
+		},
+		fulfill: func(context.Context, ids.ID) {},
+		abandon: func(context.Context, ids.ID) {},
+		update:  func(context.Context) {},
 	}
 }
 
-func (b *testBlockable) Dependencies() ids.Set                  { return b.dependencies() }
-func (b *testBlockable) Fulfill(ctx context.Context, id ids.ID) { b.fulfill(ctx, id) }
-func (b *testBlockable) Abandon(ctx context.Context, id ids.ID) { b.abandon(ctx, id) }
-func (b *testBlockable) Update(ctx context.Context)             { b.update(ctx) }
+func (b *testBlockable) Dependencies() set.Set[ids.ID] {
+	return b.dependencies()
+}
+
+func (b *testBlockable) Fulfill(ctx context.Context, id ids.ID) {
+	b.fulfill(ctx, id)
+}
+
+func (b *testBlockable) Abandon(ctx context.Context, id ids.ID) {
+	b.abandon(ctx, id)
+}
+
+func (b *testBlockable) Update(ctx context.Context) {
+	b.update(ctx)
+}

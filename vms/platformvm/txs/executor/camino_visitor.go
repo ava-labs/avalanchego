@@ -7,19 +7,43 @@ import "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
 // Camino Visitor implementations
 // Standard
-func (e *StandardTxExecutor) AddAddressStateTx(*txs.AddAddressStateTx) error { return errWrongTxType }
-func (e *StandardTxExecutor) DepositTx(*txs.DepositTx) error                 { return errWrongTxType }
-func (e *StandardTxExecutor) UnlockDepositTx(*txs.UnlockDepositTx) error     { return errWrongTxType }
+func (*StandardTxExecutor) AddAddressStateTx(*txs.AddAddressStateTx) error {
+	return errWrongTxType
+}
+
+func (*StandardTxExecutor) DepositTx(*txs.DepositTx) error {
+	return errWrongTxType
+}
+
+func (*StandardTxExecutor) UnlockDepositTx(*txs.UnlockDepositTx) error {
+	return errWrongTxType
+}
 
 // Proposal
-func (*ProposalTxExecutor) AddAddressStateTx(*txs.AddAddressStateTx) error { return errWrongTxType }
-func (*ProposalTxExecutor) DepositTx(*txs.DepositTx) error                 { return errWrongTxType }
-func (*ProposalTxExecutor) UnlockDepositTx(*txs.UnlockDepositTx) error     { return errWrongTxType }
+func (*ProposalTxExecutor) AddAddressStateTx(*txs.AddAddressStateTx) error {
+	return errWrongTxType
+}
+
+func (*ProposalTxExecutor) DepositTx(*txs.DepositTx) error {
+	return errWrongTxType
+}
+
+func (*ProposalTxExecutor) UnlockDepositTx(*txs.UnlockDepositTx) error {
+	return errWrongTxType
+}
 
 // Atomic
-func (*AtomicTxExecutor) AddAddressStateTx(*txs.AddAddressStateTx) error { return errWrongTxType }
-func (*AtomicTxExecutor) DepositTx(*txs.DepositTx) error                 { return errWrongTxType }
-func (*AtomicTxExecutor) UnlockDepositTx(*txs.UnlockDepositTx) error     { return errWrongTxType }
+func (*AtomicTxExecutor) AddAddressStateTx(*txs.AddAddressStateTx) error {
+	return errWrongTxType
+}
+
+func (*AtomicTxExecutor) DepositTx(*txs.DepositTx) error {
+	return errWrongTxType
+}
+
+func (*AtomicTxExecutor) UnlockDepositTx(*txs.UnlockDepositTx) error {
+	return errWrongTxType
+}
 
 // MemPool
 func (v *MempoolTxVerifier) AddAddressStateTx(tx *txs.AddAddressStateTx) error {

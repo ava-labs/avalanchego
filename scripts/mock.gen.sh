@@ -20,6 +20,7 @@ while IFS= read -r line
 do
   IFS='=' read src_import_path interface_name output_path <<< "${line}"
   package_name=$(basename $(dirname $output_path))
+  [[ $src_import_path == \#* ]] && continue
   echo "Generating ${output_path}..."
   mockgen -copyright_file=./LICENSE.header -package=${package_name} -destination=${output_path} ${src_import_path} ${interface_name}
 done < "$input"

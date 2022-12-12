@@ -4,6 +4,7 @@
 package corruptabledb
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -18,6 +19,14 @@ func TestInterface(t *testing.T) {
 		baseDB := memdb.New()
 		db := New(baseDB)
 		test(t, db)
+	}
+}
+
+func FuzzInterface(f *testing.F) {
+	for _, test := range database.FuzzTests {
+		baseDB := memdb.New()
+		db := New(baseDB)
+		test(f, db)
 	}
 }
 
@@ -50,7 +59,7 @@ func TestCorruption(t *testing.T) {
 			return corruptableBatch.Write()
 		},
 		"corrupted healthcheck": func(db database.Database) error {
-			_, err := db.HealthCheck()
+			_, err := db.HealthCheck(context.Background())
 			return err
 		},
 	}

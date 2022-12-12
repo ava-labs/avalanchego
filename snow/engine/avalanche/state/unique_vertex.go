@@ -4,6 +4,7 @@
 package state
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
@@ -41,7 +43,7 @@ type uniqueVertex struct {
 
 // newUniqueVertex returns a uniqueVertex instance from [b] by checking the cache
 // and then parsing the vertex bytes on a cache miss.
-func newUniqueVertex(s *Serializer, b []byte) (*uniqueVertex, error) {
+func newUniqueVertex(ctx context.Context, s *Serializer, b []byte) (*uniqueVertex, error) {
 	vtx := &uniqueVertex{
 		id:         hashing.ComputeHash256Array(b),
 		serializer: s,
@@ -65,7 +67,7 @@ func newUniqueVertex(s *Serializer, b []byte) (*uniqueVertex, error) {
 	unparsedTxs := innerVertex.Txs()
 	txs := make([]snowstorm.Tx, len(unparsedTxs))
 	for i, txBytes := range unparsedTxs {
-		tx, err := vtx.serializer.VM.ParseTx(txBytes)
+		tx, err := vtx.serializer.VM.ParseTx(ctx, txBytes)
 		if err != nil {
 			return nil, err
 		}
@@ -130,7 +132,7 @@ func (vtx *uniqueVertex) Evict() {
 	}
 }
 
-func (vtx *uniqueVertex) setVertex(innerVtx vertex.StatelessVertex) error {
+func (vtx *uniqueVertex) setVertex(ctx context.Context, innerVtx vertex.StatelessVertex) error {
 	vtx.shallowRefresh()
 	vtx.v.vtx = innerVtx
 
@@ -138,7 +140,7 @@ func (vtx *uniqueVertex) setVertex(innerVtx vertex.StatelessVertex) error {
 		return nil
 	}
 
-	if _, err := vtx.Txs(); err != nil {
+	if _, err := vtx.Txs(ctx); err != nil {
 		return err
 	}
 
@@ -165,10 +167,15 @@ func (vtx *uniqueVertex) setStatus(status choices.Status) error {
 	return vtx.serializer.state.SetStatus(vtx.ID(), status)
 }
 
-func (vtx *uniqueVertex) ID() ids.ID       { return vtx.id }
-func (vtx *uniqueVertex) Key() interface{} { return vtx.id }
+func (vtx *uniqueVertex) ID() ids.ID {
+	return vtx.id
+}
 
-func (vtx *uniqueVertex) Accept() error {
+func (vtx *uniqueVertex) Key() interface{} {
+	return vtx.id
+}
+
+func (vtx *uniqueVertex) Accept(ctx context.Context) error {
 	if err := vtx.setStatus(choices.Accepted); err != nil {
 		return err
 	}
@@ -183,7 +190,7 @@ func (vtx *uniqueVertex) Accept() error {
 		vtx.serializer.edge.Remove(parent.ID())
 	}
 
-	if err := vtx.serializer.state.SetEdge(vtx.serializer.Edge()); err != nil {
+	if err := vtx.serializer.state.SetEdge(vtx.serializer.Edge(ctx)); err != nil {
 		return fmt.Errorf("failed to set edge while accepting vertex %s due to %w", vtx.id, err)
 	}
 
@@ -194,7 +201,7 @@ func (vtx *uniqueVertex) Accept() error {
 	return vtx.serializer.versionDB.Commit()
 }
 
-func (vtx *uniqueVertex) Reject() error {
+func (vtx *uniqueVertex) Reject(context.Context) error {
 	if err := vtx.setStatus(choices.Rejected); err != nil {
 		return err
 	}
@@ -209,7 +216,10 @@ func (vtx *uniqueVertex) Reject() error {
 // TODO: run performance test to see if shallow refreshing
 // (which will mean that refresh must be called in Bytes and Verify)
 // improves performance
-func (vtx *uniqueVertex) Status() choices.Status { vtx.refresh(); return vtx.v.status }
+func (vtx *uniqueVertex) Status() choices.Status {
+	vtx.refresh()
+	return vtx.v.status
+}
 
 func (vtx *uniqueVertex) Parents() ([]avalanche.Vertex, error) {
 	vtx.refresh()
@@ -242,7 +252,7 @@ var (
 // "uniqueVertex" itself implements "Verify" regardless of whether the underlying vertex
 // is stop vertex or not. Called before issuing the vertex to the consensus.
 // No vertex should ever be able to refer to a stop vertex in its transitive closure.
-func (vtx *uniqueVertex) Verify() error {
+func (vtx *uniqueVertex) Verify(ctx context.Context) error {
 	// first verify the underlying stateless vertex
 	if err := vtx.v.vtx.Verify(); err != nil {
 		return err
@@ -262,7 +272,7 @@ func (vtx *uniqueVertex) Verify() error {
 
 	// MUST error if stop vertex has already been accepted (can't be accepted twice)
 	// regardless of whether the underlying vertex is stop vertex or not
-	stopVtxAccepted, err := vtx.serializer.StopVertexAccepted()
+	stopVtxAccepted, err := vtx.serializer.StopVertexAccepted(ctx)
 	if err != nil {
 		return err
 	}
@@ -294,11 +304,11 @@ func (vtx *uniqueVertex) Verify() error {
 	// 1. check the edge of the transitive paths refers to the accepted frontier
 	// 2. check dependencies of all txs must be subset of transitive paths
 	queue := []avalanche.Vertex{vtx}
-	visitedVtx := ids.NewSet(0)
+	visitedVtx := set.NewSet[ids.ID](0)
 
-	acceptedFrontier := ids.NewSet(0)
-	transitivePaths := ids.NewSet(0)
-	dependencies := ids.NewSet(0)
+	acceptedFrontier := set.NewSet[ids.ID](0)
+	transitivePaths := set.NewSet[ids.ID](0)
+	dependencies := set.NewSet[ids.ID](0)
 	for len(queue) > 0 { // perform BFS
 		cur := queue[0]
 		queue = queue[1:]
@@ -319,7 +329,7 @@ func (vtx *uniqueVertex) Verify() error {
 		visitedVtx.Add(curID)
 		transitivePaths.Add(curID)
 
-		txs, err := cur.Txs()
+		txs, err := cur.Txs(ctx)
 		if err != nil {
 			return err
 		}
@@ -344,8 +354,8 @@ func (vtx *uniqueVertex) Verify() error {
 		queue = append(queue, parents...)
 	}
 
-	acceptedEdges := ids.NewSet(0)
-	acceptedEdges.Add(vtx.serializer.Edge()...)
+	acceptedEdges := set.NewSet[ids.ID](0)
+	acceptedEdges.Add(vtx.serializer.Edge(ctx)...)
 
 	// stop vertex should be able to reach all IDs
 	// that are returned by the "Edge"
@@ -369,7 +379,7 @@ func (vtx *uniqueVertex) HasWhitelist() bool {
 
 // "uniqueVertex" itself implements "Whitelist" traversal iff its underlying
 // "vertex.StatelessVertex" is marked as a stop vertex.
-func (vtx *uniqueVertex) Whitelist() (ids.Set, error) {
+func (vtx *uniqueVertex) Whitelist(ctx context.Context) (set.Set[ids.ID], error) {
 	if !vtx.v.vtx.StopVertex() {
 		return nil, nil
 	}
@@ -378,8 +388,8 @@ func (vtx *uniqueVertex) Whitelist() (ids.Set, error) {
 	// represents all processing transaction IDs transitively referenced by the
 	// vertex
 	queue := []avalanche.Vertex{vtx}
-	whitlist := ids.NewSet(0)
-	visitedVtx := ids.NewSet(0)
+	whitlist := set.NewSet[ids.ID](0)
+	visitedVtx := set.NewSet[ids.ID](0)
 	for len(queue) > 0 {
 		cur := queue[0]
 		queue = queue[1:]
@@ -395,7 +405,7 @@ func (vtx *uniqueVertex) Whitelist() (ids.Set, error) {
 		}
 		visitedVtx.Add(curID)
 
-		txs, err := cur.Txs()
+		txs, err := cur.Txs(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -433,7 +443,7 @@ func (vtx *uniqueVertex) Epoch() (uint32, error) {
 	return vtx.v.vtx.Epoch(), nil
 }
 
-func (vtx *uniqueVertex) Txs() ([]snowstorm.Tx, error) {
+func (vtx *uniqueVertex) Txs(ctx context.Context) ([]snowstorm.Tx, error) {
 	vtx.refresh()
 
 	if vtx.v.vtx == nil {
@@ -444,7 +454,7 @@ func (vtx *uniqueVertex) Txs() ([]snowstorm.Tx, error) {
 	if len(txs) != len(vtx.v.txs) {
 		vtx.v.txs = make([]snowstorm.Tx, len(txs))
 		for i, txBytes := range txs {
-			tx, err := vtx.serializer.VM.ParseTx(txBytes)
+			tx, err := vtx.serializer.VM.ParseTx(ctx, txBytes)
 			if err != nil {
 				return nil, err
 			}
@@ -455,7 +465,9 @@ func (vtx *uniqueVertex) Txs() ([]snowstorm.Tx, error) {
 	return vtx.v.txs, nil
 }
 
-func (vtx *uniqueVertex) Bytes() []byte { return vtx.v.vtx.Bytes() }
+func (vtx *uniqueVertex) Bytes() []byte {
+	return vtx.v.vtx.Bytes()
+}
 
 func (vtx *uniqueVertex) String() string {
 	sb := strings.Builder{}
@@ -465,7 +477,7 @@ func (vtx *uniqueVertex) String() string {
 		sb.WriteString(fmt.Sprintf("Vertex(ID = %s, Error=error while retrieving vertex parents: %s)", vtx.ID(), err))
 		return sb.String()
 	}
-	txs, err := vtx.Txs()
+	txs, err := vtx.Txs(context.Background())
 	if err != nil {
 		sb.WriteString(fmt.Sprintf("Vertex(ID = %s, Error=error while retrieving vertex txs: %s)", vtx.ID(), err))
 		return sb.String()

@@ -91,31 +91,31 @@ func (response GetBalanceResponseWrapper) MarshalJSON() ([]byte, error) {
 }
 
 // GetBalance gets the balance of an address
-func (service *CaminoService) GetBalance(_ *http.Request, args *GetBalanceRequest, response *GetBalanceResponseWrapper) error {
-	caminoGenesis, err := service.vm.state.CaminoGenesisState()
+func (s *CaminoService) GetBalance(_ *http.Request, args *GetBalanceRequest, response *GetBalanceResponseWrapper) error {
+	caminoGenesis, err := s.vm.state.CaminoGenesisState()
 	if err != nil {
 		return err
 	}
 	response.LockModeBondDeposit = caminoGenesis.LockModeBondDeposit
 	if !caminoGenesis.LockModeBondDeposit {
-		return service.Service.GetBalance(nil, args, &response.GetBalanceResponse)
+		return s.Service.GetBalance(nil, args, &response.GetBalanceResponse)
 	}
 
 	if args.Address != nil {
 		args.Addresses = append(args.Addresses, *args.Address)
 	}
 
-	service.vm.ctx.Log.Debug("Platform: GetBalance called",
+	s.vm.ctx.Log.Debug("Platform: GetBalance called",
 		logging.UserStrings("addresses", args.Addresses),
 	)
 
 	// Parse to address
-	addrs, err := avax.ParseServiceAddresses(service.addrManager, args.Addresses)
+	addrs, err := avax.ParseServiceAddresses(s.addrManager, args.Addresses)
 	if err != nil {
 		return err
 	}
 
-	utxos, err := avax.GetAllUTXOs(service.vm.state, addrs)
+	utxos, err := avax.GetAllUTXOs(s.vm.state, addrs)
 	if err != nil {
 		return fmt.Errorf("couldn't get UTXO set of %v: %w", args.Addresses, err)
 	}
@@ -145,11 +145,11 @@ utxoFor:
 				depositedBondedOutputs[assetID] = utilsjson.SafeAdd(depositedBondedOutputs[assetID], utilsjson.Uint64(out.Amount()))
 				balances[assetID] = utilsjson.SafeAdd(balances[assetID], utilsjson.Uint64(out.Amount()))
 			default:
-				service.vm.ctx.Log.Warn("Unexpected utxo lock state")
+				s.vm.ctx.Log.Warn("Unexpected utxo lock state")
 				continue utxoFor
 			}
 		default:
-			service.vm.ctx.Log.Warn("unexpected output type in UTXO",
+			s.vm.ctx.Log.Warn("unexpected output type in UTXO",
 				zap.String("type", fmt.Sprintf("%T", out)),
 			)
 			continue utxoFor
@@ -163,36 +163,36 @@ utxoFor:
 }
 
 // GetMinStake returns the minimum staking amount in nAVAX.
-func (service *Service) GetConfiguration(_ *http.Request, _ *struct{}, reply *GetConfigurationReply) error {
-	service.vm.ctx.Log.Debug("Platform: GetConfiguration called")
+func (s *Service) GetConfiguration(_ *http.Request, _ *struct{}, reply *GetConfigurationReply) error {
+	s.vm.ctx.Log.Debug("Platform: GetConfiguration called")
 
 	// Fee Asset ID, NetworkID and HRP
-	reply.NetworkID = utilsjson.Uint32(service.vm.ctx.NetworkID)
-	reply.AssetID = service.vm.GetFeeAssetID()
-	reply.AssetSymbol = constants.TokenSymbol(service.vm.ctx.NetworkID)
-	reply.Hrp = constants.GetHRP(service.vm.ctx.NetworkID)
+	reply.NetworkID = utilsjson.Uint32(s.vm.ctx.NetworkID)
+	reply.AssetID = s.vm.GetFeeAssetID()
+	reply.AssetSymbol = constants.TokenSymbol(s.vm.ctx.NetworkID)
+	reply.Hrp = constants.GetHRP(s.vm.ctx.NetworkID)
 
 	// Blockchains of the primary network
 	blockchains := &GetBlockchainsResponse{}
-	if err := service.appendBlockchains(constants.PrimaryNetworkID, blockchains); err != nil {
+	if err := s.appendBlockchains(constants.PrimaryNetworkID, blockchains); err != nil {
 		return err
 	}
 	reply.Blockchains = blockchains.Blockchains
 
 	// Staking information
-	reply.MinStakeDuration = utilsjson.Uint64(service.vm.MinStakeDuration)
-	reply.MaxStakeDuration = utilsjson.Uint64(service.vm.MaxStakeDuration)
+	reply.MinStakeDuration = utilsjson.Uint64(s.vm.MinStakeDuration)
+	reply.MaxStakeDuration = utilsjson.Uint64(s.vm.MaxStakeDuration)
 
-	reply.MaxValidatorStake = utilsjson.Uint64(service.vm.MaxValidatorStake)
-	reply.MinValidatorStake = utilsjson.Uint64(service.vm.MinValidatorStake)
+	reply.MaxValidatorStake = utilsjson.Uint64(s.vm.MaxValidatorStake)
+	reply.MinValidatorStake = utilsjson.Uint64(s.vm.MinValidatorStake)
 
-	reply.MinDelegationFee = utilsjson.Uint32(service.vm.MinDelegationFee)
-	reply.MinDelegatorStake = utilsjson.Uint64(service.vm.MinDelegatorStake)
+	reply.MinDelegationFee = utilsjson.Uint32(s.vm.MinDelegationFee)
+	reply.MinDelegatorStake = utilsjson.Uint64(s.vm.MinDelegatorStake)
 
-	reply.MinConsumptionRate = utilsjson.Uint64(service.vm.RewardConfig.MinConsumptionRate)
-	reply.MaxConsumptionRate = utilsjson.Uint64(service.vm.RewardConfig.MaxConsumptionRate)
+	reply.MinConsumptionRate = utilsjson.Uint64(s.vm.RewardConfig.MinConsumptionRate)
+	reply.MaxConsumptionRate = utilsjson.Uint64(s.vm.RewardConfig.MaxConsumptionRate)
 
-	reply.SupplyCap = utilsjson.Uint64(service.vm.RewardConfig.SupplyCap)
+	reply.SupplyCap = utilsjson.Uint64(s.vm.RewardConfig.SupplyCap)
 
 	// Codec information
 	reply.CodecVersion = utilsjson.Uint16(txs.Version)
@@ -209,22 +209,22 @@ type SetAddressStateArgs struct {
 }
 
 // AddAdressState issues an AddAdressStateTx
-func (service *Service) SetAddressState(_ *http.Request, args *SetAddressStateArgs, response api.JSONTxID) error {
-	service.vm.ctx.Log.Debug("Platform: SetAddressState called")
+func (s *Service) SetAddressState(_ *http.Request, args *SetAddressStateArgs, response api.JSONTxID) error {
+	s.vm.ctx.Log.Debug("Platform: SetAddressState called")
 
-	keys, err := service.getKeystoreKeys(&args.JSONSpendHeader)
+	keys, err := s.getKeystoreKeys(&args.JSONSpendHeader)
 	if err != nil {
 		return err
 	}
 
-	tx, err := service.buildAddressStateTx(args, keys)
+	tx, err := s.buildAddressStateTx(args, keys)
 	if err != nil {
 		return err
 	}
 
 	response.TxID = tx.ID()
 
-	if err = service.vm.Builder.AddUnverifiedTx(tx); err != nil {
+	if err = s.vm.Builder.AddUnverifiedTx(tx); err != nil {
 		return err
 	}
 	return nil
@@ -241,15 +241,15 @@ type GetAddressStateTxReply struct {
 }
 
 // GetAddressStateTx returnes an unsigned AddAddressStateTx
-func (service *Service) GetAddressStateTx(_ *http.Request, args *GetAddressStateTxArgs, response *GetAddressStateTxReply) error {
-	service.vm.ctx.Log.Debug("Platform: GetAddressStateTx called")
+func (s *Service) GetAddressStateTx(_ *http.Request, args *GetAddressStateTxArgs, response *GetAddressStateTxReply) error {
+	s.vm.ctx.Log.Debug("Platform: GetAddressStateTx called")
 
-	keys, err := service.getFakeKeys(&args.JSONSpendHeader)
+	keys, err := s.getFakeKeys(&args.JSONSpendHeader)
 	if err != nil {
 		return err
 	}
 
-	tx, err := service.buildAddressStateTx(&args.SetAddressStateArgs, keys)
+	tx, err := s.buildAddressStateTx(&args.SetAddressStateArgs, keys)
 	if err != nil {
 		return err
 	}
@@ -265,14 +265,14 @@ func (service *Service) GetAddressStateTx(_ *http.Request, args *GetAddressState
 	return nil
 }
 
-func (service *Service) getKeystoreKeys(args *api.JSONSpendHeader) (*secp256k1fx.Keychain, error) {
+func (s *Service) getKeystoreKeys(args *api.JSONSpendHeader) (*secp256k1fx.Keychain, error) {
 	// Parse the from addresses
-	fromAddrs, err := avax.ParseServiceAddresses(service.addrManager, args.From)
+	fromAddrs, err := avax.ParseServiceAddresses(s.addrManager, args.From)
 	if err != nil {
 		return nil, err
 	}
 
-	user, err := keystore.NewUserFromKeystore(service.vm.ctx.Keystore, args.Username, args.Password)
+	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -295,9 +295,9 @@ func (service *Service) getKeystoreKeys(args *api.JSONSpendHeader) (*secp256k1fx
 	return privKeys, nil
 }
 
-func (service *Service) getFakeKeys(args *api.JSONSpendHeader) (*secp256k1fx.Keychain, error) {
+func (s *Service) getFakeKeys(args *api.JSONSpendHeader) (*secp256k1fx.Keychain, error) {
 	// Parse the from addresses
-	fromAddrs, err := avax.ParseServiceAddresses(service.addrManager, args.From)
+	fromAddrs, err := avax.ParseServiceAddresses(s.addrManager, args.From)
 	if err != nil {
 		return nil, err
 	}
@@ -309,22 +309,22 @@ func (service *Service) getFakeKeys(args *api.JSONSpendHeader) (*secp256k1fx.Key
 	return privKeys, nil
 }
 
-func (service *Service) buildAddressStateTx(args *SetAddressStateArgs, keys *secp256k1fx.Keychain) (*txs.Tx, error) {
+func (s *Service) buildAddressStateTx(args *SetAddressStateArgs, keys *secp256k1fx.Keychain) (*txs.Tx, error) {
 	var changeAddr ids.ShortID
 	if len(args.ChangeAddr) > 0 {
 		var err error
-		if changeAddr, err = avax.ParseServiceAddress(service.addrManager, args.ChangeAddr); err != nil {
+		if changeAddr, err = avax.ParseServiceAddress(s.addrManager, args.ChangeAddr); err != nil {
 			return nil, fmt.Errorf(errInvalidChangeAddr, err)
 		}
 	}
 
-	targetAddr, err := avax.ParseServiceAddress(service.addrManager, args.Address)
+	targetAddr, err := avax.ParseServiceAddress(s.addrManager, args.Address)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't parse param Address: %w", err)
 	}
 
 	// Create the transaction
-	tx, err := service.vm.txBuilder.NewAddAddressStateTx(
+	tx, err := s.vm.txBuilder.NewAddAddressStateTx(
 		targetAddr,  // Address to change state
 		args.Remove, // Add or remove State
 		args.State,  // The state to change

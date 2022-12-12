@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
@@ -52,7 +53,9 @@ type errorMsg struct {
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  readBufferSize,
 	WriteBufferSize: writeBufferSize,
-	CheckOrigin:     func(*http.Request) bool { return true },
+	CheckOrigin: func(*http.Request) bool {
+		return true
+	},
 }
 
 // Server maintains the set of active clients and sends messages to the clients.
@@ -60,15 +63,14 @@ type Server struct {
 	log  logging.Logger
 	lock sync.RWMutex
 	// conns a list of all our connections
-	conns map[*connection]struct{}
+	conns set.Set[*connection]
 	// subscribedConnections the connections that have activated subscriptions
 	subscribedConnections *connections
 }
 
-func New(networkID uint32, log logging.Logger) *Server {
+func New(log logging.Logger) *Server {
 	return &Server{
 		log:                   log,
-		conns:                 make(map[*connection]struct{}),
 		subscribedConnections: newConnections(),
 	}
 }
@@ -109,7 +111,7 @@ func (s *Server) addConnection(conn *connection) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.conns[conn] = struct{}{}
+	s.conns.Add(conn)
 
 	go conn.writePump()
 	go conn.readPump()
@@ -121,5 +123,5 @@ func (s *Server) removeConnection(conn *connection) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	delete(s.conns, conn)
+	s.conns.Remove(conn)
 }

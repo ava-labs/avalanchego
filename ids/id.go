@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/ava-labs/avalanchego/utils"
@@ -24,6 +23,8 @@ var (
 	Empty = ID{}
 
 	errMissingQuotes = errors.New("first and last characters should be quotes")
+
+	_ utils.Sortable[ID] = ID{}
 )
 
 // ID wraps a 32 byte hash used as an identifier
@@ -117,7 +118,9 @@ func (id ID) Bit(i uint) int {
 }
 
 // Hex returns a hex encoded string of this id.
-func (id ID) Hex() string { return hex.EncodeToString(id[:]) }
+func (id ID) Hex() string {
+	return hex.EncodeToString(id[:])
+}
 
 func (id ID) String() string {
 	// We assume that the maximum size of a byte slice that
@@ -128,6 +131,10 @@ func (id ID) String() string {
 
 func (id ID) MarshalText() ([]byte, error) {
 	return []byte(id.String()), nil
+}
+
+func (id ID) Less(other ID) bool {
+	return bytes.Compare(id[:], other[:]) < 0
 }
 
 type SliceStringer []ID
@@ -142,19 +149,3 @@ func (s SliceStringer) String() string {
 	}
 	return strs.String()
 }
-
-type sortIDData []ID
-
-func (ids sortIDData) Less(i, j int) bool {
-	return bytes.Compare(
-		ids[i][:],
-		ids[j][:]) == -1
-}
-func (ids sortIDData) Len() int      { return len(ids) }
-func (ids sortIDData) Swap(i, j int) { ids[j], ids[i] = ids[i], ids[j] }
-
-// SortIDs sorts the ids lexicographically
-func SortIDs(ids []ID) { sort.Sort(sortIDData(ids)) }
-
-// IsSortedAndUniqueIDs returns true if the ids are sorted and unique
-func IsSortedAndUniqueIDs(ids []ID) bool { return utils.IsSortedAndUnique(sortIDData(ids)) }

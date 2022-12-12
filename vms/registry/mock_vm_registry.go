@@ -8,6 +8,7 @@
 package registry
 
 import (
+	context "context"
 	reflect "reflect"
 
 	ids "github.com/ava-labs/avalanchego/ids"
@@ -38,9 +39,9 @@ func (m *MockVMRegistry) EXPECT() *MockVMRegistryMockRecorder {
 }
 
 // Reload mocks base method.
-func (m *MockVMRegistry) Reload() ([]ids.ID, map[ids.ID]error, error) {
+func (m *MockVMRegistry) Reload(arg0 context.Context) ([]ids.ID, map[ids.ID]error, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Reload")
+	ret := m.ctrl.Call(m, "Reload", arg0)
 	ret0, _ := ret[0].([]ids.ID)
 	ret1, _ := ret[1].(map[ids.ID]error)
 	ret2, _ := ret[2].(error)
@@ -48,15 +49,15 @@ func (m *MockVMRegistry) Reload() ([]ids.ID, map[ids.ID]error, error) {
 }
 
 // Reload indicates an expected call of Reload.
-func (mr *MockVMRegistryMockRecorder) Reload() *gomock.Call {
+func (mr *MockVMRegistryMockRecorder) Reload(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reload", reflect.TypeOf((*MockVMRegistry)(nil).Reload))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reload", reflect.TypeOf((*MockVMRegistry)(nil).Reload), arg0)
 }
 
 // ReloadWithReadLock mocks base method.
-func (m *MockVMRegistry) ReloadWithReadLock() ([]ids.ID, map[ids.ID]error, error) {
+func (m *MockVMRegistry) ReloadWithReadLock(arg0 context.Context) ([]ids.ID, map[ids.ID]error, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReloadWithReadLock")
+	ret := m.ctrl.Call(m, "ReloadWithReadLock", arg0)
 	ret0, _ := ret[0].([]ids.ID)
 	ret1, _ := ret[1].(map[ids.ID]error)
 	ret2, _ := ret[2].(error)
@@ -64,7 +65,7 @@ func (m *MockVMRegistry) ReloadWithReadLock() ([]ids.ID, map[ids.ID]error, error
 }
 
 // ReloadWithReadLock indicates an expected call of ReloadWithReadLock.
-func (mr *MockVMRegistryMockRecorder) ReloadWithReadLock() *gomock.Call {
+func (mr *MockVMRegistryMockRecorder) ReloadWithReadLock(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReloadWithReadLock", reflect.TypeOf((*MockVMRegistry)(nil).ReloadWithReadLock))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReloadWithReadLock", reflect.TypeOf((*MockVMRegistry)(nil).ReloadWithReadLock), arg0)
 }

@@ -4,6 +4,7 @@
 package tracker
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -22,11 +23,11 @@ func TestPeers(t *testing.T) {
 	require.Zero(p.ConnectedWeight())
 	require.Empty(p.PreferredPeers())
 
-	p.OnValidatorAdded(nodeID, 5)
+	p.OnValidatorAdded(nodeID, nil, ids.Empty, 5)
 	require.Zero(p.ConnectedWeight())
 	require.Empty(p.PreferredPeers())
 
-	err := p.Connected(nodeID, version.CurrentApp)
+	err := p.Connected(context.Background(), nodeID, version.CurrentApp)
 	require.NoError(err)
 	require.EqualValues(5, p.ConnectedWeight())
 	require.Contains(p.PreferredPeers(), nodeID)
@@ -39,11 +40,11 @@ func TestPeers(t *testing.T) {
 	require.Zero(p.ConnectedWeight())
 	require.Contains(p.PreferredPeers(), nodeID)
 
-	p.OnValidatorAdded(nodeID, 5)
+	p.OnValidatorAdded(nodeID, nil, ids.Empty, 5)
 	require.EqualValues(5, p.ConnectedWeight())
 	require.Contains(p.PreferredPeers(), nodeID)
 
-	err = p.Disconnected(nodeID)
+	err = p.Disconnected(context.Background(), nodeID)
 	require.NoError(err)
 	require.Zero(p.ConnectedWeight())
 	require.Empty(p.PreferredPeers())

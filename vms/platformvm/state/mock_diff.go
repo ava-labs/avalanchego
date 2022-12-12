@@ -8,10 +8,8 @@
 package state
 
 import (
-	reflect "reflect"
-	time "time"
-
 	ids "github.com/ava-labs/avalanchego/ids"
+	set "github.com/ava-labs/avalanchego/utils/set"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
 	deposit "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	genesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
@@ -19,6 +17,8 @@ import (
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	gomock "github.com/golang/mock/gomock"
+	reflect "reflect"
+	time "time"
 )
 
 // MockDiff is a mock of Diff interface.
@@ -498,7 +498,7 @@ func (mr *MockDiffMockRecorder) GetUTXO(arg0 interface{}) *gomock.Call {
 }
 
 // LockedUTXOs mocks base method.
-func (m *MockDiff) LockedUTXOs(arg0 ids.Set, arg1 ids.ShortSet, arg2 locked.State) ([]*avax.UTXO, error) {
+func (m *MockDiff) LockedUTXOs(arg0 set.Set[ids.ID], arg1 set.Set[ids.ShortID], arg2 locked.State) ([]*avax.UTXO, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "LockedUTXOs", arg0, arg1, arg2)
 	ret0, _ := ret[0].([]*avax.UTXO)

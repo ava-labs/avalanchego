@@ -8,13 +8,11 @@
 package state
 
 import (
-	reflect "reflect"
-	time "time"
-
 	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"
 	choices "github.com/ava-labs/avalanchego/snow/choices"
-	validators "github.com/ava-labs/avalanchego/snow/validators"
+	bls "github.com/ava-labs/avalanchego/utils/crypto/bls"
+	set "github.com/ava-labs/avalanchego/utils/set"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
 	blocks "github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	deposit "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
@@ -23,6 +21,8 @@ import (
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	gomock "github.com/golang/mock/gomock"
+	reflect "reflect"
+	time "time"
 )
 
 // MockState is a mock of State interface.
@@ -484,18 +484,18 @@ func (mr *MockStateMockRecorder) GetRewardUTXOs(arg0 interface{}) *gomock.Call {
 }
 
 // GetStartTime mocks base method.
-func (m *MockState) GetStartTime(arg0 ids.NodeID) (time.Time, error) {
+func (m *MockState) GetStartTime(arg0 ids.NodeID, arg1 ids.ID) (time.Time, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetStartTime", arg0)
+	ret := m.ctrl.Call(m, "GetStartTime", arg0, arg1)
 	ret0, _ := ret[0].(time.Time)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetStartTime indicates an expected call of GetStartTime.
-func (mr *MockStateMockRecorder) GetStartTime(arg0 interface{}) *gomock.Call {
+func (mr *MockStateMockRecorder) GetStartTime(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStartTime", reflect.TypeOf((*MockState)(nil).GetStartTime), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStartTime", reflect.TypeOf((*MockState)(nil).GetStartTime), arg0, arg1)
 }
 
 // GetStatelessBlock mocks base method.
@@ -590,9 +590,9 @@ func (mr *MockStateMockRecorder) GetUTXO(arg0 interface{}) *gomock.Call {
 }
 
 // GetUptime mocks base method.
-func (m *MockState) GetUptime(arg0 ids.NodeID) (time.Duration, time.Time, error) {
+func (m *MockState) GetUptime(arg0 ids.NodeID, arg1 ids.ID) (time.Duration, time.Time, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUptime", arg0)
+	ret := m.ctrl.Call(m, "GetUptime", arg0, arg1)
 	ret0, _ := ret[0].(time.Duration)
 	ret1, _ := ret[1].(time.Time)
 	ret2, _ := ret[2].(error)
@@ -600,9 +600,24 @@ func (m *MockState) GetUptime(arg0 ids.NodeID) (time.Duration, time.Time, error)
 }
 
 // GetUptime indicates an expected call of GetUptime.
-func (mr *MockStateMockRecorder) GetUptime(arg0 interface{}) *gomock.Call {
+func (mr *MockStateMockRecorder) GetUptime(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUptime", reflect.TypeOf((*MockState)(nil).GetUptime), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUptime", reflect.TypeOf((*MockState)(nil).GetUptime), arg0, arg1)
+}
+
+// GetValidatorPublicKeyDiffs mocks base method.
+func (m *MockState) GetValidatorPublicKeyDiffs(arg0 uint64) (map[ids.NodeID]*bls.PublicKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetValidatorPublicKeyDiffs", arg0)
+	ret0, _ := ret[0].(map[ids.NodeID]*bls.PublicKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetValidatorPublicKeyDiffs indicates an expected call of GetValidatorPublicKeyDiffs.
+func (mr *MockStateMockRecorder) GetValidatorPublicKeyDiffs(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetValidatorPublicKeyDiffs", reflect.TypeOf((*MockState)(nil).GetValidatorPublicKeyDiffs), arg0)
 }
 
 // GetValidatorWeightDiffs mocks base method.
@@ -621,7 +636,7 @@ func (mr *MockStateMockRecorder) GetValidatorWeightDiffs(arg0, arg1 interface{})
 }
 
 // LockedUTXOs mocks base method.
-func (m *MockState) LockedUTXOs(arg0 ids.Set, arg1 ids.ShortSet, arg2 locked.State) ([]*avax.UTXO, error) {
+func (m *MockState) LockedUTXOs(arg0 set.Set[ids.ID], arg1 set.Set[ids.ShortID], arg2 locked.State) ([]*avax.UTXO, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "LockedUTXOs", arg0, arg1, arg2)
 	ret0, _ := ret[0].([]*avax.UTXO)
@@ -744,17 +759,17 @@ func (mr *MockStateMockRecorder) SetTimestamp(arg0 interface{}) *gomock.Call {
 }
 
 // SetUptime mocks base method.
-func (m *MockState) SetUptime(arg0 ids.NodeID, arg1 time.Duration, arg2 time.Time) error {
+func (m *MockState) SetUptime(arg0 ids.NodeID, arg1 ids.ID, arg2 time.Duration, arg3 time.Time) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetUptime", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "SetUptime", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SetUptime indicates an expected call of SetUptime.
-func (mr *MockStateMockRecorder) SetUptime(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockStateMockRecorder) SetUptime(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUptime", reflect.TypeOf((*MockState)(nil).SetUptime), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUptime", reflect.TypeOf((*MockState)(nil).SetUptime), arg0, arg1, arg2, arg3)
 }
 
 // UTXOIDs mocks base method.
@@ -782,19 +797,4 @@ func (m *MockState) UpdateDeposit(arg0 ids.ID, arg1 *deposit.Deposit) {
 func (mr *MockStateMockRecorder) UpdateDeposit(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateDeposit", reflect.TypeOf((*MockState)(nil).UpdateDeposit), arg0, arg1)
-}
-
-// ValidatorSet mocks base method.
-func (m *MockState) ValidatorSet(arg0 ids.ID) (validators.Set, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ValidatorSet", arg0)
-	ret0, _ := ret[0].(validators.Set)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ValidatorSet indicates an expected call of ValidatorSet.
-func (mr *MockStateMockRecorder) ValidatorSet(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidatorSet", reflect.TypeOf((*MockState)(nil).ValidatorSet), arg0)
 }

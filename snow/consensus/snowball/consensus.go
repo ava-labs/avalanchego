@@ -17,9 +17,6 @@ type Consensus interface {
 	// Takes in alpha, beta1, beta2, and the initial choice
 	Initialize(params Parameters, initialPreference ids.ID)
 
-	// Returns the parameters that describe this snowball instance
-	Parameters() Parameters
-
 	// Adds a new choice to vote on
 	Add(newChoice ids.ID)
 

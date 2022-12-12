@@ -6,6 +6,7 @@ package sender
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // ExternalSender sends consensus messages to other validators
@@ -14,10 +15,10 @@ type ExternalSender interface {
 	// Send a message to a specific set of nodes
 	Send(
 		msg message.OutboundMessage,
-		nodeIDs ids.NodeIDSet,
+		nodeIDs set.Set[ids.NodeID],
 		subnetID ids.ID,
 		validatorOnly bool,
-	) ids.NodeIDSet
+	) set.Set[ids.NodeID]
 
 	// Send a message to a random group of nodes in a subnet.
 	// Nodes are sampled based on their validator status.
@@ -28,5 +29,5 @@ type ExternalSender interface {
 		numValidatorsToSend int,
 		numNonValidatorsToSend int,
 		numPeersToSend int,
-	) ids.NodeIDSet
+	) set.Set[ids.NodeID]
 }

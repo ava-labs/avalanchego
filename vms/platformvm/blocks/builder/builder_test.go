@@ -48,7 +48,9 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	tx := getValidTx(env.txBuilder, t)
 	txID := tx.ID()
 
-	env.sender.SendAppGossipF = func(_ context.Context, b []byte) error { return nil }
+	env.sender.SendAppGossipF = func(context.Context, []byte) error {
+		return nil
+	}
 	err := env.Builder.AddUnverifiedTx(tx)
 	require.NoError(err, "couldn't add tx to mempool")
 
@@ -56,7 +58,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	require.True(has, "valid tx not recorded into mempool")
 
 	// show that build block include that tx and removes it from mempool
-	blkIntf, err := env.Builder.BuildBlock()
+	blkIntf, err := env.Builder.BuildBlock(context.Background())
 	require.NoError(err, "couldn't build block out of mempool")
 
 	blk, ok := blkIntf.(*blockexecutor.Block)
@@ -290,8 +292,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 			defer ctrl.Finish()
 
 			state := tt.stateF(ctrl)
-			b := builder{}
-			txID, shouldReward, err := b.getNextStakerToReward(tt.timestamp, state)
+			txID, shouldReward, err := getNextStakerToReward(tt.timestamp, state)
 			if tt.expectedErr != nil {
 				require.Equal(tt.expectedErr, err)
 				return

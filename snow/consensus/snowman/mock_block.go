@@ -8,6 +8,7 @@
 package snowman
 
 import (
+	context "context"
 	reflect "reflect"
 	time "time"
 
@@ -40,17 +41,17 @@ func (m *MockBlock) EXPECT() *MockBlockMockRecorder {
 }
 
 // Accept mocks base method.
-func (m *MockBlock) Accept() error {
+func (m *MockBlock) Accept(arg0 context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Accept")
+	ret := m.ctrl.Call(m, "Accept", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Accept indicates an expected call of Accept.
-func (mr *MockBlockMockRecorder) Accept() *gomock.Call {
+func (mr *MockBlockMockRecorder) Accept(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Accept", reflect.TypeOf((*MockBlock)(nil).Accept))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Accept", reflect.TypeOf((*MockBlock)(nil).Accept), arg0)
 }
 
 // Bytes mocks base method.
@@ -110,17 +111,17 @@ func (mr *MockBlockMockRecorder) Parent() *gomock.Call {
 }
 
 // Reject mocks base method.
-func (m *MockBlock) Reject() error {
+func (m *MockBlock) Reject(arg0 context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Reject")
+	ret := m.ctrl.Call(m, "Reject", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Reject indicates an expected call of Reject.
-func (mr *MockBlockMockRecorder) Reject() *gomock.Call {
+func (mr *MockBlockMockRecorder) Reject(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reject", reflect.TypeOf((*MockBlock)(nil).Reject))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reject", reflect.TypeOf((*MockBlock)(nil).Reject), arg0)
 }
 
 // Status mocks base method.
@@ -152,15 +153,15 @@ func (mr *MockBlockMockRecorder) Timestamp() *gomock.Call {
 }
 
 // Verify mocks base method.
-func (m *MockBlock) Verify() error {
+func (m *MockBlock) Verify(arg0 context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Verify")
+	ret := m.ctrl.Call(m, "Verify", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Verify indicates an expected call of Verify.
-func (mr *MockBlockMockRecorder) Verify() *gomock.Call {
+func (mr *MockBlockMockRecorder) Verify(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verify", reflect.TypeOf((*MockBlock)(nil).Verify))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verify", reflect.TypeOf((*MockBlock)(nil).Verify), arg0)
 }

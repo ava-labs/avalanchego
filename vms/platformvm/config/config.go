@@ -18,10 +18,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -32,10 +32,12 @@ type Config struct {
 	Chains chains.Manager
 
 	// Node's validator set maps subnetID -> validators of the subnet
+	//
+	// Invariant: The primary network's validator set should have been added to
+	//            the manager before calling VM.Initialize.
+	// Invariant: The primary network's validator set should be empty before
+	//            calling VM.Initialize.
 	Validators validators.Manager
-
-	// Provides access to subnet tracking
-	SubnetTracker common.SubnetTracker
 
 	// Provides access to the uptime manager as a thread safe data structure
 	UptimeLockedCalculator uptime.LockedCalculator
@@ -44,7 +46,7 @@ type Config struct {
 	StakingEnabled bool
 
 	// Set of subnets that this node is validating
-	WhitelistedSubnets ids.Set
+	WhitelistedSubnets set.Set[ids.ID]
 
 	// Fee that is burned by every non-state creating transaction
 	TxFee uint64
@@ -117,6 +119,14 @@ type Config struct {
 
 	// Camino relevant configuration
 	CaminoConfig CaminoConfig
+	// UseCurrentHeight forces [GetMinimumHeight] to return the current height
+	// of the P-Chain instead of the oldest block in the [recentlyAccepted]
+	// window.
+	//
+	// This config is particularly useful for triggering proposervm activation
+	// on recently created subnets (without this, users need to wait for
+	// [recentlyAcceptedWindowTTL] to pass for activation to occur).
+	UseCurrentHeight bool
 }
 
 func (c *Config) IsApricotPhase3Activated(timestamp time.Time) bool {

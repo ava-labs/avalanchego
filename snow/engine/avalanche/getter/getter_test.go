@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var errUnknownVertex = errors.New("unknown vertex")
@@ -22,7 +23,7 @@ var errUnknownVertex = errors.New("unknown vertex")
 func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Config) {
 	peers := validators.NewSet()
 	peer := ids.GenerateTestNodeID()
-	if err := peers.AddWeight(peer, 1); err != nil {
+	if err := peers.Add(peer, nil, ids.Empty, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -32,9 +33,13 @@ func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Co
 
 	isBootstrapped := false
 	subnet := &common.SubnetTest{
-		T:               t,
-		IsBootstrappedF: func() bool { return isBootstrapped },
-		BootstrappedF:   func(ids.ID) { isBootstrapped = true },
+		T: t,
+		IsBootstrappedF: func() bool {
+			return isBootstrapped
+		},
+		BootstrappedF: func(ids.ID) {
+			isBootstrapped = true
+		},
 	}
 
 	commonConfig := common.Config{
@@ -73,7 +78,7 @@ func TestAcceptedFrontier(t *testing.T) {
 		t.Fatal("Unexpected get handler")
 	}
 
-	manager.EdgeF = func() []ids.ID {
+	manager.EdgeF = func(context.Context) []ids.ID {
 		return []ids.ID{
 			vtxID0,
 			vtxID1,
@@ -89,7 +94,7 @@ func TestAcceptedFrontier(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	acceptedSet := ids.Set{}
+	acceptedSet := set.Set[ids.ID]{}
 	acceptedSet.Add(accepted...)
 
 	manager.EdgeF = nil
@@ -132,7 +137,7 @@ func TestFilterAccepted(t *testing.T) {
 
 	vtxIDs := []ids.ID{vtxID0, vtxID1, vtxID2}
 
-	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch vtxID {
 		case vtxID0:
 			return vtx0, nil
@@ -154,7 +159,7 @@ func TestFilterAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	acceptedSet := ids.Set{}
+	acceptedSet := set.Set[ids.ID]{}
 	acceptedSet.Add(accepted...)
 
 	manager.GetVtxF = nil

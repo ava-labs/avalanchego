@@ -5,6 +5,7 @@ package mockdb
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"testing"
 )
@@ -46,7 +47,7 @@ func TestDefaultError(t *testing.T) {
 	if err := db.Compact([]byte{}, []byte{}); err == nil {
 		t.Fatal("should have errored")
 	}
-	if _, err := db.HealthCheck(); err == nil {
+	if _, err := db.HealthCheck(context.Background()); err == nil {
 		t.Fatal("should have errored")
 	}
 }

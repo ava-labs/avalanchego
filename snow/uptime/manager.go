@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
@@ -19,22 +20,19 @@ type Manager interface {
 }
 
 type Tracker interface {
-	// Should only be called once
-	StartTracking(nodeIDs []ids.NodeID) error
+	StartTracking(nodeIDs []ids.NodeID, subnetID ids.ID) error
+	StopTracking(nodeIDs []ids.NodeID, subnetID ids.ID) error
 
-	// Should only be called once
-	Shutdown(nodeIDs []ids.NodeID) error
-
-	Connect(nodeID ids.NodeID) error
-	IsConnected(nodeID ids.NodeID) bool
+	Connect(nodeID ids.NodeID, subnetID ids.ID) error
+	IsConnected(nodeID ids.NodeID, subnetID ids.ID) bool
 	Disconnect(nodeID ids.NodeID) error
 }
 
 type Calculator interface {
-	CalculateUptime(nodeID ids.NodeID) (time.Duration, time.Time, error)
-	CalculateUptimePercent(nodeID ids.NodeID) (float64, error)
+	CalculateUptime(nodeID ids.NodeID, subnetID ids.ID) (time.Duration, time.Time, error)
+	CalculateUptimePercent(nodeID ids.NodeID, subnetID ids.ID) (float64, error)
 	// CalculateUptimePercentFrom expects [startTime] to be truncated (floored) to the nearest second
-	CalculateUptimePercentFrom(nodeID ids.NodeID, startTime time.Time) (float64, error)
+	CalculateUptimePercentFrom(nodeID ids.NodeID, subnetID ids.ID, startTime time.Time) (float64, error)
 }
 
 type TestManager interface {
@@ -46,22 +44,22 @@ type manager struct {
 	// Used to get time. Useful for faking time during tests.
 	clock mockable.Clock
 
-	state           State
-	connections     map[ids.NodeID]time.Time
-	startedTracking bool
+	state          State
+	connections    map[ids.NodeID]map[ids.ID]time.Time // nodeID -> subnetID -> time
+	trackedSubnets set.Set[ids.ID]
 }
 
 func NewManager(state State) Manager {
 	return &manager{
 		state:       state,
-		connections: make(map[ids.NodeID]time.Time),
+		connections: make(map[ids.NodeID]map[ids.ID]time.Time),
 	}
 }
 
-func (m *manager) StartTracking(nodeIDs []ids.NodeID) error {
+func (m *manager) StartTracking(nodeIDs []ids.NodeID, subnetID ids.ID) error {
 	now := m.clock.UnixTime()
 	for _, nodeID := range nodeIDs {
-		upDuration, lastUpdated, err := m.state.GetUptime(nodeID)
+		upDuration, lastUpdated, err := m.state.GetUptime(nodeID, subnetID)
 		if err != nil {
 			return err
 		}
@@ -74,25 +72,33 @@ func (m *manager) StartTracking(nodeIDs []ids.NodeID) error {
 
 		durationOffline := now.Sub(lastUpdated)
 		newUpDuration := upDuration + durationOffline
-		if err := m.state.SetUptime(nodeID, newUpDuration, now); err != nil {
+		if err := m.state.SetUptime(nodeID, subnetID, newUpDuration, now); err != nil {
 			return err
 		}
 	}
-	m.startedTracking = true
+	m.trackedSubnets.Add(subnetID)
 	return nil
 }
 
-func (m *manager) Shutdown(nodeIDs []ids.NodeID) error {
+func (m *manager) StopTracking(nodeIDs []ids.NodeID, subnetID ids.ID) error {
 	now := m.clock.UnixTime()
 	for _, nodeID := range nodeIDs {
-		if _, connected := m.connections[nodeID]; connected {
-			if err := m.Disconnect(nodeID); err != nil {
+		connectedSubnets := m.connections[nodeID]
+		// If the node is already connected to this subnet, then we can just
+		// update the uptime in the state and remove the connection
+		if _, isConnected := connectedSubnets[subnetID]; isConnected {
+			if err := m.updateSubnetUptime(nodeID, subnetID); err != nil {
+				delete(connectedSubnets, subnetID)
 				return err
 			}
+			delete(connectedSubnets, subnetID)
 			continue
 		}
 
-		upDuration, lastUpdated, err := m.state.GetUptime(nodeID)
+		// if the node is not connected to this subnet, then we need to update
+		// the uptime in the state from the last time the node was connected to
+		// this subnet to now.
+		upDuration, lastUpdated, err := m.state.GetUptime(nodeID, subnetID)
 		if err != nil {
 			return err
 		}
@@ -103,43 +109,41 @@ func (m *manager) Shutdown(nodeIDs []ids.NodeID) error {
 			continue
 		}
 
-		if err := m.state.SetUptime(nodeID, upDuration, now); err != nil {
+		if err := m.state.SetUptime(nodeID, subnetID, upDuration, now); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (m *manager) Connect(nodeID ids.NodeID) error {
-	m.connections[nodeID] = m.clock.UnixTime()
+func (m *manager) Connect(nodeID ids.NodeID, subnetID ids.ID) error {
+	subnetConnections, ok := m.connections[nodeID]
+	if !ok {
+		subnetConnections = make(map[ids.ID]time.Time)
+		m.connections[nodeID] = subnetConnections
+	}
+	subnetConnections[subnetID] = m.clock.UnixTime()
 	return nil
 }
 
-func (m *manager) IsConnected(nodeID ids.NodeID) bool {
-	_, connected := m.connections[nodeID]
+func (m *manager) IsConnected(nodeID ids.NodeID, subnetID ids.ID) bool {
+	_, connected := m.connections[nodeID][subnetID]
 	return connected
 }
 
 func (m *manager) Disconnect(nodeID ids.NodeID) error {
-	if !m.startedTracking {
-		delete(m.connections, nodeID)
-		return nil
+	// Update every subnet that this node was connected to
+	for subnetID := range m.connections[nodeID] {
+		if err := m.updateSubnetUptime(nodeID, subnetID); err != nil {
+			return err
+		}
 	}
-
-	newDuration, newLastUpdated, err := m.CalculateUptime(nodeID)
 	delete(m.connections, nodeID)
-	if err == database.ErrNotFound {
-		// If a non-validator disconnects, we don't care
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	return m.state.SetUptime(nodeID, newDuration, newLastUpdated)
+	return nil
 }
 
-func (m *manager) CalculateUptime(nodeID ids.NodeID) (time.Duration, time.Time, error) {
-	upDuration, lastUpdated, err := m.state.GetUptime(nodeID)
+func (m *manager) CalculateUptime(nodeID ids.NodeID, subnetID ids.ID) (time.Duration, time.Time, error) {
+	upDuration, lastUpdated, err := m.state.GetUptime(nodeID, subnetID)
 	if err != nil {
 		return 0, time.Time{}, err
 	}
@@ -151,7 +155,13 @@ func (m *manager) CalculateUptime(nodeID ids.NodeID) (time.Duration, time.Time, 
 		return upDuration, lastUpdated, nil
 	}
 
-	timeConnected, isConnected := m.connections[nodeID]
+	if !m.trackedSubnets.Contains(subnetID) {
+		durationOffline := now.Sub(lastUpdated)
+		newUpDuration := upDuration + durationOffline
+		return newUpDuration, now, nil
+	}
+
+	timeConnected, isConnected := m.connections[nodeID][subnetID]
 	if !isConnected {
 		return upDuration, now, nil
 	}
@@ -175,16 +185,16 @@ func (m *manager) CalculateUptime(nodeID ids.NodeID) (time.Duration, time.Time, 
 	return newUpDuration, now, nil
 }
 
-func (m *manager) CalculateUptimePercent(nodeID ids.NodeID) (float64, error) {
-	startTime, err := m.state.GetStartTime(nodeID)
+func (m *manager) CalculateUptimePercent(nodeID ids.NodeID, subnetID ids.ID) (float64, error) {
+	startTime, err := m.state.GetStartTime(nodeID, subnetID)
 	if err != nil {
 		return 0, err
 	}
-	return m.CalculateUptimePercentFrom(nodeID, startTime)
+	return m.CalculateUptimePercentFrom(nodeID, subnetID, startTime)
 }
 
-func (m *manager) CalculateUptimePercentFrom(nodeID ids.NodeID, startTime time.Time) (float64, error) {
-	upDuration, now, err := m.CalculateUptime(nodeID)
+func (m *manager) CalculateUptimePercentFrom(nodeID ids.NodeID, subnetID ids.ID, startTime time.Time) (float64, error) {
+	upDuration, now, err := m.CalculateUptime(nodeID, subnetID)
 	if err != nil {
 		return 0, err
 	}
@@ -198,4 +208,24 @@ func (m *manager) CalculateUptimePercentFrom(nodeID ids.NodeID, startTime time.T
 
 func (m *manager) SetTime(newTime time.Time) {
 	m.clock.Set(newTime)
+}
+
+// updateSubnetUptime updates the subnet uptime of the node on the state by the amount
+// of time that the node has been connected to the subnet.
+func (m *manager) updateSubnetUptime(nodeID ids.NodeID, subnetID ids.ID) error {
+	// we're not tracking this subnet, skip updating it.
+	if !m.trackedSubnets.Contains(subnetID) {
+		return nil
+	}
+
+	newDuration, newLastUpdated, err := m.CalculateUptime(nodeID, subnetID)
+	if err == database.ErrNotFound {
+		// If a non-validator disconnects, we don't care
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	return m.state.SetUptime(nodeID, subnetID, newDuration, newLastUpdated)
 }

@@ -5,6 +5,8 @@ package ids
 
 import (
 	"testing"
+
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 func TestBagAdd(t *testing.T) {
@@ -26,7 +28,7 @@ func TestBagAdd(t *testing.T) {
 	} else if freq != 0 {
 		t.Fatalf("Bag.Mode[1] returned %d expected %d", freq, 0)
 	} else if threshold := bag.Threshold(); threshold.Len() != 0 {
-		t.Fatalf("Bag.Threshold returned %s expected %s", threshold, Set{})
+		t.Fatalf("Bag.Threshold returned %s expected %s", threshold, set.Set[ID]{})
 	}
 
 	bag.Add(id0)

@@ -16,10 +16,12 @@ type TransferInput struct {
 	Input `serialize:"true"`
 }
 
-func (in *TransferInput) InitCtx(*snow.Context) {}
+func (*TransferInput) InitCtx(*snow.Context) {}
 
 // Amount returns the quantity of the asset this input produces
-func (in *TransferInput) Amount() uint64 { return in.Amt }
+func (in *TransferInput) Amount() uint64 {
+	return in.Amt
+}
 
 // Verify this input is syntactically valid
 func (in *TransferInput) Verify() error {

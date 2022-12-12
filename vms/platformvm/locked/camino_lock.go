@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
@@ -133,7 +134,7 @@ func (lock IDs) IsNewlyLockedWith(lockState State) bool {
 	return false
 }
 
-func (lock *IDs) Match(lockState State, txIDs ids.Set) bool {
+func (lock *IDs) Match(lockState State, txIDs set.Set[ids.ID]) bool {
 	switch lockState {
 	case StateDeposited:
 		return txIDs.Contains(lock.DepositTxID)

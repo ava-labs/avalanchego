@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
@@ -216,7 +217,7 @@ func (h *handler) Lock(
 		return nil, nil, nil, errLockAmountNotZero
 	}
 
-	addrs := ids.NewShortSet(len(keys)) // The addresses controlled by [keys]
+	addrs := set.NewSet[ids.ShortID](len(keys)) // The addresses controlled by [keys]
 	for _, key := range keys {
 		addrs.Add(key.PublicKey().Address())
 	}
@@ -464,12 +465,12 @@ func (h *handler) Unlock(
 		return nil, nil, errInvalidTargetLockState
 	}
 
-	lockTxIDsSet := ids.NewSet(len(lockTxIDs))
+	lockTxIDsSet := set.NewSet[ids.ID](len(lockTxIDs))
 	for _, lockTxID := range lockTxIDs {
 		lockTxIDsSet.Add(lockTxID)
 	}
 
-	lockTxAddresses := ids.ShortSet{}
+	lockTxAddresses := set.NewSet[ids.ShortID](0)
 	for lockTxID := range lockTxIDsSet {
 		tx, s, err := state.GetTx(lockTxID)
 		if err != nil {
@@ -584,12 +585,12 @@ func (h *handler) UnlockDeposit(
 	[][]*crypto.PrivateKeySECP256K1R, // signers
 	error,
 ) {
-	addrs := ids.NewShortSet(len(keys)) // The addresses controlled by [keys]
+	addrs := set.NewSet[ids.ShortID](len(keys)) // The addresses controlled by [keys]
 	for _, key := range keys {
 		addrs.Add(key.PublicKey().Address())
 	}
 
-	depositTxSet := ids.NewSet(len(depositTxIDs))
+	depositTxSet := set.NewSet[ids.ID](len(depositTxIDs))
 	for _, depositTxID := range depositTxIDs {
 		depositTxSet.Add(depositTxID)
 	}
@@ -1204,7 +1205,7 @@ func (h *handler) VerifyUnlockDepositedUTXOs(
 		// if we don't need keys, than deposit is expired and must be fully unlocked
 		// that means that tx must fully consume remaining deposited tokens and
 		// produce them as unlocked
-		isExpired := deposit.IsExpired(depositOffer, currentTimestamp)
+		isExpired := deposit.IsExpired(currentTimestamp)
 
 		// if there are active deposit - its not system tx and we need to burn fee
 		if !isExpired {
@@ -1320,8 +1321,15 @@ func (sort *innerSortUTXOs) Less(i, j int) bool {
 
 	return iAmount < jAmount
 }
-func (sort *innerSortUTXOs) Len() int      { return len(sort.utxos) }
-func (sort *innerSortUTXOs) Swap(i, j int) { u := sort.utxos; u[j], u[i] = u[i], u[j] }
+
+func (sort *innerSortUTXOs) Len() int {
+	return len(sort.utxos)
+}
+
+func (sort *innerSortUTXOs) Swap(i, j int) {
+	u := sort.utxos
+	u[j], u[i] = u[i], u[j]
+}
 
 func sortUTXOs(utxos []*avax.UTXO, allowedAssetID ids.ID, lockState locked.State) {
 	sort.Sort(&innerSortUTXOs{utxos: utxos, allowedAssetID: allowedAssetID, lockState: lockState})
@@ -1329,7 +1337,7 @@ func sortUTXOs(utxos []*avax.UTXO, allowedAssetID ids.ID, lockState locked.State
 
 func getDepositUnlockableAmounts(
 	chainState state.Chain,
-	depositTxIDs ids.Set,
+	depositTxIDs set.Set[ids.ID],
 	currentTimestamp uint64,
 ) (map[ids.ID]uint64, error) {
 	unlockableAmounts := make(map[ids.ID]uint64, len(depositTxIDs))

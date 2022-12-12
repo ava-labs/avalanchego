@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/nodb"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
@@ -92,7 +93,9 @@ func (db *DatabaseClient) Delete(key []byte) error {
 }
 
 // NewBatch returns a new batch
-func (db *DatabaseClient) NewBatch() database.Batch { return &batch{db: db} }
+func (db *DatabaseClient) NewBatch() database.Batch {
+	return &batch{db: db}
+}
 
 func (db *DatabaseClient) NewIterator() database.Iterator {
 	return db.NewIteratorWithStartAndPrefix(nil, nil)
@@ -143,8 +146,8 @@ func (db *DatabaseClient) Close() error {
 	return errCodeToError[resp.Err]
 }
 
-func (db *DatabaseClient) HealthCheck() (interface{}, error) {
-	health, err := db.client.HealthCheck(context.Background(), &emptypb.Empty{})
+func (db *DatabaseClient) HealthCheck(ctx context.Context) (interface{}, error) {
+	health, err := db.client.HealthCheck(ctx, &emptypb.Empty{})
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +179,9 @@ func (b *batch) Delete(key []byte) error {
 	return nil
 }
 
-func (b *batch) Size() int { return b.size }
+func (b *batch) Size() int {
+	return b.size
+}
 
 func (b *batch) Write() error {
 	request := &rpcdbpb.WriteBatchRequest{
@@ -184,14 +189,14 @@ func (b *batch) Write() error {
 		Continues: true,
 	}
 	currentSize := 0
-	keySet := make(map[string]struct{}, len(b.writes))
+	keySet := set.NewSet[string](len(b.writes))
 	for i := len(b.writes) - 1; i >= 0; i-- {
 		kv := b.writes[i]
 		key := string(kv.key)
-		if _, overwritten := keySet[key]; overwritten {
+		if keySet.Contains(key) {
 			continue
 		}
-		keySet[key] = struct{}{}
+		keySet.Add(key)
 
 		sizeChange := baseElementSize + len(kv.key) + len(kv.value)
 		if newSize := currentSize + sizeChange; newSize > maxBatchSize {
@@ -250,7 +255,9 @@ func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
 	return nil
 }
 
-func (b *batch) Inner() database.Batch { return b }
+func (b *batch) Inner() database.Batch {
+	return b
+}
 
 type iterator struct {
 	db *DatabaseClient

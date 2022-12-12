@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 var _ SharedMemory = (*sharedMemory)(nil)
@@ -62,7 +63,7 @@ type sharedMemory struct {
 }
 
 func (sm *sharedMemory) Get(peerChainID ids.ID, keys [][]byte) ([][]byte, error) {
-	sharedID := sm.m.sharedID(peerChainID, sm.thisChainID)
+	sharedID := sharedID(peerChainID, sm.thisChainID)
 	db := sm.m.GetSharedDatabase(sm.m.db, sharedID)
 	defer sm.m.ReleaseSharedDatabase(sharedID)
 
@@ -88,7 +89,7 @@ func (sm *sharedMemory) Indexed(
 	startKey []byte,
 	limit int,
 ) ([][]byte, []byte, []byte, error) {
-	sharedID := sm.m.sharedID(peerChainID, sm.thisChainID)
+	sharedID := sharedID(peerChainID, sm.thisChainID)
 	db := sm.m.GetSharedDatabase(sm.m.db, sharedID)
 	defer sm.m.ReleaseSharedDatabase(sharedID)
 
@@ -117,13 +118,13 @@ func (sm *sharedMemory) Apply(requests map[ids.ID]*Requests, batches ...database
 	sharedIDs := make([]ids.ID, 0, len(requests))
 	sharedOperations := make(map[ids.ID]*Requests, len(requests))
 	for peerChainID, request := range requests {
-		sharedID := sm.m.sharedID(sm.thisChainID, peerChainID)
+		sharedID := sharedID(sm.thisChainID, peerChainID)
 		sharedIDs = append(sharedIDs, sharedID)
 
 		request.peerChainID = peerChainID
 		sharedOperations[sharedID] = request
 	}
-	ids.SortIDs(sharedIDs)
+	utils.Sort(sharedIDs)
 
 	// Make sure all operations are committed atomically
 	vdb := versiondb.New(sm.m.db)

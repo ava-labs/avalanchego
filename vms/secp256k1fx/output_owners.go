@@ -9,8 +9,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
@@ -28,10 +30,11 @@ type OutputOwners struct {
 	Locktime  uint64        `serialize:"true" json:"locktime"`
 	Threshold uint32        `serialize:"true" json:"threshold"`
 	Addrs     []ids.ShortID `serialize:"true" json:"addresses"`
+
 	// ctx is used in MarshalJSON to convert Addrs into human readable
 	// format with ChainID and NetworkID. Unexported because we don't use
 	// it outside this object.
-	ctx *snow.Context `serialize:"false"`
+	ctx *snow.Context
 }
 
 // InitCtx assigns the OutputOwners.ctx object to given [ctx] object
@@ -94,8 +97,8 @@ func (out *OutputOwners) Addresses() [][]byte {
 }
 
 // AddressesSet returns addresses as a set
-func (out *OutputOwners) AddressesSet() ids.ShortSet {
-	set := ids.NewShortSet(len(out.Addrs))
+func (out *OutputOwners) AddressesSet() set.Set[ids.ShortID] {
+	set := set.NewSet[ids.ShortID](len(out.Addrs))
 	set.Add(out.Addrs...)
 	return set
 }
@@ -125,16 +128,20 @@ func (out *OutputOwners) Verify() error {
 		return errOutputUnspendable
 	case out.Threshold == 0 && len(out.Addrs) > 0:
 		return errOutputUnoptimized
-	case !ids.IsSortedAndUniqueShortIDs(out.Addrs):
+	case !utils.IsSortedAndUniqueSortable(out.Addrs):
 		return errAddrsNotSortedUnique
 	default:
 		return nil
 	}
 }
 
-func (out *OutputOwners) VerifyState() error { return out.Verify() }
+func (out *OutputOwners) VerifyState() error {
+	return out.Verify()
+}
 
-func (out *OutputOwners) Sort() { ids.SortShortIDs(out.Addrs) }
+func (out *OutputOwners) Sort() {
+	utils.Sort(out.Addrs)
+}
 
 // formatAddress formats a given [addr] into human readable format using
 // [ChainID] and [NetworkID] from the provided [ctx].

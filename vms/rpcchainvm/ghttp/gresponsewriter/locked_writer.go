@@ -22,7 +22,9 @@ type lockedWriter struct {
 	headerWritten bool
 }
 
-func NewLockedWriter(w http.ResponseWriter) http.ResponseWriter { return &lockedWriter{writer: w} }
+func NewLockedWriter(w http.ResponseWriter) http.ResponseWriter {
+	return &lockedWriter{writer: w}
+}
 
 func (lw *lockedWriter) Header() http.Header {
 	lw.lock.Lock()

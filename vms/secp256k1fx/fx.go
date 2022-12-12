@@ -33,6 +33,7 @@ var (
 	errTooFewSigners                  = errors.New("input has less signers than expected")
 	errInputOutputIndexOutOfBounds    = errors.New("input referenced a nonexistent address in the output")
 	errInputCredentialSignersMismatch = errors.New("input expected a different number of signers than provided in the credential")
+	errWrongSig                       = errors.New("wrong signature")
 )
 
 // Fx describes the secp256k1 feature extension
@@ -74,9 +75,14 @@ func (fx *Fx) InitializeVM(vmIntf interface{}) error {
 	return nil
 }
 
-func (fx *Fx) Bootstrapping() error { return nil }
+func (*Fx) Bootstrapping() error {
+	return nil
+}
 
-func (fx *Fx) Bootstrapped() error { fx.bootstrapped = true; return nil }
+func (fx *Fx) Bootstrapped() error {
+	fx.bootstrapped = true
+	return nil
+}
 
 // VerifyPermission returns nil iff [credIntf] proves that [controlGroup] assents to [txIntf]
 func (fx *Fx) VerifyPermission(txIntf, inIntf, credIntf, ownerIntf interface{}) error {
@@ -197,7 +203,8 @@ func (fx *Fx) VerifyCredentials(utx UnsignedTx, in *Input, cred *Credential, out
 			return err
 		}
 		if expectedAddress := out.Addrs[index]; expectedAddress != pk.Address() {
-			return fmt.Errorf("expected signature from %s but got from %s",
+			return fmt.Errorf("%w: expected signature from %s but got from %s",
+				errWrongSig,
 				expectedAddress,
 				pk.Address())
 		}
@@ -208,7 +215,7 @@ func (fx *Fx) VerifyCredentials(utx UnsignedTx, in *Input, cred *Credential, out
 
 // CreateOutput creates a new output with the provided control group worth
 // the specified amount
-func (fx *Fx) CreateOutput(amount uint64, ownerIntf interface{}) (interface{}, error) {
+func (*Fx) CreateOutput(amount uint64, ownerIntf interface{}) (interface{}, error) {
 	owner, ok := ownerIntf.(*OutputOwners)
 	if !ok {
 		return nil, errWrongOwnerType

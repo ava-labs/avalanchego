@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txheap"
@@ -92,7 +93,7 @@ type mempool struct {
 	// Value: String repr. of the verification error
 	droppedTxIDs *cache.LRU
 
-	consumedUTXOs ids.Set
+	consumedUTXOs set.Set[ids.ID]
 
 	blkTimer BlockTimer
 }
@@ -136,14 +137,19 @@ func NewMempool(
 		unissuedDecisionTxs:  unissuedDecisionTxs,
 		unissuedStakerTxs:    unissuedStakerTxs,
 		droppedTxIDs:         &cache.LRU{Size: droppedTxIDsCacheSize},
-		consumedUTXOs:        ids.NewSet(initialConsumedUTXOsSize),
+		consumedUTXOs:        set.NewSet[ids.ID](initialConsumedUTXOsSize),
 		dropIncoming:         false, // enable tx adding by default
 		blkTimer:             blkTimer,
 	}, nil
 }
 
-func (m *mempool) EnableAdding()  { m.dropIncoming = false }
-func (m *mempool) DisableAdding() { m.dropIncoming = true }
+func (m *mempool) EnableAdding() {
+	m.dropIncoming = false
+}
+
+func (m *mempool) DisableAdding() {
+	m.dropIncoming = true
+}
 
 func (m *mempool) Add(tx *txs.Tx) error {
 	if m.dropIncoming {
@@ -241,7 +247,9 @@ func (m *mempool) addStakerTx(tx *txs.Tx) {
 	m.register(tx)
 }
 
-func (m *mempool) HasStakerTx() bool { return m.unissuedStakerTxs.Len() > 0 }
+func (m *mempool) HasStakerTx() bool {
+	return m.unissuedStakerTxs.Len() > 0
+}
 
 func (m *mempool) removeDecisionTxs(txs []*txs.Tx) {
 	for _, tx := range txs {

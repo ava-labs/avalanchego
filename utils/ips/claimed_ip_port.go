@@ -5,6 +5,8 @@ package ips
 
 import (
 	"crypto/x509"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 // Can't import these from wrappers package due to circular import.
@@ -12,8 +14,9 @@ const (
 	intLen  = 4
 	longLen = 8
 	ipLen   = 18
-	// Certificate length, signature length, IP, timestamp
-	baseIPCertDescLen = 2*intLen + ipLen + longLen
+	idLen   = 32
+	// Certificate length, signature length, IP, timestamp, tx ID
+	baseIPCertDescLen = 2*intLen + ipLen + longLen + idLen
 )
 
 // A self contained proof that a peer is claiming ownership of an IPPort at a
@@ -30,6 +33,8 @@ type ClaimedIPPort struct {
 	// actually claimed by the peer in question, and not by a malicious peer
 	// trying to get us to dial bogus IPPorts.
 	Signature []byte
+	// The txID that added this peer into the validator set
+	TxID ids.ID
 }
 
 // Returns the length of the byte representation of this ClaimedIPPort.

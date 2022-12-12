@@ -9,11 +9,11 @@ package common
 
 import (
 	context "context"
-	reflect "reflect"
-
 	ids "github.com/ava-labs/avalanchego/ids"
 	snow "github.com/ava-labs/avalanchego/snow"
+	set "github.com/ava-labs/avalanchego/utils/set"
 	gomock "github.com/golang/mock/gomock"
+	reflect "reflect"
 )
 
 // MockSender is a mock of Sender interface.
@@ -66,7 +66,8 @@ func (mr *MockSenderMockRecorder) SendAccepted(arg0, arg1, arg2, arg3 interface{
 }
 
 // SendAcceptedFrontier mocks base method.
-func (m *MockSender) SendAcceptedFrontier(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3 []ids.ID) {
+func (m *MockSender) SendAcceptedFrontier(arg0 context.Context, arg1 ids.NodeID, arg2 uint32,
+	arg3 []ids.ID) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SendAcceptedFrontier", arg0, arg1, arg2, arg3)
 }
@@ -116,7 +117,7 @@ func (mr *MockSenderMockRecorder) SendAppGossip(arg0, arg1 interface{}) *gomock.
 }
 
 // SendAppGossipSpecific mocks base method.
-func (m *MockSender) SendAppGossipSpecific(arg0 context.Context, arg1 ids.NodeIDSet, arg2 []byte) error {
+func (m *MockSender) SendAppGossipSpecific(arg0 context.Context, arg1 set.Set[ids.NodeID], arg2 []byte) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SendAppGossipSpecific", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -130,7 +131,7 @@ func (mr *MockSenderMockRecorder) SendAppGossipSpecific(arg0, arg1, arg2 interfa
 }
 
 // SendAppRequest mocks base method.
-func (m *MockSender) SendAppRequest(arg0 context.Context, arg1 ids.NodeIDSet, arg2 uint32, arg3 []byte) error {
+func (m *MockSender) SendAppRequest(arg0 context.Context, arg1 set.Set[ids.NodeID], arg2 uint32, arg3 []byte) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SendAppRequest", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
@@ -170,7 +171,8 @@ func (mr *MockSenderMockRecorder) SendChits(arg0, arg1, arg2, arg3 interface{}) 
 }
 
 // SendCrossChainAppRequest mocks base method.
-func (m *MockSender) SendCrossChainAppRequest(arg0 context.Context, arg1 ids.ID, arg2 uint32, arg3 []byte) error {
+func (m *MockSender) SendCrossChainAppRequest(arg0 context.Context, arg1 ids.ID, arg2 uint32,
+	arg3 []byte) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SendCrossChainAppRequest", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
@@ -210,7 +212,7 @@ func (mr *MockSenderMockRecorder) SendGet(arg0, arg1, arg2, arg3 interface{}) *g
 }
 
 // SendGetAccepted mocks base method.
-func (m *MockSender) SendGetAccepted(arg0 context.Context, arg1 ids.NodeIDSet, arg2 uint32, arg3 []ids.ID) {
+func (m *MockSender) SendGetAccepted(arg0 context.Context, arg1 set.Set[ids.NodeID], arg2 uint32, arg3 []ids.ID) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SendGetAccepted", arg0, arg1, arg2, arg3)
 }
@@ -222,7 +224,7 @@ func (mr *MockSenderMockRecorder) SendGetAccepted(arg0, arg1, arg2, arg3 interfa
 }
 
 // SendGetAcceptedFrontier mocks base method.
-func (m *MockSender) SendGetAcceptedFrontier(arg0 context.Context, arg1 ids.NodeIDSet, arg2 uint32) {
+func (m *MockSender) SendGetAcceptedFrontier(arg0 context.Context, arg1 set.Set[ids.NodeID], arg2 uint32) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SendGetAcceptedFrontier", arg0, arg1, arg2)
 }
@@ -234,7 +236,7 @@ func (mr *MockSenderMockRecorder) SendGetAcceptedFrontier(arg0, arg1, arg2 inter
 }
 
 // SendGetAcceptedStateSummary mocks base method.
-func (m *MockSender) SendGetAcceptedStateSummary(arg0 context.Context, arg1 ids.NodeIDSet, arg2 uint32, arg3 []uint64) {
+func (m *MockSender) SendGetAcceptedStateSummary(arg0 context.Context, arg1 set.Set[ids.NodeID], arg2 uint32, arg3 []uint64) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SendGetAcceptedStateSummary", arg0, arg1, arg2, arg3)
 }
@@ -258,7 +260,7 @@ func (mr *MockSenderMockRecorder) SendGetAncestors(arg0, arg1, arg2, arg3 interf
 }
 
 // SendGetStateSummaryFrontier mocks base method.
-func (m *MockSender) SendGetStateSummaryFrontier(arg0 context.Context, arg1 ids.NodeIDSet, arg2 uint32) {
+func (m *MockSender) SendGetStateSummaryFrontier(arg0 context.Context, arg1 set.Set[ids.NodeID], arg2 uint32) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SendGetStateSummaryFrontier", arg0, arg1, arg2)
 }
@@ -282,7 +284,7 @@ func (mr *MockSenderMockRecorder) SendGossip(arg0, arg1 interface{}) *gomock.Cal
 }
 
 // SendPullQuery mocks base method.
-func (m *MockSender) SendPullQuery(arg0 context.Context, arg1 ids.NodeIDSet, arg2 uint32, arg3 ids.ID) {
+func (m *MockSender) SendPullQuery(arg0 context.Context, arg1 set.Set[ids.NodeID], arg2 uint32, arg3 ids.ID) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SendPullQuery", arg0, arg1, arg2, arg3)
 }
@@ -294,7 +296,7 @@ func (mr *MockSenderMockRecorder) SendPullQuery(arg0, arg1, arg2, arg3 interface
 }
 
 // SendPushQuery mocks base method.
-func (m *MockSender) SendPushQuery(arg0 context.Context, arg1 ids.NodeIDSet, arg2 uint32, arg3 []byte) {
+func (m *MockSender) SendPushQuery(arg0 context.Context, arg1 set.Set[ids.NodeID], arg2 uint32, arg3 []byte) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SendPushQuery", arg0, arg1, arg2, arg3)
 }

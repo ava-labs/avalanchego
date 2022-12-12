@@ -58,7 +58,7 @@ type PublishBlockchainReply struct {
 }
 
 // PublishBlockchain publishes the finalized accepted transactions from the blockchainID over the IPC
-func (ipc *IPCServer) PublishBlockchain(r *http.Request, args *PublishBlockchainArgs, reply *PublishBlockchainReply) error {
+func (ipc *IPCServer) PublishBlockchain(_ *http.Request, args *PublishBlockchainArgs, reply *PublishBlockchainReply) error {
 	ipc.log.Debug("IPCs: PublishBlockchain called",
 		logging.UserString("blockchainID", args.BlockchainID),
 	)
@@ -93,7 +93,7 @@ type UnpublishBlockchainArgs struct {
 }
 
 // UnpublishBlockchain closes publishing of a blockchainID
-func (ipc *IPCServer) UnpublishBlockchain(r *http.Request, args *UnpublishBlockchainArgs, _ *api.EmptyReply) error {
+func (ipc *IPCServer) UnpublishBlockchain(_ *http.Request, args *UnpublishBlockchainArgs, _ *api.EmptyReply) error {
 	ipc.log.Debug("IPCs: UnpublishBlockchain called",
 		logging.UserString("blockchainID", args.BlockchainID),
 	)
@@ -124,7 +124,7 @@ type GetPublishedBlockchainsReply struct {
 }
 
 // GetPublishedBlockchains returns blockchains being published
-func (ipc *IPCServer) GetPublishedBlockchains(r *http.Request, args *struct{}, reply *GetPublishedBlockchainsReply) error {
+func (ipc *IPCServer) GetPublishedBlockchains(_ *http.Request, _ *struct{}, reply *GetPublishedBlockchainsReply) error {
 	reply.Chains = ipc.ipcs.GetPublishedBlockchains()
 	return nil
 }

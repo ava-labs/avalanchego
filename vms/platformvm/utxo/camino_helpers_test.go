@@ -52,10 +52,13 @@ var (
 )
 
 func defaultConfig() *config.Config {
+	vdrs := validators.NewManager()
+	primaryVdrs := validators.NewSet()
+	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	return &config.Config{
 		Chains:                 chains.MockManager{},
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Validators:             validators.NewManager(),
+		Validators:             vdrs,
 		TxFee:                  defaultTxFee,
 		CreateSubnetTxFee:      100 * defaultTxFee,
 		CreateBlockchainTxFee:  100 * defaultTxFee,
@@ -133,7 +136,7 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 	buildGenesisResponse := api.BuildGenesisReply{}
 	platformvmSS := api.StaticService{}
 	if err := platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse); err != nil {
-		panic(fmt.Errorf("problem while building platform chain's genesis state: %v", err))
+		panic(fmt.Errorf("problem while building platform chain's genesis state: %w", err))
 	}
 
 	genesisBytes, err := formatting.Decode(buildGenesisResponse.Encoding, buildGenesisResponse.Bytes)

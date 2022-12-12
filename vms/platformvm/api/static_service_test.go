@@ -6,6 +6,8 @@ package api
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -248,5 +250,93 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	validators := genesis.Validators
 	if len(validators) != 3 {
 		t.Fatal("Validators should contain 3 validators")
+	}
+}
+
+func TestUTXOLess(t *testing.T) {
+	var (
+		smallerAddr = ids.ShortID{}
+		largerAddr  = ids.ShortID{1}
+	)
+	smallerAddrStr, err := address.FormatBech32("avax", smallerAddr[:])
+	if err != nil {
+		panic(err)
+	}
+	largerAddrStr, err := address.FormatBech32("avax", largerAddr[:])
+	if err != nil {
+		panic(err)
+	}
+	type test struct {
+		name     string
+		utxo1    UTXO
+		utxo2    UTXO
+		expected bool
+	}
+	tests := []test{
+		{
+			name:     "both empty",
+			utxo1:    UTXO{},
+			utxo2:    UTXO{},
+			expected: false,
+		},
+		{
+			name:  "first locktime smaller",
+			utxo1: UTXO{},
+			utxo2: UTXO{
+				Locktime: 1,
+			},
+			expected: true,
+		},
+		{
+			name: "first locktime larger",
+			utxo1: UTXO{
+				Locktime: 1,
+			},
+			utxo2:    UTXO{},
+			expected: false,
+		},
+		{
+			name:  "first amount smaller",
+			utxo1: UTXO{},
+			utxo2: UTXO{
+				Amount: 1,
+			},
+			expected: true,
+		},
+		{
+			name: "first amount larger",
+			utxo1: UTXO{
+				Amount: 1,
+			},
+			utxo2:    UTXO{},
+			expected: false,
+		},
+		{
+			name: "first address smaller",
+			utxo1: UTXO{
+				Address: smallerAddrStr,
+			},
+			utxo2: UTXO{
+				Address: largerAddrStr,
+			},
+			expected: true,
+		},
+		{
+			name: "first address larger",
+			utxo1: UTXO{
+				Address: largerAddrStr,
+			},
+			utxo2: UTXO{
+				Address: smallerAddrStr,
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			require.Equal(tt.expected, tt.utxo1.Less(tt.utxo2))
+		})
 	}
 }

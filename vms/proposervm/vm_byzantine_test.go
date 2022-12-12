@@ -5,6 +5,7 @@ package proposervm
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"errors"
 	"testing"
@@ -14,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
@@ -21,6 +23,7 @@ import (
 // Ensure that a byzantine node issuing an invalid PreForkBlock (Y) when the
 // parent block (X) is issued into a PostForkBlock (A) will be marked as invalid
 // correctly.
+//
 //     G
 //   / |
 // A - X
@@ -40,20 +43,22 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 		HeightV:    gBlock.Height() + 1,
 		TimestampV: gBlock.Timestamp().Add(proposer.MaxDelay),
 	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return xBlock, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return xBlock, nil
+	}
 
-	aBlock, err := proVM.BuildBlock()
+	aBlock, err := proVM.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("proposerVM could not build block due to %s", err)
 	}
 
 	coreVM.BuildBlockF = nil
 
-	if err := aBlock.Verify(); err != nil {
+	if err := aBlock.Verify(context.Background()); err != nil {
 		t.Fatalf("could not verify valid block due to %s", err)
 	}
 
-	if err := aBlock.Accept(); err != nil {
+	if err := aBlock.Accept(context.Background()); err != nil {
 		t.Fatalf("could not accept valid block due to %s", err)
 	}
 
@@ -69,21 +74,21 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 		TimestampV: xBlock.Timestamp().Add(proposer.MaxDelay),
 	}
 
-	coreVM.ParseBlockF = func(blockBytes []byte) (snowman.Block, error) {
+	coreVM.ParseBlockF = func(_ context.Context, blockBytes []byte) (snowman.Block, error) {
 		if !bytes.Equal(blockBytes, yBlockBytes) {
 			return nil, errUnknownBlock
 		}
 		return yBlock, nil
 	}
 
-	parsedBlock, err := proVM.ParseBlock(yBlockBytes)
+	parsedBlock, err := proVM.ParseBlock(context.Background(), yBlockBytes)
 	if err != nil {
 		// If there was an error parsing, then this is fine.
 		return
 	}
 
 	// If there wasn't an error parsing - verify must return an error
-	if err := parsedBlock.Verify(); err == nil {
+	if err := parsedBlock.Verify(context.Background()); err == nil {
 		t.Fatal("should have marked the parsed block as invalid")
 	}
 }
@@ -134,8 +139,10 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 		},
 	}
 
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return xBlock, nil }
-	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return xBlock, nil
+	}
+	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
 			return coreGenBlk, nil
@@ -149,7 +156,7 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 			return nil, database.ErrNotFound
 		}
 	}
-	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(b, coreGenBlk.Bytes()):
 			return coreGenBlk, nil
@@ -164,7 +171,7 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 		}
 	}
 
-	aBlockIntf, err := proVM.BuildBlock()
+	aBlockIntf, err := proVM.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatal("could not build post fork oracle block")
 	}
@@ -174,35 +181,35 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 		t.Fatal("expected post fork block")
 	}
 
-	opts, err := aBlock.Options()
+	opts, err := aBlock.Options(context.Background())
 	if err != nil {
 		t.Fatal("could not retrieve options from post fork oracle block")
 	}
 
-	if err := aBlock.Verify(); err != nil {
+	if err := aBlock.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if err := opts[0].Verify(); err != nil {
+	if err := opts[0].Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if err := opts[1].Verify(); err != nil {
+	if err := opts[1].Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
-	yBlock, err := proVM.ParseBlock(xBlock.opts[0].Bytes())
+	yBlock, err := proVM.ParseBlock(context.Background(), xBlock.opts[0].Bytes())
 	if err != nil {
 		// It's okay for this block not to be parsed
 		return
 	}
-	if err := yBlock.Verify(); err == nil {
+	if err := yBlock.Verify(context.Background()); err == nil {
 		t.Fatal("unexpectedly passed block verification")
 	}
 
-	if err := aBlock.Accept(); err != nil {
+	if err := aBlock.Accept(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := yBlock.Verify(); err == nil {
+	if err := yBlock.Verify(context.Background()); err == nil {
 		t.Fatal("unexpectedly passed block verification")
 	}
 }
@@ -230,9 +237,11 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 		HeightV:    gBlock.Height() + 1,
 		TimestampV: gBlock.Timestamp().Add(proposer.MaxDelay),
 	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return xBlock, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return xBlock, nil
+	}
 
-	aBlock, err := proVM.BuildBlock()
+	aBlock, err := proVM.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("proposerVM could not build block due to %s", err)
 	}
@@ -251,7 +260,7 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 		TimestampV: xBlock.Timestamp().Add(proposer.MaxDelay),
 	}
 
-	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlock.ID():
 			return gBlock, nil
@@ -263,7 +272,7 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 			return nil, errUnknownBlock
 		}
 	}
-	coreVM.ParseBlockF = func(blockBytes []byte) (snowman.Block, error) {
+	coreVM.ParseBlockF = func(_ context.Context, blockBytes []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(blockBytes, gBlock.Bytes()):
 			return gBlock, nil
@@ -286,27 +295,27 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bBlock, err := proVM.ParseBlock(bStatelessBlock.Bytes())
+	bBlock, err := proVM.ParseBlock(context.Background(), bStatelessBlock.Bytes())
 	if err != nil {
 		// If there was an error parsing, then this is fine.
 		return
 	}
 
-	if err := aBlock.Verify(); err != nil {
+	if err := aBlock.Verify(context.Background()); err != nil {
 		t.Fatalf("could not verify valid block due to %s", err)
 	}
 
 	// If there wasn't an error parsing - verify must return an error
-	if err := bBlock.Verify(); err == nil {
+	if err := bBlock.Verify(context.Background()); err == nil {
 		t.Fatal("should have marked the parsed block as invalid")
 	}
 
-	if err := aBlock.Accept(); err != nil {
+	if err := aBlock.Accept(context.Background()); err != nil {
 		t.Fatalf("could not accept valid block due to %s", err)
 	}
 
 	// If there wasn't an error parsing - verify must return an error
-	if err := bBlock.Verify(); err == nil {
+	if err := bBlock.Verify(context.Background()); err == nil {
 		t.Fatal("should have marked the parsed block as invalid")
 	}
 }
@@ -356,8 +365,10 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 		},
 	}
 
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return xBlock, nil }
-	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return xBlock, nil
+	}
+	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
 			return coreGenBlk, nil
@@ -371,7 +382,7 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 			return nil, database.ErrNotFound
 		}
 	}
-	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(b, coreGenBlk.Bytes()):
 			return coreGenBlk, nil
@@ -386,7 +397,7 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 		}
 	}
 
-	aBlockIntf, err := proVM.BuildBlock()
+	aBlockIntf, err := proVM.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatal("could not build post fork oracle block")
 	}
@@ -395,18 +406,18 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 	if !ok {
 		t.Fatal("expected post fork block")
 	}
-	opts, err := aBlock.Options()
+	opts, err := aBlock.Options(context.Background())
 	if err != nil {
 		t.Fatal("could not retrieve options from post fork oracle block")
 	}
 
-	if err := aBlock.Verify(); err != nil {
+	if err := aBlock.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if err := opts[0].Verify(); err == nil {
+	if err := opts[0].Verify(context.Background()); err == nil {
 		t.Fatal("option 0 has invalid parent, should not verify")
 	}
-	if err := opts[1].Verify(); err == nil {
+	if err := opts[1].Verify(context.Background()); err == nil {
 		t.Fatal("option 1 has invalid parent, should not verify")
 	}
 }
@@ -460,7 +471,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		},
 	}
 
-	xInnerOptions, err := xBlock.Options()
+	xInnerOptions, err := xBlock.Options(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -498,7 +509,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		},
 	}
 
-	if err = bBlock.Verify(); err != nil {
+	if err := bBlock.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -520,18 +531,20 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		},
 	}
 
-	if err := outerOption.Verify(); !errors.Is(err, errUnexpectedBlockType) {
+	if err := outerOption.Verify(context.Background()); !errors.Is(err, errUnexpectedBlockType) {
 		t.Fatal(err)
 	}
 
 	// generate A from X and O2
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return xBlock, nil }
-	aBlock, err := proVM.BuildBlock()
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return xBlock, nil
+	}
+	aBlock, err := proVM.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 	coreVM.BuildBlockF = nil
-	if err := aBlock.Verify(); err != nil {
+	if err := aBlock.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -552,7 +565,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		},
 	}
 
-	if err := outerOption.Verify(); err != nil {
+	if err := outerOption.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -591,13 +604,15 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		},
 	}
 
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return zBlock, nil }
-	cBlock, err := proVM.BuildBlock()
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return zBlock, nil
+	}
+	cBlock, err := proVM.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 	coreVM.BuildBlockF = nil
-	if err := cBlock.Verify(); err != nil {
+	if err := cBlock.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -619,7 +634,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		},
 	}
 
-	if err := outerOption.Verify(); err != errInnerParentMismatch {
+	if err := outerOption.Verify(context.Background()); err != errInnerParentMismatch {
 		t.Fatal(err)
 	}
 }
@@ -628,10 +643,13 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 
 	// Make sure that we will be sampled to perform the proposals.
-	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.NodeID]uint64, error) {
-		res := make(map[ids.NodeID]uint64)
-		res[proVM.ctx.NodeID] = uint64(10)
-		return res, nil
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		return map[ids.NodeID]*validators.GetValidatorOutput{
+			proVM.ctx.NodeID: {
+				NodeID: proVM.ctx.NodeID,
+				Weight: 10,
+			},
+		}, nil
 	}
 
 	proVM.Set(coreGenBlk.Timestamp())
@@ -659,7 +677,7 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 		TimestampV: coreGenBlk.Timestamp(),
 	}
 
-	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
 			return coreGenBlk, nil
@@ -671,7 +689,7 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 			return nil, database.ErrNotFound
 		}
 	}
-	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(b, coreGenBlk.Bytes()):
 			return coreGenBlk, nil
@@ -685,18 +703,20 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 	}
 
 	// Build the first proposal block
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk0, nil }
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return coreBlk0, nil
+	}
 
-	builtBlk0, err := proVM.BuildBlock()
+	builtBlk0, err := proVM.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("could not build post fork block %s", err)
 	}
 
-	if err := builtBlk0.Verify(); err != nil {
+	if err := builtBlk0.Verify(context.Background()); err != nil {
 		t.Fatalf("failed to verify newly created block %s", err)
 	}
 
-	if err := proVM.SetPreference(builtBlk0.ID()); err != nil {
+	if err := proVM.SetPreference(context.Background(), builtBlk0.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -713,13 +733,13 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	invalidBlk, err := proVM.ParseBlock(invalidBlkBytes)
+	invalidBlk, err := proVM.ParseBlock(context.Background(), invalidBlkBytes)
 	if err != nil {
 		// Not being able to parse an invalid block is fine.
 		t.Skip(err)
 	}
 
-	if err := invalidBlk.Verify(); err == nil {
+	if err := invalidBlk.Verify(context.Background()); err == nil {
 		t.Fatalf("verified block without valid signature")
 	}
 
@@ -737,14 +757,14 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 	// GetBlock shouldn't really be able to succeed, as we don't have a valid
 	// representation of [blkID]
 	proVM.innerBlkCache.Flush() // So we don't get from the cache
-	fetchedBlk, err := proVM.GetBlock(blkID)
+	fetchedBlk, err := proVM.GetBlock(context.Background(), blkID)
 	if err != nil {
 		t.Skip(err)
 	}
 
 	// GetBlock returned, so it must have somehow gotten a valid representation
 	// of [blkID].
-	if err := fetchedBlk.Verify(); err != nil {
+	if err := fetchedBlk.Verify(context.Background()); err != nil {
 		t.Fatalf("GetBlock returned an invalid block when the ID represented a potentially valid block: %s", err)
 	}
 }

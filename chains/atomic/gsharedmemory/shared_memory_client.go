@@ -245,8 +245,7 @@ func (c *Client) makeBatches(rawBatches []database.Batch, currentSize int) ([][]
 	for _, batch := range rawBatches {
 		batch := batch.Inner()
 		fb := filteredBatch{
-			writes:  make(map[string][]byte),
-			deletes: make(map[string]struct{}),
+			writes: make(map[string][]byte),
 		}
 		if err := batch.Replay(&fb); err != nil {
 			return nil, err

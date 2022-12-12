@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
@@ -61,7 +62,6 @@ func NewInboundConnUpgradeThrottler(log logging.Logger, config InboundConnUpgrad
 		InboundConnUpgradeThrottlerConfig: config,
 		log:                               log,
 		done:                              make(chan struct{}),
-		recentIPs:                         make(map[string]struct{}),
 		recentIPsAndTimes:                 make(chan ipAndTime, config.MaxRecentConnsUpgraded),
 	}
 }
@@ -69,9 +69,13 @@ func NewInboundConnUpgradeThrottler(log logging.Logger, config InboundConnUpgrad
 // noInboundConnUpgradeThrottler upgrades all inbound connections
 type noInboundConnUpgradeThrottler struct{}
 
-func (*noInboundConnUpgradeThrottler) Dispatch()                     {}
-func (*noInboundConnUpgradeThrottler) Stop()                         {}
-func (*noInboundConnUpgradeThrottler) ShouldUpgrade(ips.IPPort) bool { return true }
+func (*noInboundConnUpgradeThrottler) Dispatch() {}
+
+func (*noInboundConnUpgradeThrottler) Stop() {}
+
+func (*noInboundConnUpgradeThrottler) ShouldUpgrade(ips.IPPort) bool {
+	return true
+}
 
 type ipAndTime struct {
 	ip                string
@@ -88,7 +92,7 @@ type inboundConnUpgradeThrottler struct {
 	done chan struct{}
 	// IP --> Present if ShouldUpgrade(ipStr) returned true
 	// within the last [UpgradeCooldown].
-	recentIPs map[string]struct{}
+	recentIPs set.Set[string]
 	// Sorted in order of increasing time
 	// of last call to ShouldUpgrade that returned true.
 	// For each IP in this channel, ShouldUpgrade(ipStr)
@@ -108,8 +112,7 @@ func (n *inboundConnUpgradeThrottler) ShouldUpgrade(ip ips.IPPort) bool {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
-	_, recentlyConnected := n.recentIPs[ipStr]
-	if recentlyConnected {
+	if n.recentIPs.Contains(ipStr) {
 		// We recently upgraded an inbound connection from this IP
 		return false
 	}
@@ -119,7 +122,7 @@ func (n *inboundConnUpgradeThrottler) ShouldUpgrade(ip ips.IPPort) bool {
 		ip:                ipStr,
 		cooldownElapsedAt: n.clock.Time().Add(n.UpgradeCooldown),
 	}:
-		n.recentIPs[ipStr] = struct{}{}
+		n.recentIPs.Add(ipStr)
 		return true
 	default:
 		return false
@@ -143,7 +146,7 @@ func (n *inboundConnUpgradeThrottler) Dispatch() {
 			case <-timer.C:
 				// Remove the next IP (we'd upgrade another inbound connection from it)
 				n.lock.Lock()
-				delete(n.recentIPs, next.ip)
+				n.recentIPs.Remove(next.ip)
 				n.lock.Unlock()
 			case <-n.done:
 				return

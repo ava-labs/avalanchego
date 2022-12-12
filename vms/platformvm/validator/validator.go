@@ -31,19 +31,29 @@ type Validator struct {
 }
 
 // ID returns the node ID of the validator
-func (v *Validator) ID() ids.NodeID { return v.NodeID }
+func (v *Validator) ID() ids.NodeID {
+	return v.NodeID
+}
 
 // StartTime is the time that this validator will enter the validator set
-func (v *Validator) StartTime() time.Time { return time.Unix(int64(v.Start), 0) }
+func (v *Validator) StartTime() time.Time {
+	return time.Unix(int64(v.Start), 0)
+}
 
 // EndTime is the time that this validator will leave the validator set
-func (v *Validator) EndTime() time.Time { return time.Unix(int64(v.End), 0) }
+func (v *Validator) EndTime() time.Time {
+	return time.Unix(int64(v.End), 0)
+}
 
 // Duration is the amount of time that this validator will be in the validator set
-func (v *Validator) Duration() time.Duration { return v.EndTime().Sub(v.StartTime()) }
+func (v *Validator) Duration() time.Duration {
+	return v.EndTime().Sub(v.StartTime())
+}
 
 // Weight is this validator's weight when sampling
-func (v *Validator) Weight() uint64 { return v.Wght }
+func (v *Validator) Weight() uint64 {
+	return v.Wght
+}
 
 // Verify validates the ID for this validator
 func (v *Validator) Verify() error {

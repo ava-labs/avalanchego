@@ -8,90 +8,90 @@ import (
 )
 
 func TestBinarySnowball(t *testing.T) {
-	Red := 0
-	Blue := 1
+	red := 0
+	blue := 1
 
 	beta := 2
 
 	sb := binarySnowball{}
-	sb.Initialize(beta, Red)
+	sb.Initialize(beta, red)
 
-	if pref := sb.Preference(); pref != Red {
-		t.Fatalf("Wrong preference. Expected %d got %d", Red, pref)
+	if pref := sb.Preference(); pref != red {
+		t.Fatalf("Wrong preference. Expected %d got %d", red, pref)
 	} else if sb.Finalized() {
 		t.Fatalf("Finalized too early")
 	}
 
-	sb.RecordSuccessfulPoll(Blue)
+	sb.RecordSuccessfulPoll(blue)
 
-	if pref := sb.Preference(); pref != Blue {
-		t.Fatalf("Wrong preference. Expected %d got %d", Blue, pref)
+	if pref := sb.Preference(); pref != blue {
+		t.Fatalf("Wrong preference. Expected %d got %d", blue, pref)
 	} else if sb.Finalized() {
 		t.Fatalf("Finalized too early")
 	}
 
-	sb.RecordSuccessfulPoll(Red)
+	sb.RecordSuccessfulPoll(red)
 
-	if pref := sb.Preference(); pref != Blue {
-		t.Fatalf("Wrong preference. Expected %d got %d", Blue, pref)
+	if pref := sb.Preference(); pref != blue {
+		t.Fatalf("Wrong preference. Expected %d got %d", blue, pref)
 	} else if sb.Finalized() {
 		t.Fatalf("Finalized too early")
 	}
 
-	sb.RecordSuccessfulPoll(Blue)
+	sb.RecordSuccessfulPoll(blue)
 
-	if pref := sb.Preference(); pref != Blue {
-		t.Fatalf("Wrong preference. Expected %d got %d", Blue, pref)
+	if pref := sb.Preference(); pref != blue {
+		t.Fatalf("Wrong preference. Expected %d got %d", blue, pref)
 	} else if sb.Finalized() {
 		t.Fatalf("Finalized too early")
 	}
 
-	sb.RecordSuccessfulPoll(Blue)
+	sb.RecordSuccessfulPoll(blue)
 
-	if pref := sb.Preference(); pref != Blue {
-		t.Fatalf("Wrong preference. Expected %d got %d", Blue, pref)
+	if pref := sb.Preference(); pref != blue {
+		t.Fatalf("Wrong preference. Expected %d got %d", blue, pref)
 	} else if !sb.Finalized() {
 		t.Fatalf("Didn't finalized correctly")
 	}
 }
 
 func TestBinarySnowballRecordUnsuccessfulPoll(t *testing.T) {
-	Red := 0
-	Blue := 1
+	red := 0
+	blue := 1
 
 	beta := 2
 
 	sb := binarySnowball{}
-	sb.Initialize(beta, Red)
+	sb.Initialize(beta, red)
 
-	if pref := sb.Preference(); pref != Red {
-		t.Fatalf("Wrong preference. Expected %d got %d", Red, pref)
+	if pref := sb.Preference(); pref != red {
+		t.Fatalf("Wrong preference. Expected %d got %d", red, pref)
 	} else if sb.Finalized() {
 		t.Fatalf("Finalized too early")
 	}
 
-	sb.RecordSuccessfulPoll(Blue)
+	sb.RecordSuccessfulPoll(blue)
 
-	if pref := sb.Preference(); pref != Blue {
-		t.Fatalf("Wrong preference. Expected %d got %d", Blue, pref)
+	if pref := sb.Preference(); pref != blue {
+		t.Fatalf("Wrong preference. Expected %d got %d", blue, pref)
 	} else if sb.Finalized() {
 		t.Fatalf("Finalized too early")
 	}
 
 	sb.RecordUnsuccessfulPoll()
 
-	sb.RecordSuccessfulPoll(Blue)
+	sb.RecordSuccessfulPoll(blue)
 
-	if pref := sb.Preference(); pref != Blue {
-		t.Fatalf("Wrong preference. Expected %d got %d", Blue, pref)
+	if pref := sb.Preference(); pref != blue {
+		t.Fatalf("Wrong preference. Expected %d got %d", blue, pref)
 	} else if sb.Finalized() {
 		t.Fatalf("Finalized too early")
 	}
 
-	sb.RecordSuccessfulPoll(Blue)
+	sb.RecordSuccessfulPoll(blue)
 
-	if pref := sb.Preference(); pref != Blue {
-		t.Fatalf("Wrong preference. Expected %d got %d", Blue, pref)
+	if pref := sb.Preference(); pref != blue {
+		t.Fatalf("Wrong preference. Expected %d got %d", blue, pref)
 	} else if !sb.Finalized() {
 		t.Fatalf("Finalized too late")
 	}
@@ -103,50 +103,50 @@ func TestBinarySnowballRecordUnsuccessfulPoll(t *testing.T) {
 }
 
 func TestBinarySnowballAcceptWeirdColor(t *testing.T) {
-	Blue := 0
-	Red := 1
+	blue := 0
+	red := 1
 
 	beta := 2
 
 	sb := binarySnowball{}
-	sb.Initialize(beta, Red)
+	sb.Initialize(beta, red)
 
-	if pref := sb.Preference(); pref != Red {
-		t.Fatalf("Wrong preference. Expected %d got %d", Red, pref)
+	if pref := sb.Preference(); pref != red {
+		t.Fatalf("Wrong preference. Expected %d got %d", red, pref)
 	} else if sb.Finalized() {
 		t.Fatalf("Finalized too early")
 	}
 
-	sb.RecordSuccessfulPoll(Red)
+	sb.RecordSuccessfulPoll(red)
 	sb.RecordUnsuccessfulPoll()
 
-	if pref := sb.Preference(); pref != Red {
-		t.Fatalf("Wrong preference. Expected %d got %d", Red, pref)
+	if pref := sb.Preference(); pref != red {
+		t.Fatalf("Wrong preference. Expected %d got %d", red, pref)
 	} else if sb.Finalized() {
 		t.Fatalf("Finalized too early")
 	}
 
-	sb.RecordSuccessfulPoll(Red)
+	sb.RecordSuccessfulPoll(red)
 	sb.RecordUnsuccessfulPoll()
 
-	if pref := sb.Preference(); pref != Red {
-		t.Fatalf("Wrong preference. Expected %d got %d", Red, pref)
+	if pref := sb.Preference(); pref != red {
+		t.Fatalf("Wrong preference. Expected %d got %d", red, pref)
 	} else if sb.Finalized() {
 		t.Fatalf("Finalized too early")
 	}
 
-	sb.RecordSuccessfulPoll(Blue)
+	sb.RecordSuccessfulPoll(blue)
 
-	if pref := sb.Preference(); pref != Red {
-		t.Fatalf("Wrong preference. Expected %d got %d", Red, pref)
+	if pref := sb.Preference(); pref != red {
+		t.Fatalf("Wrong preference. Expected %d got %d", red, pref)
 	} else if sb.Finalized() {
 		t.Fatalf("Finalized too early")
 	}
 
-	sb.RecordSuccessfulPoll(Blue)
+	sb.RecordSuccessfulPoll(blue)
 
-	if pref := sb.Preference(); pref != Blue {
-		t.Fatalf("Wrong preference. Expected %d got %d", Blue, pref)
+	if pref := sb.Preference(); pref != blue {
+		t.Fatalf("Wrong preference. Expected %d got %d", blue, pref)
 	} else if !sb.Finalized() {
 		t.Fatalf("Finalized too late")
 	}
@@ -158,34 +158,34 @@ func TestBinarySnowballAcceptWeirdColor(t *testing.T) {
 }
 
 func TestBinarySnowballLockColor(t *testing.T) {
-	Red := 0
-	Blue := 1
+	red := 0
+	blue := 1
 
 	beta := 1
 
 	sb := binarySnowball{}
-	sb.Initialize(beta, Red)
+	sb.Initialize(beta, red)
 
-	sb.RecordSuccessfulPoll(Red)
+	sb.RecordSuccessfulPoll(red)
 
-	if pref := sb.Preference(); pref != Red {
-		t.Fatalf("Wrong preference. Expected %d got %d", Red, pref)
+	if pref := sb.Preference(); pref != red {
+		t.Fatalf("Wrong preference. Expected %d got %d", red, pref)
 	} else if !sb.Finalized() {
 		t.Fatalf("Finalized too late")
 	}
 
-	sb.RecordSuccessfulPoll(Blue)
+	sb.RecordSuccessfulPoll(blue)
 
-	if pref := sb.Preference(); pref != Red {
-		t.Fatalf("Wrong preference. Expected %d got %d", Red, pref)
+	if pref := sb.Preference(); pref != red {
+		t.Fatalf("Wrong preference. Expected %d got %d", red, pref)
 	} else if !sb.Finalized() {
 		t.Fatalf("Finalized too late")
 	}
 
-	sb.RecordSuccessfulPoll(Blue)
+	sb.RecordSuccessfulPoll(blue)
 
-	if pref := sb.Preference(); pref != Red {
-		t.Fatalf("Wrong preference. Expected %d got %d", Red, pref)
+	if pref := sb.Preference(); pref != red {
+		t.Fatalf("Wrong preference. Expected %d got %d", red, pref)
 	} else if !sb.Finalized() {
 		t.Fatalf("Finalized too late")
 	}

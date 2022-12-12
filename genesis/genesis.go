@@ -14,17 +14,17 @@
 package genesis
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -62,8 +62,8 @@ func validateInitialStakedFunds(config *Config) error {
 		return errNoInitiallyStakedFunds
 	}
 
-	allocationSet := ids.ShortSet{}
-	initialStakedFundsSet := ids.ShortSet{}
+	allocationSet := set.Set[ids.ShortID]{}
+	initialStakedFundsSet := set.Set[ids.ShortID]{}
 	for _, allocation := range config.Allocations {
 		// It is ok to have duplicates as different
 		// ethAddrs could claim to the same avaxAddr.
@@ -287,7 +287,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 				xAllocations = append(xAllocations, allocation)
 			}
 		}
-		sortXAllocation(xAllocations)
+		utils.Sort(xAllocations)
 
 		for _, allocation := range xAllocations {
 			addr, err := address.FormatBech32(hrp, allocation.AVAXAddr.Bytes())
@@ -335,7 +335,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		return nil, ids.ID{}, fmt.Errorf("couldn't calculate the initial supply: %w", err)
 	}
 
-	initiallyStaked := ids.ShortSet{}
+	initiallyStaked := set.Set[ids.ShortID]{}
 	initiallyStaked.Add(config.InitialStakedFunds...)
 	skippedAllocations := []Allocation(nil)
 
@@ -571,16 +571,3 @@ func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
 	}
 	return tx.ID(), nil
 }
-
-type innerSortXAllocation []Allocation
-
-func (xa innerSortXAllocation) Less(i, j int) bool {
-	return xa[i].InitialAmount < xa[j].InitialAmount ||
-		(xa[i].InitialAmount == xa[j].InitialAmount &&
-			bytes.Compare(xa[i].AVAXAddr.Bytes(), xa[j].AVAXAddr.Bytes()) == -1)
-}
-
-func (xa innerSortXAllocation) Len() int      { return len(xa) }
-func (xa innerSortXAllocation) Swap(i, j int) { xa[j], xa[i] = xa[i], xa[j] }
-
-func sortXAllocation(a []Allocation) { sort.Sort(innerSortXAllocation(a)) }

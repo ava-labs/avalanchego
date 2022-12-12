@@ -8,6 +8,10 @@ import (
 	"encoding/json"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 func TestID(t *testing.T) {
@@ -175,7 +179,7 @@ func TestSortIDs(t *testing.T) {
 		{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'},
 		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 	}
-	SortIDs(ids)
+	utils.Sort(ids)
 	expected := []ID{
 		{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'},
 		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
@@ -183,30 +187,6 @@ func TestSortIDs(t *testing.T) {
 	}
 	if !reflect.DeepEqual(ids, expected) {
 		t.Fatal("[]ID was not sorted lexographically")
-	}
-}
-
-func TestIsSortedAndUnique(t *testing.T) {
-	unsorted := []ID{
-		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-	}
-	if IsSortedAndUniqueIDs(unsorted) {
-		t.Fatal("Wrongly accepted unsorted IDs")
-	}
-	duplicated := []ID{
-		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-	}
-	if IsSortedAndUniqueIDs(duplicated) {
-		t.Fatal("Wrongly accepted duplicated IDs")
-	}
-	sorted := []ID{
-		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-	}
-	if !IsSortedAndUniqueIDs(sorted) {
-		t.Fatal("Wrongly rejected sorted, unique IDs")
 	}
 }
 
@@ -234,4 +214,28 @@ func TestIDMapMarshalling(t *testing.T) {
 			t.Fatalf("map was incorrectly Unmarshalled")
 		}
 	}
+}
+
+func TestIDLess(t *testing.T) {
+	require := require.New(t)
+
+	id1 := ID{}
+	id2 := ID{}
+	require.False(id1.Less(id2))
+	require.False(id2.Less(id1))
+
+	id1 = ID{1}
+	id2 = ID{0}
+	require.False(id1.Less(id2))
+	require.True(id2.Less(id1))
+
+	id1 = ID{1}
+	id2 = ID{1}
+	require.False(id1.Less(id2))
+	require.False(id2.Less(id1))
+
+	id1 = ID{1, 0}
+	id2 = ID{1, 2}
+	require.True(id1.Less(id2))
+	require.False(id2.Less(id1))
 }

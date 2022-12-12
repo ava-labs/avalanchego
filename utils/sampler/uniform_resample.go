@@ -5,6 +5,8 @@ package sampler
 
 import (
 	"math"
+
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // uniformResample allows for sampling over a uniform distribution without
@@ -20,7 +22,7 @@ type uniformResample struct {
 	rng       rng
 	seededRNG rng
 	length    uint64
-	drawn     map[uint64]struct{}
+	drawn     set.Set[uint64]
 }
 
 func (s *uniformResample) Initialize(length uint64) error {
@@ -30,7 +32,7 @@ func (s *uniformResample) Initialize(length uint64) error {
 	s.rng = globalRNG
 	s.seededRNG = newRNG()
 	s.length = length
-	s.drawn = make(map[uint64]struct{})
+	s.drawn.Clear()
 	return nil
 }
 
@@ -58,9 +60,7 @@ func (s *uniformResample) ClearSeed() {
 }
 
 func (s *uniformResample) Reset() {
-	for k := range s.drawn {
-		delete(s.drawn, k)
-	}
+	s.drawn.Clear()
 }
 
 func (s *uniformResample) Next() (uint64, error) {
@@ -71,10 +71,10 @@ func (s *uniformResample) Next() (uint64, error) {
 
 	for {
 		draw := uint64(s.rng.Int63n(int64(s.length)))
-		if _, ok := s.drawn[draw]; ok {
+		if s.drawn.Contains(draw) {
 			continue
 		}
-		s.drawn[draw] = struct{}{}
+		s.drawn.Add(draw)
 		return draw, nil
 	}
 }

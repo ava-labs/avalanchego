@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 
@@ -54,8 +55,14 @@ type benchData struct {
 // Each element is a benched validator
 type benchedQueue []*benchData
 
-func (bq benchedQueue) Len() int           { return len(bq) }
-func (bq benchedQueue) Less(i, j int) bool { return bq[i].benchedUntil.Before(bq[j].benchedUntil) }
+func (bq benchedQueue) Len() int {
+	return len(bq)
+}
+
+func (bq benchedQueue) Less(i, j int) bool {
+	return bq[i].benchedUntil.Before(bq[j].benchedUntil)
+}
+
 func (bq benchedQueue) Swap(i, j int) {
 	bq[i], bq[j] = bq[j], bq[i]
 	bq[i].index = i
@@ -111,7 +118,7 @@ type benchlist struct {
 	failureStreaks map[ids.NodeID]failureStreak
 
 	// IDs of validators that are currently benched
-	benchlistSet ids.NodeIDSet
+	benchlistSet set.Set[ids.NodeID]
 
 	// Min heap containing benched validators and their endtimes
 	// Pop() returns the next validator to leave
@@ -150,7 +157,7 @@ func NewBenchlist(
 		chainID:                chainID,
 		log:                    log,
 		failureStreaks:         make(map[ids.NodeID]failureStreak),
-		benchlistSet:           ids.NodeIDSet{},
+		benchlistSet:           set.Set[ids.NodeID]{},
 		benchable:              benchable,
 		vdrs:                   validators,
 		threshold:              threshold,
@@ -196,14 +203,7 @@ func (b *benchlist) remove(node *benchData) {
 
 	// Update metrics
 	b.metrics.numBenched.Set(float64(b.benchedQueue.Len()))
-	benchedStake, err := b.vdrs.SubsetWeight(b.benchlistSet)
-	if err != nil {
-		// This should never happen
-		b.log.Error("couldn't get benched stake",
-			zap.Error(err),
-		)
-		return
-	}
+	benchedStake := b.vdrs.SubsetWeight(b.benchlistSet)
 	b.metrics.weightBenched.Set(float64(benchedStake))
 }
 
@@ -290,22 +290,14 @@ func (b *benchlist) RegisterFailure(nodeID ids.NodeID) {
 // Assumes [b.lock] is held
 // Assumes [nodeID] is not already benched
 func (b *benchlist) bench(nodeID ids.NodeID) {
-	benchedStake, err := b.vdrs.SubsetWeight(b.benchlistSet)
-	if err != nil {
-		// This should never happen
-		b.log.Error("couldn't get benched stake, resetting benchlist",
-			zap.Error(err),
-		)
-		return
-	}
-
-	validatorStake, isVdr := b.vdrs.GetWeight(nodeID)
-	if !isVdr {
+	validatorStake := b.vdrs.GetWeight(nodeID)
+	if validatorStake == 0 {
 		// We might want to bench a non-validator because they don't respond to
 		// my Get requests, but we choose to only bench validators.
 		return
 	}
 
+	benchedStake := b.vdrs.SubsetWeight(b.benchlistSet)
 	newBenchedStake, err := safemath.Add64(benchedStake, validatorStake)
 	if err != nil {
 		// This should never happen

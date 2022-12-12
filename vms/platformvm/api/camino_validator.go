@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -22,7 +23,7 @@ func getCaminoValidators(args *BuildGenesisArgs, vdrs txheap.TimedHeap, utxos []
 	for _, vdr := range args.Validators {
 		weight := uint64(0)
 		bond := make([]*avax.TransferableOutput, len(vdr.Staked))
-		sortUTXOs(vdr.Staked)
+		utils.Sort(vdr.Staked)
 		for i, apiUTXO := range vdr.Staked {
 			addrID, err := bech32ToID(apiUTXO.Address)
 			if err != nil {
@@ -71,7 +72,7 @@ func getCaminoValidators(args *BuildGenesisArgs, vdrs txheap.TimedHeap, utxos []
 			}
 			owner.Addrs = append(owner.Addrs, addrID)
 		}
-		ids.SortShortIDs(owner.Addrs)
+		utils.Sort(owner.Addrs)
 
 		delegationFee := uint32(0)
 		if vdr.ExactDelegationFee != nil {

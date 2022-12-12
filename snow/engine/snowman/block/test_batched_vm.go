@@ -4,6 +4,7 @@
 package block
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -27,13 +28,17 @@ type TestBatchedVM struct {
 	CantBatchParseBlock bool
 
 	GetAncestorsF func(
+		ctx context.Context,
 		blkID ids.ID,
 		maxBlocksNum int,
 		maxBlocksSize int,
 		maxBlocksRetrivalTime time.Duration,
 	) ([][]byte, error)
 
-	BatchedParseBlockF func(blks [][]byte) ([]snowman.Block, error)
+	BatchedParseBlockF func(
+		ctx context.Context,
+		blks [][]byte,
+	) ([]snowman.Block, error)
 }
 
 func (vm *TestBatchedVM) Default(cant bool) {
@@ -42,13 +47,20 @@ func (vm *TestBatchedVM) Default(cant bool) {
 }
 
 func (vm *TestBatchedVM) GetAncestors(
+	ctx context.Context,
 	blkID ids.ID,
 	maxBlocksNum int,
 	maxBlocksSize int,
 	maxBlocksRetrivalTime time.Duration,
 ) ([][]byte, error) {
 	if vm.GetAncestorsF != nil {
-		return vm.GetAncestorsF(blkID, maxBlocksNum, maxBlocksSize, maxBlocksRetrivalTime)
+		return vm.GetAncestorsF(
+			ctx,
+			blkID,
+			maxBlocksNum,
+			maxBlocksSize,
+			maxBlocksRetrivalTime,
+		)
 	}
 	if vm.CantGetAncestors && vm.T != nil {
 		vm.T.Fatal(errGetAncestor)
@@ -56,9 +68,12 @@ func (vm *TestBatchedVM) GetAncestors(
 	return nil, errGetAncestor
 }
 
-func (vm *TestBatchedVM) BatchedParseBlock(blks [][]byte) ([]snowman.Block, error) {
+func (vm *TestBatchedVM) BatchedParseBlock(
+	ctx context.Context,
+	blks [][]byte,
+) ([]snowman.Block, error) {
 	if vm.BatchedParseBlockF != nil {
-		return vm.BatchedParseBlockF(blks)
+		return vm.BatchedParseBlockF(ctx, blks)
 	}
 	if vm.CantBatchParseBlock && vm.T != nil {
 		vm.T.Fatal(errBatchedParseBlock)

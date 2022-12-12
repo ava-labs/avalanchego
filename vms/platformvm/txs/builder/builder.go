@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -365,7 +366,7 @@ func (b *builder) NewCreateChainTx(
 	signers = append(signers, subnetSigners)
 
 	// Sort the provided fxIDs
-	ids.SortIDs(fxIDs)
+	utils.Sort(fxIDs)
 
 	// Create the tx
 	utx := &txs.CreateChainTx{
@@ -403,7 +404,7 @@ func (b *builder) NewCreateSubnetTx(
 	}
 
 	// Sort control addresses
-	ids.SortShortIDs(ownerAddrs)
+	utils.Sort(ownerAddrs)
 
 	// Create the tx
 	utx := &txs.CreateSubnetTx{

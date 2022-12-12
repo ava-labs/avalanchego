@@ -11,48 +11,142 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-func TestMintOutputOwnersVerifyNil(t *testing.T) {
-	require := require.New(t)
-	out := (*OutputOwners)(nil)
-	require.ErrorIs(out.Verify(), errNilOutput)
-}
-
-func TestMintOutputOwnersExactEquals(t *testing.T) {
-	require := require.New(t)
-	out0 := (*OutputOwners)(nil)
-	out1 := (*OutputOwners)(nil)
-	require.True(out0.Equals(out1))
-}
-
-func TestMintOutputOwnersNotEqual(t *testing.T) {
-	require := require.New(t)
-	out0 := &OutputOwners{
-		Threshold: 1,
-		Addrs: []ids.ShortID{
-			ids.ShortEmpty,
+func TestOutputOwnersVerify(t *testing.T) {
+	tests := []struct {
+		name        string
+		out         *OutputOwners
+		expectedErr error
+	}{
+		{
+			name:        "nil",
+			out:         nil,
+			expectedErr: errNilOutput,
+		},
+		{
+			name: "threshold > num addrs",
+			out: &OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{},
+			},
+			expectedErr: errOutputUnspendable,
+		},
+		{
+			name: "unoptimized",
+			out: &OutputOwners{
+				Threshold: 0,
+				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+			},
+			expectedErr: errOutputUnoptimized,
+		},
+		{
+			name: "not sorted",
+			out: &OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{{2}, {1}},
+			},
+			expectedErr: errAddrsNotSortedUnique,
+		},
+		{
+			name: "not unique",
+			out: &OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{{2}, {2}},
+			},
+			expectedErr: errAddrsNotSortedUnique,
+		},
+		{
+			name: "passes verification",
+			out: &OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{{2}},
+			},
+			expectedErr: nil,
 		},
 	}
-	out1 := &OutputOwners{
-		Threshold: 1,
-		Addrs: []ids.ShortID{
-			{1},
-		},
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			require.ErrorIs(tt.out.Verify(), tt.expectedErr)
+			require.ErrorIs(tt.out.VerifyState(), tt.expectedErr)
+		})
 	}
-	require.False(out0.Equals(out1))
 }
 
-func TestMintOutputOwnersNotSorted(t *testing.T) {
-	require := require.New(t)
-	out := &OutputOwners{
-		Threshold: 1,
-		Addrs: []ids.ShortID{
-			{1},
-			{0},
+func TestOutputOwnerEquals(t *testing.T) {
+	addr1, addr2 := ids.GenerateTestShortID(), ids.GenerateTestShortID()
+	tests := []struct {
+		name        string
+		out1        *OutputOwners
+		out2        *OutputOwners
+		shouldEqual bool
+	}{
+		{
+			name:        "both nil",
+			out1:        nil,
+			out2:        nil,
+			shouldEqual: true,
+		},
+		{
+			name: "different locktimes",
+			out1: &OutputOwners{
+				Locktime: 1,
+				Addrs:    []ids.ShortID{addr1, addr2},
+			},
+			out2: &OutputOwners{
+				Locktime: 2,
+				Addrs:    []ids.ShortID{addr1, addr2},
+			},
+			shouldEqual: false,
+		},
+		{
+			name: "different thresholds",
+			out1: &OutputOwners{
+				Threshold: 1,
+				Locktime:  1,
+				Addrs:     []ids.ShortID{addr1, addr2},
+			},
+			out2: &OutputOwners{
+				Locktime: 1,
+				Addrs:    []ids.ShortID{addr1, addr2},
+			},
+			shouldEqual: false,
+		},
+		{
+			name: "different addresses",
+			out1: &OutputOwners{
+				Locktime: 1,
+				Addrs:    []ids.ShortID{addr1, ids.GenerateTestShortID()},
+			},
+			out2: &OutputOwners{
+				Locktime: 1,
+				Addrs:    []ids.ShortID{addr1, addr2},
+			},
+			shouldEqual: false,
+		},
+		{
+			name: "equal",
+			out1: &OutputOwners{
+				Locktime: 1,
+				Addrs:    []ids.ShortID{addr1, addr2},
+			},
+			out2: &OutputOwners{
+				Locktime: 1,
+				Addrs:    []ids.ShortID{addr1, addr2},
+			},
+			shouldEqual: true,
 		},
 	}
-	require.ErrorIs(out.Verify(), errAddrsNotSortedUnique)
-	out.Sort()
-	require.NoError(out.Verify())
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			require.Equal(tt.shouldEqual, tt.out1.Equals(tt.out2))
+			require.Equal(tt.shouldEqual, tt.out2.Equals(tt.out1))
+			require.True(tt.out1.Equals(tt.out1)) //nolint:gocritic
+			require.True(tt.out2.Equals(tt.out2)) //nolint:gocritic
+		})
+	}
 }
 
 func TestMarshalJSONRequiresCtxWhenAddrsArePresent(t *testing.T) {

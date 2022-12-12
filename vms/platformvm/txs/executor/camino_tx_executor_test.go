@@ -151,18 +151,18 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 				}
 			},
 			preExecute: func(t *testing.T, tx *txs.Tx) {
-				staker := state.NewCurrentStaker(
+				staker, err := state.NewCurrentStaker(
 					tx.ID(),
 					tx.Unsigned.(*txs.CaminoAddValidatorTx),
 					0,
 				)
-
+				require.NoError(t, err)
 				env.state.PutCurrentValidator(staker)
 				env.state.AddTx(tx, status.Committed)
 				dummyHeight := uint64(1)
 				env.state.SetHeight(dummyHeight)
-				err := env.state.Commit()
-				require.NoError(t, err)
+				err = env.state.Commit()
+				require.ErrorContains(t, err, errDuplicateValidator.Error())
 			},
 			expectedErr: errValidatorExists,
 		},
@@ -239,14 +239,14 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 	tempNodeKey, tempNodeID := nodeid.GenerateCaminoNodeKeyAndID()
 
 	pendingDSValidatorKey, pendingDSValidatorID := nodeid.GenerateCaminoNodeKeyAndID()
-	DSStartTime := defaultGenesisTime.Add(10 * time.Second)
-	DSEndTime := DSStartTime.Add(5 * defaultMinStakingDuration)
+	dsStartTime := defaultGenesisTime.Add(10 * time.Second)
+	dsEndTime := dsStartTime.Add(5 * defaultMinStakingDuration)
 
 	// Add `pendingDSValidatorID` as validator to pending set
 	addDSTx, err := env.txBuilder.NewAddValidatorTx(
 		env.config.MinValidatorStake,
-		uint64(DSStartTime.Unix()),
-		uint64(DSEndTime.Unix()),
+		uint64(dsStartTime.Unix()),
+		uint64(dsEndTime.Unix()),
 		pendingDSValidatorID,
 		ids.ShortEmpty,
 		reward.PercentDenominator,
@@ -254,11 +254,12 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 		ids.ShortEmpty,
 	)
 	require.NoError(t, err)
-	staker := state.NewCurrentStaker(
+	staker, err := state.NewCurrentStaker(
 		addDSTx.ID(),
 		addDSTx.Unsigned.(*txs.CaminoAddValidatorTx),
 		0,
 	)
+	require.NoError(t, err)
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(addDSTx, status.Committed)
 	dummyHeight := uint64(1)
@@ -277,11 +278,12 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 		ids.ShortEmpty,
 	)
 	require.NoError(t, err)
-	staker = state.NewCurrentStaker(
+	staker, err = state.NewCurrentStaker(
 		subnetTx.ID(),
 		subnetTx.Unsigned.(*txs.AddSubnetValidatorTx),
 		0,
 	)
+	require.NoError(t, err)
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(subnetTx, status.Committed)
 	env.state.SetHeight(dummyHeight)
@@ -355,8 +357,8 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 			generateArgs: func() args {
 				return args{
 					weight:     env.config.MinValidatorStake,
-					startTime:  uint64(DSStartTime.Unix()) - 1,
-					endTime:    uint64(DSEndTime.Unix()),
+					startTime:  uint64(dsStartTime.Unix()) - 1,
+					endTime:    uint64(dsEndTime.Unix()),
 					nodeID:     pendingDSValidatorID,
 					subnetID:   testSubnet1.ID(),
 					keys:       []*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0], testCaminoSubnet1ControlKeys[0], testCaminoSubnet1ControlKeys[1], pendingDSValidatorKey},
@@ -370,8 +372,8 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 			generateArgs: func() args {
 				return args{
 					weight:     env.config.MinValidatorStake,
-					startTime:  uint64(DSStartTime.Unix()),
-					endTime:    uint64(DSEndTime.Unix()) + 1,
+					startTime:  uint64(dsStartTime.Unix()),
+					endTime:    uint64(dsEndTime.Unix()) + 1,
 					nodeID:     pendingDSValidatorID,
 					subnetID:   testSubnet1.ID(),
 					keys:       []*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0], testCaminoSubnet1ControlKeys[0], testCaminoSubnet1ControlKeys[1], pendingDSValidatorKey},
@@ -385,8 +387,8 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 			generateArgs: func() args {
 				return args{
 					weight:     env.config.MinValidatorStake,
-					startTime:  uint64(DSStartTime.Unix()),
-					endTime:    uint64(DSEndTime.Unix()),
+					startTime:  uint64(dsStartTime.Unix()),
+					endTime:    uint64(dsEndTime.Unix()),
 					nodeID:     pendingDSValidatorID,
 					subnetID:   testSubnet1.ID(),
 					keys:       []*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0], testCaminoSubnet1ControlKeys[0], testCaminoSubnet1ControlKeys[1], pendingDSValidatorKey},
@@ -1410,7 +1412,7 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 	// UTXOs before reward
 	innerOut := stakerToRemoveTx.Outs[0].Out.(*locked.Out)
 	stakeOwners := innerOut.TransferableOut.(*secp256k1fx.TransferOutput).AddressesSet()
-	UTXOsBeforeReward, err := avax.GetAllUTXOs(env.state, stakeOwners)
+	utxosBeforeReward, err := avax.GetAllUTXOs(env.state, stakeOwners)
 	require.NoError(t, err)
 
 	type test struct {
@@ -1423,11 +1425,13 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 
 	tests := map[string]test{
 		"Reward before end time": {
-			ins:                      ins,
-			outs:                     outs,
-			preExecute:               func(t *testing.T, tx *txs.Tx) {},
-			generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO { return UTXOsBeforeReward },
-			expectedErr:              errRemoveValidatorToEarly,
+			ins:        ins,
+			outs:       outs,
+			preExecute: func(t *testing.T, tx *txs.Tx) {},
+			generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO {
+				return utxosBeforeReward
+			},
+			expectedErr: errRemoveValidatorToEarly,
 		},
 		"Wrong validator": {
 			ins:  ins,
@@ -1436,8 +1440,10 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 				rewValTx := tx.Unsigned.(*txs.CaminoRewardValidatorTx)
 				rewValTx.RewardValidatorTx.TxID = ids.GenerateTestID()
 			},
-			generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO { return UTXOsBeforeReward },
-			expectedErr:              database.ErrNotFound,
+			generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO {
+				return utxosBeforeReward
+			},
+			expectedErr: database.ErrNotFound,
 		},
 		"No zero credentials": {
 			ins:  ins,
@@ -1445,15 +1451,19 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 			preExecute: func(t *testing.T, tx *txs.Tx) {
 				tx.Creds = append(tx.Creds, &secp256k1fx.Credential{})
 			},
-			generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO { return UTXOsBeforeReward },
-			expectedErr:              errWrongNumberOfCredentials,
+			generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO {
+				return utxosBeforeReward
+			},
+			expectedErr: errWrongNumberOfCredentials,
 		},
 		"Invalid inputs (one excess)": {
-			ins:                      append(ins, &avax.TransferableInput{In: &secp256k1fx.TransferInput{}}),
-			outs:                     outs,
-			preExecute:               func(t *testing.T, tx *txs.Tx) {},
-			generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO { return UTXOsBeforeReward },
-			expectedErr:              errInvalidSystemTxBody,
+			ins:        append(ins, &avax.TransferableInput{In: &secp256k1fx.TransferInput{}}),
+			outs:       outs,
+			preExecute: func(t *testing.T, tx *txs.Tx) {},
+			generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO {
+				return utxosBeforeReward
+			},
+			expectedErr: errInvalidSystemTxBody,
 		},
 		"Invalid inputs (wrong amount)": {
 			ins: func() []*avax.TransferableInput {
@@ -1474,17 +1484,21 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 				}
 				return tempIns
 			}(),
-			outs:                     outs,
-			preExecute:               func(t *testing.T, tx *txs.Tx) {},
-			generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO { return UTXOsBeforeReward },
-			expectedErr:              errInvalidSystemTxBody,
+			outs:       outs,
+			preExecute: func(t *testing.T, tx *txs.Tx) {},
+			generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO {
+				return utxosBeforeReward
+			},
+			expectedErr: errInvalidSystemTxBody,
 		},
 		"Invalid outs (one excess)": {
-			ins:                      ins,
-			outs:                     append(outs, &avax.TransferableOutput{Out: &secp256k1fx.TransferOutput{}}),
-			preExecute:               func(t *testing.T, tx *txs.Tx) {},
-			generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO { return UTXOsBeforeReward },
-			expectedErr:              errInvalidSystemTxBody,
+			ins:        ins,
+			outs:       append(outs, &avax.TransferableOutput{Out: &secp256k1fx.TransferOutput{}}),
+			preExecute: func(t *testing.T, tx *txs.Tx) {},
+			generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO {
+				return utxosBeforeReward
+			},
+			expectedErr: errInvalidSystemTxBody,
 		},
 		"Invalid outs (wrong amount)": {
 			ins: ins,
@@ -1514,9 +1528,11 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 				}
 				return tempOuts
 			}(),
-			preExecute:               func(t *testing.T, tx *txs.Tx) {},
-			generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO { return UTXOsBeforeReward },
-			expectedErr:              errInvalidSystemTxBody,
+			preExecute: func(t *testing.T, tx *txs.Tx) {},
+			generateUTXOsAfterReward: func(txID ids.ID) []*avax.UTXO {
+				return utxosBeforeReward
+			},
+			expectedErr: errInvalidSystemTxBody,
 		},
 	}
 
@@ -1555,8 +1571,8 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 	assertBalance := func(t *testing.T, tt test, tx *txs.Tx) {
 		onCommitUTXOs, err := avax.GetAllUTXOs(env.state, outputOwners.AddressesSet())
 		require.NoError(t, err)
-		UTXOsAfterReward := tt.generateUTXOsAfterReward(tx.ID())
-		require.Equal(t, onCommitUTXOs, UTXOsAfterReward)
+		utxosAfterReward := tt.generateUTXOsAfterReward(tx.ID())
+		require.Equal(t, onCommitUTXOs, utxosAfterReward)
 	}
 
 	// Asserting that staker is removed

@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -107,7 +108,7 @@ func TestGetCaminoBalance(t *testing.T) {
 			service := defaultCaminoService(t, tt.camino, tt.genesisUTXOs)
 			service.vm.ctx.Lock.Lock()
 			defer func() {
-				if err := service.vm.Shutdown(); err != nil {
+				if err := service.vm.Shutdown(context.TODO()); err != nil {
 					t.Fatal(err)
 				}
 				service.vm.ctx.Lock.Unlock()

@@ -83,6 +83,7 @@ func (m *Mapper) Map(protocol string, intPort, extPort uint16, desc string, ip i
 		)
 	}
 
+	m.wg.Add(1)
 	go m.keepPortMapping(protocol, intPort, extPort, desc, ip, updateTime)
 }
 
@@ -111,8 +112,6 @@ func (m *Mapper) retryMapPort(protocol string, intPort, extPort uint16, desc str
 // to [intPort]] every [updateTime]. Updates [ip] every [updateTime].
 func (m *Mapper) keepPortMapping(protocol string, intPort, extPort uint16, desc string, ip ips.DynamicIPPort, updateTime time.Duration) {
 	updateTimer := time.NewTimer(updateTime)
-
-	m.wg.Add(1)
 
 	defer func(extPort uint16) {
 		updateTimer.Stop()

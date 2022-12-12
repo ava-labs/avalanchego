@@ -4,6 +4,7 @@
 package proposervm
 
 import (
+	"context"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -19,12 +20,13 @@ import (
 var _ block.BatchedChainVM = (*VM)(nil)
 
 func (vm *VM) GetAncestors(
+	ctx context.Context,
 	blkID ids.ID,
 	maxBlocksNum int,
 	maxBlocksSize int,
 	maxBlocksRetrivalTime time.Duration,
 ) ([][]byte, error) {
-	if vm.bVM == nil {
+	if vm.batchedVM == nil {
 		return nil, block.ErrRemoteVMNotImplemented
 	}
 
@@ -65,7 +67,13 @@ func (vm *VM) GetAncestors(
 	preMaxBlocksNum := maxBlocksNum - len(res)
 	preMaxBlocksSize := maxBlocksSize - currentByteLength
 	preMaxBlocksRetrivalTime := maxBlocksRetrivalTime - time.Since(startTime)
-	innerBytes, err := vm.bVM.GetAncestors(blkID, preMaxBlocksNum, preMaxBlocksSize, preMaxBlocksRetrivalTime)
+	innerBytes, err := vm.batchedVM.GetAncestors(
+		ctx,
+		blkID,
+		preMaxBlocksNum,
+		preMaxBlocksSize,
+		preMaxBlocksRetrivalTime,
+	)
 	if err != nil {
 		if len(res) == 0 {
 			return nil, err
@@ -76,8 +84,8 @@ func (vm *VM) GetAncestors(
 	return res, nil
 }
 
-func (vm *VM) BatchedParseBlock(blks [][]byte) ([]snowman.Block, error) {
-	if vm.bVM == nil {
+func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.Block, error) {
+	if vm.batchedVM == nil {
 		return nil, block.ErrRemoteVMNotImplemented
 	}
 
@@ -116,7 +124,7 @@ func (vm *VM) BatchedParseBlock(blks [][]byte) ([]snowman.Block, error) {
 	innerBlockBytes = append(innerBlockBytes, blks[blocksIndex:]...)
 
 	// parse all inner blocks at once
-	innerBlks, err := vm.bVM.BatchedParseBlock(innerBlockBytes)
+	innerBlks, err := vm.batchedVM.BatchedParseBlock(ctx, innerBlockBytes)
 	if err != nil {
 		return nil, err
 	}

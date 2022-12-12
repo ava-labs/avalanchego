@@ -5,7 +5,6 @@ package peer
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
@@ -33,15 +32,6 @@ type Network interface {
 	// for a given [Peer] object.
 	Disconnected(ids.NodeID)
 
-	// Version provides the peer with the Version message to send to the peer
-	// during the handshake.
-	Version() (message.OutboundMessage, error)
-
-	// Peers provides the peer with the PeerList message to send to the peer
-	// during the handshake.
-	Peers() (message.OutboundMessage, error)
-
-	// Pong provides the peer with a Pong message to send to the peer in
-	// response to a Ping message.
-	Pong(ids.NodeID) (message.OutboundMessage, error)
+	// Peers returns peers that [peerID] might not know about.
+	Peers(peerID ids.NodeID) ([]ips.ClaimedIPPort, error)
 }

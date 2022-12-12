@@ -60,3 +60,19 @@ func TestEncodeDecode(t *testing.T) {
 		}
 	}
 }
+
+func FuzzEncodeDecode(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+		require := require.New(t)
+
+		// Encode bytes to string
+		dataStr, err := Encode(data)
+		require.NoError(err)
+
+		// Decode string to bytes
+		gotData, err := Decode(dataStr)
+		require.NoError(err)
+
+		require.Equal(data, gotData)
+	})
+}

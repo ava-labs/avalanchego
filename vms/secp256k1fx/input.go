@@ -36,7 +36,7 @@ func (in *Input) Verify() error {
 	switch {
 	case in == nil:
 		return errNilInput
-	case !utils.IsSortedAndUniqueUint32(in.SigIndices):
+	case !utils.IsSortedAndUniqueOrdered(in.SigIndices):
 		return errNotSortedUnique
 	default:
 		return nil

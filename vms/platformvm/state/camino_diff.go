@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
@@ -29,7 +30,7 @@ func NewCaminoDiff(
 	}, nil
 }
 
-func (d *diff) LockedUTXOs(txIDs ids.Set, addresses ids.ShortSet, lockState locked.State) ([]*avax.UTXO, error) {
+func (d *diff) LockedUTXOs(txIDs set.Set[ids.ID], addresses set.Set[ids.ShortID], lockState locked.State) ([]*avax.UTXO, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
@@ -42,7 +43,7 @@ func (d *diff) LockedUTXOs(txIDs ids.Set, addresses ids.ShortSet, lockState lock
 
 	// Apply modifiedUTXO's
 	// Step 1: remove / update existing UTXOs
-	remaining := ids.NewSet(len(d.modifiedUTXOs))
+	remaining := set.NewSet[ids.ID](len(d.modifiedUTXOs))
 	for k := range d.modifiedUTXOs {
 		remaining.Add(k)
 	}
@@ -61,7 +62,8 @@ func (d *diff) LockedUTXOs(txIDs ids.Set, addresses ids.ShortSet, lockState lock
 	for utxoID := range remaining {
 		utxo := d.modifiedUTXOs[utxoID].utxo
 		if utxo != nil {
-			if lockedOut, ok := utxo.Out.(*locked.Out); ok && lockedOut.IDs.Match(lockState, txIDs) {
+			if lockedOut, ok := utxo.Out.(*locked.Out); ok &&
+				lockedOut.IDs.Match(lockState, txIDs) {
 				retUtxos = append(retUtxos, utxo)
 			}
 		}

@@ -7,15 +7,19 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"sort"
 	"strings"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 // ShortEmpty is a useful all zero value
-var ShortEmpty = ShortID{}
+var (
+	ShortEmpty = ShortID{}
+
+	_ utils.Sortable[ShortID] = ShortID{}
+)
 
 // ShortID wraps a 20 byte hash as an identifier
 type ShortID [20]byte
@@ -79,10 +83,14 @@ func (id *ShortID) UnmarshalText(text []byte) error {
 
 // Bytes returns the 20 byte hash as a slice. It is assumed this slice is not
 // modified.
-func (id ShortID) Bytes() []byte { return id[:] }
+func (id ShortID) Bytes() []byte {
+	return id[:]
+}
 
 // Hex returns a hex encoded string of this id.
-func (id ShortID) Hex() string { return hex.EncodeToString(id.Bytes()) }
+func (id ShortID) Hex() string {
+	return hex.EncodeToString(id.Bytes())
+}
 
 func (id ShortID) String() string {
 	// We assume that the maximum size of a byte slice that
@@ -100,34 +108,8 @@ func (id ShortID) MarshalText() ([]byte, error) {
 	return []byte(id.String()), nil
 }
 
-type sortShortIDData []ShortID
-
-func (ids sortShortIDData) Less(i, j int) bool {
-	return bytes.Compare(
-		ids[i].Bytes(),
-		ids[j].Bytes()) == -1
-}
-func (ids sortShortIDData) Len() int      { return len(ids) }
-func (ids sortShortIDData) Swap(i, j int) { ids[j], ids[i] = ids[i], ids[j] }
-
-// SortShortIDs sorts the ids lexicographically
-func SortShortIDs(ids []ShortID) { sort.Sort(sortShortIDData(ids)) }
-
-// IsSortedAndUniqueShortIDs returns true if the ids are sorted and unique
-func IsSortedAndUniqueShortIDs(ids []ShortID) bool {
-	for i := 0; i < len(ids)-1; i++ {
-		if bytes.Compare(ids[i].Bytes(), ids[i+1].Bytes()) != -1 {
-			return false
-		}
-	}
-	return true
-}
-
-// IsUniqueShortIDs returns true iff [ids] are unique
-func IsUniqueShortIDs(ids []ShortID) bool {
-	set := ShortSet{}
-	set.Add(ids...)
-	return set.Len() == len(ids)
+func (id ShortID) Less(other ShortID) bool {
+	return bytes.Compare(id[:], other[:]) == -1
 }
 
 // ShortIDsToStrings converts an array of shortIDs to an array of their string

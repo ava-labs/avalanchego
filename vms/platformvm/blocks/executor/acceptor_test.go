@@ -225,7 +225,9 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 		onAcceptState:  onAcceptState,
 		atomicRequests: atomicRequests,
 		standardBlockState: standardBlockState{
-			onAcceptFunc: func() { calledOnAcceptFunc = true },
+			onAcceptFunc: func() {
+				calledOnAcceptFunc = true
+			},
 		},
 	}
 	// Give [blk] a child.

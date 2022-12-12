@@ -212,7 +212,10 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 
 	txID := e.Tx.ID()
 
-	newStaker := state.NewPendingStaker(txID, tx)
+	newStaker, err := state.NewPendingStaker(txID, tx)
+	if err != nil {
+		return err
+	}
 	e.State.PutPendingValidator(newStaker)
 	utxo.Consume(e.State, tx.Ins)
 	if err := utxo.ProduceLocked(e.State, txID, tx.Outs, locked.StateBonded); err != nil {

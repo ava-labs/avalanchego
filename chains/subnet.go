@@ -5,11 +5,13 @@ package chains
 
 import (
 	"sync"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var _ Subnet = (*subnet)(nil)
@@ -22,8 +24,7 @@ type Subnet interface {
 
 	afterBootstrapped() chan struct{}
 
-	addChain(chainID ids.ID)
-	removeChain(chainID ids.ID)
+	addChain(chainID ids.ID) bool
 }
 
 type SubnetConfig struct {
@@ -32,11 +33,17 @@ type SubnetConfig struct {
 	// ValidatorOnly indicates that this Subnet's Chains are available to only subnet validators.
 	ValidatorOnly       bool                 `json:"validatorOnly" yaml:"validatorOnly"`
 	ConsensusParameters avalanche.Parameters `json:"consensusParameters" yaml:"consensusParameters"`
+
+	// ProposerMinBlockDelay is the minimum delay this node will enforce when
+	// building a snowman++ block.
+	// TODO: Remove this flag once all VMs throttle their own block production.
+	ProposerMinBlockDelay time.Duration `json:"proposerMinBlockDelay" yaml:"proposerMinBlockDelay"`
 }
 
 type subnet struct {
 	lock             sync.RWMutex
-	bootstrapping    ids.Set
+	bootstrapping    set.Set[ids.ID]
+	bootstrapped     set.Set[ids.ID]
 	once             sync.Once
 	bootstrappedSema chan struct{}
 }
@@ -59,6 +66,7 @@ func (s *subnet) Bootstrapped(chainID ids.ID) {
 	defer s.lock.Unlock()
 
 	s.bootstrapping.Remove(chainID)
+	s.bootstrapped.Add(chainID)
 	if s.bootstrapping.Len() > 0 {
 		return
 	}
@@ -72,16 +80,14 @@ func (s *subnet) afterBootstrapped() chan struct{} {
 	return s.bootstrappedSema
 }
 
-func (s *subnet) addChain(chainID ids.ID) {
+func (s *subnet) addChain(chainID ids.ID) bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+
+	if s.bootstrapping.Contains(chainID) || s.bootstrapped.Contains(chainID) {
+		return false
+	}
 
 	s.bootstrapping.Add(chainID)
-}
-
-func (s *subnet) removeChain(chainID ids.ID) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	s.bootstrapping.Remove(chainID)
+	return true
 }

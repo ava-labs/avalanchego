@@ -25,7 +25,7 @@ func (s *signerVisitor) AddAddressStateTx(tx *txs.AddAddressStateTx) error {
 	if err != nil {
 		return err
 	}
-	return s.sign(s.tx, txSigners)
+	return sign(s.tx, txSigners)
 }
 
 func (s *signerVisitor) DepositTx(tx *txs.DepositTx) error {
@@ -33,7 +33,7 @@ func (s *signerVisitor) DepositTx(tx *txs.DepositTx) error {
 	if err != nil {
 		return err
 	}
-	return s.sign(s.tx, txSigners)
+	return sign(s.tx, txSigners)
 }
 
 func (s *signerVisitor) UnlockDepositTx(tx *txs.UnlockDepositTx) error {
@@ -41,5 +41,5 @@ func (s *signerVisitor) UnlockDepositTx(tx *txs.UnlockDepositTx) error {
 	if err != nil {
 		return err
 	}
-	return s.sign(s.tx, txSigners)
+	return sign(s.tx, txSigners)
 }

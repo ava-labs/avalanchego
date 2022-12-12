@@ -73,6 +73,8 @@ var (
 
 	// Used to create and use keys.
 	testKeyfactory crypto.FactorySECP256K1R
+
+	errMissingPrimaryValidators = errors.New("missing primary validator set")
 )
 
 type mutableSharedMemory struct {
@@ -261,6 +263,7 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = 10
 	ctx.XChainID = xChainID
+	ctx.CChainID = cChainID
 	ctx.AVAXAssetID = avaxAssetID
 
 	atomicDB := prefixdb.New([]byte{1}, db)
@@ -287,10 +290,14 @@ func defaultConfig(postBanff bool) config.Config {
 	if postBanff {
 		banffTime = defaultValidateEndTime.Add(-2 * time.Second)
 	}
+
+	vdrs := validators.NewManager()
+	primaryVdrs := validators.NewSet()
+	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	return config.Config{
 		Chains:                 chains.MockManager{},
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Validators:             validators.NewManager(),
+		Validators:             vdrs,
 		TxFee:                  defaultTxFee,
 		CreateSubnetTxFee:      100 * defaultTxFee,
 		CreateBlockchainTxFee:  100 * defaultTxFee,
@@ -328,9 +335,17 @@ type fxVMInt struct {
 	log      logging.Logger
 }
 
-func (fvi *fxVMInt) CodecRegistry() codec.Registry { return fvi.registry }
-func (fvi *fxVMInt) Clock() *mockable.Clock        { return fvi.clk }
-func (fvi *fxVMInt) Logger() logging.Logger        { return fvi.log }
+func (fvi *fxVMInt) CodecRegistry() codec.Registry {
+	return fvi.registry
+}
+
+func (fvi *fxVMInt) Clock() *mockable.Clock {
+	return fvi.clk
+}
+
+func (fvi *fxVMInt) Logger() logging.Logger {
+	return fvi.log
+}
 
 func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.Fx {
 	fxVMInt := &fxVMInt{
@@ -404,7 +419,7 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 	buildGenesisResponse := api.BuildGenesisReply{}
 	platformvmSS := api.StaticService{}
 	if err := platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse); err != nil {
-		panic(fmt.Errorf("problem while building platform chain's genesis state: %v", err))
+		panic(fmt.Errorf("problem while building platform chain's genesis state: %w", err))
 	}
 
 	genesisBytes, err := formatting.Decode(buildGenesisResponse.Encoding, buildGenesisResponse.Bytes)
@@ -417,19 +432,34 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 
 func shutdownEnvironment(env *environment) error {
 	if env.isBootstrapped.GetValue() {
-		primaryValidatorSet, exist := env.config.Validators.GetValidators(constants.PrimaryNetworkID)
+		primaryValidatorSet, exist := env.config.Validators.Get(constants.PrimaryNetworkID)
 		if !exist {
-			return errors.New("no default subnet validators")
+			return errMissingPrimaryValidators
 		}
 		primaryValidators := primaryValidatorSet.List()
 
 		validatorIDs := make([]ids.NodeID, len(primaryValidators))
 		for i, vdr := range primaryValidators {
-			validatorIDs[i] = vdr.ID()
+			validatorIDs[i] = vdr.NodeID
+		}
+		if err := env.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID); err != nil {
+			return err
 		}
 
-		if err := env.uptimes.Shutdown(validatorIDs); err != nil {
-			return err
+		for subnetID := range env.config.WhitelistedSubnets {
+			vdrs, exist := env.config.Validators.Get(subnetID)
+			if !exist {
+				return nil
+			}
+			validators := vdrs.List()
+
+			validatorIDs := make([]ids.NodeID, len(validators))
+			for i, vdr := range validators {
+				validatorIDs[i] = vdr.NodeID
+			}
+			if err := env.uptimes.StopTracking(validatorIDs, subnetID); err != nil {
+				return err
+			}
 		}
 		env.state.SetHeight( /*height*/ math.MaxUint64)
 		if err := env.state.Commit(); err != nil {
