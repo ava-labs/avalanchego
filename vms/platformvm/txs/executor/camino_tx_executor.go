@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	deposits "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
@@ -60,10 +61,15 @@ type CaminoProposalTxExecutor struct {
  * has access to this node specific private key.
  */
 func (e *CaminoStandardTxExecutor) verifyNodeSignature(nodeID ids.NodeID) error {
+	return e.verifyNodeSignatureSig(nodeID, e.Tx.Creds[len(e.Tx.Creds)-1])
+}
+
+// Verify that one of the sigs recovers to nodeID
+func (e *CaminoStandardTxExecutor) verifyNodeSignatureSig(nodeID ids.NodeID, sigs verify.Verifiable) error {
 	if err := e.Backend.Fx.VerifyPermission(
 		e.Tx.Unsigned,
 		&secp256k1fx.Input{SigIndices: []uint32{0}},
-		e.Tx.Creds[len(e.Tx.Creds)-1],
+		sigs,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs: []ids.ShortID{
@@ -269,6 +275,19 @@ func (e *CaminoStandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermi
 
 	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoConfig.LockModeBondDeposit); err != nil {
 		return err
+	}
+
+	// Signer (node signature) has to recover to nodeID in case we
+	// add a validator to the primary network
+	if tx.Subnet == constants.PrimaryNetworkID && tx.Signer.Key() != nil {
+		sigs := make([][crypto.SECP256K1RSigLen]byte, 1)
+		copy(sigs[0][:], tx.Signer.Signature()[:crypto.SECP256K1RSigLen])
+
+		if err := e.verifyNodeSignatureSig(tx.NodeID(),
+			&secp256k1fx.Credential{Sigs: sigs},
+		); err != nil {
+			return err
+		}
 	}
 
 	return e.StandardTxExecutor.AddPermissionlessValidatorTx(tx)
@@ -613,7 +632,7 @@ func (e *CaminoStandardTxExecutor) AddAddressStateTx(tx *txs.AddAddressStateTx) 
 		return err
 	}
 
-	fx, ok := e.Backend.Fx.(*secp256k1fx.Fx)
+	fx, ok := e.Fx.(*secp256k1fx.Fx)
 	if !ok {
 		return errNotSecp256Fx
 	}
