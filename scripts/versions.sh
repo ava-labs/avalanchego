@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Set up the versions to be used
-subnet_evm_version=${SUBNET_EVM_VERSION:-'v0.4.5'}
+subnet_evm_version=${SUBNET_EVM_VERSION:-'v0.4.6'}
 # Don't export them as they're used in the context of other calls
 avalanche_version=${AVALANCHE_VERSION:-'v1.9.4'}
 network_runner_version=${NETWORK_RUNNER_VERSION:-'35be10cd3867a94fbe960a1c14a455f179de60d9'}
