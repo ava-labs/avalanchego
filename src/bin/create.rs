@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::{value_parser, Args};
 use firewood::db::{DBConfig, DBRevConfig, DiskBufferConfig, WALConfig, DB};
+use log;
 
 #[derive(Args)]
 pub struct Options {
@@ -257,7 +258,10 @@ pub fn initialize_db_config(opts: &Options) -> DBConfig {
 
 pub fn run(opts: &Options) -> Result<()> {
     let db_config = initialize_db_config(opts);
+    log::debug!("database configuration parameters: \n{:?}\n", db_config);
+
     let _ = DB::new(opts.name.as_ref(), &db_config);
+    log::info!("created firewood database in {:?}", opts.name);
 
     Ok(())
 }

@@ -9,6 +9,17 @@ pub mod create;
 struct Cli {
     #[command(subcommand)]
     command: Commands,
+    #[arg(
+        long,
+        short = 'l',
+        required = false,
+        help = "Log level. Respects RUST_LOG.",
+        value_name = "LOG_LEVEL",
+        num_args = 1,
+        value_parser = ["debug", "info"],
+        default_value_t = String::from("info"),
+    )]
+    log_level: String,
 }
 
 #[derive(Subcommand)]
@@ -19,6 +30,8 @@ enum Commands {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+
+    env_logger::init_from_env(env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info".to_string()));
 
     match &cli.command {
         Commands::Create(opts) => create::run(opts),

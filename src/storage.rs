@@ -792,7 +792,7 @@ pub enum BufferCmd {
     Shutdown,
 }
 
-#[derive(TypedBuilder, Clone)]
+#[derive(TypedBuilder, Clone, Debug)]
 pub struct WALConfig {
     #[builder(default = 22)] // 4MB WAL logs
     pub file_nbit: u64,
@@ -803,7 +803,7 @@ pub struct WALConfig {
 }
 
 /// Config for the disk buffer.
-#[derive(TypedBuilder, Clone)]
+#[derive(TypedBuilder, Clone, Debug)]
 pub struct DiskBufferConfig {
     /// Maximum buffered disk buffer commands.
     #[builder(default = 4096)]

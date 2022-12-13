@@ -44,7 +44,7 @@ struct DBParams {
 }
 
 /// Config for accessing a version of the DB.
-#[derive(TypedBuilder, Clone)]
+#[derive(TypedBuilder, Clone, Debug)]
 pub struct DBRevConfig {
     /// Maximum cached MPT objects.
     #[builder(default = 1 << 20)]
@@ -55,7 +55,7 @@ pub struct DBRevConfig {
 }
 
 /// Database configuration.
-#[derive(TypedBuilder)]
+#[derive(TypedBuilder, Debug)]
 pub struct DBConfig {
     /// Maximum cached pages for the free list of the item stash.
     #[builder(default = 16384)] // 64M total size by default
