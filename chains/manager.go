@@ -51,6 +51,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/metervm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/teleporter"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
 	"github.com/ava-labs/avalanchego/vms/tracedvm"
 
@@ -448,10 +449,11 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 			SNLookup:     m,
 			Metrics:      vmMetrics,
 
+			TeleporterSigner: teleporter.NewSigner(m.StakingBLSKey, chainParams.ID),
+
 			ValidatorState:    m.validatorState,
 			StakingCertLeaf:   m.StakingCert.Leaf,
 			StakingLeafSigner: m.StakingCert.PrivateKey.(crypto.Signer),
-			StakingBLSKey:     m.StakingBLSKey,
 			ChainDataDir:      chainDataDir,
 		},
 		DecisionAcceptor:  m.DecisionAcceptorGroup,

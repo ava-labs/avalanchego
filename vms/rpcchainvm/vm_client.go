@@ -44,6 +44,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
+	"github.com/ava-labs/avalanchego/vms/platformvm/teleporter/gteleporter"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gsubnetlookup"
@@ -57,6 +58,7 @@ import (
 	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
 	sharedmemorypb "github.com/ava-labs/avalanchego/proto/pb/sharedmemory"
 	subnetlookuppb "github.com/ava-labs/avalanchego/proto/pb/subnetlookup"
+	teleporterpb "github.com/ava-labs/avalanchego/proto/pb/teleporter"
 	validatorstatepb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
@@ -93,13 +95,14 @@ type VMClient struct {
 	pid            int
 	processTracker resource.ProcessTracker
 
-	messenger            *messenger.Server
-	keystore             *gkeystore.Server
-	sharedMemory         *gsharedmemory.Server
-	bcLookup             *galiasreader.Server
-	snLookup             *gsubnetlookup.Server
-	appSender            *appsender.Server
-	validatorStateServer *gvalidators.Server
+	messenger              *messenger.Server
+	keystore               *gkeystore.Server
+	sharedMemory           *gsharedmemory.Server
+	bcLookup               *galiasreader.Server
+	snLookup               *gsubnetlookup.Server
+	appSender              *appsender.Server
+	validatorStateServer   *gvalidators.Server
+	teleporterSignerServer *gteleporter.Server
 
 	serverCloser grpcutils.ServerCloser
 	conns        []*grpc.ClientConn
@@ -188,6 +191,7 @@ func (vm *VMClient) Initialize(
 	vm.snLookup = gsubnetlookup.NewServer(chainCtx.SNLookup)
 	vm.appSender = appsender.NewServer(appSender)
 	vm.validatorStateServer = gvalidators.NewServer(chainCtx.ValidatorState)
+	vm.teleporterSignerServer = gteleporter.NewServer(chainCtx.TeleporterSigner)
 
 	serverListener, err := grpcutils.NewListener()
 	if err != nil {
@@ -328,6 +332,7 @@ func (vm *VMClient) getInitServer(opts []grpc.ServerOption) *grpc.Server {
 	appsenderpb.RegisterAppSenderServer(server, vm.appSender)
 	healthpb.RegisterHealthServer(server, grpcHealth)
 	validatorstatepb.RegisterValidatorStateServer(server, vm.validatorStateServer)
+	teleporterpb.RegisterSignerServer(server, vm.teleporterSignerServer)
 
 	// Ensure metric counters are zeroed on restart
 	grpc_prometheus.Register(server)

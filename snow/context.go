@@ -16,8 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/platformvm/teleporter"
 )
 
 type SubnetLookup interface {
@@ -53,11 +53,12 @@ type Context struct {
 	SNLookup     SubnetLookup
 	Metrics      metrics.OptionalGatherer
 
+	TeleporterSigner teleporter.Signer
+
 	// snowman++ attributes
 	ValidatorState    validators.State  // interface for P-Chain validators
 	StakingLeafSigner crypto.Signer     // block signer
 	StakingCertLeaf   *x509.Certificate // block certificate
-	StakingBLSKey     *bls.SecretKey    // bls signer
 
 	// Chain-specific directory where arbitrary data can be written
 	ChainDataDir string

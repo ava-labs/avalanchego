@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/platformvm/teleporter/gteleporter"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gsubnetlookup"
@@ -48,6 +49,7 @@ import (
 	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
 	sharedmemorypb "github.com/ava-labs/avalanchego/proto/pb/sharedmemory"
 	subnetlookuppb "github.com/ava-labs/avalanchego/proto/pb/subnetlookup"
+	teleporterpb "github.com/ava-labs/avalanchego/proto/pb/teleporter"
 	validatorstatepb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
@@ -189,6 +191,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	snLookupClient := gsubnetlookup.NewClient(subnetlookuppb.NewSubnetLookupClient(clientConn))
 	appSenderClient := appsender.NewClient(appsenderpb.NewAppSenderClient(clientConn))
 	validatorStateClient := gvalidators.NewClient(validatorstatepb.NewValidatorStateClient(clientConn))
+	teleporterSignerClient := gteleporter.NewClient(teleporterpb.NewSignerClient(clientConn))
 
 	toEngine := make(chan common.Message, 1)
 	vm.closed = make(chan struct{})
@@ -223,6 +226,9 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		BCLookup:     bcLookupClient,
 		SNLookup:     snLookupClient,
 		Metrics:      metrics.NewOptionalGatherer(),
+
+		// Signs teleporter messages
+		TeleporterSigner: teleporterSignerClient,
 
 		ValidatorState: validatorStateClient,
 		// TODO: support remaining snowman++ fields
