@@ -4,6 +4,8 @@
 package state
 
 import (
+	"errors"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
@@ -11,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
@@ -32,6 +35,8 @@ var (
 	addressStatePrefix  = []byte("addressState")
 	depositOffersPrefix = []byte("depositOffers")
 	depositsPrefix      = []byte("deposits")
+
+	errWrongTxType = errors.New("unexpected tx type")
 )
 
 type CaminoApply interface {
@@ -61,17 +66,22 @@ type Camino interface {
 	CaminoDiff
 
 	LockedUTXOs(set.Set[ids.ID], set.Set[ids.ShortID], locked.State) ([]*avax.UTXO, error)
-	CaminoGenesisState() (*genesis.Camino, error)
+	CaminoConfig() (*CaminoConfig, error)
 }
 
 // For state only
 type CaminoState interface {
 	CaminoDiff
 
-	GenesisState() *genesis.Camino
+	CaminoConfig() *CaminoConfig
 	SyncGenesis(*state, *genesis.State) error
 	Load() error
 	Write() error
+}
+
+type CaminoConfig struct {
+	VerifyNodeSignature bool
+	LockModeBondDeposit bool
 }
 
 type caminoDiff struct {
@@ -145,8 +155,8 @@ func newCaminoState(baseDB *versiondb.Database, metricsReg prometheus.Registerer
 }
 
 // Return current genesis args
-func (cs *caminoState) GenesisState() *genesis.Camino {
-	return &genesis.Camino{
+func (cs *caminoState) CaminoConfig() *CaminoConfig {
+	return &CaminoConfig{
 		VerifyNodeSignature: cs.verifyNodeSignature,
 		LockModeBondDeposit: cs.lockModeBondDeposit,
 	}
@@ -182,6 +192,33 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 		}
 
 		cs.AddDepositOffer(offer)
+	}
+
+	currentTimestamp := uint64(s.GetTimestamp().Unix())
+
+	for _, tx := range g.Camino.Deposits {
+		depositTx, ok := tx.Unsigned.(*txs.DepositTx)
+		if !ok {
+			return errWrongTxType
+		}
+		depositAmount := uint64(0)
+		for _, out := range depositTx.Outs {
+			newAmount, err := math.Add64(depositAmount, out.Out.Amount())
+			if err != nil {
+				return err
+			}
+			depositAmount = newAmount
+		}
+		cs.UpdateDeposit(
+			tx.ID(),
+			&deposit.Deposit{
+				DepositOfferID: depositTx.DepositOfferID,
+				Start:          currentTimestamp,
+				Duration:       depositTx.DepositDuration,
+				Amount:         depositAmount,
+			},
+		)
+		s.AddTx(tx, status.Committed)
 	}
 
 	return nil

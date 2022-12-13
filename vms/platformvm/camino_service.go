@@ -92,12 +92,12 @@ func (response GetBalanceResponseWrapper) MarshalJSON() ([]byte, error) {
 
 // GetBalance gets the balance of an address
 func (s *CaminoService) GetBalance(_ *http.Request, args *GetBalanceRequest, response *GetBalanceResponseWrapper) error {
-	caminoGenesis, err := s.vm.state.CaminoGenesisState()
+	caminoConfig, err := s.vm.state.CaminoConfig()
 	if err != nil {
 		return err
 	}
-	response.LockModeBondDeposit = caminoGenesis.LockModeBondDeposit
-	if !caminoGenesis.LockModeBondDeposit {
+	response.LockModeBondDeposit = caminoConfig.LockModeBondDeposit
+	if !caminoConfig.LockModeBondDeposit {
 		return s.Service.GetBalance(nil, args, &response.GetBalanceResponse)
 	}
 

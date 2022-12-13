@@ -170,16 +170,16 @@ func verifyAddValidatorTxWithBonding(
 }
 
 func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
-	caminoGenesis, err := e.State.CaminoGenesisState()
+	caminoConfig, err := e.State.CaminoConfig()
 	if err != nil {
 		return err
 	}
 
-	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoGenesis.LockModeBondDeposit); err != nil {
+	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoConfig.LockModeBondDeposit); err != nil {
 		return err
 	}
 
-	if caminoGenesis.VerifyNodeSignature {
+	if caminoConfig.VerifyNodeSignature {
 		if err := e.verifyNodeSignature(tx.NodeID()); err != nil {
 			return err
 		}
@@ -189,11 +189,11 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 
 	_, isCaminoTx := e.Tx.Unsigned.(*txs.CaminoAddValidatorTx)
 
-	if !caminoGenesis.LockModeBondDeposit && !isCaminoTx {
+	if !caminoConfig.LockModeBondDeposit && !isCaminoTx {
 		return e.StandardTxExecutor.AddValidatorTx(tx)
 	}
 
-	if !caminoGenesis.LockModeBondDeposit || !isCaminoTx {
+	if !caminoConfig.LockModeBondDeposit || !isCaminoTx {
 		return errWrongLockMode
 	}
 
@@ -229,12 +229,12 @@ func (e *CaminoStandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidat
 	if err := locked.VerifyNoLocks(tx.Ins, tx.Outs); err != nil {
 		return err
 	}
-	caminoGenesis, err := e.State.CaminoGenesisState()
+	caminoConfig, err := e.State.CaminoConfig()
 	if err != nil {
 		return err
 	}
 
-	if caminoGenesis.VerifyNodeSignature {
+	if caminoConfig.VerifyNodeSignature {
 		if err := e.verifyNodeSignature(tx.NodeID()); err != nil {
 			return err
 		}
@@ -246,16 +246,16 @@ func (e *CaminoStandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidat
 }
 
 func (e *CaminoStandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
-	caminoGenesis, err := e.State.CaminoGenesisState()
+	caminoConfig, err := e.State.CaminoConfig()
 	if err != nil {
 		return err
 	}
 
-	if caminoGenesis.LockModeBondDeposit {
+	if caminoConfig.LockModeBondDeposit {
 		return errWrongTxType
 	}
 
-	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoGenesis.LockModeBondDeposit); err != nil {
+	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoConfig.LockModeBondDeposit); err != nil {
 		return err
 	}
 
@@ -263,16 +263,16 @@ func (e *CaminoStandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error 
 }
 
 func (e *CaminoStandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
-	caminoGenesis, err := e.State.CaminoGenesisState()
+	caminoConfig, err := e.State.CaminoConfig()
 	if err != nil {
 		return err
 	}
 
-	if caminoGenesis.LockModeBondDeposit {
+	if caminoConfig.LockModeBondDeposit {
 		return errWrongTxType
 	}
 
-	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoGenesis.LockModeBondDeposit); err != nil {
+	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoConfig.LockModeBondDeposit); err != nil {
 		return err
 	}
 
@@ -280,16 +280,16 @@ func (e *CaminoStandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermi
 }
 
 func (e *CaminoStandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
-	caminoGenesis, err := e.State.CaminoGenesisState()
+	caminoConfig, err := e.State.CaminoConfig()
 	if err != nil {
 		return err
 	}
 
-	if caminoGenesis.LockModeBondDeposit {
+	if caminoConfig.LockModeBondDeposit {
 		return errWrongTxType
 	}
 
-	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoGenesis.LockModeBondDeposit); err != nil {
+	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoConfig.LockModeBondDeposit); err != nil {
 		return err
 	}
 
@@ -349,18 +349,18 @@ func (e *CaminoStandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) 
 }
 
 func (e *CaminoProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
-	caminoGenesis, err := e.OnCommitState.CaminoGenesisState()
+	caminoConfig, err := e.OnCommitState.CaminoConfig()
 	if err != nil {
 		return err
 	}
 
 	caminoTx, ok := e.Tx.Unsigned.(*txs.CaminoRewardValidatorTx)
 
-	if !caminoGenesis.LockModeBondDeposit && !ok {
+	if !caminoConfig.LockModeBondDeposit && !ok {
 		return e.ProposalTxExecutor.RewardValidatorTx(tx)
 	}
 
-	if !caminoGenesis.LockModeBondDeposit || !ok {
+	if !caminoConfig.LockModeBondDeposit || !ok {
 		return errWrongLockMode
 	}
 
@@ -455,16 +455,16 @@ func (e *CaminoProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) 
 }
 
 func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
-	caminoGenesis, err := e.State.CaminoGenesisState()
+	caminoConfig, err := e.State.CaminoConfig()
 	if err != nil {
 		return err
 	}
 
-	if !caminoGenesis.LockModeBondDeposit {
+	if !caminoConfig.LockModeBondDeposit {
 		return errWrongLockMode
 	}
 
-	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoGenesis.LockModeBondDeposit); err != nil {
+	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoConfig.LockModeBondDeposit); err != nil {
 		return err
 	}
 
@@ -485,9 +485,9 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 		return errDepositOfferNotActiveYet
 	case depositOffer.EndTime().Before(currentChainTime):
 		return errDepositOfferInactive
-	case tx.Duration < depositOffer.MinDuration:
+	case tx.DepositDuration < depositOffer.MinDuration:
 		return errDepositDurationToSmall
-	case tx.Duration > depositOffer.MaxDuration:
+	case tx.DepositDuration > depositOffer.MaxDuration:
 		return errDepositDurationToBig
 	case depositAmount < depositOffer.MinAmount:
 		return errDepositToSmall
@@ -515,7 +515,7 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 
 	deposit := &deposits.Deposit{
 		DepositOfferID: tx.DepositOfferID,
-		Duration:       tx.Duration,
+		Duration:       tx.DepositDuration,
 		Amount:         depositAmount,
 		Start:          uint64(currentChainTime.Unix()),
 	}
@@ -539,16 +539,16 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 }
 
 func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) error {
-	caminoGenesis, err := e.State.CaminoGenesisState()
+	caminoConfig, err := e.State.CaminoConfig()
 	if err != nil {
 		return err
 	}
 
-	if !caminoGenesis.LockModeBondDeposit {
+	if !caminoConfig.LockModeBondDeposit {
 		return errWrongLockMode
 	}
 
-	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoGenesis.LockModeBondDeposit); err != nil {
+	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoConfig.LockModeBondDeposit); err != nil {
 		return err
 	}
 

@@ -95,7 +95,7 @@ func (b *caminoBuilder) NewAddValidatorTx(
 	keys []*crypto.PrivateKeySECP256K1R,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
-	caminoGenesis, err := b.builder.state.CaminoGenesisState()
+	caminoGenesis, err := b.builder.state.CaminoConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +115,7 @@ func (b *caminoBuilder) NewAddValidatorTx(
 			return nil, err
 		}
 
-		if caminoGenesis, err := b.builder.state.CaminoGenesisState(); err != nil {
+		if caminoGenesis, err := b.builder.state.CaminoConfig(); err != nil {
 			return nil, err
 		} else if !caminoGenesis.VerifyNodeSignature {
 			return tx, nil
@@ -198,7 +198,7 @@ func (b *caminoBuilder) NewAddSubnetValidatorTx(
 		return nil, err
 	}
 
-	if caminoGenesis, err := b.builder.state.CaminoGenesisState(); err != nil {
+	if caminoGenesis, err := b.builder.state.CaminoConfig(); err != nil {
 		return nil, err
 	} else if !caminoGenesis.VerifyNodeSignature {
 		return tx, nil
@@ -217,7 +217,7 @@ func (b *caminoBuilder) NewAddSubnetValidatorTx(
 }
 
 func (b *caminoBuilder) NewRewardValidatorTx(txID ids.ID) (*txs.Tx, error) {
-	if state, err := b.builder.state.CaminoGenesisState(); err != nil {
+	if state, err := b.builder.state.CaminoConfig(); err != nil {
 		return nil, err
 	} else if !state.LockModeBondDeposit {
 		return b.builder.NewRewardValidatorTx(txID)
@@ -293,8 +293,8 @@ func (b *caminoBuilder) NewDepositTx(
 			Ins:          ins,
 			Outs:         outs,
 		}},
-		DepositOfferID: depositOfferID,
-		Duration:       duration,
+		DepositOfferID:  depositOfferID,
+		DepositDuration: duration,
 		RewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,
 			Threshold: 1,

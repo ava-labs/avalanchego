@@ -23,7 +23,7 @@ type DepositTx struct {
 	// ID of active offer that will be used for this deposit
 	DepositOfferID ids.ID `serialize:"true" json:"depositOfferID"`
 	// duration of deposit
-	Duration uint32 `serialize:"true" json:"duration"`
+	DepositDuration uint32 `serialize:"true" json:"duration"`
 	// Where to send staking rewards when done validating
 	RewardsOwner fx.Owner `serialize:"true" json:"rewardsOwner"`
 }
@@ -34,6 +34,10 @@ type DepositTx struct {
 func (tx *DepositTx) InitCtx(ctx *snow.Context) {
 	tx.BaseTx.InitCtx(ctx)
 	tx.RewardsOwner.InitCtx(ctx)
+}
+
+func (tx *DepositTx) Duration() uint32 {
+	return tx.DepositDuration
 }
 
 func (tx *DepositTx) DepositAmount() (uint64, error) {

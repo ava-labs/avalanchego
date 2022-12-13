@@ -35,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -89,7 +88,7 @@ func (e *caminoEnvironment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
 }
 
-func newCaminoEnvironment(postBanff bool, caminoGenesisConf genesis.Camino) *caminoEnvironment {
+func newCaminoEnvironment(postBanff bool, caminoGenesisConf api.Camino) *caminoEnvironment {
 	var isBootstrapped utils.AtomicBool
 	isBootstrapped.SetValue(true)
 
@@ -199,7 +198,7 @@ func defaultCaminoState(
 	ctx *snow.Context,
 	db database.Database,
 	rewards reward.Calculator,
-	caminoGenesisConf genesis.Camino,
+	caminoGenesisConf api.Camino,
 ) state.State {
 	genesisBytes := buildCaminoGenesisTest(ctx, caminoGenesisConf)
 	state, err := state.New(
@@ -265,7 +264,7 @@ func defaultCaminoConfig(postBanff bool) config.Config {
 	}
 }
 
-func buildCaminoGenesisTest(ctx *snow.Context, caminoGenesisConf genesis.Camino) []byte {
+func buildCaminoGenesisTest(ctx *snow.Context, caminoGenesisConf api.Camino) []byte {
 	genesisUTXOs := make([]api.UTXO, len(caminoPreFundedKeys))
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	for i, key := range caminoPreFundedKeys {
@@ -278,6 +277,9 @@ func buildCaminoGenesisTest(ctx *snow.Context, caminoGenesisConf genesis.Camino)
 			Address: addr,
 		}
 	}
+
+	caminoGenesisConf.UTXODeposits = make([]ids.ID, len(genesisUTXOs))
+	caminoGenesisConf.ValidatorDeposits = make([][]ids.ID, len(caminoPreFundedKeys))
 
 	genesisValidators := make([]api.PermissionlessValidator, len(caminoPreFundedKeys))
 	for i, key := range caminoPreFundedKeys {
@@ -301,6 +303,7 @@ func buildCaminoGenesisTest(ctx *snow.Context, caminoGenesisConf genesis.Camino)
 			}},
 			DelegationFee: reward.PercentDenominator,
 		}
+		caminoGenesisConf.ValidatorDeposits[i] = make([]ids.ID, 1)
 	}
 
 	buildGenesisArgs := api.BuildGenesisArgs{

@@ -190,7 +190,7 @@ type BuildGenesisArgs struct {
 	UTXOs         []UTXO                    `json:"utxos"`
 	Validators    []PermissionlessValidator `json:"validators"`
 	Chains        []Chain                   `json:"chains"`
-	Camino        genesis.Camino            `json:"camino"`
+	Camino        Camino                    `json:"camino"`
 	Time          json.Uint64               `json:"time"`
 	InitialSupply json.Uint64               `json:"initialSupply"`
 	Message       string                    `json:"message"`
@@ -215,6 +215,11 @@ func bech32ToID(addrStr string) (ids.ShortID, error) {
 // BuildGenesis build the genesis state of the Platform Chain (and thereby the Avalanche network.)
 func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 	// Specify the UTXOs on the Platform chain that exist at genesis.
+	var vdrs txheap.TimedHeap
+	if args.Camino.LockModeBondDeposit {
+		return buildCaminoGenesis(args, reply)
+	}
+
 	utxos := make([]*genesis.UTXO, 0, len(args.UTXOs))
 	for i, apiUTXO := range args.UTXOs {
 		if apiUTXO.Amount == 0 {
@@ -257,97 +262,88 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 	}
 
 	// Specify the validators that are validating the primary network at genesis.
-	vdrs := txheap.NewByEndTime()
-	if args.Camino.LockModeBondDeposit {
-		caminoVdrs, updatedUTXOs, err := getCaminoValidators(args, vdrs, utxos)
-		if err != nil {
-			return err
-		}
-		vdrs = caminoVdrs
-		utxos = updatedUTXOs
-	} else {
-		for _, vdr := range args.Validators {
-			weight := uint64(0)
-			stake := make([]*avax.TransferableOutput, len(vdr.Staked))
-			utils.Sort(vdr.Staked)
-			for i, apiUTXO := range vdr.Staked {
-				addrID, err := bech32ToID(apiUTXO.Address)
-				if err != nil {
-					return err
-				}
-
-				utxo := &avax.TransferableOutput{
-					Asset: avax.Asset{ID: args.AvaxAssetID},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: uint64(apiUTXO.Amount),
-						OutputOwners: secp256k1fx.OutputOwners{
-							Locktime:  0,
-							Threshold: 1,
-							Addrs:     []ids.ShortID{addrID},
-						},
-					},
-				}
-				if apiUTXO.Locktime > args.Time {
-					utxo.Out = &stakeable.LockOut{
-						Locktime:        uint64(apiUTXO.Locktime),
-						TransferableOut: utxo.Out,
-					}
-				}
-				stake[i] = utxo
-
-				newWeight, err := math.Add64(weight, uint64(apiUTXO.Amount))
-				if err != nil {
-					return errStakeOverflow
-				}
-				weight = newWeight
-			}
-
-			if weight == 0 {
-				return errValidatorAddsNoValue
-			}
-			if uint64(vdr.EndTime) <= uint64(args.Time) {
-				return errValidatorAddsNoValue
-			}
-
-			owner := &secp256k1fx.OutputOwners{
-				Locktime:  uint64(vdr.RewardOwner.Locktime),
-				Threshold: uint32(vdr.RewardOwner.Threshold),
-			}
-			for _, addrStr := range vdr.RewardOwner.Addresses {
-				addrID, err := bech32ToID(addrStr)
-				if err != nil {
-					return err
-				}
-				owner.Addrs = append(owner.Addrs, addrID)
-			}
-			utils.Sort(owner.Addrs)
-
-			delegationFee := uint32(0)
-			if vdr.ExactDelegationFee != nil {
-				delegationFee = uint32(*vdr.ExactDelegationFee)
-			}
-
-			tx := &txs.Tx{Unsigned: &txs.AddValidatorTx{
-				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    uint32(args.NetworkID),
-					BlockchainID: ids.Empty,
-				}},
-				Validator: validator.Validator{
-					NodeID: vdr.NodeID,
-					Start:  uint64(args.Time),
-					End:    uint64(vdr.EndTime),
-					Wght:   weight,
-				},
-				StakeOuts:        stake,
-				RewardsOwner:     owner,
-				DelegationShares: delegationFee,
-			}}
-			if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
+	vdrs = txheap.NewByEndTime()
+	for _, vdr := range args.Validators {
+		weight := uint64(0)
+		stake := make([]*avax.TransferableOutput, len(vdr.Staked))
+		utils.Sort(vdr.Staked)
+		for i, apiUTXO := range vdr.Staked {
+			addrID, err := bech32ToID(apiUTXO.Address)
+			if err != nil {
 				return err
 			}
 
-			vdrs.Add(tx)
+			utxo := &avax.TransferableOutput{
+				Asset: avax.Asset{ID: args.AvaxAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: uint64(apiUTXO.Amount),
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{addrID},
+					},
+				},
+			}
+			if apiUTXO.Locktime > args.Time {
+				utxo.Out = &stakeable.LockOut{
+					Locktime:        uint64(apiUTXO.Locktime),
+					TransferableOut: utxo.Out,
+				}
+			}
+			stake[i] = utxo
+
+			newWeight, err := math.Add64(weight, uint64(apiUTXO.Amount))
+			if err != nil {
+				return errStakeOverflow
+			}
+			weight = newWeight
 		}
+
+		if weight == 0 {
+			return errValidatorAddsNoValue
+		}
+		if uint64(vdr.EndTime) <= uint64(args.Time) {
+			return errValidatorAddsNoValue
+		}
+
+		owner := &secp256k1fx.OutputOwners{
+			Locktime:  uint64(vdr.RewardOwner.Locktime),
+			Threshold: uint32(vdr.RewardOwner.Threshold),
+		}
+		for _, addrStr := range vdr.RewardOwner.Addresses {
+			addrID, err := bech32ToID(addrStr)
+			if err != nil {
+				return err
+			}
+			owner.Addrs = append(owner.Addrs, addrID)
+		}
+		utils.Sort(owner.Addrs)
+
+		delegationFee := uint32(0)
+		if vdr.ExactDelegationFee != nil {
+			delegationFee = uint32(*vdr.ExactDelegationFee)
+		}
+
+		tx := &txs.Tx{Unsigned: &txs.AddValidatorTx{
+			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    uint32(args.NetworkID),
+				BlockchainID: ids.Empty,
+			}},
+			Validator: validator.Validator{
+				NodeID: vdr.NodeID,
+				Start:  uint64(args.Time),
+				End:    uint64(vdr.EndTime),
+				Wght:   weight,
+			},
+			StakeOuts:        stake,
+			RewardsOwner:     owner,
+			DelegationShares: delegationFee,
+		}}
+		if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
+			return err
+		}
+
+		vdrs.Add(tx)
 	}
 
 	// Specify the chains that exist at genesis.
@@ -383,7 +379,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 		UTXOs:         utxos,
 		Validators:    validatorTxs,
 		Chains:        chains,
-		Camino:        args.Camino,
+		Camino:        args.Camino.ParseToGenesis(),
 		Timestamp:     uint64(args.Time),
 		InitialSupply: uint64(args.InitialSupply),
 		Message:       args.Message,

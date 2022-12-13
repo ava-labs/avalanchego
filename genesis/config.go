@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
 
 var _ utils.Sortable[Allocation] = Allocation{}
@@ -89,12 +88,12 @@ type Config struct {
 
 	Allocations []Allocation `json:"allocations"`
 
-	StartTime                  uint64         `json:"startTime"`
-	InitialStakeDuration       uint64         `json:"initialStakeDuration"`
-	InitialStakeDurationOffset uint64         `json:"initialStakeDurationOffset"`
-	InitialStakedFunds         []ids.ShortID  `json:"initialStakedFunds"`
-	InitialStakers             []Staker       `json:"initialStakers"`
-	Camino                     genesis.Camino `json:"camino"`
+	StartTime                  uint64        `json:"startTime"`
+	InitialStakeDuration       uint64        `json:"initialStakeDuration"`
+	InitialStakeDurationOffset uint64        `json:"initialStakeDurationOffset"`
+	InitialStakedFunds         []ids.ShortID `json:"initialStakedFunds"`
+	InitialStakers             []Staker      `json:"initialStakers"`
+	Camino                     Camino        `json:"camino"`
 
 	CChainGenesis string `json:"cChainGenesis"`
 
@@ -138,7 +137,9 @@ func (c Config) Unparse() (UnparsedConfig, error) {
 		}
 		uc.InitialStakers[i] = uis
 	}
-	if err := uc.Camino.Unparse(c.Camino, c.NetworkID); err != nil {
+	var err error
+	uc.Camino, err = c.Camino.Unparse(c.NetworkID)
+	if err != nil {
 		return uc, err
 	}
 
@@ -160,6 +161,17 @@ func (c *Config) InitialSupply() (uint64, error) {
 		}
 		initialSupply = newInitialSupply
 	}
+
+	caminoInitialSupply, err := c.Camino.InitialSupply()
+	if err != nil {
+		return 0, err
+	}
+
+	initialSupply, err = math.Add64(initialSupply, caminoInitialSupply)
+	if err != nil {
+		return 0, err
+	}
+
 	return initialSupply, nil
 }
 

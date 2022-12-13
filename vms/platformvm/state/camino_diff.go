@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 )
 
@@ -72,12 +71,12 @@ func (d *diff) LockedUTXOs(txIDs set.Set[ids.ID], addresses set.Set[ids.ShortID]
 	return retUtxos, nil
 }
 
-func (d *diff) CaminoGenesisState() (*genesis.Camino, error) {
+func (d *diff) CaminoConfig() (*CaminoConfig, error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
-	return parentState.CaminoGenesisState()
+	return parentState.CaminoConfig()
 }
 
 func (d *diff) SetAddressStates(address ids.ShortID, states uint64) {

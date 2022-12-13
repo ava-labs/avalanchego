@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	deposits "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -31,7 +32,7 @@ import (
 )
 
 func TestCaminoEnv(t *testing.T) {
-	caminoGenesisConf := genesis.Camino{
+	caminoGenesisConf := api.Camino{
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
 	}
@@ -45,7 +46,7 @@ func TestCaminoEnv(t *testing.T) {
 }
 
 func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
-	caminoGenesisConf := genesis.Camino{
+	caminoGenesisConf := api.Camino{
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
 	}
@@ -223,7 +224,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 }
 
 func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
-	caminoGenesisConf := genesis.Camino{
+	caminoGenesisConf := api.Camino{
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
 	}
@@ -505,7 +506,7 @@ func TestCaminoStandardTxExecutorAddSubnetValidatorTx(t *testing.T) {
 }
 
 func TestCaminoStandardTxExecutorAddValidatorTxBody(t *testing.T) {
-	caminoGenesisConf := genesis.Camino{
+	caminoGenesisConf := api.Camino{
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
 	}
@@ -672,7 +673,7 @@ func TestCaminoAddValidatorTxNodeSig(t *testing.T) {
 	inputSigners := []*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]}
 
 	tests := map[string]struct {
-		caminoConfig genesis.Camino
+		caminoConfig api.Camino
 		nodeID       ids.NodeID
 		nodeKey      *crypto.PrivateKeySECP256K1R
 		utxos        []*avax.UTXO
@@ -681,7 +682,7 @@ func TestCaminoAddValidatorTxNodeSig(t *testing.T) {
 		expectedErr  error
 	}{
 		"Happy path, LockModeBondDeposit false, VerifyNodeSignature true": {
-			caminoConfig: genesis.Camino{
+			caminoConfig: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: false,
 			},
@@ -699,7 +700,7 @@ func TestCaminoAddValidatorTxNodeSig(t *testing.T) {
 			expectedErr: nil,
 		},
 		"NodeId node and signature mismatch, LockModeBondDeposit false, VerifyNodeSignature true": {
-			caminoConfig: genesis.Camino{
+			caminoConfig: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: false,
 			},
@@ -717,7 +718,7 @@ func TestCaminoAddValidatorTxNodeSig(t *testing.T) {
 			expectedErr: errNodeSignatureMissing,
 		},
 		"NodeId node and signature mismatch, LockModeBondDeposit true, VerifyNodeSignature true": {
-			caminoConfig: genesis.Camino{
+			caminoConfig: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 			},
@@ -733,7 +734,7 @@ func TestCaminoAddValidatorTxNodeSig(t *testing.T) {
 			expectedErr: errNodeSignatureMissing,
 		},
 		"Inputs and credentials mismatch, LockModeBondDeposit true, VerifyNodeSignature false": {
-			caminoConfig: genesis.Camino{
+			caminoConfig: api.Camino{
 				VerifyNodeSignature: false,
 				LockModeBondDeposit: true,
 			},
@@ -749,7 +750,7 @@ func TestCaminoAddValidatorTxNodeSig(t *testing.T) {
 			expectedErr: errFlowCheckFailed,
 		},
 		"Inputs and credentials mismatch, LockModeBondDeposit false, VerifyNodeSignature false": {
-			caminoConfig: genesis.Camino{
+			caminoConfig: api.Camino{
 				VerifyNodeSignature: false,
 				LockModeBondDeposit: false,
 			},
@@ -846,6 +847,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 
 	nodeKey, nodeID := nodeid.GenerateCaminoNodeKeyAndID()
 
+	now := time.Now()
 	signers := [][]*crypto.PrivateKeySECP256K1R{{caminoPreFundedKeys[0]}}
 	signers[len(signers)-1] = []*crypto.PrivateKeySECP256K1R{nodeKey}
 
@@ -853,7 +855,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 		outs         []*avax.TransferableOutput
 		ins          []*avax.TransferableInput
 		expectedErr  error
-		caminoConfig genesis.Camino
+		caminoConfig api.Camino
 	}{
 		"Locked out - LockModeBondDeposit: true": {
 			outs: []*avax.TransferableOutput{
@@ -861,7 +863,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 			},
 			ins:         []*avax.TransferableInput{},
 			expectedErr: locked.ErrWrongOutType,
-			caminoConfig: genesis.Camino{
+			caminoConfig: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 			},
@@ -872,7 +874,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 				generateTestIn(ids.ID{}, defaultCaminoValidatorWeight, ids.GenerateTestID(), ids.Empty, sigIndices),
 			},
 			expectedErr: locked.ErrWrongInType,
-			caminoConfig: genesis.Camino{
+			caminoConfig: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 			},
@@ -883,7 +885,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 			},
 			ins:         []*avax.TransferableInput{},
 			expectedErr: locked.ErrWrongOutType,
-			caminoConfig: genesis.Camino{
+			caminoConfig: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: false,
 			},
@@ -894,7 +896,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 				generateTestIn(ids.ID{}, defaultCaminoValidatorWeight, ids.GenerateTestID(), ids.Empty, sigIndices),
 			},
 			expectedErr: locked.ErrWrongInType,
-			caminoConfig: genesis.Camino{
+			caminoConfig: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: false,
 			},
@@ -905,7 +907,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 			},
 			ins:         []*avax.TransferableInput{},
 			expectedErr: locked.ErrWrongOutType,
-			caminoConfig: genesis.Camino{
+			caminoConfig: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 			},
@@ -916,7 +918,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 				generateTestStakeableIn(avaxAssetID, defaultCaminoValidatorWeight, uint64(defaultMinStakingDuration), sigIndices),
 			},
 			expectedErr: locked.ErrWrongInType,
-			caminoConfig: genesis.Camino{
+			caminoConfig: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 			},
@@ -927,7 +929,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 			},
 			ins:         []*avax.TransferableInput{},
 			expectedErr: locked.ErrWrongOutType,
-			caminoConfig: genesis.Camino{
+			caminoConfig: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: false,
 			},
@@ -938,7 +940,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 				generateTestStakeableIn(avaxAssetID, defaultCaminoValidatorWeight, uint64(defaultMinStakingDuration), sigIndices),
 			},
 			expectedErr: locked.ErrWrongInType,
-			caminoConfig: genesis.Camino{
+			caminoConfig: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: false,
 			},
@@ -1166,8 +1168,8 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 				Validator: validator.SubnetValidator{
 					Validator: validator.Validator{
 						NodeID: nodeID,
-						Start:  uint64(time.Now().Unix()),
-						End:    uint64(time.Now().Add(time.Hour).Unix()),
+						Start:  uint64(now.Unix()),
+						End:    uint64(now.Add(time.Hour).Unix()),
 						Wght:   uint64(2022),
 					},
 					Subnet: env.ctx.SubnetID,
@@ -1223,7 +1225,7 @@ func TestCaminoAddSubnetValidatorTxNodeSig(t *testing.T) {
 	inputSigners := []*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]}
 
 	tests := map[string]struct {
-		caminoConfig genesis.Camino
+		caminoConfig api.Camino
 		nodeID       ids.NodeID
 		nodeKey      *crypto.PrivateKeySECP256K1R
 		utxos        []*avax.UTXO
@@ -1232,7 +1234,7 @@ func TestCaminoAddSubnetValidatorTxNodeSig(t *testing.T) {
 		expectedErr  error
 	}{
 		"Happy path, LockModeBondDeposit false, VerifyNodeSignature true": {
-			caminoConfig: genesis.Camino{
+			caminoConfig: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: false,
 			},
@@ -1250,7 +1252,7 @@ func TestCaminoAddSubnetValidatorTxNodeSig(t *testing.T) {
 			expectedErr: nil,
 		},
 		"NodeId node and signature mismatch, LockModeBondDeposit false, VerifyNodeSignature true": {
-			caminoConfig: genesis.Camino{
+			caminoConfig: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: false,
 			},
@@ -1268,7 +1270,7 @@ func TestCaminoAddSubnetValidatorTxNodeSig(t *testing.T) {
 			expectedErr: errNodeSignatureMissing,
 		},
 		"NodeId node and signature mismatch, LockModeBondDeposit true, VerifyNodeSignature true": {
-			caminoConfig: genesis.Camino{
+			caminoConfig: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 			},
@@ -1283,7 +1285,7 @@ func TestCaminoAddSubnetValidatorTxNodeSig(t *testing.T) {
 			expectedErr: errNodeSignatureMissing,
 		},
 		"Inputs and credentials mismatch, LockModeBondDeposit true, VerifyNodeSignature false": {
-			caminoConfig: genesis.Camino{
+			caminoConfig: api.Camino{
 				VerifyNodeSignature: false,
 				LockModeBondDeposit: true,
 			},
@@ -1298,7 +1300,7 @@ func TestCaminoAddSubnetValidatorTxNodeSig(t *testing.T) {
 			expectedErr: errUnauthorizedSubnetModification,
 		},
 		"Inputs and credentials mismatch, LockModeBondDeposit false, VerifyNodeSignature false": {
-			caminoConfig: genesis.Camino{
+			caminoConfig: api.Camino{
 				VerifyNodeSignature: false,
 				LockModeBondDeposit: false,
 			},
@@ -1383,7 +1385,7 @@ func TestCaminoAddSubnetValidatorTxNodeSig(t *testing.T) {
 }
 
 func TestCaminoRewardValidatorTx(t *testing.T) {
-	caminoGenesisConf := genesis.Camino{
+	caminoGenesisConf := api.Camino{
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
 	}
@@ -1650,7 +1652,7 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 }
 
 func TestAddAdressStateTxExecutor(t *testing.T) {
-	caminoGenesisConf := genesis.Camino{
+	caminoGenesisConf := api.Camino{
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
 	}
@@ -1940,7 +1942,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 	existingTxID := ids.GenerateTestID()
 
 	tests := map[string]struct {
-		caminoGenesisConf genesis.Camino
+		caminoGenesisConf api.Camino
 		utxos             []*avax.UTXO
 		generateIns       func([]*avax.UTXO) []*avax.TransferableInput
 		signers           [][]*crypto.PrivateKeySECP256K1R
@@ -1949,7 +1951,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 		expectedErr       error
 	}{
 		"Wrong lockModeBondDeposit flag": {
-			caminoGenesisConf: genesis.Camino{
+			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: false,
 				DepositOffers:       []genesis.DepositOffer{testDepositOffer},
@@ -1961,7 +1963,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr:    errWrongLockMode,
 		},
 		"Stakeable ins": {
-			caminoGenesisConf: genesis.Camino{
+			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				DepositOffers:       []genesis.DepositOffer{testDepositOffer},
@@ -1987,7 +1989,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: locked.ErrWrongInType,
 		},
 		"Stakeable outs": {
-			caminoGenesisConf: genesis.Camino{
+			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				DepositOffers:       []genesis.DepositOffer{testDepositOffer},
@@ -2012,7 +2014,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: locked.ErrWrongOutType,
 		},
 		"Inputs and utxos length mismatch": {
-			caminoGenesisConf: genesis.Camino{
+			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				DepositOffers:       []genesis.DepositOffer{testDepositOffer},
@@ -2039,7 +2041,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: errFlowCheckFailed,
 		},
 		"Inputs and credentials length mismatch": {
-			caminoGenesisConf: genesis.Camino{
+			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				DepositOffers:       []genesis.DepositOffer{testDepositOffer},
@@ -2065,7 +2067,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: errFlowCheckFailed,
 		},
 		"Not existing deposit offer ID": {
-			caminoGenesisConf: genesis.Camino{
+			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				DepositOffers:       []genesis.DepositOffer{testDepositOffer},
@@ -2089,14 +2091,14 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: database.ErrNotFound,
 		},
 		"Deposit is not active yet": {
-			caminoGenesisConf: genesis.Camino{
+			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				DepositOffers: []genesis.DepositOffer{
 					{
 						InterestRateNominator:   0,
-						Start:                   uint64(time.Now().Add(+60 * time.Hour).Unix()),
-						End:                     uint64(time.Now().Add(+60 * time.Hour).Unix()),
+						Start:                   uint64(currentTime.Add(+60 * time.Hour).Unix()),
+						End:                     uint64(currentTime.Add(+60 * time.Hour).Unix()),
 						MinAmount:               1,
 						MinDuration:             60,
 						MaxDuration:             60,
@@ -2126,14 +2128,14 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: errDepositOfferNotActiveYet,
 		},
 		"Deposit offer has expired": {
-			caminoGenesisConf: genesis.Camino{
+			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				DepositOffers: []genesis.DepositOffer{
 					{
 						InterestRateNominator:   0,
-						Start:                   uint64(time.Now().Add(-60 * time.Hour).Unix()),
-						End:                     uint64(time.Now().Add(-60 * time.Hour).Unix()),
+						Start:                   uint64(currentTime.Add(-60 * time.Hour).Unix()),
+						End:                     uint64(currentTime.Add(-60 * time.Hour).Unix()),
 						MinAmount:               1,
 						MinDuration:             60,
 						MaxDuration:             60,
@@ -2163,14 +2165,14 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: errDepositOfferInactive,
 		},
 		"Deposit's duration is too small": {
-			caminoGenesisConf: genesis.Camino{
+			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				DepositOffers: []genesis.DepositOffer{
 					{
 						InterestRateNominator:   0,
-						Start:                   uint64(time.Now().Add(-60 * time.Hour).Unix()),
-						End:                     uint64(time.Now().Add(+60 * time.Hour).Unix()),
+						Start:                   uint64(currentTime.Add(-60 * time.Hour).Unix()),
+						End:                     uint64(currentTime.Add(+60 * time.Hour).Unix()),
 						MinAmount:               1,
 						MinDuration:             100,
 						MaxDuration:             100,
@@ -2200,14 +2202,14 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: errDepositDurationToSmall,
 		},
 		"Deposit's duration is too big": {
-			caminoGenesisConf: genesis.Camino{
+			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				DepositOffers: []genesis.DepositOffer{
 					{
 						InterestRateNominator:   0,
-						Start:                   uint64(time.Now().Add(-60 * time.Hour).Unix()),
-						End:                     uint64(time.Now().Add(+60 * time.Hour).Unix()),
+						Start:                   uint64(currentTime.Add(-60 * time.Hour).Unix()),
+						End:                     uint64(currentTime.Add(+60 * time.Hour).Unix()),
 						MinAmount:               1,
 						MinDuration:             60,
 						MaxDuration:             30,
@@ -2237,14 +2239,14 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: errDepositDurationToBig,
 		},
 		"Deposit's amount is too small": {
-			caminoGenesisConf: genesis.Camino{
+			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				DepositOffers: []genesis.DepositOffer{
 					{
 						InterestRateNominator:   0,
-						Start:                   uint64(time.Now().Add(-60 * time.Hour).Unix()),
-						End:                     uint64(time.Now().Add(+60 * time.Hour).Unix()),
+						Start:                   uint64(currentTime.Add(-60 * time.Hour).Unix()),
+						End:                     uint64(currentTime.Add(+60 * time.Hour).Unix()),
 						MinAmount:               defaultCaminoValidatorWeight * 2,
 						MinDuration:             60,
 						MaxDuration:             60,
@@ -2274,7 +2276,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: errDepositToSmall,
 		},
 		"No fee burning": {
-			caminoGenesisConf: genesis.Camino{
+			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				DepositOffers: []genesis.DepositOffer{
@@ -2301,7 +2303,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: errFlowCheckFailed,
 		},
 		"Deposit already deposited amount": {
-			caminoGenesisConf: genesis.Camino{
+			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				DepositOffers: []genesis.DepositOffer{
@@ -2330,7 +2332,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: errFlowCheckFailed,
 		},
 		"Deposit amount of not owned utxos": {
-			caminoGenesisConf: genesis.Camino{
+			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				DepositOffers: []genesis.DepositOffer{
@@ -2358,7 +2360,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: errFlowCheckFailed,
 		},
 		"Not enough balance to deposit": {
-			caminoGenesisConf: genesis.Camino{
+			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				DepositOffers: []genesis.DepositOffer{
@@ -2386,14 +2388,14 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: errFlowCheckFailed,
 		},
 		"Supply overflow": {
-			caminoGenesisConf: genesis.Camino{
+			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				DepositOffers: []genesis.DepositOffer{
 					{
 						InterestRateNominator:   1000 * units.MegaAvax,
-						Start:                   uint64(time.Now().Add(-60 * time.Hour).Unix()),
-						End:                     uint64(time.Now().Add(+60 * time.Hour).Unix()),
+						Start:                   uint64(currentTime.Add(-60 * time.Hour).Unix()),
+						End:                     uint64(currentTime.Add(+60 * time.Hour).Unix()),
 						MinAmount:               1,
 						MinDuration:             60,
 						MaxDuration:             60,
@@ -2423,7 +2425,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: errSupplyOverflow,
 		},
 		"Happy path deposit unlocked": {
-			caminoGenesisConf: genesis.Camino{
+			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				DepositOffers: []genesis.DepositOffer{
@@ -2451,7 +2453,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: nil,
 		},
 		"Happy path deposit unlocked, fee change to new address": {
-			caminoGenesisConf: genesis.Camino{
+			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				DepositOffers: []genesis.DepositOffer{
@@ -2480,7 +2482,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: nil,
 		},
 		"Happy path deposit bonded": {
-			caminoGenesisConf: genesis.Camino{
+			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				DepositOffers: []genesis.DepositOffer{
@@ -2509,7 +2511,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: nil,
 		},
 		"Happy path deposit bonded and unlocked": {
-			caminoGenesisConf: genesis.Camino{
+			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				DepositOffers: []genesis.DepositOffer{
@@ -2539,7 +2541,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			expectedErr: nil,
 		},
 		"Happy path, deposited amount transferred to another owner": {
-			caminoGenesisConf: genesis.Camino{
+			caminoGenesisConf: api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				DepositOffers: []genesis.DepositOffer{
@@ -2578,7 +2580,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			}()
 
 			env.config.BanffTime = env.state.GetTimestamp()
-			env.state.SetTimestamp(time.Now())
+			env.state.SetTimestamp(currentTime)
 
 			for _, utxo := range tt.utxos {
 				env.state.AddUTXO(utxo)
@@ -2598,8 +2600,8 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 					Ins:          ins,
 					Outs:         tt.outs,
 				}},
-				DepositOfferID: tt.depositOfferID(*env),
-				Duration:       60,
+				DepositOfferID:  tt.depositOfferID(*env),
+				DepositDuration: 60,
 				RewardsOwner: &secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
@@ -2649,22 +2651,23 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 	existingTxID := ids.GenerateTestID()
 	depositTxID := ids.GenerateTestID()
 	depositTxID2 := ids.GenerateTestID()
-	depositStartTime := time.Now()
+	now := time.Now()
+	depositStartTime := now
 
 	depositExpiredTime := depositStartTime.Add(100 * time.Second)
 	depositEndedTime := depositStartTime.Add(80 * time.Second)
 	depositNotEndedTime := depositStartTime.Add(50 * time.Second)
 	genesisDepositOffer := genesis.DepositOffer{
 		InterestRateNominator:   0,
-		Start:                   uint64(time.Now().Add(-60 * time.Hour).Unix()),
-		End:                     uint64(time.Now().Add(+60 * time.Hour).Unix()),
+		Start:                   uint64(now.Add(-60 * time.Hour).Unix()),
+		End:                     uint64(now.Add(+60 * time.Hour).Unix()),
 		MinAmount:               1,
 		MinDuration:             60,
 		MaxDuration:             100,
 		UnlockPeriodDuration:    60,
 		NoRewardsPeriodDuration: 0,
 	}
-	caminoGenesisConf := genesis.Camino{
+	caminoGenesisConf := api.Camino{
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
 		DepositOffers: []genesis.DepositOffer{
@@ -2672,14 +2675,14 @@ func TestCaminoStandardTxExecutorUnlockDepositTx(t *testing.T) {
 		},
 	}
 	depositOffer := &deposits.Offer{
-		InterestRateNominator:   0,
-		Start:                   uint64(time.Now().Add(-60 * time.Hour).Unix()),
-		End:                     uint64(time.Now().Add(+60 * time.Hour).Unix()),
-		MinAmount:               1,
-		MinDuration:             60,
-		MaxDuration:             100,
-		UnlockPeriodDuration:    60,
-		NoRewardsPeriodDuration: 0,
+		InterestRateNominator:   genesisDepositOffer.InterestRateNominator,
+		Start:                   genesisDepositOffer.Start,
+		End:                     genesisDepositOffer.End,
+		MinAmount:               genesisDepositOffer.MinAmount,
+		MinDuration:             genesisDepositOffer.MinDuration,
+		MaxDuration:             genesisDepositOffer.MaxDuration,
+		UnlockPeriodDuration:    genesisDepositOffer.UnlockPeriodDuration,
+		NoRewardsPeriodDuration: genesisDepositOffer.NoRewardsPeriodDuration,
 	}
 	deposit := &deposits.Deposit{
 		Duration: 60,
