@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -126,19 +127,6 @@ type environment struct {
 
 func (*environment) ResetBlockTimer() {
 	// dummy call, do nothing for now
-}
-
-// TODO snLookup currently duplicated in vm_test.go. Consider removing duplication
-type snLookup struct {
-	chainsToSubnet map[ids.ID]ids.ID
-}
-
-func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
-	subnetID, ok := sn.chainsToSubnet[chainID]
-	if !ok {
-		return ids.ID{}, errors.New("")
-	}
-	return subnetID, nil
 }
 
 func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
@@ -325,11 +313,17 @@ func defaultCtx(db database.Database) *snow.Context {
 
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
-	ctx.SNLookup = &snLookup{
-		chainsToSubnet: map[ids.ID]ids.ID{
-			constants.PlatformChainID: constants.PrimaryNetworkID,
-			xChainID:                  constants.PrimaryNetworkID,
-			cChainID:                  constants.PrimaryNetworkID,
+	ctx.ValidatorState = &validators.TestState{
+		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
+			subnetID, ok := map[ids.ID]ids.ID{
+				constants.PlatformChainID: constants.PrimaryNetworkID,
+				xChainID:                  constants.PrimaryNetworkID,
+				cChainID:                  constants.PrimaryNetworkID,
+			}[chainID]
+			if !ok {
+				return ids.Empty, errors.New("missing")
+			}
+			return subnetID, nil
 		},
 	}
 

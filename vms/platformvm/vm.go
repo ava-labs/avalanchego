@@ -603,6 +603,10 @@ func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.I
 
 // GetCurrentHeight returns the height of the last accepted block
 func (vm *VM) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error) {
+	if chainID == constants.PlatformChainID {
+		return constants.PrimaryNetworkID, nil
+	}
+
 	chainTx, _, err := vm.state.GetTx(chainID)
 	if err != nil {
 		return ids.Empty, fmt.Errorf(

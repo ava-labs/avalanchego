@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -108,19 +109,6 @@ func (e *environment) GetState(blkID ids.ID) (state.Chain, bool) {
 
 func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
-}
-
-// TODO: snLookup currently duplicated in vm_test.go. Remove duplication
-type snLookup struct {
-	chainsToSubnet map[ids.ID]ids.ID
-}
-
-func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
-	subnetID, ok := sn.chainsToSubnet[chainID]
-	if !ok {
-		return ids.ID{}, errors.New("")
-	}
-	return subnetID, nil
 }
 
 func newEnvironment(postBanff bool) *environment {
@@ -274,11 +262,17 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	}
 	ctx.SharedMemory = msm
 
-	ctx.SNLookup = &snLookup{
-		chainsToSubnet: map[ids.ID]ids.ID{
-			constants.PlatformChainID: constants.PrimaryNetworkID,
-			xChainID:                  constants.PrimaryNetworkID,
-			cChainID:                  constants.PrimaryNetworkID,
+	ctx.ValidatorState = &validators.TestState{
+		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
+			subnetID, ok := map[ids.ID]ids.ID{
+				constants.PlatformChainID: constants.PrimaryNetworkID,
+				xChainID:                  constants.PrimaryNetworkID,
+				cChainID:                  constants.PrimaryNetworkID,
+			}[chainID]
+			if !ok {
+				return ids.Empty, errors.New("missing")
+			}
+			return subnetID, nil
 		},
 	}
 
