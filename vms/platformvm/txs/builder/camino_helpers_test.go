@@ -6,6 +6,7 @@ package builder
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -32,11 +33,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/nodeid"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -69,6 +72,7 @@ var (
 	testCaminoSubnet1ControlKeys = caminoPreFundedKeys[0:3]
 	lastAcceptedID               = ids.GenerateTestID()
 	testSubnet1                  *txs.Tx
+	testKeyfactory               crypto.FactorySECP256K1R
 )
 
 type mutableSharedMemory struct {
@@ -117,7 +121,7 @@ func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
 	return subnetID, nil
 }
 
-func newCaminoBuilder(postBanff bool, caminoGenesisConf api.Camino) CaminoBuilder {
+func newCaminoEnvironment(postBanff bool, caminoGenesisConf api.Camino) *caminoEnvironment {
 	var isBootstrapped utils.AtomicBool
 	isBootstrapped.SetValue(true)
 
@@ -176,7 +180,8 @@ func newCaminoBuilder(postBanff bool, caminoGenesisConf api.Camino) CaminoBuilde
 	}
 
 	addCaminoSubnet(env, txBuilder)
-	return txBuilder
+
+	return env
 }
 
 func addCaminoSubnet(
@@ -344,9 +349,9 @@ func defaultCaminoConfig(postBanff bool) config.Config {
 		TxFee:                  defaultTxFee,
 		CreateSubnetTxFee:      100 * defaultTxFee,
 		CreateBlockchainTxFee:  100 * defaultTxFee,
-		MinValidatorStake:      5 * units.MilliAvax,
+		MinValidatorStake:      defaultCaminoValidatorWeight,
 		MaxValidatorStake:      defaultCaminoValidatorWeight,
-		MinDelegatorStake:      defaultCaminoValidatorWeight,
+		MinDelegatorStake:      1 * units.MilliAvax,
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig: reward.Config{
@@ -430,4 +435,57 @@ func buildCaminoGenesisTest(ctx *snow.Context, caminoGenesisConf api.Camino) []b
 	}
 
 	return genesisBytes
+}
+
+func shutdownCaminoEnvironment(env *caminoEnvironment) error {
+	if env.isBootstrapped.GetValue() {
+		primaryValidatorSet, exist := env.config.Validators.Get(constants.PrimaryNetworkID)
+		if !exist {
+			return errors.New("no default subnet validators")
+		}
+		primaryValidators := primaryValidatorSet.List()
+
+		validatorIDs := make([]ids.NodeID, len(primaryValidators))
+		for i, vdr := range primaryValidators {
+			validatorIDs[i] = vdr.NodeID
+		}
+
+		if err := env.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID); err != nil {
+			return err
+		}
+		env.state.SetHeight( /*height*/ math.MaxUint64)
+		if err := env.state.Commit(); err != nil {
+			return err
+		}
+	}
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		env.state.Close(),
+		env.baseDB.Close(),
+	)
+	return errs.Err
+}
+
+func generateTestUTXO(txID ids.ID, assetID ids.ID, amount uint64, outputOwners secp256k1fx.OutputOwners, depositTxID, bondTxID ids.ID) *avax.UTXO {
+	var out avax.TransferableOut = &secp256k1fx.TransferOutput{
+		Amt:          amount,
+		OutputOwners: outputOwners,
+	}
+	if depositTxID != ids.Empty || bondTxID != ids.Empty {
+		out = &locked.Out{
+			IDs: locked.IDs{
+				DepositTxID: depositTxID,
+				BondTxID:    bondTxID,
+			},
+			TransferableOut: out,
+		}
+	}
+	testUTXO := &avax.UTXO{
+		UTXOID: avax.UTXOID{TxID: txID},
+		Asset:  avax.Asset{ID: assetID},
+		Out:    out,
+	}
+	testUTXO.InputID()
+	return testUTXO
 }
