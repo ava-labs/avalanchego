@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -136,7 +137,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	}
 
 	if e.Bootstrapped.GetValue() {
-		if err := verify.SameSubnet(e.Ctx, tx.SourceChain); err != nil {
+		if err := verify.SameSubnet(context.TODO(), e.Ctx, tx.SourceChain); err != nil {
 			return err
 		}
 
@@ -204,7 +205,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
 
 	if e.Bootstrapped.GetValue() {
-		if err := verify.SameSubnet(e.Ctx, tx.DestinationChain); err != nil {
+		if err := verify.SameSubnet(context.TODO(), e.Ctx, tx.DestinationChain); err != nil {
 			return err
 		}
 	}

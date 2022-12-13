@@ -445,7 +445,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 			Keystore:     m.Keystore.NewBlockchainKeyStore(chainParams.ID),
 			SharedMemory: m.AtomicMemory.NewSharedMemory(chainParams.ID),
 			BCLookup:     m,
-			SNLookup:     m,
 			Metrics:      vmMetrics,
 
 			ValidatorState:    m.validatorState,

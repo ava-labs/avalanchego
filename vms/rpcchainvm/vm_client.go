@@ -46,7 +46,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gsubnetlookup"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/messenger"
 
 	aliasreaderpb "github.com/ava-labs/avalanchego/proto/pb/aliasreader"
@@ -56,7 +55,6 @@ import (
 	messengerpb "github.com/ava-labs/avalanchego/proto/pb/messenger"
 	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
 	sharedmemorypb "github.com/ava-labs/avalanchego/proto/pb/sharedmemory"
-	subnetlookuppb "github.com/ava-labs/avalanchego/proto/pb/subnetlookup"
 	validatorstatepb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 )
@@ -97,7 +95,6 @@ type VMClient struct {
 	keystore             *gkeystore.Server
 	sharedMemory         *gsharedmemory.Server
 	bcLookup             *galiasreader.Server
-	snLookup             *gsubnetlookup.Server
 	appSender            *appsender.Server
 	validatorStateServer *gvalidators.Server
 
@@ -185,7 +182,6 @@ func (vm *VMClient) Initialize(
 	vm.keystore = gkeystore.NewServer(chainCtx.Keystore)
 	vm.sharedMemory = gsharedmemory.NewServer(chainCtx.SharedMemory, dbManager.Current().Database)
 	vm.bcLookup = galiasreader.NewServer(chainCtx.BCLookup)
-	vm.snLookup = gsubnetlookup.NewServer(chainCtx.SNLookup)
 	vm.appSender = appsender.NewServer(appSender)
 	vm.validatorStateServer = gvalidators.NewServer(chainCtx.ValidatorState)
 
@@ -324,7 +320,6 @@ func (vm *VMClient) getInitServer(opts []grpc.ServerOption) *grpc.Server {
 	keystorepb.RegisterKeystoreServer(server, vm.keystore)
 	sharedmemorypb.RegisterSharedMemoryServer(server, vm.sharedMemory)
 	aliasreaderpb.RegisterAliasReaderServer(server, vm.bcLookup)
-	subnetlookuppb.RegisterSubnetLookupServer(server, vm.snLookup)
 	appsenderpb.RegisterAppSenderServer(server, vm.appSender)
 	healthpb.RegisterHealthServer(server, grpcHealth)
 	validatorstatepb.RegisterValidatorStateServer(server, vm.validatorStateServer)

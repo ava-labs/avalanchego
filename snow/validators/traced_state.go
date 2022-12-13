@@ -21,6 +21,7 @@ type tracedState struct {
 	s                   State
 	getMinimumHeightTag string
 	getCurrentHeightTag string
+	getSubnetIDTag      string
 	getValidatorSetTag  string
 	tracer              trace.Tracer
 }
@@ -30,6 +31,7 @@ func Trace(s State, name string, tracer trace.Tracer) State {
 		s:                   s,
 		getMinimumHeightTag: fmt.Sprintf("%s.GetMinimumHeight", name),
 		getCurrentHeightTag: fmt.Sprintf("%s.GetCurrentHeight", name),
+		getSubnetIDTag:      fmt.Sprintf("%s.GetSubnetID", name),
 		getValidatorSetTag:  fmt.Sprintf("%s.GetValidatorSet", name),
 		tracer:              tracer,
 	}
@@ -47,6 +49,15 @@ func (s *tracedState) GetCurrentHeight(ctx context.Context) (uint64, error) {
 	defer span.End()
 
 	return s.s.GetCurrentHeight(ctx)
+}
+
+func (s *tracedState) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error) {
+	ctx, span := s.tracer.Start(ctx, s.getValidatorSetTag, oteltrace.WithAttributes(
+		attribute.Stringer("chainID", chainID),
+	))
+	defer span.End()
+
+	return s.s.GetSubnetID(ctx, chainID)
 }
 
 func (s *tracedState) GetValidatorSet(

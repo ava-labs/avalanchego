@@ -41,6 +41,16 @@ func (c *Client) GetCurrentHeight(ctx context.Context) (uint64, error) {
 	return resp.Height, nil
 }
 
+func (c *Client) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error) {
+	resp, err := c.client.GetSubnetID(ctx, &pb.GetSubnetIDRequest{
+		ChainId: chainID[:],
+	})
+	if err != nil {
+		return ids.Empty, err
+	}
+	return ids.ToID(resp.SubnetId)
+}
+
 func (c *Client) GetValidatorSet(
 	ctx context.Context,
 	height uint64,
