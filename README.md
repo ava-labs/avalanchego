@@ -60,6 +60,9 @@ There are several examples, in the examples directory, that simulate real world
 use-cases. Try running them via the command-line, via `cargo run --release
 --example simple`.
 
+## CLI
+Firewood comes with a CLI tool called `fwdctl` that enables one to create and interact with a local instance of a firewood database. For more information, see the [fwdctl README](src/bin/README.md).
+
 ## Test
 ```
 cargo test --release
