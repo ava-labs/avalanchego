@@ -129,8 +129,8 @@ func (cr *ChainRouter) Initialize(
 }
 
 // RegisterRequest marks that we should expect to receive a reply for a request
-// issued by [requestingChainID] from the given validator's [respondingChainID]
-// and the reply should have the given requestID.
+// issued by [requestingChainID] from the given node's [respondingChainID] and
+// the reply should have the given requestID.
 //
 // The type of message we expect is [op].
 //
@@ -170,14 +170,20 @@ func (cr *ChainRouter) RegisterRequest(
 	cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
 	cr.lock.Unlock()
 
+	// Determine whether we should include the latency of this request in our
+	// measurements.
+	// - Don't measure messages from ourself since these don't go over the
+	//   network.
+	// - Don't measure Puts because an adversary can cause us to issue a Get
+	//   request to them and not respond, causing a timeout, skewing latency
+	//   measurements.
+	shouldMeasureLatency := nodeID != cr.myNodeID && op != message.PutOp
+
 	// Register a timeout to fire if we don't get a reply in time.
-	// Don't include Put responses in the latency calculation, since an
-	// adversary can cause you to issue a Get request and then cause it to
-	// timeout, increasing your timeout.
 	cr.timeoutManager.RegisterRequest(
 		nodeID,
 		respondingChainID,
-		op != message.PutOp,
+		shouldMeasureLatency,
 		uniqueRequestID,
 		func() {
 			cr.HandleInbound(ctx, failedMsg)
