@@ -167,13 +167,27 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 	cs.lockModeBondDeposit = g.Camino.LockModeBondDeposit
 	cs.verifyNodeSignature = g.Camino.VerifyNodeSignature
 
+	// adding address states
+
+	for _, addrState := range g.Camino.AddressStates {
+		cs.SetAddressStates(addrState.Address, addrState.State)
+	}
+
+	initalAdminAddressState, err := cs.GetAddressStates(g.Camino.InitialAdmin)
+	if err != nil {
+		return err
+	}
+	cs.SetAddressStates(g.Camino.InitialAdmin,
+		initalAdminAddressState|txs.AddressStateRoleAdminBit)
+
 	tx := &txs.AddAddressStateTx{
 		Address: g.Camino.InitialAdmin,
 		State:   txs.AddressStateRoleAdmin,
 		Remove:  false,
 	}
 	s.AddTx(&txs.Tx{Unsigned: tx}, status.Committed)
-	cs.SetAddressStates(g.Camino.InitialAdmin, txs.AddressStateRoleAdminBit)
+
+	// adding deposit offers
 
 	for _, genesisOffer := range g.Camino.DepositOffers {
 		offer := &deposit.Offer{
@@ -193,6 +207,8 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 
 		cs.AddDepositOffer(offer)
 	}
+
+	// adding deposits
 
 	currentTimestamp := uint64(s.GetTimestamp().Unix())
 

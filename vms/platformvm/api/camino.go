@@ -26,6 +26,7 @@ type Camino struct {
 	VerifyNodeSignature bool                   `json:"verifyNodeSignature"`
 	LockModeBondDeposit bool                   `json:"lockModeBondDeposit"`
 	InitialAdmin        ids.ShortID            `json:"initialAdmin"`
+	AddressStates       []genesis.AddressState `json:"addressStates"`
 	DepositOffers       []genesis.DepositOffer `json:"depositOffers"`
 	ValidatorDeposits   [][]ids.ID             `json:"validatorDeposits"`
 	UTXODeposits        []ids.ID               `json:"utxoDeposits"`
@@ -36,6 +37,7 @@ func (c Camino) ParseToGenesis() genesis.Camino {
 		VerifyNodeSignature: c.VerifyNodeSignature,
 		LockModeBondDeposit: c.LockModeBondDeposit,
 		InitialAdmin:        c.InitialAdmin,
+		AddressStates:       c.AddressStates,
 		DepositOffers:       c.DepositOffers,
 	}
 }
