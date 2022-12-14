@@ -81,6 +81,18 @@ func (b BigBitSet) HammingWeight() int {
 	return result
 }
 
+// Returns the byte representation of this bitset
+func (b BigBitSet) Bytes() []byte {
+	return b.bits.Bytes()
+}
+
+// Inverse of BigBitSet.Bytes()
+func BigBitSetFromBytes(bytes []byte) BigBitSet {
+	return BigBitSet{
+		bits: new(big.Int).SetBytes(bytes),
+	}
+}
+
 // String returns the hex representation of this bitset
 func (b BigBitSet) String() string {
 	return fmt.Sprintf("%x", b.bits.Bytes())

@@ -469,3 +469,40 @@ func Test_BigBitSet_HammingWeight(t *testing.T) {
 		})
 	}
 }
+
+func Test_BigBitSet_Bytes(t *testing.T) {
+	require := require.New(t)
+
+	type test struct {
+		name string
+		elts []int
+	}
+
+	tests := []test{
+		{
+			name: "empty",
+			elts: []int{},
+		},
+		{
+			name: "single; element > 63",
+			elts: []int{1337},
+		},
+		{
+			name: "multiple",
+			elts: []int{1, 2, 3},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := NewBigBitSet(tt.elts...)
+			bytes := b.Bytes()
+			fromBytes := BigBitSetFromBytes(bytes)
+
+			require.Equal(len(tt.elts), fromBytes.HammingWeight())
+			for _, elt := range tt.elts {
+				require.True(fromBytes.Contains(elt))
+			}
+		})
+	}
+}
