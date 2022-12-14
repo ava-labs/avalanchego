@@ -6,14 +6,47 @@
     "initialAdmin": "X-kopernikus1m4nr983lhd4p4nfsqk3a6a9mejugnn73cmp283",
     "depositOffers": [
       {
-        "start": 1668073842,
+        "interestRateNominator": 80000,
+        "start": 0,
         "end": 1699609842,
         "minAmount": 1,
-        "minDuration": 60,
-        "maxDuration": 60,
-        "unlockPeriodDuration": 60,
-        "noRewardsPeriodDuration": 0,
+        "minDuration": 94608000,
+        "maxDuration": 94608000,
+        "unlockPeriodDuration": 31536000,
+        "noRewardsPeriodDuration": 15768000,
+        "flags": 0
+      },
+      {
         "interestRateNominator": 0,
+        "start": 0,
+        "end": 1699609842,
+        "minAmount": 1,
+        "minDuration": 126144000,
+        "maxDuration": 126144000,
+        "unlockPeriodDuration": 63072000,
+        "noRewardsPeriodDuration": 31536000,
+        "flags": 0
+      },
+      {
+        "interestRateNominator": 90000,
+        "start": 0,
+        "end": 1699609842,
+        "minAmount": 1,
+        "minDuration": 126144000,
+        "maxDuration": 126144000,
+        "unlockPeriodDuration": 31536000,
+        "noRewardsPeriodDuration": 15768000,
+        "flags": 0
+      },
+      {
+        "interestRateNominator": 100000,
+        "start": 0,
+        "end": 1699609842,
+        "minAmount": 1,
+        "minDuration": 157680000,
+        "maxDuration": 157680000,
+        "unlockPeriodDuration": 31536000,
+        "noRewardsPeriodDuration": 15768000,
         "flags": 0
       }
     ],
@@ -26,19 +59,19 @@
           {
             "amount": 2000000000000,
             "nodeID": "NodeID-EAm6xyzP8mGm6VMSEoeV3L6dUP1YYnjCr",
-            "depositOfferID": "2sA67xkBTMZjWatccPca4q4emptk1Qqns4eJXFtYPb4pK6EVqF"
+            "validatorDuration": 100000,
+            "depositOfferID": "LE47SR1obzixrgRavzwgJhZ6w93PyJwq1XLYcgcCKofKjviB7"
           },
           {
             "amount": 10000000000000000,
-            "depositOfferID": "2sA67xkBTMZjWatccPca4q4emptk1Qqns4eJXFtYPb4pK6EVqF"
+            "depositOfferID": "LE47SR1obzixrgRavzwgJhZ6w93PyJwq1XLYcgcCKofKjviB7"
           }
         ]
       }
     ]
   },
-  "startTime": 1647388800,
-  "initialStakeDuration": 31536000,
-  "initialStakeDurationOffset": 5400,
+  "startTime": 1670956381,
+  "initialStakeDurationOffset": 0,
   "cChainGenesis": "{\"config\":{\"chainId\":502},\"initialAdmin\":\"0x0000000000000000000000000000000000000000\", \"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x5f5e100\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0100000000000000000000000000000000000000\":{\"code\":\"0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033\",\"balance\":\"0x0\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}",
   "message": "Have a nice trip!"
 }

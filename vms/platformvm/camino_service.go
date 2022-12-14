@@ -209,7 +209,7 @@ type SetAddressStateArgs struct {
 }
 
 // AddAdressState issues an AddAdressStateTx
-func (s *Service) SetAddressState(_ *http.Request, args *SetAddressStateArgs, response api.JSONTxID) error {
+func (s *Service) SetAddressState(_ *http.Request, args *SetAddressStateArgs, response *api.JSONTxID) error {
 	s.vm.ctx.Log.Debug("Platform: SetAddressState called")
 
 	keys, err := s.getKeystoreKeys(&args.JSONSpendHeader)

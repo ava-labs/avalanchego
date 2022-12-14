@@ -141,6 +141,19 @@ func validateConfig(networkID uint32, config *Config) error {
 		)
 	}
 
+	if len(config.CChainGenesis) == 0 {
+		return errNoCChainGenesis
+	}
+
+	if err := validateCaminoConfig(config); err != nil {
+		return err
+	}
+
+	// the rest of the checks are only for LockModeBondDeposit == false
+	if config.Camino.LockModeBondDeposit {
+		return nil
+	}
+
 	// We don't impose any restrictions on the minimum
 	// stake duration to enable complex testing configurations
 	// but recommend setting a minimum duration of at least
@@ -149,32 +162,22 @@ func validateConfig(networkID uint32, config *Config) error {
 		return errNoStakeDuration
 	}
 
-	if !config.Camino.LockModeBondDeposit {
-		if len(config.InitialStakers) == 0 {
-			return errNoStakers
-		}
-
-		offsetTimeRequired := config.InitialStakeDurationOffset * uint64(len(config.InitialStakers)-1)
-		if offsetTimeRequired > config.InitialStakeDuration {
-			return fmt.Errorf(
-				"initial stake duration is %d but need at least %d with offset of %d",
-				config.InitialStakeDuration,
-				offsetTimeRequired,
-				config.InitialStakeDurationOffset,
-			)
-		}
-
-		if err := validateInitialStakedFunds(config); err != nil {
-			return fmt.Errorf("initial staked funds validation failed: %w", err)
-		}
+	if len(config.InitialStakers) == 0 {
+		return errNoStakers
 	}
 
-	if len(config.CChainGenesis) == 0 {
-		return errNoCChainGenesis
+	offsetTimeRequired := config.InitialStakeDurationOffset * uint64(len(config.InitialStakers)-1)
+	if offsetTimeRequired > config.InitialStakeDuration {
+		return fmt.Errorf(
+			"initial stake duration is %d but need at least %d with offset of %d",
+			config.InitialStakeDuration,
+			offsetTimeRequired,
+			config.InitialStakeDurationOffset,
+		)
 	}
 
-	if err := validateCaminoConfig(config); err != nil {
-		return err
+	if err := validateInitialStakedFunds(config); err != nil {
+		return fmt.Errorf("initial staked funds validation failed: %w", err)
 	}
 
 	return nil
@@ -268,6 +271,10 @@ func FromFlag(networkID uint32, genesisContent string) ([]byte, ids.ID, error) {
 func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	hrp := constants.GetHRP(config.NetworkID)
 
+	if config.Camino.LockModeBondDeposit {
+		return buildCaminoGenesis(config, hrp)
+	}
+
 	amount := uint64(0)
 
 	// Specify the genesis state of the AVM
@@ -329,10 +336,6 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	avaxAssetID, err := AVAXAssetID(bytes)
 	if err != nil {
 		return nil, ids.ID{}, fmt.Errorf("couldn't generate AVAX asset ID: %w", err)
-	}
-
-	if config.Camino.LockModeBondDeposit {
-		return buildPGenesis(config, hrp, bytes, avmReply.Bytes)
 	}
 
 	genesisTime := time.Unix(int64(config.StartTime), 0)

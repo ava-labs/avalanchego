@@ -15,11 +15,17 @@ import (
 
 // Camino genesis args
 type Camino struct {
-	VerifyNodeSignature bool           `serialize:"true" json:"verifyNodeSignature"`
-	LockModeBondDeposit bool           `serialize:"true" json:"lockModeBondDeposit"`
-	InitialAdmin        ids.ShortID    `serialize:"true" json:"initialAdmin"`
-	DepositOffers       []DepositOffer `serialize:"true" json:"depositOffers"`
-	Deposits            []*txs.Tx      `serialize:"true" json:"deposits"`
+	VerifyNodeSignature bool           `serialize:"true"`
+	LockModeBondDeposit bool           `serialize:"true"`
+	InitialAdmin        ids.ShortID    `serialize:"true"`
+	AddressStates       []AddressState `serialize:"true"`
+	DepositOffers       []DepositOffer `serialize:"true"`
+	Deposits            []*txs.Tx      `serialize:"true"`
+}
+
+type AddressState struct {
+	Address ids.ShortID `serialize:"true" json:"address"`
+	State   uint64      `serialize:"true" json:"state"`
 }
 
 type DepositOffer struct {
