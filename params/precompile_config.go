@@ -38,6 +38,8 @@ func (k precompileKey) String() string {
 		return "txAllowList"
 	case feeManagerKey:
 		return "feeManager"
+	case rewardManagerKey:
+		return "rewardManager"
 		// ADD YOUR PRECOMPILE HERE
 		/*
 			case {yourPrecompile}Key:
