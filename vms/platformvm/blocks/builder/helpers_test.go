@@ -4,6 +4,7 @@
 package builder
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -104,19 +105,6 @@ type environment struct {
 	utxosHandler   utxo.Handler
 	txBuilder      txbuilder.Builder
 	backend        txexecutor.Backend
-}
-
-// TODO snLookup currently duplicated in vm_test.go. Consider removing duplication
-type snLookup struct {
-	chainsToSubnet map[ids.ID]ids.ID
-}
-
-func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
-	subnetID, ok := sn.chainsToSubnet[chainID]
-	if !ok {
-		return ids.ID{}, errors.New("")
-	}
-	return subnetID, nil
 }
 
 func newEnvironment(t *testing.T) *environment {
@@ -293,11 +281,17 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	}
 	ctx.SharedMemory = msm
 
-	ctx.SNLookup = &snLookup{
-		chainsToSubnet: map[ids.ID]ids.ID{
-			constants.PlatformChainID: constants.PrimaryNetworkID,
-			xChainID:                  constants.PrimaryNetworkID,
-			cChainID:                  constants.PrimaryNetworkID,
+	ctx.ValidatorState = &validators.TestState{
+		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
+			subnetID, ok := map[ids.ID]ids.ID{
+				constants.PlatformChainID: constants.PrimaryNetworkID,
+				xChainID:                  constants.PrimaryNetworkID,
+				cChainID:                  constants.PrimaryNetworkID,
+			}[chainID]
+			if !ok {
+				return ids.Empty, errors.New("missing")
+			}
+			return subnetID, nil
 		},
 	}
 
