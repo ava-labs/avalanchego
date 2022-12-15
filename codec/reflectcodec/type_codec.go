@@ -86,15 +86,7 @@ func (c *genericCodec) MarshalInto(value interface{}, p *wrappers.Packer) error 
 // [value]'s underlying value must not be a nil pointer or interface
 // c.lock should be held for the duration of this function
 func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSliceLen uint32) error {
-	valueKind := value.Kind()
-	switch valueKind {
-	case reflect.Interface, reflect.Ptr, reflect.Invalid:
-		if value.IsNil() { // Can't marshal nil (except nil slices)
-			return errMarshalNil
-		}
-	}
-
-	switch valueKind {
+	switch valueKind := value.Kind(); valueKind {
 	case reflect.Uint8:
 		p.PackByte(uint8(value.Uint()))
 		return p.Err
@@ -125,9 +117,15 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 	case reflect.Bool:
 		p.PackBool(value.Bool())
 		return p.Err
-	case reflect.Uintptr, reflect.Ptr:
+	case reflect.Ptr:
+		if value.IsNil() { // Can't marshal nil (except nil slices)
+			return errMarshalNil
+		}
 		return c.marshal(value.Elem(), p, c.maxSliceLen)
 	case reflect.Interface:
+		if value.IsNil() { // Can't marshal nil (except nil slices)
+			return errMarshalNil
+		}
 		underlyingValue := value.Interface()
 		underlyingType := reflect.TypeOf(underlyingValue)
 		if err := c.typer.PackPrefix(p, underlyingType); err != nil {
@@ -369,8 +367,6 @@ func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSli
 		// Assign to the top-level struct's member
 		value.Set(v)
 		return nil
-	case reflect.Invalid:
-		return errUnmarshalNil
 	default:
 		return fmt.Errorf("can't unmarshal unknown type %s", value.Kind().String())
 	}
