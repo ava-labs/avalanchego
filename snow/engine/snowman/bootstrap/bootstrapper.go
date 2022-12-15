@@ -167,11 +167,6 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 			zap.Uint32("requestID", requestID),
 		)
 
-		// TODO ABENEGIA: this node should be already marked unavailalble
-		// Also why not keep asking blocks to this node?
-		// Note that not responding at all would stop us from asking again
-		// to the node, while an empty response would make us stop bothering
-		// that node
 		b.markUnavailable(nodeID)
 
 		// Send another request for this
