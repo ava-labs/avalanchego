@@ -8,6 +8,14 @@ import (
 	"errors"
 )
 
+type StateSummaryMode uint8
+
+const (
+	StateSummaryNotRunning StateSummaryMode = iota + 1
+	StateSummaryBlocking
+	StateSummaryNonBlocking
+)
+
 var ErrStateSyncableVMNotImplemented = errors.New("vm does not implement StateSyncableVM interface")
 
 // StateSyncableVM contains the functionality to allow VMs to sync to a given

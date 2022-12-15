@@ -999,13 +999,13 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 
 	majoritySummaryCalled := false
 	minoritySummaryCalled := false
-	summary.AcceptF = func(context.Context) (bool, error) {
+	summary.AcceptF = func(context.Context) (block.StateSummaryMode, error) {
 		majoritySummaryCalled = true
-		return true, nil
+		return block.StateSummaryBlocking, nil
 	}
-	minoritySummary.AcceptF = func(context.Context) (bool, error) {
+	minoritySummary.AcceptF = func(context.Context) (block.StateSummaryMode, error) {
 		minoritySummaryCalled = true
-		return true, nil
+		return block.StateSummaryBlocking, nil
 	}
 
 	// let a majority of voters return summaryID, and a minority return minoritySummaryID. The rest timeout.
@@ -1120,9 +1120,9 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 	require.False(syncer.pendingSeeders.Len() != 0)
 
 	minoritySummaryCalled := false
-	minoritySummary.AcceptF = func(context.Context) (bool, error) {
+	minoritySummary.AcceptF = func(context.Context) (block.StateSummaryMode, error) {
 		minoritySummaryCalled = true
-		return true, nil
+		return block.StateSummaryBlocking, nil
 	}
 
 	// Let a majority of voters timeout.
@@ -1256,13 +1256,13 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 
 	majoritySummaryCalled := false
 	minoritySummaryCalled := false
-	minoritySummary1.AcceptF = func(context.Context) (bool, error) {
+	minoritySummary1.AcceptF = func(context.Context) (block.StateSummaryMode, error) {
 		majoritySummaryCalled = true
-		return true, nil
+		return block.StateSummaryBlocking, nil
 	}
-	minoritySummary2.AcceptF = func(context.Context) (bool, error) {
+	minoritySummary2.AcceptF = func(context.Context) (block.StateSummaryMode, error) {
 		minoritySummaryCalled = true
-		return true, nil
+		return block.StateSummaryBlocking, nil
 	}
 
 	stateSyncFullyDone := false
