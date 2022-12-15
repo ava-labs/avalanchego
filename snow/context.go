@@ -91,6 +91,9 @@ type ConsensusContext struct {
 	// Non-zero iff this chain is executing transactions.
 	executing utils.AtomicBool
 
+	// Non-zero iff this chain is dynamically state-syncing
+	stateSyncing utils.AtomicBool
+
 	// Indicates this chain is available to only validators.
 	validatorOnly utils.AtomicBool
 }
@@ -113,6 +116,14 @@ func (ctx *ConsensusContext) IsExecuting() bool {
 // Set to "true" if there's an ongoing transaction.
 func (ctx *ConsensusContext) Executing(b bool) {
 	ctx.executing.SetValue(b)
+}
+
+func (ctx *ConsensusContext) IsRunningStateSync() bool {
+	return ctx.stateSyncing.GetValue()
+}
+
+func (ctx *ConsensusContext) RunningStateSync(b bool) {
+	ctx.stateSyncing.SetValue(b)
 }
 
 // IsValidatorOnly returns true iff this chain is available only to validators

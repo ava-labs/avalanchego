@@ -181,7 +181,9 @@ func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
-	t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{t.Consensus.Preference()})
+	if !t.Ctx.IsRunningStateSync() {
+		t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{t.Consensus.Preference()})
+	}
 
 	// Try to issue [blkID] to consensus.
 	// If we're missing an ancestor, request it from [vdr]
@@ -193,7 +195,9 @@ func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
-	t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{t.Consensus.Preference()})
+	if !t.Ctx.IsRunningStateSync() {
+		t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{t.Consensus.Preference()})
+	}
 
 	blk, err := t.VM.ParseBlock(ctx, blkBytes)
 	// If parsing fails, we just drop the request, as we didn't ask for it
@@ -358,16 +362,20 @@ func (t *Transitive) Shutdown(ctx context.Context) error {
 }
 
 func (t *Transitive) Notify(ctx context.Context, msg common.Message) error {
-	if msg != common.PendingTxs {
+	switch msg {
+	case common.PendingTxs:
+		// the pending txs message means we should attempt to build a block.
+		t.pendingBuildBlocks++
+		return t.buildBlocks(ctx)
+	case common.StateSyncDone:
+		t.Ctx.RunningStateSync(false)
+		return nil
+	default:
 		t.Ctx.Log.Warn("received an unexpected message from the VM",
 			zap.Stringer("messageString", msg),
 		)
 		return nil
 	}
-
-	// the pending txs message means we should attempt to build a block.
-	t.pendingBuildBlocks++
-	return t.buildBlocks(ctx)
 }
 
 func (t *Transitive) Context() *snow.ConsensusContext {
