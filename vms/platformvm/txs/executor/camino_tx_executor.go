@@ -683,7 +683,7 @@ func (e *CaminoStandardTxExecutor) AddAddressStateTx(tx *txs.AddAddressStateTx) 
 	utxo.Produce(e.State, txID, tx.Outs)
 	// Set the new states if changed
 	if states != newStates {
-		e.State.SetAddressStates(tx.Address, states)
+		e.State.SetAddressStates(tx.Address, newStates)
 	}
 
 	return nil
