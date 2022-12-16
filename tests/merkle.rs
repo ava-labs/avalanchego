@@ -1,81 +1,9 @@
-use firewood::{merkle::*, proof::Proof};
-use shale::{MemStore, MummyObj, ObjPtr};
-use std::rc::Rc;
-
-struct MerkleSetup {
-    root: ObjPtr<Node>,
-    merkle: Merkle,
-}
-
-impl MerkleSetup {
-    fn insert<K: AsRef<[u8]>>(&mut self, key: K, val: Vec<u8>) {
-        self.merkle.insert(key, val, self.root).unwrap()
-    }
-
-    fn remove<K: AsRef<[u8]>>(&mut self, key: K) {
-        self.merkle.remove(key, self.root).unwrap();
-    }
-
-    fn get<K: AsRef<[u8]>>(&self, key: K) -> Option<firewood::merkle::Ref> {
-        self.merkle.get(key, self.root).unwrap()
-    }
-
-    fn get_mut<K: AsRef<[u8]>>(&mut self, key: K) -> Option<firewood::merkle::RefMut> {
-        self.merkle.get_mut(key, self.root).unwrap()
-    }
-
-    fn root_hash(&self) -> Hash {
-        self.merkle.root_hash::<IdTrans>(self.root).unwrap()
-    }
-
-    fn dump(&self) -> String {
-        let mut s = Vec::new();
-        self.merkle.dump(self.root, &mut s).unwrap();
-        String::from_utf8(s).unwrap()
-    }
-
-    fn prove<K: AsRef<[u8]>>(&self, key: K) -> Proof {
-        self.merkle.prove::<K, IdTrans>(key, self.root).unwrap()
-    }
-
-    fn verify_proof<K: AsRef<[u8]>>(&self, key: K, proof: &Proof) -> Option<Vec<u8>> {
-        let hash: [u8; 32] = self.root_hash().0;
-        proof.verify_proof(key, hash).unwrap()
-    }
-}
-
-fn merkle_setup_test(meta_size: u64, compact_size: u64) -> MerkleSetup {
-    use shale::{compact::CompactSpaceHeader, PlainMem};
-    const RESERVED: u64 = 0x1000;
-    assert!(meta_size > RESERVED);
-    assert!(compact_size > RESERVED);
-    let mem_meta = Rc::new(PlainMem::new(meta_size, 0x0)) as Rc<dyn MemStore>;
-    let mem_payload = Rc::new(PlainMem::new(compact_size, 0x1));
-    let compact_header: ObjPtr<CompactSpaceHeader> = unsafe { ObjPtr::new_from_addr(0x0) };
-
-    mem_meta.write(
-        compact_header.addr(),
-        &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(RESERVED, RESERVED)),
-    );
-
-    let compact_header = unsafe {
-        MummyObj::ptr_to_obj(mem_meta.as_ref(), compact_header, shale::compact::CompactHeader::MSIZE).unwrap()
-    };
-
-    let cache = shale::ObjCache::new(1);
-    let space = shale::compact::CompactSpace::new(mem_meta, mem_payload, compact_header, cache, 10, 16).unwrap();
-    let mut root = ObjPtr::null();
-    Merkle::init_root(&mut root, &space).unwrap();
-    MerkleSetup {
-        root,
-        merkle: Merkle::new(Box::new(space)),
-    }
-}
+use firewood::{merkle_util::*, proof::Proof};
 
 fn merkle_build_test<K: AsRef<[u8]> + std::cmp::Ord + Clone, V: AsRef<[u8]> + Clone>(
     items: Vec<(K, V)>, meta_size: u64, compact_size: u64,
 ) -> MerkleSetup {
-    let mut merkle = merkle_setup_test(meta_size, compact_size);
+    let mut merkle = new_merkle(meta_size, compact_size);
     for (k, v) in items.iter() {
         merkle.insert(k, v.as_ref().to_vec())
     }
@@ -163,7 +91,7 @@ fn test_root_hash_reversed_deletions() {
         }
         let mut items: Vec<_> = items.into_iter().collect();
         items.sort();
-        let mut merkle = merkle_setup_test(0x100000, 0x100000);
+        let mut merkle = new_merkle(0x100000, 0x100000);
         let mut hashes = Vec::new();
         let mut dumps = Vec::new();
         for (k, v) in items.iter() {
@@ -222,7 +150,7 @@ fn test_root_hash_random_deletions() {
         let mut items_ordered: Vec<_> = items.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
         items_ordered.sort();
         items_ordered.shuffle(&mut *rng.borrow_mut());
-        let mut merkle = merkle_setup_test(0x100000, 0x100000);
+        let mut merkle = new_merkle(0x100000, 0x100000);
         for (k, v) in items.iter() {
             merkle.insert(k, v.to_vec());
         }
@@ -338,4 +266,29 @@ fn test_empty_tree_proof() {
 
     let proof = merkle.prove(key);
     assert!(proof.0.is_empty());
+}
+
+#[test]
+fn test_range_proof() {
+    let mut items = vec![("doa", "verb"), ("doe", "reindeer"), ("dog", "puppy"), ("ddd", "ok")];
+    items.sort();
+    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000);
+    let start = 0;
+    let end = &items.len() - 1;
+
+    let mut proof = merkle.prove(&items[start].0);
+    assert!(!proof.0.is_empty());
+    let end_proof = merkle.prove(&items[end].0);
+    assert!(!end_proof.0.is_empty());
+
+    proof.concat_proofs(end_proof);
+
+    let mut keys = Vec::new();
+    let mut vals = Vec::new();
+    for i in start + 1..end {
+        keys.push(&items[i].0);
+        vals.push(&items[i].1);
+    }
+
+    merkle.verify_range_proof(&proof, &items[start].0, &items[end].0, keys, vals);
 }

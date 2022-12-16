@@ -6,11 +6,12 @@ use sha3::Digest;
 use shale::{MemStore, MummyItem, ObjPtr, ObjRef, ShaleError, ShaleStore};
 
 use std::cell::Cell;
+use std::cmp;
 use std::collections::HashMap;
 use std::fmt::{self, Debug};
 use std::io::{Cursor, Read, Write};
 
-const NBRANCH: usize = 16;
+pub const NBRANCH: usize = 16;
 
 #[derive(Debug)]
 pub enum MerkleError {
@@ -137,9 +138,10 @@ impl std::ops::Deref for Data {
 }
 
 #[derive(PartialEq, Eq, Clone)]
-struct BranchNode {
+pub struct BranchNode {
     chd: [Option<ObjPtr<Node>>; NBRANCH],
     value: Option<Data>,
+    chd_eth_rlp: [Option<Vec<u8>>; NBRANCH],
 }
 
 impl Debug for BranchNode {
@@ -180,7 +182,7 @@ impl BranchNode {
 
     fn calc_eth_rlp<T: ValueTransformer>(&self, store: &dyn ShaleStore<Node>) -> Vec<u8> {
         let mut stream = rlp::RlpStream::new_list(17);
-        for c in self.chd.iter() {
+        for (index, c) in self.chd.iter().enumerate() {
             match c {
                 Some(c) => {
                     let mut c_ref = store.get_item(*c).unwrap();
@@ -196,7 +198,15 @@ impl BranchNode {
                         stream.append_raw(c_rlp, 1)
                     }
                 }
-                None => stream.append_empty_data(),
+                None => {
+                    // Check if there is already caclucated rlp for the child, which
+                    // can happen when manually construct a trie from proof.
+                    if self.chd_eth_rlp[index].is_none() {
+                        stream.append_empty_data()
+                    } else {
+                        stream.append_raw(&self.chd_eth_rlp[index].clone().unwrap(), 1)
+                    }
+                }
             };
         }
         match &self.value {
@@ -205,10 +215,28 @@ impl BranchNode {
         };
         stream.out().into()
     }
+
+    pub fn new(
+        chd: [Option<ObjPtr<Node>>; NBRANCH], value: Option<Vec<u8>>, chd_eth_rlp: [Option<Vec<u8>>; NBRANCH],
+    ) -> Self {
+        BranchNode {
+            chd,
+            value: value.map(|v| Data(v)),
+            chd_eth_rlp,
+        }
+    }
+
+    pub fn chd(&self) -> &[Option<ObjPtr<Node>>; NBRANCH] {
+        &self.chd
+    }
+
+    pub fn chd_mut(&mut self) -> &mut [Option<ObjPtr<Node>>; NBRANCH] {
+        &mut self.chd
+    }
 }
 
 #[derive(PartialEq, Eq, Clone)]
-struct LeafNode(PartialPath, Data);
+pub struct LeafNode(PartialPath, Data);
 
 impl Debug for LeafNode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
@@ -220,10 +248,14 @@ impl LeafNode {
     fn calc_eth_rlp<T: ValueTransformer>(&self) -> Vec<u8> {
         rlp::encode_list::<Vec<u8>, _>(&[from_nibbles(&self.0.encode(true)).collect(), T::transform(&self.1)]).into()
     }
+
+    pub fn new(path: Vec<u8>, data: Vec<u8>) -> Self {
+        LeafNode(PartialPath(path), Data(data))
+    }
 }
 
 #[derive(PartialEq, Eq, Clone)]
-struct ExtNode(PartialPath, ObjPtr<Node>);
+pub struct ExtNode(PartialPath, ObjPtr<Node>, Option<Vec<u8>>);
 
 impl Debug for ExtNode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
@@ -233,19 +265,41 @@ impl Debug for ExtNode {
 
 impl ExtNode {
     fn calc_eth_rlp<T: ValueTransformer>(&self, store: &dyn ShaleStore<Node>) -> Vec<u8> {
-        let mut r = store.get_item(self.1).unwrap();
         let mut stream = rlp::RlpStream::new_list(2);
-        stream.append(&from_nibbles(&self.0.encode(false)).collect::<Vec<_>>());
-        if r.get_eth_rlp_long::<T>(store) {
-            stream.append(&&(*r.get_root_hash::<T>(store))[..]);
-            if r.lazy_dirty.get() {
-                r.write(|_| {}).unwrap();
-                r.lazy_dirty.set(false)
+        if !self.1.is_null() {
+            let mut r = store.get_item(self.1).unwrap();
+            stream.append(&from_nibbles(&self.0.encode(false)).collect::<Vec<_>>());
+            if r.get_eth_rlp_long::<T>(store) {
+                stream.append(&&(*r.get_root_hash::<T>(store))[..]);
+                if r.lazy_dirty.get() {
+                    r.write(|_| {}).unwrap();
+                    r.lazy_dirty.set(false)
+                }
+            } else {
+                stream.append_raw(r.get_eth_rlp::<T>(store), 1);
             }
         } else {
-            stream.append_raw(r.get_eth_rlp::<T>(store), 1);
+            // Check if there is already caclucated rlp for the child, which
+            // can happen when manually construct a trie from proof.
+            if self.2.is_none() {
+                stream.append_empty_data();
+            } else {
+                stream.append_raw(&self.2.clone().unwrap(), 1);
+            }
         }
         stream.out().into()
+    }
+
+    pub fn new(path: Vec<u8>, chd: ObjPtr<Node>, chd_eth_rlp: Option<Vec<u8>>) -> Self {
+        ExtNode(PartialPath(path), chd, chd_eth_rlp)
+    }
+
+    pub fn chd(&self) -> ObjPtr<Node> {
+        self.1
+    }
+
+    pub fn chd_mut(&mut self) -> &mut ObjPtr<Node> {
+        &mut self.1
     }
 }
 
@@ -259,7 +313,7 @@ pub struct Node {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, EnumAsInner)]
-enum NodeType {
+pub enum NodeType {
     Branch(BranchNode),
     Leaf(LeafNode),
     Extension(ExtNode),
@@ -290,6 +344,7 @@ impl Node {
                 inner: NodeType::Branch(BranchNode {
                     chd: [Some(ObjPtr::null()); NBRANCH],
                     value: Some(Data(Vec::new())),
+                    chd_eth_rlp: Default::default(),
                 }),
                 lazy_dirty: Cell::new(false),
             }
@@ -321,7 +376,7 @@ impl Node {
         self.root_hash = OnceCell::new();
     }
 
-    fn new(inner: NodeType) -> Self {
+    pub fn new(inner: NodeType) -> Self {
         let mut s = Self {
             root_hash: OnceCell::new(),
             eth_rlp_long: OnceCell::new(),
@@ -331,6 +386,14 @@ impl Node {
         };
         s.rehash();
         s
+    }
+
+    pub fn inner(&self) -> &NodeType {
+        &self.inner
+    }
+
+    pub fn inner_mut(&mut self) -> &mut NodeType {
+        &mut self.inner
     }
 
     fn new_from_hash(root_hash: Option<Hash>, eth_rlp_long: Option<bool>, inner: NodeType) -> Self {
@@ -397,10 +460,40 @@ impl MummyItem for Node {
                             .to_vec(),
                     ))
                 };
+                let mut chd_eth_rlp: [Option<Vec<u8>>; NBRANCH] = Default::default();
+                let offset = if raw_len == u32::MAX as u64 {
+                    addr + META_SIZE + branch_header_size
+                } else {
+                    addr + META_SIZE + branch_header_size + raw_len
+                };
+                let mut cur_rlp_len = 0;
+                for chd_rlp in chd_eth_rlp.iter_mut() {
+                    let mut buff = [0 as u8; 1];
+                    let rlp_len_raw = mem
+                        .get_view(offset + cur_rlp_len, 1)
+                        .ok_or(ShaleError::LinearMemStoreError)?;
+                    cur = Cursor::new(rlp_len_raw.deref());
+                    cur.read_exact(&mut buff).map_err(|_| ShaleError::DecodeError)?;
+                    let rlp_len = buff[0] as u64;
+                    cur_rlp_len += 1;
+                    if rlp_len != 0 {
+                        let rlp_raw = mem
+                            .get_view(offset + cur_rlp_len, rlp_len)
+                            .ok_or(ShaleError::LinearMemStoreError)?;
+                        let rlp: Vec<u8> = rlp_raw[0..].to_vec();
+                        *chd_rlp = Some(rlp);
+                        cur_rlp_len += rlp_len
+                    }
+                }
+
                 Ok(Self::new_from_hash(
                     root_hash,
                     eth_rlp_long,
-                    NodeType::Branch(BranchNode { chd, value }),
+                    NodeType::Branch(BranchNode {
+                        chd,
+                        value,
+                        chd_eth_rlp,
+                    }),
                 ))
             }
             Self::EXT_NODE => {
@@ -411,19 +504,36 @@ impl MummyItem for Node {
                 let mut cur = Cursor::new(node_raw.deref());
                 let mut buff = [0; 8];
                 cur.read_exact(&mut buff[..1]).map_err(|_| ShaleError::DecodeError)?;
-                let len = buff[0] as u64;
+                let path_len = buff[0] as u64;
                 cur.read_exact(&mut buff).map_err(|_| ShaleError::DecodeError)?;
                 let ptr = u64::from_le_bytes(buff);
                 let nibbles: Vec<_> = to_nibbles(
-                    &mem.get_view(addr + META_SIZE + ext_header_size, len)
+                    &mem.get_view(addr + META_SIZE + ext_header_size, path_len)
                         .ok_or(ShaleError::LinearMemStoreError)?,
                 )
                 .collect();
                 let (path, _) = PartialPath::decode(nibbles);
+
+                let mut buff = [0 as u8; 1];
+                let rlp_len_raw = mem
+                    .get_view(addr + META_SIZE + ext_header_size + path_len, 1)
+                    .ok_or(ShaleError::LinearMemStoreError)?;
+                cur = Cursor::new(rlp_len_raw.deref());
+                cur.read_exact(&mut buff).map_err(|_| ShaleError::DecodeError)?;
+                let rlp_len = buff[0] as u64;
+                let rlp: Option<Vec<u8>> = if rlp_len != 0 {
+                    let rlp_raw = mem
+                        .get_view(addr + META_SIZE + ext_header_size + path_len + 1, rlp_len)
+                        .ok_or(ShaleError::LinearMemStoreError)?;
+                    Some(rlp_raw[0..].to_vec())
+                } else {
+                    None
+                };
+
                 Ok(Self::new_from_hash(
                     root_hash,
                     eth_rlp_long,
-                    NodeType::Extension(ExtNode(path, unsafe { ObjPtr::new_from_addr(ptr) })),
+                    NodeType::Extension(ExtNode(path, unsafe { ObjPtr::new_from_addr(ptr) }, rlp)),
                 ))
             }
             Self::LEAF_NODE => {
@@ -458,14 +568,29 @@ impl MummyItem for Node {
             1 +
             match &self.inner {
                 NodeType::Branch(n) => {
+                    let mut rlp_len = 0;
+                    for rlp in n.chd_eth_rlp.iter() {
+                        rlp_len += match rlp {
+                            Some(v) => 1 + v.len() as u64,
+                            None => 1,
+                        }
+                    }
                     NBRANCH as u64 * 8 +
                         4 +
                         match &n.value {
                             Some(val) => val.len() as u64,
                             None => 0,
+                        } +
+                        rlp_len
+                }
+                NodeType::Extension(n) => {
+                    1 + 8 +
+                        n.0.dehydrated_len() +
+                        match &n.2 {
+                            Some(v) => 1 + v.len() as u64,
+                            None => 1,
                         }
                 }
-                NodeType::Extension(n) => 1 + 8 + n.0.dehydrated_len(),
                 NodeType::Leaf(n) => 1 + 4 + n.0.dehydrated_len() + n.1.len() as u64,
             }
     }
@@ -509,6 +634,19 @@ impl MummyItem for Node {
                         cur.write_all(&u32::MAX.to_le_bytes()).unwrap();
                     }
                 }
+                // Since child eth rlp is immutable after initialization (only used for range proof),
+                // it is fine to encode its value adjacent to other fields. Same for extention node.
+                for rlp in n.chd_eth_rlp.iter() {
+                    match rlp {
+                        Some(v) => {
+                            cur.write_all(&[v.len() as u8]).unwrap();
+                            cur.write_all(&v).unwrap();
+                        }
+                        None => {
+                            cur.write_all(&0u8.to_le_bytes()).unwrap();
+                        }
+                    }
+                }
             }
             NodeType::Extension(n) => {
                 cur.write_all(&[Self::EXT_NODE]).unwrap();
@@ -516,6 +654,11 @@ impl MummyItem for Node {
                 cur.write_all(&[path.len() as u8]).unwrap();
                 cur.write_all(&n.1.addr().to_le_bytes()).unwrap();
                 cur.write_all(&path).unwrap();
+                if n.2.is_some() {
+                    let rlp = n.2.as_ref().unwrap();
+                    cur.write_all(&[rlp.len() as u8]).unwrap();
+                    cur.write_all(&rlp).unwrap();
+                }
             }
             NodeType::Leaf(n) => {
                 cur.write_all(&[Self::LEAF_NODE]).unwrap();
@@ -547,6 +690,10 @@ fn test_merkle_node_encoding() {
     for node in chd1.iter_mut().take(NBRANCH / 2) {
         *node = Some(unsafe { ObjPtr::new_from_addr(0xa) });
     }
+    let mut chd_eth_rlp: [Option<Vec<u8>>; NBRANCH] = Default::default();
+    for rlp in chd_eth_rlp.iter_mut().take(NBRANCH / 2) {
+        *rlp = Some(vec![0x1, 0x2, 0x3]);
+    }
     for node in [
         Node::new_from_hash(
             None,
@@ -556,9 +703,20 @@ fn test_merkle_node_encoding() {
         Node::new_from_hash(
             None,
             None,
-            NodeType::Extension(ExtNode(PartialPath(vec![0x1, 0x2, 0x3]), unsafe {
-                ObjPtr::new_from_addr(0x42)
-            })),
+            NodeType::Extension(ExtNode(
+                PartialPath(vec![0x1, 0x2, 0x3]),
+                unsafe { ObjPtr::new_from_addr(0x42) },
+                None,
+            )),
+        ),
+        Node::new_from_hash(
+            None,
+            None,
+            NodeType::Extension(ExtNode(
+                PartialPath(vec![0x1, 0x2, 0x3]),
+                { ObjPtr::null() },
+                Some(vec![0x1, 0x2, 0x3]),
+            )),
         ),
         Node::new_from_hash(
             None,
@@ -566,9 +724,18 @@ fn test_merkle_node_encoding() {
             NodeType::Branch(BranchNode {
                 chd: chd0,
                 value: Some(Data("hello, world!".as_bytes().to_vec())),
+                chd_eth_rlp: Default::default(),
             }),
         ),
-        Node::new_from_hash(None, None, NodeType::Branch(BranchNode { chd: chd1, value: None })),
+        Node::new_from_hash(
+            None,
+            None,
+            NodeType::Branch(BranchNode {
+                chd: chd1,
+                value: None,
+                chd_eth_rlp,
+            }),
+        ),
     ] {
         check(node);
     }
@@ -592,10 +759,10 @@ pub struct Merkle {
 }
 
 impl Merkle {
-    fn get_node(&self, ptr: ObjPtr<Node>) -> Result<ObjRef<Node>, MerkleError> {
+    pub fn get_node(&self, ptr: ObjPtr<Node>) -> Result<ObjRef<Node>, MerkleError> {
         self.store.get_item(ptr).map_err(MerkleError::Shale)
     }
-    fn new_node(&self, item: Node) -> Result<ObjRef<Node>, MerkleError> {
+    pub fn new_node(&self, item: Node) -> Result<ObjRef<Node>, MerkleError> {
         self.store.put_item(item, 0).map_err(MerkleError::Shale)
     }
     fn free_node(&mut self, ptr: ObjPtr<Node>) -> Result<(), MerkleError> {
@@ -614,6 +781,7 @@ impl Merkle {
                 Node::new(NodeType::Branch(BranchNode {
                     chd: [None; NBRANCH],
                     value: None,
+                    chd_eth_rlp: Default::default(),
                 })),
                 Node::max_branch_node_size(),
             )
@@ -752,12 +920,17 @@ impl Merkle {
                     _ => u_ptr,
                 });
                 drop(u_ref);
-                let t = NodeType::Branch(BranchNode { chd, value: None });
+                let t = NodeType::Branch(BranchNode {
+                    chd,
+                    value: None,
+                    chd_eth_rlp: Default::default(),
+                });
                 let branch_ptr = self.new_node(Node::new(t))?.as_ptr();
                 if idx > 0 {
                     self.new_node(Node::new(NodeType::Extension(ExtNode(
                         PartialPath(rem_path[..idx].to_vec()),
                         branch_ptr,
+                        None,
                     ))))?
                     .as_ptr()
                 } else {
@@ -847,12 +1020,17 @@ impl Merkle {
                 let mut chd = [None; NBRANCH];
                 chd[idx as usize] = Some(leaf_ptr);
                 let branch_ptr = self
-                    .new_node(Node::new(NodeType::Branch(BranchNode { chd, value: v })))?
+                    .new_node(Node::new(NodeType::Branch(BranchNode {
+                        chd,
+                        value: v,
+                        chd_eth_rlp: Default::default(),
+                    })))?
                     .as_ptr();
                 if !prefix.is_empty() {
                     self.new_node(Node::new(NodeType::Extension(ExtNode(
                         PartialPath(prefix.to_vec()),
                         branch_ptr,
+                        None,
                     ))))?
                     .as_ptr()
                 } else {
@@ -997,6 +1175,7 @@ impl Merkle {
                     .new_node(Node::new(NodeType::Branch(BranchNode {
                         chd,
                         value: Some(Data(val.take().unwrap())),
+                        chd_eth_rlp: Default::default(),
                     })))?
                     .as_ptr();
                 self.set_parent(branch, &mut parents);
@@ -1080,7 +1259,11 @@ impl Merkle {
                             //                           \____[Leaf]x
                             // to: [p: Branch] -> [Ext] -> [Branch]
                             let ext = self
-                                .new_node(Node::new(NodeType::Extension(ExtNode(PartialPath(vec![idx]), c_ptr))))?
+                                .new_node(Node::new(NodeType::Extension(ExtNode(
+                                    PartialPath(vec![idx]),
+                                    c_ptr,
+                                    None,
+                                ))))?
                                 .as_ptr();
                             self.set_parent(ext, &mut [(p_ref, p_idx)]);
                         }
@@ -1202,6 +1385,7 @@ impl Merkle {
                                         self.new_node(Node::new(NodeType::Extension(ExtNode(
                                             PartialPath(vec![idx]),
                                             c_ptr,
+                                            None,
                                         ))))?
                                         .as_ptr(),
                                     );
@@ -1699,6 +1883,18 @@ pub fn from_nibbles(nibbles: &[u8]) -> impl Iterator<Item = u8> + '_ {
     nibbles.chunks_exact(2).map(|p| (p[0] << 4) | p[1])
 }
 
+pub fn compare(a: &[u8], b: &[u8]) -> cmp::Ordering {
+    for (ai, bi) in a.iter().zip(b.iter()) {
+        match ai.cmp(&bi) {
+            cmp::Ordering::Equal => continue,
+            ord => return ord,
+        }
+    }
+
+    // If every single element was equal, compare length
+    a.len().cmp(&b.len())
+}
+
 #[test]
 fn test_to_nibbles() {
     for (bytes, nibbles) in [
@@ -1707,5 +1903,32 @@ fn test_to_nibbles() {
     ] {
         let n: Vec<_> = to_nibbles(&bytes).collect();
         assert_eq!(n, nibbles);
+    }
+}
+
+#[test]
+fn test_cmp() {
+    for (bytes_a, bytes_b) in [
+        (vec![0x12, 0x34, 0x56], vec![0x12, 0x34, 0x56]),
+        (vec![0xc0, 0xff], vec![0xc0, 0xff]),
+    ] {
+        let n = compare(&bytes_a, &bytes_b);
+        assert_eq!(n.is_eq(), true);
+    }
+
+    for (bytes_a, bytes_b) in [
+        (vec![0x12, 0x34, 0x56], vec![0x12, 0x34, 0x58]),
+        (vec![0xc0, 0xee], vec![0xc0, 0xff]),
+    ] {
+        let n = compare(&bytes_a, &bytes_b);
+        assert_eq!(n.is_lt(), true);
+    }
+
+    for (bytes_a, bytes_b) in [
+        (vec![0x12, 0x35, 0x56], vec![0x12, 0x34, 0x58]),
+        (vec![0xc0, 0xff, 0x33], vec![0xc0, 0xff]),
+    ] {
+        let n = compare(&bytes_a, &bytes_b);
+        assert_eq!(n.is_gt(), true);
     }
 }
