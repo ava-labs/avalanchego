@@ -280,6 +280,7 @@ func buildCaminoGenesisTest(ctx *snow.Context, caminoGenesisConf api.Camino) []b
 
 	caminoGenesisConf.UTXODeposits = make([]ids.ID, len(genesisUTXOs))
 	caminoGenesisConf.ValidatorDeposits = make([][]ids.ID, len(caminoPreFundedKeys))
+	caminoGenesisConf.ValidatorConsortiumMembers = make([]ids.ShortID, len(caminoPreFundedKeys))
 
 	genesisValidators := make([]api.PermissionlessValidator, len(caminoPreFundedKeys))
 	for i, key := range caminoPreFundedKeys {
@@ -304,6 +305,7 @@ func buildCaminoGenesisTest(ctx *snow.Context, caminoGenesisConf api.Camino) []b
 			DelegationFee: reward.PercentDenominator,
 		}
 		caminoGenesisConf.ValidatorDeposits[i] = make([]ids.ID, 1)
+		caminoGenesisConf.ValidatorConsortiumMembers[i] = key.Address()
 	}
 
 	buildGenesisArgs := api.BuildGenesisArgs{
@@ -332,7 +334,7 @@ func buildCaminoGenesisTest(ctx *snow.Context, caminoGenesisConf api.Camino) []b
 	return genesisBytes
 }
 
-func generateTestUTXO(txID ids.ID, assetID ids.ID, amount uint64, outputOwners secp256k1fx.OutputOwners, depositTxID, bondTxID ids.ID) *avax.UTXO {
+func generateTestUTXO(txID ids.ID, outputIndex int, assetID ids.ID, amount uint64, outputOwners secp256k1fx.OutputOwners, depositTxID, bondTxID ids.ID) *avax.UTXO {
 	var out avax.TransferableOut = &secp256k1fx.TransferOutput{
 		Amt:          amount,
 		OutputOwners: outputOwners,
@@ -347,9 +349,12 @@ func generateTestUTXO(txID ids.ID, assetID ids.ID, amount uint64, outputOwners s
 		}
 	}
 	testUTXO := &avax.UTXO{
-		UTXOID: avax.UTXOID{TxID: txID},
-		Asset:  avax.Asset{ID: assetID},
-		Out:    out,
+		UTXOID: avax.UTXOID{
+			TxID:        txID,
+			OutputIndex: uint32(outputIndex),
+		},
+		Asset: avax.Asset{ID: assetID},
+		Out:   out,
 	}
 	testUTXO.InputID()
 	return testUTXO

@@ -55,6 +55,10 @@
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-kopernikus1m4nr983lhd4p4nfsqk3a6a9mejugnn73cmp283",
         "xAmount": 989998000000000000,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
         "platformAllocations": [
           {
             "amount": 2000000000000,

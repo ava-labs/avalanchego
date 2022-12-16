@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	deposits "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
@@ -26,21 +25,23 @@ var (
 	_ txs.Visitor = (*CaminoStandardTxExecutor)(nil)
 	_ txs.Visitor = (*CaminoProposalTxExecutor)(nil)
 
-	errNodeSignatureMissing     = errors.New("last signature is not nodeID's signature")
-	errWrongLockMode            = errors.New("this tx can't be used with this caminoGenesis.LockModeBondDeposit")
-	errNotSecp256Fx             = errors.New("expected fx to be secp256k1.fx")
-	errRecoverAdresses          = errors.New("cannot recover addresses from credentials")
-	errInvalidRoles             = errors.New("invalid role")
-	errValidatorExists          = errors.New("node is already a validator")
-	errInvalidSystemTxBody      = errors.New("tx body doesn't match expected one")
-	errRemoveValidatorToEarly   = errors.New("attempting to remove validator before its end time")
-	errRemoveWrongValidator     = errors.New("attempting to remove wrong validator")
-	errDepositOfferNotActiveYet = errors.New("deposit offer not active yet")
-	errDepositOfferInactive     = errors.New("deposit offer inactive")
-	errDepositToSmall           = errors.New("deposit amount is less than deposit offer minmum amount")
-	errDepositDurationToSmall   = errors.New("deposit duration is less than deposit offer minmum duration")
-	errDepositDurationToBig     = errors.New("deposit duration is greater than deposit offer maximum duration")
-	errSupplyOverflow           = errors.New("resulting total supply would be more, than allowed maximum")
+	errNodeSignatureMissing       = errors.New("last signature is not nodeID's signature")
+	errWrongLockMode              = errors.New("this tx can't be used with this caminoGenesis.LockModeBondDeposit")
+	errNotSecp256Fx               = errors.New("expected fx to be secp256k1.fx")
+	errRecoverAdresses            = errors.New("cannot recover addresses from credentials")
+	errInvalidRoles               = errors.New("invalid role")
+	errValidatorExists            = errors.New("node is already a validator")
+	errInvalidSystemTxBody        = errors.New("tx body doesn't match expected one")
+	errRemoveValidatorToEarly     = errors.New("attempting to remove validator before its end time")
+	errRemoveWrongValidator       = errors.New("attempting to remove wrong validator")
+	errDepositOfferNotActiveYet   = errors.New("deposit offer not active yet")
+	errDepositOfferInactive       = errors.New("deposit offer inactive")
+	errDepositToSmall             = errors.New("deposit amount is less than deposit offer minmum amount")
+	errDepositDurationToSmall     = errors.New("deposit duration is less than deposit offer minmum duration")
+	errDepositDurationToBig       = errors.New("deposit duration is greater than deposit offer maximum duration")
+	errSupplyOverflow             = errors.New("resulting total supply would be more, than allowed maximum")
+	errNotConsortiumMember        = errors.New("address isn't consortium member")
+	errConsortiumSignatureMissing = errors.New("wrong consortium's member signature")
 )
 
 type CaminoStandardTxExecutor struct {
@@ -75,100 +76,6 @@ func (e *CaminoStandardTxExecutor) verifyNodeSignature(nodeID ids.NodeID) error 
 	return nil
 }
 
-// verifyAddValidatorTxWithBonding carries out the validation for an AddValidatorTx
-// using bonding lock-mode instead of avax staking.
-// It returns the tx outputs that should be returned if this validator is not
-// added to the staking set.
-func verifyAddValidatorTxWithBonding(
-	backend *Backend,
-	chainState state.Chain,
-	sTx *txs.Tx,
-	tx *txs.AddValidatorTx,
-) (
-	[]*avax.TransferableOutput,
-	error,
-) {
-	// Verify the tx is well-formed
-	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
-		return nil, err
-	}
-
-	duration := tx.Validator.Duration()
-
-	switch {
-	case tx.Validator.Wght < backend.Config.MinValidatorStake:
-		// Ensure validator is staking at least the minimum amount
-		return nil, errWeightTooSmall
-
-	case tx.Validator.Wght > backend.Config.MaxValidatorStake:
-		// Ensure validator isn't staking too much
-		return nil, errWeightTooLarge
-
-	case tx.DelegationShares < backend.Config.MinDelegationFee:
-		// Ensure the validator fee is at least the minimum amount
-		return nil, errInsufficientDelegationFee
-
-	case duration < backend.Config.MinStakeDuration:
-		// Ensure staking length is not too short
-		return nil, errStakeTooShort
-
-	case duration > backend.Config.MaxStakeDuration:
-		// Ensure staking length is not too long
-		return nil, errStakeTooLong
-	}
-
-	if !backend.Bootstrapped.GetValue() {
-		return tx.Outs, nil
-	}
-
-	currentTimestamp := chainState.GetTimestamp()
-	// Ensure the proposed validator starts after the current time
-	startTime := tx.StartTime()
-	if !currentTimestamp.Before(startTime) {
-		return nil, fmt.Errorf(
-			"%w: %s >= %s",
-			errTimestampNotBeforeStartTime,
-			currentTimestamp,
-			startTime,
-		)
-	}
-
-	_, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
-	if err == nil {
-		return nil, errValidatorExists
-	}
-	if err != database.ErrNotFound {
-		return nil, fmt.Errorf(
-			"failed to find whether %s is a primary network validator: %w",
-			tx.Validator.NodeID,
-			err,
-		)
-	}
-
-	// Verify the flowcheck
-	if err := backend.FlowChecker.VerifyLock(
-		tx,
-		chainState,
-		tx.Ins,
-		tx.Outs,
-		sTx.Creds,
-		backend.Config.AddPrimaryNetworkValidatorFee,
-		backend.Ctx.AVAXAssetID,
-		locked.StateBonded,
-	); err != nil {
-		return nil, fmt.Errorf("%w: %s", errFlowCheckFailed, err)
-	}
-
-	// Make sure the tx doesn't start too far in the future. This is done last
-	// to allow the verifier visitor to explicitly check for this error.
-	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
-	if startTime.After(maxStartTime) {
-		return nil, errFutureStakeTime
-	}
-
-	return tx.Outs, nil
-}
-
 func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	caminoConfig, err := e.State.CaminoConfig()
 	if err != nil {
@@ -179,15 +86,21 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 		return err
 	}
 
+	// verify node sig
+
+	consortiumMemberCredsOffset := 1
 	if caminoConfig.VerifyNodeSignature {
 		if err := e.verifyNodeSignature(tx.NodeID()); err != nil {
 			return err
 		}
-		creds := removeCreds(e.Tx, 1)
+		consortiumMemberCredsOffset--
+		creds := removeCreds(e.Tx, 1) // removing node sig
 		defer addCreds(e.Tx, creds)
 	}
 
-	_, isCaminoTx := e.Tx.Unsigned.(*txs.CaminoAddValidatorTx)
+	// verify avax tx
+
+	caminoAddValidatorTx, isCaminoTx := e.Tx.Unsigned.(*txs.CaminoAddValidatorTx)
 
 	if !caminoConfig.LockModeBondDeposit && !isCaminoTx {
 		return e.StandardTxExecutor.AddValidatorTx(tx)
@@ -197,17 +110,99 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 		return errWrongLockMode
 	}
 
-	if tx.Validator.NodeID == ids.EmptyNodeID {
-		return errEmptyNodeID
+	// verify consortium member signature
+
+	if err := e.Backend.Fx.VerifyPermission(
+		e.Tx.Unsigned,
+		&secp256k1fx.Input{SigIndices: []uint32{0}},
+		e.Tx.Creds[len(e.Tx.Creds)-consortiumMemberCredsOffset-1],
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{caminoAddValidatorTx.ConsortiumMemberAddress},
+		},
+	); err != nil {
+		return fmt.Errorf("%w: %s", errConsortiumSignatureMissing, err)
 	}
 
-	if _, err := verifyAddValidatorTxWithBonding(
-		e.Backend,
-		e.State,
-		e.Tx,
-		tx,
-	); err != nil {
+	// verify consortium member state
+
+	consortiumMemberAddressState, err := e.State.GetAddressStates(caminoAddValidatorTx.ConsortiumMemberAddress)
+	if err != nil {
 		return err
+	}
+
+	if consortiumMemberAddressState&txs.AddressStateConsortiumBit == 0 {
+		return errNotConsortiumMember
+	}
+
+	// verify camino tx
+
+	if err := e.Tx.SyntacticVerify(e.Backend.Ctx); err != nil {
+		return err
+	}
+
+	duration := tx.Validator.Duration()
+
+	switch {
+	case tx.Validator.Wght < e.Backend.Config.MinValidatorStake:
+		// Ensure validator is staking at least the minimum amount
+		return errWeightTooSmall
+	case tx.Validator.Wght > e.Backend.Config.MaxValidatorStake:
+		// Ensure validator isn't staking too much
+		return errWeightTooLarge
+	case duration < e.Backend.Config.MinStakeDuration:
+		// Ensure staking length is not too short
+		return errStakeTooShort
+	case duration > e.Backend.Config.MaxStakeDuration:
+		// Ensure staking length is not too long
+		return errStakeTooLong
+	}
+
+	if !e.Backend.Bootstrapped.GetValue() {
+		return nil
+	}
+
+	currentTimestamp := e.State.GetTimestamp()
+	// Ensure the proposed validator starts after the current time
+	startTime := tx.StartTime()
+	if !currentTimestamp.Before(startTime) {
+		return fmt.Errorf(
+			"%w: %s >= %s",
+			errTimestampNotBeforeStartTime,
+			currentTimestamp,
+			startTime,
+		)
+	}
+
+	if _, err := GetValidator(e.State, constants.PrimaryNetworkID, tx.Validator.NodeID); err == nil {
+		return errValidatorExists
+	} else if err != database.ErrNotFound {
+		return fmt.Errorf(
+			"failed to find whether %s is a primary network validator: %w",
+			tx.Validator.NodeID,
+			err,
+		)
+	}
+
+	// Verify the flowcheck
+	if err := e.Backend.FlowChecker.VerifyLock(
+		tx,
+		e.State,
+		tx.Ins,
+		tx.Outs,
+		e.Tx.Creds[:len(e.Tx.Creds)-1], // base tx creds
+		e.Backend.Config.AddPrimaryNetworkValidatorFee,
+		e.Backend.Ctx.AVAXAssetID,
+		locked.StateBonded,
+	); err != nil {
+		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
+	}
+
+	// Make sure the tx doesn't start too far in the future. This is done last
+	// to allow the verifier visitor to explicitly check for this error.
+	maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
+	if startTime.After(maxStartTime) {
+		return errFutureStakeTime
 	}
 
 	txID := e.Tx.ID()

@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
-	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -128,7 +127,7 @@ func TestCaminoBuilderNewAddValidatorTxNodeSig(t *testing.T) {
 			},
 			nodeID:      nodeID1,
 			nodeKey:     nodeKey2,
-			expectedErr: errNodeKeyMissing,
+			expectedErr: errKeyMissing,
 		},
 		"NodeId node and signature mismatch, LockModeBondDeposit true, VerifyNodeSignature true": {
 			caminoConfig: api.Camino{
@@ -137,12 +136,18 @@ func TestCaminoBuilderNewAddValidatorTxNodeSig(t *testing.T) {
 			},
 			nodeID:      nodeID1,
 			nodeKey:     nodeKey2,
-			expectedErr: errNodeKeyMissing,
+			expectedErr: errKeyMissing,
 		},
 		// No need to add tests with VerifyNodeSignature set to false
 		// because the error will rise from the execution
 	}
 	for name, tt := range tests {
+		key, err := testKeyfactory.NewPrivateKey()
+		require.NoError(t, err)
+		consortiumMemberKey, ok := key.(*crypto.PrivateKeySECP256K1R)
+		require.True(t, ok)
+		consortiumMemberAddr := consortiumMemberKey.Address()
+
 		t.Run("AddValidatorTx: "+name, func(t *testing.T) {
 			env := newCaminoEnvironment(true, tt.caminoConfig)
 			env.ctx.Lock.Lock()
@@ -152,14 +157,14 @@ func TestCaminoBuilderNewAddValidatorTxNodeSig(t *testing.T) {
 				}
 			}()
 
-			_, err := env.txBuilder.NewAddValidatorTx(
+			_, err := env.txBuilder.NewCaminoAddValidatorTx(
 				defaultCaminoValidatorWeight,
 				uint64(defaultValidateStartTime.Unix()+1),
 				uint64(defaultValidateEndTime.Unix()),
 				tt.nodeID,
+				consortiumMemberAddr,
 				ids.ShortEmpty,
-				reward.PercentDenominator,
-				[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0], tt.nodeKey},
+				[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0], tt.nodeKey, consortiumMemberKey},
 				ids.ShortEmpty,
 			)
 			require.ErrorIs(t, err, tt.expectedErr)

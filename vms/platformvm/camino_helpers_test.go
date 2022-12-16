@@ -146,6 +146,7 @@ func newCaminoGenesisWithUTXOs(caminoGenesisConfig api.Camino, genesisUTXOs []ap
 
 	caminoGenesisConfig.UTXODeposits = make([]ids.ID, len(genesisUTXOs))
 	caminoGenesisConfig.ValidatorDeposits = make([][]ids.ID, len(keys))
+	caminoGenesisConfig.ValidatorConsortiumMembers = make([]ids.ShortID, len(keys))
 
 	genesisValidators := make([]api.PermissionlessValidator, len(keys))
 	for i, key := range keys {
@@ -169,6 +170,7 @@ func newCaminoGenesisWithUTXOs(caminoGenesisConfig api.Camino, genesisUTXOs []ap
 			}},
 		}
 		caminoGenesisConfig.ValidatorDeposits[i] = make([]ids.ID, 1)
+		caminoGenesisConfig.ValidatorConsortiumMembers[i] = key.Address()
 	}
 
 	buildGenesisArgs := api.BuildGenesisArgs{
