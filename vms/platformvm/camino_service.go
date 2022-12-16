@@ -164,6 +164,10 @@ type GetConfigurationReply struct {
 	SupplyCap utilsjson.Uint64 `json:"supplyCap"`
 	// The codec version used for serializing
 	CodecVersion utilsjson.Uint16 `json:"codecVersion"`
+	// Camino VerifyNodeSignature
+	VerifyNodeSignature bool `json:"verifyNodeSignature"`
+	// Camino LockModeBondDeposit
+	LockModeBondDeposit bool `json:"lockModeBondDeposit"`
 }
 
 // GetMinStake returns the minimum staking amount in nAVAX.
@@ -200,6 +204,13 @@ func (s *CaminoService) GetConfiguration(_ *http.Request, _ *struct{}, reply *Ge
 
 	// Codec information
 	reply.CodecVersion = utilsjson.Uint16(txs.Version)
+
+	caminoConfig, err := s.vm.state.CaminoConfig()
+	if err != nil {
+		return err
+	}
+	reply.VerifyNodeSignature = caminoConfig.VerifyNodeSignature
+	reply.LockModeBondDeposit = caminoConfig.LockModeBondDeposit
 
 	return nil
 }
