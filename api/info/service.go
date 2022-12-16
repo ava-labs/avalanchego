@@ -42,6 +42,8 @@ type Info struct {
 
 type Parameters struct {
 	Version                       *version.Application
+	GitVersion                    string
+	GitCommit                     string
 	NodeID                        ids.NodeID
 	NodePOP                       *signer.ProofOfPossession
 	NetworkID                     uint32
@@ -95,7 +97,10 @@ type GetNodeVersionReply struct {
 	Version            string            `json:"version"`
 	DatabaseVersion    string            `json:"databaseVersion"`
 	RPCProtocolVersion json.Uint32       `json:"rpcProtocolVersion"`
+	SdkGitCommit       string            `json:"sdkGitCommit"`
+	SdkGitVersion      string            `json:"sdkGitVersion"`
 	GitCommit          string            `json:"gitCommit"`
+	GitVersion         string            `json:"gitVersion"`
 	VMVersions         map[string]string `json:"vmVersions"`
 }
 
@@ -111,7 +116,10 @@ func (i *Info) GetNodeVersion(_ *http.Request, _ *struct{}, reply *GetNodeVersio
 	reply.Version = i.Version.String()
 	reply.DatabaseVersion = version.CurrentDatabase.String()
 	reply.RPCProtocolVersion = json.Uint32(version.RPCChainVMProtocol)
-	reply.GitCommit = version.GitCommit
+	reply.SdkGitCommit = version.GitCommit
+	reply.SdkGitVersion = version.GitVersion
+	reply.GitCommit = i.Parameters.GitCommit
+	reply.GitVersion = i.Parameters.GitVersion
 	reply.VMVersions = vmVersions
 	return nil
 }
