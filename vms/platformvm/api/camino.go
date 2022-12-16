@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -23,14 +24,15 @@ import (
 var errNonExistingOffer = errors.New("non existing deposit offer")
 
 type Camino struct {
-	VerifyNodeSignature      bool                    `json:"verifyNodeSignature"`
-	LockModeBondDeposit      bool                    `json:"lockModeBondDeposit"`
-	InitialAdmin             ids.ShortID             `json:"initialAdmin"`
-	AddressStates            []genesis.AddressState  `json:"addressStates"`
-	DepositOffers            []genesis.DepositOffer  `json:"depositOffers"`
-	ValidatorDeposits        [][]ids.ID              `json:"validatorDeposits"`
-	UTXODeposits             []ids.ID                `json:"utxoDeposits"`
-	InitialMultisigAddresses []genesis.MultisigAlias `json:"initialMultisigAddresses"`
+	VerifyNodeSignature        bool                    `json:"verifyNodeSignature"`
+	LockModeBondDeposit        bool                    `json:"lockModeBondDeposit"`
+	InitialAdmin               ids.ShortID             `json:"initialAdmin"`
+	AddressStates              []genesis.AddressState  `json:"addressStates"`
+	DepositOffers              []genesis.DepositOffer  `json:"depositOffers"`
+	ValidatorDeposits          [][]ids.ID              `json:"validatorDeposits"`
+	ValidatorConsortiumMembers []ids.ShortID           `json:"validatorConsortiumMembers"`
+	UTXODeposits               []ids.ID                `json:"utxoDeposits"`
+	InitialMultisigAddresses   []genesis.MultisigAlias `json:"initialMultisigAddresses"`
 }
 
 func (c Camino) ParseToGenesis() genesis.Camino {
@@ -78,6 +80,7 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 		vdr := vdr
 		validatorTx, err := makeValidator(
 			&vdr,
+			args.Camino.ValidatorConsortiumMembers[validatorIndex],
 			args.AvaxAssetID,
 			startTimestamp,
 			networkID,
@@ -224,6 +227,7 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 
 func makeValidator(
 	vdr *PermissionlessValidator,
+	consortiumMemberAddr ids.ShortID,
 	avaxAssetID ids.ID,
 	startTime uint64,
 	networkID uint32,
@@ -286,6 +290,7 @@ func makeValidator(
 			},
 			RewardsOwner: rewardsOwner,
 		},
+		ConsortiumMemberAddress: consortiumMemberAddr,
 	}}
 	if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
 		return nil, err
@@ -319,13 +324,16 @@ func makeUTXOAndDeposit(
 		OutputOwners: owner,
 	}
 
+	var depositTx *txs.Tx
+	txID := bondTxID
+	depositTxID := ids.Empty
 	if depositOfferID != ids.Empty {
 		offer, ok := offers[depositOfferID]
 		if !ok {
 			return nil, nil, errNonExistingOffer
 		}
 
-		tx := &txs.Tx{Unsigned: &txs.DepositTx{
+		depositTx = &txs.Tx{Unsigned: &txs.DepositTx{
 			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 				NetworkID:    networkID,
 				BlockchainID: ids.Empty,
@@ -345,54 +353,34 @@ func makeUTXOAndDeposit(
 			DepositDuration: offer.MinDuration,
 			RewardsOwner:    &owner,
 		}}
-		if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
+		if err := depositTx.Sign(txs.GenesisCodec, nil); err != nil {
 			return nil, nil, err
 		}
 
-		txID := tx.ID()
-
-		utxo := &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        txID,
-				OutputIndex: uint32(0),
-			},
-			Asset: avax.Asset{ID: avaxAssetID},
-			Out: &locked.Out{
-				IDs: locked.IDs{
-					DepositTxID: txID,
-					BondTxID:    bondTxID,
-				},
-				TransferableOut: innerOut,
-			},
-		}
-
-		return utxo, tx, nil
+		txID = depositTx.ID()
+		outputIndex = 0
+		depositTxID = txID
 	}
 
-	if bondTxID == ids.Empty {
-		return &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        bondTxID,
-				OutputIndex: outputIndex,
+	var utxoOut verify.State = innerOut
+	if bondTxID != ids.Empty || depositTx != nil {
+		utxoOut = &locked.Out{
+			IDs: locked.IDs{
+				BondTxID:    bondTxID,
+				DepositTxID: depositTxID,
 			},
-			Asset: avax.Asset{ID: avaxAssetID},
-			Out:   innerOut,
-		}, nil, nil
+			TransferableOut: innerOut,
+		}
 	}
 
 	return &avax.UTXO{
 		UTXOID: avax.UTXOID{
-			TxID:        bondTxID,
+			TxID:        txID,
 			OutputIndex: outputIndex,
 		},
 		Asset: avax.Asset{ID: avaxAssetID},
-		Out: &locked.Out{
-			IDs: locked.IDs{
-				BondTxID: bondTxID,
-			},
-			TransferableOut: innerOut,
-		},
-	}, nil, nil
+		Out:   utxoOut,
+	}, depositTx, nil
 }
 
 func getSecpOwner(owner *Owner) (*secp256k1fx.OutputOwners, error) {

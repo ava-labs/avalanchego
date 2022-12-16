@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/nodeid"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
-	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -123,8 +122,8 @@ func TestCaminoAddValidatorTxSyntacticVerify(t *testing.T) {
 						Threshold: 1,
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
 					},
-					DelegationShares: reward.PercentDenominator,
 				},
+				ConsortiumMemberAddress: caminoPreFundedKeys[0].PublicKey().Address(),
 			}
 
 			utx = tt.preExecute(t, utx)

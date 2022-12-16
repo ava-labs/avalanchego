@@ -385,6 +385,7 @@ func buildCaminoGenesisTest(ctx *snow.Context, caminoGenesisConf api.Camino) []b
 
 	caminoGenesisConf.UTXODeposits = make([]ids.ID, len(genesisUTXOs))
 	caminoGenesisConf.ValidatorDeposits = make([][]ids.ID, len(caminoPreFundedKeys))
+	caminoGenesisConf.ValidatorConsortiumMembers = make([]ids.ShortID, len(caminoPreFundedKeys))
 
 	genesisValidators := make([]api.PermissionlessValidator, len(caminoPreFundedKeys))
 	for i, key := range caminoPreFundedKeys {
@@ -409,6 +410,7 @@ func buildCaminoGenesisTest(ctx *snow.Context, caminoGenesisConf api.Camino) []b
 			DelegationFee: reward.PercentDenominator,
 		}
 		caminoGenesisConf.ValidatorDeposits[i] = make([]ids.ID, 1)
+		caminoGenesisConf.ValidatorConsortiumMembers[i] = key.Address()
 	}
 
 	buildGenesisArgs := api.BuildGenesisArgs{

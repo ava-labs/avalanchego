@@ -7,24 +7,27 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
-	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
 var (
 	_ ValidatorTx = (*CaminoAddValidatorTx)(nil)
 
-	errAssetNotAVAX      = errors.New("locked output must be AVAX")
-	errStakeOutsNotEmpty = errors.New("stake outputs must be empty")
+	errAssetNotAVAX                 = errors.New("locked output must be AVAX")
+	errStakeOutsNotEmpty            = errors.New("stake outputs must be empty")
+	errEmptyConsortiumMemberAddress = errors.New("consortium member address cannot be empty")
 )
 
 // CaminoAddValidatorTx is an unsigned caminoAddValidatorTx
 type CaminoAddValidatorTx struct {
 	AddValidatorTx `serialize:"true"`
+
+	ConsortiumMemberAddress ids.ShortID `serialize:"true" json:"consortiumMemberAddress"`
 }
 
 func (tx *CaminoAddValidatorTx) Stake() []*avax.TransferableOutput {
@@ -44,8 +47,12 @@ func (tx *CaminoAddValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 		return ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.DelegationShares > reward.PercentDenominator: // Ensure delegators shares are in the allowed amount
+	case tx.DelegationShares > 0:
 		return errTooManyShares
+	case tx.Validator.NodeID == ids.EmptyNodeID:
+		return errEmptyNodeID
+	case tx.ConsortiumMemberAddress == ids.ShortEmpty:
+		return errEmptyConsortiumMemberAddress
 	}
 
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {

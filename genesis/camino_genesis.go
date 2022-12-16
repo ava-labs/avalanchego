@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -82,6 +83,10 @@ func validateCaminoConfig(config *Config) error {
 	nodes := set.Set[ids.NodeID]{}
 	for _, allocation := range config.Camino.Allocations {
 		for _, platformAllocation := range allocation.PlatformAllocations {
+			if allocation.AddressStates.ConsortiumMember && !allocation.AddressStates.KYCVerified {
+				return errors.New("consortium member not kyc verified")
+			}
+
 			if platformAllocation.DepositOfferID != ids.Empty {
 				if _, ok := offers[platformAllocation.DepositOfferID]; !ok {
 					return errors.New("allocation deposit offer id doesn't match any offer")
@@ -92,6 +97,9 @@ func validateCaminoConfig(config *Config) error {
 					return errors.New("repeated staker allocation")
 				}
 				nodes.Add(platformAllocation.NodeID)
+				if !allocation.AddressStates.ConsortiumMember {
+					return errors.New("staker ins't consortium member")
+				}
 			}
 			if platformAllocation.NodeID != ids.EmptyNodeID &&
 				platformAllocation.ValidatorDuration == 0 ||
@@ -226,13 +234,20 @@ func buildPGenesis(config *Config, hrp string, xGenesisBytes []byte, xGenesisDat
 	stakingOffset := time.Duration(0)
 
 	for _, allocation := range config.Camino.Allocations {
-		if allocation.AddressState != 0 {
-			addrState := genesis.AddressState{
-				Address: allocation.AVAXAddr,
-				State:   allocation.AddressState,
-			}
-			platformvmArgs.Camino.AddressStates = append(platformvmArgs.Camino.AddressStates, addrState)
+		var addrState uint64
+		if allocation.AddressStates.ConsortiumMember {
+			addrState |= txs.AddressStateConsortiumBit
 		}
+		if allocation.AddressStates.KYCVerified {
+			addrState |= txs.AddressStateKycVerifiedBit
+		}
+		if addrState != 0 {
+			platformvmArgs.Camino.AddressStates = append(platformvmArgs.Camino.AddressStates, genesis.AddressState{
+				Address: allocation.AVAXAddr,
+				State:   addrState,
+			})
+		}
+
 		for _, platformAllocation := range allocation.PlatformAllocations {
 			if platformAllocation.Amount == 0 {
 				return nil, ids.Empty, errEmptyAllocation
@@ -274,6 +289,7 @@ func buildPGenesis(config *Config, hrp string, xGenesisBytes []byte, xGenesisDat
 					},
 				)
 				platformvmArgs.Camino.ValidatorDeposits = append(platformvmArgs.Camino.ValidatorDeposits, []ids.ID{platformAllocation.DepositOfferID})
+				platformvmArgs.Camino.ValidatorConsortiumMembers = append(platformvmArgs.Camino.ValidatorConsortiumMembers, allocation.AVAXAddr)
 			} else {
 				platformvmArgs.Camino.UTXODeposits = append(platformvmArgs.Camino.UTXODeposits, platformAllocation.DepositOfferID)
 				platformvmArgs.UTXOs = append(platformvmArgs.UTXOs, utxo)

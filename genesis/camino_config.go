@@ -82,7 +82,7 @@ type CaminoAllocation struct {
 	ETHAddr             ids.ShortID          `json:"ethAddr"`
 	AVAXAddr            ids.ShortID          `json:"avaxAddr"`
 	XAmount             uint64               `json:"xAmount"`
-	AddressState        uint64               `json:"addressState"`
+	AddressStates       AddressStates        `json:"addressStates"`
 	PlatformAllocations []PlatformAllocation `json:"platformAllocations"`
 }
 
@@ -90,7 +90,7 @@ func (a CaminoAllocation) Unparse(networkID uint32) (UnparsedCaminoAllocation, e
 	ua := UnparsedCaminoAllocation{
 		XAmount:             a.XAmount,
 		ETHAddr:             "0x" + hex.EncodeToString(a.ETHAddr.Bytes()),
-		AddressState:        a.AddressState,
+		AddressStates:       a.AddressStates,
 		PlatformAllocations: make([]UnparsedPlatformAllocation, len(a.PlatformAllocations)),
 	}
 	avaxAddr, err := address.Format(
@@ -159,4 +159,9 @@ func (uma *UnparsedMultisigAlias) Unparse(ma genesis.MultisigAlias, networkID ui
 	uma.Threshold = ma.Threshold
 
 	return nil
+}
+
+type AddressStates struct {
+	ConsortiumMember bool `json:"consortiumMember"`
+	KYCVerified      bool `json:"kycVerified"`
 }

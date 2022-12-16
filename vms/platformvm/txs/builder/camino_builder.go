@@ -25,7 +25,8 @@ import (
 var (
 	_ CaminoBuilder = (*caminoBuilder)(nil)
 
-	errNodeKeyMissing   = errors.New("couldn't find key matching nodeID")
+	errWrongLockMode    = errors.New("this tx can't be used with this caminoGenesis.LockModeBondDeposit")
+	errKeyMissing       = errors.New("couldn't find key matching address")
 	errWrongNodeKeyType = errors.New("node key type isn't *crypto.PrivateKeySECP256K1R")
 )
 
@@ -35,6 +36,17 @@ type CaminoBuilder interface {
 }
 
 type CaminoTxBuilder interface {
+	NewCaminoAddValidatorTx(
+		stakeAmount,
+		startTime,
+		endTime uint64,
+		nodeID ids.NodeID,
+		consortiumMemberAddress ids.ShortID,
+		rewardAddress ids.ShortID,
+		keys []*crypto.PrivateKeySECP256K1R,
+		changeAddr ids.ShortID,
+	) (*txs.Tx, error)
+
 	NewAddAddressStateTx(
 		address ids.ShortID,
 		remove bool,
@@ -85,13 +97,13 @@ type caminoBuilder struct {
 	builder
 }
 
-func (b *caminoBuilder) NewAddValidatorTx(
+func (b *caminoBuilder) NewCaminoAddValidatorTx(
 	stakeAmount,
 	startTime,
 	endTime uint64,
 	nodeID ids.NodeID,
+	consortiumMemberAddress ids.ShortID,
 	rewardAddress ids.ShortID,
-	shares uint32,
 	keys []*crypto.PrivateKeySECP256K1R,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
@@ -100,46 +112,19 @@ func (b *caminoBuilder) NewAddValidatorTx(
 		return nil, err
 	}
 
-	if !caminoGenesis.LockModeBondDeposit {
-		tx, err := b.builder.NewAddValidatorTx(
-			stakeAmount,
-			startTime,
-			endTime,
-			nodeID,
-			rewardAddress,
-			shares,
-			keys,
-			changeAddr,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		if caminoGenesis, err := b.builder.state.CaminoConfig(); err != nil {
-			return nil, err
-		} else if !caminoGenesis.VerifyNodeSignature {
-			return tx, nil
-		}
-
-		nodeSigners, err := getNodeSigners(keys, nodeID)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := tx.Sign(txs.Codec, [][]*crypto.PrivateKeySECP256K1R{nodeSigners}); err != nil {
-			return nil, err
-		}
-
-		return tx, tx.SyntacticVerify(b.ctx)
-	}
-
 	ins, outs, signers, err := b.Lock(keys, stakeAmount, b.cfg.AddPrimaryNetworkValidatorFee, locked.StateBonded, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 
+	consortiumSigners, err := getSECPSigners(keys, consortiumMemberAddress)
+	if err != nil {
+		return nil, err
+	}
+	signers = append(signers, consortiumSigners)
+
 	if caminoGenesis.VerifyNodeSignature {
-		nodeSigners, err := getNodeSigners(keys, nodeID)
+		nodeSigners, err := getSECPSigners(keys, ids.ShortID(nodeID))
 		if err != nil {
 			return nil, err
 		}
@@ -165,14 +150,65 @@ func (b *caminoBuilder) NewAddValidatorTx(
 				Threshold: 1,
 				Addrs:     []ids.ShortID{rewardAddress},
 			},
-			DelegationShares: shares,
 		},
+		ConsortiumMemberAddress: consortiumMemberAddress,
 	}
 
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)
 	if err != nil {
 		return nil, err
 	}
+	return tx, tx.SyntacticVerify(b.ctx)
+}
+
+func (b *caminoBuilder) NewAddValidatorTx(
+	stakeAmount,
+	startTime,
+	endTime uint64,
+	nodeID ids.NodeID,
+	rewardAddress ids.ShortID,
+	shares uint32,
+	keys []*crypto.PrivateKeySECP256K1R,
+	changeAddr ids.ShortID,
+) (*txs.Tx, error) {
+	caminoGenesis, err := b.builder.state.CaminoConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	if caminoGenesis.LockModeBondDeposit {
+		return nil, errWrongLockMode
+	}
+
+	tx, err := b.builder.NewAddValidatorTx(
+		stakeAmount,
+		startTime,
+		endTime,
+		nodeID,
+		rewardAddress,
+		shares,
+		keys,
+		changeAddr,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if caminoGenesis, err := b.builder.state.CaminoConfig(); err != nil {
+		return nil, err
+	} else if !caminoGenesis.VerifyNodeSignature {
+		return tx, nil
+	}
+
+	nodeSigners, err := getSECPSigners(keys, ids.ShortID(nodeID))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Sign(txs.Codec, [][]*crypto.PrivateKeySECP256K1R{nodeSigners}); err != nil {
+		return nil, err
+	}
+
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
@@ -204,7 +240,7 @@ func (b *caminoBuilder) NewAddSubnetValidatorTx(
 		return tx, nil
 	}
 
-	nodeSigners, err := getNodeSigners(keys, nodeID)
+	nodeSigners, err := getSECPSigners(keys, ids.ShortID(nodeID))
 	if err != nil {
 		return nil, err
 	}
@@ -355,13 +391,13 @@ func (b *caminoBuilder) NewUnlockDepositTx(
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
-func getNodeSigners(
+func getSECPSigners(
 	keys []*crypto.PrivateKeySECP256K1R,
-	nodeID ids.NodeID,
+	address ids.ShortID,
 ) ([]*crypto.PrivateKeySECP256K1R, error) {
-	signer, found := secp256k1fx.NewKeychain(keys...).Get(ids.ShortID(nodeID))
+	signer, found := secp256k1fx.NewKeychain(keys...).Get(address)
 	if !found {
-		return nil, errNodeKeyMissing
+		return nil, fmt.Errorf("%w %s", errKeyMissing, address.String())
 	}
 
 	key, ok := signer.(*crypto.PrivateKeySECP256K1R)
