@@ -11,9 +11,9 @@ import (
 type StateSummaryMode uint8
 
 const (
-	StateSummaryNotRunning StateSummaryMode = iota + 1
-	StateSummaryBlocking
-	StateSummaryNonBlocking
+	StateSummaryStopped StateSummaryMode = iota + 1
+	StateSummaryStatic
+	StateSummaryDynamic
 )
 
 var ErrStateSyncableVMNotImplemented = errors.New("vm does not implement StateSyncableVM interface")

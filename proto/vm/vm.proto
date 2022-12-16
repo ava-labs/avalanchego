@@ -377,9 +377,9 @@ message StateSummaryAcceptRequest {
 message StateSummaryAcceptResponse {
   enum Mode {
     MODE_UNSPECIFIED = 0;
-    MODE_NOT_RUNNING = 1;
-    MODE_BLOCKING = 2;
-    MODE_NON_BLOCKING = 3;
+    MODE_STOPPED = 1;
+    MODE_STATIC = 2;
+    MODE_DYNAMIC = 3;
   }
   Mode mode = 1;
   uint32 err = 2;

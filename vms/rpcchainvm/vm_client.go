@@ -969,7 +969,7 @@ func (s *summaryClient) Accept(ctx context.Context) (block.StateSummaryMode, err
 		},
 	)
 	if err != nil {
-		return block.StateSummaryNotRunning, err
+		return block.StateSummaryStopped, err
 	}
 	return block.StateSummaryMode(resp.Mode), errCodeToError[resp.Err]
 }

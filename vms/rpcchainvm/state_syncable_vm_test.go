@@ -191,7 +191,7 @@ func acceptStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (plugin.P
 				func(context.Context, []byte) (block.StateSummary, error) {
 					// setup summary to be accepted before returning it
 					mockedSummary.AcceptF = func(context.Context) (block.StateSummaryMode, error) {
-						return block.StateSummaryBlocking, nil
+						return block.StateSummaryStatic, nil
 					}
 					return mockedSummary, nil
 				},
@@ -200,7 +200,7 @@ func acceptStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (plugin.P
 				func(context.Context, []byte) (block.StateSummary, error) {
 					// setup summary to be skipped before returning it
 					mockedSummary.AcceptF = func(context.Context) (block.StateSummaryMode, error) {
-						return block.StateSummaryNotRunning, nil
+						return block.StateSummaryStopped, nil
 					}
 					return mockedSummary, nil
 				},
@@ -209,7 +209,7 @@ func acceptStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (plugin.P
 				func(context.Context, []byte) (block.StateSummary, error) {
 					// setup summary to fail accept
 					mockedSummary.AcceptF = func(context.Context) (block.StateSummaryMode, error) {
-						return block.StateSummaryNotRunning, errBrokenConnectionOrSomething
+						return block.StateSummaryStopped, errBrokenConnectionOrSomething
 					}
 					return mockedSummary, nil
 				},
@@ -244,7 +244,7 @@ func lastAcceptedBlockPostStateSummaryAcceptTestPlugin(t *testing.T, loadExpecta
 				func(context.Context, []byte) (block.StateSummary, error) {
 					// setup summary to be accepted before returning it
 					mockedSummary.AcceptF = func(context.Context) (block.StateSummaryMode, error) {
-						return block.StateSummaryBlocking, nil
+						return block.StateSummaryStatic, nil
 					}
 					return mockedSummary, nil
 				},
@@ -455,12 +455,12 @@ func TestAcceptStateSummary(t *testing.T) {
 	// test status Summary
 	status, err := summary.Accept(context.Background())
 	require.NoError(err)
-	require.Equal(block.StateSummaryBlocking, status)
+	require.Equal(block.StateSummaryStatic, status)
 
 	// test skipped Summary
 	status, err = summary.Accept(context.Background())
 	require.NoError(err)
-	require.Equal(block.StateSummaryNotRunning, status)
+	require.Equal(block.StateSummaryStopped, status)
 
 	// test a non-special error.
 	// TODO: retrieve exact error
@@ -502,7 +502,7 @@ func TestLastAcceptedBlockPostStateSummaryAccept(t *testing.T) {
 
 	status, err := summary.Accept(context.Background())
 	require.NoError(err)
-	require.Equal(block.StateSummaryBlocking, status)
+	require.Equal(block.StateSummaryStatic, status)
 
 	// State Sync accept does not duly update LastAccepted block information
 	// since state sync can complete asynchronously

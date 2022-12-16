@@ -316,16 +316,16 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 	}
 
 	switch stateSyncMode {
-	case block.StateSummaryNotRunning:
+	case block.StateSummaryStopped:
 		// VM did not accept the summary, move on to bootstrapping.
 		ss.Ctx.RunningStateSync(false)
 		return ss.onDoneStateSyncing(ctx, ss.requestID)
-	case block.StateSummaryBlocking:
+	case block.StateSummaryStatic:
 		// summary was accepted and VM is state syncing.
 		// Engine will wait for notification of state sync done.
 		ss.Ctx.RunningStateSync(true)
 		return nil
-	case block.StateSummaryNonBlocking:
+	case block.StateSummaryDynamic:
 		// VM will run state summary but it's able to complete
 		// bootstrapping in the meantime. Proceed to bootstrap
 		ss.Ctx.RunningStateSync(true)

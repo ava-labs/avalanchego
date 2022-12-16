@@ -46,5 +46,5 @@ func (s *TestStateSummary) Accept(ctx context.Context) (StateSummaryMode, error)
 	if s.CantAccept && s.T != nil {
 		s.T.Fatal(errAccept)
 	}
-	return StateSummaryNotRunning, errAccept
+	return StateSummaryStopped, errAccept
 }

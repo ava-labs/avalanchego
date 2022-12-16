@@ -881,7 +881,7 @@ func (vm *VMServer) StateSummaryAccept(
 	req *vmpb.StateSummaryAcceptRequest,
 ) (*vmpb.StateSummaryAcceptResponse, error) {
 	var (
-		mode = block.StateSummaryNotRunning
+		mode = block.StateSummaryStopped
 		err  error
 	)
 	if vm.ssVM != nil {
@@ -896,14 +896,14 @@ func (vm *VMServer) StateSummaryAccept(
 
 	var protoMode vmpb.StateSummaryAcceptResponse_Mode
 	switch mode {
-	case block.StateSummaryNotRunning:
-		protoMode = vmpb.StateSummaryAcceptResponse_MODE_NOT_RUNNING
-	case block.StateSummaryBlocking:
-		protoMode = vmpb.StateSummaryAcceptResponse_MODE_BLOCKING
-	case block.StateSummaryNonBlocking:
-		protoMode = vmpb.StateSummaryAcceptResponse_MODE_NON_BLOCKING
+	case block.StateSummaryStopped:
+		protoMode = vmpb.StateSummaryAcceptResponse_MODE_STOPPED
+	case block.StateSummaryStatic:
+		protoMode = vmpb.StateSummaryAcceptResponse_MODE_STATIC
+	case block.StateSummaryDynamic:
+		protoMode = vmpb.StateSummaryAcceptResponse_MODE_DYNAMIC
 	default:
-		protoMode = vmpb.StateSummaryAcceptResponse_MODE_NOT_RUNNING
+		protoMode = vmpb.StateSummaryAcceptResponse_MODE_STOPPED
 	}
 
 	return &vmpb.StateSummaryAcceptResponse{

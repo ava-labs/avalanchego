@@ -1001,11 +1001,11 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	minoritySummaryCalled := false
 	summary.AcceptF = func(context.Context) (block.StateSummaryMode, error) {
 		majoritySummaryCalled = true
-		return block.StateSummaryBlocking, nil
+		return block.StateSummaryStatic, nil
 	}
 	minoritySummary.AcceptF = func(context.Context) (block.StateSummaryMode, error) {
 		minoritySummaryCalled = true
-		return block.StateSummaryBlocking, nil
+		return block.StateSummaryStatic, nil
 	}
 
 	// let a majority of voters return summaryID, and a minority return minoritySummaryID. The rest timeout.
@@ -1122,7 +1122,7 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 	minoritySummaryCalled := false
 	minoritySummary.AcceptF = func(context.Context) (block.StateSummaryMode, error) {
 		minoritySummaryCalled = true
-		return block.StateSummaryBlocking, nil
+		return block.StateSummaryStatic, nil
 	}
 
 	// Let a majority of voters timeout.
@@ -1258,11 +1258,11 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 	minoritySummaryCalled := false
 	minoritySummary1.AcceptF = func(context.Context) (block.StateSummaryMode, error) {
 		majoritySummaryCalled = true
-		return block.StateSummaryBlocking, nil
+		return block.StateSummaryStatic, nil
 	}
 	minoritySummary2.AcceptF = func(context.Context) (block.StateSummaryMode, error) {
 		minoritySummaryCalled = true
-		return block.StateSummaryBlocking, nil
+		return block.StateSummaryStatic, nil
 	}
 
 	stateSyncFullyDone := false
