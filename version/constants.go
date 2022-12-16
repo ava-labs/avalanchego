@@ -28,8 +28,9 @@ const RPCChainVMProtocol uint = 20
 
 // These are globals that describe network upgrades and node versions
 var (
-	// GitCommit will be set with -X during build step
-	GitCommit string
+	// GitCommit and GitVersion will be set with -X during build step
+	GitCommit  string = "unknown"
+	GitVersion string = "unknown"
 
 	Current = &Semantic{
 		Major: 0,
