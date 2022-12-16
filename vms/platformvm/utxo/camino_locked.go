@@ -11,6 +11,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -833,8 +834,13 @@ func (h *handler) VerifyLockUTXOs(
 			return errLockedFundsNotMarkedAsLocked
 		}
 
+		// Get output signed by real owners (would stay the same if its not msig)
+		msigOut, err := h.getMultisigTransferOutput(utxo)
+		if err != nil {
+			return err
+		}
 		// Verify that this tx's credentials allow [in] to be spent
-		if err := h.fx.VerifyTransfer(tx, in, creds[index], out); err != nil {
+		if err := h.fx.VerifyTransfer(tx, in, creds[index], msigOut); err != nil {
 			return fmt.Errorf("failed to verify transfer: %w", err)
 		}
 
@@ -1094,7 +1100,12 @@ func (h *handler) VerifyUnlockDepositedUTXOs(
 			}
 			depUnlock.consumed = newAmount
 		} else {
-			if err := h.fx.VerifyTransfer(tx, in, creds[index], out); err != nil {
+			// Get output signed by real owners (would stay the same if its not msig)
+			msigOut, err := h.getMultisigTransferOutput(utxo)
+			if err != nil {
+				return nil, err
+			}
+			if err := h.fx.VerifyTransfer(tx, in, creds[index], msigOut); err != nil {
 				return nil, fmt.Errorf("failed to verify transfer: %w", err)
 			}
 
@@ -1247,6 +1258,51 @@ func (h *handler) VerifyUnlockDepositedUTXOs(
 	}
 
 	return unlockedAmount, nil
+}
+
+func (h *handler) getMultisigTransferOutput(utxo *avax.UTXO) (verify.Verifiable, error) {
+	// It preprocesses the UTXO the same way as the `platformvm.utxo.handler.VerifySpendUTXOs`.
+	// Prepared `utxos` will be used only for signature verification
+	out := utxo.Out
+	if inner, ok := out.(*stakeable.LockOut); ok {
+		out = inner.TransferableOut
+	}
+	if inner, ok := out.(*locked.Out); ok {
+		out = inner.TransferableOut
+	}
+
+	secpOut, ok := out.(*secp256k1fx.TransferOutput)
+	if !ok {
+		// Conversion should succeed, otherwise it will be handled by the caller
+		return secpOut, nil
+	}
+
+	if len(secpOut.Addrs) != 1 {
+		// There always should be just one, otherwise it is not a multisig
+		return secpOut, nil
+	}
+
+	// ! because currently there is no support for adding new msig aliases after genesis,
+	// ! we assume that state diffs won't contain any changes to msig aliases state
+	// ! that must be changed later
+	state, ok := h.utxosReader.(state.State)
+	if !ok {
+		return secpOut, nil
+	}
+
+	owner, err := state.GetMultisigOwner(secpOut.Addrs[0])
+	if err != nil {
+		if err == database.ErrNotFound {
+			return secpOut, nil
+		}
+
+		return secpOut, err
+	}
+
+	return &secp256k1fx.TransferOutput{
+		Amt:          secpOut.Amount(),
+		OutputOwners: owner.Owners,
+	}, nil
 }
 
 type innerSortUTXOs struct {

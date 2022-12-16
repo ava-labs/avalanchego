@@ -103,6 +103,14 @@ func validateCaminoConfig(config *Config) error {
 		}
 	}
 
+	// validate msig aliases
+	genesisTxID := ids.Empty
+	for _, msig := range config.Camino.InitialMultisigAddresses {
+		if err := msig.Verify(genesisTxID); err != nil {
+			return fmt.Errorf("wrong msig alias definition: %w", err)
+		}
+	}
+
 	if nodes.Len() == 0 {
 		return errors.New("no staker allocations")
 	}
@@ -112,10 +120,11 @@ func validateCaminoConfig(config *Config) error {
 
 func caminoArgFromConfig(config *Config) api.Camino {
 	return api.Camino{
-		VerifyNodeSignature: config.Camino.VerifyNodeSignature,
-		LockModeBondDeposit: config.Camino.LockModeBondDeposit,
-		InitialAdmin:        config.Camino.InitialAdmin,
-		DepositOffers:       config.Camino.DepositOffers,
+		VerifyNodeSignature:      config.Camino.VerifyNodeSignature,
+		LockModeBondDeposit:      config.Camino.LockModeBondDeposit,
+		InitialAdmin:             config.Camino.InitialAdmin,
+		DepositOffers:            config.Camino.DepositOffers,
+		InitialMultisigAddresses: config.Camino.InitialMultisigAddresses,
 	}
 }
 

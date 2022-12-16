@@ -137,6 +137,7 @@ type State interface {
 	BlockState
 	uptime.State
 	avax.UTXOReader
+	CaminoMultisig
 
 	GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error)
 

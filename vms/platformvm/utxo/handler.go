@@ -566,8 +566,13 @@ func (h *handler) VerifySpendUTXOs(
 			in = inner.TransferableIn
 		}
 
+		// Get output signed by real owners (would stay the same if its not msig)
+		msigOut, err := h.getMultisigTransferOutput(utxo)
+		if err != nil {
+			return err
+		}
 		// Verify that this tx's credentials allow [in] to be spent
-		if err := h.fx.VerifyTransfer(tx, in, creds[index], out); err != nil {
+		if err := h.fx.VerifyTransfer(tx, in, creds[index], msigOut); err != nil {
 			return fmt.Errorf("failed to verify transfer: %w", err)
 		}
 

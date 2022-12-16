@@ -23,22 +23,24 @@ import (
 var errNonExistingOffer = errors.New("non existing deposit offer")
 
 type Camino struct {
-	VerifyNodeSignature bool                   `json:"verifyNodeSignature"`
-	LockModeBondDeposit bool                   `json:"lockModeBondDeposit"`
-	InitialAdmin        ids.ShortID            `json:"initialAdmin"`
-	AddressStates       []genesis.AddressState `json:"addressStates"`
-	DepositOffers       []genesis.DepositOffer `json:"depositOffers"`
-	ValidatorDeposits   [][]ids.ID             `json:"validatorDeposits"`
-	UTXODeposits        []ids.ID               `json:"utxoDeposits"`
+	VerifyNodeSignature      bool                    `json:"verifyNodeSignature"`
+	LockModeBondDeposit      bool                    `json:"lockModeBondDeposit"`
+	InitialAdmin             ids.ShortID             `json:"initialAdmin"`
+	AddressStates            []genesis.AddressState  `json:"addressStates"`
+	DepositOffers            []genesis.DepositOffer  `json:"depositOffers"`
+	ValidatorDeposits        [][]ids.ID              `json:"validatorDeposits"`
+	UTXODeposits             []ids.ID                `json:"utxoDeposits"`
+	InitialMultisigAddresses []genesis.MultisigAlias `json:"initialMultisigAddresses"`
 }
 
 func (c Camino) ParseToGenesis() genesis.Camino {
 	return genesis.Camino{
-		VerifyNodeSignature: c.VerifyNodeSignature,
-		LockModeBondDeposit: c.LockModeBondDeposit,
-		InitialAdmin:        c.InitialAdmin,
-		AddressStates:       c.AddressStates,
-		DepositOffers:       c.DepositOffers,
+		VerifyNodeSignature:      c.VerifyNodeSignature,
+		LockModeBondDeposit:      c.LockModeBondDeposit,
+		InitialAdmin:             c.InitialAdmin,
+		AddressStates:            c.AddressStates,
+		DepositOffers:            c.DepositOffers,
+		InitialMultisigAddresses: c.InitialMultisigAddresses,
 	}
 }
 

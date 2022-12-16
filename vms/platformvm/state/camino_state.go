@@ -68,3 +68,11 @@ func (s *state) UpdateDeposit(depositTxID ids.ID, deposit *deposit.Deposit) {
 func (s *state) GetDeposit(depositTxID ids.ID) (*deposit.Deposit, error) {
 	return s.caminoState.GetDeposit(depositTxID)
 }
+
+func (s *state) SetMultisigOwner(owner *MultisigOwner) {
+	s.caminoState.SetMultisigOwner(owner)
+}
+
+func (s *state) GetMultisigOwner(alias ids.ShortID) (*MultisigOwner, error) {
+	return s.caminoState.GetMultisigOwner(alias)
+}

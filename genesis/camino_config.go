@@ -5,6 +5,7 @@ package genesis
 
 import (
 	"encoding/hex"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -14,19 +15,21 @@ import (
 )
 
 type Camino struct {
-	VerifyNodeSignature bool                   `json:"verifyNodeSignature"`
-	LockModeBondDeposit bool                   `json:"lockModeBondDeposit"`
-	InitialAdmin        ids.ShortID            `json:"initialAdmin"`
-	DepositOffers       []genesis.DepositOffer `json:"depositOffers"`
-	Allocations         []CaminoAllocation     `json:"allocations"`
+	VerifyNodeSignature      bool                    `json:"verifyNodeSignature"`
+	LockModeBondDeposit      bool                    `json:"lockModeBondDeposit"`
+	InitialAdmin             ids.ShortID             `json:"initialAdmin"`
+	DepositOffers            []genesis.DepositOffer  `json:"depositOffers"`
+	Allocations              []CaminoAllocation      `json:"allocations"`
+	InitialMultisigAddresses []genesis.MultisigAlias `json:"initialMultisigAddresses"`
 }
 
 func (c Camino) Unparse(networkID uint32) (UnparsedCamino, error) {
 	uc := UnparsedCamino{
-		VerifyNodeSignature: c.VerifyNodeSignature,
-		LockModeBondDeposit: c.LockModeBondDeposit,
-		DepositOffers:       c.DepositOffers,
-		Allocations:         make([]UnparsedCaminoAllocation, len(c.Allocations)),
+		VerifyNodeSignature:      c.VerifyNodeSignature,
+		LockModeBondDeposit:      c.LockModeBondDeposit,
+		DepositOffers:            c.DepositOffers,
+		Allocations:              make([]UnparsedCaminoAllocation, len(c.Allocations)),
+		InitialMultisigAddresses: make([]UnparsedMultisigAlias, len(c.InitialMultisigAddresses)),
 	}
 
 	avaxAddr, err := address.Format(
@@ -45,6 +48,13 @@ func (c Camino) Unparse(networkID uint32) (UnparsedCamino, error) {
 			return uc, err
 		}
 		uc.Allocations[i] = ua
+	}
+
+	for i, ma := range c.InitialMultisigAddresses {
+		err = uc.InitialMultisigAddresses[i].Unparse(ma, networkID)
+		if err != nil {
+			return uc, err
+		}
 	}
 
 	return uc, nil
@@ -128,4 +138,25 @@ func (a PlatformAllocation) Unparse() (UnparsedPlatformAllocation, error) {
 	}
 
 	return ua, nil
+}
+
+func (uma *UnparsedMultisigAlias) Unparse(ma genesis.MultisigAlias, networkID uint32) error {
+	addresses := make([]string, len(ma.Addresses))
+	for i, a := range ma.Addresses {
+		addr, err := address.Format(configChainIDAlias, constants.GetHRP(networkID), a.Bytes())
+		if err != nil {
+			return fmt.Errorf("while unparsing cannot format multisig address %s: %w", a, err)
+		}
+		addresses[i] = addr
+	}
+
+	alias, err := address.Format(configChainIDAlias, constants.GetHRP(networkID), ma.Alias.Bytes())
+	if err != nil {
+		return fmt.Errorf("while unparsing cannot format multisig alias %s: %w", ma.Alias, err)
+	}
+	uma.Alias = alias
+	uma.Addresses = addresses
+	uma.Threshold = ma.Threshold
+
+	return nil
 }

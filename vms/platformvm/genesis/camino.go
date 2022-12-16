@@ -4,23 +4,27 @@
 package genesis
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 // Camino genesis args
 type Camino struct {
-	VerifyNodeSignature bool           `serialize:"true"`
-	LockModeBondDeposit bool           `serialize:"true"`
-	InitialAdmin        ids.ShortID    `serialize:"true"`
-	AddressStates       []AddressState `serialize:"true"`
-	DepositOffers       []DepositOffer `serialize:"true"`
-	Deposits            []*txs.Tx      `serialize:"true"`
+	VerifyNodeSignature      bool            `serialize:"true"`
+	LockModeBondDeposit      bool            `serialize:"true"`
+	InitialAdmin             ids.ShortID     `serialize:"true"`
+	AddressStates            []AddressState  `serialize:"true"`
+	DepositOffers            []DepositOffer  `serialize:"true"`
+	Deposits                 []*txs.Tx       `serialize:"true"`
+	InitialMultisigAddresses []MultisigAlias `serialize:"true" json:"initialMultisigAddresses"`
 }
 
 type AddressState struct {
@@ -80,6 +84,74 @@ func (offer DepositOffer) Verify() error {
 			offer.MinDuration,
 			offer.UnlockPeriodDuration,
 		)
+	}
+
+	return nil
+}
+
+type MultisigAlias struct {
+	Alias     ids.ShortID   `serialize:"true" json:"alias"`
+	Threshold uint32        `serialize:"true" json:"threshold"`
+	Addresses []ids.ShortID `serialize:"true" json:"addresses"`
+}
+
+func NewMultisigAlias(txID ids.ID, addresses []ids.ShortID, threshold uint32) (MultisigAlias, error) {
+	var err error
+
+	// make sure provided addresses are unique and sorted
+	addrSet := set.NewSet[ids.ShortID](len(addresses))
+	addrSet.Add(addresses...)
+	sortedAddrs := addrSet.List()
+	utils.Sort(sortedAddrs)
+
+	if len(sortedAddrs) < int(threshold) {
+		return MultisigAlias{}, fmt.Errorf("threshold %d is greater than the number of addresses %d", threshold, len(sortedAddrs))
+	}
+
+	ma := MultisigAlias{
+		Addresses: sortedAddrs,
+		Threshold: threshold,
+	}
+	ma.Alias = ma.ComputeAlias(txID)
+
+	return ma, err
+}
+
+func (ma *MultisigAlias) ComputeAlias(txID ids.ID) ids.ShortID {
+	txIDBytes := txID[:]
+	thresholdBytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(thresholdBytes, ma.Threshold)
+	allBytes := make([]byte, 32+4+20*len(ma.Addresses))
+
+	copy(allBytes, txIDBytes)
+	copy(allBytes[32:], thresholdBytes)
+
+	beg := 32 + 4
+	for _, addr := range ma.Addresses {
+		copy(allBytes[beg:], addr.Bytes())
+		beg += 20
+	}
+
+	alias, _ := ids.ToShortID(hashing.ComputeHash160(hashing.ComputeHash256(allBytes)))
+	return alias
+}
+
+func (ma *MultisigAlias) Verify(txID ids.ID) error {
+	// double check that the addresses are unique
+	addrSet := set.NewSet[ids.ShortID](len(ma.Addresses))
+	addrSet.Add(ma.Addresses...)
+	if addrSet.Len() != len(ma.Addresses) {
+		return errors.New("duplicate addresses found in multisig alias")
+	}
+
+	// double check passed addresses are sorted, as required
+	if !utils.IsSortedAndUniqueSortable(ma.Addresses) {
+		return fmt.Errorf("addresses must be sorted and unique")
+	}
+
+	alias := ma.ComputeAlias(txID)
+	if alias != ma.Alias {
+		return fmt.Errorf("calculated alias does not match provided one")
 	}
 
 	return nil

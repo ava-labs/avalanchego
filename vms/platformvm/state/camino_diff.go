@@ -171,4 +171,8 @@ func (d *diff) ApplyCaminoState(baseState State) {
 	for depositTxID, deposit := range d.caminoDiff.modifiedDeposits {
 		baseState.UpdateDeposit(depositTxID, deposit)
 	}
+
+	for _, v := range d.caminoDiff.modifiedMultisigOwners {
+		baseState.SetMultisigOwner(v)
+	}
 }

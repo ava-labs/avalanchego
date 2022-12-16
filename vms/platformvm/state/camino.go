@@ -33,10 +33,11 @@ const (
 var (
 	_ CaminoState = (*caminoState)(nil)
 
-	caminoPrefix        = []byte("camino")
-	addressStatePrefix  = []byte("addressState")
-	depositOffersPrefix = []byte("depositOffers")
-	depositsPrefix      = []byte("deposits")
+	caminoPrefix         = []byte("camino")
+	addressStatePrefix   = []byte("addressState")
+	depositOffersPrefix  = []byte("depositOffers")
+	depositsPrefix       = []byte("deposits")
+	multisigOwnersPrefix = []byte("multisigOwners")
 
 	nodeSignatureKey   = []byte("nodeSignature")
 	depositBondModeKey = []byte("depositBondMode")
@@ -46,6 +47,11 @@ var (
 
 type CaminoApply interface {
 	ApplyCaminoState(State)
+}
+
+type CaminoMultisig interface {
+	GetMultisigOwner(ids.ShortID) (*MultisigOwner, error)
+	SetMultisigOwner(*MultisigOwner)
 }
 
 type CaminoDiff interface {
@@ -77,6 +83,7 @@ type Camino interface {
 // For state only
 type CaminoState interface {
 	CaminoDiff
+	CaminoMultisig
 
 	CaminoConfig() *CaminoConfig
 	SyncGenesis(*state, *genesis.State) error
@@ -90,9 +97,10 @@ type CaminoConfig struct {
 }
 
 type caminoDiff struct {
-	modifiedAddressStates map[ids.ShortID]uint64
-	modifiedDepositOffers map[ids.ID]*deposit.Offer
-	modifiedDeposits      map[ids.ID]*deposit.Deposit
+	modifiedAddressStates  map[ids.ShortID]uint64
+	modifiedDepositOffers  map[ids.ID]*deposit.Offer
+	modifiedDeposits       map[ids.ID]*deposit.Deposit
+	modifiedMultisigOwners map[ids.ShortID]*MultisigOwner
 }
 
 type caminoState struct {
@@ -115,13 +123,17 @@ type caminoState struct {
 	// Deposits
 	depositsCache cache.Cacher
 	depositsDB    database.Database
+
+	// MSIG aliases
+	multisigOwnersDB database.Database
 }
 
 func newCaminoDiff() *caminoDiff {
 	return &caminoDiff{
-		modifiedAddressStates: make(map[ids.ShortID]uint64),
-		modifiedDepositOffers: make(map[ids.ID]*deposit.Offer),
-		modifiedDeposits:      make(map[ids.ID]*deposit.Deposit),
+		modifiedAddressStates:  make(map[ids.ShortID]uint64),
+		modifiedDepositOffers:  make(map[ids.ID]*deposit.Offer),
+		modifiedDeposits:       make(map[ids.ID]*deposit.Deposit),
+		modifiedMultisigOwners: make(map[ids.ShortID]*MultisigOwner),
 	}
 }
 
@@ -153,6 +165,7 @@ func newCaminoState(baseDB *versiondb.Database, metricsReg prometheus.Registerer
 		depositOffers:     make(map[ids.ID]*deposit.Offer),
 		depositOffersDB:   depositOffersDB,
 		depositOffersList: linkeddb.NewDefault(depositOffersDB),
+		multisigOwnersDB:  prefixdb.New(multisigOwnersPrefix, baseDB),
 
 		depositsCache: depositsCache,
 		depositsDB:    prefixdb.New(depositsPrefix, baseDB),
@@ -247,6 +260,11 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 		s.AddTx(tx, status.Committed)
 	}
 
+	for _, gma := range g.Camino.InitialMultisigAddresses {
+		owner := FromGenesisMultisigAlias(gma)
+		cs.SetMultisigOwner(owner)
+	}
+
 	return nil
 }
 
@@ -284,5 +302,12 @@ func (cs *caminoState) Write() error {
 	if err := cs.writeDepositOffers(); err != nil {
 		return err
 	}
-	return cs.writeDeposits()
+	if err := cs.writeDeposits(); err != nil {
+		return err
+	}
+	if err := cs.writeMultisigOwners(); err != nil {
+		return err
+	}
+
+	return nil
 }
