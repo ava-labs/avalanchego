@@ -31,7 +31,7 @@ func TestByStopTime(t *testing.T) {
 		RewardsOwner: &secp256k1fx.OutputOwners{},
 	}
 	tx0 := &txs.Tx{Unsigned: utx0}
-	err := tx0.Sign(txs.Codec, nil)
+	err := tx0.Initialize(txs.Codec)
 	require.NoError(err)
 
 	utx1 := &txs.AddValidatorTx{
@@ -43,7 +43,7 @@ func TestByStopTime(t *testing.T) {
 		RewardsOwner: &secp256k1fx.OutputOwners{},
 	}
 	tx1 := &txs.Tx{Unsigned: utx1}
-	err = tx1.Sign(txs.Codec, nil)
+	err = tx1.Initialize(txs.Codec)
 	require.NoError(err)
 
 	utx2 := &txs.AddValidatorTx{
@@ -55,7 +55,7 @@ func TestByStopTime(t *testing.T) {
 		RewardsOwner: &secp256k1fx.OutputOwners{},
 	}
 	tx2 := &txs.Tx{Unsigned: utx2}
-	err = tx2.Sign(txs.Codec, nil)
+	err = tx2.Initialize(txs.Codec)
 	require.NoError(err)
 
 	txHeap.Add(tx2)

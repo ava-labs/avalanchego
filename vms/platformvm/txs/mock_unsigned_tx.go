@@ -66,18 +66,6 @@ func (mr *MockUnsignedTxMockRecorder) InitCtx(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InitCtx", reflect.TypeOf((*MockUnsignedTx)(nil).InitCtx), arg0)
 }
 
-// Initialize mocks base method.
-func (m *MockUnsignedTx) Initialize(arg0 []byte) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Initialize", arg0)
-}
-
-// Initialize indicates an expected call of Initialize.
-func (mr *MockUnsignedTxMockRecorder) Initialize(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*MockUnsignedTx)(nil).Initialize), arg0)
-}
-
 // InputIDs mocks base method.
 func (m *MockUnsignedTx) InputIDs() set.Set[ids.ID] {
 	m.ctrl.T.Helper()
@@ -104,6 +92,18 @@ func (m *MockUnsignedTx) Outputs() []*avax.TransferableOutput {
 func (mr *MockUnsignedTxMockRecorder) Outputs() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Outputs", reflect.TypeOf((*MockUnsignedTx)(nil).Outputs))
+}
+
+// SetBytes mocks base method.
+func (m *MockUnsignedTx) SetBytes(arg0 []byte) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetBytes", arg0)
+}
+
+// SetBytes indicates an expected call of SetBytes.
+func (mr *MockUnsignedTxMockRecorder) SetBytes(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetBytes", reflect.TypeOf((*MockUnsignedTx)(nil).SetBytes), arg0)
 }
 
 // SyntacticVerify mocks base method.

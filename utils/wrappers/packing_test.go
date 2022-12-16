@@ -18,25 +18,25 @@ const (
 
 func TestPackerCheckSpace(t *testing.T) {
 	p := Packer{Offset: -1}
-	p.CheckSpace(1)
+	p.checkSpace(1)
 	if !p.Errored() {
 		t.Fatal("Expected errNegativeOffset")
 	}
 
 	p = Packer{}
-	p.CheckSpace(-1)
+	p.checkSpace(-1)
 	if !p.Errored() {
 		t.Fatal("Expected errInvalidInput")
 	}
 
 	p = Packer{Bytes: []byte{0x01}, Offset: 1}
-	p.CheckSpace(1)
+	p.checkSpace(1)
 	if !p.Errored() {
 		t.Fatal("Expected errBadLength")
 	}
 
 	p = Packer{Bytes: []byte{0x01}, Offset: 2}
-	p.CheckSpace(0)
+	p.checkSpace(0)
 	if !p.Errored() {
 		t.Fatal("Expected errBadLength, due to out of bounds offset")
 	}
@@ -44,13 +44,13 @@ func TestPackerCheckSpace(t *testing.T) {
 
 func TestPackerExpand(t *testing.T) {
 	p := Packer{Bytes: []byte{0x01}, Offset: 2}
-	p.Expand(1)
+	p.expand(1)
 	if !p.Errored() {
 		t.Fatal("packer.Expand didn't notice packer had out of bounds offset")
 	}
 
 	p = Packer{Bytes: []byte{0x01, 0x02, 0x03}, Offset: 0}
-	p.Expand(1)
+	p.expand(1)
 	if p.Errored() {
 		t.Fatalf("packer.Expand unexpectedly had error %s", p.Err)
 	} else if len(p.Bytes) != 3 {

@@ -29,7 +29,7 @@ func (t *BaseTx) InitCtx(ctx *snow.Context) {
 	}
 }
 
-func (t *BaseTx) Initialize(bytes []byte) {
+func (t *BaseTx) SetBytes(bytes []byte) {
 	t.bytes = bytes
 }
 

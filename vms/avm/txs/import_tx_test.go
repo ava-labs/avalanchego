@@ -107,7 +107,7 @@ func TestImportTxSerialization(t *testing.T) {
 	}}
 
 	c := setupCodec()
-	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
+	if err := tx.Initialize(c); err != nil {
 		t.Fatal(err)
 	}
 	require.Equal(t, tx.ID().String(), "9wdPb5rsThXYLX4WxkNeyYrNMfDE5cuWLgifSjxKiA2dCmgCZ")
@@ -218,7 +218,6 @@ func TestImportTxSyntacticVerify(t *testing.T) {
 			},
 		}},
 	}
-	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err != nil {
 		t.Fatal(err)
@@ -265,7 +264,6 @@ func TestImportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 			},
 		}},
 	}
-	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("should have erred due to memo field being too long")

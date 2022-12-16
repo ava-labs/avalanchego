@@ -27,7 +27,7 @@ type AdvanceTimeTx struct {
 	unsignedBytes []byte // Unsigned byte representation of this data
 }
 
-func (tx *AdvanceTimeTx) Initialize(unsignedBytes []byte) {
+func (tx *AdvanceTimeTx) SetBytes(unsignedBytes []byte) {
 	tx.unsignedBytes = unsignedBytes
 }
 

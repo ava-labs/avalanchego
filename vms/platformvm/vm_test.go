@@ -1455,7 +1455,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 			},
 		}},
 	}}
-	if err := tx.Sign(txs.Codec, [][]*crypto.PrivateKeySECP256K1R{{}}); err != nil {
+	if err := tx.Initialize(txs.Codec); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1584,7 +1584,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(tx.Sign(txs.Codec, [][]*crypto.PrivateKeySECP256K1R{{}}))
+	require.NoError(tx.Initialize(txs.Codec))
 
 	statelessBlk, err := blocks.NewBanffStandardBlock(
 		nextChainTime,
@@ -1729,7 +1729,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(tx.Sign(txs.Codec, [][]*crypto.PrivateKeySECP256K1R{{}}))
+	require.NoError(tx.Initialize(txs.Codec))
 
 	nextChainTime := initialClkTime.Add(time.Second)
 	preferredID := preferred.ID()
@@ -2039,7 +2039,7 @@ func TestUnverifiedParent(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(tx1.Sign(txs.Codec, [][]*crypto.PrivateKeySECP256K1R{{}}))
+	require.NoError(tx1.Initialize(txs.Codec))
 
 	preferred, err := vm.Builder.Preferred()
 	require.NoError(err)
@@ -2076,7 +2076,7 @@ func TestUnverifiedParent(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(tx1.Sign(txs.Codec, [][]*crypto.PrivateKeySECP256K1R{{}}))
+	require.NoError(tx1.Initialize(txs.Codec))
 	nextChainTime = nextChainTime.Add(time.Second)
 	vm.clock.Set(nextChainTime)
 	statelessSecondAdvanceTimeBlk, err := blocks.NewBanffStandardBlock(

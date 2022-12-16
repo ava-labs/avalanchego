@@ -30,12 +30,12 @@ func Parse(genesisBytes []byte) (*Genesis, error) {
 		return nil, err
 	}
 	for _, tx := range gen.Validators {
-		if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
+		if err := tx.Initialize(txs.GenesisCodec); err != nil {
 			return nil, err
 		}
 	}
 	for _, tx := range gen.Chains {
-		if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
+		if err := tx.Initialize(txs.GenesisCodec); err != nil {
 			return nil, err
 		}
 	}

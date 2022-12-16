@@ -107,7 +107,7 @@ func TestExportTxSerialization(t *testing.T) {
 	}}
 
 	c := setupCodec()
-	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
+	if err := tx.Initialize(c); err != nil {
 		t.Fatal(err)
 	}
 	require.Equal(t, tx.ID().String(), "2PKJE4TrKYpgynBFCpNPpV3GHK7d9QTgrL5mpYG6abHKDvNBG3")
@@ -218,7 +218,6 @@ func TestExportTxSyntacticVerify(t *testing.T) {
 			},
 		}},
 	}
-	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err != nil {
 		t.Fatal(err)
@@ -275,7 +274,6 @@ func TestExportTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 			},
 		}},
 	}
-	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("should have erred due to a wrong network ID")
@@ -326,7 +324,6 @@ func TestExportTxSyntacticVerifyWrongBlockchainID(t *testing.T) {
 			},
 		}},
 	}
-	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("should have erred due to wrong blockchain ID")
@@ -373,7 +370,6 @@ func TestExportTxSyntacticVerifyInvalidMemo(t *testing.T) {
 			},
 		}},
 	}
-	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("should have erred due to memo field being too long")
@@ -429,7 +425,6 @@ func TestExportTxSyntacticVerifyInvalidBaseOutput(t *testing.T) {
 			},
 		}},
 	}
-	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("should have erred due to an invalid base output")
@@ -497,7 +492,6 @@ func TestExportTxSyntacticVerifyUnsortedBaseOutputs(t *testing.T) {
 			},
 		}},
 	}
-	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("should have erred due to unsorted base outputs")
@@ -543,7 +537,6 @@ func TestExportTxSyntacticVerifyInvalidOutput(t *testing.T) {
 			},
 		}},
 	}
-	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("should have erred due to invalid output")
@@ -601,7 +594,6 @@ func TestExportTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 			},
 		},
 	}
-	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("should have erred due to unsorted outputs")
@@ -667,7 +659,6 @@ func TestExportTxSyntacticVerifyInvalidInput(t *testing.T) {
 			},
 		}},
 	}
-	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("should have erred due to invalid input")
@@ -733,7 +724,6 @@ func TestExportTxSyntacticVerifyUnsortedInputs(t *testing.T) {
 			},
 		}},
 	}
-	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("should have erred due to unsorted inputs")
@@ -779,7 +769,6 @@ func TestExportTxSyntacticVerifyInvalidFlowCheck(t *testing.T) {
 			},
 		}},
 	}
-	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("should have erred due to an invalid flow check")

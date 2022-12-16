@@ -322,6 +322,6 @@ func sign(tx *txs.Tx, txSigners [][]keychain.Signer) error {
 	if err != nil {
 		return fmt.Errorf("couldn't marshal tx: %w", err)
 	}
-	tx.Initialize(unsignedBytes, signedBytes)
+	tx.SetBytes(unsignedBytes, signedBytes)
 	return nil
 }
