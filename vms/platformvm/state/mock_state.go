@@ -14,6 +14,7 @@ import (
 	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"
 	choices "github.com/ava-labs/avalanchego/snow/choices"
+	validators "github.com/ava-labs/avalanchego/snow/validators"
 	bls "github.com/ava-labs/avalanchego/utils/crypto/bls"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
 	blocks "github.com/ava-labs/avalanchego/vms/platformvm/blocks"
@@ -668,4 +669,18 @@ func (m *MockState) UTXOIDs(arg0 []byte, arg1 ids.ID, arg2 int) ([]ids.ID, error
 func (mr *MockStateMockRecorder) UTXOIDs(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UTXOIDs", reflect.TypeOf((*MockState)(nil).UTXOIDs), arg0, arg1, arg2)
+}
+
+// ValidatorSet mocks base method.
+func (m *MockState) ValidatorSet(arg0 ids.ID, arg1 validators.Set) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ValidatorSet", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ValidatorSet indicates an expected call of ValidatorSet.
+func (mr *MockStateMockRecorder) ValidatorSet(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidatorSet", reflect.TypeOf((*MockState)(nil).ValidatorSet), arg0, arg1)
 }
