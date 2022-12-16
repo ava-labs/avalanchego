@@ -21,6 +21,9 @@ type State interface {
 	// GetCurrentHeight returns the current height of the P-chain.
 	GetCurrentHeight(context.Context) (uint64, error)
 
+	// GetSubnetID returns the subnetID of the provided chain.
+	GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error)
+
 	// GetValidatorSet returns the validators of the provided subnet at the
 	// requested P-chain height.
 	// The returned map should not be modified.
@@ -55,6 +58,13 @@ func (s *lockedState) GetCurrentHeight(ctx context.Context) (uint64, error) {
 	defer s.lock.Unlock()
 
 	return s.s.GetCurrentHeight(ctx)
+}
+
+func (s *lockedState) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.s.GetSubnetID(ctx, chainID)
 }
 
 func (s *lockedState) GetValidatorSet(

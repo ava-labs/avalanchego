@@ -4,6 +4,7 @@
 package verify
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -19,17 +20,17 @@ var (
 // SameSubnet verifies that the provided [ctx] was provided to a chain in the
 // same subnet as [peerChainID], but not the same chain. If this verification
 // fails, a non-nil error will be returned.
-func SameSubnet(ctx *snow.Context, peerChainID ids.ID) error {
-	if peerChainID == ctx.ChainID {
+func SameSubnet(ctx context.Context, chainCtx *snow.Context, peerChainID ids.ID) error {
+	if peerChainID == chainCtx.ChainID {
 		return errSameChainID
 	}
 
-	subnetID, err := ctx.SNLookup.SubnetID(peerChainID)
+	subnetID, err := chainCtx.ValidatorState.GetSubnetID(ctx, peerChainID)
 	if err != nil {
 		return fmt.Errorf("failed to get subnet of %q: %w", peerChainID, err)
 	}
-	if ctx.SubnetID != subnetID {
-		return fmt.Errorf("%w; expected %q got %q", errMismatchedSubnetIDs, ctx.SubnetID, subnetID)
+	if chainCtx.SubnetID != subnetID {
+		return fmt.Errorf("%w; expected %q got %q", errMismatchedSubnetIDs, chainCtx.SubnetID, subnetID)
 	}
 	return nil
 }

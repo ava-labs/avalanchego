@@ -52,15 +52,15 @@ func (v *voter) Update(ctx context.Context) {
 		return
 	}
 
-	// To prevent any potential deadlocks with un-disclosed dependencies, votes
-	// must be bubbled to the nearest valid block
-	for i, result := range results {
-		results[i] = v.bubbleVotes(ctx, result)
-	}
-
 	for _, result := range results {
 		result := result
+		v.t.Ctx.Log.Debug("filtering poll results",
+			zap.Stringer("result", &result),
+		)
 
+		// To prevent any potential deadlocks with un-disclosed dependencies,
+		// votes must be bubbled to the nearest valid block
+		result = v.bubbleVotes(ctx, result)
 		v.t.Ctx.Log.Debug("finishing poll",
 			zap.Stringer("result", &result),
 		)

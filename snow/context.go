@@ -20,10 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/teleporter"
 )
 
-type SubnetLookup interface {
-	SubnetID(chainID ids.ID) (ids.ID, error)
-}
-
 // ContextInitializable represents an object that can be initialized
 // given a *Context object
 type ContextInitializable interface {
@@ -50,7 +46,6 @@ type Context struct {
 	Keystore     keystore.BlockchainKeystore
 	SharedMemory atomic.SharedMemory
 	BCLookup     ids.AliaserReader
-	SNLookup     SubnetLookup
 	Metrics      metrics.OptionalGatherer
 
 	TeleporterSigner teleporter.Signer

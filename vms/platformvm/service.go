@@ -1771,23 +1771,13 @@ type ValidatedByResponse struct {
 }
 
 // ValidatedBy returns the ID of the Subnet that validates [args.BlockchainID]
-func (s *Service) ValidatedBy(_ *http.Request, args *ValidatedByArgs, response *ValidatedByResponse) error {
+func (s *Service) ValidatedBy(r *http.Request, args *ValidatedByArgs, response *ValidatedByResponse) error {
 	s.vm.ctx.Log.Debug("Platform: ValidatedBy called")
 
-	chainTx, _, err := s.vm.state.GetTx(args.BlockchainID)
-	if err != nil {
-		return fmt.Errorf(
-			"problem retrieving blockchain %q: %w",
-			args.BlockchainID,
-			err,
-		)
-	}
-	chain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
-	if !ok {
-		return fmt.Errorf("%q is not a blockchain", args.BlockchainID)
-	}
-	response.SubnetID = chain.SubnetID
-	return nil
+	var err error
+	ctx := r.Context()
+	response.SubnetID, err = s.vm.GetSubnetID(ctx, args.BlockchainID)
+	return err
 }
 
 // ValidatesArgs are the arguments to Validates

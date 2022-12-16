@@ -47,16 +47,18 @@ func (v *voter) Update(ctx context.Context) {
 	if len(results) == 0 {
 		return
 	}
+
 	for _, result := range results {
+		result := result
+		v.t.Ctx.Log.Debug("filtering poll results",
+			zap.Stringer("result", &result),
+		)
+
 		_, err := v.bubbleVotes(ctx, result)
 		if err != nil {
 			v.t.errs.Add(err)
 			return
 		}
-	}
-
-	for _, result := range results {
-		result := result
 
 		v.t.Ctx.Log.Debug("finishing poll",
 			zap.Stringer("result", &result),

@@ -18,6 +18,7 @@ var Tests = []func(c GeneralCodec, t testing.TB){
 	TestStruct,
 	TestRegisterStructTwice,
 	TestUInt32,
+	TestUIntPtr,
 	TestSlice,
 	TestMaxSizeSlice,
 	TestBool,
@@ -198,6 +199,19 @@ func TestUInt32(codec GeneralCodec, t testing.TB) {
 	if number != numberUnmarshaled {
 		t.Fatal("expected marshaled and unmarshaled values to match")
 	}
+}
+
+func TestUIntPtr(codec GeneralCodec, t testing.TB) {
+	require := require.New(t)
+
+	manager := NewDefaultManager()
+
+	err := manager.RegisterCodec(0, codec)
+	require.NoError(err)
+
+	number := uintptr(500)
+	_, err = manager.Marshal(0, number)
+	require.Error(err)
 }
 
 func TestSlice(codec GeneralCodec, t testing.TB) {
