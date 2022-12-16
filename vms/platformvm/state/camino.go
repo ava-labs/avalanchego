@@ -5,6 +5,7 @@ package state
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
@@ -32,9 +33,13 @@ const (
 var (
 	_ CaminoState = (*caminoState)(nil)
 
+	caminoPrefix        = []byte("camino")
 	addressStatePrefix  = []byte("addressState")
 	depositOffersPrefix = []byte("depositOffers")
 	depositsPrefix      = []byte("deposits")
+
+	nodeSignatureKey   = []byte("nodeSignature")
+	depositBondModeKey = []byte("depositBondMode")
 
 	errWrongTxType = errors.New("unexpected tx type")
 )
@@ -93,6 +98,8 @@ type caminoDiff struct {
 type caminoState struct {
 	*caminoDiff
 
+	caminoDB            database.Database
+	genesisSynced       bool
 	verifyNodeSignature bool
 	lockModeBondDeposit bool
 
@@ -150,6 +157,8 @@ func newCaminoState(baseDB *versiondb.Database, metricsReg prometheus.Registerer
 		depositsCache: depositsCache,
 		depositsDB:    prefixdb.New(depositsPrefix, baseDB),
 
+		caminoDB: prefixdb.New(caminoPrefix, baseDB),
+
 		caminoDiff: newCaminoDiff(),
 	}, nil
 }
@@ -164,6 +173,7 @@ func (cs *caminoState) CaminoConfig() *CaminoConfig {
 
 // Extract camino tag from genesis
 func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
+	cs.genesisSynced = true
 	cs.lockModeBondDeposit = g.Camino.LockModeBondDeposit
 	cs.verifyNodeSignature = g.Camino.VerifyNodeSignature
 
@@ -241,10 +251,33 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 }
 
 func (cs *caminoState) Load() error {
+	// Read the singletons
+	nodeSig, err := database.GetBool(cs.caminoDB, nodeSignatureKey)
+	if err != nil {
+		return err
+	}
+	cs.verifyNodeSignature = nodeSig
+
+	mode, err := database.GetBool(cs.caminoDB, depositBondModeKey)
+	if err != nil {
+		return err
+	}
+	cs.lockModeBondDeposit = mode
+
 	return cs.loadDepositOffers()
 }
 
 func (cs *caminoState) Write() error {
+	// Write the singletons (only once after sync)
+	if cs.genesisSynced {
+		if err := database.PutBool(cs.caminoDB, nodeSignatureKey, cs.verifyNodeSignature); err != nil {
+			return fmt.Errorf("failed to write verifyNodeSignature: %w", err)
+		}
+		if err := database.PutBool(cs.caminoDB, depositBondModeKey, cs.lockModeBondDeposit); err != nil {
+			return fmt.Errorf("failed to write lockModeBondDeposit: %w", err)
+		}
+	}
+
 	if err := cs.writeAddressStates(); err != nil {
 		return err
 	}
