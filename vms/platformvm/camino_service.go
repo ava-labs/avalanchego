@@ -44,18 +44,19 @@ type GetBalanceResponseV2 struct {
 	BondedOutputs          map[ids.ID]utilsjson.Uint64 `json:"bondedOutputs"`
 	DepositedOutputs       map[ids.ID]utilsjson.Uint64 `json:"depositedOutputs"`
 	DepositedBondedOutputs map[ids.ID]utilsjson.Uint64 `json:"bondedDepositedOutputs"`
+	UTXOIDs                []*avax.UTXOID              `json:"utxoIDs"`
 }
 type GetBalanceResponseWrapper struct {
 	LockModeBondDeposit bool
-	GetBalanceResponse
-	GetBalanceResponseV2 //nolint:govet
+	avax                GetBalanceResponse
+	camino              GetBalanceResponseV2
 }
 
 func (response GetBalanceResponseWrapper) MarshalJSON() ([]byte, error) {
 	if !response.LockModeBondDeposit {
-		return json.Marshal(response.GetBalanceResponse)
+		return json.Marshal(response.avax)
 	}
-	return json.Marshal(response.GetBalanceResponseV2)
+	return json.Marshal(response.camino)
 }
 
 // GetBalance gets the balance of an address
@@ -66,7 +67,7 @@ func (s *CaminoService) GetBalance(_ *http.Request, args *GetBalanceRequest, res
 	}
 	response.LockModeBondDeposit = caminoConfig.LockModeBondDeposit
 	if !caminoConfig.LockModeBondDeposit {
-		return s.Service.GetBalance(nil, args, &response.GetBalanceResponse)
+		return s.Service.GetBalance(nil, args, &response.avax)
 	}
 
 	if args.Address != nil {
@@ -93,6 +94,7 @@ func (s *CaminoService) GetBalance(_ *http.Request, args *GetBalanceRequest, res
 	depositedOutputs := map[ids.ID]utilsjson.Uint64{}
 	depositedBondedOutputs := map[ids.ID]utilsjson.Uint64{}
 	balances := map[ids.ID]utilsjson.Uint64{}
+	var utxoIDs []*avax.UTXOID
 
 utxoFor:
 	for _, utxo := range utxos {
@@ -123,10 +125,10 @@ utxoFor:
 			continue utxoFor
 		}
 
-		response.UTXOIDs = append(response.UTXOIDs, &utxo.UTXOID)
+		utxoIDs = append(utxoIDs, &utxo.UTXOID)
 	}
 
-	response.GetBalanceResponseV2 = GetBalanceResponseV2{balances, unlockedOutputs, bondedOutputs, depositedOutputs, depositedBondedOutputs}
+	response.camino = GetBalanceResponseV2{balances, unlockedOutputs, bondedOutputs, depositedOutputs, depositedBondedOutputs, utxoIDs}
 	return nil
 }
 
@@ -162,6 +164,10 @@ type GetConfigurationReply struct {
 	SupplyCap utilsjson.Uint64 `json:"supplyCap"`
 	// The codec version used for serializing
 	CodecVersion utilsjson.Uint16 `json:"codecVersion"`
+	// Camino VerifyNodeSignature
+	VerifyNodeSignature bool `json:"verifyNodeSignature"`
+	// Camino LockModeBondDeposit
+	LockModeBondDeposit bool `json:"lockModeBondDeposit"`
 }
 
 // GetMinStake returns the minimum staking amount in nAVAX.
@@ -198,6 +204,13 @@ func (s *CaminoService) GetConfiguration(_ *http.Request, _ *struct{}, reply *Ge
 
 	// Codec information
 	reply.CodecVersion = utilsjson.Uint16(txs.Version)
+
+	caminoConfig, err := s.vm.state.CaminoConfig()
+	if err != nil {
+		return err
+	}
+	reply.VerifyNodeSignature = caminoConfig.VerifyNodeSignature
+	reply.LockModeBondDeposit = caminoConfig.LockModeBondDeposit
 
 	return nil
 }
