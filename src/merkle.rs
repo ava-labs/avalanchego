@@ -182,7 +182,7 @@ impl BranchNode {
 
     fn calc_eth_rlp<T: ValueTransformer>(&self, store: &dyn ShaleStore<Node>) -> Vec<u8> {
         let mut stream = rlp::RlpStream::new_list(17);
-        for (index, c) in self.chd.iter().enumerate() {
+        for (i, c) in self.chd.iter().enumerate() {
             match c {
                 Some(c) => {
                     let mut c_ref = store.get_item(*c).unwrap();
@@ -199,12 +199,12 @@ impl BranchNode {
                     }
                 }
                 None => {
-                    // Check if there is already caclucated rlp for the child, which
-                    // can happen when manually construct a trie from proof.
-                    if self.chd_eth_rlp[index].is_none() {
+                    // Check if there is already a calculated rlp for the child, which
+                    // can happen when manually constructing a trie from proof.
+                    if self.chd_eth_rlp[i].is_none() {
                         stream.append_empty_data()
                     } else {
-                        stream.append_raw(&self.chd_eth_rlp[index].clone().unwrap(), 1)
+                        stream.append_raw(&self.chd_eth_rlp[i].clone().unwrap(), 1)
                     }
                 }
             };
@@ -279,8 +279,8 @@ impl ExtNode {
                 stream.append_raw(r.get_eth_rlp::<T>(store), 1);
             }
         } else {
-            // Check if there is already caclucated rlp for the child, which
-            // can happen when manually construct a trie from proof.
+            // Check if there is already a caclucated rlp for the child, which
+            // can happen when manually constructing a trie from proof.
             if self.2.is_none() {
                 stream.append_empty_data();
             } else {

@@ -16,9 +16,7 @@ pub struct DynamicMem {
 
 impl DynamicMem {
     pub fn new(size: u64, id: SpaceID) -> Self {
-        let mut space = Vec::new();
-        space.resize(size as usize, 0);
-        let space = Rc::new(UnsafeCell::new(space));
+        let space = Rc::new(UnsafeCell::new(vec![0; size as usize]));
         Self { space, id }
     }
 

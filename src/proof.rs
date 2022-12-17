@@ -157,14 +157,14 @@ impl Proof {
         }
 
         for v in vals.iter() {
-            if v.as_ref().len() == 0 {
+            if v.as_ref().is_empty() {
                 return Err(ProofError::RangeHasDeletion)
             }
         }
 
         // Special case, there is no edge proof at all. The given range is expected
         // to be the whole leaf-set in the trie.
-        if self.0.len() == 0 {
+        if self.0.is_empty() {
             // Use in-memory merkle
             let mut merkle = new_merkle(0x10000, 0x10000);
             for (index, k) in keys.iter().enumerate() {
@@ -201,9 +201,8 @@ impl Proof {
         // proof is also allowed.
         self.proof_to_path(last_key, root_hash, &mut merkle_setup)?;
 
-        // let merkle = merkle_setup.get_merkle_mut();
-        for index in 0..keys.len() {
-            merkle_setup.insert(keys[index].as_ref(), vals[index].as_ref().to_vec())
+        for (i, _) in keys.iter().enumerate() {
+            merkle_setup.insert(keys[i].as_ref(), vals[i].as_ref().to_vec())
         }
 
         // Calculate the hash
@@ -235,7 +234,6 @@ impl Proof {
         let proofs_map = &self.0;
         let mut key_index = 0;
         let mut branch_index: u8 = 0;
-        // let mut root = ObjPtr::null();
         let mut iter = 0;
         loop {
             let cur_proof = proofs_map.get(&cur_hash).ok_or(ProofError::ProofNodeMissing)?;
@@ -278,6 +276,7 @@ impl Proof {
                         chd_ptr = Some(node);
                     }
                 }
+                // We should not hit a leaf node as a parent.
                 _ => return Err(ProofError::DecodeError),
             };
 
@@ -300,6 +299,7 @@ impl Proof {
                 Some(p) => {
                     // Return when reaching the end of the key.
                     if key_index == chunks.len() {
+                        // Release the handle to the node.
                         drop(u_ref);
                         return Ok(())
                     }
@@ -400,6 +400,7 @@ impl Proof {
                     .map_err(|_| ProofError::ProofNodeMissing)?;
                 Ok((Some(branch_ptr.as_ptr()), subproof, 1))
             }
+            // RLP length can only be the two cases above.
             _ => Err(ProofError::DecodeError),
         }
     }
