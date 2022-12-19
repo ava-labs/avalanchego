@@ -32,7 +32,7 @@ func TestParse(t *testing.T) {
 		VerifyNodeSignature   bool
 		LockModeBondDeposit   bool
 		InitialAdmin          string
-		DepositOffers         []genesis.DepositOffer
+		DepositOffers         []UnparsedDepositOffer
 		Allocations           []UnparsedCaminoAllocation
 		UnparsedMultisigAlias []UnparsedMultisigAlias
 	}
@@ -143,7 +143,7 @@ func TestParse(t *testing.T) {
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				InitialAdmin:        toAvaxAddr(xAddress),
-				DepositOffers:       nil,
+				DepositOffers:       []genesis.DepositOffer{},
 				Allocations: []CaminoAllocation{{
 					ETHAddr: func() ids.ShortID {
 						i, _ := ids.ShortFromString("0x" + hex.EncodeToString(toShortID.Bytes()))

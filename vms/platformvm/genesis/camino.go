@@ -137,6 +137,10 @@ func (ma *MultisigAlias) ComputeAlias(txID ids.ID) ids.ShortID {
 }
 
 func (ma *MultisigAlias) Verify(txID ids.ID) error {
+	if len(ma.Addresses) > int(ma.Threshold) {
+		return errors.New("msig alias threshold is greater, than the number of addresses")
+	}
+
 	// double check that the addresses are unique
 	addrSet := set.NewSet[ids.ShortID](len(ma.Addresses))
 	addrSet.Add(ma.Addresses...)

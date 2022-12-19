@@ -14,7 +14,9 @@
         "maxDuration": 94608000,
         "unlockPeriodDuration": 31536000,
         "noRewardsPeriodDuration": 15768000,
-        "flags": 0
+        "flags": {
+          "locked": true
+        }
       },
       {
         "interestRateNominator": 0,
@@ -25,7 +27,9 @@
         "maxDuration": 126144000,
         "unlockPeriodDuration": 63072000,
         "noRewardsPeriodDuration": 31536000,
-        "flags": 0
+        "flags": {
+          "locked": true
+        }
       },
       {
         "interestRateNominator": 90000,
@@ -36,7 +40,9 @@
         "maxDuration": 126144000,
         "unlockPeriodDuration": 31536000,
         "noRewardsPeriodDuration": 15768000,
-        "flags": 0
+        "flags": {
+          "locked": true
+        }
       },
       {
         "interestRateNominator": 100000,
@@ -47,7 +53,9 @@
         "maxDuration": 157680000,
         "unlockPeriodDuration": 31536000,
         "noRewardsPeriodDuration": 15768000,
-        "flags": 0
+        "flags": {
+          "locked": true
+        }
       }
     ],
     "allocations": [
@@ -64,13 +72,22 @@
             "amount": 2000000000000,
             "nodeID": "NodeID-EAm6xyzP8mGm6VMSEoeV3L6dUP1YYnjCr",
             "validatorDuration": 100000,
-            "depositOfferID": "LE47SR1obzixrgRavzwgJhZ6w93PyJwq1XLYcgcCKofKjviB7"
+            "depositOfferID": "2YtQJUH73pdL98N71R54s2b4QiiSX4nzwbTYFHHmyEQtDmSL3a"
           },
           {
             "amount": 10000000000000000,
-            "depositOfferID": "LE47SR1obzixrgRavzwgJhZ6w93PyJwq1XLYcgcCKofKjviB7"
+            "depositOfferID": "2YtQJUH73pdL98N71R54s2b4QiiSX4nzwbTYFHHmyEQtDmSL3a"
           }
         ]
+      }
+    ],
+    "initialMultisigAddresses": [
+      {
+        "alias": "X-kopernikus15c7c4yvnudvz27wxpaw3pt8769zqar59cu2pl8",
+        "addresses": [
+          "X-kopernikus1m4nr983lhd4p4nfsqk3a6a9mejugnn73cmp283"
+        ],
+        "threshold": 1
       }
     ]
   },

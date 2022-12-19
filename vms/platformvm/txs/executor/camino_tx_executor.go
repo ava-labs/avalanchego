@@ -495,6 +495,8 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 	currentChainTime := e.State.GetTimestamp()
 
 	switch {
+	case depositOffer.Flags&deposits.OfferFlagLocked != 0:
+		return errDepositOfferInactive
 	case depositOffer.StartTime().After(currentChainTime):
 		return errDepositOfferNotActiveYet
 	case depositOffer.EndTime().Before(currentChainTime):

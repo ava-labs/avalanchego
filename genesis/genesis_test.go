@@ -370,15 +370,15 @@ func TestGenesis(t *testing.T) {
 		},
 		{
 			networkID:  constants.CaminoID,
-			expectedID: "2dKZjCY2DaFYGtz55XeSoSMPbbCu7mwjz4fg5FdRzKr24Dz4T8",
+			expectedID: "ga6Vx2roMmfuyipQ5hNHee4u9oG11iq2d212CcGk1DVUhRYk7",
 		},
 		{
 			networkID:  constants.ColumbusID,
-			expectedID: "AFXPkskaxMoq1oUNd11ePwSeHNBJLxzbb1EpoTKWszSempu7e",
+			expectedID: "2mWSAwE6Siyf2i1Drz2n4fub6gRn9HVDNMxyTJZZaQZYbQLUot",
 		},
 		{
 			networkID:  constants.KopernikusID,
-			expectedID: "UJf5MUfYWoiinfpJAtkkd6iuH8u6EtkW2te7o1xDkhCnBEhR8",
+			expectedID: "27ScvZmZkMPWcHxQqwrSk3LmjNFr6YTZjbQKJfNq3b6MRW78Gr",
 		},
 		{
 			networkID:  constants.LocalID,

@@ -27,7 +27,7 @@ func (c Camino) Unparse(networkID uint32) (UnparsedCamino, error) {
 	uc := UnparsedCamino{
 		VerifyNodeSignature:      c.VerifyNodeSignature,
 		LockModeBondDeposit:      c.LockModeBondDeposit,
-		DepositOffers:            c.DepositOffers,
+		DepositOffers:            make([]UnparsedDepositOffer, len(c.DepositOffers)),
 		Allocations:              make([]UnparsedCaminoAllocation, len(c.Allocations)),
 		InitialMultisigAddresses: make([]UnparsedMultisigAlias, len(c.InitialMultisigAddresses)),
 	}
@@ -48,6 +48,12 @@ func (c Camino) Unparse(networkID uint32) (UnparsedCamino, error) {
 			return uc, err
 		}
 		uc.Allocations[i] = ua
+	}
+
+	for i := range uc.DepositOffers {
+		var udo *UnparsedDepositOffer
+		udo.Unparse(c.DepositOffers[i])
+		uc.DepositOffers[i] = *udo
 	}
 
 	for i, ma := range c.InitialMultisigAddresses {

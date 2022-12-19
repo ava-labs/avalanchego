@@ -67,7 +67,7 @@ func TestUnparse(t *testing.T) {
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				InitialAdmin:        "X-" + wrappers.IgnoreError(address.FormatBech32("local", sampleShortID.Bytes())).(string),
-				DepositOffers:       nil,
+				DepositOffers:       []UnparsedDepositOffer{},
 				Allocations: []UnparsedCaminoAllocation{{
 					ETHAddr:       "0x" + hex.EncodeToString(sampleShortID.Bytes()),
 					AVAXAddr:      "X-" + wrappers.IgnoreError(address.FormatBech32("local", sampleShortID.Bytes())).(string),

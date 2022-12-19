@@ -16,6 +16,8 @@ import (
 const (
 	interestRateBase        = 365 * 24 * 60 * 60
 	interestRateDenominator = 1_000_000 * interestRateBase
+
+	OfferFlagLocked uint64 = 0b1
 )
 
 var bigInterestRateDenominator = (&big.Int{}).SetInt64(interestRateDenominator)
