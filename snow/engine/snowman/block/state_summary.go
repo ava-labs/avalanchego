@@ -23,7 +23,6 @@ type StateSummary interface {
 
 	// Accept triggers the VM to start state syncing this summary.
 	//
-	// The returned boolean will be [true] if the VM has started state sync or
-	// [false] if the VM has skipped state sync.
+	// It returns the state sync mode select by the VM
 	Accept(context.Context) (StateSummaryMode, error)
 }
