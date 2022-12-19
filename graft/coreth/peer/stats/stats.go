@@ -9,8 +9,7 @@ import (
 	"github.com/ava-labs/coreth/metrics"
 )
 
-// RequestHandlerStats provides the interface for metrics on request handling.
-// Since we drop
+// RequestHandlerStats provides the interface for metrics for both app requests and cross chain requests.
 type RequestHandlerStats interface {
 	UpdateTimeUntilDeadline(duration time.Duration)
 	IncDeadlineDroppedRequest()
@@ -33,5 +32,12 @@ func NewRequestHandlerStats() RequestHandlerStats {
 	return &requestHandlerStats{
 		timeUntilDeadline: metrics.GetOrRegisterTimer("net_req_time_until_deadline", nil),
 		droppedRequests:   metrics.GetOrRegisterCounter("net_req_deadline_dropped", nil),
+	}
+}
+
+func NewCrossChainRequestHandlerStats() RequestHandlerStats {
+	return &requestHandlerStats{
+		timeUntilDeadline: metrics.GetOrRegisterTimer("net_cross_chain_req_time_until_deadline", nil),
+		droppedRequests:   metrics.GetOrRegisterCounter("net_cross_chain_req_deadline_dropped", nil),
 	}
 }

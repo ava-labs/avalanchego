@@ -30,6 +30,7 @@ const minRequestHandlingDuration = 100 * time.Millisecond
 
 var (
 	errAcquiringSemaphore                      = errors.New("error acquiring semaphore")
+	errExpiredRequest                          = errors.New("expired request")
 	_                     Network              = &network{}
 	_                     validators.Connector = &network{}
 	_                     common.AppHandler    = &network{}
@@ -39,17 +40,20 @@ type Network interface {
 	validators.Connector
 	common.AppHandler
 
-	// RequestAny synchronously sends request to a randomly chosen peer with a
+	// SendAppRequestAny synchronously sends request to an arbitrary peer with a
 	// node version greater than or equal to minVersion.
 	// Returns the ID of the chosen peer, and an error if the request could not
 	// be sent to a peer with the desired [minVersion].
-	RequestAny(minVersion *version.Application, message []byte, handler message.ResponseHandler) (ids.NodeID, error)
+	SendAppRequestAny(minVersion *version.Application, message []byte, handler message.ResponseHandler) (ids.NodeID, error)
 
-	// Request sends message to given nodeID, notifying handler when there's a response or timeout
-	Request(nodeID ids.NodeID, message []byte, handler message.ResponseHandler) error
+	// SendAppRequest sends message to given nodeID, notifying handler when there's a response or timeout
+	SendAppRequest(nodeID ids.NodeID, message []byte, handler message.ResponseHandler) error
 
 	// Gossip sends given gossip message to peers
 	Gossip(gossip []byte) error
+
+	// SendCrossChainRequest sends a message to given chainID notifying handler when there's a response or timeout
+	SendCrossChainRequest(chainID ids.ID, message []byte, handler message.ResponseHandler) error
 
 	// Shutdown stops all peer channel listeners and marks the node to have stopped
 	// n.Start() can be called again but the peers will have to be reconnected
@@ -61,6 +65,9 @@ type Network interface {
 
 	// SetRequestHandler sets the provided request handler as the request handler
 	SetRequestHandler(handler message.RequestHandler)
+
+	// SetCrossChainHandler sets the provided cross chain request handler as the cross chain request handler
+	SetCrossChainRequestHandler(handler message.CrossChainRequestHandler)
 
 	// Size returns the size of the network in number of connected peers
 	Size() uint32
@@ -77,74 +84,82 @@ type network struct {
 	self                       ids.NodeID                         // NodeID of this node
 	requestIDGen               uint32                             // requestID counter used to track outbound requests
 	outstandingRequestHandlers map[uint32]message.ResponseHandler // maps avalanchego requestID => message.ResponseHandler
-	activeRequests             *semaphore.Weighted                // controls maximum number of active outbound requests
+	activeAppRequests          *semaphore.Weighted                // controls maximum number of active outbound requests
+	activeCrossChainRequests   *semaphore.Weighted                // controls maximum number of active outbound cross chain requests
 	appSender                  common.AppSender                   // avalanchego AppSender for sending messages
 	codec                      codec.Manager                      // Codec used for parsing messages
-	requestHandler             message.RequestHandler             // maps request type => handler
+	crossChainCodec            codec.Manager                      // Codec used for parsing cross chain messages
+	appRequestHandler          message.RequestHandler             // maps request type => handler
+	crossChainRequestHandler   message.CrossChainRequestHandler   // maps cross chain request type => handler
 	gossipHandler              message.GossipHandler              // maps gossip type => handler
 	peers                      *peerTracker                       // tracking of peers & bandwidth
-	stats                      stats.RequestHandlerStats          // Provide request handler metrics
+	appStats                   stats.RequestHandlerStats          // Provide request handler metrics
+	crossChainStats            stats.RequestHandlerStats          // Provide cross chain request handler metrics
 }
 
-func NewNetwork(appSender common.AppSender, codec codec.Manager, self ids.NodeID, maxActiveRequests int64) Network {
+func NewNetwork(appSender common.AppSender, codec codec.Manager, crossChainCodec codec.Manager, self ids.NodeID, maxActiveAppRequests int64, maxActiveCrossChainRequests int64) Network {
 	return &network{
 		appSender:                  appSender,
 		codec:                      codec,
+		crossChainCodec:            crossChainCodec,
 		self:                       self,
 		outstandingRequestHandlers: make(map[uint32]message.ResponseHandler),
-		activeRequests:             semaphore.NewWeighted(maxActiveRequests),
+		activeAppRequests:          semaphore.NewWeighted(maxActiveAppRequests),
+		activeCrossChainRequests:   semaphore.NewWeighted(maxActiveCrossChainRequests),
 		gossipHandler:              message.NoopMempoolGossipHandler{},
-		requestHandler:             message.NoopRequestHandler{},
+		appRequestHandler:          message.NoopRequestHandler{},
+		crossChainRequestHandler:   message.NoopCrossChainRequestHandler{},
 		peers:                      NewPeerTracker(),
-		stats:                      stats.NewRequestHandlerStats(),
+		appStats:                   stats.NewRequestHandlerStats(),
+		crossChainStats:            stats.NewCrossChainRequestHandlerStats(),
 	}
 }
 
-// RequestAny synchronously sends request to a randomly chosen peer with a
+// SendAppRequestAny synchronously sends request to an arbitrary peer with a
 // node version greater than or equal to minVersion. If minVersion is nil,
 // the request will be sent to any peer regardless of their version.
 // Returns the ID of the chosen peer, and an error if the request could not
 // be sent to a peer with the desired [minVersion].
-func (n *network) RequestAny(minVersion *version.Application, request []byte, handler message.ResponseHandler) (ids.NodeID, error) {
-	// Take a slot from total [activeRequests] and block until a slot becomes available.
-	if err := n.activeRequests.Acquire(context.Background(), 1); err != nil {
+func (n *network) SendAppRequestAny(minVersion *version.Application, request []byte, handler message.ResponseHandler) (ids.NodeID, error) {
+	// Take a slot from total [activeAppRequests] and block until a slot becomes available.
+	if err := n.activeAppRequests.Acquire(context.Background(), 1); err != nil {
 		return ids.EmptyNodeID, errAcquiringSemaphore
 	}
 
 	n.lock.Lock()
 	defer n.lock.Unlock()
 	if nodeID, ok := n.peers.GetAnyPeer(minVersion); ok {
-		return nodeID, n.request(nodeID, request, handler)
+		return nodeID, n.sendAppRequest(nodeID, request, handler)
 	}
 
-	n.activeRequests.Release(1)
+	n.activeAppRequests.Release(1)
 	return ids.EmptyNodeID, fmt.Errorf("no peers found matching version %s out of %d peers", minVersion, n.peers.Size())
 }
 
-// Request sends request message bytes to specified nodeID, notifying the responseHandler on response or failure
-func (n *network) Request(nodeID ids.NodeID, request []byte, responseHandler message.ResponseHandler) error {
+// SendAppRequest sends request message bytes to specified nodeID, notifying the responseHandler on response or failure
+func (n *network) SendAppRequest(nodeID ids.NodeID, request []byte, responseHandler message.ResponseHandler) error {
 	if nodeID == ids.EmptyNodeID {
 		return fmt.Errorf("cannot send request to empty nodeID, nodeID=%s, requestLen=%d", nodeID, len(request))
 	}
 
-	// Take a slot from total [activeRequests] and block until a slot becomes available.
-	if err := n.activeRequests.Acquire(context.Background(), 1); err != nil {
+	// Take a slot from total [activeAppRequests] and block until a slot becomes available.
+	if err := n.activeAppRequests.Acquire(context.Background(), 1); err != nil {
 		return errAcquiringSemaphore
 	}
 
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
-	return n.request(nodeID, request, responseHandler)
+	return n.sendAppRequest(nodeID, request, responseHandler)
 }
 
-// request sends request message bytes to specified nodeID and adds [responseHandler] to [outstandingRequestHandlers]
+// sendAppRequest sends request message bytes to specified nodeID and adds [responseHandler] to [outstandingRequestHandlers]
 // so that it can be invoked when the network receives either a response or failure message.
 // Assumes [nodeID] is never [self] since we guarantee [self] will not be added to the [peers] map.
 // Releases active requests semaphore if there was an error in sending the request
 // Returns an error if [appSender] is unable to make the request.
 // Assumes write lock is held
-func (n *network) request(nodeID ids.NodeID, request []byte, responseHandler message.ResponseHandler) error {
+func (n *network) sendAppRequest(nodeID ids.NodeID, request []byte, responseHandler message.ResponseHandler) error {
 	log.Debug("sending request to peer", "nodeID", nodeID, "requestLen", len(request))
 	n.peers.TrackPeer(nodeID)
 
@@ -157,12 +172,10 @@ func (n *network) request(nodeID ids.NodeID, request []byte, responseHandler mes
 	nodeIDs := set.NewSet[ids.NodeID](1)
 	nodeIDs.Add(nodeID)
 
-	// send app request to the peer
-	// on failure: release the activeRequests slot, mark message as processed and return fatal error
 	// Send app request to [nodeID].
-	// On failure, release the slot from active requests and [outstandingRequestHandlers].
+	// On failure, release the slot from [activeAppRequests] and delete request from [outstandingRequestHandlers]
 	if err := n.appSender.SendAppRequest(context.TODO(), nodeIDs, requestID, request); err != nil {
-		n.activeRequests.Release(1)
+		n.activeAppRequests.Release(1)
 		delete(n.outstandingRequestHandlers, requestID)
 		return err
 	}
@@ -171,16 +184,116 @@ func (n *network) request(nodeID ids.NodeID, request []byte, responseHandler mes
 	return nil
 }
 
-func (n *network) CrossChainAppRequest(_ context.Context, requestingChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+// SendCrossChainRequest sends request message bytes to specified chainID and adds [handler] to [outstandingRequestHandlers]
+// so that it can be invoked when the network receives either a response or failure message.
+// Returns an error if [appSender] is unable to make the request.
+func (n *network) SendCrossChainRequest(chainID ids.ID, request []byte, handler message.ResponseHandler) error {
+	// Take a slot from total [activeCrossChainRequests] and block until a slot becomes available.
+	if err := n.activeCrossChainRequests.Acquire(context.Background(), 1); err != nil {
+		return errAcquiringSemaphore
+	}
+
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	// generate requestID
+	requestID := n.requestIDGen
+	n.requestIDGen++
+
+	n.outstandingRequestHandlers[requestID] = handler
+
+	// Send cross chain request to [chainID].
+	// On failure, release the slot from [activeCrossChainRequests] and delete request from [outstandingRequestHandlers].
+	if err := n.appSender.SendCrossChainAppRequest(context.TODO(), chainID, requestID, request); err != nil {
+		n.activeCrossChainRequests.Release(1)
+		delete(n.outstandingRequestHandlers, requestID)
+		return err
+	}
+
+	log.Debug("sent request message to chain", "chainID", chainID, "crossChainRequestID", requestID)
 	return nil
 }
 
-func (n *network) CrossChainAppRequestFailed(_ context.Context, respondingChainID ids.ID, requestID uint32) error {
-	return nil
+// CrossChainAppRequest notifies the VM when another chain in the network requests for data.
+// Send a CrossChainAppResponse to [chainID] in response to a valid message using the same
+// [requestID] before the deadline.
+func (n *network) CrossChainAppRequest(ctx context.Context, requestingChainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+	log.Debug("received CrossChainAppRequest from chain", "requestingChainID", requestingChainID, "requestID", requestID, "requestLen", len(request))
+
+	var req message.CrossChainRequest
+	if _, err := n.crossChainCodec.Unmarshal(request, &req); err != nil {
+		log.Debug("failed to unmarshal CrossChainAppRequest", "requestingChainID", requestingChainID, "requestID", requestID, "requestLen", len(request), "err", err)
+		return nil
+	}
+
+	bufferedDeadline, err := calculateTimeUntilDeadline(deadline, n.crossChainStats)
+	if err != nil {
+		log.Debug("deadline to process CrossChainAppRequest has expired, skipping", "requestingChainID", requestingChainID, "requestID", requestID, "err", err)
+		return nil
+	}
+
+	log.Debug("processing incoming CrossChainAppRequest", "requestingChainID", requestingChainID, "requestID", requestID, "req", req)
+	handleCtx, cancel := context.WithDeadline(context.Background(), bufferedDeadline)
+	defer cancel()
+
+	responseBytes, err := req.Handle(handleCtx, requestingChainID, requestID, n.crossChainRequestHandler)
+	switch {
+	case err != nil && err != context.DeadlineExceeded:
+		return err // Return a fatal error
+	case responseBytes != nil:
+		return n.appSender.SendCrossChainAppResponse(ctx, requestingChainID, requestID, responseBytes) // Propagate fatal error
+	default:
+		return nil
+	}
 }
 
-func (n *network) CrossChainAppResponse(_ context.Context, respondingChainID ids.ID, requestID uint32, response []byte) error {
-	return nil
+// CrossChainAppRequestFailed can be called by the avalanchego -> VM in following cases:
+// - respondingChain doesn't exist
+// - invalid CrossChainAppResponse from respondingChain
+// - invalid CrossChainRequest was sent to respondingChain
+// - request times out before a response is provided
+// If [requestID] is not known, this function will emit a log and return a nil error.
+// If the response handler returns an error it is propagated as a fatal error.
+func (n *network) CrossChainAppRequestFailed(ctx context.Context, respondingChainID ids.ID, requestID uint32) error {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	log.Debug("received CrossChainAppRequestFailed from chain", "respondingChainID", respondingChainID, "requestID", requestID)
+
+	handler, exists := n.markRequestFulfilled(requestID)
+	if !exists {
+		// Should never happen since the engine should be managing outstanding requests
+		log.Error("received CrossChainAppRequestFailed to unknown request", "respondingChainID", respondingChainID, "requestID", requestID)
+		return nil
+	}
+
+	// We must release the slot
+	n.activeCrossChainRequests.Release(1)
+
+	return handler.OnFailure()
+}
+
+// CrossChainAppResponse is invoked when there is a
+// response received from [respondingChainID] regarding a request the VM sent out
+// If [requestID] is not known, this function will emit a log and return a nil error.
+// If the response handler returns an error it is propagated as a fatal error.
+func (n *network) CrossChainAppResponse(ctx context.Context, respondingChainID ids.ID, requestID uint32, response []byte) error {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	log.Debug("received CrossChainAppResponse from responding chain", "respondingChainID", respondingChainID, "requestID", requestID)
+
+	handler, exists := n.markRequestFulfilled(requestID)
+	if !exists {
+		// Should never happen since the engine should be managing outstanding requests
+		log.Error("received CrossChainAppResponse to unknown request", "respondingChainID", respondingChainID, "requestID", requestID, "responseLen", len(response))
+		return nil
+	}
+
+	// We must release the slot
+	n.activeCrossChainRequests.Release(1)
+
+	return handler.OnResponse(response)
 }
 
 // AppRequest is called by avalanchego -> VM when there is an incoming AppRequest from a peer
@@ -189,9 +302,6 @@ func (n *network) CrossChainAppResponse(_ context.Context, respondingChainID ids
 // sends a response back to the sender if length of response returned by the handler is >0
 // expects the deadline to not have been passed
 func (n *network) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
-	n.lock.RLock()
-	defer n.lock.RUnlock()
-
 	log.Debug("received AppRequest from node", "nodeID", nodeID, "requestID", requestID, "requestLen", len(request))
 
 	var req message.Request
@@ -200,20 +310,9 @@ func (n *network) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID u
 		return nil
 	}
 
-	// calculate how much time is left until the deadline
-	timeTillDeadline := time.Until(deadline)
-	n.stats.UpdateTimeUntilDeadline(timeTillDeadline)
-
-	// bufferedDeadline is half the time till actual deadline so that the message has a reasonable chance
-	// of completing its processing and sending the response to the peer.
-	timeTillDeadline = time.Duration(timeTillDeadline.Nanoseconds() / 2)
-	bufferedDeadline := time.Now().Add(timeTillDeadline)
-
-	// check if we have enough time to handle this request
-	if time.Until(bufferedDeadline) < minRequestHandlingDuration {
-		// Drop the request if we already missed the deadline to respond.
-		log.Debug("deadline to process AppRequest has expired, skipping", "nodeID", nodeID, "requestID", requestID, "req", req)
-		n.stats.IncDeadlineDroppedRequest()
+	bufferedDeadline, err := calculateTimeUntilDeadline(deadline, n.appStats)
+	if err != nil {
+		log.Debug("deadline to process AppRequest has expired, skipping", "nodeID", nodeID, "requestID", requestID, "err", err)
 		return nil
 	}
 
@@ -223,7 +322,7 @@ func (n *network) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID u
 	handleCtx, cancel := context.WithDeadline(context.Background(), bufferedDeadline)
 	defer cancel()
 
-	responseBytes, err := req.Handle(handleCtx, nodeID, requestID, n.requestHandler)
+	responseBytes, err := req.Handle(handleCtx, nodeID, requestID, n.appRequestHandler)
 	switch {
 	case err != nil && err != context.DeadlineExceeded:
 		return err // Return a fatal error
@@ -244,48 +343,77 @@ func (n *network) AppResponse(_ context.Context, nodeID ids.NodeID, requestID ui
 
 	log.Debug("received AppResponse from peer", "nodeID", nodeID, "requestID", requestID)
 
-	handler, exists := n.getRequestHandler(requestID)
+	handler, exists := n.markRequestFulfilled(requestID)
 	if !exists {
 		// Should never happen since the engine should be managing outstanding requests
-		log.Error("received response to unknown request", "nodeID", nodeID, "requestID", requestID, "responseLen", len(response))
+		log.Error("received AppResponse to unknown request", "nodeID", nodeID, "requestID", requestID, "responseLen", len(response))
 		return nil
 	}
 
-	return handler.OnResponse(nodeID, requestID, response)
+	// We must release the slot
+	n.activeAppRequests.Release(1)
+
+	return handler.OnResponse(response)
 }
 
 // AppRequestFailed can be called by the avalanchego -> VM in following cases:
 // - node is benched
 // - failed to send message to [nodeID] due to a network issue
-// - timeout
+// - request times out before a response is provided
 // error returned by this function is expected to be treated as fatal by the engine
 // returns error only when the response handler returns an error
 func (n *network) AppRequestFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
+
 	log.Debug("received AppRequestFailed from peer", "nodeID", nodeID, "requestID", requestID)
 
-	handler, exists := n.getRequestHandler(requestID)
+	handler, exists := n.markRequestFulfilled(requestID)
 	if !exists {
 		// Should never happen since the engine should be managing outstanding requests
-		log.Error("received request failed to unknown request", "nodeID", nodeID, "requestID", requestID)
+		log.Error("received AppRequestFailed to unknown request", "nodeID", nodeID, "requestID", requestID)
 		return nil
 	}
 
-	return handler.OnFailure(nodeID, requestID)
+	// We must release the slot
+	n.activeAppRequests.Release(1)
+
+	return handler.OnFailure()
 }
 
-// getRequestHandler fetches the handler for [requestID] and marks the request with [requestID] as having been fulfilled.
+// calculateTimeUntilDeadline calculates the time until deadline and drops it if we missed he deadline to response.
+// This function updates metrics for both app requests and cross chain requests.
+// This is called by either [AppRequest] or [CrossChainAppRequest].
+func calculateTimeUntilDeadline(deadline time.Time, stats stats.RequestHandlerStats) (time.Time, error) {
+	// calculate how much time is left until the deadline
+	timeTillDeadline := time.Until(deadline)
+	stats.UpdateTimeUntilDeadline(timeTillDeadline)
+
+	// bufferedDeadline is half the time till actual deadline so that the message has a reasonable chance
+	// of completing its processing and sending the response to the peer.
+	bufferedDeadline := time.Now().Add(timeTillDeadline / 2)
+
+	// check if we have enough time to handle this request
+	if time.Until(bufferedDeadline) < minRequestHandlingDuration {
+		// Drop the request if we already missed the deadline to respond.
+		stats.IncDeadlineDroppedRequest()
+		return time.Time{}, errExpiredRequest
+	}
+
+	return bufferedDeadline, nil
+}
+
+// markRequestFulfilled fetches the handler for [requestID] and marks the request with [requestID] as having been fulfilled.
 // This is called by either [AppResponse] or [AppRequestFailed].
-// assumes that the write lock is held.
-func (n *network) getRequestHandler(requestID uint32) (message.ResponseHandler, bool) {
+// Assumes that the write lock is held.
+func (n *network) markRequestFulfilled(requestID uint32) (message.ResponseHandler, bool) {
 	handler, exists := n.outstandingRequestHandlers[requestID]
 	if !exists {
 		return nil, false
 	}
-	// mark message as processed, release activeRequests slot
+	// mark message as processed
 	delete(n.outstandingRequestHandlers, requestID)
-	n.activeRequests.Release(1)
+
 	return handler, true
 }
 
@@ -354,7 +482,14 @@ func (n *network) SetRequestHandler(handler message.RequestHandler) {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
-	n.requestHandler = handler
+	n.appRequestHandler = handler
+}
+
+func (n *network) SetCrossChainRequestHandler(handler message.CrossChainRequestHandler) {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	n.crossChainRequestHandler = handler
 }
 
 func (n *network) Size() uint32 {

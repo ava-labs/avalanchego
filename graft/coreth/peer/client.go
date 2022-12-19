@@ -19,15 +19,19 @@ var (
 
 // NetworkClient defines ability to send request / response through the Network
 type NetworkClient interface {
-	// RequestAny synchronously sends request to a randomly chosen peer with a
+	// SendAppRequestAny synchronously sends request to an arbitrary peer with a
 	// node version greater than or equal to minVersion.
 	// Returns response bytes, the ID of the chosen peer, and ErrRequestFailed if
 	// the request should be retried.
-	RequestAny(minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error)
+	SendAppRequestAny(minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error)
 
-	// Request synchronously sends request to the selected nodeID
+	// SendAppRequest synchronously sends request to the selected nodeID
 	// Returns response bytes, and ErrRequestFailed if the request should be retried.
-	Request(nodeID ids.NodeID, request []byte) ([]byte, error)
+	SendAppRequest(nodeID ids.NodeID, request []byte) ([]byte, error)
+
+	// SendCrossChainRequest sends a request to a specific blockchain running on this node.
+	// Returns response bytes, and ErrRequestFailed if the request failed.
+	SendCrossChainRequest(chainID ids.ID, request []byte) ([]byte, error)
 
 	// Gossip sends given gossip message to peers
 	Gossip(gossip []byte) error
@@ -51,13 +55,13 @@ func NewNetworkClient(network Network) NetworkClient {
 	}
 }
 
-// RequestAny synchronously sends request to a randomly chosen peer with a
+// SendAppRequestAny synchronously sends request to an arbitrary peer with a
 // node version greater than or equal to minVersion.
 // Returns response bytes, the ID of the chosen peer, and ErrRequestFailed if
 // the request should be retried.
-func (c *client) RequestAny(minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error) {
+func (c *client) SendAppRequestAny(minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error) {
 	waitingHandler := newWaitingResponseHandler()
-	nodeID, err := c.network.RequestAny(minVersion, request, waitingHandler)
+	nodeID, err := c.network.SendAppRequestAny(minVersion, request, waitingHandler)
 	if err != nil {
 		return nil, nodeID, err
 	}
@@ -68,11 +72,25 @@ func (c *client) RequestAny(minVersion *version.Application, request []byte) ([]
 	return response, nodeID, nil
 }
 
-// Request synchronously sends request to the specified nodeID
+// SendAppRequest synchronously sends request to the specified nodeID
 // Returns response bytes and ErrRequestFailed if the request should be retried.
-func (c *client) Request(nodeID ids.NodeID, request []byte) ([]byte, error) {
+func (c *client) SendAppRequest(nodeID ids.NodeID, request []byte) ([]byte, error) {
 	waitingHandler := newWaitingResponseHandler()
-	if err := c.network.Request(nodeID, request, waitingHandler); err != nil {
+	if err := c.network.SendAppRequest(nodeID, request, waitingHandler); err != nil {
+		return nil, err
+	}
+	response := <-waitingHandler.responseChan
+	if waitingHandler.failed {
+		return nil, ErrRequestFailed
+	}
+	return response, nil
+}
+
+// SendCrossChainRequest synchronously sends request to the specified chainID
+// Returns response bytes and ErrRequestFailed if the request should be retried.
+func (c *client) SendCrossChainRequest(chainID ids.ID, request []byte) ([]byte, error) {
+	waitingHandler := newWaitingResponseHandler()
+	if err := c.network.SendCrossChainRequest(chainID, request, waitingHandler); err != nil {
 		return nil, err
 	}
 	response := <-waitingHandler.responseChan
