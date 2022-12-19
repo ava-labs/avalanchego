@@ -123,9 +123,9 @@ func (p *parser) InitializeGenesisTx(tx *Tx) error {
 	return initializeTx(p.gcm, tx)
 }
 
-func parse(cm codec.Manager, bytes []byte) (*Tx, error) {
+func parse(cm codec.Manager, signedBytes []byte) (*Tx, error) {
 	tx := &Tx{}
-	parsedVersion, err := cm.Unmarshal(bytes, tx)
+	parsedVersion, err := cm.Unmarshal(signedBytes, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -133,23 +133,28 @@ func parse(cm codec.Manager, bytes []byte) (*Tx, error) {
 		return nil, fmt.Errorf("expected codec version %d but got %d", CodecVersion, parsedVersion)
 	}
 
-	unsignedBytes, err := cm.Marshal(CodecVersion, &tx.Unsigned)
+	unsignedBytesLen, err := cm.Size(CodecVersion, &tx.Unsigned)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
 	}
-	tx.Initialize(unsignedBytes, bytes)
+
+	unsignedBytes := signedBytes[:unsignedBytesLen]
+	tx.SetBytes(unsignedBytes, signedBytes)
 	return tx, nil
 }
 
 func initializeTx(cm codec.Manager, tx *Tx) error {
-	unsignedBytes, err := cm.Marshal(CodecVersion, tx.Unsigned)
+	signedBytes, err := cm.Marshal(CodecVersion, tx)
 	if err != nil {
-		return err
+		return fmt.Errorf("problem creating transaction: %w", err)
 	}
-	signedBytes, err := cm.Marshal(CodecVersion, &tx)
+
+	unsignedBytesLen, err := cm.Size(CodecVersion, &tx.Unsigned)
 	if err != nil {
-		return err
+		return fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
 	}
-	tx.Initialize(unsignedBytes, signedBytes)
+
+	unsignedBytes := signedBytes[:unsignedBytesLen]
+	tx.SetBytes(unsignedBytes, signedBytes)
 	return nil
 }

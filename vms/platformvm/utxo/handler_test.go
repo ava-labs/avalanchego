@@ -56,7 +56,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 	unsignedTx := dummyUnsignedTx{
 		BaseTx: txs.BaseTx{},
 	}
-	unsignedTx.Initialize([]byte{0})
+	unsignedTx.SetBytes([]byte{0})
 
 	customAssetID := ids.GenerateTestID()
 

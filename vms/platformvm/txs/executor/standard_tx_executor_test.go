@@ -1171,7 +1171,7 @@ func newRemoveSubnetValidatorTx(t *testing.T) (*txs.RemoveSubnetValidatorTx, *tx
 		Unsigned: unsignedTx,
 		Creds:    creds,
 	}
-	if err := tx.Sign(txs.Codec, nil); err != nil {
+	if err := tx.Initialize(txs.Codec); err != nil {
 		t.Fatal(err)
 	}
 	return unsignedTx, tx
@@ -1554,7 +1554,7 @@ func newTransformSubnetTx(t *testing.T) (*txs.TransformSubnetTx, *txs.Tx) {
 		Unsigned: unsignedTx,
 		Creds:    creds,
 	}
-	if err := tx.Sign(txs.Codec, nil); err != nil {
+	if err := tx.Initialize(txs.Codec); err != nil {
 		t.Fatal(err)
 	}
 	return unsignedTx, tx

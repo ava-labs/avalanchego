@@ -22,7 +22,7 @@ type ApricotAtomicBlock struct {
 
 func (b *ApricotAtomicBlock) initialize(bytes []byte) error {
 	b.CommonBlock.initialize(bytes)
-	if err := b.Tx.Sign(txs.Codec, nil); err != nil {
+	if err := b.Tx.Initialize(txs.Codec); err != nil {
 		return fmt.Errorf("failed to initialize tx: %w", err)
 	}
 	return nil

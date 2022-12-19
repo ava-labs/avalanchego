@@ -506,7 +506,10 @@ func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.I
 
 	currentSubnetValidators, ok := vm.Validators.Get(subnetID)
 	if !ok {
-		return nil, errMissingValidatorSet
+		currentSubnetValidators = validators.NewSet()
+		if err := vm.state.ValidatorSet(subnetID, currentSubnetValidators); err != nil {
+			return nil, err
+		}
 	}
 	currentPrimaryNetworkValidators, ok := vm.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {

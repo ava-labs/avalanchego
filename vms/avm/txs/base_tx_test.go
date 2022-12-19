@@ -118,7 +118,7 @@ func TestBaseTxSerialization(t *testing.T) {
 	}}}
 
 	c := setupCodec()
-	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
+	if err := tx.Initialize(c); err != nil {
 		t.Fatal(err)
 	}
 	require.Equal(t, tx.ID().String(), "zeqT8FTnRAxes7QQQYkaWhNkHavd9d6aCdH8TQu2Mx5KEydEz")
@@ -223,7 +223,6 @@ func TestBaseTxGetters(t *testing.T) {
 			},
 		}},
 	}}
-	tx.Initialize(nil)
 
 	if assets := tx.AssetIDs(); assets.Len() != 1 {
 		t.Fatalf("Wrong number of assets returned")
@@ -272,7 +271,6 @@ func TestBaseTxSyntacticVerify(t *testing.T) {
 			},
 		}},
 	}}
-	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err != nil {
 		t.Fatal(err)
@@ -316,7 +314,6 @@ func TestBaseTxSyntacticVerifyMemoTooLarge(t *testing.T) {
 		}},
 		Memo: make([]byte, avax.MaxMemoSize+1),
 	}}
-	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatal("should have failed because memo is too large")
@@ -369,7 +366,6 @@ func TestBaseTxSyntacticVerifyWrongNetworkID(t *testing.T) {
 			},
 		}},
 	}}
-	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Wrong networkID should have erred")
@@ -412,7 +408,6 @@ func TestBaseTxSyntacticVerifyWrongChainID(t *testing.T) {
 			},
 		}},
 	}}
-	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Wrong chain ID should have erred")
@@ -446,7 +441,6 @@ func TestBaseTxSyntacticVerifyInvalidOutput(t *testing.T) {
 			},
 		}},
 	}}
-	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Invalid output should have erred")
@@ -503,7 +497,6 @@ func TestBaseTxSyntacticVerifyUnsortedOutputs(t *testing.T) {
 			},
 		},
 	}}
-	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Unsorted outputs should have erred")
@@ -529,7 +522,6 @@ func TestBaseTxSyntacticVerifyInvalidInput(t *testing.T) {
 		}},
 		Ins: []*avax.TransferableInput{nil},
 	}}
-	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Invalid input should have erred")
@@ -592,7 +584,6 @@ func TestBaseTxSyntacticVerifyInputOverflow(t *testing.T) {
 			},
 		},
 	}}
-	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Input overflow should have erred")
@@ -647,7 +638,6 @@ func TestBaseTxSyntacticVerifyOutputOverflow(t *testing.T) {
 			},
 		}},
 	}}
-	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Output overflow should have erred")
@@ -690,7 +680,6 @@ func TestBaseTxSyntacticVerifyInsufficientFunds(t *testing.T) {
 			},
 		}},
 	}}
-	tx.Initialize(nil)
 
 	if err := tx.SyntacticVerify(ctx, c, ids.Empty, 0, 0, 0); err == nil {
 		t.Fatalf("Insufficient funds should have erred")
