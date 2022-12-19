@@ -18,10 +18,14 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 
+	"github.com/ava-labs/coreth/internal/ethapi"
 	"github.com/ava-labs/coreth/metrics"
+	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/trie"
 
 	"github.com/stretchr/testify/assert"
@@ -57,6 +61,7 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
 
+	"github.com/ava-labs/coreth/accounts/abi"
 	accountKeystore "github.com/ava-labs/coreth/accounts/keystore"
 )
 
@@ -323,6 +328,172 @@ func TestVMConfig(t *testing.T) {
 	assert.Equal(t, vm.config.RPCTxFeeCap, txFeeCap, "Tx Fee Cap should be set")
 	assert.Equal(t, vm.config.EthAPIs(), enabledEthAPIs, "EnabledEthAPIs should be set")
 	assert.NoError(t, vm.Shutdown(context.Background()))
+}
+
+func TestCrossChainMessagestoVM(t *testing.T) {
+	crossChainCodec := message.CrossChainCodec
+	require := require.New(t)
+
+	//  the following is based on this contract:
+	//  contract T {
+	//  	event received(address sender, uint amount, bytes memo);
+	//  	event receivedAddr(address sender);
+	//
+	//  	function receive(bytes calldata memo) external payable returns (string memory res) {
+	//  		emit received(msg.sender, msg.value, memo);
+	//  		emit receivedAddr(msg.sender);
+	//		return "hello world";
+	//  	}
+	//  }
+
+	const abiBin = `0x608060405234801561001057600080fd5b506102a0806100206000396000f3fe60806040526004361061003b576000357c010000000000000000000000000000000000000000000000000000000090048063a69b6ed014610040575b600080fd5b6100b76004803603602081101561005657600080fd5b810190808035906020019064010000000081111561007357600080fd5b82018360208201111561008557600080fd5b803590602001918460018302840111640100000000831117156100a757600080fd5b9091929391929390505050610132565b6040518080602001828103825283818151815260200191508051906020019080838360005b838110156100f75780820151818401526020810190506100dc565b50505050905090810190601f1680156101245780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b60607f75fd880d39c1daf53b6547ab6cb59451fc6452d27caa90e5b6649dd8293b9eed33348585604051808573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001848152602001806020018281038252848482818152602001925080828437600081840152601f19601f8201169050808301925050509550505050505060405180910390a17f46923992397eac56cf13058aced2a1871933622717e27b24eabc13bf9dd329c833604051808273ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200191505060405180910390a16040805190810160405280600b81526020017f68656c6c6f20776f726c6400000000000000000000000000000000000000000081525090509291505056fea165627a7a72305820ff0c57dad254cfeda48c9cfb47f1353a558bccb4d1bc31da1dae69315772d29e0029`
+	const abiJSON = `[ { "constant": false, "inputs": [ { "name": "memo", "type": "bytes" } ], "name": "receive", "outputs": [ { "name": "res", "type": "string" } ], "payable": true, "stateMutability": "payable", "type": "function" }, { "anonymous": false, "inputs": [ { "indexed": false, "name": "sender", "type": "address" }, { "indexed": false, "name": "amount", "type": "uint256" }, { "indexed": false, "name": "memo", "type": "bytes" } ], "name": "received", "type": "event" }, { "anonymous": false, "inputs": [ { "indexed": false, "name": "sender", "type": "address" } ], "name": "receivedAddr", "type": "event" } ]`
+	parsed, err := abi.JSON(strings.NewReader(abiJSON))
+	require.NoErrorf(err, "could not parse abi: %v")
+
+	calledSendCrossChainAppResponseFn := false
+	importAmount := uint64(5000000000)
+	issuer, vm, _, _, appSender := GenesisVMWithUTXOs(t, true, "", "", "", map[ids.ShortID]uint64{
+		testShortIDAddrs[0]: importAmount,
+	})
+
+	defer func() {
+		err := vm.Shutdown(context.Background())
+		require.NoError(err)
+	}()
+
+	appSender.SendCrossChainAppResponseF = func(ctx context.Context, respondingChainID ids.ID, requestID uint32, responseBytes []byte) {
+		calledSendCrossChainAppResponseFn = true
+
+		var response message.EthCallResponse
+		if _, err = crossChainCodec.Unmarshal(responseBytes, &response); err != nil {
+			require.NoErrorf(err, "unexpected error during unmarshal: %w")
+		}
+
+		result := core.ExecutionResult{}
+		err = json.Unmarshal(response.ExecutionResult, &result)
+		require.NoError(err)
+		require.NotNil(result.ReturnData)
+
+		finalResult, err := parsed.Unpack("receive", result.ReturnData)
+		require.NoError(err)
+		require.NotNil(finalResult)
+		require.Equal("hello world", finalResult[0])
+	}
+
+	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
+	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
+
+	importTx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	require.NoError(err)
+
+	err = vm.issueTx(importTx, true /*=local*/)
+	require.NoError(err)
+
+	<-issuer
+
+	blk1, err := vm.BuildBlock(context.Background())
+	require.NoError(err)
+
+	err = blk1.Verify(context.Background())
+	require.NoError(err)
+
+	if status := blk1.Status(); status != choices.Processing {
+		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
+	}
+
+	err = vm.SetPreference(context.Background(), blk1.ID())
+	require.NoError(err)
+
+	err = blk1.Accept(context.Background())
+	require.NoError(err)
+
+	newHead := <-newTxPoolHeadChan
+	if newHead.Head.Hash() != common.Hash(blk1.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+
+	if status := blk1.Status(); status != choices.Accepted {
+		t.Fatalf("Expected status of accepted block to be %s, but found %s", choices.Accepted, status)
+	}
+
+	lastAcceptedID, err := vm.LastAccepted(context.Background())
+	require.NoError(err)
+
+	if lastAcceptedID != blk1.ID() {
+		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk1.ID(), lastAcceptedID)
+	}
+
+	contractTx := types.NewContractCreation(0, common.Big0, 200000, new(big.Int).Mul(big.NewInt(3), initialBaseFee), common.FromHex(abiBin))
+	contractSignedTx, err := types.SignTx(contractTx, types.NewEIP155Signer(vm.chainID), testKeys[0].ToECDSA())
+	require.NoError(err)
+
+	errs := vm.txPool.AddRemotesSync([]*types.Transaction{contractSignedTx})
+	for _, err := range errs {
+		require.NoError(err)
+	}
+	testAddr := ethcrypto.PubkeyToAddress(testKeys[0].ToECDSA().PublicKey)
+	contractAddress := ethcrypto.CreateAddress(testAddr, 0)
+
+	<-issuer
+
+	blk2, err := vm.BuildBlock(context.Background())
+	require.NoError(err)
+
+	err = blk2.Verify(context.Background())
+	require.NoError(err)
+
+	if status := blk2.Status(); status != choices.Processing {
+		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
+	}
+
+	err = vm.SetPreference(context.Background(), blk2.ID())
+	require.NoError(err)
+
+	err = blk2.Accept(context.Background())
+	require.NoError(err)
+
+	newHead = <-newTxPoolHeadChan
+	if newHead.Head.Hash() != common.Hash(blk2.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+
+	if status := blk2.Status(); status != choices.Accepted {
+		t.Fatalf("Expected status of accepted block to be %s, but found %s", choices.Accepted, status)
+	}
+
+	lastAcceptedID, err = vm.LastAccepted(context.Background())
+	require.NoError(err)
+
+	if lastAcceptedID != blk2.ID() {
+		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk2.ID(), lastAcceptedID)
+	}
+
+	input, err := parsed.Pack("receive", []byte("X"))
+	require.NoError(err)
+
+	data := hexutil.Bytes(input)
+
+	requestArgs, err := json.Marshal(&ethapi.TransactionArgs{
+		To:   &contractAddress,
+		Data: &data,
+	})
+	require.NoError(err)
+
+	var ethCallRequest message.CrossChainRequest = message.EthCallRequest{
+		RequestArgs: requestArgs,
+	}
+
+	crossChainRequest, err := crossChainCodec.Marshal(message.Version, &ethCallRequest)
+	require.NoError(err)
+
+	requestingChainID := ids.ID(common.BytesToHash([]byte{1, 2, 3, 4, 5}))
+
+	// we need all items in the acceptor queue to be processed before we process a cross chain request
+	vm.blockChain.DrainAcceptorQueue()
+	err = vm.Network.CrossChainAppRequest(context.Background(), requestingChainID, 1, time.Now().Add(60*time.Second), crossChainRequest)
+	require.NoError(err)
+	require.True(calledSendCrossChainAppResponseFn, "sendCrossChainAppResponseFn was not called")
 }
 
 func TestVMConfigDefaults(t *testing.T) {

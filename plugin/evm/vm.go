@@ -497,7 +497,7 @@ func (vm *VM) Initialize(
 
 	// initialize peer network
 	vm.networkCodec = message.Codec
-	vm.Network = peer.NewNetwork(appSender, vm.networkCodec, chainCtx.NodeID, vm.config.MaxOutboundActiveRequests)
+	vm.Network = peer.NewNetwork(appSender, vm.networkCodec, message.CrossChainCodec, chainCtx.NodeID, vm.config.MaxOutboundActiveRequests, vm.config.MaxOutboundActiveCrossChainRequests)
 	vm.client = peer.NewNetworkClient(vm.Network)
 
 	if err := vm.initializeChain(lastAcceptedHash); err != nil {
@@ -657,6 +657,7 @@ func (vm *VM) initializeStateSyncServer() {
 	})
 
 	vm.setAppRequestHandlers()
+	vm.setCrossChainAppRequestHandler()
 }
 
 func (vm *VM) initChainState(lastAcceptedBlock *types.Block) error {
@@ -1002,6 +1003,13 @@ func (vm *VM) setAppRequestHandlers() {
 		handlerstats.NewHandlerStats(metrics.Enabled),
 	)
 	vm.Network.SetRequestHandler(syncRequestHandler)
+}
+
+// setCrossChainAppRequestHandler sets the request handlers for the VM to serve cross chain
+// requests.
+func (vm *VM) setCrossChainAppRequestHandler() {
+	crossChainRequestHandler := message.NewCrossChainHandler(vm.eth.APIBackend, message.CrossChainCodec)
+	vm.Network.SetCrossChainRequestHandler(crossChainRequestHandler)
 }
 
 // Shutdown implements the snowman.ChainVM interface
