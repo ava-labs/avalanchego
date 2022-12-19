@@ -5,6 +5,7 @@ package genesis
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -12,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
 
-var errCannotParseInitialAdmin = "cannot parse initialAdmin from genesis: %w"
+var errCannotParseInitialAdmin = errors.New("cannot parse initialAdmin from genesis")
 
 type UnparsedCamino struct {
 	VerifyNodeSignature      bool                       `json:"verifyNodeSignature"`
@@ -34,11 +35,11 @@ func (uc UnparsedCamino) Parse() (Camino, error) {
 
 	_, _, avaxAddrBytes, err := address.Parse(uc.InitialAdmin)
 	if err != nil {
-		return c, fmt.Errorf(errCannotParseInitialAdmin, err)
+		return c, fmt.Errorf("%w: %v", errCannotParseInitialAdmin, err)
 	}
 	avaxAddr, err := ids.ToShortID(avaxAddrBytes)
 	if err != nil {
-		return c, fmt.Errorf(errCannotParseInitialAdmin, err)
+		return c, fmt.Errorf("%w: %v", errCannotParseInitialAdmin, err)
 	}
 	c.InitialAdmin = avaxAddr
 
