@@ -4,7 +4,6 @@
 package set
 
 import (
-	"crypto/rand"
 	"strconv"
 	"testing"
 )
@@ -13,13 +12,9 @@ func BenchmarkSetList(b *testing.B) {
 	sizes := []int{5, 25, 100, 100_000} // Test with various sizes
 	for size := range sizes {
 		b.Run(strconv.Itoa(size), func(b *testing.B) {
-			set := Set[testSettable]{}
+			set := Set[int]{}
 			for i := 0; i < size; i++ {
-				var s testSettable
-				if _, err := rand.Read(s[:]); err != nil {
-					b.Fatal(err)
-				}
-				set.Add(s)
+				set.Add(i)
 			}
 			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
@@ -32,9 +27,11 @@ func BenchmarkSetList(b *testing.B) {
 func BenchmarkSetClear(b *testing.B) {
 	for _, numElts := range []int{10, 25, 50, 100, 250, 500, 1000} {
 		b.Run(strconv.Itoa(numElts), func(b *testing.B) {
-			set := NewSet[testSettable](numElts)
+			set := NewSet[int](numElts)
 			for n := 0; n < b.N; n++ {
-				set.Add(make([]testSettable, numElts)...)
+				for i := 0; i < numElts; i++ {
+					set.Add(i)
+				}
 				set.Clear()
 			}
 		})
