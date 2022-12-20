@@ -1025,6 +1025,12 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 
 	trackedPeers, err := p.Network.Track(p.id, discoveredIPs)
 	if err != nil {
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.PeerListOp),
+			zap.String("field", "claimedIP"),
+			zap.Error(err),
+		)
 		p.StartClose()
 		return
 	}
@@ -1055,6 +1061,12 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 func (p *peer) handlePeerListAck(msg *p2ppb.PeerListAck) {
 	err := p.Network.MarkTracked(p.id, msg.PeerAcks)
 	if err != nil {
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.PeerListAckOp),
+			zap.String("field", "txID"),
+			zap.Error(err),
+		)
 		p.StartClose()
 	}
 }
