@@ -545,6 +545,8 @@ func (n *network) MarkTracked(peerID ids.NodeID, ips []*p2ppb.PeerAck) error {
 			return err
 		}
 
+		// If [txID]'s corresponding nodeID isn't known, then they must no
+		// longer be a validator. Therefore we wouldn't gossip their IP anyways.
 		nodeID, ok := n.gossipTracker.GetNodeID(txID)
 		if !ok {
 			continue
