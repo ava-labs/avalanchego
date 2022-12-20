@@ -624,7 +624,7 @@ func (n *network) Peers(peerID ids.NodeID) ([]ips.ClaimedIPPort, error) {
 
 		validator := unknownValidators[drawn]
 		n.peersLock.RLock()
-		peer, isConnected := n.connectedPeers.GetByID(validator.NodeID)
+		_, isConnected := n.connectedPeers.GetByID(validator.NodeID)
 		peerIP := n.peerIPs[validator.NodeID]
 		n.peersLock.RUnlock()
 		if !isConnected {
@@ -635,9 +635,11 @@ func (n *network) Peers(peerID ids.NodeID) ([]ips.ClaimedIPPort, error) {
 			continue
 		}
 
+		// Note: peerIP isn't used directly here because the TxID may be
+		//       incorrect.
 		validatorIPs = append(validatorIPs,
 			ips.ClaimedIPPort{
-				Cert:      peer.Cert(),
+				Cert:      peerIP.Cert,
 				IPPort:    peerIP.IPPort,
 				Timestamp: peerIP.Timestamp,
 				Signature: peerIP.Signature,
