@@ -26,7 +26,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api/keystore"
@@ -213,8 +212,8 @@ func GenesisVM(t *testing.T,
 	}
 
 	if finishBootstrapping {
-		assert.NoError(t, vm.SetState(context.Background(), snow.Bootstrapping))
-		assert.NoError(t, vm.SetState(context.Background(), snow.NormalOp))
+		require.NoError(t, vm.SetState(context.Background(), snow.Bootstrapping))
+		require.NoError(t, vm.SetState(context.Background(), snow.NormalOp))
 	}
 
 	return issuer, vm, dbManager, appSender
@@ -227,7 +226,7 @@ func TestVMConfig(t *testing.T) {
 	_, vm, _, _ := GenesisVM(t, false, "", configJSON, "")
 	require.Equal(t, vm.config.RPCTxFeeCap, txFeeCap, "Tx Fee Cap should be set")
 	require.Equal(t, vm.config.EthAPIs(), enabledEthAPIs, "EnabledEthAPIs should be set")
-	assert.NoError(t, vm.Shutdown(context.Background()))
+	require.NoError(t, vm.Shutdown(context.Background()))
 }
 
 func TestVMConfigDefaults(t *testing.T) {
@@ -241,7 +240,7 @@ func TestVMConfigDefaults(t *testing.T) {
 	vmConfig.RPCTxFeeCap = txFeeCap
 	vmConfig.EnabledEthAPIs = enabledEthAPIs
 	require.Equal(t, vmConfig, vm.config, "VM Config should match default with overrides")
-	assert.NoError(t, vm.Shutdown(context.Background()))
+	require.NoError(t, vm.Shutdown(context.Background()))
 }
 
 func TestVMNilConfig(t *testing.T) {
@@ -251,7 +250,7 @@ func TestVMNilConfig(t *testing.T) {
 	var vmConfig Config
 	vmConfig.SetDefaults()
 	require.Equal(t, vmConfig, vm.config, "VM Config should match default config")
-	assert.NoError(t, vm.Shutdown(context.Background()))
+	require.NoError(t, vm.Shutdown(context.Background()))
 }
 
 func TestVMContinuousProfiler(t *testing.T) {
@@ -265,12 +264,12 @@ func TestVMContinuousProfiler(t *testing.T) {
 	// Sleep for twice the frequency of the profiler to give it time
 	// to generate the first profile.
 	time.Sleep(2 * time.Second)
-	assert.NoError(t, vm.Shutdown(context.Background()))
+	require.NoError(t, vm.Shutdown(context.Background()))
 
 	// Check that the first profile was generated
 	expectedFileName := filepath.Join(profilerDir, "cpu.profile.1")
 	_, err := os.Stat(expectedFileName)
-	assert.NoError(t, err, "Expected continuous profiler to generate the first CPU profile at %s", expectedFileName)
+	require.NoError(t, err, "Expected continuous profiler to generate the first CPU profile at %s", expectedFileName)
 }
 
 func TestVMUpgrades(t *testing.T) {
@@ -2208,7 +2207,7 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	// Submit a successful transaction
 	tx0 := types.NewTransaction(uint64(0), testEthAddrs[0], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx0, err := types.SignTx(tx0, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	errs := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx0})
 	if err := errs[0]; err != nil {
@@ -2255,19 +2254,24 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	issuer, vm, _, _ := GenesisVM(t, true, string(genesisJSON), "", "")
 
 	// arbitrary choice ahead of enableAllowListTimestamp
 	disableAllowListTimestamp := enableAllowListTimestamp.Add(10 * time.Hour)
-
 	// configure a network upgrade to remove the allowlist
-	precompileConfigs := &vm.blockChain.Config().UpgradeConfig
-	precompileConfigs.PrecompileUpgrades = append(
-		precompileConfigs.PrecompileUpgrades,
-		params.PrecompileUpgrade{
-			TxAllowListConfig: precompile.NewDisableTxAllowListConfig(big.NewInt(disableAllowListTimestamp.Unix())),
-		},
-	)
+	upgradeConfig := fmt.Sprintf(`
+	{
+		"precompileUpgrades": [
+			{
+				"txAllowListConfig": {
+					"blockTimestamp": %d,
+					"disable": true
+				}
+			}
+		]
+	}
+	`, disableAllowListTimestamp.Unix())
+
+	issuer, vm, _, _ := GenesisVM(t, true, string(genesisJSON), "", upgradeConfig)
 
 	vm.clock.Set(disableAllowListTimestamp) // upgrade takes effect after a block is issued, so we can set vm's clock here.
 
@@ -2298,7 +2302,7 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 	// Submit a successful transaction
 	tx0 := types.NewTransaction(uint64(0), testEthAddrs[0], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx0, err := types.SignTx(tx0, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	errs := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx0})
 	if err := errs[0]; err != nil {
@@ -2328,7 +2332,7 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 	require.Equal(t, signedTx0.Hash(), txs[0].Hash())
 
 	// verify the issued block is after the network upgrade
-	assert.True(t, block.Timestamp().Cmp(big.NewInt(disableAllowListTimestamp.Unix())) >= 0)
+	require.True(t, block.Timestamp().Cmp(big.NewInt(disableAllowListTimestamp.Unix())) >= 0)
 
 	<-newTxPoolHeadChan // wait for new head in tx pool
 
@@ -2405,16 +2409,16 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	}
 	// Contract is initialized but no preconfig is given, reader should return genesis fee config
 	feeConfig, lastChangedAt, err := vm.blockChain.GetFeeConfigAt(vm.blockChain.Genesis().Header())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.EqualValues(t, feeConfig, testLowFeeConfig)
-	assert.Zero(t, vm.blockChain.CurrentBlock().Number().Cmp(lastChangedAt))
+	require.Zero(t, vm.blockChain.CurrentBlock().Number().Cmp(lastChangedAt))
 
 	// set a different fee config now
 	testHighFeeConfig := testLowFeeConfig
 	testHighFeeConfig.MinBaseFee = big.NewInt(28_000_000_000)
 
 	data, err := precompile.PackSetFeeConfig(testHighFeeConfig)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	tx := types.NewTx(&types.DynamicFeeTx{
 		ChainID:   genesis.Config.ChainID,
@@ -2447,7 +2451,7 @@ func TestFeeManagerChangeFee(t *testing.T) {
 
 	// Contract is initialized but no state is given, reader should return genesis fee config
 	feeConfig, lastChangedAt, err = vm.blockChain.GetFeeConfigAt(block.Header())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.EqualValues(t, testHighFeeConfig, feeConfig)
 	require.EqualValues(t, vm.blockChain.CurrentBlock().Number(), lastChangedAt)
 
@@ -2469,7 +2473,7 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	}
 
 	err = vm.txPool.AddRemote(signedTx2)
-	assert.ErrorIs(t, err, core.ErrUnderpriced)
+	require.ErrorIs(t, err, core.ErrUnderpriced)
 }
 
 // Test Allow Fee Recipients is disabled and, etherbase must be blackhole address
@@ -2609,7 +2613,25 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 	configJSON, err := json.Marshal(c)
 	require.NoError(t, err)
 
-	issuer, vm, _, _ := GenesisVM(t, true, string(genesisJSON), string(configJSON), "")
+	// arbitrary choice ahead of enableAllowListTimestamp
+	// configure a network upgrade to remove the reward manager
+	disableTime := time.Now().Add(10 * time.Hour)
+
+	// configure a network upgrade to remove the allowlist
+	upgradeConfig := fmt.Sprintf(`
+		{
+			"precompileUpgrades": [
+				{
+					"rewardManagerConfig": {
+						"blockTimestamp": %d,
+						"disable": true
+					}
+				}
+			]
+		}
+		`, disableTime.Unix())
+
+	issuer, vm, _, _ := GenesisVM(t, true, string(genesisJSON), string(configJSON), upgradeConfig)
 
 	defer func() {
 		err := vm.Shutdown(context.Background())
@@ -2666,17 +2688,8 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 	// This should revert back to enabling fee recipients
 	previousBalance := blkState.GetBalance(etherBase)
 
-	// configure a network upgrade to remove the reward manager
-	disableTime := vm.clock.Time()
-	precompileConfigs := &vm.blockChain.Config().UpgradeConfig
-	precompileConfigs.PrecompileUpgrades = append(
-		precompileConfigs.PrecompileUpgrades,
-		params.PrecompileUpgrade{
-			RewardManagerConfig: precompile.NewDisableRewardManagerConfig(big.NewInt(disableTime.Unix())),
-		},
-	)
-
-	vm.clock.Set(vm.clock.Time().Add(2 * time.Hour)) // upgrade takes effect after a block is issued, so we can set vm's clock here.
+	// issue a new block to trigger the upgrade
+	vm.clock.Set(disableTime) // upgrade takes effect after a block is issued, so we can set vm's clock here.
 	tx2 := types.NewTransaction(uint64(1), testEthAddrs[0], big.NewInt(2), 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx2, err := types.SignTx(tx2, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[1])
 	require.NoError(t, err)
@@ -2690,8 +2703,31 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 	newHead = <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 	ethBlock = blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
-	require.Equal(t, etherBase, ethBlock.Coinbase()) // reward address was activated at previous block
-	assert.True(t, ethBlock.Timestamp().Cmp(big.NewInt(disableTime.Unix())) >= 0)
+	// Reward manager deactivated at this block, so we expect the parent state
+	// to determine the coinbase for this block before full deactivation in the
+	// next block.
+	require.Equal(t, testAddr, ethBlock.Coinbase())
+	require.True(t, ethBlock.Timestamp().Cmp(big.NewInt(disableTime.Unix())) >= 0)
+
+	vm.clock.Set(vm.clock.Time().Add(3 * time.Hour)) // let time pass to decrease gas price
+	// issue another block to verify that the reward manager is disabled
+	tx2 = types.NewTransaction(uint64(2), testEthAddrs[0], big.NewInt(2), 21000, big.NewInt(testMinGasPrice), nil)
+	signedTx2, err = types.SignTx(tx2, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[1])
+	require.NoError(t, err)
+
+	txErrors = vm.txPool.AddRemotesSync([]*types.Transaction{signedTx2})
+	for _, err := range txErrors {
+		require.NoError(t, err)
+	}
+
+	blk = issueAndAccept(t, issuer, vm)
+	newHead = <-newTxPoolHeadChan
+	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
+	ethBlock = blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
+	// reward manager was disabled at previous block
+	// so this block should revert back to enabling fee recipients
+	require.Equal(t, etherBase, ethBlock.Coinbase())
+	require.True(t, ethBlock.Timestamp().Cmp(big.NewInt(disableTime.Unix())) >= 0)
 
 	// Verify that Blackhole has received fees
 	blkState, err = vm.blockChain.StateAt(ethBlock.Root())
@@ -2705,8 +2741,7 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	genesis := &core.Genesis{}
 	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
 
-	enableRewardManagerTimestamp := time.Unix(0, 0) // enable at genesis
-	genesis.Config.RewardManagerConfig = precompile.NewRewardManagerConfig(big.NewInt(enableRewardManagerTimestamp.Unix()), testEthAddrs[0:1], nil, nil)
+	genesis.Config.RewardManagerConfig = precompile.NewRewardManagerConfig(common.Big0, testEthAddrs[0:1], nil, nil)
 	genesis.Config.AllowFeeRecipients = false // disable this in genesis
 	genesisJSON, err := genesis.MarshalJSON()
 	require.NoError(t, err)
@@ -2716,7 +2751,25 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	c.FeeRecipient = etherBase.String()
 	configJSON, err := json.Marshal(c)
 	require.NoError(t, err)
-	issuer, vm, _, _ := GenesisVM(t, true, string(genesisJSON), string(configJSON), "")
+	// configure a network upgrade to remove the reward manager
+	// arbitrary choice ahead of enableAllowListTimestamp
+	// configure a network upgrade to remove the reward manager
+	disableTime := time.Now().Add(10 * time.Hour)
+
+	// configure a network upgrade to remove the allowlist
+	upgradeConfig := fmt.Sprintf(`
+		{
+			"precompileUpgrades": [
+				{
+					"rewardManagerConfig": {
+						"blockTimestamp": %d,
+						"disable": true
+					}
+				}
+			]
+		}
+		`, disableTime.Unix())
+	issuer, vm, _, _ := GenesisVM(t, true, string(genesisJSON), string(configJSON), upgradeConfig)
 
 	defer func() {
 		require.NoError(t, vm.Shutdown(context.Background()))
@@ -2771,17 +2824,7 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	// This should revert back to burning fees
 	previousBalance := blkState.GetBalance(constants.BlackholeAddr)
 
-	// configure a network upgrade to remove the reward manager
-	disableTime := vm.clock.Time()
-	precompileConfigs := &vm.blockChain.Config().UpgradeConfig
-	precompileConfigs.PrecompileUpgrades = append(
-		precompileConfigs.PrecompileUpgrades,
-		params.PrecompileUpgrade{
-			RewardManagerConfig: precompile.NewDisableRewardManagerConfig(big.NewInt(disableTime.Unix())),
-		},
-	)
-
-	vm.clock.Set(vm.clock.Time().Add(2 * time.Hour)) // upgrade takes effect after a block is issued, so we can set vm's clock here.
+	vm.clock.Set(disableTime) // upgrade takes effect after a block is issued, so we can set vm's clock here.
 	tx2 := types.NewTransaction(uint64(1), testEthAddrs[0], big.NewInt(2), 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx2, err := types.SignTx(tx2, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[1])
 	require.NoError(t, err)
@@ -2795,8 +2838,25 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	newHead = <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 	ethBlock = blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
+	require.Equal(t, etherBase, ethBlock.Coinbase()) // reward address was activated at previous block
+	require.True(t, ethBlock.Timestamp().Cmp(big.NewInt(disableTime.Unix())) >= 0)
+
+	vm.clock.Set(vm.clock.Time().Add(3 * time.Hour)) // let time pass so that gas price is reduced
+	tx2 = types.NewTransaction(uint64(2), testEthAddrs[0], big.NewInt(2), 21000, big.NewInt(testMinGasPrice), nil)
+	signedTx2, err = types.SignTx(tx2, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[1])
+	require.NoError(t, err)
+
+	txErrors = vm.txPool.AddRemotesSync([]*types.Transaction{signedTx2})
+	for _, err := range txErrors {
+		require.NoError(t, err)
+	}
+
+	blk = issueAndAccept(t, issuer, vm)
+	newHead = <-newTxPoolHeadChan
+	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
+	ethBlock = blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
 	require.Equal(t, constants.BlackholeAddr, ethBlock.Coinbase()) // reward address was activated at previous block
-	assert.True(t, ethBlock.Timestamp().Cmp(big.NewInt(disableTime.Unix())) >= 0)
+	require.True(t, ethBlock.Timestamp().Cmp(big.NewInt(disableTime.Unix())) >= 0)
 
 	// Verify that Blackhole has received fees
 	blkState, err = vm.blockChain.StateAt(ethBlock.Root())

@@ -381,7 +381,9 @@ func (bc *BlockChain) GetFeeConfigAt(parent *types.Header) (commontype.FeeConfig
 	return storedFeeConfig, lastChangedAt, nil
 }
 
-// GetCoinbaseAt returns the configured coinbase address at [parent]. If fee recipients are allowed, returns true in the second return value.
+// GetCoinbaseAt returns the configured coinbase address at [parent].
+// If RewardManager is activated at [parent], returns the reward manager config in the precompile contract state.
+// If fee recipients are allowed, returns true in the second return value.
 func (bc *BlockChain) GetCoinbaseAt(parent *types.Header) (common.Address, bool, error) {
 	config := bc.Config()
 	bigTime := new(big.Int).SetUint64(parent.Time)

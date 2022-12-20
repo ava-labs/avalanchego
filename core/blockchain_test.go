@@ -57,7 +57,7 @@ func createBlockChain(
 		db,
 		cacheConfig,
 		chainConfig,
-		dummy.NewFaker(),
+		dummy.NewCoinbaseFaker(),
 		vm.Config{},
 		lastAcceptedHash,
 	)
@@ -375,9 +375,10 @@ func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
 		return createBlockChain(db, pruningConfig, chainConfig, lastAcceptedHash)
 	}
 	for _, tt := range tests {
+		tst := tt
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			tt.testFunc(t, create)
+			tst.testFunc(t, create)
 		})
 	}
 }
@@ -677,7 +678,7 @@ func TestCanonicalHashMarker(t *testing.T) {
 				BaseFee: big.NewInt(params.TestInitialBaseFee),
 			}
 			genesis = gspec.MustCommit(db)
-			engine  = dummy.NewFaker()
+			engine  = dummy.NewCoinbaseFaker()
 		)
 		forkA, _, err := GenerateChain(params.TestChainConfig, genesis, engine, db, c.forkA, 10, func(i int, gen *BlockGen) {})
 		if err != nil {

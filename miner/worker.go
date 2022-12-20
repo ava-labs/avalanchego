@@ -117,22 +117,25 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 	defer w.mu.RUnlock()
 
 	tstart := w.clock.Time()
-	timestamp := tstart.Unix()
+	timestamp := uint64(tstart.Unix())
 	parent := w.chain.CurrentBlock()
 	// Note: in order to support asynchronous block production, blocks are allowed to have
 	// the same timestamp as their parent. This allows more than one block to be produced
 	// per second.
-	if parent.Time() >= uint64(timestamp) {
-		timestamp = int64(parent.Time())
+	if parent.Time() >= timestamp {
+		timestamp = parent.Time()
 	}
 
+	bigTimestamp := new(big.Int).SetUint64(timestamp)
 	var gasLimit uint64
+	// The fee config manager relies on the state of the parent block to set the fee config
+	// because the fee config may be changed by the current block.
 	feeConfig, _, err := w.chain.GetFeeConfigAt(parent.Header())
 	if err != nil {
 		return nil, err
 	}
 	configuredGasLimit := feeConfig.GasLimit.Uint64()
-	if w.chainConfig.IsSubnetEVM(big.NewInt(timestamp)) {
+	if w.chainConfig.IsSubnetEVM(bigTimestamp) {
 		gasLimit = configuredGasLimit
 	} else {
 		// The gas limit is set in SubnetEVMGasLimit because the ceiling and floor were set to the same value
@@ -145,13 +148,12 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 		Number:     num.Add(num, common.Big1),
 		GasLimit:   gasLimit,
 		Extra:      nil,
-		Time:       uint64(timestamp),
+		Time:       timestamp,
 	}
 
-	bigTimestamp := big.NewInt(timestamp)
 	if w.chainConfig.IsSubnetEVM(bigTimestamp) {
 		var err error
-		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(w.chainConfig, feeConfig, parent.Header(), uint64(timestamp))
+		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(w.chainConfig, feeConfig, parent.Header(), timestamp)
 		if err != nil {
 			return nil, fmt.Errorf("failed to calculate new base fee: %w", err)
 		}
