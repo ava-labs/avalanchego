@@ -550,6 +550,10 @@ func (n *network) MarkTracked(peerID ids.NodeID, ips []*p2ppb.PeerAck) error {
 			continue
 		}
 
+		// If the peer returns a lower timestamp than I currently have, then I
+		// have updated the IP since I sent the PeerList message this is in
+		// response to. That means that I should re-gossip this node's IP to the
+		// peer.
 		myIP, previouslyTracked := n.peerIPs[nodeID]
 		if previouslyTracked && myIP.Timestamp <= ip.Timestamp {
 			txIDs = append(txIDs, txID)
