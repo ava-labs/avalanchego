@@ -173,8 +173,11 @@ func TestMessage(t *testing.T) {
 			msg: &p2ppb.Message{
 				Message: &p2ppb.Message_PeerListAck{
 					PeerListAck: &p2ppb.PeerListAck{
-						TxIds: [][]byte{
-							testID[:],
+						PeerAcks: []*p2ppb.PeerAck{
+							{
+								TxId:      testID[:],
+								Timestamp: 1,
+							},
 						},
 					},
 				},

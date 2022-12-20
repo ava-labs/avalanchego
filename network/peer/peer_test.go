@@ -90,9 +90,6 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 	)
 	require.NoError(err)
 
-	gossipTracker, err := NewGossipTracker(prometheus.NewRegistry(), "foobar")
-	require.NoError(err)
-
 	sharedConfig := Config{
 		Metrics:              metrics,
 		MessageCreator:       mc,
@@ -106,7 +103,6 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 		PongTimeout:          constants.DefaultPingPongTimeout,
 		MaxClockDifference:   time.Minute,
 		ResourceTracker:      resourceTracker,
-		GossipTracker:        gossipTracker,
 	}
 	peerConfig0 := sharedConfig
 	peerConfig1 := sharedConfig

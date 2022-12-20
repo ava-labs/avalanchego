@@ -263,6 +263,60 @@ func TestGossipTracker_RemoveValidator(t *testing.T) {
 	}
 }
 
+func TestGossipTracker_ResetValidator(t *testing.T) {
+	type args struct {
+		id ids.NodeID
+	}
+
+	tests := []struct {
+		name       string
+		validators []ValidatorID
+		args       args
+		expected   bool
+	}{
+		{
+			name:       "non-existent validator",
+			validators: []ValidatorID{},
+			args:       args{id: v1.NodeID},
+			expected:   false,
+		},
+		{
+			name:       "existing validator",
+			validators: []ValidatorID{v1},
+			args:       args{id: v1.NodeID},
+			expected:   true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			r := require.New(t)
+
+			g, err := NewGossipTracker(prometheus.NewRegistry(), "foobar")
+			r.NoError(err)
+
+			r.True(g.StartTrackingPeer(p1))
+
+			for _, v := range test.validators {
+				r.True(g.AddValidator(v))
+				g.AddKnown(p1, []ids.ID{v.TxID}, nil)
+
+				unknown, ok := g.GetUnknown(p1)
+				r.True(ok)
+				r.NotContains(unknown, v)
+			}
+
+			r.Equal(test.expected, g.ResetValidator(test.args.id))
+
+			for _, v := range test.validators {
+				unknown, ok := g.GetUnknown(p1)
+				r.True(ok)
+				r.Contains(unknown, v)
+			}
+		})
+	}
+}
+
 func TestGossipTracker_AddKnown(t *testing.T) {
 	type args struct {
 		peerID ids.NodeID
@@ -340,7 +394,7 @@ func TestGossipTracker_AddKnown(t *testing.T) {
 				r.True(g.AddValidator(v))
 			}
 
-			txIDs, ok := g.AddKnown(test.args.peerID, test.args.txIDs)
+			txIDs, ok := g.AddKnown(test.args.peerID, test.args.txIDs, test.args.txIDs)
 			r.Equal(test.expectedOk, ok)
 			r.Equal(test.expectedTxIDs, txIDs)
 		})
@@ -470,7 +524,7 @@ func TestGossipTracker_E2E(t *testing.T) {
 
 	// p1 now knows about v1, but not v2, so it should see [v2] in its unknown
 	// p2 still knows nothing, so it should see both
-	txIDs, ok := g.AddKnown(p1, []ids.ID{v1.TxID})
+	txIDs, ok := g.AddKnown(p1, []ids.ID{v1.TxID}, []ids.ID{v1.TxID})
 	r.True(ok)
 	r.Equal([]ids.ID{v1.TxID}, txIDs)
 
@@ -494,7 +548,7 @@ func TestGossipTracker_E2E(t *testing.T) {
 	// p1 and p2 still don't know of v3
 	r.True(g.StartTrackingPeer(p3))
 
-	txIDs, ok = g.AddKnown(p3, []ids.ID{v1.TxID, v2.TxID, v3.TxID})
+	txIDs, ok = g.AddKnown(p3, []ids.ID{v1.TxID, v2.TxID, v3.TxID}, []ids.ID{v1.TxID, v2.TxID, v3.TxID})
 	r.True(ok)
 	r.Equal([]ids.ID{v1.TxID, v2.TxID, v3.TxID}, txIDs)
 

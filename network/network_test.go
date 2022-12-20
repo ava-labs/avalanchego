@@ -358,7 +358,7 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 	err := validators.Add(network.config.Validators, constants.PrimaryNetworkID, nodeID, nil, ids.Empty, 1)
 	require.NoError(err)
 
-	useful := network.Track(ips.ClaimedIPPort{
+	_, err = network.Track(ids.EmptyNodeID, []*ips.ClaimedIPPort{{
 		Cert: tlsCert.Leaf,
 		IPPort: ips.IPPort{
 			IP:   net.IPv4(123, 132, 123, 123),
@@ -366,9 +366,9 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 		},
 		Timestamp: 1000,
 		Signature: nil,
-	})
+	}})
 	// The signature is wrong so this peer tracking info isn't useful.
-	require.False(useful)
+	require.Error(err)
 
 	network.peersLock.RLock()
 	require.Empty(network.trackedIPs)
