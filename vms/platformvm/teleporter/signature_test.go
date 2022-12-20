@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 const pChainHeight uint64 = 1337
@@ -231,7 +232,7 @@ func TestSignatureVerification(t *testing.T) {
 				)
 				require.NoError(err)
 
-				signers := ids.NewBigBitSet()
+				signers := set.NewBits()
 				signers.Add(3) // vdr oob
 
 				msg, err := NewMessage(
@@ -266,7 +267,7 @@ func TestSignatureVerification(t *testing.T) {
 
 				// [signers] has weight from [vdr[0], vdr[1]],
 				// which is 6, which is less than 9
-				signers := ids.NewBigBitSet()
+				signers := set.NewBits()
 				signers.Add(0)
 				signers.Add(1)
 
@@ -308,7 +309,7 @@ func TestSignatureVerification(t *testing.T) {
 				)
 				require.NoError(err)
 
-				signers := ids.NewBigBitSet()
+				signers := set.NewBits()
 				signers.Add(0)
 				signers.Add(1)
 
@@ -342,7 +343,7 @@ func TestSignatureVerification(t *testing.T) {
 				)
 				require.NoError(err)
 
-				signers := ids.NewBigBitSet()
+				signers := set.NewBits()
 				signers.Add(0)
 				signers.Add(1)
 
@@ -386,7 +387,7 @@ func TestSignatureVerification(t *testing.T) {
 				)
 				require.NoError(err)
 
-				signers := ids.NewBigBitSet()
+				signers := set.NewBits()
 				signers.Add(0)
 				signers.Add(1)
 
@@ -426,7 +427,7 @@ func TestSignatureVerification(t *testing.T) {
 				)
 				require.NoError(err)
 
-				signers := ids.NewBigBitSet()
+				signers := set.NewBits()
 				signers.Add(0)
 				signers.Add(1)
 
@@ -473,7 +474,7 @@ func TestSignatureVerification(t *testing.T) {
 
 				// [signers] has weight from [vdr[1], vdr[2]],
 				// which is 6, which is greater than 4.5
-				signers := ids.NewBigBitSet()
+				signers := set.NewBits()
 				signers.Add(1)
 				signers.Add(2)
 
@@ -517,7 +518,7 @@ func TestSignatureVerification(t *testing.T) {
 
 				// [signers] has weight from [vdr[1], vdr[2]],
 				// which is 6, which meets the minimum 6
-				signers := ids.NewBigBitSet()
+				signers := set.NewBits()
 				signers.Add(1)
 				signers.Add(2)
 
@@ -577,7 +578,7 @@ func TestSignatureVerification(t *testing.T) {
 
 				// [signers] has weight from [vdr2, vdr3],
 				// which is 6, which is greater than 3
-				signers := ids.NewBigBitSet()
+				signers := set.NewBits()
 				// Note: the bits are shifted because vdr[0]'s key was zeroed
 				signers.Add(0) // vdr[1]
 				signers.Add(1) // vdr[2]
@@ -638,7 +639,7 @@ func TestSignatureVerification(t *testing.T) {
 
 				// [signers] has weight from [vdr2, vdr3],
 				// which is 6, which meets the minimum 6
-				signers := ids.NewBigBitSet()
+				signers := set.NewBits()
 				// Note: the bits are shifted because vdr[0]'s key was zeroed
 				// Note: vdr[1] and vdr[2] were combined because of a shared pk
 				signers.Add(0) // vdr[1] + vdr[2]

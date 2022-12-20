@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
@@ -64,7 +64,7 @@ func (s *BitSetSignature) Verify(
 	}
 
 	// Parse signer bit vector
-	signerIndices := ids.BigBitSetFromBytes(s.Signers)
+	signerIndices := set.BitsFromBytes(s.Signers)
 	if len(signerIndices.Bytes()) != len(s.Signers) {
 		return ErrInvalidBitSet
 	}

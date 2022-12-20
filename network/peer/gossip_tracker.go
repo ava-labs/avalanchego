@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // GossipTracker tracks the validators that we're currently aware of, as well as
@@ -83,7 +84,7 @@ type gossipTracker struct {
 	// each validator in the index it occupies in the bitset
 	validatorIDs []ValidatorID
 	// a mapping of each peer => the validators they know about
-	trackedPeers map[ids.NodeID]ids.BigBitSet
+	trackedPeers map[ids.NodeID]set.Bits
 
 	metrics gossipTrackerMetrics
 }
@@ -101,7 +102,7 @@ func NewGossipTracker(
 	return &gossipTracker{
 		txIDsToNodeIDs:   make(map[ids.ID]ids.NodeID),
 		nodeIDsToIndices: make(map[ids.NodeID]int),
-		trackedPeers:     make(map[ids.NodeID]ids.BigBitSet),
+		trackedPeers:     make(map[ids.NodeID]set.Bits),
 		metrics:          m,
 	}, nil
 }
@@ -125,7 +126,7 @@ func (g *gossipTracker) StartTrackingPeer(peerID ids.NodeID) bool {
 
 	// start tracking the peer. Initialize their bitset to zero since we
 	// haven't sent them anything yet.
-	g.trackedPeers[peerID] = ids.NewBigBitSet()
+	g.trackedPeers[peerID] = set.NewBits()
 
 	// emit metrics
 	g.metrics.trackedPeersSize.Set(float64(len(g.trackedPeers)))

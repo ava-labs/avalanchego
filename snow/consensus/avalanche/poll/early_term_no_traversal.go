@@ -7,6 +7,8 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+
+	sets "github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
@@ -70,7 +72,7 @@ func (p *earlyTermNoTraversalPoll) Finished() bool {
 	// votes will be applied to a single shared ancestor. In this case, the poll
 	// can terminate early, iff there are not enough pending votes for this
 	// ancestor to receive alpha votes.
-	partialVotes := ids.BitSet64(0)
+	partialVotes := sets.Bits64(0)
 	for _, vote := range p.votes.List() {
 		if voters := p.votes.GetSet(vote); voters.Len() < p.alpha {
 			partialVotes.Union(voters)

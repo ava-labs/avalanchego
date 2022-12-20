@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 func TestGetCanonicalValidatorSet(t *testing.T) {
@@ -180,7 +181,7 @@ func TestFilterValidators(t *testing.T) {
 
 	type test struct {
 		name         string
-		indices      ids.BigBitSet
+		indices      set.Bits
 		vdrs         []*Validator
 		expectedVdrs []*Validator
 		expectedErr  error
@@ -189,20 +190,20 @@ func TestFilterValidators(t *testing.T) {
 	tests := []test{
 		{
 			name:         "empty",
-			indices:      ids.NewBigBitSet(),
+			indices:      set.NewBits(),
 			vdrs:         []*Validator{},
 			expectedVdrs: []*Validator{},
 			expectedErr:  nil,
 		},
 		{
 			name:        "unknown validator",
-			indices:     ids.NewBigBitSet(2),
+			indices:     set.NewBits(2),
 			vdrs:        []*Validator{vdr0, vdr1},
 			expectedErr: ErrUnknownValidator,
 		},
 		{
 			name:    "two filtered out",
-			indices: ids.NewBigBitSet(),
+			indices: set.NewBits(),
 			vdrs: []*Validator{
 				vdr0,
 				vdr1,
@@ -212,7 +213,7 @@ func TestFilterValidators(t *testing.T) {
 		},
 		{
 			name:    "one filtered out",
-			indices: ids.NewBigBitSet(1),
+			indices: set.NewBits(1),
 			vdrs: []*Validator{
 				vdr0,
 				vdr1,
@@ -224,7 +225,7 @@ func TestFilterValidators(t *testing.T) {
 		},
 		{
 			name:    "none filtered out",
-			indices: ids.NewBigBitSet(0, 1),
+			indices: set.NewBits(0, 1),
 			vdrs: []*Validator{
 				vdr0,
 				vdr1,
