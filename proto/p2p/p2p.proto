@@ -128,7 +128,7 @@ message PeerAck {
 // Message that responds to a peer_list message containing the AddValidatorTxIDs
 // from the peer_list message that we currently have in our validator set.
 message PeerListAck {
-  reserved 1;
+  reserved 1; // deprecated; used to be tx_ids
 
   repeated PeerAck peer_acks = 2;
 }
