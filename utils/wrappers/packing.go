@@ -37,6 +37,7 @@ var (
 	errNegativeOffset = errors.New("negative offset")
 	errInvalidInput   = errors.New("input does not match expected format")
 	errBadBool        = errors.New("unexpected value when unpacking bool")
+	errOversized      = errors.New("size is larger than limit")
 )
 
 // Packer packs and unpacks a byte array from/to standard values
@@ -203,6 +204,17 @@ func (p *Packer) UnpackBytes() []byte {
 	return p.UnpackFixedBytes(int(size))
 }
 
+// UnpackLimitedBytes unpacks a byte slice. If the size of the slice is greater
+// than [limit], adds [errOversized] to the packer and returns nil.
+func (p *Packer) UnpackLimitedBytes(limit uint32) []byte {
+	size := p.UnpackInt()
+	if size > limit {
+		p.Add(errOversized)
+		return nil
+	}
+	return p.UnpackFixedBytes(int(size))
+}
+
 // PackStr append a string to the byte array
 func (p *Packer) PackStr(str string) {
 	strSize := len(str)
@@ -217,6 +229,17 @@ func (p *Packer) PackStr(str string) {
 // UnpackStr unpacks a string from the byte array
 func (p *Packer) UnpackStr() string {
 	strSize := p.UnpackShort()
+	return string(p.UnpackFixedBytes(int(strSize)))
+}
+
+// UnpackLimitedStr unpacks a string. If the size of the string is greater than
+// [limit], adds [errOversized] to the packer and returns the empty string.
+func (p *Packer) UnpackLimitedStr(limit uint16) string {
+	strSize := p.UnpackShort()
+	if strSize > limit {
+		p.Add(errOversized)
+		return ""
+	}
 	return string(p.UnpackFixedBytes(int(strSize)))
 }
 
