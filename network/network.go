@@ -394,7 +394,7 @@ func (n *network) Connected(nodeID ids.NodeID) {
 
 		if !prevIP.IPPort.Equal(newIP.IPPort) {
 			// This IP is actually different, so we should gossip it.
-			n.gossipTracker.ResetValidator(nodeID)
+			_ = n.gossipTracker.ResetValidator(nodeID)
 		}
 	}
 
