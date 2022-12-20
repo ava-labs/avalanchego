@@ -69,7 +69,8 @@ type GossipTracker interface {
 	// 	bool: False if [validator] was not present. True otherwise.
 	ResetValidator(validatorID ids.NodeID) bool
 
-	// AddKnown adds [knownTxIDs] to the txIDs known by [peerID]
+	// AddKnown adds [knownTxIDs] to the txIDs known by [peerID] and filters
+	// [txIDs] for non-validators.
 	// Returns:
 	// 	txIDs: The txIDs in [txIDs] that are currently validators.
 	// 	bool: False if [peerID] is not tracked. True otherwise.
@@ -260,9 +261,6 @@ func (g *gossipTracker) ResetValidator(validatorID ids.NodeID) bool {
 // AddKnown invariants:
 //  1. [peerID] SHOULD only be a nodeID that has been tracked with
 //     StartTrackingPeer().
-//  2. [txIDs] SHOULD only be a slice of txIDs that have been added with
-//     AddValidator. Trying to learn about txIDs that aren't registered
-//     yet will result in dropping the unregistered ID.
 func (g *gossipTracker) AddKnown(
 	peerID ids.NodeID,
 	knownTxIDs []ids.ID,

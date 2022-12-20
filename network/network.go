@@ -146,6 +146,8 @@ type network struct {
 	peersLock     sync.RWMutex
 	// peerIPs contains the most up to date set of signed IPs for nodes we are
 	// currently connected or attempting to connect to.
+	// Note: The txID provided inside of a claimed IP is not verified and should
+	//       not be accessed from this map.
 	peerIPs map[ids.NodeID]*ips.ClaimedIPPort
 	// trackedIPs contains the set of IPs that we are currently attempting to
 	// connect to. An entry is added to this set when we first start attempting
@@ -541,7 +543,11 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 	for i, txID := range txIDsToAck {
 		txID := txID
 		peerAcks[i] = &p2ppb.PeerAck{
-			TxId:      txID[:],
+			TxId: txID[:],
+			// By responding with the highest timestamp, not just the timestamp
+			// the peer provided us, we may be able to avoid some unnecessary
+			// gossip in the case that the peer is about to update this
+			// validator's IP.
 			Timestamp: newestTimestamp[txID],
 		}
 	}
