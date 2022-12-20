@@ -394,6 +394,9 @@ func (n *network) Connected(nodeID ids.NodeID) {
 
 		if !prevIP.IPPort.Equal(newIP.IPPort) {
 			// This IP is actually different, so we should gossip it.
+			n.peerConfig.Log.Debug("resetting gossip due to ip change",
+				zap.Stringer("nodeID", nodeID),
+			)
 			_ = n.gossipTracker.ResetValidator(nodeID)
 		}
 	}
@@ -498,7 +501,10 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 			}
 
 			// We should gossip this new IP to all our peers.
-			n.gossipTracker.ResetValidator(nodeID)
+			n.peerConfig.Log.Debug("resetting gossip due to ip change",
+				zap.Stringer("nodeID", nodeID),
+			)
+			_ = n.gossipTracker.ResetValidator(nodeID)
 
 			// We should update any existing outbound connection attempts.
 			if isTracked {
