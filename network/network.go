@@ -451,8 +451,10 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 		}
 	}
 
-	newestTimestamp := make(map[ids.ID]uint64, len(nodeIDs)) // Information for them to update about us
-	txIDsWithUpToDateIP := make([]ids.ID, 0, len(nodeIDs))   // Information for us to update about them
+	// Information for them to update about us
+	newestTimestamp := make(map[ids.ID]uint64, len(nodeIDs))
+	// Information for us to update about them
+	txIDsWithUpToDateIP := make([]ids.ID, 0, len(nodeIDs))
 
 	n.peersLock.Lock()
 	defer n.peersLock.Unlock()
