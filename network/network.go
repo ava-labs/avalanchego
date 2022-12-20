@@ -608,9 +608,10 @@ func (n *network) Peers(peerID ids.NodeID) ([]ips.ClaimedIPPort, error) {
 
 		validator := unknownValidators[drawn]
 		n.peersLock.RLock()
-		p, ok := n.connectedPeers.GetByID(validator.NodeID)
+		peer, isConnected := n.connectedPeers.GetByID(validator.NodeID)
+		peerIP := n.peerIPs[validator.NodeID]
 		n.peersLock.RUnlock()
-		if !ok {
+		if !isConnected {
 			n.peerConfig.Log.Debug(
 				"unable to find validator in connected peers",
 				zap.Stringer("nodeID", validator.NodeID),
@@ -618,12 +619,11 @@ func (n *network) Peers(peerID ids.NodeID) ([]ips.ClaimedIPPort, error) {
 			continue
 		}
 
-		peerIP := p.IP()
 		validatorIPs = append(validatorIPs,
 			ips.ClaimedIPPort{
-				Cert:      p.Cert(),
-				IPPort:    peerIP.IP.IP,
-				Timestamp: peerIP.IP.Timestamp,
+				Cert:      peer.Cert(),
+				IPPort:    peerIP.IPPort,
+				Timestamp: peerIP.Timestamp,
 				Signature: peerIP.Signature,
 				TxID:      validator.TxID,
 			},
@@ -1125,12 +1125,9 @@ func (n *network) StartClose() {
 		n.closing = true
 		n.onCloseCtxCancel()
 
-		for nodeID := range n.peerIPs {
-			delete(n.peerIPs, nodeID)
-		}
-
 		for nodeID, tracked := range n.trackedIPs {
 			tracked.stopTracking()
+			delete(n.peerIPs, nodeID)
 			delete(n.trackedIPs, nodeID)
 		}
 
