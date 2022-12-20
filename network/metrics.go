@@ -26,6 +26,7 @@ type metrics struct {
 	acceptFailed                    prometheus.Counter
 	inboundConnRateLimited          prometheus.Counter
 	inboundConnAllowed              prometheus.Counter
+	numUselessPeerListBytes         prometheus.Counter
 	nodeUptimeWeightedAverage       prometheus.Gauge
 	nodeUptimeRewardingStake        prometheus.Gauge
 	nodeSubnetUptimeWeightedAverage *prometheus.GaugeVec
@@ -92,6 +93,11 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 			Name:      "inbound_conn_throttler_allowed",
 			Help:      "Times this node allowed (attempted to upgrade) an inbound connection",
 		}),
+		numUselessPeerListBytes: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "num_useless_peerlist_bytes",
+			Help:      "Amount of useless bytes (i.e. information about nodes we already knew/don't want to connect to) received in PeerList messages",
+		}),
 		inboundConnRateLimited: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "inbound_conn_throttler_rate_limited",
@@ -138,6 +144,7 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 		registerer.Register(m.disconnected),
 		registerer.Register(m.acceptFailed),
 		registerer.Register(m.inboundConnAllowed),
+		registerer.Register(m.numUselessPeerListBytes),
 		registerer.Register(m.inboundConnRateLimited),
 		registerer.Register(m.nodeUptimeWeightedAverage),
 		registerer.Register(m.nodeUptimeRewardingStake),

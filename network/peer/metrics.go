@@ -80,10 +80,9 @@ func NewMessageMetrics(
 }
 
 type Metrics struct {
-	Log                     logging.Logger
-	FailedToParse           prometheus.Counter
-	NumUselessPeerListBytes prometheus.Counter
-	MessageMetrics          map[message.Op]*MessageMetrics
+	Log            logging.Logger
+	FailedToParse  prometheus.Counter
+	MessageMetrics map[message.Op]*MessageMetrics
 }
 
 func NewMetrics(
@@ -98,18 +97,12 @@ func NewMetrics(
 			Name:      "msgs_failed_to_parse",
 			Help:      "Number of messages that could not be parsed or were invalidly formed",
 		}),
-		NumUselessPeerListBytes: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "num_useless_peerlist_bytes",
-			Help:      "Amount of useless bytes (i.e. information about nodes we already knew/don't want to connect to) received in PeerList messages",
-		}),
 		MessageMetrics: make(map[message.Op]*MessageMetrics, len(message.ExternalOps)),
 	}
 
 	errs := wrappers.Errs{}
 	errs.Add(
 		registerer.Register(m.FailedToParse),
-		registerer.Register(m.NumUselessPeerListBytes),
 	)
 	for _, op := range message.ExternalOps {
 		m.MessageMetrics[op] = NewMessageMetrics(op, namespace, registerer, &errs)
