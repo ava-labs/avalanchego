@@ -384,12 +384,16 @@ func (n *network) Connected(nodeID ids.NodeID) {
 	}
 	prevIP, ok := n.peerIPs[nodeID]
 	if !ok {
+		// If the IP wasn't previously tracked, then we never could have
+		// gossiped it. This means we don't need to reset the validator's
+		// tracked set.
 		n.peerIPs[nodeID] = newIP
 	} else if prevIP.Timestamp < newIP.Timestamp {
+		// The previous IP was stale, so we should gossip the newer IP.
 		n.peerIPs[nodeID] = newIP
 
 		if !prevIP.IPPort.Equal(newIP.IPPort) {
-			// We should gossip this new IP to all our peers.
+			// This IP is actually different, so we should gossip it.
 			n.gossipTracker.ResetValidator(nodeID)
 		}
 	}
