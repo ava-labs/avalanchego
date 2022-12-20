@@ -59,7 +59,7 @@ func NewGetHandler(reporter func() (map[string]Result, bool)) http.Handler {
 		}
 		// The encoder will call write on the writer, which will write the
 		// header with a 200.
-		_ = stdjson.NewEncoder(w).Encode(APIHealthReply{
+		_ = stdjson.NewEncoder(w).Encode(APIReply{
 			Checks:  checks,
 			Healthy: healthy,
 		})
