@@ -14,13 +14,13 @@ import (
 )
 
 type mockClient struct {
-	reply  APIHealthReply
+	reply  APIReply
 	err    error
 	onCall func()
 }
 
 func (mc *mockClient) SendRequest(_ context.Context, _ string, _ interface{}, replyIntf interface{}, _ ...rpc.Option) error {
-	reply := replyIntf.(*APIHealthReply)
+	reply := replyIntf.(*APIReply)
 	*reply = mc.reply
 	mc.onCall()
 	return mc.err
@@ -37,13 +37,13 @@ func TestClient(t *testing.T) {
 	require := require.New(t)
 
 	mc := &mockClient{
-		reply: APIHealthReply{
+		reply: APIReply{
 			Healthy: true,
 		},
 		err:    nil,
 		onCall: func() {},
 	}
-	c := client{
+	c := &client{
 		requester: mc,
 	}
 
@@ -67,7 +67,15 @@ func TestClient(t *testing.T) {
 
 	{
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		healthy, err := c.AwaitHealthy(ctx, time.Second)
+		healthy, err := AwaitHealthy(ctx, c, time.Second)
+		cancel()
+		require.NoError(err)
+		require.True(healthy)
+	}
+
+	{
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		healthy, err := AwaitReady(ctx, c, time.Second)
 		cancel()
 		require.NoError(err)
 		require.True(healthy)
@@ -77,7 +85,15 @@ func TestClient(t *testing.T) {
 
 	{
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Microsecond)
-		healthy, err := c.AwaitHealthy(ctx, time.Microsecond)
+		healthy, err := AwaitHealthy(ctx, c, time.Microsecond)
+		cancel()
+		require.Error(err)
+		require.False(healthy)
+	}
+
+	{
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Microsecond)
+		healthy, err := AwaitReady(ctx, c, time.Microsecond)
 		cancel()
 		require.Error(err)
 		require.False(healthy)
@@ -88,7 +104,14 @@ func TestClient(t *testing.T) {
 	}
 
 	{
-		healthy, err := c.AwaitHealthy(context.Background(), time.Microsecond)
+		healthy, err := AwaitHealthy(context.Background(), c, time.Microsecond)
+		require.NoError(err)
+		require.True(healthy)
+	}
+
+	mc.reply.Healthy = false
+	{
+		healthy, err := AwaitReady(context.Background(), c, time.Microsecond)
 		require.NoError(err)
 		require.True(healthy)
 	}
