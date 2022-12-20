@@ -834,6 +834,13 @@ func (x *PeerList) GetClaimedIpPorts() []*ClaimedIpPort {
 	return nil
 }
 
+// "peer_ack" is sent in response to a "peer_list" message. The "tx_id" should
+// correspond to a "tx_id" in the "peer_list" message. The sender should set
+// "timestamp" to be the latest known timestamp of a signed IP corresponding to
+// the nodeID of "tx_id".
+//
+// Upon receipt, the "tx_id" and "timestamp" will determine if the receiptent
+// can forgo future gossip of the node's IP to the sender of this message.
 type PeerAck struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
