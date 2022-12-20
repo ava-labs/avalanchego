@@ -266,7 +266,7 @@ func (mr *MockOutboundMsgBuilderMockRecorder) PeerList(arg0, arg1 interface{}) *
 }
 
 // PeerListAck mocks base method.
-func (m *MockOutboundMsgBuilder) PeerListAck(arg0 []ids.ID) (OutboundMessage, error) {
+func (m *MockOutboundMsgBuilder) PeerListAck(arg0 []*p2p.PeerAck) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PeerListAck", arg0)
 	ret0, _ := ret[0].(OutboundMessage)
