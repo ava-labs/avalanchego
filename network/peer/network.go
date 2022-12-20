@@ -24,9 +24,7 @@ type Network interface {
 	// connect to, given the [ips] of the peers it sent us during the peer
 	// handshake.
 	//
-	// Returns false if this call was not "useful". That is, we were already
-	// connected to this node, we already had this tracking information, the
-	// signature is invalid or we don't want to connect.
+	// Returns which IPs should not be gossipped to this node again.
 	Track(peerID ids.NodeID, ips []*ips.ClaimedIPPort) ([]*p2ppb.PeerAck, error)
 
 	// MarkTracked stops sending gossip about [ips] to [peerID].
