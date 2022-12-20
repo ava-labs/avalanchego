@@ -497,20 +497,14 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 			// We should update any existing outbound connection attempts.
 			if isTracked {
 				// Stop tracking the old IP and instead start tracking new one.
-				tracked := tracked.trackNewIP(&peer.UnsignedIP{
-					IP:        ip.IPPort,
-					Timestamp: ip.Timestamp,
-				})
+				tracked := tracked.trackNewIP(ip.IPPort)
 				n.trackedIPs[nodeID] = tracked
 				n.dial(n.onCloseCtx, nodeID, tracked)
 			}
 		case !connected && !previouslyTracked && n.wantsConnection(nodeID):
 			n.peerIPs[nodeID] = ip
 
-			tracked := newTrackedIP(&peer.UnsignedIP{
-				IP:        ip.IPPort,
-				Timestamp: ip.Timestamp,
-			})
+			tracked := newTrackedIP(ip.IPPort)
 			n.trackedIPs[nodeID] = tracked
 			n.dial(n.onCloseCtx, nodeID, tracked)
 		default:
@@ -745,10 +739,7 @@ func (n *network) ManuallyTrack(nodeID ids.NodeID, ip ips.IPPort) {
 
 	_, isTracked := n.trackedIPs[nodeID]
 	if !isTracked {
-		tracked := newTrackedIP(&peer.UnsignedIP{
-			IP:        ip,
-			Timestamp: 0,
-		})
+		tracked := newTrackedIP(ip)
 		n.trackedIPs[nodeID] = tracked
 		n.dial(n.onCloseCtx, nodeID, tracked)
 	}
@@ -892,7 +883,8 @@ func (n *network) disconnectedFromConnected(peer peer.Peer, nodeID ids.NodeID) {
 
 	// The peer that is disconnecting from us finished the handshake
 	if n.wantsConnection(nodeID) {
-		tracked := newTrackedIP(&peer.IP().IP)
+		prevIP := n.peerIPs[nodeID]
+		tracked := newTrackedIP(prevIP.IPPort)
 		n.trackedIPs[nodeID] = tracked
 		n.dial(n.onCloseCtx, nodeID, tracked)
 	} else {
@@ -975,7 +967,7 @@ func (n *network) dial(ctx context.Context, nodeID ids.NodeID, ip *trackedIP) {
 				n.config.MaxReconnectDelay,
 			)
 
-			conn, err := n.dialer.Dial(ctx, ip.ip.IP)
+			conn, err := n.dialer.Dial(ctx, ip.ip)
 			if err != nil {
 				n.peerConfig.Log.Verbo(
 					"failed to reach peer, attempting again",
