@@ -506,6 +506,9 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 				n.dial(n.onCloseCtx, nodeID, tracked)
 			}
 		case !connected && !previouslyTracked && n.wantsConnection(nodeID):
+			// This is the first we've heard of this IP and we want to connect
+			// to it. We don't need to reset the validator's tracked set because
+			// we previously didn't have an IP to gossip.
 			n.peerIPs[nodeID] = ip
 
 			tracked := newTrackedIP(ip.IPPort)
