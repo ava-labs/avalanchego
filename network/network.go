@@ -466,11 +466,15 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 			// not to gossip their IP to us. We should still gossip our IP to
 			// them.
 			newestTimestamp[ip.TxID] = prevIP.Timestamp
+
+			n.peerConfig.Metrics.NumUselessPeerListBytes.Add(float64(ip.BytesLen()))
 		case previouslyTracked && prevIP.Timestamp == ip.Timestamp:
 			// Our previous IP was equally fresh. We should tell the peer
 			// not to gossip this IP to us. We should not gossip our IP to them.
 			newestTimestamp[ip.TxID] = prevIP.Timestamp
 			txIDsWithUpToDateIP = append(txIDsWithUpToDateIP, ip.TxID)
+
+			n.peerConfig.Metrics.NumUselessPeerListBytes.Add(float64(ip.BytesLen()))
 		case previouslyTracked && prevIP.Timestamp < ip.Timestamp:
 			// This IP is more up to date. We should tell the peer not to gossip
 			// this IP to us. We should not gossip our IP to them.
@@ -509,6 +513,9 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 			})
 			n.trackedIPs[nodeID] = tracked
 			n.dial(n.onCloseCtx, nodeID, tracked)
+		default:
+			// This IP isn't desired
+			n.peerConfig.Metrics.NumUselessPeerListBytes.Add(float64(ip.BytesLen()))
 		}
 	}
 
