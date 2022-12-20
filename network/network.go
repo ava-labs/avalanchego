@@ -376,12 +376,21 @@ func (n *network) Connected(nodeID ids.NodeID) {
 	}
 
 	peerIP := peer.IP()
-	if prevIP, ok := n.peerIPs[nodeID]; !ok || prevIP.Timestamp < peerIP.IP.Timestamp {
-		n.peerIPs[nodeID] = &ips.ClaimedIPPort{
-			Cert:      peer.Cert(),
-			IPPort:    peerIP.IP.IP,
-			Timestamp: peerIP.IP.Timestamp,
-			Signature: peerIP.Signature,
+	newIP := &ips.ClaimedIPPort{
+		Cert:      peer.Cert(),
+		IPPort:    peerIP.IP.IP,
+		Timestamp: peerIP.IP.Timestamp,
+		Signature: peerIP.Signature,
+	}
+	prevIP, ok := n.peerIPs[nodeID]
+	if !ok {
+		n.peerIPs[nodeID] = newIP
+	} else if prevIP.Timestamp < newIP.Timestamp {
+		n.peerIPs[nodeID] = newIP
+
+		if !prevIP.IPPort.Equal(newIP.IPPort) {
+			// We should gossip this new IP to all our peers.
+			n.gossipTracker.ResetValidator(nodeID)
 		}
 	}
 
