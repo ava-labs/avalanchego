@@ -137,7 +137,7 @@ func (ma *MultisigAlias) ComputeAlias(txID ids.ID) ids.ShortID {
 }
 
 func (ma *MultisigAlias) Verify(txID ids.ID) error {
-	if len(ma.Addresses) > int(ma.Threshold) {
+	if len(ma.Addresses) < int(ma.Threshold) {
 		return errors.New("msig alias threshold is greater, than the number of addresses")
 	}
 

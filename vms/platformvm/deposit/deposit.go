@@ -114,7 +114,7 @@ func (deposit *Deposit) UnlockableAmount(offer *Offer, unlockTime uint64) uint64
 // Returns amount of tokens that can be claimed as reward for [deposit] at [claimetime] (seconds).
 //
 // Precondition: all args are valid in conjunction.
-func (deposit *Deposit) ClaimableReward(offer *Offer, depositAmount, claimTime uint64) uint64 {
+func (deposit *Deposit) ClaimableReward(offer *Offer, claimTime uint64) uint64 {
 	if deposit.Start > claimTime {
 		return 0
 	}
@@ -130,7 +130,7 @@ func (deposit *Deposit) ClaimableReward(offer *Offer, depositAmount, claimTime u
 
 	claimTime = math.Min(claimTime, rewardsEndTime)
 
-	bigTotalRewardAmount := (&big.Int{}).SetUint64(depositAmount)
+	bigTotalRewardAmount := (&big.Int{}).SetUint64(deposit.Amount)
 	bigPassedDepositDuration := (&big.Int{}).SetUint64(claimTime - deposit.Start)
 	bigInterestRateNominator := (&big.Int{}).SetUint64(offer.InterestRateNominator)
 
