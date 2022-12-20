@@ -508,7 +508,7 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 
 			// We should update any existing outbound connection attempts.
 			if isTracked {
-				// Stop tracking the old IP and instead start tracking new one.
+				// Stop tracking the old IP and start tracking the new one.
 				tracked := tracked.trackNewIP(ip.IPPort)
 				n.trackedIPs[nodeID] = tracked
 				n.dial(n.onCloseCtx, nodeID, tracked)
