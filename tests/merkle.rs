@@ -292,3 +292,69 @@ fn test_range_proof() {
 
     merkle.verify_range_proof(&proof, &items[start].0, &items[end].0, keys, vals);
 }
+
+#[test]
+fn test_range_proof_with_non_existent_proof() {
+    let mut items = vec![
+        (std::str::from_utf8(&[0x7]).unwrap(), "verb"),
+        (std::str::from_utf8(&[0x4]).unwrap(), "reindeer"),
+        (std::str::from_utf8(&[0x5]).unwrap(), "puppy"),
+        (std::str::from_utf8(&[0x6]).unwrap(), "coin"),
+        (std::str::from_utf8(&[0x3]).unwrap(), "stallion"),
+    ];
+
+    items.sort();
+    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000);
+    let start = 0;
+    let end = &items.len() - 1;
+
+    let mut proof = merkle.prove(std::str::from_utf8(&[0x2]).unwrap());
+    assert!(!proof.0.is_empty());
+    let end_proof = merkle.prove(std::str::from_utf8(&[0x8]).unwrap());
+    assert!(!end_proof.0.is_empty());
+
+    proof.concat_proofs(end_proof);
+
+    let mut keys = Vec::new();
+    let mut vals = Vec::new();
+    for i in start..=end {
+        keys.push(&items[i].0);
+        vals.push(&items[i].1);
+    }
+
+    merkle.verify_range_proof(&proof, &items[start].0, &items[end].0, keys, vals);
+}
+
+#[test]
+#[should_panic]
+fn test_range_proof_with_invalid_non_existent_proof() {
+    let mut items = vec![
+        (std::str::from_utf8(&[0x8]).unwrap(), "verb"),
+        (std::str::from_utf8(&[0x4]).unwrap(), "reindeer"),
+        (std::str::from_utf8(&[0x5]).unwrap(), "puppy"),
+        (std::str::from_utf8(&[0x6]).unwrap(), "coin"),
+        (std::str::from_utf8(&[0x2]).unwrap(), "stallion"),
+    ];
+
+    items.sort();
+    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000);
+    let start = 0;
+    let end = &items.len() - 1;
+
+    let mut proof = merkle.prove(std::str::from_utf8(&[0x3]).unwrap());
+    assert!(!proof.0.is_empty());
+    let end_proof = merkle.prove(std::str::from_utf8(&[0x7]).unwrap());
+    assert!(!end_proof.0.is_empty());
+
+    proof.concat_proofs(end_proof);
+
+    let mut keys = Vec::new();
+    let mut vals = Vec::new();
+    // Create gap
+    for i in start + 2..end - 1 {
+        keys.push(&items[i].0);
+        vals.push(&items[i].1);
+    }
+
+    merkle.verify_range_proof(&proof, &items[start].0, &items[end].0, keys, vals);
+}

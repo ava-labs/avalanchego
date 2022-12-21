@@ -233,6 +233,14 @@ impl BranchNode {
     pub fn chd_mut(&mut self) -> &mut [Option<ObjPtr<Node>>; NBRANCH] {
         &mut self.chd
     }
+
+    pub fn chd_eth_rlp(&self) -> &[Option<Vec<u8>>; NBRANCH] {
+        &self.chd_eth_rlp
+    }
+
+    pub fn chd_eth_rlp_mut(&mut self) -> &mut [Option<Vec<u8>>; NBRANCH] {
+        &mut self.chd_eth_rlp
+    }
 }
 
 #[derive(PartialEq, Eq, Clone)]
@@ -292,6 +300,10 @@ impl ExtNode {
 
     pub fn new(path: Vec<u8>, chd: ObjPtr<Node>, chd_eth_rlp: Option<Vec<u8>>) -> Self {
         ExtNode(PartialPath(path), chd, chd_eth_rlp)
+    }
+
+    pub fn path(&self) -> &PartialPath {
+        &self.0
     }
 
     pub fn chd(&self) -> ObjPtr<Node> {
@@ -634,7 +646,7 @@ impl MummyItem for Node {
                         cur.write_all(&u32::MAX.to_le_bytes()).unwrap();
                     }
                 }
-                // Since child eth rlp is immutable after initialization (only used for range proof),
+                // Since child eth rlp will only be unset after initialization (only used for range proof),
                 // it is fine to encode its value adjacent to other fields. Same for extention node.
                 for rlp in n.chd_eth_rlp.iter() {
                     match rlp {
