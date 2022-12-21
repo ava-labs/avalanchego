@@ -7,8 +7,8 @@
     "depositOffers": [
       {
         "interestRateNominator": 80000,
-        "start": 0,
-        "end": 1699609842,
+        "startOffset": 0,
+        "endOffset": 110449241,
         "minAmount": 1,
         "minDuration": 94608000,
         "maxDuration": 94608000,
@@ -20,8 +20,8 @@
       },
       {
         "interestRateNominator": 0,
-        "start": 0,
-        "end": 1699609842,
+        "startOffset": 0,
+        "endOffset": 157784630,
         "minAmount": 1,
         "minDuration": 126144000,
         "maxDuration": 126144000,
@@ -33,8 +33,8 @@
       },
       {
         "interestRateNominator": 90000,
-        "start": 0,
-        "end": 1699609842,
+        "startOffset": 0,
+        "endOffset": 142006167,
         "minAmount": 1,
         "minDuration": 126144000,
         "maxDuration": 126144000,
@@ -46,8 +46,8 @@
       },
       {
         "interestRateNominator": 100000,
-        "start": 0,
-        "end": 1699609842,
+        "startOffset": 0,
+        "endOffset": 173563093,
         "minAmount": 1,
         "minDuration": 157680000,
         "maxDuration": 157680000,
@@ -72,11 +72,11 @@
             "amount": 100000000000000,
             "nodeID": "NodeID-PGHYeLVkU6ZVQEu8CuRBk6pQ2NJNAuzZ4",
             "validatorDuration": 100000,
-            "depositOfferID": "2YtQJUH73pdL98N71R54s2b4QiiSX4nzwbTYFHHmyEQtDmSL3a"
+            "depositOfferID": "2QsFwKZfs9XRe4oYK614fREt8fZVqFajDdHMLjcU8qtXQcc8ya"
           },
           {
             "amount": 10000000000000000,
-            "depositOfferID": "2YtQJUH73pdL98N71R54s2b4QiiSX4nzwbTYFHHmyEQtDmSL3a"
+            "depositOfferID": "2QsFwKZfs9XRe4oYK614fREt8fZVqFajDdHMLjcU8qtXQcc8ya"
           }
         ]
       }

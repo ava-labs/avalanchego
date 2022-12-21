@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
@@ -25,7 +26,7 @@ type UnparsedCamino struct {
 	InitialMultisigAddresses []UnparsedMultisigAlias    `json:"initialMultisigAddresses"`
 }
 
-func (uc UnparsedCamino) Parse() (Camino, error) {
+func (uc UnparsedCamino) Parse(startTime uint64) (Camino, error) {
 	c := Camino{
 		VerifyNodeSignature:      uc.VerifyNodeSignature,
 		LockModeBondDeposit:      uc.LockModeBondDeposit,
@@ -45,7 +46,11 @@ func (uc UnparsedCamino) Parse() (Camino, error) {
 	c.InitialAdmin = avaxAddr
 
 	for i, udo := range uc.DepositOffers {
-		c.DepositOffers[i] = udo.Parse()
+		offer, err := udo.Parse(startTime)
+		if err != nil {
+			return c, err
+		}
+		c.DepositOffers[i] = offer
 	}
 
 	for i, ua := range uc.Allocations {
@@ -200,8 +205,8 @@ func (uma UnparsedMultisigAlias) Parse() (genesis.MultisigAlias, error) {
 
 type UnparsedDepositOffer struct {
 	InterestRateNominator   uint64                    `json:"interestRateNominator"`
-	Start                   uint64                    `json:"start"`
-	End                     uint64                    `json:"end"`
+	StartOffset             uint64                    `json:"startOffset"`
+	EndOffset               uint64                    `json:"endOffset"`
 	MinAmount               uint64                    `json:"minAmount"`
 	MinDuration             uint32                    `json:"minDuration"`
 	MaxDuration             uint32                    `json:"maxDuration"`
@@ -214,11 +219,9 @@ type UnparsedDepositOfferFlags struct {
 	Locked bool `json:"locked"`
 }
 
-func (udo UnparsedDepositOffer) Parse() genesis.DepositOffer {
+func (udo UnparsedDepositOffer) Parse(startTime uint64) (genesis.DepositOffer, error) {
 	do := genesis.DepositOffer{
 		InterestRateNominator:   udo.InterestRateNominator,
-		Start:                   udo.Start,
-		End:                     udo.End,
 		MinAmount:               udo.MinAmount,
 		MinDuration:             udo.MinDuration,
 		MaxDuration:             udo.MaxDuration,
@@ -226,18 +229,28 @@ func (udo UnparsedDepositOffer) Parse() genesis.DepositOffer {
 		NoRewardsPeriodDuration: udo.NoRewardsPeriodDuration,
 	}
 
+	offerStartTime, err := math.Add64(startTime, udo.StartOffset)
+	if err != nil {
+		return do, err
+	}
+	do.Start = offerStartTime
+
+	offerEndTime, err := math.Add64(startTime, udo.EndOffset)
+	if err != nil {
+		return do, err
+	}
+	do.End = offerEndTime
+
 	if udo.Flags.Locked {
 		do.Flags |= deposit.OfferFlagLocked
 	}
 
-	return do
+	return do, nil
 }
 
-func (udo *UnparsedDepositOffer) Unparse(do genesis.DepositOffer) {
+func (udo *UnparsedDepositOffer) Unparse(do genesis.DepositOffer, startime uint64) error {
 	udo = &UnparsedDepositOffer{
 		InterestRateNominator:   do.InterestRateNominator,
-		Start:                   do.Start,
-		End:                     do.End,
 		MinAmount:               do.MinAmount,
 		MinDuration:             do.MinDuration,
 		MaxDuration:             do.MaxDuration,
@@ -245,7 +258,21 @@ func (udo *UnparsedDepositOffer) Unparse(do genesis.DepositOffer) {
 		NoRewardsPeriodDuration: do.NoRewardsPeriodDuration,
 	}
 
+	offerStartOffset, err := math.Sub(do.Start, startime)
+	if err != nil {
+		return err
+	}
+	udo.StartOffset = offerStartOffset
+
+	offerEndOffset, err := math.Add64(do.End, startime)
+	if err != nil {
+		return err
+	}
+	udo.EndOffset = offerEndOffset
+
 	if do.Flags&deposit.OfferFlagLocked != 0 {
 		udo.Flags.Locked = true
 	}
+
+	return nil
 }

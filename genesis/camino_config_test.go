@@ -98,7 +98,7 @@ func TestUnparse(t *testing.T) {
 				Allocations:              tt.fields.Allocations,
 				InitialMultisigAddresses: tt.fields.InitialMultisigAddresses,
 			}
-			got, err := c.Unparse(tt.args.networkID)
+			got, err := c.Unparse(tt.args.networkID, 0)
 
 			if tt.err != nil {
 				require.ErrorContains(t, err, tt.err.Error())
