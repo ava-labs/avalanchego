@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -42,7 +43,8 @@ var (
 	nodeSignatureKey   = []byte("nodeSignature")
 	depositBondModeKey = []byte("depositBondMode")
 
-	errWrongTxType = errors.New("unexpected tx type")
+	errWrongTxType      = errors.New("unexpected tx type")
+	errNonExistingOffer = errors.New("deposit offer doesn't exist")
 )
 
 type CaminoApply interface {
@@ -190,6 +192,12 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 	cs.lockModeBondDeposit = g.Camino.LockModeBondDeposit
 	cs.verifyNodeSignature = g.Camino.VerifyNodeSignature
 
+	if cs.lockModeBondDeposit {
+		// overwriting initial supply because state.SyncGenesis
+		// added potential avax validator rewards to it
+		s.SetCurrentSupply(constants.PrimaryNetworkID, g.InitialSupply)
+	}
+
 	// adding address states
 
 	for _, addrState := range g.Camino.AddressStates {
@@ -248,15 +256,31 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 			}
 			depositAmount = newAmount
 		}
-		cs.UpdateDeposit(
-			tx.ID(),
-			&deposit.Deposit{
-				DepositOfferID: depositTx.DepositOfferID,
-				Start:          currentTimestamp,
-				Duration:       depositTx.DepositDuration,
-				Amount:         depositAmount,
-			},
-		)
+
+		deposit := &deposit.Deposit{
+			DepositOfferID: depositTx.DepositOfferID,
+			Start:          currentTimestamp,
+			Duration:       depositTx.DepositDuration,
+			Amount:         depositAmount,
+		}
+
+		currentSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
+		if err != nil {
+			return err
+		}
+
+		offer, ok := cs.modifiedDepositOffers[deposit.DepositOfferID]
+		if !ok {
+			return errNonExistingOffer
+		}
+
+		newCurrentSupply, err := math.Add64(currentSupply, deposit.TotalReward(offer))
+		if err != nil {
+			return err
+		}
+
+		s.SetCurrentSupply(constants.PrimaryNetworkID, newCurrentSupply)
+		cs.UpdateDeposit(tx.ID(), deposit)
 		s.AddTx(tx, status.Committed)
 	}
 
