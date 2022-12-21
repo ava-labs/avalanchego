@@ -207,8 +207,9 @@ impl Proof {
 
         // Remove all internal calcuated RLP values. All the removed parts should
         // be re-filled(or re-constructed) by the given leaves range.
-        let empty = unset_internal(&mut merkle_setup, first_key.as_ref(), last_key.as_ref())?;
-        if empty {
+        let fork_at_root = unset_internal(&mut merkle_setup, first_key.as_ref(), last_key.as_ref())?;
+        // If the fork point is the root, the trie should be empty, start with a new one.
+        if fork_at_root {
             merkle_setup = new_merkle(0x100000, 0x100000);
         }
 
@@ -231,7 +232,7 @@ impl Proof {
     ///
     /// The given edge proof is allowed to be an existent or non-existent proof.
     fn proof_to_path<K: AsRef<[u8]>>(
-        &self, key: K, root_hash: [u8; 32], merkle_setup: &mut MerkleSetup, allow_non_existent: bool,
+        &self, key: K, root_hash: [u8; 32], merkle_setup: &mut MerkleSetup, allow_non_existent_node: bool,
     ) -> Result<(), ProofError> {
         let root = merkle_setup.get_root();
         let merkle = merkle_setup.get_merkle_mut();
@@ -318,7 +319,7 @@ impl Proof {
                     // The trie doesn't contain the key.
                     if p.hash.is_none() {
                         drop(u_ref);
-                        if allow_non_existent {
+                        if allow_non_existent_node {
                             return Ok(())
                         }
                         return Err(ProofError::NodeNotInTrie)
@@ -332,7 +333,7 @@ impl Proof {
                 // enough for us to prove range.
                 None => {
                     drop(u_ref);
-                    if allow_non_existent {
+                    if allow_non_existent_node {
                         return Ok(())
                     }
                     return Err(ProofError::NodeNotInTrie)
@@ -426,17 +427,19 @@ impl Proof {
     }
 }
 
-// unsetInternal removes all internal node references.
+// unset_internal removes all internal node references.
 // It should be called after a trie is constructed with two edge paths. Also
 // the given boundary keys must be the one used to construct the edge paths.
 //
-// It's the key step for range proof. All visited nodes should be marked dirty
-// since the node content might be modified. Besides it can happen that some
-// fullnodes only have one child which is disallowed. But if the proof is valid,
+// It's the key step for range proof. The precalucated RLP value of all internal
+// nodes should be removed. But if the proof is valid,
 // the missing children will be filled, otherwise it will be thrown anyway.
 //
 // Note we have the assumption here the given boundary keys are different
 // and right is larger than left.
+//
+// The return value indicates if the fork point is root node. If so, unset the
+// entire trie.
 fn unset_internal<K: AsRef<[u8]>>(merkle_setup: &mut MerkleSetup, left: K, right: K) -> Result<bool, ProofError> {
     // Add the sentinel root
     let mut left_chunks = vec![0];
@@ -444,7 +447,6 @@ fn unset_internal<K: AsRef<[u8]>>(merkle_setup: &mut MerkleSetup, left: K, right
     // Add the sentinel root
     let mut right_chunks = vec![0];
     right_chunks.extend(to_nibbles(right.as_ref()));
-    let mut index = 0;
     let root = merkle_setup.get_root();
     let merkle = merkle_setup.get_merkle_mut();
     let mut u_ref = merkle.get_node(root).map_err(|_| ProofError::NoSuchNode)?;
@@ -453,6 +455,7 @@ fn unset_internal<K: AsRef<[u8]>>(merkle_setup: &mut MerkleSetup, left: K, right
     let mut fork_left: Ordering = Ordering::Equal;
     let mut fork_right: Ordering = Ordering::Equal;
 
+    let mut index = 0;
     loop {
         match &u_ref.inner() {
             NodeType::Branch(n) => {
@@ -492,6 +495,7 @@ fn unset_internal<K: AsRef<[u8]>>(merkle_setup: &mut MerkleSetup, left: K, right
                 u_ref = merkle.get_node(n.chd()).map_err(|_| ProofError::DecodeError)?;
                 index += cur_key.len();
             }
+            // The fork point cannot be a leaf since it doesn't have any children.
             _ => return Err(ProofError::InvalidNode),
         }
     }
@@ -512,8 +516,8 @@ fn unset_internal<K: AsRef<[u8]>>(merkle_setup: &mut MerkleSetup, left: K, right
             }
             let p = u_ref.as_ptr();
             drop(u_ref);
-            unset(merkle, p, left_node, left_chunks[index..].to_vec(), 1, false)?;
-            unset(merkle, p, right_node, right_chunks[index..].to_vec(), 1, true)?;
+            unset_node_ref(merkle, p, left_node, left_chunks[index..].to_vec(), 1, false)?;
+            unset_node_ref(merkle, p, right_node, right_chunks[index..].to_vec(), 1, true)?;
             return Ok(false)
         }
         NodeType::Extension(n) => {
@@ -533,7 +537,7 @@ fn unset_internal<K: AsRef<[u8]>>(merkle_setup: &mut MerkleSetup, left: K, right
                 drop(u_ref);
                 return Err(ProofError::EmptyRange)
             }
-            if !fork_left.is_eq() && !fork_right.is_eq() {
+            if fork_left.is_ne() && fork_right.is_ne() {
                 // The fork point is root node, unset the entire trie
                 if parent.is_null() {
                     drop(u_ref);
@@ -542,7 +546,7 @@ fn unset_internal<K: AsRef<[u8]>>(merkle_setup: &mut MerkleSetup, left: K, right
                 let mut p_ref = merkle.get_node(parent).map_err(|_| ProofError::NoSuchNode)?;
                 p_ref
                     .write(|p| {
-                        let pp = p.inner_mut().as_branch_mut().unwrap();
+                        let pp = p.inner_mut().as_branch_mut().expect("not a branch node");
                         pp.chd_eth_rlp_mut()[left_chunks[index - 1] as usize] = None;
                     })
                     .unwrap();
@@ -553,8 +557,8 @@ fn unset_internal<K: AsRef<[u8]>>(merkle_setup: &mut MerkleSetup, left: K, right
             let p = u_ref.as_ptr();
             drop(u_ref);
             // Only one proof points to non-existent key.
-            if !fork_right.is_eq() {
-                unset(
+            if fork_right.is_ne() {
+                unset_node_ref(
                     merkle,
                     p,
                     Some(node),
@@ -564,8 +568,8 @@ fn unset_internal<K: AsRef<[u8]>>(merkle_setup: &mut MerkleSetup, left: K, right
                 )?;
                 return Ok(false)
             }
-            if !fork_left.is_eq() {
-                unset(
+            if fork_left.is_ne() {
+                unset_node_ref(
                     merkle,
                     p,
                     Some(node),
@@ -593,7 +597,7 @@ fn unset_internal<K: AsRef<[u8]>>(merkle_setup: &mut MerkleSetup, left: K, right
 //     keep the entire branch and return.
 //   - the fork point is a shortnode, the shortnode is excluded in the range,
 //     unset the entire branch.
-fn unset<K: AsRef<[u8]>>(
+fn unset_node_ref<K: AsRef<[u8]>>(
     merkle: &Merkle, parent: ObjPtr<Node>, node: Option<ObjPtr<Node>>, key: K, index: usize, remove_left: bool,
 ) -> Result<(), ProofError> {
     if node.is_none() {
@@ -632,13 +636,12 @@ fn unset<K: AsRef<[u8]>>(
             }
 
             drop(u_ref);
-            return unset(merkle, p, node, key, index + 1, remove_left)
+            return unset_node_ref(merkle, p, node, key, index + 1, remove_left)
         }
         NodeType::Extension(n) => {
             let cur_key = n.path().clone().into_inner();
             let node = n.chd();
-            if chunks[index..].len() < cur_key.len() ||
-                !compare(&cur_key, &chunks[index..index + cur_key.len()]).is_eq()
+            if chunks[index..].len() < cur_key.len() || compare(&cur_key, &chunks[index..index + cur_key.len()]).is_ne()
             {
                 let mut p_ref = merkle.get_node(parent).map_err(|_| ProofError::NoSuchNode)?;
                 // Find the fork point, it's an non-existent branch.
@@ -649,7 +652,7 @@ fn unset<K: AsRef<[u8]>>(
                         // branch. The parent must be a fullnode.
                         p_ref
                             .write(|p| {
-                                let pp = p.inner_mut().as_branch_mut().unwrap();
+                                let pp = p.inner_mut().as_branch_mut().expect("not a branch node");
                                 pp.chd_eth_rlp_mut()[chunks[index - 1] as usize] = None;
                             })
                             .unwrap();
@@ -683,8 +686,9 @@ fn unset<K: AsRef<[u8]>>(
             }
 
             drop(u_ref);
-            return unset(merkle, p, Some(node), key, index + cur_key.len(), remove_left)
+            return unset_node_ref(merkle, p, Some(node), key, index + cur_key.len(), remove_left)
         }
+        // Noop for leaf node as it doesn't have any children and no precalculated RLP value stored.
         NodeType::Leaf(_) => (),
     }
 
