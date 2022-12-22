@@ -81,8 +81,20 @@ func validateCaminoConfig(config *Config) error {
 
 	// validation allocations and stakers
 	nodes := set.Set[ids.NodeID]{}
+	allocationsAddresses := set.NewSet[ids.ShortID](len(config.Camino.Allocations))
 	for _, allocation := range config.Camino.Allocations {
+		if allocationsAddresses.Contains(allocation.AVAXAddr) {
+			return errors.New("allocation duplicate")
+		}
+		allocationsAddresses.Add(allocation.AVAXAddr)
+
+		platformAllocations := set.NewSet[PlatformAllocation](len(allocation.PlatformAllocations))
 		for _, platformAllocation := range allocation.PlatformAllocations {
+			if platformAllocations.Contains(platformAllocation) {
+				return errors.New("platform allocation duplicate")
+			}
+			platformAllocations.Add(platformAllocation)
+
 			if allocation.AddressStates.ConsortiumMember && !allocation.AddressStates.KYCVerified {
 				return errors.New("consortium member not kyc verified")
 			}
