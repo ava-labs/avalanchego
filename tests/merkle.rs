@@ -358,3 +358,57 @@ fn test_range_proof_with_invalid_non_existent_proof() {
 
     merkle.verify_range_proof(&proof, &items[start].0, &items[end].0, keys, vals);
 }
+
+#[test]
+// The start and end nodes are both the same.
+fn test_one_element_range_proof() {
+    let mut items = vec![("key1", "value1"), ("key2", "value2"), ("key3", "value3")];
+    items.sort();
+
+    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000);
+    let start = 0;
+    let end = &items.len() - 1;
+
+    let mut start_proof = merkle.prove(&items[start].0);
+    assert!(!start_proof.0.is_empty());
+    let end_proof = merkle.prove(&items[start].0); // start and end nodes are the same
+    assert!(!end_proof.0.is_empty());
+
+    start_proof.concat_proofs(end_proof);
+
+    let mut keys = Vec::new();
+    let mut vals = Vec::new();
+    for i in start..=end {
+        keys.push(&items[i].0);
+        vals.push(&items[i].1);
+    }
+
+    assert!(merkle.verify_range_proof(&start_proof, &items[start].0, &items[end].0, keys, vals));
+}
+
+#[test]
+// The range proof starts from 0 (root) to the last one
+fn test_all_elements_proof() {
+    let mut items = vec![("key1", "value1"), ("key2", "value2"), ("key3", "value3")];
+    items.sort();
+
+    let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000);
+    let start = 0;
+    let end = &items.len() - 1;
+
+    let mut proof = merkle.prove(&items[start].0);
+    assert!(!proof.0.is_empty());
+    let end_proof = merkle.prove(&items[end].0); // start and end nodes are the same
+    assert!(!end_proof.0.is_empty());
+
+    proof.concat_proofs(end_proof);
+
+    let mut keys = Vec::new();
+    let mut vals = Vec::new();
+    for i in start..=end {
+        keys.push(&items[i].0);
+        vals.push(&items[i].1);
+    }
+
+    merkle.verify_range_proof(&proof, &items[start].0, &items[end].0, keys, vals);
+}
