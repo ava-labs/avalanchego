@@ -60,8 +60,8 @@ github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kd
 github.com/apache/arrow/go/arrow v0.0.0-20191024131854-af6fa24be0db/go.mod h1:VTxUBvSJ3s3eHAg65PNgrsn5BtqCRPdmyXh6rAfdxN0=
 github.com/ava-labs/avalanche-network-runner-sdk v0.3.0 h1:TVi9JEdKNU/RevYZ9PyW4pULbEdS+KQDA9Ki2DUvuAs=
 github.com/ava-labs/avalanche-network-runner-sdk v0.3.0/go.mod h1:SgKJvtqvgo/Bl/c8fxEHCLaSxEbzimYfBopcfrajxQk=
-github.com/ava-labs/avalanchego v1.9.4 h1:z5tE/vUGzUQflqv3mn6X5E1VTCZHYhuD36idOyPNRrc=
-github.com/ava-labs/avalanchego v1.9.4/go.mod h1:H4pMTYzgudfPs9WX+KXI0nCiUGNkdgPWOwm1nqzGibQ=
+github.com/ava-labs/avalanchego v1.9.5 h1:0uykbcKFocUL7U7SO/PGrXSMLX9RSt8xo5rj84bI3YY=
+github.com/ava-labs/avalanchego v1.9.5/go.mod h1:1f/z4CBcz/VhNlOTj607dQj5ZQQaZQO/RO8sEa0EgvA=
 github.com/benbjohnson/clock v1.3.0 h1:ip6w0uFQkncKQ979AypyG0ER7mqUSBdKLOgAle/AT8A=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=

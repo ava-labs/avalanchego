@@ -34,13 +34,14 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	avalancheConstants "github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
 	engCommon "github.com/ava-labs/avalanchego/snow/engine/common"
-	avaConstants "github.com/ava-labs/avalanchego/utils/constants"
 
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/constants"
@@ -118,11 +119,17 @@ func NewContext() *snow.Context {
 	_ = aliaser.Alias(testCChainID, testCChainID.String())
 	_ = aliaser.Alias(testXChainID, "X")
 	_ = aliaser.Alias(testXChainID, testXChainID.String())
-	ctx.SNLookup = &snLookup{
-		chainsToSubnet: map[ids.ID]ids.ID{
-			avaConstants.PlatformChainID: avaConstants.PrimaryNetworkID,
-			testXChainID:                 avaConstants.PrimaryNetworkID,
-			testCChainID:                 avaConstants.PrimaryNetworkID,
+	ctx.ValidatorState = &validators.TestState{
+		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
+			subnetID, ok := map[ids.ID]ids.ID{
+				avalancheConstants.PlatformChainID: avalancheConstants.PrimaryNetworkID,
+				testXChainID:                       avalancheConstants.PrimaryNetworkID,
+				testCChainID:                       avalancheConstants.PrimaryNetworkID,
+			}[chainID]
+			if !ok {
+				return ids.Empty, errors.New("unknown chain")
+			}
+			return subnetID, nil
 		},
 	}
 	return ctx
