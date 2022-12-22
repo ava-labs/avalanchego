@@ -221,18 +221,9 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 	// adding deposit offers
 
 	for _, genesisOffer := range g.Camino.DepositOffers {
-		offer := &deposit.Offer{
-			InterestRateNominator:   genesisOffer.InterestRateNominator,
-			Start:                   genesisOffer.Start,
-			End:                     genesisOffer.End,
-			MinAmount:               genesisOffer.MinAmount,
-			MinDuration:             genesisOffer.MinDuration,
-			MaxDuration:             genesisOffer.MaxDuration,
-			UnlockPeriodDuration:    genesisOffer.UnlockPeriodDuration,
-			NoRewardsPeriodDuration: genesisOffer.NoRewardsPeriodDuration,
-			Flags:                   genesisOffer.Flags,
-		}
-		if err := offer.SetID(); err != nil {
+		genesisOffer := genesisOffer
+		offer, err := ParseDepositOfferFromGenesisOffer(&genesisOffer)
+		if err != nil {
 			return err
 		}
 

@@ -28,7 +28,6 @@ var (
 
 	errNodeSignatureMissing       = errors.New("last signature is not nodeID's signature")
 	errWrongLockMode              = errors.New("this tx can't be used with this caminoGenesis.LockModeBondDeposit")
-	errNotSecp256Fx               = errors.New("expected fx to be secp256k1.fx")
 	errRecoverAdresses            = errors.New("cannot recover addresses from credentials")
 	errInvalidRoles               = errors.New("invalid role")
 	errValidatorExists            = errors.New("node is already a validator")
@@ -116,6 +115,12 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 		return errWrongLockMode
 	}
 
+	// verify camino tx
+
+	if err := e.Tx.SyntacticVerify(e.Backend.Ctx); err != nil {
+		return err
+	}
+
 	// verify consortium member signature
 
 	if err := e.Backend.Fx.VerifyPermission(
@@ -140,13 +145,6 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 	if consortiumMemberAddressState&txs.AddressStateConsortiumBit == 0 {
 		return errNotConsortiumMember
 	}
-
-	// verify camino tx
-
-	if err := e.Tx.SyntacticVerify(e.Backend.Ctx); err != nil {
-		return err
-	}
-
 	duration := tx.Validator.Duration()
 
 	switch {
@@ -482,6 +480,10 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 		return err
 	}
 
+	if err := e.Tx.SyntacticVerify(e.Backend.Ctx); err != nil {
+		return err
+	}
+
 	depositAmount, err := tx.DepositAmount()
 	if err != nil {
 		return err
@@ -568,6 +570,10 @@ func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) erro
 		return err
 	}
 
+	if err := e.Tx.SyntacticVerify(e.Backend.Ctx); err != nil {
+		return err
+	}
+
 	newUnlockedAmounts, err := e.FlowChecker.VerifyUnlockDeposit(
 		e.State,
 		tx,
@@ -634,12 +640,7 @@ func (e *CaminoStandardTxExecutor) AddAddressStateTx(tx *txs.AddAddressStateTx) 
 		return err
 	}
 
-	fx, ok := e.Fx.(*secp256k1fx.Fx)
-	if !ok {
-		return errNotSecp256Fx
-	}
-
-	addresses, err := fx.RecoverAddresses(tx, e.Tx.Creds)
+	addresses, err := e.Fx.RecoverAddresses(tx, e.Tx.Creds)
 	if err != nil {
 		return fmt.Errorf("%w: %s", errRecoverAdresses, err)
 	}

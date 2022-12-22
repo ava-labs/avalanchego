@@ -73,15 +73,17 @@ func (deposit *Deposit) StartTime() time.Time {
 	return time.Unix(int64(deposit.Start), 0)
 }
 
-func (deposit *Deposit) IsExpired(
-	timestamp uint64,
-) bool {
-	depositEndTime, err := math.Add64(deposit.Start, uint64(deposit.Duration))
+func (deposit *Deposit) EndTime() time.Time {
+	return deposit.StartTime().Add(time.Duration(deposit.Duration) * time.Second)
+}
+
+func (deposit *Deposit) IsExpired(timestamp uint64) bool {
+	depositEndTimestamp, err := math.Add64(deposit.Start, uint64(deposit.Duration))
 	if err != nil {
-		// if err (overflow), than depositEndTime >= unlockTime
+		// if err (overflow), than depositEndTimestamp > timestamp
 		return false
 	}
-	return depositEndTime < timestamp
+	return depositEndTimestamp <= timestamp
 }
 
 // Returns amount of tokens that can be unlocked from [deposit] at [unlockTime] (seconds).
