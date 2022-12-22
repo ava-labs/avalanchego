@@ -124,9 +124,9 @@ func validateCaminoConfig(config *Config) error {
 	}
 
 	// validate msig aliases
-	genesisTxID := ids.Empty
-	for _, msig := range config.Camino.InitialMultisigAddresses {
-		if err := msig.Verify(genesisTxID); err != nil {
+	for idx, msig := range config.Camino.InitialMultisigAddresses {
+		rowTxID := ids.FromInt(uint64(idx))
+		if err := msig.Verify(rowTxID); err != nil {
 			return fmt.Errorf("wrong msig alias definition: %w", err)
 		}
 	}
