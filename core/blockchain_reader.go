@@ -400,11 +400,23 @@ func (bc *BlockChain) GetCoinbaseAt(parent *types.Header) (common.Address, bool,
 		}
 	}
 
+	// try to return it from the cache
+	if cached, hit := bc.coinbaseConfigCache.Get(parent.Root); hit {
+		cachedCoinbaseConfig, ok := cached.(*cacheableCoinbaseConfig)
+		if !ok {
+			return common.Address{}, false, fmt.Errorf("expected type cachedCoinbaseConfig, got %T", cached)
+		}
+		return cachedCoinbaseConfig.coinbaseAddress, cachedCoinbaseConfig.allowFeeRecipients, nil
+	}
+
 	stateDB, err := bc.StateAt(parent.Root)
 	if err != nil {
 		return common.Address{}, false, err
 	}
 	rewardAddress, feeRecipients := precompile.GetStoredRewardAddress(stateDB)
+
+	cacheable := &cacheableCoinbaseConfig{coinbaseAddress: rewardAddress, allowFeeRecipients: feeRecipients}
+	bc.coinbaseConfigCache.Add(parent.Root, cacheable)
 	return rewardAddress, feeRecipients, nil
 }
 

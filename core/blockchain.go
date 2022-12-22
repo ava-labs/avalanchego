@@ -95,13 +95,14 @@ var (
 )
 
 const (
-	bodyCacheLimit      = 256
-	blockCacheLimit     = 256
-	receiptsCacheLimit  = 32
-	txLookupCacheLimit  = 1024
-	feeConfigCacheLimit = 256
-	badBlockLimit       = 10
-	TriesInMemory       = 128
+	bodyCacheLimit           = 256
+	blockCacheLimit          = 256
+	receiptsCacheLimit       = 32
+	txLookupCacheLimit       = 1024
+	feeConfigCacheLimit      = 256
+	coinbaseConfigCacheLimit = 256
+	badBlockLimit            = 10
+	TriesInMemory            = 128
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	//
@@ -142,6 +143,13 @@ const (
 type cacheableFeeConfig struct {
 	feeConfig     commontype.FeeConfig
 	lastChangedAt *big.Int
+}
+
+// cacheableCoinbaseConfig encapsulates coinbase address itself and allowFeeRecipient flag,
+// in order to cache them together.
+type cacheableCoinbaseConfig struct {
+	coinbaseAddress    common.Address
+	allowFeeRecipients bool
 }
 
 // CacheConfig contains the configuration values for the trie caching/pruning
@@ -219,13 +227,14 @@ type BlockChain struct {
 
 	currentBlock atomic.Value // Current head of the block chain
 
-	stateCache     state.Database // State database to reuse between imports (contains state cache)
-	stateManager   TrieWriter
-	bodyCache      *lru.Cache // Cache for the most recent block bodies
-	receiptsCache  *lru.Cache // Cache for the most recent receipts per block
-	blockCache     *lru.Cache // Cache for the most recent entire blocks
-	txLookupCache  *lru.Cache // Cache for the most recent transaction lookup data.
-	feeConfigCache *lru.Cache // Cache for the most recent feeConfig lookup data.
+	stateCache          state.Database // State database to reuse between imports (contains state cache)
+	stateManager        TrieWriter
+	bodyCache           *lru.Cache // Cache for the most recent block bodies
+	receiptsCache       *lru.Cache // Cache for the most recent receipts per block
+	blockCache          *lru.Cache // Cache for the most recent entire blocks
+	txLookupCache       *lru.Cache // Cache for the most recent transaction lookup data.
+	feeConfigCache      *lru.Cache // Cache for the most recent feeConfig lookup data.
+	coinbaseConfigCache *lru.Cache // Cache for the most recent coinbaseConfig lookup data.
 
 	running int32 // 0 if chain is running, 1 when stopped
 
@@ -298,6 +307,7 @@ func NewBlockChain(
 	blockCache, _ := lru.New(blockCacheLimit)
 	txLookupCache, _ := lru.New(txLookupCacheLimit)
 	feeConfigCache, _ := lru.New(feeConfigCacheLimit)
+	coinbaseConfigCache, _ := lru.New(coinbaseConfigCacheLimit)
 	badBlocks, _ := lru.New(badBlockLimit)
 
 	bc := &BlockChain{
@@ -310,18 +320,19 @@ func NewBlockChain(
 			Preimages:   cacheConfig.Preimages,
 			StatsPrefix: trieCleanCacheStatsNamespace,
 		}),
-		bodyCache:         bodyCache,
-		receiptsCache:     receiptsCache,
-		blockCache:        blockCache,
-		txLookupCache:     txLookupCache,
-		feeConfigCache:    feeConfigCache,
-		engine:            engine,
-		vmConfig:          vmConfig,
-		badBlocks:         badBlocks,
-		senderCacher:      newTxSenderCacher(runtime.NumCPU()),
-		acceptorQueue:     make(chan *types.Block, cacheConfig.AcceptorQueueLimit),
-		quit:              make(chan struct{}),
-		acceptedLogsCache: NewFIFOCache[common.Hash, [][]*types.Log](cacheConfig.AcceptedCacheSize),
+		bodyCache:           bodyCache,
+		receiptsCache:       receiptsCache,
+		blockCache:          blockCache,
+		txLookupCache:       txLookupCache,
+		feeConfigCache:      feeConfigCache,
+		coinbaseConfigCache: coinbaseConfigCache,
+		engine:              engine,
+		vmConfig:            vmConfig,
+		badBlocks:           badBlocks,
+		senderCacher:        newTxSenderCacher(runtime.NumCPU()),
+		acceptorQueue:       make(chan *types.Block, cacheConfig.AcceptorQueueLimit),
+		quit:                make(chan struct{}),
+		acceptedLogsCache:   NewFIFOCache[common.Hash, [][]*types.Log](cacheConfig.AcceptedCacheSize),
 	}
 	bc.validator = NewBlockValidator(chainConfig, bc, engine)
 	bc.prefetcher = newStatePrefetcher(chainConfig, bc, engine)
