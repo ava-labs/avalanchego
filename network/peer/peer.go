@@ -197,11 +197,6 @@ func Start(
 		peerListChan:       make(chan struct{}, 1),
 	}
 
-	// We add the peer to our gossip tracker before the handshake starts because
-	// a PeerList message (which depends on the gossip tracker's info) is sent
-	// as part of the handshake.
-	p.GossipTracker.StartTrackingPeer(id)
-
 	go p.readMessages()
 	go p.writeMessages()
 	go p.sendNetworkMessages()
@@ -350,8 +345,6 @@ func (p *peer) close() {
 	if atomic.AddInt64(&p.numExecuting, -1) != 0 {
 		return
 	}
-
-	p.GossipTracker.StopTrackingPeer(p.id)
 
 	p.Network.Disconnected(p.id)
 	close(p.onClosed)
@@ -976,8 +969,7 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 	}
 
 	// the peers this peer told us about
-	discoveredIPs := make([]ips.ClaimedIPPort, len(msg.ClaimedIpPorts))
-	discoveredTxIDs := make([]ids.ID, 0, len(msg.ClaimedIpPorts))
+	discoveredIPs := make([]*ips.ClaimedIPPort, len(msg.ClaimedIpPorts))
 	for i, claimedIPPort := range msg.ClaimedIpPorts {
 		tlsCert, err := x509.ParseCertificate(claimedIPPort.X509Certificate)
 		if err != nil {
@@ -1017,11 +1009,9 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 				p.StartClose()
 				return
 			}
-
-			discoveredTxIDs = append(discoveredTxIDs, txID)
 		}
 
-		discoveredIPs[i] = ips.ClaimedIPPort{
+		discoveredIPs[i] = &ips.ClaimedIPPort{
 			Cert: tlsCert,
 			IPPort: ips.IPPort{
 				IP:   claimedIPPort.IpAddr,
@@ -1033,40 +1023,25 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 		}
 	}
 
-	// Invariant: Because [p.Network.Track] directly calls the validator set, we
-	// must get the [trackedTxIDs] from the [p.GossipTracker] first. This
-	// prevents the situation where we may drop an IP in [p.Network.Track] but
-	// report to the peer that it was tracked. This means we may not send as
-	// many txIDs as we could send. However, we guarantee the txIDs we do send
-	// are correct.
-
-	// The peer knows about peers they gossiped to us.
-	trackedTxIDs, ok := p.GossipTracker.AddKnown(p.id, discoveredTxIDs)
-	if !ok {
-		p.Log.Error("failed to update known peers",
+	trackedPeers, err := p.Network.Track(p.id, discoveredIPs)
+	if err != nil {
+		p.Log.Debug("message with invalid field",
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.PeerListOp),
+			zap.String("field", "claimedIP"),
+			zap.Error(err),
+		)
+		p.StartClose()
+		return
+	}
+	if len(trackedPeers) == 0 {
+		p.Log.Debug("skipping peerlist ack as there were no tracked peers",
 			zap.Stringer("nodeID", p.id),
 		)
 		return
 	}
 
-	for _, ip := range discoveredIPs {
-		// It's important that the return value of [Track] is not considered for
-		// gossip tracking. In addition to the racy behavior documented above,
-		// the gossip tracker should not care if the received IP was new. The
-		// gossip tracker only tracks if the peer knows the IP.
-		if !p.Network.Track(ip) {
-			p.Metrics.NumUselessPeerListBytes.Add(float64(ip.BytesLen()))
-		}
-	}
-
-	if len(trackedTxIDs) == 0 {
-		p.Log.Debug("skipping peerlist ack as there were no tracked txIDs",
-			zap.Stringer("nodeID", p.id),
-		)
-		return
-	}
-
-	peerListAckMsg, err := p.Config.MessageCreator.PeerListAck(trackedTxIDs)
+	peerListAckMsg, err := p.Config.MessageCreator.PeerListAck(trackedPeers)
 	if err != nil {
 		p.Log.Error("failed to create message",
 			zap.Stringer("nodeID", p.id),
@@ -1084,27 +1059,15 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 }
 
 func (p *peer) handlePeerListAck(msg *p2ppb.PeerListAck) {
-	txIDs := make([]ids.ID, len(msg.TxIds))
-	for i, txIDBytes := range msg.TxIds {
-		txID, err := ids.ToID(txIDBytes)
-		if err != nil {
-			p.Log.Debug("failed to parse txID",
-				zap.Stringer("nodeID", p.id),
-				zap.Error(err),
-			)
-			p.StartClose()
-			return
-		}
-
-		txIDs[i] = txID
-	}
-
-	// Add this to our gossip tracker, so we don't send this peer these
-	// validators again.
-	if _, ok := p.GossipTracker.AddKnown(p.id, txIDs); !ok {
-		p.Log.Error("failed to update known peers",
+	err := p.Network.MarkTracked(p.id, msg.PeerAcks)
+	if err != nil {
+		p.Log.Debug("message with invalid field",
 			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.PeerListAckOp),
+			zap.String("field", "txID"),
+			zap.Error(err),
 		)
+		p.StartClose()
 	}
 }
 
