@@ -27,7 +27,6 @@ import (
 
 var (
 	id           = ids.GenerateTestID()
-	id2          = ids.GenerateTestID()
 	shortID      = ids.GenerateTestShortID()
 	shortID2     = ids.GenerateTestShortID()
 	initialAdmin = ids.GenerateTestShortID()
@@ -48,30 +47,7 @@ func TestSyncGenesis(t *testing.T) {
 		Addrs: []ids.ShortID{shortID2},
 	}
 
-	depositTxs := []*txs.Tx{
-		{
-			Unsigned: &txs.DepositTx{
-				BaseTx:          *generateBaseTx(id, 1, outputOwners, ids.Empty, ids.Empty),
-				DepositOfferID:  id,
-				DepositDuration: 1,
-				RewardsOwner:    &outputOwners,
-			},
-			Creds: nil,
-		},
-		{
-			Unsigned: &txs.DepositTx{
-				BaseTx:          *generateBaseTx(id, 2, outputOwners2, ids.Empty, ids.Empty),
-				DepositOfferID:  id2,
-				DepositDuration: 2,
-				RewardsOwner:    &outputOwners2,
-			},
-			Creds: nil,
-		},
-	}
-	depositTxs[0].Initialize(utils.RandomBytes(16), utils.RandomBytes(16))
-	depositTxs[1].Initialize(utils.RandomBytes(16), utils.RandomBytes(16))
-
-	depositOffers := []deposit.Offer{
+	depositOffers := []*deposit.Offer{
 		{
 			InterestRateNominator:   1,
 			Start:                   2,
@@ -94,6 +70,31 @@ func TestSyncGenesis(t *testing.T) {
 			Flags:                   10,
 		},
 	}
+	require.NoError(depositOffers[0].SetID())
+	require.NoError(depositOffers[1].SetID())
+
+	depositTxs := []*txs.Tx{
+		{
+			Unsigned: &txs.DepositTx{
+				BaseTx:          *generateBaseTx(id, 1, outputOwners, ids.Empty, ids.Empty),
+				DepositOfferID:  depositOffers[0].ID,
+				DepositDuration: 1,
+				RewardsOwner:    &outputOwners,
+			},
+			Creds: nil,
+		},
+		{
+			Unsigned: &txs.DepositTx{
+				BaseTx:          *generateBaseTx(id, 2, outputOwners2, ids.Empty, ids.Empty),
+				DepositOfferID:  depositOffers[1].ID,
+				DepositDuration: 2,
+				RewardsOwner:    &outputOwners2,
+			},
+			Creds: nil,
+		},
+	}
+	depositTxs[0].Initialize(utils.RandomBytes(16), utils.RandomBytes(16))
+	depositTxs[1].Initialize(utils.RandomBytes(16), utils.RandomBytes(16))
 
 	type args struct {
 		s *state
@@ -137,9 +138,7 @@ func TestSyncGenesis(t *testing.T) {
 			},
 			prepare: func(cd caminoDiff) {
 				for _, v := range depositOffers {
-					v := v
-					v.SetID()                           //nolint:errcheck
-					cd.modifiedDepositOffers[v.ID] = &v //nolint:nolintlint
+					cd.modifiedDepositOffers[v.ID] = v //nolint:nolintlint
 				}
 			},
 		},

@@ -7,11 +7,11 @@
     "depositOffers": [
       {
         "interestRateNominator": 80000,
-        "start": 0,
-        "end": 1699609842,
+        "startOffset": 0,
+        "endOffset": 111585600,
         "minAmount": 1,
-        "minDuration": 94608000,
-        "maxDuration": 94608000,
+        "minDuration": 110376000,
+        "maxDuration": 110376000,
         "unlockPeriodDuration": 31536000,
         "noRewardsPeriodDuration": 15768000,
         "flags": {
@@ -20,11 +20,11 @@
       },
       {
         "interestRateNominator": 0,
-        "start": 0,
-        "end": 1699609842,
+        "startOffset": 0,
+        "endOffset": 158889600,
         "minAmount": 1,
-        "minDuration": 126144000,
-        "maxDuration": 126144000,
+        "minDuration": 157680000,
+        "maxDuration": 157680000,
         "unlockPeriodDuration": 63072000,
         "noRewardsPeriodDuration": 31536000,
         "flags": {
@@ -33,11 +33,11 @@
       },
       {
         "interestRateNominator": 90000,
-        "start": 0,
-        "end": 1699609842,
+        "startOffset": 0,
+        "endOffset": 143121600,
         "minAmount": 1,
-        "minDuration": 126144000,
-        "maxDuration": 126144000,
+        "minDuration": 141912000,
+        "maxDuration": 141912000,
         "unlockPeriodDuration": 31536000,
         "noRewardsPeriodDuration": 15768000,
         "flags": {
@@ -46,11 +46,11 @@
       },
       {
         "interestRateNominator": 100000,
-        "start": 0,
-        "end": 1699609842,
+        "startOffset": 0,
+        "endOffset": 174657600,
         "minAmount": 1,
-        "minDuration": 157680000,
-        "maxDuration": 157680000,
+        "minDuration": 173448000,
+        "maxDuration": 173448000,
         "unlockPeriodDuration": 31536000,
         "noRewardsPeriodDuration": 15768000,
         "flags": {
@@ -72,11 +72,11 @@
             "amount": 100000000000000,
             "nodeID": "NodeID-PGHYeLVkU6ZVQEu8CuRBk6pQ2NJNAuzZ4",
             "validatorDuration": 100000,
-            "depositOfferID": "2YtQJUH73pdL98N71R54s2b4QiiSX4nzwbTYFHHmyEQtDmSL3a"
+            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
           },
           {
             "amount": 10000000000000000,
-            "depositOfferID": "2YtQJUH73pdL98N71R54s2b4QiiSX4nzwbTYFHHmyEQtDmSL3a"
+            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
           }
         ]
       }

@@ -23,7 +23,7 @@ type Camino struct {
 	InitialMultisigAddresses []genesis.MultisigAlias `json:"initialMultisigAddresses"`
 }
 
-func (c Camino) Unparse(networkID uint32) (UnparsedCamino, error) {
+func (c Camino) Unparse(networkID uint32, starttime uint64) (UnparsedCamino, error) {
 	uc := UnparsedCamino{
 		VerifyNodeSignature:      c.VerifyNodeSignature,
 		LockModeBondDeposit:      c.LockModeBondDeposit,
@@ -52,7 +52,9 @@ func (c Camino) Unparse(networkID uint32) (UnparsedCamino, error) {
 
 	for i := range uc.DepositOffers {
 		var udo *UnparsedDepositOffer
-		udo.Unparse(c.DepositOffers[i])
+		if err := udo.Unparse(c.DepositOffers[i], starttime); err != nil {
+			return uc, err
+		}
 		uc.DepositOffers[i] = *udo
 	}
 

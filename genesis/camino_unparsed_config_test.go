@@ -175,7 +175,7 @@ func TestParse(t *testing.T) {
 				Allocations:              tt.fields.Allocations,
 				InitialMultisigAddresses: tt.fields.UnparsedMultisigAlias,
 			}
-			got, err := uc.Parse()
+			got, err := uc.Parse(0)
 
 			if tt.err != nil {
 				require.ErrorContains(t, err, tt.err.Error())
