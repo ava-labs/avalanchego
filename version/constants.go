@@ -34,7 +34,7 @@ var (
 
 	Current = &Semantic{
 		Major: 0,
-		Minor: 2,
+		Minor: 4,
 		Patch: 0,
 	}
 	CurrentApp = &Application{
@@ -44,12 +44,12 @@ var (
 	}
 	MinimumCompatibleVersion = &Application{
 		Major: 0,
-		Minor: 2,
+		Minor: 4,
 		Patch: 0,
 	}
 	PrevMinimumCompatibleVersion = &Application{
 		Major: 0,
-		Minor: 2,
+		Minor: 4,
 		Patch: 0,
 	}
 
