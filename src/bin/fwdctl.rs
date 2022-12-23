@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 pub mod create;
+pub mod insert;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -26,6 +27,8 @@ struct Cli {
 enum Commands {
     /// Create a new firewood database
     Create(create::Options),
+    /// Insert a key/value pair into the database
+    Insert(insert::Options),
 }
 
 fn main() -> Result<()> {
@@ -37,5 +40,6 @@ fn main() -> Result<()> {
 
     match &cli.command {
         Commands::Create(opts) => create::run(opts),
+        Commands::Insert(opts) => insert::run(opts),
     }
 }

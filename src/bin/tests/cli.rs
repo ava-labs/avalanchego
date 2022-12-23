@@ -6,7 +6,7 @@ const PRG: &str = "fwdctl";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[test]
-fn prints_version() -> Result<()> {
+fn fwdctl_prints_version() -> Result<()> {
     let expected_version_output: String = format!("{PRG} {VERSION}");
 
     // version is defined and succeeds with the desired output
@@ -15,6 +15,17 @@ fn prints_version() -> Result<()> {
         .assert()
         .success()
         .stdout(predicate::str::contains(expected_version_output));
+
+    Ok(())
+}
+
+#[test]
+fn fwdctl_insert_successful() -> Result<()> {
+    Command::cargo_bin(PRG)?
+    .args(["insert --key year --value 2023"])
+    .assert()
+    .success()
+    .stdout(predicate::str::equals("year"));
 
     Ok(())
 }
