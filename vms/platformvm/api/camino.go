@@ -19,9 +19,15 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txheap"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/types"
 )
 
 var errNonExistingOffer = errors.New("non existing deposit offer")
+
+type UTXODeposit struct {
+	OfferID ids.ID `json:"offerID"`
+	Memo    string `json:"memo"`
+}
 
 type Camino struct {
 	VerifyNodeSignature        bool                    `json:"verifyNodeSignature"`
@@ -29,9 +35,9 @@ type Camino struct {
 	InitialAdmin               ids.ShortID             `json:"initialAdmin"`
 	AddressStates              []genesis.AddressState  `json:"addressStates"`
 	DepositOffers              []genesis.DepositOffer  `json:"depositOffers"`
-	ValidatorDeposits          [][]ids.ID              `json:"validatorDeposits"`
+	ValidatorDeposits          [][]UTXODeposit         `json:"validatorDeposits"`
 	ValidatorConsortiumMembers []ids.ShortID           `json:"validatorConsortiumMembers"`
-	UTXODeposits               []ids.ID                `json:"utxoDeposits"`
+	UTXODeposits               []UTXODeposit           `json:"utxoDeposits"`
 	InitialMultisigAddresses   []genesis.MultisigAlias `json:"initialMultisigAddresses"`
 }
 
@@ -303,7 +309,7 @@ func makeUTXOAndDeposit(
 	offers map[ids.ID]genesis.DepositOffer,
 	apiUTXO *UTXO,
 	bondTxID ids.ID,
-	depositOfferID ids.ID,
+	deposit UTXODeposit,
 	outputIndex uint32,
 	ownerAddr ids.ShortID,
 	avaxAssetID ids.ID,
@@ -327,8 +333,8 @@ func makeUTXOAndDeposit(
 	var depositTx *txs.Tx
 	txID := bondTxID
 	depositTxID := ids.Empty
-	if depositOfferID != ids.Empty {
-		offer, ok := offers[depositOfferID]
+	if deposit.OfferID != ids.Empty {
+		offer, ok := offers[deposit.OfferID]
 		if !ok {
 			return nil, nil, errNonExistingOffer
 		}
@@ -337,6 +343,7 @@ func makeUTXOAndDeposit(
 			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 				NetworkID:    networkID,
 				BlockchainID: ids.Empty,
+				Memo:         types.JSONByteSlice(deposit.Memo),
 				Ins:          []*avax.TransferableInput{},
 				Outs: []*avax.TransferableOutput{{
 					Asset: avax.Asset{ID: avaxAssetID},
@@ -349,7 +356,7 @@ func makeUTXOAndDeposit(
 					},
 				}},
 			}},
-			DepositOfferID:  depositOfferID,
+			DepositOfferID:  deposit.OfferID,
 			DepositDuration: offer.MinDuration,
 			RewardsOwner:    &owner,
 		}}

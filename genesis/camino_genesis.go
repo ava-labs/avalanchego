@@ -81,17 +81,21 @@ func validateCaminoConfig(config *Config) error {
 
 	// validation allocations and stakers
 	nodes := set.Set[ids.NodeID]{}
-	allocationsAddresses := set.NewSet[ids.ShortID](len(config.Camino.Allocations))
+	allPlatformAllocations := map[ids.ShortID]set.Set[PlatformAllocation]{}
 	for _, allocation := range config.Camino.Allocations {
-		if allocationsAddresses.Contains(allocation.AVAXAddr) {
-			return errors.New("allocation duplicate")
+		platformAllocations, ok := allPlatformAllocations[allocation.AVAXAddr]
+		if !ok {
+			platformAllocations = set.NewSet[PlatformAllocation](len(allocation.PlatformAllocations))
+			allPlatformAllocations[allocation.AVAXAddr] = platformAllocations
 		}
-		allocationsAddresses.Add(allocation.AVAXAddr)
-
-		platformAllocations := set.NewSet[PlatformAllocation](len(allocation.PlatformAllocations))
 		for _, platformAllocation := range allocation.PlatformAllocations {
 			if platformAllocations.Contains(platformAllocation) {
-				return errors.New("platform allocation duplicate")
+				addr, _ := address.Format(
+					configChainIDAlias,
+					constants.GetHRP(config.NetworkID),
+					allocation.AVAXAddr[:],
+				)
+				return fmt.Errorf("platform allocation duplicate (%s)", addr)
 			}
 			platformAllocations.Add(platformAllocation)
 
@@ -300,10 +304,19 @@ func buildPGenesis(config *Config, hrp string, xGenesisBytes []byte, xGenesisDat
 						Staked: []api.UTXO{utxo},
 					},
 				)
-				platformvmArgs.Camino.ValidatorDeposits = append(platformvmArgs.Camino.ValidatorDeposits, []ids.ID{platformAllocation.DepositOfferID})
+				platformvmArgs.Camino.ValidatorDeposits = append(platformvmArgs.Camino.ValidatorDeposits,
+					[]api.UTXODeposit{{
+						OfferID: platformAllocation.DepositOfferID,
+						Memo:    platformAllocation.Memo,
+					}})
+
 				platformvmArgs.Camino.ValidatorConsortiumMembers = append(platformvmArgs.Camino.ValidatorConsortiumMembers, allocation.AVAXAddr)
 			} else {
-				platformvmArgs.Camino.UTXODeposits = append(platformvmArgs.Camino.UTXODeposits, platformAllocation.DepositOfferID)
+				platformvmArgs.Camino.UTXODeposits = append(platformvmArgs.Camino.UTXODeposits,
+					api.UTXODeposit{
+						OfferID: platformAllocation.DepositOfferID,
+						Memo:    platformAllocation.Memo,
+					})
 				platformvmArgs.UTXOs = append(platformvmArgs.UTXOs, utxo)
 			}
 		}

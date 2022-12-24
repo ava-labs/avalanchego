@@ -72,11 +72,12 @@
             "amount": 2000000000000,
             "nodeID": "NodeID-EAm6xyzP8mGm6VMSEoeV3L6dUP1YYnjCr",
             "validatorDuration": 31536000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "KOPERNIKUS"
           },
           {
             "amount": 10000000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7"
           }
         ]
       }

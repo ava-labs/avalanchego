@@ -278,8 +278,8 @@ func buildCaminoGenesisTest(ctx *snow.Context, caminoGenesisConf api.Camino) []b
 		}
 	}
 
-	caminoGenesisConf.UTXODeposits = make([]ids.ID, len(genesisUTXOs))
-	caminoGenesisConf.ValidatorDeposits = make([][]ids.ID, len(caminoPreFundedKeys))
+	caminoGenesisConf.UTXODeposits = make([]api.UTXODeposit, len(genesisUTXOs))
+	caminoGenesisConf.ValidatorDeposits = make([][]api.UTXODeposit, len(caminoPreFundedKeys))
 	caminoGenesisConf.ValidatorConsortiumMembers = make([]ids.ShortID, len(caminoPreFundedKeys))
 
 	genesisValidators := make([]api.PermissionlessValidator, len(caminoPreFundedKeys))
@@ -304,7 +304,7 @@ func buildCaminoGenesisTest(ctx *snow.Context, caminoGenesisConf api.Camino) []b
 			}},
 			DelegationFee: reward.PercentDenominator,
 		}
-		caminoGenesisConf.ValidatorDeposits[i] = make([]ids.ID, 1)
+		caminoGenesisConf.ValidatorDeposits[i] = make([]api.UTXODeposit, 1)
 		caminoGenesisConf.ValidatorConsortiumMembers[i] = key.Address()
 	}
 

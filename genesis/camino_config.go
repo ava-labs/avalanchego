@@ -129,12 +129,14 @@ type PlatformAllocation struct {
 	NodeID            ids.NodeID `json:"nodeID"`
 	ValidatorDuration uint64     `json:"validatorDuration"`
 	DepositOfferID    ids.ID     `json:"depositOfferID"`
+	Memo              string     `json:"memo"`
 }
 
 func (a PlatformAllocation) Unparse() (UnparsedPlatformAllocation, error) {
 	ua := UnparsedPlatformAllocation{
 		Amount:            a.Amount,
 		ValidatorDuration: a.ValidatorDuration,
+		Memo:              a.Memo,
 	}
 
 	if a.NodeID != ids.EmptyNodeID {

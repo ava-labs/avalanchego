@@ -127,7 +127,8 @@
             "amount": 100000000000000,
             "nodeID": "NodeID-6XD16eZ22fadTKq3qsxro9TPFZyxTiFv3",
             "validatorDuration": 31104000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "2"
           }
         ]
       },
@@ -144,7 +145,8 @@
             "amount": 100000000000000,
             "nodeID": "NodeID-6rsqgkg4F1i3SBjzj4tS5ucQWH7JMEouj",
             "validatorDuration": 62208000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "3"
           }
         ]
       },
@@ -159,7 +161,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000000,
-            "depositOfferID": "hV5265pC16vAxfaBgqWJY2dFrHy6URJJL9VEVN9GqAYsTMAyd"
+            "depositOfferID": "tdxfeS6QkMrqoJTrFaBdizAng1edgMxJw5oXVi2ePtTKTgrs7",
+            "memo": "4"
           }
         ]
       },
@@ -184,7 +187,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "Mc2xe3kHRdAnCbMYhK1p4GhnpJSYbyR47d6upA8Xg98DMpByf"
+            "depositOfferID": "o8JnmzXWxufz2LFRn22kXHzJ6kq5pK8q8j7USwALajJmaQekV",
+            "memo": "6"
           }
         ]
       },
@@ -199,7 +203,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "7"
           }
         ]
       },
@@ -214,7 +219,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "8"
           }
         ]
       },
@@ -229,7 +235,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "9"
           }
         ]
       },
@@ -244,7 +251,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000000,
-            "depositOfferID": "hV5265pC16vAxfaBgqWJY2dFrHy6URJJL9VEVN9GqAYsTMAyd"
+            "depositOfferID": "tdxfeS6QkMrqoJTrFaBdizAng1edgMxJw5oXVi2ePtTKTgrs7",
+            "memo": "10"
           }
         ]
       },
@@ -259,7 +267,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000000,
-            "depositOfferID": "hV5265pC16vAxfaBgqWJY2dFrHy6URJJL9VEVN9GqAYsTMAyd"
+            "depositOfferID": "tdxfeS6QkMrqoJTrFaBdizAng1edgMxJw5oXVi2ePtTKTgrs7",
+            "memo": "11"
           }
         ]
       },
@@ -274,7 +283,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "hV5265pC16vAxfaBgqWJY2dFrHy6URJJL9VEVN9GqAYsTMAyd"
+            "depositOfferID": "tdxfeS6QkMrqoJTrFaBdizAng1edgMxJw5oXVi2ePtTKTgrs7",
+            "memo": "12"
           }
         ]
       },
@@ -299,7 +309,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "hV5265pC16vAxfaBgqWJY2dFrHy6URJJL9VEVN9GqAYsTMAyd"
+            "depositOfferID": "tdxfeS6QkMrqoJTrFaBdizAng1edgMxJw5oXVi2ePtTKTgrs7",
+            "memo": "14"
           }
         ]
       },
@@ -314,7 +325,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000000,
-            "depositOfferID": "hV5265pC16vAxfaBgqWJY2dFrHy6URJJL9VEVN9GqAYsTMAyd"
+            "depositOfferID": "tdxfeS6QkMrqoJTrFaBdizAng1edgMxJw5oXVi2ePtTKTgrs7",
+            "memo": "15"
           }
         ]
       },
@@ -329,7 +341,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "16"
           }
         ]
       },
@@ -344,7 +357,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "hV5265pC16vAxfaBgqWJY2dFrHy6URJJL9VEVN9GqAYsTMAyd"
+            "depositOfferID": "tdxfeS6QkMrqoJTrFaBdizAng1edgMxJw5oXVi2ePtTKTgrs7",
+            "memo": "17"
           }
         ]
       },
@@ -359,7 +373,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "hV5265pC16vAxfaBgqWJY2dFrHy6URJJL9VEVN9GqAYsTMAyd"
+            "depositOfferID": "tdxfeS6QkMrqoJTrFaBdizAng1edgMxJw5oXVi2ePtTKTgrs7",
+            "memo": "18"
           }
         ]
       },
@@ -374,7 +389,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "hV5265pC16vAxfaBgqWJY2dFrHy6URJJL9VEVN9GqAYsTMAyd"
+            "depositOfferID": "tdxfeS6QkMrqoJTrFaBdizAng1edgMxJw5oXVi2ePtTKTgrs7",
+            "memo": "19"
           }
         ]
       },
@@ -389,7 +405,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "hV5265pC16vAxfaBgqWJY2dFrHy6URJJL9VEVN9GqAYsTMAyd"
+            "depositOfferID": "tdxfeS6QkMrqoJTrFaBdizAng1edgMxJw5oXVi2ePtTKTgrs7",
+            "memo": "20"
           }
         ]
       },
@@ -404,7 +421,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000000,
-            "depositOfferID": "hV5265pC16vAxfaBgqWJY2dFrHy6URJJL9VEVN9GqAYsTMAyd"
+            "depositOfferID": "tdxfeS6QkMrqoJTrFaBdizAng1edgMxJw5oXVi2ePtTKTgrs7",
+            "memo": "21"
           }
         ]
       },
@@ -419,7 +437,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "hV5265pC16vAxfaBgqWJY2dFrHy6URJJL9VEVN9GqAYsTMAyd"
+            "depositOfferID": "tdxfeS6QkMrqoJTrFaBdizAng1edgMxJw5oXVi2ePtTKTgrs7",
+            "memo": "22"
           }
         ]
       },
@@ -434,7 +453,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "hV5265pC16vAxfaBgqWJY2dFrHy6URJJL9VEVN9GqAYsTMAyd"
+            "depositOfferID": "tdxfeS6QkMrqoJTrFaBdizAng1edgMxJw5oXVi2ePtTKTgrs7",
+            "memo": "23"
           }
         ]
       },
@@ -449,7 +469,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "hV5265pC16vAxfaBgqWJY2dFrHy6URJJL9VEVN9GqAYsTMAyd"
+            "depositOfferID": "tdxfeS6QkMrqoJTrFaBdizAng1edgMxJw5oXVi2ePtTKTgrs7",
+            "memo": "24"
           }
         ]
       },
@@ -464,7 +485,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "hV5265pC16vAxfaBgqWJY2dFrHy6URJJL9VEVN9GqAYsTMAyd"
+            "depositOfferID": "tdxfeS6QkMrqoJTrFaBdizAng1edgMxJw5oXVi2ePtTKTgrs7",
+            "memo": "25"
           }
         ]
       },
@@ -479,7 +501,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "hV5265pC16vAxfaBgqWJY2dFrHy6URJJL9VEVN9GqAYsTMAyd"
+            "depositOfferID": "tdxfeS6QkMrqoJTrFaBdizAng1edgMxJw5oXVi2ePtTKTgrs7",
+            "memo": "26"
           }
         ]
       },
@@ -494,7 +517,8 @@
         "platformAllocations": [
           {
             "amount": 2800000000000000,
-            "depositOfferID": "Mc2xe3kHRdAnCbMYhK1p4GhnpJSYbyR47d6upA8Xg98DMpByf"
+            "depositOfferID": "o8JnmzXWxufz2LFRn22kXHzJ6kq5pK8q8j7USwALajJmaQekV",
+            "memo": "27"
           }
         ]
       },
@@ -509,7 +533,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "28"
           }
         ]
       },
@@ -524,7 +549,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "29"
           }
         ]
       },
@@ -539,7 +565,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "30"
           }
         ]
       },
@@ -554,7 +581,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "31"
           }
         ]
       },
@@ -569,7 +597,8 @@
         "platformAllocations": [
           {
             "amount": 20000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "32"
           }
         ]
       },
@@ -584,7 +613,8 @@
         "platformAllocations": [
           {
             "amount": 50000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "33"
           }
         ]
       },
@@ -599,7 +629,8 @@
         "platformAllocations": [
           {
             "amount": 15000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "34"
           }
         ]
       },
@@ -614,7 +645,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "35"
           }
         ]
       },
@@ -629,7 +661,8 @@
         "platformAllocations": [
           {
             "amount": 20000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "36"
           }
         ]
       },
@@ -644,7 +677,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "37"
           }
         ]
       },
@@ -659,7 +693,8 @@
         "platformAllocations": [
           {
             "amount": 40000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "38"
           }
         ]
       },
@@ -674,7 +709,8 @@
         "platformAllocations": [
           {
             "amount": 50000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "39"
           }
         ]
       },
@@ -689,7 +725,8 @@
         "platformAllocations": [
           {
             "amount": 200000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "40"
           }
         ]
       },
@@ -704,7 +741,8 @@
         "platformAllocations": [
           {
             "amount": 20000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "41"
           }
         ]
       },
@@ -719,7 +757,8 @@
         "platformAllocations": [
           {
             "amount": 20000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "42"
           }
         ]
       },
@@ -734,7 +773,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "43"
           }
         ]
       },
@@ -749,7 +789,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "44"
           }
         ]
       },
@@ -764,7 +805,8 @@
         "platformAllocations": [
           {
             "amount": 50000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "45"
           }
         ]
       },
@@ -779,7 +821,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "46"
           }
         ]
       },
@@ -794,7 +837,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "47"
           }
         ]
       },
@@ -809,7 +853,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "48"
           }
         ]
       },
@@ -824,7 +869,8 @@
         "platformAllocations": [
           {
             "amount": 500000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "49"
           }
         ]
       },
@@ -840,7 +886,9 @@
           {
             "amount": 500000000000000,
             "nodeID": "NodeID-ADyRxZndN569FitkbBzpr8oSe6FnYCMUr",
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "validatorDuration": 32400000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "50"
           }
         ]
       },
@@ -855,7 +903,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "51"
           }
         ]
       },
@@ -870,7 +919,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "52"
           }
         ]
       },
@@ -885,7 +935,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "53"
           }
         ]
       },
@@ -900,7 +951,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "54"
           }
         ]
       },
@@ -915,7 +967,8 @@
         "platformAllocations": [
           {
             "amount": 600000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "55"
           }
         ]
       },
@@ -930,7 +983,8 @@
         "platformAllocations": [
           {
             "amount": 500000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "56"
           }
         ]
       },
@@ -945,7 +999,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "57"
           }
         ]
       },
@@ -960,7 +1015,8 @@
         "platformAllocations": [
           {
             "amount": 20000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "58"
           }
         ]
       },
@@ -975,7 +1031,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "59"
           }
         ]
       },
@@ -990,7 +1047,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "60"
           }
         ]
       },
@@ -1005,7 +1063,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "61"
           }
         ]
       },
@@ -1020,7 +1079,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "62"
           }
         ]
       },
@@ -1035,7 +1095,8 @@
         "platformAllocations": [
           {
             "amount": 50000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "63"
           }
         ]
       },
@@ -1050,7 +1111,8 @@
         "platformAllocations": [
           {
             "amount": 15000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "64"
           }
         ]
       },
@@ -1065,7 +1127,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "65"
           }
         ]
       },
@@ -1080,7 +1143,8 @@
         "platformAllocations": [
           {
             "amount": 60000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "66"
           }
         ]
       },
@@ -1095,7 +1159,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "67"
           }
         ]
       },
@@ -1110,7 +1175,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "68"
           }
         ]
       },
@@ -1125,7 +1191,8 @@
         "platformAllocations": [
           {
             "amount": 200000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "69"
           }
         ]
       },
@@ -1140,7 +1207,8 @@
         "platformAllocations": [
           {
             "amount": 50000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "70"
           }
         ]
       },
@@ -1155,7 +1223,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "71"
           }
         ]
       },
@@ -1170,7 +1239,8 @@
         "platformAllocations": [
           {
             "amount": 50000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "72"
           }
         ]
       },
@@ -1185,7 +1255,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "73"
           }
         ]
       },
@@ -1200,7 +1271,8 @@
         "platformAllocations": [
           {
             "amount": 15000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "74"
           }
         ]
       },
@@ -1215,7 +1287,8 @@
         "platformAllocations": [
           {
             "amount": 50000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "75"
           }
         ]
       },
@@ -1230,7 +1303,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "76"
           }
         ]
       },
@@ -1245,7 +1319,8 @@
         "platformAllocations": [
           {
             "amount": 50000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "77"
           }
         ]
       },
@@ -1260,7 +1335,8 @@
         "platformAllocations": [
           {
             "amount": 15000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "78"
           }
         ]
       },
@@ -1275,7 +1351,8 @@
         "platformAllocations": [
           {
             "amount": 25000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "79"
           }
         ]
       },
@@ -1290,7 +1367,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "80"
           }
         ]
       },
@@ -1305,7 +1383,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "81"
           }
         ]
       },
@@ -1320,7 +1399,8 @@
         "platformAllocations": [
           {
             "amount": 20000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "82"
           }
         ]
       },
@@ -1335,7 +1415,8 @@
         "platformAllocations": [
           {
             "amount": 500000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "83"
           }
         ]
       },
@@ -1350,7 +1431,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "84"
           }
         ]
       },
@@ -1365,7 +1447,8 @@
         "platformAllocations": [
           {
             "amount": 20000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "85"
           }
         ]
       },
@@ -1380,7 +1463,8 @@
         "platformAllocations": [
           {
             "amount": 200000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "86"
           }
         ]
       },
@@ -1395,7 +1479,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "87"
           }
         ]
       },
@@ -1410,2077 +1495,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus18euuxjyet4x6lnphvk9dkfw9dpx3pz648cdt64",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": true,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1gs4dlsv4d7j053vy7fs44p63kmmwjrzvv38ffk",
-        "xAmount": 150000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 15000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1zd8q570y8q8z42huyxmejnnhmmw75uys7afzrv",
-        "xAmount": 10000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 1000000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus13cvll3vsm02quegweeupnan5kvkqtkzpj0r5xe",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1kqd0hqxvrjkc0ez30lfst860w2uu6562knn9tx",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus18y4z5dcscmy5qn38wypnszmh6tu93vk5ypn6zd",
-        "xAmount": 500000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 50000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1ujp0vh9az0gaeuqd44vmmx9f7ztmyhmt9hj9vt",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1fnpdrhkmtz6pfngm73k2nfgfwsgdhhdp0zqfnh",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1udj7xy6g2ppr9d4m55e9v2r98lk8ntcl3f98m2",
-        "xAmount": 200000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": false
-        },
-        "platformAllocations": [
-          {
-            "amount": 20000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1m22a6qy7vtgxg73pt6uzew5zfjq0fn8ndqgsca",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus15zt49dmwzq3qdfqkwx3rrkzcl42yezf0aqhw9w",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1jj003n7f454ku29y5l3a05p6quzu0khz3axu3q",
-        "xAmount": 200000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 20000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1mvceaqtg5jefpwdhkqxj75ll79t95k4yjgncrp",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus19q3cq6pz468vpx7g337laevc2vjkt9482uugwx",
-        "xAmount": 250000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 25000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1vzcaj0e3n76fng2xc0lug2sl26re2sav4e0aj5",
-        "xAmount": 2000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 200000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus127fy88q8lfue2teuflgg8yzwdanj096rvk8ewx",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus19x22enr8t00kr8yuc76atdf8yfwsmkjvxftqtj",
-        "xAmount": 500000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 50000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1vgphq2z2u4rgv6jux8yez4uwygx6qgqvehe4uz",
-        "xAmount": 10000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 1000000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus12wa0pwzygj0e60lpjkle9nkejwne6ue6h40v57",
-        "xAmount": 300000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 30000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1r265cwy7rgpclut52qrzsl56tt3ywn8tf7v4cc",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1dw50nruyyhdqfsjnvpw8kt4eyjr5mw8qcad4wm",
-        "xAmount": 500000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 50000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1m0wxqxk304jeqqdzk6elgh4zrx5uvgl2vgamev",
-        "xAmount": 500000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 50000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus105e0gjwzsvvffa9l60j5h8f4tcxss9dm8rktdt",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": true,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1pe75rm3mkxs6q99d0wxh9mzrwtv5jzvz3udtwh",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": true,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1jn7h9l0phzh9lvj0744tvc6ta20vxsxffdpzkm",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus19drcmmm4smw3hd4a6k4fyzapaznf9t05uzlu5p",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus17jk0qh8727rk9sfd5fdtn3mg83zva23hx592f6",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1dce8ay267x3rdk5lumnn273r0dalm60cx3hzy3",
-        "xAmount": 2000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 200000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1ah4qrkkprd7z062vaewvdvxhxes4n0curnm4jk",
-        "xAmount": 4000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 400000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1m7vkm5q9jr0papjc3meux346chqq2wuf3vqvmd",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1epg2a7nk4c7yqh48286n3r8hnc5lhtddjt7t2v",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus126lt3yr99frvdeajduw2q7m9dgqnkrkfp03ppx",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus18nleueq7dvfr782dlq3cpz9402y0944cpkkf9p",
-        "xAmount": 1500000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 150000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus13jm659wgtlyhynufv2jmmjsux5hgq7sjdukzne",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1tvpqc5dpeduzwsuez597xf7h9qtlalxn3m77rn",
-        "xAmount": 2000000000000,
-        "addressStates": {
-          "consortiumMember": true,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 200000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1krytgmsvgezzn6vj8zx2jhy3hjmed7cxyhvh6f",
-        "xAmount": 200000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 20000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1qnatsmlx0xandjnjyc5c7fzksjjfzl6amxxgsd",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1cqmedqupdjezjt4yw2rhpyh33u3hh2m64e5gpt",
-        "xAmount": 150000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 15000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1tma7putyyyg9zka742mpdz8amn65m7gkj2zm4k",
-        "xAmount": 0,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 300000000000000,
-            "depositOfferID": "Mc2xe3kHRdAnCbMYhK1p4GhnpJSYbyR47d6upA8Xg98DMpByf"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1wd6lw2ssu4edpl9c5gymsk5e7clxw03hsuzceg",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1lgjlklvqgj9rn0zjfh06zgzfa45cfcj6lhuzah",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1rwaj6n2hp8gvxr0dqn5mgesccgek6f85hzj38q",
-        "xAmount": 200000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 20000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1t9wruy74ma9k7nswq2vvmw05yqzfdaenglfxue",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus13enppcukm9jxvs4jms25er7u5jntpnm8vrdzek",
-        "xAmount": 200000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 20000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1t0shdplvgkq9kg508v4mquj6xgdzuyq8m3vpyw",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1kyrnfq2gwgx2eqkrwej4cumkjydqlj600qlczz",
-        "xAmount": 300000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 30000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1u6q5jgrawt0m6g4kcwewut7zfzfu7dddz9vv9g",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus14c7mns35dfpyvpqc3wllkhusmjp7kgts3slyz4",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus14w8skztykj8p3kqjy4xr3mdx7nf3w00q39htgn",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": true,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1t7ptfcxfxgv7xal499pm0m2r8rf8kaukkwy3uy",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1c3zwa9ezxa77wd8qkvtyk6akfkr7usn82z6qlg",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1qtvt2rmn34ufdxvm2nwsm6ksadqvs6qvc635w7",
-        "xAmount": 2500000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 250000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1h9xtus3a0a6fqfngqfsganha436tm320u933km",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus187l7hzn5rldne5lcq0un2ushzhtqekvltz4jnx",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1qg4c3qpvq08gsu90sw9x84fcw86tdgcx6vapgh",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus18nmn4htudf268aknz7k2ee92zrhau5tc68cman",
-        "xAmount": 200000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": false
-        },
-        "platformAllocations": [
-          {
-            "amount": 20000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1v3c33ujhgkzr369024w4f6x7ssaxf0y6dkgqy0",
-        "xAmount": 30000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 3000000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1lf3rmuueyqhdjkqphwkky4e5wcaevflguhu6hc",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus19se7jz52czhxsvdgz87aedywcdgxycf2699csh",
-        "xAmount": 200000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 20000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus165tgygtc8h73pkvakdvl5nuzgtqzvwgr7fjpku",
-        "xAmount": 300000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 30000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1qcgtkfcda46lnluehc6r98xjgcxmxy82f9sn0l",
-        "xAmount": 1500000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 150000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus182v0jkv9esteufgpu6d29dqr0n6dzrpestrfh7",
-        "xAmount": 250000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 25000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1syef5x68ra2k9edldegm9wvqhg567ygwhqtaug",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1wmqq9v670z4hrr3x65xhfhttlk9lqu8myp4uyk",
-        "xAmount": 200000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 20000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1puxw75l9njng4gr8f27ajl7qpl45ndyzgkrn2l",
-        "xAmount": 2000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 200000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus15cwtyp6670eeeypkpsvamnzy4m7jpxehazy9y0",
-        "xAmount": 200000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 20000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1quvvdczjdlt0vcd2v6y7eem6g0khj60y9wc88x",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1sfgnnad8g2f9lnw6c8eqe52nyhz4cd8drys5nr",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1d8wfvesnck4ptcfp70tajhu54zrgftwzmxsmgq",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1wqmv02nm4cu0alxyegxcc4mp4732q6ac9k9jjp",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1cvng85rpwwumxd90uwjr3ky64876h2egs5x3w2",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus12x34xyn47cx3cqprf7pqz6cpzv60ynelpqsg74",
-        "xAmount": 200000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 20000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1fx8rm8dww6uzstdk65du5d73x0nzntg9cqexm4",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus12362l5ftcuva4q6p5jcyf7h6gjgy2qtmsqwuys",
-        "xAmount": 200000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 20000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1ldwjgkwgd7hhyutdfdskr5nmw87k77t6z75n49",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1yc54996lkxajkys2zpaquju8hn3pwr58za4u5m",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus109x70su7sqqn9t2s4danjjueu5mc9jhyawxnly",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": false
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus16tdrzql3nyxd0npqhw9f5d6zxkpvq208y42s0l",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1c50n0l3t4effuat2lujeltyvg9zpxp28rnr4a9",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1dew8n748nygu6mfflq4f22rs25uu2dss2hfud2",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus13e2yxg2gkpkxmtedkqpnynvup30k3t2sh6g7tp",
-        "xAmount": 4000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 400000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1mjenvt5su69dh0zyshvqyv3kcw4ul805geezw8",
-        "xAmount": 2500000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 250000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1sgyj0xkjt5erpammkfcftg8aqv2fp8e65mu0pr",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1fvppvzuf6vnduwvcgvn9per95dryn4ww2lggy5",
-        "xAmount": 500000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 50000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1rjtkck732eu288f7gc98u4ckc5zwr5xw63atxy",
-        "xAmount": 2000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 200000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1zqp6d8zjd63gyq42px7gsf2ac6h9kwym6ksjs8",
-        "xAmount": 500000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 50000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1cvrvujyg3sd92tek7y02vgs6zlz35rh29djmqn",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": true,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus19a3qnpagws33cmcpfptfc4evekvructnd7rm3f",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": true,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1ztxgksna3mhnwpvc4slze3q59x9grsf6gtelrv",
-        "xAmount": 750000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 75000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus18d6x3whh25l8m4x53g0kygv4ppewmkq59wsz9k",
-        "xAmount": 200000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 20000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1r5fr6qz5s2qjd0lqkrju8trrkg4v86mre0jqrp",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1c65a257ndfgtayq5m3n3z9xhcpkhevszgxlxa3",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus13pk0dtypwfnssdx880hvr9ezjzlvkp5lcr3ltw",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1qwck6hzr4l02g8rnc3nmw76exxz5fej9mj9rjy",
-        "xAmount": 200000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 20000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1ujqfjw0ntt0eclgezscry4rfqtka5affxggsgw",
-        "xAmount": 2000000000000,
-        "addressStates": {
-          "consortiumMember": true,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 200000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1xysg8r87kzrm8vwx04gzzvttx902ttmppauqrq",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1fpxdj92sma76eh6pc4myeumnr2v3a8tes8k88d",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": false
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1djvdu0lagmtrpq35fnug649fmv3ry6z5lu5n4t",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1r8ackvr368s76ec6zlkxvjmxw4njn6fklhft37",
-        "xAmount": 200000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 20000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1jmw9k6v3pfk2wr5yj80svy9ulf8qr0yg2gcqsw",
-        "xAmount": 250000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 25000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1cpawfw2u3cxzan8n7uqs5hcy2hk847m8sdpuca",
-        "xAmount": 1200000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": false
-        },
-        "platformAllocations": [
-          {
-            "amount": 120000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1ah2ss87zx8tg4e3l62c9a03gj4c4rml9heykvz",
-        "xAmount": 2000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 200000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1pxweaqwecr4gsh9kr3ed8ljegsxgh2ezucf3za",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1rnfwllg4wjtygafheat8da4lv4wqa7yyf8qata",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1zj4gs3ldxz6sm5d6zjdv36p0ag8rjey6q5pt2t",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1nl0pgg4fry3rwxcvw7h0n2ypt65ns0587dqu6g",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1kgfs032y5fxnvyp0nyhzgt78dzmk2y39r8zrac",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus12wz3mm7qgz0elxf3htwg8sgvnzevr7026k6ryw",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1c50n0l3t4effuat2lujeltyvg9zpxp28rnr4a9",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1j300cnhffvpuezmnh4hm54cfu6g4fgjw55vt9u",
-        "xAmount": 200000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 20000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1cfqr4ch84z728k2kzqwy82llsmzpa4frg0g8lp",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1zpmmsy75djpguyp7m55vp4x37k4hesx595thn5",
-        "xAmount": 500000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 50000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1dp7cltp0j3aaj6efku3ewd29mwe8el44jvztps",
-        "xAmount": 1500000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 150000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus10q3dc78tw70m89s8lgl9fgwe9tfu4a0sry5xgd",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1dt2gmpynvaah9juxwpyw2l83lm78c2c9rvnsyw",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1344av3drwd03pmnk99jlgsv3gz0xsuyvtp5mpv",
-        "xAmount": 500000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 50000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus18y4z5dcscmy5qn38wypnszmh6tu93vk5ypn6zd",
-        "xAmount": 500000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 50000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1kjj39faew5lvkfrslp70fuvdk4vvzktngjwhr8",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1yk2ydhcav6sq4gm4tw9necmtmgnx3q2ngwx6n9",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus18dw78q4lkdks05zk939mc4rygs6w5uetwz8gfa",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1ruhwpty2jnyz2stv007y56w6llc9w58n3as7wf",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1vuq4da8j4t8vf4nn7gq0kg0a2lgczf8epa0g6f",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus13tg6t2ed9yrle44s9z8g3mag4cfw68gk0tly0x",
-        "xAmount": 200000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 20000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus18fphrmnm8zl5y8m2z39ydpmhl4pvtslj8kwpxe",
-        "xAmount": 1500000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 150000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1uhdv7ytdu9w7mza2etzajrcqvl2j85s93d328a",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1wjz4ssewut2cv4kk9y5ladfr3g97ng9s55xrea",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus145pm20lmj3w6ts4u29826m59mca23muwju8qzd",
-        "xAmount": 1000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus104wz2lt44kw2u8r775hfdujk6rrpgmjdhl7q6h",
-        "xAmount": 1500000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 150000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus105ysvey52quqydtuwcw9qgx3c3y0eqk04qtcdx",
-        "xAmount": 700000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 70000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1yqqenlx3n6lc7jas4m0jh9cghct3me68depja2",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1q37excjx65fzk2kgjqesqjmp0de0nvkh4kvghy",
-        "xAmount": 200000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 20000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus19n3y06nrquf9n7y22x3gr35gsms94a4zwjupxh",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1l828527ytgs0wlk9ncvw7zgp4jtadzc25xl2tz",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1dxqcc8s3mfgj6thsfmkh5z23gt0fyngjgy5jfe",
-        "xAmount": 100000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1w82vcsrucl4lrys8dtnk5t2yshpnuq234u53x9",
-        "xAmount": 2000000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 200000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus10hdjkp8qynahtewufy6ek3pv0r35j7ufqaze4x",
-        "xAmount": 150000000000,
-        "addressStates": {
-          "consortiumMember": false,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 15000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus14y7vw9ncnu0wl59amjf6m5dmxsdhvydg37p8ne",
-        "xAmount": 0,
-        "addressStates": {
-          "consortiumMember": true,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 4500000000000000,
-            "depositOfferID": "Mc2xe3kHRdAnCbMYhK1p4GhnpJSYbyR47d6upA8Xg98DMpByf"
-          }
-        ]
-      },
-      {
-        "ethAddr": "0x0000000000000000000000000000000000000000",
-        "avaxAddr": "X-columbus1nckwrhkr4gt5897v8uzcg2mfsw4kdcds3eg2xn",
-        "xAmount": 2000000000000,
-        "addressStates": {
-          "consortiumMember": true,
-          "kycVerified": true
-        },
-        "platformAllocations": [
-          {
-            "amount": 200000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "88"
           }
         ]
       },
@@ -3495,7 +1511,2216 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "89"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1gs4dlsv4d7j053vy7fs44p63kmmwjrzvv38ffk",
+        "xAmount": 150000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 15000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "90"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1zd8q570y8q8z42huyxmejnnhmmw75uys7afzrv",
+        "xAmount": 10000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 1000000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "91"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus13cvll3vsm02quegweeupnan5kvkqtkzpj0r5xe",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "92"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1kqd0hqxvrjkc0ez30lfst860w2uu6562knn9tx",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "93"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus18y4z5dcscmy5qn38wypnszmh6tu93vk5ypn6zd",
+        "xAmount": 500000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 50000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "94"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1ujp0vh9az0gaeuqd44vmmx9f7ztmyhmt9hj9vt",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "95"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1fnpdrhkmtz6pfngm73k2nfgfwsgdhhdp0zqfnh",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "96"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1udj7xy6g2ppr9d4m55e9v2r98lk8ntcl3f98m2",
+        "xAmount": 200000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": false
+        },
+        "platformAllocations": [
+          {
+            "amount": 20000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "97"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1m22a6qy7vtgxg73pt6uzew5zfjq0fn8ndqgsca",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "98"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus15zt49dmwzq3qdfqkwx3rrkzcl42yezf0aqhw9w",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "99"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1jj003n7f454ku29y5l3a05p6quzu0khz3axu3q",
+        "xAmount": 200000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 20000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "100"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1mvceaqtg5jefpwdhkqxj75ll79t95k4yjgncrp",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "101"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus19q3cq6pz468vpx7g337laevc2vjkt9482uugwx",
+        "xAmount": 250000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 25000000000000,
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "102"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1vzcaj0e3n76fng2xc0lug2sl26re2sav4e0aj5",
+        "xAmount": 2000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 200000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "103"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus127fy88q8lfue2teuflgg8yzwdanj096rvk8ewx",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "104"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus19x22enr8t00kr8yuc76atdf8yfwsmkjvxftqtj",
+        "xAmount": 500000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 50000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "105"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1vgphq2z2u4rgv6jux8yez4uwygx6qgqvehe4uz",
+        "xAmount": 10000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 1000000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "106"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus12wa0pwzygj0e60lpjkle9nkejwne6ue6h40v57",
+        "xAmount": 300000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 30000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "107"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1r265cwy7rgpclut52qrzsl56tt3ywn8tf7v4cc",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "108"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1dw50nruyyhdqfsjnvpw8kt4eyjr5mw8qcad4wm",
+        "xAmount": 500000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 50000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "109"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1m0wxqxk304jeqqdzk6elgh4zrx5uvgl2vgamev",
+        "xAmount": 500000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 50000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "110"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus105e0gjwzsvvffa9l60j5h8f4tcxss9dm8rktdt",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "111"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1pe75rm3mkxs6q99d0wxh9mzrwtv5jzvz3udtwh",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "112"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1jn7h9l0phzh9lvj0744tvc6ta20vxsxffdpzkm",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "113"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus19drcmmm4smw3hd4a6k4fyzapaznf9t05uzlu5p",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "114"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus17jk0qh8727rk9sfd5fdtn3mg83zva23hx592f6",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "115"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1dce8ay267x3rdk5lumnn273r0dalm60cx3hzy3",
+        "xAmount": 2000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 200000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "116"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1ah4qrkkprd7z062vaewvdvxhxes4n0curnm4jk",
+        "xAmount": 4000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 400000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "117"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1m7vkm5q9jr0papjc3meux346chqq2wuf3vqvmd",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "118"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1epg2a7nk4c7yqh48286n3r8hnc5lhtddjt7t2v",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "119"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus126lt3yr99frvdeajduw2q7m9dgqnkrkfp03ppx",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "120"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus18nleueq7dvfr782dlq3cpz9402y0944cpkkf9p",
+        "xAmount": 1500000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 150000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "121"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus13jm659wgtlyhynufv2jmmjsux5hgq7sjdukzne",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "122"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1tvpqc5dpeduzwsuez597xf7h9qtlalxn3m77rn",
+        "xAmount": 2000000000000,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 200000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "123"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1krytgmsvgezzn6vj8zx2jhy3hjmed7cxyhvh6f",
+        "xAmount": 200000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 20000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "124"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1qnatsmlx0xandjnjyc5c7fzksjjfzl6amxxgsd",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "125"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1cqmedqupdjezjt4yw2rhpyh33u3hh2m64e5gpt",
+        "xAmount": 150000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 15000000000000,
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "126"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1tma7putyyyg9zka742mpdz8amn65m7gkj2zm4k",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 300000000000000,
+            "depositOfferID": "o8JnmzXWxufz2LFRn22kXHzJ6kq5pK8q8j7USwALajJmaQekV",
+            "memo": "127"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1wd6lw2ssu4edpl9c5gymsk5e7clxw03hsuzceg",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "128"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1lgjlklvqgj9rn0zjfh06zgzfa45cfcj6lhuzah",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "129"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1rwaj6n2hp8gvxr0dqn5mgesccgek6f85hzj38q",
+        "xAmount": 200000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 20000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "130"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1t9wruy74ma9k7nswq2vvmw05yqzfdaenglfxue",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "131"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus13enppcukm9jxvs4jms25er7u5jntpnm8vrdzek",
+        "xAmount": 200000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 20000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "132"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1t0shdplvgkq9kg508v4mquj6xgdzuyq8m3vpyw",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "133"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1kyrnfq2gwgx2eqkrwej4cumkjydqlj600qlczz",
+        "xAmount": 300000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 30000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "134"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1u6q5jgrawt0m6g4kcwewut7zfzfu7dddz9vv9g",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "135"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus14c7mns35dfpyvpqc3wllkhusmjp7kgts3slyz4",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "136"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus14w8skztykj8p3kqjy4xr3mdx7nf3w00q39htgn",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "137"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1t7ptfcxfxgv7xal499pm0m2r8rf8kaukkwy3uy",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "138"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1c3zwa9ezxa77wd8qkvtyk6akfkr7usn82z6qlg",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "139"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1qtvt2rmn34ufdxvm2nwsm6ksadqvs6qvc635w7",
+        "xAmount": 2500000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 250000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "140"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1h9xtus3a0a6fqfngqfsganha436tm320u933km",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "141"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus187l7hzn5rldne5lcq0un2ushzhtqekvltz4jnx",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "142"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1qg4c3qpvq08gsu90sw9x84fcw86tdgcx6vapgh",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "143"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus18nmn4htudf268aknz7k2ee92zrhau5tc68cman",
+        "xAmount": 200000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": false
+        },
+        "platformAllocations": [
+          {
+            "amount": 20000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "144"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1v3c33ujhgkzr369024w4f6x7ssaxf0y6dkgqy0",
+        "xAmount": 30000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 3000000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "145"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1lf3rmuueyqhdjkqphwkky4e5wcaevflguhu6hc",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "146"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus19se7jz52czhxsvdgz87aedywcdgxycf2699csh",
+        "xAmount": 200000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 20000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "147"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus165tgygtc8h73pkvakdvl5nuzgtqzvwgr7fjpku",
+        "xAmount": 300000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 30000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "148"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1qcgtkfcda46lnluehc6r98xjgcxmxy82f9sn0l",
+        "xAmount": 1500000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 150000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "149"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus182v0jkv9esteufgpu6d29dqr0n6dzrpestrfh7",
+        "xAmount": 250000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 25000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "150"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1syef5x68ra2k9edldegm9wvqhg567ygwhqtaug",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "151"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1wmqq9v670z4hrr3x65xhfhttlk9lqu8myp4uyk",
+        "xAmount": 200000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 20000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "152"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1puxw75l9njng4gr8f27ajl7qpl45ndyzgkrn2l",
+        "xAmount": 2000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 200000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "153"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus15cwtyp6670eeeypkpsvamnzy4m7jpxehazy9y0",
+        "xAmount": 200000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 20000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "154"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1quvvdczjdlt0vcd2v6y7eem6g0khj60y9wc88x",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "155"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1sfgnnad8g2f9lnw6c8eqe52nyhz4cd8drys5nr",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "156"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1d8wfvesnck4ptcfp70tajhu54zrgftwzmxsmgq",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "157"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1wqmv02nm4cu0alxyegxcc4mp4732q6ac9k9jjp",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "158"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1cvng85rpwwumxd90uwjr3ky64876h2egs5x3w2",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "159"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus12x34xyn47cx3cqprf7pqz6cpzv60ynelpqsg74",
+        "xAmount": 200000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 20000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "160"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1fx8rm8dww6uzstdk65du5d73x0nzntg9cqexm4",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "161"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus12362l5ftcuva4q6p5jcyf7h6gjgy2qtmsqwuys",
+        "xAmount": 200000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 20000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "162"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1ldwjgkwgd7hhyutdfdskr5nmw87k77t6z75n49",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "163"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1yc54996lkxajkys2zpaquju8hn3pwr58za4u5m",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "164"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus109x70su7sqqn9t2s4danjjueu5mc9jhyawxnly",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": false
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "165"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus16tdrzql3nyxd0npqhw9f5d6zxkpvq208y42s0l",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "166"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1c50n0l3t4effuat2lujeltyvg9zpxp28rnr4a9",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "167"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1dew8n748nygu6mfflq4f22rs25uu2dss2hfud2",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "168"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus13e2yxg2gkpkxmtedkqpnynvup30k3t2sh6g7tp",
+        "xAmount": 4000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 400000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "169"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1mjenvt5su69dh0zyshvqyv3kcw4ul805geezw8",
+        "xAmount": 2500000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 250000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "170"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1sgyj0xkjt5erpammkfcftg8aqv2fp8e65mu0pr",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "171"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1fvppvzuf6vnduwvcgvn9per95dryn4ww2lggy5",
+        "xAmount": 500000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 50000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "172"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1rjtkck732eu288f7gc98u4ckc5zwr5xw63atxy",
+        "xAmount": 2000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 200000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "173"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1zqp6d8zjd63gyq42px7gsf2ac6h9kwym6ksjs8",
+        "xAmount": 500000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 50000000000000,
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "174"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1cvrvujyg3sd92tek7y02vgs6zlz35rh29djmqn",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "175"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus19a3qnpagws33cmcpfptfc4evekvructnd7rm3f",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "176"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1ztxgksna3mhnwpvc4slze3q59x9grsf6gtelrv",
+        "xAmount": 750000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 75000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "177"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus18d6x3whh25l8m4x53g0kygv4ppewmkq59wsz9k",
+        "xAmount": 200000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 20000000000000,
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "178"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1r5fr6qz5s2qjd0lqkrju8trrkg4v86mre0jqrp",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "179"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1c65a257ndfgtayq5m3n3z9xhcpkhevszgxlxa3",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "180"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus13pk0dtypwfnssdx880hvr9ezjzlvkp5lcr3ltw",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "181"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1qwck6hzr4l02g8rnc3nmw76exxz5fej9mj9rjy",
+        "xAmount": 200000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 20000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "182"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1ujqfjw0ntt0eclgezscry4rfqtka5affxggsgw",
+        "xAmount": 2000000000000,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 200000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "183"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1xysg8r87kzrm8vwx04gzzvttx902ttmppauqrq",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "184"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1fpxdj92sma76eh6pc4myeumnr2v3a8tes8k88d",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": false
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "185"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1djvdu0lagmtrpq35fnug649fmv3ry6z5lu5n4t",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "186"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1r8ackvr368s76ec6zlkxvjmxw4njn6fklhft37",
+        "xAmount": 200000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 20000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "187"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1jmw9k6v3pfk2wr5yj80svy9ulf8qr0yg2gcqsw",
+        "xAmount": 250000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 25000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "188"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1cpawfw2u3cxzan8n7uqs5hcy2hk847m8sdpuca",
+        "xAmount": 1200000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": false
+        },
+        "platformAllocations": [
+          {
+            "amount": 120000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "189"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1ah2ss87zx8tg4e3l62c9a03gj4c4rml9heykvz",
+        "xAmount": 2000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 200000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "190"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1pxweaqwecr4gsh9kr3ed8ljegsxgh2ezucf3za",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "191"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1rnfwllg4wjtygafheat8da4lv4wqa7yyf8qata",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "192"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1zj4gs3ldxz6sm5d6zjdv36p0ag8rjey6q5pt2t",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "193"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1nl0pgg4fry3rwxcvw7h0n2ypt65ns0587dqu6g",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "194"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1kgfs032y5fxnvyp0nyhzgt78dzmk2y39r8zrac",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "195"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus12wz3mm7qgz0elxf3htwg8sgvnzevr7026k6ryw",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "196"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1c50n0l3t4effuat2lujeltyvg9zpxp28rnr4a9",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "197"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1j300cnhffvpuezmnh4hm54cfu6g4fgjw55vt9u",
+        "xAmount": 200000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 20000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "198"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1cfqr4ch84z728k2kzqwy82llsmzpa4frg0g8lp",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "199"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1zpmmsy75djpguyp7m55vp4x37k4hesx595thn5",
+        "xAmount": 500000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 50000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "200"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1dp7cltp0j3aaj6efku3ewd29mwe8el44jvztps",
+        "xAmount": 1500000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 150000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "201"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus10q3dc78tw70m89s8lgl9fgwe9tfu4a0sry5xgd",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "202"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1dt2gmpynvaah9juxwpyw2l83lm78c2c9rvnsyw",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "203"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1344av3drwd03pmnk99jlgsv3gz0xsuyvtp5mpv",
+        "xAmount": 500000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 50000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "204"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus18y4z5dcscmy5qn38wypnszmh6tu93vk5ypn6zd",
+        "xAmount": 500000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 50000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "205"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1kjj39faew5lvkfrslp70fuvdk4vvzktngjwhr8",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "206"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1yk2ydhcav6sq4gm4tw9necmtmgnx3q2ngwx6n9",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "207"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus18dw78q4lkdks05zk939mc4rygs6w5uetwz8gfa",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "208"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1ruhwpty2jnyz2stv007y56w6llc9w58n3as7wf",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "209"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1vuq4da8j4t8vf4nn7gq0kg0a2lgczf8epa0g6f",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "210"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus13tg6t2ed9yrle44s9z8g3mag4cfw68gk0tly0x",
+        "xAmount": 200000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 20000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "211"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus18fphrmnm8zl5y8m2z39ydpmhl4pvtslj8kwpxe",
+        "xAmount": 1500000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 150000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "212"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1uhdv7ytdu9w7mza2etzajrcqvl2j85s93d328a",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "213"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1wjz4ssewut2cv4kk9y5ladfr3g97ng9s55xrea",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "214"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus145pm20lmj3w6ts4u29826m59mca23muwju8qzd",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "215"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus104wz2lt44kw2u8r775hfdujk6rrpgmjdhl7q6h",
+        "xAmount": 1500000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 150000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "216"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus105ysvey52quqydtuwcw9qgx3c3y0eqk04qtcdx",
+        "xAmount": 700000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 70000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "217"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1yqqenlx3n6lc7jas4m0jh9cghct3me68depja2",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "218"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1q37excjx65fzk2kgjqesqjmp0de0nvkh4kvghy",
+        "xAmount": 200000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 20000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "219"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus19n3y06nrquf9n7y22x3gr35gsms94a4zwjupxh",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "220"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1l828527ytgs0wlk9ncvw7zgp4jtadzc25xl2tz",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "221"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1dxqcc8s3mfgj6thsfmkh5z23gt0fyngjgy5jfe",
+        "xAmount": 100000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "222"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1w82vcsrucl4lrys8dtnk5t2yshpnuq234u53x9",
+        "xAmount": 2000000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 200000000000000,
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "223"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus10hdjkp8qynahtewufy6ek3pv0r35j7ufqaze4x",
+        "xAmount": 150000000000,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 15000000000000,
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "224"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus14y7vw9ncnu0wl59amjf6m5dmxsdhvydg37p8ne",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 4500000000000000,
+            "depositOfferID": "o8JnmzXWxufz2LFRn22kXHzJ6kq5pK8q8j7USwALajJmaQekV",
+            "memo": "225"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1nckwrhkr4gt5897v8uzcg2mfsw4kdcds3eg2xn",
+        "xAmount": 2000000000000,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 200000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "226"
+          }
+        ]
+      },
+      {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-columbus1mspvckgspqvwkpdkaszkv5jf75dcs0mv486740",
+        "xAmount": 1000000000000,
+        "addressStates": {
+          "consortiumMember": true,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 100000000000000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "227"
           }
         ]
       },
@@ -3510,7 +3735,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "228"
           }
         ]
       },
@@ -3526,7 +3752,9 @@
           {
             "amount": 2000000000000000,
             "nodeID": "NodeID-CXYTCzyt3KysvbanQijppcsnSyixuKASv",
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
+            "validatorDuration": 30672000,
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "229"
           }
         ]
       },
@@ -3541,7 +3769,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "230"
           }
         ]
       },
@@ -3556,7 +3785,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "231"
           }
         ]
       },
@@ -3571,7 +3801,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "232"
           }
         ]
       },
@@ -3586,7 +3817,8 @@
         "platformAllocations": [
           {
             "amount": 150000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "233"
           }
         ]
       },
@@ -3601,7 +3833,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "234"
           }
         ]
       },
@@ -3616,7 +3849,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "235"
           }
         ]
       },
@@ -3631,7 +3865,8 @@
         "platformAllocations": [
           {
             "amount": 150000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "236"
           }
         ]
       },
@@ -3647,7 +3882,9 @@
           {
             "amount": 2000000000000000,
             "nodeID": "NodeID-P7Afz8yMSGE9XYqRXBXvMCGHj5JtvcK6z",
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
+            "validatorDuration": 31536000,
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "237"
           }
         ]
       },
@@ -3662,7 +3899,8 @@
         "platformAllocations": [
           {
             "amount": 500000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "238"
           }
         ]
       },
@@ -3677,7 +3915,8 @@
         "platformAllocations": [
           {
             "amount": 300000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "239"
           }
         ]
       },
@@ -3692,7 +3931,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "240"
           }
         ]
       },
@@ -3707,7 +3947,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "241"
           }
         ]
       },
@@ -3722,7 +3963,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "242"
           }
         ]
       },
@@ -3737,7 +3979,8 @@
         "platformAllocations": [
           {
             "amount": 400000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "243"
           }
         ]
       },
@@ -3752,7 +3995,8 @@
         "platformAllocations": [
           {
             "amount": 10000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "244"
           }
         ]
       },
@@ -3767,7 +4011,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "245"
           }
         ]
       },
@@ -3782,7 +4027,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "246"
           }
         ]
       },
@@ -3797,7 +4043,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "247"
           }
         ]
       },
@@ -3812,7 +4059,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "248"
           }
         ]
       },
@@ -3828,7 +4076,9 @@
           {
             "amount": 500000000000000,
             "nodeID": "NodeID-4EQFrUN4H512882gcc4UPkwDueQwM49bx",
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "validatorDuration": 30240000,
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "249"
           }
         ]
       },
@@ -3843,7 +4093,8 @@
         "platformAllocations": [
           {
             "amount": 200000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "250"
           }
         ]
       },
@@ -3858,7 +4109,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "251"
           }
         ]
       },
@@ -3873,7 +4125,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "252"
           }
         ]
       },
@@ -3888,7 +4141,8 @@
         "platformAllocations": [
           {
             "amount": 300000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "253"
           }
         ]
       },
@@ -3903,7 +4157,8 @@
         "platformAllocations": [
           {
             "amount": 250000000000000,
-            "depositOfferID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n"
+            "depositOfferID": "sYBxoiGqzP7gq3t9LguAetqUJAAKu1zxqJUfWUhFCh68fAgRV",
+            "memo": "254"
           }
         ]
       },
@@ -3918,7 +4173,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "255"
           }
         ]
       },
@@ -3933,7 +4189,8 @@
         "platformAllocations": [
           {
             "amount": 100000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "256"
           }
         ]
       },
@@ -3948,7 +4205,8 @@
         "platformAllocations": [
           {
             "amount": 1000000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "257"
           }
         ]
       },
@@ -3963,7 +4221,8 @@
         "platformAllocations": [
           {
             "amount": 500000000000000,
-            "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
+            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "memo": "258"
           }
         ]
       },
@@ -3978,7 +4237,8 @@
         "platformAllocations": [
           {
             "amount": 1500000000000000,
-            "depositOfferID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj"
+            "depositOfferID": "pxYRYqJxsd9G1gU159pQKAXkg5fQogyBAsqypvuqhAzcB7dkD",
+            "memo": "259"
           }
         ]
       },
@@ -3994,7 +4254,9 @@
           {
             "amount": 10000000000000000,
             "nodeID": "NodeID-5APqagKQK2d9cMrtgR2h3bsC4GrU3UkNr",
-            "depositOfferID": "Mc2xe3kHRdAnCbMYhK1p4GhnpJSYbyR47d6upA8Xg98DMpByf"
+            "validatorDuration": 31968000,
+            "depositOfferID": "o8JnmzXWxufz2LFRn22kXHzJ6kq5pK8q8j7USwALajJmaQekV",
+            "memo": "260"
           }
         ]
       }
@@ -4047,11 +4309,11 @@
         "threshold": 1
       },
       {
-        "alias": "X-columbus18euuxjyet4x6lnphvk9dkfw9dpx3pz648cdt64",
+        "alias": "X-columbus134aa7levwh0d0cl90dw8rajg8j6ysrxnwdnv8j",
         "addresses": [
           "X-columbus1ale9unm94g5at8vp2z0ang7l5hc5maugsrrggh"
         ],
-        "threshold": 0
+        "threshold": 1
       },
       {
         "alias": "X-columbus14y7vw9ncnu0wl59amjf6m5dmxsdhvydg37p8ne",

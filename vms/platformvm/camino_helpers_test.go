@@ -144,8 +144,8 @@ func defaultCaminoConfig(postBanff bool) config.Config {
 func newCaminoGenesisWithUTXOs(caminoGenesisConfig api.Camino, genesisUTXOs []api.UTXO) (*api.BuildGenesisArgs, []byte) {
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 
-	caminoGenesisConfig.UTXODeposits = make([]ids.ID, len(genesisUTXOs))
-	caminoGenesisConfig.ValidatorDeposits = make([][]ids.ID, len(keys))
+	caminoGenesisConfig.UTXODeposits = make([]api.UTXODeposit, len(genesisUTXOs))
+	caminoGenesisConfig.ValidatorDeposits = make([][]api.UTXODeposit, len(keys))
 	caminoGenesisConfig.ValidatorConsortiumMembers = make([]ids.ShortID, len(keys))
 
 	genesisValidators := make([]api.PermissionlessValidator, len(keys))
@@ -169,7 +169,7 @@ func newCaminoGenesisWithUTXOs(caminoGenesisConfig api.Camino, genesisUTXOs []ap
 				Address: addr,
 			}},
 		}
-		caminoGenesisConfig.ValidatorDeposits[i] = make([]ids.ID, 1)
+		caminoGenesisConfig.ValidatorDeposits[i] = make([]api.UTXODeposit, 1)
 		caminoGenesisConfig.ValidatorConsortiumMembers[i] = key.Address()
 	}
 
