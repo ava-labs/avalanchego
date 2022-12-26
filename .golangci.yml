@@ -68,6 +68,11 @@ linters-settings:
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#empty-lines
       - name: empty-lines
         disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#string-format
+      - name: string-format
+        disabled: false
+        arguments:
+        - ["fmt.Errorf[0]", "/.*%.*/", "no format directive, use errors.New instead"]
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#struct-tag
       - name: struct-tag
         disabled: false

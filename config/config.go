@@ -77,6 +77,7 @@ var (
 	errCannotWhitelistPrimaryNetwork = errors.New("cannot whitelist primary network")
 	errStakingKeyContentUnset        = fmt.Errorf("%s key not set but %s set", StakingTLSKeyContentKey, StakingCertContentKey)
 	errStakingCertContentUnset       = fmt.Errorf("%s key set but %s not set", StakingTLSKeyContentKey, StakingCertContentKey)
+	errMissingStakingSigningKeyFile  = errors.New("missing staking signing key file")
 	errTracingEndpointEmpty          = fmt.Errorf("%s cannot be empty", TracingEndpointKey)
 )
 
@@ -753,7 +754,7 @@ func getStakingSigner(v *viper.Viper) (*bls.SecretKey, error) {
 	}
 
 	if v.IsSet(StakingSignerKeyPathKey) {
-		return nil, errors.New("missing staking signing key file")
+		return nil, errMissingStakingSigningKeyFile
 	}
 
 	key, err := bls.NewSecretKey()

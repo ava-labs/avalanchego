@@ -6,6 +6,7 @@ package e2e
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -40,11 +41,18 @@ const (
 )
 
 // Env is the global struct containing all we need to test
-var Env = &TestEnvinronment{
-	testEnvironmentConfig: &testEnvironmentConfig{
-		clusterType: Unknown,
-	},
-}
+var (
+	Env = &TestEnvinronment{
+		testEnvironmentConfig: &testEnvironmentConfig{
+			clusterType: Unknown,
+		},
+	}
+
+	errGRPCAndURIsSpecified = errors.New("either network-runner-grpc-endpoint or uris should be specified, not both")
+	errNoKeyFile            = errors.New("test keys file not provided")
+	errUnknownClusterType   = errors.New("unhandled cluster type")
+	errNotNetworkRunnerCLI  = errors.New("not network-runner cli")
+)
 
 type testEnvironmentConfig struct {
 	clusterType               ClusterType
@@ -127,14 +135,14 @@ func (te *TestEnvinronment) ConfigCluster(
 		return nil
 
 	default:
-		return fmt.Errorf("either network-runner-grpc-endpoint or uris should be specified, not both")
+		return errGRPCAndURIsSpecified
 	}
 }
 
 func (te *TestEnvinronment) LoadKeys() error {
 	// load test keys
 	if len(te.testKeysFile) == 0 {
-		return fmt.Errorf("test keys file not provided")
+		return errNoKeyFile
 	}
 	testKeys, err := tests.LoadHexTestKeys(te.testKeysFile)
 	if err != nil {
@@ -175,7 +183,7 @@ func (te *TestEnvinronment) StartCluster() error {
 		return nil // nothing to do, really
 
 	default:
-		return fmt.Errorf("unhandled cluster type")
+		return errUnknownClusterType
 	}
 }
 
@@ -272,7 +280,7 @@ func (te *TestEnvinronment) ShutdownCluster() error {
 
 	runnerCli := te.GetRunnerClient()
 	if runnerCli == nil {
-		return fmt.Errorf("not network-runner cli")
+		return errNotNetworkRunnerCLI
 	}
 
 	tests.Outf("{{red}}shutting down network-runner cluster{{/}}\n")
