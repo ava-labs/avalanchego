@@ -280,7 +280,7 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 		cs.SetMultisigOwner(owner)
 	}
 
-	return nil
+	return s.write(false, 0)
 }
 
 func (cs *caminoState) Load() error {

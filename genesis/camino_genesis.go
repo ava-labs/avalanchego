@@ -264,14 +264,14 @@ func buildPGenesis(config *Config, hrp string, xGenesisBytes []byte, xGenesisDat
 			})
 		}
 
+		allocationAddress, err := address.FormatBech32(hrp, allocation.AVAXAddr.Bytes())
+		if err != nil {
+			return nil, ids.Empty, err
+		}
+
 		for _, platformAllocation := range allocation.PlatformAllocations {
 			if platformAllocation.Amount == 0 {
 				return nil, ids.Empty, errEmptyAllocation
-			}
-
-			allocationAddress, err := address.FormatBech32(hrp, allocation.AVAXAddr.Bytes())
-			if err != nil {
-				return nil, ids.Empty, err
 			}
 
 			allocationMessage, err := formatting.Encode(defaultEncoding, allocation.ETHAddr.Bytes())

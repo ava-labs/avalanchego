@@ -170,7 +170,7 @@ type GetConfigurationReply struct {
 	LockModeBondDeposit bool `json:"lockModeBondDeposit"`
 }
 
-// GetMinStake returns the minimum staking amount in nAVAX.
+// GetConfiguration returns platformVM configuration
 func (s *CaminoService) GetConfiguration(_ *http.Request, _ *struct{}, reply *GetConfigurationReply) error {
 	s.vm.ctx.Log.Debug("Platform: GetConfiguration called")
 
