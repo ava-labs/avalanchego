@@ -324,6 +324,7 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 		Config: config.Config{
 			Chains:                 chains.MockManager{},
 			UptimeLockedCalculator: uptime.NewLockedCalculator(),
+			StakingEnabled:         true,
 			Validators:             vdrs,
 			TxFee:                  defaultTxFee,
 			CreateSubnetTxFee:      100 * defaultTxFee,
@@ -1781,6 +1782,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		timeoutManager,
 		time.Second,
 		set.Set[ids.ID]{},
+		true,
 		set.Set[ids.ID]{},
 		nil,
 		router.HealthConfig{},
