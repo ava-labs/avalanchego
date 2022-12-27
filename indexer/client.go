@@ -104,7 +104,7 @@ func (c *client) GetLastAccepted(ctx context.Context, options ...rpc.Option) (Co
 		Encoding: formatting.Hex,
 	}, &fc, options...)
 	if err != nil {
-		return Container{}, 0, nil
+		return Container{}, 0, err
 	}
 
 	containerBytes, err := formatting.Decode(fc.Encoding, fc.Bytes)
