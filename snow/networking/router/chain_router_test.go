@@ -281,7 +281,7 @@ func TestShutdownTimesOut(t *testing.T) {
 
 // Ensure that a timeout fires if we don't get a response to a request
 func TestRouterTimeout(t *testing.T) {
-	r := require.New(t)
+	require := require.New(t)
 	// Create a timeout manager
 	maxTimeout := 25 * time.Millisecond
 	tm, err := timeout.NewManager(
@@ -296,7 +296,7 @@ func TestRouterTimeout(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	)
-	r.NoError(err)
+	require.NoError(err)
 	go tm.Dispatch()
 
 	// Create a router
@@ -315,7 +315,7 @@ func TestRouterTimeout(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	)
-	r.NoError(err)
+	require.NoError(err)
 
 	// Create bootstrapper, engine and handler
 	var (
@@ -332,7 +332,7 @@ func TestRouterTimeout(t *testing.T) {
 	ctx := snow.DefaultConsensusContextTest()
 	vdrs := validators.NewSet()
 	err = vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
-	r.NoError(err)
+	require.NoError(err)
 
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
@@ -340,7 +340,7 @@ func TestRouterTimeout(t *testing.T) {
 		meter.ContinuousFactory{},
 		time.Second,
 	)
-	r.NoError(err)
+	require.NoError(err)
 
 	handler, err := handler.New(
 		ctx,
@@ -351,7 +351,7 @@ func TestRouterTimeout(t *testing.T) {
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)
-	r.NoError(err)
+	require.NoError(err)
 
 	bootstrapper := &common.BootstrapperTest{
 		BootstrapableTest: common.BootstrapableTest{
@@ -595,15 +595,15 @@ func TestRouterTimeout(t *testing.T) {
 	chainRouter.lock.Lock()
 	defer chainRouter.lock.Unlock()
 
-	r.True(calledGetStateSummaryFrontierFailed)
-	r.True(calledGetAcceptedStateSummaryFailed)
-	r.True(calledGetAcceptedFrontierFailed)
-	r.True(calledGetAcceptedFailed)
-	r.True(calledGetAncestorsFailed)
-	r.True(calledGetFailed)
-	r.True(calledQueryFailed)
-	r.True(calledAppRequestFailed)
-	r.True(calledCrossChainAppRequestFailed)
+	require.True(calledGetStateSummaryFrontierFailed)
+	require.True(calledGetAcceptedStateSummaryFailed)
+	require.True(calledGetAcceptedFrontierFailed)
+	require.True(calledGetAcceptedFailed)
+	require.True(calledGetAncestorsFailed)
+	require.True(calledGetFailed)
+	require.True(calledQueryFailed)
+	require.True(calledAppRequestFailed)
+	require.True(calledCrossChainAppRequestFailed)
 }
 
 func TestRouterClearTimeouts(t *testing.T) {

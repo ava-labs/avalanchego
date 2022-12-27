@@ -39,8 +39,6 @@ func TestMessage(t *testing.T) {
 }
 
 func TestParseMessageJunk(t *testing.T) {
-	require := require.New(t)
-
 	_, err := ParseMessage(utils.RandomBytes(1024))
-	require.Error(err)
+	require.Error(t, err)
 }

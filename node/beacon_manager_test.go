@@ -24,14 +24,14 @@ const numValidators = 5_000
 // Tests that reconnects that mutate the beacon manager's current total stake
 // weight is consistent. Test is not deterministic.
 func TestBeaconManager_DataRace(t *testing.T) {
-	r := require.New(t)
+	require := require.New(t)
 
 	validatorIDs := make([]ids.NodeID, 0, numValidators)
 	validatorSet := validators.NewSet()
 	for i := 0; i < numValidators; i++ {
 		nodeID := ids.GenerateTestNodeID()
 
-		r.NoError(validatorSet.Add(nodeID, nil, ids.Empty, 1))
+		require.NoError(validatorSet.Add(nodeID, nil, ids.Empty, 1))
 		validatorIDs = append(validatorIDs, nodeID)
 	}
 
@@ -66,7 +66,7 @@ func TestBeaconManager_DataRace(t *testing.T) {
 	wg.Wait()
 
 	// we should have a weight of numValidators now
-	r.EqualValues(numValidators, b.numConns)
+	require.EqualValues(numValidators, b.numConns)
 
 	// disconnect numValidators validators
 	wg.Add(numValidators)
@@ -83,5 +83,5 @@ func TestBeaconManager_DataRace(t *testing.T) {
 	wg.Wait()
 
 	// we should a weight of zero now
-	r.Zero(b.numConns)
+	require.Zero(b.numConns)
 }

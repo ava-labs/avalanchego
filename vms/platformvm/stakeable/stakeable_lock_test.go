@@ -63,7 +63,6 @@ func TestLockOutVerify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
@@ -71,7 +70,7 @@ func TestLockOutVerify(t *testing.T) {
 				Locktime:        tt.locktime,
 				TransferableOut: tt.transferableOutF(ctrl),
 			}
-			require.Equal(tt.expectedErr, lockOut.Verify())
+			require.Equal(t, tt.expectedErr, lockOut.Verify())
 		})
 	}
 }
@@ -123,7 +122,6 @@ func TestLockInVerify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
@@ -131,7 +129,7 @@ func TestLockInVerify(t *testing.T) {
 				Locktime:       tt.locktime,
 				TransferableIn: tt.transferableInF(ctrl),
 			}
-			require.Equal(tt.expectedErr, lockOut.Verify())
+			require.Equal(t, tt.expectedErr, lockOut.Verify())
 		})
 	}
 }

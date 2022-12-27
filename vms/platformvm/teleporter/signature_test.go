@@ -95,7 +95,7 @@ func TestSignatureVerification(t *testing.T) {
 		stateF    func(*gomock.Controller) validators.State
 		quorumNum uint64
 		quorumDen uint64
-		msgF      func(require *require.Assertions) *Message
+		msgF      func(*require.Assertions) *Message
 		err       error
 	}{
 		{

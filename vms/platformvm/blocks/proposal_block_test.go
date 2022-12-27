@@ -51,8 +51,8 @@ func TestNewBanffProposalBlock(t *testing.T) {
 	require.NoError(err)
 
 	// Make sure the block and tx are initialized
-	require.NotNil(blk.Bytes())
-	require.NotNil(blk.Tx.Bytes())
+	require.NotEmpty(blk.Bytes())
+	require.NotEmpty(blk.Tx.Bytes())
 	require.NotEqual(ids.Empty, blk.Tx.ID())
 	require.Equal(tx.Bytes(), blk.Tx.Bytes())
 	require.Equal(timestamp, blk.Timestamp())
@@ -92,8 +92,8 @@ func TestNewApricotProposalBlock(t *testing.T) {
 	require.NoError(err)
 
 	// Make sure the block and tx are initialized
-	require.NotNil(blk.Bytes())
-	require.NotNil(blk.Tx.Bytes())
+	require.NotEmpty(blk.Bytes())
+	require.NotEmpty(blk.Tx.Bytes())
 	require.NotEqual(ids.Empty, blk.Tx.ID())
 	require.Equal(tx.Bytes(), blk.Tx.Bytes())
 	require.Equal(parentID, blk.Parent())

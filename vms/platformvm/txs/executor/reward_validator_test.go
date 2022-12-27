@@ -46,14 +46,10 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	txExecutor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
@@ -71,14 +67,10 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require.NoError(err)
 
 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	onAbortState, err = state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
 		OnCommitState: onCommitState,
@@ -93,14 +85,10 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require.NoError(err)
 
 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	onAbortState, err = state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
 		OnCommitState: onCommitState,
@@ -158,14 +146,10 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	txExecutor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
@@ -195,14 +179,10 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require.NoError(err)
 
 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	onAbortState, err = state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
 		OnCommitState: onCommitState,
@@ -240,9 +220,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment( /*postBanff*/ false)
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 	dummyHeight := uint64(1)
 
@@ -312,14 +290,10 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	txExecutor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
@@ -370,9 +344,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment( /*postBanff*/ false)
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 	dummyHeight := uint64(1)
 
@@ -437,14 +409,10 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	txExecutor := ProposalTxExecutor{
 		OnCommitState: onCommitState,

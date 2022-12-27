@@ -29,14 +29,14 @@ func Test_Bits_New(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			r := require.New(t)
+			require := require.New(t)
 			b := NewBits(test.bits...)
 
 			for _, bit := range test.bits {
-				r.True(b.Contains(bit))
+				require.True(b.Contains(bit))
 			}
 
-			r.Equal(test.length, b.Len())
+			require.Equal(test.length, b.Len())
 		})
 	}
 }
@@ -109,7 +109,7 @@ func Test_Bits_AddRemove(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			r := require.New(t)
+			require := require.New(t)
 			b := NewBits()
 
 			for _, add := range test.toAdd {
@@ -121,10 +121,10 @@ func Test_Bits_AddRemove(t *testing.T) {
 			}
 
 			for _, element := range test.expectedElements {
-				r.True(b.Contains(element))
+				require.True(b.Contains(element))
 			}
 
-			r.Equal(test.expectedLen, b.Len())
+			require.Equal(test.expectedLen, b.Len())
 		})
 	}
 }
@@ -183,7 +183,7 @@ func Test_Bits_Union(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			r := require.New(t)
+			require := require.New(t)
 			b := NewBits()
 
 			for _, add := range test.left {
@@ -194,10 +194,10 @@ func Test_Bits_Union(t *testing.T) {
 			}
 
 			for _, element := range test.expected {
-				r.True(b.Contains(element))
+				require.True(b.Contains(element))
 			}
 
-			r.Equal(test.expectedLen, b.Len())
+			require.Equal(test.expectedLen, b.Len())
 		})
 	}
 }
@@ -256,7 +256,7 @@ func Test_Bits_Intersection(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			r := require.New(t)
+			require := require.New(t)
 			left := NewBits()
 			right := NewBits()
 			for _, add := range test.left {
@@ -273,7 +273,7 @@ func Test_Bits_Intersection(t *testing.T) {
 				expected.Add(element)
 			}
 
-			r.ElementsMatch(left.bits.Bits(), expected.bits.Bits())
+			require.ElementsMatch(left.bits.Bits(), expected.bits.Bits())
 		})
 	}
 }
@@ -332,7 +332,7 @@ func Test_Bits_Difference(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			r := require.New(t)
+			require := require.New(t)
 			left := NewBits()
 			right := NewBits()
 			for _, add := range test.left {
@@ -349,7 +349,7 @@ func Test_Bits_Difference(t *testing.T) {
 				expected.Add(element)
 			}
 
-			r.ElementsMatch(left.bits.Bits(), expected.bits.Bits())
+			require.ElementsMatch(left.bits.Bits(), expected.bits.Bits())
 		})
 	}
 }
@@ -374,7 +374,7 @@ func Test_Bits_Clear(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			r := require.New(t)
+			require := require.New(t)
 			b := NewBits()
 
 			for bit := range test.bitset {
@@ -383,7 +383,7 @@ func Test_Bits_Clear(t *testing.T) {
 
 			b.Clear()
 
-			r.Zero(b.Len())
+			require.Zero(b.Len())
 		})
 	}
 }
@@ -407,14 +407,14 @@ func Test_Bits_String(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			r := require.New(t)
+			require := require.New(t)
 			b := NewBits()
 
 			for _, bit := range test.bitset {
 				b.Add(bit)
 			}
 
-			r.Equal(test.expected, b.String())
+			require.Equal(test.expected, b.String())
 		})
 	}
 }
@@ -458,14 +458,14 @@ func Test_Bits_HammingWeight(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			r := require.New(t)
+			require := require.New(t)
 			b := NewBits()
 
 			for _, bit := range test.bitset {
 				b.Add(bit)
 			}
 
-			r.Equal(test.expected, b.HammingWeight())
+			require.Equal(test.expected, b.HammingWeight())
 		})
 	}
 }

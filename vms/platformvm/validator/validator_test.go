@@ -4,8 +4,9 @@
 package validator
 
 import (
-	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -13,14 +14,12 @@ import (
 
 const defaultWeight = 10000
 
-var (
-	errCalculatedSubsetWrong = errors.New("incorrectly calculated whether one duration was subset of other")
-
-	// each key controls an address that has [defaultBalance] AVAX at genesis
-	keys = crypto.BuildTestKeys()
-)
+// each key controls an address that has [defaultBalance] AVAX at genesis
+var keys = crypto.BuildTestKeys()
 
 func TestValidatorBoundedBy(t *testing.T) {
+	require := require.New(t)
+
 	// case 1: a starts, a finishes, b starts, b finishes
 	aStartTime := uint64(0)
 	aEndTIme := uint64(1)
@@ -39,62 +38,54 @@ func TestValidatorBoundedBy(t *testing.T) {
 		End:    bEndTime,
 		Wght:   defaultWeight,
 	}
-
-	if a.BoundedBy(b.StartTime(), b.EndTime()) || b.BoundedBy(a.StartTime(), a.EndTime()) {
-		t.Fatal(errCalculatedSubsetWrong)
-	}
+	require.False(a.BoundedBy(b.StartTime(), b.EndTime()))
+	require.False(b.BoundedBy(a.StartTime(), a.EndTime()))
 
 	// case 2: a starts, b starts, a finishes, b finishes
 	a.Start = 0
 	b.Start = 1
 	a.End = 2
 	b.End = 3
-	if a.BoundedBy(b.StartTime(), b.EndTime()) || b.BoundedBy(a.StartTime(), a.EndTime()) {
-		t.Fatal(errCalculatedSubsetWrong)
-	}
+	require.False(a.BoundedBy(b.StartTime(), b.EndTime()))
+	require.False(b.BoundedBy(a.StartTime(), a.EndTime()))
 
 	// case 3: a starts, b starts, b finishes, a finishes
 	a.Start = 0
 	b.Start = 1
 	b.End = 2
 	a.End = 3
-	if a.BoundedBy(b.StartTime(), b.EndTime()) || !b.BoundedBy(a.StartTime(), a.EndTime()) {
-		t.Fatal(errCalculatedSubsetWrong)
-	}
+	require.False(a.BoundedBy(b.StartTime(), b.EndTime()))
+	require.True(b.BoundedBy(a.StartTime(), a.EndTime()))
 
 	// case 4: b starts, a starts, a finishes, b finishes
 	b.Start = 0
 	a.Start = 1
 	a.End = 2
 	b.End = 3
-	if !a.BoundedBy(b.StartTime(), b.EndTime()) || b.BoundedBy(a.StartTime(), a.EndTime()) {
-		t.Fatal(errCalculatedSubsetWrong)
-	}
+	require.True(a.BoundedBy(b.StartTime(), b.EndTime()))
+	require.False(b.BoundedBy(a.StartTime(), a.EndTime()))
 
 	// case 5: b starts, b finishes, a starts, a finishes
 	b.Start = 0
 	b.End = 1
 	a.Start = 2
 	a.End = 3
-	if a.BoundedBy(b.StartTime(), b.EndTime()) || b.BoundedBy(a.StartTime(), a.EndTime()) {
-		t.Fatal(errCalculatedSubsetWrong)
-	}
+	require.False(a.BoundedBy(b.StartTime(), b.EndTime()))
+	require.False(b.BoundedBy(a.StartTime(), a.EndTime()))
 
 	// case 6: b starts, a starts, b finishes, a finishes
 	b.Start = 0
 	a.Start = 1
 	b.End = 2
 	a.End = 3
-	if a.BoundedBy(b.StartTime(), b.EndTime()) || b.BoundedBy(a.StartTime(), a.EndTime()) {
-		t.Fatal(errCalculatedSubsetWrong)
-	}
+	require.False(a.BoundedBy(b.StartTime(), b.EndTime()))
+	require.False(b.BoundedBy(a.StartTime(), a.EndTime()))
 
 	// case 3: a starts, b starts, b finishes, a finishes
 	a.Start = 0
 	b.Start = 0
 	b.End = 1
 	a.End = 1
-	if !a.BoundedBy(b.StartTime(), b.EndTime()) || !b.BoundedBy(a.StartTime(), a.EndTime()) {
-		t.Fatal(errCalculatedSubsetWrong)
-	}
+	require.True(a.BoundedBy(b.StartTime(), b.EndTime()))
+	require.True(b.BoundedBy(a.StartTime(), a.EndTime()))
 }

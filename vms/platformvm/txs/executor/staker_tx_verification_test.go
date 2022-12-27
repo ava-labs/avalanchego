@@ -531,7 +531,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
@@ -543,7 +542,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			)
 
 			err := verifyAddPermissionlessValidatorTx(backend, state, sTx, tx)
-			require.ErrorIs(err, tt.expectedErr)
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }
