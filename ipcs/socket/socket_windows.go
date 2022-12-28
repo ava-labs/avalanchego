@@ -10,6 +10,7 @@ import (
 	"net"
 
 	"github.com/Microsoft/go-winio"
+
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 

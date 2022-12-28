@@ -132,7 +132,7 @@ func (s *set) Vote(requestID uint32, vdr ids.NodeID, votes []ids.ID) []ids.Uniqu
 	s.log.Verbo("processing votes",
 		zap.Stringer("validator", vdr),
 		zap.Uint32("requestID", requestID),
-		zap.Stringer("votes", ids.SliceStringer(votes)),
+		zap.Stringers("votes", votes),
 	)
 
 	p.Vote(vdr, votes)
