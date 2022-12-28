@@ -377,7 +377,7 @@ message StateSummaryAcceptRequest {
 message StateSummaryAcceptResponse {
   enum Mode {
     MODE_UNSPECIFIED = 0;
-    MODE_STOPPED = 1;
+    MODE_SKIPPED = 1;
     MODE_STATIC = 2;
     MODE_DYNAMIC = 3;
   }

@@ -961,7 +961,7 @@ func (s *summaryClient) Bytes() []byte {
 	return s.bytes
 }
 
-func (s *summaryClient) Accept(ctx context.Context) (block.StateSummaryMode, error) {
+func (s *summaryClient) Accept(ctx context.Context) (block.StateSyncMode, error) {
 	resp, err := s.vm.client.StateSummaryAccept(
 		ctx,
 		&vmpb.StateSummaryAcceptRequest{
@@ -969,7 +969,7 @@ func (s *summaryClient) Accept(ctx context.Context) (block.StateSummaryMode, err
 		},
 	)
 	if err != nil {
-		return block.StateSummaryStopped, err
+		return block.StateSyncSkipped, err
 	}
-	return block.StateSummaryMode(resp.Mode), errCodeToError[resp.Err]
+	return block.StateSyncMode(resp.Mode), errCodeToError[resp.Err]
 }

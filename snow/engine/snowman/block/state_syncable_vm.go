@@ -8,21 +8,23 @@ import (
 	"errors"
 )
 
-// [StateSummaryMode] is returned by the StateSyncableVM one a state summary is passed to it.
-// [StateSummaryMode] indicates whuch type of state sync to use.
-type StateSummaryMode uint8
+// StateSyncMode is returned by the StateSyncableVM when a state summary is
+// passed to it. It indicates which type of state sync the VM is performing.
+type StateSyncMode uint8
 
 const (
-	// [StateSummaryStopped] indicates that state sync won't be really run by the VM
-	// (e.g. state sync is too recent, it's faster to bootstrap missing blocks)
-	StateSummaryStopped StateSummaryMode = iota + 1
+	// StateSyncSkipped indicates that state sync won't be run by the VM. This
+	// may happen if the VM decides that the state sync is too recent and it
+	// would be faster to bootstrap the missing blocks.
+	StateSyncSkipped StateSyncMode = iota + 1
 
-	// [StateSummaryStatic] indicates that engine should stop and wait for state sync
-	// to complete before moving ahead with bootstrapping.
-	StateSummaryStatic
+	// StateSyncStatic indicates that engine should stop and wait for the VM to
+	// complete state syncing before moving ahead with bootstrapping.
+	StateSyncStatic
 
-	// [StateSummaryDynamic] indicates that engine should keep going with bootstrapping
-	// and normal engine mode. State sync will proceed asynchronously in VM.
+	// StateSummaryDynamic indicates that engine should immediately transition
+	// into bootstrapping and then normal consensus. State sync will proceed
+	// asynchronously in the VM.
 	StateSummaryDynamic
 )
 

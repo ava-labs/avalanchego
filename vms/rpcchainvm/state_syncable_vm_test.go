@@ -190,8 +190,8 @@ func acceptStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (plugin.P
 			ssVM.MockStateSyncableVM.EXPECT().ParseStateSummary(gomock.Any(), gomock.Any()).DoAndReturn(
 				func(context.Context, []byte) (block.StateSummary, error) {
 					// setup summary to be accepted before returning it
-					mockedSummary.AcceptF = func(context.Context) (block.StateSummaryMode, error) {
-						return block.StateSummaryStatic, nil
+					mockedSummary.AcceptF = func(context.Context) (block.StateSyncMode, error) {
+						return block.StateSyncStatic, nil
 					}
 					return mockedSummary, nil
 				},
@@ -199,8 +199,8 @@ func acceptStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (plugin.P
 			ssVM.MockStateSyncableVM.EXPECT().ParseStateSummary(gomock.Any(), gomock.Any()).DoAndReturn(
 				func(context.Context, []byte) (block.StateSummary, error) {
 					// setup summary to be skipped before returning it
-					mockedSummary.AcceptF = func(context.Context) (block.StateSummaryMode, error) {
-						return block.StateSummaryStopped, nil
+					mockedSummary.AcceptF = func(context.Context) (block.StateSyncMode, error) {
+						return block.StateSyncSkipped, nil
 					}
 					return mockedSummary, nil
 				},
@@ -208,8 +208,8 @@ func acceptStateSummaryTestPlugin(t *testing.T, loadExpectations bool) (plugin.P
 			ssVM.MockStateSyncableVM.EXPECT().ParseStateSummary(gomock.Any(), gomock.Any()).DoAndReturn(
 				func(context.Context, []byte) (block.StateSummary, error) {
 					// setup summary to fail accept
-					mockedSummary.AcceptF = func(context.Context) (block.StateSummaryMode, error) {
-						return block.StateSummaryStopped, errBrokenConnectionOrSomething
+					mockedSummary.AcceptF = func(context.Context) (block.StateSyncMode, error) {
+						return block.StateSyncSkipped, errBrokenConnectionOrSomething
 					}
 					return mockedSummary, nil
 				},
@@ -243,8 +243,8 @@ func lastAcceptedBlockPostStateSummaryAcceptTestPlugin(t *testing.T, loadExpecta
 			ssVM.MockStateSyncableVM.EXPECT().ParseStateSummary(gomock.Any(), gomock.Any()).DoAndReturn(
 				func(context.Context, []byte) (block.StateSummary, error) {
 					// setup summary to be accepted before returning it
-					mockedSummary.AcceptF = func(context.Context) (block.StateSummaryMode, error) {
-						return block.StateSummaryStatic, nil
+					mockedSummary.AcceptF = func(context.Context) (block.StateSyncMode, error) {
+						return block.StateSyncStatic, nil
 					}
 					return mockedSummary, nil
 				},
@@ -455,12 +455,12 @@ func TestAcceptStateSummary(t *testing.T) {
 	// test status Summary
 	status, err := summary.Accept(context.Background())
 	require.NoError(err)
-	require.Equal(block.StateSummaryStatic, status)
+	require.Equal(block.StateSyncStatic, status)
 
 	// test skipped Summary
 	status, err = summary.Accept(context.Background())
 	require.NoError(err)
-	require.Equal(block.StateSummaryStopped, status)
+	require.Equal(block.StateSyncSkipped, status)
 
 	// test a non-special error.
 	// TODO: retrieve exact error
@@ -502,7 +502,7 @@ func TestLastAcceptedBlockPostStateSummaryAccept(t *testing.T) {
 
 	status, err := summary.Accept(context.Background())
 	require.NoError(err)
-	require.Equal(block.StateSummaryStatic, status)
+	require.Equal(block.StateSyncStatic, status)
 
 	// State Sync accept does not duly update LastAccepted block information
 	// since state sync can complete asynchronously

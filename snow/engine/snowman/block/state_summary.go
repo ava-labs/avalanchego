@@ -21,8 +21,8 @@ type StateSummary interface {
 	// Bytes returns a byte slice than can be used to reconstruct this summary.
 	Bytes() []byte
 
-	// Accept triggers the VM to start state syncing this summary.
+	// Accept triggers the VM to start state syncing to this summary.
 	//
-	// It returns the state sync mode select by the VM
-	Accept(context.Context) (StateSummaryMode, error)
+	// It returns the state sync mode selected by the VM.
+	Accept(context.Context) (StateSyncMode, error)
 }
