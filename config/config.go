@@ -77,6 +77,7 @@ var (
 	errCannotWhitelistPrimaryNetwork = errors.New("cannot whitelist primary network")
 	errStakingKeyContentUnset        = fmt.Errorf("%s key not set but %s set", StakingTLSKeyContentKey, StakingCertContentKey)
 	errStakingCertContentUnset       = fmt.Errorf("%s key set but %s not set", StakingTLSKeyContentKey, StakingCertContentKey)
+	errMissingStakingSigningKeyFile  = errors.New("missing staking signing key file")
 	errTracingEndpointEmpty          = fmt.Errorf("%s cannot be empty", TracingEndpointKey)
 )
 
@@ -333,7 +334,7 @@ func getGossipConfig(v *viper.Viper) sender.GossipConfig {
 	}
 }
 
-func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, error) {
+func getNetworkConfig(v *viper.Viper, stakingEnabled bool, halflife time.Duration) (network.Config, error) {
 	// Set the max number of recent inbound connections upgraded to be
 	// equal to the max number of inbound connections per second.
 	maxInboundConnsPerSec := v.GetFloat64(InboundThrottlerMaxConnsPerSecKey)
@@ -376,6 +377,7 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 		},
 
 		HealthConfig: network.HealthConfig{
+			Enabled:                      stakingEnabled,
 			MaxTimeSinceMsgSent:          v.GetDuration(NetworkHealthMaxTimeSinceMsgSentKey),
 			MaxTimeSinceMsgReceived:      v.GetDuration(NetworkHealthMaxTimeSinceMsgReceivedKey),
 			MaxPortionSendQueueBytesFull: v.GetFloat64(NetworkHealthMaxPortionSendQueueFillKey),
@@ -753,7 +755,7 @@ func getStakingSigner(v *viper.Viper) (*bls.SecretKey, error) {
 	}
 
 	if v.IsSet(StakingSignerKeyPathKey) {
-		return nil, errors.New("missing staking signing key file")
+		return nil, errMissingStakingSigningKeyFile
 	}
 
 	key, err := bls.NewSecretKey()
@@ -1341,7 +1343,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	}
 
 	// Network Config
-	nodeConfig.NetworkConfig, err = getNetworkConfig(v, healthCheckAveragerHalflife)
+	nodeConfig.NetworkConfig, err = getNetworkConfig(v, nodeConfig.EnableStaking, healthCheckAveragerHalflife)
 	if err != nil {
 		return node.Config{}, err
 	}

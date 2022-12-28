@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanchego/network/peer"
+	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 func init() {
@@ -19,20 +19,20 @@ type trackedIP struct {
 	delayLock sync.RWMutex
 	delay     time.Duration
 
-	ip *peer.UnsignedIP
+	ip ips.IPPort
 
 	stopTrackingOnce sync.Once
 	onStopTracking   chan struct{}
 }
 
-func newTrackedIP(ip *peer.UnsignedIP) *trackedIP {
+func newTrackedIP(ip ips.IPPort) *trackedIP {
 	return &trackedIP{
 		ip:             ip,
 		onStopTracking: make(chan struct{}),
 	}
 }
 
-func (ip *trackedIP) trackNewIP(newIP *peer.UnsignedIP) *trackedIP {
+func (ip *trackedIP) trackNewIP(newIP ips.IPPort) *trackedIP {
 	ip.stopTracking()
 	return &trackedIP{
 		delay:          ip.getDelay(),

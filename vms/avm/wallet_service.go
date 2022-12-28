@@ -37,7 +37,7 @@ func (w *WalletService) decided(txID ids.ID) {
 }
 
 func (w *WalletService) issue(txBytes []byte) (ids.ID, error) {
-	tx, err := w.vm.parser.Parse(txBytes)
+	tx, err := w.vm.parser.ParseTx(txBytes)
 	if err != nil {
 		return ids.ID{}, err
 	}

@@ -35,9 +35,7 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 
 	env := newEnvironment(t, ctrl)
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 
 	// setup and store parent block
@@ -93,9 +91,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 
 	env := newEnvironment(t, ctrl)
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 	now := env.clk.Time()
 	env.clk.Set(now)
@@ -339,7 +335,7 @@ func TestBanffStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 	updatedState := blkStateMap[block.ID()].onAcceptState
 	currentValidator, err := updatedState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
-	require.True(currentValidator.TxID == addPendingValidatorTx.ID(), "Added the wrong tx to the validator set")
+	require.Equal(addPendingValidatorTx.ID(), currentValidator.TxID)
 	require.EqualValues(1370, currentValidator.PotentialReward) // See rewards tests to explain why 1370
 
 	_, err = updatedState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
@@ -486,13 +482,11 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.description, func(ts *testing.T) {
-			require := require.New(ts)
+		t.Run(test.description, func(t *testing.T) {
+			require := require.New(t)
 			env := newEnvironment(t, nil)
 			defer func() {
-				if err := shutdownEnvironment(env); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(shutdownEnvironment(env))
 			}()
 			env.config.BanffTime = time.Time{} // activate Banff
 
@@ -591,9 +585,7 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, nil)
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 	env.config.BanffTime = time.Time{} // activate Banff
 
@@ -685,15 +677,12 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 }
 
 func TestBanffStandardBlockWhitelistedSubnet(t *testing.T) {
-	require := require.New(t)
-
 	for _, whitelist := range []bool{true, false} {
-		t.Run(fmt.Sprintf("whitelisted %t", whitelist), func(ts *testing.T) {
+		t.Run(fmt.Sprintf("whitelisted %t", whitelist), func(t *testing.T) {
+			require := require.New(t)
 			env := newEnvironment(t, nil)
 			defer func() {
-				if err := shutdownEnvironment(env); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(shutdownEnvironment(env))
 			}()
 			env.config.BanffTime = time.Time{} // activate Banff
 
@@ -757,9 +746,7 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, nil)
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 	env.config.BanffTime = time.Time{} // activate Banff
 

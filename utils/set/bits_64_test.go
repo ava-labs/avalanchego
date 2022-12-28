@@ -1,12 +1,12 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package ids
+package set
 
 import "testing"
 
-func TestBitSet(t *testing.T) {
-	var bs1 BitSet64
+func TestBits64(t *testing.T) {
+	var bs1 Bits64
 
 	if bs1.Len() != 0 {
 		t.Fatalf("Empty set's len should be 0")
@@ -39,7 +39,7 @@ func TestBitSet(t *testing.T) {
 		t.Fatalf("Set should contain element")
 	}
 
-	var bs2 BitSet64
+	var bs2 Bits64
 
 	bs2.Add(0)
 	if bs2.Len() != 1 {
@@ -104,13 +104,13 @@ func TestBitSet(t *testing.T) {
 		t.Fatalf("Set should contain element")
 	}
 
-	var bs3 BitSet64
+	var bs3 Bits64
 
 	bs3.Add(0)
 	bs3.Add(2)
 	bs3.Add(5)
 
-	var bs4 BitSet64
+	var bs4 Bits64
 
 	bs4.Add(2)
 	bs4.Add(5)
@@ -128,13 +128,13 @@ func TestBitSet(t *testing.T) {
 		t.Fatalf("Wrong set length")
 	}
 
-	var bs5 BitSet64
+	var bs5 Bits64
 
 	bs5.Add(7)
 	bs5.Add(11)
 	bs5.Add(9)
 
-	var bs6 BitSet64
+	var bs6 Bits64
 
 	bs6.Add(9)
 	bs6.Add(11)
@@ -151,8 +151,8 @@ func TestBitSet(t *testing.T) {
 	}
 }
 
-func TestBitSetString(t *testing.T) {
-	var bs BitSet64
+func TestBits64String(t *testing.T) {
+	var bs Bits64
 
 	bs.Add(17)
 

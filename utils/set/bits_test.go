@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package ids
+package set
 
 import (
 	"testing"
@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_BigBitSet_New(t *testing.T) {
+func Test_Bits_New(t *testing.T) {
 	tests := []struct {
 		name   string
 		bits   []int
@@ -29,19 +29,19 @@ func Test_BigBitSet_New(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			r := require.New(t)
-			b := NewBigBitSet(test.bits...)
+			require := require.New(t)
+			b := NewBits(test.bits...)
 
 			for _, bit := range test.bits {
-				r.True(b.Contains(bit))
+				require.True(b.Contains(bit))
 			}
 
-			r.Equal(test.length, b.Len())
+			require.Equal(test.length, b.Len())
 		})
 	}
 }
 
-func Test_BigBitSet_AddRemove(t *testing.T) {
+func Test_Bits_AddRemove(t *testing.T) {
 	tests := []struct {
 		name             string
 		toAdd            []int
@@ -109,8 +109,8 @@ func Test_BigBitSet_AddRemove(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			r := require.New(t)
-			b := NewBigBitSet()
+			require := require.New(t)
+			b := NewBits()
 
 			for _, add := range test.toAdd {
 				b.Add(add)
@@ -121,15 +121,15 @@ func Test_BigBitSet_AddRemove(t *testing.T) {
 			}
 
 			for _, element := range test.expectedElements {
-				r.True(b.Contains(element))
+				require.True(b.Contains(element))
 			}
 
-			r.Equal(test.expectedLen, b.Len())
+			require.Equal(test.expectedLen, b.Len())
 		})
 	}
 }
 
-func Test_BigBitSet_Union(t *testing.T) {
+func Test_Bits_Union(t *testing.T) {
 	tests := []struct {
 		name        string
 		left        []int
@@ -183,8 +183,8 @@ func Test_BigBitSet_Union(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			r := require.New(t)
-			b := NewBigBitSet()
+			require := require.New(t)
+			b := NewBits()
 
 			for _, add := range test.left {
 				b.Add(add)
@@ -194,15 +194,15 @@ func Test_BigBitSet_Union(t *testing.T) {
 			}
 
 			for _, element := range test.expected {
-				r.True(b.Contains(element))
+				require.True(b.Contains(element))
 			}
 
-			r.Equal(test.expectedLen, b.Len())
+			require.Equal(test.expectedLen, b.Len())
 		})
 	}
 }
 
-func Test_BigBitSet_Intersection(t *testing.T) {
+func Test_Bits_Intersection(t *testing.T) {
 	tests := []struct {
 		name        string
 		left        []int
@@ -256,9 +256,9 @@ func Test_BigBitSet_Intersection(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			r := require.New(t)
-			left := NewBigBitSet()
-			right := NewBigBitSet()
+			require := require.New(t)
+			left := NewBits()
+			right := NewBits()
 			for _, add := range test.left {
 				left.Add(add)
 			}
@@ -268,17 +268,17 @@ func Test_BigBitSet_Intersection(t *testing.T) {
 
 			left.Intersection(right)
 
-			expected := NewBigBitSet()
+			expected := NewBits()
 			for _, element := range test.expected {
 				expected.Add(element)
 			}
 
-			r.ElementsMatch(left.bits.Bits(), expected.bits.Bits())
+			require.ElementsMatch(left.bits.Bits(), expected.bits.Bits())
 		})
 	}
 }
 
-func Test_BigBitSet_Difference(t *testing.T) {
+func Test_Bits_Difference(t *testing.T) {
 	tests := []struct {
 		name        string
 		left        []int
@@ -332,9 +332,9 @@ func Test_BigBitSet_Difference(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			r := require.New(t)
-			left := NewBigBitSet()
-			right := NewBigBitSet()
+			require := require.New(t)
+			left := NewBits()
+			right := NewBits()
 			for _, add := range test.left {
 				left.Add(add)
 			}
@@ -344,17 +344,17 @@ func Test_BigBitSet_Difference(t *testing.T) {
 
 			left.Difference(right)
 
-			expected := NewBigBitSet()
+			expected := NewBits()
 			for _, element := range test.expected {
 				expected.Add(element)
 			}
 
-			r.ElementsMatch(left.bits.Bits(), expected.bits.Bits())
+			require.ElementsMatch(left.bits.Bits(), expected.bits.Bits())
 		})
 	}
 }
 
-func Test_BigBitSet_Clear(t *testing.T) {
+func Test_Bits_Clear(t *testing.T) {
 	tests := []struct {
 		name   string
 		bitset []int
@@ -374,8 +374,8 @@ func Test_BigBitSet_Clear(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			r := require.New(t)
-			b := NewBigBitSet()
+			require := require.New(t)
+			b := NewBits()
 
 			for bit := range test.bitset {
 				b.Add(bit)
@@ -383,12 +383,12 @@ func Test_BigBitSet_Clear(t *testing.T) {
 
 			b.Clear()
 
-			r.Zero(b.Len())
+			require.Zero(b.Len())
 		})
 	}
 }
 
-func Test_BigBitSet_String(t *testing.T) {
+func Test_Bits_String(t *testing.T) {
 	tests := []struct {
 		name     string
 		bitset   []int
@@ -407,19 +407,19 @@ func Test_BigBitSet_String(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			r := require.New(t)
-			b := NewBigBitSet()
+			require := require.New(t)
+			b := NewBits()
 
 			for _, bit := range test.bitset {
 				b.Add(bit)
 			}
 
-			r.Equal(test.expected, b.String())
+			require.Equal(test.expected, b.String())
 		})
 	}
 }
 
-func Test_BigBitSet_HammingWeight(t *testing.T) {
+func Test_Bits_HammingWeight(t *testing.T) {
 	tests := []struct {
 		name     string
 		bitset   []int
@@ -458,19 +458,19 @@ func Test_BigBitSet_HammingWeight(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			r := require.New(t)
-			b := NewBigBitSet()
+			require := require.New(t)
+			b := NewBits()
 
 			for _, bit := range test.bitset {
 				b.Add(bit)
 			}
 
-			r.Equal(test.expected, b.HammingWeight())
+			require.Equal(test.expected, b.HammingWeight())
 		})
 	}
 }
 
-func Test_BigBitSet_Bytes(t *testing.T) {
+func Test_Bits_Bytes(t *testing.T) {
 	require := require.New(t)
 
 	type test struct {
@@ -495,9 +495,9 @@ func Test_BigBitSet_Bytes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := NewBigBitSet(tt.elts...)
+			b := NewBits(tt.elts...)
 			bytes := b.Bytes()
-			fromBytes := BigBitSetFromBytes(bytes)
+			fromBytes := BitsFromBytes(bytes)
 
 			require.Equal(len(tt.elts), fromBytes.HammingWeight())
 			for _, elt := range tt.elts {

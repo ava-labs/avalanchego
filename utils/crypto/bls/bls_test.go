@@ -232,7 +232,7 @@ func TestAggregation(t *testing.T) {
 
 				return nil, sigs, msg
 			},
-			expectedPubKeyAggError: errNoPublicKeys,
+			expectedPubKeyAggError: ErrNoPublicKeys,
 			expectedValid:          false,
 		},
 		{

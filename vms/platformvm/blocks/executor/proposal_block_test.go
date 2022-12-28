@@ -38,9 +38,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 
 	env := newEnvironment(t, ctrl)
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 
 	// create apricotParentBlk. It's a standard one for simplicity
@@ -150,9 +148,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 
 	env := newEnvironment(t, ctrl)
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 	env.clk.Set(defaultGenesisTime)
 	env.config.BanffTime = time.Time{} // activate Banff
@@ -551,13 +547,11 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.description, func(ts *testing.T) {
-			require := require.New(ts)
+		t.Run(test.description, func(t *testing.T) {
+			require := require.New(t)
 			env := newEnvironment(t, nil)
 			defer func() {
-				if err := shutdownEnvironment(env); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(shutdownEnvironment(env))
 			}()
 
 			env.config.BanffTime = time.Time{} // activate Banff
@@ -705,9 +699,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, nil)
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 	env.config.BanffTime = time.Time{} // activate Banff
 
@@ -840,15 +832,12 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 }
 
 func TestBanffProposalBlockWhitelistedSubnet(t *testing.T) {
-	require := require.New(t)
-
 	for _, whitelist := range []bool{true, false} {
 		t.Run(fmt.Sprintf("whitelisted %t", whitelist), func(ts *testing.T) {
+			require := require.New(t)
 			env := newEnvironment(t, nil)
 			defer func() {
-				if err := shutdownEnvironment(env); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(shutdownEnvironment(env))
 			}()
 			env.config.BanffTime = time.Time{} // activate Banff
 
@@ -952,9 +941,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, nil)
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 	env.config.BanffTime = time.Time{} // activate Banff
 
@@ -1135,9 +1122,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, nil)
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 	env.config.BanffTime = time.Time{} // activate Banff
 

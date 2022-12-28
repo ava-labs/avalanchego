@@ -74,6 +74,7 @@ type ChainRouter struct {
 	// invariant: if a node is benched on any chain, it is treated as disconnected on all chains
 	benched        map[ids.NodeID]set.Set[ids.ID]
 	criticalChains set.Set[ids.ID]
+	stakingEnabled bool
 	onFatal        func(exitCode int)
 	metrics        *routerMetrics
 	// Parameters for doing health checks
@@ -93,6 +94,7 @@ func (cr *ChainRouter) Initialize(
 	timeoutManager timeout.Manager,
 	closeTimeout time.Duration,
 	criticalChains set.Set[ids.ID],
+	stakingEnabled bool,
 	whitelistedSubnets set.Set[ids.ID],
 	onFatal func(exitCode int),
 	healthConfig HealthConfig,
@@ -105,6 +107,7 @@ func (cr *ChainRouter) Initialize(
 	cr.closeTimeout = closeTimeout
 	cr.benched = make(map[ids.NodeID]set.Set[ids.ID])
 	cr.criticalChains = criticalChains
+	cr.stakingEnabled = stakingEnabled
 	cr.onFatal = onFatal
 	cr.timedRequests = linkedhashmap.New[ids.RequestID, requestEntry]()
 	cr.peers = make(map[ids.NodeID]*peer)
@@ -357,11 +360,21 @@ func (cr *ChainRouter) AddChain(ctx context.Context, chain handler.Handler) {
 	// Notify connected validators
 	subnetID := chain.Context().SubnetID
 	for validatorID, peer := range cr.peers {
-		// If this validator is benched on any chain, treat them as disconnected on all chains
-		if _, benched := cr.benched[validatorID]; !benched && peer.trackedSubnets.Contains(subnetID) {
-			msg := message.InternalConnected(validatorID, peer.version)
-			chain.Push(ctx, msg)
+		// If this validator is benched on any chain, treat them as disconnected
+		// on all chains
+		_, benched := cr.benched[validatorID]
+		if benched {
+			continue
 		}
+
+		// If this peer isn't running this chain, then we shouldn't mark them as
+		// connected
+		if !peer.trackedSubnets.Contains(subnetID) && cr.stakingEnabled {
+			continue
+		}
+
+		msg := message.InternalConnected(validatorID, peer.version)
+		chain.Push(ctx, msg)
 	}
 
 	// When we register the P-chain, we mark ourselves as connected on all of
@@ -405,11 +418,20 @@ func (cr *ChainRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Applica
 
 	msg := message.InternalConnected(nodeID, nodeVersion)
 
-	// TODO: fire up an event when validator state changes i.e when they leave set, disconnect.
-	// we cannot put a subnet-only validator check here since Disconnected would not be handled properly.
-	for _, chain := range cr.chains {
-		if subnetID == chain.Context().SubnetID {
-			chain.Push(context.TODO(), msg)
+	// TODO: fire up an event when validator state changes i.e when they leave
+	// set, disconnect. we cannot put a subnet-only validator check here since
+	// Disconnected would not be handled properly.
+	//
+	// When staking is disabled, we only want this clause to happen once.
+	// Therefore, we only update the chains during the connection of the primary
+	// network, which is guaranteed to happen for every peer.
+	if cr.stakingEnabled || subnetID == constants.PrimaryNetworkID {
+		for _, chain := range cr.chains {
+			// If staking is disabled, send a Connected message to every chain
+			// when connecting to the primary network
+			if subnetID == chain.Context().SubnetID || !cr.stakingEnabled {
+				chain.Push(context.TODO(), msg)
+			}
 		}
 	}
 
@@ -429,10 +451,12 @@ func (cr *ChainRouter) Disconnected(nodeID ids.NodeID) {
 
 	msg := message.InternalDisconnected(nodeID)
 
-	// TODO: fire up an event when validator state changes i.e when they leave set, disconnect.
-	// we cannot put a subnet-only validator check here since if a validator connects then it leaves validator-set, it would not be disconnected properly.
+	// TODO: fire up an event when validator state changes i.e when they leave
+	// set, disconnect. we cannot put a subnet-only validator check here since
+	// if a validator connects then it leaves validator-set, it would not be
+	// disconnected properly.
 	for _, chain := range cr.chains {
-		if peer.trackedSubnets.Contains(chain.Context().SubnetID) {
+		if peer.trackedSubnets.Contains(chain.Context().SubnetID) || !cr.stakingEnabled {
 			chain.Push(context.TODO(), msg)
 		}
 	}
@@ -457,7 +481,7 @@ func (cr *ChainRouter) Benched(chainID ids.ID, nodeID ids.NodeID) {
 	msg := message.InternalDisconnected(nodeID)
 
 	for _, chain := range cr.chains {
-		if peer.trackedSubnets.Contains(chain.Context().SubnetID) {
+		if peer.trackedSubnets.Contains(chain.Context().SubnetID) || !cr.stakingEnabled {
 			chain.Push(context.TODO(), msg)
 		}
 	}
@@ -487,7 +511,7 @@ func (cr *ChainRouter) Unbenched(chainID ids.ID, nodeID ids.NodeID) {
 	msg := message.InternalConnected(nodeID, peer.version)
 
 	for _, chain := range cr.chains {
-		if peer.trackedSubnets.Contains(chain.Context().SubnetID) {
+		if peer.trackedSubnets.Contains(chain.Context().SubnetID) || !cr.stakingEnabled {
 			chain.Push(context.TODO(), msg)
 		}
 	}

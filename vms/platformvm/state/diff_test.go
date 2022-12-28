@@ -21,7 +21,6 @@ import (
 )
 
 func TestDiffMissingState(t *testing.T) {
-	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -31,7 +30,7 @@ func TestDiffMissingState(t *testing.T) {
 	versions.EXPECT().GetState(parentID).Times(1).Return(nil, false)
 
 	_, err := NewDiff(parentID, versions)
-	require.ErrorIs(err, ErrMissingParentState)
+	require.ErrorIs(t, err, ErrMissingParentState)
 }
 
 func TestDiffCreation(t *testing.T) {
@@ -318,8 +317,8 @@ func TestDiffChain(t *testing.T) {
 	gotChains, err := d.GetChains(subnetID)
 	require.NoError(err)
 	require.Len(gotChains, 2)
-	require.Equal(gotChains[0], parentStateCreateChainTx)
-	require.Equal(gotChains[1], createChainTx)
+	require.Equal(parentStateCreateChainTx, gotChains[0])
+	require.Equal(createChainTx, gotChains[1])
 }
 
 func TestDiffTx(t *testing.T) {

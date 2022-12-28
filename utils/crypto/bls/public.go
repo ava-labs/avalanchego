@@ -12,9 +12,9 @@ import (
 const PublicKeyLen = blst.BLST_P1_COMPRESS_BYTES
 
 var (
+	ErrNoPublicKeys               = errors.New("no public keys")
 	errFailedPublicKeyDecompress  = errors.New("couldn't decompress public key")
 	errInvalidPublicKey           = errors.New("invalid public key")
-	errNoPublicKeys               = errors.New("no public keys")
 	errFailedPublicKeyAggregation = errors.New("couldn't aggregate public keys")
 )
 
@@ -46,7 +46,7 @@ func PublicKeyFromBytes(pkBytes []byte) (*PublicKey, error) {
 // Invariant: all [pks] have been validated.
 func AggregatePublicKeys(pks []*PublicKey) (*PublicKey, error) {
 	if len(pks) == 0 {
-		return nil, errNoPublicKeys
+		return nil, ErrNoPublicKeys
 	}
 
 	var agg AggregatePublicKey

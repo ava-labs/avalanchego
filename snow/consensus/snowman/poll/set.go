@@ -86,7 +86,7 @@ func NewSet(
 
 // Add to the current set of polls
 // Returns true if the poll was registered correctly and the network sample
-//         should be made.
+// should be made.
 func (s *set) Add(requestID uint32, vdrs ids.NodeIDBag) bool {
 	if _, exists := s.polls.Get(requestID); exists {
 		s.log.Debug("dropping poll",

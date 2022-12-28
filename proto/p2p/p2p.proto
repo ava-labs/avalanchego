@@ -120,10 +120,24 @@ message PeerList {
   repeated ClaimedIpPort claimed_ip_ports = 1;
 }
 
+// "peer_ack" is sent in response to a "peer_list" message. The "tx_id" should
+// correspond to a "tx_id" in the "peer_list" message. The sender should set
+// "timestamp" to be the latest known timestamp of a signed IP corresponding to
+// the nodeID of "tx_id".
+//
+// Upon receipt, the "tx_id" and "timestamp" will determine if the receiptent
+// can forgo future gossip of the node's IP to the sender of this message.
+message PeerAck {
+  bytes tx_id = 1;
+  uint64 timestamp = 2;
+}
+
 // Message that responds to a peer_list message containing the AddValidatorTxIDs
 // from the peer_list message that we currently have in our validator set.
 message PeerListAck {
-  repeated bytes tx_ids = 1;
+  reserved 1; // deprecated; used to be tx_ids
+
+  repeated PeerAck peer_acks = 2;
 }
 
 message GetStateSummaryFrontier {

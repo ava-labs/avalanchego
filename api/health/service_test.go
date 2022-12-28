@@ -37,7 +37,7 @@ func TestServiceResponses(t *testing.T) {
 	require.NoError(err)
 
 	{
-		reply := APIHealthReply{}
+		reply := APIReply{}
 		err = s.Readiness(nil, nil, &reply)
 		require.NoError(err)
 
@@ -48,7 +48,7 @@ func TestServiceResponses(t *testing.T) {
 	}
 
 	{
-		reply := APIHealthReply{}
+		reply := APIReply{}
 		err = s.Health(nil, nil, &reply)
 		require.NoError(err)
 
@@ -59,7 +59,7 @@ func TestServiceResponses(t *testing.T) {
 	}
 
 	{
-		reply := APIHealthReply{}
+		reply := APIReply{}
 		err = s.Liveness(nil, nil, &reply)
 		require.NoError(err)
 
@@ -77,7 +77,7 @@ func TestServiceResponses(t *testing.T) {
 	awaitLiveness(h, true)
 
 	{
-		reply := APIHealthReply{}
+		reply := APIReply{}
 		err = s.Readiness(nil, nil, &reply)
 		require.NoError(err)
 
@@ -89,7 +89,7 @@ func TestServiceResponses(t *testing.T) {
 	}
 
 	{
-		reply := APIHealthReply{}
+		reply := APIReply{}
 		err = s.Health(nil, nil, &reply)
 		require.NoError(err)
 
@@ -101,7 +101,7 @@ func TestServiceResponses(t *testing.T) {
 	}
 
 	{
-		reply := APIHealthReply{}
+		reply := APIReply{}
 		err = s.Liveness(nil, nil, &reply)
 		require.NoError(err)
 

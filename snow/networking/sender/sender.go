@@ -335,7 +335,7 @@ func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 			zap.Stringer("messageOp", message.AcceptedStateSummaryOp),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
-			zap.Stringer("summaryIDs", ids.SliceStringer(summaryIDs)),
+			zap.Stringers("summaryIDs", summaryIDs),
 			zap.Error(err),
 		)
 		return
@@ -356,7 +356,7 @@ func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
-			zap.Stringer("summaryIDs", ids.SliceStringer(summaryIDs)),
+			zap.Stringers("summaryIDs", summaryIDs),
 		)
 	}
 }
@@ -467,7 +467,7 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 			zap.Stringer("messageOp", message.AcceptedFrontierOp),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
-			zap.Stringer("containerIDs", ids.SliceStringer(containerIDs)),
+			zap.Stringers("containerIDs", containerIDs),
 			zap.Error(err),
 		)
 		return
@@ -488,7 +488,7 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
-			zap.Stringer("containerIDs", ids.SliceStringer(containerIDs)),
+			zap.Stringers("containerIDs", containerIDs),
 		)
 	}
 }
@@ -558,7 +558,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 			zap.Stringer("messageOp", message.GetAcceptedOp),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
-			zap.Stringer("containerIDs", ids.SliceStringer(containerIDs)),
+			zap.Stringers("containerIDs", containerIDs),
 			zap.Error(err),
 		)
 	}
@@ -570,7 +570,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("chainID", s.ctx.ChainID),
 				zap.Uint32("requestID", requestID),
-				zap.Stringer("containerIDs", ids.SliceStringer(containerIDs)),
+				zap.Stringers("containerIDs", containerIDs),
 			)
 		}
 	}
@@ -597,7 +597,7 @@ func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 			zap.Stringer("messageOp", message.AcceptedOp),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
-			zap.Stringer("containerIDs", ids.SliceStringer(containerIDs)),
+			zap.Stringers("containerIDs", containerIDs),
 			zap.Error(err),
 		)
 		return
@@ -618,7 +618,7 @@ func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
-			zap.Stringer("containerIDs", ids.SliceStringer(containerIDs)),
+			zap.Stringers("containerIDs", containerIDs),
 		)
 	}
 }
@@ -1135,7 +1135,7 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 			zap.Stringer("messageOp", message.ChitsOp),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
-			zap.Stringer("containerIDs", ids.SliceStringer(votes)),
+			zap.Stringers("containerIDs", votes),
 			zap.Error(err),
 		)
 		return
@@ -1156,7 +1156,7 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
-			zap.Stringer("containerIDs", ids.SliceStringer(votes)),
+			zap.Stringers("containerIDs", votes),
 		)
 	}
 }

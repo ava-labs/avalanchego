@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/cb58"
@@ -135,17 +134,4 @@ func (id ID) MarshalText() ([]byte, error) {
 
 func (id ID) Less(other ID) bool {
 	return bytes.Compare(id[:], other[:]) < 0
-}
-
-type SliceStringer []ID
-
-func (s SliceStringer) String() string {
-	var strs strings.Builder
-	for i, id := range s {
-		if i != 0 {
-			_, _ = strs.WriteString(", ")
-		}
-		_, _ = strs.WriteString(id.String())
-	}
-	return strs.String()
 }

@@ -102,7 +102,7 @@ type Topological struct {
 
 type kahnNode struct {
 	inDegree int
-	votes    ids.BitSet64
+	votes    set.Bits64
 }
 
 func (ta *Topological) Initialize(
@@ -238,7 +238,7 @@ func (ta *Topological) RecordPoll(ctx context.Context, responses ids.UniqueBag) 
 	// If it isn't possible to have alpha votes for any transaction, then we can
 	// just reset the confidence values in the conflict graph and not perform
 	// any traversals.
-	partialVotes := ids.BitSet64(0)
+	partialVotes := set.Bits64(0)
 	for vote := range responses {
 		votes := responses.GetSet(vote)
 		partialVotes.Union(votes)
@@ -485,7 +485,7 @@ func (ta *Topological) pushVotes(ctx context.Context) (ids.Bag, error) {
 // I now update all my ancestors
 // If any of my parents are rejected, reject myself
 // If I'm preferred, remove all my ancestors from the preferred frontier, add
-//     myself to the preferred frontier
+// myself to the preferred frontier
 // If all my parents are accepted and I'm acceptable, accept myself
 func (ta *Topological) update(ctx context.Context, vtx Vertex) error {
 	vtxID := vtx.ID()

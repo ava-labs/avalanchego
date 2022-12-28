@@ -33,12 +33,10 @@ func TestHandleTx(t *testing.T) {
 }
 
 func TestNoopHandler(t *testing.T) {
-	require := require.New(t)
-
 	handler := NoopHandler{
 		Log: logging.NoLog{},
 	}
 
 	err := handler.HandleTx(ids.EmptyNodeID, 0, nil)
-	require.NoError(err)
+	require.NoError(t, err)
 }

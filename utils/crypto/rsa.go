@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
+const rsaSize = 3072
+
 var (
 	errWrongKeyType = errors.New("wrong key type")
 
@@ -21,8 +23,6 @@ var (
 	_ PublicKey  = (*PublicKeyRSA)(nil)
 	_ PrivateKey = (*PrivateKeyRSA)(nil)
 )
-
-const rsaSize = 3072
 
 type FactoryRSA struct{}
 

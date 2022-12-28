@@ -71,7 +71,7 @@ func (s *txState) GetTx(txID ids.ID) (*txs.Tx, error) {
 	}
 
 	// The key was in the database
-	tx, err := s.parser.ParseGenesis(txBytes)
+	tx, err := s.parser.ParseGenesisTx(txBytes)
 	if err != nil {
 		return nil, err
 	}

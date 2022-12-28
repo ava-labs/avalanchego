@@ -37,15 +37,12 @@ func TestLongerDurationBonus(t *testing.T) {
 		r := c.Calculate(shortDuration, shortBalance, 359*units.MegaAvax+shortBalance)
 		shortBalance += r
 	}
-	r := c.Calculate(totalDuration%shortDuration, shortBalance, 359*units.MegaAvax+shortBalance)
-	shortBalance += r
+	reward := c.Calculate(totalDuration%shortDuration, shortBalance, 359*units.MegaAvax+shortBalance)
+	shortBalance += reward
 
 	longBalance := units.KiloAvax
 	longBalance += c.Calculate(totalDuration, longBalance, 359*units.MegaAvax+longBalance)
-
-	if shortBalance >= longBalance {
-		t.Fatalf("should promote stakers to stake longer")
-	}
+	require.Less(t, shortBalance, longBalance, "should promote stakers to stake longer")
 }
 
 func TestRewards(t *testing.T) {
@@ -126,21 +123,17 @@ func TestRewards(t *testing.T) {
 			test.expectedReward,
 		)
 		t.Run(name, func(t *testing.T) {
-			r := c.Calculate(
+			reward := c.Calculate(
 				test.duration,
 				test.stakeAmount,
 				test.existingAmount,
 			)
-			if r != test.expectedReward {
-				t.Fatalf("expected %d; got %d", test.expectedReward, r)
-			}
+			require.Equal(t, test.expectedReward, reward)
 		})
 	}
 }
 
 func TestRewardsOverflow(t *testing.T) {
-	require := require.New(t)
-
 	var (
 		maxSupply     uint64 = math.MaxUint64
 		initialSupply uint64 = 1
@@ -151,17 +144,15 @@ func TestRewardsOverflow(t *testing.T) {
 		MintingPeriod:      defaultMinStakingDuration,
 		SupplyCap:          maxSupply,
 	})
-	rewards := c.Calculate(
+	reward := c.Calculate(
 		defaultMinStakingDuration,
 		maxSupply, // The staked amount is larger than the current supply
 		initialSupply,
 	)
-	require.Equal(maxSupply-initialSupply, rewards)
+	require.Equal(t, maxSupply-initialSupply, reward)
 }
 
 func TestRewardsMint(t *testing.T) {
-	require := require.New(t)
-
 	var (
 		maxSupply     uint64 = 1000
 		initialSupply uint64 = 1
@@ -177,5 +168,5 @@ func TestRewardsMint(t *testing.T) {
 		maxSupply, // The staked amount is larger than the current supply
 		initialSupply,
 	)
-	require.Equal(maxSupply-initialSupply, rewards)
+	require.Equal(t, maxSupply-initialSupply, rewards)
 }

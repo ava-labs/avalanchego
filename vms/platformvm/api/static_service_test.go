@@ -19,12 +19,12 @@ import (
 const testNetworkID = 10 // To be used in tests
 
 func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
+	require := require.New(t)
 	nodeID := ids.NodeID{1, 2, 3}
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	addr, err := address.FormatBech32(hrp, nodeID.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+
 	utxo := UTXO{
 		Address: addr,
 		Amount:  0,
@@ -59,18 +59,16 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 	reply := BuildGenesisReply{}
 
 	ss := StaticService{}
-	if err := ss.BuildGenesis(nil, &args, &reply); err == nil {
-		t.Fatalf("Should have errored due to an invalid balance")
-	}
+	require.Error(ss.BuildGenesis(nil, &args, &reply), "should have errored due to an invalid balance")
 }
 
 func TestBuildGenesisInvalidAmount(t *testing.T) {
+	require := require.New(t)
 	nodeID := ids.NodeID{1, 2, 3}
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	addr, err := address.FormatBech32(hrp, nodeID.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+
 	utxo := UTXO{
 		Address: addr,
 		Amount:  123456789,
@@ -105,18 +103,16 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 	reply := BuildGenesisReply{}
 
 	ss := StaticService{}
-	if err := ss.BuildGenesis(nil, &args, &reply); err == nil {
-		t.Fatalf("Should have errored due to an invalid amount")
-	}
+	require.Error(ss.BuildGenesis(nil, &args, &reply), "should have errored due to an invalid amount")
 }
 
 func TestBuildGenesisInvalidEndtime(t *testing.T) {
+	require := require.New(t)
 	nodeID := ids.NodeID{1, 2, 3}
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	addr, err := address.FormatBech32(hrp, nodeID.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+
 	utxo := UTXO{
 		Address: addr,
 		Amount:  123456789,
@@ -152,18 +148,16 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 	reply := BuildGenesisReply{}
 
 	ss := StaticService{}
-	if err := ss.BuildGenesis(nil, &args, &reply); err == nil {
-		t.Fatalf("Should have errored due to an invalid end time")
-	}
+	require.Error(ss.BuildGenesis(nil, &args, &reply), "should have errored due to an invalid end time")
 }
 
 func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
+	require := require.New(t)
 	nodeID := ids.NodeID{1}
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	addr, err := address.FormatBech32(hrp, nodeID.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+
 	utxo := UTXO{
 		Address: addr,
 		Amount:  123456789,
@@ -234,23 +228,16 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	reply := BuildGenesisReply{}
 
 	ss := StaticService{}
-	if err := ss.BuildGenesis(nil, &args, &reply); err != nil {
-		t.Fatalf("BuildGenesis should not have errored but got error: %s", err)
-	}
+	require.NoError(ss.BuildGenesis(nil, &args, &reply))
 
 	genesisBytes, err := formatting.Decode(reply.Encoding, reply.Bytes)
-	if err != nil {
-		t.Fatalf("Problem decoding BuildGenesis response: %s", err)
-	}
+	require.NoError(err)
 
 	genesis, err := genesis.Parse(genesisBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+
 	validators := genesis.Validators
-	if len(validators) != 3 {
-		t.Fatal("Validators should contain 3 validators")
-	}
+	require.Len(validators, 3)
 }
 
 func TestUTXOLess(t *testing.T) {
@@ -335,8 +322,7 @@ func TestUTXOLess(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-			require.Equal(tt.expected, tt.utxo1.Less(tt.utxo2))
+			require.Equal(t, tt.expected, tt.utxo1.Less(tt.utxo2))
 		})
 	}
 }

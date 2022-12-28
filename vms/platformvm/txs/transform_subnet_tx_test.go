@@ -405,18 +405,16 @@ func TestTransformSubnetTxSyntacticVerify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
 			tx := tt.txFunc(ctrl)
 			err := tx.SyntacticVerify(ctx)
-			require.ErrorIs(err, tt.err)
+			require.ErrorIs(t, err, tt.err)
 		})
 	}
 
 	t.Run("invalid BaseTx", func(t *testing.T) {
-		require := require.New(t)
 		tx := &TransformSubnetTx{
 			BaseTx:                   invalidBaseTx,
 			Subnet:                   ids.GenerateTestID(),
@@ -435,6 +433,6 @@ func TestTransformSubnetTxSyntacticVerify(t *testing.T) {
 			UptimeRequirement:        reward.PercentDenominator,
 		}
 		err := tx.SyntacticVerify(ctx)
-		require.Error(err)
+		require.Error(t, err)
 	})
 }

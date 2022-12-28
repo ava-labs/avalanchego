@@ -126,7 +126,7 @@ func (r *upnpRouter) MapPort(
 ) error {
 	ip, err := r.localIP()
 	if err != nil {
-		return nil
+		return err
 	}
 	lifetime := duration.Seconds()
 	if lifetime < 0 || lifetime > math.MaxUint32 {

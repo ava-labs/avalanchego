@@ -104,7 +104,7 @@ func (vm *VM) HealthCheck(context.Context) (interface{}, error) {
 		}
 	}
 
-	if len(errorReasons) == 0 {
+	if len(errorReasons) == 0 || !vm.StakingEnabled {
 		return details, nil
 	}
 	return details, fmt.Errorf("platform layer is unhealthy err: %w, details: %s",

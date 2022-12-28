@@ -29,8 +29,6 @@ func TestUnsignedMessage(t *testing.T) {
 }
 
 func TestParseUnsignedMessageJunk(t *testing.T) {
-	require := require.New(t)
-
 	_, err := ParseUnsignedMessage(utils.RandomBytes(1024))
-	require.Error(err)
+	require.Error(t, err)
 }

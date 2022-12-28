@@ -13,11 +13,9 @@ import (
 )
 
 func TestSigner(t *testing.T) {
-	require := require.New(t)
-
 	for _, test := range SignerTests {
 		sk, err := bls.NewSecretKey()
-		require.NoError(err)
+		require.NoError(t, err)
 
 		chainID := ids.GenerateTestID()
 		s := NewSigner(sk, chainID)

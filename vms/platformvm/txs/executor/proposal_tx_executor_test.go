@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -41,25 +43,20 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 			ids.ShortEmpty,
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		staker, err := state.NewCurrentStaker(
 			tx.ID(),
 			tx.Unsigned.(*txs.AddValidatorTx),
 			0,
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		target.state.PutCurrentValidator(staker)
 		target.state.AddTx(tx, status.Committed)
 		target.state.SetHeight(dummyHeight)
-		if err := target.state.Commit(); err != nil {
-			t.Fatal(err)
-		}
+		err = target.state.Commit()
+		require.NoError(t, err)
 	}
 
 	// [addMaxStakeValidator] adds a new validator to the primary network's
@@ -75,25 +72,20 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 			ids.ShortEmpty,
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		staker, err := state.NewCurrentStaker(
 			tx.ID(),
 			tx.Unsigned.(*txs.AddValidatorTx),
 			0,
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		target.state.PutCurrentValidator(staker)
 		target.state.AddTx(tx, status.Committed)
 		target.state.SetHeight(dummyHeight)
-		if err := target.state.Commit(); err != nil {
-			t.Fatal(err)
-		}
+		err = target.state.Commit()
+		require.NoError(t, err)
 	}
 
 	dummyH := newEnvironment( /*postBanff*/ false)
@@ -221,16 +213,14 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 					preFundedKeys[1].PublicKey().Address().Bytes(),
 					ids.Empty,
 					math.MaxInt32)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
+
 				for _, utxoID := range utxoIDs {
 					target.state.DeleteUTXO(utxoID)
 				}
 				target.state.SetHeight(dummyHeight)
-				if err := target.state.Commit(); err != nil {
-					t.Fatal(err)
-				}
+				err = target.state.Commit()
+				require.NoError(t, err)
 			},
 			AP3Time:     defaultGenesisTime,
 			shouldErr:   true,
@@ -264,12 +254,11 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
+			require := require.New(t)
 			freshTH := newEnvironment( /*postBanff*/ false)
 			freshTH.config.ApricotPhase3Time = tt.AP3Time
 			defer func() {
-				if err := shutdownEnvironment(freshTH); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(shutdownEnvironment(freshTH))
 			}()
 
 			tx, err := freshTH.txBuilder.NewAddDelegatorTx(
@@ -281,22 +270,17 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 				tt.feeKeys,
 				ids.ShortEmpty,
 			)
-			if err != nil {
-				t.Fatalf("couldn't build tx: %s", err)
-			}
+			require.NoError(err)
+
 			if tt.setup != nil {
 				tt.setup(freshTH)
 			}
 
 			onCommitState, err := state.NewDiff(lastAcceptedID, freshTH)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 
 			onAbortState, err := state.NewDiff(lastAcceptedID, freshTH)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 
 			executor := ProposalTxExecutor{
 				OnCommitState: onCommitState,
@@ -305,22 +289,21 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 				Tx:            tx,
 			}
 			err = tx.Unsigned.Visit(&executor)
-			if err != nil && !tt.shouldErr {
-				t.Fatalf("shouldn't have errored but got %s", err)
-			} else if err == nil && tt.shouldErr {
-				t.Fatalf("expected test to error but got none")
+			if tt.shouldErr {
+				require.Error(err)
+			} else {
+				require.NoError(err)
 			}
 		})
 	}
 }
 
 func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
+	require := require.New(t)
 	env := newEnvironment( /*postBanff*/ false)
 	env.ctx.Lock.Lock()
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 
 	nodeID := preFundedKeys[0].PublicKey().Address()
@@ -338,19 +321,13 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -359,9 +336,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		if err == nil {
-			t.Fatal("should have failed because validator stops validating primary network earlier than subnet")
-		}
+		require.Error(err, "should have failed because validator stops validating primary network earlier than subnet")
 	}
 
 	{
@@ -378,19 +353,13 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -399,16 +368,12 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 	}
 
 	// Add a validator to pending validator set of primary network
 	key, err := testKeyfactory.NewPrivateKey()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	pendingDSValidatorID := ids.NodeID(key.PublicKey().Address())
 
 	// starts validating primary network 10 seconds after genesis
@@ -425,9 +390,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 		ids.ShortEmpty,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	{
 		// Case: Proposed validator isn't in pending or current validator sets
@@ -440,19 +403,13 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -461,9 +418,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		if err == nil {
-			t.Fatal("should have failed because validator not in the current or pending validator sets of the primary network")
-		}
+		require.Error(err, "should have failed because validator not in the current or pending validator sets of the primary network")
 	}
 
 	staker, err := state.NewCurrentStaker(
@@ -471,17 +426,14 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		addDSTx.Unsigned.(*txs.AddValidatorTx),
 		0,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(addDSTx, status.Committed)
 	dummyHeight := uint64(1)
 	env.state.SetHeight(dummyHeight)
-	if err := env.state.Commit(); err != nil {
-		t.Fatal(err)
-	}
+	err = env.state.Commit()
+	require.NoError(err)
 
 	// Node with ID key.PublicKey().Address() now a pending validator for primary network
 
@@ -497,19 +449,13 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -518,9 +464,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		if err == nil {
-			t.Fatal("should have failed because validator starts validating primary network before starting to validate primary network")
-		}
+		require.Error(err, "should have failed because validator starts validating primary network before starting to validate primary network")
 	}
 
 	{
@@ -535,19 +479,13 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -556,9 +494,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		if err == nil {
-			t.Fatal("should have failed because validator stops validating primary network after stops validating primary network")
-		}
+		require.Error(err, "should have failed because validator stops validating primary network after stops validating primary network")
 	}
 
 	{
@@ -573,19 +509,13 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -594,9 +524,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 	}
 
 	// Case: Proposed validator start validating at/before current timestamp
@@ -614,19 +542,13 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -635,9 +557,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		if err == nil {
-			t.Fatal("should have failed verification because starts validating at current timestamp")
-		}
+		require.Error(err, "should have failed verification because starts validating at current timestamp")
 	}
 
 	// reset the timestamp
@@ -654,25 +574,20 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	staker, err = state.NewCurrentStaker(
 		subnetTx.ID(),
 		subnetTx.Unsigned.(*txs.AddSubnetValidatorTx),
 		0,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	env.state.PutCurrentValidator(staker)
 	env.state.AddTx(subnetTx, status.Committed)
 	env.state.SetHeight(dummyHeight)
-	if err := env.state.Commit(); err != nil {
-		t.Fatal(err)
-	}
+	err = env.state.Commit()
+	require.NoError(err)
 
 	{
 		// Node with ID nodeIDKey.PublicKey().Address() now validating subnet with ID testSubnet1.ID
@@ -685,19 +600,13 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -706,16 +615,13 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			Tx:            duplicateSubnetTx,
 		}
 		err = duplicateSubnetTx.Unsigned.Visit(&executor)
-		if err == nil {
-			t.Fatal("should have failed verification because validator already validating the specified subnet")
-		}
+		require.Error(err, "should have failed verification because validator already validating the specified subnet")
 	}
 
 	env.state.DeleteCurrentValidator(staker)
 	env.state.SetHeight(dummyHeight)
-	if err := env.state.Commit(); err != nil {
-		t.Fatal(err)
-	}
+	err = env.state.Commit()
+	require.NoError(err)
 
 	{
 		// Case: Too many signatures
@@ -728,19 +634,13 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
 			ids.ShortEmpty, // change addr
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -749,9 +649,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		if err == nil {
-			t.Fatal("should have failed verification because tx has 3 signatures but only 2 needed")
-		}
+		require.Error(err, "should have failed verification because tx has 3 signatures but only 2 needed")
 	}
 
 	{
@@ -765,9 +663,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[2]},
 			ids.ShortEmpty, // change addr
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		// Remove a signature
 		addSubnetValidatorTx := tx.Unsigned.(*txs.AddSubnetValidatorTx)
@@ -777,14 +673,10 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		addSubnetValidatorTx.SyntacticallyVerified = false
 
 		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -793,9 +685,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		if err == nil {
-			t.Fatal("should have failed verification because not enough control sigs")
-		}
+		require.Error(err, "should have failed verification because not enough control sigs")
 	}
 
 	{
@@ -809,25 +699,18 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], preFundedKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
+
 		// Replace a valid signature with one from keys[3]
 		sig, err := preFundedKeys[3].SignHash(hashing.ComputeHash256(tx.Unsigned.Bytes()))
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 		copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
 		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -836,9 +719,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		if err == nil {
-			t.Fatal("should have failed verification because a control sig is invalid")
-		}
+		require.Error(err, "should have failed verification because a control sig is invalid")
 	}
 
 	{
@@ -853,35 +734,26 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 			ids.ShortEmpty, // change addr
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		staker, err = state.NewCurrentStaker(
 			subnetTx.ID(),
 			subnetTx.Unsigned.(*txs.AddSubnetValidatorTx),
 			0,
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		env.state.PutCurrentValidator(staker)
 		env.state.AddTx(tx, status.Committed)
 		env.state.SetHeight(dummyHeight)
-		if err := env.state.Commit(); err != nil {
-			t.Fatal(err)
-		}
+		err = env.state.Commit()
+		require.NoError(err)
 
 		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -890,19 +762,16 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		if err == nil {
-			t.Fatal("should have failed verification because validator already in pending validator set of the specified subnet")
-		}
+		require.Error(err, "should have failed verification because validator already in pending validator set of the specified subnet")
 	}
 }
 
 func TestProposalTxExecuteAddValidator(t *testing.T) {
+	require := require.New(t)
 	env := newEnvironment( /*postBanff*/ false)
 	env.ctx.Lock.Lock()
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 
 	nodeID := ids.GenerateTestNodeID()
@@ -919,19 +788,13 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -940,9 +803,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		if err == nil {
-			t.Fatal("should've errored because start time too early")
-		}
+		require.Error(err, "should've errored because start time too early")
 	}
 
 	{
@@ -957,19 +818,13 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -978,9 +833,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		if err == nil {
-			t.Fatal("should've errored because start time too far in the future")
-		}
+		require.Error(err, "should've errored because start time too far in the future")
 	}
 
 	{
@@ -995,19 +848,13 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -1016,9 +863,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		if err == nil {
-			t.Fatal("should've errored because validator already validating")
-		}
+		require.Error(err, "should've errored because validator already validating")
 	}
 
 	{
@@ -1034,36 +879,27 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		staker, err := state.NewCurrentStaker(
 			tx.ID(),
 			tx.Unsigned.(*txs.AddValidatorTx),
 			0,
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		env.state.PutCurrentValidator(staker)
 		env.state.AddTx(tx, status.Committed)
 		dummyHeight := uint64(1)
 		env.state.SetHeight(dummyHeight)
-		if err := env.state.Commit(); err != nil {
-			t.Fatal(err)
-		}
+		err = env.state.Commit()
+		require.NoError(err)
 
 		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -1072,9 +908,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		if err == nil {
-			t.Fatal("should have failed because validator in pending validator set")
-		}
+		require.Error(err, "should have failed because validator in pending validator set")
 	}
 
 	{
@@ -1089,28 +923,21 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
 			ids.ShortEmpty, // change addr
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		// Remove all UTXOs owned by preFundedKeys[0]
 		utxoIDs, err := env.state.UTXOIDs(preFundedKeys[0].PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
+
 		for _, utxoID := range utxoIDs {
 			env.state.DeleteUTXO(utxoID)
 		}
 
 		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		executor := ProposalTxExecutor{
 			OnCommitState: onCommitState,
@@ -1119,8 +946,6 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		if err == nil {
-			t.Fatal("should have failed because tx fee paying key has no funds")
-		}
+		require.Error(err, "should have failed because tx fee paying key has no funds")
 	}
 }

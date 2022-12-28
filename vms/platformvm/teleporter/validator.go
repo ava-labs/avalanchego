@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
@@ -90,7 +91,7 @@ func GetCanonicalValidatorSet(
 //
 // Returns an error if [indices] references an unknown validator.
 func FilterValidators(
-	indices ids.BigBitSet,
+	indices set.Bits,
 	vdrs []*Validator,
 ) ([]*Validator, error) {
 	// Verify that all alleged signers exist
