@@ -83,10 +83,10 @@ type ConsensusContext struct {
 	// Non-zero iff this chain bootstrapped.
 	state utils.AtomicInterface
 
-	// Non-zero iff this chain is executing transactions.
+	// True iff this chain is executing transactions.
 	executing utils.AtomicBool
 
-	// Non-zero iff this chain is dynamically state-syncing
+	// True iff this chain is dynamically state-syncing
 	stateSyncing utils.AtomicBool
 
 	// Indicates this chain is available to only validators.
