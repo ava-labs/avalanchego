@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -27,10 +28,13 @@ import (
 )
 
 var (
-	errSerializeTx       = "couldn't serialize TX: %w"
-	errEncodeTx          = "couldn't encode TX as string: %w"
-	errInvalidChangeAddr = "couldn't parse changeAddr: %w"
-	errCreateTx          = "couldn't create tx: %w"
+	errSerializeTx            = "couldn't serialize TX: %w"
+	errEncodeTx               = "couldn't encode TX as string: %w"
+	errInvalidChangeAddr      = "couldn't parse changeAddr: %w"
+	errCreateTx               = "couldn't create tx: %w"
+	errCreateTransferables    = errors.New("couldn't create transferables")
+	errSerializeTransferables = errors.New("couldn't serialize transferables")
+	errEncodeTransferables    = errors.New("couldn't encode transferables as string")
 )
 
 // CaminoService defines the API calls that can be made to the platform chain
@@ -259,7 +263,7 @@ type GetAddressStateTxReply struct {
 func (s *CaminoService) GetAddressStateTx(_ *http.Request, args *GetAddressStateTxArgs, response *GetAddressStateTxReply) error {
 	s.vm.ctx.Log.Debug("Platform: GetAddressStateTx called")
 
-	keys, err := s.getFakeKeys(&args.JSONSpendHeader)
+	keys, err := s.getFakeKeys(&args.JSONFromAddrs)
 	if err != nil {
 		return err
 	}
@@ -400,6 +404,71 @@ func (s *CaminoService) AddValidator(_ *http.Request, args *CaminoAddValidatorAr
 	return errs.Err
 }
 
+type SpendArgs struct {
+	api.JSONFromAddrs
+	api.JSONChangeAddr
+
+	LockMode     byte                `json:"lockMode"`
+	AmountToLock uint64              `json:"amountToLock"`
+	AmountToBurn uint64              `json:"amountToBurn"`
+	Encoding     formatting.Encoding `json:"encoding"`
+}
+type SpendReply struct {
+	Ins  string `json:"ins"`
+	Outs string `json:"outs"`
+}
+
+func (s *CaminoService) Spend(_ *http.Request, args *SpendArgs, response *SpendReply) error {
+	s.vm.ctx.Log.Debug("Platform: Spend called")
+
+	keys, err := s.getFakeKeys(&args.JSONFromAddrs)
+	if err != nil {
+		return err
+	}
+	if len(keys.Keys) == 0 {
+		return errNoKeys
+	}
+
+	changeAddr := ids.ShortEmpty
+	if len(args.ChangeAddr) > 0 {
+		var err error
+		if changeAddr, err = avax.ParseServiceAddress(s.addrManager, args.ChangeAddr); err != nil {
+			return fmt.Errorf(errInvalidChangeAddr, err)
+		}
+	}
+
+	ins, outs, _, err := s.vm.txBuilder.Lock(
+		keys.Keys,
+		args.AmountToLock,
+		args.AmountToBurn,
+		locked.State(args.LockMode),
+		changeAddr,
+	)
+	if err != nil {
+		return fmt.Errorf("%w: %s", errCreateTransferables, err)
+	}
+
+	bytes, err := txs.Codec.Marshal(txs.Version, ins)
+	if err != nil {
+		return fmt.Errorf("%w: %s", errSerializeTransferables, err)
+	}
+
+	if response.Ins, err = formatting.Encode(args.Encoding, bytes); err != nil {
+		return fmt.Errorf("%w: %s", errEncodeTransferables, err)
+	}
+
+	bytes, err = txs.Codec.Marshal(txs.Version, outs)
+	if err != nil {
+		return fmt.Errorf("%w: %s", errSerializeTransferables, err)
+	}
+
+	if response.Outs, err = formatting.Encode(args.Encoding, bytes); err != nil {
+		return fmt.Errorf("%w: %s", errEncodeTransferables, err)
+	}
+
+	return nil
+}
+
 func (s *Service) getKeystoreKeys(args *api.JSONSpendHeader) (*secp256k1fx.Keychain, error) {
 	// Parse the from addresses
 	fromAddrs, err := avax.ParseServiceAddresses(s.addrManager, args.From)
@@ -430,7 +499,7 @@ func (s *Service) getKeystoreKeys(args *api.JSONSpendHeader) (*secp256k1fx.Keych
 	return privKeys, nil
 }
 
-func (s *Service) getFakeKeys(args *api.JSONSpendHeader) (*secp256k1fx.Keychain, error) {
+func (s *Service) getFakeKeys(args *api.JSONFromAddrs) (*secp256k1fx.Keychain, error) {
 	// Parse the from addresses
 	fromAddrs, err := avax.ParseServiceAddresses(s.addrManager, args.From)
 	if err != nil {

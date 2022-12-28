@@ -33,6 +33,7 @@ var (
 type CaminoBuilder interface {
 	Builder
 	CaminoTxBuilder
+	utxo.Spender
 }
 
 type CaminoTxBuilder interface {
