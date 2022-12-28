@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 )
 
+// CodecVersion is the current default codec version
 const CodecVersion = 0
 
 var _ Parser = (*parser)(nil)
@@ -25,8 +26,11 @@ type Parser interface {
 	Codec() codec.Manager
 	GenesisCodec() codec.Manager
 
-	Parse(bytes []byte) (*Tx, error)
-	ParseGenesis(bytes []byte) (*Tx, error)
+	CodecRegistry() codec.Registry
+	GenesisCodecRegistry() codec.Registry
+
+	ParseTx(bytes []byte) (*Tx, error)
+	ParseGenesisTx(bytes []byte) (*Tx, error)
 
 	InitializeTx(tx *Tx) error
 	InitializeGenesisTx(tx *Tx) error
@@ -35,6 +39,8 @@ type Parser interface {
 type parser struct {
 	cm  codec.Manager
 	gcm codec.Manager
+	c   linearcodec.Codec
+	gc  linearcodec.Codec
 }
 
 func NewParser(fxs []fxs.Fx) (Parser, error) {
@@ -96,6 +102,8 @@ func NewCustomParser(
 	return &parser{
 		cm:  cm,
 		gcm: gcm,
+		c:   c,
+		gc:  gc,
 	}, nil
 }
 
@@ -107,11 +115,19 @@ func (p *parser) GenesisCodec() codec.Manager {
 	return p.gcm
 }
 
-func (p *parser) Parse(bytes []byte) (*Tx, error) {
+func (p *parser) CodecRegistry() codec.Registry {
+	return p.c
+}
+
+func (p *parser) GenesisCodecRegistry() codec.Registry {
+	return p.gc
+}
+
+func (p *parser) ParseTx(bytes []byte) (*Tx, error) {
 	return parse(p.cm, bytes)
 }
 
-func (p *parser) ParseGenesis(bytes []byte) (*Tx, error) {
+func (p *parser) ParseGenesisTx(bytes []byte) (*Tx, error) {
 	return parse(p.gcm, bytes)
 }
 

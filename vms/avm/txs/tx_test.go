@@ -30,26 +30,13 @@ var (
 )
 
 func setupCodec() codec.Manager {
-	c := linearcodec.NewDefault()
-	m := codec.NewDefaultManager()
-	errs := wrappers.Errs{}
-	errs.Add(
-		c.RegisterType(&BaseTx{}),
-		c.RegisterType(&CreateAssetTx{}),
-		c.RegisterType(&OperationTx{}),
-		c.RegisterType(&ImportTx{}),
-		c.RegisterType(&ExportTx{}),
-		c.RegisterType(&secp256k1fx.TransferInput{}),
-		c.RegisterType(&secp256k1fx.MintOutput{}),
-		c.RegisterType(&secp256k1fx.TransferOutput{}),
-		c.RegisterType(&secp256k1fx.MintOperation{}),
-		c.RegisterType(&secp256k1fx.Credential{}),
-		m.RegisterCodec(CodecVersion, c),
-	)
-	if errs.Errored() {
-		panic(errs.Err)
+	parser, err := NewParser([]fxs.Fx{
+		&secp256k1fx.Fx{},
+	})
+	if err != nil {
+		panic(err)
 	}
-	return m
+	return parser.Codec()
 }
 
 func NewContext(tb testing.TB) *snow.Context {

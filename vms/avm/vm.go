@@ -493,7 +493,7 @@ func (vm *VM) initState(tx txs.Tx) error {
 }
 
 func (vm *VM) parseTx(bytes []byte) (*UniqueTx, error) {
-	rawTx, err := vm.parser.Parse(bytes)
+	rawTx, err := vm.parser.ParseTx(bytes)
 	if err != nil {
 		return nil, err
 	}
