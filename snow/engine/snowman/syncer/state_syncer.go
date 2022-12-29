@@ -304,23 +304,38 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 	}
 
 	preferredStateSummary := ss.selectSyncableStateSummary()
-	ss.Ctx.Log.Info("selected summary start state sync",
-		zap.Stringer("summaryID", preferredStateSummary.ID()),
-		zap.Int("numTotalSummaries", size),
-	)
-
-	startedSyncing, err := preferredStateSummary.Accept(ctx)
+	syncMode, err := preferredStateSummary.Accept(ctx)
 	if err != nil {
 		return err
 	}
-	if startedSyncing {
-		// summary was accepted and VM is state syncing.
-		// Engine will wait for notification of state sync done.
-		return nil
-	}
 
-	// VM did not accept the summary, move on to bootstrapping.
-	return ss.onDoneStateSyncing(ctx, ss.requestID)
+	ss.Ctx.Log.Info("accepted state summary",
+		zap.Stringer("summaryID", preferredStateSummary.ID()),
+		zap.Stringer("syncMode", syncMode),
+		zap.Int("numTotalSummaries", size),
+	)
+
+	switch syncMode {
+	case block.StateSyncSkipped:
+		// VM did not accept the summary, move on to bootstrapping.
+		return ss.onDoneStateSyncing(ctx, ss.requestID)
+	case block.StateSyncStatic:
+		// Summary was accepted and VM is state syncing.
+		// Engine will wait for notification of state sync done.
+		ss.Ctx.RunningStateSync(true)
+		return nil
+	case block.StateSummaryDynamic:
+		// Summary was accepted and VM is state syncing.
+		// Engine will continue into bootstrapping and the VM will sync in the
+		// background.
+		ss.Ctx.RunningStateSync(true)
+		return ss.onDoneStateSyncing(ctx, ss.requestID)
+	default:
+		ss.Ctx.Log.Warn("unhandled state summary mode, proceeding to bootstrap",
+			zap.Stringer("syncMode", syncMode),
+		)
+		return ss.onDoneStateSyncing(ctx, ss.requestID)
+	}
 }
 
 // selectSyncableStateSummary chooses a state summary from all
@@ -526,6 +541,8 @@ func (ss *stateSyncer) Notify(ctx context.Context, msg common.Message) error {
 		)
 		return nil
 	}
+
+	ss.Ctx.RunningStateSync(false)
 	return ss.onDoneStateSyncing(ctx, ss.requestID)
 }
 

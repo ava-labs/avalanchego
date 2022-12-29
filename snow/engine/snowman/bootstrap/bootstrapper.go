@@ -292,7 +292,15 @@ func (b *bootstrapper) Shutdown(ctx context.Context) error {
 	return b.VM.Shutdown(ctx)
 }
 
-func (*bootstrapper) Notify(context.Context, common.Message) error {
+func (b *bootstrapper) Notify(_ context.Context, msg common.Message) error {
+	if msg != common.StateSyncDone {
+		b.Ctx.Log.Warn("received an unexpected message from the VM",
+			zap.Stringer("msg", msg),
+		)
+		return nil
+	}
+
+	b.Ctx.RunningStateSync(false)
 	return nil
 }
 

@@ -521,20 +521,20 @@ func TestStateSummaryAccept(t *testing.T) {
 	require.NoError(err)
 
 	// test Accept accepted
-	innerSummary.AcceptF = func(context.Context) (bool, error) {
-		return true, nil
+	innerSummary.AcceptF = func(context.Context) (block.StateSyncMode, error) {
+		return block.StateSyncStatic, nil
 	}
-	accepted, err := summary.Accept(context.Background())
+	status, err := summary.Accept(context.Background())
 	require.NoError(err)
-	require.True(accepted)
+	require.Equal(block.StateSyncStatic, status)
 
 	// test Accept skipped
-	innerSummary.AcceptF = func(context.Context) (bool, error) {
-		return false, nil
+	innerSummary.AcceptF = func(context.Context) (block.StateSyncMode, error) {
+		return block.StateSyncSkipped, nil
 	}
-	accepted, err = summary.Accept(context.Background())
+	status, err = summary.Accept(context.Background())
 	require.NoError(err)
-	require.False(accepted)
+	require.Equal(block.StateSyncSkipped, status)
 }
 
 func TestStateSummaryAcceptOlderBlock(t *testing.T) {
@@ -595,12 +595,12 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 	require.NoError(err)
 
 	// test Accept skipped
-	innerSummary.AcceptF = func(context.Context) (bool, error) {
-		return true, nil
+	innerSummary.AcceptF = func(context.Context) (block.StateSyncMode, error) {
+		return block.StateSyncStatic, nil
 	}
-	accepted, err := summary.Accept(context.Background())
+	status, err := summary.Accept(context.Background())
 	require.NoError(err)
-	require.False(accepted)
+	require.Equal(block.StateSyncSkipped, status)
 }
 
 func TestNoStateSummariesServedWhileRepairingHeightIndex(t *testing.T) {

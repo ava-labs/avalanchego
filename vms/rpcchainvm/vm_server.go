@@ -881,21 +881,21 @@ func (vm *VMServer) StateSummaryAccept(
 	req *vmpb.StateSummaryAcceptRequest,
 ) (*vmpb.StateSummaryAcceptResponse, error) {
 	var (
-		accepted bool
-		err      error
+		mode = block.StateSyncSkipped
+		err  error
 	)
 	if vm.ssVM != nil {
 		var summary block.StateSummary
 		summary, err = vm.ssVM.ParseStateSummary(ctx, req.Bytes)
 		if err == nil {
-			accepted, err = summary.Accept(ctx)
+			mode, err = summary.Accept(ctx)
 		}
 	} else {
 		err = block.ErrStateSyncableVMNotImplemented
 	}
 
 	return &vmpb.StateSummaryAcceptResponse{
-		Accepted: accepted,
-		Err:      errorToErrCode[err],
+		Mode: vmpb.StateSummaryAcceptResponse_Mode(mode),
+		Err:  errorToErrCode[err],
 	}, errorToRPCError(err)
 }

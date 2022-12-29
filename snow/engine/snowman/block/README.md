@@ -55,9 +55,9 @@ Of all the valid state summaries, one is selected and passed to the VM by callin
 
 The Avalanche engine declares state syncing complete in the following cases:
 
-1. `Summary.Accept()` returns `(false, nil)` signalling that the VM considered the summary valid but skips the whole syncing process. This may happen if the VM estimates that bootstrapping would be faster than state syncing with the provided summary.
+1. `Summary.Accept()` returns `(StateSyncSkipped, nil)` signalling that the VM considered the summary valid but skips the whole syncing process. This may happen if the VM estimates that bootstrapping would be faster than state syncing with the provided summary.
 2. The VM sends `StateSyncDone` via the `Notify` channel.
 
 Note that any error returned from `Summary.Accept()` is considered fatal and causes the engine to shutdown.
 
-After state sync is complete, Avalanche will continue bootstrapping the remaining blocks until the node has reached the block frontier.
+If `Summary.Accept()` returns `(StateSyncStatic, nil)`, Avalanche will wait until state synced is complete before continuing the bootstrapping process. If `Summary.Accept()` returns `(StateSyncDynamic, nil)`, Avalanche will immediately continue the bootstrapping process. If bootstrapping finishes before the state sync has been completed, `Chits` messages will include the `LastAcceptedID` rather than the `PreferredID`.
