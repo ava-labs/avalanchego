@@ -1,6 +1,10 @@
 // Copyright (C) 2022, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+// PrivateKey-vmRQiZeXEXYMyJhEiqdC2z5JhuDbxL8ix9UVvjgMu2Er1NepE => X-kopernikus1g65uqn6t77p656w64023nh8nd9updzmxh8ttv3
+// staking/local/staker1.key / crt => NodeID-AK7sPBsZM9rQwse23aLhEEBPHZD5gkLrL
+// 56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027 => 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
+
 package genesis
 
 import (
