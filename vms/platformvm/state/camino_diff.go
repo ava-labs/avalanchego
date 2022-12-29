@@ -6,6 +6,7 @@ package state
 import (
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -175,13 +176,16 @@ func (d *diff) GetMultisigOwner(alias ids.ShortID) (*MultisigOwner, error) {
 	return parentState.GetMultisigOwner(alias)
 }
 
-func (d *diff) SetNodeConsortiumMember(nodeID ids.NodeID, addr ids.ShortID) {
+func (d *diff) SetNodeConsortiumMember(nodeID ids.NodeID, addr *ids.ShortID) {
 	d.caminoDiff.modifiedConsortiumMemberNodes[nodeID] = addr
 }
 
 func (d *diff) GetNodeConsortiumMember(nodeID ids.NodeID) (ids.ShortID, error) {
 	if addr, ok := d.caminoDiff.modifiedConsortiumMemberNodes[nodeID]; ok {
-		return addr, nil
+		if addr == nil {
+			return ids.ShortEmpty, database.ErrNotFound
+		}
+		return *addr, nil
 	}
 
 	parentState, ok := d.stateVersions.GetState(d.parentID)

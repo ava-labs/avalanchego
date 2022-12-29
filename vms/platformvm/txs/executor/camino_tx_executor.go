@@ -43,6 +43,7 @@ var (
 	errSupplyOverflow             = errors.New("resulting total supply would be more, than allowed maximum")
 	errNotConsortiumMember        = errors.New("address isn't consortium member")
 	errConsortiumSignatureMissing = errors.New("wrong consortium's member signature")
+	errNotNodeOwner               = errors.New("node is registered for another consortium member address")
 )
 
 type CaminoStandardTxExecutor struct {
@@ -124,19 +125,9 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 		return err
 	}
 
-	msigOwner, err := e.State.GetMultisigOwner(consortiumMemberAddress)
-	if err != nil && err != database.ErrNotFound {
+	consortiumMemberOwner, err := e.getMSIGOwner(consortiumMemberAddress)
+	if err != nil {
 		return err
-	}
-
-	var consortiumMemberOwner *secp256k1fx.OutputOwners
-	if msigOwner == nil {
-		consortiumMemberOwner = &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{consortiumMemberAddress},
-		}
-	} else {
-		consortiumMemberOwner = &msigOwner.Owners
 	}
 
 	if err := verifyAddrsOwner(signersAddresses, consortiumMemberOwner); err != nil {
@@ -624,6 +615,103 @@ func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) erro
 	return nil
 }
 
+func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error {
+	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
+		return err
+	}
+
+	// verify consortium member state
+
+	consortiumMemberAddressState, err := e.State.GetAddressStates(tx.ConsortiumMemberAddress)
+	if err != nil {
+		return err
+	}
+
+	if consortiumMemberAddressState&txs.AddressStateConsortiumBit == 0 {
+		return errNotConsortiumMember
+	}
+
+	// verify consortium member cred
+
+	consortiumMemberOwner, err := e.getMSIGOwner(tx.ConsortiumMemberAddress)
+	if err != nil {
+		return err
+	}
+
+	if err := e.Backend.Fx.VerifyPermission(
+		e.Tx.Unsigned,
+		tx.ConsortiumMemberAuth,
+		e.Tx.Creds[len(e.Tx.Creds)-1], // consortium member cred
+		consortiumMemberOwner,
+	); err != nil {
+		return fmt.Errorf("%w: %s", errConsortiumSignatureMissing, err)
+	}
+
+	// verify old nodeID ownership
+
+	oldNodeIDNotEmpty := tx.OldNodeID != ids.EmptyNodeID
+	if oldNodeIDNotEmpty {
+		oldNodeOwnerAddr, err := e.State.GetNodeConsortiumMember(tx.OldNodeID)
+		if err != nil {
+			return err
+		}
+		if oldNodeOwnerAddr != tx.ConsortiumMemberAddress {
+			return errNotNodeOwner
+		}
+	}
+
+	// verify new nodeID cred
+
+	newNodeIDNotEmpty := tx.NewNodeID != ids.EmptyNodeID
+	if newNodeIDNotEmpty {
+		if err := e.Backend.Fx.VerifyPermission(
+			e.Tx.Unsigned,
+			&secp256k1fx.Input{SigIndices: []uint32{0}},
+			e.Tx.Creds[len(e.Tx.Creds)-2], // new nodeID cred
+			&secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{ids.ShortID(tx.NewNodeID)},
+			},
+		); err != nil {
+			return fmt.Errorf("%w: %s", errNodeSignatureMissing, err)
+		}
+	}
+
+	// verify the flowcheck
+
+	if err := e.FlowChecker.VerifyLock(
+		tx,
+		e.State,
+		tx.Ins,
+		tx.Outs,
+		e.Tx.Creds[:len(e.Tx.Creds)-2], // base tx creds
+		e.Config.TxFee,
+		e.Ctx.AVAXAssetID,
+		locked.StateUnlocked,
+	); err != nil {
+		return err
+	}
+
+	// update state
+
+	txID := e.Tx.ID()
+
+	// Consume the UTXOS
+	utxo.Consume(e.State, tx.Ins)
+	// Produce the UTXOS
+	utxo.Produce(e.State, txID, tx.Outs)
+
+	if oldNodeIDNotEmpty {
+		e.State.SetNodeConsortiumMember(tx.OldNodeID, nil)
+	}
+
+	if newNodeIDNotEmpty {
+		e.State.SetNodeConsortiumMember(tx.NewNodeID, &tx.ConsortiumMemberAddress)
+	}
+
+	return nil
+}
+
 func removeCreds(tx *txs.Tx, num int) []verify.Verifiable {
 	newCredsLen := len(tx.Creds) - num
 	removedCreds := tx.Creds[newCredsLen:len(tx.Creds)]
@@ -734,4 +822,20 @@ func verifyAddrsOwner(addrs set.Set[ids.ShortID], owner *secp256k1fx.OutputOwner
 		}
 	}
 	return errors.New("missing signature")
+}
+
+func (e *CaminoStandardTxExecutor) getMSIGOwner(addr ids.ShortID) (*secp256k1fx.OutputOwners, error) {
+	msigOwner, err := e.State.GetMultisigOwner(addr)
+	if err != nil && err != database.ErrNotFound {
+		return nil, err
+	}
+
+	if msigOwner != nil {
+		return &msigOwner.Owners, nil
+	}
+
+	return &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{addr},
+	}, nil
 }

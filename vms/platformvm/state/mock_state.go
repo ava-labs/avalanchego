@@ -438,7 +438,7 @@ func (mr *MockStateMockRecorder) GetMultisigOwner(arg0 interface{}) *gomock.Call
 }
 
 // SetNodeConsortiumMember mocks base method.
-func (m *MockState) SetNodeConsortiumMember(arg0 ids.NodeID, arg1 ids.ShortID) {
+func (m *MockState) SetNodeConsortiumMember(arg0 ids.NodeID, arg1 *ids.ShortID) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetNodeConsortiumMember", arg0)
 }

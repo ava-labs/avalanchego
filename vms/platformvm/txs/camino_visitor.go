@@ -7,4 +7,5 @@ type CaminoVisitor interface {
 	AddAddressStateTx(*AddAddressStateTx) error
 	DepositTx(*DepositTx) error
 	UnlockDepositTx(*UnlockDepositTx) error
+	RegisterNodeTx(*RegisterNodeTx) error
 }

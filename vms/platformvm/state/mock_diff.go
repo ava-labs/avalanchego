@@ -268,11 +268,11 @@ func (m *MockDiff) GetMultisigOwner(arg0 ids.ShortID) (*MultisigOwner, error) {
 // GetMultisigOwner indicates an expected call of GetMultisigOwner.
 func (mr *MockDiffMockRecorder) GetMultisigOwner(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMultisigOwner", reflect.TypeOf((*MockState)(nil).GetMultisigOwner), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMultisigOwner", reflect.TypeOf((*MockDiff)(nil).GetMultisigOwner), arg0)
 }
 
 // SetNodeConsortiumMember mocks base method.
-func (m *MockDiff) SetNodeConsortiumMember(arg0 ids.NodeID, arg1 ids.ShortID) {
+func (m *MockDiff) SetNodeConsortiumMember(arg0 ids.NodeID, arg1 *ids.ShortID) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetNodeConsortiumMember", arg0)
 }
@@ -280,7 +280,7 @@ func (m *MockDiff) SetNodeConsortiumMember(arg0 ids.NodeID, arg1 ids.ShortID) {
 // SetNodeConsortiumMember indicates an expected call of SetNodeConsortiumMember.
 func (mr *MockDiffMockRecorder) SetNodeConsortiumMember(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNodeConsortiumMember", reflect.TypeOf((*MockState)(nil).SetNodeConsortiumMember), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNodeConsortiumMember", reflect.TypeOf((*MockDiff)(nil).SetNodeConsortiumMember), arg0, arg1)
 }
 
 // GetNodeConsortiumMember mocks base method.
@@ -295,7 +295,7 @@ func (m *MockDiff) GetNodeConsortiumMember(arg0 ids.NodeID) (ids.ShortID, error)
 // GetNodeConsortiumMember indicates an expected call of GetNodeConsortiumMember.
 func (mr *MockDiffMockRecorder) GetNodeConsortiumMember(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodeConsortiumMember", reflect.TypeOf((*MockState)(nil).GetNodeConsortiumMember), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodeConsortiumMember", reflect.TypeOf((*MockDiff)(nil).GetNodeConsortiumMember), arg0)
 }
 
 // GetChains mocks base method.
@@ -634,7 +634,7 @@ func (m *MockDiff) SetMultisigOwner(arg0 *MultisigOwner) {
 // SetMultisigOwner indicates an expected call of SetMultisigOwner.
 func (mr *MockDiffMockRecorder) SetMultisigOwner(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetMultisigOwner", reflect.TypeOf((*MockState)(nil).SetMultisigOwner), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetMultisigOwner", reflect.TypeOf((*MockDiff)(nil).SetMultisigOwner), arg0)
 }
 
 // SetTimestamp mocks base method.

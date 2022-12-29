@@ -60,9 +60,13 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 
 	env.config.BanffTime = env.state.GetTimestamp()
 	_, nodeID := nodeid.GenerateCaminoNodeKeyAndID()
+	_, nodeID2 := nodeid.GenerateCaminoNodeKeyAndID()
 	msigKey, err := testKeyfactory.NewPrivateKey()
 	require.NoError(t, err)
 	msigAlias := msigKey.PublicKey().Address()
+
+	addr0 := caminoPreFundedKeys[0].Address()
+	addr1 := caminoPreFundedKeys[1].Address()
 
 	require.NoError(t, env.state.Commit())
 
@@ -95,7 +99,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 				}
 			},
 			preExecute: func(t *testing.T, tx *txs.Tx) {
-				env.state.SetNodeConsortiumMember(nodeID, caminoPreFundedKeys[0].Address())
+				env.state.SetNodeConsortiumMember(nodeID, &addr0)
 			},
 			expectedErr: nil,
 		},
@@ -113,7 +117,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 				}
 			},
 			preExecute: func(t *testing.T, tx *txs.Tx) {
-				env.state.SetNodeConsortiumMember(nodeID, caminoPreFundedKeys[0].Address())
+				env.state.SetNodeConsortiumMember(nodeID, &addr0)
 			},
 			expectedErr: errTimestampNotBeforeStartTime,
 		},
@@ -131,7 +135,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 				}
 			},
 			preExecute: func(t *testing.T, tx *txs.Tx) {
-				env.state.SetNodeConsortiumMember(nodeID, caminoPreFundedKeys[0].Address())
+				env.state.SetNodeConsortiumMember(nodeID, &addr0)
 			},
 			expectedErr: errFutureStakeTime,
 		},
@@ -149,7 +153,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 				}
 			},
 			preExecute: func(t *testing.T, tx *txs.Tx) {
-				env.state.SetNodeConsortiumMember(nodeID, caminoPreFundedKeys[0].Address())
+				env.state.SetNodeConsortiumMember(caminoPreFundedNodeIDs[0], &addr0)
 			},
 			expectedErr: errValidatorExists,
 		},
@@ -159,7 +163,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 					stakeAmount:   env.config.MinValidatorStake,
 					startTime:     uint64(defaultGenesisTime.Add(1 * time.Second).Unix()),
 					endTime:       uint64(defaultGenesisTime.Add(1 * time.Second).Add(defaultMinStakingDuration).Unix()),
-					nodeID:        caminoPreFundedNodeIDs[0],
+					nodeID:        nodeID2,
 					rewardAddress: ids.ShortEmpty,
 					shares:        reward.PercentDenominator,
 					keys:          []*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
@@ -167,7 +171,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 				}
 			},
 			preExecute: func(t *testing.T, tx *txs.Tx) {
-				env.state.SetNodeConsortiumMember(nodeID, caminoPreFundedKeys[0].Address())
+				env.state.SetNodeConsortiumMember(nodeID2, &addr0)
 				staker, err := state.NewCurrentStaker(
 					tx.ID(),
 					tx.Unsigned.(*txs.CaminoAddValidatorTx),
@@ -178,8 +182,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 				env.state.AddTx(tx, status.Committed)
 				dummyHeight := uint64(1)
 				env.state.SetHeight(dummyHeight)
-				err = env.state.Commit()
-				require.ErrorContains(t, err, errDuplicateValidator.Error())
+				require.NoError(t, env.state.Commit())
 			},
 			expectedErr: errValidatorExists,
 		},
@@ -197,7 +200,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 				}
 			},
 			preExecute: func(t *testing.T, tx *txs.Tx) {
-				env.state.SetNodeConsortiumMember(nodeID, caminoPreFundedKeys[1].Address())
+				env.state.SetNodeConsortiumMember(nodeID, &addr1)
 				utxoIDs, err := env.state.UTXOIDs(caminoPreFundedKeys[1].PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
 				require.NoError(t, err)
 				for _, utxoID := range utxoIDs {
@@ -236,7 +239,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 				}
 			},
 			preExecute: func(t *testing.T, tx *txs.Tx) {
-				env.state.SetNodeConsortiumMember(nodeID, msigAlias)
+				env.state.SetNodeConsortiumMember(nodeID, &msigAlias)
 				env.state.SetMultisigOwner(&state.MultisigOwner{
 					Alias: msigAlias,
 					Owners: secp256k1fx.OutputOwners{
@@ -580,7 +583,8 @@ func TestCaminoStandardTxExecutorAddValidatorTxBody(t *testing.T) {
 	}()
 
 	_, nodeID := nodeid.GenerateCaminoNodeKeyAndID()
-	env.state.SetNodeConsortiumMember(nodeID, caminoPreFundedKeys[0].PublicKey().Address())
+	addr0 := caminoPreFundedKeys[0].Address()
+	env.state.SetNodeConsortiumMember(nodeID, &addr0)
 
 	existingTxID := ids.GenerateTestID()
 	env.config.BanffTime = env.state.GetTimestamp()

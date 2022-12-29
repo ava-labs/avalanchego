@@ -79,7 +79,7 @@ type CaminoDiff interface {
 
 	// Consortium member nodes
 
-	SetNodeConsortiumMember(nodeID ids.NodeID, addr ids.ShortID)
+	SetNodeConsortiumMember(nodeID ids.NodeID, addr *ids.ShortID)
 	GetNodeConsortiumMember(nodeID ids.NodeID) (ids.ShortID, error)
 }
 
@@ -112,7 +112,7 @@ type caminoDiff struct {
 	modifiedDepositOffers         map[ids.ID]*deposit.Offer
 	modifiedDeposits              map[ids.ID]*deposit.Deposit
 	modifiedMultisigOwners        map[ids.ShortID]*MultisigOwner
-	modifiedConsortiumMemberNodes map[ids.NodeID]ids.ShortID
+	modifiedConsortiumMemberNodes map[ids.NodeID]*ids.ShortID
 }
 
 type caminoState struct {
@@ -150,7 +150,7 @@ func newCaminoDiff() *caminoDiff {
 		modifiedDepositOffers:         make(map[ids.ID]*deposit.Offer),
 		modifiedDeposits:              make(map[ids.ID]*deposit.Deposit),
 		modifiedMultisigOwners:        make(map[ids.ShortID]*MultisigOwner),
-		modifiedConsortiumMemberNodes: make(map[ids.NodeID]ids.ShortID),
+		modifiedConsortiumMemberNodes: make(map[ids.NodeID]*ids.ShortID),
 	}
 }
 
@@ -248,8 +248,8 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 
 	// adding consortium member nodes
 
-	for _, conMem := range g.Camino.ConsortiumMembersNodeIDs {
-		cs.SetNodeConsortiumMember(conMem.NodeID, conMem.ConsortiumMemberAddress)
+	for _, consortiumMemberNode := range g.Camino.ConsortiumMembersNodeIDs {
+		cs.SetNodeConsortiumMember(consortiumMemberNode.NodeID, &consortiumMemberNode.ConsortiumMemberAddress)
 	}
 
 	// adding deposit offers

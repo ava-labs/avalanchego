@@ -4,26 +4,36 @@
 package state
 
 import (
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
 func (cs *caminoState) writeNodeConsortiumMembers() error {
 	for nodeID, addr := range cs.modifiedConsortiumMemberNodes {
 		delete(cs.modifiedConsortiumMemberNodes, nodeID)
-		if err := cs.consortiumMemberNodesDB.Put(nodeID[:], addr[:]); err != nil {
-			return err
+		if addr == nil {
+			if err := cs.consortiumMemberNodesDB.Delete(nodeID[:]); err != nil {
+				return err
+			}
+		} else {
+			if err := cs.consortiumMemberNodesDB.Put(nodeID[:], addr[:]); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-func (cs *caminoState) SetNodeConsortiumMember(nodeID ids.NodeID, addr ids.ShortID) {
+func (cs *caminoState) SetNodeConsortiumMember(nodeID ids.NodeID, addr *ids.ShortID) {
 	cs.modifiedConsortiumMemberNodes[nodeID] = addr
 }
 
 func (cs *caminoState) GetNodeConsortiumMember(nodeID ids.NodeID) (ids.ShortID, error) {
 	if addr, ok := cs.modifiedConsortiumMemberNodes[nodeID]; ok {
-		return addr, nil
+		if addr == nil {
+			return ids.ShortEmpty, database.ErrNotFound
+		}
+		return *addr, nil
 	}
 
 	if addr, ok := cs.consortiumMemberNodesCache.Get(nodeID); ok {

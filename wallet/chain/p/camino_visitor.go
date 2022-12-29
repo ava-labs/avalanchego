@@ -8,6 +8,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
+// backend
+
 func (b *backendVisitor) AddAddressStateTx(tx *txs.AddAddressStateTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
@@ -19,6 +21,12 @@ func (b *backendVisitor) DepositTx(tx *txs.DepositTx) error {
 func (b *backendVisitor) UnlockDepositTx(tx *txs.UnlockDepositTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
+
+func (b *backendVisitor) RegisterNodeTx(tx *txs.RegisterNodeTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
+// signer
 
 func (s *signerVisitor) AddAddressStateTx(tx *txs.AddAddressStateTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
@@ -37,6 +45,14 @@ func (s *signerVisitor) DepositTx(tx *txs.DepositTx) error {
 }
 
 func (s *signerVisitor) UnlockDepositTx(tx *txs.UnlockDepositTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return sign(s.tx, txSigners)
+}
+
+func (s *signerVisitor) RegisterNodeTx(tx *txs.RegisterNodeTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err

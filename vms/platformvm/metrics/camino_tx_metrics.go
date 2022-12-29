@@ -15,7 +15,8 @@ type caminoTxMetrics struct {
 	txMetrics
 	numAddAddressStateTxs,
 	numDepositTxs,
-	numUnlockDepositTxs prometheus.Counter
+	numUnlockDepositTxs,
+	numRegisterNodeTx prometheus.Counter
 }
 
 func newCaminoTxMetrics(
@@ -36,6 +37,8 @@ func newCaminoTxMetrics(
 	return m, errs.Err
 }
 
+// avax metrics
+
 func (*txMetrics) AddAddressStateTx(*txs.AddAddressStateTx) error {
 	return nil
 }
@@ -47,6 +50,12 @@ func (*txMetrics) DepositTx(*txs.DepositTx) error {
 func (*txMetrics) UnlockDepositTx(*txs.UnlockDepositTx) error {
 	return nil
 }
+
+func (*txMetrics) RegisterNodeTx(*txs.RegisterNodeTx) error {
+	return nil
+}
+
+// camino metrics
 
 func (m *caminoTxMetrics) AddAddressStateTx(*txs.AddAddressStateTx) error {
 	m.numAddAddressStateTxs.Inc()
@@ -60,5 +69,10 @@ func (m *caminoTxMetrics) DepositTx(*txs.DepositTx) error {
 
 func (m *caminoTxMetrics) UnlockDepositTx(*txs.UnlockDepositTx) error {
 	m.numUnlockDepositTxs.Inc()
+	return nil
+}
+
+func (m *caminoTxMetrics) RegisterNodeTx(*txs.RegisterNodeTx) error {
+	m.numRegisterNodeTx.Inc()
 	return nil
 }
