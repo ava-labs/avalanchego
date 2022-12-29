@@ -18,16 +18,13 @@ import (
 var (
 	_ ValidatorTx = (*CaminoAddValidatorTx)(nil)
 
-	errAssetNotAVAX                 = errors.New("locked output must be AVAX")
-	errStakeOutsNotEmpty            = errors.New("stake outputs must be empty")
-	errEmptyConsortiumMemberAddress = errors.New("consortium member address cannot be empty")
+	errAssetNotAVAX      = errors.New("locked output must be AVAX")
+	errStakeOutsNotEmpty = errors.New("stake outputs must be empty")
 )
 
 // CaminoAddValidatorTx is an unsigned caminoAddValidatorTx
 type CaminoAddValidatorTx struct {
 	AddValidatorTx `serialize:"true"`
-
-	ConsortiumMemberAddress ids.ShortID `serialize:"true" json:"consortiumMemberAddress"`
 }
 
 func (tx *CaminoAddValidatorTx) Stake() []*avax.TransferableOutput {
@@ -51,8 +48,6 @@ func (tx *CaminoAddValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 		return errTooManyShares
 	case tx.Validator.NodeID == ids.EmptyNodeID:
 		return errEmptyNodeID
-	case tx.ConsortiumMemberAddress == ids.ShortEmpty:
-		return errEmptyConsortiumMemberAddress
 	}
 
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {

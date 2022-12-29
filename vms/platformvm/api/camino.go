@@ -71,6 +71,7 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 	utxos := make([]*genesis.UTXO, 0, len(args.UTXOs))
 	validators := txheap.NewByEndTime()
 	deposits := txheap.NewByDuration()
+	consortiumMemberNodes := make([]genesis.ConsortiumMemberNodeID, len(args.Validators))
 
 	offers := make(map[ids.ID]genesis.DepositOffer, len(args.Camino.DepositOffers))
 	for i := range args.Camino.DepositOffers {
@@ -81,18 +82,21 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 		}
 		offers[offerID] = offer
 	}
-
 	for validatorIndex, vdr := range args.Validators {
 		vdr := vdr
 		validatorTx, err := makeValidator(
 			&vdr,
-			args.Camino.ValidatorConsortiumMembers[validatorIndex],
 			args.AvaxAssetID,
 			startTimestamp,
 			networkID,
 		)
 		if err != nil {
 			return err
+		}
+
+		consortiumMemberNodes[validatorIndex] = genesis.ConsortiumMemberNodeID{
+			ConsortiumMemberAddress: args.Camino.ValidatorConsortiumMembers[validatorIndex],
+			NodeID:                  args.Validators[validatorIndex].NodeID,
 		}
 
 		bondTxID := validatorTx.ID()
@@ -207,6 +211,8 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 		camino.Deposits = deposits.List()
 	}
 
+	camino.ConsortiumMembersNodeIDs = consortiumMemberNodes
+
 	// genesis holds the genesis state
 	g := genesis.Genesis{
 		UTXOs:         utxos,
@@ -233,7 +239,6 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 
 func makeValidator(
 	vdr *PermissionlessValidator,
-	consortiumMemberAddr ids.ShortID,
 	avaxAssetID ids.ID,
 	startTime uint64,
 	networkID uint32,
@@ -296,7 +301,6 @@ func makeValidator(
 			},
 			RewardsOwner: rewardsOwner,
 		},
-		ConsortiumMemberAddress: consortiumMemberAddr,
 	}}
 	if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
 		return nil, err

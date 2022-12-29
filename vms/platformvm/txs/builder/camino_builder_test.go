@@ -101,7 +101,7 @@ func TestCaminoBuilderTxAddressState(t *testing.T) {
 	}
 }
 
-func TestCaminoBuilderNewAddValidatorTxNodeSig(t *testing.T) {
+func TestCaminoBuilderNewAddSubnetValidatorTxNodeSig(t *testing.T) {
 	nodeKey1, nodeID1 := nodeid.GenerateCaminoNodeKeyAndID()
 	nodeKey2, _ := nodeid.GenerateCaminoNodeKeyAndID()
 
@@ -142,35 +142,7 @@ func TestCaminoBuilderNewAddValidatorTxNodeSig(t *testing.T) {
 		// because the error will rise from the execution
 	}
 	for name, tt := range tests {
-		key, err := testKeyfactory.NewPrivateKey()
-		require.NoError(t, err)
-		consortiumMemberKey, ok := key.(*crypto.PrivateKeySECP256K1R)
-		require.True(t, ok)
-		consortiumMemberAddr := consortiumMemberKey.Address()
-
-		t.Run("AddValidatorTx: "+name, func(t *testing.T) {
-			env := newCaminoEnvironment(true, tt.caminoConfig)
-			env.ctx.Lock.Lock()
-			defer func() {
-				if err := shutdownCaminoEnvironment(env); err != nil {
-					t.Fatal(err)
-				}
-			}()
-
-			_, err := env.txBuilder.NewCaminoAddValidatorTx(
-				defaultCaminoValidatorWeight,
-				uint64(defaultValidateStartTime.Unix()+1),
-				uint64(defaultValidateEndTime.Unix()),
-				tt.nodeID,
-				consortiumMemberAddr,
-				ids.ShortEmpty,
-				[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0], tt.nodeKey, consortiumMemberKey},
-				ids.ShortEmpty,
-			)
-			require.ErrorIs(t, err, tt.expectedErr)
-		})
-
-		t.Run("AddSubnetValidatorTx: "+name, func(t *testing.T) {
+		t.Run(name, func(t *testing.T) {
 			env := newCaminoEnvironment(true, tt.caminoConfig)
 			env.ctx.Lock.Lock()
 			defer func() {

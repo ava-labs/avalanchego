@@ -84,7 +84,6 @@ func (cs *caminoState) writeDepositOffers() error {
 			return fmt.Errorf("failed to serialize deposit offer: %w", err)
 		}
 
-		offerID := offerID
 		if err := cs.depositOffersList.Put(offerID[:], offerBytes); err != nil {
 			return err
 		}

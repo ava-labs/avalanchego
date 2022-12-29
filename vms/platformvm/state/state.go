@@ -137,7 +137,6 @@ type State interface {
 	BlockState
 	uptime.State
 	avax.UTXOReader
-	CaminoMultisig
 
 	GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error)
 
@@ -1337,7 +1336,7 @@ func (s *state) loadPendingValidators() error {
 }
 
 // Invariant: initValidatorSets requires loadCurrentValidators to have already
-//            been called.
+//	been called.
 func (s *state) initValidatorSets() error {
 	primaryValidators, ok := s.cfg.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
@@ -1432,6 +1431,7 @@ func (s *state) Close() error {
 		s.chainDB.Close(),
 		s.singletonDB.Close(),
 		s.blockDB.Close(),
+		s.caminoState.Close(),
 	)
 	return errs.Err
 }

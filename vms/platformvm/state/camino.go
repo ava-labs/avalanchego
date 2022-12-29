@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
@@ -27,18 +28,20 @@ import (
 )
 
 const (
-	addressStateCacheSize = 1024
-	depositsCacheSize     = 1024
+	addressStateCacheSize          = 1024
+	depositsCacheSize              = 1024
+	consortiumMemberNodesCacheSize = 1024
 )
 
 var (
 	_ CaminoState = (*caminoState)(nil)
 
-	caminoPrefix         = []byte("camino")
-	addressStatePrefix   = []byte("addressState")
-	depositOffersPrefix  = []byte("depositOffers")
-	depositsPrefix       = []byte("deposits")
-	multisigOwnersPrefix = []byte("multisigOwners")
+	caminoPrefix                = []byte("camino")
+	addressStatePrefix          = []byte("addressState")
+	depositOffersPrefix         = []byte("depositOffers")
+	depositsPrefix              = []byte("deposits")
+	multisigOwnersPrefix        = []byte("multisigOwners")
+	ConsortiumMemberNodesPrefix = []byte("consortiumMemberNodes")
 
 	nodeSignatureKey   = []byte("nodeSignature")
 	depositBondModeKey = []byte("depositBondMode")
@@ -51,27 +54,33 @@ type CaminoApply interface {
 	ApplyCaminoState(State)
 }
 
-type CaminoMultisig interface {
-	GetMultisigOwner(ids.ShortID) (*MultisigOwner, error)
-	SetMultisigOwner(*MultisigOwner)
-}
-
 type CaminoDiff interface {
 	// Address State
 
 	SetAddressStates(ids.ShortID, uint64)
 	GetAddressStates(ids.ShortID) (uint64, error)
 
-	// Deposit offers state
+	// Deposit offers
 
 	// precondition: offer.SetID() must be called and return no error
 	AddDepositOffer(offer *deposit.Offer)
 	GetDepositOffer(offerID ids.ID) (*deposit.Offer, error)
 	GetAllDepositOffers() ([]*deposit.Offer, error)
 
-	// Deposits state
+	// Deposits
+
 	UpdateDeposit(depositTxID ids.ID, deposit *deposit.Deposit)
 	GetDeposit(depositTxID ids.ID) (*deposit.Deposit, error)
+
+	// Multisig Owners
+
+	GetMultisigOwner(ids.ShortID) (*MultisigOwner, error)
+	SetMultisigOwner(*MultisigOwner)
+
+	// Consortium member nodes
+
+	SetNodeConsortiumMember(nodeID ids.NodeID, addr ids.ShortID)
+	GetNodeConsortiumMember(nodeID ids.NodeID) (ids.ShortID, error)
 }
 
 // For state and diff
@@ -85,12 +94,12 @@ type Camino interface {
 // For state only
 type CaminoState interface {
 	CaminoDiff
-	CaminoMultisig
 
 	CaminoConfig() *CaminoConfig
 	SyncGenesis(*state, *genesis.State) error
 	Load() error
 	Write() error
+	Close() error
 }
 
 type CaminoConfig struct {
@@ -99,10 +108,11 @@ type CaminoConfig struct {
 }
 
 type caminoDiff struct {
-	modifiedAddressStates  map[ids.ShortID]uint64
-	modifiedDepositOffers  map[ids.ID]*deposit.Offer
-	modifiedDeposits       map[ids.ID]*deposit.Deposit
-	modifiedMultisigOwners map[ids.ShortID]*MultisigOwner
+	modifiedAddressStates         map[ids.ShortID]uint64
+	modifiedDepositOffers         map[ids.ID]*deposit.Offer
+	modifiedDeposits              map[ids.ID]*deposit.Deposit
+	modifiedMultisigOwners        map[ids.ShortID]*MultisigOwner
+	modifiedConsortiumMemberNodes map[ids.NodeID]ids.ShortID
 }
 
 type caminoState struct {
@@ -128,14 +138,19 @@ type caminoState struct {
 
 	// MSIG aliases
 	multisigOwnersDB database.Database
+
+	// Consortium member nodes
+	consortiumMemberNodesCache cache.Cacher
+	consortiumMemberNodesDB    database.Database
 }
 
 func newCaminoDiff() *caminoDiff {
 	return &caminoDiff{
-		modifiedAddressStates:  make(map[ids.ShortID]uint64),
-		modifiedDepositOffers:  make(map[ids.ID]*deposit.Offer),
-		modifiedDeposits:       make(map[ids.ID]*deposit.Deposit),
-		modifiedMultisigOwners: make(map[ids.ShortID]*MultisigOwner),
+		modifiedAddressStates:         make(map[ids.ShortID]uint64),
+		modifiedDepositOffers:         make(map[ids.ID]*deposit.Offer),
+		modifiedDeposits:              make(map[ids.ID]*deposit.Deposit),
+		modifiedMultisigOwners:        make(map[ids.ShortID]*MultisigOwner),
+		modifiedConsortiumMemberNodes: make(map[ids.NodeID]ids.ShortID),
 	}
 }
 
@@ -158,6 +173,15 @@ func newCaminoState(baseDB *versiondb.Database, metricsReg prometheus.Registerer
 		return nil, err
 	}
 
+	consortiumMemberNodesCache, err := metercacher.New(
+		"consortium_member_nodes_cache",
+		metricsReg,
+		&cache.LRU{Size: consortiumMemberNodesCacheSize},
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	depositOffersDB := prefixdb.New(depositOffersPrefix, baseDB)
 
 	return &caminoState{
@@ -167,10 +191,14 @@ func newCaminoState(baseDB *versiondb.Database, metricsReg prometheus.Registerer
 		depositOffers:     make(map[ids.ID]*deposit.Offer),
 		depositOffersDB:   depositOffersDB,
 		depositOffersList: linkeddb.NewDefault(depositOffersDB),
-		multisigOwnersDB:  prefixdb.New(multisigOwnersPrefix, baseDB),
 
 		depositsCache: depositsCache,
 		depositsDB:    prefixdb.New(depositsPrefix, baseDB),
+
+		multisigOwnersDB: prefixdb.New(multisigOwnersPrefix, baseDB),
+
+		consortiumMemberNodesCache: consortiumMemberNodesCache,
+		consortiumMemberNodesDB:    prefixdb.New(ConsortiumMemberNodesPrefix, baseDB),
 
 		caminoDB: prefixdb.New(caminoPrefix, baseDB),
 
@@ -217,6 +245,12 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 		Remove:  false,
 	}
 	s.AddTx(&txs.Tx{Unsigned: tx}, status.Committed)
+
+	// adding consortium member nodes
+
+	for _, conMem := range g.Camino.ConsortiumMembersNodeIDs {
+		cs.SetNodeConsortiumMember(conMem.NodeID, conMem.ConsortiumMemberAddress)
+	}
 
 	// adding deposit offers
 
@@ -323,6 +357,22 @@ func (cs *caminoState) Write() error {
 	if err := cs.writeMultisigOwners(); err != nil {
 		return err
 	}
+	if err := cs.writeNodeConsortiumMembers(); err != nil {
+		return err
+	}
 
 	return nil
+}
+
+func (cs *caminoState) Close() error {
+	errs := wrappers.Errs{}
+	errs.Add(
+		cs.caminoDB.Close(),
+		cs.addressStateDB.Close(),
+		cs.depositOffersDB.Close(),
+		cs.depositsDB.Close(),
+		cs.multisigOwnersDB.Close(),
+		cs.consortiumMemberNodesDB.Close(),
+	)
+	return errs.Err
 }

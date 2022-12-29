@@ -334,7 +334,7 @@ func buildCaminoGenesisTest(ctx *snow.Context, caminoGenesisConf api.Camino) []b
 	return genesisBytes
 }
 
-func generateTestUTXO(txID ids.ID, outputIndex int, assetID ids.ID, amount uint64, outputOwners secp256k1fx.OutputOwners, depositTxID, bondTxID ids.ID) *avax.UTXO {
+func generateTestUTXO(txID ids.ID, assetID ids.ID, amount uint64, outputOwners secp256k1fx.OutputOwners, depositTxID, bondTxID ids.ID) *avax.UTXO {
 	var out avax.TransferableOut = &secp256k1fx.TransferOutput{
 		Amt:          amount,
 		OutputOwners: outputOwners,
@@ -351,7 +351,7 @@ func generateTestUTXO(txID ids.ID, outputIndex int, assetID ids.ID, amount uint6
 	testUTXO := &avax.UTXO{
 		UTXOID: avax.UTXOID{
 			TxID:        txID,
-			OutputIndex: uint32(outputIndex),
+			OutputIndex: uint32(0),
 		},
 		Asset: avax.Asset{ID: assetID},
 		Out:   out,

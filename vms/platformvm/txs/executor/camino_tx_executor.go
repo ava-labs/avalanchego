@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	deposits "github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
@@ -91,21 +92,9 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 		return err
 	}
 
-	// verify node sig
-
-	consortiumMemberCredsOffset := 1
-	if caminoConfig.VerifyNodeSignature {
-		if err := e.verifyNodeSignature(tx.NodeID()); err != nil {
-			return err
-		}
-		consortiumMemberCredsOffset--
-		creds := removeCreds(e.Tx, 1) // removing node sig
-		defer addCreds(e.Tx, creds)
-	}
-
 	// verify avax tx
 
-	caminoAddValidatorTx, isCaminoTx := e.Tx.Unsigned.(*txs.CaminoAddValidatorTx)
+	_, isCaminoTx := e.Tx.Unsigned.(*txs.CaminoAddValidatorTx)
 
 	if !caminoConfig.LockModeBondDeposit && !isCaminoTx {
 		return e.StandardTxExecutor.AddValidatorTx(tx)
@@ -121,30 +110,41 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 		return err
 	}
 
-	// verify consortium member signature
+	// verify that node owned by consortium member
 
-	if err := e.Backend.Fx.VerifyPermission(
-		e.Tx.Unsigned,
-		&secp256k1fx.Input{SigIndices: []uint32{0}},
-		e.Tx.Creds[len(e.Tx.Creds)-consortiumMemberCredsOffset-1],
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{caminoAddValidatorTx.ConsortiumMemberAddress},
-		},
-	); err != nil {
-		return fmt.Errorf("%w: %s", errConsortiumSignatureMissing, err)
+	consortiumMemberAddress, err := e.State.GetNodeConsortiumMember(tx.NodeID())
+	if err != nil {
+		return fmt.Errorf("%w: %s", errNotConsortiumMember, err)
 	}
 
-	// verify consortium member state
+	// verifying consortium member signatures
 
-	consortiumMemberAddressState, err := e.State.GetAddressStates(caminoAddValidatorTx.ConsortiumMemberAddress)
+	signersAddresses, err := e.Fx.RecoverAddresses(tx, e.Tx.Creds)
 	if err != nil {
 		return err
 	}
 
-	if consortiumMemberAddressState&txs.AddressStateConsortiumBit == 0 {
-		return errNotConsortiumMember
+	msigOwner, err := e.State.GetMultisigOwner(consortiumMemberAddress)
+	if err != nil && err != database.ErrNotFound {
+		return err
 	}
+
+	var consortiumMemberOwner *secp256k1fx.OutputOwners
+	if msigOwner == nil {
+		consortiumMemberOwner = &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{consortiumMemberAddress},
+		}
+	} else {
+		consortiumMemberOwner = &msigOwner.Owners
+	}
+
+	if err := verifyAddrsOwner(signersAddresses, consortiumMemberOwner); err != nil {
+		return fmt.Errorf("%w: %s", errConsortiumSignatureMissing, err)
+	}
+
+	// verify validator
+
 	duration := tx.Validator.Duration()
 
 	switch {
@@ -194,7 +194,7 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 		e.State,
 		tx.Ins,
 		tx.Outs,
-		e.Tx.Creds[:len(e.Tx.Creds)-1], // base tx creds
+		e.Tx.Creds,
 		e.Backend.Config.AddPrimaryNetworkValidatorFee,
 		e.Backend.Ctx.AVAXAssetID,
 		locked.StateBonded,
@@ -721,4 +721,17 @@ func verifyAccess(roles, statesBit uint64) error {
 		return errInvalidRoles
 	}
 	return nil
+}
+
+func verifyAddrsOwner(addrs set.Set[ids.ShortID], owner *secp256k1fx.OutputOwners) error {
+	matchingSigsCount := uint32(0)
+	for _, addr := range owner.Addrs {
+		if addrs.Contains(addr) {
+			matchingSigsCount++
+			if matchingSigsCount == owner.Threshold {
+				return nil
+			}
+		}
+	}
+	return errors.New("missing signature")
 }

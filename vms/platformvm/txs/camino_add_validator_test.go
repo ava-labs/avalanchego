@@ -123,7 +123,6 @@ func TestCaminoAddValidatorTxSyntacticVerify(t *testing.T) {
 						Addrs:     []ids.ShortID{ids.ShortEmpty},
 					},
 				},
-				ConsortiumMemberAddress: caminoPreFundedKeys[0].PublicKey().Address(),
 			}
 
 			utx = tt.preExecute(t, utx)

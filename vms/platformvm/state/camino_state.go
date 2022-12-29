@@ -76,3 +76,11 @@ func (s *state) SetMultisigOwner(owner *MultisigOwner) {
 func (s *state) GetMultisigOwner(alias ids.ShortID) (*MultisigOwner, error) {
 	return s.caminoState.GetMultisigOwner(alias)
 }
+
+func (s *state) SetNodeConsortiumMember(nodeID ids.NodeID, addr ids.ShortID) {
+	s.caminoState.SetNodeConsortiumMember(nodeID, addr)
+}
+
+func (s *state) GetNodeConsortiumMember(nodeID ids.NodeID) (ids.ShortID, error) {
+	return s.caminoState.GetNodeConsortiumMember(nodeID)
+}

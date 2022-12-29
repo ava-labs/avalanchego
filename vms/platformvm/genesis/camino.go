@@ -18,18 +18,24 @@ import (
 
 // Camino genesis args
 type Camino struct {
-	VerifyNodeSignature      bool            `serialize:"true"`
-	LockModeBondDeposit      bool            `serialize:"true"`
-	InitialAdmin             ids.ShortID     `serialize:"true"`
-	AddressStates            []AddressState  `serialize:"true"`
-	DepositOffers            []DepositOffer  `serialize:"true"`
-	Deposits                 []*txs.Tx       `serialize:"true"`
-	InitialMultisigAddresses []MultisigAlias `serialize:"true" json:"initialMultisigAddresses"`
+	VerifyNodeSignature      bool                     `serialize:"true"`
+	LockModeBondDeposit      bool                     `serialize:"true"`
+	InitialAdmin             ids.ShortID              `serialize:"true"`
+	AddressStates            []AddressState           `serialize:"true"`
+	DepositOffers            []DepositOffer           `serialize:"true"`
+	Deposits                 []*txs.Tx                `serialize:"true"`
+	ConsortiumMembersNodeIDs []ConsortiumMemberNodeID `serialize:"true"`
+	InitialMultisigAddresses []MultisigAlias          `serialize:"true"`
+}
+
+type ConsortiumMemberNodeID struct {
+	ConsortiumMemberAddress ids.ShortID `serialize:"true"`
+	NodeID                  ids.NodeID  `serialize:"true"`
 }
 
 type AddressState struct {
-	Address ids.ShortID `serialize:"true" json:"address"`
-	State   uint64      `serialize:"true" json:"state"`
+	Address ids.ShortID `serialize:"true"`
+	State   uint64      `serialize:"true"`
 }
 
 type DepositOffer struct {

@@ -111,6 +111,9 @@ func (ldb *linkedDB) Put(key, value []byte) error {
 
 	// The key isn't currently in the list, so we should add it as the head.
 	newHead := node{Value: utils.CopyBytes(value)}
+	// Make a copy of the key to prevent range changes
+	key = utils.CopyBytes(key)
+
 	if headKey, err := ldb.getHeadKey(); err == nil {
 		// The list currently has a head, so we need to update the old head.
 		oldHead, err := ldb.getNode(headKey)

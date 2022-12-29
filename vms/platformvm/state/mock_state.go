@@ -437,6 +437,33 @@ func (mr *MockStateMockRecorder) GetMultisigOwner(arg0 interface{}) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMultisigOwner", reflect.TypeOf((*MockState)(nil).GetMultisigOwner), arg0)
 }
 
+// SetNodeConsortiumMember mocks base method.
+func (m *MockState) SetNodeConsortiumMember(arg0 ids.NodeID, arg1 ids.ShortID) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetNodeConsortiumMember", arg0)
+}
+
+// SetNodeConsortiumMember indicates an expected call of SetNodeConsortiumMember.
+func (mr *MockStateMockRecorder) SetNodeConsortiumMember(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNodeConsortiumMember", reflect.TypeOf((*MockState)(nil).SetNodeConsortiumMember), arg0, arg1)
+}
+
+// GetNodeConsortiumMember mocks base method.
+func (m *MockState) GetNodeConsortiumMember(arg0 ids.NodeID) (ids.ShortID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNodeConsortiumMember", arg0)
+	ret0, _ := ret[0].(ids.ShortID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNodeConsortiumMember indicates an expected call of GetNodeConsortiumMember.
+func (mr *MockStateMockRecorder) GetNodeConsortiumMember(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodeConsortiumMember", reflect.TypeOf((*MockState)(nil).GetNodeConsortiumMember), arg0)
+}
+
 // GetPendingDelegatorIterator mocks base method.
 func (m *MockState) GetPendingDelegatorIterator(arg0 ids.ID, arg1 ids.NodeID) (StakerIterator, error) {
 	m.ctrl.T.Helper()

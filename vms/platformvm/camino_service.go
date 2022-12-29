@@ -15,12 +15,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"go.uber.org/zap"
 
@@ -284,126 +282,6 @@ func (s *CaminoService) GetAddressStateTx(_ *http.Request, args *GetAddressState
 	return nil
 }
 
-// CaminoAddValidatorArgs are the arguments to AddCaminoValidator
-type CaminoAddValidatorArgs struct {
-	// User, password, from addrs, change addr, staker, rewardAddress
-	AddValidatorArgs
-	// Address of consortium member, who runs the node
-	ConsortiumMember string `json:"consortiumMember"`
-}
-
-// AddValidator creates and signs and issues a transaction to add a validator to
-// the primary network
-func (s *CaminoService) AddValidator(_ *http.Request, args *CaminoAddValidatorArgs, reply *api.JSONTxIDChangeAddr) error {
-	s.vm.ctx.Log.Debug("Platform: AddCaminoValidator called")
-
-	caminoConfig, err := s.vm.state.CaminoConfig()
-	if err != nil {
-		return err
-	}
-
-	if !caminoConfig.LockModeBondDeposit {
-		return s.Service.AddValidator(nil, &args.AddValidatorArgs, reply)
-	}
-
-	now := s.vm.clock.Time()
-	minAddStakerTime := now.Add(minAddStakerDelay)
-	minAddStakerUnix := utilsjson.Uint64(minAddStakerTime.Unix())
-	maxAddStakerTime := now.Add(executor.MaxFutureStartTime)
-	maxAddStakerUnix := utilsjson.Uint64(maxAddStakerTime.Unix())
-
-	if args.StartTime == 0 {
-		args.StartTime = minAddStakerUnix
-	}
-
-	switch {
-	case args.RewardAddress == "":
-		return errNoRewardAddress
-	case args.StartTime < minAddStakerUnix:
-		return errStartTimeTooSoon
-	case args.StartTime > maxAddStakerUnix:
-		return errStartTimeTooLate
-	case args.DelegationFeeRate < 0 || args.DelegationFeeRate > 100:
-		return errInvalidDelegationRate
-	}
-
-	// Parse the node ID
-	var nodeID ids.NodeID
-	if args.NodeID == ids.EmptyNodeID { // If ID unspecified, use this node's ID
-		nodeID = s.vm.ctx.NodeID
-	} else {
-		nodeID = args.NodeID
-	}
-
-	// Parse the from addresses
-	fromAddrs, err := avax.ParseServiceAddresses(s.addrManager, args.From)
-	if err != nil {
-		return err
-	}
-
-	// Parse the reward address
-	rewardAddress, err := avax.ParseServiceAddress(s.addrManager, args.RewardAddress)
-	if err != nil {
-		return fmt.Errorf("problem while parsing reward address: %w", err)
-	}
-
-	// Parse the consortium member address
-	consortiumMemberAddress, err := avax.ParseServiceAddress(s.addrManager, args.ConsortiumMember)
-	if err != nil {
-		return fmt.Errorf("problem while parsing consortium member address: %w", err)
-	}
-
-	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
-	if err != nil {
-		return err
-	}
-	defer user.Close()
-
-	// Get the user's keys
-	privKeys, err := keystore.GetKeychain(user, fromAddrs)
-	if err != nil {
-		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
-	}
-
-	// Parse the change address.
-	if len(privKeys.Keys) == 0 {
-		return errNoKeys
-	}
-	changeAddr := privKeys.Keys[0].PublicKey().Address() // By default, use a key controlled by the user
-	if args.ChangeAddr != "" {
-		changeAddr, err = avax.ParseServiceAddress(s.addrManager, args.ChangeAddr)
-		if err != nil {
-			return fmt.Errorf("couldn't parse changeAddr: %w", err)
-		}
-	}
-
-	// Create the transaction
-	tx, err := s.vm.txBuilder.NewCaminoAddValidatorTx(
-		s.vm.Config.MinValidatorStake, // Stake amount
-		uint64(args.StartTime),        // Start time
-		uint64(args.EndTime),          // End time
-		nodeID,                        // Node ID
-		rewardAddress,                 // Reward Address
-		consortiumMemberAddress,       // consortium member address
-		privKeys.Keys,                 // Keys providing the staked tokens
-		changeAddr,
-	)
-	if err != nil {
-		return fmt.Errorf("couldn't create tx: %w", err)
-	}
-
-	reply.TxID = tx.ID()
-	reply.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		err,
-		s.vm.Builder.AddUnverifiedTx(tx),
-		user.Close(),
-	)
-	return errs.Err
-}
-
 type SpendArgs struct {
 	api.JSONFromAddrs
 	api.JSONChangeAddr
@@ -413,6 +291,7 @@ type SpendArgs struct {
 	AmountToBurn uint64              `json:"amountToBurn"`
 	Encoding     formatting.Encoding `json:"encoding"`
 }
+
 type SpendReply struct {
 	Ins  string `json:"ins"`
 	Outs string `json:"outs"`

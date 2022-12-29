@@ -158,6 +158,40 @@ func (d *diff) GetDeposit(depositTxID ids.ID) (*deposit.Deposit, error) {
 	return parentState.GetDeposit(depositTxID)
 }
 
+func (d *diff) SetMultisigOwner(owner *MultisigOwner) {
+	d.caminoDiff.modifiedMultisigOwners[owner.Alias] = owner
+}
+
+func (d *diff) GetMultisigOwner(alias ids.ShortID) (*MultisigOwner, error) {
+	if msigOwner, ok := d.caminoDiff.modifiedMultisigOwners[alias]; ok {
+		return msigOwner, nil
+	}
+
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	return parentState.GetMultisigOwner(alias)
+}
+
+func (d *diff) SetNodeConsortiumMember(nodeID ids.NodeID, addr ids.ShortID) {
+	d.caminoDiff.modifiedConsortiumMemberNodes[nodeID] = addr
+}
+
+func (d *diff) GetNodeConsortiumMember(nodeID ids.NodeID) (ids.ShortID, error) {
+	if addr, ok := d.caminoDiff.modifiedConsortiumMemberNodes[nodeID]; ok {
+		return addr, nil
+	}
+
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return ids.ShortEmpty, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	return parentState.GetNodeConsortiumMember(nodeID)
+}
+
 // Finally apply all changes
 func (d *diff) ApplyCaminoState(baseState State) {
 	for k, v := range d.caminoDiff.modifiedAddressStates {

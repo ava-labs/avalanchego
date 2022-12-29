@@ -41,16 +41,20 @@ func (cs *caminoState) GetMultisigOwner(alias ids.ShortID) (*MultisigOwner, erro
 		return owner, nil
 	}
 
-	multisigAlias := &MultisigOwner{}
-	maBytes, err := cs.multisigOwnersDB.Get(alias.Bytes())
+	maBytes, err := cs.multisigOwnersDB.Get(alias[:])
 	if err != nil {
-		return multisigAlias, err
+		return nil, err
 	}
 
-	_, err = blocks.GenesisCodec.Unmarshal(maBytes, multisigAlias)
-	multisigAlias.Alias = alias
+	multisigOwner := &MultisigOwner{}
+	_, err = blocks.GenesisCodec.Unmarshal(maBytes, multisigOwner)
+	if err != nil {
+		return nil, err
+	}
 
-	return multisigAlias, err
+	multisigOwner.Alias = alias
+
+	return multisigOwner, nil
 }
 
 func (cs *caminoState) writeMultisigOwners() error {
