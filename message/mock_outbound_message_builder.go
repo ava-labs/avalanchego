@@ -146,18 +146,18 @@ func (mr *MockOutboundMsgBuilderMockRecorder) AppResponse(arg0, arg1, arg2 inter
 }
 
 // Chits mocks base method.
-func (m *MockOutboundMsgBuilder) Chits(arg0 ids.ID, arg1 uint32, arg2 []ids.ID, arg3 p2p.EngineType) (OutboundMessage, error) {
+func (m *MockOutboundMsgBuilder) Chits(arg0 ids.ID, arg1 uint32, arg2, arg3 []ids.ID, arg4 p2p.EngineType) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Chits", arg0, arg1, arg2, arg3)
+	ret := m.ctrl.Call(m, "Chits", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Chits indicates an expected call of Chits.
-func (mr *MockOutboundMsgBuilderMockRecorder) Chits(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+func (mr *MockOutboundMsgBuilderMockRecorder) Chits(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Chits", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).Chits), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Chits", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).Chits), arg0, arg1, arg2, arg3, arg4)
 }
 
 // Get mocks base method.

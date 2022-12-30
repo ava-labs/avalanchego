@@ -181,9 +181,7 @@ func (t *Transitive) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
-	if err := t.sendChits(ctx, nodeID, requestID); err != nil {
-		return err
-	}
+	t.sendChits(ctx, nodeID, requestID)
 
 	// Try to issue [blkID] to consensus.
 	// If we're missing an ancestor, request it from [vdr]
@@ -195,9 +193,7 @@ func (t *Transitive) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID
 }
 
 func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte) error {
-	if err := t.sendChits(ctx, nodeID, requestID); err != nil {
-		return err
-	}
+	t.sendChits(ctx, nodeID, requestID)
 
 	blk, err := t.VM.ParseBlock(ctx, blkBytes)
 	// If parsing fails, we just drop the request, as we didn't ask for it
@@ -471,17 +467,13 @@ func (t *Transitive) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block,
 	return t.VM.GetBlock(ctx, blkID)
 }
 
-func (t *Transitive) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (t *Transitive) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32) {
+	lastAccepted := t.Consensus.LastAccepted()
 	if t.Ctx.IsRunningStateSync() {
-		lastAcceptedID, err := t.VM.LastAccepted(ctx)
-		if err != nil {
-			return err
-		}
-		t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{lastAcceptedID})
+		t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{lastAccepted}, []ids.ID{lastAccepted})
 	} else {
-		t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{t.Consensus.Preference()})
+		t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{t.Consensus.Preference()}, []ids.ID{lastAccepted})
 	}
-	return nil
 }
 
 // Build blocks if they have been requested and the number of processing blocks

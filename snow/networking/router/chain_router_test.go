@@ -826,6 +826,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 			ctx.ChainID,
 			requestID,
 			nil,
+			nil,
 			nodeID,
 			engineType,
 		)
@@ -1037,7 +1038,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	err = vdrs.RemoveWeight(vID, 1)
 	require.NoError(t, err)
 
-	inMsg = message.InboundChits(ctx.ChainID, reqID, nil, nID, engineType)
+	inMsg = message.InboundChits(ctx.ChainID, reqID, nil, nil, nID, engineType)
 	chainRouter.HandleInbound(context.Background(), inMsg)
 
 	// shouldn't clear out timed request, as the request should be cleared when

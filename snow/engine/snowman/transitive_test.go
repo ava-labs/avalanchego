@@ -214,7 +214,7 @@ func TestEngineQuery(t *testing.T) {
 	}
 
 	chitted := new(bool)
-	sender.SendChitsF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, prefSet []ids.ID) {
+	sender.SendChitsF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, prefSet []ids.ID, accepted []ids.ID) {
 		if *chitted {
 			t.Fatalf("Sent multiple chits")
 		}
@@ -227,6 +227,12 @@ func TestEngineQuery(t *testing.T) {
 		}
 		if gBlk.ID() != prefSet[0] {
 			t.Fatalf("Wrong chits block")
+		}
+		if len(accepted) != 1 {
+			t.Fatal("accepted should only have one element")
+		}
+		if gBlk.ID() != accepted[0] {
+			t.Fatalf("Wrong accepted frontier")
 		}
 	}
 
@@ -764,7 +770,7 @@ func TestEnginePushQuery(t *testing.T) {
 	}
 
 	chitted := new(bool)
-	sender.SendChitsF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, votes []ids.ID) {
+	sender.SendChitsF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, votes []ids.ID, accepted []ids.ID) {
 		if *chitted {
 			t.Fatalf("Sent chit multiple times")
 		}
@@ -780,6 +786,12 @@ func TestEnginePushQuery(t *testing.T) {
 		}
 		if gBlk.ID() != votes[0] {
 			t.Fatalf("Asking for wrong block")
+		}
+		if len(accepted) != 1 {
+			t.Fatal("accepted should only have one element")
+		}
+		if gBlk.ID() != accepted[0] {
+			t.Fatalf("Wrong accepted frontier")
 		}
 	}
 

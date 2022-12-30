@@ -248,11 +248,14 @@ func InboundChits(
 	chainID ids.ID,
 	requestID uint32,
 	preferredContainerIDs []ids.ID,
+	acceptedContainerIDs []ids.ID,
 	nodeID ids.NodeID,
 	engineType p2p.EngineType,
 ) InboundMessage {
 	preferredContainerIDBytes := make([][]byte, len(preferredContainerIDs))
 	encodeIDs(preferredContainerIDs, preferredContainerIDBytes)
+	acceptedContainerIDBytes := make([][]byte, len(acceptedContainerIDs))
+	encodeIDs(acceptedContainerIDs, acceptedContainerIDBytes)
 	return &inboundMessage{
 		nodeID: nodeID,
 		op:     ChitsOp,
@@ -260,6 +263,7 @@ func InboundChits(
 			ChainId:               chainID[:],
 			RequestId:             requestID,
 			PreferredContainerIds: preferredContainerIDBytes,
+			AcceptedContainerIds:  acceptedContainerIDBytes,
 			EngineType:            engineType,
 		},
 		expiration: mockable.MaxTime,

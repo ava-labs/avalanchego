@@ -159,15 +159,15 @@ func (mr *MockSenderMockRecorder) SendAppResponse(arg0, arg1, arg2, arg3 interfa
 }
 
 // SendChits mocks base method.
-func (m *MockSender) SendChits(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3 []ids.ID) {
+func (m *MockSender) SendChits(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3, arg4 []ids.ID) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SendChits", arg0, arg1, arg2, arg3)
+	m.ctrl.Call(m, "SendChits", arg0, arg1, arg2, arg3, arg4)
 }
 
 // SendChits indicates an expected call of SendChits.
-func (mr *MockSenderMockRecorder) SendChits(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+func (mr *MockSenderMockRecorder) SendChits(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendChits", reflect.TypeOf((*MockSender)(nil).SendChits), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendChits", reflect.TypeOf((*MockSender)(nil).SendChits), arg0, arg1, arg2, arg3, arg4)
 }
 
 // SendCrossChainAppRequest mocks base method.

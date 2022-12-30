@@ -31,17 +31,18 @@ func Test_newMsgBuilder(t *testing.T) {
 
 func TestInboundMsgBuilder(t *testing.T) {
 	var (
-		chainID             = ids.GenerateTestID()
-		requestID    uint32 = 12345
-		deadline            = time.Hour
-		nodeID              = ids.GenerateTestNodeID()
-		summary             = []byte{9, 8, 7}
-		appBytes            = []byte{1, 3, 3, 7}
-		container           = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9}
-		containerIDs        = []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
-		summaryIDs          = []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
-		heights             = []uint64{1000, 2000}
-		engineType          = p2p.EngineType_ENGINE_TYPE_SNOWMAN
+		chainID                     = ids.GenerateTestID()
+		requestID            uint32 = 12345
+		deadline                    = time.Hour
+		nodeID                      = ids.GenerateTestNodeID()
+		summary                     = []byte{9, 8, 7}
+		appBytes                    = []byte{1, 3, 3, 7}
+		container                   = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9}
+		containerIDs                = []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
+		acceptedContainerIDs        = []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
+		summaryIDs                  = []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
+		heights                     = []uint64{1000, 2000}
+		engineType                  = p2p.EngineType_ENGINE_TYPE_SNOWMAN
 	)
 
 	t.Run(
@@ -329,6 +330,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 				chainID,
 				requestID,
 				containerIDs,
+				acceptedContainerIDs,
 				nodeID,
 				engineType,
 			)
@@ -346,6 +348,12 @@ func TestInboundMsgBuilder(t *testing.T) {
 				containerIDsBytes[i] = id[:]
 			}
 			require.Equal(containerIDsBytes, innerMsg.PreferredContainerIds)
+			acceptedContainerIDsBytes := make([][]byte, len(acceptedContainerIDs))
+			for i, id := range acceptedContainerIDs {
+				id := id
+				acceptedContainerIDsBytes[i] = id[:]
+			}
+			require.Equal(acceptedContainerIDsBytes, innerMsg.AcceptedContainerIds)
 			require.Equal(engineType, innerMsg.EngineType)
 		},
 	)

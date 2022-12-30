@@ -146,7 +146,8 @@ type OutboundMsgBuilder interface {
 	Chits(
 		chainID ids.ID,
 		requestID uint32,
-		containerIDs []ids.ID,
+		preferredContainerIDs []ids.ID,
+		acceptedContainerIDs []ids.ID,
 		engineType p2p.EngineType,
 	) (OutboundMessage, error)
 
@@ -608,10 +609,13 @@ func (b *outMsgBuilder) Chits(
 	chainID ids.ID,
 	requestID uint32,
 	preferredContainerIDs []ids.ID,
+	acceptedContainerIDs []ids.ID,
 	engineType p2p.EngineType,
 ) (OutboundMessage, error) {
 	preferredContainerIDBytes := make([][]byte, len(preferredContainerIDs))
 	encodeIDs(preferredContainerIDs, preferredContainerIDBytes)
+	acceptedContainerIDBytes := make([][]byte, len(acceptedContainerIDs))
+	encodeIDs(acceptedContainerIDs, acceptedContainerIDBytes)
 	return b.builder.createOutbound(
 		&p2p.Message{
 			Message: &p2p.Message_Chits{
@@ -619,6 +623,7 @@ func (b *outMsgBuilder) Chits(
 					ChainId:               chainID[:],
 					RequestId:             requestID,
 					PreferredContainerIds: preferredContainerIDBytes,
+					AcceptedContainerIds:  acceptedContainerIDBytes,
 					EngineType:            engineType,
 				},
 			},
