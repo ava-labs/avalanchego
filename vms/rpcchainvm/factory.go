@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"path/filepath"
 
 	"github.com/hashicorp/go-hclog"
@@ -62,14 +61,12 @@ func (f *factory) New(ctx *snow.Context) (interface{}, error) {
 	// createStaticHandlers will send a nil ctx to disable logs
 	// TODO: create a separate log file and no-op ctx
 	if ctx != nil {
-		log.SetOutput(ctx.Log)
 		config.Stderr = ctx.Log
 		config.Logger = hclog.New(&hclog.LoggerOptions{
 			Output: ctx.Log,
 			Level:  hclog.Info,
 		})
 	} else {
-		log.SetOutput(io.Discard)
 		config.Stderr = io.Discard
 		config.Logger = hclog.New(&hclog.LoggerOptions{
 			Output: io.Discard,

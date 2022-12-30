@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
@@ -54,6 +55,8 @@ import (
 
 var (
 	_ vmpb.VMServer = (*VMServer)(nil)
+
+	originalStderr = os.Stderr
 
 	errExpectedBlockWithVerifyContext = errors.New("expected block.WithVerifyContext")
 )
@@ -217,7 +220,15 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		CChainID:    cChainID,
 		AVAXAssetID: avaxAssetID,
 
-		Log:          logging.NoLog{},
+		// TODO: Allow the logger to be configured by the client
+		Log: logging.NewLogger(
+			fmt.Sprintf("<%s Chain>", chainID),
+			logging.NewWrappedCore(
+				logging.Info,
+				originalStderr,
+				logging.Colors.ConsoleEncoder(),
+			),
+		),
 		Keystore:     keystoreClient,
 		SharedMemory: sharedMemoryClient,
 		BCLookup:     bcLookupClient,
