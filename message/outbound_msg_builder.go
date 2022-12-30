@@ -607,19 +607,19 @@ func (b *outMsgBuilder) PullQuery(
 func (b *outMsgBuilder) Chits(
 	chainID ids.ID,
 	requestID uint32,
-	containerIDs []ids.ID,
+	preferredContainerIDs []ids.ID,
 	engineType p2p.EngineType,
 ) (OutboundMessage, error) {
-	containerIDBytes := make([][]byte, len(containerIDs))
-	encodeIDs(containerIDs, containerIDBytes)
+	preferredContainerIDBytes := make([][]byte, len(preferredContainerIDs))
+	encodeIDs(preferredContainerIDs, preferredContainerIDBytes)
 	return b.builder.createOutbound(
 		&p2p.Message{
 			Message: &p2p.Message_Chits{
 				Chits: &p2p.Chits{
-					ChainId:      chainID[:],
-					RequestId:    requestID,
-					ContainerIds: containerIDBytes,
-					EngineType:   engineType,
+					ChainId:               chainID[:],
+					RequestId:             requestID,
+					PreferredContainerIds: preferredContainerIDBytes,
+					EngineType:            engineType,
 				},
 			},
 		},

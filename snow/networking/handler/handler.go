@@ -631,13 +631,13 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 		return engine.PullQuery(ctx, nodeID, msg.RequestId, containerID)
 
 	case *p2p.Chits:
-		votes, err := getIDs(msg.ContainerIds)
+		votes, err := getIDs(msg.PreferredContainerIds)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", message.ChitsOp),
 				zap.Uint32("requestID", msg.RequestId),
-				zap.String("field", "ContainerIDs"),
+				zap.String("field", "PreferredContainerIDs"),
 				zap.Error(err),
 			)
 			return engine.QueryFailed(ctx, nodeID, msg.RequestId)

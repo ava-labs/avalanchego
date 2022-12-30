@@ -247,20 +247,20 @@ func InboundPullQuery(
 func InboundChits(
 	chainID ids.ID,
 	requestID uint32,
-	containerIDs []ids.ID,
+	preferredContainerIDs []ids.ID,
 	nodeID ids.NodeID,
 	engineType p2p.EngineType,
 ) InboundMessage {
-	containerIDBytes := make([][]byte, len(containerIDs))
-	encodeIDs(containerIDs, containerIDBytes)
+	preferredContainerIDBytes := make([][]byte, len(preferredContainerIDs))
+	encodeIDs(preferredContainerIDs, preferredContainerIDBytes)
 	return &inboundMessage{
 		nodeID: nodeID,
 		op:     ChitsOp,
 		message: &p2p.Chits{
-			ChainId:      chainID[:],
-			RequestId:    requestID,
-			ContainerIds: containerIDBytes,
-			EngineType:   engineType,
+			ChainId:               chainID[:],
+			RequestId:             requestID,
+			PreferredContainerIds: preferredContainerIDBytes,
+			EngineType:            engineType,
 		},
 		expiration: mockable.MaxTime,
 	}

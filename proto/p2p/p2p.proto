@@ -319,8 +319,12 @@ message PullQuery {
 message Chits {
   bytes chain_id = 1;
   uint32 request_id = 2;
-  repeated bytes container_ids = 3;
-  // TODO: Add repeated bytes accepted_container_ids = 4;
+  // Represents the current preferred frontier.
+  // TODO: Remove `repeated` once all chains are running Snowman.
+  repeated bytes preferred_container_ids = 3;
+  // Represents the current accepted frontier.
+  // TODO: Remove `repeated` once all chains are running Snowman.
+  repeated bytes accepted_container_ids = 4;
   EngineType engine_type = 5;
 }
 

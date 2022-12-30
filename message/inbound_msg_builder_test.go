@@ -345,7 +345,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 				id := id
 				containerIDsBytes[i] = id[:]
 			}
-			require.Equal(containerIDsBytes, innerMsg.ContainerIds)
+			require.Equal(containerIDsBytes, innerMsg.PreferredContainerIds)
 			require.Equal(engineType, innerMsg.EngineType)
 		},
 	)

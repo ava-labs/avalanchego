@@ -532,10 +532,10 @@ func TestMessage(t *testing.T) {
 			msg: &p2p.Message{
 				Message: &p2p.Message_Chits{
 					Chits: &p2p.Chits{
-						ChainId:      testID[:],
-						RequestId:    1,
-						ContainerIds: [][]byte{testID[:], testID[:]},
-						EngineType:   p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+						ChainId:               testID[:],
+						RequestId:             1,
+						PreferredContainerIds: [][]byte{testID[:], testID[:]},
+						EngineType:            p2p.EngineType_ENGINE_TYPE_AVALANCHE,
 					},
 				},
 			},
