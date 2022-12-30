@@ -451,7 +451,7 @@ func (vm *VMServer) ParseBlock(ctx context.Context, req *vmpb.ParseBlockRequest)
 	return &vmpb.ParseBlockResponse{
 		Id:                blkID[:],
 		ParentId:          parentID[:],
-		Status:            uint32(blk.Status()),
+		Status:            vmpb.Status(blk.Status()),
 		Height:            blk.Height(),
 		Timestamp:         grpcutils.TimestampFromTime(blk.Timestamp()),
 		VerifyWithContext: verifyWithCtx,
@@ -466,7 +466,7 @@ func (vm *VMServer) GetBlock(ctx context.Context, req *vmpb.GetBlockRequest) (*v
 	blk, err := vm.vm.GetBlock(ctx, id)
 	if err != nil {
 		return &vmpb.GetBlockResponse{
-			Err: errorToErrCode[err],
+			Err: errorToErrEnum[err],
 		}, errorToRPCError(err)
 	}
 
@@ -482,7 +482,7 @@ func (vm *VMServer) GetBlock(ctx context.Context, req *vmpb.GetBlockRequest) (*v
 	return &vmpb.GetBlockResponse{
 		ParentId:          parentID[:],
 		Bytes:             blk.Bytes(),
-		Status:            uint32(blk.Status()),
+		Status:            vmpb.Status(blk.Status()),
 		Height:            blk.Height(),
 		Timestamp:         grpcutils.TimestampFromTime(blk.Timestamp()),
 		VerifyWithContext: verifyWithCtx,
@@ -673,7 +673,7 @@ func (vm *VMServer) VerifyHeightIndex(ctx context.Context, _ *emptypb.Empty) (*v
 	}
 
 	return &vmpb.VerifyHeightIndexResponse{
-		Err: errorToErrCode[err],
+		Err: errorToErrEnum[err],
 	}, errorToRPCError(err)
 }
 
@@ -693,7 +693,7 @@ func (vm *VMServer) GetBlockIDAtHeight(
 
 	return &vmpb.GetBlockIDAtHeightResponse{
 		BlkId: blkID[:],
-		Err:   errorToErrCode[err],
+		Err:   errorToErrEnum[err],
 	}, errorToRPCError(err)
 }
 
@@ -708,7 +708,7 @@ func (vm *VMServer) StateSyncEnabled(ctx context.Context, _ *emptypb.Empty) (*vm
 
 	return &vmpb.StateSyncEnabledResponse{
 		Enabled: enabled,
-		Err:     errorToErrCode[err],
+		Err:     errorToErrEnum[err],
 	}, errorToRPCError(err)
 }
 
@@ -728,7 +728,7 @@ func (vm *VMServer) GetOngoingSyncStateSummary(
 
 	if err != nil {
 		return &vmpb.GetOngoingSyncStateSummaryResponse{
-			Err: errorToErrCode[err],
+			Err: errorToErrEnum[err],
 		}, errorToRPCError(err)
 	}
 
@@ -753,7 +753,7 @@ func (vm *VMServer) GetLastStateSummary(ctx context.Context, _ *emptypb.Empty) (
 
 	if err != nil {
 		return &vmpb.GetLastStateSummaryResponse{
-			Err: errorToErrCode[err],
+			Err: errorToErrEnum[err],
 		}, errorToRPCError(err)
 	}
 
@@ -781,7 +781,7 @@ func (vm *VMServer) ParseStateSummary(
 
 	if err != nil {
 		return &vmpb.ParseStateSummaryResponse{
-			Err: errorToErrCode[err],
+			Err: errorToErrEnum[err],
 		}, errorToRPCError(err)
 	}
 
@@ -808,7 +808,7 @@ func (vm *VMServer) GetStateSummary(
 
 	if err != nil {
 		return &vmpb.GetStateSummaryResponse{
-			Err: errorToErrCode[err],
+			Err: errorToErrEnum[err],
 		}, errorToRPCError(err)
 	}
 
@@ -896,6 +896,6 @@ func (vm *VMServer) StateSummaryAccept(
 
 	return &vmpb.StateSummaryAcceptResponse{
 		Mode: vmpb.StateSummaryAcceptResponse_Mode(mode),
-		Err:  errorToErrCode[err],
+		Err:  errorToErrEnum[err],
 	}, errorToRPCError(err)
 }

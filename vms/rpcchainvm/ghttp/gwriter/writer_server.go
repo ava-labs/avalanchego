@@ -29,8 +29,8 @@ func (s *Server) Write(_ context.Context, req *writerpb.WriteRequest) (*writerpb
 		Written: int32(n),
 	}
 	if err != nil {
-		resp.Errored = true
-		resp.Error = err.Error()
+		errStr := err.Error()
+		resp.Error = &errStr
 	}
 	return resp, nil
 }

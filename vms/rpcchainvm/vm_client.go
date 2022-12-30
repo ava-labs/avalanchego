@@ -337,7 +337,7 @@ func (vm *VMClient) getInitServer(opts []grpc.ServerOption) *grpc.Server {
 
 func (vm *VMClient) SetState(ctx context.Context, state snow.State) error {
 	resp, err := vm.client.SetState(ctx, &vmpb.SetStateRequest{
-		State: uint32(state),
+		State: vmpb.State(state),
 	})
 	if err != nil {
 		return err
@@ -511,8 +511,8 @@ func (vm *VMClient) getBlock(ctx context.Context, blkID ids.ID) (snowman.Block, 
 	if err != nil {
 		return nil, err
 	}
-	if errCode := resp.Err; errCode != 0 {
-		return nil, errCodeToError[errCode]
+	if errEnum := resp.Err; errEnum != vmpb.Error_ERROR_UNSPECIFIED {
+		return nil, errEnumToError[errEnum]
 	}
 
 	parentID, err := ids.ToID(resp.ParentId)
@@ -725,7 +725,7 @@ func (vm *VMClient) VerifyHeightIndex(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return errCodeToError[resp.Err]
+	return errEnumToError[resp.Err]
 }
 
 func (vm *VMClient) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
@@ -736,8 +736,8 @@ func (vm *VMClient) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.
 	if err != nil {
 		return ids.Empty, err
 	}
-	if errCode := resp.Err; errCode != 0 {
-		return ids.Empty, errCodeToError[errCode]
+	if errEnum := resp.Err; errEnum != vmpb.Error_ERROR_UNSPECIFIED {
+		return ids.Empty, errEnumToError[errEnum]
 	}
 	return ids.ToID(resp.BlkId)
 }
@@ -747,7 +747,7 @@ func (vm *VMClient) StateSyncEnabled(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	err = errCodeToError[resp.Err]
+	err = errEnumToError[resp.Err]
 	if err == block.ErrStateSyncableVMNotImplemented {
 		return false, nil
 	}
@@ -759,8 +759,8 @@ func (vm *VMClient) GetOngoingSyncStateSummary(ctx context.Context) (block.State
 	if err != nil {
 		return nil, err
 	}
-	if errCode := resp.Err; errCode != 0 {
-		return nil, errCodeToError[errCode]
+	if errEnum := resp.Err; errEnum != vmpb.Error_ERROR_UNSPECIFIED {
+		return nil, errEnumToError[errEnum]
 	}
 
 	summaryID, err := ids.ToID(resp.Id)
@@ -777,8 +777,8 @@ func (vm *VMClient) GetLastStateSummary(ctx context.Context) (block.StateSummary
 	if err != nil {
 		return nil, err
 	}
-	if errCode := resp.Err; errCode != 0 {
-		return nil, errCodeToError[errCode]
+	if errEnum := resp.Err; errEnum != vmpb.Error_ERROR_UNSPECIFIED {
+		return nil, errEnumToError[errEnum]
 	}
 
 	summaryID, err := ids.ToID(resp.Id)
@@ -800,8 +800,8 @@ func (vm *VMClient) ParseStateSummary(ctx context.Context, summaryBytes []byte) 
 	if err != nil {
 		return nil, err
 	}
-	if errCode := resp.Err; errCode != 0 {
-		return nil, errCodeToError[errCode]
+	if errEnum := resp.Err; errEnum != vmpb.Error_ERROR_UNSPECIFIED {
+		return nil, errEnumToError[errEnum]
 	}
 
 	summaryID, err := ids.ToID(resp.Id)
@@ -823,8 +823,8 @@ func (vm *VMClient) GetStateSummary(ctx context.Context, summaryHeight uint64) (
 	if err != nil {
 		return nil, err
 	}
-	if errCode := resp.Err; errCode != 0 {
-		return nil, errCodeToError[errCode]
+	if errEnum := resp.Err; errEnum != vmpb.Error_ERROR_UNSPECIFIED {
+		return nil, errEnumToError[errEnum]
 	}
 
 	summaryID, err := ids.ToID(resp.Id)
@@ -971,5 +971,5 @@ func (s *summaryClient) Accept(ctx context.Context) (block.StateSyncMode, error)
 	if err != nil {
 		return block.StateSyncSkipped, err
 	}
-	return block.StateSyncMode(resp.Mode), errCodeToError[resp.Err]
+	return block.StateSyncMode(resp.Mode), errEnumToError[resp.Err]
 }

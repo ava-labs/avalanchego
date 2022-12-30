@@ -29,8 +29,8 @@ func (c *Client) Write(p []byte) (int, error) {
 		return 0, err
 	}
 
-	if resp.Errored {
-		err = errors.New(resp.Error)
+	if resp.Error != nil {
+		err = errors.New(*resp.Error)
 	}
 	return int(resp.Written), err
 }

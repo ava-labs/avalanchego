@@ -23,7 +23,7 @@ func NewClient(client messengerpb.MessengerClient) *Client {
 
 func (c *Client) Notify(msg common.Message) error {
 	_, err := c.client.Notify(context.Background(), &messengerpb.NotifyRequest{
-		Message: uint32(msg),
+		Message: messengerpb.Message(msg),
 	})
 	return err
 }

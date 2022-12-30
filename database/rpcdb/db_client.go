@@ -44,7 +44,7 @@ func (db *DatabaseClient) Has(key []byte) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return resp.Has, errCodeToError[resp.Err]
+	return resp.Has, errEnumToError[resp.Err]
 }
 
 // Get attempts to return the value that was mapped to the key that was provided
@@ -55,7 +55,7 @@ func (db *DatabaseClient) Get(key []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return resp.Value, errCodeToError[resp.Err]
+	return resp.Value, errEnumToError[resp.Err]
 }
 
 // Put attempts to set the value this key maps to
@@ -67,7 +67,7 @@ func (db *DatabaseClient) Put(key, value []byte) error {
 	if err != nil {
 		return err
 	}
-	return errCodeToError[resp.Err]
+	return errEnumToError[resp.Err]
 }
 
 // Delete attempts to remove any mapping from the key
@@ -78,7 +78,7 @@ func (db *DatabaseClient) Delete(key []byte) error {
 	if err != nil {
 		return err
 	}
-	return errCodeToError[resp.Err]
+	return errEnumToError[resp.Err]
 }
 
 // NewBatch returns a new batch
@@ -122,7 +122,7 @@ func (db *DatabaseClient) Compact(start, limit []byte) error {
 	if err != nil {
 		return err
 	}
-	return errCodeToError[resp.Err]
+	return errEnumToError[resp.Err]
 }
 
 // Close attempts to close the database
@@ -132,7 +132,7 @@ func (db *DatabaseClient) Close() error {
 	if err != nil {
 		return err
 	}
-	return errCodeToError[resp.Err]
+	return errEnumToError[resp.Err]
 }
 
 func (db *DatabaseClient) HealthCheck(ctx context.Context) (interface{}, error) {
@@ -199,7 +199,7 @@ func (b *batch) Write() error {
 	if err != nil {
 		return err
 	}
-	return errCodeToError[resp.Err]
+	return errEnumToError[resp.Err]
 }
 
 func (b *batch) Reset() {
@@ -273,7 +273,7 @@ func (it *iterator) Error() error {
 	if err != nil {
 		it.errs.Add(err)
 	} else {
-		it.errs.Add(errCodeToError[resp.Err])
+		it.errs.Add(errEnumToError[resp.Err])
 	}
 	return it.errs.Err
 }
@@ -302,6 +302,6 @@ func (it *iterator) Release() {
 	if err != nil {
 		it.errs.Add(err)
 	} else {
-		it.errs.Add(errCodeToError[resp.Err])
+		it.errs.Add(errEnumToError[resp.Err])
 	}
 }

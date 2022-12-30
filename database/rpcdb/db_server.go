@@ -50,7 +50,7 @@ func (db *DatabaseServer) Has(_ context.Context, req *rpcdbpb.HasRequest) (*rpcd
 	has, err := db.db.Has(req.Key)
 	return &rpcdbpb.HasResponse{
 		Has: has,
-		Err: errorToErrCode[err],
+		Err: errorToErrEnum[err],
 	}, errorToRPCError(err)
 }
 
@@ -59,34 +59,34 @@ func (db *DatabaseServer) Get(_ context.Context, req *rpcdbpb.GetRequest) (*rpcd
 	value, err := db.db.Get(req.Key)
 	return &rpcdbpb.GetResponse{
 		Value: value,
-		Err:   errorToErrCode[err],
+		Err:   errorToErrEnum[err],
 	}, errorToRPCError(err)
 }
 
 // Put delegates the Put call to the managed database and returns the result
 func (db *DatabaseServer) Put(_ context.Context, req *rpcdbpb.PutRequest) (*rpcdbpb.PutResponse, error) {
 	err := db.db.Put(req.Key, req.Value)
-	return &rpcdbpb.PutResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
+	return &rpcdbpb.PutResponse{Err: errorToErrEnum[err]}, errorToRPCError(err)
 }
 
 // Delete delegates the Delete call to the managed database and returns the
 // result
 func (db *DatabaseServer) Delete(_ context.Context, req *rpcdbpb.DeleteRequest) (*rpcdbpb.DeleteResponse, error) {
 	err := db.db.Delete(req.Key)
-	return &rpcdbpb.DeleteResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
+	return &rpcdbpb.DeleteResponse{Err: errorToErrEnum[err]}, errorToRPCError(err)
 }
 
 // Compact delegates the Compact call to the managed database and returns the
 // result
 func (db *DatabaseServer) Compact(_ context.Context, req *rpcdbpb.CompactRequest) (*rpcdbpb.CompactResponse, error) {
 	err := db.db.Compact(req.Start, req.Limit)
-	return &rpcdbpb.CompactResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
+	return &rpcdbpb.CompactResponse{Err: errorToErrEnum[err]}, errorToRPCError(err)
 }
 
 // Close delegates the Close call to the managed database and returns the result
 func (db *DatabaseServer) Close(context.Context, *rpcdbpb.CloseRequest) (*rpcdbpb.CloseResponse, error) {
 	err := db.db.Close()
-	return &rpcdbpb.CloseResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
+	return &rpcdbpb.CloseResponse{Err: errorToErrEnum[err]}, errorToRPCError(err)
 }
 
 // HealthCheck performs a heath check against the underlying database.
@@ -109,21 +109,21 @@ func (db *DatabaseServer) WriteBatch(_ context.Context, req *rpcdbpb.WriteBatchR
 	for _, put := range req.Puts {
 		if err := batch.Put(put.Key, put.Value); err != nil {
 			return &rpcdbpb.WriteBatchResponse{
-				Err: errorToErrCode[err],
+				Err: errorToErrEnum[err],
 			}, errorToRPCError(err)
 		}
 	}
 	for _, del := range req.Deletes {
 		if err := batch.Delete(del.Key); err != nil {
 			return &rpcdbpb.WriteBatchResponse{
-				Err: errorToErrCode[err],
+				Err: errorToErrEnum[err],
 			}, errorToRPCError(err)
 		}
 	}
 
 	err := batch.Write()
 	return &rpcdbpb.WriteBatchResponse{
-		Err: errorToErrCode[err],
+		Err: errorToErrEnum[err],
 	}, errorToRPCError(err)
 }
 
@@ -177,7 +177,7 @@ func (db *DatabaseServer) IteratorError(_ context.Context, req *rpcdbpb.Iterator
 		return nil, errUnknownIterator
 	}
 	err := it.Error()
-	return &rpcdbpb.IteratorErrorResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
+	return &rpcdbpb.IteratorErrorResponse{Err: errorToErrEnum[err]}, errorToRPCError(err)
 }
 
 // IteratorRelease attempts to release the resources allocated to an iterator
@@ -186,12 +186,12 @@ func (db *DatabaseServer) IteratorRelease(_ context.Context, req *rpcdbpb.Iterat
 	it, exists := db.iterators[req.Id]
 	if !exists {
 		db.iteratorLock.Unlock()
-		return &rpcdbpb.IteratorReleaseResponse{Err: 0}, nil
+		return &rpcdbpb.IteratorReleaseResponse{}, nil
 	}
 	delete(db.iterators, req.Id)
 	db.iteratorLock.Unlock()
 
 	err := it.Error()
 	it.Release()
-	return &rpcdbpb.IteratorReleaseResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
+	return &rpcdbpb.IteratorReleaseResponse{Err: errorToErrEnum[err]}, errorToRPCError(err)
 }
