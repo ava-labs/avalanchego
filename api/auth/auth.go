@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang-jwt/jwt"
+	jwt "github.com/golang-jwt/jwt/v4"
 
 	"github.com/gorilla/rpc/v2"
 
@@ -148,12 +148,12 @@ func (a *auth) NewToken(pw string, duration time.Duration, endpoints []string) (
 	if _, err := rand.Read(idBytes[:]); err != nil {
 		return "", fmt.Errorf("failed to generate the unique token ID due to %w", err)
 	}
-	id := base64.URLEncoding.EncodeToString(idBytes[:])
+	id := base64.RawURLEncoding.EncodeToString(idBytes[:])
 
 	claims := endpointClaims{
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: a.clock.Time().Add(duration).Unix(),
-			Id:        id,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(a.clock.Time().Add(duration)),
+			ID:        id,
 		},
 	}
 	if canAccessAll {
@@ -195,7 +195,7 @@ func (a *auth) RevokeToken(tokenStr, pw string) error {
 	if !ok {
 		return fmt.Errorf("expected auth token's claims to be type endpointClaims but is %T", token.Claims)
 	}
-	a.revoked.Add(claims.Id)
+	a.revoked.Add(claims.ID)
 	return nil
 }
 
@@ -216,7 +216,7 @@ func (a *auth) AuthenticateToken(tokenStr, url string) error {
 		return fmt.Errorf("expected auth token's claims to be type endpointClaims but is %T", token.Claims)
 	}
 
-	_, revoked := a.revoked[claims.Id]
+	_, revoked := a.revoked[claims.ID]
 	if revoked {
 		return errTokenRevoked
 	}
