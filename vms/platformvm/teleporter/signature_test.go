@@ -25,7 +25,7 @@ const pChainHeight uint64 = 1337
 var (
 	_ utils.Sortable[*testValidator] = (*testValidator)(nil)
 
-	errMock       = errors.New("")
+	errTest       = errors.New("non-nil error")
 	sourceChainID = ids.GenerateTestID()
 	subnetID      = ids.GenerateTestID()
 
@@ -102,7 +102,7 @@ func TestSignatureVerification(t *testing.T) {
 			name: "can't get subnetID",
 			stateF: func(ctrl *gomock.Controller) validators.State {
 				state := validators.NewMockState(ctrl)
-				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(subnetID, errMock)
+				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(subnetID, errTest)
 				return state
 			},
 			quorumNum: 1,
@@ -122,14 +122,14 @@ func TestSignatureVerification(t *testing.T) {
 				require.NoError(err)
 				return msg
 			},
-			err: errMock,
+			err: errTest,
 		},
 		{
 			name: "can't get validator set",
 			stateF: func(ctrl *gomock.Controller) validators.State {
 				state := validators.NewMockState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(subnetID, nil)
-				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(nil, errMock)
+				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(nil, errTest)
 				return state
 			},
 			quorumNum: 1,
@@ -149,7 +149,7 @@ func TestSignatureVerification(t *testing.T) {
 				require.NoError(err)
 				return msg
 			},
-			err: errMock,
+			err: errTest,
 		},
 		{
 			name: "weight overflow",

@@ -57,6 +57,7 @@ var (
 	errUnknownBlock      = errors.New("unknown block")
 	errUnverifiedBlock   = errors.New("unverified block")
 	errMarshallingFailed = errors.New("marshalling failed")
+	errTooHigh           = errors.New("too high")
 )
 
 func init() {
@@ -1903,7 +1904,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 			},
 			GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
 				if height >= uint64(len(coreHeights)) {
-					return ids.ID{}, errors.New("too high")
+					return ids.ID{}, errTooHigh
 				}
 				return coreHeights[height], nil
 			},
@@ -2113,7 +2114,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 			},
 			GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
 				if height >= uint64(len(coreHeights)) {
-					return ids.ID{}, errors.New("too high")
+					return ids.ID{}, errTooHigh
 				}
 				return coreHeights[height], nil
 			},

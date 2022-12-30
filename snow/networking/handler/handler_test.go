@@ -27,6 +27,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/resource"
 )
 
+var errFatal = errors.New("error should cause handler to close")
+
 func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	called := make(chan struct{})
 
@@ -157,7 +159,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		return ctx
 	}
 	bootstrapper.GetAcceptedFrontierF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-		return errors.New("Engine error should cause handler to close")
+		return errFatal
 	}
 	handler.SetBootstrapper(bootstrapper)
 

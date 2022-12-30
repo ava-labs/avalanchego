@@ -32,10 +32,10 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 			name: "can't get validator set",
 			stateF: func(ctrl *gomock.Controller) validators.State {
 				state := validators.NewMockState(ctrl)
-				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(nil, errMock)
+				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(nil, errTest)
 				return state
 			},
-			expectedErr: errMock,
+			expectedErr: errTest,
 		},
 		{
 			name: "all validators have public keys; no duplicate pub keys",

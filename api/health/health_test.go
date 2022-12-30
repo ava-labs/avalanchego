@@ -24,6 +24,8 @@ const (
 	awaitFreq = 50 * time.Microsecond
 )
 
+var errUnhealthy = errors.New("unhealthy")
+
 func awaitReadiness(r Reporter) {
 	for {
 		_, ready := r.Readiness()
@@ -190,13 +192,10 @@ func TestPassingChecks(t *testing.T) {
 func TestPassingThenFailingChecks(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		shouldCheckErr utils.AtomicBool
-		checkErr       = errors.New("unhealthy")
-	)
+	var shouldCheckErr utils.AtomicBool
 	check := CheckerFunc(func(context.Context) (interface{}, error) {
 		if shouldCheckErr.GetValue() {
-			return checkErr.Error(), checkErr
+			return errUnhealthy.Error(), errUnhealthy
 		}
 		return "", nil
 	})

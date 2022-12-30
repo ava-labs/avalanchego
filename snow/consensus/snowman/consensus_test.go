@@ -67,6 +67,8 @@ var (
 		ErrorOnAddDecidedBlock,
 		ErrorOnAddDuplicateBlockID,
 	}
+
+	errTest = errors.New("non-nil error")
 )
 
 // Execute all tests against a consensus implementation
@@ -1524,7 +1526,7 @@ func ErrorOnInitialRejectionTest(t *testing.T, factory Factory) {
 	block := &TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(2),
-			RejectV: errors.New(""),
+			RejectV: errTest,
 			StatusV: choices.Processing,
 		},
 		ParentV: rejectedBlock.IDV,
@@ -1558,7 +1560,7 @@ func ErrorOnAcceptTest(t *testing.T, factory Factory) {
 	block := &TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(1),
-			AcceptV: errors.New(""),
+			AcceptV: errTest,
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
@@ -1606,7 +1608,7 @@ func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
 	block1 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(2),
-			RejectV: errors.New(""),
+			RejectV: errTest,
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis.IDV,
@@ -1664,7 +1666,7 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 	block2 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(3),
-			RejectV: errors.New(""),
+			RejectV: errTest,
 			StatusV: choices.Processing,
 		},
 		ParentV: block1.IDV,

@@ -26,9 +26,12 @@ import (
 )
 
 var (
-	errUnknownBlock = errors.New("unknown block")
-	errUnknownBytes = errors.New("unknown bytes")
-	Genesis         = ids.GenerateTestID()
+	errUnknownBlock   = errors.New("unknown block")
+	errUnknownBytes   = errors.New("unknown bytes")
+	errInvalid        = errors.New("invalid")
+	errUnexpectedCall = errors.New("unexpected call")
+	errTest           = errors.New("non-nil test")
+	Genesis           = ids.GenerateTestID()
 )
 
 func setup(t *testing.T, commonCfg common.Config, engCfg Config) (ids.NodeID, validators.Set, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
@@ -1503,7 +1506,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 		},
 		ParentV: validBlk.IDV,
 		HeightV: 2,
-		VerifyV: errors.New(""),
+		VerifyV: errTest,
 		BytesV:  []byte{2},
 	}
 
@@ -2436,7 +2439,7 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 	pendingBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			RejectV: errors.New("shouldn't have issued to consensus"),
+			RejectV: errUnexpectedCall,
 			StatusV: choices.Processing,
 		},
 		ParentV: rejectedBlk.IDV,
@@ -2530,13 +2533,13 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 		},
 		ParentV: gBlk.ID(),
 		HeightV: 1,
-		VerifyV: errors.New("invalid"),
+		VerifyV: errUnexpectedCall,
 		BytesV:  []byte{2},
 	}
 	pendingBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			RejectV: errors.New("shouldn't have issued to consensus"),
+			RejectV: errUnexpectedCall,
 			StatusV: choices.Processing,
 		},
 		ParentV: rejectedBlk.IDV,
@@ -2716,7 +2719,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		ParentV: blk1.ID(),
 		HeightV: 2,
 		BytesV:  []byte{2},
-		VerifyV: errors.New("blk2 does not pass verification until after blk1 is accepted"),
+		VerifyV: errInvalid,
 	}
 
 	// The VM should be able to parse [blk1] and [blk2]
@@ -2939,7 +2942,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 		ParentV: blk1.ID(),
 		HeightV: 2,
 		BytesV:  []byte{2},
-		VerifyV: errors.New("blk2 does not pass verification until after blk1 is accepted"),
+		VerifyV: errInvalid,
 	}
 	// [blk3] is a child of [blk2] and will not attempt to be issued until
 	// [blk2] has successfully been verified.
@@ -3266,7 +3269,7 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 		},
 		ParentV: grandParentBlk.ID(),
 		HeightV: 2,
-		VerifyV: errors.New(""), // Reports as invalid
+		VerifyV: errTest, // Reports as invalid
 		BytesV:  []byte{2},
 	}
 

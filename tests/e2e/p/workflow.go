@@ -6,7 +6,6 @@ package p
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
@@ -210,7 +209,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 					common.WithContext(ctx),
 				)
 				cancel()
-				gomega.Expect(err).Should(gomega.BeNil(), fmt.Errorf("error timeout: %v", errors.Is(err, context.DeadlineExceeded)))
+				gomega.Expect(err).Should(gomega.BeNil(), "is context.DeadlineExceeded: %v", errors.Is(err, context.DeadlineExceeded))
 
 				ctx, cancel = context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
 				txStatus, err := xChainClient.GetTxStatus(ctx, importTxID)

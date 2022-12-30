@@ -86,6 +86,7 @@ var (
 	testSubnet1  *txs.Tx
 
 	errMissingPrimaryValidators = errors.New("missing primary validator set")
+	errMissing                  = errors.New("missing")
 )
 
 type stakerStatus uint
@@ -321,7 +322,7 @@ func defaultCtx(db database.Database) *snow.Context {
 				cChainID:                  constants.PrimaryNetworkID,
 			}[chainID]
 			if !ok {
-				return ids.Empty, errors.New("missing")
+				return ids.Empty, errMissing
 			}
 			return subnetID, nil
 		},

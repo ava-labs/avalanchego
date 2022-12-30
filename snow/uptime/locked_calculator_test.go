@@ -4,7 +4,6 @@
 package uptime
 
 import (
-	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -54,16 +53,15 @@ func TestLockedCalculator(t *testing.T) {
 	isBootstrapped.SetValue(true)
 
 	// Should return the value from the mocked inner calculator
-	mockErr := errors.New("mock error")
-	mockCalc.EXPECT().CalculateUptime(gomock.Any(), gomock.Any()).AnyTimes().Return(time.Duration(0), time.Time{}, mockErr)
+	mockCalc.EXPECT().CalculateUptime(gomock.Any(), gomock.Any()).AnyTimes().Return(time.Duration(0), time.Time{}, errTest)
 	_, _, err = lc.CalculateUptime(nodeID, subnetID)
-	require.ErrorIs(err, mockErr)
+	require.ErrorIs(err, errTest)
 
-	mockCalc.EXPECT().CalculateUptimePercent(gomock.Any(), gomock.Any()).AnyTimes().Return(float64(0), mockErr)
+	mockCalc.EXPECT().CalculateUptimePercent(gomock.Any(), gomock.Any()).AnyTimes().Return(float64(0), errTest)
 	_, err = lc.CalculateUptimePercent(nodeID, subnetID)
-	require.ErrorIs(err, mockErr)
+	require.ErrorIs(err, errTest)
 
-	mockCalc.EXPECT().CalculateUptimePercentFrom(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(float64(0), mockErr)
+	mockCalc.EXPECT().CalculateUptimePercentFrom(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(float64(0), errTest)
 	_, err = lc.CalculateUptimePercentFrom(nodeID, subnetID, time.Now())
-	require.ErrorIs(err, mockErr)
+	require.ErrorIs(err, errTest)
 }

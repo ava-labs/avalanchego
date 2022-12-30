@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"crypto"
-	"errors"
 	"testing"
 	"time"
 
@@ -628,7 +627,7 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 			case bytes.Equal(blkBytes, coreBlk3.Bytes()):
 				res = append(res, coreBlk3)
 			default:
-				return nil, errors.New("Unexpected call to parse unknown block")
+				return nil, errUnknownBlock
 			}
 		}
 		return res, nil
@@ -734,7 +733,7 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 			case bytes.Equal(blkBytes, coreBlk3.Bytes()):
 				res = append(res, coreBlk3)
 			default:
-				return nil, errors.New("Unexpected call to parse unknown block")
+				return nil, errUnknownBlock
 			}
 		}
 		return res, nil
@@ -894,7 +893,7 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 			case bytes.Equal(blkBytes, coreBlk4.Bytes()):
 				res = append(res, coreBlk4)
 			default:
-				return nil, errors.New("Unexpected call to parse unknown block")
+				return nil, errUnknownBlock
 			}
 		}
 		return res, nil

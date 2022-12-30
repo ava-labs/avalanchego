@@ -27,6 +27,7 @@ import (
 var (
 	errUnknownVertex       = errors.New("unknown vertex")
 	errParsedUnknownVertex = errors.New("parsed unknown vertex")
+	errUnknownTx           = errors.New("unknown tx")
 )
 
 func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.TestManager, *vertex.TestVM) {
@@ -398,7 +399,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		case bytes.Equal(b, txBytes1):
 			return tx1, nil
 		default:
-			return nil, errors.New("wrong tx")
+			return nil, errUnknownTx
 		}
 	}
 

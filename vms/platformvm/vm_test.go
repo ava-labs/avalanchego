@@ -125,6 +125,8 @@ var (
 
 	// Used to create and use keys.
 	testKeyFactory crypto.FactorySECP256K1R
+
+	errMissing = errors.New("missing")
 )
 
 type mutableSharedMemory struct {
@@ -161,7 +163,7 @@ func defaultContext() *snow.Context {
 				cChainID:                  constants.PrimaryNetworkID,
 			}[chainID]
 			if !ok {
-				return ids.Empty, errors.New("missing")
+				return ids.Empty, errMissing
 			}
 			return subnetID, nil
 		},

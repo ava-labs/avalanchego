@@ -21,6 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+var errCustom = errors.New("custom error")
+
 func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 	type test struct {
 		name   string
@@ -53,8 +55,6 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 
 	// A BaseTx that fails syntactic verification.
 	invalidBaseTx := BaseTx{}
-
-	errCustom := errors.New("custom error")
 
 	tests := []test{
 		{

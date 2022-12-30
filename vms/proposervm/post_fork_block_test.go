@@ -18,6 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
+var errDuplicateVerify = errors.New("duplicate verify")
+
 // ProposerBlock Option interface tests section
 func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 	// setup
@@ -809,7 +811,7 @@ func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	}
 
 	// set error on coreBlock.Verify and recall Verify()
-	coreBlk.VerifyV = errors.New("core block verify should only be called once")
+	coreBlk.VerifyV = errDuplicateVerify
 	if err := builtBlk.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}

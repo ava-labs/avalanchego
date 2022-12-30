@@ -31,7 +31,11 @@ import (
 	smblockmocks "github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 )
 
-var _ server.PathAdder = (*apiServerMock)(nil)
+var (
+	_ server.PathAdder = (*apiServerMock)(nil)
+
+	errUnimplemented = errors.New("unimplemented")
+)
 
 type apiServerMock struct {
 	timesCalled int
@@ -47,7 +51,7 @@ func (a *apiServerMock) AddRoute(_ *common.HTTPHandler, _ *sync.RWMutex, base, e
 }
 
 func (*apiServerMock) AddAliases(string, ...string) error {
-	return errors.New("unimplemented")
+	return errUnimplemented
 }
 
 // Test that newIndexer sets fields correctly

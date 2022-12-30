@@ -26,6 +26,7 @@ var (
 	testPassword              = "password!@#$%$#@!"
 	hashedPassword            = password.Hash{}
 	unAuthorizedResponseRegex = "^{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"(.*)\"},\"id\":1}"
+	errTest                   = errors.New("non-nil error")
 )
 
 func init() {
@@ -279,9 +280,9 @@ func TestWrapHandlerAccessAll(t *testing.T) {
 
 func TestWriteUnauthorizedResponse(t *testing.T) {
 	rr := httptest.NewRecorder()
-	writeUnauthorizedResponse(rr, errors.New("example err"))
+	writeUnauthorizedResponse(rr, errTest)
 	require.Equal(t, http.StatusUnauthorized, rr.Code)
-	require.Equal(t, "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"example err\"},\"id\":1}\n", rr.Body.String())
+	require.Equal(t, "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"non-nil error\"},\"id\":1}\n", rr.Body.String())
 }
 
 func TestWrapHandlerMutatedRevokedToken(t *testing.T) {

@@ -4,7 +4,6 @@
 package txs
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -27,9 +26,8 @@ func TestTransformSubnetTxSyntacticVerify(t *testing.T) {
 	}
 
 	var (
-		networkID            = uint32(1337)
-		chainID              = ids.GenerateTestID()
-		errInvalidSubnetAuth = errors.New("invalid subnet auth")
+		networkID = uint32(1337)
+		chainID   = ids.GenerateTestID()
 	)
 
 	ctx := &snow.Context{

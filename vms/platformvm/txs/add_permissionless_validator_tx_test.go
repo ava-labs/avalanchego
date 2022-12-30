@@ -4,7 +4,6 @@
 package txs
 
 import (
-	"errors"
 	"math"
 	"testing"
 
@@ -61,8 +60,6 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 
 	// A BaseTx that fails syntactic verification.
 	invalidBaseTx := BaseTx{}
-
-	errCustom := errors.New("custom error")
 
 	tests := []test{
 		{

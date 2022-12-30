@@ -37,6 +37,8 @@ import (
 // never overflow
 const _ time.Duration = math.MaxUint32 * time.Second
 
+var errTest = errors.New("non-nil error")
+
 func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment( /*postBanff*/ false)
@@ -1260,7 +1262,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					},
 				}
 				env.state.EXPECT().GetTx(env.unsignedTx.Subnet).Return(subnetTx, status.Committed, nil)
-				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(errors.New(""))
+				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(errTest)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{
@@ -1296,7 +1298,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil)
 				env.flowChecker.EXPECT().VerifySpend(
 					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
-				).Return(errors.New(""))
+				).Return(errTest)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config: &config.Config{

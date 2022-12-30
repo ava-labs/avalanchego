@@ -26,34 +26,38 @@ import (
 
 type testFunc func(*testing.T, Factory)
 
-var testFuncs = []testFunc{
-	MetricsTest,
-	NumProcessingTest,
-	AddTest,
-	VertexIssuedTest,
-	TxIssuedTest,
-	VirtuousTest,
-	VirtuousSkippedUpdateTest,
-	VotingTest,
-	IgnoreInvalidVotingTest,
-	IgnoreInvalidTransactionVertexVotingTest,
-	TransitiveVotingTest,
-	SplitVotingTest,
-	TransitiveRejectionTest,
-	IsVirtuousTest,
-	QuiesceTest,
-	QuiesceAfterVotingTest,
-	TransactionVertexTest,
-	OrphansTest,
-	OrphansUpdateTest,
-	ErrorOnVacuousAcceptTest,
-	ErrorOnTxAcceptTest,
-	ErrorOnVtxAcceptTest,
-	ErrorOnVtxRejectTest,
-	ErrorOnParentVtxRejectTest,
-	ErrorOnTransitiveVtxRejectTest,
-	SilenceTransactionVertexEventsTest,
-}
+var (
+	testFuncs = []testFunc{
+		MetricsTest,
+		NumProcessingTest,
+		AddTest,
+		VertexIssuedTest,
+		TxIssuedTest,
+		VirtuousTest,
+		VirtuousSkippedUpdateTest,
+		VotingTest,
+		IgnoreInvalidVotingTest,
+		IgnoreInvalidTransactionVertexVotingTest,
+		TransitiveVotingTest,
+		SplitVotingTest,
+		TransitiveRejectionTest,
+		IsVirtuousTest,
+		QuiesceTest,
+		QuiesceAfterVotingTest,
+		TransactionVertexTest,
+		OrphansTest,
+		OrphansUpdateTest,
+		ErrorOnVacuousAcceptTest,
+		ErrorOnTxAcceptTest,
+		ErrorOnVtxAcceptTest,
+		ErrorOnVtxRejectTest,
+		ErrorOnParentVtxRejectTest,
+		ErrorOnTransitiveVtxRejectTest,
+		SilenceTransactionVertexEventsTest,
+	}
+
+	errTest = errors.New("non-nil error")
+)
 
 func runConsensusTests(t *testing.T, factory Factory) {
 	for _, test := range testFuncs {
@@ -2171,7 +2175,7 @@ func ErrorOnVacuousAcceptTest(t *testing.T, factory Factory) {
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
-		AcceptV: errors.New(""),
+		AcceptV: errTest,
 		StatusV: choices.Processing,
 	}}
 
@@ -2220,7 +2224,7 @@ func ErrorOnTxAcceptTest(t *testing.T, factory Factory) {
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
-		AcceptV: errors.New(""),
+		AcceptV: errTest,
 		StatusV: choices.Processing,
 	}}
 	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
@@ -2283,7 +2287,7 @@ func ErrorOnVtxAcceptTest(t *testing.T, factory Factory) {
 	vtx0 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			AcceptV: errors.New(""),
+			AcceptV: errTest,
 			StatusV: choices.Processing,
 		},
 		ParentsV: vts,
@@ -2355,7 +2359,7 @@ func ErrorOnVtxRejectTest(t *testing.T, factory Factory) {
 	vtx1 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			RejectV: errors.New(""),
+			RejectV: errTest,
 			StatusV: choices.Processing,
 		},
 		ParentsV: vts,
@@ -2429,7 +2433,7 @@ func ErrorOnParentVtxRejectTest(t *testing.T, factory Factory) {
 	vtx1 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			RejectV: errors.New(""),
+			RejectV: errTest,
 			StatusV: choices.Processing,
 		},
 		ParentsV: vts,
@@ -2525,7 +2529,7 @@ func ErrorOnTransitiveVtxRejectTest(t *testing.T, factory Factory) {
 	vtx2 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			RejectV: errors.New(""),
+			RejectV: errTest,
 			StatusV: choices.Processing,
 		},
 		ParentsV: []Vertex{vtx1},

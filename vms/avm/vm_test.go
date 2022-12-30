@@ -59,6 +59,9 @@ var (
 	password       = "StrnasfqewiurPasswdn56d" // #nosec G101
 	feeAssetName   = "TEST"
 	otherAssetName = "OTHER"
+
+	errMissing = errors.New("missing")
+	errTest    = errors.New("non-nil error")
 )
 
 func init() {
@@ -107,7 +110,7 @@ func NewContext(tb testing.TB) *snow.Context {
 				chainID:                   ctx.SubnetID,
 			}[chainID]
 			if !ok {
-				return ids.Empty, errors.New("missing")
+				return ids.Empty, errMissing
 			}
 			return subnetID, nil
 		},
@@ -1115,7 +1118,7 @@ func TestTxCached(t *testing.T) {
 	called := new(bool)
 	db.OnGet = func([]byte) ([]byte, error) {
 		*called = true
-		return nil, errors.New("")
+		return nil, errTest
 	}
 
 	registerer := prometheus.NewRegistry()
@@ -1151,7 +1154,7 @@ func TestTxNotCached(t *testing.T) {
 	called := new(bool)
 	db.OnGet = func([]byte) ([]byte, error) {
 		*called = true
-		return nil, errors.New("")
+		return nil, errTest
 	}
 	db.OnPut = func([]byte, []byte) error {
 		return nil

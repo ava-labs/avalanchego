@@ -66,12 +66,12 @@ func TestReload_GetNewVMsFails(t *testing.T) {
 	resources := initVMRegistryTest(t)
 	defer resources.ctrl.Finish()
 
-	resources.mockVMGetter.EXPECT().Get().Times(1).Return(nil, nil, errOops)
+	resources.mockVMGetter.EXPECT().Get().Times(1).Return(nil, nil, errTest)
 
 	installedVMs, failedVMs, err := resources.vmRegistry.Reload(context.Background())
 	require.Empty(t, installedVMs)
 	require.Empty(t, failedVMs)
-	require.ErrorIs(t, err, errOops)
+	require.ErrorIs(t, err, errTest)
 }
 
 // Tests that if we fail to register a VM, we fail.
@@ -101,7 +101,7 @@ func TestReload_PartialRegisterFailure(t *testing.T) {
 	resources.mockVMRegisterer.EXPECT().
 		Register(gomock.Any(), id3, factory3).
 		Times(1).
-		Return(errOops)
+		Return(errTest)
 	resources.mockVMRegisterer.EXPECT().
 		Register(gomock.Any(), id4, factory4).
 		Times(1).
@@ -110,7 +110,7 @@ func TestReload_PartialRegisterFailure(t *testing.T) {
 	installedVMs, failedVMs, err := resources.vmRegistry.Reload(context.Background())
 
 	require.Len(t, failedVMs, 1)
-	require.ErrorIs(t, failedVMs[id3], errOops)
+	require.ErrorIs(t, failedVMs[id3], errTest)
 	require.Len(t, installedVMs, 1)
 	require.Equal(t, id4, installedVMs[0])
 	require.NoError(t, err)
@@ -160,12 +160,12 @@ func TestReloadWithReadLock_GetNewVMsFails(t *testing.T) {
 	resources := initVMRegistryTest(t)
 	defer resources.ctrl.Finish()
 
-	resources.mockVMGetter.EXPECT().Get().Times(1).Return(nil, nil, errOops)
+	resources.mockVMGetter.EXPECT().Get().Times(1).Return(nil, nil, errTest)
 
 	installedVMs, failedVMs, err := resources.vmRegistry.ReloadWithReadLock(context.Background())
 	require.Empty(t, installedVMs)
 	require.Empty(t, failedVMs)
-	require.ErrorIs(t, err, errOops)
+	require.ErrorIs(t, err, errTest)
 }
 
 // Tests that if we fail to register a VM, we fail.
@@ -195,7 +195,7 @@ func TestReloadWithReadLock_PartialRegisterFailure(t *testing.T) {
 	resources.mockVMRegisterer.EXPECT().
 		RegisterWithReadLock(gomock.Any(), id3, factory3).
 		Times(1).
-		Return(errOops)
+		Return(errTest)
 	resources.mockVMRegisterer.EXPECT().
 		RegisterWithReadLock(gomock.Any(), id4, factory4).
 		Times(1).
@@ -204,7 +204,7 @@ func TestReloadWithReadLock_PartialRegisterFailure(t *testing.T) {
 	installedVMs, failedVMs, err := resources.vmRegistry.ReloadWithReadLock(context.Background())
 
 	require.Len(t, failedVMs, 1)
-	require.ErrorIs(t, failedVMs[id3], errOops)
+	require.ErrorIs(t, failedVMs[id3], errTest)
 	require.Len(t, installedVMs, 1)
 	require.Equal(t, id4, installedVMs[0])
 	require.NoError(t, err)

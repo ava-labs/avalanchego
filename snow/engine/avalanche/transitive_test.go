@@ -39,6 +39,7 @@ var (
 	errUnknownVertex = errors.New("unknown vertex")
 	errFailedParsing = errors.New("failed parsing")
 	errMissing       = errors.New("missing")
+	errTest          = errors.New("non-nil error")
 )
 
 type dummyHandler struct {
@@ -3449,7 +3450,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		VerifyV: errors.New(""),
+		VerifyV: errTest,
 	}
 	tx1.InputIDsV = append(tx1.InputIDsV, utxos[1])
 
@@ -3508,7 +3509,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 		case vtx1.ID():
 			return vtx1, nil
 		}
-		return nil, errors.New("Unknown vtx")
+		return nil, errUnknownVertex
 	}
 
 	if err := te.Chits(context.Background(), vdr, *reqID, []ids.ID{vtx1.ID()}); err != nil {
@@ -3553,7 +3554,7 @@ func TestEnginePartiallyValidVertex(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		VerifyV: errors.New(""),
+		VerifyV: errTest,
 	}
 	tx1.InputIDsV = append(tx1.InputIDsV, utxos[1])
 
@@ -4668,7 +4669,7 @@ func TestAbandonTx(t *testing.T) {
 		DependenciesV: []snowstorm.Tx{gTx},
 		InputIDsV:     []ids.ID{gTx.ID()},
 		BytesV:        utils.RandomBytes(32),
-		VerifyV:       errors.New(""),
+		VerifyV:       errTest,
 	}
 
 	tx1 := &snowstorm.TestTx{ // Depends on tx0
@@ -4721,7 +4722,7 @@ func TestAbandonTx(t *testing.T) {
 			return vtx1, nil
 		}
 		require.FailNow("should have asked to parse vtx1")
-		return nil, errors.New("should have asked to parse vtx1")
+		return nil, nil
 	}
 	err = te.Put(context.Background(), vdr, 0, vtx1.Bytes())
 	require.NoError(err)
@@ -4737,7 +4738,7 @@ func TestAbandonTx(t *testing.T) {
 			return vtx0, nil
 		}
 		require.FailNow("should have asked to parse vtx0")
-		return nil, errors.New("should have asked to parse vtx0")
+		return nil, nil
 	}
 	err = te.Put(context.Background(), vdr, 0, vtx0.Bytes())
 	require.NoError(err)

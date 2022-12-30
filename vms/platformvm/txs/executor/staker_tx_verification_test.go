@@ -4,7 +4,6 @@
 package executor
 
 import (
-	"errors"
 	"testing"
 	"time"
 
@@ -399,7 +398,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
-				).Return(errors.New("flow check failed"))
+				).Return(errFlowCheckFailed)
 
 				return &Backend{
 					FlowChecker: flowChecker,
@@ -568,7 +567,6 @@ func TestGetValidatorRules(t *testing.T) {
 		avaxAssetID   = ids.GenerateTestID()
 		customAssetID = ids.GenerateTestID()
 		subnetID      = ids.GenerateTestID()
-		testErr       = errors.New("an error")
 	)
 
 	tests := []test{
@@ -599,11 +597,11 @@ func TestGetValidatorRules(t *testing.T) {
 			backend:  nil,
 			chainStateF: func(ctrl *gomock.Controller) state.Chain {
 				state := state.NewMockChain(ctrl)
-				state.EXPECT().GetSubnetTransformation(subnetID).Return(nil, testErr)
+				state.EXPECT().GetSubnetTransformation(subnetID).Return(nil, errTest)
 				return state
 			},
 			expectedRules: &addValidatorRules{},
-			expectedErr:   testErr,
+			expectedErr:   errTest,
 		},
 		{
 			name:     "invalid transformation tx",
@@ -688,7 +686,6 @@ func TestGetDelegatorRules(t *testing.T) {
 		avaxAssetID   = ids.GenerateTestID()
 		customAssetID = ids.GenerateTestID()
 		subnetID      = ids.GenerateTestID()
-		testErr       = errors.New("an error")
 	)
 	tests := []test{
 		{
@@ -718,11 +715,11 @@ func TestGetDelegatorRules(t *testing.T) {
 			backend:  nil,
 			chainStateF: func(ctrl *gomock.Controller) state.Chain {
 				state := state.NewMockChain(ctrl)
-				state.EXPECT().GetSubnetTransformation(subnetID).Return(nil, testErr)
+				state.EXPECT().GetSubnetTransformation(subnetID).Return(nil, errTest)
 				return state
 			},
 			expectedRules: &addDelegatorRules{},
-			expectedErr:   testErr,
+			expectedErr:   errTest,
 		},
 		{
 			name:     "invalid transformation tx",

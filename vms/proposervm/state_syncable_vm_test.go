@@ -29,6 +29,8 @@ import (
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
+var errUnknownSummary = errors.New("unknown summary")
+
 func stopHeightReindexing(t *testing.T, coreVM *fullVM, dbMan manager.Manager) {
 	rawDB := dbMan.Current().Database
 	prefixDB := prefixdb.New(dbPrefix, rawDB)
@@ -623,7 +625,7 @@ func TestNoStateSummariesServedWhileRepairingHeightIndex(t *testing.T) {
 	}
 	coreVM.GetStateSummaryF = func(_ context.Context, height uint64) (block.StateSummary, error) {
 		if height != summaryHeight {
-			return nil, errors.New("requested unexpected summary")
+			return nil, errUnknownSummary
 		}
 		return coreStateSummary, nil
 	}

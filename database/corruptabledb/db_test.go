@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 )
 
+var errTest = errors.New("non-nil error")
+
 func TestInterface(t *testing.T) {
 	for _, test := range database.Tests {
 		baseDB := memdb.New()
@@ -66,12 +68,11 @@ func TestCorruption(t *testing.T) {
 	baseDB := memdb.New()
 	// wrap this db
 	corruptableDB := New(baseDB)
-	initError := errors.New("corruption error")
-	_ = corruptableDB.handleError(initError)
+	_ = corruptableDB.handleError(errTest)
 	for name, testFn := range tests {
 		t.Run(name, func(tt *testing.T) {
 			err := testFn(corruptableDB)
-			require.ErrorIsf(tt, err, initError, "not received the corruption error")
+			require.ErrorIsf(tt, err, errTest, "not received the corruption error")
 		})
 	}
 }

@@ -4,7 +4,6 @@
 package txs
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/codec"
@@ -112,7 +111,7 @@ func TestTxInvalidCredential(t *testing.T) {
 				},
 			}},
 		}},
-		Creds: []*fxs.FxCredential{{Verifiable: &avax.TestVerifiable{Err: errors.New("")}}},
+		Creds: []*fxs.FxCredential{{Verifiable: &avax.TestVerifiable{Err: errTest}}},
 	}
 	tx.SetBytes(nil, nil)
 

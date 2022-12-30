@@ -10,6 +10,8 @@ import (
 	"testing"
 )
 
+var errTest = errors.New("non-nil error")
+
 // Assert that when no members are assigned values, every method returns nil/error
 func TestDefaultError(t *testing.T) {
 	db := New()
@@ -61,12 +63,12 @@ func TestGet(t *testing.T) {
 		if bytes.Equal(b, []byte{1, 2, 3}) {
 			return true, nil
 		}
-		return false, errors.New("")
+		return false, errTest
 	}
 
 	if has, err := db.Has([]byte{1, 2, 3}); err != nil {
 		t.Fatal("should not have errored")
-	} else if has != true {
+	} else if !has {
 		t.Fatal("has should be true")
 	}
 

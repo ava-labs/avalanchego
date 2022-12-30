@@ -21,7 +21,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-var _ Block = (*TestBlock)(nil)
+var (
+	_ Block = (*TestBlock)(nil)
+
+	errCantBuildBlock = errors.New("can't build new block")
+	errVerify         = errors.New("verify failed")
+	errAccept         = errors.New("accept failed")
+	errReject         = errors.New("reject failed")
+)
 
 type TestBlock struct {
 	*snowman.TestBlock
@@ -122,7 +129,7 @@ func createInternalBlockFuncs(t *testing.T, blks []*TestBlock) (
 }
 
 func cantBuildBlock(context.Context) (snowman.Block, error) {
-	return nil, errors.New("can't build new block")
+	return nil, errCantBuildBlock
 }
 
 // checkProcessingBlock checks that [blk] is of the correct type and is
@@ -399,11 +406,11 @@ func TestStateDecideBlock(t *testing.T) {
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 	badAcceptBlk := testBlks[1]
-	badAcceptBlk.AcceptV = errors.New("this block should fail on Accept")
+	badAcceptBlk.AcceptV = errAccept
 	badVerifyBlk := testBlks[2]
-	badVerifyBlk.VerifyV = errors.New("this block should fail verification")
+	badVerifyBlk.VerifyV = errVerify
 	badRejectBlk := testBlks[3]
-	badRejectBlk.RejectV = errors.New("this block should fail on reject")
+	badRejectBlk.RejectV = errReject
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 	chainState := NewState(&Config{
 		DecidedCacheSize:    2,
@@ -684,7 +691,7 @@ func TestStateBytesToIDCache(t *testing.T) {
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 	buildBlock := func(context.Context) (snowman.Block, error) {
 		t.Fatal("shouldn't have been called")
-		return nil, errors.New("")
+		return nil, nil
 	}
 
 	chainState := NewState(&Config{

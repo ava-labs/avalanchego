@@ -31,9 +31,9 @@ func TestRegisterRegisterVMFails(t *testing.T) {
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 
 	// We fail to register the VM
-	resources.mockManager.EXPECT().RegisterFactory(gomock.Any(), id, vmFactory).Times(1).Return(errOops)
+	resources.mockManager.EXPECT().RegisterFactory(gomock.Any(), id, vmFactory).Times(1).Return(errTest)
 
-	require.ErrorIs(t, resources.registerer.Register(context.Background(), id, vmFactory), errOops)
+	require.ErrorIs(t, resources.registerer.Register(context.Background(), id, vmFactory), errTest)
 }
 
 // Tests Register if a VM doesn't actually implement VM.
@@ -62,10 +62,10 @@ func TestRegisterCreateHandlersAndShutdownFails(t *testing.T) {
 	resources.mockManager.EXPECT().RegisterFactory(gomock.Any(), id, vmFactory).Times(1).Return(nil)
 	vmFactory.EXPECT().New(nil).Times(1).Return(vm, nil)
 	// We fail to create handlers + fail to shutdown
-	vm.EXPECT().CreateStaticHandlers(gomock.Any()).Return(nil, errOops).Times(1)
-	vm.EXPECT().Shutdown(gomock.Any()).Return(errOops).Times(1)
+	vm.EXPECT().CreateStaticHandlers(gomock.Any()).Return(nil, errTest).Times(1)
+	vm.EXPECT().Shutdown(gomock.Any()).Return(errTest).Times(1)
 
-	require.ErrorIs(t, resources.registerer.Register(context.Background(), id, vmFactory), errOops)
+	require.ErrorIs(t, resources.registerer.Register(context.Background(), id, vmFactory), errTest)
 }
 
 // Tests Register if creating endpoints for a VM fails + shutdown succeeds
@@ -79,10 +79,10 @@ func TestRegisterCreateHandlersFails(t *testing.T) {
 	resources.mockManager.EXPECT().RegisterFactory(gomock.Any(), id, vmFactory).Times(1).Return(nil)
 	vmFactory.EXPECT().New(nil).Times(1).Return(vm, nil)
 	// We fail to create handlers + but succeed our shutdown
-	vm.EXPECT().CreateStaticHandlers(gomock.Any()).Return(nil, errOops).Times(1)
+	vm.EXPECT().CreateStaticHandlers(gomock.Any()).Return(nil, errTest).Times(1)
 	vm.EXPECT().Shutdown(gomock.Any()).Return(nil).Times(1)
 
-	require.ErrorIs(t, resources.registerer.Register(context.Background(), id, vmFactory), errOops)
+	require.ErrorIs(t, resources.registerer.Register(context.Background(), id, vmFactory), errTest)
 }
 
 // Tests Register if we fail to register the new endpoint on the server.
@@ -109,9 +109,9 @@ func TestRegisterAddRouteFails(t *testing.T) {
 			"foo",
 		).
 		Times(1).
-		Return(errOops)
+		Return(errTest)
 
-	require.ErrorIs(t, resources.registerer.Register(context.Background(), id, vmFactory), errOops)
+	require.ErrorIs(t, resources.registerer.Register(context.Background(), id, vmFactory), errTest)
 }
 
 // Tests Register we can't find the alias for the newly registered vm
@@ -139,9 +139,9 @@ func TestRegisterAliasLookupFails(t *testing.T) {
 		).
 		Times(1).
 		Return(nil)
-	resources.mockManager.EXPECT().Aliases(id).Times(1).Return(nil, errOops)
+	resources.mockManager.EXPECT().Aliases(id).Times(1).Return(nil, errTest)
 
-	require.ErrorIs(t, resources.registerer.Register(context.Background(), id, vmFactory), errOops)
+	require.ErrorIs(t, resources.registerer.Register(context.Background(), id, vmFactory), errTest)
 }
 
 // Tests Register if adding aliases for the newly registered vm fails
@@ -177,9 +177,9 @@ func TestRegisterAddAliasesFails(t *testing.T) {
 			path.Join(constants.VMAliasPrefix, aliases[0]),
 			path.Join(constants.VMAliasPrefix, aliases[1]),
 		).
-		Return(errOops)
+		Return(errTest)
 
-	require.ErrorIs(t, resources.registerer.Register(context.Background(), id, vmFactory), errOops)
+	require.ErrorIs(t, resources.registerer.Register(context.Background(), id, vmFactory), errTest)
 }
 
 // Tests Register if no errors are thrown
@@ -228,9 +228,9 @@ func TestRegisterWithReadLockRegisterVMFails(t *testing.T) {
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 
 	// We fail to register the VM
-	resources.mockManager.EXPECT().RegisterFactory(gomock.Any(), id, vmFactory).Times(1).Return(errOops)
+	resources.mockManager.EXPECT().RegisterFactory(gomock.Any(), id, vmFactory).Times(1).Return(errTest)
 
-	require.ErrorIs(t, resources.registerer.RegisterWithReadLock(context.Background(), id, vmFactory), errOops)
+	require.ErrorIs(t, resources.registerer.RegisterWithReadLock(context.Background(), id, vmFactory), errTest)
 }
 
 // Tests RegisterWithReadLock if a VM doesn't actually implement VM.
@@ -259,10 +259,10 @@ func TestRegisterWithReadLockCreateHandlersAndShutdownFails(t *testing.T) {
 	resources.mockManager.EXPECT().RegisterFactory(gomock.Any(), id, vmFactory).Times(1).Return(nil)
 	vmFactory.EXPECT().New(nil).Times(1).Return(vm, nil)
 	// We fail to create handlers + fail to shutdown
-	vm.EXPECT().CreateStaticHandlers(gomock.Any()).Return(nil, errOops).Times(1)
-	vm.EXPECT().Shutdown(gomock.Any()).Return(errOops).Times(1)
+	vm.EXPECT().CreateStaticHandlers(gomock.Any()).Return(nil, errTest).Times(1)
+	vm.EXPECT().Shutdown(gomock.Any()).Return(errTest).Times(1)
 
-	require.ErrorIs(t, resources.registerer.RegisterWithReadLock(context.Background(), id, vmFactory), errOops)
+	require.ErrorIs(t, resources.registerer.RegisterWithReadLock(context.Background(), id, vmFactory), errTest)
 }
 
 // Tests RegisterWithReadLock if creating endpoints for a VM fails + shutdown succeeds
@@ -276,10 +276,10 @@ func TestRegisterWithReadLockCreateHandlersFails(t *testing.T) {
 	resources.mockManager.EXPECT().RegisterFactory(gomock.Any(), id, vmFactory).Times(1).Return(nil)
 	vmFactory.EXPECT().New(nil).Times(1).Return(vm, nil)
 	// We fail to create handlers + but succeed our shutdown
-	vm.EXPECT().CreateStaticHandlers(gomock.Any()).Return(nil, errOops).Times(1)
+	vm.EXPECT().CreateStaticHandlers(gomock.Any()).Return(nil, errTest).Times(1)
 	vm.EXPECT().Shutdown(gomock.Any()).Return(nil).Times(1)
 
-	require.ErrorIs(t, resources.registerer.RegisterWithReadLock(context.Background(), id, vmFactory), errOops)
+	require.ErrorIs(t, resources.registerer.RegisterWithReadLock(context.Background(), id, vmFactory), errTest)
 }
 
 // Tests RegisterWithReadLock if we fail to register the new endpoint on the server.
@@ -306,9 +306,9 @@ func TestRegisterWithReadLockAddRouteWithReadLockFails(t *testing.T) {
 			"foo",
 		).
 		Times(1).
-		Return(errOops)
+		Return(errTest)
 
-	require.ErrorIs(t, resources.registerer.RegisterWithReadLock(context.Background(), id, vmFactory), errOops)
+	require.ErrorIs(t, resources.registerer.RegisterWithReadLock(context.Background(), id, vmFactory), errTest)
 }
 
 // Tests RegisterWithReadLock we can't find the alias for the newly registered vm
@@ -336,9 +336,9 @@ func TestRegisterWithReadLockAliasLookupFails(t *testing.T) {
 		).
 		Times(1).
 		Return(nil)
-	resources.mockManager.EXPECT().Aliases(id).Times(1).Return(nil, errOops)
+	resources.mockManager.EXPECT().Aliases(id).Times(1).Return(nil, errTest)
 
-	require.ErrorIs(t, resources.registerer.RegisterWithReadLock(context.Background(), id, vmFactory), errOops)
+	require.ErrorIs(t, resources.registerer.RegisterWithReadLock(context.Background(), id, vmFactory), errTest)
 }
 
 // Tests RegisterWithReadLock if adding aliases for the newly registered vm fails
@@ -374,9 +374,9 @@ func TestRegisterWithReadLockAddAliasesFails(t *testing.T) {
 			path.Join(constants.VMAliasPrefix, aliases[0]),
 			path.Join(constants.VMAliasPrefix, aliases[1]),
 		).
-		Return(errOops)
+		Return(errTest)
 
-	require.ErrorIs(t, resources.registerer.RegisterWithReadLock(context.Background(), id, vmFactory), errOops)
+	require.ErrorIs(t, resources.registerer.RegisterWithReadLock(context.Background(), id, vmFactory), errTest)
 }
 
 // Tests RegisterWithReadLock if no errors are thrown
