@@ -156,17 +156,17 @@ func (mr *MockEngineMockRecorder) AppResponse(arg0, arg1, arg2, arg3 interface{}
 }
 
 // Chits mocks base method.
-func (m *MockEngine) Chits(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3 []ids.ID) error {
+func (m *MockEngine) Chits(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3, arg4 []ids.ID) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Chits", arg0, arg1, arg2, arg3)
+	ret := m.ctrl.Call(m, "Chits", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Chits indicates an expected call of Chits.
-func (mr *MockEngineMockRecorder) Chits(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+func (mr *MockEngineMockRecorder) Chits(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Chits", reflect.TypeOf((*MockEngine)(nil).Chits), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Chits", reflect.TypeOf((*MockEngine)(nil).Chits), arg0, arg1, arg2, arg3, arg4)
 }
 
 // Connected mocks base method.

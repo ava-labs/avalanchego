@@ -643,7 +643,19 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 			return engine.QueryFailed(ctx, nodeID, msg.RequestId)
 		}
 
-		return engine.Chits(ctx, nodeID, msg.RequestId, votes)
+		accepted, err := getIDs(msg.AcceptedContainerIds)
+		if err != nil {
+			h.ctx.Log.Debug("message with invalid field",
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("messageOp", message.ChitsOp),
+				zap.Uint32("requestID", msg.RequestId),
+				zap.String("field", "AcceptedContainerIDs"),
+				zap.Error(err),
+			)
+			return engine.QueryFailed(ctx, nodeID, msg.RequestId)
+		}
+
+		return engine.Chits(ctx, nodeID, msg.RequestId, votes, accepted)
 
 	case *message.QueryFailed:
 		return engine.QueryFailed(ctx, nodeID, msg.RequestID)

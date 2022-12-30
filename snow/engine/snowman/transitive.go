@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/poll"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/events"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -66,6 +67,9 @@ type Transitive struct {
 	// occurs.
 	nonVerifiedCache cache.Cacher
 
+	// acceptedFrontiers of the other validators of this chain
+	acceptedFrontiers tracker.Accepted
+
 	// operations that are blocked on a block being issued. This could be
 	// issuing another block, responding to a query, or applying votes to consensus
 	blocked events.Blocker
@@ -89,6 +93,10 @@ func newTransitive(config Config) (*Transitive, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	acceptedFrontiers := tracker.NewAccepted()
+	config.Validators.RegisterCallbackListener(acceptedFrontiers)
+
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t := &Transitive{
 		Config:                      config,
@@ -100,6 +108,7 @@ func newTransitive(config Config) (*Transitive, error) {
 		pending:                     make(map[ids.ID]snowman.Block),
 		nonVerifieds:                NewAncestorTree(),
 		nonVerifiedCache:            nonVerifiedCache,
+		acceptedFrontiers:           acceptedFrontiers,
 		polls: poll.NewSet(factory,
 			config.Ctx.Log,
 			"",
@@ -228,7 +237,9 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 	return t.buildBlocks(ctx)
 }
 
-func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID) error {
+func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID, accepted []ids.ID) error {
+	t.acceptedFrontiers.SetAcceptedFrontier(nodeID, accepted)
+
 	// Since this is a linear chain, there should only be one ID in the vote set
 	if len(votes) != 1 {
 		t.Ctx.Log.Debug("failing Chits",
@@ -272,6 +283,13 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 }
 
 func (t *Transitive) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	lastAccepted := t.acceptedFrontiers.AcceptedFrontier(nodeID)
+	if len(lastAccepted) == 1 {
+		// Chits calls QueryFailed if [votes] doesn't have length 1, so this
+		// check is required to avoid infinite mutual recursion.
+		return t.Chits(ctx, nodeID, requestID, lastAccepted, lastAccepted)
+	}
+
 	t.blocked.Register(
 		ctx,
 		&voter{
