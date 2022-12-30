@@ -18,6 +18,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
@@ -49,6 +50,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)
@@ -84,14 +86,14 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	nodeID := ids.EmptyNodeID
 	reqID := uint32(1)
 	chainID := ids.ID{}
-	msg := message.InboundGetAcceptedFrontier(chainID, reqID, 0*time.Second, nodeID)
+	msg := message.InboundGetAcceptedFrontier(chainID, reqID, 0*time.Second, nodeID, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 	handler.Push(context.Background(), msg)
 
 	currentTime := time.Now().Add(time.Second)
 	handler.clock.Set(currentTime)
 
 	reqID++
-	msg = message.InboundGetAccepted(chainID, reqID, 1*time.Second, nil, nodeID)
+	msg = message.InboundGetAccepted(chainID, reqID, 1*time.Second, nil, nodeID, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 	handler.Push(context.Background(), msg)
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
@@ -130,6 +132,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)
@@ -178,7 +181,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	nodeID := ids.EmptyNodeID
 	reqID := uint32(1)
 	deadline := time.Nanosecond
-	msg := message.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline, nodeID)
+	msg := message.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline, nodeID, 0)
 	handler.Push(context.Background(), msg)
 
 	ticker := time.NewTicker(time.Second)
@@ -209,6 +212,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		nil,
 		nil,
 		1,
+		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)
@@ -245,7 +249,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	nodeID := ids.EmptyNodeID
 	chainID := ids.Empty
 	reqID := uint32(1)
-	inMsg := message.InternalGetFailed(nodeID, chainID, reqID)
+	inMsg := message.InternalGetFailed(nodeID, chainID, reqID, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 	handler.Push(context.Background(), inMsg)
 
 	ticker := time.NewTicker(time.Second)
@@ -278,6 +282,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		msgFromVMChan,
 		nil,
 		time.Second,
+		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)
@@ -346,6 +351,7 @@ func TestHandlerSubnetConnector(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		resourceTracker,
 		connector,
 	)

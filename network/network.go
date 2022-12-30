@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -38,8 +39,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
-
-	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
 const (
@@ -430,7 +429,7 @@ func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 		n.WantsConnection(nodeID)
 }
 
-func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) ([]*p2ppb.PeerAck, error) {
+func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) ([]*p2p.PeerAck, error) {
 	// Perform all signature verification and hashing before grabbing the peer
 	// lock.
 	// Note: Avoiding signature verification when the IP isn't needed is a
@@ -549,10 +548,10 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 		return nil, nil
 	}
 
-	peerAcks := make([]*p2ppb.PeerAck, len(txIDsToAck))
+	peerAcks := make([]*p2p.PeerAck, len(txIDsToAck))
 	for i, txID := range txIDsToAck {
 		txID := txID
-		peerAcks[i] = &p2ppb.PeerAck{
+		peerAcks[i] = &p2p.PeerAck{
 			TxId: txID[:],
 			// By responding with the highest timestamp, not just the timestamp
 			// the peer provided us, we may be able to avoid some unnecessary
@@ -564,7 +563,7 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 	return peerAcks, nil
 }
 
-func (n *network) MarkTracked(peerID ids.NodeID, ips []*p2ppb.PeerAck) error {
+func (n *network) MarkTracked(peerID ids.NodeID, ips []*p2p.PeerAck) error {
 	txIDs := make([]ids.ID, 0, len(ips))
 
 	n.peersLock.RLock()

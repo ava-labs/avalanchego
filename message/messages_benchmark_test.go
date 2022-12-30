@@ -16,8 +16,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
-
-	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
 var (
@@ -45,9 +44,9 @@ func BenchmarkMarshalVersion(b *testing.B) {
 	require := require.New(b)
 
 	id := ids.GenerateTestID()
-	msg := p2ppb.Message{
-		Message: &p2ppb.Message_Version{
-			Version: &p2ppb.Version{
+	msg := p2p.Message{
+		Message: &p2p.Message_Version{
+			Version: &p2p.Version{
 				NetworkId:      uint32(1337),
 				MyTime:         uint64(time.Now().Unix()),
 				IpAddr:         []byte(net.IPv4(1, 2, 3, 4).To16()),
@@ -101,9 +100,9 @@ func BenchmarkUnmarshalVersion(b *testing.B) {
 	b.StopTimer()
 
 	id := ids.GenerateTestID()
-	msg := p2ppb.Message{
-		Message: &p2ppb.Message_Version{
-			Version: &p2ppb.Version{
+	msg := p2p.Message{
+		Message: &p2p.Message_Version{
+			Version: &p2p.Version{
 				NetworkId:      uint32(1337),
 				MyTime:         uint64(time.Now().Unix()),
 				IpAddr:         []byte(net.IPv4(1, 2, 3, 4).To16()),
@@ -128,7 +127,7 @@ func BenchmarkUnmarshalVersion(b *testing.B) {
 		if useBuilder {
 			_, err = codec.parseInbound(rawMsg, dummyNodeID, dummyOnFinishedHandling)
 		} else {
-			var msg p2ppb.Message
+			var msg p2p.Message
 			err = proto.Unmarshal(rawMsg, &msg)
 		}
 		require.NoError(err)

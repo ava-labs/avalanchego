@@ -41,6 +41,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 		containerIDs        = []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 		summaryIDs          = []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 		heights             = []uint64{1000, 2000}
+		engineType          = p2p.EngineType_ENGINE_TYPE_SNOWMAN
 	)
 
 	t.Run(
@@ -157,6 +158,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 				requestID,
 				deadline,
 				nodeID,
+				engineType,
 			)
 			end := time.Now()
 
@@ -168,6 +170,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 			require.True(ok)
 			require.Equal(chainID[:], innerMsg.ChainId)
 			require.Equal(requestID, innerMsg.RequestId)
+			require.Equal(engineType, innerMsg.EngineType)
 		},
 	)
 
@@ -181,6 +184,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 				requestID,
 				containerIDs,
 				nodeID,
+				engineType,
 			)
 
 			require.Equal(AcceptedFrontierOp, msg.Op())
@@ -196,6 +200,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 				containerIDsBytes[i] = id[:]
 			}
 			require.Equal(containerIDsBytes, innerMsg.ContainerIds)
+			require.Equal(engineType, innerMsg.EngineType)
 		},
 	)
 
@@ -211,6 +216,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 				deadline,
 				containerIDs,
 				nodeID,
+				engineType,
 			)
 			end := time.Now()
 
@@ -222,6 +228,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 			require.True(ok)
 			require.Equal(chainID[:], innerMsg.ChainId)
 			require.Equal(requestID, innerMsg.RequestId)
+			require.Equal(engineType, innerMsg.EngineType)
 		},
 	)
 
@@ -235,6 +242,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 				requestID,
 				containerIDs,
 				nodeID,
+				engineType,
 			)
 
 			require.Equal(AcceptedOp, msg.Op())
@@ -250,6 +258,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 				containerIDsBytes[i] = id[:]
 			}
 			require.Equal(containerIDsBytes, innerMsg.ContainerIds)
+			require.Equal(engineType, innerMsg.EngineType)
 		},
 	)
 
@@ -265,6 +274,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 				deadline,
 				container,
 				nodeID,
+				engineType,
 			)
 			end := time.Now()
 
@@ -277,6 +287,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 			require.Equal(chainID[:], innerMsg.ChainId)
 			require.Equal(requestID, innerMsg.RequestId)
 			require.Equal(container, innerMsg.Container)
+			require.Equal(engineType, innerMsg.EngineType)
 		},
 	)
 
@@ -292,6 +303,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 				deadline,
 				containerIDs[0],
 				nodeID,
+				engineType,
 			)
 			end := time.Now()
 
@@ -304,6 +316,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 			require.Equal(chainID[:], innerMsg.ChainId)
 			require.Equal(requestID, innerMsg.RequestId)
 			require.Equal(containerIDs[0][:], innerMsg.ContainerId)
+			require.Equal(engineType, innerMsg.EngineType)
 		},
 	)
 
@@ -317,6 +330,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 				requestID,
 				containerIDs,
 				nodeID,
+				engineType,
 			)
 
 			require.Equal(ChitsOp, msg.Op())
@@ -332,6 +346,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 				containerIDsBytes[i] = id[:]
 			}
 			require.Equal(containerIDsBytes, innerMsg.ContainerIds)
+			require.Equal(engineType, innerMsg.EngineType)
 		},
 	)
 

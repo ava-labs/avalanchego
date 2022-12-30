@@ -5,9 +5,8 @@ package peer
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/utils/ips"
-
-	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
 // Network defines the interface that is used by a peer to help establish a well
@@ -25,10 +24,10 @@ type Network interface {
 	// handshake.
 	//
 	// Returns which IPs should not be gossipped to this node again.
-	Track(peerID ids.NodeID, ips []*ips.ClaimedIPPort) ([]*p2ppb.PeerAck, error)
+	Track(peerID ids.NodeID, ips []*ips.ClaimedIPPort) ([]*p2p.PeerAck, error)
 
 	// MarkTracked stops sending gossip about [ips] to [peerID].
-	MarkTracked(peerID ids.NodeID, ips []*p2ppb.PeerAck) error
+	MarkTracked(peerID ids.NodeID, ips []*p2p.PeerAck) error
 
 	// Disconnected is called when the peer finishes shutting down. It is not
 	// guaranteed that [Connected] was called for the provided peer. However, it

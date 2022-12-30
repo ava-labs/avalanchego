@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
@@ -33,6 +34,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
 )
+
+const engineType = p2p.EngineType_ENGINE_TYPE_AVALANCHE
 
 func TestShutdown(t *testing.T) {
 	vdrs := validators.NewSet()
@@ -86,6 +89,7 @@ func TestShutdown(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		engineType,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)
@@ -208,6 +212,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		engineType,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)
@@ -263,7 +268,7 @@ func TestShutdownTimesOut(t *testing.T) {
 
 	go func() {
 		chainID := ids.ID{}
-		msg := message.InboundPullQuery(chainID, 1, time.Hour, ids.GenerateTestID(), nodeID)
+		msg := message.InboundPullQuery(chainID, 1, time.Hour, ids.GenerateTestID(), nodeID, engineType)
 		handler.Push(context.Background(), msg)
 
 		time.Sleep(50 * time.Millisecond) // Pause to ensure message gets processed
@@ -348,6 +353,7 @@ func TestRouterTimeout(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		engineType,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)
@@ -477,6 +483,7 @@ func TestRouterTimeout(t *testing.T) {
 				nodeID,
 				ctx.ChainID,
 				requestID,
+				engineType,
 			),
 		)
 	}
@@ -495,6 +502,7 @@ func TestRouterTimeout(t *testing.T) {
 				nodeID,
 				ctx.ChainID,
 				requestID,
+				engineType,
 			),
 		)
 	}
@@ -513,6 +521,7 @@ func TestRouterTimeout(t *testing.T) {
 				nodeID,
 				ctx.ChainID,
 				requestID,
+				engineType,
 			),
 		)
 	}
@@ -531,6 +540,7 @@ func TestRouterTimeout(t *testing.T) {
 				nodeID,
 				ctx.ChainID,
 				requestID,
+				engineType,
 			),
 		)
 	}
@@ -549,6 +559,7 @@ func TestRouterTimeout(t *testing.T) {
 				nodeID,
 				ctx.ChainID,
 				requestID,
+				engineType,
 			),
 		)
 	}
@@ -659,6 +670,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		engineType,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)
@@ -755,6 +767,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 				nodeID,
 				ctx.ChainID,
 				requestID,
+				engineType,
 			),
 		)
 		msg := message.InboundAcceptedFrontier(
@@ -762,6 +775,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 			requestID,
 			nil,
 			nodeID,
+			engineType,
 		)
 		chainRouter.HandleInbound(context.Background(), msg)
 	}
@@ -779,6 +793,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 				nodeID,
 				ctx.ChainID,
 				requestID,
+				engineType,
 			),
 		)
 		msg := message.InboundAccepted(
@@ -786,6 +801,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 			requestID,
 			nil,
 			nodeID,
+			engineType,
 		)
 		chainRouter.HandleInbound(context.Background(), msg)
 	}
@@ -803,6 +819,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 				nodeID,
 				ctx.ChainID,
 				requestID,
+				engineType,
 			),
 		)
 		msg := message.InboundChits(
@@ -810,6 +827,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 			requestID,
 			nil,
 			nodeID,
+			engineType,
 		)
 		chainRouter.HandleInbound(context.Background(), msg)
 	}
@@ -925,6 +943,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		engineType,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)
@@ -972,8 +991,13 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	nID := ids.GenerateTestNodeID()
 
 	calledF = false
-	inMsg = message.InboundPullQuery(ctx.ChainID, reqID, time.Hour, dummyContainerID,
+	inMsg = message.InboundPullQuery(
+		ctx.ChainID,
+		reqID,
+		time.Hour,
+		dummyContainerID,
 		nID,
+		engineType,
 	)
 	chainRouter.HandleInbound(context.Background(), inMsg)
 
@@ -982,8 +1006,13 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	// Validator case
 	calledF = false
 	reqID++
-	inMsg = message.InboundPullQuery(ctx.ChainID, reqID, time.Hour, dummyContainerID,
+	inMsg = message.InboundPullQuery(
+		ctx.ChainID,
+		reqID,
+		time.Hour,
+		dummyContainerID,
 		vID,
+		engineType,
 	)
 	wg.Add(1)
 	chainRouter.HandleInbound(context.Background(), inMsg)
@@ -1000,7 +1029,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		ctx.ChainID,
 		reqID,
 		message.ChitsOp,
-		message.InternalQueryFailed(vID, ctx.ChainID, reqID),
+		message.InternalQueryFailed(vID, ctx.ChainID, reqID, engineType),
 	)
 	require.Equal(t, 1, chainRouter.timedRequests.Len())
 
@@ -1008,7 +1037,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	err = vdrs.RemoveWeight(vID, 1)
 	require.NoError(t, err)
 
-	inMsg = message.InboundChits(ctx.ChainID, reqID, nil, nID)
+	inMsg = message.InboundChits(ctx.ChainID, reqID, nil, nID, engineType)
 	chainRouter.HandleInbound(context.Background(), inMsg)
 
 	// shouldn't clear out timed request, as the request should be cleared when
@@ -1075,6 +1104,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		engineType,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)
@@ -1092,6 +1122,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		engineType,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)

@@ -5,9 +5,8 @@ package peer
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/utils/ips"
-
-	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
 var TestNetwork Network = testNetwork{}
@@ -20,11 +19,11 @@ func (testNetwork) AllowConnection(ids.NodeID) bool {
 	return true
 }
 
-func (testNetwork) Track(ids.NodeID, []*ips.ClaimedIPPort) ([]*p2ppb.PeerAck, error) {
+func (testNetwork) Track(ids.NodeID, []*ips.ClaimedIPPort) ([]*p2p.PeerAck, error) {
 	return nil, nil
 }
 
-func (testNetwork) MarkTracked(ids.NodeID, []*p2ppb.PeerAck) error {
+func (testNetwork) MarkTracked(ids.NodeID, []*p2p.PeerAck) error {
 	return nil
 }
 

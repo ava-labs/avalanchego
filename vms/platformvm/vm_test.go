@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
@@ -63,7 +64,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
@@ -1763,6 +1763,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			AppGossipValidatorSize:    1,
 			AppGossipNonValidatorSize: 1,
 		},
+		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 	)
 	require.NoError(err)
 
@@ -1835,6 +1836,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		msgChan,
 		nil,
 		time.Hour,
+		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		cpuTracker,
 		vm,
 	)
@@ -1886,7 +1888,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		require.NoError(err)
 		require.Equal(message.GetAcceptedOp, inMsgIntf.Op())
-		inMsg := inMsgIntf.Message().(*p2ppb.GetAccepted)
+		inMsg := inMsgIntf.Message().(*p2p.GetAccepted)
 
 		reqID = inMsg.RequestId
 		return nodeIDs
@@ -1900,7 +1902,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
 		require.NoError(err)
 		require.Equal(message.GetAncestorsOp, inMsgIntf.Op())
-		inMsg := inMsgIntf.Message().(*p2ppb.GetAncestors)
+		inMsg := inMsgIntf.Message().(*p2p.GetAncestors)
 
 		reqID = inMsg.RequestId
 

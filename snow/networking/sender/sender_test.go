@@ -100,6 +100,7 @@ func TestTimeout(t *testing.T) {
 		&chainRouter,
 		tm,
 		defaultGossipConfig,
+		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 	)
 	require.NoError(err)
 
@@ -117,6 +118,7 @@ func TestTimeout(t *testing.T) {
 		nil,
 		nil,
 		time.Hour,
+		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)
@@ -357,6 +359,7 @@ func TestReliableMessages(t *testing.T) {
 		&chainRouter,
 		tm,
 		defaultGossipConfig,
+		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 	)
 	require.NoError(t, err)
 
@@ -374,6 +377,7 @@ func TestReliableMessages(t *testing.T) {
 		nil,
 		nil,
 		1,
+		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)
@@ -482,7 +486,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	externalSender := &ExternalSenderTest{TB: t}
 	externalSender.Default(false)
 
-	sender, err := New(ctx, mc, externalSender, &chainRouter, tm, defaultGossipConfig)
+	sender, err := New(ctx, mc, externalSender, &chainRouter, tm, defaultGossipConfig, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 	require.NoError(t, err)
 
 	ctx2 := snow.DefaultConsensusContextTest()
@@ -499,6 +503,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		nil,
 		nil,
 		time.Second,
+		p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 	)
@@ -567,6 +572,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 		ctx           = snow.DefaultContextTest()
 		heights       = []uint64{1, 2, 3}
 		containerIDs  = []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
+		engineType    = p2p.EngineType_ENGINE_TYPE_SNOWMAN
 	)
 	ctx.ChainID = chainID
 	ctx.SubnetID = subnetID
@@ -682,6 +688,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 					nodeID,
 					chainID,
 					requestID,
+					engineType,
 				)
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
@@ -690,6 +697,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				require.Equal(chainID[:], innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				require.Equal(uint64(deadline), innerMsg.Deadline)
+				require.Equal(engineType, innerMsg.EngineType)
 			},
 			expectedResponseOp: message.AcceptedFrontierOp,
 			setMsgCreatorExpect: func(msgCreator *message.MockOutboundMsgBuilder) {
@@ -697,6 +705,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 					chainID,
 					requestID,
 					deadline,
+					engineType,
 				).Return(nil, nil)
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
@@ -723,6 +732,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 					nodeID,
 					chainID,
 					requestID,
+					engineType,
 				)
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
@@ -731,6 +741,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				require.Equal(chainID[:], innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				require.Equal(uint64(deadline), innerMsg.Deadline)
+				require.Equal(engineType, innerMsg.EngineType)
 			},
 			expectedResponseOp: message.AcceptedOp,
 			setMsgCreatorExpect: func(msgCreator *message.MockOutboundMsgBuilder) {
@@ -739,6 +750,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 					requestID,
 					deadline,
 					containerIDs,
+					engineType,
 				).Return(nil, nil)
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
@@ -788,6 +800,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				router,
 				timeoutManager,
 				defaultGossipConfig,
+				engineType,
 			)
 			require.NoError(err)
 
@@ -846,6 +859,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 		ctx               = snow.DefaultContextTest()
 		summaryIDs        = []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 		summary           = []byte{1, 2, 3}
+		engineType        = p2p.EngineType_ENGINE_TYPE_AVALANCHE
 	)
 	ctx.ChainID = chainID
 	ctx.SubnetID = subnetID
@@ -929,6 +943,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 					chainID,
 					requestID,
 					summaryIDs,
+					engineType,
 				).Return(nil, nil) // Don't care about the message
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
@@ -939,6 +954,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				for i, summaryID := range summaryIDs {
 					require.Equal(summaryID[:], innerMsg.ContainerIds[i])
 				}
+				require.Equal(engineType, innerMsg.EngineType)
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
@@ -959,6 +975,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 					chainID,
 					requestID,
 					summaryIDs,
+					engineType,
 				).Return(nil, nil) // Don't care about the message
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
@@ -969,6 +986,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				for i, summaryID := range summaryIDs {
 					require.Equal(summaryID[:], innerMsg.ContainerIds[i])
 				}
+				require.Equal(engineType, innerMsg.EngineType)
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
@@ -1005,6 +1023,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				router,
 				timeoutManager,
 				defaultGossipConfig,
+				engineType,
 			)
 			require.NoError(err)
 
@@ -1049,6 +1068,7 @@ func TestSender_Single_Request(t *testing.T) {
 		requestID         = uint32(1337)
 		ctx               = snow.DefaultContextTest()
 		containerID       = ids.GenerateTestID()
+		engineType        = p2p.EngineType_ENGINE_TYPE_SNOWMAN
 	)
 	ctx.ChainID = chainID
 	ctx.SubnetID = subnetID
@@ -1076,6 +1096,7 @@ func TestSender_Single_Request(t *testing.T) {
 					nodeID,
 					chainID,
 					requestID,
+					engineType,
 				)
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
@@ -1083,6 +1104,7 @@ func TestSender_Single_Request(t *testing.T) {
 				require.True(ok)
 				require.Equal(chainID, innerMsg.ChainID)
 				require.Equal(requestID, innerMsg.RequestID)
+				require.Equal(engineType, innerMsg.EngineType)
 			},
 			expectedResponseOp: message.AncestorsOp,
 			setMsgCreatorExpect: func(msgCreator *message.MockOutboundMsgBuilder) {
@@ -1091,6 +1113,7 @@ func TestSender_Single_Request(t *testing.T) {
 					requestID,
 					deadline,
 					containerID,
+					engineType,
 				).Return(nil, nil)
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender, sentTo set.Set[ids.NodeID]) {
@@ -1112,6 +1135,7 @@ func TestSender_Single_Request(t *testing.T) {
 					nodeID,
 					chainID,
 					requestID,
+					engineType,
 				)
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
@@ -1119,6 +1143,7 @@ func TestSender_Single_Request(t *testing.T) {
 				require.True(ok)
 				require.Equal(chainID, innerMsg.ChainID)
 				require.Equal(requestID, innerMsg.RequestID)
+				require.Equal(engineType, innerMsg.EngineType)
 			},
 			expectedResponseOp: message.PutOp,
 			setMsgCreatorExpect: func(msgCreator *message.MockOutboundMsgBuilder) {
@@ -1127,6 +1152,7 @@ func TestSender_Single_Request(t *testing.T) {
 					requestID,
 					deadline,
 					containerID,
+					engineType,
 				).Return(nil, nil)
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender, sentTo set.Set[ids.NodeID]) {
@@ -1164,6 +1190,7 @@ func TestSender_Single_Request(t *testing.T) {
 				router,
 				timeoutManager,
 				defaultGossipConfig,
+				engineType,
 			)
 			require.NoError(err)
 

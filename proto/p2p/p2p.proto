@@ -165,6 +165,12 @@ message AcceptedStateSummary {
   repeated bytes summary_ids = 3;
 }
 
+enum EngineType {
+  ENGINE_TYPE_UNSPECIFIED = 0;
+  ENGINE_TYPE_AVALANCHE = 1;
+  ENGINE_TYPE_SNOWMAN = 2;
+}
+
 // Message to request for the accepted frontier of the "remote" peer.
 // For instance, the accepted frontier of X-chain DAG is the set of
 // accepted vertices that do not have any accepted descendants (i.e., frontier).
@@ -178,6 +184,7 @@ message GetAcceptedFrontier {
   bytes chain_id = 1;
   uint32 request_id = 2;
   uint64 deadline = 3;
+  EngineType engine_type = 4;
 }
 
 // Message that contains the list of accepted frontier in response to
@@ -189,6 +196,7 @@ message AcceptedFrontier {
   bytes chain_id = 1;
   uint32 request_id = 2;
   repeated bytes container_ids = 3;
+  EngineType engine_type = 4;
 }
 
 // Message to request for the accepted blocks/vertices of the "remote" peer.
@@ -203,6 +211,7 @@ message GetAccepted {
   uint32 request_id = 2;
   uint64 deadline = 3;
   repeated bytes container_ids = 4;
+  EngineType engine_type = 5;
 }
 
 // Message that contains the list of accepted block/vertex IDs in response to
@@ -216,6 +225,7 @@ message Accepted {
   bytes chain_id = 1;
   uint32 request_id = 2;
   repeated bytes container_ids = 3;
+  EngineType engine_type = 4;
 }
 
 // Message that requests for the ancestors (parents) of the specified container ID.
@@ -229,6 +239,7 @@ message GetAncestors {
   uint32 request_id = 2;
   uint64 deadline = 3;
   bytes container_id = 4;
+  EngineType engine_type = 5;
 }
 
 // Message that contains the container bytes of the ancestors
@@ -240,6 +251,7 @@ message Ancestors {
   bytes chain_id = 1;
   uint32 request_id = 2;
   repeated bytes containers = 3;
+  EngineType engine_type = 4;
 }
 
 // Message that requests for the container data.
@@ -251,6 +263,7 @@ message Get {
   uint32 request_id = 2;
   uint64 deadline = 3;
   bytes container_id = 4;
+  EngineType engine_type = 5;
 }
 
 // Message that contains the container ID and its bytes in response to "get".
@@ -260,6 +273,7 @@ message Put {
   bytes chain_id = 1;
   uint32 request_id = 2;
   bytes container = 3;
+  EngineType engine_type = 4;
 
   // NOTE: "container_id" is deprecated in packer based serializer
 }
@@ -278,6 +292,7 @@ message PushQuery {
   uint32 request_id = 2;
   uint64 deadline = 3;
   bytes container = 4;
+  EngineType engine_type = 5;
 
   // NOTE: "container_id" is deprecated in packer based serializer
 }
@@ -292,6 +307,7 @@ message PullQuery {
   uint32 request_id = 2;
   uint64 deadline = 3;
   bytes container_id = 4;
+  EngineType engine_type = 5;
 }
 
 // Message that contains the votes/preferences of the local node,
@@ -304,6 +320,8 @@ message Chits {
   bytes chain_id = 1;
   uint32 request_id = 2;
   repeated bytes container_ids = 3;
+  // TODO: Add repeated bytes accepted_container_ids = 4;
+  EngineType engine_type = 5;
 }
 
 message AppRequest {

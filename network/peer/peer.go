@@ -19,6 +19,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
@@ -26,8 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
-
-	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
 var (
@@ -669,23 +668,23 @@ func (p *peer) sendNetworkMessages() {
 
 func (p *peer) handle(msg message.InboundMessage) {
 	switch m := msg.Message().(type) { // Network-related message types
-	case *p2ppb.Ping:
+	case *p2p.Ping:
 		p.handlePing(m)
 		msg.OnFinishedHandling()
 		return
-	case *p2ppb.Pong:
+	case *p2p.Pong:
 		p.handlePong(m)
 		msg.OnFinishedHandling()
 		return
-	case *p2ppb.Version:
+	case *p2p.Version:
 		p.handleVersion(m)
 		msg.OnFinishedHandling()
 		return
-	case *p2ppb.PeerList:
+	case *p2p.PeerList:
 		p.handlePeerList(m)
 		msg.OnFinishedHandling()
 		return
-	case *p2ppb.PeerListAck:
+	case *p2p.PeerListAck:
 		p.handlePeerListAck(m)
 		msg.OnFinishedHandling()
 		return
@@ -705,7 +704,7 @@ func (p *peer) handle(msg message.InboundMessage) {
 	p.Router.HandleInbound(context.Background(), msg)
 }
 
-func (p *peer) handlePing(_ *p2ppb.Ping) {
+func (p *peer) handlePing(*p2p.Ping) {
 	primaryUptime, err := p.UptimeCalculator.CalculateUptimePercent(
 		p.id,
 		constants.PrimaryNetworkID,
@@ -719,7 +718,7 @@ func (p *peer) handlePing(_ *p2ppb.Ping) {
 		primaryUptime = 0
 	}
 
-	subnetUptimes := make([]*p2ppb.SubnetUptime, 0, p.trackedSubnets.Len())
+	subnetUptimes := make([]*p2p.SubnetUptime, 0, p.trackedSubnets.Len())
 	for subnetID := range p.trackedSubnets {
 		subnetUptime, err := p.UptimeCalculator.CalculateUptimePercent(p.id, subnetID)
 		if err != nil {
@@ -732,7 +731,7 @@ func (p *peer) handlePing(_ *p2ppb.Ping) {
 		}
 
 		subnetID := subnetID
-		subnetUptimes = append(subnetUptimes, &p2ppb.SubnetUptime{
+		subnetUptimes = append(subnetUptimes, &p2p.SubnetUptime{
 			SubnetId: subnetID[:],
 			Uptime:   uint32(subnetUptime * 100),
 		})
@@ -750,7 +749,7 @@ func (p *peer) handlePing(_ *p2ppb.Ping) {
 	p.Send(p.onClosingCtx, msg)
 }
 
-func (p *peer) handlePong(msg *p2ppb.Pong) {
+func (p *peer) handlePong(msg *p2p.Pong) {
 	if msg.Uptime > 100 {
 		p.Log.Debug("dropping pong message with invalid uptime",
 			zap.Stringer("nodeID", p.id),
@@ -794,7 +793,7 @@ func (p *peer) observeUptime(subnetID ids.ID, uptime uint32) {
 	p.observedUptimesLock.Unlock()
 }
 
-func (p *peer) handleVersion(msg *p2ppb.Version) {
+func (p *peer) handleVersion(msg *p2p.Version) {
 	if p.gotVersion.GetValue() {
 		// TODO: this should never happen, should we close the connection here?
 		p.Log.Verbo("dropping duplicated version message",
@@ -957,7 +956,7 @@ func (p *peer) handleVersion(msg *p2ppb.Version) {
 	}
 }
 
-func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
+func (p *peer) handlePeerList(msg *p2p.PeerList) {
 	if !p.finishedHandshake.GetValue() {
 		if !p.gotVersion.GetValue() {
 			return
@@ -1058,7 +1057,7 @@ func (p *peer) handlePeerList(msg *p2ppb.PeerList) {
 	}
 }
 
-func (p *peer) handlePeerListAck(msg *p2ppb.PeerListAck) {
+func (p *peer) handlePeerListAck(msg *p2p.PeerListAck) {
 	err := p.Network.MarkTracked(p.id, msg.PeerAcks)
 	if err != nil {
 		p.Log.Debug("message with invalid field",
