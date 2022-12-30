@@ -2,6 +2,7 @@
 // See the file LICENSE for licensing terms.
 
 // PrivateKey-vmRQiZeXEXYMyJhEiqdC2z5JhuDbxL8ix9UVvjgMu2Er1NepE => X-kopernikus1g65uqn6t77p656w64023nh8nd9updzmxh8ttv3
+// PrivateKey-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN => X-kopernikus18jma8ppw3nhx5r4ap8clazz0dps7rv5uuvjh68
 // staking/local/staker1.key / crt => NodeID-AK7sPBsZM9rQwse23aLhEEBPHZD5gkLrL
 // 56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027 => 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
 
