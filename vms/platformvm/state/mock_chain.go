@@ -259,7 +259,6 @@ func (mr *MockChainMockRecorder) SetNodeConsortiumMember(arg0, arg1 interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNodeConsortiumMember", reflect.TypeOf((*MockChain)(nil).SetNodeConsortiumMember), arg0, arg1)
 }
 
-
 // GetNodeConsortiumMember mocks base method.
 func (m *MockChain) GetNodeConsortiumMember(arg0 ids.NodeID) (ids.ShortID, error) {
 	m.ctrl.T.Helper()

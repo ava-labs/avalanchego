@@ -213,4 +213,8 @@ func (d *diff) ApplyCaminoState(baseState State) {
 	for _, v := range d.caminoDiff.modifiedMultisigOwners {
 		baseState.SetMultisigOwner(v)
 	}
+
+	for nodeID, addr := range d.caminoDiff.modifiedConsortiumMemberNodes {
+		baseState.SetNodeConsortiumMember(nodeID, addr)
+	}
 }

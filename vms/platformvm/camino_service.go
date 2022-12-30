@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
@@ -346,6 +347,82 @@ func (s *CaminoService) Spend(_ *http.Request, args *SpendArgs, response *SpendR
 	}
 
 	return nil
+}
+
+type RegisterNodeArgs struct {
+	api.JSONSpendHeader
+
+	OldNodeID               ids.NodeID `json:"oldNodeID"`
+	NewNodeID               ids.NodeID `json:"newNodeID"`
+	ConsortiumMemberAddress string     `json:"consortiumMemberAddress"`
+}
+
+// RegisterNode issues an RegisterNodeTx
+func (s *CaminoService) RegisterNode(_ *http.Request, args *RegisterNodeArgs, reply *api.JSONTxIDChangeAddr) error {
+	s.vm.ctx.Log.Debug("Platform: RegisterNode called")
+
+	// Parse the from addresses
+	fromAddrs, err := avax.ParseServiceAddresses(s.addrManager, args.From)
+	if err != nil {
+		return err
+	}
+
+	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
+	if err != nil {
+		return err
+	}
+
+	// Get the user's keys
+	privKeys, err := keystore.GetKeychain(user, fromAddrs)
+	if err != nil {
+		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
+	}
+
+	if err := user.Close(); err != nil {
+		return err
+	}
+
+	if len(privKeys.Keys) == 0 {
+		return errNoKeys
+	}
+
+	// Parse the change address.
+	changeAddr := ids.ShortEmpty
+	if len(args.ChangeAddr) > 0 {
+		var err error
+		if changeAddr, err = avax.ParseServiceAddress(s.addrManager, args.ChangeAddr); err != nil {
+			return fmt.Errorf(errInvalidChangeAddr, err)
+		}
+	}
+
+	// Parse the consortium member address.
+	consortiumMemberAddress, err := avax.ParseServiceAddress(s.addrManager, args.ConsortiumMemberAddress)
+	if err != nil {
+		return fmt.Errorf("couldn't parse consortiumMemberAddress: %w", err)
+	}
+
+	// Create the transaction
+	tx, err := s.vm.txBuilder.NewRegisterNodeTx(
+		args.OldNodeID,
+		args.NewNodeID,
+		consortiumMemberAddress,
+		privKeys.Keys,
+		changeAddr,
+	)
+	if err != nil {
+		return fmt.Errorf("couldn't create tx: %w", err)
+	}
+
+	reply.TxID = tx.ID()
+	reply.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		err,
+		s.vm.Builder.AddUnverifiedTx(tx),
+	)
+
+	return errs.Err
 }
 
 func (s *Service) getKeystoreKeys(args *api.JSONSpendHeader) (*secp256k1fx.Keychain, error) {

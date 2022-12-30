@@ -15,7 +15,8 @@ import (
 var (
 	_ UnsignedTx = (*RegisterNodeTx)(nil)
 
-	errNoNodeID = errors.New("no nodeID specified")
+	errNoNodeID                  = errors.New("no nodeID specified")
+	errConsortiumMemberAddrEmpty = errors.New("consortium member address is empty")
 )
 
 // RegisterNodeTx is an unsigned registerNodeTx
@@ -49,10 +50,16 @@ func (tx *RegisterNodeTx) SyntacticVerify(ctx *snow.Context) error {
 		return nil
 	case tx.NewNodeID == ids.EmptyNodeID && tx.OldNodeID == ids.EmptyNodeID:
 		return errNoNodeID
+	case tx.ConsortiumMemberAddress == ids.ShortEmpty:
+		return errConsortiumMemberAddrEmpty
 	}
 
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
+	}
+
+	if err := tx.ConsortiumMemberAuth.Verify(); err != nil {
+		return fmt.Errorf("failed to verify consortium member auth: %w", err)
 	}
 
 	// cache that this is valid

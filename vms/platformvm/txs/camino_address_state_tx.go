@@ -29,8 +29,8 @@ const (
 	AddressStateConsortiumBit  = uint64(0b10000000000000000000000000000000000)
 	AddressStateKycBits        = uint64(0b11100000000000000000000000000000000)
 
-	AddressStateValidator     = uint8(38)
-	AddressStateValidatorBits = uint64(0b100000000000000000000000000000000000000)
+	AddressStateRegisteredNode    = uint8(38)
+	AddressStateRegisteredNodeBit = uint64(0b100000000000000000000000000000000000000)
 
 	AddressStateMax       = uint8(63)
 	AddressStateValidBits = AddressStateRoleBits | AddressStateKycBits

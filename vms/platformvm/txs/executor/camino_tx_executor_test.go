@@ -222,7 +222,9 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 					changeAddr:    ids.ShortEmpty,
 				}
 			},
-			preExecute:  func(t *testing.T, tx *txs.Tx) {},
+			preExecute: func(t *testing.T, tx *txs.Tx) {
+				env.state.SetNodeConsortiumMember(nodeID, &addr0)
+			},
 			expectedErr: errConsortiumSignatureMissing,
 		},
 		"Not enough sigs from msig consortium member": {

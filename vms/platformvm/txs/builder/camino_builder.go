@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
+	"github.com/ava-labs/avalanchego/vms/platformvm/msig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
@@ -55,6 +56,14 @@ type CaminoTxBuilder interface {
 
 	NewUnlockDepositTx(
 		lockTxIDs []ids.ID,
+		keys []*crypto.PrivateKeySECP256K1R,
+		changeAddr ids.ShortID,
+	) (*txs.Tx, error)
+
+	NewRegisterNodeTx(
+		OldNodeID ids.NodeID,
+		NewNodeID ids.NodeID,
+		ConsortiumMemberAddress ids.ShortID,
 		keys []*crypto.PrivateKeySECP256K1R,
 		changeAddr ids.ShortID,
 	) (*txs.Tx, error)
@@ -176,7 +185,7 @@ func (b *caminoBuilder) NewAddSubnetValidatorTx(
 		return tx, nil
 	}
 
-	nodeSigners, err := getSigners(keys, ids.ShortID(nodeID))
+	nodeSigners, err := getSigner(keys, ids.ShortID(nodeID))
 	if err != nil {
 		return nil, err
 	}
@@ -327,19 +336,88 @@ func (b *caminoBuilder) NewUnlockDepositTx(
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
-func getSigners(
+func (b *caminoBuilder) NewRegisterNodeTx(
+	oldNodeID ids.NodeID,
+	newNodeID ids.NodeID,
+	consortiumMemberAddress ids.ShortID,
+	keys []*crypto.PrivateKeySECP256K1R,
+	changeAddr ids.ShortID,
+) (*txs.Tx, error) {
+	ins, outs, signers, err := b.Lock(keys, 0, b.cfg.TxFee, locked.StateUnlocked, changeAddr)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+
+	nodeSigners := []*crypto.PrivateKeySECP256K1R{}
+	if newNodeID != ids.EmptyNodeID {
+		nodeSigners, err = getSigner(keys, ids.ShortID(newNodeID))
+		if err != nil {
+			return nil, err
+		}
+	}
+	signers = append(signers, nodeSigners)
+
+	consortiumMemberOwner, err := msig.GetOwner(b.state, consortiumMemberAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	consortiumSigners, err := getSigners(keys, consortiumMemberOwner.Addrs)
+	if err != nil {
+		return nil, err
+	}
+	signers = append(signers, consortiumSigners)
+
+	kc := secp256k1fx.NewKeychain(consortiumSigners...)
+	sigIndices, _, able := kc.Match(consortiumMemberOwner, b.clk.Unix())
+	if !able {
+		return nil, fmt.Errorf("failed to get consortium member auth: %w", err)
+	}
+
+	utx := &txs.RegisterNodeTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.ctx.NetworkID,
+			BlockchainID: b.ctx.ChainID,
+			Ins:          ins,
+			Outs:         outs,
+		}},
+		OldNodeID:               oldNodeID,
+		NewNodeID:               newNodeID,
+		ConsortiumMemberAuth:    &secp256k1fx.Input{SigIndices: sigIndices},
+		ConsortiumMemberAddress: consortiumMemberAddress,
+	}
+
+	tx, err := txs.NewSigned(utx, txs.Codec, signers)
+	if err != nil {
+		return nil, err
+	}
+	return tx, tx.SyntacticVerify(b.ctx)
+}
+
+func getSigner(
 	keys []*crypto.PrivateKeySECP256K1R,
 	address ids.ShortID,
 ) ([]*crypto.PrivateKeySECP256K1R, error) {
-	signer, found := secp256k1fx.NewKeychain(keys...).Get(address)
-	if !found {
-		return nil, fmt.Errorf("%w %s", errKeyMissing, address.String())
-	}
+	return getSigners(keys, []ids.ShortID{address})
+}
 
-	key, ok := signer.(*crypto.PrivateKeySECP256K1R)
-	if !ok {
-		return nil, errWrongNodeKeyType
-	}
+func getSigners(
+	keys []*crypto.PrivateKeySECP256K1R,
+	addresses []ids.ShortID,
+) ([]*crypto.PrivateKeySECP256K1R, error) {
+	signers := make([]*crypto.PrivateKeySECP256K1R, len(addresses))
+	for i, addr := range addresses {
+		signer, found := secp256k1fx.NewKeychain(keys...).Get(addr)
+		if !found {
+			return nil, fmt.Errorf("%w %s", errKeyMissing, addr.String())
+		}
 
-	return []*crypto.PrivateKeySECP256K1R{key}, nil
+		key, ok := signer.(*crypto.PrivateKeySECP256K1R)
+		if !ok {
+			return nil, errWrongNodeKeyType
+		}
+
+		signers[i] = key
+	}
+	return signers, nil
 }

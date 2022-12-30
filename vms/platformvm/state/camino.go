@@ -250,6 +250,14 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 
 	for _, consortiumMemberNode := range g.Camino.ConsortiumMembersNodeIDs {
 		cs.SetNodeConsortiumMember(consortiumMemberNode.NodeID, &consortiumMemberNode.ConsortiumMemberAddress)
+		addrState, err := cs.GetAddressStates(consortiumMemberNode.ConsortiumMemberAddress)
+		if err != nil {
+			return err
+		}
+		cs.SetAddressStates(
+			consortiumMemberNode.ConsortiumMemberAddress,
+			addrState|txs.AddressStateRegisteredNodeBit,
+		)
 	}
 
 	// adding deposit offers

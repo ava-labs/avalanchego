@@ -33,6 +33,9 @@ func newCaminoTxMetrics(
 		txMetrics: *txm,
 		// Camino specific tx metrics
 		numAddAddressStateTxs: newTxMetric(namespace, "add_address_state", registerer, &errs),
+		numDepositTxs:         newTxMetric(namespace, "deposit", registerer, &errs),
+		numUnlockDepositTxs:   newTxMetric(namespace, "unlock_deposit", registerer, &errs),
+		numRegisterNodeTx:     newTxMetric(namespace, "register_node", registerer, &errs),
 	}
 	return m, errs.Err
 }
