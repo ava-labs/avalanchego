@@ -27,10 +27,16 @@ type node struct {
 func getNodes(networkID uint32) []node {
 	switch networkID {
 	case constants.ColumbusID:
-		return []node{{
-			ip:     "104.154.245.81:9651",
-			nodeID: "NodeID-PGHYeLVkU6ZVQEu8CuRBk6pQ2NJNAuzZ4",
-		}}
+		return []node{
+			{
+				ip:     "34.91.158.85:9651",
+				nodeID: "NodeID-6XD16eZ22fadTKq3qsxro9TPFZyxTiFv3",
+			},
+			{
+				ip:     "35.205.189.109:9651",
+				nodeID: "NodeID-6rsqgkg4F1i3SBjzj4tS5ucQWH7JMEouj",
+			},
+		}
 	default:
 		return nil
 	}
