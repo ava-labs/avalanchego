@@ -249,6 +249,9 @@ func buildPGenesis(config *Config, hrp string, xGenesisBytes []byte, xGenesisDat
 
 	stakingOffset := time.Duration(0)
 
+	minValidatorStake := GetStakingConfig(config.NetworkID).MinValidatorStake
+	maxValidatorStake := GetStakingConfig(config.NetworkID).MaxValidatorStake
+
 	for _, allocation := range config.Camino.Allocations {
 		var addrState uint64
 		if allocation.AddressStates.ConsortiumMember {
@@ -269,6 +272,7 @@ func buildPGenesis(config *Config, hrp string, xGenesisBytes []byte, xGenesisDat
 			return nil, ids.Empty, err
 		}
 
+		stakeRemaining := maxValidatorStake
 		for _, platformAllocation := range allocation.PlatformAllocations {
 			if platformAllocation.Amount == 0 {
 				return nil, ids.Empty, errEmptyAllocation
@@ -279,13 +283,27 @@ func buildPGenesis(config *Config, hrp string, xGenesisBytes []byte, xGenesisDat
 				return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
 			}
 
+			amountRemaining := platformAllocation.Amount
 			utxo := api.UTXO{
-				Amount:  json.Uint64(platformAllocation.Amount),
 				Address: allocationAddress,
 				Message: allocationMessage,
 			}
 
-			if platformAllocation.NodeID != ids.EmptyNodeID {
+			if platformAllocation.NodeID != ids.EmptyNodeID && stakeRemaining > 0 {
+				// Never allocate more than Max
+				if amountRemaining > stakeRemaining {
+					utxo.Amount = json.Uint64(stakeRemaining)
+				} else {
+					utxo.Amount = json.Uint64(amountRemaining)
+				}
+
+				amountRemaining -= uint64(utxo.Amount)
+				stakeRemaining -= uint64(utxo.Amount)
+
+				if uint64(utxo.Amount) < minValidatorStake {
+					return nil, ids.Empty, fmt.Errorf("not enough validator stake (%d)", utxo.Amount)
+				}
+
 				stakingDuration := time.Duration(platformAllocation.ValidatorDuration) * time.Second
 				endStakingTime := genesisTime.Add(stakingDuration).Add(-stakingOffset)
 				stakingOffset += time.Duration(config.InitialStakeDurationOffset) * time.Second
@@ -311,7 +329,9 @@ func buildPGenesis(config *Config, hrp string, xGenesisBytes []byte, xGenesisDat
 					}})
 
 				platformvmArgs.Camino.ValidatorConsortiumMembers = append(platformvmArgs.Camino.ValidatorConsortiumMembers, allocation.AVAXAddr)
-			} else {
+			}
+			if amountRemaining > 0 {
+				utxo.Amount = json.Uint64(amountRemaining)
 				platformvmArgs.Camino.UTXODeposits = append(platformvmArgs.Camino.UTXODeposits,
 					api.UTXODeposit{
 						OfferID: platformAllocation.DepositOfferID,
