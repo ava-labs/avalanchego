@@ -67,8 +67,7 @@ type VM struct {
 	minBlkDelay         time.Duration
 
 	state.State
-	hIndexer                indexer.HeightIndexer
-	resetHeightIndexOngoing utils.AtomicBool
+	hIndexer indexer.HeightIndexer
 
 	proposer.Windower
 	tree.Tree
@@ -206,7 +205,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	if err := vm.repair(detachedCtx, indexerState); err != nil {
+	if err := vm.repair(detachedCtx); err != nil {
 		return err
 	}
 
@@ -327,52 +326,28 @@ func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
 	return lastAccepted, err
 }
 
-func (vm *VM) repair(ctx context.Context, indexerState state.State) error {
+func (vm *VM) repair(ctx context.Context) error {
 	// check and possibly rebuild height index
 	if vm.hVM == nil {
 		return vm.repairAcceptedChainByIteration(ctx)
 	}
 
-	indexIsEmpty, err := vm.State.IsIndexEmpty()
-	if err != nil {
-		return err
-	}
-	if indexIsEmpty {
-		if err := vm.State.SetIndexHasReset(); err != nil {
-			return err
-		}
-		if err := vm.State.Commit(); err != nil {
-			return err
-		}
-	} else {
-		indexWasReset, err := vm.State.HasIndexReset()
+	switch vm.hVM.VerifyHeightIndex(ctx) {
+	case nil:
+		// InnerVM height index is complete. We can immediately verify
+		// and repair this VM height index.
+		shouldRepair, err := vm.shouldHeightIndexBeRepaired(ctx)
 		if err != nil {
-			return fmt.Errorf("retrieving value of required index reset failed with: %w", err)
-		}
-
-		if !indexWasReset {
-			vm.resetHeightIndexOngoing.SetValue(true)
-		}
-	}
-
-	if !vm.resetHeightIndexOngoing.GetValue() {
-		// We are not going to wipe the height index
-		switch vm.hVM.VerifyHeightIndex(ctx) {
-		case nil:
-			// We are not going to wait for the height index to be repaired.
-			shouldRepair, err := vm.shouldHeightIndexBeRepaired(ctx)
-			if err != nil {
-				return err
-			}
-			if !shouldRepair {
-				vm.ctx.Log.Info("block height index was successfully verified")
-				vm.hIndexer.MarkRepaired(true)
-				return vm.repairAcceptedChainByHeight(ctx)
-			}
-		case block.ErrIndexIncomplete:
-		default:
 			return err
 		}
+		if !shouldRepair {
+			vm.ctx.Log.Info("block height index was successfully verified")
+			vm.hIndexer.MarkRepaired(true)
+			return vm.repairAcceptedChainByHeight(ctx)
+		}
+	case block.ErrIndexIncomplete:
+	default:
+		return nil
 	}
 
 	if err := vm.repairAcceptedChainByIteration(ctx); err != nil {
@@ -381,21 +356,6 @@ func (vm *VM) repair(ctx context.Context, indexerState state.State) error {
 
 	// asynchronously rebuild height index, if needed
 	go func() {
-		// If index reset has been requested, carry it out first
-		if vm.resetHeightIndexOngoing.GetValue() {
-			vm.ctx.Log.Info("block height indexing reset started")
-
-			if err := indexerState.ResetHeightIndex(vm.ctx.Log, vm); err != nil {
-				vm.ctx.Log.Error("block height indexing reset failed",
-					zap.Error(err),
-				)
-				return
-			}
-
-			vm.ctx.Log.Info("block height indexing reset finished")
-			vm.resetHeightIndexOngoing.SetValue(false)
-		}
-
 		// Poll until the underlying chain's index is complete or shutdown is
 		// called.
 		ticker := time.NewTicker(checkIndexedFrequency)
@@ -407,7 +367,7 @@ func (vm *VM) repair(ctx context.Context, indexerState state.State) error {
 			vm.ctx.Lock.Unlock()
 
 			if err == nil {
-				// innerVM indexing complete. Let re-index this machine
+				// innerVM indexing complete. Let's re-index this VM
 				break
 			}
 			if err != block.ErrIndexIncomplete {

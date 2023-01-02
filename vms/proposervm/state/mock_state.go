@@ -159,21 +159,6 @@ func (mr *MockStateMockRecorder) GetLastAccepted() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastAccepted", reflect.TypeOf((*MockState)(nil).GetLastAccepted))
 }
 
-// HasIndexReset mocks base method.
-func (m *MockState) HasIndexReset() (bool, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HasIndexReset")
-	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// HasIndexReset indicates an expected call of HasIndexReset.
-func (mr *MockStateMockRecorder) HasIndexReset() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasIndexReset", reflect.TypeOf((*MockState)(nil).HasIndexReset))
-}
-
 // IsIndexEmpty mocks base method.
 func (m *MockState) IsIndexEmpty() (bool, error) {
 	m.ctrl.T.Helper()
@@ -257,20 +242,6 @@ func (m *MockState) SetForkHeight(arg0 uint64) error {
 func (mr *MockStateMockRecorder) SetForkHeight(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetForkHeight", reflect.TypeOf((*MockState)(nil).SetForkHeight), arg0)
-}
-
-// SetIndexHasReset mocks base method.
-func (m *MockState) SetIndexHasReset() error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetIndexHasReset")
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SetIndexHasReset indicates an expected call of SetIndexHasReset.
-func (mr *MockStateMockRecorder) SetIndexHasReset() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetIndexHasReset", reflect.TypeOf((*MockState)(nil).SetIndexHasReset))
 }
 
 // SetLastAccepted mocks base method.

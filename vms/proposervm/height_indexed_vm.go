@@ -90,10 +90,6 @@ func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, er
 // As postFork blocks/options are accepted, height index is updated even if its
 // repairing is ongoing. vm.ctx.Lock should be held
 func (vm *VM) updateHeightIndex(height uint64, blkID ids.ID) error {
-	if vm.resetHeightIndexOngoing.GetValue() {
-		return nil
-	}
-
 	_, err := vm.State.GetCheckpoint()
 	switch err {
 	case nil:
