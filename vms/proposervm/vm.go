@@ -326,9 +326,11 @@ func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
 	return lastAccepted, err
 }
 
+// repair makes sure that vm and innerVM chains are in sync.
+// Moreover it fixes vm's height index if defined.
 func (vm *VM) repair(ctx context.Context) error {
-	// check and possibly rebuild height index
 	if vm.hVM == nil {
+		// height index not defined. Just sync vms and innerVM chains.
 		return vm.repairAcceptedChainByIteration(ctx)
 	}
 
@@ -350,6 +352,7 @@ func (vm *VM) repair(ctx context.Context) error {
 		return nil
 	}
 
+	// innerVM height index is incomplete. Sync vm and innerVM chains first.
 	if err := vm.repairAcceptedChainByIteration(ctx); err != nil {
 		return err
 	}
@@ -509,7 +512,6 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
 	proLastAccepted, err := vm.getPostForkBlock(ctx, proLastAcceptedID)
 	if err != nil {
 		return err
@@ -533,7 +535,6 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 
 	if forkHeight > innerLastAcceptedHeight {
 		// We are rolling back past the fork, so we should just forget about all of our proposervm indices.
-
 		if err := vm.State.DeleteLastAccepted(); err != nil {
 			return err
 		}
