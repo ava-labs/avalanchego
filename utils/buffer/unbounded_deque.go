@@ -29,6 +29,10 @@ type Deque[T any] interface {
 	// Return the rightmost element of the deque without removing it.
 	// Returns false if the deque is empty.
 	PeekRight() (T, bool)
+	// Returns the element at the given index.
+	// Returns false if the index is out of bounds.
+	// The leftmost element is at index 0.
+	Index(int) (T, bool)
 	// Returns the number of elements in the deque.
 	Len() int
 	// Returns the elements in the deque from left to right.
@@ -125,6 +129,15 @@ func (b *unboundedSliceDeque[T]) PeekRight() (T, bool) {
 		return utils.Zero[T](), false
 	}
 	idx := b.rightmostEltIdx()
+	return b.data[idx], true
+}
+
+func (b *unboundedSliceDeque[T]) Index(idx int) (T, bool) {
+	if idx < 0 || idx >= b.size {
+		return utils.Zero[T](), false
+	}
+	leftmostIdx := b.leftmostEltIdx()
+	idx = (leftmostIdx + idx) % len(b.data)
 	return b.data[idx], true
 }
 

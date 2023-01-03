@@ -123,6 +123,16 @@ func (q *unboundedBlockingDeque[T]) PeekLeft() (T, bool) {
 	return q.Deque.PeekLeft()
 }
 
+func (q *unboundedBlockingDeque[T]) Index(i int) (T, bool) {
+	q.lock.RLock()
+	defer q.lock.RUnlock()
+
+	if q.closed {
+		return utils.Zero[T](), false
+	}
+	return q.Deque.Index(i)
+}
+
 func (q *unboundedBlockingDeque[T]) Len() int {
 	q.lock.RLock()
 	defer q.lock.RUnlock()
