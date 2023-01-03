@@ -343,12 +343,33 @@ func makeUTXOAndDeposit(
 			return nil, nil, errNonExistingOffer
 		}
 
+		ins := []*avax.TransferableInput{}
+		if bondTxID != ids.Empty {
+			ins = append(ins, &avax.TransferableInput{
+				UTXOID: avax.UTXOID{
+					TxID:        txID,
+					OutputIndex: outputIndex,
+				},
+				Asset: avax.Asset{ID: avaxAssetID},
+				In: &locked.In{
+					IDs: locked.IDs{
+						BondTxID:    bondTxID,
+						DepositTxID: ids.Empty,
+					},
+					TransferableIn: &secp256k1fx.TransferInput{
+						Amt:   uint64(apiUTXO.Amount),
+						Input: secp256k1fx.Input{},
+					},
+				},
+			})
+		}
+
 		depositTx = &txs.Tx{Unsigned: &txs.DepositTx{
 			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 				NetworkID:    networkID,
 				BlockchainID: ids.Empty,
 				Memo:         types.JSONByteSlice(deposit.Memo),
-				Ins:          []*avax.TransferableInput{},
+				Ins:          ins,
 				Outs: []*avax.TransferableOutput{{
 					Asset: avax.Asset{ID: avaxAssetID},
 					Out: &locked.Out{

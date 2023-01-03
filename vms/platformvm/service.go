@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	json_encoder "encoding/json"
 	stdmath "math"
 
 	"go.uber.org/zap"
@@ -444,6 +445,15 @@ func (s *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, response *ap
 
 	response.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
+		if args.Encoding == formatting.JSON {
+			utxo.Out.InitCtx(s.vm.ctx)
+			bytes, err := json_encoder.Marshal(utxo)
+			if err != nil {
+				return fmt.Errorf("couldn't marshal UTXO %q: %w", utxo.InputID(), err)
+			}
+			response.UTXOs[i] = string(bytes)
+			continue
+		}
 		bytes, err := txs.Codec.Marshal(txs.Version, utxo)
 		if err != nil {
 			return fmt.Errorf("couldn't serialize UTXO %q: %w", utxo.InputID(), err)
