@@ -31,6 +31,8 @@ type Deque[T any] interface {
 	PeekRight() (T, bool)
 	// Returns the number of elements in the deque.
 	Len() int
+	// Returns the elements in the deque from left to right.
+	List() []T
 }
 
 // Returns a new unbounded deque with the given initial slice size.
@@ -128,6 +130,22 @@ func (b *unboundedSliceDeque[T]) PeekRight() (T, bool) {
 
 func (b *unboundedSliceDeque[T]) Len() int {
 	return b.size
+}
+
+func (b *unboundedSliceDeque[T]) List() []T {
+	if b.size == 0 {
+		return nil
+	}
+
+	list := make([]T, b.size)
+	leftmostIdx := b.leftmostEltIdx()
+	if numCopied := copy(list, b.data[leftmostIdx:]); numCopied < b.size {
+		// We copied all of the elements from the leftmost element index
+		// to the end of the underlying slice, but we still haven't copied
+		// all of the elements, so wrap around and copy the rest.
+		copy(list[numCopied:], b.data[:b.right])
+	}
+	return list
 }
 
 func (b *unboundedSliceDeque[T]) leftmostEltIdx() int {

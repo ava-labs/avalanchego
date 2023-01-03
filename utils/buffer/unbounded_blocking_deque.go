@@ -133,6 +133,16 @@ func (q *unboundedBlockingDeque[T]) Len() int {
 	return q.Deque.Len()
 }
 
+func (q *unboundedBlockingDeque[T]) List() []T {
+	q.lock.RLock()
+	defer q.lock.RUnlock()
+
+	if q.closed {
+		return nil
+	}
+	return q.Deque.List()
+}
+
 func (q *unboundedBlockingDeque[T]) Close() {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
