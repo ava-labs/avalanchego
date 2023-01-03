@@ -54,12 +54,7 @@ type diff struct {
 	addedTxs map[ids.ID]*txAndStatus
 
 	// map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
-	modifiedUTXOs map[ids.ID]*utxoModification
-}
-
-type utxoModification struct {
-	utxoID ids.ID
-	utxo   *avax.UTXO
+	modifiedUTXOs map[ids.ID]*avax.UTXO
 }
 
 func NewDiff(
@@ -411,36 +406,29 @@ func (d *diff) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 		}
 		return parentState.GetUTXO(utxoID)
 	}
-	if utxo.utxo == nil {
+	if utxo == nil {
 		return nil, database.ErrNotFound
 	}
-	return utxo.utxo, nil
+	return utxo, nil
 }
 
 func (d *diff) AddUTXO(utxo *avax.UTXO) {
-	newUTXO := &utxoModification{
-		utxoID: utxo.InputID(),
-		utxo:   utxo,
-	}
 	if d.modifiedUTXOs == nil {
-		d.modifiedUTXOs = map[ids.ID]*utxoModification{
-			utxo.InputID(): newUTXO,
+		d.modifiedUTXOs = map[ids.ID]*avax.UTXO{
+			utxo.InputID(): utxo,
 		}
 	} else {
-		d.modifiedUTXOs[utxo.InputID()] = newUTXO
+		d.modifiedUTXOs[utxo.InputID()] = utxo
 	}
 }
 
 func (d *diff) DeleteUTXO(utxoID ids.ID) {
-	newUTXO := &utxoModification{
-		utxoID: utxoID,
-	}
 	if d.modifiedUTXOs == nil {
-		d.modifiedUTXOs = map[ids.ID]*utxoModification{
-			utxoID: newUTXO,
+		d.modifiedUTXOs = map[ids.ID]*avax.UTXO{
+			utxoID: nil,
 		}
 	} else {
-		d.modifiedUTXOs[utxoID] = newUTXO
+		d.modifiedUTXOs[utxoID] = nil
 	}
 }
 
@@ -510,11 +498,11 @@ func (d *diff) Apply(baseState State) {
 			baseState.AddRewardUTXO(txID, utxo)
 		}
 	}
-	for _, utxo := range d.modifiedUTXOs {
-		if utxo.utxo != nil {
-			baseState.AddUTXO(utxo.utxo)
+	for utxoID, utxo := range d.modifiedUTXOs {
+		if utxo != nil {
+			baseState.AddUTXO(utxo)
 		} else {
-			baseState.DeleteUTXO(utxo.utxoID)
+			baseState.DeleteUTXO(utxoID)
 		}
 	}
 }
