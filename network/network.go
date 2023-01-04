@@ -341,6 +341,9 @@ func (n *network) HealthCheck(context.Context) (interface{}, error) {
 	details[SendFailRateKey] = sendFailRate
 	n.metrics.sendFailRate.Set(sendFailRate)
 
+	// emit metrics about the lifetime of peer connections
+	n.metrics.updatePeerConnectionLifetimeMetrics()
+
 	// Network layer is healthy
 	if healthy || !n.config.HealthConfig.Enabled {
 		return details, nil
