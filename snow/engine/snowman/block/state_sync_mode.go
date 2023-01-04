@@ -17,7 +17,7 @@ const (
 	// complete state syncing before moving ahead with bootstrapping.
 	StateSyncStatic
 
-	// StateSummaryDynamic indicates that engine should immediately transition
+	// StateSyncDynamic indicates that engine should immediately transition
 	// into bootstrapping and then normal consensus. State sync will proceed
 	// asynchronously in the VM.
 	//
@@ -27,7 +27,7 @@ const (
 	// LastAccepted, GetBlock, ParseBlock, and Block.Verify are maintained. This
 	// means that when StateSummary.Accept returns, the block that would become
 	// the last accepted block must be immediately fetchable by the engine.
-	StateSummaryDynamic
+	StateSyncDynamic
 )
 
 func (s StateSyncMode) String() string {
@@ -36,7 +36,7 @@ func (s StateSyncMode) String() string {
 		return "Skipped"
 	case StateSyncStatic:
 		return "Static"
-	case StateSummaryDynamic:
+	case StateSyncDynamic:
 		return "Dynamic"
 	default:
 		return "Unknown"
