@@ -110,22 +110,16 @@ type Chain interface {
 	AddTx(tx *txs.Tx, status status.Status)
 }
 
-type LastAccepteder interface {
-	GetLastAccepted() ids.ID
-	SetLastAccepted(blkID ids.ID)
-}
-
-type BlockState interface {
-	GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error)
-	AddStatelessBlock(block blocks.Block, status choices.Status)
-}
-
 type State interface {
-	LastAccepteder
 	Chain
-	BlockState
 	uptime.State
 	avax.UTXOReader
+
+	GetLastAccepted() ids.ID
+	SetLastAccepted(blkID ids.ID)
+
+	GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error)
+	AddStatelessBlock(block blocks.Block, status choices.Status)
 
 	// ValidatorSet adds all the validators and delegators of [subnetID] into
 	// [vdrs].

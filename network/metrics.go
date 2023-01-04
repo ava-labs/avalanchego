@@ -4,6 +4,9 @@
 package network
 
 import (
+	"sync"
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -31,6 +34,11 @@ type metrics struct {
 	nodeUptimeRewardingStake        prometheus.Gauge
 	nodeSubnetUptimeWeightedAverage *prometheus.GaugeVec
 	nodeSubnetUptimeRewardingStake  *prometheus.GaugeVec
+	peerConnectedLifetimeAverage    prometheus.Gauge
+
+	lock                       sync.RWMutex
+	peerConnectedStartTimes    map[ids.NodeID]float64
+	peerConnectedStartTimesSum float64
 }
 
 func newMetrics(namespace string, registerer prometheus.Registerer, initialSubnetIDs set.Set[ids.ID]) (*metrics, error) {
@@ -129,6 +137,14 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 			},
 			[]string{"subnetID"},
 		),
+		peerConnectedLifetimeAverage: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "peer_connected_duration_average",
+				Help:      "The average duration of all peer connections in nanoseconds",
+			},
+		),
+		peerConnectedStartTimes: make(map[ids.NodeID]float64),
 	}
 
 	errs := wrappers.Errs{}
@@ -150,6 +166,7 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 		registerer.Register(m.nodeUptimeRewardingStake),
 		registerer.Register(m.nodeSubnetUptimeWeightedAverage),
 		registerer.Register(m.nodeSubnetUptimeRewardingStake),
+		registerer.Register(m.peerConnectedLifetimeAverage),
 	)
 
 	// init subnet tracker metrics with whitelisted subnets
@@ -176,6 +193,13 @@ func (m *metrics) markConnected(peer peer.Peer) {
 	for subnetID := range trackedSubnets {
 		m.numSubnetPeers.WithLabelValues(subnetID.String()).Inc()
 	}
+
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	now := float64(time.Now().UnixNano())
+	m.peerConnectedStartTimes[peer.ID()] = now
+	m.peerConnectedStartTimesSum += now
 }
 
 func (m *metrics) markDisconnected(peer peer.Peer) {
@@ -186,4 +210,26 @@ func (m *metrics) markDisconnected(peer peer.Peer) {
 	for subnetID := range trackedSubnets {
 		m.numSubnetPeers.WithLabelValues(subnetID.String()).Dec()
 	}
+
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	peerID := peer.ID()
+	start := m.peerConnectedStartTimes[peerID]
+	m.peerConnectedStartTimesSum -= start
+
+	delete(m.peerConnectedStartTimes, peerID)
+}
+
+func (m *metrics) updatePeerConnectionLifetimeMetrics() {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	avg := float64(0)
+	if n := len(m.peerConnectedStartTimes); n > 0 {
+		avgStartTime := m.peerConnectedStartTimesSum / float64(n)
+		avg = float64(time.Now().UnixNano()) - avgStartTime
+	}
+
+	m.peerConnectedLifetimeAverage.Set(avg)
 }

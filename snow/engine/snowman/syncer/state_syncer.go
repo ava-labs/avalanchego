@@ -324,7 +324,7 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 		// Engine will wait for notification of state sync done.
 		ss.Ctx.RunningStateSync(true)
 		return nil
-	case block.StateSummaryDynamic:
+	case block.StateSyncDynamic:
 		// Summary was accepted and VM is state syncing.
 		// Engine will continue into bootstrapping and the VM will sync in the
 		// background.
