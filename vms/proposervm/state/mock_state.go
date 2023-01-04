@@ -10,10 +10,8 @@ package state
 import (
 	reflect "reflect"
 
-	versiondb "github.com/ava-labs/avalanchego/database/versiondb"
 	ids "github.com/ava-labs/avalanchego/ids"
 	choices "github.com/ava-labs/avalanchego/snow/choices"
-	logging "github.com/ava-labs/avalanchego/utils/logging"
 	block "github.com/ava-labs/avalanchego/vms/proposervm/block"
 	gomock "github.com/golang/mock/gomock"
 )
@@ -159,21 +157,6 @@ func (mr *MockStateMockRecorder) GetLastAccepted() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastAccepted", reflect.TypeOf((*MockState)(nil).GetLastAccepted))
 }
 
-// IsIndexEmpty mocks base method.
-func (m *MockState) IsIndexEmpty() (bool, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IsIndexEmpty")
-	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// IsIndexEmpty indicates an expected call of IsIndexEmpty.
-func (mr *MockStateMockRecorder) IsIndexEmpty() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsIndexEmpty", reflect.TypeOf((*MockState)(nil).IsIndexEmpty))
-}
-
 // PutBlock mocks base method.
 func (m *MockState) PutBlock(arg0 block.Block, arg1 choices.Status) error {
 	m.ctrl.T.Helper()
@@ -186,20 +169,6 @@ func (m *MockState) PutBlock(arg0 block.Block, arg1 choices.Status) error {
 func (mr *MockStateMockRecorder) PutBlock(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutBlock", reflect.TypeOf((*MockState)(nil).PutBlock), arg0, arg1)
-}
-
-// ResetHeightIndex mocks base method.
-func (m *MockState) ResetHeightIndex(arg0 logging.Logger, arg1 versiondb.Commitable) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ResetHeightIndex", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// ResetHeightIndex indicates an expected call of ResetHeightIndex.
-func (mr *MockStateMockRecorder) ResetHeightIndex(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetHeightIndex", reflect.TypeOf((*MockState)(nil).ResetHeightIndex), arg0, arg1)
 }
 
 // SetBlockIDAtHeight mocks base method.
