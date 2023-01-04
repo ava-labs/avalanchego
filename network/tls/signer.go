@@ -24,6 +24,7 @@ type Signer struct {
 	opts       stdcrypto.SignerOpts
 }
 
+// NewSigner returns a new instance of Signer.
 func NewSigner(cert *tls.Certificate, opts stdcrypto.SignerOpts) (*Signer, error) {
 	privateKey, ok := cert.PrivateKey.(stdcrypto.Signer)
 	if !ok {
@@ -37,6 +38,5 @@ func NewSigner(cert *tls.Certificate, opts stdcrypto.SignerOpts) (*Signer, error
 }
 
 func (s Signer) Sign(msg []byte) ([]byte, error) {
-	return s.privateKey.Sign(rand.Reader, msg, s.opts,
-	)
+	return s.privateKey.Sign(rand.Reader, msg, s.opts)
 }

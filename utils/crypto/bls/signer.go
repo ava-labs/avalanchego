@@ -14,6 +14,7 @@ type Signer struct {
 	secretKey *SecretKey
 }
 
+// NewSigner returns a new instance of Signer.
 func NewSigner(secretKey *SecretKey) Signer {
 	return Signer{
 		secretKey: secretKey,
