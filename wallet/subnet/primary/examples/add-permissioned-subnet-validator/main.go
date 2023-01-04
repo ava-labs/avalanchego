@@ -41,8 +41,8 @@ func main() {
 	}
 	log.Printf("fetched node ID %s in %s\n", nodeID, time.Since(nodeInfoStartTime))
 
-	// NewWalletFromURI fetches the available UTXOs owned by [kc] on the network
-	// that [uri] is hosting.
+	// NewWalletWithTxs fetches the available UTXOs owned by [kc] on the network
+	// that [uri] is hosting and registers [subnetID].
 	walletSyncStartTime := time.Now()
 	wallet, err := primary.NewWalletWithTxs(ctx, uri, kc, subnetID)
 	if err != nil {
