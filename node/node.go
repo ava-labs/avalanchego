@@ -89,8 +89,7 @@ var (
 	genesisHashKey  = []byte("genesisID")
 	indexerDBPrefix = []byte{0x00}
 
-	errInvalidTLSKey = errors.New("invalid TLS key")
-	errShuttingDown  = errors.New("server shutting down")
+	errShuttingDown = errors.New("server shutting down")
 )
 
 // Node is an instance of an Avalanche node.

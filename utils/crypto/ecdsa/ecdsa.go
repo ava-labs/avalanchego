@@ -26,6 +26,7 @@ func NewSigner(curve elliptic.Curve, opts stdcrypto.SignerOpts) (Signer, error) 
 	if err != nil {
 		return Signer{}, err
 	}
+
 	return Signer{
 		privateKey: privateKey,
 		opts:       opts,
