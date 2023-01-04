@@ -171,8 +171,10 @@ func initTestProposerVM(
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
 
-	// pre-insert resetOccurred key to make VM not spinning height reindexing
-	stopHeightReindexing(t, coreVM, dummyDBManager)
+	// signal height index is complete
+	coreVM.VerifyHeightIndexF = func(context.Context) error {
+		return nil
+	}
 
 	err := proVM.Initialize(
 		context.Background(),

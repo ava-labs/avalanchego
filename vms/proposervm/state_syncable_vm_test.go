@@ -15,8 +15,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -24,33 +22,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
 var errUnknownSummary = errors.New("unknown summary")
-
-func stopHeightReindexing(t *testing.T, coreVM *fullVM, dbMan manager.Manager) {
-	rawDB := dbMan.Current().Database
-	prefixDB := prefixdb.New(dbPrefix, rawDB)
-	db := versiondb.New(prefixDB)
-	vmState := state.New(db)
-
-	if err := vmState.SetIndexHasReset(); err != nil {
-		t.Fatal("could not preload key to vm state")
-	}
-	if err := vmState.Commit(); err != nil {
-		t.Fatal("could not commit preloaded key")
-	}
-	if err := db.Commit(); err != nil {
-		t.Fatal("could not commit preloaded key")
-	}
-
-	coreVM.VerifyHeightIndexF = func(context.Context) error {
-		return nil
-	}
-}
 
 func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	innerVM := &fullVM{
@@ -67,10 +43,10 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 		},
 	}
 
-	// Preload DB with key showing height index has been purged of rejected blocks
-	dbManager := manager.NewMemDB(version.Semantic1_0_0)
-	dbManager = dbManager.NewPrefixDBManager([]byte{})
-	stopHeightReindexing(t, innerVM, dbManager)
+	// signal height index is complete
+	innerVM.VerifyHeightIndexF = func(context.Context) error {
+		return nil
+	}
 
 	// load innerVM expectations
 	innerGenesisBlk := &snowman.TestBlock{
@@ -97,6 +73,9 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	}
 
 	// createVM
+	dbManager := manager.NewMemDB(version.Semantic1_0_0)
+	dbManager = dbManager.NewPrefixDBManager([]byte{})
+
 	vm := New(innerVM, time.Time{}, 0, DefaultMinBlockDelay)
 
 	ctx := snow.DefaultContextTest()
