@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 pub mod create;
+pub mod get;
 pub mod insert;
 
 #[derive(Parser)]
@@ -29,6 +30,8 @@ enum Commands {
     Create(create::Options),
     /// Insert a key/value pair into the database
     Insert(insert::Options),
+    /// Get values associated with a key
+    Get(get::Options),
 }
 
 fn main() -> Result<()> {
@@ -41,5 +44,6 @@ fn main() -> Result<()> {
     match &cli.command {
         Commands::Create(opts) => create::run(opts),
         Commands::Insert(opts) => insert::run(opts),
+        Commands::Get(opts) => get::run(opts),
     }
 }

@@ -14,6 +14,7 @@ $ ./target/release/fwdctl -h
 
 ## Supported commands
 * `fwdctl create`: Create a new firewood database.
+* `fwdctl get`: Get the code associated with a key in the database
 
 ## Examples
 * fwdctl create
@@ -25,4 +26,6 @@ $ fwdctl create --name=my-db
 # Look inside, there are several folders representing different components of firewood, including the WAL
 $ ls my-db
 ```
+* fwdctl get <KEY>
+
 
