@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/tls"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -81,9 +82,14 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 
-	err := vm.Initialize(
+	signer, err := tls.NewSigner(pTestCert, crypto.SHA256)
+	ctx.StakingLeafSigner = signer
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vm.Initialize(
 		context.Background(),
 		ctx,
 		dbManager,

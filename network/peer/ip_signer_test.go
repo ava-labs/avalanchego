@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/network/tls"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/ips"
 )
@@ -26,7 +27,8 @@ func TestIPSigner(t *testing.T) {
 	tlsCert, err := staking.NewTLSCert()
 	require.NoError(err)
 
-	key := tlsCert.PrivateKey.(crypto.Signer)
+	key, err := tls.NewSigner(tlsCert, crypto.SHA256)
+	require.NoError(err)
 
 	s := NewIPSigner(dynIP, key)
 

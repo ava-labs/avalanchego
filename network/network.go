@@ -7,13 +7,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	gomath "math"
 	"net"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	gomath "math"
 
 	"github.com/prometheus/client_golang/prometheus"
 

@@ -4,12 +4,11 @@
 package block
 
 import (
-	"crypto"
-	"crypto/rand"
 	"crypto/x509"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -80,7 +79,7 @@ func Build(
 	}
 
 	headerHash := hashing.ComputeHash256(header.Bytes())
-	block.Signature, err = key.Sign(rand.Reader, headerHash, crypto.SHA256)
+	block.Signature, err = key.Sign(headerHash)
 	if err != nil {
 		return nil, err
 	}

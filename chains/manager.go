@@ -6,7 +6,7 @@ package chains
 import (
 	"context"
 	"crypto"
-	"crypto/tls"
+	stdtls "crypto/tls"
 	"errors"
 	"fmt"
 	"os"
@@ -55,6 +55,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/teleporter"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
 	"github.com/ava-labs/avalanchego/vms/tracedvm"
+
+	"github.com/ava-labs/avalanchego/network/tls"
 
 	dbManager "github.com/ava-labs/avalanchego/database/manager"
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
@@ -153,8 +155,8 @@ type ChainConfig struct {
 }
 
 type ManagerConfig struct {
-	StakingEnabled bool            // True iff the network has staking enabled
-	StakingCert    tls.Certificate // needed to sign snowman++ blocks
+	StakingEnabled bool               // True iff the network has staking enabled
+	StakingCert    stdtls.Certificate // needed to sign snowman++ blocks
 	StakingBLSKey  *bls.SecretKey
 	TracingEnabled bool
 	// Must not be used unless [TracingEnabled] is true as this may be nil.
@@ -428,6 +430,10 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		return nil, fmt.Errorf("error while registering vm's metrics %w", err)
 	}
 
+	signer, err := tls.NewSigner(&m.StakingCert, crypto.SHA256)
+	if err != nil {
+		return nil, fmt.Errorf("error while creating tls signer %w", err)
+	}
 	ctx := &snow.ConsensusContext{
 		Context: &snow.Context{
 			NetworkID: m.NetworkID,
@@ -449,7 +455,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 
 			ValidatorState:    m.validatorState,
 			StakingCertLeaf:   m.StakingCert.Leaf,
-			StakingLeafSigner: m.StakingCert.PrivateKey.(crypto.Signer),
+			StakingLeafSigner: signer,
 			ChainDataDir:      chainDataDir,
 		},
 		DecisionAcceptor:  m.DecisionAcceptorGroup,

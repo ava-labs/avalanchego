@@ -4,7 +4,6 @@
 package network
 
 import (
-	"crypto"
 	"crypto/tls"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -126,8 +126,10 @@ type Config struct {
 	// true.
 	CompressionEnabled bool `json:"compressionEnabled"`
 
-	// TLSKey is this node's TLS key that is used to sign IPs.
+	// TLSKey is this node's key that is used to sign IPs.
 	TLSKey crypto.Signer `json:"-"`
+	// BLSKey is this node's BLS key that is used to sign IPs.
+	BLSKey crypto.Signer `json:"-"`
 
 	// WhitelistedSubnets of the node.
 	WhitelistedSubnets set.Set[ids.ID] `json:"-"`

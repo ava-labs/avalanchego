@@ -7,7 +7,7 @@ import (
 	"bytes"
 	"context"
 	"crypto"
-	"crypto/tls"
+	stdtls "crypto/tls"
 	"errors"
 	"testing"
 	"time"
@@ -18,6 +18,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/tls"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -47,7 +48,7 @@ type fullVM struct {
 }
 
 var (
-	pTestCert *tls.Certificate
+	pTestCert *stdtls.Certificate
 
 	genesisUnixTimestamp int64 = 1000
 	genesisTimestamp           = time.Unix(genesisUnixTimestamp, 0)
@@ -165,7 +166,11 @@ func initTestProposerVM(
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
+	signer, err := tls.NewSigner(pTestCert, crypto.SHA256)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx.StakingLeafSigner = signer
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -176,7 +181,7 @@ func initTestProposerVM(
 		return nil
 	}
 
-	err := proVM.Initialize(
+	err = proVM.Initialize(
 		context.Background(),
 		ctx,
 		dummyDBManager,
@@ -949,7 +954,11 @@ func TestExpiredBuildBlock(t *testing.T) {
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
+	signer, err := tls.NewSigner(pTestCert, crypto.SHA256)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx.StakingLeafSigner = signer
 	ctx.ValidatorState = valState
 
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -972,7 +981,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	}
 
 	// make sure that DBs are compressed correctly
-	err := proVM.Initialize(
+	err = proVM.Initialize(
 		context.Background(),
 		ctx,
 		dbManager,
@@ -1264,7 +1273,11 @@ func TestInnerVMRollback(t *testing.T) {
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
+	signer, err := tls.NewSigner(pTestCert, crypto.SHA256)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx.StakingLeafSigner = signer
 	ctx.ValidatorState = valState
 
 	coreVM.InitializeF = func(
@@ -1285,7 +1298,7 @@ func TestInnerVMRollback(t *testing.T) {
 
 	proVM := New(coreVM, time.Time{}, 0, DefaultMinBlockDelay)
 
-	err := proVM.Initialize(
+	err = proVM.Initialize(
 		context.Background(),
 		ctx,
 		dbManager,
@@ -1974,13 +1987,15 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
+	signer, err := tls.NewSigner(pTestCert, crypto.SHA256)
+	require.NoError(err)
+	ctx.StakingLeafSigner = signer
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	// make sure that DBs are compressed correctly
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
-	err := proVM.Initialize(
+	err = proVM.Initialize(
 		context.Background(),
 		ctx,
 		dummyDBManager,
@@ -2184,13 +2199,15 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
+	signer, err := tls.NewSigner(pTestCert, crypto.SHA256)
+	require.NoError(err)
+	ctx.StakingLeafSigner = signer
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	// make sure that DBs are compressed correctly
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
-	err := proVM.Initialize(
+	err = proVM.Initialize(
 		context.Background(),
 		ctx,
 		dummyDBManager,
@@ -2336,9 +2353,13 @@ func TestVMInnerBlkCache(t *testing.T) {
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
+	signer, err := tls.NewSigner(pTestCert, crypto.SHA256)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx.StakingLeafSigner = signer
 
-	err := vm.Initialize(
+	err = vm.Initialize(
 		context.Background(),
 		ctx,
 		dummyDBManager,
@@ -2520,9 +2541,11 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 	snowCtx := snow.DefaultContextTest()
 	snowCtx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	snowCtx.StakingCertLeaf = pTestCert.Leaf
-	snowCtx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
+	signer, err := tls.NewSigner(pTestCert, crypto.SHA256)
+	require.NoError(err)
+	snowCtx.StakingLeafSigner = signer
 
-	err := vm.Initialize(
+	err = vm.Initialize(
 		context.Background(),
 		snowCtx,
 		dummyDBManager,

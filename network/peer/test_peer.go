@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/throttling"
+	"github.com/ava-labs/avalanchego/network/tls"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -98,7 +99,10 @@ func StartTestPeer(
 	}
 
 	signerIP := ips.NewDynamicIPPort(net.IPv6zero, 0)
-	tls := tlsCert.PrivateKey.(crypto.Signer)
+	signer, err := tls.NewSigner(tlsCert, crypto.SHA256)
+	if err != nil {
+		return nil, err
+	}
 
 	peer := Start(
 		&Config{
@@ -116,7 +120,7 @@ func StartTestPeer(
 			PongTimeout:          constants.DefaultPingPongTimeout,
 			MaxClockDifference:   time.Minute,
 			ResourceTracker:      resourceTracker,
-			IPSigner:             NewIPSigner(signerIP, tls),
+			IPSigner:             NewIPSigner(signerIP, signer),
 		},
 		conn,
 		cert,

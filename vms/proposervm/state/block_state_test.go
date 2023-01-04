@@ -4,7 +4,7 @@
 package state
 
 import (
-	"crypto"
+	stdcrypto "crypto"
 	"testing"
 	"time"
 
@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/tls"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -31,7 +32,8 @@ func testBlockState(a *require.Assertions, bs BlockState) {
 	a.NoError(err)
 
 	cert := tlsCert.Leaf
-	key := tlsCert.PrivateKey.(crypto.Signer)
+	key, err := tls.NewSigner(tlsCert, stdcrypto.SHA256)
+	a.NoError(err)
 
 	b, err := block.Build(
 		parentID,

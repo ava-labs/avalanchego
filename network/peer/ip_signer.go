@@ -4,9 +4,9 @@
 package peer
 
 import (
-	"crypto"
 	"sync"
 
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )

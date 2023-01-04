@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/tls"
 	"github.com/ava-labs/avalanchego/staking"
 )
 
@@ -26,9 +27,10 @@ func TestBuild(t *testing.T) {
 	tlsCert, err := staking.NewTLSCert()
 	require.NoError(err)
 
-	cert := tlsCert.Leaf
-	key := tlsCert.PrivateKey.(crypto.Signer)
+	key, err := tls.NewSigner(tlsCert, crypto.SHA256)
+	require.NoError(err)
 
+	cert := tlsCert.Leaf
 	builtBlock, err := Build(
 		parentID,
 		timestamp,
