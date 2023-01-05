@@ -27,8 +27,6 @@ import (
 )
 
 var (
-	errSerializeTx            = "couldn't serialize TX: %w"
-	errEncodeTx               = "couldn't encode TX as string: %w"
 	errInvalidChangeAddr      = "couldn't parse changeAddr: %w"
 	errCreateTx               = "couldn't create tx: %w"
 	errCreateTransferables    = errors.New("couldn't create transferables")
@@ -235,9 +233,29 @@ func (s *CaminoService) SetAddressState(_ *http.Request, args *SetAddressStateAr
 		return err
 	}
 
-	tx, err := s.buildAddressStateTx(args, keys)
+	var changeAddr ids.ShortID
+	if len(args.ChangeAddr) > 0 {
+		var err error
+		if changeAddr, err = avax.ParseServiceAddress(s.addrManager, args.ChangeAddr); err != nil {
+			return fmt.Errorf(errInvalidChangeAddr, err)
+		}
+	}
+
+	targetAddr, err := avax.ParseServiceAddress(s.addrManager, args.Address)
 	if err != nil {
-		return err
+		return fmt.Errorf("couldn't parse param Address: %w", err)
+	}
+
+	// Create the transaction
+	tx, err := s.vm.txBuilder.NewAddAddressStateTx(
+		targetAddr,  // Address to change state
+		args.Remove, // Add or remove State
+		args.State,  // The state to change
+		keys.Keys,   // Keys providing the staked tokens
+		changeAddr,
+	)
+	if err != nil {
+		return fmt.Errorf(errCreateTx, err)
 	}
 
 	response.TxID = tx.ID()
@@ -248,38 +266,24 @@ func (s *CaminoService) SetAddressState(_ *http.Request, args *SetAddressStateAr
 	return nil
 }
 
-type GetAddressStateTxArgs struct {
-	SetAddressStateArgs
-
-	Encoding formatting.Encoding `json:"encoding"`
+type GetAddressStateArgs struct {
+	Address string `json:"address"`
 }
 
-type GetAddressStateTxReply struct {
-	Tx string `json:"tx"`
-}
-
-// GetAddressStateTx returnes an unsigned AddAddressStateTx
-func (s *CaminoService) GetAddressStateTx(_ *http.Request, args *GetAddressStateTxArgs, response *GetAddressStateTxReply) error {
-	s.vm.ctx.Log.Debug("Platform: GetAddressStateTx called")
-
-	keys, err := s.getFakeKeys(&args.JSONFromAddrs)
+// GetAdressStates retrieves the state applied to an address (see setAddressState)
+func (s *CaminoService) GetAddressStates(_ *http.Request, args *GetAddressStateArgs, response *utilsjson.Uint64) error {
+	addr, err := avax.ParseServiceAddress(s.addrManager, args.Address)
 	if err != nil {
 		return err
 	}
 
-	tx, err := s.buildAddressStateTx(&args.SetAddressStateArgs, keys)
+	state, err := s.vm.state.GetAddressStates(addr)
 	if err != nil {
 		return err
 	}
 
-	bytes, err := txs.Codec.Marshal(txs.Version, tx.Unsigned)
-	if err != nil {
-		return fmt.Errorf(errSerializeTx, err)
-	}
+	*response = utilsjson.Uint64(state)
 
-	if response.Tx, err = formatting.Encode(args.Encoding, bytes); err != nil {
-		return fmt.Errorf(errEncodeTx, err)
-	}
 	return nil
 }
 
@@ -288,14 +292,15 @@ type SpendArgs struct {
 	api.JSONChangeAddr
 
 	LockMode     byte                `json:"lockMode"`
-	AmountToLock uint64              `json:"amountToLock"`
-	AmountToBurn uint64              `json:"amountToBurn"`
+	AmountToLock utilsjson.Uint64    `json:"amountToLock"`
+	AmountToBurn utilsjson.Uint64    `json:"amountToBurn"`
 	Encoding     formatting.Encoding `json:"encoding"`
 }
 
 type SpendReply struct {
-	Ins  string `json:"ins"`
-	Outs string `json:"outs"`
+	Ins     string          `json:"ins"`
+	Outs    string          `json:"outs"`
+	Signers [][]ids.ShortID `json:"signers"`
 }
 
 func (s *CaminoService) Spend(_ *http.Request, args *SpendArgs, response *SpendReply) error {
@@ -317,10 +322,10 @@ func (s *CaminoService) Spend(_ *http.Request, args *SpendArgs, response *SpendR
 		}
 	}
 
-	ins, outs, _, err := s.vm.txBuilder.Lock(
+	ins, outs, signers, err := s.vm.txBuilder.Lock(
 		keys.Keys,
-		args.AmountToLock,
-		args.AmountToBurn,
+		uint64(args.AmountToLock),
+		uint64(args.AmountToBurn),
 		locked.State(args.LockMode),
 		changeAddr,
 	)
@@ -344,6 +349,14 @@ func (s *CaminoService) Spend(_ *http.Request, args *SpendArgs, response *SpendR
 
 	if response.Outs, err = formatting.Encode(args.Encoding, bytes); err != nil {
 		return fmt.Errorf("%w: %s", errEncodeTransferables, err)
+	}
+
+	response.Signers = make([][]ids.ShortID, len(signers))
+	for i, cred := range signers {
+		response.Signers[i] = make([]ids.ShortID, len(cred))
+		for j, sig := range cred {
+			response.Signers[i][j] = sig.Address()
+		}
 	}
 
 	return nil
@@ -467,32 +480,4 @@ func (s *Service) getFakeKeys(args *api.JSONFromAddrs) (*secp256k1fx.Keychain, e
 		privKeys.Add(crypto.FakePrivateKey(fromAddr))
 	}
 	return privKeys, nil
-}
-
-func (s *Service) buildAddressStateTx(args *SetAddressStateArgs, keys *secp256k1fx.Keychain) (*txs.Tx, error) {
-	var changeAddr ids.ShortID
-	if len(args.ChangeAddr) > 0 {
-		var err error
-		if changeAddr, err = avax.ParseServiceAddress(s.addrManager, args.ChangeAddr); err != nil {
-			return nil, fmt.Errorf(errInvalidChangeAddr, err)
-		}
-	}
-
-	targetAddr, err := avax.ParseServiceAddress(s.addrManager, args.Address)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't parse param Address: %w", err)
-	}
-
-	// Create the transaction
-	tx, err := s.vm.txBuilder.NewAddAddressStateTx(
-		targetAddr,  // Address to change state
-		args.Remove, // Add or remove State
-		args.State,  // The state to change
-		keys.Keys,   // Keys providing the staked tokens
-		changeAddr,
-	)
-	if err != nil {
-		return nil, fmt.Errorf(errCreateTx, err)
-	}
-	return tx, nil
 }
