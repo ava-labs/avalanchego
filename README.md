@@ -59,21 +59,12 @@ Install AvalancheGo using an `apt` repository.
 
 If you have already added the APT repository, you do not need to add it again.
 
-To add the repository on Ubuntu 20.04 (Focal), run:
+To add the repository on Ubuntu, run:
 
 ```sh
 sudo su -
-wget -O - https://downloads.avax.network/avalanchego.gpg.key | apt-key add -
-echo "deb https://downloads.avax.network/apt focal main" > /etc/apt/sources.list.d/avalanche.list
-exit
-```
-
-To add the repository on Ubuntu 22.04 (Jammy), run:
-
-```sh
-sudo su -
-wget -O - https://downloads.avax.network/avalanchego.gpg.key | apt-key add -
-echo "deb https://downloads.avax.network/apt jammy main" > /etc/apt/sources.list.d/avalanche.list
+wget -qO - https://downloads.avax.network/avalanchego.gpg.key | tee /etc/apt/trusted.gpg.d/avalanchego.asc
+source /etc/os-release && echo "deb https://downloads.avax.network/apt $UBUNTU_CODENAME main" > /etc/apt/sources.list.d/avalanche.list
 exit
 ```
 
