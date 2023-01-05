@@ -30,7 +30,7 @@ func TestIPSigner(t *testing.T) {
 	key, err := tls.NewSigner(tlsCert, crypto.SHA256)
 	require.NoError(err)
 
-	s := NewIPSigner(dynIP, key)
+	s := NewDynamicIPSigner(dynIP, key)
 
 	s.clock.Set(time.Unix(10, 0))
 

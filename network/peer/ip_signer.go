@@ -10,8 +10,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
-// IPSigner will return a signedIP for the current value of our dynamic IP.
-type IPSigner struct {
+// DynamicIPSigner will return a signedIP for the current value of our dynamic IP.
+type DynamicIPSigner struct {
 	ip     ips.DynamicIPPort
 	clock  mockable.Clock
 	signer ips.Signer
@@ -23,11 +23,11 @@ type IPSigner struct {
 	signedIP *SignedIP
 }
 
-func NewIPSigner(
+func NewDynamicIPSigner(
 	ip ips.DynamicIPPort,
 	signer ips.Signer,
-) *IPSigner {
-	return &IPSigner{
+) *DynamicIPSigner {
+	return &DynamicIPSigner{
 		ip:     ip,
 		signer: signer,
 	}
@@ -38,7 +38,7 @@ func NewIPSigner(
 // GetSignedIP, then the same [SignedIP] will be returned.
 //
 // It's safe for multiple goroutines to concurrently call GetSignedIP.
-func (s *IPSigner) GetSignedIP() (*SignedIP, error) {
+func (s *DynamicIPSigner) GetSignedIP() (*SignedIP, error) {
 	// Optimistically, the IP should already be signed. By grabbing a read lock
 	// here we enable full concurrency of new connections.
 	s.signedIPLock.RLock()

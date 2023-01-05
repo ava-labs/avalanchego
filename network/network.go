@@ -243,7 +243,7 @@ func NewNetwork(
 		MaxClockDifference:   config.MaxClockDifference,
 		ResourceTracker:      config.ResourceTracker,
 		UptimeCalculator:     config.UptimeCalculator,
-		IPSigner:             peer.NewIPSigner(config.MyIPPort, config.TLSKey),
+		IPSigner:             peer.NewDynamicIPSigner(config.MyIPPort, config.TLSKey),
 	}
 
 	onCloseCtx, cancel := context.WithCancel(context.Background())
