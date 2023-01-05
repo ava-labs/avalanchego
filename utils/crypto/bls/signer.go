@@ -4,10 +4,10 @@
 package bls
 
 import (
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
-var _ crypto.Signer = (*Signer)(nil)
+var _ ips.Signer = (*Signer)(nil)
 
 // Signer signs messages with a BLS key.
 type Signer struct {

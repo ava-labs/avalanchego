@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -127,7 +126,7 @@ type Config struct {
 	CompressionEnabled bool `json:"compressionEnabled"`
 
 	// TLSKey is this node's TLS key that is used to sign IPs.
-	TLSKey crypto.Signer `json:"-"`
+	TLSKey ips.Signer `json:"-"`
 
 	// WhitelistedSubnets of the node.
 	WhitelistedSubnets set.Set[ids.ID] `json:"-"`

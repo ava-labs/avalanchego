@@ -14,7 +14,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/tls"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -1015,17 +1014,13 @@ func initTestRemoteProposerVM(
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	ctx.StakingCertLeaf = pTestCert.Leaf
-	signer, err := tls.NewSigner(pTestCert, crypto.SHA256)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctx.StakingLeafSigner = signer
+	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	// make sure that DBs are compressed correctly
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
-	err = proVM.Initialize(
+	err := proVM.Initialize(
 		context.Background(),
 		ctx,
 		dummyDBManager,

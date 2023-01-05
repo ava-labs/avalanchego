@@ -56,8 +56,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm"
 	"github.com/ava-labs/avalanchego/vms/tracedvm"
 
-	"github.com/ava-labs/avalanchego/network/tls"
-
 	dbManager "github.com/ava-labs/avalanchego/database/manager"
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
 
@@ -430,7 +428,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		return nil, fmt.Errorf("error while registering vm's metrics %w", err)
 	}
 
-	signer, err := tls.NewSigner(&m.StakingCert, crypto.SHA256)
 	if err != nil {
 		return nil, fmt.Errorf("error while creating tls signer %w", err)
 	}
@@ -455,7 +452,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 
 			ValidatorState:    m.validatorState,
 			StakingCertLeaf:   m.StakingCert.Leaf,
-			StakingLeafSigner: signer,
+			StakingLeafSigner: m.StakingCert.PrivateKey.(crypto.Signer),
 			ChainDataDir:      chainDataDir,
 		},
 		DecisionAcceptor:  m.DecisionAcceptorGroup,

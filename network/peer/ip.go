@@ -6,7 +6,6 @@ package peer
 import (
 	"crypto/x509"
 
-	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -21,7 +20,7 @@ type UnsignedIP struct {
 }
 
 // Sign this IP with the provided signer and return the signed IP.
-func (ip *UnsignedIP) Sign(signer crypto.Signer) (*SignedIP, error) {
+func (ip *UnsignedIP) Sign(signer ips.Signer) (*SignedIP, error) {
 	sig, err := signer.Sign(hashing.ComputeHash256(ip.bytes()))
 	return &SignedIP{
 		UnsignedIP: *ip,

@@ -5,8 +5,9 @@ package proposervm
 
 import (
 	"context"
-	"crypto"
+	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/x509"
 	"testing"
 	"time"
@@ -21,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/crypto/ecdsa"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
@@ -56,7 +56,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 	windower := proposer.NewMockWindower(ctrl)
 	windower.EXPECT().Delay(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(time.Duration(0), nil).AnyTimes()
 
-	signer, err := ecdsa.NewSigner(elliptic.P256(), crypto.SHA256)
+	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(err)
 	vm := &VM{
 		ChainVM:        innerVM,
@@ -65,7 +65,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 			ValidatorState:    vdrState,
 			Log:               logging.NoLog{},
 			StakingCertLeaf:   &x509.Certificate{},
-			StakingLeafSigner: signer,
+			StakingLeafSigner: pk,
 		},
 		Windower: windower,
 	}
