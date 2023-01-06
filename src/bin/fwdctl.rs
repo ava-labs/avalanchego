@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 pub mod create;
+pub mod delete;
 pub mod get;
 pub mod insert;
 
@@ -32,6 +33,8 @@ enum Commands {
     Insert(insert::Options),
     /// Get values associated with a key
     Get(get::Options),
+    /// Delete values associated with a key
+    Delete(delete::Options),
 }
 
 fn main() -> Result<()> {
@@ -45,5 +48,6 @@ fn main() -> Result<()> {
         Commands::Create(opts) => create::run(opts),
         Commands::Insert(opts) => insert::run(opts),
         Commands::Get(opts) => get::run(opts),
+        Commands::Delete(opts) => delete::run(opts),
     }
 }
