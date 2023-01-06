@@ -20,6 +20,7 @@ github.com/ava-labs/avalanchego/snow/uptime=Calculator=snow/uptime/mock_calculat
 github.com/ava-labs/avalanchego/snow/validators=Manager=snow/validators/mock_manager.go
 github.com/ava-labs/avalanchego/snow/validators=State=snow/validators/mock_state.go
 github.com/ava-labs/avalanchego/snow/validators=SubnetConnector=snow/validators/mock_subnet_connector.go
+github.com/ava-labs/avalanchego/utils/crypto/keychain=Ledger=utils/crypto/keychain/mock_ledger.go
 github.com/ava-labs/avalanchego/utils/filesystem=Reader=utils/filesystem/mock_io.go
 github.com/ava-labs/avalanchego/utils/hashing=Hasher=utils/hashing/mock_hasher.go
 github.com/ava-labs/avalanchego/utils/logging=Logger=utils/logging/mock_logger.go

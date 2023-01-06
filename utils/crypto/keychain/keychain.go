@@ -9,8 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
-
-	ledger "github.com/ava-labs/avalanche-ledger-go"
 )
 
 var (
@@ -43,7 +41,7 @@ type Keychain interface {
 // ledgerKeychain is an abstraction of the underlying ledger hardware device,
 // to be able to get a signer from a finite set of derived signers
 type ledgerKeychain struct {
-	ledger    ledger.Ledger
+	ledger    Ledger
 	addrs     set.Set[ids.ShortID]
 	addrToIdx map[ids.ShortID]uint32
 }
@@ -51,13 +49,13 @@ type ledgerKeychain struct {
 // ledgerSigner is an abstraction of the underlying ledger hardware device,
 // to be able sign for a specific address
 type ledgerSigner struct {
-	ledger ledger.Ledger
+	ledger Ledger
 	idx    uint32
 	addr   ids.ShortID
 }
 
 // NewLedgerKeychain creates a new Ledger with [numToDerive] addresses.
-func NewLedgerKeychain(l ledger.Ledger, numToDerive int) (Keychain, error) {
+func NewLedgerKeychain(l Ledger, numToDerive int) (Keychain, error) {
 	if numToDerive < 1 {
 		return nil, ErrInvalidNumAddrsToDerive
 	}
@@ -71,7 +69,7 @@ func NewLedgerKeychain(l ledger.Ledger, numToDerive int) (Keychain, error) {
 }
 
 // NewLedgerKeychainFromIndices creates a new Ledger with addresses taken from the given [indices].
-func NewLedgerKeychainFromIndices(l ledger.Ledger, indices []uint32) (Keychain, error) {
+func NewLedgerKeychainFromIndices(l Ledger, indices []uint32) (Keychain, error) {
 	if len(indices) == 0 {
 		return nil, ErrInvalidIndicesLength
 	}
