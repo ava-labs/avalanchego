@@ -630,10 +630,10 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 		return errNotConsortiumMember
 	}
 
-	newNodeIDNotEmpty := tx.NewNodeID != ids.EmptyNodeID
-	oldNodeIDNotEmpty := tx.OldNodeID != ids.EmptyNodeID
+	newNodeIDEmpty := tx.NewNodeID == ids.EmptyNodeID
+	oldNodeIDEmpty := tx.OldNodeID == ids.EmptyNodeID
 
-	if !oldNodeIDNotEmpty && newNodeIDNotEmpty &&
+	if oldNodeIDEmpty && !newNodeIDEmpty &&
 		consortiumMemberAddressState&txs.AddressStateRegisteredNodeBit != 0 {
 		return errConsortiumMemberHasNode
 	}
@@ -656,7 +656,7 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 
 	// verify old nodeID ownership
 
-	if oldNodeIDNotEmpty {
+	if !oldNodeIDEmpty {
 		oldNodeOwnerAddr, err := e.State.GetNodeConsortiumMember(tx.OldNodeID)
 		if err != nil {
 			return err
@@ -668,7 +668,13 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 
 	// verify new nodeID cred
 
-	if newNodeIDNotEmpty {
+	if !newNodeIDEmpty {
+		// there mustn't be an existing entry
+		if oldNodeIDEmpty {
+			if _, err := e.State.GetNodeConsortiumMember(tx.NewNodeID); err == nil {
+				return errNotNodeOwner
+			}
+		}
 		if err := e.Backend.Fx.VerifyPermission(
 			e.Tx.Unsigned,
 			&secp256k1fx.Input{SigIndices: []uint32{0}},
@@ -706,19 +712,19 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 	// Produce the UTXOS
 	utxo.Produce(e.State, txID, tx.Outs)
 
-	if oldNodeIDNotEmpty {
+	if !oldNodeIDEmpty {
 		e.State.SetNodeConsortiumMember(tx.OldNodeID, nil)
 	}
 
-	if newNodeIDNotEmpty {
+	if !newNodeIDEmpty {
 		e.State.SetNodeConsortiumMember(tx.NewNodeID, &tx.ConsortiumMemberAddress)
 	}
 
 	newConsortiumMemberAddressState := consortiumMemberAddressState
 
-	if !oldNodeIDNotEmpty && newNodeIDNotEmpty {
+	if oldNodeIDEmpty && !newNodeIDEmpty {
 		newConsortiumMemberAddressState |= txs.AddressStateRegisteredNodeBit
-	} else if !newNodeIDNotEmpty {
+	} else if newNodeIDEmpty {
 		newConsortiumMemberAddressState &^= txs.AddressStateRegisteredNodeBit
 	}
 
