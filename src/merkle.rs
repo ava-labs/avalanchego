@@ -726,7 +726,7 @@ fn test_merkle_node_encoding() {
             None,
             NodeType::Extension(ExtNode(
                 PartialPath(vec![0x1, 0x2, 0x3]),
-                { ObjPtr::null() },
+                ObjPtr::null(),
                 Some(vec![0x1, 0x2, 0x3]),
             )),
         ),

@@ -6,7 +6,7 @@ use log;
 #[derive(Debug, Args)]
 pub struct Options {
     /// The key to get the value for
-    #[arg(long, required = true, value_name = "KEY", help = "Key to get")]
+    #[arg(long, short = 'k', required = true, value_name = "KEY", help = "Key to get")]
     pub key: String,
 
     /// The database path (if no path is provided, return an error). Defaults to firewood.
