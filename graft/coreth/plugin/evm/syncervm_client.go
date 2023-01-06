@@ -160,7 +160,7 @@ func (client *stateSyncerClient) stateSync(ctx context.Context) error {
 
 // acceptSyncSummary returns true if sync will be performed and launches the state sync process
 // in a goroutine.
-func (client *stateSyncerClient) acceptSyncSummary(proposedSummary message.SyncSummary) (bool, error) {
+func (client *stateSyncerClient) acceptSyncSummary(proposedSummary message.SyncSummary) (block.StateSyncMode, error) {
 	isResume := proposedSummary.BlockHash == client.resumableSummary.BlockHash
 	if !isResume {
 		// Skip syncing if the blockchain is not significantly ahead of local state,
@@ -173,12 +173,12 @@ func (client *stateSyncerClient) acceptSyncSummary(proposedSummary message.SyncS
 				"syncableHeight", proposedSummary.Height(),
 			)
 			if err := client.StateSyncClearOngoingSummary(); err != nil {
-				return false, fmt.Errorf("failed to clear ongoing summary after skipping state sync: %w", err)
+				return block.StateSyncSkipped, fmt.Errorf("failed to clear ongoing summary after skipping state sync: %w", err)
 			}
 			// Initialize snapshots if we're skipping state sync, since it will not have been initialized on
 			// startup.
 			client.chain.BlockChain().InitializeSnapshots()
-			return false, nil
+			return block.StateSyncSkipped, nil
 		}
 
 		// Wipe the snapshot completely if we are not resuming from an existing sync, so that we do not
@@ -199,10 +199,10 @@ func (client *stateSyncerClient) acceptSyncSummary(proposedSummary message.SyncS
 	// Note: this must be performed after WipeSnapshot finishes so that we do not start a state sync
 	// session from a partially wiped snapshot.
 	if err := client.metadataDB.Put(stateSyncSummaryKey, proposedSummary.Bytes()); err != nil {
-		return false, fmt.Errorf("failed to write state sync summary key to disk: %w", err)
+		return block.StateSyncSkipped, fmt.Errorf("failed to write state sync summary key to disk: %w", err)
 	}
 	if err := client.db.Commit(); err != nil {
-		return false, fmt.Errorf("failed to commit db: %w", err)
+		return block.StateSyncSkipped, fmt.Errorf("failed to commit db: %w", err)
 	}
 
 	log.Info("Starting state sync", "summary", proposedSummary)
@@ -226,7 +226,7 @@ func (client *stateSyncerClient) acceptSyncSummary(proposedSummary message.SyncS
 		log.Info("stateSync completed, notifying engine", "err", client.stateSyncErr)
 		client.toEngine <- commonEng.StateSyncDone
 	}()
-	return true, nil
+	return block.StateSyncStatic, nil
 }
 
 // syncBlocks fetches (up to) [parentsToGet] blocks from peers
