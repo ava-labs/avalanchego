@@ -12,9 +12,9 @@ import (
 )
 
 var (
-	errInvalidMaxMessageLength   = errors.New("invalid maximum message length")
-	errInvalidMessageLengthBytes = errors.New("invalid message length bytes")
-	errMaxMessageLengthExceeded  = errors.New("maximum message length exceeded")
+	errInvalidMaxMessageLength  = errors.New("invalid maximum message length")
+	errInvalidMessageLength     = errors.New("invalid message length")
+	errMaxMessageLengthExceeded = errors.New("maximum message length exceeded")
 )
 
 // Used to mask the most significant bit to indicate that the message format
@@ -24,7 +24,11 @@ const bitmaskCodec = uint32(1 << 31)
 // Assumes the specified [msgLen] will never >= 1<<31.
 func writeMsgLen(msgLen uint32, maxMsgLen uint32) ([wrappers.IntLen]byte, error) {
 	if maxMsgLen >= bitmaskCodec {
-		return [wrappers.IntLen]byte{}, fmt.Errorf("%w; maximum message length must be <%d to be able to embed codec information at most significant bit", errInvalidMaxMessageLength, bitmaskCodec)
+		return [wrappers.IntLen]byte{}, fmt.Errorf(
+			"%w; maximum message length must be <%d to be able to embed codec information at most significant bit",
+			errInvalidMaxMessageLength,
+			bitmaskCodec,
+		)
 	}
 	if msgLen > maxMsgLen {
 		return [wrappers.IntLen]byte{}, fmt.Errorf("%w; the message length %d exceeds the specified limit %d", errMaxMessageLengthExceeded, msgLen, maxMsgLen)
@@ -46,8 +50,19 @@ func writeMsgLen(msgLen uint32, maxMsgLen uint32) ([wrappers.IntLen]byte, error)
 
 // Assumes the read [msgLen] will never >= 1<<31.
 func readMsgLen(b []byte, maxMsgLen uint32) (uint32, error) {
+	if maxMsgLen >= bitmaskCodec {
+		return 0, fmt.Errorf(
+			"%w; maximum message length must be <%d to be able to embed codec information at most significant bit",
+			errInvalidMaxMessageLength,
+			bitmaskCodec,
+		)
+	}
 	if len(b) != wrappers.IntLen {
-		return 0, fmt.Errorf("%w; readMsgLen only supports 4-byte (got %d bytes)", errInvalidMessageLengthBytes, len(b))
+		return 0, fmt.Errorf(
+			"%w; readMsgLen only supports 4 bytes (got %d bytes)",
+			errInvalidMessageLength,
+			len(b),
+		)
 	}
 
 	// parse the message length
@@ -59,7 +74,12 @@ func readMsgLen(b []byte, maxMsgLen uint32) (uint32, error) {
 	msgLen &^= bitmaskCodec
 
 	if msgLen > maxMsgLen {
-		return 0, fmt.Errorf("%w; the message length %d exceeds the specified limit %d", errMaxMessageLengthExceeded, msgLen, maxMsgLen)
+		return 0, fmt.Errorf(
+			"%w; the message length %d exceeds the specified limit %d",
+			errMaxMessageLengthExceeded,
+			msgLen,
+			maxMsgLen,
+		)
 	}
 
 	return msgLen, nil
