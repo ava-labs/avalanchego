@@ -20,7 +20,7 @@ jobs:
         with:
           go-version: '1.19'
           check-latest: true
-      - name: Build the avalanchego binaries
+      - name: Build the avalanchego binary
         shell: bash
         run: ./scripts/build.sh -r
       - name: Run e2e tests

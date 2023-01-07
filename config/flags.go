@@ -6,13 +6,10 @@ package config
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime"
 	"time"
-
-	"github.com/kardianos/osext"
 
 	"github.com/spf13/viper"
 
@@ -49,35 +46,13 @@ var (
 	defaultVMAliasFilePath      = filepath.Join(defaultVMConfigDir, "aliases.json")
 	defaultChainAliasFilePath   = filepath.Join(defaultChainConfigDir, "aliases.json")
 	defaultSubnetConfigDir      = filepath.Join(defaultConfigDir, "subnets")
+	defaultPluginDir            = filepath.Join(defaultUnexpandedDataDir, "plugins")
 	defaultChainDataDir         = filepath.Join(defaultUnexpandedDataDir, "chainData")
-
-	// Places to look for the build directory
-	defaultBuildDirs = []string{}
 )
-
-func init() {
-	folderPath, err := osext.ExecutableFolder()
-	if err == nil {
-		defaultBuildDirs = append(defaultBuildDirs, folderPath)
-		defaultBuildDirs = append(defaultBuildDirs, filepath.Dir(folderPath))
-	}
-	wd, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-	defaultBuildDirs = append(defaultBuildDirs,
-		wd,
-		filepath.Join("/", "usr", "local", "lib", constants.AppName),
-		defaultUnexpandedDataDir,
-	)
-}
 
 func addProcessFlags(fs *flag.FlagSet) {
 	// If true, print the version and quit.
 	fs.Bool(VersionKey, false, "If true, print version and quit")
-
-	// Build directory
-	fs.String(BuildDirKey, defaultBuildDirs[0], "Path to the build directory")
 
 	// Plugin
 	fs.Bool(PluginModeKey, false, "Whether the app should run as a plugin")
@@ -88,6 +63,9 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(DataDirKey, defaultDataDir, "Sets the base data directory where default sub-directories will be placed unless otherwise specified.")
 	// System
 	fs.Uint64(FdLimitKey, ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value and error if the value is above the system max")
+
+	// Plugin directory
+	fs.String(PluginDirKey, defaultPluginDir, "Path to the plugin directory")
 
 	// Config File
 	fs.String(ConfigFileKey, "", fmt.Sprintf("Specifies a config file. Ignored if %s is specified", ConfigContentKey))

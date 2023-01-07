@@ -614,17 +614,8 @@ func setupViperFlags() *viper.Viper {
 
 func setupViper(configFilePath string) *viper.Viper {
 	v := setupViperFlags()
-	// need to set it since in tests executable dir is somewhere /var/tmp/ (or wherever is designated by go)
-	// thus it searches buildDir in /var/tmp/
-	// but actual buildDir resides under project_root/build
-	currentPath, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-	v.Set(BuildDirKey, filepath.Join(currentPath, "..", "build"))
 	v.SetConfigFile(configFilePath)
-	err = v.ReadInConfig()
-	if err != nil {
+	if err := v.ReadInConfig(); err != nil {
 		log.Fatal(err)
 	}
 	return v

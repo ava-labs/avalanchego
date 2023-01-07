@@ -26,7 +26,9 @@ If you plan to build AvalancheGo from source, you will also need the following s
 - [gcc](https://gcc.gnu.org/)
 - g++
 
-### Native Install
+### Building From Source
+
+#### Clone The Repository
 
 Clone the AvalancheGo repository:
 
@@ -35,17 +37,17 @@ git clone git@github.com:ava-labs/avalanchego.git
 cd avalanchego
 ```
 
-This will clone and checkout to `master` branch.
+This will clone and checkout the `master` branch.
 
-#### Building the Avalanche Executable
+#### Building AvalancheGo
 
-Build Avalanche by running the build script:
+Build AvalancheGo by running the build script:
 
 ```sh
 ./scripts/build.sh
 ```
 
-The output of the script will be the Avalanche binary named `avalanchego`. It is located in the build directory:
+The `avalanchego` binary is now in the `build` directory. To run:
 
 ```sh
 ./build/avalanchego

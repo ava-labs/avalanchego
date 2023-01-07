@@ -40,14 +40,14 @@ echo GINKGO_LABEL_FILTER: ${GINKGO_LABEL_FILTER}
 # TODO: migrate to upstream avalanche-network-runner
 GOARCH=$(go env GOARCH)
 GOOS=$(go env GOOS)
-NETWORK_RUNNER_VERSION=1.3.1
+NETWORK_RUNNER_VERSION=1.3.5-rc.0
 DOWNLOAD_PATH=/tmp/avalanche-network-runner.tar.gz
 DOWNLOAD_URL="https://github.com/ava-labs/avalanche-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/avalanche-network-runner_${NETWORK_RUNNER_VERSION}_${GOOS}_${GOARCH}.tar.gz"
 
 rm -f ${DOWNLOAD_PATH}
 rm -f /tmp/avalanche-network-runner
 
-echo "downloading avalanche-network-runner ${NETWORK_RUNNER_VERSION} at ${DOWNLOAD_URL}"
+echo "downloading avalanche-network-runner ${NETWORK_RUNNER_VERSION} at ${DOWNLOAD_URL} to ${DOWNLOAD_PATH}"
 curl --fail -L ${DOWNLOAD_URL} -o ${DOWNLOAD_PATH}
 
 echo "extracting downloaded avalanche-network-runner"
