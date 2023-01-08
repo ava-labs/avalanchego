@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	pchaintxs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -255,10 +255,10 @@ func buildPGenesis(config *Config, hrp string, xGenesisBytes []byte, xGenesisDat
 	for _, allocation := range config.Camino.Allocations {
 		var addrState uint64
 		if allocation.AddressStates.ConsortiumMember {
-			addrState |= txs.AddressStateConsortiumBit
+			addrState |= pchaintxs.AddressStateConsortiumBit
 		}
 		if allocation.AddressStates.KYCVerified {
-			addrState |= txs.AddressStateKycVerifiedBit
+			addrState |= pchaintxs.AddressStateKycVerifiedBit
 		}
 		if addrState != 0 {
 			platformvmArgs.Camino.AddressStates = append(platformvmArgs.Camino.AddressStates, genesis.AddressState{
@@ -379,4 +379,25 @@ func buildPGenesis(config *Config, hrp string, xGenesisBytes []byte, xGenesisDat
 	}
 
 	return genesisBytes, avaxAssetID, nil
+}
+
+func GenesisChainData(genesisBytes []byte, vmIDs []ids.ID) ([]*pchaintxs.Tx, bool, error) {
+	genesis, err := genesis.Parse(genesisBytes)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to parse genesis: %w", err)
+	}
+	result := make([]*pchaintxs.Tx, len(vmIDs))
+	for idx, vmID := range vmIDs {
+		for _, chain := range genesis.Chains {
+			uChain := chain.Unsigned.(*pchaintxs.CreateChainTx)
+			if uChain.VMID == vmID {
+				result[idx] = chain
+				break
+			}
+		}
+		if result[idx] == nil {
+			return nil, false, fmt.Errorf("couldn't find blockchain with VM ID %s", vmID)
+		}
+	}
+	return result, genesis.Camino.LockModeBondDeposit, nil
 }
