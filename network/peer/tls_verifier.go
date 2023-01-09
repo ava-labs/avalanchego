@@ -3,9 +3,18 @@
 
 package peer
 
-import "crypto/x509"
+import (
+	"crypto/x509"
+	"errors"
+	"fmt"
+)
 
-var _ IPVerifier = (*TLSVerifier)(nil)
+var (
+	_ IPVerifier = (*TLSVerifier)(nil)
+
+	errMissingSignature    = errors.New("missing signature")
+	errMissingTLSSignature = fmt.Errorf("%w: tls", errMissingSignature)
+)
 
 // TLSVerifier verifies a signature of an ip against  a TLS cert.
 type TLSVerifier struct {
@@ -14,7 +23,7 @@ type TLSVerifier struct {
 
 func (t TLSVerifier) Verify(ipBytes []byte, sig Signature) error {
 	if len(sig.TLSSignature) == 0 {
-		return errMissingSignature
+		return errMissingTLSSignature
 	}
 
 	return t.Cert.CheckSignature(t.Cert.SignatureAlgorithm, ipBytes,

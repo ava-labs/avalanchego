@@ -13,9 +13,9 @@ import (
 )
 
 var (
-	errInvalidTLSKey = errors.New("invalid TLS key")
-
 	_ IPSigner = (*TLSSigner)(nil)
+
+	errInvalidTLSKey = errors.New("invalid TLS key")
 )
 
 // TLSSigner is signs ips with a TLS key.

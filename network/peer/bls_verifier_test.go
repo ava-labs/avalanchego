@@ -26,33 +26,65 @@ func TestBLSVerifier(t *testing.T) {
 	sig := bls.SignatureToBytes(bls.Sign(sk, ipBytes))
 
 	tests := []struct {
-		name        string
-		args        args
-		expectedErr bool
+		name    string
+		args    args
+		wantErr func(r *require.Assertions, err error)
 	}{
 		{
-			name: "nil ipBytes",
+			name: "fail - nil ipBytes",
 			args: args{
-				message:   nil,
-				signature: Signature{BLSSignature: sig},
+				message: nil,
 			},
-			expectedErr: true,
+			wantErr: func(r *require.Assertions, err error) {
+				r.Error(err)
+			},
 		},
 		{
-			name: "invalid ipBytes",
+			name: "fail - empty ipBytes",
+			args: args{
+				message: []byte{},
+			},
+			wantErr: func(r *require.Assertions, err error) {
+				r.Error(err)
+			},
+		},
+		{
+			name: "fail - missing signature",
+			args: args{
+				signature: Signature{BLSSignature: nil},
+			},
+			wantErr: func(r *require.Assertions, err error) {
+				r.ErrorIs(err, errMissingSignature)
+			},
+		},
+		{
+			name: "fail - empty signature",
+			args: args{
+				signature: Signature{BLSSignature: []byte{}},
+			},
+			wantErr: func(r *require.Assertions, err error) {
+				r.ErrorIs(err, errMissingSignature)
+			},
+		},
+		{
+			name: "fail - invalid signature",
 			args: args{
 				message:   ipBytes,
 				signature: Signature{BLSSignature: []byte("garbage")},
 			},
-			expectedErr: true,
+			wantErr: func(r *require.Assertions, err error) {
+				r.Error(err)
+			},
 		},
 		{
-			name: "valid ipBytes",
+			name: "success - valid ipBytes",
 			args: args{
 				message:   ipBytes,
 				signature: Signature{BLSSignature: sig},
 			},
-			expectedErr: false,
+			wantErr: func(r *require.Assertions, err error) {
+				r.NoError(err)
+			},
 		},
 	}
 
@@ -64,13 +96,7 @@ func TestBLSVerifier(t *testing.T) {
 				PublicKey: pk,
 			}
 
-			err := verifier.Verify(test.args.message, test.args.signature)
-
-			if test.expectedErr {
-				r.Error(err)
-			} else {
-				r.NoError(err)
-			}
+			test.wantErr(r, verifier.Verify(test.args.message, test.args.signature))
 		})
 	}
 }

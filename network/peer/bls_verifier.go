@@ -4,7 +4,7 @@
 package peer
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
@@ -12,8 +12,8 @@ import (
 var (
 	_ IPVerifier = (*BLSVerifier)(nil)
 
-	errMissingSignature      = errors.New("missing signature")
-	errFailedBLSVerification = errors.New("failed bls verification")
+	errFailedVerification  = fmt.Errorf("failed verification")
+	errMissingBLSSignature = fmt.Errorf("%w: bls", errMissingSignature)
 )
 
 // BLSVerifier verifies a signature of an ip against a BLS key
@@ -23,7 +23,7 @@ type BLSVerifier struct {
 
 func (b BLSVerifier) Verify(ipBytes []byte, sig Signature) error {
 	if len(sig.BLSSignature) == 0 {
-		return errMissingSignature
+		return errMissingBLSSignature
 	}
 
 	blsSig, err := bls.SignatureFromBytes(sig.BLSSignature)
@@ -32,7 +32,7 @@ func (b BLSVerifier) Verify(ipBytes []byte, sig Signature) error {
 	}
 
 	if !bls.Verify(b.PublicKey, blsSig, ipBytes) {
-		return errFailedBLSVerification
+		return errFailedVerification
 	}
 
 	return nil

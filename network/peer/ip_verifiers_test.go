@@ -57,6 +57,16 @@ func TestIPVerifiers(t *testing.T) {
 			err:            errFoobar,
 		},
 		{
+			name: "fail - missing required",
+			args: args{
+				ipBytes: nil,
+				sig:     Signature{},
+			},
+			requiredResult: errMissingSignature,
+			optionalResult: nil,
+			err:            errMissingSignature,
+		},
+		{
 			name: "success - missing optional",
 			args: args{
 				ipBytes: nil,
