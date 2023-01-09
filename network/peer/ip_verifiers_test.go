@@ -83,7 +83,7 @@ func TestIPVerifiers(t *testing.T) {
 			required: true,
 			optional: false,
 		})
-	
+
 		r.Equal(test.err, verifier.Verify(test.args.ipBytes, test.args.sig))
 	}
 }
