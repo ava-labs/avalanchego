@@ -30,7 +30,7 @@ pub fn run(opts: &Options) -> Result<()> {
         Err(_) => return Err(anyhow!("error opening database")),
     };
 
-    match db.get_code(opts.key.as_bytes()) {
+    match db.kv_get(opts.key.as_bytes()) {
         Ok(val) => log::info!("{:#?}", val),
         Err(_) => return Err(anyhow!("error getting key")),
     }

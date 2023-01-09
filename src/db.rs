@@ -246,6 +246,15 @@ impl DBRev {
             .map_err(DBError::Merkle)
     }
 
+    /// Get a value associated with a key
+    pub fn kv_get_merkle(&self, key: &[u8]) -> Result<Vec<u8>, DBError> {
+        let obj_ref = self.merkle.get(key, self.header.kv_root).map_err(DBError::Merkle)?;
+        match obj_ref {
+            None => Ok(vec![]),
+            Some(obj) => Ok(obj.to_vec()),
+        }
+    }
+
     /// Dump the MPT of the generic key-value storage.
     pub fn kv_dump(&self, w: &mut dyn Write) -> Result<(), DBError> {
         self.merkle.dump(self.header.kv_root, w).map_err(DBError::Merkle)
@@ -616,6 +625,11 @@ impl DB {
     /// Get root hash of the latest generic key-value storage.
     pub fn kv_root_hash(&self) -> Result<Hash, DBError> {
         self.inner.lock().latest.kv_root_hash()
+    }
+
+    /// Get a value in the kv store associated with a particular key.
+    pub fn kv_get(&self, key: &[u8]) -> Result<Vec<u8>, DBError> {
+        self.inner.lock().latest.kv_get_merkle(key)
     }
 
     /// Get root hash of the latest world state of all accounts.

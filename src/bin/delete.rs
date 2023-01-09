@@ -30,8 +30,8 @@ pub fn run(opts: &Options) -> Result<()> {
         Err(_) => return Err(anyhow!("error opening database")),
     };
 
-    let mut account = None;
-    if let Err(_) = db.new_writebatch().delete_account(opts.key.as_bytes(), &mut account) {
+    let mut account: Option<Vec<u8>> = None;
+    if let Err(_) = db.new_writebatch().kv_remove(opts.key, &mut account) {
         return Err(anyhow!("error deleting key"))
     }
 
