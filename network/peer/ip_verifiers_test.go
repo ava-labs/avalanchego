@@ -4,7 +4,7 @@
 package peer
 
 import (
-	"fmt"
+	"errors"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -12,7 +12,7 @@ import (
 )
 
 func TestIPVerifiers(t *testing.T) {
-	errFoobar := fmt.Errorf("foobar")
+	errFoobar := errors.New("foobar")
 
 	type args struct {
 		ipBytes []byte
