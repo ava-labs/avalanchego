@@ -428,9 +428,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		return nil, fmt.Errorf("error while registering vm's metrics %w", err)
 	}
 
-	if err != nil {
-		return nil, fmt.Errorf("error while creating tls signer %w", err)
-	}
 	ctx := &snow.ConsensusContext{
 		Context: &snow.Context{
 			NetworkID: m.NetworkID,
