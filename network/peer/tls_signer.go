@@ -35,8 +35,8 @@ func NewTLSSigner(cert *tls.Certificate) (*TLSSigner, error) {
 	}, nil
 }
 
-func (s TLSSigner) Sign(ipBytes []byte, sig Signature) (Signature, error) {
-	tlsSig, err := s.privateKey.Sign(rand.Reader,
+func (t TLSSigner) Sign(ipBytes []byte, sig Signature) (Signature, error) {
+	tlsSig, err := t.privateKey.Sign(rand.Reader,
 		hashing.ComputeHash256(ipBytes), crypto.SHA256)
 	if err != nil {
 		return Signature{}, err

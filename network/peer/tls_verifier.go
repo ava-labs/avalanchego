@@ -12,7 +12,7 @@ type TLSVerifier struct {
 	Cert *x509.Certificate
 }
 
-func (x TLSVerifier) Verify(ipBytes []byte, sig Signature) error {
-	return x.Cert.CheckSignature(x.Cert.SignatureAlgorithm, ipBytes,
+func (t TLSVerifier) Verify(ipBytes []byte, sig Signature) error {
+	return t.Cert.CheckSignature(t.Cert.SignatureAlgorithm, ipBytes,
 		sig.TLSSignature)
 }
