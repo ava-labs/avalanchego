@@ -4,6 +4,7 @@
 package peer
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -12,7 +13,7 @@ import (
 var (
 	_ IPVerifier = (*BLSVerifier)(nil)
 
-	errFailedBLSVerification = fmt.Errorf("failed bls verification")
+	errFailedBLSVerification = errors.New("failed bls verification")
 	errMissingBLSSignature   = fmt.Errorf("%w: bls", errMissingSignature)
 )
 
