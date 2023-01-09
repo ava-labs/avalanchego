@@ -7,7 +7,7 @@ import "github.com/ava-labs/avalanchego/utils/crypto/bls"
 
 var _ IPSigner = (*BLSSigner)(nil)
 
-// BLSSigner signs messages with a BLS key.
+// BLSSigner signs ips with a BLS key.
 type BLSSigner struct {
 	secretKey *bls.SecretKey
 }

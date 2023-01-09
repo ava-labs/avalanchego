@@ -18,7 +18,7 @@ var (
 	_ IPSigner = (*TLSSigner)(nil)
 )
 
-// TLSSigner is signs messages with a TLS ipVerifier.
+// TLSSigner is signs ips with a TLS key.
 type TLSSigner struct {
 	privateKey crypto.Signer
 }

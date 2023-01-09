@@ -20,8 +20,8 @@ func NewIPVerifiers(verifiers map[IPVerifier]bool) *IPVerifiers {
 
 // Verify verifies against each verifier, and fails if any required verifier
 // fails verification.
-func (m IPVerifiers) Verify(ipBytes []byte, sig Signature) error {
-	for verifier, required := range m.verifiers {
+func (i IPVerifiers) Verify(ipBytes []byte, sig Signature) error {
+	for verifier, required := range i.verifiers {
 		if err := verifier.Verify(ipBytes, sig); required && err != nil {
 			return err
 		}
