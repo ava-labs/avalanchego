@@ -12,8 +12,8 @@ import (
 var (
 	_ IPVerifier = (*BLSVerifier)(nil)
 
-	errFailedVerification  = fmt.Errorf("failed verification")
-	errMissingBLSSignature = fmt.Errorf("%w: bls", errMissingSignature)
+	errFailedBLSVerification = fmt.Errorf("failed bls verification")
+	errMissingBLSSignature   = fmt.Errorf("%w: bls", errMissingSignature)
 )
 
 // BLSVerifier verifies a signature of an ip against a BLS key
@@ -32,7 +32,7 @@ func (b BLSVerifier) Verify(ipBytes []byte, sig Signature) error {
 	}
 
 	if !bls.Verify(b.PublicKey, blsSig, ipBytes) {
-		return errFailedVerification
+		return errFailedBLSVerification
 	}
 
 	return nil
