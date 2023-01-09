@@ -4,7 +4,7 @@
 package peer
 
 import (
-	"crypto/x509"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/ips"

@@ -126,7 +126,7 @@ type Config struct {
 	CompressionEnabled bool `json:"compressionEnabled"`
 
 	// TLSKey is this node's TLS key that is used to sign IPs.
-	TLSKey ips.Signer `json:"-"`
+	TLSKey peer.Signer `json:"-"`
 
 	// WhitelistedSubnets of the node.
 	WhitelistedSubnets set.Set[ids.ID] `json:"-"`

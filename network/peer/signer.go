@@ -1,10 +1,12 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package ips
+package peer
+
+import "fmt"
 
 // Signer cryptographically signs messages.
 type Signer interface {
-	// Sign signs [msg].
+	fmt.Stringer
 	Sign(msg []byte) ([]byte, error)
 }

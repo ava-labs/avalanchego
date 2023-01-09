@@ -9,13 +9,13 @@ import (
 	"crypto/tls"
 	"errors"
 
-	"github.com/ava-labs/avalanchego/utils/ips"
+	"github.com/ava-labs/avalanchego/network/peer"
 )
 
 var (
 	errInvalidTLSKey = errors.New("invalid TLS key")
 
-	_ ips.Signer = (*Signer)(nil)
+	_ peer.Signer = (*Signer)(nil)
 )
 
 // Signer is signs messages with a TLS cert.

@@ -4,10 +4,10 @@
 package bls
 
 import (
-	"github.com/ava-labs/avalanchego/utils/ips"
+	"github.com/ava-labs/avalanchego/network/peer"
 )
 
-var _ ips.Signer = (*Signer)(nil)
+var _ peer.Signer = (*Signer)(nil)
 
 // Signer signs messages with a BLS key.
 type Signer struct {
