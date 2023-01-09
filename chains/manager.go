@@ -6,7 +6,7 @@ package chains
 import (
 	"context"
 	"crypto"
-	stdtls "crypto/tls"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"os"
@@ -153,8 +153,8 @@ type ChainConfig struct {
 }
 
 type ManagerConfig struct {
-	StakingEnabled bool               // True iff the network has staking enabled
-	StakingCert    stdtls.Certificate // needed to sign snowman++ blocks
+	StakingEnabled bool            // True iff the network has staking enabled
+	StakingCert    tls.Certificate // needed to sign snowman++ blocks
 	StakingBLSKey  *bls.SecretKey
 	TracingEnabled bool
 	// Must not be used unless [TracingEnabled] is true as this may be nil.

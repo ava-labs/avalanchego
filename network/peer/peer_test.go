@@ -5,7 +5,6 @@ package peer
 
 import (
 	"context"
-	"crypto"
 	"crypto/x509"
 	"net"
 	"testing"
@@ -18,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/throttling"
-	"github.com/ava-labs/avalanchego/network/tls"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
@@ -110,7 +108,7 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 	peerConfig1 := sharedConfig
 
 	ip0 := ips.NewDynamicIPPort(net.IPv6loopback, 0)
-	tls0, err := tls.NewSigner(tlsCert0, crypto.SHA256)
+	tls0, err := NewTLSSigner(tlsCert0)
 	require.NoError(err)
 	peerConfig0.IPSigner = NewDynamicIPSigner(ip0, tls0)
 
@@ -121,7 +119,7 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 	})
 
 	ip1 := ips.NewDynamicIPPort(net.IPv6loopback, 1)
-	tls1, err := tls.NewSigner(tlsCert1, crypto.SHA256)
+	tls1, err := NewTLSSigner(tlsCert1)
 	require.NoError(err)
 	peerConfig1.IPSigner = NewDynamicIPSigner(ip1, tls1)
 

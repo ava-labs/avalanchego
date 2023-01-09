@@ -4,8 +4,6 @@
 package peer
 
 import (
-	"fmt"
-
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -20,8 +18,10 @@ type UnsignedIP struct {
 }
 
 // Sign this IP with the provided signer and return the signed IP.
-func (ip *UnsignedIP) Sign(signer ips.Signer) (*SignedIP, error) {
-	sig, err := signer.Sign(hashing.ComputeHash256(ip.bytes()))
+func (ip *UnsignedIP) Sign(signer IPSigner) (*SignedIP, error) {
+	signature := Signature{}
+	sig, err := signer.Sign(hashing.ComputeHash256(ip.bytes()), signature)
+
 	return &SignedIP{
 		UnsignedIP: *ip,
 		Signature:  sig,
@@ -37,16 +37,28 @@ func (ip *UnsignedIP) bytes() []byte {
 	return p.Bytes
 }
 
+type Signature struct {
+	TLSSignature []byte
+	BLSSignature []byte
+}
+
 // SignedIP is a wrapper of an UnsignedIP with the signature from a signer.
 type SignedIP struct {
 	UnsignedIP
-	Signature []byte
+	Signature
 }
 
-func (ip *SignedIP) Verify(cert *x509.Certificate) error {
-	return cert.CheckSignature(
-		cert.SignatureAlgorithm,
-		ip.UnsignedIP.bytes(),
-		ip.Signature,
-	)
+func (ip *SignedIP) Verify(verifier IPVerifier) error {
+	return verifier.Verify(ip.UnsignedIP.bytes(), ip.Signature)
+}
+
+func (ip *SignedIP) Sign(signer IPSigner) (*SignedIP, error) {
+	sig, err := signer.Sign(ip.UnsignedIP.bytes(), ip.Signature)
+	if err != nil {
+		return nil, err
+	}
+
+	ip.Signature = sig
+
+	return ip, err
 }

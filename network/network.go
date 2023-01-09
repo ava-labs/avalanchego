@@ -7,13 +7,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	gomath "math"
 	"net"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	gomath "math"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -243,7 +242,7 @@ func NewNetwork(
 		MaxClockDifference:   config.MaxClockDifference,
 		ResourceTracker:      config.ResourceTracker,
 		UptimeCalculator:     config.UptimeCalculator,
-		IPSigner:             peer.NewDynamicIPSigner(config.MyIPPort, config.TLSKey),
+		IPSigner:             peer.NewDynamicIPSigner(config.MyIPPort, config.IPSigner),
 	}
 
 	onCloseCtx, cancel := context.WithCancel(context.Background())
@@ -384,7 +383,7 @@ func (n *network) Connected(nodeID ids.NodeID) {
 		Cert:      peer.Cert(),
 		IPPort:    peerIP.IPPort,
 		Timestamp: peerIP.Timestamp,
-		Signature: peerIP.Signature,
+		Signature: peerIP.TLSSignature,
 	}
 	prevIP, ok := n.peerIPs[nodeID]
 	if !ok {
@@ -962,9 +961,19 @@ func (n *network) authenticateIPs(ips []*ips.ClaimedIPPort) ([]*ipAuth, error) {
 				IPPort:    ip.IPPort,
 				Timestamp: ip.Timestamp,
 			},
-			Signature: ip.Signature,
+			Signature: peer.Signature{
+				TLSSignature: ip.Signature,
+				BLSSignature: nil,
+			},
 		}
-		if err := signedIP.Verify(ip.Cert); err != nil {
+		tlsVerifier := peer.TLSVerifier{
+			Cert: ip.Cert,
+		}
+		verifier := peer.NewIPVerifiers(map[peer.IPVerifier]bool{
+			tlsVerifier: true,
+		})
+
+		if err := signedIP.Verify(verifier); err != nil {
 			return nil, err
 		}
 		ipAuths[i] = &ipAuth{

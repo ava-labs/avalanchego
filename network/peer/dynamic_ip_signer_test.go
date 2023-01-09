@@ -4,14 +4,12 @@
 package peer
 
 import (
-	"crypto"
 	"net"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/network/tls"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/ips"
 )
@@ -27,7 +25,7 @@ func TestIPSigner(t *testing.T) {
 	tlsCert, err := staking.NewTLSCert()
 	require.NoError(err)
 
-	key, err := tls.NewSigner(tlsCert, crypto.SHA256)
+	key, err := NewTLSSigner(tlsCert)
 	require.NoError(err)
 
 	s := NewDynamicIPSigner(dynIP, key)

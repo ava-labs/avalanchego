@@ -5,7 +5,6 @@ package node
 
 import (
 	"context"
-	stdcrypto "crypto"
 	"errors"
 	"fmt"
 	"io"
@@ -48,7 +47,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
-	"github.com/ava-labs/avalanchego/network/tls"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
@@ -226,7 +224,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		)
 	}
 
-	tlsKey, err := tls.NewSigner(&n.Config.StakingTLSCert, stdcrypto.SHA256)
+	tlsKey, err := peer.NewTLSSigner(&n.Config.StakingTLSCert)
 	if err != nil {
 		return err
 	}
@@ -324,7 +322,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	n.Config.NetworkConfig.Validators = n.vdrs
 	n.Config.NetworkConfig.Beacons = n.beacons
 	n.Config.NetworkConfig.TLSConfig = tlsConfig
-	n.Config.NetworkConfig.TLSKey = tlsKey
+	n.Config.NetworkConfig.IPSigner = peer.NewIPSigners(tlsKey)
 	n.Config.NetworkConfig.WhitelistedSubnets = n.Config.WhitelistedSubnets
 	n.Config.NetworkConfig.UptimeCalculator = n.uptimeCalculator
 	n.Config.NetworkConfig.UptimeRequirement = n.Config.UptimeRequirement

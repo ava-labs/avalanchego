@@ -5,7 +5,6 @@ package network
 
 import (
 	"context"
-	"crypto"
 	"net"
 	"sync"
 	"testing"
@@ -20,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
-	"github.com/ava-labs/avalanchego/network/tls"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
@@ -171,11 +169,11 @@ func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []id
 		config.MyNodeID = nodeID
 		config.MyIPPort = ip
 
-		tlsKey, err := tls.NewSigner(tlsCert, crypto.SHA256)
+		tlsKey, err := peer.NewTLSSigner(tlsCert)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
-		config.TLSKey = tlsKey
+		config.IPSigner = peer.NewIPSigners(tlsKey)
 
 		listeners[i] = listener
 		nodeIDs[i] = nodeID

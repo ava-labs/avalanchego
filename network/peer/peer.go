@@ -110,6 +110,9 @@ type peer struct {
 	// the connection object that is used to read/write messages from
 	conn net.Conn
 
+	// [ipVerifier] verifies messages from this peer.
+	ipVerifier IPVerifier
+
 	// [cert] is this peer's certificate, specifically the leaf of the
 	// certificate chain they provided.
 	cert *x509.Certificate
@@ -180,10 +183,17 @@ func Start(
 	id ids.NodeID,
 	messageQueue MessageQueue,
 ) Peer {
+	tlsVerifier := TLSVerifier{
+		Cert: cert,
+	}
+
 	onClosingCtx, onClosingCtxCancel := context.WithCancel(context.Background())
 	p := &peer{
-		Config:             config,
-		conn:               conn,
+		Config: config,
+		conn:   conn,
+		ipVerifier: NewIPVerifiers(map[IPVerifier]bool{
+			tlsVerifier: true,
+		}),
 		cert:               cert,
 		id:                 id,
 		messageQueue:       messageQueue,
@@ -503,7 +513,7 @@ func (p *peer) writeMessages() {
 		mySignedIP.IPPort,
 		p.VersionCompatibility.Version().String(),
 		mySignedIP.Timestamp,
-		mySignedIP.Signature,
+		mySignedIP.TLSSignature,
 		p.MySubnets.List(),
 	)
 	if err != nil {
@@ -915,9 +925,12 @@ func (p *peer) handleVersion(msg *p2p.Version) {
 			},
 			Timestamp: msg.MyVersionTime,
 		},
-		Signature: msg.Sig,
+		Signature: Signature{
+			TLSSignature: msg.Sig,
+			BLSSignature: nil,
+		},
 	}
-	if err := p.ip.Verify(p.cert); err != nil {
+	if err := p.ip.Verify(p.ipVerifier); err != nil {
 		p.Log.Debug("signature verification failed",
 			zap.Stringer("nodeID", p.id),
 			zap.Error(err),

@@ -5,7 +5,6 @@ package peer
 
 import (
 	"context"
-	"crypto"
 	"net"
 	"time"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/throttling"
-	"github.com/ava-labs/avalanchego/network/tls"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -99,7 +97,7 @@ func StartTestPeer(
 	}
 
 	signerIP := ips.NewDynamicIPPort(net.IPv6zero, 0)
-	signer, err := tls.NewSigner(tlsCert, crypto.SHA256)
+	signer, err := NewTLSSigner(tlsCert)
 	if err != nil {
 		return nil, err
 	}
