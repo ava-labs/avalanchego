@@ -4,7 +4,6 @@
 package peer
 
 import (
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -20,7 +19,7 @@ type UnsignedIP struct {
 // Sign this IP with the provided signer and return the signed IP.
 func (ip *UnsignedIP) Sign(signer IPSigner) (*SignedIP, error) {
 	signature := Signature{}
-	sig, err := signer.Sign(hashing.ComputeHash256(ip.bytes()), signature)
+	sig, err := signer.Sign(ip.bytes(), signature)
 
 	return &SignedIP{
 		UnsignedIP: *ip,
