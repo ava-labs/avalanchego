@@ -37,7 +37,7 @@ func TestIPSigners(t *testing.T) {
 		expected expected
 	}{
 		{
-			name: "all fail",
+			name: "fail - all fail",
 			result0: result{
 				err: errFoobar,
 			},
@@ -49,7 +49,7 @@ func TestIPSigners(t *testing.T) {
 			},
 		},
 		{
-			name: "failure - first signer",
+			name: "fail - first signer",
 			result0: result{
 				err: errFoobar,
 			},
@@ -58,7 +58,7 @@ func TestIPSigners(t *testing.T) {
 			},
 		},
 		{
-			name: "failure - second signer",
+			name: "fail - second signer",
 			result1: result{
 				err: errFoobar,
 			},
