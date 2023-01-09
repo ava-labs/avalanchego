@@ -41,7 +41,6 @@ var (
 	errNotBurnedEnough           = errors.New("burned less tokens, than needed to")
 	errAssetIDMismatch           = errors.New("input assetID is different from utxo asset id")
 	errLockIDsMismatch           = errors.New("input lock ids is different from utxo lock ids")
-	errLockAmountNotZero         = errors.New("lockAmount must be 0 for StateUnlocked")
 	errFailToGetDeposit          = errors.New("couldn't get deposit")
 	errUnlockedMoreThanAvailable = errors.New("unlocked more deposited tokens, than was available for unlock")
 	errNotConsumedDeposit        = errors.New("didn't consume whole deposit amount, but deposit is expired and can't be partially unlocked")
@@ -86,6 +85,9 @@ type CaminoSpender interface {
 	// - [keys] are the owners of the funds
 	// - [totalAmountToLock] is the amount of funds that are trying to be locked with [appliedLockState]
 	// - [totalAmountToBurn] is the amount of AVAX that should be burned
+	// - [appliedLockState] state to set (except BondDeposit)
+	// - [to] owner of unlocked amounts if appliedLockState is Unlocked
+	// - [change] owner of unlocked amounts resulting from splittig inputs
 	// Returns:
 	// - [inputs] the inputs that should be consumed to fund the outputs
 	// - [outputs] the outputs that should be returned to the UTXO set
@@ -95,7 +97,9 @@ type CaminoSpender interface {
 		totalAmountToLock uint64,
 		totalAmountToBurn uint64,
 		appliedLockState locked.State,
-		changeAddr ids.ShortID,
+		to *secp256k1fx.OutputOwners,
+		change *secp256k1fx.OutputOwners,
+		asOf uint64,
 	) (
 		[]*avax.TransferableInput, // inputs
 		[]*avax.TransferableOutput, // outputs
@@ -199,7 +203,9 @@ func (h *handler) Lock(
 	totalAmountToLock uint64,
 	totalAmountToBurn uint64,
 	appliedLockState locked.State,
-	changeAddr ids.ShortID,
+	to *secp256k1fx.OutputOwners,
+	change *secp256k1fx.OutputOwners,
+	asOf uint64,
 ) (
 	[]*avax.TransferableInput, // inputs
 	[]*avax.TransferableOutput, // outputs
@@ -212,10 +218,6 @@ func (h *handler) Lock(
 		locked.StateUnlocked:
 	default:
 		return nil, nil, nil, errInvalidTargetLockState
-	}
-
-	if appliedLockState == locked.StateUnlocked && totalAmountToLock > 0 {
-		return nil, nil, nil, errLockAmountNotZero
 	}
 
 	addrs := set.NewSet[ids.ShortID](len(keys)) // The addresses controlled by [keys]
@@ -232,7 +234,10 @@ func (h *handler) Lock(
 	kc := secp256k1fx.NewKeychain(keys...) // Keychain consumes UTXOs and creates new ones
 
 	// Minimum time this transaction will be issued at
-	now := uint64(h.clk.Time().Unix())
+	now := asOf
+	if now == 0 {
+		now = uint64(h.clk.Time().Unix())
+	}
 
 	ins := []*avax.TransferableInput{}
 	outs := []*avax.TransferableOutput{}
@@ -248,15 +253,36 @@ func (h *handler) Lock(
 		locked   uint64
 		remained uint64
 	}
+	type OwnerID struct {
+		owners   *secp256k1fx.OutputOwners
+		ownersID *ids.ID
+	}
 	type OwnerAmounts struct {
 		amounts map[ids.ID]lockedAndRemainedAmounts
 		owners  secp256k1fx.OutputOwners
-		signers []*crypto.PrivateKeySECP256K1R
 	}
 	// Track the amount of transfers and their owners
 	// if appliedLockState == bond, then otherLockTxID is depositTxID and vice versa
 	// ownerID -> otherLockTxID -> AAAA
 	insAmounts := make(map[ids.ID]OwnerAmounts)
+
+	var toOwnerID *ids.ID
+	if to != nil && appliedLockState == locked.StateUnlocked {
+		id, err := GetOwnerID(OwnedWrapper{*to})
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		toOwnerID = &id
+	}
+
+	var changeOwnerID *ids.ID
+	if change != nil {
+		id, err := GetOwnerID(OwnedWrapper{*change})
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		changeOwnerID = &id
+	}
 
 	for _, utxo := range utxos {
 		// If we have consumed more AVAX than we are trying to lock,
@@ -291,6 +317,12 @@ func (h *handler) Lock(
 			continue
 		}
 
+		outOwnerID, err := GetOwnerID(out)
+		if err != nil {
+			// We couldn't get owner of this output, so move on to the next one
+			continue
+		}
+
 		inIntf, inSigners, err := kc.Spend(innerOut, now)
 		if err != nil {
 			// We couldn't spend the output, so move on to the next one
@@ -307,6 +339,9 @@ func (h *handler) Lock(
 
 		remainingValue := in.Amount()
 
+		lockedOwnerID := OwnerID{&innerOut.OutputOwners, &outOwnerID}
+		remainingOwnerID := lockedOwnerID
+
 		if !lockIDs.IsLocked() {
 			// Burn any value that should be burned
 			amountToBurn := math.Min(
@@ -315,6 +350,13 @@ func (h *handler) Lock(
 			)
 			totalAmountBurned += amountToBurn
 			remainingValue -= amountToBurn
+
+			if toOwnerID != nil {
+				lockedOwnerID = OwnerID{to, toOwnerID}
+			}
+			if changeOwnerID != nil {
+				remainingOwnerID = OwnerID{change, changeOwnerID}
+			}
 		}
 
 		// Lock any value that should be locked
@@ -340,50 +382,84 @@ func (h *handler) Lock(
 			})
 			signers = append(signers, inSigners)
 
-			ownerID, err := GetOwnerID(out)
-			if err != nil {
-				// We couldn't get owner of this output, so move on to the next one
-				continue
-			}
-
-			ownerAmounts, ok := insAmounts[ownerID]
-			if !ok {
-				ownerAmounts = OwnerAmounts{
-					amounts: make(map[ids.ID]lockedAndRemainedAmounts),
-					owners:  innerOut.OutputOwners,
-					signers: inSigners,
-				}
-			}
-
 			otherLockTxID := lockIDs.DepositTxID
 			if appliedLockState == locked.StateDeposited {
 				otherLockTxID = lockIDs.BondTxID
 			}
 
-			amounts := ownerAmounts.amounts[otherLockTxID]
+			ownerAmounts, ok := insAmounts[*lockedOwnerID.ownersID]
+			if !ok {
+				ownerAmounts = OwnerAmounts{
+					amounts: make(map[ids.ID]lockedAndRemainedAmounts),
+					owners:  *lockedOwnerID.owners,
+				}
+			}
 
+			amounts := ownerAmounts.amounts[otherLockTxID]
 			newAmount, err := math.Add64(amounts.locked, amountToLock)
 			if err != nil {
-				// We couldn't sum this input's amount, so move on to the next one
-				continue
+				return nil, nil, nil, err
 			}
-			amounts.locked = newAmount
 
+			amounts.locked = newAmount
+			ownerAmounts.amounts[otherLockTxID] = amounts
+			if !ok {
+				insAmounts[*lockedOwnerID.ownersID] = ownerAmounts
+			}
+
+			ownerAmounts, ok = insAmounts[*remainingOwnerID.ownersID]
+			if !ok {
+				ownerAmounts = OwnerAmounts{
+					amounts: make(map[ids.ID]lockedAndRemainedAmounts),
+					owners:  *remainingOwnerID.owners,
+				}
+			}
+
+			amounts = ownerAmounts.amounts[otherLockTxID]
 			newAmount, err = math.Add64(amounts.remained, remainingValue)
 			if err != nil {
-				// We couldn't sum this input's amount, so move on to the next one
-				continue
+				return nil, nil, nil, err
 			}
 			amounts.remained = newAmount
 
 			ownerAmounts.amounts[otherLockTxID] = amounts
 			if !ok {
-				insAmounts[ownerID] = ownerAmounts
+				insAmounts[*remainingOwnerID.ownersID] = ownerAmounts
 			}
 		}
 	}
 
 	for _, ownerAmounts := range insAmounts {
+		addOut := func(amt uint64, lockIDs locked.IDs, collect bool) uint64 {
+			if amt == 0 {
+				return 0
+			}
+			if lockIDs.IsLocked() {
+				outs = append(outs, &avax.TransferableOutput{
+					Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
+					Out: &locked.Out{
+						IDs: lockIDs,
+						TransferableOut: &secp256k1fx.TransferOutput{
+							Amt:          amt,
+							OutputOwners: ownerAmounts.owners,
+						},
+					},
+				})
+			} else {
+				if collect {
+					return amt
+				}
+				outs = append(outs, &avax.TransferableOutput{
+					Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt:          amt,
+						OutputOwners: ownerAmounts.owners,
+					},
+				})
+			}
+			return 0
+		}
+
 		for otherLockTxID, amounts := range ownerAmounts.amounts {
 			lockIDs := locked.IDs{}
 			switch appliedLockState {
@@ -393,53 +469,13 @@ func (h *handler) Lock(
 				lockIDs.BondTxID = otherLockTxID
 			}
 
-			if amounts.locked > 0 {
-				// Some of this input was put for locking
-				outs = append(outs, &avax.TransferableOutput{
-					Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
-					Out: &locked.Out{
-						IDs: lockIDs.Lock(appliedLockState),
-						TransferableOut: &secp256k1fx.TransferOutput{
-							Amt:          amounts.locked,
-							OutputOwners: ownerAmounts.owners,
-						},
-					},
-				})
+			// If out is unlocked no UTXO is written instead the amount is returned.
+			// We apply the unlocked amount in the remaining step to compact UTXOs
+			unlockAmount := addOut(amounts.locked, lockIDs.Lock(appliedLockState), true)
+			if unlockAmount, err = math.Add64(unlockAmount, amounts.remained); err != nil {
+				return nil, nil, nil, err
 			}
-
-			// This input had extra value, so some of it must be returned
-			if amounts.remained > 0 {
-				if lockIDs.IsLocked() {
-					outs = append(outs, &avax.TransferableOutput{
-						Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
-						Out: &locked.Out{
-							IDs: lockIDs,
-							TransferableOut: &secp256k1fx.TransferOutput{
-								Amt:          amounts.remained,
-								OutputOwners: ownerAmounts.owners,
-							},
-						},
-					})
-				} else {
-					var owners secp256k1fx.OutputOwners
-					if changeAddr != ids.ShortEmpty {
-						owners = secp256k1fx.OutputOwners{
-							Locktime:  0,
-							Threshold: 1,
-							Addrs:     []ids.ShortID{changeAddr},
-						}
-					} else {
-						owners = ownerAmounts.owners
-					}
-					outs = append(outs, &avax.TransferableOutput{
-						Asset: avax.Asset{ID: h.ctx.AVAXAssetID},
-						Out: &secp256k1fx.TransferOutput{
-							Amt:          amounts.remained,
-							OutputOwners: owners,
-						},
-					})
-				}
-			}
+			addOut(unlockAmount, lockIDs, false)
 		}
 	}
 

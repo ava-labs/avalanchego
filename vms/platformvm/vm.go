@@ -178,7 +178,16 @@ func (vm *VM) Initialize(
 	}
 
 	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(chainCtx.SharedMemory, txs.Codec)
-	utxoHandler := utxo.NewHandler(vm.ctx, &vm.clock, vm.state, vm.fx)
+
+	camCfg, _ := vm.state.CaminoConfig()
+	utxoHandler := utxo.NewCaminoHandler(
+		vm.ctx,
+		&vm.clock,
+		vm.state,
+		vm.fx,
+		camCfg != nil && camCfg.LockModeBondDeposit,
+	)
+
 	vm.uptimeManager = uptime.NewManager(vm.state)
 	vm.UptimeLockedCalculator.SetCalculator(&vm.bootstrapped, &chainCtx.Lock, vm.uptimeManager)
 

@@ -15,6 +15,14 @@ import (
 
 var errOutNotOwned = errors.New("out doesn't implement fx.Owned interface")
 
+type OwnedWrapper struct {
+	wrapped interface{}
+}
+
+func (o OwnedWrapper) Owners() interface{} {
+	return o.wrapped
+}
+
 // Returns hash of marshalled bytes of output owner, which can be treated as owner ID.
 // [out] must implement fx.Owned interface.
 func GetOwnerID(out interface{}) (ids.ID, error) {

@@ -203,13 +203,27 @@ func TestLock(t *testing.T) {
 		Threshold: 1,
 		Addrs:     []ids.ShortID{address},
 	}
+
+	testKeys := crypto.BuildTestKeys()
+	changeOwners := secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs:     []ids.ShortID{testKeys[0].Address()},
+	}
+	recipientOwners := secp256k1fx.OutputOwners{
+		Locktime:  0,
+		Threshold: 1,
+		Addrs:     []ids.ShortID{testKeys[1].Address()},
+	}
+
 	existingTxID := ids.GenerateTestID()
 
 	type args struct {
 		totalAmountToSpend uint64
 		totalAmountToBurn  uint64
 		appliedLockState   locked.State
-		changeAddr         ids.ShortID
+		recipient          *secp256k1fx.OutputOwners
+		change             *secp256k1fx.OutputOwners
 	}
 	type want struct {
 		ins  []*avax.TransferableInput
@@ -368,6 +382,71 @@ func TestLock(t *testing.T) {
 			expectError: errNotEnoughBalance,
 			msg:         "Not enough balance to deposit",
 		},
+		"Self Transfer": {
+			args: args{
+				totalAmountToSpend: 1,
+				totalAmountToBurn:  1,
+				appliedLockState:   locked.StateUnlocked,
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{8, 8}, ctx.AVAXAssetID, 5, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateWant: func(utxos []*avax.UTXO) want {
+				return want{
+					ins: []*avax.TransferableInput{
+						generateTestInFromUTXO(utxos[0], []uint32{0}),
+					},
+					outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, 4, outputOwners, ids.Empty, ids.Empty),
+					},
+				}
+			},
+		},
+		"Self Transfer and change": {
+			args: args{
+				totalAmountToSpend: 1,
+				totalAmountToBurn:  1,
+				appliedLockState:   locked.StateUnlocked,
+				change:             &changeOwners,
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{8, 8}, ctx.AVAXAssetID, 5, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateWant: func(utxos []*avax.UTXO) want {
+				return want{
+					ins: []*avax.TransferableInput{
+						generateTestInFromUTXO(utxos[0], []uint32{0}),
+					},
+					outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, 1, outputOwners, ids.Empty, ids.Empty),
+						generateTestOut(ctx.AVAXAssetID, 3, changeOwners, ids.Empty, ids.Empty),
+					},
+				}
+			},
+		},
+		"Recipient transfer and change": {
+			args: args{
+				totalAmountToSpend: 1,
+				totalAmountToBurn:  1,
+				appliedLockState:   locked.StateUnlocked,
+				change:             &changeOwners,
+				recipient:          &recipientOwners,
+			},
+			utxos: []*avax.UTXO{
+				generateTestUTXO(ids.ID{8, 8}, ctx.AVAXAssetID, 5, outputOwners, ids.Empty, ids.Empty),
+			},
+			generateWant: func(utxos []*avax.UTXO) want {
+				return want{
+					ins: []*avax.TransferableInput{
+						generateTestInFromUTXO(utxos[0], []uint32{0}),
+					},
+					outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, 1, recipientOwners, ids.Empty, ids.Empty),
+						generateTestOut(ctx.AVAXAssetID, 3, changeOwners, ids.Empty, ids.Empty),
+					},
+				}
+			},
+		},
 	}
 
 	for name, tt := range tests {
@@ -405,7 +484,9 @@ func TestLock(t *testing.T) {
 				tt.args.totalAmountToSpend,
 				tt.args.totalAmountToBurn,
 				tt.args.appliedLockState,
-				tt.args.changeAddr,
+				tt.args.recipient,
+				tt.args.change,
+				0,
 			)
 
 			avax.SortTransferableOutputs(want.outs, txs.Codec)

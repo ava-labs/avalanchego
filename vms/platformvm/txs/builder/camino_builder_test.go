@@ -94,7 +94,7 @@ func TestCaminoBuilderTxAddressState(t *testing.T) {
 				tt.remove,
 				tt.state,
 				caminoPreFundedKeys,
-				ids.ShortEmpty,
+				nil,
 			)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
@@ -251,7 +251,7 @@ func TestUnlockDepositTx(t *testing.T) {
 			tx, err := env.txBuilder.NewUnlockDepositTx(
 				[]ids.ID{depositTxID},
 				[]*crypto.PrivateKeySECP256K1R{testKey.(*crypto.PrivateKeySECP256K1R)},
-				ids.ShortEmpty,
+				nil,
 			)
 			require.ErrorIs(t, err, tt.expectedErr)
 

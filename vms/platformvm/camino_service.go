@@ -24,6 +24,7 @@ import (
 	"go.uber.org/zap"
 
 	utilsjson "github.com/ava-labs/avalanchego/utils/json"
+	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
 var (
@@ -217,28 +218,27 @@ func (s *CaminoService) GetConfiguration(_ *http.Request, _ *struct{}, reply *Ge
 }
 
 type SetAddressStateArgs struct {
-	api.JSONSpendHeader
+	api.UserPass
+	api.JSONFromAddrs
 
-	Address string `json:"address"`
-	State   uint8  `json:"state"`
-	Remove  bool   `json:"remove"`
+	Change  platformapi.Owner `json:"change"`
+	Address string            `json:"address"`
+	State   uint8             `json:"state"`
+	Remove  bool              `json:"remove"`
 }
 
 // AddAdressState issues an AddAdressStateTx
 func (s *CaminoService) SetAddressState(_ *http.Request, args *SetAddressStateArgs, response *api.JSONTxID) error {
 	s.vm.ctx.Log.Debug("Platform: SetAddressState called")
 
-	keys, err := s.getKeystoreKeys(&args.JSONSpendHeader)
+	keys, err := s.getKeystoreKeys(&args.UserPass, &args.JSONFromAddrs)
 	if err != nil {
 		return err
 	}
 
-	var changeAddr ids.ShortID
-	if len(args.ChangeAddr) > 0 {
-		var err error
-		if changeAddr, err = avax.ParseServiceAddress(s.addrManager, args.ChangeAddr); err != nil {
-			return fmt.Errorf(errInvalidChangeAddr, err)
-		}
+	change, err := s.getOutputOwner(&args.Change)
+	if err != nil {
+		return err
 	}
 
 	targetAddr, err := avax.ParseServiceAddress(s.addrManager, args.Address)
@@ -252,7 +252,7 @@ func (s *CaminoService) SetAddressState(_ *http.Request, args *SetAddressStateAr
 		args.Remove, // Add or remove State
 		args.State,  // The state to change
 		keys.Keys,   // Keys providing the staked tokens
-		changeAddr,
+		change,
 	)
 	if err != nil {
 		return fmt.Errorf(errCreateTx, err)
@@ -289,11 +289,13 @@ func (s *CaminoService) GetAddressStates(_ *http.Request, args *GetAddressStateA
 
 type SpendArgs struct {
 	api.JSONFromAddrs
-	api.JSONChangeAddr
 
+	To           platformapi.Owner   `json:"to"`
+	Change       platformapi.Owner   `json:"change"`
 	LockMode     byte                `json:"lockMode"`
 	AmountToLock utilsjson.Uint64    `json:"amountToLock"`
 	AmountToBurn utilsjson.Uint64    `json:"amountToBurn"`
+	AsOf         utilsjson.Uint64    `json:"asOf"`
 	Encoding     formatting.Encoding `json:"encoding"`
 }
 
@@ -314,12 +316,14 @@ func (s *CaminoService) Spend(_ *http.Request, args *SpendArgs, response *SpendR
 		return errNoKeys
 	}
 
-	changeAddr := ids.ShortEmpty
-	if len(args.ChangeAddr) > 0 {
-		var err error
-		if changeAddr, err = avax.ParseServiceAddress(s.addrManager, args.ChangeAddr); err != nil {
-			return fmt.Errorf(errInvalidChangeAddr, err)
-		}
+	to, err := s.getOutputOwner(&args.To)
+	if err != nil {
+		return err
+	}
+
+	change, err := s.getOutputOwner(&args.Change)
+	if err != nil {
+		return err
 	}
 
 	ins, outs, signers, err := s.vm.txBuilder.Lock(
@@ -327,7 +331,9 @@ func (s *CaminoService) Spend(_ *http.Request, args *SpendArgs, response *SpendR
 		uint64(args.AmountToLock),
 		uint64(args.AmountToBurn),
 		locked.State(args.LockMode),
-		changeAddr,
+		to,
+		change,
+		uint64(args.AsOf),
 	)
 	if err != nil {
 		return fmt.Errorf("%w: %s", errCreateTransferables, err)
@@ -363,15 +369,17 @@ func (s *CaminoService) Spend(_ *http.Request, args *SpendArgs, response *SpendR
 }
 
 type RegisterNodeArgs struct {
-	api.JSONSpendHeader
+	api.UserPass
+	api.JSONFromAddrs
 
-	OldNodeID               ids.NodeID `json:"oldNodeID"`
-	NewNodeID               ids.NodeID `json:"newNodeID"`
-	ConsortiumMemberAddress string     `json:"consortiumMemberAddress"`
+	Change                  platformapi.Owner `json:"change"`
+	OldNodeID               ids.NodeID        `json:"oldNodeID"`
+	NewNodeID               ids.NodeID        `json:"newNodeID"`
+	ConsortiumMemberAddress string            `json:"consortiumMemberAddress"`
 }
 
 // RegisterNode issues an RegisterNodeTx
-func (s *CaminoService) RegisterNode(_ *http.Request, args *RegisterNodeArgs, reply *api.JSONTxIDChangeAddr) error {
+func (s *CaminoService) RegisterNode(_ *http.Request, args *RegisterNodeArgs, reply *api.JSONTxID) error {
 	s.vm.ctx.Log.Debug("Platform: RegisterNode called")
 
 	// Parse the from addresses
@@ -399,13 +407,9 @@ func (s *CaminoService) RegisterNode(_ *http.Request, args *RegisterNodeArgs, re
 		return errNoKeys
 	}
 
-	// Parse the change address.
-	changeAddr := ids.ShortEmpty
-	if len(args.ChangeAddr) > 0 {
-		var err error
-		if changeAddr, err = avax.ParseServiceAddress(s.addrManager, args.ChangeAddr); err != nil {
-			return fmt.Errorf(errInvalidChangeAddr, err)
-		}
+	change, err := s.getOutputOwner(&args.Change)
+	if err != nil {
+		return err
 	}
 
 	// Parse the consortium member address.
@@ -420,14 +424,13 @@ func (s *CaminoService) RegisterNode(_ *http.Request, args *RegisterNodeArgs, re
 		args.NewNodeID,
 		consortiumMemberAddress,
 		privKeys.Keys,
-		changeAddr,
+		change,
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
 	}
 
 	reply.TxID = tx.ID()
-	reply.ChangeAddr, err = s.addrManager.FormatLocalAddress(changeAddr)
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -438,14 +441,14 @@ func (s *CaminoService) RegisterNode(_ *http.Request, args *RegisterNodeArgs, re
 	return errs.Err
 }
 
-func (s *Service) getKeystoreKeys(args *api.JSONSpendHeader) (*secp256k1fx.Keychain, error) {
+func (s *Service) getKeystoreKeys(creds *api.UserPass, from *api.JSONFromAddrs) (*secp256k1fx.Keychain, error) {
 	// Parse the from addresses
-	fromAddrs, err := avax.ParseServiceAddresses(s.addrManager, args.From)
+	fromAddrs, err := avax.ParseServiceAddresses(s.addrManager, from.From)
 	if err != nil {
 		return nil, err
 	}
 
-	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, args.Username, args.Password)
+	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, creds.Username, creds.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -480,4 +483,23 @@ func (s *Service) getFakeKeys(args *api.JSONFromAddrs) (*secp256k1fx.Keychain, e
 		privKeys.Add(crypto.FakePrivateKey(fromAddr))
 	}
 	return privKeys, nil
+}
+
+func (s *Service) getOutputOwner(args *platformapi.Owner) (*secp256k1fx.OutputOwners, error) {
+	if len(args.Addresses) > 0 {
+		ret := &secp256k1fx.OutputOwners{
+			Locktime:  uint64(args.Locktime),
+			Threshold: uint32(args.Threshold),
+		}
+		for _, addr := range args.Addresses {
+			if addrBytes, err := avax.ParseServiceAddress(s.addrManager, addr); err != nil {
+				return nil, fmt.Errorf(errInvalidChangeAddr, err)
+			} else {
+				ret.Addrs = append(ret.Addrs, addrBytes)
+			}
+		}
+		ret.Sort()
+		return ret, nil
+	}
+	return nil, nil
 }
