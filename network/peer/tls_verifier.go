@@ -7,6 +7,7 @@ import "crypto/x509"
 
 var _ IPVerifier = (*TLSVerifier)(nil)
 
+// TLSVerifier verifies a signature of an ip against  a TLS cert.
 type TLSVerifier struct {
 	Cert *x509.Certificate
 }

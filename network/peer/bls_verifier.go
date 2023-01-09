@@ -15,6 +15,7 @@ var (
 	errFailedBLSVerification = fmt.Errorf("failed bls verification")
 )
 
+// BLSVerifier verifies a signature of an ip against a BLS key
 type BLSVerifier struct {
 	PublicKey *bls.PublicKey
 }
