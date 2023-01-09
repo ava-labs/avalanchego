@@ -276,9 +276,9 @@ fn test_range_proof() {
     let start = 0;
     let end = &items.len() - 1;
 
-    let mut proof = merkle.prove(&items[start].0);
+    let mut proof = merkle.prove(items[start].0);
     assert!(!proof.0.is_empty());
-    let end_proof = merkle.prove(&items[end].0);
+    let end_proof = merkle.prove(items[end].0);
     assert!(!end_proof.0.is_empty());
 
     proof.concat_proofs(end_proof);

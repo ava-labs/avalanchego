@@ -31,7 +31,7 @@ pub fn run(opts: &Options) -> Result<()> {
     };
 
     let mut account: Option<Vec<u8>> = None;
-    if let Err(_) = db.new_writebatch().kv_remove(opts.key, &mut account) {
+    if let Err(_) = db.new_writebatch().kv_remove(opts.key.clone(), &mut account) {
         return Err(anyhow!("error deleting key"))
     }
 

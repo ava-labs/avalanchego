@@ -246,7 +246,7 @@ impl DBRev {
             .map_err(DBError::Merkle)
     }
 
-    /// Get a value associated with a key
+    /// Get a value associated with a key.
     pub fn kv_get_merkle(&self, key: &[u8]) -> Result<Vec<u8>, DBError> {
         let obj_ref = self.merkle.get(key, self.header.kv_root).map_err(DBError::Merkle)?;
         match obj_ref {

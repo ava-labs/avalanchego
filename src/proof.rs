@@ -223,7 +223,7 @@ impl Proof {
             return Err(ProofError::InvalidProof)
         }
 
-        return Ok(true)
+        Ok(true)
     }
 
     /// proofToPath converts a merkle proof to trie node path. The main purpose of
@@ -412,7 +412,7 @@ impl Proof {
                 } else {
                     chd_eth_rlp[index].clone().unwrap()
                 };
-                let subproof = self.generate_subproof(data).map(|subproof| subproof)?;
+                let subproof = self.generate_subproof(data)?;
 
                 let chd = [None; NBRANCH];
                 let t = NodeType::Branch(BranchNode::new(chd, None, chd_eth_rlp));
@@ -518,7 +518,7 @@ fn unset_internal<K: AsRef<[u8]>>(merkle_setup: &mut MerkleSetup, left: K, right
             drop(u_ref);
             unset_node_ref(merkle, p, left_node, left_chunks[index..].to_vec(), 1, false)?;
             unset_node_ref(merkle, p, right_node, right_chunks[index..].to_vec(), 1, true)?;
-            return Ok(false)
+            Ok(false)
         }
         NodeType::Extension(n) => {
             // There can have these five scenarios:
@@ -579,9 +579,9 @@ fn unset_internal<K: AsRef<[u8]>>(merkle_setup: &mut MerkleSetup, left: K, right
                 )?;
                 return Ok(false)
             }
-            return Ok(false)
+            Ok(false)
         }
-        _ => return Err(ProofError::InvalidNode),
+        _ => Err(ProofError::InvalidNode),
     }
 }
 
@@ -662,23 +662,18 @@ fn unset_node_ref<K: AsRef<[u8]>>(
                     // path(it doesn't belong to the range), keep
                     // it with the cached hash available.
                     //}
-                } else {
-                    if compare(&cur_key, &chunks[index..]).is_gt() {
-                        // The key of fork shortnode is greater than the
-                        // path(it belongs to the range), unset the entrie
-                        // branch. The parent must be a fullnode.
-                        p_ref
-                            .write(|p| {
-                                let pp = p.inner_mut().as_branch_mut().unwrap();
-                                pp.chd_eth_rlp_mut()[chunks[index - 1] as usize] = None;
-                            })
-                            .unwrap();
-                    }
-                    //else {
-                    // The key of fork shortnode is less than the
-                    // path(it doesn't belong to the range), keep
-                    // it with the cached hash available.
-                    //}
+                } else if compare(&cur_key, &chunks[index..]).is_gt() {
+                    // The key of fork shortnode is greater than the
+                    // path(it belongs to the range), unset the entrie
+                    // branch. The parent must be a fullnode. Otherwise the
+                    // key is not part of the range and should remain in the
+                    // cached hash.
+                    p_ref
+                        .write(|p| {
+                            let pp = p.inner_mut().as_branch_mut().unwrap();
+                            pp.chd_eth_rlp_mut()[chunks[index - 1] as usize] = None;
+                        })
+                        .unwrap();
                 }
                 drop(u_ref);
                 drop(p_ref);
@@ -692,5 +687,5 @@ fn unset_node_ref<K: AsRef<[u8]>>(
         NodeType::Leaf(_) => (),
     }
 
-    return Ok(())
+    Ok(())
 }

@@ -221,7 +221,7 @@ impl BranchNode {
     ) -> Self {
         BranchNode {
             chd,
-            value: value.map(|v| Data(v)),
+            value: value.map(Data),
             chd_eth_rlp,
         }
     }
@@ -480,7 +480,7 @@ impl MummyItem for Node {
                 };
                 let mut cur_rlp_len = 0;
                 for chd_rlp in chd_eth_rlp.iter_mut() {
-                    let mut buff = [0 as u8; 1];
+                    let mut buff = [0_u8; 1];
                     let rlp_len_raw = mem
                         .get_view(offset + cur_rlp_len, 1)
                         .ok_or(ShaleError::LinearMemStoreError)?;
@@ -526,7 +526,7 @@ impl MummyItem for Node {
                 .collect();
                 let (path, _) = PartialPath::decode(nibbles);
 
-                let mut buff = [0 as u8; 1];
+                let mut buff = [0_u8; 1];
                 let rlp_len_raw = mem
                     .get_view(addr + META_SIZE + ext_header_size + path_len, 1)
                     .ok_or(ShaleError::LinearMemStoreError)?;
@@ -652,7 +652,7 @@ impl MummyItem for Node {
                     match rlp {
                         Some(v) => {
                             cur.write_all(&[v.len() as u8]).unwrap();
-                            cur.write_all(&v).unwrap();
+                            cur.write_all(v).unwrap();
                         }
                         None => {
                             cur.write_all(&0u8.to_le_bytes()).unwrap();
@@ -669,7 +669,7 @@ impl MummyItem for Node {
                 if n.2.is_some() {
                     let rlp = n.2.as_ref().unwrap();
                     cur.write_all(&[rlp.len() as u8]).unwrap();
-                    cur.write_all(&rlp).unwrap();
+                    cur.write_all(rlp).unwrap();
                 }
             }
             NodeType::Leaf(n) => {
@@ -1897,7 +1897,7 @@ pub fn from_nibbles(nibbles: &[u8]) -> impl Iterator<Item = u8> + '_ {
 
 pub fn compare(a: &[u8], b: &[u8]) -> cmp::Ordering {
     for (ai, bi) in a.iter().zip(b.iter()) {
-        match ai.cmp(&bi) {
+        match ai.cmp(bi) {
             cmp::Ordering::Equal => continue,
             ord => return ord,
         }

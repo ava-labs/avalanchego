@@ -32,7 +32,7 @@ impl MemStore for DynamicMem {
         let size = offset + length;
         // Increase the size if the request range exceeds the current limit.
         if size > self.get_space_mut().len() {
-            self.get_space_mut().resize(size as usize, 0);
+            self.get_space_mut().resize(size, 0);
         }
         Some(Box::new(DynamicMemView {
             offset,
@@ -57,7 +57,7 @@ impl MemStore for DynamicMem {
         let size = offset + length;
         // Increase the size if the request range exceeds the current limit.
         if size > self.get_space_mut().len() {
-            self.get_space_mut().resize(size as usize, 0);
+            self.get_space_mut().resize(size, 0);
         }
         self.get_space_mut()[offset..offset + length].copy_from_slice(change)
     }
