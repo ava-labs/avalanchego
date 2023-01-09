@@ -47,13 +47,23 @@ func TestIPVerifiers(t *testing.T) {
 			err:            errFoobar,
 		},
 		{
-			name: "success - optional fails",
+			name: "fail - optional fails",
 			args: args{
 				ipBytes: nil,
 				sig:     Signature{},
 			},
 			requiredResult: nil,
 			optionalResult: errFoobar,
+			err:            errFoobar,
+		},
+		{
+			name: "success - missing optional",
+			args: args{
+				ipBytes: nil,
+				sig:     Signature{},
+			},
+			requiredResult: nil,
+			optionalResult: errMissingSignature,
 			err:            nil,
 		},
 		{
@@ -69,21 +79,23 @@ func TestIPVerifiers(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		r := require.New(t)
-		ctrl := gomock.NewController(t)
+		t.Run(test.name, func(t *testing.T) {
+			r := require.New(t)
+			ctrl := gomock.NewController(t)
 
-		required := NewMockIPVerifier(ctrl)
-		required.EXPECT().Verify(gomock.Any(), gomock.Any()).
-			Return(test.requiredResult).AnyTimes()
-		optional := NewMockIPVerifier(ctrl)
-		optional.EXPECT().Verify(gomock.Any(), gomock.Any()).
-			Return(test.optionalResult).AnyTimes()
+			required := NewMockIPVerifier(ctrl)
+			required.EXPECT().Verify(gomock.Any(), gomock.Any()).
+				Return(test.requiredResult).AnyTimes()
+			optional := NewMockIPVerifier(ctrl)
+			optional.EXPECT().Verify(gomock.Any(), gomock.Any()).
+				Return(test.optionalResult).AnyTimes()
 
-		verifier := NewIPVerifiers(map[IPVerifier]bool{
-			required: true,
-			optional: false,
+			verifier := NewIPVerifiers(map[IPVerifier]bool{
+				required: true,
+				optional: false,
+			})
+
+			r.Equal(test.err, verifier.Verify(test.args.ipBytes, test.args.sig))
 		})
-
-		r.Equal(test.err, verifier.Verify(test.args.ipBytes, test.args.sig))
 	}
 }

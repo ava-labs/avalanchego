@@ -12,6 +12,7 @@ import (
 var (
 	_ IPVerifier = (*BLSVerifier)(nil)
 
+	errMissingSignature      = errors.New("missing signature")
 	errFailedBLSVerification = errors.New("failed bls verification")
 )
 
@@ -21,6 +22,10 @@ type BLSVerifier struct {
 }
 
 func (b BLSVerifier) Verify(ipBytes []byte, sig Signature) error {
+	if len(sig.BLSSignature) == 0 {
+		return errMissingSignature
+	}
+
 	blsSig, err := bls.SignatureFromBytes(sig.BLSSignature)
 	if err != nil {
 		return err

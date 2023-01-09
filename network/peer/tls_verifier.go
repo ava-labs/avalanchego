@@ -13,6 +13,10 @@ type TLSVerifier struct {
 }
 
 func (t TLSVerifier) Verify(ipBytes []byte, sig Signature) error {
+	if len(sig.TLSSignature) == 0 {
+		return errMissingSignature
+	}
+
 	return t.Cert.CheckSignature(t.Cert.SignatureAlgorithm, ipBytes,
 		sig.TLSSignature)
 }
