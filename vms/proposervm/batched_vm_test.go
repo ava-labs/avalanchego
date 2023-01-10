@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
@@ -979,7 +980,26 @@ func initTestRemoteProposerVM(
 		}
 	}
 
-	proVM := New(coreVM, proBlkStartTime, 0, DefaultMinBlockDelay, proBlkStartTime)
+	tlsSigner, err := signer.NewTLSSigner(pTestCert)
+	if err != nil {
+		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
+	sk, err := bls.NewSecretKey()
+	if err != nil {
+		t.Fatalf("failed to create bls private key with %s", err)
+	}
+	blsSigner := signer.NewBLSSigner(sk)
+
+	proVM := New(
+		coreVM,
+		proBlkStartTime,
+		0,
+		DefaultMinBlockDelay,
+		proBlkStartTime,
+		pTestCert.Leaf,
+		&tlsSigner,
+		&blsSigner,
+	)
 
 	valState := &validators.TestState{
 		T: t,
@@ -1011,15 +1031,8 @@ func initTestRemoteProposerVM(
 		}, nil
 	}
 
-	tlsSigner, err := signer.NewTLSSigner(pTestCert)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
-
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
-	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = &tlsSigner
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)

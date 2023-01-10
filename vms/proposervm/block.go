@@ -243,17 +243,17 @@ func (p *postForkCommonComponents) buildChild(
 			pChainHeight,
 			innerBlock.Bytes(),
 		)
-	case p.vm.ctx.BlsSigner == nil:
+	case p.vm.blsSigner == nil:
 		// bls key not specified for this node. Whether bls signing fork
 		// is active or not, sign using tls certificate
 		statelessChild, err = block.BuildCertSigned(
 			parentID,
 			newTimestamp,
 			pChainHeight,
-			p.vm.ctx.StakingCertLeaf,
+			p.vm.stakingCertLeaf,
 			innerBlock.Bytes(),
 			p.vm.ctx.ChainID,
-			p.vm.ctx.StakingLeafSigner,
+			p.vm.tlsSigner,
 		)
 	case !parentTimestamp.Before(p.vm.blsSigningActivationTime):
 		// bls signing is our prefer way to sign if available
@@ -264,7 +264,7 @@ func (p *postForkCommonComponents) buildChild(
 			p.vm.ctx.NodeID,
 			innerBlock.Bytes(),
 			p.vm.ctx.ChainID,
-			p.vm.ctx.BlsSigner,
+			p.vm.blsSigner,
 		)
 	default:
 		// bls signing fork not active yet, sign using tls certificate
@@ -272,10 +272,10 @@ func (p *postForkCommonComponents) buildChild(
 			parentID,
 			newTimestamp,
 			pChainHeight,
-			p.vm.ctx.StakingCertLeaf,
+			p.vm.stakingCertLeaf,
 			innerBlock.Bytes(),
 			p.vm.ctx.ChainID,
-			p.vm.ctx.StakingLeafSigner,
+			p.vm.tlsSigner,
 		)
 	}
 

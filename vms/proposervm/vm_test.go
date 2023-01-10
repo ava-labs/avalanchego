@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
@@ -130,7 +131,21 @@ func initTestProposerVM(
 		}
 	}
 
-	proVM := New(coreVM, proBlkStartTime, minPChainHeight, DefaultMinBlockDelay, proBlkStartTime)
+	tlsSigner, err := signer.NewTLSSigner(pTestCert)
+	if err != nil {
+		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
+
+	proVM := New(
+		coreVM,
+		proBlkStartTime, // fork activation time
+		minPChainHeight, // minimum P-Chain height
+		DefaultMinBlockDelay,
+		proBlkStartTime, // bls signing activation time
+		pTestCert.Leaf,
+		&tlsSigner,
+		nil, // TODO ABENEGIA: make signer.NewBLSSigner(sk)
+	)
 
 	valState := &validators.TestState{
 		T: t,
@@ -162,15 +177,8 @@ func initTestProposerVM(
 		}, nil
 	}
 
-	tlsSigner, err := signer.NewTLSSigner(pTestCert)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
-
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
-	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = &tlsSigner
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -536,10 +544,10 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 		proVM.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		proVM.ctx.StakingCertLeaf,
+		proVM.stakingCertLeaf,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.StakingLeafSigner,
+		proVM.tlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -581,10 +589,10 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		proVM.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		proVM.ctx.StakingCertLeaf,
+		proVM.stakingCertLeaf,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.StakingLeafSigner,
+		proVM.tlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -602,10 +610,10 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		proVM.preferred,
 		innerBlk.Timestamp(),
 		200, // pChainHeight,
-		proVM.ctx.StakingCertLeaf,
+		proVM.stakingCertLeaf,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.StakingLeafSigner,
+		proVM.tlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -931,12 +939,25 @@ func TestExpiredBuildBlock(t *testing.T) {
 		}
 	}
 
+	tlsSigner, err := signer.NewTLSSigner(pTestCert)
+	if err != nil {
+		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
+	sk, err := bls.NewSecretKey()
+	if err != nil {
+		t.Fatalf("failed to create bls private key with %s", err)
+	}
+	blsSigner := signer.NewBLSSigner(sk)
+
 	proVM := New(
 		coreVM,
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
 		time.Time{}, // bls signing allowed
+		pTestCert.Leaf,
+		&tlsSigner,
+		&blsSigner,
 	)
 
 	valState := &validators.TestState{
@@ -957,15 +978,8 @@ func TestExpiredBuildBlock(t *testing.T) {
 		}, nil
 	}
 
-	tlsSigner, err := signer.NewTLSSigner(pTestCert)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
-
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
-	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = &tlsSigner
 	ctx.ValidatorState = valState
 
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -1277,15 +1291,8 @@ func TestInnerVMRollback(t *testing.T) {
 		}
 	}
 
-	tlsSigner, err := signer.NewTLSSigner(pTestCert)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
-
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
-	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = &tlsSigner
 	ctx.ValidatorState = valState
 
 	coreVM.InitializeF = func(
@@ -1304,12 +1311,25 @@ func TestInnerVMRollback(t *testing.T) {
 
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 
+	tlsSigner, err := signer.NewTLSSigner(pTestCert)
+	if err != nil {
+		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
+	sk, err := bls.NewSecretKey()
+	if err != nil {
+		t.Fatalf("failed to create bls private key with %s", err)
+	}
+	blsSigner := signer.NewBLSSigner(sk)
+
 	proVM := New(
 		coreVM,
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
 		time.Time{}, // bls signing allowed
+		pTestCert.Leaf,
+		&tlsSigner,
+		&blsSigner,
 	)
 
 	err = proVM.Initialize(
@@ -1418,6 +1438,9 @@ func TestInnerVMRollback(t *testing.T) {
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
 		time.Time{}, // bls signing allowed
+		pTestCert.Leaf,
+		&tlsSigner,
+		&blsSigner,
 	)
 
 	err = proVM.Initialize(
@@ -1972,12 +1995,25 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		}
 	}
 
+	tlsSigner, err := signer.NewTLSSigner(pTestCert)
+	if err != nil {
+		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
+	sk, err := bls.NewSecretKey()
+	if err != nil {
+		t.Fatalf("failed to create bls private key with %s", err)
+	}
+	blsSigner := signer.NewBLSSigner(sk)
+
 	proVM := New(
 		coreVM,
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
 		time.Time{}, // bls signing allowed
+		pTestCert.Leaf,
+		&tlsSigner,
+		&blsSigner,
 	)
 
 	valState := &validators.TestState{
@@ -2010,15 +2046,8 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		}, nil
 	}
 
-	tlsSigner, err := signer.NewTLSSigner(pTestCert)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
-
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
-	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = &tlsSigner
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -2193,12 +2222,25 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		}
 	}
 
+	tlsSigner, err := signer.NewTLSSigner(pTestCert)
+	if err != nil {
+		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
+	sk, err := bls.NewSecretKey()
+	if err != nil {
+		t.Fatalf("failed to create bls private key with %s", err)
+	}
+	blsSigner := signer.NewBLSSigner(sk)
+
 	proVM := New(
 		coreVM,
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
 		time.Time{}, // bls signing allowed
+		pTestCert.Leaf,
+		&tlsSigner,
+		&blsSigner,
 	)
 
 	valState := &validators.TestState{
@@ -2231,15 +2273,8 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		}, nil
 	}
 
-	tlsSigner, err := signer.NewTLSSigner(pTestCert)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
-
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
-	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = &tlsSigner
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -2365,12 +2400,26 @@ func TestVMInnerBlkCache(t *testing.T) {
 
 	// Create a VM
 	innerVM := mocks.NewMockChainVM(ctrl)
+
+	tlsSigner, err := signer.NewTLSSigner(pTestCert)
+	if err != nil {
+		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
+	sk, err := bls.NewSecretKey()
+	if err != nil {
+		t.Fatalf("failed to create bls private key with %s", err)
+	}
+	blsSigner := signer.NewBLSSigner(sk)
+
 	vm := New(
 		innerVM,
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
 		time.Time{}, // bls signing allowed
+		pTestCert.Leaf,
+		&tlsSigner,
+		&blsSigner,
 	)
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -2389,15 +2438,8 @@ func TestVMInnerBlkCache(t *testing.T) {
 		gomock.Any(),
 	).Return(nil)
 
-	tlsSigner, err := signer.NewTLSSigner(pTestCert)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
-
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
-	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = &tlsSigner
 
 	err = vm.Initialize(
 		context.Background(),
@@ -2417,13 +2459,13 @@ func TestVMInnerBlkCache(t *testing.T) {
 	// Create a block near the tip (0).
 	blkNearTipInnerBytes := []byte{1}
 	blkNearTip, err := statelessblock.BuildCertSigned(
-		ids.GenerateTestID(),     // parent
-		time.Time{},              // timestamp
-		1,                        // pChainHeight,
-		vm.ctx.StakingCertLeaf,   // cert
-		blkNearTipInnerBytes,     // inner blk bytes
-		vm.ctx.ChainID,           // chain ID
-		vm.ctx.StakingLeafSigner, // key
+		ids.GenerateTestID(), // parent
+		time.Time{},          // timestamp
+		1,                    // pChainHeight,
+		vm.stakingCertLeaf,   // cert
+		blkNearTipInnerBytes, // inner blk bytes
+		vm.ctx.ChainID,       // chain ID
+		vm.tlsSigner,         // key
 	)
 	require.NoError(err)
 
@@ -2555,12 +2597,26 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 
 	// Create a VM
 	innerVM := mocks.NewMockChainVM(ctrl)
+
+	tlsSigner, err := signer.NewTLSSigner(pTestCert)
+	if err != nil {
+		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
+	sk, err := bls.NewSecretKey()
+	if err != nil {
+		t.Fatalf("failed to create bls private key with %s", err)
+	}
+	blsSigner := signer.NewBLSSigner(sk)
+
 	vm := New(
 		innerVM,
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
-		mockable.MaxTime, // bls signing allowed
+		time.Time{}, // bls signing allowed
+		pTestCert.Leaf,
+		&tlsSigner,
+		&blsSigner,
 	)
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -2579,15 +2635,8 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		gomock.Any(),
 	).Return(nil)
 
-	tlsSigner, err := signer.NewTLSSigner(pTestCert)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
-
 	snowCtx := snow.DefaultContextTest()
 	snowCtx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
-	snowCtx.StakingCertLeaf = pTestCert.Leaf
-	snowCtx.StakingLeafSigner = &tlsSigner
 
 	err = vm.Initialize(
 		context.Background(),

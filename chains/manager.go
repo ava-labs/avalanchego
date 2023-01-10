@@ -429,11 +429,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		return nil, fmt.Errorf("error while registering vm's metrics %w", err)
 	}
 
-	tlsSigner, err := signer.NewTLSSigner(&m.StakingCert)
-	if err != nil {
-		return nil, fmt.Errorf("error while creating tls signer %w", err)
-	}
-	blsSigner := signer.NewBLSSigner(m.StakingBLSKey)
 	ctx := &snow.ConsensusContext{
 		Context: &snow.Context{
 			NetworkID: m.NetworkID,
@@ -453,11 +448,8 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 
 			TeleporterSigner: teleporter.NewSigner(m.StakingBLSKey, chainParams.ID),
 
-			ValidatorState:    m.validatorState,
-			StakingCertLeaf:   m.StakingCert.Leaf,
-			StakingLeafSigner: &tlsSigner,
-			BlsSigner:         &blsSigner,
-			ChainDataDir:      chainDataDir,
+			ValidatorState: m.validatorState,
+			ChainDataDir:   chainDataDir,
 		},
 		DecisionAcceptor:  m.DecisionAcceptorGroup,
 		ConsensusAcceptor: m.ConsensusAcceptorGroup,
@@ -937,12 +929,21 @@ func (m *manager) createSnowmanChain(
 		vm = tracedvm.NewBlockVM(vm, chainAlias, m.Tracer)
 	}
 
+	tlsSigner, err := signer.NewTLSSigner(&m.StakingCert)
+	if err != nil {
+		return nil, fmt.Errorf("error while creating tls signer %w", err)
+	}
+	blsSigner := signer.NewBLSSigner(m.StakingBLSKey)
+
 	vm = proposervm.New(
 		vm,
 		m.ApricotPhase4Time,
 		m.ApricotPhase4MinPChainHeight,
 		minBlockDelay,
 		m.BlsSigningProposerVMTime,
+		m.StakingCert.Leaf,
+		&tlsSigner,
+		&blsSigner,
 	)
 
 	if m.MeterVMEnabled {

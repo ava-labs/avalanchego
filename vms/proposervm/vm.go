@@ -5,6 +5,7 @@ package proposervm
 
 import (
 	"context"
+	"crypto/x509"
 	"fmt"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -67,6 +69,10 @@ type VM struct {
 	minBlkDelay              time.Duration
 	blsSigningActivationTime time.Time
 
+	stakingCertLeaf *x509.Certificate
+	tlsSigner       *signer.TLSSigner
+	blsSigner       *signer.BLSSigner
+
 	state.State
 	hIndexer indexer.HeightIndexer
 
@@ -110,6 +116,9 @@ func New(
 	minimumPChainHeight uint64,
 	minBlkDelay time.Duration,
 	blsSigningActivationTime time.Time,
+	stakingCertLeaf *x509.Certificate,
+	stakingLeafsSigner *signer.TLSSigner,
+	blsSigner *signer.BLSSigner,
 ) *VM {
 	blockBuilderVM, _ := vm.(block.BuildBlockWithContextChainVM)
 	batchedVM, _ := vm.(block.BatchedChainVM)
@@ -126,6 +135,9 @@ func New(
 		minimumPChainHeight:      minimumPChainHeight,
 		minBlkDelay:              minBlkDelay,
 		blsSigningActivationTime: blsSigningActivationTime,
+		stakingCertLeaf:          stakingCertLeaf,
+		tlsSigner:                stakingLeafsSigner,
+		blsSigner:                blsSigner,
 	}
 }
 

@@ -4,7 +4,6 @@
 package snow
 
 import (
-	"crypto/x509"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -13,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -51,10 +49,7 @@ type Context struct {
 	TeleporterSigner teleporter.Signer
 
 	// snowman++ attributes
-	ValidatorState    validators.State // interface for P-Chain validators
-	StakingLeafSigner *signer.TLSSigner
-	BlsSigner         *signer.BLSSigner
-	StakingCertLeaf   *x509.Certificate // block certificate
+	ValidatorState validators.State // interface for P-Chain validators
 
 	// Chain-specific directory where arbitrary data can be written
 	ChainDataDir string

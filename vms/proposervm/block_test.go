@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
@@ -59,16 +60,21 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 	tlsSigner, err := signer.NewTLSSigner(testCert)
 	require.NoError(err)
 
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+	blsSigner := signer.NewBLSSigner(sk)
+
 	vm := &VM{
 		ChainVM:        innerVM,
 		blockBuilderVM: innerBlockBuilderVM,
 		ctx: &snow.Context{
-			ValidatorState:    vdrState,
-			Log:               logging.NoLog{},
-			StakingCertLeaf:   testCert.Leaf,
-			StakingLeafSigner: &tlsSigner,
+			ValidatorState: vdrState,
+			Log:            logging.NoLog{},
 		},
-		Windower: windower,
+		Windower:        windower,
+		stakingCertLeaf: testCert.Leaf,
+		tlsSigner:       &tlsSigner,
+		blsSigner:       &blsSigner,
 	}
 
 	blk := &postForkCommonComponents{
