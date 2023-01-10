@@ -103,7 +103,7 @@ func BuildBlsSigned(
 		BlockProposer:     nodeID,
 		InnerBlockBytes:   innerBlockBytes,
 
-		timestamp: timestamp,
+		timestamp: timestamp, // TODO ABENEGIA: similarly to CertSigned block we don't use initialize here. Not great
 	}
 	var blockIntf SignedBlock = block
 

@@ -13,7 +13,44 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
+
+func TestParseBlsSigned(t *testing.T) {
+	require := require.New(t)
+
+	parentID := ids.ID{1}
+	timestamp := time.Unix(123, 0)
+	pChainHeight := uint64(2)
+	proposerID := ids.GenerateTestNodeID()
+	innerBlockBytes := []byte{3}
+	chainID := ids.ID{4}
+
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+	blsSigner := signer.NewBLSSigner(sk)
+
+	builtBlock, err := BuildBlsSigned(
+		parentID,
+		timestamp,
+		pChainHeight,
+		proposerID,
+		innerBlockBytes,
+		chainID,
+		&blsSigner,
+	)
+	require.NoError(err)
+
+	builtBlockBytes := builtBlock.Bytes()
+
+	parsedBlockIntf, err := Parse(builtBlockBytes)
+	require.NoError(err)
+
+	parsedBlock, ok := parsedBlockIntf.(SignedBlock)
+	require.True(ok)
+
+	equal(require, chainID, builtBlock, parsedBlock)
+}
 
 func TestParseCertSigned(t *testing.T) {
 	require := require.New(t)

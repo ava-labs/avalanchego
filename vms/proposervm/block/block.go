@@ -169,9 +169,17 @@ func (b *statelessBlsSignedBlock) Bytes() []byte {
 	return b.bytes
 }
 
-func (b *statelessBlsSignedBlock) initialize(_ []byte) error {
+func (b *statelessBlsSignedBlock) initialize(bytes []byte) error {
+	b.bytes = bytes
 	b.timestamp = time.Unix(b.BlockTimestamp, 0)
-	return errBlsBlocksNotFullyImplemented
+
+	// The serialized form of the block is the unsignedBytes followed by the
+	// signature, which is prefixed by a uint32. So, we need to strip off the
+	// signature as well as it's length prefix to get the unsigned bytes.
+	lenUnsignedBytes := len(bytes) - wrappers.IntLen - len(b.Signature)
+	unsignedBytes := bytes[:lenUnsignedBytes]
+	b.id = hashing.ComputeHash256Array(unsignedBytes)
+	return nil
 }
 
 func (b *statelessBlsSignedBlock) PChainHeight() uint64 {

@@ -27,7 +27,6 @@ func TestBuildBlsSigned(t *testing.T) {
 
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
-
 	blsSigner := signer.NewBLSSigner(sk)
 
 	builtBlock, err := BuildBlsSigned(
