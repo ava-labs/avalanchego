@@ -140,7 +140,7 @@ func (p *postForkCommonComponents) Verify(
 
 		childHeight := child.Height()
 		proposerID := child.Proposer()
-		minDelay, err := p.vm.Windower.Delay(ctx, childHeight, parentPChainHeight, proposerID)
+		minDelay, proposerBlsPubKey, err := p.vm.Windower.DelayAndBlsKey(ctx, childHeight, parentPChainHeight, proposerID)
 		if err != nil {
 			return err
 		}
@@ -152,7 +152,7 @@ func (p *postForkCommonComponents) Verify(
 
 		// Verify the signature of the node
 		shouldHaveProposer := delay < proposer.MaxDelay
-		if err := child.SignedBlock.Verify(shouldHaveProposer, p.vm.ctx.ChainID); err != nil {
+		if err := child.SignedBlock.Verify(shouldHaveProposer, p.vm.ctx.ChainID, proposerBlsPubKey); err != nil {
 			return err
 		}
 
@@ -197,7 +197,7 @@ func (p *postForkCommonComponents) buildChild(
 	if delay < proposer.MaxDelay {
 		parentHeight := p.innerBlk.Height()
 		proposerID := p.vm.ctx.NodeID
-		minDelay, err := p.vm.Windower.Delay(ctx, parentHeight+1, parentPChainHeight, proposerID)
+		minDelay, _, err := p.vm.Windower.DelayAndBlsKey(ctx, parentHeight+1, parentPChainHeight, proposerID)
 		if err != nil {
 			return nil, err
 		}

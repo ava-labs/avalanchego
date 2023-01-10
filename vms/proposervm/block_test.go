@@ -53,7 +53,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 	vdrState := validators.NewMockState(ctrl)
 	vdrState.EXPECT().GetMinimumHeight(context.Background()).Return(pChainHeight, nil).AnyTimes()
 	windower := proposer.NewMockWindower(ctrl)
-	windower.EXPECT().Delay(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(time.Duration(0), nil).AnyTimes()
+	windower.EXPECT().DelayAndBlsKey(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(time.Duration(0), nil, nil).AnyTimes()
 
 	testCert, err := staking.NewTLSCert()
 	require.NoError(err)

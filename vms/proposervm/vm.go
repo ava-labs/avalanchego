@@ -312,7 +312,7 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 	}
 
 	// reset scheduler
-	minDelay, err := vm.Windower.Delay(ctx, blk.Height()+1, pChainHeight, vm.ctx.NodeID)
+	minDelay, _, err := vm.Windower.DelayAndBlsKey(ctx, blk.Height()+1, pChainHeight, vm.ctx.NodeID)
 	if err != nil {
 		vm.ctx.Log.Debug("failed to fetch the expected delay",
 			zap.Error(err),

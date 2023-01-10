@@ -22,8 +22,8 @@ func equal(require *require.Assertions, chainID ids.ID, want, have SignedBlock) 
 	require.Equal(want.Block(), have.Block())
 	require.Equal(want.Proposer(), have.Proposer())
 	require.Equal(want.Bytes(), have.Bytes())
-	require.Equal(want.Verify(false, chainID), have.Verify(false, chainID))
-	require.Equal(want.Verify(true, chainID), have.Verify(true, chainID))
+	require.Equal(want.Verify(false, chainID, nil), have.Verify(false, chainID, nil))
+	require.Equal(want.Verify(true, chainID, nil), have.Verify(true, chainID, nil))
 }
 
 func TestVerifyNoCertWithSignature(t *testing.T) {
@@ -40,10 +40,10 @@ func TestVerifyNoCertWithSignature(t *testing.T) {
 	builtBlock := builtBlockIntf.(*statelessCertSignedBlock)
 	builtBlock.Signature = []byte{0}
 
-	err = builtBlock.Verify(false, ids.Empty)
+	err = builtBlock.Verify(false, ids.Empty, nil)
 	require.Error(err)
 
-	err = builtBlock.Verify(true, ids.Empty)
+	err = builtBlock.Verify(true, ids.Empty, nil)
 	require.Error(err)
 }
 

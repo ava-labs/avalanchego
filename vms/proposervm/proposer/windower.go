@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -33,16 +34,16 @@ type Windower interface {
 		ctx context.Context,
 		chainHeight,
 		pChainHeight uint64,
-	) ([]ids.NodeID, error)
-	// Delay returns the amount of time that [validatorID] must wait before
+	) ([]*validators.GetValidatorOutput, error)
+	// DelayAndBlsKey returns the amount of time that [validatorID] must wait before
 	// building a block at [chainHeight] when the validator set is defined at
-	// [pChainHeight].
-	Delay(
+	// [pChainHeight]. It also returns validator's bls public key if available.
+	DelayAndBlsKey(
 		ctx context.Context,
 		chainHeight,
 		pChainHeight uint64,
 		validatorID ids.NodeID,
-	) (time.Duration, error)
+	) (time.Duration, *bls.PublicKey, error)
 }
 
 // windower interfaces with P-Chain and it is responsible for calculating the
@@ -64,20 +65,22 @@ func New(state validators.State, subnetID, chainID ids.ID) Windower {
 	}
 }
 
-func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint64) ([]ids.NodeID, error) {
+func (w *windower) Proposers(
+	ctx context.Context,
+	chainHeight, pChainHeight uint64,
+) ([]*validators.GetValidatorOutput, error) {
 	// get the validator set by the p-chain height
 	validatorsMap, err := w.state.GetValidatorSet(ctx, pChainHeight, w.subnetID)
 	if err != nil {
 		return nil, err
 	}
 
-	// convert the map of validators to a slice
-	validators := make([]validatorData, 0, len(validatorsMap))
+	// convert the map of vals to a slice
+	vals := make([]validatorData, 0, len(validatorsMap))
 	weight := uint64(0)
-	for k, v := range validatorsMap {
-		validators = append(validators, validatorData{
-			id:     k,
-			weight: v.Weight,
+	for _, v := range validatorsMap {
+		vals = append(vals, validatorData{
+			GetValidatorOutput: v,
 		})
 		newWeight, err := math.Add64(weight, v.Weight)
 		if err != nil {
@@ -89,12 +92,12 @@ func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint
 	// canonically sort validators
 	// Note: validators are sorted by ID, sorting by weight would not create a
 	// canonically sorted list
-	utils.Sort(validators)
+	utils.Sort(vals)
 
 	// convert the slice of validators to a slice of weights
-	validatorWeights := make([]uint64, len(validators))
-	for i, v := range validators {
-		validatorWeights[i] = v.weight
+	validatorWeights := make([]uint64, len(vals))
+	for i, v := range vals {
+		validatorWeights[i] = v.Weight
 	}
 
 	if err := w.sampler.Initialize(validatorWeights); err != nil {
@@ -114,29 +117,33 @@ func (w *windower) Proposers(ctx context.Context, chainHeight, pChainHeight uint
 		return nil, err
 	}
 
-	nodeIDs := make([]ids.NodeID, numToSample)
+	res := make([]*validators.GetValidatorOutput, numToSample)
 	for i, index := range indices {
-		nodeIDs[i] = validators[index].id
+		res[i] = vals[index].GetValidatorOutput
 	}
-	return nodeIDs, nil
+	return res, nil
 }
 
-func (w *windower) Delay(ctx context.Context, chainHeight, pChainHeight uint64, validatorID ids.NodeID) (time.Duration, error) {
+func (w *windower) DelayAndBlsKey(
+	ctx context.Context,
+	chainHeight, pChainHeight uint64,
+	validatorID ids.NodeID,
+) (time.Duration, *bls.PublicKey, error) {
 	if validatorID == ids.EmptyNodeID {
-		return MaxDelay, nil
+		return MaxDelay, nil, nil
 	}
 
 	proposers, err := w.Proposers(ctx, chainHeight, pChainHeight)
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 
 	delay := time.Duration(0)
-	for _, nodeID := range proposers {
-		if nodeID == validatorID {
-			return delay, nil
+	for _, val := range proposers {
+		if val.NodeID == validatorID {
+			return delay, val.PublicKey, nil
 		}
 		delay += WindowDuration
 	}
-	return delay, nil
+	return delay, nil, nil
 }

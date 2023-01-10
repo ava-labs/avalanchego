@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -18,9 +20,9 @@ var (
 	_ SignedBlock = (*statelessCertSignedBlock)(nil)
 	_ SignedBlock = (*statelessBlsSignedBlock)(nil)
 
-	errUnexpectedProposer           = errors.New("expected no proposer but one was provided")
-	errMissingProposer              = errors.New("expected proposer but none was provided")
-	errBlsBlocksNotFullyImplemented = errors.New("NOT YET IMPLEMENTED")
+	errUnexpectedProposer     = errors.New("expected no proposer but one was provided")
+	errMissingProposer        = errors.New("expected proposer but none was provided")
+	errBlsSigningNotPreferred = errors.New("proposer should sign with bls key if available")
 )
 
 type Block interface {
@@ -39,7 +41,7 @@ type SignedBlock interface {
 	Timestamp() time.Time
 	Proposer() ids.NodeID
 
-	Verify(shouldHaveProposer bool, chainID ids.ID) error
+	Verify(shouldHaveProposer bool, chainID ids.ID, blsPubKey *bls.PublicKey) error
 }
 
 // NOTE ABENEGIA: statelessUnsignedBlock not reused for bls signed blocks
@@ -120,14 +122,18 @@ func (b *statelessCertSignedBlock) Proposer() ids.NodeID {
 	return b.proposer
 }
 
-func (b *statelessCertSignedBlock) Verify(shouldHaveProposer bool, chainID ids.ID) error {
-	if !shouldHaveProposer {
+func (b *statelessCertSignedBlock) Verify(shouldHaveProposer bool, chainID ids.ID, blsPubKey *bls.PublicKey) error {
+	switch {
+	case !shouldHaveProposer:
 		if len(b.Signature) > 0 || len(b.StatelessBlock.Certificate) > 0 {
 			return errUnexpectedProposer
 		}
 		return nil
-	} else if b.cert == nil {
+	case blsPubKey != nil:
+		return errBlsSigningNotPreferred
+	case b.cert == nil:
 		return errMissingProposer
+	default:
 	}
 
 	header, err := buildHeader(chainID, b.StatelessBlock.ParentID, b.id)
@@ -149,8 +155,7 @@ type statelessBlsSignedBlock struct {
 
 	id        ids.ID
 	timestamp time.Time
-	// cert      *x509.Certificate // TODO ABENEGIA: maybe BLS key?
-	bytes []byte
+	bytes     []byte
 }
 
 func (b *statelessBlsSignedBlock) ID() ids.ID {
@@ -194,6 +199,23 @@ func (b *statelessBlsSignedBlock) Proposer() ids.NodeID {
 	return b.BlockProposer
 }
 
-func (*statelessBlsSignedBlock) Verify(_ bool, _ ids.ID) error {
-	return errBlsBlocksNotFullyImplemented
+func (b *statelessBlsSignedBlock) Verify(shouldHaveProposer bool, chainID ids.ID, blsPubKey *bls.PublicKey) error {
+	if !shouldHaveProposer {
+		if len(b.Signature) > 0 {
+			return errUnexpectedProposer
+		}
+		return nil
+	} else if blsPubKey == nil {
+		return errMissingProposer
+	}
+
+	header, err := buildHeader(chainID, b.BlockParentID, b.id)
+	if err != nil {
+		return err
+	}
+
+	headerBytes := header.Bytes()
+	return signer.BLSVerifier{
+		PublicKey: blsPubKey,
+	}.Verify(headerBytes, b.Signature)
 }

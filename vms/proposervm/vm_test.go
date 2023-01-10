@@ -47,7 +47,8 @@ type fullVM struct {
 }
 
 var (
-	pTestCert *tls.Certificate
+	pTestCert         *tls.Certificate
+	pTestBlsSecretKey *bls.SecretKey
 
 	genesisUnixTimestamp int64 = 1000
 	genesisTimestamp           = time.Unix(genesisUnixTimestamp, 0)
@@ -63,6 +64,11 @@ var (
 func init() {
 	var err error
 	pTestCert, err = staking.NewTLSCert()
+	if err != nil {
+		panic(err)
+	}
+
+	pTestBlsSecretKey, err = bls.NewSecretKey()
 	if err != nil {
 		panic(err)
 	}
@@ -137,7 +143,7 @@ func initTestProposerVM(
 		DefaultMinBlockDelay,
 		proBlkStartTime, // bls signing activation time
 		pTestCert,
-		nil, // TODO ABENEGIA: make a non-nil bls key
+		pTestBlsSecretKey,
 	)
 	if err != nil {
 		t.Fatalf("failed to create proposerVM with %s", err)
@@ -1475,8 +1481,9 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 		return map[ids.NodeID]*validators.GetValidatorOutput{
 			proVM.ctx.NodeID: {
-				NodeID: proVM.ctx.NodeID,
-				Weight: 10,
+				NodeID:    proVM.ctx.NodeID,
+				Weight:    10,
+				PublicKey: bls.PublicFromSecretKey(pTestBlsSecretKey),
 			},
 		}, nil
 	}

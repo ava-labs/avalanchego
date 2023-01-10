@@ -4,17 +4,18 @@
 package proposer
 
 import (
-	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 )
 
 var _ utils.Sortable[validatorData] = validatorData{}
 
+// validatorData just sorts validators.GetValidatorOutput
+// in the canonical way we need in proposerVM
 type validatorData struct {
-	id     ids.NodeID
-	weight uint64
+	*validators.GetValidatorOutput
 }
 
 func (d validatorData) Less(other validatorData) bool {
-	return d.id.Less(other.id)
+	return d.NodeID.Less(other.NodeID)
 }

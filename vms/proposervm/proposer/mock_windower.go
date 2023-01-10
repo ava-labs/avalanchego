@@ -13,6 +13,8 @@ import (
 	time "time"
 
 	ids "github.com/ava-labs/avalanchego/ids"
+	validators "github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -39,26 +41,27 @@ func (m *MockWindower) EXPECT() *MockWindowerMockRecorder {
 	return m.recorder
 }
 
-// Delay mocks base method.
-func (m *MockWindower) Delay(arg0 context.Context, arg1, arg2 uint64, arg3 ids.NodeID) (time.Duration, error) {
+// DelayAndBlsKey mocks base method.
+func (m *MockWindower) DelayAndBlsKey(arg0 context.Context, arg1, arg2 uint64, arg3 ids.NodeID) (time.Duration, *bls.PublicKey, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Delay", arg0, arg1, arg2, arg3)
+	ret := m.ctrl.Call(m, "DelayAndBlsKey", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(time.Duration)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(*bls.PublicKey)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
-// Delay indicates an expected call of Delay.
-func (mr *MockWindowerMockRecorder) Delay(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+// DelayAndBlsKey indicates an expected call of DelayAndBlsKey.
+func (mr *MockWindowerMockRecorder) DelayAndBlsKey(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delay", reflect.TypeOf((*MockWindower)(nil).Delay), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DelayAndBlsKey", reflect.TypeOf((*MockWindower)(nil).DelayAndBlsKey), arg0, arg1, arg2, arg3)
 }
 
 // Proposers mocks base method.
-func (m *MockWindower) Proposers(arg0 context.Context, arg1, arg2 uint64) ([]ids.NodeID, error) {
+func (m *MockWindower) Proposers(arg0 context.Context, arg1, arg2 uint64) ([]*validators.GetValidatorOutput, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Proposers", arg0, arg1, arg2)
-	ret0, _ := ret[0].([]ids.NodeID)
+	ret0, _ := ret[0].([]*validators.GetValidatorOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

@@ -45,11 +45,12 @@ func TestBuildBlsSigned(t *testing.T) {
 	require.Equal(timestamp, builtBlock.Timestamp())
 	require.Equal(innerBlockBytes, builtBlock.Block())
 
-	err = builtBlock.Verify(true, chainID)
-	require.Error(err, errBlsBlocksNotFullyImplemented)
+	pk := bls.PublicFromSecretKey(sk)
+	err = builtBlock.Verify(true, chainID, pk)
+	require.NoError(err)
 
-	err = builtBlock.Verify(false, chainID)
-	require.Error(err, errBlsBlocksNotFullyImplemented)
+	err = builtBlock.Verify(false, chainID, pk)
+	require.Error(err)
 }
 
 func TestBuildCertSigned(t *testing.T) {
@@ -83,10 +84,10 @@ func TestBuildCertSigned(t *testing.T) {
 	require.Equal(timestamp, builtBlock.Timestamp())
 	require.Equal(innerBlockBytes, builtBlock.Block())
 
-	err = builtBlock.Verify(true, chainID)
+	err = builtBlock.Verify(true, chainID, nil)
 	require.NoError(err)
 
-	err = builtBlock.Verify(false, chainID)
+	err = builtBlock.Verify(false, chainID, nil)
 	require.Error(err)
 }
 
@@ -107,10 +108,10 @@ func TestBuildUnsigned(t *testing.T) {
 	require.Equal(innerBlockBytes, builtBlock.Block())
 	require.Equal(ids.EmptyNodeID, builtBlock.Proposer())
 
-	err = builtBlock.Verify(false, ids.Empty)
+	err = builtBlock.Verify(false, ids.Empty, nil)
 	require.NoError(err)
 
-	err = builtBlock.Verify(true, ids.Empty)
+	err = builtBlock.Verify(true, ids.Empty, nil)
 	require.Error(err)
 }
 
