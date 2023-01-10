@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/pubsub"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -62,6 +63,7 @@ var (
 	errGenesisAssetMustHaveState = errors.New("genesis asset must have non-empty state")
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 	errInsufficientFunds         = errors.New("insufficient funds")
+	errUnimplemented             = errors.New("unimplemented")
 
 	_ vertex.DAGVM = (*VM)(nil)
 )
@@ -124,7 +126,7 @@ func (*VM) Disconnected(context.Context, ids.NodeID) error {
 
 /*
  ******************************************************************************
- ******************************** Avalanche API *******************************
+ ********************************* Common VM **********************************
  ******************************************************************************
  */
 
@@ -337,6 +339,42 @@ func (*VM) CreateStaticHandlers(context.Context) (map[string]*common.HTTPHandler
 	return map[string]*common.HTTPHandler{
 		"": {LockOptions: common.WriteLock, Handler: newServer},
 	}, newServer.RegisterService(staticService, "avm")
+}
+
+/*
+ ******************************************************************************
+ ********************************** Chain VM **********************************
+ ******************************************************************************
+ */
+
+func (*VM) GetBlock(context.Context, ids.ID) (snowman.Block, error) {
+	return nil, errUnimplemented
+}
+
+func (*VM) ParseBlock(context.Context, []byte) (snowman.Block, error) {
+	return nil, errUnimplemented
+}
+
+func (*VM) BuildBlock(context.Context) (snowman.Block, error) {
+	return nil, errUnimplemented
+}
+
+func (*VM) SetPreference(context.Context, ids.ID) error {
+	return errUnimplemented
+}
+
+func (*VM) LastAccepted(context.Context) (ids.ID, error) {
+	return ids.Empty, errUnimplemented
+}
+
+/*
+ ******************************************************************************
+ *********************************** DAG VM ***********************************
+ ******************************************************************************
+ */
+
+func (*VM) Linearize(context.Context, ids.ID) error {
+	return errUnimplemented
 }
 
 func (vm *VM) PendingTxs(context.Context) []snowstorm.Tx {

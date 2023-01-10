@@ -8,14 +8,26 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 // DAGVM defines the minimum functionality that an avalanche VM must
 // implement
 type DAGVM interface {
-	common.VM
+	block.ChainVM
 	Getter
+
+	// Linearize is called after [Initialize] and after the DAG has been
+	// finalized. After Linearize is called:
+	// - PendingTxs will never be called again
+	// - GetTx will never be called again
+	// - ParseTx may still be called
+	// - All the block based functions of the [block.ChainVM] must work as
+	//   expected.
+	// Linearize is part of the VM initialization, and will be called at most
+	// once per VM instantiation. This means that Linearize should be called
+	// every time the chain restarts after the DAG has finalized.
+	Linearize(ctx context.Context, stopVertexID ids.ID) error
 
 	// Return any transactions that have not been sent to consensus yet
 	PendingTxs(ctx context.Context) []snowstorm.Tx
