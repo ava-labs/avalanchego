@@ -15,7 +15,8 @@ import (
 )
 
 var (
-	_ SignedBlock = (*statelessBlock)(nil)
+	_ SignedBlock = (*statelessCertSignedBlock)(nil)
+	_ SignedBlock = (*statelessBlsSignedBlock)(nil)
 
 	errUnexpectedProposer = errors.New("expected no proposer but one was provided")
 	errMissingProposer    = errors.New("expected proposer but none was provided")
@@ -48,7 +49,7 @@ type statelessUnsignedBlock struct {
 	Block        []byte `serialize:"true"`
 }
 
-type statelessBlock struct {
+type statelessCertSignedBlock struct {
 	StatelessBlock statelessUnsignedBlock `serialize:"true"`
 	Signature      []byte                 `serialize:"true"`
 
@@ -59,23 +60,23 @@ type statelessBlock struct {
 	bytes     []byte
 }
 
-func (b *statelessBlock) ID() ids.ID {
+func (b *statelessCertSignedBlock) ID() ids.ID {
 	return b.id
 }
 
-func (b *statelessBlock) ParentID() ids.ID {
+func (b *statelessCertSignedBlock) ParentID() ids.ID {
 	return b.StatelessBlock.ParentID
 }
 
-func (b *statelessBlock) Block() []byte {
+func (b *statelessCertSignedBlock) Block() []byte {
 	return b.StatelessBlock.Block
 }
 
-func (b *statelessBlock) Bytes() []byte {
+func (b *statelessCertSignedBlock) Bytes() []byte {
 	return b.bytes
 }
 
-func (b *statelessBlock) initialize(bytes []byte) error {
+func (b *statelessCertSignedBlock) initialize(bytes []byte) error {
 	b.bytes = bytes
 
 	// The serialized form of the block is the unsignedBytes followed by the
@@ -104,19 +105,19 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 	return nil
 }
 
-func (b *statelessBlock) PChainHeight() uint64 {
+func (b *statelessCertSignedBlock) PChainHeight() uint64 {
 	return b.StatelessBlock.PChainHeight
 }
 
-func (b *statelessBlock) Timestamp() time.Time {
+func (b *statelessCertSignedBlock) Timestamp() time.Time {
 	return b.timestamp
 }
 
-func (b *statelessBlock) Proposer() ids.NodeID {
+func (b *statelessCertSignedBlock) Proposer() ids.NodeID {
 	return b.proposer
 }
 
-func (b *statelessBlock) Verify(shouldHaveProposer bool, chainID ids.ID) error {
+func (b *statelessCertSignedBlock) Verify(shouldHaveProposer bool, chainID ids.ID) error {
 	if !shouldHaveProposer {
 		if len(b.Signature) > 0 || len(b.StatelessBlock.Certificate) > 0 {
 			return errUnexpectedProposer
@@ -133,4 +134,54 @@ func (b *statelessBlock) Verify(shouldHaveProposer bool, chainID ids.ID) error {
 
 	headerBytes := header.Bytes()
 	return b.cert.CheckSignature(b.cert.SignatureAlgorithm, headerBytes, b.Signature)
+}
+
+type statelessBlsSignedBlock struct {
+	BlockParentID     ids.ID     `serialize:"true"`
+	BlockTimestamp    int64      `serialize:"true"`
+	BlockPChainHeight uint64     `serialize:"true"`
+	BlockProposer     ids.NodeID `serialize:"true"`
+	InnerBlockBytes   []byte     `serialize:"true"`
+	Signature         []byte     `serialize:"true"`
+
+	id        ids.ID
+	timestamp time.Time
+	// cert      *x509.Certificate // TODO ABENEGIA: maybe BLS key?
+	bytes []byte
+}
+
+func (b *statelessBlsSignedBlock) ID() ids.ID {
+	return b.id
+}
+
+func (b *statelessBlsSignedBlock) ParentID() ids.ID {
+	return b.BlockParentID
+}
+
+func (b *statelessBlsSignedBlock) Block() []byte {
+	return b.InnerBlockBytes
+}
+
+func (b *statelessBlsSignedBlock) Bytes() []byte {
+	return b.bytes
+}
+
+func (*statelessBlsSignedBlock) initialize(_ []byte) error {
+	return errors.New("NOT YET IMPLEMENTED")
+}
+
+func (b *statelessBlsSignedBlock) PChainHeight() uint64 {
+	return b.BlockPChainHeight
+}
+
+func (b *statelessBlsSignedBlock) Timestamp() time.Time {
+	return b.timestamp
+}
+
+func (b *statelessBlsSignedBlock) Proposer() ids.NodeID {
+	return b.BlockProposer
+}
+
+func (*statelessBlsSignedBlock) Verify(_ bool, _ ids.ID) error {
+	return errors.New("NOT YET IMPLEMENTED")
 }

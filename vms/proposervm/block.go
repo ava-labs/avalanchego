@@ -243,7 +243,9 @@ func (p *postForkCommonComponents) buildChild(
 			innerBlock.Bytes(),
 		)
 	} else {
-		statelessChild, err = block.Build(
+		// TODO ABENEGIA: introduce bls signed blocks
+
+		statelessChild, err = block.BuildCertSigned(
 			parentID,
 			newTimestamp,
 			pChainHeight,
@@ -251,7 +253,6 @@ func (p *postForkCommonComponents) buildChild(
 			innerBlock.Bytes(),
 			p.vm.ctx.ChainID,
 			p.vm.ctx.StakingLeafSigner,
-			p.vm.ctx.BlsSigner,
 		)
 	}
 	if err != nil {

@@ -19,7 +19,7 @@ func BuildUnsigned(
 	pChainHeight uint64,
 	blockBytes []byte,
 ) (SignedBlock, error) {
-	var block SignedBlock = &statelessBlock{
+	var block SignedBlock = &statelessCertSignedBlock{
 		StatelessBlock: statelessUnsignedBlock{
 			ParentID:     parentID,
 			Timestamp:    timestamp.Unix(),
@@ -37,7 +37,7 @@ func BuildUnsigned(
 	return block, block.initialize(bytes)
 }
 
-func Build(
+func BuildCertSigned(
 	parentID ids.ID,
 	timestamp time.Time,
 	pChainHeight uint64,
@@ -45,9 +45,8 @@ func Build(
 	blockBytes []byte,
 	chainID ids.ID,
 	tlsSigner *signer.TLSSigner,
-	_ *signer.BLSSigner,
 ) (SignedBlock, error) {
-	block := &statelessBlock{
+	block := &statelessCertSignedBlock{
 		StatelessBlock: statelessUnsignedBlock{
 			ParentID:     parentID,
 			Timestamp:    timestamp.Unix(),

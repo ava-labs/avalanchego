@@ -37,7 +37,7 @@ func TestVerifyNoCertWithSignature(t *testing.T) {
 	builtBlockIntf, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes)
 	require.NoError(err)
 
-	builtBlock := builtBlockIntf.(*statelessBlock)
+	builtBlock := builtBlockIntf.(*statelessCertSignedBlock)
 	builtBlock.Signature = []byte{0}
 
 	err = builtBlock.Verify(false, ids.Empty)

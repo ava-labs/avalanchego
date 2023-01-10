@@ -532,7 +532,7 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 	coreVM.ParseBlockF = func(context.Context, []byte) (snowman.Block, error) {
 		return nil, errMarshallingFailed
 	}
-	slb, err := statelessblock.Build(
+	slb, err := statelessblock.BuildCertSigned(
 		proVM.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
@@ -540,7 +540,6 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
-		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -578,7 +577,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		return innerBlk, nil
 	}
 
-	slb1, err := statelessblock.Build(
+	slb1, err := statelessblock.BuildCertSigned(
 		proVM.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
@@ -586,7 +585,6 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
-		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -600,7 +598,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		},
 	}
 
-	slb2, err := statelessblock.Build(
+	slb2, err := statelessblock.BuildCertSigned(
 		proVM.preferred,
 		innerBlk.Timestamp(),
 		200, // pChainHeight,
@@ -608,7 +606,6 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
-		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -2388,7 +2385,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 
 	// Create a block near the tip (0).
 	blkNearTipInnerBytes := []byte{1}
-	blkNearTip, err := statelessblock.Build(
+	blkNearTip, err := statelessblock.BuildCertSigned(
 		ids.GenerateTestID(),     // parent
 		time.Time{},              // timestamp
 		1,                        // pChainHeight,
@@ -2396,7 +2393,6 @@ func TestVMInnerBlkCache(t *testing.T) {
 		blkNearTipInnerBytes,     // inner blk bytes
 		vm.ctx.ChainID,           // chain ID
 		vm.ctx.StakingLeafSigner, // key
-		vm.ctx.BlsSigner,
 	)
 	require.NoError(err)
 

@@ -362,7 +362,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	}
 
 	// postFork block does NOT verify if parent is before fork activation time
-	postForkStatelessChild, err := block.Build(
+	postForkStatelessChild, err := block.BuildCertSigned(
 		coreGenBlk.ID(),
 		coreBlk.Timestamp(),
 		0, // pChainHeight
@@ -370,7 +370,6 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 		coreBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
-		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatalf("unexpectedly could not build block due to %s", err)
@@ -796,7 +795,7 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	slb, err := block.Build(
+	slb, err := block.BuildCertSigned(
 		firstBlock.ID(), // refer unknown parent
 		firstBlock.Timestamp(),
 		0, // pChainHeight,
@@ -804,7 +803,6 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 		coreBlk.opts[0].Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
-		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")

@@ -26,7 +26,7 @@ func init() {
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		linearCodec.RegisterType(&statelessBlock{}),
+		linearCodec.RegisterType(&statelessCertSignedBlock{}),
 		linearCodec.RegisterType(&option{}),
 		c.RegisterCodec(codecVersion, linearCodec),
 	)

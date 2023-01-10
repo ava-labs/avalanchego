@@ -186,7 +186,7 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 		return innerBlk, nil
 	}
 
-	slb, err := statelessblock.Build(
+	slb, err := statelessblock.BuildCertSigned(
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
@@ -194,7 +194,6 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
 		vm.ctx.StakingLeafSigner,
-		vm.ctx.BlsSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -269,7 +268,7 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 		return innerBlk, nil
 	}
 
-	slb, err := statelessblock.Build(
+	slb, err := statelessblock.BuildCertSigned(
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
@@ -277,7 +276,6 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
 		vm.ctx.StakingLeafSigner,
-		vm.ctx.BlsSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -355,7 +353,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 		return innerBlk, nil
 	}
 
-	slb, err := statelessblock.Build(
+	slb, err := statelessblock.BuildCertSigned(
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
@@ -363,7 +361,6 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
 		vm.ctx.StakingLeafSigner,
-		vm.ctx.BlsSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -426,7 +423,7 @@ func TestParseStateSummary(t *testing.T) {
 		return innerBlk, nil
 	}
 
-	slb, err := statelessblock.Build(
+	slb, err := statelessblock.BuildCertSigned(
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
@@ -434,7 +431,6 @@ func TestParseStateSummary(t *testing.T) {
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
 		vm.ctx.StakingLeafSigner,
-		vm.ctx.BlsSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -487,7 +483,7 @@ func TestStateSummaryAccept(t *testing.T) {
 		return innerBlk, nil
 	}
 
-	slb, err := statelessblock.Build(
+	slb, err := statelessblock.BuildCertSigned(
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
@@ -495,7 +491,6 @@ func TestStateSummaryAccept(t *testing.T) {
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
 		vm.ctx.StakingLeafSigner,
-		vm.ctx.BlsSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -562,7 +557,7 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 		return innerBlk, nil
 	}
 
-	slb, err := statelessblock.Build(
+	slb, err := statelessblock.BuildCertSigned(
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
@@ -570,7 +565,6 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
 		vm.ctx.StakingLeafSigner,
-		vm.ctx.BlsSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{

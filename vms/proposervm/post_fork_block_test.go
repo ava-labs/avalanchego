@@ -60,7 +60,7 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 		},
 	}
 
-	slb, err := block.Build(
+	slb, err := block.BuildCertSigned(
 		ids.Empty, // refer unknown parent
 		time.Time{},
 		0, // pChainHeight,
@@ -68,7 +68,6 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 		innerOracleBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
-		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -150,7 +149,7 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 		BytesV:     []byte{2},
 		TimestampV: prntCoreBlk.Timestamp(),
 	}
-	childSlb, err := block.Build(
+	childSlb, err := block.BuildCertSigned(
 		ids.Empty, // refer unknown parent
 		childCoreBlk.Timestamp(),
 		pChainHeight,
@@ -158,7 +157,6 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
-		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -266,7 +264,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	// child block timestamp cannot be lower than parent timestamp
 	childCoreBlk.TimestampV = prntTimestamp.Add(-1 * time.Second)
 	proVM.Clock.Set(childCoreBlk.TimestampV)
-	childSlb, err := block.Build(
+	childSlb, err := block.BuildCertSigned(
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
 		pChainHeight,
@@ -274,7 +272,6 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
-		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -300,7 +297,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	}
 	beforeWinStart := prntTimestamp.Add(blkWinDelay).Add(-1 * time.Second)
 	proVM.Clock.Set(beforeWinStart)
-	childSlb, err = block.Build(
+	childSlb, err = block.BuildCertSigned(
 		prntProBlk.ID(),
 		beforeWinStart,
 		pChainHeight,
@@ -308,7 +305,6 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
-		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -322,7 +318,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	// block can arrive at its creator window starts
 	atWindowStart := prntTimestamp.Add(blkWinDelay)
 	proVM.Clock.Set(atWindowStart)
-	childSlb, err = block.Build(
+	childSlb, err = block.BuildCertSigned(
 		prntProBlk.ID(),
 		atWindowStart,
 		pChainHeight,
@@ -330,7 +326,6 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
-		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -344,7 +339,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	// block can arrive after its creator window starts
 	afterWindowStart := prntTimestamp.Add(blkWinDelay).Add(5 * time.Second)
 	proVM.Clock.Set(afterWindowStart)
-	childSlb, err = block.Build(
+	childSlb, err = block.BuildCertSigned(
 		prntProBlk.ID(),
 		afterWindowStart,
 		pChainHeight,
@@ -352,7 +347,6 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
-		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -381,7 +375,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 
 	// block timestamp cannot be too much in the future
 	afterSubWinEnd := proVM.Time().Add(maxSkew).Add(time.Second)
-	childSlb, err = block.Build(
+	childSlb, err = block.BuildCertSigned(
 		prntProBlk.ID(),
 		afterSubWinEnd,
 		pChainHeight,
@@ -389,7 +383,6 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
-		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -468,7 +461,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	}
 
 	// child P-Chain height must not precede parent P-Chain height
-	childSlb, err := block.Build(
+	childSlb, err := block.BuildCertSigned(
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
 		prntBlkPChainHeight-1,
@@ -476,7 +469,6 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
-		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -677,7 +669,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 	}
 
 	// child P-Chain height must not precede parent P-Chain height
-	childSlb, err := block.Build(
+	childSlb, err := block.BuildCertSigned(
 		parentBlk.ID(),
 		childCoreBlk.Timestamp(),
 		prntBlkPChainHeight-1,
@@ -685,7 +677,6 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
-		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -1094,7 +1085,7 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 	}
 
 	// Build the child
-	statelessChild, err := block.Build(
+	statelessChild, err := block.BuildCertSigned(
 		postForkOracleBlk.ID(),
 		postForkOracleBlk.Timestamp().Add(proposer.WindowDuration),
 		postForkOracleBlk.PChainHeight(),
@@ -1102,7 +1093,6 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 		oracleCoreBlk.opts[0].Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
-		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("failed to build new child block")
