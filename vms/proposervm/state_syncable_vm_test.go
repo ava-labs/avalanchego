@@ -76,7 +76,13 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 	dbManager = dbManager.NewPrefixDBManager([]byte{})
 
-	vm := New(innerVM, time.Time{}, 0, DefaultMinBlockDelay)
+	vm := New(
+		innerVM,
+		time.Time{}, // fork is active
+		0,           // minimum P-Chain height
+		DefaultMinBlockDelay,
+		time.Time{}, // bls signing allowed
+	)
 
 	tlsSigner, err := signer.NewTLSSigner(pTestCert)
 	if err != nil {

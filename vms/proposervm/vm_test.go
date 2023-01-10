@@ -130,7 +130,7 @@ func initTestProposerVM(
 		}
 	}
 
-	proVM := New(coreVM, proBlkStartTime, minPChainHeight, DefaultMinBlockDelay)
+	proVM := New(coreVM, proBlkStartTime, minPChainHeight, DefaultMinBlockDelay, proBlkStartTime)
 
 	valState := &validators.TestState{
 		T: t,
@@ -931,7 +931,13 @@ func TestExpiredBuildBlock(t *testing.T) {
 		}
 	}
 
-	proVM := New(coreVM, time.Time{}, 0, DefaultMinBlockDelay)
+	proVM := New(
+		coreVM,
+		time.Time{}, // fork is active
+		0,           // minimum P-Chain height
+		DefaultMinBlockDelay,
+		time.Time{}, // bls signing allowed
+	)
 
 	valState := &validators.TestState{
 		T: t,
@@ -1298,7 +1304,13 @@ func TestInnerVMRollback(t *testing.T) {
 
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 
-	proVM := New(coreVM, time.Time{}, 0, DefaultMinBlockDelay)
+	proVM := New(
+		coreVM,
+		time.Time{}, // fork is active
+		0,           // minimum P-Chain height
+		DefaultMinBlockDelay,
+		time.Time{}, // bls signing allowed
+	)
 
 	err = proVM.Initialize(
 		context.Background(),
@@ -1400,7 +1412,13 @@ func TestInnerVMRollback(t *testing.T) {
 
 	coreBlk.StatusV = choices.Processing
 
-	proVM = New(coreVM, time.Time{}, 0, DefaultMinBlockDelay)
+	proVM = New(
+		coreVM,
+		time.Time{}, // fork is active
+		0,           // minimum P-Chain height
+		DefaultMinBlockDelay,
+		time.Time{}, // bls signing allowed
+	)
 
 	err = proVM.Initialize(
 		context.Background(),
@@ -1954,7 +1972,13 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		}
 	}
 
-	proVM := New(coreVM, time.Time{}, 0, DefaultMinBlockDelay)
+	proVM := New(
+		coreVM,
+		time.Time{}, // fork is active
+		0,           // minimum P-Chain height
+		DefaultMinBlockDelay,
+		time.Time{}, // bls signing allowed
+	)
 
 	valState := &validators.TestState{
 		T: t,
@@ -2169,7 +2193,13 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		}
 	}
 
-	proVM := New(coreVM, time.Time{}, 0, DefaultMinBlockDelay)
+	proVM := New(
+		coreVM,
+		time.Time{}, // fork is active
+		0,           // minimum P-Chain height
+		DefaultMinBlockDelay,
+		time.Time{}, // bls signing allowed
+	)
 
 	valState := &validators.TestState{
 		T: t,
@@ -2340,6 +2370,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
+		time.Time{}, // bls signing allowed
 	)
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -2529,6 +2560,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
+		mockable.MaxTime, // bls signing allowed
 	)
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)

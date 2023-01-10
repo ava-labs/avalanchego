@@ -62,9 +62,10 @@ type VM struct {
 	hVM            block.HeightIndexedChainVM
 	ssVM           block.StateSyncableVM
 
-	activationTime      time.Time
-	minimumPChainHeight uint64
-	minBlkDelay         time.Duration
+	activationTime           time.Time
+	minimumPChainHeight      uint64
+	minBlkDelay              time.Duration
+	blsSigningActivationTime time.Time
 
 	state.State
 	hIndexer indexer.HeightIndexer
@@ -108,6 +109,7 @@ func New(
 	activationTime time.Time,
 	minimumPChainHeight uint64,
 	minBlkDelay time.Duration,
+	blsSigningActivationTime time.Time,
 ) *VM {
 	blockBuilderVM, _ := vm.(block.BuildBlockWithContextChainVM)
 	batchedVM, _ := vm.(block.BatchedChainVM)
@@ -120,9 +122,10 @@ func New(
 		hVM:            hVM,
 		ssVM:           ssVM,
 
-		activationTime:      activationTime,
-		minimumPChainHeight: minimumPChainHeight,
-		minBlkDelay:         minBlkDelay,
+		activationTime:           activationTime,
+		minimumPChainHeight:      minimumPChainHeight,
+		minBlkDelay:              minBlkDelay,
+		blsSigningActivationTime: blsSigningActivationTime,
 	}
 }
 

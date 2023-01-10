@@ -235,16 +235,39 @@ func (p *postForkCommonComponents) buildChild(
 
 	// Build the child
 	var statelessChild block.SignedBlock
-	if delay >= proposer.MaxDelay {
+	switch {
+	case delay >= proposer.MaxDelay:
 		statelessChild, err = block.BuildUnsigned(
 			parentID,
 			newTimestamp,
 			pChainHeight,
 			innerBlock.Bytes(),
 		)
-	} else {
-		// TODO ABENEGIA: introduce bls signed blocks
-
+	case p.vm.ctx.BlsSigner == nil:
+		// bls key not specified for this node. Whether bls signing fork
+		// is active or not, sign using tls certificate
+		statelessChild, err = block.BuildCertSigned(
+			parentID,
+			newTimestamp,
+			pChainHeight,
+			p.vm.ctx.StakingCertLeaf,
+			innerBlock.Bytes(),
+			p.vm.ctx.ChainID,
+			p.vm.ctx.StakingLeafSigner,
+		)
+	case !parentTimestamp.Before(p.vm.blsSigningActivationTime):
+		// bls signing is our prefer way to sign if available
+		statelessChild, err = block.BuildBlsSigned(
+			parentID,
+			newTimestamp,
+			pChainHeight,
+			p.vm.ctx.NodeID,
+			innerBlock.Bytes(),
+			p.vm.ctx.ChainID,
+			p.vm.ctx.BlsSigner,
+		)
+	default:
+		// bls signing fork not active yet, sign using tls certificate
 		statelessChild, err = block.BuildCertSigned(
 			parentID,
 			newTimestamp,
@@ -255,6 +278,7 @@ func (p *postForkCommonComponents) buildChild(
 			p.vm.ctx.StakingLeafSigner,
 		)
 	}
+
 	if err != nil {
 		return nil, err
 	}

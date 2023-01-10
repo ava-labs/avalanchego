@@ -738,9 +738,14 @@ func TestOptionTimestampValidity(t *testing.T) {
 	}
 
 	// Restart the node.
-
 	ctx := proVM.ctx
-	proVM = New(coreVM, time.Time{}, 0, DefaultMinBlockDelay)
+	proVM = New(
+		coreVM,
+		time.Time{}, // fork is active
+		0,           // minimum P-Chain height
+		DefaultMinBlockDelay,
+		time.Time{}, // bls signing allowed
+	)
 
 	coreVM.InitializeF = func(
 		context.Context,
