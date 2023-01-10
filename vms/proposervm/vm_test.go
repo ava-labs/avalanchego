@@ -540,6 +540,7 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
+		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -585,6 +586,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
+		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -606,6 +608,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
+		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -2393,6 +2396,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 		blkNearTipInnerBytes,     // inner blk bytes
 		vm.ctx.ChainID,           // chain ID
 		vm.ctx.StakingLeafSigner, // key
+		vm.ctx.BlsSigner,
 	)
 	require.NoError(err)
 

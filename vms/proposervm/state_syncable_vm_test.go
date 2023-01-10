@@ -194,6 +194,7 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
 		vm.ctx.StakingLeafSigner,
+		vm.ctx.BlsSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -276,6 +277,7 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
 		vm.ctx.StakingLeafSigner,
+		vm.ctx.BlsSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -361,6 +363,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
 		vm.ctx.StakingLeafSigner,
+		vm.ctx.BlsSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -431,6 +434,7 @@ func TestParseStateSummary(t *testing.T) {
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
 		vm.ctx.StakingLeafSigner,
+		vm.ctx.BlsSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -491,6 +495,7 @@ func TestStateSummaryAccept(t *testing.T) {
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
 		vm.ctx.StakingLeafSigner,
+		vm.ctx.BlsSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -565,6 +570,7 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
 		vm.ctx.StakingLeafSigner,
+		vm.ctx.BlsSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{

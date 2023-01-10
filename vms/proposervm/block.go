@@ -251,6 +251,7 @@ func (p *postForkCommonComponents) buildChild(
 			innerBlock.Bytes(),
 			p.vm.ctx.ChainID,
 			p.vm.ctx.StakingLeafSigner,
+			p.vm.ctx.BlsSigner,
 		)
 	}
 	if err != nil {

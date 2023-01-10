@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
 func TestBuild(t *testing.T) {
@@ -29,6 +30,11 @@ func TestBuild(t *testing.T) {
 	tlsSigner, err := signer.NewTLSSigner(tlsCert)
 	require.NoError(err)
 
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+	blsSigner := signer.NewBLSSigner(sk)
+	require.NoError(err)
+
 	builtBlock, err := Build(
 		parentID,
 		timestamp,
@@ -37,6 +43,7 @@ func TestBuild(t *testing.T) {
 		innerBlockBytes,
 		chainID,
 		&tlsSigner,
+		&blsSigner,
 	)
 	require.NoError(err)
 

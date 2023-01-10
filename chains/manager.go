@@ -432,6 +432,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	if err != nil {
 		return nil, fmt.Errorf("error while creating tls signer %w", err)
 	}
+	blsSigner := signer.NewBLSSigner(m.StakingBLSKey)
 	ctx := &snow.ConsensusContext{
 		Context: &snow.Context{
 			NetworkID: m.NetworkID,
@@ -454,6 +455,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 			ValidatorState:    m.validatorState,
 			StakingCertLeaf:   m.StakingCert.Leaf,
 			StakingLeafSigner: &tlsSigner,
+			BlsSigner:         &blsSigner,
 			ChainDataDir:      chainDataDir,
 		},
 		DecisionAcceptor:  m.DecisionAcceptorGroup,

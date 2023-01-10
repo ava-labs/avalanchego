@@ -45,6 +45,7 @@ func Build(
 	blockBytes []byte,
 	chainID ids.ID,
 	tlsSigner *signer.TLSSigner,
+	_ *signer.BLSSigner,
 ) (SignedBlock, error) {
 	block := &statelessBlock{
 		StatelessBlock: statelessUnsignedBlock{

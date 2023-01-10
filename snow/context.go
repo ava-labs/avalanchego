@@ -53,6 +53,7 @@ type Context struct {
 	// snowman++ attributes
 	ValidatorState    validators.State // interface for P-Chain validators
 	StakingLeafSigner *signer.TLSSigner
+	BlsSigner         *signer.BLSSigner
 	StakingCertLeaf   *x509.Certificate // block certificate
 
 	// Chain-specific directory where arbitrary data can be written

@@ -68,6 +68,7 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 		innerOracleBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
+		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -157,6 +158,7 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
+		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -272,6 +274,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
+		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -305,6 +308,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
+		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -326,6 +330,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
+		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -347,6 +352,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
+		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -383,6 +389,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
+		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -469,6 +476,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
+		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -677,6 +685,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
+		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -1093,6 +1102,7 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 		oracleCoreBlk.opts[0].Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
+		proVM.ctx.BlsSigner,
 	)
 	if err != nil {
 		t.Fatal("failed to build new child block")
