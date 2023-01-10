@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -741,26 +740,23 @@ func TestOptionTimestampValidity(t *testing.T) {
 
 	// Restart the node.
 	ctx := proVM.ctx
-	tlsSigner, err := signer.NewTLSSigner(pTestCert)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
 	sk, err := bls.NewSecretKey()
 	if err != nil {
 		t.Fatalf("failed to create bls private key with %s", err)
 	}
-	blsSigner := signer.NewBLSSigner(sk)
 
-	proVM = New(
+	proVM, err = New(
 		coreVM,
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
 		time.Time{}, // bls signing allowed
-		pTestCert.Leaf,
-		&tlsSigner,
-		&blsSigner,
+		pTestCert,
+		sk,
 	)
+	if err != nil {
+		t.Fatalf("failed to create proposerVM with %s", err)
+	}
 
 	coreVM.InitializeF = func(
 		context.Context,

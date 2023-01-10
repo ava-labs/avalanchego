@@ -5,6 +5,7 @@ package proposervm
 
 import (
 	"context"
+	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/indexer"
@@ -69,9 +71,9 @@ type VM struct {
 	minBlkDelay              time.Duration
 	blsSigningActivationTime time.Time
 
-	stakingCertLeaf *x509.Certificate
-	tlsSigner       *signer.TLSSigner
-	blsSigner       *signer.BLSSigner
+	stakingCert *x509.Certificate
+	tlsSigner   *signer.TLSSigner
+	blsSigner   *signer.BLSSigner
 
 	state.State
 	hIndexer indexer.HeightIndexer
@@ -116,14 +118,25 @@ func New(
 	minimumPChainHeight uint64,
 	minBlkDelay time.Duration,
 	blsSigningActivationTime time.Time,
-	stakingCertLeaf *x509.Certificate,
-	stakingLeafsSigner *signer.TLSSigner,
-	blsSigner *signer.BLSSigner,
-) *VM {
+	stakingCert *tls.Certificate,
+	blsSecretKey *bls.SecretKey,
+) (*VM, error) {
 	blockBuilderVM, _ := vm.(block.BuildBlockWithContextChainVM)
 	batchedVM, _ := vm.(block.BatchedChainVM)
 	hVM, _ := vm.(block.HeightIndexedChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
+
+	tlsSigner, err := signer.NewTLSSigner(stakingCert)
+	if err != nil {
+		return nil, fmt.Errorf("error while creating tls signer %w", err)
+	}
+
+	var blsSigner *signer.BLSSigner
+	if blsSecretKey != nil {
+		s := signer.NewBLSSigner(blsSecretKey)
+		blsSigner = &s
+	}
+
 	return &VM{
 		ChainVM:        vm,
 		blockBuilderVM: blockBuilderVM,
@@ -135,10 +148,10 @@ func New(
 		minimumPChainHeight:      minimumPChainHeight,
 		minBlkDelay:              minBlkDelay,
 		blsSigningActivationTime: blsSigningActivationTime,
-		stakingCertLeaf:          stakingCertLeaf,
-		tlsSigner:                stakingLeafsSigner,
+		stakingCert:              stakingCert.Leaf,
+		tlsSigner:                &tlsSigner,
 		blsSigner:                blsSigner,
-	}
+	}, nil
 }
 
 func (vm *VM) Initialize(

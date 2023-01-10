@@ -71,10 +71,10 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 			ValidatorState: vdrState,
 			Log:            logging.NoLog{},
 		},
-		Windower:        windower,
-		stakingCertLeaf: testCert.Leaf,
-		tlsSigner:       &tlsSigner,
-		blsSigner:       &blsSigner,
+		Windower:    windower,
+		stakingCert: testCert.Leaf,
+		tlsSigner:   &tlsSigner,
+		blsSigner:   &blsSigner,
 	}
 
 	blk := &postForkCommonComponents{

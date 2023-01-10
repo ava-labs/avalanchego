@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
-	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/state"
@@ -929,22 +928,18 @@ func (m *manager) createSnowmanChain(
 		vm = tracedvm.NewBlockVM(vm, chainAlias, m.Tracer)
 	}
 
-	tlsSigner, err := signer.NewTLSSigner(&m.StakingCert)
-	if err != nil {
-		return nil, fmt.Errorf("error while creating tls signer %w", err)
-	}
-	blsSigner := signer.NewBLSSigner(m.StakingBLSKey)
-
-	vm = proposervm.New(
+	vm, err = proposervm.New(
 		vm,
 		m.ApricotPhase4Time,
 		m.ApricotPhase4MinPChainHeight,
 		minBlockDelay,
 		m.BlsSigningProposerVMTime,
-		m.StakingCert.Leaf,
-		&tlsSigner,
-		&blsSigner,
+		&m.StakingCert,
+		m.StakingBLSKey,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("error while creating proposer vm %w", err)
+	}
 
 	if m.MeterVMEnabled {
 		vm = metervm.NewBlockVM(vm)

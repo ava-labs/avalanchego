@@ -17,7 +17,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -131,21 +130,18 @@ func initTestProposerVM(
 		}
 	}
 
-	tlsSigner, err := signer.NewTLSSigner(pTestCert)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
-
-	proVM := New(
+	proVM, err := New(
 		coreVM,
 		proBlkStartTime, // fork activation time
 		minPChainHeight, // minimum P-Chain height
 		DefaultMinBlockDelay,
 		proBlkStartTime, // bls signing activation time
-		pTestCert.Leaf,
-		&tlsSigner,
-		nil, // TODO ABENEGIA: make signer.NewBLSSigner(sk)
+		pTestCert,
+		nil, // TODO ABENEGIA: make a non-nil bls key
 	)
+	if err != nil {
+		t.Fatalf("failed to create proposerVM with %s", err)
+	}
 
 	valState := &validators.TestState{
 		T: t,
@@ -544,7 +540,7 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 		proVM.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		proVM.stakingCertLeaf,
+		proVM.stakingCert,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.tlsSigner,
@@ -589,7 +585,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		proVM.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		proVM.stakingCertLeaf,
+		proVM.stakingCert,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.tlsSigner,
@@ -610,7 +606,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		proVM.preferred,
 		innerBlk.Timestamp(),
 		200, // pChainHeight,
-		proVM.stakingCertLeaf,
+		proVM.stakingCert,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
 		proVM.tlsSigner,
@@ -939,26 +935,23 @@ func TestExpiredBuildBlock(t *testing.T) {
 		}
 	}
 
-	tlsSigner, err := signer.NewTLSSigner(pTestCert)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
 	sk, err := bls.NewSecretKey()
 	if err != nil {
 		t.Fatalf("failed to create bls private key with %s", err)
 	}
-	blsSigner := signer.NewBLSSigner(sk)
 
-	proVM := New(
+	proVM, err := New(
 		coreVM,
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
 		time.Time{}, // bls signing allowed
-		pTestCert.Leaf,
-		&tlsSigner,
-		&blsSigner,
+		pTestCert,
+		sk,
 	)
+	if err != nil {
+		t.Fatalf("failed to create proposerVM with %s", err)
+	}
 
 	valState := &validators.TestState{
 		T: t,
@@ -1311,26 +1304,23 @@ func TestInnerVMRollback(t *testing.T) {
 
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 
-	tlsSigner, err := signer.NewTLSSigner(pTestCert)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
 	sk, err := bls.NewSecretKey()
 	if err != nil {
 		t.Fatalf("failed to create bls private key with %s", err)
 	}
-	blsSigner := signer.NewBLSSigner(sk)
 
-	proVM := New(
+	proVM, err := New(
 		coreVM,
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
 		time.Time{}, // bls signing allowed
-		pTestCert.Leaf,
-		&tlsSigner,
-		&blsSigner,
+		pTestCert,
+		sk,
 	)
+	if err != nil {
+		t.Fatalf("failed to create proposerVM with %s", err)
+	}
 
 	err = proVM.Initialize(
 		context.Background(),
@@ -1432,16 +1422,18 @@ func TestInnerVMRollback(t *testing.T) {
 
 	coreBlk.StatusV = choices.Processing
 
-	proVM = New(
+	proVM, err = New(
 		coreVM,
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
 		time.Time{}, // bls signing allowed
-		pTestCert.Leaf,
-		&tlsSigner,
-		&blsSigner,
+		pTestCert,
+		sk,
 	)
+	if err != nil {
+		t.Fatalf("failed to create proposerVM with %s", err)
+	}
 
 	err = proVM.Initialize(
 		context.Background(),
@@ -1995,26 +1987,23 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		}
 	}
 
-	tlsSigner, err := signer.NewTLSSigner(pTestCert)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
 	sk, err := bls.NewSecretKey()
 	if err != nil {
 		t.Fatalf("failed to create bls private key with %s", err)
 	}
-	blsSigner := signer.NewBLSSigner(sk)
 
-	proVM := New(
+	proVM, err := New(
 		coreVM,
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
 		time.Time{}, // bls signing allowed
-		pTestCert.Leaf,
-		&tlsSigner,
-		&blsSigner,
+		pTestCert,
+		sk,
 	)
+	if err != nil {
+		t.Fatalf("failed to create proposerVM with %s", err)
+	}
 
 	valState := &validators.TestState{
 		T: t,
@@ -2222,26 +2211,23 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		}
 	}
 
-	tlsSigner, err := signer.NewTLSSigner(pTestCert)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
 	sk, err := bls.NewSecretKey()
 	if err != nil {
 		t.Fatalf("failed to create bls private key with %s", err)
 	}
-	blsSigner := signer.NewBLSSigner(sk)
 
-	proVM := New(
+	proVM, err := New(
 		coreVM,
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
 		time.Time{}, // bls signing allowed
-		pTestCert.Leaf,
-		&tlsSigner,
-		&blsSigner,
+		pTestCert,
+		sk,
 	)
+	if err != nil {
+		t.Fatalf("failed to create proposerVM with %s", err)
+	}
 
 	valState := &validators.TestState{
 		T: t,
@@ -2401,26 +2387,23 @@ func TestVMInnerBlkCache(t *testing.T) {
 	// Create a VM
 	innerVM := mocks.NewMockChainVM(ctrl)
 
-	tlsSigner, err := signer.NewTLSSigner(pTestCert)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
 	sk, err := bls.NewSecretKey()
 	if err != nil {
 		t.Fatalf("failed to create bls private key with %s", err)
 	}
-	blsSigner := signer.NewBLSSigner(sk)
 
-	vm := New(
+	vm, err := New(
 		innerVM,
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
 		time.Time{}, // bls signing allowed
-		pTestCert.Leaf,
-		&tlsSigner,
-		&blsSigner,
+		pTestCert,
+		sk,
 	)
+	if err != nil {
+		t.Fatalf("failed to create proposerVM with %s", err)
+	}
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	// make sure that DBs are compressed correctly
@@ -2462,7 +2445,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 		ids.GenerateTestID(), // parent
 		time.Time{},          // timestamp
 		1,                    // pChainHeight,
-		vm.stakingCertLeaf,   // cert
+		vm.stakingCert,       // cert
 		blkNearTipInnerBytes, // inner blk bytes
 		vm.ctx.ChainID,       // chain ID
 		vm.tlsSigner,         // key
@@ -2598,26 +2581,23 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 	// Create a VM
 	innerVM := mocks.NewMockChainVM(ctrl)
 
-	tlsSigner, err := signer.NewTLSSigner(pTestCert)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
 	sk, err := bls.NewSecretKey()
 	if err != nil {
 		t.Fatalf("failed to create bls private key with %s", err)
 	}
-	blsSigner := signer.NewBLSSigner(sk)
 
-	vm := New(
+	vm, err := New(
 		innerVM,
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
 		time.Time{}, // bls signing allowed
-		pTestCert.Leaf,
-		&tlsSigner,
-		&blsSigner,
+		pTestCert,
+		sk,
 	)
+	if err != nil {
+		t.Fatalf("failed to create proposerVM with %s", err)
+	}
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	// make sure that DBs are compressed correctly
