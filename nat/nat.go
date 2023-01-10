@@ -25,9 +25,9 @@ type Router interface {
 	// True iff this router supports NAT
 	SupportsNAT() bool
 	// Map external port [extPort] to internal port [intPort] for [duration]
-	MapPort(protocol string, intPort, extPort uint16, desc string, duration time.Duration) error
+	MapPort(intPort, extPort uint16, desc string, duration time.Duration) error
 	// Undo a port mapping
-	UnmapPort(protocol string, intPort, extPort uint16) error
+	UnmapPort(intPort, extPort uint16) error
 	// Return our external IP
 	ExternalIP() (net.IP, error)
 }
@@ -63,13 +63,13 @@ func NewPortMapper(log logging.Logger, r Router) Mapper {
 
 // Map external port [extPort] (exposed to the internet) to internal port [intPort] (where our process is listening)
 // and set [ip]. Does this every [updateTime]. [ip] may be nil.
-func (m *Mapper) Map(protocol string, intPort, extPort uint16, desc string, ip ips.DynamicIPPort, updateTime time.Duration) {
+func (m *Mapper) Map(intPort, extPort uint16, desc string, ip ips.DynamicIPPort, updateTime time.Duration) {
 	if !m.r.SupportsNAT() {
 		return
 	}
 
 	// we attempt a port map, and log an Error if it fails.
-	err := m.retryMapPort(protocol, intPort, extPort, desc, mapTimeout)
+	err := m.retryMapPort(intPort, extPort, desc, mapTimeout)
 	if err != nil {
 		m.log.Error("NAT traversal failed",
 			zap.Uint16("externalPort", extPort),
@@ -84,14 +84,14 @@ func (m *Mapper) Map(protocol string, intPort, extPort uint16, desc string, ip i
 	}
 
 	m.wg.Add(1)
-	go m.keepPortMapping(protocol, intPort, extPort, desc, ip, updateTime)
+	go m.keepPortMapping(intPort, extPort, desc, ip, updateTime)
 }
 
 // Retry port map up to maxRefreshRetries with a 1 second delay
-func (m *Mapper) retryMapPort(protocol string, intPort, extPort uint16, desc string, timeout time.Duration) error {
+func (m *Mapper) retryMapPort(intPort, extPort uint16, desc string, timeout time.Duration) error {
 	var err error
 	for retryCnt := 0; retryCnt < maxRefreshRetries; retryCnt++ {
-		err = m.r.MapPort(protocol, intPort, extPort, desc, timeout)
+		err = m.r.MapPort(intPort, extPort, desc, timeout)
 		if err == nil {
 			return nil
 		}
@@ -110,18 +110,17 @@ func (m *Mapper) retryMapPort(protocol string, intPort, extPort uint16, desc str
 
 // keepPortMapping runs in the background to keep a port mapped. It renews the mapping from [extPort]
 // to [intPort]] every [updateTime]. Updates [ip] every [updateTime].
-func (m *Mapper) keepPortMapping(protocol string, intPort, extPort uint16, desc string, ip ips.DynamicIPPort, updateTime time.Duration) {
+func (m *Mapper) keepPortMapping(intPort, extPort uint16, desc string, ip ips.DynamicIPPort, updateTime time.Duration) {
 	updateTimer := time.NewTimer(updateTime)
 
 	defer func(extPort uint16) {
 		updateTimer.Stop()
 
 		m.log.Debug("unmapping port",
-			zap.String("protocol", protocol),
 			zap.Uint16("externalPort", extPort),
 		)
 
-		if err := m.r.UnmapPort(protocol, intPort, extPort); err != nil {
+		if err := m.r.UnmapPort(intPort, extPort); err != nil {
 			m.log.Debug("error unmapping port",
 				zap.Uint16("externalPort", extPort),
 				zap.Uint16("internalPort", intPort),
@@ -135,7 +134,7 @@ func (m *Mapper) keepPortMapping(protocol string, intPort, extPort uint16, desc 
 	for {
 		select {
 		case <-updateTimer.C:
-			err := m.retryMapPort(protocol, intPort, extPort, desc, mapTimeout)
+			err := m.retryMapPort(intPort, extPort, desc, mapTimeout)
 			if err != nil {
 				m.log.Warn("renew NAT traversal failed",
 					zap.Uint16("externalPort", extPort),

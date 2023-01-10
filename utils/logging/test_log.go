@@ -39,6 +39,8 @@ func (NoLog) Debug(string, ...zap.Field) {}
 
 func (NoLog) Verbo(string, ...zap.Field) {}
 
+func (NoLog) SetLevel(Level) {}
+
 func (NoLog) StopOnPanic() {}
 
 func (NoLog) RecoverAndPanic(f func()) {

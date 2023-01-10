@@ -382,8 +382,8 @@ func (n *network) Connected(nodeID ids.NodeID) {
 	peerIP := peer.IP()
 	newIP := &ips.ClaimedIPPort{
 		Cert:      peer.Cert(),
-		IPPort:    peerIP.IP.IP,
-		Timestamp: peerIP.IP.Timestamp,
+		IPPort:    peerIP.IPPort,
+		Timestamp: peerIP.Timestamp,
 		Signature: peerIP.Signature,
 	}
 	prevIP, ok := n.peerIPs[nodeID]
@@ -958,8 +958,8 @@ func (n *network) authenticateIPs(ips []*ips.ClaimedIPPort) ([]*ipAuth, error) {
 
 		// Verify signature if needed
 		signedIP := peer.SignedIP{
-			IP: peer.UnsignedIP{
-				IP:        ip.IPPort,
+			UnsignedIP: peer.UnsignedIP{
+				IPPort:    ip.IPPort,
 				Timestamp: ip.Timestamp,
 			},
 			Signature: ip.Signature,

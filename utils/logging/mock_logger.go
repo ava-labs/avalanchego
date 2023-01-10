@@ -129,6 +129,18 @@ func (mr *MockLoggerMockRecorder) RecoverAndPanic(arg0 interface{}) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecoverAndPanic", reflect.TypeOf((*MockLogger)(nil).RecoverAndPanic), arg0)
 }
 
+// SetLevel mocks base method.
+func (m *MockLogger) SetLevel(arg0 Level) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetLevel", arg0)
+}
+
+// SetLevel indicates an expected call of SetLevel.
+func (mr *MockLoggerMockRecorder) SetLevel(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLevel", reflect.TypeOf((*MockLogger)(nil).SetLevel), arg0)
+}
+
 // Stop mocks base method.
 func (m *MockLogger) Stop() {
 	m.ctrl.T.Helper()

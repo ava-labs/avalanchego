@@ -17,7 +17,7 @@ import (
 // ensure that the most updated IP claim is tracked by peers for a given
 // validator.
 type UnsignedIP struct {
-	IP        ips.IPPort
+	ips.IPPort
 	Timestamp uint64
 }
 
@@ -29,8 +29,8 @@ func (ip *UnsignedIP) Sign(signer crypto.Signer) (*SignedIP, error) {
 		crypto.SHA256,
 	)
 	return &SignedIP{
-		IP:        *ip,
-		Signature: sig,
+		UnsignedIP: *ip,
+		Signature:  sig,
 	}, err
 }
 
@@ -38,21 +38,21 @@ func (ip *UnsignedIP) bytes() []byte {
 	p := wrappers.Packer{
 		Bytes: make([]byte, wrappers.IPLen+wrappers.LongLen),
 	}
-	ips.PackIP(&p, ip.IP)
+	ips.PackIP(&p, ip.IPPort)
 	p.PackLong(ip.Timestamp)
 	return p.Bytes
 }
 
 // SignedIP is a wrapper of an UnsignedIP with the signature from a signer.
 type SignedIP struct {
-	IP        UnsignedIP
+	UnsignedIP
 	Signature []byte
 }
 
 func (ip *SignedIP) Verify(cert *x509.Certificate) error {
 	return cert.CheckSignature(
 		cert.SignatureAlgorithm,
-		ip.IP.bytes(),
+		ip.UnsignedIP.bytes(),
 		ip.Signature,
 	)
 }

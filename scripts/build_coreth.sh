@@ -11,9 +11,6 @@ evm_path=''
 # Directory above this script
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 
-# Load the versions
-source "$AVALANCHE_PATH"/scripts/versions.sh
-
 # Load the constants
 source "$AVALANCHE_PATH"/scripts/constants.sh
 
@@ -59,3 +56,12 @@ cd "$AVALANCHE_PATH"
 
 # Building coreth + using go get can mess with the go.mod file.
 go mod tidy -compat=1.18
+
+# Exit build successfully if the Coreth EVM binary is created successfully
+if [[ -f "$evm_path" ]]; then
+        echo "Coreth Build Successful"
+        exit 0
+else
+        echo "Coreth Build Failure" >&2
+        exit 1
+fi

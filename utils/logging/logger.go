@@ -36,6 +36,9 @@ type Logger interface {
 	// aspect of the program
 	Verbo(msg string, fields ...zap.Field)
 
+	// SetLevel that this logger should log to
+	SetLevel(level Level)
+
 	// Recovers a panic, logs the error, and rethrows the panic.
 	StopOnPanic()
 	// If a function panics, this will log that panic and then re-panic ensuring

@@ -34,22 +34,22 @@ func TestIPSigner(t *testing.T) {
 
 	signedIP1, err := s.GetSignedIP()
 	require.NoError(err)
-	require.EqualValues(dynIP.IPPort(), signedIP1.IP.IP)
-	require.EqualValues(10, signedIP1.IP.Timestamp)
+	require.EqualValues(dynIP.IPPort(), signedIP1.IPPort)
+	require.EqualValues(10, signedIP1.Timestamp)
 
 	s.clock.Set(time.Unix(11, 0))
 
 	signedIP2, err := s.GetSignedIP()
 	require.NoError(err)
-	require.EqualValues(dynIP.IPPort(), signedIP2.IP.IP)
-	require.EqualValues(10, signedIP2.IP.Timestamp)
+	require.EqualValues(dynIP.IPPort(), signedIP2.IPPort)
+	require.EqualValues(10, signedIP2.Timestamp)
 	require.EqualValues(signedIP1.Signature, signedIP2.Signature)
 
 	dynIP.SetIP(net.IPv4(1, 2, 3, 4))
 
 	signedIP3, err := s.GetSignedIP()
 	require.NoError(err)
-	require.EqualValues(dynIP.IPPort(), signedIP3.IP.IP)
-	require.EqualValues(11, signedIP3.IP.Timestamp)
+	require.EqualValues(dynIP.IPPort(), signedIP3.IPPort)
+	require.EqualValues(11, signedIP3.Timestamp)
 	require.NotEqualValues(signedIP2.Signature, signedIP3.Signature)
 }
