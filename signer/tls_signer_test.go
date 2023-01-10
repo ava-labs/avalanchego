@@ -1,14 +1,13 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package peer
+package signer
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/staking"
 )
 
@@ -48,7 +47,7 @@ func TestTLSSigner(t *testing.T) {
 			// generate a tls cert
 			cert, err := staking.NewTLSCert()
 			r.NoError(err)
-			signer, err := signer.NewTLSSigner(cert)
+			signer, err := NewTLSSigner(cert)
 			r.NoError(err)
 
 			// sign the ip with the cert

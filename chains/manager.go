@@ -5,7 +5,6 @@ package chains
 
 import (
 	"context"
-	"crypto"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -28,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/state"
@@ -428,6 +428,10 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		return nil, fmt.Errorf("error while registering vm's metrics %w", err)
 	}
 
+	tlsSigner, err := signer.NewTLSSigner(&m.StakingCert)
+	if err != nil {
+		return nil, fmt.Errorf("error while creating tls signer %w", err)
+	}
 	ctx := &snow.ConsensusContext{
 		Context: &snow.Context{
 			NetworkID: m.NetworkID,
@@ -449,7 +453,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 
 			ValidatorState:    m.validatorState,
 			StakingCertLeaf:   m.StakingCert.Leaf,
-			StakingLeafSigner: m.StakingCert.PrivateKey.(crypto.Signer),
+			StakingLeafSigner: &tlsSigner,
 			ChainDataDir:      chainDataDir,
 		},
 		DecisionAcceptor:  m.DecisionAcceptorGroup,

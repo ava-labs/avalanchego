@@ -6,7 +6,6 @@ package proposervm
 import (
 	"bytes"
 	"context"
-	"crypto"
 	"errors"
 	"testing"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -78,12 +78,17 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 
 	vm := New(innerVM, time.Time{}, 0, DefaultMinBlockDelay)
 
+	tlsSigner, err := signer.NewTLSSigner(pTestCert)
+	if err != nil {
+		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
+
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
+	ctx.StakingLeafSigner = &tlsSigner
 
-	err := vm.Initialize(
+	err = vm.Initialize(
 		context.Background(),
 		ctx,
 		dbManager,

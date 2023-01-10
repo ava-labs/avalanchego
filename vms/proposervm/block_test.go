@@ -5,10 +5,6 @@ package proposervm
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/x509"
 	"testing"
 	"time"
 
@@ -17,11 +13,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
@@ -56,16 +54,19 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 	windower := proposer.NewMockWindower(ctrl)
 	windower.EXPECT().Delay(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(time.Duration(0), nil).AnyTimes()
 
-	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	testCert, err := staking.NewTLSCert()
 	require.NoError(err)
+	tlsSigner, err := signer.NewTLSSigner(testCert)
+	require.NoError(err)
+
 	vm := &VM{
 		ChainVM:        innerVM,
 		blockBuilderVM: innerBlockBuilderVM,
 		ctx: &snow.Context{
 			ValidatorState:    vdrState,
 			Log:               logging.NoLog{},
-			StakingCertLeaf:   &x509.Certificate{},
-			StakingLeafSigner: pk,
+			StakingCertLeaf:   testCert.Leaf,
+			StakingLeafSigner: &tlsSigner,
 		},
 		Windower: windower,
 	}

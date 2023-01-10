@@ -4,7 +4,6 @@
 package block
 
 import (
-	"crypto"
 	"encoding/hex"
 	"testing"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/staking"
 )
 
@@ -27,17 +27,17 @@ func TestParse(t *testing.T) {
 	tlsCert, err := staking.NewTLSCert()
 	require.NoError(err)
 
-	cert := tlsCert.Leaf
-	key := tlsCert.PrivateKey.(crypto.Signer)
+	tlsSigner, err := signer.NewTLSSigner(tlsCert)
+	require.NoError(err)
 
 	builtBlock, err := Build(
 		parentID,
 		timestamp,
 		pChainHeight,
-		cert,
+		tlsCert.Leaf,
 		innerBlockBytes,
 		chainID,
-		key,
+		&tlsSigner,
 	)
 	require.NoError(err)
 

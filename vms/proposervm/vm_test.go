@@ -6,7 +6,6 @@ package proposervm
 import (
 	"bytes"
 	"context"
-	"crypto"
 	"crypto/tls"
 	"errors"
 	"testing"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -162,10 +162,15 @@ func initTestProposerVM(
 		}, nil
 	}
 
+	tlsSigner, err := signer.NewTLSSigner(pTestCert)
+	if err != nil {
+		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
+
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
+	ctx.StakingLeafSigner = &tlsSigner
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -176,7 +181,7 @@ func initTestProposerVM(
 		return nil
 	}
 
-	err := proVM.Initialize(
+	err = proVM.Initialize(
 		context.Background(),
 		ctx,
 		dummyDBManager,
@@ -946,10 +951,15 @@ func TestExpiredBuildBlock(t *testing.T) {
 		}, nil
 	}
 
+	tlsSigner, err := signer.NewTLSSigner(pTestCert)
+	if err != nil {
+		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
+
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
+	ctx.StakingLeafSigner = &tlsSigner
 	ctx.ValidatorState = valState
 
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -972,7 +982,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	}
 
 	// make sure that DBs are compressed correctly
-	err := proVM.Initialize(
+	err = proVM.Initialize(
 		context.Background(),
 		ctx,
 		dbManager,
@@ -1261,10 +1271,15 @@ func TestInnerVMRollback(t *testing.T) {
 		}
 	}
 
+	tlsSigner, err := signer.NewTLSSigner(pTestCert)
+	if err != nil {
+		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
+
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
+	ctx.StakingLeafSigner = &tlsSigner
 	ctx.ValidatorState = valState
 
 	coreVM.InitializeF = func(
@@ -1285,7 +1300,7 @@ func TestInnerVMRollback(t *testing.T) {
 
 	proVM := New(coreVM, time.Time{}, 0, DefaultMinBlockDelay)
 
-	err := proVM.Initialize(
+	err = proVM.Initialize(
 		context.Background(),
 		ctx,
 		dbManager,
@@ -1971,16 +1986,21 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		}, nil
 	}
 
+	tlsSigner, err := signer.NewTLSSigner(pTestCert)
+	if err != nil {
+		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
+
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
+	ctx.StakingLeafSigner = &tlsSigner
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	// make sure that DBs are compressed correctly
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
-	err := proVM.Initialize(
+	err = proVM.Initialize(
 		context.Background(),
 		ctx,
 		dummyDBManager,
@@ -2181,16 +2201,21 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		}, nil
 	}
 
+	tlsSigner, err := signer.NewTLSSigner(pTestCert)
+	if err != nil {
+		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
+
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
+	ctx.StakingLeafSigner = &tlsSigner
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	// make sure that DBs are compressed correctly
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
-	err := proVM.Initialize(
+	err = proVM.Initialize(
 		context.Background(),
 		ctx,
 		dummyDBManager,
@@ -2333,12 +2358,17 @@ func TestVMInnerBlkCache(t *testing.T) {
 		gomock.Any(),
 	).Return(nil)
 
+	tlsSigner, err := signer.NewTLSSigner(pTestCert)
+	if err != nil {
+		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
+
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
+	ctx.StakingLeafSigner = &tlsSigner
 
-	err := vm.Initialize(
+	err = vm.Initialize(
 		context.Background(),
 		ctx,
 		dummyDBManager,
@@ -2517,12 +2547,17 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		gomock.Any(),
 	).Return(nil)
 
+	tlsSigner, err := signer.NewTLSSigner(pTestCert)
+	if err != nil {
+		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
+
 	snowCtx := snow.DefaultContextTest()
 	snowCtx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	snowCtx.StakingCertLeaf = pTestCert.Leaf
-	snowCtx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
+	snowCtx.StakingLeafSigner = &tlsSigner
 
-	err := vm.Initialize(
+	err = vm.Initialize(
 		context.Background(),
 		snowCtx,
 		dummyDBManager,

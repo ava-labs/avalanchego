@@ -4,12 +4,11 @@
 package block
 
 import (
-	"crypto"
-	"crypto/rand"
 	"crypto/x509"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -45,7 +44,7 @@ func Build(
 	cert *x509.Certificate,
 	blockBytes []byte,
 	chainID ids.ID,
-	key crypto.Signer,
+	tlsSigner *signer.TLSSigner,
 ) (SignedBlock, error) {
 	block := &statelessBlock{
 		StatelessBlock: statelessUnsignedBlock{
@@ -79,8 +78,7 @@ func Build(
 		return nil, err
 	}
 
-	headerHash := hashing.ComputeHash256(header.Bytes())
-	block.Signature, err = key.Sign(rand.Reader, headerHash, crypto.SHA256)
+	block.Signature, err = tlsSigner.Sign(header.Bytes())
 	if err != nil {
 		return nil, err
 	}

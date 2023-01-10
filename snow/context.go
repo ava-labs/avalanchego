@@ -4,7 +4,6 @@
 package snow
 
 import (
-	"crypto"
 	"crypto/x509"
 	"sync"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -51,8 +51,8 @@ type Context struct {
 	TeleporterSigner teleporter.Signer
 
 	// snowman++ attributes
-	ValidatorState    validators.State  // interface for P-Chain validators
-	StakingLeafSigner crypto.Signer     // block signer
+	ValidatorState    validators.State // interface for P-Chain validators
+	StakingLeafSigner *signer.TLSSigner
 	StakingCertLeaf   *x509.Certificate // block certificate
 
 	// Chain-specific directory where arbitrary data can be written
