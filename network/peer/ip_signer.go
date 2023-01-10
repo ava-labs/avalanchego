@@ -24,7 +24,7 @@ type IPSigner struct {
 	signedIP *SignedIP
 }
 
-func NewDynamicIPSigner(
+func NewIPSigner(
 	ip ips.DynamicIPPort,
 	signer crypto.MultiSigner,
 ) *IPSigner {

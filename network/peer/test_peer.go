@@ -118,7 +118,7 @@ func StartTestPeer(
 			PongTimeout:          constants.DefaultPingPongTimeout,
 			MaxClockDifference:   time.Minute,
 			ResourceTracker:      resourceTracker,
-			IPSigner:             NewDynamicIPSigner(signerIP, signer),
+			IPSigner:             NewIPSigner(signerIP, signer),
 		},
 		conn,
 		cert,

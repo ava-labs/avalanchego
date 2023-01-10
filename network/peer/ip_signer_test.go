@@ -28,7 +28,7 @@ func TestIPSigner(t *testing.T) {
 	key, err := NewBanffSigner(tlsCert)
 	require.NoError(err)
 
-	s := NewDynamicIPSigner(dynIP, key)
+	s := NewIPSigner(dynIP, key)
 
 	s.clock.Set(time.Unix(10, 0))
 
