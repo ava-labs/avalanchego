@@ -74,7 +74,7 @@ To support these changes, there have been a number of changes to the SubnetEVM b
 
 ### Clone Subnet-evm
 
-First install Go 1.18.1 or later. Follow the instructions [here](https://golang.org/doc/install). You can verify by runing `go version`.
+First install Go 1.18.1 or later. Follow the instructions [here](https://golang.org/doc/install). You can verify by running `go version`.
 
 Set `$GOPATH` environment variable properly for Go to look for Go Workspaces. Please read [this](https://go.dev/doc/gopath_code) for details. You can verify by running `echo $GOPATH`.
 
@@ -118,9 +118,9 @@ Note: make sure you check the version compatibility above between AvalancheGo an
 Note that this ewoq address (`0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC`) is a prefunded address on the local network, see [here](https://docs.avax.network/quickstart/fund-a-local-test-network) for more info. The private key for this address is
 `0x56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027`.
 
-With this command, `avalanchego`, `avalanche-network-runner` and GoLang packages will be downloaded and installed on a `/tmp` directory. Note: please make sure that your have fast internet connection to download these packages, otherwise, it will take a long time.
+With this command, `avalanchego`, `avalanche-network-runner` and GoLang packages will be downloaded and installed on a `/tmp` directory. Note: please make sure that you have a fast internet connection to download these packages, otherwise, it will take a long time.
 
-Once the the network is started up, the following info will be printed to the
+Once the network is started up, the following info will be printed to the
 console:
 
 ```bash
@@ -149,7 +149,7 @@ Funded Address: 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
 Network Name: Local EVM
 RPC URL: http://127.0.0.1:14463/ext/bc/28N1Tv5CZziQ3FKCaXmo8xtxoFtuoVA6NvZykAT5MtGjF4JkGs/rpc
 Chain ID: 99999
-Curreny Symbol: LEVM
+Currency Symbol: LEVM
 network-runner RPC server is running on PID 79100...
 
 use the following command to terminate:
@@ -208,7 +208,7 @@ You can create a new metamask account by importing the private key `0x56289e99c9
 ### Load Simulator
 
 When building developing your own blockchain using `subnet-evm`, you may want
-to analyze how your fee paramterization behaves and/or how many resources your VM
+to analyze how your fee parameterization behaves and/or how many resources your VM
 uses under different load patterns. For this reason, we developed `cmd/simulator`.
 `cmd/simulator` lets your drive arbitrary load across any number of [endpoints]
 with a user-specified `concurrency`, `base-fee`, and `priority-fee`.
@@ -343,7 +343,7 @@ We created a basic [WAGMI explorer](https://trywagmi.xyz) that surfaces
 aggregated usage statistics about the subnet. If you'd like to see any other
 stats added to this site, please send a DM to [@\_patrickogrady on Twitter](https://twitter.com/_patrickogrady).
 
-Everyone that has used the the C-Chain more than twice (~970k addresses) has
+Everyone that has used the C-Chain more than twice (~970k addresses) has
 been airdropped 10 WGM tokens. With the current fee parameterization, this
 should be enough for hundreds of txs.
 
