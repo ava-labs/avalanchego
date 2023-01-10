@@ -15,7 +15,7 @@ var (
 	_ crypto.MultiVerifier = (*PreBanffVerifier)(nil)
 )
 
-// PreBanffSigner is used for all signing from genesis -> banff.
+// PreBanffSigner is used for all ip signing up to the Banff fork.
 type PreBanffSigner struct {
 	tlsSigner crypto.TLSSigner
 }
@@ -39,7 +39,7 @@ func (b PreBanffSigner) SignTLS(msg []byte) ([]byte, error) {
 	return b.tlsSigner.Sign(msg)
 }
 
-// PreBanffVerifier is used for all verification <= Banff.
+// PreBanffVerifier  is used for all ip verification up to the Banff fork.
 type PreBanffVerifier struct {
 	tlsVerifier crypto.TLSVerifier
 }
