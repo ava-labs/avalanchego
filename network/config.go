@@ -126,7 +126,7 @@ type Config struct {
 	CompressionEnabled bool `json:"compressionEnabled"`
 
 	// IPSigner this node's key which is used to sign IPs.
-	IPSigner peer.IPSigner `json:"-"`
+	IPSigner peer.Signer `json:"-"`
 
 	// WhitelistedSubnets of the node.
 	WhitelistedSubnets set.Set[ids.ID] `json:"-"`

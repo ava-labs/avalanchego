@@ -13,8 +13,8 @@ import (
 
 func TestBLSSigner(t *testing.T) {
 	type args struct {
-		ipBytes   []byte
-		signature Signature
+		msg       []byte
+		signature []byte
 	}
 
 	tests := []struct {
@@ -24,31 +24,26 @@ func TestBLSSigner(t *testing.T) {
 		{
 			name: "nil ip",
 			args: args{
-				ipBytes:   nil,
-				signature: Signature{},
+				msg: nil,
 			},
 		},
 		{
 			name: "empty ip",
 			args: args{
-				ipBytes:   []byte{},
-				signature: Signature{},
+				msg: []byte{},
 			},
 		},
 		{
 			name: "non-empty ip",
 			args: args{
-				ipBytes:   []byte{1, 2, 3, 3, 5},
-				signature: Signature{},
+				msg: []byte{1, 2, 3, 3, 5},
 			},
 		},
 		{
 			name: "overwrite previous signature",
 			args: args{
-				ipBytes: []byte{1, 2, 3, 3, 5},
-				signature: Signature{
-					BLSSignature: []byte{6, 7, 8, 9, 0},
-				},
+				msg:       []byte{1, 2, 3, 3, 5},
+				signature: []byte{6, 7, 8, 9, 0},
 			},
 		},
 	}
@@ -63,15 +58,14 @@ func TestBLSSigner(t *testing.T) {
 
 			// sign the ip
 			signer := NewBLSSigner(sk)
-			sig, err := signer.Sign(test.args.ipBytes, test.args.signature)
-			r.NoError(err)
+			sig := signer.Sign(test.args.msg)
 
 			// verify the signature of the ip against the public key
-			blsSig, err := bls.SignatureFromBytes(sig.BLSSignature)
+			blsSig, err := bls.SignatureFromBytes(sig)
 			r.NoError(err)
 
 			pk := bls.PublicFromSecretKey(sk)
-			r.True(bls.Verify(pk, blsSig, test.args.ipBytes))
+			r.True(bls.Verify(pk, blsSig, test.args.msg))
 		})
 	}
 }

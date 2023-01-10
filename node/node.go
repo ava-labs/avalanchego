@@ -224,7 +224,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		)
 	}
 
-	tlsKey, err := peer.NewTLSSigner(&n.Config.StakingTLSCert)
+	ipSigner, err := peer.NewBanffSigner(&n.Config.StakingTLSCert)
 	if err != nil {
 		return err
 	}
@@ -322,7 +322,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	n.Config.NetworkConfig.Validators = n.vdrs
 	n.Config.NetworkConfig.Beacons = n.beacons
 	n.Config.NetworkConfig.TLSConfig = tlsConfig
-	n.Config.NetworkConfig.IPSigner = peer.NewIPSigners(tlsKey)
+	n.Config.NetworkConfig.IPSigner = ipSigner
 	n.Config.NetworkConfig.WhitelistedSubnets = n.Config.WhitelistedSubnets
 	n.Config.NetworkConfig.UptimeCalculator = n.uptimeCalculator
 	n.Config.NetworkConfig.UptimeRequirement = n.Config.UptimeRequirement

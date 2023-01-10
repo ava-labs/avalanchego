@@ -13,8 +13,7 @@ import (
 
 func TestTLSSigner(t *testing.T) {
 	type args struct {
-		ipBytes   []byte
-		signature Signature
+		msg []byte
 	}
 
 	tests := []struct {
@@ -22,33 +21,21 @@ func TestTLSSigner(t *testing.T) {
 		args args
 	}{
 		{
-			name: "nil ip",
+			name: "nil msg",
 			args: args{
-				ipBytes:   nil,
-				signature: Signature{},
+				msg: nil,
 			},
 		},
 		{
-			name: "empty ip",
+			name: "empty msg",
 			args: args{
-				ipBytes:   []byte{},
-				signature: Signature{},
+				msg: []byte{},
 			},
 		},
 		{
-			name: "non-empty ip",
+			name: "non-empty msg",
 			args: args{
-				ipBytes:   []byte{1, 2, 3, 3, 5},
-				signature: Signature{},
-			},
-		},
-		{
-			name: "overwrite previous signature",
-			args: args{
-				ipBytes: []byte{1, 2, 3, 3, 5},
-				signature: Signature{
-					TLSSignature: []byte{6, 7, 8, 9, 0},
-				},
+				msg: []byte{1, 2, 3, 3, 5},
 			},
 		},
 	}
@@ -64,12 +51,12 @@ func TestTLSSigner(t *testing.T) {
 			r.NoError(err)
 
 			// sign the ip with the cert
-			sig, err := signer.Sign(test.args.ipBytes, test.args.signature)
+			sig, err := signer.Sign(test.args.msg)
 			r.NoError(err)
 
 			// verify the signature of the ip against the cert
 			r.NoError(cert.Leaf.CheckSignature(cert.Leaf.SignatureAlgorithm,
-				test.args.ipBytes, sig.TLSSignature))
+				test.args.msg, sig))
 		})
 	}
 }

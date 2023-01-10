@@ -17,13 +17,18 @@ type UnsignedIP struct {
 }
 
 // Sign this IP with the provided signer and return the signed IP.
-func (ip *UnsignedIP) Sign(signer IPSigner) (*SignedIP, error) {
-	signature := Signature{}
-	sig, err := signer.Sign(ip.bytes(), signature)
+func (ip *UnsignedIP) Sign(signer Signer) (*SignedIP, error) {
+	tlsSig, err := signer.SignTLS(ip.bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	blsSig := signer.SignBLS(ip.bytes())
 
 	return &SignedIP{
-		UnsignedIP: *ip,
-		Signature:  sig,
+		UnsignedIP:   *ip,
+		TLSSignature: tlsSig,
+		BLSSignature: blsSig,
 	}, err
 }
 
@@ -36,28 +41,20 @@ func (ip *UnsignedIP) bytes() []byte {
 	return p.Bytes
 }
 
-type Signature struct {
+// SignedIP is a wrapper of an UnsignedIP with the signature from a signer.
+type SignedIP struct {
+	UnsignedIP
 	TLSSignature []byte
 	BLSSignature []byte
 }
 
-// SignedIP is a wrapper of an UnsignedIP with the signature from a signer.
-type SignedIP struct {
-	UnsignedIP
-	Signature
-}
+func (ip *SignedIP) Verify(verifier Verifier) error {
+	errs := wrappers.Errs{}
 
-func (ip *SignedIP) Verify(verifier IPVerifier) error {
-	return verifier.Verify(ip.UnsignedIP.bytes(), ip.Signature)
-}
+	errs.Add(
+		verifier.VerifyTLS(ip.UnsignedIP.bytes(), ip.TLSSignature),
+		verifier.VerifyBLS(ip.UnsignedIP.bytes(), ip.BLSSignature),
+	)
 
-func (ip *SignedIP) Sign(signer IPSigner) (*SignedIP, error) {
-	sig, err := signer.Sign(ip.UnsignedIP.bytes(), ip.Signature)
-	if err != nil {
-		return nil, err
-	}
-
-	ip.Signature = sig
-
-	return ip, err
+	return errs.Err
 }

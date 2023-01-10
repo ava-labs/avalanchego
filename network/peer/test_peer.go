@@ -97,7 +97,7 @@ func StartTestPeer(
 	}
 
 	signerIP := ips.NewDynamicIPPort(net.IPv6zero, 0)
-	signer, err := NewTLSSigner(tlsCert)
+	signer, err := NewBanffSigner(tlsCert)
 	if err != nil {
 		return nil, err
 	}

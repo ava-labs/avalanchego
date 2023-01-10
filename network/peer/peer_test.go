@@ -108,9 +108,9 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 	peerConfig1 := sharedConfig
 
 	ip0 := ips.NewDynamicIPPort(net.IPv6loopback, 0)
-	tls0, err := NewTLSSigner(tlsCert0)
+	signer0, err := NewBanffSigner(tlsCert0)
 	require.NoError(err)
-	peerConfig0.IPSigner = NewDynamicIPSigner(ip0, tls0)
+	peerConfig0.IPSigner = NewDynamicIPSigner(ip0, signer0)
 
 	peerConfig0.Network = TestNetwork
 	inboundMsgChan0 := make(chan message.InboundMessage)
@@ -119,9 +119,9 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 	})
 
 	ip1 := ips.NewDynamicIPPort(net.IPv6loopback, 1)
-	tls1, err := NewTLSSigner(tlsCert1)
+	signer1, err := NewBanffSigner(tlsCert1)
 	require.NoError(err)
-	peerConfig1.IPSigner = NewDynamicIPSigner(ip1, tls1)
+	peerConfig1.IPSigner = NewDynamicIPSigner(ip1, signer1)
 
 	peerConfig1.Network = TestNetwork
 	inboundMsgChan1 := make(chan message.InboundMessage)

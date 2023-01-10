@@ -111,7 +111,7 @@ type peer struct {
 	conn net.Conn
 
 	// [ipVerifier] verifies messages from this peer.
-	ipVerifier IPVerifier
+	ipVerifier Verifier
 
 	// [cert] is this peer's certificate, specifically the leaf of the
 	// certificate chain they provided.
@@ -183,17 +183,11 @@ func Start(
 	id ids.NodeID,
 	messageQueue MessageQueue,
 ) Peer {
-	tlsVerifier := TLSVerifier{
-		Cert: cert,
-	}
-
 	onClosingCtx, onClosingCtxCancel := context.WithCancel(context.Background())
 	p := &peer{
-		Config: config,
-		conn:   conn,
-		ipVerifier: NewIPVerifiers(map[IPVerifier]bool{
-			tlsVerifier: true,
-		}),
+		Config:             config,
+		conn:               conn,
+		ipVerifier:         NewBanffVerifier(cert),
 		cert:               cert,
 		id:                 id,
 		messageQueue:       messageQueue,
@@ -925,10 +919,8 @@ func (p *peer) handleVersion(msg *p2p.Version) {
 			},
 			Timestamp: msg.MyVersionTime,
 		},
-		Signature: Signature{
-			TLSSignature: msg.Sig,
-			BLSSignature: nil,
-		},
+		TLSSignature: msg.Sig,
+		BLSSignature: nil,
 	}
 	if err := p.ip.Verify(p.ipVerifier); err != nil {
 		p.Log.Debug("signature verification failed",

@@ -14,7 +14,7 @@ import (
 type DynamicIPSigner struct {
 	ip     ips.DynamicIPPort
 	clock  mockable.Clock
-	signer IPSigner
+	signer Signer
 
 	// Must be held while accessing [signedIP]
 	signedIPLock sync.RWMutex
@@ -25,7 +25,7 @@ type DynamicIPSigner struct {
 
 func NewDynamicIPSigner(
 	ip ips.DynamicIPPort,
-	signer IPSigner,
+	signer Signer,
 ) *DynamicIPSigner {
 	return &DynamicIPSigner{
 		ip:     ip,

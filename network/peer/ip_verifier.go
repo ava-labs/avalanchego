@@ -3,8 +3,11 @@
 
 package peer
 
-type IPVerifier interface {
-	// Verify [signature] against [message]. Returns an error if verification
-	// fails.
-	Verify(ipBytes []byte, sig Signature) error
+type Verifier interface {
+	// VerifyTLS [sig] against [msg] using a tls key.
+	// Returns an error if verification fails.
+	VerifyTLS(ipBytes []byte, sig []byte) error
+	// VerifyBLS [sig] against [msg] using a bls key.
+	// Returns an error if verification fails.
+	VerifyBLS(ipBytes []byte, sig []byte) error
 }

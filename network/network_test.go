@@ -169,12 +169,12 @@ func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []id
 		config.MyNodeID = nodeID
 		config.MyIPPort = ip
 
-		tlsKey, err := peer.NewTLSSigner(tlsCert)
+		ipSigner, err := peer.NewBanffSigner(tlsCert)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
-		config.IPSigner = peer.NewIPSigners(tlsKey)
 
+		config.IPSigner = ipSigner
 		listeners[i] = listener
 		nodeIDs[i] = nodeID
 		configs[i] = &config

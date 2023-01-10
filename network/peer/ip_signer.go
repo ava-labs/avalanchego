@@ -3,8 +3,10 @@
 
 package peer
 
-type IPSigner interface {
-	// Sign signs the byte representation of the unsigned ip.
-	// Returns the updated Signature, and an error if signing failed.
-	Sign(ipBytes []byte, sig Signature) (Signature, error)
+type Signer interface {
+	// SignBLS signs the byte representation of the unsigned ip with a bls key.
+	SignBLS(ipBytes []byte) []byte
+	// SignTLS signs the byte representation of the unsigned ip with a tls key.
+	// Returns an error if signing failed.
+	SignTLS(ipBytes []byte) ([]byte, error)
 }
