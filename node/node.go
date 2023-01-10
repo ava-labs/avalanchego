@@ -5,7 +5,6 @@ package node
 
 import (
 	"context"
-	"crypto"
 	"errors"
 	"fmt"
 	"io"
@@ -88,8 +87,7 @@ var (
 	genesisHashKey  = []byte("genesisID")
 	indexerDBPrefix = []byte{0x00}
 
-	errInvalidTLSKey = errors.New("invalid TLS key")
-	errShuttingDown  = errors.New("server shutting down")
+	errShuttingDown = errors.New("server shutting down")
 )
 
 // Node is an instance of an Avalanche node.
@@ -226,9 +224,9 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		)
 	}
 
-	tlsKey, ok := n.Config.StakingTLSCert.PrivateKey.(crypto.Signer)
-	if !ok {
-		return errInvalidTLSKey
+	ipSigner, err := peer.NewBanffSigner(&n.Config.StakingTLSCert)
+	if err != nil {
+		return err
 	}
 
 	if n.Config.NetworkConfig.TLSKeyLogFile != "" {
@@ -324,7 +322,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	n.Config.NetworkConfig.Validators = n.vdrs
 	n.Config.NetworkConfig.Beacons = n.beacons
 	n.Config.NetworkConfig.TLSConfig = tlsConfig
-	n.Config.NetworkConfig.TLSKey = tlsKey
+	n.Config.NetworkConfig.IPSigner = ipSigner
 	n.Config.NetworkConfig.WhitelistedSubnets = n.Config.WhitelistedSubnets
 	n.Config.NetworkConfig.UptimeCalculator = n.uptimeCalculator
 	n.Config.NetworkConfig.UptimeRequirement = n.Config.UptimeRequirement

@@ -243,7 +243,7 @@ func NewNetwork(
 		MaxClockDifference:   config.MaxClockDifference,
 		ResourceTracker:      config.ResourceTracker,
 		UptimeCalculator:     config.UptimeCalculator,
-		IPSigner:             peer.NewIPSigner(config.MyIPPort, config.TLSKey),
+		IPSigner:             peer.NewDynamicIPSigner(config.MyIPPort, config.IPSigner),
 	}
 
 	onCloseCtx, cancel := context.WithCancel(context.Background())
@@ -384,7 +384,7 @@ func (n *network) Connected(nodeID ids.NodeID) {
 		Cert:      peer.Cert(),
 		IPPort:    peerIP.IPPort,
 		Timestamp: peerIP.Timestamp,
-		Signature: peerIP.Signature,
+		Signature: peerIP.TLSSignature,
 	}
 	prevIP, ok := n.peerIPs[nodeID]
 	if !ok {
@@ -962,9 +962,11 @@ func (n *network) authenticateIPs(ips []*ips.ClaimedIPPort) ([]*ipAuth, error) {
 				IPPort:    ip.IPPort,
 				Timestamp: ip.Timestamp,
 			},
-			Signature: ip.Signature,
+			TLSSignature: ip.Signature,
+			BLSSignature: nil,
 		}
-		if err := signedIP.Verify(ip.Cert); err != nil {
+		verifier := peer.NewBanffVerifier(ip.Cert)
+		if err := signedIP.Verify(verifier); err != nil {
 			return nil, err
 		}
 		ipAuths[i] = &ipAuth{

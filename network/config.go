@@ -4,7 +4,6 @@
 package network
 
 import (
-	"crypto"
 	"crypto/tls"
 	"time"
 
@@ -126,8 +125,8 @@ type Config struct {
 	// true.
 	CompressionEnabled bool `json:"compressionEnabled"`
 
-	// TLSKey is this node's TLS key that is used to sign IPs.
-	TLSKey crypto.Signer `json:"-"`
+	// IPSigner this node's key which is used to sign IPs.
+	IPSigner peer.Signer `json:"-"`
 
 	// WhitelistedSubnets of the node.
 	WhitelistedSubnets set.Set[ids.ID] `json:"-"`

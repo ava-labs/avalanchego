@@ -5,7 +5,6 @@ package peer
 
 import (
 	"context"
-	"crypto"
 	"net"
 	"time"
 
@@ -98,7 +97,10 @@ func StartTestPeer(
 	}
 
 	signerIP := ips.NewDynamicIPPort(net.IPv6zero, 0)
-	tls := tlsCert.PrivateKey.(crypto.Signer)
+	signer, err := NewBanffSigner(tlsCert)
+	if err != nil {
+		return nil, err
+	}
 
 	peer := Start(
 		&Config{
@@ -116,7 +118,7 @@ func StartTestPeer(
 			PongTimeout:          constants.DefaultPingPongTimeout,
 			MaxClockDifference:   time.Minute,
 			ResourceTracker:      resourceTracker,
-			IPSigner:             NewIPSigner(signerIP, tls),
+			IPSigner:             NewDynamicIPSigner(signerIP, signer),
 		},
 		conn,
 		cert,

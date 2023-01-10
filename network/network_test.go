@@ -5,7 +5,6 @@ package network
 
 import (
 	"context"
-	"crypto"
 	"net"
 	"sync"
 	"testing"
@@ -154,7 +153,7 @@ func newDefaultResourceTracker() tracker.ResourceTracker {
 	return tracker
 }
 
-func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []ids.NodeID, []*Config) {
+func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []ids.NodeID, []*Config, error) {
 	var (
 		dialer    = newTestDialer()
 		listeners = make([]*testListener, count)
@@ -169,13 +168,18 @@ func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []id
 		config.TLSConfig = tlsConfig
 		config.MyNodeID = nodeID
 		config.MyIPPort = ip
-		config.TLSKey = tlsCert.PrivateKey.(crypto.Signer)
 
+		ipSigner, err := peer.NewBanffSigner(tlsCert)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+
+		config.IPSigner = ipSigner
 		listeners[i] = listener
 		nodeIDs[i] = nodeID
 		configs[i] = &config
 	}
-	return dialer, listeners, nodeIDs, configs
+	return dialer, listeners, nodeIDs, configs, nil
 }
 
 func newMessageCreator(t *testing.T) message.Creator {
@@ -195,7 +199,8 @@ func newMessageCreator(t *testing.T) message.Creator {
 func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler) ([]ids.NodeID, []Network, *sync.WaitGroup) {
 	require := require.New(t)
 
-	dialer, listeners, nodeIDs, configs := newTestNetwork(t, len(handlers))
+	dialer, listeners, nodeIDs, configs, err := newTestNetwork(t, len(handlers))
+	require.NoError(err)
 
 	var (
 		networks = make([]Network, len(configs))

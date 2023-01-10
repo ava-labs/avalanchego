@@ -110,6 +110,9 @@ type peer struct {
 	// the connection object that is used to read/write messages from
 	conn net.Conn
 
+	// [ipVerifier] verifies messages from this peer.
+	ipVerifier Verifier
+
 	// [cert] is this peer's certificate, specifically the leaf of the
 	// certificate chain they provided.
 	cert *x509.Certificate
@@ -184,6 +187,7 @@ func Start(
 	p := &peer{
 		Config:             config,
 		conn:               conn,
+		ipVerifier:         NewBanffVerifier(cert),
 		cert:               cert,
 		id:                 id,
 		messageQueue:       messageQueue,
@@ -503,7 +507,7 @@ func (p *peer) writeMessages() {
 		mySignedIP.IPPort,
 		p.VersionCompatibility.Version().String(),
 		mySignedIP.Timestamp,
-		mySignedIP.Signature,
+		mySignedIP.TLSSignature,
 		p.MySubnets.List(),
 	)
 	if err != nil {
@@ -915,9 +919,10 @@ func (p *peer) handleVersion(msg *p2p.Version) {
 			},
 			Timestamp: msg.MyVersionTime,
 		},
-		Signature: msg.Sig,
+		TLSSignature: msg.Sig,
+		BLSSignature: nil,
 	}
-	if err := p.ip.Verify(p.cert); err != nil {
+	if err := p.ip.Verify(p.ipVerifier); err != nil {
 		p.Log.Debug("signature verification failed",
 			zap.Stringer("nodeID", p.id),
 			zap.Error(err),
