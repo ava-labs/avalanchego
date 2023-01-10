@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package peer
+package crypto
 
 import (
 	"crypto"
@@ -15,20 +15,13 @@ import (
 
 var errInvalidTLSKey = errors.New("invalid TLS key")
 
-// BLSSigner signs ips with a BLS key.
-type BLSSigner struct {
-	secretKey *bls.SecretKey
-}
-
-// NewBLSSigner returns a new instance of BLSSigner.
-func NewBLSSigner(secretKey *bls.SecretKey) BLSSigner {
-	return BLSSigner{
-		secretKey: secretKey,
-	}
-}
-
-func (b BLSSigner) Sign(msg []byte) []byte {
-	return bls.SignatureToBytes(bls.Sign(b.secretKey, msg))
+// MultiSigner supports the signing of multiple signature types
+type MultiSigner interface {
+	// SignBLS signs the byte representation of the unsigned ip with a bls key.
+	SignBLS(ipBytes []byte) []byte
+	// SignTLS signs the byte representation of the unsigned ip with a tls key.
+	// Returns an error if signing failed.
+	SignTLS(ipBytes []byte) ([]byte, error)
 }
 
 // TLSSigner is signs ips with a TLS key.
@@ -56,4 +49,20 @@ func (t TLSSigner) Sign(bytes []byte) ([]byte, error) {
 	}
 
 	return tlsSig, err
+}
+
+// BLSSigner signs ips with a BLS key.
+type BLSSigner struct {
+	secretKey *bls.SecretKey
+}
+
+// NewBLSSigner returns a new instance of BLSSigner.
+func NewBLSSigner(secretKey *bls.SecretKey) BLSSigner {
+	return BLSSigner{
+		secretKey: secretKey,
+	}
+}
+
+func (b BLSSigner) Sign(msg []byte) []byte {
+	return bls.SignatureToBytes(bls.Sign(b.secretKey, msg))
 }

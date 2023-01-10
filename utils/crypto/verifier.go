@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package peer
+package crypto
 
 import (
 	"crypto/x509"
@@ -11,6 +11,16 @@ import (
 )
 
 var errFailedBLSVerification = errors.New("failed bls verification")
+
+// MultiVerifier supports the verification of multiple signature types
+type MultiVerifier interface {
+	// VerifyTLS [sig] against [msg] using a tls key.
+	// Returns an error if verification fails.
+	VerifyTLS(ipBytes []byte, sig []byte) error
+	// VerifyBLS [sig] against [msg] using a bls key.
+	// Returns an error if verification fails.
+	VerifyBLS(ipBytes []byte, sig []byte) error
+}
 
 // BLSVerifier verifies a signature of an ip against a BLS key
 type BLSVerifier struct {

@@ -6,53 +6,56 @@ package peer
 import (
 	"crypto/tls"
 	"crypto/x509"
+
+	"github.com/ava-labs/avalanchego/utils/crypto"
 )
 
-var _ Signer = (*BanffSigner)(nil)
+var (
+	_ crypto.MultiSigner   = (*PreBanffSigner)(nil)
+	_ crypto.MultiVerifier = (*PreBanffVerifier)(nil)
+)
 
-// BanffSigner is used for all signing from genesis -> banff.
-type BanffSigner struct {
-	tlsSigner TLSSigner
+// PreBanffSigner is used for all signing from genesis -> banff.
+type PreBanffSigner struct {
+	tlsSigner crypto.TLSSigner
 }
 
-func NewBanffSigner(cert *tls.Certificate) (*BanffSigner, error) {
-	tlsSigner, err := NewTLSSigner(cert)
+func NewBanffSigner(cert *tls.Certificate) (*PreBanffSigner, error) {
+	tlsSigner, err := crypto.NewTLSSigner(cert)
 	if err != nil {
 		return nil, err
 	}
 
-	return &BanffSigner{
+	return &PreBanffSigner{
 		tlsSigner: tlsSigner,
 	}, nil
 }
 
-func (BanffSigner) SignBLS(_ []byte) []byte {
+func (PreBanffSigner) SignBLS(_ []byte) []byte {
 	return nil
 }
 
-func (b BanffSigner) SignTLS(msg []byte) ([]byte, error) {
+func (b PreBanffSigner) SignTLS(msg []byte) ([]byte, error) {
 	return b.tlsSigner.Sign(msg)
 }
 
-var _ Verifier = (*BanffVerifier)(nil)
-
-// BanffVerifier is used for all verification <= Banff.
-type BanffVerifier struct {
-	tlsVerifier TLSVerifier
+// PreBanffVerifier is used for all verification <= Banff.
+type PreBanffVerifier struct {
+	tlsVerifier crypto.TLSVerifier
 }
 
-func NewBanffVerifier(cert *x509.Certificate) *BanffVerifier {
-	return &BanffVerifier{
-		tlsVerifier: TLSVerifier{
+func NewBanffVerifier(cert *x509.Certificate) *PreBanffVerifier {
+	return &PreBanffVerifier{
+		tlsVerifier: crypto.TLSVerifier{
 			Cert: cert,
 		},
 	}
 }
 
-func (BanffVerifier) VerifyBLS(_, _ []byte) error {
+func (PreBanffVerifier) VerifyBLS(_, _ []byte) error {
 	return nil
 }
 
-func (b BanffVerifier) VerifyTLS(msg, sig []byte) error {
+func (b PreBanffVerifier) VerifyTLS(msg, sig []byte) error {
 	return b.tlsVerifier.Verify(msg, sig)
 }

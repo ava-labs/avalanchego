@@ -51,5 +51,5 @@ type Config struct {
 	UptimeCalculator uptime.Calculator
 
 	// Signs my IP so I can send my signed IP address in the Version message
-	IPSigner *DynamicIPSigner
+	IPSigner *IPSigner
 }
