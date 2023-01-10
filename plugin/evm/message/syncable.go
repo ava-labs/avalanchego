@@ -25,10 +25,10 @@ type SyncSummary struct {
 
 	summaryID  ids.ID
 	bytes      []byte
-	acceptImpl func(SyncSummary) (bool, error)
+	acceptImpl func(SyncSummary) (block.StateSyncMode, error)
 }
 
-func NewSyncSummaryFromBytes(summaryBytes []byte, acceptImpl func(SyncSummary) (bool, error)) (SyncSummary, error) {
+func NewSyncSummaryFromBytes(summaryBytes []byte, acceptImpl func(SyncSummary) (block.StateSyncMode, error)) (SyncSummary, error) {
 	summary := SyncSummary{}
 	if codecVersion, err := Codec.Unmarshal(summaryBytes, &summary); err != nil {
 		return SyncSummary{}, err
@@ -83,9 +83,9 @@ func (s SyncSummary) String() string {
 	return fmt.Sprintf("SyncSummary(BlockHash=%s, BlockNumber=%d, BlockRoot=%s)", s.BlockHash, s.BlockNumber, s.BlockRoot)
 }
 
-func (s SyncSummary) Accept(context.Context) (bool, error) {
+func (s SyncSummary) Accept(context.Context) (block.StateSyncMode, error) {
 	if s.acceptImpl == nil {
-		return false, fmt.Errorf("accept implementation not specified for summary: %s", s)
+		return block.StateSyncSkipped, fmt.Errorf("accept implementation not specified for summary: %s", s)
 	}
 	return s.acceptImpl(s)
 }
