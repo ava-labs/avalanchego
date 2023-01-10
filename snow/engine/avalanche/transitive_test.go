@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -924,7 +925,7 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 	engCfg.Manager = manager
 	manager.Default(true)
 
-	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
+	vm := &vertex.TestVM{TestVM: block.TestVM{TestVM: common.TestVM{T: t}}}
 	engCfg.VM = vm
 	vm.Default(true)
 
@@ -1030,7 +1031,7 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 	engCfg.Manager = manager
 	manager.Default(true)
 
-	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
+	vm := &vertex.TestVM{TestVM: block.TestVM{TestVM: common.TestVM{T: t}}}
 	engCfg.VM = vm
 	vm.Default(true)
 
@@ -1218,7 +1219,7 @@ func TestEngineReissue(t *testing.T) {
 	manager.Default(true)
 	engCfg.Manager = manager
 
-	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
+	vm := &vertex.TestVM{TestVM: block.TestVM{TestVM: common.TestVM{T: t}}}
 	vm.Default(true)
 	engCfg.VM = vm
 
@@ -1406,7 +1407,7 @@ func TestEngineLargeIssue(t *testing.T) {
 	manager.Default(true)
 	engCfg.Manager = manager
 
-	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
+	vm := &vertex.TestVM{TestVM: block.TestVM{TestVM: common.TestVM{T: t}}}
 	vm.Default(true)
 	engCfg.VM = vm
 
@@ -2726,7 +2727,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
-	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
+	vm := &vertex.TestVM{TestVM: block.TestVM{TestVM: common.TestVM{T: t}}}
 	vm.Default(true)
 	bootCfg.VM = vm
 	engCfg.VM = vm
@@ -3002,7 +3003,7 @@ func TestEngineReBootstrapFails(t *testing.T) {
 	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
-	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
+	vm := &vertex.TestVM{TestVM: block.TestVM{TestVM: common.TestVM{T: t}}}
 	vm.Default(true)
 	bootCfg.VM = vm
 	engCfg.VM = vm
@@ -3167,7 +3168,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
-	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
+	vm := &vertex.TestVM{TestVM: block.TestVM{TestVM: common.TestVM{T: t}}}
 	vm.Default(true)
 	bootCfg.VM = vm
 	engCfg.VM = vm
@@ -3974,7 +3975,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	manager := vertex.NewTestManager(t)
 	engCfg.Manager = manager
 
-	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
+	vm := &vertex.TestVM{TestVM: block.TestVM{TestVM: common.TestVM{T: t}}}
 	vm.Default(true)
 	engCfg.VM = vm
 
@@ -4091,7 +4092,7 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 
 	manager.Default(true)
 
-	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
+	vm := &vertex.TestVM{TestVM: block.TestVM{TestVM: common.TestVM{T: t}}}
 	vm.Default(true)
 	engCfg.VM = vm
 
@@ -4490,7 +4491,7 @@ func TestEngineIssue(t *testing.T) {
 	manager.Default(true)
 	engCfg.Manager = manager
 
-	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
+	vm := &vertex.TestVM{TestVM: block.TestVM{TestVM: common.TestVM{T: t}}}
 	vm.Default(true)
 	engCfg.VM = vm
 
@@ -4638,7 +4639,7 @@ func TestAbandonTx(t *testing.T) {
 	manager.CantGetVtx = false
 	engCfg.Manager = manager
 
-	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
+	vm := &vertex.TestVM{TestVM: block.TestVM{TestVM: common.TestVM{T: t}}}
 	vm.Default(true)
 	vm.CantSetState = false
 
@@ -4913,7 +4914,7 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 	manager.Default(true)
 	engCfg.Manager = manager
 
-	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
+	vm := &vertex.TestVM{TestVM: block.TestVM{TestVM: common.TestVM{T: t}}}
 	vm.Default(true)
 	engCfg.VM = vm
 
