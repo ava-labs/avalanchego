@@ -407,7 +407,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			},
 			errMessage: "invalid character",
 		},
-		"subnet is not whitelisted": {
+		"subnet is not tracked": {
 			fileName:  "Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU.json",
 			givenJSON: `{"validatorOnly": true}`,
 			testF: func(require *require.Assertions, given map[ids.ID]chains.SubnetConfig) {
@@ -508,7 +508,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				require.Equal(20, config.ConsensusParameters.K)
 			},
 		},
-		"subnet is not whitelisted": {
+		"subnet is not tracked": {
 			givenJSON: `{"Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU":{"validatorOnly":true}}`,
 			testF: func(require *require.Assertions, given map[ids.ID]chains.SubnetConfig) {
 				require.Empty(given)

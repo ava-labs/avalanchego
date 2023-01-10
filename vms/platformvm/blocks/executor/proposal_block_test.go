@@ -557,7 +557,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 			env.config.BanffTime = time.Time{} // activate Banff
 
 			subnetID := testSubnet1.ID()
-			env.config.WhitelistedSubnets.Add(subnetID)
+			env.config.TrackedSubnets.Add(subnetID)
 			env.config.Validators.Add(subnetID, validators.NewSet())
 
 			for _, staker := range test.stakers {
@@ -704,7 +704,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	env.config.BanffTime = time.Time{} // activate Banff
 
 	subnetID := testSubnet1.ID()
-	env.config.WhitelistedSubnets.Add(subnetID)
+	env.config.TrackedSubnets.Add(subnetID)
 	env.config.Validators.Add(subnetID, validators.NewSet())
 
 	// Add a subnet validator to the staker set
@@ -831,9 +831,9 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	require.False(validators.Contains(env.config.Validators, subnetID, subnetValidatorNodeID))
 }
 
-func TestBanffProposalBlockWhitelistedSubnet(t *testing.T) {
-	for _, whitelist := range []bool{true, false} {
-		t.Run(fmt.Sprintf("whitelisted %t", whitelist), func(ts *testing.T) {
+func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
+	for _, tracked := range []bool{true, false} {
+		t.Run(fmt.Sprintf("tracked %t", tracked), func(ts *testing.T) {
 			require := require.New(t)
 			env := newEnvironment(t, nil)
 			defer func() {
@@ -842,8 +842,8 @@ func TestBanffProposalBlockWhitelistedSubnet(t *testing.T) {
 			env.config.BanffTime = time.Time{} // activate Banff
 
 			subnetID := testSubnet1.ID()
-			if whitelist {
-				env.config.WhitelistedSubnets.Add(subnetID)
+			if tracked {
+				env.config.TrackedSubnets.Add(subnetID)
 				env.config.Validators.Add(subnetID, validators.NewSet())
 			}
 
@@ -932,7 +932,7 @@ func TestBanffProposalBlockWhitelistedSubnet(t *testing.T) {
 
 			require.NoError(propBlk.Accept(context.Background()))
 			require.NoError(commitBlk.Accept(context.Background()))
-			require.Equal(whitelist, validators.Contains(env.config.Validators, subnetID, subnetValidatorNodeID))
+			require.Equal(tracked, validators.Contains(env.config.Validators, subnetID, subnetValidatorNodeID))
 		})
 	}
 }

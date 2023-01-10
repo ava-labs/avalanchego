@@ -169,7 +169,7 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 		registerer.Register(m.peerConnectedLifetimeAverage),
 	)
 
-	// init subnet tracker metrics with whitelisted subnets
+	// init subnet tracker metrics with tracked subnets
 	for subnetID := range initialSubnetIDs {
 		// no need to track primary network ID
 		if subnetID == constants.PrimaryNetworkID {

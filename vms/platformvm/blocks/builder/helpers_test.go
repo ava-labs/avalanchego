@@ -164,7 +164,7 @@ func newEnvironment(t *testing.T) *environment {
 	)
 	res.sender = &common.SenderTest{T: t}
 
-	metrics, err := metrics.New("", registerer, res.config.WhitelistedSubnets)
+	metrics, err := metrics.New("", registerer, res.config.TrackedSubnets)
 	if err != nil {
 		panic(fmt.Errorf("failed to create metrics: %w", err))
 	}

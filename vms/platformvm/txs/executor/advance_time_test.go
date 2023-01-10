@@ -355,7 +355,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 			dummyHeight := uint64(1)
 
 			subnetID := testSubnet1.ID()
-			env.config.WhitelistedSubnets.Add(subnetID)
+			env.config.TrackedSubnets.Add(subnetID)
 			env.config.Validators.Add(subnetID, validators.NewSet())
 
 			for _, staker := range test.stakers {
@@ -455,7 +455,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	}()
 
 	subnetID := testSubnet1.ID()
-	env.config.WhitelistedSubnets.Add(subnetID)
+	env.config.TrackedSubnets.Add(subnetID)
 	env.config.Validators.Add(subnetID, validators.NewSet())
 
 	dummyHeight := uint64(1)
@@ -545,9 +545,9 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	require.False(validators.Contains(env.config.Validators, subnetID, subnetValidatorNodeID))
 }
 
-func TestWhitelistedSubnet(t *testing.T) {
-	for _, whitelist := range []bool{true, false} {
-		t.Run(fmt.Sprintf("whitelisted %t", whitelist), func(t *testing.T) {
+func TestTrackedSubnet(t *testing.T) {
+	for _, tracked := range []bool{true, false} {
+		t.Run(fmt.Sprintf("tracked %t", tracked), func(t *testing.T) {
 			require := require.New(t)
 			env := newEnvironment( /*postBanff*/ false)
 			env.ctx.Lock.Lock()
@@ -557,8 +557,8 @@ func TestWhitelistedSubnet(t *testing.T) {
 			dummyHeight := uint64(1)
 
 			subnetID := testSubnet1.ID()
-			if whitelist {
-				env.config.WhitelistedSubnets.Add(subnetID)
+			if tracked {
+				env.config.TrackedSubnets.Add(subnetID)
 				env.config.Validators.Add(subnetID, validators.NewSet())
 			}
 
@@ -613,7 +613,7 @@ func TestWhitelistedSubnet(t *testing.T) {
 			executor.OnCommitState.Apply(env.state)
 			env.state.SetHeight(dummyHeight)
 			require.NoError(env.state.Commit())
-			require.Equal(whitelist, validators.Contains(env.config.Validators, subnetID, ids.NodeID(subnetValidatorNodeID)))
+			require.Equal(tracked, validators.Contains(env.config.Validators, subnetID, ids.NodeID(subnetValidatorNodeID)))
 		})
 	}
 }
