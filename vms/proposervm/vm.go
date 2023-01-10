@@ -5,6 +5,8 @@ package proposervm
 
 import (
 	"context"
+	"crypto"
+	"crypto/x509"
 	"fmt"
 	"time"
 
@@ -65,6 +67,10 @@ type VM struct {
 	activationTime      time.Time
 	minimumPChainHeight uint64
 	minBlkDelay         time.Duration
+	// block signer
+	stakingLeafSigner crypto.Signer
+	// block certificate
+	stakingCertLeaf *x509.Certificate
 
 	state.State
 	hIndexer indexer.HeightIndexer
@@ -108,6 +114,8 @@ func New(
 	activationTime time.Time,
 	minimumPChainHeight uint64,
 	minBlkDelay time.Duration,
+	stakingLeafSigner crypto.Signer,
+	stakingCertLeaf *x509.Certificate,
 ) *VM {
 	blockBuilderVM, _ := vm.(block.BuildBlockWithContextChainVM)
 	batchedVM, _ := vm.(block.BatchedChainVM)
@@ -123,6 +131,8 @@ func New(
 		activationTime:      activationTime,
 		minimumPChainHeight: minimumPChainHeight,
 		minBlkDelay:         minBlkDelay,
+		stakingLeafSigner:   stakingLeafSigner,
+		stakingCertLeaf:     stakingCertLeaf,
 	}
 }
 

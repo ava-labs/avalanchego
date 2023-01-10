@@ -447,10 +447,8 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 
 			TeleporterSigner: teleporter.NewSigner(m.StakingBLSKey, chainParams.ID),
 
-			ValidatorState:    m.validatorState,
-			StakingCertLeaf:   m.StakingCert.Leaf,
-			StakingLeafSigner: m.StakingCert.PrivateKey.(crypto.Signer),
-			ChainDataDir:      chainDataDir,
+			ValidatorState: m.validatorState,
+			ChainDataDir:   chainDataDir,
 		},
 		DecisionAcceptor:  m.DecisionAcceptorGroup,
 		ConsensusAcceptor: m.ConsensusAcceptorGroup,
@@ -934,6 +932,8 @@ func (m *manager) createSnowmanChain(
 		m.ApricotPhase4Time,
 		m.ApricotPhase4MinPChainHeight,
 		minBlockDelay,
+		m.StakingCert.PrivateKey.(crypto.Signer),
+		m.StakingCert.Leaf,
 	)
 
 	if m.MeterVMEnabled {

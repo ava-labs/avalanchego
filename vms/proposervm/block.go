@@ -247,10 +247,10 @@ func (p *postForkCommonComponents) buildChild(
 			parentID,
 			newTimestamp,
 			pChainHeight,
-			p.vm.ctx.StakingCertLeaf,
+			p.vm.stakingCertLeaf,
 			innerBlock.Bytes(),
 			p.vm.ctx.ChainID,
-			p.vm.ctx.StakingLeafSigner,
+			p.vm.stakingLeafSigner,
 		)
 	}
 	if err != nil {

@@ -4,8 +4,6 @@
 package snow
 
 import (
-	"crypto"
-	"crypto/x509"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -51,10 +49,7 @@ type Context struct {
 	TeleporterSigner teleporter.Signer
 
 	// snowman++ attributes
-	ValidatorState    validators.State  // interface for P-Chain validators
-	StakingLeafSigner crypto.Signer     // block signer
-	StakingCertLeaf   *x509.Certificate // block certificate
-
+	ValidatorState validators.State // interface for P-Chain validators
 	// Chain-specific directory where arbitrary data can be written
 	ChainDataDir string
 }

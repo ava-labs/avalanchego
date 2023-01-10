@@ -17,6 +17,8 @@ import (
 
 	"github.com/NYTimes/gziphandler"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/rs/cors"
 
 	"go.uber.org/zap"
@@ -95,6 +97,8 @@ type server struct {
 	tracingEnabled bool
 	tracer         trace.Tracer
 
+	metrics *metrics
+
 	// Maps endpoints to handlers
 	router *router
 
@@ -112,8 +116,15 @@ func New(
 	nodeID ids.NodeID,
 	tracingEnabled bool,
 	tracer trace.Tracer,
+	namespace string,
+	registerer prometheus.Registerer,
 	wrappers ...Wrapper,
-) Server {
+) (Server, error) {
+	m, err := newMetrics(namespace, registerer)
+	if err != nil {
+		return nil, err
+	}
+
 	router := newRouter()
 	corsHandler := cors.New(cors.Options{
 		AllowedOrigins:   allowedOrigins,
@@ -144,12 +155,13 @@ func New(
 		shutdownTimeout: shutdownTimeout,
 		tracingEnabled:  tracingEnabled,
 		tracer:          tracer,
+		metrics:         m,
 		router:          router,
 		srv: &http.Server{
 			Handler:           handler,
 			ReadHeaderTimeout: readHeaderTimeout,
 		},
-	}
+	}, nil
 }
 
 func (s *server) Dispatch() error {
@@ -278,6 +290,7 @@ func (s *server) addChainRoute(chainName string, handler *common.HTTPHandler, ct
 	}
 	// Apply middleware to reject calls to the handler before the chain finishes bootstrapping
 	h = rejectMiddleware(h, ctx)
+	h = s.metrics.wrapHandler(chainName, h)
 	return s.router.AddRouter(url, endpoint, h)
 }
 
@@ -316,6 +329,7 @@ func (s *server) addRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base,
 	if err != nil {
 		return err
 	}
+	h = s.metrics.wrapHandler(base, h)
 	return s.router.AddRouter(url, endpoint, h)
 }
 

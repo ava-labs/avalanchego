@@ -554,12 +554,18 @@ func (n *Node) initChains(genesisBytes []byte) {
 	n.chainManager.StartChainCreator(platformChain)
 }
 
+func (n *Node) initMetrics() {
+	n.MetricsRegisterer = prometheus.NewRegistry()
+	n.MetricsGatherer = metrics.NewMultiGatherer()
+}
+
 // initAPIServer initializes the server that handles HTTP calls
 func (n *Node) initAPIServer() error {
 	n.Log.Info("initializing API server")
 
 	if !n.Config.APIRequireAuthToken {
-		n.APIServer = server.New(
+		var err error
+		n.APIServer, err = server.New(
 			n.Log,
 			n.LogFactory,
 			n.Config.HTTPHost,
@@ -569,8 +575,10 @@ func (n *Node) initAPIServer() error {
 			n.ID,
 			n.Config.TraceConfig.Enabled,
 			n.tracer,
+			"api",
+			n.MetricsRegisterer,
 		)
-		return nil
+		return err
 	}
 
 	a, err := auth.New(n.Log, "auth", n.Config.APIAuthPassword)
@@ -578,7 +586,7 @@ func (n *Node) initAPIServer() error {
 		return err
 	}
 
-	n.APIServer = server.New(
+	n.APIServer, err = server.New(
 		n.Log,
 		n.LogFactory,
 		n.Config.HTTPHost,
@@ -588,8 +596,13 @@ func (n *Node) initAPIServer() error {
 		n.ID,
 		n.Config.TraceConfig.Enabled,
 		n.tracer,
+		"api",
+		n.MetricsRegisterer,
 		a,
 	)
+	if err != nil {
+		return err
+	}
 
 	// only create auth service if token authorization is required
 	n.Log.Info("API authorization is enabled. Auth tokens must be passed in the header of API requests, except requests to the auth service.")
@@ -847,9 +860,6 @@ func (n *Node) initKeystoreAPI() error {
 // initMetricsAPI initializes the Metrics API
 // Assumes n.APIServer is already set
 func (n *Node) initMetricsAPI() error {
-	n.MetricsRegisterer = prometheus.NewRegistry()
-	n.MetricsGatherer = metrics.NewMultiGatherer()
-
 	if !n.Config.MetricsAPIEnabled {
 		n.Log.Info("skipping metrics API initialization because it has been disabled")
 		return nil
@@ -1232,6 +1242,8 @@ func (n *Node) Initialize(
 	if n.Config.TraceConfig.Enabled {
 		n.Config.ConsensusRouter = router.Trace(n.Config.ConsensusRouter, n.tracer)
 	}
+
+	n.initMetrics()
 
 	if err := n.initAPIServer(); err != nil { // Start the API Server
 		return fmt.Errorf("couldn't initialize API server: %w", err)
