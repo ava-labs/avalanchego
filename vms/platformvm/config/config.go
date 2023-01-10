@@ -36,7 +36,7 @@ type Config struct {
 	StakingEnabled bool
 
 	// Set of subnets that this node is validating
-	WhitelistedSubnets set.Set[ids.ID]
+	TrackedSubnets set.Set[ids.ID]
 
 	// Fee that is burned by every non-state creating transaction
 	TxFee uint64
@@ -101,9 +101,9 @@ type Config struct {
 	// Subnet ID --> Minimum portion of the subnet's stake this node must be
 	// connected to in order to report healthy.
 	// [constants.PrimaryNetworkID] is always a key in this map.
-	// If a subnet is in this map, but it isn't whitelisted, its corresponding
-	// value isn't used.
-	// If a subnet is whitelisted but not in this map, we use the value for the
+	// If a subnet is in this map, but it isn't tracked, its corresponding value
+	// isn't used.
+	// If a subnet is tracked but not in this map, we use the value for the
 	// Primary Network.
 	MinPercentConnectedStakeHealthy map[ids.ID]float64
 
@@ -148,7 +148,7 @@ func (c *Config) GetCreateSubnetTxFee(timestamp time.Time) uint64 {
 func (c *Config) CreateChain(chainID ids.ID, tx *txs.CreateChainTx) {
 	if c.StakingEnabled && // Staking is enabled, so nodes might not validate all chains
 		constants.PrimaryNetworkID != tx.SubnetID && // All nodes must validate the primary network
-		!c.WhitelistedSubnets.Contains(tx.SubnetID) { // This node doesn't validate this blockchain
+		!c.TrackedSubnets.Contains(tx.SubnetID) { // This node doesn't validate this blockchain
 		return
 	}
 

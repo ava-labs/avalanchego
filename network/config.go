@@ -129,9 +129,9 @@ type Config struct {
 	// IPSigner this node's key which is used to sign IPs.
 	IPSigner signer.Signer `json:"-"`
 
-	// WhitelistedSubnets of the node.
-	WhitelistedSubnets set.Set[ids.ID] `json:"-"`
-	Beacons            validators.Set  `json:"-"`
+	// TrackedSubnets of the node.
+	TrackedSubnets set.Set[ids.ID] `json:"-"`
+	Beacons        validators.Set  `json:"-"`
 
 	// Validators are the current validators in the Avalanche network
 	Validators validators.Manager `json:"-"`

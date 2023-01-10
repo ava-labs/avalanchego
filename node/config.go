@@ -161,16 +161,12 @@ type Config struct {
 
 	AdaptiveTimeoutConfig timer.AdaptiveTimeoutConfig `json:"adaptiveTimeoutConfig"`
 
-	// Benchlist Configuration
 	BenchlistConfig benchlist.Config `json:"benchlistConfig"`
 
-	// Profiling configurations
 	ProfilerConfig profiler.Config `json:"profilerConfig"`
 
-	// Logging configuration
 	LoggingConfig logging.Config `json:"loggingConfig"`
 
-	// Plugin directory
 	PluginDir string `json:"pluginDir"`
 
 	// File Descriptor Limit
@@ -189,17 +185,13 @@ type Config struct {
 	// Gossip a container in the accepted frontier every [ConsensusGossipFrequency]
 	ConsensusGossipFrequency time.Duration `json:"consensusGossipFreq"`
 
-	// Subnet Whitelist
-	WhitelistedSubnets set.Set[ids.ID] `json:"whitelistedSubnets"`
+	TrackedSubnets set.Set[ids.ID] `json:"trackedSubnets"`
 
-	// SubnetConfigs
 	SubnetConfigs map[ids.ID]chains.SubnetConfig `json:"subnetConfigs"`
 
-	// ChainConfigs
 	ChainConfigs map[string]chains.ChainConfig `json:"-"`
 	ChainAliases map[ids.ID][]string           `json:"chainAliases"`
 
-	// VM management
 	VMManager vms.Manager `json:"-"`
 
 	// Halflife to use for the processing requests tracker.

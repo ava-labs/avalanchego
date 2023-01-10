@@ -441,7 +441,7 @@ func shutdownEnvironment(env *environment) error {
 			return err
 		}
 
-		for subnetID := range env.config.WhitelistedSubnets {
+		for subnetID := range env.config.TrackedSubnets {
 			vdrs, exist := env.config.Validators.Get(subnetID)
 			if !exist {
 				return nil
