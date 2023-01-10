@@ -16,6 +16,7 @@ This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/ava
 
 - Added `--plugin-dir` flag. The default value is `[DATADIR]/plugins`
 - Removed `--build-dir` flag. The location of the avalanchego binary is no longer considered when looking for the `plugins` directory. Subnet maintainers should ensure that their node is able to properly discover plugins, as the default location is likely changed. See `--plugin-dir`
+- Changed the default value of `--api-keystore-enabled` to `false`
 - Added `--track-subnets` flag as a replacement of `--whitelisted-subnets`
 
 ### Fixes
@@ -30,6 +31,13 @@ This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/ava
 - Added `Block` format and definition to the `AVM`
 - Removed `proposervm` height index reset
 
+### Metrics
+
+- Added `avalanche_network_peer_connected_duration_average` metric
+- Added `avalanche_api_calls_processing` metric
+- Added `avalanche_api_calls` metric
+- Added `avalanche_api_calls_duration` metric
+
 ### Documentation
 
 - Added wallet example to create `stakeable.LockOut` outputs
@@ -39,7 +47,6 @@ This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/ava
 
 - Updated ledger-avalanche to v0.6.5
 - Added linter to ban the usage of `fmt.Errorf` without format directives
-- Added `avalanche_network_peer_connected_duration_average` metric
 - Added `List` to the `buffer#Deque` interface
 - Added `Index` to the `buffer#Deque` interface
 - Added `SetLevel` to the `Logger` interface
