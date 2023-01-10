@@ -66,7 +66,7 @@ func (vm *VM) HealthCheck(context.Context) (interface{}, error) {
 		)
 	}
 
-	for subnetID := range vm.WhitelistedSubnets {
+	for subnetID := range vm.TrackedSubnets {
 		percentConnected, err := vm.getPercentConnected(subnetID)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't get percent connected for %q: %w", subnetID, err)

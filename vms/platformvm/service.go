@@ -2347,7 +2347,7 @@ func (s *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, response *ap
 
 func (s *Service) getAPIUptime(staker *state.Staker) (*json.Float32, error) {
 	// Only report uptimes that we have been actively tracking.
-	if constants.PrimaryNetworkID != staker.SubnetID && !s.vm.WhitelistedSubnets.Contains(staker.SubnetID) {
+	if constants.PrimaryNetworkID != staker.SubnetID && !s.vm.TrackedSubnets.Contains(staker.SubnetID) {
 		return nil, nil
 	}
 

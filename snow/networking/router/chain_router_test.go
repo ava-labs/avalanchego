@@ -1206,8 +1206,8 @@ func TestConnectedSubnet(t *testing.T) {
 	peerNodeID := ids.GenerateTestNodeID()
 	subnetID0 := ids.GenerateTestID()
 	subnetID1 := ids.GenerateTestID()
-	whitelistedSubnets := set.Set[ids.ID]{}
-	whitelistedSubnets.Add(subnetID0, subnetID1)
+	trackedSubnets := set.Set[ids.ID]{}
+	trackedSubnets.Add(subnetID0, subnetID1)
 	chainRouter := ChainRouter{}
 	err = chainRouter.Initialize(
 		myNodeID,
@@ -1216,7 +1216,7 @@ func TestConnectedSubnet(t *testing.T) {
 		time.Millisecond,
 		set.Set[ids.ID]{},
 		true,
-		whitelistedSubnets,
+		trackedSubnets,
 		nil,
 		HealthConfig{},
 		"",
