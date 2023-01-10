@@ -98,7 +98,7 @@ type Manager interface {
 	// Queues a chain to be created in the future after chain creator is unblocked.
 	// This is only called from the P-chain thread to create other chains
 	// Queued chains are created only after P-chain is bootstrapped.
-	// This assumes only chains in whitelisted subnets are queued.
+	// This assumes only chains in tracked subnets are queued.
 	QueueChainCreation(ChainParameters)
 
 	// Add a registrant [r]. Every time a chain is
@@ -262,7 +262,7 @@ func (m *manager) Router() router.Router {
 }
 
 // QueueChainCreation queues a chain creation request
-// Invariant: Whitelisted Subnet must be checked before calling this function
+// Invariant: Tracked Subnet must be checked before calling this function
 func (m *manager) QueueChainCreation(chainParams ChainParameters) {
 	m.subnetsLock.Lock()
 	sb, exists := m.subnets[chainParams.SubnetID]

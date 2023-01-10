@@ -95,7 +95,7 @@ type VM struct {
 	// Bootstrapped remembers if this chain has finished bootstrapping or not
 	bootstrapped utils.AtomicBool
 
-	// Maps caches for each subnet that is currently whitelisted.
+	// Maps caches for each subnet that is currently tracked.
 	// Key: Subnet ID
 	// Value: cache mapping height -> validator set map
 	validatorSetCaches map[ids.ID]cache.Cacher
@@ -130,7 +130,7 @@ func (vm *VM) Initialize(
 
 	// Initialize metrics as soon as possible
 	var err error
-	vm.metrics, err = metrics.New("", registerer, vm.WhitelistedSubnets)
+	vm.metrics, err = metrics.New("", registerer, vm.TrackedSubnets)
 	if err != nil {
 		return fmt.Errorf("failed to initialize metrics: %w", err)
 	}
@@ -238,7 +238,7 @@ func (vm *VM) initBlockchains() error {
 	}
 
 	if vm.StakingEnabled {
-		for subnetID := range vm.WhitelistedSubnets {
+		for subnetID := range vm.TrackedSubnets {
 			if err := vm.createSubnet(subnetID); err != nil {
 				return err
 			}
@@ -298,7 +298,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 		return err
 	}
 
-	for subnetID := range vm.WhitelistedSubnets {
+	for subnetID := range vm.TrackedSubnets {
 		vdrIDs, exists := vm.getValidatorIDs(subnetID)
 		if !exists {
 			return errMissingValidatorSet
@@ -345,7 +345,7 @@ func (vm *VM) Shutdown(context.Context) error {
 			return err
 		}
 
-		for subnetID := range vm.WhitelistedSubnets {
+		for subnetID := range vm.TrackedSubnets {
 			vdrIDs, exists := vm.getValidatorIDs(subnetID)
 			if !exists {
 				return errMissingValidatorSet
@@ -478,8 +478,8 @@ func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.I
 	validatorSetsCache, exists := vm.validatorSetCaches[subnetID]
 	if !exists {
 		validatorSetsCache = &cache.LRU{Size: validatorSetsCacheSize}
-		// Only cache whitelisted subnets
-		if subnetID == constants.PrimaryNetworkID || vm.WhitelistedSubnets.Contains(subnetID) {
+		// Only cache tracked subnets
+		if subnetID == constants.PrimaryNetworkID || vm.TrackedSubnets.Contains(subnetID) {
 			vm.validatorSetCaches[subnetID] = validatorSetsCache
 		}
 	}

@@ -68,7 +68,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 
 			subnetID := ids.GenerateTestID()
 			subnetVdrs := validators.NewSet()
-			vm.WhitelistedSubnets.Add(subnetID)
+			vm.TrackedSubnets.Add(subnetID)
 			testVdrCount := 4
 			for i := 0; i < testVdrCount; i++ {
 				subnetVal := ids.GenerateTestNodeID()
