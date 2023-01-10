@@ -62,12 +62,12 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 		ChainVM:        innerVM,
 		blockBuilderVM: innerBlockBuilderVM,
 		ctx: &snow.Context{
-			ValidatorState:    vdrState,
-			Log:               logging.NoLog{},
-			StakingCertLeaf:   &x509.Certificate{},
-			StakingLeafSigner: pk,
+			ValidatorState: vdrState,
+			Log:            logging.NoLog{},
 		},
-		Windower: windower,
+		Windower:          windower,
+		stakingCertLeaf:   &x509.Certificate{},
+		stakingLeafSigner: pk,
 	}
 
 	blk := &postForkCommonComponents{

@@ -979,7 +979,14 @@ func initTestRemoteProposerVM(
 		}
 	}
 
-	proVM := New(coreVM, proBlkStartTime, 0, DefaultMinBlockDelay)
+	proVM := New(
+		coreVM,
+		proBlkStartTime,
+		0,
+		DefaultMinBlockDelay,
+		pTestCert.PrivateKey.(crypto.Signer),
+		pTestCert.Leaf,
+	)
 
 	valState := &validators.TestState{
 		T: t,
@@ -1013,8 +1020,6 @@ func initTestRemoteProposerVM(
 
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
-	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
