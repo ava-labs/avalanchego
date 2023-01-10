@@ -6,6 +6,7 @@ package peer
 import (
 	"sync"
 
+	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
@@ -14,7 +15,7 @@ import (
 type DynamicIPSigner struct {
 	ip     ips.DynamicIPPort
 	clock  mockable.Clock
-	signer Signer
+	signer signer.Signer
 
 	// Must be held while accessing [signedIP]
 	signedIPLock sync.RWMutex
@@ -25,7 +26,7 @@ type DynamicIPSigner struct {
 
 func NewDynamicIPSigner(
 	ip ips.DynamicIPPort,
-	signer Signer,
+	signer signer.Signer,
 ) *DynamicIPSigner {
 	return &DynamicIPSigner{
 		ip:     ip,

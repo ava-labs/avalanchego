@@ -6,17 +6,19 @@ package peer
 import (
 	"crypto/tls"
 	"crypto/x509"
+
+	"github.com/ava-labs/avalanchego/signer"
 )
 
-var _ Signer = (*BanffSigner)(nil)
+var _ signer.Signer = (*BanffSigner)(nil)
 
 // BanffSigner is used for all signing from genesis -> banff.
 type BanffSigner struct {
-	tlsSigner TLSSigner
+	tlsSigner signer.TLSSigner
 }
 
 func NewBanffSigner(cert *tls.Certificate) (*BanffSigner, error) {
-	tlsSigner, err := NewTLSSigner(cert)
+	tlsSigner, err := signer.NewTLSSigner(cert)
 	if err != nil {
 		return nil, err
 	}
@@ -34,16 +36,16 @@ func (b BanffSigner) SignTLS(msg []byte) ([]byte, error) {
 	return b.tlsSigner.Sign(msg)
 }
 
-var _ Verifier = (*BanffVerifier)(nil)
+var _ signer.Verifier = (*BanffVerifier)(nil)
 
 // BanffVerifier is used for all verification <= Banff.
 type BanffVerifier struct {
-	tlsVerifier TLSVerifier
+	tlsVerifier signer.TLSVerifier
 }
 
 func NewBanffVerifier(cert *x509.Certificate) *BanffVerifier {
 	return &BanffVerifier{
-		tlsVerifier: TLSVerifier{
+		tlsVerifier: signer.TLSVerifier{
 			Cert: cert,
 		},
 	}

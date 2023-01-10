@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/staking"
 )
 
@@ -47,7 +48,7 @@ func TestTLSSigner(t *testing.T) {
 			// generate a tls cert
 			cert, err := staking.NewTLSCert()
 			r.NoError(err)
-			signer, err := NewTLSSigner(cert)
+			signer, err := signer.NewTLSSigner(cert)
 			r.NoError(err)
 
 			// sign the ip with the cert

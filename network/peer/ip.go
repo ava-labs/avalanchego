@@ -4,6 +4,7 @@
 package peer
 
 import (
+	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -17,7 +18,7 @@ type UnsignedIP struct {
 }
 
 // Sign this IP with the provided signer and return the signed IP.
-func (ip *UnsignedIP) Sign(signer Signer) (*SignedIP, error) {
+func (ip *UnsignedIP) Sign(signer signer.Signer) (*SignedIP, error) {
 	tlsSig, err := signer.SignTLS(ip.bytes())
 	if err != nil {
 		return nil, err
@@ -48,7 +49,7 @@ type SignedIP struct {
 	BLSSignature []byte
 }
 
-func (ip *SignedIP) Verify(verifier Verifier) error {
+func (ip *SignedIP) Verify(verifier signer.Verifier) error {
 	errs := wrappers.Errs{}
 
 	errs.Add(
