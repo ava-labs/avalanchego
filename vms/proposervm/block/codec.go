@@ -28,6 +28,7 @@ func init() {
 	errs.Add(
 		linearCodec.RegisterType(&statelessCertSignedBlock{}),
 		linearCodec.RegisterType(&option{}),
+		linearCodec.RegisterType(&statelessBlsSignedBlock{}),
 		c.RegisterCodec(codecVersion, linearCodec),
 	)
 	if errs.Errored() {

@@ -12,9 +12,48 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
-func TestBuild(t *testing.T) {
+func TestBuildBlsSigned(t *testing.T) {
+	require := require.New(t)
+
+	parentID := ids.ID{1}
+	timestamp := time.Unix(123, 0)
+	pChainHeight := uint64(2)
+	proposerID := ids.GenerateTestNodeID()
+	innerBlockBytes := []byte{3}
+	chainID := ids.ID{4}
+
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+
+	blsSigner := signer.NewBLSSigner(sk)
+
+	builtBlock, err := BuildBlsSigned(
+		parentID,
+		timestamp,
+		pChainHeight,
+		proposerID,
+		innerBlockBytes,
+		chainID,
+		&blsSigner,
+	)
+	require.NoError(err)
+
+	require.Equal(parentID, builtBlock.ParentID())
+	require.Equal(pChainHeight, builtBlock.PChainHeight())
+	require.Equal(timestamp, builtBlock.Timestamp())
+	require.Equal(innerBlockBytes, builtBlock.Block())
+
+	err = builtBlock.Verify(true, chainID)
+	require.Error(err, errBlsBlocksNotFullyImplemented)
+
+	err = builtBlock.Verify(false, chainID)
+	require.Error(err, errBlsBlocksNotFullyImplemented)
+}
+
+func TestBuildCertSigned(t *testing.T) {
 	require := require.New(t)
 
 	parentID := ids.ID{1}
@@ -83,7 +122,7 @@ func TestBuildHeader(t *testing.T) {
 	parentID := ids.ID{2}
 	bodyID := ids.ID{3}
 
-	builtHeader, err := BuildHeader(
+	builtHeader, err := buildHeader(
 		chainID,
 		parentID,
 		bodyID,

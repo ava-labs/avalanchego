@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/staking"
 )
 
-func TestParse(t *testing.T) {
+func TestParseCertSigned(t *testing.T) {
 	require := require.New(t)
 
 	parentID := ids.ID{1}
@@ -70,7 +70,7 @@ func TestParseHeader(t *testing.T) {
 	parentID := ids.ID{2}
 	bodyID := ids.ID{3}
 
-	builtHeader, err := BuildHeader(
+	builtHeader, err := buildHeader(
 		chainID,
 		parentID,
 		bodyID,

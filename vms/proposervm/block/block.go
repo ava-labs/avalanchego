@@ -18,8 +18,9 @@ var (
 	_ SignedBlock = (*statelessCertSignedBlock)(nil)
 	_ SignedBlock = (*statelessBlsSignedBlock)(nil)
 
-	errUnexpectedProposer = errors.New("expected no proposer but one was provided")
-	errMissingProposer    = errors.New("expected proposer but none was provided")
+	errUnexpectedProposer           = errors.New("expected no proposer but one was provided")
+	errMissingProposer              = errors.New("expected proposer but none was provided")
+	errBlsBlocksNotFullyImplemented = errors.New("NOT YET IMPLEMENTED")
 )
 
 type Block interface {
@@ -41,6 +42,8 @@ type SignedBlock interface {
 	Verify(shouldHaveProposer bool, chainID ids.ID) error
 }
 
+// NOTE ABENEGIA: statelessUnsignedBlock not reused for bls signed blocks
+// since certificate is not needed
 type statelessUnsignedBlock struct {
 	ParentID     ids.ID `serialize:"true"`
 	Timestamp    int64  `serialize:"true"`
@@ -127,7 +130,7 @@ func (b *statelessCertSignedBlock) Verify(shouldHaveProposer bool, chainID ids.I
 		return errMissingProposer
 	}
 
-	header, err := BuildHeader(chainID, b.StatelessBlock.ParentID, b.id)
+	header, err := buildHeader(chainID, b.StatelessBlock.ParentID, b.id)
 	if err != nil {
 		return err
 	}
@@ -166,8 +169,9 @@ func (b *statelessBlsSignedBlock) Bytes() []byte {
 	return b.bytes
 }
 
-func (*statelessBlsSignedBlock) initialize(_ []byte) error {
-	return errors.New("NOT YET IMPLEMENTED")
+func (b *statelessBlsSignedBlock) initialize(_ []byte) error {
+	b.timestamp = time.Unix(b.BlockTimestamp, 0)
+	return errBlsBlocksNotFullyImplemented
 }
 
 func (b *statelessBlsSignedBlock) PChainHeight() uint64 {
@@ -183,5 +187,5 @@ func (b *statelessBlsSignedBlock) Proposer() ids.NodeID {
 }
 
 func (*statelessBlsSignedBlock) Verify(_ bool, _ ids.ID) error {
-	return errors.New("NOT YET IMPLEMENTED")
+	return errBlsBlocksNotFullyImplemented
 }

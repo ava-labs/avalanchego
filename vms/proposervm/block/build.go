@@ -54,7 +54,7 @@ func BuildCertSigned(
 			Certificate:  cert.Raw,
 			Block:        blockBytes,
 		},
-		timestamp: timestamp,
+		timestamp: timestamp, // TODO ABENEGIA: why don't we use initialize here somewhere??
 		cert:      cert,
 		proposer:  ids.NodeIDFromCert(cert),
 	}
@@ -73,7 +73,7 @@ func BuildCertSigned(
 	unsignedBytes := unsignedBytesWithEmptySignature[:lenUnsignedBytes]
 	block.id = hashing.ComputeHash256Array(unsignedBytes)
 
-	header, err := BuildHeader(chainID, parentID, block.id)
+	header, err := buildHeader(chainID, parentID, block.id)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,50 @@ func BuildCertSigned(
 	return block, err
 }
 
-func BuildHeader(
+func BuildBlsSigned(
+	parentID ids.ID,
+	timestamp time.Time,
+	pChainHeight uint64,
+	nodeID ids.NodeID,
+	innerBlockBytes []byte,
+	chainID ids.ID,
+	blsSigner *signer.BLSSigner,
+) (SignedBlock, error) {
+	block := &statelessBlsSignedBlock{
+		BlockParentID:     parentID,
+		BlockTimestamp:    timestamp.Unix(),
+		BlockPChainHeight: pChainHeight,
+		BlockProposer:     nodeID,
+		InnerBlockBytes:   innerBlockBytes,
+
+		timestamp: timestamp,
+	}
+	var blockIntf SignedBlock = block
+
+	unsignedBytesWithEmptySignature, err := c.Marshal(codecVersion, &blockIntf)
+	if err != nil {
+		return nil, err
+	}
+
+	// The serialized form of the block is the unsignedBytes followed by the
+	// signature, which is prefixed by a uint32. Because we are marshalling the
+	// block with an empty signature, we only need to strip off the length
+	// prefix to get the unsigned bytes.
+	lenUnsignedBytes := len(unsignedBytesWithEmptySignature) - wrappers.IntLen
+	unsignedBytes := unsignedBytesWithEmptySignature[:lenUnsignedBytes]
+	block.id = hashing.ComputeHash256Array(unsignedBytes)
+
+	header, err := buildHeader(chainID, parentID, block.id)
+	if err != nil {
+		return nil, err
+	}
+
+	block.Signature = blsSigner.Sign(header.Bytes())
+	block.bytes, err = c.Marshal(codecVersion, &blockIntf)
+	return block, err
+}
+
+func buildHeader(
 	chainID ids.ID,
 	parentID ids.ID,
 	bodyID ids.ID,
