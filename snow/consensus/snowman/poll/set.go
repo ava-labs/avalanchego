@@ -154,7 +154,7 @@ func (s *set) processFinishedPolls() []ids.Bag {
 		}
 
 		s.log.Verbo("poll finished",
-			zap.Any("requestID", iter.Key()),
+			zap.Uint32("requestID", iter.Key()),
 			zap.Stringer("poll", holder.GetPoll()),
 		)
 		s.durPolls.Observe(float64(time.Since(holder.StartTime())))
