@@ -69,7 +69,7 @@ func Produce(
 }
 
 // TODO: Stake and Authorize should be replaced by similar methods in the
-//	P-chain wallet
+//       P-chain wallet
 type Spender interface {
 	// Spend the provided amount while deducting the provided fee.
 	// Arguments:
@@ -567,12 +567,12 @@ func (h *handler) VerifySpendUTXOs(
 		}
 
 		// Get output signed by real owners (would stay the same if its not msig)
-		msigOut, err := h.getMultisigTransferOutput(utxo)
+		out, err := h.getMultisigTransferOutput(out)
 		if err != nil {
 			return err
 		}
 		// Verify that this tx's credentials allow [in] to be spent
-		if err := h.fx.VerifyTransfer(tx, in, creds[index], msigOut); err != nil {
+		if err := h.fx.VerifyTransfer(tx, in, creds[index], out); err != nil {
 			return fmt.Errorf("failed to verify transfer: %w", err)
 		}
 

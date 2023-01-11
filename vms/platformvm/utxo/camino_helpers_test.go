@@ -5,10 +5,12 @@ package utxo
 
 import (
 	"fmt"
+	"testing"
 	"time"
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/uptime"
@@ -32,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -338,4 +341,31 @@ func generateOwnersAndSig(tx txs.UnsignedTx) (secp256k1fx.OutputOwners, *secp256
 	copy(cred.Sigs[0][:], sig)
 
 	return outputOwners, cred
+}
+
+func defaultCaminoHandler(t *testing.T, state avax.UTXOReader) *caminoHandler {
+	fx := &secp256k1fx.Fx{}
+
+	err := fx.InitializeVM(&secp256k1fx.TestVM{})
+	require.NoError(t, err)
+
+	err = fx.Bootstrapped()
+	require.NoError(t, err)
+
+	if state == nil {
+		state = avax.NewUTXOState(
+			memdb.New(),
+			txs.Codec,
+		)
+	}
+
+	return &caminoHandler{
+		handler: handler{
+			ctx:         snow.DefaultContextTest(),
+			clk:         &mockable.Clock{},
+			utxosReader: state,
+			fx:          fx,
+		},
+		lockModeBondDeposit: true,
+	}
 }

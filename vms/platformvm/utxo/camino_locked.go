@@ -44,6 +44,7 @@ var (
 	errFailToGetDeposit          = errors.New("couldn't get deposit")
 	errUnlockedMoreThanAvailable = errors.New("unlocked more deposited tokens, than was available for unlock")
 	errNotConsumedDeposit        = errors.New("didn't consume whole deposit amount, but deposit is expired and can't be partially unlocked")
+	errLockedUTXO                = errors.New("can't spend locked utxo")
 )
 
 // Creates UTXOs from [outs] and adds them to the UTXO set.
@@ -782,7 +783,9 @@ func (h *handler) VerifyLockUTXOs(
 	assetID ids.ID,
 	appliedLockState locked.State,
 ) error {
-	if appliedLockState != locked.StateBonded && appliedLockState != locked.StateDeposited {
+	if appliedLockState != locked.StateBonded &&
+		appliedLockState != locked.StateDeposited &&
+		appliedLockState != locked.StateUnlocked {
 		return errInvalidTargetLockState
 	}
 
@@ -845,8 +848,11 @@ func (h *handler) VerifyLockUTXOs(
 
 		lockIDs := &locked.IDsEmpty
 		if lockedOut, ok := out.(*locked.Out); ok {
-			// utxo is already locked with appliedLockState, so it can't be locked it again
-			if lockedOut.IsLockedWith(appliedLockState) {
+			// can only spend unlocked utxos, if appliedLockState is unlocked
+			if appliedLockState == locked.StateUnlocked {
+				return errLockedUTXO
+				// utxo is already locked with appliedLockState, so it can't be locked it again
+			} else if lockedOut.IsLockedWith(appliedLockState) {
 				return errLockingLockedUTXO
 			}
 			out = lockedOut.TransferableOut
@@ -871,12 +877,12 @@ func (h *handler) VerifyLockUTXOs(
 		}
 
 		// Get output signed by real owners (would stay the same if its not msig)
-		msigOut, err := h.getMultisigTransferOutput(utxo)
+		out, err := h.getMultisigTransferOutput(out)
 		if err != nil {
 			return err
 		}
 		// Verify that this tx's credentials allow [in] to be spent
-		if err := h.fx.VerifyTransfer(tx, in, creds[index], msigOut); err != nil {
+		if err := h.fx.VerifyTransfer(tx, in, creds[index], out); err != nil {
 			return fmt.Errorf("failed to verify transfer: %w", err)
 		}
 
@@ -1137,11 +1143,11 @@ func (h *handler) VerifyUnlockDepositedUTXOs(
 			depUnlock.consumed = newAmount
 		} else {
 			// Get output signed by real owners (would stay the same if its not msig)
-			msigOut, err := h.getMultisigTransferOutput(utxo)
+			out, err := h.getMultisigTransferOutput(out)
 			if err != nil {
 				return nil, err
 			}
-			if err := h.fx.VerifyTransfer(tx, in, creds[index], msigOut); err != nil {
+			if err := h.fx.VerifyTransfer(tx, in, creds[index], out); err != nil {
 				return nil, fmt.Errorf("failed to verify transfer: %w", err)
 			}
 
@@ -1296,17 +1302,7 @@ func (h *handler) VerifyUnlockDepositedUTXOs(
 	return unlockedAmount, nil
 }
 
-func (h *handler) getMultisigTransferOutput(utxo *avax.UTXO) (verify.Verifiable, error) {
-	// It preprocesses the UTXO the same way as the `platformvm.utxo.handler.VerifySpendUTXOs`.
-	// Prepared `utxos` will be used only for signature verification
-	out := utxo.Out
-	if inner, ok := out.(*stakeable.LockOut); ok {
-		out = inner.TransferableOut
-	}
-	if inner, ok := out.(*locked.Out); ok {
-		out = inner.TransferableOut
-	}
-
+func (h *handler) getMultisigTransferOutput(out verify.State) (verify.State, error) {
 	secpOut, ok := out.(*secp256k1fx.TransferOutput)
 	if !ok {
 		// Conversion should succeed, otherwise it will be handled by the caller

@@ -11,13 +11,11 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -34,25 +32,8 @@ import (
 )
 
 func TestUnlockUTXOs(t *testing.T) {
-	fx := &secp256k1fx.Fx{}
-
-	err := fx.InitializeVM(&secp256k1fx.TestVM{})
-	require.NoError(t, err)
-
-	err = fx.Bootstrapped()
-	require.NoError(t, err)
-
-	ctx := snow.DefaultContextTest()
-
-	testHandler := &handler{
-		ctx: ctx,
-		clk: &mockable.Clock{},
-		utxosReader: avax.NewUTXOState(
-			memdb.New(),
-			txs.Codec,
-		),
-		fx: fx,
-	}
+	testHandler := defaultCaminoHandler(t, nil)
+	ctx := testHandler.ctx
 
 	cryptFactory := crypto.FactorySECP256K1R{}
 	key, err := cryptFactory.NewPrivateKey()
@@ -472,12 +453,7 @@ func TestLock(t *testing.T) {
 			}
 			internalState.EXPECT().UTXOIDs(address.Bytes(), ids.Empty, math.MaxInt).Return(utxoIDs, nil)
 
-			testHandler := &handler{
-				ctx:         snow.DefaultContextTest(),
-				clk:         &mockable.Clock{},
-				utxosReader: internalState,
-				fx:          fx,
-			}
+			testHandler := defaultCaminoHandler(t, internalState)
 
 			ins, outs, signers, err := testHandler.Lock(
 				[]*crypto.PrivateKeySECP256K1R{secpKey},
@@ -508,15 +484,8 @@ func TestVerifyLockUTXOs(t *testing.T) {
 	err = fx.Bootstrapped()
 	require.NoError(t, err)
 
-	testHandler := &handler{
-		ctx: snow.DefaultContextTest(),
-		clk: &mockable.Clock{},
-		utxosReader: avax.NewUTXOState(
-			memdb.New(),
-			txs.Codec,
-		),
-		fx: fx,
-	}
+	testHandler := defaultCaminoHandler(t, nil)
+
 	assetID := testHandler.ctx.AVAXAssetID
 
 	tx := &dummyUnsignedTx{txs.BaseTx{}}
@@ -871,24 +840,10 @@ func TestGetDepositUnlockableAmounts(t *testing.T) {
 }
 
 func TestUnlockDeposit(t *testing.T) {
-	fx := &secp256k1fx.Fx{}
-	err := fx.InitializeVM(&secp256k1fx.TestVM{})
-	require.NoError(t, err)
-	err = fx.Bootstrapped()
-	require.NoError(t, err)
-	ctx := snow.DefaultContextTest()
+	testHandler := defaultCaminoHandler(t, nil)
+	ctx := testHandler.ctx
 
 	testID := ids.GenerateTestID()
-
-	testHandler := &handler{
-		ctx: ctx,
-		clk: &mockable.Clock{},
-		utxosReader: avax.NewUTXOState(
-			memdb.New(),
-			txs.Codec,
-		),
-		fx: fx,
-	}
 	txID := ids.GenerateTestID()
 	depositedAmount := uint64(2000)
 	outputOwners := defaultOwners()
@@ -1021,22 +976,9 @@ func TestUnlockDeposit(t *testing.T) {
 }
 
 func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
-	fx := &secp256k1fx.Fx{}
-	err := fx.InitializeVM(&secp256k1fx.TestVM{})
-	require.NoError(t, err)
-	err = fx.Bootstrapped()
-	require.NoError(t, err)
-	ctx := snow.DefaultContextTest()
+	testHandler := defaultCaminoHandler(t, nil)
+	ctx := testHandler.ctx
 
-	testHandler := &handler{
-		ctx: ctx,
-		clk: &mockable.Clock{},
-		utxosReader: avax.NewUTXOState(
-			memdb.New(),
-			txs.Codec,
-		),
-		fx: fx,
-	}
 	tx := &dummyUnsignedTx{txs.BaseTx{}}
 	tx.Initialize([]byte{0})
 	var nilCreds *secp256k1fx.Credential
