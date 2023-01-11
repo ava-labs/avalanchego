@@ -661,7 +661,7 @@ func (n *network) Peers(peerID ids.NodeID) ([]ips.ClaimedIPPort, error) {
 		peerIP := n.peerIPs[validator.NodeID]
 		n.peersLock.RUnlock()
 		if !isConnected {
-			n.peerConfig.Log.Debug(
+			n.peerConfig.Log.Verbo(
 				"unable to find validator in connected peers",
 				zap.Stringer("nodeID", validator.NodeID),
 			)
