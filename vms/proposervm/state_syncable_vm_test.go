@@ -29,6 +29,7 @@ import (
 var errUnknownSummary = errors.New("unknown summary")
 
 func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
+	require := require.New(t)
 	innerVM := &fullVM{
 		TestVM: &block.TestVM{
 			TestVM: common.TestVM{
@@ -77,9 +78,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	dbManager = dbManager.NewPrefixDBManager([]byte{})
 
 	sk, err := bls.NewSecretKey()
-	if err != nil {
-		t.Fatalf("failed to create bls private key with %s", err)
-	}
+	require.NoError(err)
 
 	vm, err := New(
 		innerVM,
@@ -90,9 +89,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 		pTestCert,
 		sk,
 	)
-	if err != nil {
-		t.Fatalf("failed to create proposerVM with %s", err)
-	}
+	require.NoError(err)
 
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
@@ -108,9 +105,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 		nil,
 		nil,
 	)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
+	require.NoError(err)
 
 	return innerVM, vm
 }

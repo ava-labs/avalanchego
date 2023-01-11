@@ -928,6 +928,7 @@ func initTestRemoteProposerVM(
 	*VM,
 	*snowman.TestBlock,
 ) {
+	require := require.New(t)
 	coreGenBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
@@ -980,9 +981,7 @@ func initTestRemoteProposerVM(
 	}
 
 	sk, err := bls.NewSecretKey()
-	if err != nil {
-		t.Fatalf("failed to create bls private key with %s", err)
-	}
+	require.NoError(err)
 
 	proVM, err := New(
 		coreVM,
@@ -993,9 +992,7 @@ func initTestRemoteProposerVM(
 		pTestCert,
 		sk,
 	)
-	if err != nil {
-		t.Fatalf("failed to create proposerVM with %s", err)
-	}
+	require.NoError(err)
 
 	valState := &validators.TestState{
 		T: t,
@@ -1045,20 +1042,16 @@ func initTestRemoteProposerVM(
 		nil,
 		nil,
 	)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
+	require.NoError(err)
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
-	if err := proVM.SetState(context.Background(), snow.NormalOp); err != nil {
-		t.Fatal(err)
-	}
+	err = proVM.SetState(context.Background(), snow.NormalOp)
+	require.NoError(err)
 
-	if err := proVM.SetPreference(context.Background(), coreGenBlk.IDV); err != nil {
-		t.Fatal(err)
-	}
+	err = proVM.SetPreference(context.Background(), coreGenBlk.ID())
+	require.NoError(err)
 
 	return coreVM, proVM, coreGenBlk
 }
