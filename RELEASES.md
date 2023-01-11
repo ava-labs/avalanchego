@@ -23,6 +23,7 @@ This version is backwards compatible to [v1.9.0](https://github.com/ava-labs/ava
 
 - Fixed NAT-PMP router discovery and port mapping
 - Fixed `--staking-enabled=false` setting to correctly start subnet chains and report healthy
+- Fixed message logging in the consensus handler
 
 ### VMs
 
