@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 
@@ -194,10 +195,15 @@ func (p *postForkCommonComponents) buildChild(
 	}
 
 	delay := newTimestamp.Sub(parentTimestamp)
+	var proposerBlsPubKey *bls.PublicKey
 	if delay < proposer.MaxDelay {
-		parentHeight := p.innerBlk.Height()
-		proposerID := p.vm.ctx.NodeID
-		minDelay, _, err := p.vm.Windower.DelayAndBlsKey(ctx, parentHeight+1, parentPChainHeight, proposerID)
+		var (
+			parentHeight = p.innerBlk.Height()
+			proposerID   = p.vm.ctx.NodeID
+			minDelay     time.Duration
+		)
+
+		minDelay, proposerBlsPubKey, err = p.vm.Windower.DelayAndBlsKey(ctx, parentHeight+1, parentPChainHeight, proposerID)
 		if err != nil {
 			return nil, err
 		}
@@ -243,9 +249,9 @@ func (p *postForkCommonComponents) buildChild(
 			pChainHeight,
 			innerBlock.Bytes(),
 		)
-	case p.vm.blsSigner == nil:
-		// bls key not specified for this node. Whether bls signing fork
-		// is active or not, sign using tls certificate
+	case p.vm.blsSigner == nil || proposerBlsPubKey == nil:
+		// bls key not specified or not yet registered for this node.
+		// Whether bls signing fork is active or not, sign using tls certificate.
 		statelessChild, err = block.BuildCertSigned(
 			parentID,
 			newTimestamp,
