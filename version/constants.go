@@ -99,9 +99,7 @@ var (
 		constants.MainnetID: time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
 	}
-
-	// TODO ABENEGIA: activate in testnet as soon as block validation is ready
-	BlsSigningProposerVMDefaultTime = time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC)
+	BlsSigningProposerVMDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
 	// FIXME: update this before release
 	XChainMigrationTimes = map[uint32]time.Time{
