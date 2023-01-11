@@ -188,7 +188,7 @@ func Start(
 	p := &peer{
 		Config:             config,
 		conn:               conn,
-		ipVerifier:         NewBanffVerifier(cert),
+		ipVerifier:         NewPreBanffVerifier(cert),
 		cert:               cert,
 		id:                 id,
 		messageQueue:       messageQueue,

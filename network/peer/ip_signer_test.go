@@ -25,7 +25,7 @@ func TestIPSigner(t *testing.T) {
 	tlsCert, err := staking.NewTLSCert()
 	require.NoError(err)
 
-	key, err := NewBanffSigner(tlsCert)
+	key, err := NewPreBanffSigner(tlsCert)
 	require.NoError(err)
 
 	s := NewIPSigner(dynIP, key)

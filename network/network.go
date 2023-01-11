@@ -965,7 +965,7 @@ func (n *network) authenticateIPs(ips []*ips.ClaimedIPPort) ([]*ipAuth, error) {
 			TLSSignature: ip.Signature,
 			BLSSignature: nil,
 		}
-		verifier := peer.NewBanffVerifier(ip.Cert)
+		verifier := peer.NewPreBanffVerifier(ip.Cert)
 		if err := signedIP.Verify(verifier); err != nil {
 			return nil, err
 		}

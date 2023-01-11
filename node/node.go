@@ -224,7 +224,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		)
 	}
 
-	ipSigner, err := peer.NewBanffSigner(&n.Config.StakingTLSCert)
+	ipSigner, err := peer.NewPreBanffSigner(&n.Config.StakingTLSCert)
 	if err != nil {
 		return err
 	}

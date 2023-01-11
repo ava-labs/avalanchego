@@ -20,7 +20,7 @@ type PreBanffSigner struct {
 	tlsSigner crypto.TLSSigner
 }
 
-func NewBanffSigner(cert *tls.Certificate) (*PreBanffSigner, error) {
+func NewPreBanffSigner(cert *tls.Certificate) (*PreBanffSigner, error) {
 	tlsSigner, err := crypto.NewTLSSigner(cert)
 	if err != nil {
 		return nil, err
@@ -44,7 +44,7 @@ type PreBanffVerifier struct {
 	tlsVerifier crypto.TLSVerifier
 }
 
-func NewBanffVerifier(cert *x509.Certificate) *PreBanffVerifier {
+func NewPreBanffVerifier(cert *x509.Certificate) *PreBanffVerifier {
 	return &PreBanffVerifier{
 		tlsVerifier: crypto.TLSVerifier{
 			Cert: cert,
