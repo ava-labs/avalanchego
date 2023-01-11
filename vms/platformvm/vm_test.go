@@ -2724,6 +2724,34 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
+		{
+			name:               "unrelated primary network key removal on subnet lookup",
+			height:             4,
+			lastAcceptedHeight: 5,
+			subnetID:           ids.GenerateTestID(),
+			currentPrimaryNetworkValidators: []*validators.Validator{
+				copyPrimaryValidator(vdrs[0]),
+			},
+			currentSubnetValidators: []*validators.Validator{
+				copySubnetValidator(vdrs[0]),
+			},
+			weightDiffs: []map[ids.NodeID]*state.ValidatorWeightDiff{
+				{},
+			},
+			pkDiffs: []map[ids.NodeID]*bls.PublicKey{
+				{
+					vdrs[1].NodeID: vdrs[1].PublicKey,
+				},
+			},
+			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
+				vdrs[0].NodeID: {
+					NodeID:    vdrs[0].NodeID,
+					PublicKey: vdrs[0].PublicKey,
+					Weight:    vdrs[0].Weight,
+				},
+			},
+			expectedErr: nil,
+		},
 	}
 
 	for _, tt := range tests {

@@ -579,18 +579,14 @@ func (vm *VM) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.I
 		}
 
 		for nodeID, pk := range pkDiffs {
-			vdr, ok := vdrSet[nodeID]
-			if !ok {
-				// If this were to happen - that would mean that this validator
-				// had a public key removed when they were not a validator.
-				// Because there is a minimum stake duration, this is
-				// impossible.
-				return nil, fmt.Errorf("%w: %s", errMissingValidator, vdr.NodeID)
+			// pkDiffs includes all primary network key diffs, if we are
+			// fetching a subnet's validator set, we should ignore non-subnet
+			// validators.
+			if vdr, ok := vdrSet[nodeID]; ok {
+				// The validator's public key was removed at this block, so it
+				// was in the validator set before.
+				vdr.PublicKey = pk
 			}
-
-			// The validator's public key was removed at this block, so it
-			// was in the validator set before.
-			vdr.PublicKey = pk
 		}
 	}
 
