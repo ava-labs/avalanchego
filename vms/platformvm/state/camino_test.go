@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/golang/mock/gomock"
 	"github.com/prometheus/client_golang/prometheus"
@@ -147,12 +148,7 @@ func TestSyncGenesis(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tt.prepare(tt.want)
 			err := tt.cs.SyncGenesis(tt.args.s, tt.args.g)
-
-			if tt.err != nil {
-				require.ErrorIs(tt.err, err)
-				return
-			}
-			require.NoError(err)
+			require.ErrorIs(tt.err, err)
 
 			for k, d := range tt.want.modifiedDeposits {
 				require.Equal(d.DepositOfferID, tt.cs.modifiedDeposits[k].DepositOfferID)
@@ -180,18 +176,22 @@ func defaultGenesisState(addresses []genesis.AddressState, deposits []*txs.Tx) *
 				},
 			},
 		},
-		Validators: []*txs.Tx{
-			{},
-		},
-		Chains: []*txs.Tx{
-			{},
-		},
+		Chains:        []*txs.Tx{{}},
 		Timestamp:     uint64(initialTime.Unix()),
 		InitialSupply: units.Schmeckle + units.Avax,
 		Camino: genesis.Camino{
 			AddressStates: addresses,
 			InitialAdmin:  initialAdmin,
-			Deposits:      deposits,
+			Blocks: []*genesis.Block{{
+				Validators: []*txs.Tx{{Unsigned: &txs.CaminoAddValidatorTx{
+					AddValidatorTx: txs.AddValidatorTx{
+						BaseTx:       txs.BaseTx{},
+						Validator:    validator.Validator{},
+						RewardsOwner: &secp256k1fx.OutputOwners{},
+					},
+				}}},
+				Deposits: deposits,
+			}},
 			DepositOffers: []genesis.DepositOffer{
 				{
 					InterestRateNominator:   1,

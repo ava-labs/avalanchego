@@ -72,11 +72,13 @@
             "amount": 4000000000000,
             "nodeID": "NodeID-AK7sPBsZM9rQwse23aLhEEBPHZD5gkLrL",
             "validatorDuration": 31536000,
+            "depositDuration": 110376000,
             "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
             "memo": "KOPERNIKUS"
           },
           {
             "amount": 10000000000000000,
+            "depositDuration": 110376000,
             "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7"
           }
         ]
@@ -90,10 +92,11 @@
         },
         "platformAllocations": [
           {
-            "amount": 500000000000000
+            "amount": 510000000000000
           },
           {
-            "amount": 500000000000000,
+            "amount": 520000000000000,
+            "depositDuration": 110376000,
             "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7"
           }
         ]

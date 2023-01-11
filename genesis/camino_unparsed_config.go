@@ -125,6 +125,8 @@ type UnparsedPlatformAllocation struct {
 	Amount            uint64 `json:"amount"`
 	NodeID            string `json:"nodeID,omitempty"`
 	ValidatorDuration uint64 `json:"validatorDuration,omitempty"`
+	DepositDuration   uint64 `json:"depositDuration,omitempty"`
+	TimestampOffset   uint64 `json:"timestampOffset,omitempty"`
 	DepositOfferID    string `json:"depositOfferID"`
 	Memo              string `json:"memo,omitempty"`
 }
@@ -133,6 +135,8 @@ func (ua UnparsedPlatformAllocation) Parse() (PlatformAllocation, error) {
 	a := PlatformAllocation{
 		Amount:            ua.Amount,
 		ValidatorDuration: ua.ValidatorDuration,
+		DepositDuration:   ua.DepositDuration,
+		TimestampOffset:   ua.TimestampOffset,
 		Memo:              ua.Memo,
 	}
 

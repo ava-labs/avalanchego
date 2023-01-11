@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txheap"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/types"
@@ -25,8 +24,10 @@ import (
 var errNonExistingOffer = errors.New("non existing deposit offer")
 
 type UTXODeposit struct {
-	OfferID ids.ID `json:"offerID"`
-	Memo    string `json:"memo"`
+	OfferID         ids.ID `json:"offerID"`
+	Duration        uint64 `json:"duration"`
+	TimestampOffset uint64 `json:"timestampOffset"`
+	Memo            string `json:"memo"`
 }
 
 type Camino struct {
@@ -69,8 +70,7 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 	startTimestamp := uint64(args.Time)
 	networkID := uint32(args.NetworkID)
 	utxos := make([]*genesis.UTXO, 0, len(args.UTXOs))
-	validators := txheap.NewByEndTime()
-	deposits := txheap.NewByDuration()
+	genesisBlocks := map[uint64]*genesis.Block{}
 	consortiumMemberNodes := make([]genesis.ConsortiumMemberNodeID, len(args.Validators))
 
 	offers := make(map[ids.ID]genesis.DepositOffer, len(args.Camino.DepositOffers))
@@ -82,17 +82,27 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 		}
 		offers[offerID] = offer
 	}
+
 	for validatorIndex, vdr := range args.Validators {
 		vdr := vdr
 		validatorTx, err := makeValidator(
 			&vdr,
 			args.AvaxAssetID,
-			startTimestamp,
 			networkID,
 		)
 		if err != nil {
 			return err
 		}
+
+		validatorBlockTimestamp := uint64(vdr.StartTime)
+		blk, ok := genesisBlocks[validatorBlockTimestamp]
+		if !ok {
+			blk = &genesis.Block{
+				Timestamp: validatorBlockTimestamp,
+			}
+			genesisBlocks[validatorBlockTimestamp] = blk
+		}
+		blk.Validators = append(blk.Validators, validatorTx)
 
 		consortiumMemberNodes[validatorIndex] = genesis.ConsortiumMemberNodeID{
 			ConsortiumMemberAddress: args.Camino.ValidatorConsortiumMembers[validatorIndex],
@@ -126,7 +136,19 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 			}
 
 			if depositTx != nil {
-				deposits.Add(depositTx)
+				blockTimestamp := startTimestamp + args.Camino.ValidatorDeposits[validatorIndex][i].TimestampOffset
+				if blockTimestamp < validatorBlockTimestamp {
+					return errors.New("validator timestamp is after validator's bond deposit timestamp")
+				}
+
+				blk, ok := genesisBlocks[blockTimestamp]
+				if !ok {
+					blk = &genesis.Block{
+						Timestamp: blockTimestamp,
+					}
+					genesisBlocks[blockTimestamp] = blk
+				}
+				blk.Deposits = append(blk.Deposits, depositTx)
 			}
 
 			utxos = append(utxos, &genesis.UTXO{
@@ -134,8 +156,6 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 				Message: messageBytes,
 			})
 		}
-
-		validators.Add(validatorTx)
 	}
 
 	for i, apiUTXO := range args.UTXOs {
@@ -169,7 +189,15 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 		}
 
 		if depositTx != nil {
-			deposits.Add(depositTx)
+			blockTimestamp := startTimestamp + args.Camino.UTXODeposits[i].TimestampOffset
+			blk, ok := genesisBlocks[blockTimestamp]
+			if !ok {
+				blk = &genesis.Block{
+					Timestamp: blockTimestamp,
+				}
+				genesisBlocks[blockTimestamp] = blk
+			}
+			blk.Deposits = append(blk.Deposits, depositTx)
 		}
 
 		utxos = append(utxos, &genesis.UTXO{
@@ -204,19 +232,18 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 		chains = append(chains, tx)
 	}
 
-	validatorTxs := validators.List()
-
 	camino := args.Camino.ParseToGenesis()
-	if deposits != nil {
-		camino.Deposits = deposits.List()
+	camino.Blocks = make([]*genesis.Block, 0, len(genesisBlocks))
+	for _, block := range genesisBlocks {
+		camino.Blocks = append(camino.Blocks, block)
 	}
+	utils.Sort(camino.Blocks)
 
 	camino.ConsortiumMembersNodeIDs = consortiumMemberNodes
 
 	// genesis holds the genesis state
 	g := genesis.Genesis{
 		UTXOs:         utxos,
-		Validators:    validatorTxs,
 		Chains:        chains,
 		Camino:        camino,
 		Timestamp:     uint64(args.Time),
@@ -240,7 +267,6 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 func makeValidator(
 	vdr *PermissionlessValidator,
 	avaxAssetID ids.ID,
-	startTime uint64,
 	networkID uint32,
 ) (*txs.Tx, error) {
 	weight := uint64(0)
@@ -277,7 +303,7 @@ func makeValidator(
 	if weight == 0 {
 		return nil, errValidatorAddsNoValue
 	}
-	if uint64(vdr.EndTime) <= startTime {
+	if vdr.EndTime <= vdr.StartTime {
 		return nil, errValidatorAddsNoValue
 	}
 
@@ -295,7 +321,7 @@ func makeValidator(
 			}},
 			Validator: validator.Validator{
 				NodeID: vdr.NodeID,
-				Start:  startTime,
+				Start:  uint64(vdr.StartTime),
 				End:    uint64(vdr.EndTime),
 				Wght:   weight,
 			},

@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -81,6 +82,7 @@ func validateCaminoConfig(config *Config) error {
 
 	// validation allocations and stakers
 	nodes := set.Set[ids.NodeID]{}
+	consortiumMembersWithNodes := set.Set[ids.ShortID]{}
 	allPlatformAllocations := map[ids.ShortID]set.Set[PlatformAllocation]{}
 	for _, allocation := range config.Camino.Allocations {
 		platformAllocations, ok := allPlatformAllocations[allocation.AVAXAddr]
@@ -104,18 +106,54 @@ func validateCaminoConfig(config *Config) error {
 			}
 
 			if platformAllocation.DepositOfferID != ids.Empty {
-				if _, ok := offers[platformAllocation.DepositOfferID]; !ok {
+				offer, ok := offers[platformAllocation.DepositOfferID]
+				if !ok {
 					return errors.New("allocation deposit offer id doesn't match any offer")
 				}
+				if platformAllocation.DepositDuration < uint64(offer.MinDuration) {
+					return errors.New("allocation deposit duration is less than deposit offer min duration")
+				}
+				if platformAllocation.DepositDuration > uint64(offer.MaxDuration) {
+					return errors.New("allocation deposit duration is more than deposit offer max duration")
+				}
+
+				sum, err := math.Add64(config.StartTime, platformAllocation.TimestampOffset)
+				if err != nil {
+					return err
+				}
+				depositStartTime := sum
+
+				if depositStartTime < offer.Start {
+					return errors.New("allocation deposit start time is less than deposit offer start time")
+				}
+
+				sum, err = math.Add64(depositStartTime, platformAllocation.DepositDuration)
+				if err != nil {
+					return err
+				}
+				depositEndTime := sum
+
+				if depositEndTime > offer.End {
+					return errors.New("allocation deposit end time is greater than deposit offer end time")
+				}
 			}
+
+			if platformAllocation.DepositOfferID == ids.Empty && platformAllocation.DepositDuration != 0 {
+				return errors.New("allocation has non-zero deposit duration, while deposit offer id is nil")
+			}
+
 			if platformAllocation.NodeID != ids.EmptyNodeID {
-				if _, ok := nodes[platformAllocation.NodeID]; ok {
+				if nodes.Contains(platformAllocation.NodeID) {
 					return errors.New("repeated staker allocation")
 				}
 				nodes.Add(platformAllocation.NodeID)
 				if !allocation.AddressStates.ConsortiumMember {
 					return errors.New("staker ins't consortium member")
 				}
+				if consortiumMembersWithNodes.Contains(allocation.AVAXAddr) {
+					return errors.New("consortium member has more, than one node")
+				}
+				consortiumMembersWithNodes.Add(allocation.AVAXAddr)
 			}
 			if platformAllocation.NodeID != ids.EmptyNodeID &&
 				platformAllocation.ValidatorDuration == 0 ||
@@ -305,13 +343,14 @@ func buildPGenesis(config *Config, hrp string, xGenesisBytes []byte, xGenesisDat
 				}
 
 				stakingDuration := time.Duration(platformAllocation.ValidatorDuration) * time.Second
+				startStakingTime := genesisTime.Add(time.Duration(platformAllocation.TimestampOffset) * time.Second)
 				endStakingTime := genesisTime.Add(stakingDuration).Add(-stakingOffset)
 				stakingOffset += time.Duration(config.InitialStakeDurationOffset) * time.Second
 
 				platformvmArgs.Validators = append(platformvmArgs.Validators,
 					api.PermissionlessValidator{
 						Staker: api.Staker{
-							StartTime: json.Uint64(genesisTime.Unix()),
+							StartTime: json.Uint64(startStakingTime.Unix()),
 							EndTime:   json.Uint64(endStakingTime.Unix()),
 							NodeID:    platformAllocation.NodeID,
 						},
@@ -324,8 +363,10 @@ func buildPGenesis(config *Config, hrp string, xGenesisBytes []byte, xGenesisDat
 				)
 				platformvmArgs.Camino.ValidatorDeposits = append(platformvmArgs.Camino.ValidatorDeposits,
 					[]api.UTXODeposit{{
-						OfferID: platformAllocation.DepositOfferID,
-						Memo:    platformAllocation.Memo,
+						OfferID:         platformAllocation.DepositOfferID,
+						Duration:        platformAllocation.DepositDuration,
+						TimestampOffset: platformAllocation.TimestampOffset,
+						Memo:            platformAllocation.Memo,
 					}})
 
 				platformvmArgs.Camino.ValidatorConsortiumMembers = append(platformvmArgs.Camino.ValidatorConsortiumMembers, allocation.AVAXAddr)
@@ -334,8 +375,10 @@ func buildPGenesis(config *Config, hrp string, xGenesisBytes []byte, xGenesisDat
 				utxo.Amount = json.Uint64(amountRemaining)
 				platformvmArgs.Camino.UTXODeposits = append(platformvmArgs.Camino.UTXODeposits,
 					api.UTXODeposit{
-						OfferID: platformAllocation.DepositOfferID,
-						Memo:    platformAllocation.Memo,
+						OfferID:         platformAllocation.DepositOfferID,
+						Duration:        platformAllocation.DepositDuration,
+						TimestampOffset: platformAllocation.TimestampOffset,
+						Memo:            platformAllocation.Memo,
 					})
 				platformvmArgs.UTXOs = append(platformvmArgs.UTXOs, utxo)
 			}

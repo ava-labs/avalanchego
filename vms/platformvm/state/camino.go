@@ -14,11 +14,13 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	choices "github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
@@ -262,67 +264,107 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 
 	// adding deposit offers
 
+	depositOffers := make(map[ids.ID]*deposit.Offer, len(g.Camino.DepositOffers))
 	for _, genesisOffer := range g.Camino.DepositOffers {
 		genesisOffer := genesisOffer
 		offer, err := ParseDepositOfferFromGenesisOffer(&genesisOffer)
 		if err != nil {
 			return err
 		}
+		depositOffers[offer.ID] = offer
 
 		cs.AddDepositOffer(offer)
 	}
 
-	// adding deposits
-
-	currentTimestamp := uint64(s.GetTimestamp().Unix())
-
-	for _, tx := range g.Camino.Deposits {
-		depositTx, ok := tx.Unsigned.(*txs.DepositTx)
-		if !ok {
-			return errWrongTxType
-		}
-		depositAmount := uint64(0)
-		for _, out := range depositTx.Outs {
-			newAmount, err := math.Add64(depositAmount, out.Out.Amount())
-			if err != nil {
-				return err
-			}
-			depositAmount = newAmount
-		}
-
-		deposit := &deposit.Deposit{
-			DepositOfferID: depositTx.DepositOfferID,
-			Start:          currentTimestamp,
-			Duration:       depositTx.DepositDuration,
-			Amount:         depositAmount,
-		}
-
-		currentSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
-		if err != nil {
-			return err
-		}
-
-		offer, ok := cs.modifiedDepositOffers[deposit.DepositOfferID]
-		if !ok {
-			return errNonExistingOffer
-		}
-
-		newCurrentSupply, err := math.Add64(currentSupply, deposit.TotalReward(offer))
-		if err != nil {
-			return err
-		}
-
-		s.SetCurrentSupply(constants.PrimaryNetworkID, newCurrentSupply)
-		cs.UpdateDeposit(tx.ID(), deposit)
-		s.AddTx(tx, status.Committed)
-	}
+	// adding msig aliases
 
 	for _, gma := range g.Camino.InitialMultisigAddresses {
 		owner := FromGenesisMultisigAlias(gma)
 		cs.SetMultisigOwner(owner)
 	}
 
-	return s.write(false, 0)
+	// adding blocks (validators and deposits)
+
+	for blockIndex, block := range g.Camino.Blocks {
+		// add validators
+		for _, tx := range block.Validators {
+			validatorTx, ok := tx.Unsigned.(txs.ValidatorTx)
+			if !ok {
+				return fmt.Errorf("expected tx type txs.ValidatorTx but got %T", tx.Unsigned)
+			}
+
+			staker, err := NewCurrentStaker(tx.ID(), validatorTx, 0)
+			if err != nil {
+				return err
+			}
+
+			s.PutCurrentValidator(staker)
+			s.AddTx(tx, status.Committed)
+		}
+
+		// add deposits
+		for _, tx := range block.Deposits {
+			depositTx, ok := tx.Unsigned.(*txs.DepositTx)
+			if !ok {
+				return errWrongTxType
+			}
+			depositAmount := uint64(0)
+			for _, out := range depositTx.Outs {
+				newAmount, err := math.Add64(depositAmount, out.Out.Amount())
+				if err != nil {
+					return err
+				}
+				depositAmount = newAmount
+			}
+
+			deposit := &deposit.Deposit{
+				DepositOfferID: depositTx.DepositOfferID,
+				Start:          block.Timestamp,
+				Duration:       depositTx.DepositDuration,
+				Amount:         depositAmount,
+			}
+
+			currentSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
+			if err != nil {
+				return err
+			}
+
+			offer, ok := depositOffers[deposit.DepositOfferID]
+			if !ok {
+				return errNonExistingOffer
+			}
+
+			newCurrentSupply, err := math.Add64(currentSupply, deposit.TotalReward(offer))
+			if err != nil {
+				return err
+			}
+
+			s.SetCurrentSupply(constants.PrimaryNetworkID, newCurrentSupply)
+			cs.UpdateDeposit(tx.ID(), deposit)
+			s.AddTx(tx, status.Committed)
+		}
+
+		height := uint64(blockIndex) + 1 // +1 because 0-block is commit block from avax syncGenesis
+		genesisBlock, err := blocks.NewBanffStandardBlock(
+			block.Time(),
+			s.GetLastAccepted(), // must be not empty
+			height,
+			block.Txs(),
+		)
+		if err != nil {
+			return err
+		}
+
+		s.AddStatelessBlock(genesisBlock, choices.Accepted)
+		s.SetLastAccepted(genesisBlock.ID())
+		s.SetHeight(height)
+
+		if err := s.write(false, height); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (cs *caminoState) Load() error {

@@ -72,10 +72,12 @@
             "amount": 100000000000000,
             "nodeID": "NodeID-PGHYeLVkU6ZVQEu8CuRBk6pQ2NJNAuzZ4",
             "validatorDuration": 100000,
+            "depositDuration": 110376000,
             "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
           },
           {
             "amount": 10000000000000000,
+            "depositDuration": 110376000,
             "depositOfferID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY"
           }
         ]
