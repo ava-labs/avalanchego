@@ -420,12 +420,17 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 	var (
 		nodeID    = msg.NodeID()
 		op        = msg.Op()
+		body      = msg.Message()
 		startTime = h.clock.Time()
 	)
 	h.ctx.Log.Debug("forwarding sync message to consensus",
 		zap.Stringer("nodeID", nodeID),
 		zap.Stringer("messageOp", op),
-		zap.Any("message", msg),
+	)
+	h.ctx.Log.Verbo("forwarding sync message to consensus",
+		zap.Stringer("nodeID", nodeID),
+		zap.Stringer("messageOp", op),
+		zap.Any("message", body),
 	)
 	h.resourceTracker.StartProcessing(nodeID, startTime)
 	h.ctx.Lock.Lock()
@@ -448,7 +453,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 				zap.Duration("processingTime", processingTime),
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", op),
-				zap.Any("message", msg),
+				zap.Any("message", body),
 			)
 		}
 	}()
@@ -464,7 +469,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg message.InboundMessage)
 	//            the timeout has already been cleared. This means the engine
 	//            should be invoked with a failure message if parsing of the
 	//            response fails.
-	switch msg := msg.Message().(type) {
+	switch msg := body.(type) {
 	// State messages should always be sent to the snowman engine
 	case *p2p.GetStateSummaryFrontier:
 		return engine.GetStateSummaryFrontier(ctx, nodeID, msg.RequestId)
@@ -695,12 +700,17 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg message.InboundMessag
 	var (
 		nodeID    = msg.NodeID()
 		op        = msg.Op()
+		body      = msg.Message()
 		startTime = h.clock.Time()
 	)
 	h.ctx.Log.Debug("forwarding async message to consensus",
 		zap.Stringer("nodeID", nodeID),
 		zap.Stringer("messageOp", op),
-		zap.Any("message", msg),
+	)
+	h.ctx.Log.Verbo("forwarding async message to consensus",
+		zap.Stringer("nodeID", nodeID),
+		zap.Stringer("messageOp", op),
+		zap.Any("message", body),
 	)
 	h.resourceTracker.StartProcessing(nodeID, startTime)
 	defer func() {
@@ -721,7 +731,7 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg message.InboundMessag
 		return err
 	}
 
-	switch m := msg.Message().(type) {
+	switch m := body.(type) {
 	case *p2p.AppRequest:
 		return engine.AppRequest(
 			ctx,
@@ -776,11 +786,15 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg message.InboundMessag
 func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 	var (
 		op        = msg.Op()
+		body      = msg.Message()
 		startTime = h.clock.Time()
 	)
 	h.ctx.Log.Debug("forwarding chan message to consensus",
 		zap.Stringer("messageOp", op),
-		zap.Any("message", msg),
+	)
+	h.ctx.Log.Verbo("forwarding chan message to consensus",
+		zap.Stringer("messageOp", op),
+		zap.Any("message", body),
 	)
 	h.ctx.Lock.Lock()
 	defer func() {
@@ -802,7 +816,7 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 		return err
 	}
 
-	switch msg := msg.Message().(type) {
+	switch msg := body.(type) {
 	case *message.VMMessage:
 		return engine.Notify(context.TODO(), common.Message(msg.Notification))
 
