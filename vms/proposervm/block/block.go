@@ -123,17 +123,17 @@ func (b *statelessCertSignedBlock) Proposer() ids.NodeID {
 }
 
 func (b *statelessCertSignedBlock) Verify(shouldHaveProposer bool, chainID ids.ID, blsPubKey *bls.PublicKey) error {
-	switch {
-	case !shouldHaveProposer:
+	if !shouldHaveProposer {
 		if len(b.Signature) > 0 || len(b.StatelessBlock.Certificate) > 0 {
 			return errUnexpectedProposer
 		}
 		return nil
-	case blsPubKey != nil:
+	}
+	if blsPubKey != nil {
 		return errBlsSigningNotPreferred
-	case b.cert == nil:
+	}
+	if b.cert == nil {
 		return errMissingProposer
-	default:
 	}
 
 	header, err := buildHeader(chainID, b.StatelessBlock.ParentID, b.id)
@@ -205,7 +205,8 @@ func (b *statelessBlsSignedBlock) Verify(shouldHaveProposer bool, chainID ids.ID
 			return errUnexpectedProposer
 		}
 		return nil
-	} else if blsPubKey == nil {
+	}
+	if blsPubKey == nil {
 		return errMissingProposer
 	}
 
