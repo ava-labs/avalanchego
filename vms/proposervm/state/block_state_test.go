@@ -17,10 +17,11 @@ import (
 	"github.com/ava-labs/avalanchego/signer"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-func testBlockState(a *require.Assertions, bs BlockState) {
+func testCertSignedBlockState(a *require.Assertions, bs BlockState) {
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
@@ -64,21 +65,81 @@ func testBlockState(a *require.Assertions, bs BlockState) {
 	a.Equal(b.Bytes(), fetchedBlock.Bytes())
 }
 
+func testBlsSignedBlockState(a *require.Assertions, bs BlockState) {
+	nodeID := ids.NodeID{'n', 'o', 'd', 'e'}
+	parentID := ids.ID{1}
+	timestamp := time.Unix(123, 0)
+	pChainHeight := uint64(2)
+	innerBlockBytes := []byte{3}
+	chainID := ids.ID{4}
+
+	sk, err := bls.NewSecretKey()
+	a.NoError(err)
+	blsSigner := signer.NewBLSSigner(sk)
+
+	b, err := block.BuildBlsSigned(
+		parentID,
+		timestamp,
+		pChainHeight,
+		nodeID,
+		innerBlockBytes,
+		chainID,
+		&blsSigner,
+	)
+	a.NoError(err)
+
+	_, _, err = bs.GetBlock(b.ID())
+	a.Equal(database.ErrNotFound, err)
+
+	_, _, err = bs.GetBlock(b.ID())
+	a.Equal(database.ErrNotFound, err)
+
+	err = bs.PutBlock(b, choices.Accepted)
+	a.NoError(err)
+
+	fetchedBlock, fetchedStatus, err := bs.GetBlock(b.ID())
+	a.NoError(err)
+	a.Equal(choices.Accepted, fetchedStatus)
+	a.Equal(b.Bytes(), fetchedBlock.Bytes())
+
+	fetchedBlock, fetchedStatus, err = bs.GetBlock(b.ID())
+	a.NoError(err)
+	a.Equal(choices.Accepted, fetchedStatus)
+	a.Equal(b.Bytes(), fetchedBlock.Bytes())
+}
+
 func TestBlockState(t *testing.T) {
 	a := require.New(t)
 
-	db := memdb.New()
-	bs := NewBlockState(db)
+	{
+		db := memdb.New()
+		bs := NewBlockState(db)
+		testCertSignedBlockState(a, bs)
+	}
 
-	testBlockState(a, bs)
+	{
+		db := memdb.New()
+		bs := NewBlockState(db)
+		testBlsSignedBlockState(a, bs)
+	}
 }
 
 func TestMeteredBlockState(t *testing.T) {
 	a := require.New(t)
 
-	db := memdb.New()
-	bs, err := NewMeteredBlockState(db, "", prometheus.NewRegistry())
-	a.NoError(err)
+	{
+		db := memdb.New()
+		bs, err := NewMeteredBlockState(db, "", prometheus.NewRegistry())
+		a.NoError(err)
 
-	testBlockState(a, bs)
+		testCertSignedBlockState(a, bs)
+	}
+
+	{
+		db := memdb.New()
+		bs, err := NewMeteredBlockState(db, "", prometheus.NewRegistry())
+		a.NoError(err)
+
+		testBlsSignedBlockState(a, bs)
+	}
 }

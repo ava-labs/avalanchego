@@ -503,14 +503,14 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 	coreVM.ParseBlockF = func(context.Context, []byte) (snowman.Block, error) {
 		return nil, errMarshallingFailed
 	}
-	slb, err := statelessblock.BuildCertSigned(
+	slb, err := statelessblock.BuildBlsSigned(
 		proVM.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		proVM.stakingCert,
+		proVM.ctx.NodeID,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.tlsSigner,
+		proVM.blsSigner,
 	)
 	require.NoError(err)
 
@@ -544,14 +544,14 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		return innerBlk, nil
 	}
 
-	slb1, err := statelessblock.BuildCertSigned(
+	slb1, err := statelessblock.BuildBlsSigned(
 		proVM.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		proVM.stakingCert,
+		proVM.ctx.NodeID,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.tlsSigner,
+		proVM.blsSigner,
 	)
 	require.NoError(err)
 
@@ -564,14 +564,14 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		},
 	}
 
-	slb2, err := statelessblock.BuildCertSigned(
+	slb2, err := statelessblock.BuildBlsSigned(
 		proVM.preferred,
 		innerBlk.Timestamp(),
 		200, // pChainHeight,
-		proVM.stakingCert,
+		proVM.ctx.NodeID,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.tlsSigner,
+		proVM.blsSigner,
 	)
 	require.NoError(err)
 
@@ -2225,14 +2225,14 @@ func TestVMInnerBlkCache(t *testing.T) {
 
 	// Create a block near the tip (0).
 	blkNearTipInnerBytes := []byte{1}
-	blkNearTip, err := statelessblock.BuildCertSigned(
+	blkNearTip, err := statelessblock.BuildBlsSigned(
 		ids.GenerateTestID(), // parent
 		time.Time{},          // timestamp
 		1,                    // pChainHeight,
-		vm.stakingCert,       // cert
+		vm.ctx.NodeID,
 		blkNearTipInnerBytes, // inner blk bytes
 		vm.ctx.ChainID,       // chain ID
-		vm.tlsSigner,         // key
+		vm.blsSigner,
 	)
 	require.NoError(err)
 

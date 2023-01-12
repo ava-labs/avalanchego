@@ -426,14 +426,14 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	}
 
 	// child P-Chain height must not precede parent P-Chain height
-	childSlb, err := block.BuildCertSigned(
+	childSlb, err := block.BuildBlsSigned(
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
 		prntBlkPChainHeight-1,
-		proVM.stakingCert,
+		proVM.ctx.NodeID,
 		childCoreBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.tlsSigner,
+		proVM.blsSigner,
 	)
 	require.NoError(err)
 
