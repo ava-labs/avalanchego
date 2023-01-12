@@ -95,14 +95,8 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 		}
 
 		validatorBlockTimestamp := uint64(vdr.StartTime)
-		blk, ok := genesisBlocks[validatorBlockTimestamp]
-		if !ok {
-			blk = &genesis.Block{
-				Timestamp: validatorBlockTimestamp,
-			}
-			genesisBlocks[validatorBlockTimestamp] = blk
-		}
-		blk.Validators = append(blk.Validators, validatorTx)
+		genesisBlock := getGenesisBlock(genesisBlocks, validatorBlockTimestamp, networkID)
+		genesisBlock.Validators = append(genesisBlock.Validators, validatorTx)
 
 		consortiumMemberNodes[validatorIndex] = genesis.ConsortiumMemberNodeID{
 			ConsortiumMemberAddress: args.Camino.ValidatorConsortiumMembers[validatorIndex],
@@ -141,14 +135,8 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 					return errors.New("validator timestamp is after validator's bond deposit timestamp")
 				}
 
-				blk, ok := genesisBlocks[blockTimestamp]
-				if !ok {
-					blk = &genesis.Block{
-						Timestamp: blockTimestamp,
-					}
-					genesisBlocks[blockTimestamp] = blk
-				}
-				blk.Deposits = append(blk.Deposits, depositTx)
+				genesisBlock := getGenesisBlock(genesisBlocks, blockTimestamp, networkID)
+				genesisBlock.Deposits = append(genesisBlock.Deposits, depositTx)
 			}
 
 			utxos = append(utxos, &genesis.UTXO{
@@ -188,16 +176,24 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 			return err
 		}
 
+		blockTimestamp := startTimestamp + args.Camino.UTXODeposits[i].TimestampOffset
+		genesisBlock := getGenesisBlock(genesisBlocks, blockTimestamp, networkID)
+
 		if depositTx != nil {
-			blockTimestamp := startTimestamp + args.Camino.UTXODeposits[i].TimestampOffset
-			blk, ok := genesisBlocks[blockTimestamp]
-			if !ok {
-				blk = &genesis.Block{
-					Timestamp: blockTimestamp,
-				}
-				genesisBlocks[blockTimestamp] = blk
-			}
-			blk.Deposits = append(blk.Deposits, depositTx)
+			genesisBlock.Deposits = append(genesisBlock.Deposits, depositTx)
+		} else {
+			tx := genesisBlock.UnlockedUTXOsTx.Unsigned.(*txs.BaseTx)
+			tx.Outs = append(tx.Outs, &avax.TransferableOutput{
+				Asset: avax.Asset{ID: args.AvaxAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: uint64(apiUTXO.Amount),
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{addrID},
+					},
+				},
+			})
 		}
 
 		utxos = append(utxos, &genesis.UTXO{
@@ -215,7 +211,7 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 		}
 		tx := &txs.Tx{Unsigned: &txs.CreateChainTx{
 			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-				NetworkID:    uint32(args.NetworkID),
+				NetworkID:    networkID,
 				BlockchainID: ids.Empty,
 			}},
 			SubnetID:    chain.SubnetID,
@@ -234,8 +230,12 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 
 	camino := args.Camino.ParseToGenesis()
 	camino.Blocks = make([]*genesis.Block, 0, len(genesisBlocks))
-	for _, block := range genesisBlocks {
-		camino.Blocks = append(camino.Blocks, block)
+	for _, genesisBlock := range genesisBlocks {
+		if err := genesisBlock.UnlockedUTXOsTx.Sign(txs.GenesisCodec, nil); err != nil {
+			return err
+		}
+
+		camino.Blocks = append(camino.Blocks, genesisBlock)
 	}
 	utils.Sort(camino.Blocks)
 
@@ -455,4 +455,20 @@ func getSecpOwner(owner *Owner) (*secp256k1fx.OutputOwners, error) {
 	}
 	utils.Sort(outputOwners.Addrs)
 	return outputOwners, nil
+}
+
+func getGenesisBlock(blocks map[uint64]*genesis.Block, timestamp uint64, networkID uint32) *genesis.Block {
+	block, ok := blocks[timestamp]
+	if !ok {
+		block = &genesis.Block{
+			Timestamp: timestamp,
+			// need this tx even if there will be no unlocked utxos, because we can't marshal nil
+			UnlockedUTXOsTx: &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    networkID,
+				BlockchainID: ids.Empty,
+			}}},
+		}
+		blocks[timestamp] = block
+	}
+	return block
 }

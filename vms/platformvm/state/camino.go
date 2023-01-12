@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	choices "github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -286,6 +287,16 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 	// adding blocks (validators and deposits)
 
 	for blockIndex, block := range g.Camino.Blocks {
+		// add unlocked utxos tx
+		tx, ok := block.UnlockedUTXOsTx.Unsigned.(*txs.BaseTx)
+		if !ok {
+			return errWrongTxType
+		}
+
+		if len(tx.Outs) > 0 {
+			s.AddTx(block.UnlockedUTXOsTx, status.Committed)
+		}
+
 		// add validators
 		for _, tx := range block.Validators {
 			validatorTx, ok := tx.Unsigned.(txs.ValidatorTx)
@@ -425,4 +436,31 @@ func (cs *caminoState) Close() error {
 		cs.consortiumMemberNodesDB.Close(),
 	)
 	return errs.Err
+}
+
+func GetGenesisBlocksIDs(genesisBytes []byte, genesis *genesis.Genesis) ([]ids.ID, error) {
+	genesisID := hashing.ComputeHash256Array(genesisBytes)
+	zeroBlock, err := blocks.NewApricotCommitBlock(genesisID, 0 /*height*/)
+	if err != nil {
+		return nil, err
+	}
+
+	parentID := zeroBlock.ID()
+	blockIDs := make([]ids.ID, len(genesis.Camino.Blocks))
+
+	for i, block := range genesis.Camino.Blocks {
+		genesisBlock, err := blocks.NewBanffStandardBlock(
+			block.Time(),
+			parentID,
+			uint64(i)+1,
+			block.Txs(),
+		)
+		if err != nil {
+			return nil, err
+		}
+		parentID = genesisBlock.ID()
+		blockIDs[i] = parentID
+	}
+
+	return blockIDs, nil
 }

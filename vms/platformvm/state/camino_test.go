@@ -190,7 +190,8 @@ func defaultGenesisState(addresses []genesis.AddressState, deposits []*txs.Tx) *
 						RewardsOwner: &secp256k1fx.OutputOwners{},
 					},
 				}}},
-				Deposits: deposits,
+				Deposits:        deposits,
+				UnlockedUTXOsTx: &txs.Tx{Unsigned: &txs.BaseTx{}},
 			}},
 			DepositOffers: []genesis.DepositOffer{
 				{
