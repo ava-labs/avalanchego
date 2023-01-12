@@ -160,8 +160,9 @@ func initTestProposerVM(
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 		return map[ids.NodeID]*validators.GetValidatorOutput{
 			proVM.ctx.NodeID: {
-				NodeID: proVM.ctx.NodeID,
-				Weight: 10,
+				NodeID:    proVM.ctx.NodeID,
+				Weight:    10,
+				PublicKey: bls.PublicFromSecretKey(pTestBlsSecretKey),
 			},
 			{1}: {
 				NodeID: ids.NodeID{1},
