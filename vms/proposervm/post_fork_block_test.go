@@ -753,6 +753,125 @@ func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	require.NoError(err)
 }
 
+func TestBlockVerify_CertSignedBlock_InvalidIfBlsKeyIsRegistered(t *testing.T) {
+	// Bls signing is preferred which means that Cert Signed blocks won't verify
+	// if a BLS key is publicly registered
+
+	require := require.New(t)
+	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	pChainHeight := uint64(100)
+	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
+		return pChainHeight, nil
+	}
+
+	// create parent block ...
+	prntCoreBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(1111),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk.ID(),
+		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
+	}
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return prntCoreBlk, nil
+	}
+	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case prntCoreBlk.ID():
+			return prntCoreBlk, nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, prntCoreBlk.Bytes()):
+			return prntCoreBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	prntProBlk, err := proVM.BuildBlock(context.Background())
+	require.NoError(err)
+
+	err = prntProBlk.Verify(context.Background())
+	require.NoError(err)
+
+	err = proVM.SetPreference(context.Background(), prntProBlk.ID())
+	require.NoError(err)
+
+	childCoreBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(2222),
+			StatusV: choices.Processing,
+		},
+		ParentV: prntCoreBlk.ID(),
+		BytesV:  []byte{2},
+	}
+
+	prntTimestamp := prntProBlk.Timestamp()
+	blkWinDelay, _, err := proVM.DelayAndBlsKey(context.Background(), childCoreBlk.Height(), pChainHeight, proVM.ctx.NodeID)
+	require.NoError(err)
+
+	afterWindowStart := prntTimestamp.Add(blkWinDelay).Add(5 * time.Second)
+	proVM.Clock.Set(afterWindowStart)
+
+	// A BLS signed block does verify
+	blkBlk, err := block.BuildBlsSigned(
+		prntProBlk.ID(),
+		afterWindowStart,
+		pChainHeight,
+		proVM.ctx.NodeID,
+		childCoreBlk.Bytes(),
+		proVM.ctx.ChainID,
+		proVM.blsSigner,
+	)
+	require.NoError(err)
+
+	childProBlk := postForkBlock{
+		SignedBlock: blkBlk,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: childCoreBlk,
+			status:   choices.Processing,
+		},
+	}
+
+	err = childProBlk.Verify(context.Background())
+	require.NoError(err)
+
+	// A Cert signed block does not, since BLS key is registered
+	certBlk, err := block.BuildCertSigned(
+		prntProBlk.ID(),
+		afterWindowStart,
+		pChainHeight,
+		pTestCert.Leaf,
+		childCoreBlk.Bytes(),
+		proVM.ctx.ChainID,
+		proVM.tlsSigner,
+	)
+	require.NoError(err)
+
+	childProBlk = postForkBlock{
+		SignedBlock: certBlk,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: childCoreBlk,
+			status:   choices.Processing,
+		},
+	}
+
+	err = childProBlk.Verify(context.Background())
+	require.True(errors.Is(err, block.ErrBlsSigningNotPreferred))
+}
+
 // ProposerBlock.Accept tests section
 func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 	// setup

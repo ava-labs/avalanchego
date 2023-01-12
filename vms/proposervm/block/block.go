@@ -20,9 +20,9 @@ var (
 	_ SignedBlock = (*statelessCertSignedBlock)(nil)
 	_ SignedBlock = (*statelessBlsSignedBlock)(nil)
 
+	ErrBlsSigningNotPreferred = errors.New("proposer should sign with bls key if available")
 	errUnexpectedProposer     = errors.New("expected no proposer but one was provided")
 	errMissingProposer        = errors.New("expected proposer but none was provided")
-	errBlsSigningNotPreferred = errors.New("proposer should sign with bls key if available")
 )
 
 type Block interface {
@@ -130,7 +130,7 @@ func (b *statelessCertSignedBlock) Verify(shouldHaveProposer bool, chainID ids.I
 		return nil
 	}
 	if blsPubKey != nil {
-		return errBlsSigningNotPreferred
+		return ErrBlsSigningNotPreferred
 	}
 	if b.cert == nil {
 		return errMissingProposer

@@ -11,10 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-func equal(require *require.Assertions, chainID ids.ID, want, have SignedBlock) {
+func equal(require *require.Assertions, chainID ids.ID, pk *bls.PublicKey, want, have SignedBlock) {
 	require.Equal(want.ID(), have.ID())
 	require.Equal(want.ParentID(), have.ParentID())
 	require.Equal(want.PChainHeight(), have.PChainHeight())
@@ -22,8 +23,8 @@ func equal(require *require.Assertions, chainID ids.ID, want, have SignedBlock) 
 	require.Equal(want.Block(), have.Block())
 	require.Equal(want.Proposer(), have.Proposer())
 	require.Equal(want.Bytes(), have.Bytes())
-	require.Equal(want.Verify(false, chainID, nil), have.Verify(false, chainID, nil))
-	require.Equal(want.Verify(true, chainID, nil), have.Verify(true, chainID, nil))
+	require.Equal(want.Verify(false, chainID, pk), have.Verify(false, chainID, pk))
+	require.Equal(want.Verify(true, chainID, pk), have.Verify(true, chainID, pk))
 }
 
 func TestVerifyNoCertWithSignature(t *testing.T) {

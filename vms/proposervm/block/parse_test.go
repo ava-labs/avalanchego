@@ -29,6 +29,7 @@ func TestParseBlsSigned(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 	blsSigner := signer.NewBLSSigner(sk)
+	pk := bls.PublicFromSecretKey(sk)
 
 	builtBlock, err := BuildBlsSigned(
 		parentID,
@@ -49,7 +50,7 @@ func TestParseBlsSigned(t *testing.T) {
 	parsedBlock, ok := parsedBlockIntf.(SignedBlock)
 	require.True(ok)
 
-	equal(require, chainID, builtBlock, parsedBlock)
+	equal(require, chainID, pk, builtBlock, parsedBlock)
 }
 
 func TestParseCertSigned(t *testing.T) {
@@ -86,7 +87,7 @@ func TestParseCertSigned(t *testing.T) {
 	parsedBlock, ok := parsedBlockIntf.(SignedBlock)
 	require.True(ok)
 
-	equal(require, chainID, builtBlock, parsedBlock)
+	equal(require, chainID, nil, builtBlock, parsedBlock)
 }
 
 func TestParseDuplicateExtension(t *testing.T) {
@@ -158,7 +159,7 @@ func TestParseUnsigned(t *testing.T) {
 	parsedBlock, ok := parsedBlockIntf.(SignedBlock)
 	require.True(ok)
 
-	equal(require, ids.Empty, builtBlock, parsedBlock)
+	equal(require, ids.Empty, nil, builtBlock, parsedBlock)
 }
 
 func TestParseGibberish(t *testing.T) {
