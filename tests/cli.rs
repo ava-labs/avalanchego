@@ -21,10 +21,22 @@ fn fwdctl_prints_version() -> Result<()> {
 }
 
 #[test]
+fn fwdctl_creates_database() -> Result<()> {
+    // version is defined and succeeds with the desired output
+    Command::cargo_bin(PRG)?.arg("create").assert().success();
+
+    Ok(())
+}
+
+#[test]
 #[ignore] // TODO
 fn fwdctl_insert_successful() -> Result<()> {
+    // Create db
+    fwdctl_creates_database()?;
+
+    // Insert data
     Command::cargo_bin(PRG)?
-        .args(["insert --key year --value 2023"])
+        .args(["insert", "--", "--key year", "--value hello"])
         .assert()
         .success()
         .stdout(predicate::str::contains("year"));

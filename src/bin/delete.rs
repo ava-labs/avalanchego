@@ -11,7 +11,7 @@ pub struct Options {
 
     /// The database path (if no path is provided, return an error). Defaults to firewood.
     #[arg(
-        required = true,
+        required = false,
         value_name = "DB_NAME",
         default_value_t = String::from("firewood"),
         help = "Name of the database"
@@ -31,9 +31,14 @@ pub fn run(opts: &Options) -> Result<()> {
     };
 
     let mut account: Option<Vec<u8>> = None;
-    if let Err(_) = db.new_writebatch().kv_remove(opts.key.clone(), &mut account) {
-        return Err(anyhow!("error deleting key"))
-    }
+    let x = match db.new_writebatch().kv_remove(opts.key.clone(), &mut account) {
+        Ok(wb) => {
+            wb.commit();
+            log::info!("{}", opts.key);
 
-    Ok(())
+            Ok(())
+        }
+        Err(_) => Err(anyhow!("error deleting key")),
+    };
+    x
 }

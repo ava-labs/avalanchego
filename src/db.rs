@@ -28,6 +28,7 @@ pub enum DBError {
     Merkle(MerkleError),
     Blob(crate::account::BlobError),
     System(nix::Error),
+    KeyNotFound,
 }
 
 /// DBParams contains the constants that are fixed upon the creation of the DB, this ensures the
@@ -247,11 +248,11 @@ impl DBRev {
     }
 
     /// Get a value associated with a key.
-    pub fn kv_get_merkle(&self, key: &[u8]) -> Result<Vec<u8>, DBError> {
-        let obj_ref = self.merkle.get(key, self.header.kv_root).map_err(DBError::Merkle)?;
+    pub fn kv_get(&self, key: &[u8]) -> Option<Vec<u8>> {
+        let obj_ref = self.merkle.get(key, self.header.kv_root);
         match obj_ref {
-            None => Ok(vec![]),
-            Some(obj) => Ok(obj.to_vec()),
+            Err(_) => None,
+            Ok(obj) => Some(obj.unwrap().to_vec()),
         }
     }
 
@@ -629,7 +630,7 @@ impl DB {
 
     /// Get a value in the kv store associated with a particular key.
     pub fn kv_get(&self, key: &[u8]) -> Result<Vec<u8>, DBError> {
-        self.inner.lock().latest.kv_get_merkle(key)
+        self.inner.lock().latest.kv_get(key).ok_or(DBError::KeyNotFound)
     }
 
     /// Get root hash of the latest world state of all accounts.

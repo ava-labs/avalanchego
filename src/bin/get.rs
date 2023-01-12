@@ -11,7 +11,7 @@ pub struct Options {
 
     /// The database path (if no path is provided, return an error). Defaults to firewood.
     #[arg(
-        required = true,
+        required = false,
         value_name = "DB_NAME",
         default_value_t = String::from("firewood"),
         help = "Name of the database"
@@ -27,13 +27,17 @@ pub fn run(opts: &Options) -> Result<()> {
 
     let db = match DB::new(opts.db_path.as_str(), &cfg.build()) {
         Ok(db) => db,
-        Err(_) => return Err(anyhow!("error opening database")),
+        Err(_) => return Err(anyhow!("db not available")),
     };
 
     match db.kv_get(opts.key.as_bytes()) {
-        Ok(val) => log::info!("{:#?}", val),
-        Err(_) => return Err(anyhow!("error getting key")),
+        Ok(val) => {
+            log::info!("{:#?}", val);
+            if val.is_empty() {
+                return Err(anyhow!("no value found for key"))
+            }
+            return Ok(())
+        }
+        Err(_) => return Err(anyhow!("key not found")),
     }
-
-    Ok(())
 }

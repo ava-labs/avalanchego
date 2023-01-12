@@ -15,7 +15,7 @@ pub struct Options {
 
     /// The database path (if no path is provided, return an error). Defaults to firewood.
     #[arg(
-        required = true,
+        required = false,
         value_name = "DB_NAME",
         default_value_t = String::from("firewood"),
         help = "Name of the database"
