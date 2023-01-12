@@ -13,12 +13,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	pchaintxs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
@@ -449,4 +451,31 @@ func GenesisChainData(genesisBytes []byte, vmIDs []ids.ID) ([]*pchaintxs.Tx, boo
 		}
 	}
 	return result, genesis.Camino.LockModeBondDeposit, nil
+}
+
+func GetGenesisBlocksIDs(genesisBytes []byte, genesis *genesis.Genesis) ([]ids.ID, error) {
+	genesisID := hashing.ComputeHash256Array(genesisBytes)
+	zeroBlock, err := blocks.NewApricotCommitBlock(genesisID, 0 /*height*/)
+	if err != nil {
+		return nil, err
+	}
+
+	parentID := zeroBlock.ID()
+	blockIDs := make([]ids.ID, len(genesis.Camino.Blocks))
+
+	for i, block := range genesis.Camino.Blocks {
+		genesisBlock, err := blocks.NewBanffStandardBlock(
+			block.Time(),
+			parentID,
+			uint64(i)+1,
+			block.Txs(),
+		)
+		if err != nil {
+			return nil, err
+		}
+		parentID = genesisBlock.ID()
+		blockIDs[i] = parentID
+	}
+
+	return blockIDs, nil
 }

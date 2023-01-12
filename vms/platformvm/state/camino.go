@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	choices "github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -436,31 +435,4 @@ func (cs *caminoState) Close() error {
 		cs.consortiumMemberNodesDB.Close(),
 	)
 	return errs.Err
-}
-
-func GetGenesisBlocksIDs(genesisBytes []byte, genesis *genesis.Genesis) ([]ids.ID, error) {
-	genesisID := hashing.ComputeHash256Array(genesisBytes)
-	zeroBlock, err := blocks.NewApricotCommitBlock(genesisID, 0 /*height*/)
-	if err != nil {
-		return nil, err
-	}
-
-	parentID := zeroBlock.ID()
-	blockIDs := make([]ids.ID, len(genesis.Camino.Blocks))
-
-	for i, block := range genesis.Camino.Blocks {
-		genesisBlock, err := blocks.NewBanffStandardBlock(
-			block.Time(),
-			parentID,
-			uint64(i)+1,
-			block.Txs(),
-		)
-		if err != nil {
-			return nil, err
-		}
-		parentID = genesisBlock.ID()
-		blockIDs[i] = parentID
-	}
-
-	return blockIDs, nil
 }
