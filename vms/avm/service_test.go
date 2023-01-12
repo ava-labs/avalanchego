@@ -304,8 +304,8 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.PutUTXO(twoOfTwoUTXO)
-	require.NoError(t, err)
+	vm.state.AddUTXO(twoOfTwoUTXO)
+	require.NoError(t, vm.state.Commit())
 
 	// Check the balance with IncludePartial set to true
 	balanceArgs := &GetBalanceArgs{
@@ -349,8 +349,8 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.PutUTXO(oneOfTwoUTXO)
-	require.NoError(t, err)
+	vm.state.AddUTXO(oneOfTwoUTXO)
+	require.NoError(t, vm.state.Commit())
 
 	// Check the balance with IncludePartial set to true
 	balanceArgs = &GetBalanceArgs{
@@ -396,8 +396,8 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.PutUTXO(futureUTXO)
-	require.NoError(t, err)
+	vm.state.AddUTXO(futureUTXO)
+	require.NoError(t, vm.state.Commit())
 
 	// Check the balance with IncludePartial set to true
 	balanceArgs = &GetBalanceArgs{
@@ -500,8 +500,8 @@ func TestServiceGetAllBalances(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.PutUTXO(twoOfTwoUTXO)
-	require.NoError(t, err)
+	vm.state.AddUTXO(twoOfTwoUTXO)
+	require.NoError(t, vm.state.Commit())
 
 	// Check the balance with IncludePartial set to true
 	balanceArgs := &GetAllBalancesArgs{
@@ -542,8 +542,8 @@ func TestServiceGetAllBalances(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.PutUTXO(oneOfTwoUTXO)
-	require.NoError(t, err)
+	vm.state.AddUTXO(oneOfTwoUTXO)
+	require.NoError(t, vm.state.Commit())
 
 	// Check the balance with IncludePartial set to true
 	balanceArgs = &GetAllBalancesArgs{
@@ -587,8 +587,8 @@ func TestServiceGetAllBalances(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.PutUTXO(futureUTXO)
-	require.NoError(t, err)
+	vm.state.AddUTXO(futureUTXO)
+	require.NoError(t, vm.state.Commit())
 
 	// Check the balance with IncludePartial set to true
 	balanceArgs = &GetAllBalancesArgs{
@@ -630,8 +630,8 @@ func TestServiceGetAllBalances(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.PutUTXO(otherAssetUTXO)
-	require.NoError(t, err)
+	vm.state.AddUTXO(otherAssetUTXO)
+	require.NoError(t, vm.state.Commit())
 
 	// Check the balance with IncludePartial set to true
 	balanceArgs = &GetAllBalancesArgs{
@@ -1829,10 +1829,9 @@ func TestServiceGetUTXOs(t *testing.T) {
 				},
 			},
 		}
-		if err := vm.state.PutUTXO(utxo); err != nil {
-			t.Fatal(err)
-		}
+		vm.state.AddUTXO(utxo)
 	}
+	require.NoError(t, vm.state.Commit())
 
 	sm := m.NewSharedMemory(constants.PlatformChainID)
 
