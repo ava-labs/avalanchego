@@ -242,7 +242,7 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 	cs.SetAddressStates(g.Camino.InitialAdmin,
 		initalAdminAddressState|txs.AddressStateRoleAdminBit)
 
-	tx := &txs.AddAddressStateTx{
+	tx := &txs.AddressStateTx{
 		Address: g.Camino.InitialAdmin,
 		State:   txs.AddressStateRoleAdmin,
 		Remove:  false,

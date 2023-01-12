@@ -37,7 +37,7 @@ type CaminoBuilder interface {
 }
 
 type CaminoTxBuilder interface {
-	NewAddAddressStateTx(
+	NewAddressStateTx(
 		address ids.ShortID,
 		remove bool,
 		state uint8,
@@ -234,7 +234,7 @@ func (b *caminoBuilder) NewRewardValidatorTx(txID ids.ID) (*txs.Tx, error) {
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
-func (b *caminoBuilder) NewAddAddressStateTx(
+func (b *caminoBuilder) NewAddressStateTx(
 	address ids.ShortID,
 	remove bool,
 	state uint8,
@@ -247,7 +247,7 @@ func (b *caminoBuilder) NewAddAddressStateTx(
 	}
 
 	// Create the tx
-	utx := &txs.AddAddressStateTx{
+	utx := &txs.AddressStateTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.ctx.NetworkID,
 			BlockchainID: b.ctx.ChainID,

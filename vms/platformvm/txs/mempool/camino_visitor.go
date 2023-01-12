@@ -9,7 +9,7 @@ import (
 
 // Issuer
 
-func (i *issuer) AddAddressStateTx(*txs.AddAddressStateTx) error {
+func (i *issuer) AddressStateTx(*txs.AddressStateTx) error {
 	i.m.addDecisionTx(i.tx)
 	return nil
 }
@@ -31,7 +31,7 @@ func (i *issuer) RegisterNodeTx(*txs.RegisterNodeTx) error {
 
 // Remover
 
-func (r *remover) AddAddressStateTx(*txs.AddAddressStateTx) error {
+func (r *remover) AddressStateTx(*txs.AddressStateTx) error {
 	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
 	return nil
 }

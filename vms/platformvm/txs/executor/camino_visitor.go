@@ -9,7 +9,7 @@ import "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
 // Standard
 
-func (*StandardTxExecutor) AddAddressStateTx(*txs.AddAddressStateTx) error {
+func (*StandardTxExecutor) AddressStateTx(*txs.AddressStateTx) error {
 	return errWrongTxType
 }
 
@@ -27,7 +27,7 @@ func (*StandardTxExecutor) RegisterNodeTx(*txs.RegisterNodeTx) error {
 
 // Proposal
 
-func (*ProposalTxExecutor) AddAddressStateTx(*txs.AddAddressStateTx) error {
+func (*ProposalTxExecutor) AddressStateTx(*txs.AddressStateTx) error {
 	return errWrongTxType
 }
 
@@ -45,7 +45,7 @@ func (*ProposalTxExecutor) RegisterNodeTx(*txs.RegisterNodeTx) error {
 
 // Atomic
 
-func (*AtomicTxExecutor) AddAddressStateTx(*txs.AddAddressStateTx) error {
+func (*AtomicTxExecutor) AddressStateTx(*txs.AddressStateTx) error {
 	return errWrongTxType
 }
 
@@ -63,7 +63,7 @@ func (*AtomicTxExecutor) RegisterNodeTx(*txs.RegisterNodeTx) error {
 
 // MemPool
 
-func (v *MempoolTxVerifier) AddAddressStateTx(tx *txs.AddAddressStateTx) error {
+func (v *MempoolTxVerifier) AddressStateTx(tx *txs.AddressStateTx) error {
 	return v.standardTx(tx)
 }
 

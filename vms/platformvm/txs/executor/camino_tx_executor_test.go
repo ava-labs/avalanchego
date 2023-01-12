@@ -933,7 +933,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 
-		t.Run("AddAddressStateTx "+name, func(t *testing.T) {
+		t.Run("AddressStateTx "+name, func(t *testing.T) {
 			env := newCaminoEnvironment( /*postBanff*/ true, tt.caminoConfig)
 			env.ctx.Lock.Lock()
 			defer func() {
@@ -942,7 +942,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 			}()
 			env.config.BanffTime = env.state.GetTimestamp()
 
-			addAddressStateTxLockedTx := &txs.AddAddressStateTx{
+			addressStateTxLockedTx := &txs.AddressStateTx{
 				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 					NetworkID:    env.ctx.NetworkID,
 					BlockchainID: env.ctx.ChainID,
@@ -954,9 +954,9 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 				Remove:  false,
 			}
 
-			executor := generateExecutor(addAddressStateTxLockedTx, env)
+			executor := generateExecutor(addressStateTxLockedTx, env)
 
-			err := executor.AddAddressStateTx(addAddressStateTxLockedTx)
+			err := executor.AddressStateTx(addressStateTxLockedTx)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 
@@ -1715,7 +1715,7 @@ func TestAddAdressStateTxExecutor(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			addAddressStateTx := &txs.AddAddressStateTx{
+			addressStateTx := &txs.AddressStateTx{
 				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 					NetworkID:    env.ctx.NetworkID,
 					BlockchainID: env.ctx.ChainID,
@@ -1731,7 +1731,7 @@ func TestAddAdressStateTxExecutor(t *testing.T) {
 				Remove:  tt.remove,
 			}
 
-			tx, err := txs.NewSigned(addAddressStateTx, txs.Codec, signers)
+			tx, err := txs.NewSigned(addressStateTx, txs.Codec, signers)
 			require.NoError(t, err)
 
 			onAcceptState, err := state.NewCaminoDiff(lastAcceptedID, env)
@@ -1748,7 +1748,7 @@ func TestAddAdressStateTxExecutor(t *testing.T) {
 			executor.State.SetAddressStates(tt.stateAddress, tt.flag)
 			executor.State.SetAddressStates(tt.targetAddress, tt.flag)
 
-			err = addAddressStateTx.Visit(&executor)
+			err = addressStateTx.Visit(&executor)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}

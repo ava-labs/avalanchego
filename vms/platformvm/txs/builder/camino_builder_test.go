@@ -89,7 +89,7 @@ func TestCaminoBuilderTxAddressState(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, err := env.txBuilder.NewAddAddressStateTx(
+			_, err := env.txBuilder.NewAddressStateTx(
 				tt.address,
 				tt.remove,
 				tt.state,

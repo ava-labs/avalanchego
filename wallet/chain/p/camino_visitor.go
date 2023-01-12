@@ -10,7 +10,7 @@ import (
 
 // backend
 
-func (b *backendVisitor) AddAddressStateTx(tx *txs.AddAddressStateTx) error {
+func (b *backendVisitor) AddressStateTx(tx *txs.AddressStateTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
@@ -28,7 +28,7 @@ func (b *backendVisitor) RegisterNodeTx(tx *txs.RegisterNodeTx) error {
 
 // signer
 
-func (s *signerVisitor) AddAddressStateTx(tx *txs.AddAddressStateTx) error {
+func (s *signerVisitor) AddressStateTx(tx *txs.AddressStateTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err

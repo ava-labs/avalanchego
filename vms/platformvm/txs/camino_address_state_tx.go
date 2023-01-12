@@ -37,14 +37,14 @@ const (
 )
 
 var (
-	_ UnsignedTx = (*AddAddressStateTx)(nil)
+	_ UnsignedTx = (*AddressStateTx)(nil)
 
 	ErrEmptyAddress = errors.New("address is empty")
 	ErrInvalidState = errors.New("invalid state")
 )
 
-// AddAddressStateTx is an unsigned addAddressStateTx
-type AddAddressStateTx struct {
+// AddressStateTx is an unsigned AddressStateTx
+type AddressStateTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// The address to add / remove state
@@ -56,7 +56,7 @@ type AddAddressStateTx struct {
 }
 
 // SyntacticVerify returns nil if [tx] is valid
-func (tx *AddAddressStateTx) SyntacticVerify(ctx *snow.Context) error {
+func (tx *AddressStateTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
 		return ErrNilTx
@@ -75,6 +75,6 @@ func (tx *AddAddressStateTx) SyntacticVerify(ctx *snow.Context) error {
 	return tx.BaseTx.SyntacticVerify(ctx)
 }
 
-func (tx *AddAddressStateTx) Visit(visitor Visitor) error {
-	return visitor.AddAddressStateTx(tx)
+func (tx *AddressStateTx) Visit(visitor Visitor) error {
+	return visitor.AddressStateTx(tx)
 }

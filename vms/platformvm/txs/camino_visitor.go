@@ -4,7 +4,7 @@
 package txs
 
 type CaminoVisitor interface {
-	AddAddressStateTx(*AddAddressStateTx) error
+	AddressStateTx(*AddressStateTx) error
 	DepositTx(*DepositTx) error
 	UnlockDepositTx(*UnlockDepositTx) error
 	RegisterNodeTx(*RegisterNodeTx) error

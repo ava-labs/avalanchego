@@ -746,7 +746,7 @@ func addCreds(tx *txs.Tx, creds []verify.Verifiable) {
 	tx.Creds = append(tx.Creds, creds...)
 }
 
-func (e *CaminoStandardTxExecutor) AddAddressStateTx(tx *txs.AddAddressStateTx) error {
+func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error {
 	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
 		return err
 	}

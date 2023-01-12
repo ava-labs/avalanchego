@@ -13,7 +13,7 @@ var _ txs.Visitor = (*caminoTxMetrics)(nil)
 
 type caminoTxMetrics struct {
 	txMetrics
-	numAddAddressStateTxs,
+	numAddressStateTxs,
 	numDepositTxs,
 	numUnlockDepositTxs,
 	numRegisterNodeTx prometheus.Counter
@@ -32,17 +32,17 @@ func newCaminoTxMetrics(
 	m := &caminoTxMetrics{
 		txMetrics: *txm,
 		// Camino specific tx metrics
-		numAddAddressStateTxs: newTxMetric(namespace, "add_address_state", registerer, &errs),
-		numDepositTxs:         newTxMetric(namespace, "deposit", registerer, &errs),
-		numUnlockDepositTxs:   newTxMetric(namespace, "unlock_deposit", registerer, &errs),
-		numRegisterNodeTx:     newTxMetric(namespace, "register_node", registerer, &errs),
+		numAddressStateTxs:  newTxMetric(namespace, "add_address_state", registerer, &errs),
+		numDepositTxs:       newTxMetric(namespace, "deposit", registerer, &errs),
+		numUnlockDepositTxs: newTxMetric(namespace, "unlock_deposit", registerer, &errs),
+		numRegisterNodeTx:   newTxMetric(namespace, "register_node", registerer, &errs),
 	}
 	return m, errs.Err
 }
 
 // avax metrics
 
-func (*txMetrics) AddAddressStateTx(*txs.AddAddressStateTx) error {
+func (*txMetrics) AddressStateTx(*txs.AddressStateTx) error {
 	return nil
 }
 
@@ -60,8 +60,8 @@ func (*txMetrics) RegisterNodeTx(*txs.RegisterNodeTx) error {
 
 // camino metrics
 
-func (m *caminoTxMetrics) AddAddressStateTx(*txs.AddAddressStateTx) error {
-	m.numAddAddressStateTxs.Inc()
+func (m *caminoTxMetrics) AddressStateTx(*txs.AddressStateTx) error {
+	m.numAddressStateTxs.Inc()
 	return nil
 }
 

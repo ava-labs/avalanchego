@@ -247,7 +247,7 @@ func (s *CaminoService) SetAddressState(_ *http.Request, args *SetAddressStateAr
 	}
 
 	// Create the transaction
-	tx, err := s.vm.txBuilder.NewAddAddressStateTx(
+	tx, err := s.vm.txBuilder.NewAddressStateTx(
 		targetAddr,  // Address to change state
 		args.Remove, // Add or remove State
 		args.State,  // The state to change

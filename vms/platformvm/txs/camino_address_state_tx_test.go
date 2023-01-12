@@ -16,22 +16,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAddAddressStateTxSyntacticVerify(t *testing.T) {
+func TestAddressStateTxSyntacticVerify(t *testing.T) {
 	require := require.New(t)
 	ctx := snow.DefaultContextTest()
 	signers := [][]*crypto.PrivateKeySECP256K1R{preFundedKeys}
 
 	var (
-		stx               *Tx
-		addAddressStateTx *AddAddressStateTx
-		err               error
+		stx            *Tx
+		addressStateTx *AddressStateTx
+		err            error
 	)
 
 	// Case : signed tx is nil
 	require.ErrorIs(stx.SyntacticVerify(ctx), ErrNilSignedTx)
 
 	// Case : unsigned tx is nil
-	require.ErrorIs(addAddressStateTx.SyntacticVerify(ctx), ErrNilTx)
+	require.ErrorIs(addressStateTx.SyntacticVerify(ctx), ErrNilTx)
 
 	inputs := []*avax.TransferableInput{{
 		UTXOID: avax.UTXOID{
@@ -81,7 +81,7 @@ func TestAddAddressStateTxSyntacticVerify(t *testing.T) {
 		},
 	}
 
-	addAddressStateTx = &AddAddressStateTx{
+	addressStateTx = &AddressStateTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    ctx.NetworkID,
 			BlockchainID: ctx.ChainID,
@@ -95,7 +95,7 @@ func TestAddAddressStateTxSyntacticVerify(t *testing.T) {
 	}
 
 	outputs = append(outputs, lockedOut)
-	addAddressStateTxLocked := &AddAddressStateTx{
+	addressStateTxLocked := &AddressStateTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    ctx.NetworkID,
 			BlockchainID: ctx.ChainID,
@@ -109,7 +109,7 @@ func TestAddAddressStateTxSyntacticVerify(t *testing.T) {
 	}
 
 	outputs[1] = stakedOut
-	addAddressStateTxStaked := &AddAddressStateTx{
+	addressStateTxStaked := &AddressStateTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    ctx.NetworkID,
 			BlockchainID: ctx.ChainID,
@@ -123,36 +123,36 @@ func TestAddAddressStateTxSyntacticVerify(t *testing.T) {
 	}
 
 	// Case: valid tx
-	stx, err = NewSigned(addAddressStateTx, Codec, signers)
+	stx, err = NewSigned(addressStateTx, Codec, signers)
 	require.NoError(err)
 	require.NoError(stx.SyntacticVerify(ctx))
 
 	// Case: Empty address
-	addAddressStateTx.SyntacticallyVerified = false
-	addAddressStateTx.Address = ids.ShortID{}
-	stx, err = NewSigned(addAddressStateTx, Codec, signers)
+	addressStateTx.SyntacticallyVerified = false
+	addressStateTx.Address = ids.ShortID{}
+	stx, err = NewSigned(addressStateTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
 	require.Error(err, ErrEmptyAddress)
-	addAddressStateTx.Address = preFundedKeys[0].PublicKey().Address()
+	addressStateTx.Address = preFundedKeys[0].PublicKey().Address()
 
 	// Invalid mode
-	addAddressStateTx.SyntacticallyVerified = false
-	addAddressStateTx.State = 99
-	stx, err = NewSigned(addAddressStateTx, Codec, signers)
+	addressStateTx.SyntacticallyVerified = false
+	addressStateTx.State = 99
+	stx, err = NewSigned(addressStateTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
 	require.Error(err, ErrInvalidState)
-	addAddressStateTx.State = AddressStateRoleAdmin
+	addressStateTx.State = AddressStateRoleAdmin
 
 	// Locked out
-	stx, err = NewSigned(addAddressStateTxLocked, Codec, signers)
+	stx, err = NewSigned(addressStateTxLocked, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
 	require.Error(err)
 
 	// Staked out
-	stx, err = NewSigned(addAddressStateTxStaked, Codec, signers)
+	stx, err = NewSigned(addressStateTxStaked, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
 	require.Error(err)
