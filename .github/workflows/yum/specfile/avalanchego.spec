@@ -14,9 +14,9 @@ Avalanche is an incredibly lightweight protocol, so the minimum computer require
 %files
 /usr/local/bin/avalanchego
 /usr/local/lib/avalanchego
-/usr/local/lib/avalanchego/evm
 
 %changelog
 * Mon Oct 26 2020 Charlie Wyse <charlie@avalabs.org>
 - First creation of package
+- Remove EVM binary
 

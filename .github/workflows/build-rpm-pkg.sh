@@ -11,10 +11,6 @@ OK=`cp ./build/avalanchego $AVALANCHE_BUILD_BIN_DIR`
 if [[ $OK -ne 0 ]]; then
   exit $OK;
 fi
-OK=`cp ./build/plugins/evm $AVALANCHE_LIB_DIR`
-if [[ $OK -ne 0 ]]; then
-  exit $OK;
-fi
 
 echo "Build rpm package..."
 VER=$(echo $TAG | gawk -F- '{print$1}' | tr -d 'v' )
