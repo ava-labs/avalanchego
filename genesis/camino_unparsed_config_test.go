@@ -187,6 +187,96 @@ func TestParse(t *testing.T) {
 	}
 }
 
+func TestParsingAndUnparsingDepositOffer(t *testing.T) {
+	tests := map[string]struct {
+		startTime uint64
+		udo       UnparsedDepositOffer
+	}{
+		"Columbus 8% offer with OfferID": {
+			startTime: uint64(1671058800),
+			udo: UnparsedDepositOffer{
+				OfferID:                 "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
+				InterestRateNominator:   80000,
+				StartOffset:             0,
+				EndOffset:               112795200,
+				MinAmount:               1,
+				MinDuration:             110376000,
+				MaxDuration:             110376000,
+				UnlockPeriodDuration:    31536000,
+				NoRewardsPeriodDuration: 15768000,
+				Flags: UnparsedDepositOfferFlags{
+					Locked: true,
+				},
+			},
+		},
+		"Camino 8% offer with OfferID - diff StartTime & OfferID": {
+			startTime: uint64(1670956381),
+			udo: UnparsedDepositOffer{
+				OfferID:                 "2Tw263fNqheTwcHguRao5FFLJWF1ppkygf7Gnb7YTCAZT1h7Pc",
+				InterestRateNominator:   80000,
+				StartOffset:             0,
+				EndOffset:               112795200,
+				MinAmount:               1,
+				MinDuration:             110376000,
+				MaxDuration:             110376000,
+				UnlockPeriodDuration:    31536000,
+				NoRewardsPeriodDuration: 15768000,
+				Flags: UnparsedDepositOfferFlags{
+					Locked: true,
+				},
+			},
+		},
+		"0% Camino with OfferID, no Flags": {
+			startTime: uint64(1670956381),
+			udo: UnparsedDepositOffer{
+				OfferID:                 "x4Y4buPNQS1an99Rt4MxdKCyVtxB6wXtrmkNaKiSWAbL18Mxf",
+				InterestRateNominator:   0,
+				StartOffset:             0,
+				EndOffset:               158889600,
+				MinAmount:               1,
+				MinDuration:             157680000,
+				MaxDuration:             157680000,
+				UnlockPeriodDuration:    63072000,
+				NoRewardsPeriodDuration: 31536000,
+			},
+		},
+		"Template does require OfferID as well": {
+			startTime: uint64(0),
+			udo: UnparsedDepositOffer{
+				OfferID:                 "2Wh3B62v2huDhA9fWrqCVQqnRqv2GCxdbEdfaz1avzrTiMg2Po",
+				InterestRateNominator:   11,
+				StartOffset:             0,
+				EndOffset:               63072000,
+				MinAmount:               1,
+				MinDuration:             60,
+				MaxDuration:             31536000,
+				UnlockPeriodDuration:    0,
+				NoRewardsPeriodDuration: 0,
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			do, err := tt.udo.Parse(tt.startTime)
+			require.NoError(t, err)
+
+			if tt.udo.OfferID != "" {
+				require.NotEqualf(t, do.OfferID, ids.Empty, "OfferID should not be empty")
+				require.Equal(t, tt.udo.OfferID, do.OfferID.String())
+				require.NoError(t, do.Verify())
+			}
+
+			// Don't check template equality
+			if tt.startTime > 0 {
+				udo := UnparsedDepositOffer{}
+				require.NoError(t, udo.Unparse(do, tt.startTime))
+				require.Equal(t, tt.udo, udo)
+			}
+		})
+	}
+}
+
 func toAvaxAddr(id string) ids.ShortID {
 	_, _, avaxAddrBytes, _ := address.Parse(id)
 	avaxAddr, _ := ids.ToShortID(avaxAddrBytes)

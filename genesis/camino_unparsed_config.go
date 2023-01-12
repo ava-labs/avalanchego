@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
@@ -174,6 +175,7 @@ type UnparsedMultisigAlias struct {
 	Alias     string   `json:"alias"`
 	Addresses []string `json:"addresses"`
 	Threshold uint32   `json:"threshold"`
+	Memo      string   `json:"memo,omitempty"`
 }
 
 func (uma UnparsedMultisigAlias) Parse() (genesis.MultisigAlias, error) {
@@ -202,14 +204,20 @@ func (uma UnparsedMultisigAlias) Parse() (genesis.MultisigAlias, error) {
 		}
 	}
 
+	if len(uma.Memo) > avax.MaxMemoSize {
+		return ma, fmt.Errorf("msig alias memo is larger (%d bytes) than max of %d bytes", len(uma.Memo), avax.MaxMemoSize)
+	}
+
 	return genesis.MultisigAlias{
 		Alias:     alias,
 		Addresses: addrs,
 		Threshold: uma.Threshold,
+		Memo:      uma.Memo,
 	}, nil
 }
 
 type UnparsedDepositOffer struct {
+	OfferID                 string                    `json:"offerID"`
 	InterestRateNominator   uint64                    `json:"interestRateNominator"`
 	StartOffset             uint64                    `json:"startOffset"`
 	EndOffset               uint64                    `json:"endOffset"`
@@ -251,18 +259,28 @@ func (udo UnparsedDepositOffer) Parse(startTime uint64) (genesis.DepositOffer, e
 		do.Flags |= deposit.OfferFlagLocked
 	}
 
+	if offerID, err := ids.FromString(udo.OfferID); err != nil {
+		return do, err
+	} else {
+		do.OfferID = offerID
+	}
+
 	return do, nil
 }
 
 func (udo *UnparsedDepositOffer) Unparse(do genesis.DepositOffer, startime uint64) error {
-	udo = &UnparsedDepositOffer{
-		InterestRateNominator:   do.InterestRateNominator,
-		MinAmount:               do.MinAmount,
-		MinDuration:             do.MinDuration,
-		MaxDuration:             do.MaxDuration,
-		UnlockPeriodDuration:    do.UnlockPeriodDuration,
-		NoRewardsPeriodDuration: do.NoRewardsPeriodDuration,
+	udo.InterestRateNominator = do.InterestRateNominator
+	udo.MinAmount = do.MinAmount
+	udo.MinDuration = do.MinDuration
+	udo.MaxDuration = do.MaxDuration
+	udo.UnlockPeriodDuration = do.UnlockPeriodDuration
+	udo.NoRewardsPeriodDuration = do.NoRewardsPeriodDuration
+
+	offerID, err := do.ID()
+	if err != nil {
+		return err
 	}
+	udo.OfferID = offerID.String()
 
 	offerStartOffset, err := math.Sub(do.Start, startime)
 	if err != nil {

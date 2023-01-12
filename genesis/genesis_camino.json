@@ -6,6 +6,7 @@
     "initialAdmin": "X-camino1m4nr983lhd4p4nfsqk3a6a9mejugnn73f83vuy",
     "depositOffers": [
       {
+        "offerID": "DDTaFCwYbhEiJ35ZSA25qFGbfrRnqoi4a9czFJ5WCbNYxf8NY",
         "interestRateNominator": 80000,
         "startOffset": 0,
         "endOffset": 111585600,
@@ -19,6 +20,7 @@
         }
       },
       {
+        "offerID": "Mc2xe3kHRdAnCbMYhK1p4GhnpJSYbyR47d6upA8Xg98DMpByf",
         "interestRateNominator": 0,
         "startOffset": 0,
         "endOffset": 158889600,
@@ -32,6 +34,7 @@
         }
       },
       {
+        "offerID": "2qQCBBxw2wMZXNdqQKtDojeVpNN5z9WpRVuHsR4UBZr5wrXy9n",
         "interestRateNominator": 90000,
         "startOffset": 0,
         "endOffset": 143121600,
@@ -45,6 +48,7 @@
         }
       },
       {
+        "offerID": "2mdhxmmNUgxmc8W17LpyegMVqHLofYGgDFVMEYuua9R4V4aSuj",
         "interestRateNominator": 100000,
         "startOffset": 0,
         "endOffset": 174657600,

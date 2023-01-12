@@ -6,9 +6,10 @@
     "initialAdmin": "X-kopernikus1g65uqn6t77p656w64023nh8nd9updzmxh8ttv3",
     "depositOffers": [
       {
+        "offerID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
         "interestRateNominator": 80000,
         "startOffset": 0,
-        "endOffset": 111585600,
+        "endOffset": 112795200,
         "minAmount": 1,
         "minDuration": 110376000,
         "maxDuration": 110376000,
@@ -19,9 +20,10 @@
         }
       },
       {
+        "offerID": "2AySgbKZp8PP95KCsttY68uKJyFbsATHnE73jk1P9fSppmqV45",
         "interestRateNominator": 0,
         "startOffset": 0,
-        "endOffset": 158889600,
+        "endOffset": 160099200,
         "minAmount": 1,
         "minDuration": 157680000,
         "maxDuration": 157680000,
@@ -32,9 +34,10 @@
         }
       },
       {
+        "offerID": "2uGR8giEWip1mGWQzF1DXNVpUXY8M1futjhVErqV7uJntHmWrh",
         "interestRateNominator": 90000,
         "startOffset": 0,
-        "endOffset": 143121600,
+        "endOffset": 144331200,
         "minAmount": 1,
         "minDuration": 141912000,
         "maxDuration": 141912000,
@@ -45,9 +48,10 @@
         }
       },
       {
+        "offerID": "2ad2QNdpDQWGUMx7WWRwAG1bxFwx5amEZzfoqGrGF1D7N3HNLp",
         "interestRateNominator": 100000,
         "startOffset": 0,
-        "endOffset": 174657600,
+        "endOffset": 175867200,
         "minAmount": 1,
         "minDuration": 173448000,
         "maxDuration": 173448000,
@@ -55,6 +59,48 @@
         "noRewardsPeriodDuration": 15768000,
         "flags": {
           "locked": true
+        }
+      },
+      {
+        "offerID": "k5VaqN4kFtcKQWfjyJpk4YA8VBwW7TyeRicDGsdzRNRNSG1R1",
+        "interestRateNominator": 90000,
+        "startOffset": 0,
+        "endOffset": 32745600,
+        "minAmount": 1,
+        "minDuration": 31536000,
+        "maxDuration": 31536000,
+        "unlockPeriodDuration": 31536000,
+        "noRewardsPeriodDuration": 15768000,
+        "flags": {
+          "locked": true
+        }
+      },
+      {
+        "offerID": "2vGw1ZaUWWGxhAm69Dt13zw5sUvmtCbzVTvvzPp34Ch5qEznBg",
+        "interestRateNominator": 110000,
+        "startOffset": 0,
+        "endOffset": 64281600,
+        "minAmount": 1,
+        "minDuration": 60,
+        "maxDuration": 31536000,
+        "unlockPeriodDuration": 0,
+        "noRewardsPeriodDuration": 0,
+        "flags": {
+          "locked": false
+        }
+      },
+      {
+        "offerID": "24zEuyv4zBvF2pGPbzwVYhCxPQUfuqD4pWDRfJrJapXBhFfxDh",
+        "interestRateNominator": 210000,
+        "startOffset": 0,
+        "endOffset": 64281600,
+        "minAmount": 1,
+        "minDuration": 86400,
+        "maxDuration": 31536000,
+        "unlockPeriodDuration": 43200,
+        "noRewardsPeriodDuration": 43200,
+        "flags": {
+          "locked": false
         }
       }
     ],
@@ -73,13 +119,15 @@
             "nodeID": "NodeID-AK7sPBsZM9rQwse23aLhEEBPHZD5gkLrL",
             "validatorDuration": 31536000,
             "depositDuration": 110376000,
-            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7",
+            "timestampOffset": 0,
+            "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi",
             "memo": "KOPERNIKUS"
           },
           {
             "amount": 10000000000000000,
             "depositDuration": 110376000,
-            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7"
+            "timestampOffset": 0,
+            "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi"
           }
         ]
       },
@@ -92,12 +140,13 @@
         },
         "platformAllocations": [
           {
-            "amount": 510000000000000
+            "amount": 500000000000000
           },
           {
-            "amount": 520000000000000,
+            "amount": 500000000000000,
             "depositDuration": 110376000,
-            "depositOfferID": "wVVZinZkN9x6e9dh3DNNfrmdXaHPPwKWt3Zerx2vD8Ccuo6E7"
+            "timestampOffset": 0,
+            "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi"
           }
         ]
       }

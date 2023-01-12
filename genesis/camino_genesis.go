@@ -166,11 +166,17 @@ func validateCaminoConfig(config *Config) error {
 	}
 
 	// validate msig aliases
-	for idx, msig := range config.Camino.InitialMultisigAddresses {
-		rowTxID := ids.FromInt(uint64(idx))
-		if err := msig.Verify(rowTxID); err != nil {
+	txID := ids.Empty
+	uniqAliases := set.NewSet[ids.ShortID](len(config.Camino.InitialMultisigAddresses))
+	for _, msig := range config.Camino.InitialMultisigAddresses {
+		if err = msig.Verify(txID); err != nil {
 			return fmt.Errorf("wrong msig alias definition: %w", err)
 		}
+
+		if uniqAliases.Contains(msig.Alias) {
+			return fmt.Errorf("duplicated Multisig alias: %s (%s)", msig.Alias.Hex(), msig.Memo)
+		}
+		uniqAliases.Add(msig.Alias)
 	}
 
 	if nodes.Len() == 0 {

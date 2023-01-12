@@ -208,7 +208,7 @@ func TestGenesisFromFile(t *testing.T) {
 		"custom": {
 			networkID:    9999,
 			customConfig: customGenesisConfigJSON,
-			expected:     "04068ee6f095f09017f3d914f4f1a25c04d7c1a1518f3db48f97040a7d9f005c",
+			expected:     "e505cde775294a30c34e0d9ad52957f1ee41437b4fdc70373679b5168c29951d",
 		},
 		"custom (networkID mismatch)": {
 			networkID:    9999,
@@ -290,7 +290,7 @@ func TestGenesisFromFlag(t *testing.T) {
 		"custom": {
 			networkID:    9999,
 			customConfig: customGenesisConfigJSON,
-			expected:     "04068ee6f095f09017f3d914f4f1a25c04d7c1a1518f3db48f97040a7d9f005c",
+			expected:     "e505cde775294a30c34e0d9ad52957f1ee41437b4fdc70373679b5168c29951d",
 		},
 		"custom (networkID mismatch)": {
 			networkID:    9999,
@@ -374,11 +374,11 @@ func TestGenesis(t *testing.T) {
 		},
 		{
 			networkID:  constants.ColumbusID,
-			expectedID: "2DWrwmjXoJ9i9pVVf7AZfCv1mFk6LtngrKU71uQU15YUCcZEQ9",
+			expectedID: "285fyTBJwChJWawa87gsA8E1NzkjBtp3jxjuGPNqV5jZyTKuQe",
 		},
 		{
 			networkID:  constants.KopernikusID,
-			expectedID: "2qmJHpvmxmqY2vaLbHTTT5bLGzvJxETgkmSe8SzZFS35TDoMdM",
+			expectedID: "DnxpNtFAPaH1PsbxvDJHBDFAEigSMncMScEZZkBZsXuAzD8EP",
 		},
 		{
 			networkID:  constants.LocalID,
@@ -426,7 +426,7 @@ func TestVMGenesis(t *testing.T) {
 			vmTest: []vmTest{
 				{
 					vmID:       constants.AVMID,
-					expectedID: "sKRk9Q6u3NEVdGtSvsMhjoGdzc7AnRZ2wP5YcoJL4xJB7UX4J",
+					expectedID: "2HXHScbCPLeDcW1S4tjjSYpxr3Cf3eeckmajNBnB1z96TKyrkn",
 				},
 				{
 					vmID:       constants.EVMID,
@@ -501,7 +501,7 @@ func TestAVAXAssetID(t *testing.T) {
 		},
 		{
 			networkID:  constants.ColumbusID,
-			expectedID: "21aEnvVjGVrjiHkv1QrTvU7F19kXCZUPbgFpe8HrSsXMTpBPP6",
+			expectedID: "yC1TAhZ9e18q1bcB7kBpVojEUTZSDgxmt4PBXzGgHsdp7zviL",
 		},
 		{
 			networkID:  constants.KopernikusID,

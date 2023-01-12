@@ -11,22 +11,25 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/types"
 )
 
 type MultisigOwner struct {
 	Alias  ids.ShortID
+	Memo   types.JSONByteSlice      `serialize:"true" json:"memo"`
 	Owners secp256k1fx.OutputOwners `serialize:"true" json:"owners"`
 }
 
-func FromGenesisMultisigAlias(gma genesis.MultisigAlias) *MultisigOwner {
+func FromGenesisMultisigAlias(msig genesis.MultisigAlias) *MultisigOwner {
 	// Important! OutputOwners expects sorted list of addresses
-	owners := gma.Addresses
+	owners := msig.Addresses
 	utils.Sort(owners)
 
 	return &MultisigOwner{
-		Alias: gma.Alias,
+		Alias: msig.Alias,
+		Memo:  types.JSONByteSlice(msig.Memo),
 		Owners: secp256k1fx.OutputOwners{
-			Threshold: gma.Threshold,
+			Threshold: msig.Threshold,
 			Addrs:     owners,
 		},
 	}

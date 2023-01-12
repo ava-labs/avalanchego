@@ -154,23 +154,25 @@ func (a PlatformAllocation) Unparse() (UnparsedPlatformAllocation, error) {
 	return ua, nil
 }
 
-func (uma *UnparsedMultisigAlias) Unparse(ma genesis.MultisigAlias, networkID uint32) error {
-	addresses := make([]string, len(ma.Addresses))
-	for i, a := range ma.Addresses {
-		addr, err := address.Format(configChainIDAlias, constants.GetHRP(networkID), a.Bytes())
+func (uma *UnparsedMultisigAlias) Unparse(msigAlias genesis.MultisigAlias, networkID uint32) error {
+	addresses := make([]string, len(msigAlias.Addresses))
+	for i, elem := range msigAlias.Addresses {
+		addr, err := address.Format(configChainIDAlias, constants.GetHRP(networkID), elem.Bytes())
 		if err != nil {
-			return fmt.Errorf("while unparsing cannot format multisig address %s: %w", a, err)
+			return fmt.Errorf("while unparsing cannot format multisig address %s: %w", addr, err)
 		}
 		addresses[i] = addr
 	}
 
-	alias, err := address.Format(configChainIDAlias, constants.GetHRP(networkID), ma.Alias.Bytes())
+	alias, err := address.Format(configChainIDAlias, constants.GetHRP(networkID), msigAlias.Alias.Bytes())
 	if err != nil {
-		return fmt.Errorf("while unparsing cannot format multisig alias %s: %w", ma.Alias, err)
+		return fmt.Errorf("while unparsing cannot format multisig alias %s: %w", msigAlias.Alias, err)
 	}
+
 	uma.Alias = alias
 	uma.Addresses = addresses
-	uma.Threshold = ma.Threshold
+	uma.Threshold = msigAlias.Threshold
+	uma.Memo = msigAlias.Memo
 
 	return nil
 }
