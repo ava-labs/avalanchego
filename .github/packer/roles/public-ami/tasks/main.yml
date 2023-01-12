@@ -67,14 +67,6 @@
     group: "{{ ava_group }}"
     state: directory
 
-- name: Create avalanche plugins directory
-  file:
-    path: "{{ plugin_dir }}"
-    owner: "{{ ava_user }}"
-    group: "{{ ava_group }}"
-    state: directory
-    recurse: yes
-
 - name: Build avalanchego
   command: ./scripts/build.sh
   args:
@@ -84,12 +76,6 @@
   command: cp build/avalanchego /usr/local/bin/avalanchego
   args:
     chdir: "{{ repo_folder }}"
-
-- name: Copy evm binaries to the correct location
-  command: cp build/plugins/evm {{ plugin_dir }}
-  args:
-    chdir: "{{ repo_folder }}"
-
 
 - name: Configure avalanche 
   template:
