@@ -275,7 +275,7 @@ func TestLock(t *testing.T) {
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{8, 8}, ctx.AVAXAssetID, 10, outputOwners, ids.Empty, existingTxID),
 			},
-			expectError: errNotEnoughBalance,
+			expectError: errInsufficientBalance,
 			msg:         "Bonding already bonded amount",
 		},
 		"Not enough balance to bond": {
@@ -287,7 +287,7 @@ func TestLock(t *testing.T) {
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{8, 8}, ctx.AVAXAssetID, 5, outputOwners, ids.Empty, ids.Empty),
 			},
-			expectError: errNotEnoughBalance,
+			expectError: errInsufficientBalance,
 			msg:         "Not enough balance to bond",
 		},
 		"Happy path depositing": {
@@ -348,7 +348,7 @@ func TestLock(t *testing.T) {
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{8, 8}, ctx.AVAXAssetID, 1, outputOwners, existingTxID, ids.Empty),
 			},
-			expectError: errNotEnoughBalance,
+			expectError: errInsufficientBalance,
 			msg:         "Depositing already deposited amount",
 		},
 		"Not enough balance to deposit": {
@@ -360,7 +360,7 @@ func TestLock(t *testing.T) {
 			utxos: []*avax.UTXO{
 				generateTestUTXO(ids.ID{8, 8}, ctx.AVAXAssetID, 5, outputOwners, ids.Empty, ids.Empty),
 			},
-			expectError: errNotEnoughBalance,
+			expectError: errInsufficientBalance,
 			msg:         "Not enough balance to deposit",
 		},
 		"Self Transfer": {

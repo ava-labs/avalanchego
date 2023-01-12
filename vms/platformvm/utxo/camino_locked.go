@@ -30,7 +30,7 @@ var (
 	errInvalidTargetLockState    = errors.New("invalid target lock state")
 	errLockingLockedUTXO         = errors.New("utxo consumed for locking are already locked")
 	errUnlockingUnlockedUTXO     = errors.New("utxo consumed for unlocking are already unlocked")
-	errNotEnoughBalance          = errors.New("not enough balance to lock")
+	errInsufficientBalance       = errors.New("insufficient balance")
 	errWrongInType               = errors.New("wrong input type")
 	errWrongOutType              = errors.New("wrong output type")
 	errWrongUTXOOutType          = errors.New("wrong utxo output type")
@@ -481,7 +481,7 @@ func (h *handler) Lock(
 	}
 
 	if totalAmountBurned < totalAmountToBurn || totalAmountLocked < totalAmountToLock {
-		return nil, nil, nil, errNotEnoughBalance
+		return nil, nil, nil, errInsufficientBalance
 	}
 
 	avax.SortTransferableInputsWithSigners(ins, signers) // sort inputs and keys

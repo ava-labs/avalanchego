@@ -108,7 +108,7 @@
       {
         "ethAddr": "0x0000000000000000000000000000000000000000",
         "avaxAddr": "X-kopernikus1g65uqn6t77p656w64023nh8nd9updzmxh8ttv3",
-        "xAmount": 988994000000000000,
+        "xAmount": 988990000000000000,
         "addressStates": {
           "consortiumMember": true,
           "kycVerified": true
@@ -128,7 +128,11 @@
             "depositDuration": 110376000,
             "timestampOffset": 0,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi"
+          },
+          {
+            "amount": 4000000000000
           }
+
         ]
       },
       {
@@ -140,10 +144,10 @@
         },
         "platformAllocations": [
           {
-            "amount": 500000000000000
+            "amount": 400000000000000
           },
           {
-            "amount": 500000000000000,
+            "amount": 600000000000000,
             "depositDuration": 110376000,
             "timestampOffset": 0,
             "depositOfferID": "2SAadCwUEjHWfZEiK2DgRNQTE4YHgT8guTvmhB4uJDswabvvsi"
