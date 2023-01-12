@@ -298,7 +298,7 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 	// child block referring unknown parent does not verify
 	childCoreBlk.ParentV = ids.Empty
 	err = childProBlk.Verify(context.Background())
-	require.Error(err)
+	require.True(errors.Is(err, database.ErrNotFound))
 
 	// child block referring known parent does verify
 	childCoreBlk.ParentV = prntProBlk.ID()
@@ -339,14 +339,14 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	require.NoError(err)
 
 	// postFork block does NOT verify if parent is before fork activation time
-	postForkStatelessChild, err := block.BuildCertSigned(
+	postForkStatelessChild, err := block.BuildBlsSigned(
 		coreGenBlk.ID(),
 		coreBlk.Timestamp(),
 		0, // pChainHeight
-		proVM.stakingCert,
+		proVM.ctx.NodeID,
 		coreBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.tlsSigner,
+		proVM.blsSigner,
 	)
 	require.NoError(err)
 
@@ -362,7 +362,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	// post Fork blocks should NOT verify before fork
 	require.True(postForkChild.Timestamp().Before(activationTime))
 	err = postForkChild.Verify(context.Background())
-	require.Error(err)
+	require.True(errors.Is(err, errProposersNotActivated))
 
 	// once activation time is crossed postForkBlock are produced
 	postActivationTime := activationTime.Add(time.Second)
@@ -735,14 +735,14 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 	err = firstBlock.Verify(context.Background())
 	require.NoError(err)
 
-	slb, err := block.BuildCertSigned(
+	slb, err := block.BuildBlsSigned(
 		firstBlock.ID(), // refer unknown parent
 		firstBlock.Timestamp(),
 		0, // pChainHeight,
-		proVM.stakingCert,
+		proVM.ctx.NodeID,
 		coreBlk.opts[0].Bytes(),
 		proVM.ctx.ChainID,
-		proVM.tlsSigner,
+		proVM.blsSigner,
 	)
 	require.NoError(err)
 
