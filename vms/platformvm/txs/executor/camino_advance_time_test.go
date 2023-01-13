@@ -1,4 +1,4 @@
-// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -31,21 +31,21 @@ func TestDeferredStakers(t *testing.T) {
 	const (
 		pending stakerStatus = iota
 		current
+		deferred
 		expired
 	)
 
 	type staker struct {
-		nodeID                          ids.NodeID
-		nodeKey                         *crypto.PrivateKeySECP256K1R
-		nodeOwnerAddr                   ids.ShortID
-		nodeOwnerKey                    *crypto.PrivateKeySECP256K1R
-		startTime, endTime, suspendTime time.Time
+		nodeID                        ids.NodeID
+		nodeKey                       *crypto.PrivateKeySECP256K1R
+		nodeOwnerAddr                 ids.ShortID
+		nodeOwnerKey                  *crypto.PrivateKeySECP256K1R
+		startTime, endTime, deferTime time.Time
 	}
 	type test struct {
-		description           string
 		stakers               []staker
 		subnetStakers         []staker
-		suspendedStakers      []staker
+		deferredStakers       []staker
 		advanceTimeTo         []time.Time
 		expectedStakers       map[ids.NodeID]stakerStatus
 		expectedSubnetStakers map[ids.NodeID]stakerStatus
@@ -57,7 +57,7 @@ func TestDeferredStakers(t *testing.T) {
 	// Staker3:            			|------------------------|
 	// Staker3sub:             			|----------------|
 	// staker4:                                 		 |---|
-	// staker5Suspended	        |---|--------------------|
+	// staker5Deferred	        |---|--------------------|
 
 	nodeIDs := make([]ids.NodeID, 6)
 	nodeKeys := make([]*crypto.PrivateKeySECP256K1R, 6)
@@ -115,12 +115,11 @@ func TestDeferredStakers(t *testing.T) {
 		nodeOwnerKey:  nodeOwnerKeys[5],
 		startTime:     staker2.startTime,
 		endTime:       staker2.endTime,
-		suspendTime:   staker3.startTime,
+		deferTime:     staker3.startTime,
 	}
 
-	tests := []test{
-		{
-			description:   "Staker 5 still in pending set",
+	tests := map[string]test{
+		"Staker 5 still in pending set": {
 			stakers:       []staker{staker1, staker2, staker3, staker4, staker5},
 			subnetStakers: []staker{staker1, staker2, staker3, staker4, staker5},
 			advanceTimeTo: []time.Time{staker1.startTime.Add(-1 * time.Second)},
@@ -139,11 +138,10 @@ func TestDeferredStakers(t *testing.T) {
 				staker5.nodeID: pending,
 			},
 		},
-		{
-			description:      "Staker 5 in current set",
-			stakers:          []staker{staker1, staker2, staker3, staker4, staker5},
-			suspendedStakers: []staker{staker5},
-			advanceTimeTo:    []time.Time{staker1.startTime, staker2.startTime},
+		"Staker 5 in current set": {
+			stakers:         []staker{staker1, staker2, staker3, staker4, staker5},
+			deferredStakers: []staker{staker5},
+			advanceTimeTo:   []time.Time{staker1.startTime, staker2.startTime},
 			expectedStakers: map[ids.NodeID]stakerStatus{
 				staker1.nodeID: current,
 				staker2.nodeID: current,
@@ -152,18 +150,17 @@ func TestDeferredStakers(t *testing.T) {
 				staker5.nodeID: current,
 			},
 		},
-		{
-			description:      "Staker 5 suspended but still validating subnet",
-			stakers:          []staker{staker1, staker2, staker3, staker4, staker5},
-			subnetStakers:    []staker{staker1, staker2, staker3Sub, staker4, staker5},
-			suspendedStakers: []staker{staker5},
-			advanceTimeTo:    []time.Time{staker1.startTime, staker2.startTime, staker3.startTime},
+		"Staker 5 deferred but still validating subnet": {
+			stakers:         []staker{staker1, staker2, staker3, staker4, staker5},
+			subnetStakers:   []staker{staker1, staker2, staker3Sub, staker4, staker5},
+			deferredStakers: []staker{staker5},
+			advanceTimeTo:   []time.Time{staker1.startTime, staker2.startTime, staker3.startTime},
 			expectedStakers: map[ids.NodeID]stakerStatus{
 				staker1.nodeID: current,
 				staker2.nodeID: current,
 				staker3.nodeID: current,
 				staker4.nodeID: pending,
-				staker5.nodeID: pending,
+				staker5.nodeID: deferred,
 			},
 			expectedSubnetStakers: map[ids.NodeID]stakerStatus{
 				staker1.nodeID: current,
@@ -173,18 +170,17 @@ func TestDeferredStakers(t *testing.T) {
 				staker5.nodeID: current,
 			},
 		},
-		{
-			description:      "Staker 5 expired",
-			stakers:          []staker{staker1, staker2, staker3, staker4, staker5},
-			subnetStakers:    []staker{staker1, staker2, staker3Sub, staker4, staker5},
-			suspendedStakers: []staker{staker5},
-			advanceTimeTo:    []time.Time{staker1.startTime, staker2.startTime, staker3.startTime, staker3Sub.startTime, staker5.endTime},
+		"Staker 5 expired": {
+			stakers:         []staker{staker1, staker2, staker3, staker4, staker5},
+			subnetStakers:   []staker{staker1, staker2, staker3Sub, staker4, staker5},
+			deferredStakers: []staker{staker5},
+			advanceTimeTo:   []time.Time{staker1.startTime, staker2.startTime, staker3.startTime, staker3Sub.startTime, staker5.endTime},
 			expectedStakers: map[ids.NodeID]stakerStatus{
 				staker1.nodeID: current,
 				staker2.nodeID: current,
 				staker3.nodeID: current,
 				staker4.nodeID: current,
-				staker5.nodeID: pending,
+				staker5.nodeID: expired,
 			},
 			expectedSubnetStakers: map[ids.NodeID]stakerStatus{
 				staker1.nodeID: current,
@@ -196,8 +192,8 @@ func TestDeferredStakers(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.description, func(ts *testing.T) {
+	for name, test := range tests {
+		t.Run(name, func(ts *testing.T) {
 			require := require.New(ts)
 			caminoGenesisConf := api.Camino{
 				VerifyNodeSignature: true,
@@ -276,9 +272,9 @@ func TestDeferredStakers(t *testing.T) {
 				env.state.SetHeight(dummyHeight)
 				require.NoError(env.state.Commit())
 
-				for _, staker := range test.suspendedStakers {
-					if newTime == staker.suspendTime {
-						_, err = suspendValidator(env, staker.nodeOwnerAddr, caminoPreFundedKeys[0])
+				for _, staker := range test.deferredStakers {
+					if newTime == staker.deferTime {
+						_, err = deferValidator(env, staker.nodeOwnerAddr, caminoPreFundedKeys[0])
 						require.NoError(err)
 					}
 				}
@@ -370,7 +366,7 @@ func addCaminoPendingValidator(
 	return tx, nil
 }
 
-func suspendValidator(env *caminoEnvironment, nodeOwnerAddress ids.ShortID, key *crypto.PrivateKeySECP256K1R) (*txs.Tx, error) {
+func deferValidator(env *caminoEnvironment, nodeOwnerAddress ids.ShortID, key *crypto.PrivateKeySECP256K1R) (*txs.Tx, error) {
 	outputOwners := &secp256k1fx.OutputOwners{
 		Locktime:  0,
 		Threshold: 1,

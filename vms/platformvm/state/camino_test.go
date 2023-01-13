@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	root_genesis "github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -169,6 +170,8 @@ func TestSyncGenesis(t *testing.T) {
 	defer ctrl.Finish()
 	s, _ := newInitializedState(require)
 	baseDBManager := db_manager.NewMemDB(version.Semantic1_0_0)
+	baseDB := versiondb.New(baseDBManager.Current().Database)
+	validatorsDB := prefixdb.New(validatorsPrefix, baseDB)
 
 	var (
 		id           = ids.GenerateTestID()
@@ -254,7 +257,7 @@ func TestSyncGenesis(t *testing.T) {
 					},
 				}, depositTxs, initialAdmin),
 			},
-			cs: *wrappers.IgnoreError(newCaminoState(versiondb.New(baseDBManager.Current().Database), prometheus.NewRegistry())).(*caminoState),
+			cs: *wrappers.IgnoreError(newCaminoState(baseDB, validatorsDB, prometheus.NewRegistry())).(*caminoState),
 			want: caminoDiff{
 				modifiedAddressStates: map[ids.ShortID]uint64{initialAdmin: txs.AddressStateRoleAdminBit, shortID: txs.AddressStateRoleKycBit},
 				modifiedDepositOffers: map[ids.ID]*deposit.Offer{

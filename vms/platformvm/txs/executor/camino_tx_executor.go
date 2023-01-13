@@ -423,7 +423,7 @@ func (e *CaminoProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) 
 	}
 
 	var currentStakerToRemove *state.Staker
-	var pendingStakerToRemove *state.Staker
+	var deferredStakerToRemove *state.Staker
 	var stakerToRemove *state.Staker
 	removeFromCurrent := false
 
@@ -436,16 +436,16 @@ func (e *CaminoProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) 
 		currentStakerIterator.Release()
 	}
 
-	pendingStakerIterator, err := e.OnCommitState.GetPendingStakerIterator()
+	deferredStakerIterator, err := e.OnCommitState.GetDeferredStakerIterator()
 	if err != nil {
 		return err
 	}
-	if pendingStakerIterator.Next() {
-		pendingStakerToRemove = pendingStakerIterator.Value()
-		pendingStakerIterator.Release()
+	if deferredStakerIterator.Next() {
+		deferredStakerToRemove = deferredStakerIterator.Value()
+		deferredStakerIterator.Release()
 	}
 
-	if currentStakerToRemove == nil && pendingStakerToRemove == nil {
+	if currentStakerToRemove == nil && deferredStakerToRemove == nil {
 		return fmt.Errorf("failed to get next staker to remove: %w", database.ErrNotFound)
 	}
 
@@ -453,8 +453,8 @@ func (e *CaminoProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) 
 	case currentStakerToRemove != nil && currentStakerToRemove.TxID == tx.TxID:
 		removeFromCurrent = true
 		stakerToRemove = currentStakerToRemove
-	case pendingStakerToRemove != nil && pendingStakerToRemove.TxID == tx.TxID:
-		stakerToRemove = pendingStakerToRemove
+	case deferredStakerToRemove != nil && deferredStakerToRemove.TxID == tx.TxID:
+		stakerToRemove = deferredStakerToRemove
 	default:
 		return fmt.Errorf(
 			"trying to remove validator %s: %w",
@@ -492,8 +492,8 @@ func (e *CaminoProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) 
 		e.OnCommitState.DeleteCurrentValidator(stakerToRemove)
 		e.OnAbortState.DeleteCurrentValidator(stakerToRemove)
 	} else {
-		e.OnCommitState.DeletePendingValidator(stakerToRemove)
-		e.OnAbortState.DeletePendingValidator(stakerToRemove)
+		e.OnCommitState.DeleteDeferredValidator(stakerToRemove)
+		e.OnAbortState.DeleteDeferredValidator(stakerToRemove)
 	}
 
 	txID := e.Tx.ID()
@@ -1150,29 +1150,21 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 		}
 		nodeID := ids.NodeID(nodeShortID)
 		if tx.Remove {
-			// transfer staker to from pending to current stakers set
-			stakerToRemove, err := e.State.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+			// transfer staker to from deferred to current stakers set
+			stakerToReactivate, err := e.State.GetDeferredValidator(constants.PrimaryNetworkID, nodeID)
 			if err != nil {
-				return fmt.Errorf("validator with nodeID %s, does not exist in pending stakers set: %w", nodeID, errValidatorNotFound)
+				return fmt.Errorf("validator with nodeID %s, does not exist in deferred stakers set: %w", nodeID, errValidatorNotFound)
 			}
-			e.State.DeletePendingValidator(stakerToRemove)
-			stakerToAdd := copyStaker(stakerToRemove)
-			stakerToAdd.StartTime = e.State.GetTimestamp()
-			stakerToAdd.NextTime = stakerToAdd.EndTime
-			stakerToAdd.Priority = txs.PrimaryNetworkValidatorCurrentPriority
-			e.State.PutCurrentValidator(stakerToAdd)
+			e.State.DeleteDeferredValidator(stakerToReactivate)
+			e.State.PutCurrentValidator(stakerToReactivate)
 		} else {
-			// transfer staker to from current to pending stakers set
-			stakerToRemove, err := e.State.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+			// transfer staker to from current to deferred stakers set
+			stakerToDefer, err := e.State.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 			if err != nil {
 				return fmt.Errorf("validator with nodeID %s, does not exist in current stakers set: %w", nodeID, errValidatorNotFound)
 			}
-			e.State.DeleteCurrentValidator(stakerToRemove)
-			stakerToAdd := copyStaker(stakerToRemove)
-			stakerToAdd.StartTime = stakerToAdd.EndTime
-			stakerToAdd.NextTime = stakerToAdd.StartTime
-			stakerToAdd.Priority = txs.PrimaryNetworkValidatorPendingPriority
-			e.State.PutPendingValidator(stakerToAdd)
+			e.State.DeleteCurrentValidator(stakerToDefer)
+			e.State.PutDeferredValidator(stakerToDefer)
 		}
 	}
 
@@ -1212,9 +1204,4 @@ func verifyAddrsOwner(addrs secp256k1fx.RecoverMap, owner *secp256k1fx.OutputOwn
 		}
 	}
 	return errors.New("missing signature")
-}
-
-func copyStaker(staker *state.Staker) *state.Staker {
-	newStaker := *staker
-	return &newStaker
 }

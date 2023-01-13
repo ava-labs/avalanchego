@@ -158,6 +158,12 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	pendingIt.EXPECT().Release().Return().AnyTimes()
 	onParentAccept.EXPECT().GetPendingStakerIterator().Return(pendingIt, nil).AnyTimes()
 
+	// no deferred stakers
+	deferredStakersIt := state.NewMockStakerIterator(ctrl)
+	deferredStakersIt.EXPECT().Next().Return(false).AnyTimes()
+	deferredStakersIt.EXPECT().Release().AnyTimes()
+	onParentAccept.EXPECT().GetDeferredStakerIterator().Return(deferredStakersIt, nil).AnyTimes()
+
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 
 	txID := ids.GenerateTestID()

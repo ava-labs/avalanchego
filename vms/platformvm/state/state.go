@@ -493,7 +493,7 @@ func new(
 		return nil, err
 	}
 
-	caminoState, err := newCaminoState(baseDB, metricsReg)
+	caminoState, err := newCaminoState(baseDB, validatorsDB, metricsReg)
 	if err != nil {
 		return nil, err
 	}
@@ -1066,7 +1066,7 @@ func (s *state) load() error {
 		s.loadCurrentValidators(),
 		s.loadPendingValidators(),
 		s.initValidatorSets(),
-		s.caminoState.Load(),
+		s.caminoState.Load(s),
 	)
 	return errs.Err
 }

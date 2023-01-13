@@ -106,3 +106,19 @@ func (s *state) SetNotDistributedValidatorReward(reward uint64) {
 func (s *state) GetNotDistributedValidatorReward() (uint64, error) {
 	return s.caminoState.GetNotDistributedValidatorReward()
 }
+
+func (s *state) GetDeferredValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
+	return s.caminoState.GetDeferredValidator(subnetID, nodeID)
+}
+
+func (s *state) PutDeferredValidator(staker *Staker) {
+	s.caminoState.PutDeferredValidator(staker)
+}
+
+func (s *state) DeleteDeferredValidator(staker *Staker) {
+	s.caminoState.DeleteDeferredValidator(staker)
+}
+
+func (s *state) GetDeferredStakerIterator() (StakerIterator, error) {
+	return s.caminoState.GetDeferredStakerIterator()
+}

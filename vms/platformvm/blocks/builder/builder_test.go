@@ -1,3 +1,13 @@
+// Copyright (C) 2023, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
 // Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -292,10 +302,10 @@ func TestGetNextStakerToReward(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockState := tt.stateF(ctrl).(*state.MockChain)
-			pendingStakerIter := state.NewMockStakerIterator(ctrl)
-			pendingStakerIter.EXPECT().Next().Return(false).AnyTimes()
-			pendingStakerIter.EXPECT().Release().AnyTimes()
-			mockState.EXPECT().GetPendingStakerIterator().Return(pendingStakerIter, nil).AnyTimes()
+			deferredStakerIter := state.NewMockStakerIterator(ctrl)
+			deferredStakerIter.EXPECT().Next().Return(false).AnyTimes()
+			deferredStakerIter.EXPECT().Release().AnyTimes()
+			mockState.EXPECT().GetDeferredStakerIterator().Return(deferredStakerIter, nil).AnyTimes()
 
 			txID, shouldReward, err := getNextStakerToReward(tt.timestamp, mockState)
 			if tt.expectedErr != nil {
@@ -676,10 +686,10 @@ func TestBuildBlock(t *testing.T) {
 			defer ctrl.Finish()
 
 			parentState := tt.parentStateF(ctrl).(*state.MockChain)
-			pendingStakerIter := state.NewMockStakerIterator(ctrl)
-			pendingStakerIter.EXPECT().Next().Return(false).AnyTimes()
-			pendingStakerIter.EXPECT().Release().AnyTimes()
-			parentState.EXPECT().GetPendingStakerIterator().Return(pendingStakerIter, nil).AnyTimes()
+			deferredStakerIter := state.NewMockStakerIterator(ctrl)
+			deferredStakerIter.EXPECT().Next().Return(false).AnyTimes()
+			deferredStakerIter.EXPECT().Release().AnyTimes()
+			parentState.EXPECT().GetDeferredStakerIterator().Return(deferredStakerIter, nil).AnyTimes()
 
 			gotBlk, err := buildBlock(
 				tt.builderF(ctrl),

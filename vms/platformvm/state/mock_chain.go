@@ -8,6 +8,9 @@
 package state
 
 import (
+	reflect "reflect"
+	time "time"
+
 	ids "github.com/ava-labs/avalanchego/ids"
 	set "github.com/ava-labs/avalanchego/utils/set"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
@@ -18,8 +21,6 @@ import (
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	gomock "github.com/golang/mock/gomock"
-	reflect "reflect"
-	time "time"
 )
 
 // MockChain is a mock of Chain interface.
@@ -442,6 +443,60 @@ func (m *MockChain) GetPendingValidator(arg0 ids.ID, arg1 ids.NodeID) (*Staker, 
 func (mr *MockChainMockRecorder) GetPendingValidator(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPendingValidator", reflect.TypeOf((*MockChain)(nil).GetPendingValidator), arg0, arg1)
+}
+
+// GetDeferredStakerIterator mocks base method.
+func (m *MockChain) GetDeferredStakerIterator() (StakerIterator, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDeferredStakerIterator")
+	ret0, _ := ret[0].(StakerIterator)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDeferredStakerIterator indicates an expected call of GetDeferredStakerIterator.
+func (mr *MockChainMockRecorder) GetDeferredStakerIterator() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDeferredStakerIterator", reflect.TypeOf((*MockChain)(nil).GetDeferredStakerIterator))
+}
+
+// GetDeferredValidator mocks base method.
+func (m *MockChain) GetDeferredValidator(arg0 ids.ID, arg1 ids.NodeID) (*Staker, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDeferredValidator", arg0, arg1)
+	ret0, _ := ret[0].(*Staker)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDeferredValidator indicates an expected call of GetDeferredValidator.
+func (mr *MockChainMockRecorder) GetDeferredValidator(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDeferredValidator", reflect.TypeOf((*MockChain)(nil).GetDeferredValidator), arg0, arg1)
+}
+
+// DeleteDeferredValidator mocks base method.
+func (m *MockChain) DeleteDeferredValidator(arg0 *Staker) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "DeleteDeferredValidator", arg0)
+}
+
+// DeleteDeferredValidator indicates an expected call of DeleteDeferredValidator.
+func (mr *MockChainMockRecorder) DeleteDeferredValidator(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteDeferredValidator", reflect.TypeOf((*MockChain)(nil).DeleteDeferredValidator), arg0)
+}
+
+// PutDeferredValidator mocks base method.
+func (m *MockChain) PutDeferredValidator(arg0 *Staker) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "PutDeferredValidator", arg0)
+}
+
+// PutDeferredValidator indicates an expected call of PutDeferredValidator.
+func (mr *MockChainMockRecorder) PutDeferredValidator(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutDeferredValidator", reflect.TypeOf((*MockChain)(nil).PutDeferredValidator), arg0)
 }
 
 // GetRewardUTXOs mocks base method.

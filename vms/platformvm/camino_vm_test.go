@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -30,7 +30,7 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
-func TestRewardSuspendedValidator(t *testing.T) {
+func TestRemoveDeferredValidator(t *testing.T) {
 	require := require.New(t)
 	addr := caminoPreFundedKeys[0].Address()
 	hrp := constants.NetworkIDToHRP[testNetworkID]
@@ -145,7 +145,7 @@ func TestRewardSuspendedValidator(t *testing.T) {
 	err = vm.state.Commit()
 	require.NoError(err)
 
-	// Suspend the validator
+	// Defer the validator
 	tx, err = vm.txBuilder.NewAddressStateTx(
 		consortiumMemberKey.Address(),
 		false,
@@ -165,10 +165,10 @@ func TestRewardSuspendedValidator(t *testing.T) {
 	err = vm.SetPreference(context.Background(), vm.manager.LastAccepted())
 	require.NoError(err)
 
-	// Verify that the validator is suspended (moved from current to pending stakers set)
+	// Verify that the validator is deferred (moved from current to deferred stakers set)
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
-	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetDeferredValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 
 	// Fast-forward clock to time for validator to be rewarded
@@ -215,14 +215,14 @@ func TestRewardSuspendedValidator(t *testing.T) {
 	// Verify that the validator is rewarded
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
-	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetDeferredValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	timestamp := vm.state.GetTimestamp()
 	require.Equal(endTime.Unix(), timestamp.Unix())
 }
 
-func TestRewardReactivatedValidator(t *testing.T) {
+func TestRemoveReactivatedValidator(t *testing.T) {
 	require := require.New(t)
 	addr := caminoPreFundedKeys[0].Address()
 	hrp := constants.NetworkIDToHRP[testNetworkID]
@@ -337,7 +337,7 @@ func TestRewardReactivatedValidator(t *testing.T) {
 	err = vm.state.Commit()
 	require.NoError(err)
 
-	// Suspend the validator
+	// Defer the validator
 	tx, err = vm.txBuilder.NewAddressStateTx(
 		consortiumMemberKey.Address(),
 		false,
@@ -357,10 +357,10 @@ func TestRewardReactivatedValidator(t *testing.T) {
 	err = vm.SetPreference(context.Background(), vm.manager.LastAccepted())
 	require.NoError(err)
 
-	// Verify that the validator is suspended (moved from current to pending stakers set)
+	// Verify that the validator is deferred (moved from current to deferred stakers set)
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
-	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetDeferredValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 
 	// Reactivate the validator
@@ -383,10 +383,10 @@ func TestRewardReactivatedValidator(t *testing.T) {
 	err = vm.SetPreference(context.Background(), vm.manager.LastAccepted())
 	require.NoError(err)
 
-	// Verify that the validator is activated again (moved from pending to current stakers set)
+	// Verify that the validator is activated again (moved from deferred to current stakers set)
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
-	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetDeferredValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Fast-forward clock to time for validator to be rewarded
@@ -433,7 +433,7 @@ func TestRewardReactivatedValidator(t *testing.T) {
 	// Verify that the validator is rewarded
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
-	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetDeferredValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	timestamp := vm.state.GetTimestamp()

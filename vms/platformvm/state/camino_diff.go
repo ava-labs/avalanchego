@@ -246,6 +246,47 @@ func (d *diff) GetNotDistributedValidatorReward() (uint64, error) {
 	return parentState.GetNotDistributedValidatorReward()
 }
 
+func (d *diff) GetDeferredValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
+	// If the validator was modified in this diff, return the modified
+	// validator.
+	newValidator, ok := d.caminoDiff.deferredStakerDiffs.GetValidator(subnetID, nodeID)
+	if ok {
+		if newValidator == nil {
+			return nil, database.ErrNotFound
+		}
+		return newValidator, nil
+	}
+
+	// If the validator wasn't modified in this diff, ask the parent state.
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+	return parentState.GetDeferredValidator(subnetID, nodeID)
+}
+
+func (d *diff) PutDeferredValidator(staker *Staker) {
+	d.caminoDiff.deferredStakerDiffs.PutValidator(staker)
+}
+
+func (d *diff) DeleteDeferredValidator(staker *Staker) {
+	d.caminoDiff.deferredStakerDiffs.DeleteValidator(staker)
+}
+
+func (d *diff) GetDeferredStakerIterator() (StakerIterator, error) {
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	parentIterator, err := parentState.GetDeferredStakerIterator()
+	if err != nil {
+		return nil, err
+	}
+
+	return d.caminoDiff.deferredStakerDiffs.GetStakerIterator(parentIterator), nil
+}
+
 // Finally apply all changes
 func (d *diff) ApplyCaminoState(baseState State) {
 	if d.caminoDiff.modifiedNotDistributedValidatorReward != nil {
@@ -275,5 +316,17 @@ func (d *diff) ApplyCaminoState(baseState State) {
 
 	for ownerID, claimable := range d.caminoDiff.modifiedClaimables {
 		baseState.SetClaimable(ownerID, claimable)
+	}
+
+	for _, validatorDiffs := range d.caminoDiff.deferredStakerDiffs.validatorDiffs {
+		for _, validatorDiff := range validatorDiffs {
+			if validatorDiff.validatorModified {
+				if validatorDiff.validatorDeleted {
+					baseState.DeleteDeferredValidator(validatorDiff.validator)
+				} else {
+					baseState.PutDeferredValidator(validatorDiff.validator)
+				}
+			}
+		}
 	}
 }

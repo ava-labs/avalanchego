@@ -1,3 +1,6 @@
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package state
 
 import (
@@ -5,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -19,6 +23,8 @@ import (
 
 func TestGetDeposit(t *testing.T) {
 	baseDBManager := db_manager.NewMemDB(version.Semantic1_0_0)
+	baseDB := versiondb.New(baseDBManager.Current().Database)
+	validatorsDB := prefixdb.New(validatorsPrefix, baseDB)
 	addr0 := ids.GenerateTestShortID()
 	addresses := set.NewSet[ids.ShortID](0)
 	addresses.Add(addr0)
@@ -41,7 +47,7 @@ func TestGetDeposit(t *testing.T) {
 	}{
 		"retrieve from modified state": {
 			cs: func() CaminoState {
-				cs, _ := newCaminoState(versiondb.New(baseDBManager.Current().Database), prometheus.NewRegistry())
+				cs, _ := newCaminoState(versiondb.New(baseDBManager.Current().Database), validatorsDB, prometheus.NewRegistry())
 				return cs
 			}(),
 			args: args{
@@ -54,7 +60,7 @@ func TestGetDeposit(t *testing.T) {
 		},
 		"retrieve from modified state when deposit already in db": {
 			cs: func() CaminoState {
-				cs, _ := newCaminoState(versiondb.New(baseDBManager.Current().Database), prometheus.NewRegistry())
+				cs, _ := newCaminoState(versiondb.New(baseDBManager.Current().Database), validatorsDB, prometheus.NewRegistry())
 				return cs
 			}(),
 			args: args{
@@ -71,7 +77,7 @@ func TestGetDeposit(t *testing.T) {
 		},
 		"retrieval fails when deposit already in modified state but with nil value even if present in db": {
 			cs: func() CaminoState {
-				cs, _ := newCaminoState(versiondb.New(baseDBManager.Current().Database), prometheus.NewRegistry())
+				cs, _ := newCaminoState(versiondb.New(baseDBManager.Current().Database), validatorsDB, prometheus.NewRegistry())
 				return cs
 			}(),
 			args: args{
@@ -88,7 +94,7 @@ func TestGetDeposit(t *testing.T) {
 		},
 		"retrieve from cache": {
 			cs: func() CaminoState {
-				cs, _ := newCaminoState(versiondb.New(baseDBManager.Current().Database), prometheus.NewRegistry())
+				cs, _ := newCaminoState(versiondb.New(baseDBManager.Current().Database), validatorsDB, prometheus.NewRegistry())
 				return cs
 			}(),
 			args: args{
@@ -102,7 +108,7 @@ func TestGetDeposit(t *testing.T) {
 		},
 		"retrieve from cache when deposit already in db": {
 			cs: func() CaminoState {
-				cs, _ := newCaminoState(versiondb.New(baseDBManager.Current().Database), prometheus.NewRegistry())
+				cs, _ := newCaminoState(versiondb.New(baseDBManager.Current().Database), validatorsDB, prometheus.NewRegistry())
 				return cs
 			}(),
 			args: args{
@@ -120,7 +126,7 @@ func TestGetDeposit(t *testing.T) {
 		},
 		"retrieve from db": {
 			cs: func() CaminoState {
-				cs, _ := newCaminoState(versiondb.New(baseDBManager.Current().Database), prometheus.NewRegistry())
+				cs, _ := newCaminoState(versiondb.New(baseDBManager.Current().Database), validatorsDB, prometheus.NewRegistry())
 				return cs
 			}(),
 			args: args{
@@ -135,7 +141,7 @@ func TestGetDeposit(t *testing.T) {
 		},
 		"db retrieval failed": {
 			cs: func() CaminoState {
-				cs, _ := newCaminoState(versiondb.New(baseDBManager.Current().Database), prometheus.NewRegistry())
+				cs, _ := newCaminoState(versiondb.New(baseDBManager.Current().Database), validatorsDB, prometheus.NewRegistry())
 				return cs
 			}(),
 			args: args{
@@ -162,6 +168,8 @@ func TestGetDeposit(t *testing.T) {
 
 func TestWriteDeposits(t *testing.T) {
 	baseDBManager := db_manager.NewMemDB(version.Semantic1_0_0)
+	baseDB := versiondb.New(baseDBManager.Current().Database)
+	validatorsDB := prefixdb.New(validatorsPrefix, baseDB)
 	addr0 := ids.GenerateTestShortID()
 	addresses := set.NewSet[ids.ShortID](0)
 	addresses.Add(addr0)
@@ -181,7 +189,7 @@ func TestWriteDeposits(t *testing.T) {
 	}{
 		"Deposit nil / success db deletion": {
 			prepareFunc: func() CaminoState {
-				cs, _ := newCaminoState(versiondb.New(baseDBManager.Current().Database), prometheus.NewRegistry())
+				cs, _ := newCaminoState(versiondb.New(baseDBManager.Current().Database), validatorsDB, prometheus.NewRegistry())
 				cs.modifiedDeposits[testID] = nil
 				return cs
 			},
@@ -189,7 +197,7 @@ func TestWriteDeposits(t *testing.T) {
 		},
 		"Deposit nil / error in db deletion": {
 			prepareFunc: func() CaminoState {
-				cs, _ := newCaminoState(versiondb.New(baseDBManager.Current().Database), prometheus.NewRegistry())
+				cs, _ := newCaminoState(versiondb.New(baseDBManager.Current().Database), validatorsDB, prometheus.NewRegistry())
 				cs.modifiedDeposits[testID] = nil
 				cs.depositsDB.Close() // close db connection to cause error on deletion
 				return cs
@@ -198,7 +206,7 @@ func TestWriteDeposits(t *testing.T) {
 		},
 		"Success": {
 			prepareFunc: func() CaminoState {
-				cs, _ := newCaminoState(versiondb.New(baseDBManager.Current().Database), prometheus.NewRegistry())
+				cs, _ := newCaminoState(versiondb.New(baseDBManager.Current().Database), validatorsDB, prometheus.NewRegistry())
 				cs.modifiedDeposits[testID] = &deposit1
 				return cs
 			},

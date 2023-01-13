@@ -53,24 +53,24 @@ func CaminoNew(
 	return builder
 }
 
-func getNextPendingStakerToRemove(
+func getNextDeferredStakerToRemove(
 	chainTimestamp time.Time,
 	shouldRewardNextCurrentStaker bool,
 	nextCurrentStaker *state.Staker,
 	preferredState state.Chain,
 ) (ids.ID, bool, error) {
-	pendingStakerIterator, err := preferredState.GetPendingStakerIterator()
+	deferredStakerIterator, err := preferredState.GetDeferredStakerIterator()
 	if err != nil {
 		return ids.Empty, false, err
 	}
-	defer pendingStakerIterator.Release()
+	defer deferredStakerIterator.Release()
 
-	if pendingStakerIterator.Next() {
-		pendingStaker := pendingStakerIterator.Value()
-		if shouldRewardNextCurrentStaker && !nextCurrentStaker.EndTime.After(pendingStaker.EndTime) {
+	if deferredStakerIterator.Next() {
+		deferredStaker := deferredStakerIterator.Value()
+		if shouldRewardNextCurrentStaker && !nextCurrentStaker.EndTime.After(deferredStaker.EndTime) {
 			return nextCurrentStaker.TxID, shouldRewardNextCurrentStaker, nil
 		}
-		return pendingStaker.TxID, chainTimestamp.Equal(pendingStaker.EndTime), nil
+		return deferredStaker.TxID, chainTimestamp.Equal(deferredStaker.EndTime), nil
 	}
 
 	return nextCurrentStaker.TxID, shouldRewardNextCurrentStaker, nil

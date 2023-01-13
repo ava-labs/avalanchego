@@ -3824,8 +3824,7 @@ func TestCaminoStandardTxExecutorSuspendValidator(t *testing.T) {
 				stakerToTransfer, err := state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 				require.NoError(t, err)
 				state.DeleteCurrentValidator(stakerToTransfer)
-				stakerToTransfer.StartTime = stakerToTransfer.EndTime
-				state.PutPendingValidator(stakerToTransfer)
+				state.PutDeferredValidator(stakerToTransfer)
 			},
 			expectedErr: nil,
 		},
@@ -3892,7 +3891,7 @@ func TestCaminoStandardTxExecutorSuspendValidator(t *testing.T) {
 				stakerIterator, err = onAcceptState.GetCurrentStakerIterator()
 				require.NoError(t, err)
 			} else {
-				stakerIterator, err = onAcceptState.GetPendingStakerIterator()
+				stakerIterator, err = onAcceptState.GetDeferredStakerIterator()
 				require.NoError(t, err)
 			}
 			require.True(t, stakerIterator.Next())

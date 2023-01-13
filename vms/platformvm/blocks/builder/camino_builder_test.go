@@ -1,4 +1,4 @@
-// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -28,20 +28,20 @@ func TestGetNextStakerToRewardWithTwoIterations(t *testing.T) {
 	}
 
 	var (
-		now         = time.Now()
-		currentTxID = ids.GenerateTestID()
-		pendingTxID = ids.GenerateTestID()
+		now          = time.Now()
+		currentTxID  = ids.GenerateTestID()
+		deferredTxID = ids.GenerateTestID()
 	)
 	tests := []test{
 		{
-			name:      "End time reached for both next current and pending - first reward current and then pending",
+			name:      "End time reached for both next current and deferred - first reward current and then deferred",
 			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
 				currentStakerIter := state.NewMockStakerIterator(ctrl)
-				pendingStakerIter := state.NewMockStakerIterator(ctrl)
+				deferredStakerIter := state.NewMockStakerIterator(ctrl)
 
 				currentStakerIter.EXPECT().Next().Return(true).AnyTimes()
-				pendingStakerIter.EXPECT().Next().Return(true).AnyTimes()
+				deferredStakerIter.EXPECT().Next().Return(true).AnyTimes()
 				firstCurrentStakerIter := currentStakerIter.EXPECT().Value().Return(&state.Staker{
 					TxID:     currentTxID,
 					Priority: txs.PrimaryNetworkValidatorCurrentPriority,
@@ -52,8 +52,8 @@ func TestGetNextStakerToRewardWithTwoIterations(t *testing.T) {
 					Priority: txs.PrimaryNetworkValidatorCurrentPriority,
 					EndTime:  now.Add(1 * time.Hour),
 				})
-				pendingStakerIter.EXPECT().Value().Return(&state.Staker{
-					TxID:     pendingTxID,
+				deferredStakerIter.EXPECT().Value().Return(&state.Staker{
+					TxID:     deferredTxID,
 					Priority: txs.PrimaryNetworkValidatorCurrentPriority,
 					EndTime:  now,
 				}).AnyTimes()
@@ -62,58 +62,58 @@ func TestGetNextStakerToRewardWithTwoIterations(t *testing.T) {
 					secondCurrentStakerIter,
 				)
 				currentStakerIter.EXPECT().Release().AnyTimes()
-				pendingStakerIter.EXPECT().Release().AnyTimes()
+				deferredStakerIter.EXPECT().Release().AnyTimes()
 
 				s := state.NewMockChain(ctrl)
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).AnyTimes()
-				s.EXPECT().GetPendingStakerIterator().Return(pendingStakerIter, nil).AnyTimes()
+				s.EXPECT().GetDeferredStakerIterator().Return(deferredStakerIter, nil).AnyTimes()
 
 				return s
 			},
 			firstExpectedTxID:          currentTxID,
-			secondExpectedTxID:         pendingTxID,
+			secondExpectedTxID:         deferredTxID,
 			firstExpectedShouldReward:  true,
 			secondExpectedShouldReward: true,
 		},
 		{
-			name:      "End time reached only for pending - reward pending and then nothing",
+			name:      "End time reached only for deferred - reward deferred and then nothing",
 			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
 				currentStakerIter := state.NewMockStakerIterator(ctrl)
-				pendingStakerIter := state.NewMockStakerIterator(ctrl)
+				deferredStakerIter := state.NewMockStakerIterator(ctrl)
 
 				currentStakerIter.EXPECT().Next().Return(true).AnyTimes()
-				pendingStakerIter.EXPECT().Next().Return(true).AnyTimes()
+				deferredStakerIter.EXPECT().Next().Return(true).AnyTimes()
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
 					TxID:     currentTxID,
 					Priority: txs.PrimaryNetworkValidatorCurrentPriority,
 					EndTime:  now.Add(1 * time.Hour),
 				}).AnyTimes()
-				firstPendingStakerIter := pendingStakerIter.EXPECT().Value().Return(&state.Staker{
-					TxID:     pendingTxID,
+				firstDeferredStakerIter := deferredStakerIter.EXPECT().Value().Return(&state.Staker{
+					TxID:     deferredTxID,
 					Priority: txs.PrimaryNetworkValidatorCurrentPriority,
 					EndTime:  now,
 				})
-				secondPendingStakerIter := pendingStakerIter.EXPECT().Value().Return(&state.Staker{
-					TxID:     pendingTxID,
+				secondDeferredStakerIter := deferredStakerIter.EXPECT().Value().Return(&state.Staker{
+					TxID:     deferredTxID,
 					Priority: txs.PrimaryNetworkValidatorCurrentPriority,
 					EndTime:  now.Add(1 * time.Hour),
 				})
 				gomock.InOrder(
-					firstPendingStakerIter,
-					secondPendingStakerIter,
+					firstDeferredStakerIter,
+					secondDeferredStakerIter,
 				)
 				currentStakerIter.EXPECT().Release().AnyTimes()
-				pendingStakerIter.EXPECT().Release().AnyTimes()
+				deferredStakerIter.EXPECT().Release().AnyTimes()
 
 				s := state.NewMockChain(ctrl)
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).AnyTimes()
-				s.EXPECT().GetPendingStakerIterator().Return(pendingStakerIter, nil).AnyTimes()
+				s.EXPECT().GetDeferredStakerIterator().Return(deferredStakerIter, nil).AnyTimes()
 
 				return s
 			},
-			firstExpectedTxID:          pendingTxID,
-			secondExpectedTxID:         pendingTxID,
+			firstExpectedTxID:          deferredTxID,
+			secondExpectedTxID:         deferredTxID,
 			firstExpectedShouldReward:  true,
 			secondExpectedShouldReward: false,
 		},

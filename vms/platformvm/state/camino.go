@@ -48,6 +48,9 @@ var (
 	consortiumMemberNodesPrefix = []byte("consortiumMemberNodes")
 	claimablesPrefix            = []byte("claimables")
 
+	// Used for prefixing the validatorsDB
+	deferredPrefix = []byte("deferred")
+
 	nodeSignatureKey                 = []byte("nodeSignature")
 	depositBondModeKey               = []byte("depositBondMode")
 	notDistributedValidatorRewardKey = []byte("notDistributedValidatorReward")
@@ -95,6 +98,13 @@ type CaminoDiff interface {
 	GetClaimable(ownerID ids.ID) (*Claimable, error)
 	SetNotDistributedValidatorReward(reward uint64)
 	GetNotDistributedValidatorReward() (uint64, error)
+
+	// Deferred validator set
+
+	GetDeferredValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error)
+	PutDeferredValidator(staker *Staker)
+	DeleteDeferredValidator(staker *Staker)
+	GetDeferredStakerIterator() (StakerIterator, error)
 }
 
 // For state and diff
@@ -112,7 +122,7 @@ type CaminoState interface {
 
 	CaminoConfig() *CaminoConfig
 	SyncGenesis(*state, *genesis.State) error
-	Load() error
+	Load(*state) error
 	Write() error
 	Close() error
 }
@@ -123,6 +133,7 @@ type CaminoConfig struct {
 }
 
 type caminoDiff struct {
+	deferredStakerDiffs                   diffStakers
 	modifiedAddressStates                 map[ids.ShortID]uint64
 	modifiedDepositOffers                 map[ids.ID]*deposit.Offer
 	modifiedDeposits                      map[ids.ID]*deposit.Deposit
@@ -139,6 +150,11 @@ type caminoState struct {
 	genesisSynced       bool
 	verifyNodeSignature bool
 	lockModeBondDeposit bool
+
+	// Deferred Stakers
+	deferredStakers       *baseStakers
+	deferredValidatorsDB  database.Database
+	deferredValidatorList linkeddb.LinkedDB
 
 	// Address State
 	addressStateCache cache.Cacher
@@ -175,7 +191,7 @@ func newCaminoDiff() *caminoDiff {
 	}
 }
 
-func newCaminoState(baseDB *versiondb.Database, metricsReg prometheus.Registerer) (*caminoState, error) {
+func newCaminoState(baseDB *versiondb.Database, validatorsDB *prefixdb.Database, metricsReg prometheus.Registerer) (*caminoState, error) {
 	addressStateCache, err := metercacher.New(
 		"address_state_cache",
 		metricsReg,
@@ -204,6 +220,7 @@ func newCaminoState(baseDB *versiondb.Database, metricsReg prometheus.Registerer
 	}
 
 	depositOffersDB := prefixdb.New(depositOffersPrefix, baseDB)
+	deferredValidatorsDB := prefixdb.New(deferredPrefix, validatorsDB)
 
 	return &caminoState{
 		// Address State
@@ -228,6 +245,11 @@ func newCaminoState(baseDB *versiondb.Database, metricsReg prometheus.Registerer
 
 		//  Claimable & rewards
 		claimableDB: prefixdb.New(claimablesPrefix, baseDB),
+
+		// Deferred Stakers
+		deferredStakers:       newBaseStakers(),
+		deferredValidatorsDB:  deferredValidatorsDB,
+		deferredValidatorList: linkeddb.NewDefault(deferredValidatorsDB),
 
 		caminoDB:   prefixdb.New(caminoPrefix, baseDB),
 		caminoDiff: newCaminoDiff(),
@@ -416,7 +438,7 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 	return nil
 }
 
-func (cs *caminoState) Load() error {
+func (cs *caminoState) Load(s *state) error {
 	// Read the singletons
 	nodeSig, err := database.GetBool(cs.caminoDB, nodeSignatureKey)
 	if err != nil {
@@ -430,40 +452,33 @@ func (cs *caminoState) Load() error {
 	}
 	cs.lockModeBondDeposit = mode
 
-	return cs.loadDepositOffers()
+	errs := wrappers.Errs{}
+	errs.Add(
+		cs.loadDepositOffers(),
+		cs.loadDeferredValidators(s),
+	)
+	return errs.Err
 }
 
 func (cs *caminoState) Write() error {
+	errs := wrappers.Errs{}
 	// Write the singletons (only once after sync)
 	if cs.genesisSynced {
-		if err := database.PutBool(cs.caminoDB, nodeSignatureKey, cs.verifyNodeSignature); err != nil {
-			return fmt.Errorf("failed to write verifyNodeSignature: %w", err)
-		}
-		if err := database.PutBool(cs.caminoDB, depositBondModeKey, cs.lockModeBondDeposit); err != nil {
-			return fmt.Errorf("failed to write lockModeBondDeposit: %w", err)
-		}
+		errs.Add(
+			database.PutBool(cs.caminoDB, nodeSignatureKey, cs.verifyNodeSignature),
+			database.PutBool(cs.caminoDB, depositBondModeKey, cs.lockModeBondDeposit),
+		)
 	}
-
-	if err := cs.writeAddressStates(); err != nil {
-		return err
-	}
-	if err := cs.writeDepositOffers(); err != nil {
-		return err
-	}
-	if err := cs.writeDeposits(); err != nil {
-		return err
-	}
-	if err := cs.writeMultisigOwners(); err != nil {
-		return err
-	}
-	if err := cs.writeShortLinks(); err != nil {
-		return err
-	}
-	if err := cs.writeClaimableAndValidatorRewards(); err != nil {
-		return err
-	}
-
-	return nil
+	errs.Add(
+		cs.writeAddressStates(),
+		cs.writeDepositOffers(),
+		cs.writeDeposits(),
+		cs.writeMultisigOwners(),
+		cs.writeShortLinks(),
+		cs.writeClaimableAndValidatorRewards(),
+		cs.writeDeferredStakers(),
+	)
+	return errs.Err
 }
 
 func (cs *caminoState) Close() error {
@@ -476,6 +491,7 @@ func (cs *caminoState) Close() error {
 		cs.multisigOwnersDB.Close(),
 		cs.shortLinksDB.Close(),
 		cs.claimableDB.Close(),
+		cs.deferredValidatorsDB.Close(),
 	)
 	return errs.Err
 }
