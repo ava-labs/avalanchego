@@ -286,14 +286,9 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 	// adding blocks (validators and deposits)
 
 	for blockIndex, block := range g.Camino.Blocks {
-		// add unlocked utxos tx
-		tx, ok := block.UnlockedUTXOsTx.Unsigned.(*txs.BaseTx)
-		if !ok {
-			return errWrongTxType
-		}
-
-		if len(tx.Outs) > 0 {
-			s.AddTx(block.UnlockedUTXOsTx, status.Committed)
+		// add unlocked utxos txs
+		for _, tx := range block.UnlockedUTXOsTxs {
+			s.AddTx(tx, status.Committed)
 		}
 
 		// add validators

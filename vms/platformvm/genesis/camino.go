@@ -194,10 +194,10 @@ func (ma *MultisigAlias) Verify(txID ids.ID) error {
 }
 
 type Block struct {
-	Timestamp       uint64    `serialize:"true"`
-	Deposits        []*txs.Tx `serialize:"true"`
-	Validators      []*txs.Tx `serialize:"true"`
-	UnlockedUTXOsTx *txs.Tx   `serialize:"true"`
+	Timestamp        uint64    `serialize:"true"`
+	Deposits         []*txs.Tx `serialize:"true"`
+	Validators       []*txs.Tx `serialize:"true"`
+	UnlockedUTXOsTxs []*txs.Tx `serialize:"true"`
 }
 
 func (b *Block) Init() error {
@@ -211,8 +211,10 @@ func (b *Block) Init() error {
 			return err
 		}
 	}
-	if err := b.UnlockedUTXOsTx.Sign(txs.GenesisCodec, nil); err != nil {
-		return err
+	for _, tx := range b.UnlockedUTXOsTxs {
+		if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -226,8 +228,8 @@ func (b *Block) Time() time.Time {
 }
 
 func (b *Block) Txs() []*txs.Tx {
-	txs := make([]*txs.Tx, 0, len(b.Validators)+len(b.Deposits)+1)
+	txs := make([]*txs.Tx, 0, len(b.Validators)+len(b.Deposits)+len(b.UnlockedUTXOsTxs))
 	txs = append(txs, b.Validators...)
 	txs = append(txs, b.Deposits...)
-	return append(txs, b.UnlockedUTXOsTx)
+	return append(txs, b.UnlockedUTXOsTxs...)
 }

@@ -95,7 +95,7 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 		}
 
 		validatorBlockTimestamp := uint64(vdr.StartTime)
-		genesisBlock := getGenesisBlock(genesisBlocks, validatorBlockTimestamp, networkID)
+		genesisBlock := getGenesisBlock(genesisBlocks, validatorBlockTimestamp)
 		genesisBlock.Validators = append(genesisBlock.Validators, validatorTx)
 
 		consortiumMemberNodes[validatorIndex] = genesis.ConsortiumMemberNodeID{
@@ -135,7 +135,7 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 					return errors.New("validator timestamp is after validator's bond deposit timestamp")
 				}
 
-				genesisBlock := getGenesisBlock(genesisBlocks, blockTimestamp, networkID)
+				genesisBlock := getGenesisBlock(genesisBlocks, blockTimestamp)
 				genesisBlock.Deposits = append(genesisBlock.Deposits, depositTx)
 			}
 
@@ -177,12 +177,18 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 		}
 
 		blockTimestamp := startTimestamp + args.Camino.UTXODeposits[i].TimestampOffset
-		genesisBlock := getGenesisBlock(genesisBlocks, blockTimestamp, networkID)
+		genesisBlock := getGenesisBlock(genesisBlocks, blockTimestamp)
 
 		if depositTx != nil {
 			genesisBlock.Deposits = append(genesisBlock.Deposits, depositTx)
 		} else {
-			tx := genesisBlock.UnlockedUTXOsTx.Unsigned.(*txs.BaseTx)
+			if len(genesisBlock.UnlockedUTXOsTxs) == 0 {
+				genesisBlock.UnlockedUTXOsTxs = []*txs.Tx{{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    networkID,
+					BlockchainID: ids.Empty,
+				}}}}
+			}
+			tx := genesisBlock.UnlockedUTXOsTxs[0].Unsigned.(*txs.BaseTx)
 			tx.Outs = append(tx.Outs, &avax.TransferableOutput{
 				Asset: avax.Asset{ID: args.AvaxAssetID},
 				Out: &secp256k1fx.TransferOutput{
@@ -231,8 +237,10 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 	camino := args.Camino.ParseToGenesis()
 	camino.Blocks = make([]*genesis.Block, 0, len(genesisBlocks))
 	for _, genesisBlock := range genesisBlocks {
-		if err := genesisBlock.UnlockedUTXOsTx.Sign(txs.GenesisCodec, nil); err != nil {
-			return err
+		for _, tx := range genesisBlock.UnlockedUTXOsTxs {
+			if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
+				return err
+			}
 		}
 
 		camino.Blocks = append(camino.Blocks, genesisBlock)
@@ -457,16 +465,11 @@ func getSecpOwner(owner *Owner) (*secp256k1fx.OutputOwners, error) {
 	return outputOwners, nil
 }
 
-func getGenesisBlock(blocks map[uint64]*genesis.Block, timestamp uint64, networkID uint32) *genesis.Block {
+func getGenesisBlock(blocks map[uint64]*genesis.Block, timestamp uint64) *genesis.Block {
 	block, ok := blocks[timestamp]
 	if !ok {
 		block = &genesis.Block{
 			Timestamp: timestamp,
-			// need this tx even if there will be no unlocked utxos, because we can't marshal nil
-			UnlockedUTXOsTx: &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
-				NetworkID:    networkID,
-				BlockchainID: ids.Empty,
-			}}},
 		}
 		blocks[timestamp] = block
 	}
