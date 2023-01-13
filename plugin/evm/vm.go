@@ -108,13 +108,14 @@ var (
 )
 
 var (
-	errEmptyBlock               = errors.New("empty block")
-	errUnsupportedFXs           = errors.New("unsupported feature extensions")
-	errInvalidBlock             = errors.New("invalid block")
-	errInvalidNonce             = errors.New("invalid nonce")
-	errUnclesUnsupported        = errors.New("uncles unsupported")
-	errNilBaseFeeSubnetEVM      = errors.New("nil base fee is invalid after subnetEVM")
-	errNilBlockGasCostSubnetEVM = errors.New("nil blockGasCost is invalid after subnetEVM")
+	errEmptyBlock                 = errors.New("empty block")
+	errUnsupportedFXs             = errors.New("unsupported feature extensions")
+	errInvalidBlock               = errors.New("invalid block")
+	errInvalidNonce               = errors.New("invalid nonce")
+	errUnclesUnsupported          = errors.New("uncles unsupported")
+	errNilBaseFeeSubnetEVM        = errors.New("nil base fee is invalid after subnetEVM")
+	errNilBlockGasCostSubnetEVM   = errors.New("nil blockGasCost is invalid after subnetEVM")
+	errSubnetEVMUpgradeNotEnabled = errors.New("SubnetEVM upgrade is not enabled in genesis")
 )
 
 var originalStderr *os.File
@@ -368,6 +369,13 @@ func (vm *VM) Initialize(
 
 	vm.chainConfig = g.Config
 	vm.networkID = vm.ethConfig.NetworkId
+
+	if !vm.config.SkipSubnetEVMUpgradeCheck {
+		// check that subnetEVM upgrade is enabled from genesis before upgradeBytes
+		if !vm.chainConfig.IsSubnetEVM(common.Big0) {
+			return errSubnetEVMUpgradeNotEnabled
+		}
+	}
 
 	// Apply upgradeBytes (if any) by unmarshalling them into [chainConfig.UpgradeConfig].
 	// Initializing the chain will verify upgradeBytes are compatible with existing values.
